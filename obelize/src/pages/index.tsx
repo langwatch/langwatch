@@ -72,7 +72,7 @@ function AuthShowcase() {
       </p>
       <button
         className={styles.loginButton}
-        onClick={sessionData ? () => void signOut() : () => void signIn()}
+        onClick={sessionData ? () => void signOut() : () => void signIn("auth0")}
       >
         {sessionData ? "Sign out" : "Sign in"}
       </button>
