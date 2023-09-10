@@ -14,3 +14,15 @@ a {
 * {
   box-sizing: border-box;
 }
+
+.debug {
+  border: 2px solid red;
+
+  & > * {
+    border: 2px dashed blue;
+
+    & > * {
+      border: 2px solid green;
+    }
+  }
+}
