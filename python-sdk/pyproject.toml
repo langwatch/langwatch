@@ -1,0 +1,46 @@
+[tool.poetry]
+name = "langwatch"
+version = "0.0.1"
+description = "Python SDK for LangWatch for monitoring your LLMs"
+authors = ["Rogerio Chaves <rogeriocfj@gmail.com>"]
+homepage = "https://github.com/langwatch/langwatch"
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+license = "MIT"
+readme = "README.md"
+
+[tool.poetry.urls]
+"Documentation" = "https://langwatch.ai/docs"
+"Source Code" = "https://github.com/langwatch/langwatch"
+"Issue Tracker" = "https://github.com/langwatch/langwatch/issues"
+
+[tool.poetry.dependencies]
+python = "^3.9"
+nanoid = "^2.0.0"
+requests = "^2.31.0"
+
+openai = { version = "*", optional = true }
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^7.4.2"
+
+[tool.poetry.group.test.dependencies]
+pytest = "^7.4.2"
+requests-mock = "^1.11.0"
+
+[tool.poetry.extras]
+openai = ["openai"]
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
