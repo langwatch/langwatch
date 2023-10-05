@@ -1,29 +1,40 @@
 from datetime import datetime
-from typing import List
-import nanoid
+from typing import Any
 import openai
-from contextlib import contextmanager
+from langwatch.tracer import BaseTracer
 
-from langwatch.tracer import send_steps
 from langwatch.types import StepInput, StepMetrics, StepOutput, StepParams, StepTrace
 from langwatch.utils import safe_get
 
 
-@contextmanager
-def trace():
-    trace_id = f"trace_{nanoid.generate()}"
+class OpenAITracer(BaseTracer):
+    def __enter__(self):
+        super().__enter__()
+        self._original_completion_create = openai.Completion.create
+        self._original_completion_acreate = openai.Completion.acreate
 
-    # TODO: consider async acreate
-    _original_completion_create = openai.Completion.create
+        def patched_completion_create(*args, **kwargs):
+            # TODO: consider streaming
+            response: dict = self._original_completion_create(*args, **kwargs)
+            self.handle_response(response, **kwargs)
+            return response
 
-    steps: List[StepTrace] = []
+        async def patched_completion_acreate(*args, **kwargs):
+            # TODO: consider streaming
+            response: dict = await self._original_completion_acreate(*args, **kwargs)
+            self.handle_response(response, **kwargs)
+            return response
 
-    def patched_completion_create(*args, **kwargs):
-        # TODO: consider streaming
-        response: dict = _original_completion_create(*args, **kwargs)
+        openai.Completion.create = patched_completion_create
+        openai.Completion.acreate = patched_completion_acreate
 
-        step_trace = StepTrace(
-            trace_id=trace_id,
+    def __exit__(self, _type, _value, _traceback):
+        super().__exit__(_type, _value, _traceback)
+        openai.Completion.create = self._original_completion_create
+
+    def map_response(self, response: Any, **kwargs) -> StepTrace:
+        return StepTrace(
+            trace_id=self.trace_id,
             model=f"openai/{kwargs.get('model') or 'unknown'}",
             input=StepInput(type="text", value=kwargs.get("prompt") or ""),
             outputs=[
@@ -38,14 +49,3 @@ def trace():
             ),
             requested_at=int(datetime.now().timestamp()),
         )
-        steps.append(step_trace)
-
-        return response
-
-    openai.Completion.create = patched_completion_create
-
-    yield
-
-    send_steps(steps)
-
-    openai.Completion.create = _original_completion_create

@@ -1,3 +1,4 @@
+import asyncio
 from datetime import datetime
 import time
 from freezegun import freeze_time
@@ -22,7 +23,7 @@ def test_trace_session_captures_openai_calls():
     ), requests_mock.Mocker() as mock_request:
         mock_request.post(langwatch.endpoint, json={})
 
-        with langwatch.openai.trace():
+        with langwatch.openai.OpenAITracer():
             openai.Completion.create(model="babbage-002", prompt="hi")
             openai.Completion.create(model="babbage-002", prompt="foo")
 
@@ -37,23 +38,19 @@ def test_trace_session_captures_openai_calls():
                 "value": " there",
             }
         ]
-        assert first_step["raw_response"] == create_openai_completion_mock(
-            " there"
-        )
+        assert first_step["raw_response"] == create_openai_completion_mock(" there")
         assert first_step["params"] == {"temperature": 1}
         assert first_step["metrics"] == {
             "prompt_tokens": 5,
             "completion_tokens": 16,
         }
         # TODO: timing metrics
-        assert first_step["requested_at"] == int(
-            datetime(2022, 1, 1, 0, 0).timestamp()
-        )
+        assert first_step["requested_at"] == int(datetime(2022, 1, 1, 0, 0).timestamp())
 
         second_step = mock_request.request_history[0].json()["steps"][1]
         assert second_step["trace_id"] == first_step["trace_id"]
 
-        with langwatch.openai.trace():
+        with langwatch.openai.OpenAITracer():
             openai.Completion.create(model="babbage-002", prompt="we will we will rock")
             openai.Completion.create(model="babbage-002", prompt="heey hey baby uh")
 
@@ -63,6 +60,30 @@ def test_trace_session_captures_openai_calls():
 
         fourth_step = mock_request.request_history[1].json()["steps"][1]
         assert fourth_step["trace_id"] == third_step["trace_id"]
+
+
+@pytest.mark.asyncio
+async def test_trace_session_captures_openai_async_calls():
+    with patch.object(
+        openai.Completion,
+        "acreate",
+        side_effect=[
+            create_openai_completion_mock(" there"),
+        ],
+    ), requests_mock.Mocker() as mock_request:
+        mock_request.post(langwatch.endpoint, json={})
+
+        with langwatch.openai.OpenAITracer():
+            await openai.Completion.acreate(model="babbage-002", prompt="hi")
+
+        await asyncio.sleep(0.1)
+        first_step = mock_request.request_history[0].json()["steps"][0]
+        assert first_step["outputs"] == [
+            {
+                "type": "text",
+                "value": " there",
+            }
+        ]
 
 
 def create_openai_completion_mock(text):
