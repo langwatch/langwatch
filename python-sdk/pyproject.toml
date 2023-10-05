@@ -30,6 +30,7 @@ nanoid = "^2.0.0"
 requests = "^2.31.0"
 
 openai = { version = "*", optional = true }
+retry = "^0.9.2"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.4.2"
@@ -37,6 +38,7 @@ pytest = "^7.4.2"
 [tool.poetry.group.test.dependencies]
 pytest = "^7.4.2"
 requests-mock = "^1.11.0"
+freezegun = "^1.2.2"
 
 [tool.poetry.extras]
 openai = ["openai"]
