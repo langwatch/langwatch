@@ -13,30 +13,35 @@ class OpenAICompletionTracer(BaseTracer):
         self._original_completion_create = openai.Completion.create
         self._original_completion_acreate = openai.Completion.acreate
 
+        def reyield_and_handle(response, **kwargs):
+            deltas = []
+            for chunk in response:
+                deltas.append(chunk)
+                yield chunk
+            self.handle_deltas(deltas, **kwargs)
+
         def patched_completion_create(*args, **kwargs):
             response = self._original_completion_create(*args, **kwargs)
             if isinstance(response, Generator):
-                deltas = []
-                for chunk in response:
-                    deltas.append(chunk)
-                    # TODO: yield? TEST THIS
-                self.handle_deltas(deltas, **kwargs)
+                return reyield_and_handle(response, **kwargs)
             else:
                 self.handle_list_or_dict(response, **kwargs)
-            return response # TODO: test this
+                return response
+
+        async def async_reyield_and_handle(response, **kwargs):
+            deltas = []
+            async for chunk in response:
+                deltas.append(chunk)
+                yield chunk
+            self.handle_deltas(deltas, **kwargs)
 
         async def patched_completion_acreate(*args, **kwargs):
-            # TODO: consider streaming
             response = await self._original_completion_acreate(*args, **kwargs)
             if isinstance(response, AsyncGenerator):
-                deltas = []
-                async for chunk in response:
-                    deltas.append(chunk)
-                    # TODO: yield? TEST THIS
-                self.handle_deltas(deltas, **kwargs)
+                return async_reyield_and_handle(response, **kwargs)
             else:
                 self.handle_list_or_dict(response, **kwargs)
-            return response # TODO: test this
+                return response
 
         openai.Completion.create = patched_completion_create
         openai.Completion.acreate = patched_completion_acreate
@@ -59,6 +64,7 @@ class OpenAICompletionTracer(BaseTracer):
                 ],
                 # TODO: timings
                 metrics=StepMetrics(),
+                **kwargs,
             )
         )
 
@@ -95,7 +101,10 @@ class OpenAICompletionTracer(BaseTracer):
             input=StepInput(type="text", value=kwargs.get("prompt") or ""),
             outputs=outputs,
             raw_response=raw_response,
-            params=StepParams(temperature=(kwargs.get("temperature") or 1.0)),
+            params=StepParams(
+                temperature=kwargs.get("temperature", 1.0),
+                stream=kwargs.get("stream", False),
+            ),
             # TODO: timings
             metrics=metrics,
             requested_at=int(datetime.now().timestamp()),

@@ -18,6 +18,7 @@ class StepMetrics(TypedDict, total=False):
 
 class StepParams(TypedDict, total=False):
     temperature: float
+    stream: bool
 
 
 class StepTrace(TypedDict):

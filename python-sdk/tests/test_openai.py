@@ -11,21 +11,28 @@ import requests_mock
 
 @freeze_time("2022-01-01")
 def test_trace_session_captures_openai_calls():
+    openai_mocks = [
+        create_openai_completion_mock(" there"),
+        create_openai_completion_mock(" bar"),
+        create_openai_completion_mock(" you!"),
+        create_openai_completion_mock(" ah!"),
+    ]
     with patch.object(
         openai.Completion,
         "create",
-        side_effect=[
-            create_openai_completion_mock(" there"),
-            create_openai_completion_mock(" bar"),
-            create_openai_completion_mock(" you!"),
-            create_openai_completion_mock(" ah!"),
-        ],
+        side_effect=openai_mocks,
     ), requests_mock.Mocker() as mock_request:
         mock_request.post(langwatch.endpoint, json={})
 
         with langwatch.openai.OpenAICompletionTracer():
-            openai.Completion.create(model="gpt-3.5-turbo-instruct", prompt="hi")
-            openai.Completion.create(model="gpt-3.5-turbo-instruct", prompt="foo")
+            response = openai.Completion.create(
+                model="gpt-3.5-turbo-instruct", prompt="hi"
+            )
+            assert response == openai_mocks[0]
+            response = openai.Completion.create(
+                model="gpt-3.5-turbo-instruct", prompt="foo"
+            )
+            assert response == openai_mocks[1]
 
         time.sleep(0.1)
         first_step = mock_request.request_history[0].json()["steps"][0]
@@ -38,8 +45,8 @@ def test_trace_session_captures_openai_calls():
                 "value": " there",
             }
         ]
-        assert first_step["raw_response"] == create_openai_completion_mock(" there")
-        assert first_step["params"] == {"temperature": 1}
+        assert first_step["raw_response"] == openai_mocks[0]
+        assert first_step["params"] == {"temperature": 1, "stream": False}
         assert first_step["metrics"] == {
             "prompt_tokens": 5,
             "completion_tokens": 16,
@@ -68,17 +75,21 @@ def test_trace_session_captures_openai_calls():
 
 @pytest.mark.asyncio
 async def test_trace_session_captures_openai_async_calls():
+    openai_mocks = [
+        create_openai_completion_mock(" there"),
+    ]
     with patch.object(
         openai.Completion,
         "acreate",
-        side_effect=[
-            create_openai_completion_mock(" there"),
-        ],
+        side_effect=openai_mocks,
     ), requests_mock.Mocker() as mock_request:
         mock_request.post(langwatch.endpoint, json={})
 
         with langwatch.openai.OpenAICompletionTracer():
-            await openai.Completion.acreate(model="gpt-3.5-turbo-instruct", prompt="hi")
+            response = await openai.Completion.acreate(
+                model="gpt-3.5-turbo-instruct", prompt="hi"
+            )
+            assert response == openai_mocks[0]
 
         await asyncio.sleep(0.1)
         first_step = mock_request.request_history[0].json()["steps"][0]
@@ -103,9 +114,13 @@ def test_trace_session_captures_openai_streams():
         mock_request.post(langwatch.endpoint, json={})
 
         with langwatch.openai.OpenAICompletionTracer():
-            openai.Completion.create(
+            response = openai.Completion.create(
                 model="gpt-3.5-turbo-instruct", prompt="hi", stream=True, n=2
             )
+            texts = []
+            for chunk in response:
+                texts.append(chunk.get("choices")[0].get("text"))  # type: ignore
+            assert texts == [" there", " all", " good?", " how", " are", " you"]
 
         time.sleep(1)
         first_step = mock_request.request_history[0].json()["steps"][0]
@@ -119,6 +134,8 @@ def test_trace_session_captures_openai_streams():
                 "value": " how are you",
             },
         ]
+        assert first_step["model"] == "openai/gpt-3.5-turbo-instruct"
+        assert first_step["params"] == {"temperature": 1, "stream": True}
 
 
 @pytest.mark.asyncio
@@ -135,9 +152,13 @@ async def test_trace_session_captures_openai_async_streams():
         mock_request.post(langwatch.endpoint, json={})
 
         with langwatch.openai.OpenAICompletionTracer():
-            await openai.Completion.acreate(
+            response = await openai.Completion.acreate(
                 model="gpt-3.5-turbo-instruct", prompt="hi", stream=True, n=2
             )
+            texts = []
+            async for chunk in response: # type: ignore
+                texts.append(chunk.get("choices")[0].get("text"))  # type: ignore
+            assert texts == [" there", " all", " good?", " how", " are", " you"]
 
         time.sleep(1)
         first_step = mock_request.request_history[0].json()["steps"][0]
@@ -151,6 +172,8 @@ async def test_trace_session_captures_openai_async_streams():
                 "value": " how are you",
             },
         ]
+        assert first_step["model"] == "openai/gpt-3.5-turbo-instruct"
+        assert first_step["params"] == {"temperature": 1, "stream": True}
 
 
 def create_openai_completion_mock(text):
@@ -176,10 +199,12 @@ def create_openai_completion_stream_mock(*text_groups):
         for text in texts:
             yield create_openai_completion_chunk(index, text)
 
+
 async def create_openai_completion_async_stream_mock(*text_groups):
     for index, texts in enumerate(text_groups):
         for text in texts:
             yield create_openai_completion_chunk(index, text)
+
 
 def create_openai_completion_chunk(index, text):
     return {
