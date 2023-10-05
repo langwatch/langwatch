@@ -1,4 +1,4 @@
-from typing import Any, List
+from typing import Any, Callable, List, TypeVar
 import nanoid
 import requests
 from concurrent.futures import ThreadPoolExecutor
@@ -7,6 +7,7 @@ from retry import retry
 import langwatch
 from langwatch.types import StepTrace
 
+T = TypeVar("T")
 
 class BaseTracer:
     def __init__(self):
@@ -18,13 +19,6 @@ class BaseTracer:
 
     def __exit__(self, _type, _value, _traceback):
         send_steps(self.steps)
-
-    def handle_response(self, response: Any, **kwargs):
-        self.steps.append(self.map_response(response, **kwargs))
-
-    def map_response(self, response: Any, **kwargs) -> StepTrace:
-        raise NotImplementedError
-
 
 executor = ThreadPoolExecutor(max_workers=10)
 

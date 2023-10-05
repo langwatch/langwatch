@@ -11,7 +11,7 @@ class StepOutput(TypedDict):
     value: str
 
 
-class StepMetrics(TypedDict):
+class StepMetrics(TypedDict, total=False):
     prompt_tokens: Optional[int]
     completion_tokens: Optional[int]
 
