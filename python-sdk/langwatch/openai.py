@@ -85,9 +85,11 @@ class OpenAICompletionTracer(BaseTracer):
         timestamps: StepTimestamps,
         **kwargs,
     ):
+        raw_response = []
         text_outputs: Dict[int, str] = {}
         for delta in deltas:
             delta = cast(Dict[Any, Any], delta)
+            raw_response.append(delta)
             for choice in delta.get("choices", []):
                 index = choice.get("index", 0)
                 text_outputs[index] = text_outputs.get(index, "") + choice.get(
@@ -96,7 +98,7 @@ class OpenAICompletionTracer(BaseTracer):
 
         self.steps.append(
             self.build_trace(
-                raw_response={},  # TODO
+                raw_response=raw_response,
                 outputs=[
                     StepOutput(type="text", value=output)
                     for output in text_outputs.values()

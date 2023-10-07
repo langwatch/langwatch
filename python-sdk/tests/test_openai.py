@@ -150,6 +150,14 @@ def test_trace_session_captures_openai_streams():
         assert first_step["timestamps"]["finished_at"] == int(
             datetime(2022, 1, 1, 0, 0, 30).timestamp() * 1000
         )
+        assert first_step["raw_response"] == [
+            create_openai_completion_chunk(0, " there"),
+            create_openai_completion_chunk(0, " all"),
+            create_openai_completion_chunk(0, " good?"),
+            create_openai_completion_chunk(1, " how"),
+            create_openai_completion_chunk(1, " are"),
+            create_openai_completion_chunk(1, " you"),
+        ]
 
 
 @pytest.mark.asyncio
@@ -220,7 +228,7 @@ async def create_openai_completion_async_stream_mock(*text_groups):
             yield create_openai_completion_chunk(index, text)
 
 
-def create_openai_completion_chunk(index, text):
+def create_openai_completion_chunk(index: int, text: str):
     return {
         "id": "cmpl-86MtN6iz0JSSIiLAesNKKqyDtKcZO",
         "object": "text_completion",
