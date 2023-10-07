@@ -1,4 +1,5 @@
 import time
+import traceback
 from typing import (
     Any,
     AsyncGenerator,
@@ -10,6 +11,8 @@ from typing import (
     Tuple,
     TypeVar,
 )
+
+from langwatch.types import ErrorCapture
 
 T = TypeVar("T")
 
@@ -54,3 +57,10 @@ async def capture_async_chunks_with_timings_and_reyield(
         yield chunk
     finished_at = milliseconds_timestamp()
     callback(chunks, first_token_at, finished_at)
+
+
+def capture_exception(err: Exception):
+    string_stacktrace = traceback.format_exception(
+        etype=type(err), value=err, tb=err.__traceback__
+    )
+    return ErrorCapture(message=str(err), stacktrace=string_stacktrace)

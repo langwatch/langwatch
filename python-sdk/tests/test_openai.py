@@ -77,6 +77,23 @@ def test_trace_session_captures_openai_calls():
         assert fourth_step["trace_id"] == third_step["trace_id"]
 
 
+def test_trace_session_captures_exceptions():
+    with patch.object(
+        openai.Completion, "create", side_effect=Exception("An error occurred!")
+    ), requests_mock.Mocker() as mock_request:
+        mock_request.post(langwatch.endpoint, json={})
+
+        with pytest.raises(Exception) as err:
+            with langwatch.openai.OpenAICompletionTracer():
+                openai.Completion.create(model="gpt-3.5-turbo-instruct", prompt="hi")
+        assert str(err.value) == "An error occurred!"
+
+        time.sleep(0.1)
+        traced = mock_request.request_history[0].json()["steps"][0]
+        assert traced["error"]["message"] == "An error occurred!"
+        assert len(traced["error"]["stacktrace"]) > 0
+
+
 @pytest.mark.asyncio
 async def test_trace_session_captures_openai_async_calls():
     openai_mocks = [

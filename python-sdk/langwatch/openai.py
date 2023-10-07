@@ -3,9 +3,11 @@ import openai
 from langwatch.tracer import BaseTracer
 
 from langwatch.types import (
+    ErrorCapture,
     StepInput,
     StepMetrics,
     StepOutput,
+    StepOutputText,
     StepParams,
     StepTimestamps,
     StepTrace,
@@ -13,6 +15,7 @@ from langwatch.types import (
 from langwatch.utils import (
     capture_async_chunks_with_timings_and_reyield,
     capture_chunks_with_timings_and_reyield,
+    capture_exception,
     milliseconds_timestamp,
     safe_get,
 )
@@ -26,29 +29,40 @@ class OpenAICompletionTracer(BaseTracer):
 
         def patched_completion_create(*args, **kwargs):
             requested_at = milliseconds_timestamp()
-            response = self._original_completion_create(*args, **kwargs)
+            try:
+                response = self._original_completion_create(*args, **kwargs)
 
-            if isinstance(response, Generator):
-                return capture_chunks_with_timings_and_reyield(
-                    response,
-                    lambda chunks, first_token_at, finished_at: self.handle_deltas(
-                        chunks,
+                if isinstance(response, Generator):
+                    return capture_chunks_with_timings_and_reyield(
+                        response,
+                        lambda chunks, first_token_at, finished_at: self.handle_deltas(
+                            chunks,
+                            StepTimestamps(
+                                requested_at=requested_at,
+                                first_token_at=first_token_at,
+                                finished_at=finished_at,
+                            ),
+                            **kwargs,
+                        ),
+                    )
+                else:
+                    finished_at = milliseconds_timestamp()
+                    self.handle_list_or_dict(
+                        response,
                         StepTimestamps(
-                            requested_at=requested_at,
-                            first_token_at=first_token_at,
-                            finished_at=finished_at,
+                            requested_at=requested_at, finished_at=finished_at
                         ),
                         **kwargs,
-                    ),
-                )
-            else:
+                    )
+                    return response
+            except Exception as err:
                 finished_at = milliseconds_timestamp()
-                self.handle_list_or_dict(
-                    response,
+                self.handle_exception(
+                    err,
                     StepTimestamps(requested_at=requested_at, finished_at=finished_at),
                     **kwargs,
                 )
-                return response
+                raise err
 
         async def patched_completion_acreate(*args, **kwargs):
             requested_at = milliseconds_timestamp()
@@ -100,11 +114,12 @@ class OpenAICompletionTracer(BaseTracer):
             self.build_trace(
                 raw_response=raw_response,
                 outputs=[
-                    StepOutput(type="text", value=output)
+                    StepOutputText(type="text", value=output)
                     for output in text_outputs.values()
                 ],
                 metrics=StepMetrics(),
                 timestamps=timestamps,
+                error=None,
                 **kwargs,
             )
         )
@@ -121,7 +136,7 @@ class OpenAICompletionTracer(BaseTracer):
                 self.build_trace(
                     raw_response=response,
                     outputs=[
-                        StepOutput(type="text", value=output.get("text"))
+                        StepOutputText(type="text", value=output.get("text"))
                         for output in response.get("choices", [])
                     ],
                     metrics=StepMetrics(
@@ -131,16 +146,35 @@ class OpenAICompletionTracer(BaseTracer):
                         ),
                     ),
                     timestamps=timestamps,
+                    error=None,
                     **kwargs,
                 )
             )
 
+    def handle_exception(
+        self,
+        err: Exception,
+        timestamps: StepTimestamps,
+        **kwargs,
+    ):
+        self.steps.append(
+            self.build_trace(
+                raw_response=None,
+                outputs=[],
+                metrics=StepMetrics(),
+                timestamps=timestamps,
+                error=capture_exception(err),
+                **kwargs,
+            )
+        )
+
     def build_trace(
         self,
-        raw_response: Any,
+        raw_response: Optional[Union[dict, list]],
         outputs: List[StepOutput],
         metrics: StepMetrics,
         timestamps: StepTimestamps,
+        error: Optional[ErrorCapture],
         **kwargs,
     ) -> StepTrace:
         return StepTrace(
@@ -149,6 +183,7 @@ class OpenAICompletionTracer(BaseTracer):
             input=StepInput(type="text", value=kwargs.get("prompt") or ""),
             outputs=outputs,
             raw_response=raw_response,
+            error=error,
             params=StepParams(
                 temperature=kwargs.get("temperature", 1.0),
                 stream=kwargs.get("stream", False),

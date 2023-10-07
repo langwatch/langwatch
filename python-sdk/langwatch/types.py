@@ -1,4 +1,4 @@
-from typing import List, Literal, Optional, TypedDict
+from typing import List, Literal, Optional, TypedDict, Union
 
 
 class StepInput(TypedDict):
@@ -6,9 +6,17 @@ class StepInput(TypedDict):
     value: str
 
 
-class StepOutput(TypedDict):
+class StepOutputText(TypedDict):
     type: Literal["text"]
     value: str
+
+
+class ErrorCapture(TypedDict):
+    message: str
+    stacktrace: List[str]
+
+
+StepOutput = StepOutputText
 
 
 class StepMetrics(TypedDict, total=False):
@@ -32,7 +40,8 @@ class StepTrace(TypedDict):
     model: str
     input: StepInput
     outputs: List[StepOutput]
-    raw_response: dict
+    raw_response: Optional[Union[dict, list]]
+    error: Optional[ErrorCapture]
     params: StepParams
     metrics: StepMetrics
     timestamps: StepTimestamps
