@@ -23,3 +23,10 @@ You can run tests with
 ```
 make test
 ```
+
+# Running examples
+
+```
+cd examples
+chainlit run openai_bot.py -w
+```

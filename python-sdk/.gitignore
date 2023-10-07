@@ -3,3 +3,5 @@ build
 dist
 .pytest_cache
 .venv
+examples/.chainlit
+examples/chainlit.md

@@ -1,4 +1,4 @@
-from typing import Any, Callable, List, TypeVar
+from typing import List, TypeVar
 import nanoid
 import requests
 from concurrent.futures import ThreadPoolExecutor

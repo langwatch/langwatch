@@ -1,14 +1,20 @@
 from typing import List, Literal, Optional, TypedDict, Union
 
 
-class StepInput(TypedDict):
+class TypedValueText(TypedDict):
     type: Literal["text"]
     value: str
 
 
-class StepOutputText(TypedDict):
-    type: Literal["text"]
-    value: str
+class ChatMessage(TypedDict, total=False):
+    role: Literal["system", "user", "assistant", "function"]
+    content: str
+    name: Optional[str]
+
+
+class TypedValueChatMessages(TypedDict):
+    type: Literal["chat_messages"]
+    value: List[ChatMessage]
 
 
 class ErrorCapture(TypedDict):
@@ -16,7 +22,9 @@ class ErrorCapture(TypedDict):
     stacktrace: List[str]
 
 
-StepOutput = StepOutputText
+StepInput = Union[TypedValueText, TypedValueChatMessages]
+
+StepOutput = Union[TypedValueText, TypedValueChatMessages]
 
 
 class StepMetrics(TypedDict, total=False):
