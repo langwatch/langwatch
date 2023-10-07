@@ -27,49 +27,20 @@ class OpenAICompletionTracer(BaseTracer):
         self._original_completion_create = openai.Completion.create
         self._original_completion_acreate = openai.Completion.acreate
 
-        def patched_completion_create(*args, **kwargs):
-            requested_at = milliseconds_timestamp()
-            try:
-                response = self._original_completion_create(*args, **kwargs)
+        openai.Completion.create = self.patched_completion_create
+        openai.Completion.acreate = self.patched_completion_acreate
 
-                if isinstance(response, Generator):
-                    return capture_chunks_with_timings_and_reyield(
-                        response,
-                        lambda chunks, first_token_at, finished_at: self.handle_deltas(
-                            chunks,
-                            StepTimestamps(
-                                requested_at=requested_at,
-                                first_token_at=first_token_at,
-                                finished_at=finished_at,
-                            ),
-                            **kwargs,
-                        ),
-                    )
-                else:
-                    finished_at = milliseconds_timestamp()
-                    self.handle_list_or_dict(
-                        response,
-                        StepTimestamps(
-                            requested_at=requested_at, finished_at=finished_at
-                        ),
-                        **kwargs,
-                    )
-                    return response
-            except Exception as err:
-                finished_at = milliseconds_timestamp()
-                self.handle_exception(
-                    err,
-                    StepTimestamps(requested_at=requested_at, finished_at=finished_at),
-                    **kwargs,
-                )
-                raise err
+    def __exit__(self, _type, _value, _traceback):
+        super().__exit__(_type, _value, _traceback)
+        openai.Completion.create = self._original_completion_create
 
-        async def patched_completion_acreate(*args, **kwargs):
-            requested_at = milliseconds_timestamp()
-            response = await self._original_completion_acreate(*args, **kwargs)
+    def patched_completion_create(self, *args, **kwargs):
+        requested_at = milliseconds_timestamp()
+        try:
+            response = self._original_completion_create(*args, **kwargs)
 
-            if isinstance(response, AsyncGenerator):
-                return capture_async_chunks_with_timings_and_reyield(
+            if isinstance(response, Generator):
+                return capture_chunks_with_timings_and_reyield(
                     response,
                     lambda chunks, first_token_at, finished_at: self.handle_deltas(
                         chunks,
@@ -89,9 +60,40 @@ class OpenAICompletionTracer(BaseTracer):
                     **kwargs,
                 )
                 return response
+        except Exception as err:
+            finished_at = milliseconds_timestamp()
+            self.handle_exception(
+                err,
+                StepTimestamps(requested_at=requested_at, finished_at=finished_at),
+                **kwargs,
+            )
+            raise err
 
-        openai.Completion.create = patched_completion_create
-        openai.Completion.acreate = patched_completion_acreate
+    async def patched_completion_acreate(self, *args, **kwargs):
+        requested_at = milliseconds_timestamp()
+        response = await self._original_completion_acreate(*args, **kwargs)
+
+        if isinstance(response, AsyncGenerator):
+            return capture_async_chunks_with_timings_and_reyield(
+                response,
+                lambda chunks, first_token_at, finished_at: self.handle_deltas(
+                    chunks,
+                    StepTimestamps(
+                        requested_at=requested_at,
+                        first_token_at=first_token_at,
+                        finished_at=finished_at,
+                    ),
+                    **kwargs,
+                ),
+            )
+        else:
+            finished_at = milliseconds_timestamp()
+            self.handle_list_or_dict(
+                response,
+                StepTimestamps(requested_at=requested_at, finished_at=finished_at),
+                **kwargs,
+            )
+            return response
 
     def handle_deltas(
         self,
@@ -191,7 +193,3 @@ class OpenAICompletionTracer(BaseTracer):
             metrics=metrics,
             timestamps=timestamps,
         )
-
-    def __exit__(self, _type, _value, _traceback):
-        super().__exit__(_type, _value, _traceback)
-        openai.Completion.create = self._original_completion_create
