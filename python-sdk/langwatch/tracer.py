@@ -1,4 +1,4 @@
-from typing import List, TypeVar
+from typing import List, Optional, TypeVar
 import nanoid
 import requests
 from concurrent.futures import ThreadPoolExecutor
@@ -9,16 +9,19 @@ from langwatch.types import StepTrace
 
 T = TypeVar("T")
 
+
 class BaseTracer:
-    def __init__(self):
+    def __init__(self, trace_id: Optional[str] = None):
         self.steps: List[StepTrace] = []
-        self.trace_id = f"trace_{nanoid.generate()}"
+        self.trace_id = trace_id or f"trace_{nanoid.generate()}"
 
     def __enter__(self):
         pass
 
     def __exit__(self, _type, _value, _traceback):
-        send_steps(self.steps)
+        if len(self.steps) > 0:
+            send_steps(self.steps)
+
 
 executor = ThreadPoolExecutor(max_workers=10)
 

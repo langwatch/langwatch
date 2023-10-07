@@ -13,7 +13,7 @@ async def main(message: str):
         content="",
     )
 
-    with langwatch.openai.OpenAIChatCompletionTracer():
+    with langwatch.OpenAITracer():
         completion = openai.ChatCompletion.create(
             model="gpt-3.5-turbo",
             messages=[

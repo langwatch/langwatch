@@ -448,6 +448,32 @@ class TestOpenAIChatCompletionTracer:
             assert first_step["params"] == {"temperature": 1, "stream": True}
 
 
+class TestOpenAITracer:
+    def test_traces_both_completion_and_chat_completion(self):
+        with patch.object(
+            openai.Completion,
+            "create",
+            side_effect=[create_openai_completion_mock("foo")],
+        ), patch.object(
+            openai.ChatCompletion,
+            "create",
+            side_effect=[create_openai_chat_completion_mock("bar")],
+        ), requests_mock.Mocker() as mock_request:
+            with langwatch.openai.OpenAITracer():
+                openai.Completion.create(
+                    model="gpt-3.5-turbo-instruct", prompt="Hello Completion!"
+                )
+                openai.ChatCompletion.create(
+                    model="gpt-3.5-turbo",
+                    messages=[{"role": "user", "content": "Hello ChatCompletion!"}],
+                )
+
+            time.sleep(0.1)
+            first_step = mock_request.request_history[0].json()["steps"][0]
+            second_step = mock_request.request_history[1].json()["steps"][0]
+            assert first_step["trace_id"] == second_step["trace_id"]
+
+
 def create_openai_completion_mock(text):
     return {
         "id": "cmpl-861BvC6rh12Y1hrk8ml1BaQPJP0mE",

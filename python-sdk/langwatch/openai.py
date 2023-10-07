@@ -5,7 +5,6 @@ from langwatch.tracer import BaseTracer
 from langwatch.types import (
     ChatMessage,
     ErrorCapture,
-    StepInput,
     StepMetrics,
     StepOutput,
     TypedValueChatMessages,
@@ -21,6 +20,28 @@ from langwatch.utils import (
     milliseconds_timestamp,
     safe_get,
 )
+
+
+class OpenAITracer(BaseTracer):
+    """
+    Tracing for both Completion and ChatCompletion endpoints
+    """
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if "trace_id" not in kwargs:
+            kwargs["trace_id"] = self.trace_id
+        self.completion_tracer = OpenAICompletionTracer(*args, **kwargs)
+        self.chat_completion_tracer = OpenAIChatCompletionTracer(*args, **kwargs)
+
+    def __enter__(self):
+        super().__enter__()
+        self.completion_tracer.__enter__()
+        self.chat_completion_tracer.__enter__()
+
+    def __exit__(self, _type, _value, _traceback):
+        super().__exit__(_type, _value, _traceback)
+        self.completion_tracer.__exit__(_type, _value, _traceback)
+        self.chat_completion_tracer.__exit__(_type, _value, _traceback)
 
 
 class OpenAICompletionTracer(BaseTracer):
