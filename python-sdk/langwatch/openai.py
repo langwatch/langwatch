@@ -1,5 +1,4 @@
 from typing import Any, AsyncGenerator, Dict, Generator, List, Optional, Union, cast
-import openai
 from langwatch.tracer import BaseTracer
 
 from langwatch.types import (
@@ -46,6 +45,7 @@ class OpenAITracer(BaseTracer):
 
 class OpenAICompletionTracer(BaseTracer):
     def __enter__(self):
+        import openai
         super().__enter__()
         self._original_completion_create = openai.Completion.create
         self._original_completion_acreate = openai.Completion.acreate
@@ -54,6 +54,7 @@ class OpenAICompletionTracer(BaseTracer):
         openai.Completion.acreate = self.patched_completion_acreate
 
     def __exit__(self, _type, _value, _traceback):
+        import openai
         super().__exit__(_type, _value, _traceback)
         openai.Completion.create = self._original_completion_create
 
@@ -220,6 +221,7 @@ class OpenAICompletionTracer(BaseTracer):
 
 class OpenAIChatCompletionTracer(BaseTracer):
     def __enter__(self):
+        import openai
         super().__enter__()
         self._original_completion_create = openai.ChatCompletion.create
         self._original_completion_acreate = openai.ChatCompletion.acreate
@@ -228,6 +230,7 @@ class OpenAIChatCompletionTracer(BaseTracer):
         openai.ChatCompletion.acreate = self.patched_completion_acreate
 
     def __exit__(self, _type, _value, _traceback):
+        import openai
         super().__exit__(_type, _value, _traceback)
         openai.Completion.create = self._original_completion_create
 

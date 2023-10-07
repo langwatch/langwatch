@@ -28,5 +28,5 @@ make test
 
 ```
 cd examples
-chainlit run openai_bot.py -w
+poetry run chainlit run openai_bot.py -w
 ```
