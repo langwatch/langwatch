@@ -1,10 +1,21 @@
-from datetime import datetime
-from typing import Any, AsyncGenerator, Dict, Generator, List, Union
+from typing import Any, AsyncGenerator, Dict, Generator, List, Optional, Union, cast
 import openai
 from langwatch.tracer import BaseTracer
 
-from langwatch.types import StepInput, StepMetrics, StepOutput, StepParams, StepTrace
-from langwatch.utils import safe_get
+from langwatch.types import (
+    StepInput,
+    StepMetrics,
+    StepOutput,
+    StepParams,
+    StepTimestamps,
+    StepTrace,
+)
+from langwatch.utils import (
+    capture_async_chunks_with_timings_and_reyield,
+    capture_chunks_with_timings_and_reyield,
+    milliseconds_timestamp,
+    safe_get,
+)
 
 
 class OpenAICompletionTracer(BaseTracer):
@@ -13,42 +24,70 @@ class OpenAICompletionTracer(BaseTracer):
         self._original_completion_create = openai.Completion.create
         self._original_completion_acreate = openai.Completion.acreate
 
-        def reyield_and_handle(response, **kwargs):
-            deltas = []
-            for chunk in response:
-                deltas.append(chunk)
-                yield chunk
-            self.handle_deltas(deltas, **kwargs)
-
         def patched_completion_create(*args, **kwargs):
+            requested_at = milliseconds_timestamp()
             response = self._original_completion_create(*args, **kwargs)
+
             if isinstance(response, Generator):
-                return reyield_and_handle(response, **kwargs)
+                return capture_chunks_with_timings_and_reyield(
+                    response,
+                    lambda chunks, first_token_at, finished_at: self.handle_deltas(
+                        chunks,
+                        StepTimestamps(
+                            requested_at=requested_at,
+                            first_token_at=first_token_at,
+                            finished_at=finished_at,
+                        ),
+                        **kwargs,
+                    ),
+                )
             else:
-                self.handle_list_or_dict(response, **kwargs)
+                finished_at = milliseconds_timestamp()
+                self.handle_list_or_dict(
+                    response,
+                    StepTimestamps(requested_at=requested_at, finished_at=finished_at),
+                    **kwargs,
+                )
                 return response
 
-        async def async_reyield_and_handle(response, **kwargs):
-            deltas = []
-            async for chunk in response:
-                deltas.append(chunk)
-                yield chunk
-            self.handle_deltas(deltas, **kwargs)
-
         async def patched_completion_acreate(*args, **kwargs):
+            requested_at = milliseconds_timestamp()
             response = await self._original_completion_acreate(*args, **kwargs)
+
             if isinstance(response, AsyncGenerator):
-                return async_reyield_and_handle(response, **kwargs)
+                return capture_async_chunks_with_timings_and_reyield(
+                    response,
+                    lambda chunks, first_token_at, finished_at: self.handle_deltas(
+                        chunks,
+                        StepTimestamps(
+                            requested_at=requested_at,
+                            first_token_at=first_token_at,
+                            finished_at=finished_at,
+                        ),
+                        **kwargs,
+                    ),
+                )
             else:
-                self.handle_list_or_dict(response, **kwargs)
+                finished_at = milliseconds_timestamp()
+                self.handle_list_or_dict(
+                    response,
+                    StepTimestamps(requested_at=requested_at, finished_at=finished_at),
+                    **kwargs,
+                )
                 return response
 
         openai.Completion.create = patched_completion_create
         openai.Completion.acreate = patched_completion_acreate
 
-    def handle_deltas(self, deltas: List[Dict[Any, Any]], **kwargs):
+    def handle_deltas(
+        self,
+        deltas: List[Union[Dict[Any, Any], List[Any]]],
+        timestamps: StepTimestamps,
+        **kwargs,
+    ):
         text_outputs: Dict[int, str] = {}
         for delta in deltas:
+            delta = cast(Dict[Any, Any], delta)
             for choice in delta.get("choices", []):
                 index = choice.get("index", 0)
                 text_outputs[index] = text_outputs.get(index, "") + choice.get(
@@ -62,13 +101,18 @@ class OpenAICompletionTracer(BaseTracer):
                     StepOutput(type="text", value=output)
                     for output in text_outputs.values()
                 ],
-                # TODO: timings
                 metrics=StepMetrics(),
+                timestamps=timestamps,
                 **kwargs,
             )
         )
 
-    def handle_list_or_dict(self, res: Union[List[Any], Dict[Any, Any]], **kwargs):
+    def handle_list_or_dict(
+        self,
+        res: Union[List[Any], Dict[Any, Any]],
+        timestamps: StepTimestamps,
+        **kwargs,
+    ):
         responses_list: List[dict] = res if isinstance(res, list) else [res]
         for response in responses_list:
             self.steps.append(
@@ -84,6 +128,7 @@ class OpenAICompletionTracer(BaseTracer):
                             response, "usage", "completion_tokens"
                         ),
                     ),
+                    timestamps=timestamps,
                     **kwargs,
                 )
             )
@@ -93,6 +138,7 @@ class OpenAICompletionTracer(BaseTracer):
         raw_response: Any,
         outputs: List[StepOutput],
         metrics: StepMetrics,
+        timestamps: StepTimestamps,
         **kwargs,
     ) -> StepTrace:
         return StepTrace(
@@ -105,9 +151,8 @@ class OpenAICompletionTracer(BaseTracer):
                 temperature=kwargs.get("temperature", 1.0),
                 stream=kwargs.get("stream", False),
             ),
-            # TODO: timings
             metrics=metrics,
-            requested_at=int(datetime.now().timestamp()),
+            timestamps=timestamps,
         )
 
     def __exit__(self, _type, _value, _traceback):

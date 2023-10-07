@@ -21,6 +21,12 @@ class StepParams(TypedDict, total=False):
     stream: bool
 
 
+class StepTimestamps(TypedDict, total=False):
+    requested_at: int
+    first_token_at: Optional[int]
+    finished_at: int
+
+
 class StepTrace(TypedDict):
     trace_id: str
     model: str
@@ -29,4 +35,4 @@ class StepTrace(TypedDict):
     raw_response: dict
     params: StepParams
     metrics: StepMetrics
-    requested_at: int
+    timestamps: StepTimestamps

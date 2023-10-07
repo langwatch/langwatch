@@ -9,7 +9,7 @@ import langwatch
 import requests_mock
 
 
-@freeze_time("2022-01-01")
+@freeze_time("2022-01-01", auto_tick_seconds=15)
 def test_trace_session_captures_openai_calls():
     openai_mocks = [
         create_openai_completion_mock(" there"),
@@ -51,8 +51,12 @@ def test_trace_session_captures_openai_calls():
             "prompt_tokens": 5,
             "completion_tokens": 16,
         }
-        # TODO: timing metrics
-        assert first_step["requested_at"] == int(datetime(2022, 1, 1, 0, 0).timestamp())
+        assert first_step["timestamps"]["requested_at"] == int(
+            datetime(2022, 1, 1, 0, 0, 0).timestamp() * 1000
+        )
+        assert first_step["timestamps"]["finished_at"] == int(
+            datetime(2022, 1, 1, 0, 0, 15).timestamp() * 1000
+        )
 
         second_step = mock_request.request_history[0].json()["steps"][1]
         assert second_step["trace_id"] == first_step["trace_id"]
@@ -101,6 +105,7 @@ async def test_trace_session_captures_openai_async_calls():
         ]
 
 
+@freeze_time("2022-01-01", auto_tick_seconds=15)
 def test_trace_session_captures_openai_streams():
     with patch.object(
         openai.Completion,
@@ -136,6 +141,15 @@ def test_trace_session_captures_openai_streams():
         ]
         assert first_step["model"] == "openai/gpt-3.5-turbo-instruct"
         assert first_step["params"] == {"temperature": 1, "stream": True}
+        assert first_step["timestamps"]["requested_at"] == int(
+            datetime(2022, 1, 1, 0, 0, 0).timestamp() * 1000
+        )
+        assert first_step["timestamps"]["first_token_at"] == int(
+            datetime(2022, 1, 1, 0, 0, 15).timestamp() * 1000
+        )
+        assert first_step["timestamps"]["finished_at"] == int(
+            datetime(2022, 1, 1, 0, 0, 30).timestamp() * 1000
+        )
 
 
 @pytest.mark.asyncio
@@ -156,7 +170,7 @@ async def test_trace_session_captures_openai_async_streams():
                 model="gpt-3.5-turbo-instruct", prompt="hi", stream=True, n=2
             )
             texts = []
-            async for chunk in response: # type: ignore
+            async for chunk in response:  # type: ignore
                 texts.append(chunk.get("choices")[0].get("text"))  # type: ignore
             assert texts == [" there", " all", " good?", " how", " are", " you"]
 
