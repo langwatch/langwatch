@@ -245,10 +245,12 @@ class TestOpenAICompletionTracer:
 
             time.sleep(0.01)
 
-            first_span = mock_request.request_history[0].json()["spans"][0]
-            second_span = mock_request.request_history[0].json()["spans"][1]
-            third_span = mock_request.request_history[0].json()["spans"][2]
-            fourth_span = mock_request.request_history[0].json()["spans"][3]
+            (
+                first_span,
+                second_span,
+                third_span,
+                fourth_span,
+            ) = mock_request.request_history[0].json()["spans"]
 
             assert first_span["type"] == "llm"
             assert first_span["trace_id"].startswith("trace_")

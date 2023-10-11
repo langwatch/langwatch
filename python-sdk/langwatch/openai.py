@@ -139,7 +139,7 @@ class OpenAICompletionTracer(BaseContextTracer):
                     "text", ""
                 )
 
-        self.spans.append(
+        self.append_span(
             self.build_trace(
                 raw_response=raw_response,
                 outputs=[
@@ -161,7 +161,7 @@ class OpenAICompletionTracer(BaseContextTracer):
     ):
         responses_list: List[dict] = res if isinstance(res, list) else [res]
         for response in responses_list:
-            self.spans.append(
+            self.append_span(
                 self.build_trace(
                     raw_response=response,
                     outputs=[
@@ -186,7 +186,7 @@ class OpenAICompletionTracer(BaseContextTracer):
         timestamps: SpanTimestamps,
         **kwargs,
     ):
-        self.spans.append(
+        self.append_span(
             self.build_trace(
                 raw_response=None,
                 outputs=[],
@@ -333,7 +333,7 @@ class OpenAIChatCompletionTracer(BaseContextTracer):
                         "content", ""
                     ) + delta.get("content", "")
 
-        self.spans.append(
+        self.append_span(
             self.build_trace(
                 raw_response=raw_response,
                 outputs=[
@@ -355,7 +355,7 @@ class OpenAIChatCompletionTracer(BaseContextTracer):
     ):
         responses_list: List[dict] = res if isinstance(res, list) else [res]
         for response in responses_list:
-            self.spans.append(
+            self.append_span(
                 self.build_trace(
                     raw_response=response,
                     outputs=[
@@ -382,7 +382,7 @@ class OpenAIChatCompletionTracer(BaseContextTracer):
         timestamps: SpanTimestamps,
         **kwargs,
     ):
-        self.spans.append(
+        self.append_span(
             self.build_trace(
                 raw_response=None,
                 outputs=[],

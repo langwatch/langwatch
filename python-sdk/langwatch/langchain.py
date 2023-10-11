@@ -1,4 +1,3 @@
-import json
 from typing import Any, Dict, List, Optional, Union, cast
 from langchain.schema import (
     LLMResult,
@@ -12,8 +11,9 @@ from langchain.schema import (
     ChatGeneration,
 )
 from langchain.callbacks.base import BaseCallbackHandler
-from langwatch.tracer import send_spans
+from langwatch.tracer import BaseContextTracer
 from langwatch.types import (
+    BaseSpan,
     ChatMessage,
     ChatRole,
     SpanMetrics,
@@ -24,9 +24,8 @@ from langwatch.types import (
     TypedValueChatMessages,
     TypedValueText,
 )
-import nanoid
 
-from langwatch.utils import list_get, milliseconds_timestamp
+from langwatch.utils import capture_exception, list_get, milliseconds_timestamp
 from uuid import UUID
 
 
@@ -56,30 +55,30 @@ def langchain_message_to_chat_message(message: BaseMessage) -> ChatMessage:
     return ChatMessage(role=role, content=message.content)
 
 
-class LangWatchCallback(BaseCallbackHandler):
+class LangChainTracer(BaseContextTracer, BaseCallbackHandler):
     """Base callback handler that can be used to handle callbacks from langchain."""
 
     def __init__(self, trace_id: Optional[str] = None) -> None:
-        super().__init__()
-        self.spans: Dict[UUID, LLMSpan] = {}
-        self.trace_id = trace_id or f"trace_{nanoid.generate()}"
+        super().__init__(trace_id)
 
     def on_llm_start(
         self, serialized: Dict[str, Any], prompts: List[str], **kwargs: Any
     ) -> Any:
-        raise NotImplementedError
+        print("NOT IMPLEMENTED YET on_llm_start")
 
     def on_chat_model_start(
         self,
         serialized: Dict[str, Any],
         messages: List[List[BaseMessage]],
+        *,
         run_id: UUID,
+        parent_run_id: UUID,
         **kwargs: Any,
     ) -> Any:
-        self.spans[run_id] = LLMSpan(
+        self.spans[str(run_id)] = LLMSpan(
             type="llm",
-            # span_id=run_id, # TODO
-            # parent_id=parent_run_id, # TODO
+            span_id=f"span_{run_id}",
+            parent_id=f"span_{parent_run_id}" if parent_run_id else None,
             trace_id=self.trace_id,
             vendor=list_get(serialized.get("id", []), 2, "unknown").lower(),
             model=kwargs.get("invocation_params", {}).get("model_name", "unknown"),
@@ -100,8 +99,10 @@ class LangWatchCallback(BaseCallbackHandler):
         print("NOT IMPLEMENTED YET on_llm_new_token")
 
     def on_llm_end(self, response: LLMResult, *, run_id: UUID, **kwargs: Any) -> Any:
-        span = self.spans[run_id]
-        if "timestamps" in span:
+        span = cast(Optional[LLMSpan], self.spans.get(str(run_id)))
+        if span == None:
+            return
+        if "timestamps" in span and span["timestamps"]:
             span["timestamps"]["finished_at"] = milliseconds_timestamp()
 
         outputs: List[SpanOutput] = []
@@ -132,10 +133,11 @@ class LangWatchCallback(BaseCallbackHandler):
                 completion_tokens=usage.get("completion_tokens"),
             )
 
-    def on_llm_error(
-        self, error: Union[Exception, KeyboardInterrupt], **kwargs: Any
-    ) -> Any:
-        print("NOT IMPLEMENTED YET on_llm_error")
+    def on_llm_error(self, error: BaseException, *, run_id: UUID, **kwargs: Any) -> Any:
+        span = self.spans.get(str(run_id))
+        if span == None:
+            return
+        span["error"] = capture_exception(error)
 
     def on_chain_start(
         self,
@@ -143,17 +145,38 @@ class LangWatchCallback(BaseCallbackHandler):
         inputs: Dict[str, Any],
         *,
         run_id: UUID,
+        parent_run_id: UUID,
+        name: Optional[str],
         **kwargs: Any,
     ) -> Any:
-        pass
+        self.spans[str(run_id)] = BaseSpan(
+            type="chain",
+            name=name if name else list_get(serialized.get("id", ""), -1, None),
+            span_id=f"span_{run_id}",
+            parent_id=f"span_{parent_run_id}" if parent_run_id else None,
+            trace_id=self.trace_id,
+            outputs=[],  # TODO?
+            error=None,
+            timestamps=SpanTimestamps(started_at=milliseconds_timestamp()),
+        )
 
-    def on_chain_end(self, outputs: Dict[str, Any], run_id: UUID, **kwargs: Any) -> Any:
-        send_spans(list(self.spans.values()))
+    def on_chain_end(
+        self, outputs: Dict[str, Any], *, run_id: UUID, **kwargs: Any
+    ) -> Any:
+        span = self.spans.get(str(run_id))
+        if span == None:
+            return
+
+        if "timestamps" in span and span["timestamps"]:
+            span["timestamps"]["finished_at"] = milliseconds_timestamp()
 
     def on_chain_error(
-        self, error: Union[Exception, KeyboardInterrupt], **kwargs: Any
+        self, error: BaseException, *, run_id: UUID, **kwargs: Any
     ) -> Any:
-        print("NOT IMPLEMENTED YET on_chain_error")
+        span = self.spans.get(str(run_id))
+        if span == None:
+            return
+        span["error"] = capture_exception(error)
 
     def on_tool_start(
         self, serialized: Dict[str, Any], input_str: str, **kwargs: Any

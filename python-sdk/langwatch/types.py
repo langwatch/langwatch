@@ -47,11 +47,12 @@ class SpanTimestamps(TypedDict, total=False):
 
 
 class BaseSpan(TypedDict):
-    type: Literal["span"]
+    type: Literal["span", "chain"]
     name: Optional[str]
     span_id: str
     parent_id: Optional[str]
     trace_id: str
+    # TODO: inputs?
     outputs: List[SpanOutput]  # TODO?
     error: Optional[ErrorCapture]
     timestamps: SpanTimestamps

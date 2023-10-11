@@ -59,7 +59,7 @@ async def capture_async_chunks_with_timings_and_reyield(
     callback(chunks, first_token_at, finished_at)
 
 
-def capture_exception(err: Exception):
+def capture_exception(err: BaseException):
     string_stacktrace = traceback.format_exception(
         etype=type(err), value=err, tb=err.__traceback__
     )

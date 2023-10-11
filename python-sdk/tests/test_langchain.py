@@ -51,27 +51,40 @@ class TestLangChainTracer:
                 prompt=chat_prompt,
                 # TODO: output_parser=CommaSeparatedListOutputParser(),
             )
-            result = chain.run(
-                text="colors", callbacks=[langwatch.langchain.LangWatchCallback()]
-            )
+            with langwatch.langchain.LangChainTracer() as langWatchCallback:
+                result = chain.run(text="colors", callbacks=[langWatchCallback])
             assert result == "red, blue, green, yellow"
 
-            time.sleep(1)
+            time.sleep(0.01)
             request_history = [
                 r for r in mock_request.request_history if "langwatch" in r.url
             ]
-            first_span = request_history[0].json()["spans"][0]
+            first_span, second_span = request_history[0].json()["spans"]
+
+            assert first_span["type"] == "chain"
             assert first_span["trace_id"].startswith("trace_")
-            assert first_span["vendor"] == "openai"
-            assert first_span["model"] == "gpt-3.5-turbo"
-            assert first_span["input"] == {
+            assert first_span["parent_id"] == None
+            assert first_span["timestamps"]["started_at"] == int(
+                datetime(2022, 1, 1, 0, 0, 0).timestamp() * 1000
+            )
+            assert first_span["timestamps"]["finished_at"] >= int(
+                datetime(2022, 1, 1, 0, 0, 45).timestamp() * 1000
+            )
+
+            assert second_span["type"] == "llm"
+            assert second_span["trace_id"].startswith("trace_")
+            assert second_span["span_id"].startswith("span_")
+            assert second_span["parent_id"] == first_span["span_id"]
+            assert second_span["vendor"] == "openai"
+            assert second_span["model"] == "gpt-3.5-turbo"
+            assert second_span["input"] == {
                 "type": "chat_messages",
                 "value": [
                     {"role": "system", "content": template},
                     {"role": "user", "content": "colors"},
                 ],
             }
-            assert first_span["outputs"] == [
+            assert second_span["outputs"] == [
                 {
                     "type": "chat_messages",
                     "value": [
@@ -79,15 +92,47 @@ class TestLangChainTracer:
                     ],
                 }
             ]
-            assert "red, blue, green, yellow" in first_span["raw_response"]
-            assert first_span["params"] == {"temperature": 0.7, "stream": False}
-            assert first_span["metrics"] == {
+            assert "red, blue, green, yellow" in second_span["raw_response"]
+            assert second_span["params"] == {"temperature": 0.7, "stream": False}
+            assert second_span["metrics"] == {
                 "prompt_tokens": 5,
                 "completion_tokens": 16,
             }
-            assert first_span["timestamps"]["started_at"] == int(
-                datetime(2022, 1, 1, 0, 0, 0).timestamp() * 1000
-            )
-            assert first_span["timestamps"]["finished_at"] >= int(
+            assert second_span["timestamps"]["started_at"] == int(
                 datetime(2022, 1, 1, 0, 0, 15).timestamp() * 1000
             )
+            assert second_span["timestamps"]["finished_at"] >= int(
+                datetime(2022, 1, 1, 0, 0, 30).timestamp() * 1000
+            )
+
+    def test_trace_errors(self):
+        with requests_mock.Mocker() as mock_request:
+            mock_request.post(langwatch.endpoint, json={})
+            mock_request.post(
+                "https://api.openai.com/v1/chat/completions",
+                status_code=500,
+                text="An error occurred!",
+            )
+
+            chain = LLMChain(
+                llm=ChatOpenAI(max_retries=0),
+                prompt=ChatPromptTemplate.from_messages(
+                    [
+                        ("human", "hi there"),
+                    ]
+                ),
+            )
+            with langwatch.langchain.LangChainTracer() as langWatchCallback:
+                try:
+                    chain.run(text="hi", callbacks=[langWatchCallback])
+                except:
+                    pass
+
+            time.sleep(0.01)
+            request_history = [
+                r for r in mock_request.request_history if "langwatch" in r.url
+            ]
+            first_span, second_span = request_history[0].json()["spans"]
+
+            assert "An error occurred!" in first_span["error"]["message"]
+            assert "An error occurred!" in second_span["error"]["message"]

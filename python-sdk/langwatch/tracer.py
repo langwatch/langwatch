@@ -1,6 +1,6 @@
 from contextlib import contextmanager
 import threading
-from typing import List, Optional, TypeVar, TypedDict
+from typing import Dict, List, Optional, TypeVar, TypedDict
 import nanoid
 import requests
 from concurrent.futures import ThreadPoolExecutor
@@ -44,11 +44,12 @@ def span(name: Optional[str] = None):
         _local_context, "current_tracer", None
     )
     if context_tracer:
-        context_tracer.spans.append(
+        span_id = context_span["id"]  # TODO: test?
+        context_tracer.append_span(
             BaseSpan(
                 type="span",
                 name=name,
-                span_id=context_span["id"],  # TODO: test?
+                span_id=span_id,
                 parent_id=context_span["parent"]["id"]
                 if context_span["parent"]
                 else None,  # TODO: test
@@ -66,15 +67,20 @@ def span(name: Optional[str] = None):
 
 class BaseContextTracer:
     def __init__(self, trace_id: Optional[str] = None):
-        self.spans: List[Span] = []
+        self.spans: Dict[str, Span] = {}
         self.trace_id = trace_id or f"trace_{nanoid.generate()}"
 
     def __enter__(self):
         _local_context.current_tracer = self
+        return self
 
     def __exit__(self, _type, _value, _traceback):
-        send_spans(self.spans)
+        send_spans(list(self.spans.values()))
         _local_context.current_tracer = None
+
+    def append_span(self, span: Span):
+        span["span_id"] = span.get("span_id", f"span_{nanoid.generate()}")
+        self.spans[span["span_id"]] = span
 
     def get_parent_id(self):
         current_span = getattr(_local_context, "current_span", None)
