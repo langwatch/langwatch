@@ -12,15 +12,15 @@ from langchain.schema import (
     ChatGeneration,
 )
 from langchain.callbacks.base import BaseCallbackHandler
-from langwatch.tracer import send_steps
+from langwatch.tracer import send_spans
 from langwatch.types import (
     ChatMessage,
     ChatRole,
-    StepMetrics,
-    StepOutput,
-    StepParams,
-    StepTimestamps,
-    StepTrace,
+    SpanMetrics,
+    SpanOutput,
+    SpanParams,
+    SpanTimestamps,
+    SpanTrace,
     TypedValueChatMessages,
     TypedValueText,
 )
@@ -61,7 +61,7 @@ class LangWatchCallback(BaseCallbackHandler):
 
     def __init__(self, trace_id: Optional[str] = None) -> None:
         super().__init__()
-        self.steps: Dict[UUID, StepTrace] = {}
+        self.spans: Dict[UUID, SpanTrace] = {}
         self.trace_id = trace_id or f"trace_{nanoid.generate()}"
 
     def on_llm_start(
@@ -76,7 +76,7 @@ class LangWatchCallback(BaseCallbackHandler):
         run_id: UUID,
         **kwargs: Any,
     ) -> Any:
-        self.steps[run_id] = StepTrace(
+        self.spans[run_id] = SpanTrace(
             trace_id=self.trace_id,
             vendor=list_get(serialized.get("id", []), 2, "unknown").lower(),
             model=kwargs.get("invocation_params", {}).get("model_name", "unknown"),
@@ -84,8 +84,8 @@ class LangWatchCallback(BaseCallbackHandler):
                 type="chat_messages",
                 value=langchain_messages_to_chat_messages(messages),
             ),
-            timestamps=StepTimestamps(requested_at=milliseconds_timestamp()),
-            params=StepParams(
+            timestamps=SpanTimestamps(requested_at=milliseconds_timestamp()),
+            params=SpanParams(
                 stream=kwargs.get("invocation_params", {}).get("stream", False),
                 temperature=kwargs.get("invocation_params", {}).get(
                     "temperature", None
@@ -97,11 +97,11 @@ class LangWatchCallback(BaseCallbackHandler):
         print("NOT IMPLEMENTED YET on_llm_new_token")
 
     def on_llm_end(self, response: LLMResult, *, run_id: UUID, **kwargs: Any) -> Any:
-        step = self.steps[run_id]
-        if "timestamps" in step:
-            step["timestamps"]["finished_at"] = milliseconds_timestamp()
+        span = self.spans[run_id]
+        if "timestamps" in span:
+            span["timestamps"]["finished_at"] = milliseconds_timestamp()
 
-        outputs: List[StepOutput] = []
+        outputs: List[SpanOutput] = []
         for generations in response.generations:
             # TODO: why the twice loop? Can OpenAI generate multiple chat outputs?
             for g in generations:
@@ -120,11 +120,11 @@ class LangWatchCallback(BaseCallbackHandler):
                             value=g.text,
                         )
                     )
-        step["outputs"] = outputs
-        step["raw_response"] = f"{type(response).__name__}({str(response)})"
+        span["outputs"] = outputs
+        span["raw_response"] = f"{type(response).__name__}({str(response)})"
         if response.llm_output and "token_usage" in response.llm_output:
             usage = response.llm_output["token_usage"]
-            step["metrics"] = StepMetrics(
+            span["metrics"] = SpanMetrics(
                 prompt_tokens=usage.get("prompt_tokens"),
                 completion_tokens=usage.get("completion_tokens"),
             )
@@ -145,7 +145,7 @@ class LangWatchCallback(BaseCallbackHandler):
         pass
 
     def on_chain_end(self, outputs: Dict[str, Any], run_id: UUID, **kwargs: Any) -> Any:
-        send_steps(list(self.steps.values()))
+        send_spans(list(self.spans.values()))
 
     def on_chain_error(
         self, error: Union[Exception, KeyboardInterrupt], **kwargs: Any

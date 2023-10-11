@@ -39,32 +39,32 @@ class TestOpenAICompletionTracer:
                 assert response == openai_mocks[1]
 
             time.sleep(0.1)
-            first_step = mock_request.request_history[0].json()["steps"][0]
-            assert first_step["trace_id"].startswith("trace_")
-            assert first_step["vendor"] == "openai"
-            assert first_step["model"] == "gpt-3.5-turbo-instruct"
-            assert first_step["input"] == {"type": "text", "value": "hi"}
-            assert first_step["outputs"] == [
+            first_span = mock_request.request_history[0].json()["spans"][0]
+            assert first_span["trace_id"].startswith("trace_")
+            assert first_span["vendor"] == "openai"
+            assert first_span["model"] == "gpt-3.5-turbo-instruct"
+            assert first_span["input"] == {"type": "text", "value": "hi"}
+            assert first_span["outputs"] == [
                 {
                     "type": "text",
                     "value": " there",
                 }
             ]
-            assert first_step["raw_response"] == openai_mocks[0]
-            assert first_step["params"] == {"temperature": 1, "stream": False}
-            assert first_step["metrics"] == {
+            assert first_span["raw_response"] == openai_mocks[0]
+            assert first_span["params"] == {"temperature": 1, "stream": False}
+            assert first_span["metrics"] == {
                 "prompt_tokens": 5,
                 "completion_tokens": 16,
             }
-            assert first_step["timestamps"]["requested_at"] == int(
+            assert first_span["timestamps"]["requested_at"] == int(
                 datetime(2022, 1, 1, 0, 0, 0).timestamp() * 1000
             )
-            assert first_step["timestamps"]["finished_at"] == int(
+            assert first_span["timestamps"]["finished_at"] == int(
                 datetime(2022, 1, 1, 0, 0, 15).timestamp() * 1000
             )
 
-            second_step = mock_request.request_history[0].json()["steps"][1]
-            assert second_step["trace_id"] == first_step["trace_id"]
+            second_span = mock_request.request_history[0].json()["spans"][1]
+            assert second_span["trace_id"] == first_span["trace_id"]
 
             with langwatch.openai.OpenAICompletionTracer():
                 openai.Completion.create(
@@ -75,11 +75,11 @@ class TestOpenAICompletionTracer:
                 )
 
             time.sleep(0.1)
-            third_step = mock_request.request_history[1].json()["steps"][0]
-            assert third_step["trace_id"] != first_step["trace_id"]
+            third_span = mock_request.request_history[1].json()["spans"][0]
+            assert third_span["trace_id"] != first_span["trace_id"]
 
-            fourth_step = mock_request.request_history[1].json()["steps"][1]
-            assert fourth_step["trace_id"] == third_step["trace_id"]
+            fourth_span = mock_request.request_history[1].json()["spans"][1]
+            assert fourth_span["trace_id"] == third_span["trace_id"]
 
     def test_trace_session_captures_exceptions(self):
         with patch.object(
@@ -95,7 +95,7 @@ class TestOpenAICompletionTracer:
             assert str(err.value) == "An error occurred!"
 
             time.sleep(0.1)
-            traced = mock_request.request_history[0].json()["steps"][0]
+            traced = mock_request.request_history[0].json()["spans"][0]
             assert traced["error"]["message"] == "An error occurred!"
             assert len(traced["error"]["stacktrace"]) > 0
 
@@ -118,8 +118,8 @@ class TestOpenAICompletionTracer:
                 assert response == openai_mocks[0]
 
             await asyncio.sleep(0.1)
-            first_step = mock_request.request_history[0].json()["steps"][0]
-            assert first_step["outputs"] == [
+            first_span = mock_request.request_history[0].json()["spans"][0]
+            assert first_span["outputs"] == [
                 {
                     "type": "text",
                     "value": " there",
@@ -149,8 +149,8 @@ class TestOpenAICompletionTracer:
                 assert texts == [" there", " all", " good?", " how", " are", " you"]
 
             time.sleep(1)
-            first_step = mock_request.request_history[0].json()["steps"][0]
-            assert first_step["outputs"] == [
+            first_span = mock_request.request_history[0].json()["spans"][0]
+            assert first_span["outputs"] == [
                 {
                     "type": "text",
                     "value": " there all good?",
@@ -160,19 +160,19 @@ class TestOpenAICompletionTracer:
                     "value": " how are you",
                 },
             ]
-            assert first_step["vendor"] == "openai"
-            assert first_step["model"] == "gpt-3.5-turbo-instruct"
-            assert first_step["params"] == {"temperature": 1, "stream": True}
-            assert first_step["timestamps"]["requested_at"] == int(
+            assert first_span["vendor"] == "openai"
+            assert first_span["model"] == "gpt-3.5-turbo-instruct"
+            assert first_span["params"] == {"temperature": 1, "stream": True}
+            assert first_span["timestamps"]["requested_at"] == int(
                 datetime(2022, 1, 1, 0, 0, 0).timestamp() * 1000
             )
-            assert first_step["timestamps"]["first_token_at"] == int(
+            assert first_span["timestamps"]["first_token_at"] == int(
                 datetime(2022, 1, 1, 0, 0, 15).timestamp() * 1000
             )
-            assert first_step["timestamps"]["finished_at"] == int(
+            assert first_span["timestamps"]["finished_at"] == int(
                 datetime(2022, 1, 1, 0, 0, 30).timestamp() * 1000
             )
-            assert first_step["raw_response"] == [
+            assert first_span["raw_response"] == [
                 create_openai_completion_chunk(0, " there"),
                 create_openai_completion_chunk(0, " all"),
                 create_openai_completion_chunk(0, " good?"),
@@ -204,8 +204,8 @@ class TestOpenAICompletionTracer:
                 assert texts == [" there", " all", " good?", " how", " are", " you"]
 
             time.sleep(1)
-            first_step = mock_request.request_history[0].json()["steps"][0]
-            assert first_step["outputs"] == [
+            first_span = mock_request.request_history[0].json()["spans"][0]
+            assert first_span["outputs"] == [
                 {
                     "type": "text",
                     "value": " there all good?",
@@ -215,9 +215,9 @@ class TestOpenAICompletionTracer:
                     "value": " how are you",
                 },
             ]
-            assert first_step["vendor"] == "openai"
-            assert first_step["model"] == "gpt-3.5-turbo-instruct"
-            assert first_step["params"] == {"temperature": 1, "stream": True}
+            assert first_span["vendor"] == "openai"
+            assert first_span["model"] == "gpt-3.5-turbo-instruct"
+            assert first_span["params"] == {"temperature": 1, "stream": True}
 
 
 class TestOpenAIChatCompletionTracer:
@@ -247,35 +247,35 @@ class TestOpenAIChatCompletionTracer:
                 assert response == openai_mocks[1]
 
             time.sleep(0.1)
-            first_step = mock_request.request_history[0].json()["steps"][0]
-            assert first_step["trace_id"].startswith("trace_")
-            assert first_step["vendor"] == "openai"
-            assert first_step["model"] == "gpt-3.5-turbo"
-            assert first_step["input"] == {
+            first_span = mock_request.request_history[0].json()["spans"][0]
+            assert first_span["trace_id"].startswith("trace_")
+            assert first_span["vendor"] == "openai"
+            assert first_span["model"] == "gpt-3.5-turbo"
+            assert first_span["input"] == {
                 "type": "chat_messages",
                 "value": [{"role": "user", "content": "Hello!"}],
             }
-            assert first_step["outputs"] == [
+            assert first_span["outputs"] == [
                 {
                     "type": "chat_messages",
                     "value": [{"role": "assistant", "content": "hi there!"}],
                 }
             ]
-            assert first_step["raw_response"] == openai_mocks[0]
-            assert first_step["params"] == {"temperature": 1, "stream": False}
-            assert first_step["metrics"] == {
+            assert first_span["raw_response"] == openai_mocks[0]
+            assert first_span["params"] == {"temperature": 1, "stream": False}
+            assert first_span["metrics"] == {
                 "prompt_tokens": 5,
                 "completion_tokens": 16,
             }
-            assert first_step["timestamps"]["requested_at"] == int(
+            assert first_span["timestamps"]["requested_at"] == int(
                 datetime(2022, 1, 1, 0, 0, 0).timestamp() * 1000
             )
-            assert first_step["timestamps"]["finished_at"] == int(
+            assert first_span["timestamps"]["finished_at"] == int(
                 datetime(2022, 1, 1, 0, 0, 15).timestamp() * 1000
             )
 
-            second_step = mock_request.request_history[0].json()["steps"][1]
-            assert second_step["trace_id"] == first_step["trace_id"]
+            second_span = mock_request.request_history[0].json()["spans"][1]
+            assert second_span["trace_id"] == first_span["trace_id"]
 
     def test_trace_session_captures_exceptions(self):
         with patch.object(
@@ -289,7 +289,7 @@ class TestOpenAIChatCompletionTracer:
             assert str(err.value) == "An error occurred!"
 
             time.sleep(0.1)
-            traced = mock_request.request_history[0].json()["steps"][0]
+            traced = mock_request.request_history[0].json()["spans"][0]
             assert traced["error"]["message"] == "An error occurred!"
             assert len(traced["error"]["stacktrace"]) > 0
 
@@ -313,8 +313,8 @@ class TestOpenAIChatCompletionTracer:
                 assert response == openai_mocks[0]
 
             await asyncio.sleep(0.1)
-            first_step = mock_request.request_history[0].json()["steps"][0]
-            assert first_step["outputs"] == [
+            first_span = mock_request.request_history[0].json()["spans"][0]
+            assert first_span["outputs"] == [
                 {
                     "type": "chat_messages",
                     "value": [{"role": "assistant", "content": "hi there!"}],
@@ -360,8 +360,8 @@ class TestOpenAIChatCompletionTracer:
                 ]
 
             time.sleep(1)
-            first_step = mock_request.request_history[0].json()["steps"][0]
-            assert first_step["outputs"] == [
+            first_span = mock_request.request_history[0].json()["spans"][0]
+            assert first_span["outputs"] == [
                 {
                     "type": "chat_messages",
                     "value": [{"role": "assistant", "content": "Hi there all good?"}],
@@ -371,19 +371,19 @@ class TestOpenAIChatCompletionTracer:
                     "value": [{"role": "assistant", "content": "Hi how are you"}],
                 },
             ]
-            assert first_step["vendor"] == "openai"
-            assert first_step["model"] == "gpt-3.5-turbo"
-            assert first_step["params"] == {"temperature": 1, "stream": True}
-            assert first_step["timestamps"]["requested_at"] == int(
+            assert first_span["vendor"] == "openai"
+            assert first_span["model"] == "gpt-3.5-turbo"
+            assert first_span["params"] == {"temperature": 1, "stream": True}
+            assert first_span["timestamps"]["requested_at"] == int(
                 datetime(2022, 1, 1, 0, 0, 0).timestamp() * 1000
             )
-            assert first_step["timestamps"]["first_token_at"] == int(
+            assert first_span["timestamps"]["first_token_at"] == int(
                 datetime(2022, 1, 1, 0, 0, 15).timestamp() * 1000
             )
-            assert first_step["timestamps"]["finished_at"] == int(
+            assert first_span["timestamps"]["finished_at"] == int(
                 datetime(2022, 1, 1, 0, 0, 30).timestamp() * 1000
             )
-            assert first_step["raw_response"] == [
+            assert first_span["raw_response"] == [
                 create_openai_chat_completion_chunk(
                     0, {"role": "assistant", "content": ""}
                 ),
@@ -441,8 +441,8 @@ class TestOpenAIChatCompletionTracer:
                 ]
 
             time.sleep(1)
-            first_step = mock_request.request_history[0].json()["steps"][0]
-            assert first_step["outputs"] == [
+            first_span = mock_request.request_history[0].json()["spans"][0]
+            assert first_span["outputs"] == [
                 {
                     "type": "chat_messages",
                     "value": [{"role": "assistant", "content": "Hi there all good?"}],
@@ -452,8 +452,8 @@ class TestOpenAIChatCompletionTracer:
                     "value": [{"role": "assistant", "content": "Hi how are you"}],
                 },
             ]
-            assert first_step["model"] == "gpt-3.5-turbo"
-            assert first_step["params"] == {"temperature": 1, "stream": True}
+            assert first_span["model"] == "gpt-3.5-turbo"
+            assert first_span["params"] == {"temperature": 1, "stream": True}
 
 
 class TestOpenAITracer:
@@ -477,6 +477,6 @@ class TestOpenAITracer:
                 )
 
             time.sleep(0.1)
-            first_step = mock_request.request_history[0].json()["steps"][0]
-            second_step = mock_request.request_history[1].json()["steps"][0]
-            assert first_step["trace_id"] == second_step["trace_id"]
+            first_span = mock_request.request_history[0].json()["spans"][0]
+            second_span = mock_request.request_history[1].json()["spans"][0]
+            assert first_span["trace_id"] == second_span["trace_id"]

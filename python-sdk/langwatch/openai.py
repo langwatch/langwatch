@@ -4,13 +4,13 @@ from langwatch.tracer import BaseContextTracer
 from langwatch.types import (
     ChatMessage,
     ErrorCapture,
-    StepMetrics,
-    StepOutput,
+    SpanMetrics,
+    SpanOutput,
     TypedValueChatMessages,
     TypedValueText,
-    StepParams,
-    StepTimestamps,
-    StepTrace,
+    SpanParams,
+    SpanTimestamps,
+    SpanTrace,
 )
 from langwatch.utils import (
     capture_async_chunks_with_timings_and_reyield,
@@ -69,7 +69,7 @@ class OpenAICompletionTracer(BaseContextTracer):
                     response,
                     lambda chunks, first_token_at, finished_at: self.handle_deltas(
                         chunks,
-                        StepTimestamps(
+                        SpanTimestamps(
                             requested_at=requested_at,
                             first_token_at=first_token_at,
                             finished_at=finished_at,
@@ -81,7 +81,7 @@ class OpenAICompletionTracer(BaseContextTracer):
                 finished_at = milliseconds_timestamp()
                 self.handle_list_or_dict(
                     response,
-                    StepTimestamps(requested_at=requested_at, finished_at=finished_at),
+                    SpanTimestamps(requested_at=requested_at, finished_at=finished_at),
                     **kwargs,
                 )
                 return response
@@ -89,7 +89,7 @@ class OpenAICompletionTracer(BaseContextTracer):
             finished_at = milliseconds_timestamp()
             self.handle_exception(
                 err,
-                StepTimestamps(requested_at=requested_at, finished_at=finished_at),
+                SpanTimestamps(requested_at=requested_at, finished_at=finished_at),
                 **kwargs,
             )
             raise err
@@ -103,7 +103,7 @@ class OpenAICompletionTracer(BaseContextTracer):
                 response,
                 lambda chunks, first_token_at, finished_at: self.handle_deltas(
                     chunks,
-                    StepTimestamps(
+                    SpanTimestamps(
                         requested_at=requested_at,
                         first_token_at=first_token_at,
                         finished_at=finished_at,
@@ -115,7 +115,7 @@ class OpenAICompletionTracer(BaseContextTracer):
             finished_at = milliseconds_timestamp()
             self.handle_list_or_dict(
                 response,
-                StepTimestamps(requested_at=requested_at, finished_at=finished_at),
+                SpanTimestamps(requested_at=requested_at, finished_at=finished_at),
                 **kwargs,
             )
             return response
@@ -123,7 +123,7 @@ class OpenAICompletionTracer(BaseContextTracer):
     def handle_deltas(
         self,
         deltas: List[Union[Dict[Any, Any], List[Any]]],
-        timestamps: StepTimestamps,
+        timestamps: SpanTimestamps,
         **kwargs,
     ):
         raw_response = []
@@ -137,14 +137,14 @@ class OpenAICompletionTracer(BaseContextTracer):
                     "text", ""
                 )
 
-        self.steps.append(
+        self.spans.append(
             self.build_trace(
                 raw_response=raw_response,
                 outputs=[
                     TypedValueText(type="text", value=output)
                     for output in text_outputs.values()
                 ],
-                metrics=StepMetrics(),
+                metrics=SpanMetrics(),
                 timestamps=timestamps,
                 error=None,
                 **kwargs,
@@ -154,19 +154,19 @@ class OpenAICompletionTracer(BaseContextTracer):
     def handle_list_or_dict(
         self,
         res: Union[List[Any], Dict[Any, Any]],
-        timestamps: StepTimestamps,
+        timestamps: SpanTimestamps,
         **kwargs,
     ):
         responses_list: List[dict] = res if isinstance(res, list) else [res]
         for response in responses_list:
-            self.steps.append(
+            self.spans.append(
                 self.build_trace(
                     raw_response=response,
                     outputs=[
                         TypedValueText(type="text", value=output.get("text"))
                         for output in response.get("choices", [])
                     ],
-                    metrics=StepMetrics(
+                    metrics=SpanMetrics(
                         prompt_tokens=safe_get(response, "usage", "prompt_tokens"),
                         completion_tokens=safe_get(
                             response, "usage", "completion_tokens"
@@ -181,14 +181,14 @@ class OpenAICompletionTracer(BaseContextTracer):
     def handle_exception(
         self,
         err: Exception,
-        timestamps: StepTimestamps,
+        timestamps: SpanTimestamps,
         **kwargs,
     ):
-        self.steps.append(
+        self.spans.append(
             self.build_trace(
                 raw_response=None,
                 outputs=[],
-                metrics=StepMetrics(),
+                metrics=SpanMetrics(),
                 timestamps=timestamps,
                 error=capture_exception(err),
                 **kwargs,
@@ -198,13 +198,13 @@ class OpenAICompletionTracer(BaseContextTracer):
     def build_trace(
         self,
         raw_response: Optional[Union[dict, list]],
-        outputs: List[StepOutput],
-        metrics: StepMetrics,
-        timestamps: StepTimestamps,
+        outputs: List[SpanOutput],
+        metrics: SpanMetrics,
+        timestamps: SpanTimestamps,
         error: Optional[ErrorCapture],
         **kwargs,
-    ) -> StepTrace:
-        return StepTrace(
+    ) -> SpanTrace:
+        return SpanTrace(
             trace_id=self.trace_id,
             vendor="openai",
             model=kwargs.get('model', 'unknown'),
@@ -212,7 +212,7 @@ class OpenAICompletionTracer(BaseContextTracer):
             outputs=outputs,
             raw_response=raw_response,
             error=error,
-            params=StepParams(
+            params=SpanParams(
                 temperature=kwargs.get("temperature", 1.0),
                 stream=kwargs.get("stream", False),
             ),
@@ -244,7 +244,7 @@ class OpenAIChatCompletionTracer(BaseContextTracer):
                     response,
                     lambda chunks, first_token_at, finished_at: self.handle_deltas(
                         chunks,
-                        StepTimestamps(
+                        SpanTimestamps(
                             requested_at=requested_at,
                             first_token_at=first_token_at,
                             finished_at=finished_at,
@@ -256,7 +256,7 @@ class OpenAIChatCompletionTracer(BaseContextTracer):
                 finished_at = milliseconds_timestamp()
                 self.handle_list_or_dict(
                     response,
-                    StepTimestamps(requested_at=requested_at, finished_at=finished_at),
+                    SpanTimestamps(requested_at=requested_at, finished_at=finished_at),
                     **kwargs,
                 )
                 return response
@@ -264,7 +264,7 @@ class OpenAIChatCompletionTracer(BaseContextTracer):
             finished_at = milliseconds_timestamp()
             self.handle_exception(
                 err,
-                StepTimestamps(requested_at=requested_at, finished_at=finished_at),
+                SpanTimestamps(requested_at=requested_at, finished_at=finished_at),
                 **kwargs,
             )
             raise err
@@ -278,7 +278,7 @@ class OpenAIChatCompletionTracer(BaseContextTracer):
                 response,
                 lambda chunks, first_token_at, finished_at: self.handle_deltas(
                     chunks,
-                    StepTimestamps(
+                    SpanTimestamps(
                         requested_at=requested_at,
                         first_token_at=first_token_at,
                         finished_at=finished_at,
@@ -290,7 +290,7 @@ class OpenAIChatCompletionTracer(BaseContextTracer):
             finished_at = milliseconds_timestamp()
             self.handle_list_or_dict(
                 response,
-                StepTimestamps(requested_at=requested_at, finished_at=finished_at),
+                SpanTimestamps(requested_at=requested_at, finished_at=finished_at),
                 **kwargs,
             )
             return response
@@ -298,7 +298,7 @@ class OpenAIChatCompletionTracer(BaseContextTracer):
     def handle_deltas(
         self,
         deltas: List[Union[Dict[Any, Any], List[Any]]],
-        timestamps: StepTimestamps,
+        timestamps: SpanTimestamps,
         **kwargs,
     ):
         raw_response = []
@@ -328,14 +328,14 @@ class OpenAIChatCompletionTracer(BaseContextTracer):
                         "content", ""
                     ) + delta.get("content", "")
 
-        self.steps.append(
+        self.spans.append(
             self.build_trace(
                 raw_response=raw_response,
                 outputs=[
                     TypedValueChatMessages(type="chat_messages", value=output)
                     for output in chat_outputs.values()
                 ],
-                metrics=StepMetrics(),
+                metrics=SpanMetrics(),
                 timestamps=timestamps,
                 error=None,
                 **kwargs,
@@ -345,12 +345,12 @@ class OpenAIChatCompletionTracer(BaseContextTracer):
     def handle_list_or_dict(
         self,
         res: Union[List[Any], Dict[Any, Any]],
-        timestamps: StepTimestamps,
+        timestamps: SpanTimestamps,
         **kwargs,
     ):
         responses_list: List[dict] = res if isinstance(res, list) else [res]
         for response in responses_list:
-            self.steps.append(
+            self.spans.append(
                 self.build_trace(
                     raw_response=response,
                     outputs=[
@@ -359,7 +359,7 @@ class OpenAIChatCompletionTracer(BaseContextTracer):
                         )
                         for output in response.get("choices", [])
                     ],
-                    metrics=StepMetrics(
+                    metrics=SpanMetrics(
                         prompt_tokens=safe_get(response, "usage", "prompt_tokens"),
                         completion_tokens=safe_get(
                             response, "usage", "completion_tokens"
@@ -374,14 +374,14 @@ class OpenAIChatCompletionTracer(BaseContextTracer):
     def handle_exception(
         self,
         err: Exception,
-        timestamps: StepTimestamps,
+        timestamps: SpanTimestamps,
         **kwargs,
     ):
-        self.steps.append(
+        self.spans.append(
             self.build_trace(
                 raw_response=None,
                 outputs=[],
-                metrics=StepMetrics(),
+                metrics=SpanMetrics(),
                 timestamps=timestamps,
                 error=capture_exception(err),
                 **kwargs,
@@ -391,13 +391,13 @@ class OpenAIChatCompletionTracer(BaseContextTracer):
     def build_trace(
         self,
         raw_response: Optional[Union[dict, list]],
-        outputs: List[StepOutput],
-        metrics: StepMetrics,
-        timestamps: StepTimestamps,
+        outputs: List[SpanOutput],
+        metrics: SpanMetrics,
+        timestamps: SpanTimestamps,
         error: Optional[ErrorCapture],
         **kwargs,
-    ) -> StepTrace:
-        return StepTrace(
+    ) -> SpanTrace:
+        return SpanTrace(
             trace_id=self.trace_id,
             vendor="openai",
             model=kwargs.get('model', 'unknown'),
@@ -407,7 +407,7 @@ class OpenAIChatCompletionTracer(BaseContextTracer):
             outputs=outputs,
             raw_response=raw_response,
             error=error,
-            params=StepParams(
+            params=SpanParams(
                 temperature=kwargs.get("temperature", 1.0),
                 stream=kwargs.get("stream", False),
             ),

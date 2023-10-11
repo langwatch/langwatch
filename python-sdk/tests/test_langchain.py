@@ -60,18 +60,18 @@ class TestLangChainTracer:
             request_history = [
                 r for r in mock_request.request_history if "langwatch" in r.url
             ]
-            first_step = request_history[0].json()["steps"][0]
-            assert first_step["trace_id"].startswith("trace_")
-            assert first_step["vendor"] == "openai"
-            assert first_step["model"] == "gpt-3.5-turbo"
-            assert first_step["input"] == {
+            first_span = request_history[0].json()["spans"][0]
+            assert first_span["trace_id"].startswith("trace_")
+            assert first_span["vendor"] == "openai"
+            assert first_span["model"] == "gpt-3.5-turbo"
+            assert first_span["input"] == {
                 "type": "chat_messages",
                 "value": [
                     {"role": "system", "content": template},
                     {"role": "user", "content": "colors"},
                 ],
             }
-            assert first_step["outputs"] == [
+            assert first_span["outputs"] == [
                 {
                     "type": "chat_messages",
                     "value": [
@@ -79,15 +79,15 @@ class TestLangChainTracer:
                     ],
                 }
             ]
-            assert "red, blue, green, yellow" in first_step["raw_response"]
-            assert first_step["params"] == {"temperature": 0.7, "stream": False}
-            assert first_step["metrics"] == {
+            assert "red, blue, green, yellow" in first_span["raw_response"]
+            assert first_span["params"] == {"temperature": 0.7, "stream": False}
+            assert first_span["metrics"] == {
                 "prompt_tokens": 5,
                 "completion_tokens": 16,
             }
-            assert first_step["timestamps"]["requested_at"] == int(
+            assert first_span["timestamps"]["requested_at"] == int(
                 datetime(2022, 1, 1, 0, 0, 0).timestamp() * 1000
             )
-            assert first_step["timestamps"]["finished_at"] >= int(
+            assert first_span["timestamps"]["finished_at"] >= int(
                 datetime(2022, 1, 1, 0, 0, 15).timestamp() * 1000
             )

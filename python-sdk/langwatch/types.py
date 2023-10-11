@@ -25,35 +25,35 @@ class ErrorCapture(TypedDict):
     stacktrace: List[str]
 
 
-StepInput = Union[TypedValueText, TypedValueChatMessages]
+SpanInput = Union[TypedValueText, TypedValueChatMessages]
 
-StepOutput = Union[TypedValueText, TypedValueChatMessages]
+SpanOutput = Union[TypedValueText, TypedValueChatMessages]
 
 
-class StepMetrics(TypedDict, total=False):
+class SpanMetrics(TypedDict, total=False):
     prompt_tokens: Optional[int]
     completion_tokens: Optional[int]
 
 
-class StepParams(TypedDict, total=False):
+class SpanParams(TypedDict, total=False):
     temperature: float
     stream: bool
 
 
-class StepTimestamps(TypedDict, total=False):
+class SpanTimestamps(TypedDict, total=False):
     requested_at: int
     first_token_at: Optional[int]
     finished_at: int
 
 
-class StepTrace(TypedDict, total=False):
+class SpanTrace(TypedDict, total=False):
     trace_id: str
     vendor: str
     model: str
-    input: StepInput
-    outputs: List[StepOutput]
+    input: SpanInput
+    outputs: List[SpanOutput]
     raw_response: Optional[Union[str, dict, list]]
     error: Optional[ErrorCapture]
-    params: StepParams
-    metrics: StepMetrics
-    timestamps: StepTimestamps
+    params: SpanParams
+    metrics: SpanMetrics
+    timestamps: SpanTimestamps
