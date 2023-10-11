@@ -20,7 +20,7 @@ from langwatch.types import (
     SpanOutput,
     SpanParams,
     SpanTimestamps,
-    SpanTrace,
+    LLMSpan,
     TypedValueChatMessages,
     TypedValueText,
 )
@@ -61,7 +61,7 @@ class LangWatchCallback(BaseCallbackHandler):
 
     def __init__(self, trace_id: Optional[str] = None) -> None:
         super().__init__()
-        self.spans: Dict[UUID, SpanTrace] = {}
+        self.spans: Dict[UUID, LLMSpan] = {}
         self.trace_id = trace_id or f"trace_{nanoid.generate()}"
 
     def on_llm_start(
@@ -76,7 +76,10 @@ class LangWatchCallback(BaseCallbackHandler):
         run_id: UUID,
         **kwargs: Any,
     ) -> Any:
-        self.spans[run_id] = SpanTrace(
+        self.spans[run_id] = LLMSpan(
+            type="llm",
+            # span_id=run_id, # TODO
+            # parent_id=parent_run_id, # TODO
             trace_id=self.trace_id,
             vendor=list_get(serialized.get("id", []), 2, "unknown").lower(),
             model=kwargs.get("invocation_params", {}).get("model_name", "unknown"),
@@ -84,7 +87,7 @@ class LangWatchCallback(BaseCallbackHandler):
                 type="chat_messages",
                 value=langchain_messages_to_chat_messages(messages),
             ),
-            timestamps=SpanTimestamps(requested_at=milliseconds_timestamp()),
+            timestamps=SpanTimestamps(started_at=milliseconds_timestamp()),
             params=SpanParams(
                 stream=kwargs.get("invocation_params", {}).get("stream", False),
                 temperature=kwargs.get("invocation_params", {}).get(

@@ -1,5 +1,6 @@
 import asyncio
 from datetime import datetime
+import json
 import time
 from freezegun import freeze_time
 from unittest.mock import patch
@@ -38,7 +39,7 @@ class TestOpenAICompletionTracer:
                 )
                 assert response == openai_mocks[1]
 
-            time.sleep(0.1)
+            time.sleep(0.01)
             first_span = mock_request.request_history[0].json()["spans"][0]
             assert first_span["trace_id"].startswith("trace_")
             assert first_span["vendor"] == "openai"
@@ -56,7 +57,7 @@ class TestOpenAICompletionTracer:
                 "prompt_tokens": 5,
                 "completion_tokens": 16,
             }
-            assert first_span["timestamps"]["requested_at"] == int(
+            assert first_span["timestamps"]["started_at"] == int(
                 datetime(2022, 1, 1, 0, 0, 0).timestamp() * 1000
             )
             assert first_span["timestamps"]["finished_at"] == int(
@@ -74,7 +75,7 @@ class TestOpenAICompletionTracer:
                     model="gpt-3.5-turbo-instruct", prompt="heey hey baby uh"
                 )
 
-            time.sleep(0.1)
+            time.sleep(0.01)
             third_span = mock_request.request_history[1].json()["spans"][0]
             assert third_span["trace_id"] != first_span["trace_id"]
 
@@ -94,7 +95,7 @@ class TestOpenAICompletionTracer:
                     )
             assert str(err.value) == "An error occurred!"
 
-            time.sleep(0.1)
+            time.sleep(0.01)
             traced = mock_request.request_history[0].json()["spans"][0]
             assert traced["error"]["message"] == "An error occurred!"
             assert len(traced["error"]["stacktrace"]) > 0
@@ -148,7 +149,7 @@ class TestOpenAICompletionTracer:
                     texts.append(chunk.get("choices")[0].get("text"))  # type: ignore
                 assert texts == [" there", " all", " good?", " how", " are", " you"]
 
-            time.sleep(1)
+            time.sleep(0.01)
             first_span = mock_request.request_history[0].json()["spans"][0]
             assert first_span["outputs"] == [
                 {
@@ -163,7 +164,7 @@ class TestOpenAICompletionTracer:
             assert first_span["vendor"] == "openai"
             assert first_span["model"] == "gpt-3.5-turbo-instruct"
             assert first_span["params"] == {"temperature": 1, "stream": True}
-            assert first_span["timestamps"]["requested_at"] == int(
+            assert first_span["timestamps"]["started_at"] == int(
                 datetime(2022, 1, 1, 0, 0, 0).timestamp() * 1000
             )
             assert first_span["timestamps"]["first_token_at"] == int(
@@ -203,7 +204,7 @@ class TestOpenAICompletionTracer:
                     texts.append(chunk.get("choices")[0].get("text"))  # type: ignore
                 assert texts == [" there", " all", " good?", " how", " are", " you"]
 
-            time.sleep(1)
+            time.sleep(0.01)
             first_span = mock_request.request_history[0].json()["spans"][0]
             assert first_span["outputs"] == [
                 {
@@ -218,6 +219,55 @@ class TestOpenAICompletionTracer:
             assert first_span["vendor"] == "openai"
             assert first_span["model"] == "gpt-3.5-turbo-instruct"
             assert first_span["params"] == {"temperature": 1, "stream": True}
+
+    @freeze_time("2022-01-01", auto_tick_seconds=15)
+    def test_trace_nested_spans(self):
+        with patch.object(
+            openai.Completion,
+            "create",
+            side_effect=[
+                create_openai_completion_mock(" there"),
+                create_openai_completion_mock(" are"),
+                create_openai_completion_mock("?"),
+            ],
+        ), requests_mock.Mocker() as mock_request:
+            mock_request.post(langwatch.endpoint, json={})
+
+            with langwatch.openai.OpenAICompletionTracer():
+                openai.Completion.create(model="gpt-3.5-turbo-instruct", prompt="hi")
+                with langwatch.span("subtask"):
+                    openai.Completion.create(
+                        model="gpt-3.5-turbo-instruct", prompt="how"
+                    )
+                    openai.Completion.create(
+                        model="gpt-3.5-turbo-instruct", prompt="you"
+                    )
+
+            time.sleep(0.01)
+
+            first_span = mock_request.request_history[0].json()["spans"][0]
+            second_span = mock_request.request_history[0].json()["spans"][1]
+            third_span = mock_request.request_history[0].json()["spans"][2]
+            fourth_span = mock_request.request_history[0].json()["spans"][3]
+
+            assert first_span["type"] == "llm"
+            assert first_span["trace_id"].startswith("trace_")
+            assert first_span["span_id"].startswith("span_")
+            assert first_span["parent_id"] == None
+
+            assert fourth_span["type"] == "span"
+            assert fourth_span["name"] == "subtask"
+            assert fourth_span["trace_id"] == first_span["trace_id"]
+            assert fourth_span["span_id"].startswith("span_")
+            assert fourth_span["parent_id"] == None
+
+            assert second_span["type"] == "llm"
+            assert second_span["trace_id"] == first_span["trace_id"]
+            assert second_span["parent_id"] == fourth_span["span_id"]
+
+            assert third_span["type"] == "llm"
+            assert third_span["trace_id"] == first_span["trace_id"]
+            assert third_span["parent_id"] == fourth_span["span_id"]
 
 
 class TestOpenAIChatCompletionTracer:
@@ -246,7 +296,7 @@ class TestOpenAIChatCompletionTracer:
                 )
                 assert response == openai_mocks[1]
 
-            time.sleep(0.1)
+            time.sleep(0.01)
             first_span = mock_request.request_history[0].json()["spans"][0]
             assert first_span["trace_id"].startswith("trace_")
             assert first_span["vendor"] == "openai"
@@ -267,7 +317,7 @@ class TestOpenAIChatCompletionTracer:
                 "prompt_tokens": 5,
                 "completion_tokens": 16,
             }
-            assert first_span["timestamps"]["requested_at"] == int(
+            assert first_span["timestamps"]["started_at"] == int(
                 datetime(2022, 1, 1, 0, 0, 0).timestamp() * 1000
             )
             assert first_span["timestamps"]["finished_at"] == int(
@@ -288,7 +338,7 @@ class TestOpenAIChatCompletionTracer:
                     openai.ChatCompletion.create(model="gpt-3.5-turbo", messages=[])
             assert str(err.value) == "An error occurred!"
 
-            time.sleep(0.1)
+            time.sleep(0.01)
             traced = mock_request.request_history[0].json()["spans"][0]
             assert traced["error"]["message"] == "An error occurred!"
             assert len(traced["error"]["stacktrace"]) > 0
@@ -359,7 +409,7 @@ class TestOpenAIChatCompletionTracer:
                     None,
                 ]
 
-            time.sleep(1)
+            time.sleep(0.01)
             first_span = mock_request.request_history[0].json()["spans"][0]
             assert first_span["outputs"] == [
                 {
@@ -374,7 +424,7 @@ class TestOpenAIChatCompletionTracer:
             assert first_span["vendor"] == "openai"
             assert first_span["model"] == "gpt-3.5-turbo"
             assert first_span["params"] == {"temperature": 1, "stream": True}
-            assert first_span["timestamps"]["requested_at"] == int(
+            assert first_span["timestamps"]["started_at"] == int(
                 datetime(2022, 1, 1, 0, 0, 0).timestamp() * 1000
             )
             assert first_span["timestamps"]["first_token_at"] == int(
@@ -440,7 +490,7 @@ class TestOpenAIChatCompletionTracer:
                     None,
                 ]
 
-            time.sleep(1)
+            time.sleep(0.01)
             first_span = mock_request.request_history[0].json()["spans"][0]
             assert first_span["outputs"] == [
                 {
@@ -476,7 +526,7 @@ class TestOpenAITracer:
                     messages=[{"role": "user", "content": "Hello ChatCompletion!"}],
                 )
 
-            time.sleep(0.1)
+            time.sleep(0.01)
             first_span = mock_request.request_history[0].json()["spans"][0]
             second_span = mock_request.request_history[1].json()["spans"][0]
             assert first_span["trace_id"] == second_span["trace_id"]

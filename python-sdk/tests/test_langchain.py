@@ -85,7 +85,7 @@ class TestLangChainTracer:
                 "prompt_tokens": 5,
                 "completion_tokens": 16,
             }
-            assert first_span["timestamps"]["requested_at"] == int(
+            assert first_span["timestamps"]["started_at"] == int(
                 datetime(2022, 1, 1, 0, 0, 0).timestamp() * 1000
             )
             assert first_span["timestamps"]["finished_at"] >= int(

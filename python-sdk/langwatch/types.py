@@ -41,12 +41,26 @@ class SpanParams(TypedDict, total=False):
 
 
 class SpanTimestamps(TypedDict, total=False):
-    requested_at: int
+    started_at: int
     first_token_at: Optional[int]
     finished_at: int
 
 
-class SpanTrace(TypedDict, total=False):
+class BaseSpan(TypedDict):
+    type: Literal["span"]
+    name: Optional[str]
+    span_id: str
+    parent_id: Optional[str]
+    trace_id: str
+    outputs: List[SpanOutput]  # TODO?
+    error: Optional[ErrorCapture]
+    timestamps: SpanTimestamps
+
+
+class LLMSpan(TypedDict, total=False):
+    type: Literal["llm"]
+    span_id: str
+    parent_id: Optional[str]
     trace_id: str
     vendor: str
     model: str
@@ -57,3 +71,6 @@ class SpanTrace(TypedDict, total=False):
     params: SpanParams
     metrics: SpanMetrics
     timestamps: SpanTimestamps
+
+
+Span = Union[LLMSpan, BaseSpan]
