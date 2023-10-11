@@ -10,7 +10,7 @@ from langwatch.types import StepTrace
 T = TypeVar("T")
 
 
-class BaseTracer:
+class BaseContextTracer:
     def __init__(self, trace_id: Optional[str] = None):
         self.steps: List[StepTrace] = []
         self.trace_id = trace_id or f"trace_{nanoid.generate()}"
@@ -19,8 +19,7 @@ class BaseTracer:
         pass
 
     def __exit__(self, _type, _value, _traceback):
-        if len(self.steps) > 0:
-            send_steps(self.steps)
+        send_steps(self.steps)
 
 
 executor = ThreadPoolExecutor(max_workers=10)
@@ -33,4 +32,6 @@ def _send_steps(steps: List[StepTrace]):
 
 
 def send_steps(steps: List[StepTrace]):
+    if len(steps) == 0:
+        return
     executor.submit(_send_steps, steps)

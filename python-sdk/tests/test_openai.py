@@ -6,7 +6,10 @@ from unittest.mock import patch
 import pytest
 import openai
 import langwatch
+import langwatch.openai
 import requests_mock
+
+from tests.utils import *
 
 
 class TestOpenAICompletionTracer:
@@ -38,7 +41,8 @@ class TestOpenAICompletionTracer:
             time.sleep(0.1)
             first_step = mock_request.request_history[0].json()["steps"][0]
             assert first_step["trace_id"].startswith("trace_")
-            assert first_step["model"] == "openai/gpt-3.5-turbo-instruct"
+            assert first_step["vendor"] == "openai"
+            assert first_step["model"] == "gpt-3.5-turbo-instruct"
             assert first_step["input"] == {"type": "text", "value": "hi"}
             assert first_step["outputs"] == [
                 {
@@ -156,7 +160,8 @@ class TestOpenAICompletionTracer:
                     "value": " how are you",
                 },
             ]
-            assert first_step["model"] == "openai/gpt-3.5-turbo-instruct"
+            assert first_step["vendor"] == "openai"
+            assert first_step["model"] == "gpt-3.5-turbo-instruct"
             assert first_step["params"] == {"temperature": 1, "stream": True}
             assert first_step["timestamps"]["requested_at"] == int(
                 datetime(2022, 1, 1, 0, 0, 0).timestamp() * 1000
@@ -210,7 +215,8 @@ class TestOpenAICompletionTracer:
                     "value": " how are you",
                 },
             ]
-            assert first_step["model"] == "openai/gpt-3.5-turbo-instruct"
+            assert first_step["vendor"] == "openai"
+            assert first_step["model"] == "gpt-3.5-turbo-instruct"
             assert first_step["params"] == {"temperature": 1, "stream": True}
 
 
@@ -243,7 +249,8 @@ class TestOpenAIChatCompletionTracer:
             time.sleep(0.1)
             first_step = mock_request.request_history[0].json()["steps"][0]
             assert first_step["trace_id"].startswith("trace_")
-            assert first_step["model"] == "openai/gpt-3.5-turbo"
+            assert first_step["vendor"] == "openai"
+            assert first_step["model"] == "gpt-3.5-turbo"
             assert first_step["input"] == {
                 "type": "chat_messages",
                 "value": [{"role": "user", "content": "Hello!"}],
@@ -364,7 +371,8 @@ class TestOpenAIChatCompletionTracer:
                     "value": [{"role": "assistant", "content": "Hi how are you"}],
                 },
             ]
-            assert first_step["model"] == "openai/gpt-3.5-turbo"
+            assert first_step["vendor"] == "openai"
+            assert first_step["model"] == "gpt-3.5-turbo"
             assert first_step["params"] == {"temperature": 1, "stream": True}
             assert first_step["timestamps"]["requested_at"] == int(
                 datetime(2022, 1, 1, 0, 0, 0).timestamp() * 1000
@@ -444,7 +452,7 @@ class TestOpenAIChatCompletionTracer:
                     "value": [{"role": "assistant", "content": "Hi how are you"}],
                 },
             ]
-            assert first_step["model"] == "openai/gpt-3.5-turbo"
+            assert first_step["model"] == "gpt-3.5-turbo"
             assert first_step["params"] == {"temperature": 1, "stream": True}
 
 
@@ -472,99 +480,3 @@ class TestOpenAITracer:
             first_step = mock_request.request_history[0].json()["steps"][0]
             second_step = mock_request.request_history[1].json()["steps"][0]
             assert first_step["trace_id"] == second_step["trace_id"]
-
-
-def create_openai_completion_mock(text):
-    return {
-        "id": "cmpl-861BvC6rh12Y1hrk8ml1BaQPJP0mE",
-        "object": "text_completion",
-        "created": 1696445239,
-        "model": "gpt-3.5-turbo-instruct",
-        "choices": [
-            {
-                "text": text,
-                "index": 0,
-                "logprobs": None,
-                "finish_reason": "length",
-            }
-        ],
-        "usage": {"prompt_tokens": 5, "completion_tokens": 16, "total_tokens": 21},
-    }
-
-
-def create_openai_completion_stream_mock(*text_groups):
-    for index, texts in enumerate(text_groups):
-        for text in texts:
-            yield create_openai_completion_chunk(index, text)
-
-
-async def create_openai_completion_async_stream_mock(*text_groups):
-    for index, texts in enumerate(text_groups):
-        for text in texts:
-            yield create_openai_completion_chunk(index, text)
-
-
-def create_openai_completion_chunk(index: int, text: str):
-    return {
-        "id": "cmpl-86MtN6iz0JSSIiLAesNKKqyDtKcZO",
-        "object": "text_completion",
-        "created": 1696528657,
-        "choices": [
-            {"text": text, "index": index, "logprobs": None, "finish_reason": "length"}
-        ],
-        "model": "gpt-3.5-turbo-instruct",
-    }
-
-
-def create_openai_chat_completion_mock(text):
-    return {
-        "id": "chatcmpl-86zIvz53Wa4qTc1ksUt3coF5yTvm7",
-        "object": "chat.completion",
-        "created": 1696676313,
-        "model": "gpt-3.5-turbo-0613",
-        "choices": [
-            {
-                "index": 0,
-                "message": {
-                    "role": "assistant",
-                    "content": text,
-                },
-                "finish_reason": "stop",
-            }
-        ],
-        "usage": {"prompt_tokens": 5, "completion_tokens": 16, "total_tokens": 21},
-    }
-
-
-def create_openai_chat_completion_stream_mock(*text_groups):
-    for index in range(0, len(text_groups)):
-        yield create_openai_chat_completion_chunk(
-            index, {"role": "assistant", "content": ""}
-        )
-    for index, texts in enumerate(text_groups):
-        for text in texts:
-            yield create_openai_chat_completion_chunk(index, {"content": text})
-    for index in range(0, len(text_groups)):
-        yield create_openai_chat_completion_chunk(index, {})
-
-
-async def create_openai_chat_completion_async_stream_mock(*text_groups):
-    for index in range(0, len(text_groups)):
-        yield create_openai_chat_completion_chunk(
-            index, {"role": "assistant", "content": ""}
-        )
-    for index, texts in enumerate(text_groups):
-        for text in texts:
-            yield create_openai_chat_completion_chunk(index, {"content": text})
-    for index in range(0, len(text_groups)):
-        yield create_openai_chat_completion_chunk(index, {})
-
-
-def create_openai_chat_completion_chunk(index: int, delta: dict):
-    return {
-        "id": "chatcmpl-871IjS1cTmejs3MVHu3zJseODF5KU",
-        "object": "chat.completion.chunk",
-        "created": 1696683989,
-        "model": "gpt-3.5-turbo-0613",
-        "choices": [{"index": index, "delta": delta, "finish_reason": None}],
-    }

@@ -6,8 +6,11 @@ class TypedValueText(TypedDict):
     value: str
 
 
+ChatRole = Literal["system", "user", "assistant", "function", "unknown"]
+
+
 class ChatMessage(TypedDict, total=False):
-    role: Literal["system", "user", "assistant", "function"]
+    role: ChatRole
     content: str
     name: Optional[str]
 
@@ -43,12 +46,13 @@ class StepTimestamps(TypedDict, total=False):
     finished_at: int
 
 
-class StepTrace(TypedDict):
+class StepTrace(TypedDict, total=False):
     trace_id: str
+    vendor: str
     model: str
     input: StepInput
     outputs: List[StepOutput]
-    raw_response: Optional[Union[dict, list]]
+    raw_response: Optional[Union[str, dict, list]]
     error: Optional[ErrorCapture]
     params: StepParams
     metrics: StepMetrics

@@ -2,7 +2,9 @@
 LangWatch
 
 This is the top level module for [LangWatch](https://github.com/langwatch/langwatch),
-all the core classes and functions are made available to be imported from here.
+it holds the api_key and the endpoint the tracing is going to be send to.
+
+For LLM and library-specific tracing functions, check out the other files on this module.
 """
 
 import os
@@ -11,6 +13,4 @@ import os
 endpoint = "https://app.langwatch.ai/api/trace"
 api_key = os.environ.get("LANGWATCH_API_KEY")
 
-from langwatch.openai import OpenAITracer
-
-__all__ = ("endpoint", "api_key", "OpenAITracer")
+__all__ = ("endpoint", "api_key")

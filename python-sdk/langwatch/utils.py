@@ -64,3 +64,10 @@ def capture_exception(err: Exception):
         etype=type(err), value=err, tb=err.__traceback__
     )
     return ErrorCapture(message=str(err), stacktrace=string_stacktrace)
+
+
+def list_get(l, i, default=None):
+    try:
+        return l[i]
+    except IndexError:
+        return default

@@ -1,5 +1,5 @@
 from typing import Any, AsyncGenerator, Dict, Generator, List, Optional, Union, cast
-from langwatch.tracer import BaseTracer
+from langwatch.tracer import BaseContextTracer
 
 from langwatch.types import (
     ChatMessage,
@@ -20,11 +20,14 @@ from langwatch.utils import (
     safe_get,
 )
 
+import openai
 
-class OpenAITracer(BaseTracer):
+
+class OpenAITracer(BaseContextTracer):
     """
     Tracing for both Completion and ChatCompletion endpoints
     """
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         if "trace_id" not in kwargs:
@@ -43,9 +46,8 @@ class OpenAITracer(BaseTracer):
         self.chat_completion_tracer.__exit__(_type, _value, _traceback)
 
 
-class OpenAICompletionTracer(BaseTracer):
+class OpenAICompletionTracer(BaseContextTracer):
     def __enter__(self):
-        import openai
         super().__enter__()
         self._original_completion_create = openai.Completion.create
         self._original_completion_acreate = openai.Completion.acreate
@@ -54,7 +56,6 @@ class OpenAICompletionTracer(BaseTracer):
         openai.Completion.acreate = self.patched_completion_acreate
 
     def __exit__(self, _type, _value, _traceback):
-        import openai
         super().__exit__(_type, _value, _traceback)
         openai.Completion.create = self._original_completion_create
 
@@ -205,7 +206,8 @@ class OpenAICompletionTracer(BaseTracer):
     ) -> StepTrace:
         return StepTrace(
             trace_id=self.trace_id,
-            model=f"openai/{kwargs.get('model', 'unknown')}",
+            vendor="openai",
+            model=kwargs.get('model', 'unknown'),
             input=TypedValueText(type="text", value=kwargs.get("prompt", "")),
             outputs=outputs,
             raw_response=raw_response,
@@ -219,9 +221,8 @@ class OpenAICompletionTracer(BaseTracer):
         )
 
 
-class OpenAIChatCompletionTracer(BaseTracer):
+class OpenAIChatCompletionTracer(BaseContextTracer):
     def __enter__(self):
-        import openai
         super().__enter__()
         self._original_completion_create = openai.ChatCompletion.create
         self._original_completion_acreate = openai.ChatCompletion.acreate
@@ -230,7 +231,6 @@ class OpenAIChatCompletionTracer(BaseTracer):
         openai.ChatCompletion.acreate = self.patched_completion_acreate
 
     def __exit__(self, _type, _value, _traceback):
-        import openai
         super().__exit__(_type, _value, _traceback)
         openai.Completion.create = self._original_completion_create
 
@@ -399,7 +399,8 @@ class OpenAIChatCompletionTracer(BaseTracer):
     ) -> StepTrace:
         return StepTrace(
             trace_id=self.trace_id,
-            model=f"openai/{kwargs.get('model', 'unknown')}",
+            vendor="openai",
+            model=kwargs.get('model', 'unknown'),
             input=TypedValueChatMessages(
                 type="chat_messages", value=kwargs.get("messages", [])
             ),
