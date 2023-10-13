@@ -45,7 +45,9 @@ class ErrorCapture(TypedDict):
 
 SpanInput = Union[TypedValueText, TypedValueChatMessages, TypedValueJson, TypedValueRaw]
 
-SpanOutput = Union[TypedValueText, TypedValueChatMessages, TypedValueJson, TypedValueRaw]
+SpanOutput = Union[
+    TypedValueText, TypedValueChatMessages, TypedValueJson, TypedValueRaw
+]
 
 
 class SpanMetrics(TypedDict, total=False):
@@ -71,8 +73,8 @@ class BaseSpan(TypedDict):
     span_id: str
     parent_id: Optional[str]
     trace_id: str
-    # TODO: inputs?
-    outputs: List[SpanOutput]  # TODO?
+    input: Optional[SpanInput]
+    outputs: List[SpanOutput]
     error: Optional[ErrorCapture]
     timestamps: SpanTimestamps
 

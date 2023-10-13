@@ -199,12 +199,13 @@ class LangChainTracer(BaseContextTracer, BaseCallbackHandler):
             run_id=run_id,
             parent_run_id=parent_run_id,
             name=name if name else list_get(serialized.get("id", ""), -1, None),
+            input=self._autoconvert_typed_values(inputs),
         )
 
     def on_chain_end(
         self, outputs: Dict[str, Any], *, run_id: UUID, **kwargs: Any
     ) -> Any:
-        self._end_base_span(run_id, outputs=[self._autoconvert_output(outputs)])
+        self._end_base_span(run_id, outputs=[self._autoconvert_typed_values(outputs)])
 
     def on_chain_error(
         self, error: BaseException, *, run_id: UUID, **kwargs: Any
@@ -227,6 +228,7 @@ class LangChainTracer(BaseContextTracer, BaseCallbackHandler):
             run_id=run_id,
             parent_run_id=parent_run_id,
             name=serialized.get("name"),
+            input=self._autoconvert_typed_values(input_str),
         )
 
     def _build_base_span(
@@ -235,6 +237,7 @@ class LangChainTracer(BaseContextTracer, BaseCallbackHandler):
         run_id: UUID,
         parent_run_id: Optional[UUID],
         name: Optional[str],
+        input: Optional[SpanInput],
     ) -> BaseSpan:
         return BaseSpan(
             type=type,
@@ -242,6 +245,7 @@ class LangChainTracer(BaseContextTracer, BaseCallbackHandler):
             span_id=f"span_{run_id}",
             parent_id=f"span_{parent_run_id}" if parent_run_id else None,
             trace_id=self.trace_id,
+            input=input,
             outputs=[],
             error=None,
             timestamps=SpanTimestamps(started_at=milliseconds_timestamp()),
@@ -269,7 +273,7 @@ class LangChainTracer(BaseContextTracer, BaseCallbackHandler):
         run_id: UUID,
         **kwargs: Any,
     ) -> Any:
-        self._end_base_span(run_id, outputs=[self._autoconvert_output(output)])
+        self._end_base_span(run_id, outputs=[self._autoconvert_typed_values(output)])
 
     def on_tool_error(
         self, error: BaseException, *, run_id: UUID, **kwargs: Any
@@ -292,6 +296,7 @@ class LangChainTracer(BaseContextTracer, BaseCallbackHandler):
             run_id=run_id,
             parent_run_id=parent_run_id,
             name=action.tool,
+            input=self._autoconvert_typed_values(action.tool_input),
         )
 
     def on_agent_finish(
@@ -303,10 +308,10 @@ class LangChainTracer(BaseContextTracer, BaseCallbackHandler):
         **kwargs: Any,
     ) -> Any:
         self._end_base_span(
-            run_id, outputs=[self._autoconvert_output(finish.return_values)]
+            run_id, outputs=[self._autoconvert_typed_values(finish.return_values)]
         )
 
-    def _autoconvert_output(self, output: Any) -> SpanOutput:
+    def _autoconvert_typed_values(self, output: Any) -> SpanOutput:
         if isinstance(output, BaseMessage):
             return TypedValueChatMessages(
                 type="chat_messages", value=[langchain_message_to_chat_message(output)]
@@ -315,6 +320,15 @@ class LangChainTracer(BaseContextTracer, BaseCallbackHandler):
             return TypedValueChatMessages(
                 type="chat_messages",
                 value=[langchain_message_to_chat_message(m) for m in output],
+            )
+        elif (
+            type(output) == list
+            and type(list_get(output, 0)) == list
+            and isinstance(list_get(output[0], 0), BaseMessage)
+        ):
+            return TypedValueChatMessages(
+                type="chat_messages",
+                value=langchain_messages_to_chat_messages(output),
             )
         else:
             return autoconvert_typed_values(output)

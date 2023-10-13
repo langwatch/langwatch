@@ -1,7 +1,7 @@
 from contextlib import contextmanager
 import json
 import threading
-from typing import Dict, List, Optional, TypeVar, TypedDict
+from typing import Any, Dict, List, Optional, TypeVar, TypedDict
 import nanoid
 import requests
 from concurrent.futures import ThreadPoolExecutor
@@ -9,7 +9,7 @@ from retry import retry
 
 import langwatch
 from langwatch.types import BaseSpan, ErrorCapture, Span, SpanTimestamps
-from langwatch.utils import capture_exception, milliseconds_timestamp
+from langwatch.utils import autoconvert_typed_values, capture_exception, milliseconds_timestamp
 
 T = TypeVar("T")
 
@@ -19,11 +19,11 @@ _local_context = threading.local()
 class ContextSpan(TypedDict):
     id: str
     parent: Optional["ContextSpan"]
-    name: str
+    name: Optional[str]
 
 
 @contextmanager
-def span(name: Optional[str] = None):
+def span(name: Optional[str] = None, input: Any = None):
     context_span = ContextSpan(id=f"span_{nanoid.generate()}", parent=None, name=name)
 
     current_span = getattr(_local_context, "current_span", None)
@@ -35,8 +35,10 @@ def span(name: Optional[str] = None):
 
     started_at = milliseconds_timestamp()
     error: Optional[ErrorCapture] = None
+
+    output : Any = None
     try:
-        yield
+        output = yield
     except Exception as err:
         error = capture_exception(err)
     finished_at = milliseconds_timestamp()
@@ -55,7 +57,8 @@ def span(name: Optional[str] = None):
                 if context_span["parent"]
                 else None,  # TODO: test
                 trace_id=context_tracer.trace_id,  # TODO: test
-                outputs=[],  # TODO
+                input=autoconvert_typed_values(input) if input else None,
+                outputs=[autoconvert_typed_values(output)] if output else [],  # TODO
                 error=error,  # TODO: test
                 timestamps=SpanTimestamps(
                     started_at=started_at, finished_at=finished_at
