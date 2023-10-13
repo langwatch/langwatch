@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional, Union, cast
+from typing import Any, Dict, List, Literal, Optional, Union, cast
 from langchain.schema import (
     LLMResult,
     AgentAction,
@@ -184,53 +184,116 @@ class LangChainTracer(BaseContextTracer, BaseCallbackHandler):
         name: Optional[str],
         **kwargs: Any,
     ) -> Any:
-        self.spans[str(run_id)] = BaseSpan(
+        self.spans[str(run_id)] = self._build_base_span(
             type="chain",
+            run_id=run_id,
+            parent_run_id=parent_run_id,
             name=name if name else list_get(serialized.get("id", ""), -1, None),
-            span_id=f"span_{run_id}",
-            parent_id=f"span_{parent_run_id}" if parent_run_id else None,
-            trace_id=self.trace_id,
-            outputs=[],  # TODO?
-            error=None,
-            timestamps=SpanTimestamps(started_at=milliseconds_timestamp()),
         )
 
     def on_chain_end(
         self, outputs: Dict[str, Any], *, run_id: UUID, **kwargs: Any
     ) -> Any:
+        self._end_base_span(
+            run_id, outputs=[TypedValueJson(type="json", value=outputs)]
+        )
+
+    def on_chain_error(
+        self, error: BaseException, *, run_id: UUID, **kwargs: Any
+    ) -> Any:
+        self._on_error_base_span(run_id, error)
+
+    def on_tool_start(
+        self,
+        serialized: Dict[str, Any],
+        input_str: str,
+        *,
+        run_id: UUID,
+        parent_run_id: Optional[UUID] = None,
+        tags: Union[List[str], None] = None,  # TODO?
+        metadata: Union[Dict[str, Any], None] = None,  # TODO?
+        **kwargs: Any,
+    ) -> Any:
+        self.spans[str(run_id)] = self._build_base_span(
+            type="tool",
+            run_id=run_id,
+            parent_run_id=parent_run_id,
+            name=serialized.get("name"),
+        )
+
+    def _build_base_span(
+        self,
+        type: Literal["span", "chain", "tool", "agent"],
+        run_id: UUID,
+        parent_run_id: Optional[UUID],
+        name: Optional[str],
+    ) -> BaseSpan:
+        return BaseSpan(
+            type=type,
+            name=name,
+            span_id=f"span_{run_id}",
+            parent_id=f"span_{parent_run_id}" if parent_run_id else None,
+            trace_id=self.trace_id,
+            outputs=[],
+            error=None,
+            timestamps=SpanTimestamps(started_at=milliseconds_timestamp()),
+        )
+
+    def _end_base_span(self, run_id: UUID, outputs: List[SpanOutput]):
         span = self.spans.get(str(run_id))
         if span == None:
             return
 
         if "timestamps" in span and span["timestamps"]:
             span["timestamps"]["finished_at"] = milliseconds_timestamp()
+        span["outputs"] = outputs
 
-    def on_chain_error(
-        self, error: BaseException, *, run_id: UUID, **kwargs: Any
-    ) -> Any:
+    def _on_error_base_span(self, run_id: UUID, error: BaseException):
         span = self.spans.get(str(run_id))
         if span == None:
             return
         span["error"] = capture_exception(error)
 
-    def on_tool_start(
-        self, serialized: Dict[str, Any], input_str: str, **kwargs: Any
+    def on_tool_end(
+        self,
+        output: str,
+        *,
+        run_id: UUID,
+        **kwargs: Any,
     ) -> Any:
-        print("NOT IMPLEMENTED YET on_tool_start")
-
-    def on_tool_end(self, output: str, **kwargs: Any) -> Any:
-        print("NOT IMPLEMENTED YET on_tool_end")
+        self._end_base_span(run_id, outputs=[TypedValueText(type="text", value=output)])
 
     def on_tool_error(
-        self, error: Union[Exception, KeyboardInterrupt], **kwargs: Any
+        self, error: BaseException, *, run_id: UUID, **kwargs: Any
     ) -> Any:
-        print("NOT IMPLEMENTED YET on_tool_error")
+        self._on_error_base_span(run_id, error)
 
     def on_text(self, text: str, **kwargs: Any) -> Any:
         pass
 
-    def on_agent_action(self, action: AgentAction, **kwargs: Any) -> Any:
-        print("NOT IMPLEMENTED YET on_agent_action")
+    def on_agent_action(
+        self,
+        action: AgentAction,
+        *,
+        run_id: UUID,
+        parent_run_id: Optional[UUID] = None,
+        **kwargs: Any,
+    ) -> Any:
+        self.spans[str(run_id)] = self._build_base_span(
+            type="agent",
+            run_id=run_id,
+            parent_run_id=parent_run_id,
+            name=action.tool,
+        )
 
-    def on_agent_finish(self, finish: AgentFinish, **kwargs: Any) -> Any:
-        print("NOT IMPLEMENTED YET on_agent_finish")
+    def on_agent_finish(
+        self,
+        finish: AgentFinish,
+        *,
+        run_id: UUID,
+        parent_run_id: Optional[UUID] = None,
+        **kwargs: Any,
+    ) -> Any:
+        self._end_base_span(
+            run_id, outputs=[TypedValueJson(type="json", value=finish.return_values)]
+        )

@@ -55,7 +55,7 @@ class SpanTimestamps(TypedDict, total=False):
 
 
 class BaseSpan(TypedDict):
-    type: Literal["span", "chain"]
+    type: Literal["span", "chain", "tool", "agent"]
     name: Optional[str]
     span_id: str
     parent_id: Optional[str]

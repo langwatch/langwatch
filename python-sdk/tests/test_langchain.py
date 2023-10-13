@@ -4,6 +4,7 @@ import time
 from unittest.mock import patch
 from freezegun import freeze_time
 
+from langchain.chains import LLMMathChain
 from langchain.llms import OpenAI
 from langchain.chat_models import ChatOpenAI
 from langchain.prompts import PromptTemplate, ChatPromptTemplate
@@ -16,6 +17,9 @@ import requests_mock
 
 import langwatch
 import langwatch.langchain
+from langchain.agents import load_tools, initialize_agent, Tool
+from langchain.agents.agent import AgentExecutor
+from langchain.agents.openai_functions_agent.base import OpenAIFunctionsAgent
 
 from tests.utils import *
 
@@ -243,6 +247,141 @@ class TestLangChainTracer:
             assert second_span["timestamps"]["finished_at"] >= int(
                 datetime(2022, 1, 1, 0, 0, 30).timestamp() * 1000
             )
+
+    @freeze_time("2022-01-01", auto_tick_seconds=15)
+    def test_trace_agents_functions_and_tools(self):  # TODO: test without functions?
+        # with patch.object(
+        #     openai.ChatCompletion,
+        #     "create",
+        #     side_effect=[
+        #         {
+        #             "choices": [
+        #                 {
+        #                     "finish_reason": "function_call",
+        #                     "index": 0,
+        #                     "message": {
+        #                         "content": None,
+        #                         "function_call": {
+        #                             "arguments": '{\n  "__arg1": "2+2"\n}',
+        #                             "name": "Calculator",
+        #                         },
+        #                         "role": "assistant",
+        #                     },
+        #                 }
+        #             ],
+        #             "created": 1697189473,
+        #             "id": "chatcmpl-898nhOctWsU6TpiJYEsrwcAHj1sSN",
+        #             "model": "gpt-3.5-turbo-0613",
+        #             "object": "chat.completion",
+        #             "usage": {
+        #                 "completion_tokens": 19,
+        #                 "prompt_tokens": 66,
+        #                 "total_tokens": 85,
+        #             },
+        #         },
+        #     ],
+        # ), requests_mock.Mocker() as mock_request:
+        with requests_mock.Mocker() as mock_request:
+            mock_request.post(langwatch.endpoint, json={})
+            mock_request.post(
+                "https://api.openai.com/v1/chat/completions",
+                [
+                    {
+                        "json": {
+                            "choices": [
+                                {
+                                    "finish_reason": "function_call",
+                                    "index": 0,
+                                    "message": {
+                                        "content": None,
+                                        "function_call": {
+                                            "arguments": '{\n  "__arg1": "2+2"\n}',
+                                            "name": "Calculator",
+                                        },
+                                        "role": "assistant",
+                                    },
+                                }
+                            ],
+                            "created": 1697189473,
+                            "id": "chatcmpl-898nhOctWsU6TpiJYEsrwcAHj1sSN",
+                            "model": "gpt-3.5-turbo-0613",
+                            "object": "chat.completion",
+                            "usage": {
+                                "completion_tokens": 19,
+                                "prompt_tokens": 66,
+                                "total_tokens": 85,
+                            },
+                        }
+                    },
+                    {
+                        "json": create_openai_chat_completion_mock(
+                            '```text\n2 + 2\n```\n...numexpr.evaluate("2 + 2")...\n'
+                        )
+                    },
+                    {
+                        "json": create_openai_chat_completion_mock(
+                            "2 + 2 is equal to 4."
+                        )
+                    },
+                ],
+            )
+
+            llm = ChatOpenAI()
+            llm_math_chain = LLMMathChain.from_llm(llm=llm, verbose=True)
+            tools = [
+                Tool(
+                    name="Calculator",
+                    func=llm_math_chain.run,
+                    description="useful for when you need to answer questions about math",
+                ),
+            ]
+            agent = AgentExecutor.from_agent_and_tools(
+                agent=OpenAIFunctionsAgent.from_llm_and_tools(
+                    llm,
+                    tools,
+                    verbose=True,
+                ),
+                tools=tools,
+                verbose=True,
+            )
+
+            with langwatch.langchain.LangChainTracer() as langWatchCallback:
+                result = agent.run("how much is 2+2?", callbacks=[langWatchCallback])
+            print("\n\nresult\n\n", result)
+
+            assert result == "2 + 2 is equal to 4."
+
+            time.sleep(0.01)
+            request_history = [
+                r for r in mock_request.request_history if "langwatch" in r.url
+            ]
+            # print(
+            #     "\n\nrequest_history[0].json()\n\n",
+            #     json.dumps(request_history[0].json(), indent=2),
+            # )
+            spans = request_history[0].json()["spans"]
+
+            calculator_tool = [
+                span
+                for span in spans
+                if span["type"] == "tool"
+                and "name" in span
+                and span["name"] == "Calculator"
+            ][0]
+            assert calculator_tool["outputs"] == [
+                {"type": "text", "value": "Answer: 4"}
+            ]
+
+            calculator_agent = [
+                span
+                for span in spans
+                if span["type"] == "agent"
+                and "name" in span
+                and span["name"] == "Calculator"
+            ][0]
+            assert calculator_agent["outputs"] == [
+                {"type": "json", "value": {"output": "2 + 2 is equal to 4."}}
+            ]
 
     def test_trace_errors(self):
         with requests_mock.Mocker() as mock_request:

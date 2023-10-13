@@ -5,3 +5,4 @@ dist
 .venv
 examples/.chainlit
 examples/chainlit.md
+repl.ipynb
