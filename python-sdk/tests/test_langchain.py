@@ -3,8 +3,9 @@ import json
 import time
 from freezegun import freeze_time
 
+from langchain.llms import OpenAI
 from langchain.chat_models import ChatOpenAI
-from langchain.prompts.chat import ChatPromptTemplate
+from langchain.prompts import PromptTemplate, ChatPromptTemplate
 from langchain.schema import (
     BaseOutputParser,
 )
@@ -27,7 +28,7 @@ class CommaSeparatedListOutputParser(BaseOutputParser):
 
 class TestLangChainTracer:
     @freeze_time("2022-01-01", auto_tick_seconds=15)
-    def test_trace_lang_chain_calls(self):
+    def test_trace_lang_chain_chat_calls(self):
         with requests_mock.Mocker() as mock_request:
             mock_request.post(langwatch.endpoint, json={})
             mock_request.post(
@@ -104,6 +105,55 @@ class TestLangChainTracer:
             assert second_span["timestamps"]["finished_at"] >= int(
                 datetime(2022, 1, 1, 0, 0, 30).timestamp() * 1000
             )
+
+    def test_trace_lang_chain_completion(self):
+        with requests_mock.Mocker() as mock_request:
+            mock_request.post(langwatch.endpoint, json={})
+            mock_request.post(
+                "https://api.openai.com/v1/completions",
+                json=create_openai_completion_mock("red, blue, green, yellow"),
+            )
+
+            template = """You are a helpful assistant who generates comma separated lists.
+            A user will pass in a category, and you should generate 5 objects in that category in a comma separated list.
+            ONLY return a comma separated list, and nothing more. Make a list of {text}"""
+
+            chat_prompt = PromptTemplate.from_template(template)
+            chain = LLMChain(
+                llm=OpenAI(),
+                prompt=chat_prompt,
+            )
+            with langwatch.langchain.LangChainTracer() as langWatchCallback:
+                result = chain.run(text="colors", callbacks=[langWatchCallback])
+            assert result == "red, blue, green, yellow"
+
+            time.sleep(0.01)
+            request_history = [
+                r for r in mock_request.request_history if "langwatch" in r.url
+            ]
+            first_span, second_span = request_history[0].json()["spans"]
+
+            assert first_span["type"] == "chain"
+
+            assert second_span["type"] == "llm"
+            assert second_span["vendor"] == "openai"
+            assert second_span["model"] == "text-davinci-003"
+            assert second_span["input"] == {
+                "type": "json",
+                "value": [template.replace("{text}", "colors")],
+            }
+            assert second_span["outputs"] == [
+                {
+                    "type": "text",
+                    "value": "red, blue, green, yellow",
+                }
+            ]
+            assert "red, blue, green, yellow" in second_span["raw_response"]
+            assert second_span["params"] == {"temperature": 0.7, "stream": False}
+            assert second_span["metrics"] == {
+                "prompt_tokens": 5,
+                "completion_tokens": 16,
+            }
 
     def test_trace_errors(self):
         with requests_mock.Mocker() as mock_request:

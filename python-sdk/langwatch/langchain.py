@@ -16,12 +16,14 @@ from langwatch.types import (
     BaseSpan,
     ChatMessage,
     ChatRole,
+    SpanInput,
     SpanMetrics,
     SpanOutput,
     SpanParams,
     SpanTimestamps,
     LLMSpan,
     TypedValueChatMessages,
+    TypedValueJson,
     TypedValueText,
 )
 
@@ -62,9 +64,26 @@ class LangChainTracer(BaseContextTracer, BaseCallbackHandler):
         super().__init__(trace_id)
 
     def on_llm_start(
-        self, serialized: Dict[str, Any], prompts: List[str], **kwargs: Any
+        self,
+        serialized: Dict[str, Any],
+        prompts: List[str],
+        *,
+        run_id: UUID,
+        parent_run_id: Union[UUID, None] = None,
+        tags: Union[List[str], None] = None,  # TODO?
+        metadata: Union[Dict[str, Any], None] = None,  # TODO?
+        **kwargs: Any,
     ) -> Any:
-        print("NOT IMPLEMENTED YET on_llm_start")
+        self.spans[str(run_id)] = self._build_llm_span(
+            serialized=serialized,
+            run_id=run_id,
+            parent_run_id=parent_run_id,
+            input=TypedValueJson(
+                type="json",
+                value=prompts,
+            ),
+            **kwargs,
+        )
 
     def on_chat_model_start(
         self,
@@ -72,20 +91,36 @@ class LangChainTracer(BaseContextTracer, BaseCallbackHandler):
         messages: List[List[BaseMessage]],
         *,
         run_id: UUID,
-        parent_run_id: UUID,
+        parent_run_id: Optional[UUID],
         **kwargs: Any,
     ) -> Any:
-        self.spans[str(run_id)] = LLMSpan(
+        self.spans[str(run_id)] = self._build_llm_span(
+            serialized=serialized,
+            run_id=run_id,
+            parent_run_id=parent_run_id,
+            input=TypedValueChatMessages(
+                type="chat_messages",
+                value=langchain_messages_to_chat_messages(messages),
+            ),
+            **kwargs,
+        )
+
+    def _build_llm_span(
+        self,
+        serialized: Dict[str, Any],
+        run_id: UUID,
+        parent_run_id: Optional[UUID],
+        input: SpanInput,
+        **kwargs: Any,
+    ):
+        return LLMSpan(
             type="llm",
             span_id=f"span_{run_id}",
             parent_id=f"span_{parent_run_id}" if parent_run_id else None,
             trace_id=self.trace_id,
             vendor=list_get(serialized.get("id", []), 2, "unknown").lower(),
             model=kwargs.get("invocation_params", {}).get("model_name", "unknown"),
-            input=TypedValueChatMessages(
-                type="chat_messages",
-                value=langchain_messages_to_chat_messages(messages),
-            ),
+            input=input,
             timestamps=SpanTimestamps(started_at=milliseconds_timestamp()),
             params=SpanParams(
                 stream=kwargs.get("invocation_params", {}).get("stream", False),

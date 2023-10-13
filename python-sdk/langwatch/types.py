@@ -1,9 +1,4 @@
-from typing import List, Literal, Optional, TypedDict, Union
-
-
-class TypedValueText(TypedDict):
-    type: Literal["text"]
-    value: str
+from typing import Any, Dict, List, Literal, Optional, TypedDict, Union
 
 
 ChatRole = Literal["system", "user", "assistant", "function", "unknown"]
@@ -20,14 +15,27 @@ class TypedValueChatMessages(TypedDict):
     value: List[ChatMessage]
 
 
+class TypedValueText(TypedDict):
+    type: Literal["text"]
+    value: str
+
+
+JSONSerializable = Union[str, int, float, bool, None, Dict[str, Any], List[Any]]
+
+
+class TypedValueJson(TypedDict):
+    type: Literal["json"]
+    value: JSONSerializable
+
+
 class ErrorCapture(TypedDict):
     message: str
     stacktrace: List[str]
 
 
-SpanInput = Union[TypedValueText, TypedValueChatMessages]
+SpanInput = Union[TypedValueText, TypedValueChatMessages, TypedValueJson]
 
-SpanOutput = Union[TypedValueText, TypedValueChatMessages]
+SpanOutput = Union[TypedValueText, TypedValueChatMessages, TypedValueJson]
 
 
 class SpanMetrics(TypedDict, total=False):
