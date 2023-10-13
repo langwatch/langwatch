@@ -306,6 +306,7 @@ class OpenAIChatCompletionTracer(BaseContextTracer):
         timestamps: SpanTimestamps,
         **kwargs,
     ):
+        # Accumulate deltas
         raw_response = []
         chat_outputs: Dict[int, List[ChatMessage]] = {}
         for delta in deltas:
@@ -317,18 +318,25 @@ class OpenAIChatCompletionTracer(BaseContextTracer):
                 if "role" in delta:
                     chat_message: ChatMessage = {
                         "role": delta.get("role"),
-                        "content": delta.get("content", ""),
+                        "content": delta.get("content"),
                     }
-                    if "name" in delta:
-                        chat_message["name"] = delta.get("name")
+                    if "function_call" in delta:
+                        chat_message["function_call"] = delta["function_call"]
                     if index not in chat_outputs:
                         chat_outputs[index] = []
                     chat_outputs[index].append(chat_message)
-                elif "content" in delta or "name" in delta:
-                    if (
-                        "name" in delta
-                    ):  # TODO: check if this is the actual behaviour with function calls
-                        chat_outputs[index][-1]["name"] = delta.get("name")
+                elif "function_call" in delta:
+                    last_item = chat_outputs[index][-1]
+                    if "function_call" in last_item and last_item["function_call"]:
+                        current_arguments = last_item["function_call"].get(
+                            "arguments", ""
+                        )
+                        last_item["function_call"][
+                            "arguments"
+                        ] = current_arguments + delta["function_call"].get(
+                            "arguments", ""
+                        )
+                elif "content" in delta:
                     chat_outputs[index][-1]["content"] = chat_outputs[index][-1].get(
                         "content", ""
                     ) + delta.get("content", "")
@@ -402,6 +410,13 @@ class OpenAIChatCompletionTracer(BaseContextTracer):
         error: Optional[ErrorCapture],
         **kwargs,
     ) -> LLMSpan:
+        params = SpanParams(
+            temperature=kwargs.get("temperature", 1.0),
+            stream=kwargs.get("stream", False),
+        )
+        functions = kwargs.get("functions", None)
+        if functions:
+            params["functions"] = functions
         return LLMSpan(
             type="llm",
             span_id=f"span_{nanoid.generate()}",
@@ -415,10 +430,7 @@ class OpenAIChatCompletionTracer(BaseContextTracer):
             outputs=outputs,
             raw_response=raw_response,
             error=error,
-            params=SpanParams(
-                temperature=kwargs.get("temperature", 1.0),
-                stream=kwargs.get("stream", False),
-            ),
+            params=params,
             metrics=metrics,
             timestamps=timestamps,
         )

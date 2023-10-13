@@ -72,6 +72,26 @@ def create_openai_chat_completion_stream_mock(*text_groups):
         yield create_openai_chat_completion_chunk(index, {})
 
 
+def create_openai_chat_completion_function_stream_mock(*function_calls):
+    for index, function_call in enumerate(function_calls):
+        yield create_openai_chat_completion_chunk(
+            index,
+            {
+                "role": "assistant",
+                "content": None,
+                "function_call": {"name": function_call["name"], "arguments": ""},
+            },
+        )
+    for index, function_call in enumerate(function_calls):
+        for token_index, token in enumerate(function_call["arguments"].split(" ")):
+            yield create_openai_chat_completion_chunk(
+                index,
+                {"function_call": {"arguments": ("" if token_index == 0 else " ") + token}},
+            )
+    for index in range(0, len(function_calls)):
+        yield create_openai_chat_completion_chunk(index, {})
+
+
 async def create_openai_chat_completion_async_stream_mock(*text_groups):
     for index in range(0, len(text_groups)):
         yield create_openai_chat_completion_chunk(

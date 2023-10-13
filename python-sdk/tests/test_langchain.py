@@ -250,37 +250,6 @@ class TestLangChainTracer:
 
     @freeze_time("2022-01-01", auto_tick_seconds=15)
     def test_trace_agents_functions_and_tools(self):  # TODO: test without functions?
-        # with patch.object(
-        #     openai.ChatCompletion,
-        #     "create",
-        #     side_effect=[
-        #         {
-        #             "choices": [
-        #                 {
-        #                     "finish_reason": "function_call",
-        #                     "index": 0,
-        #                     "message": {
-        #                         "content": None,
-        #                         "function_call": {
-        #                             "arguments": '{\n  "__arg1": "2+2"\n}',
-        #                             "name": "Calculator",
-        #                         },
-        #                         "role": "assistant",
-        #                     },
-        #                 }
-        #             ],
-        #             "created": 1697189473,
-        #             "id": "chatcmpl-898nhOctWsU6TpiJYEsrwcAHj1sSN",
-        #             "model": "gpt-3.5-turbo-0613",
-        #             "object": "chat.completion",
-        #             "usage": {
-        #                 "completion_tokens": 19,
-        #                 "prompt_tokens": 66,
-        #                 "total_tokens": 85,
-        #             },
-        #         },
-        #     ],
-        # ), requests_mock.Mocker() as mock_request:
         with requests_mock.Mocker() as mock_request:
             mock_request.post(langwatch.endpoint, json={})
             mock_request.post(

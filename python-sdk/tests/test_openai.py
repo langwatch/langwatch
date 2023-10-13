@@ -374,6 +374,106 @@ class TestOpenAIChatCompletionTracer:
             ]
 
     @freeze_time("2022-01-01", auto_tick_seconds=15)
+    def test_trace_session_captures_openai_function_calls(self):
+        openai_mocks = [
+            {
+                "id": "chatcmpl-86zIvz53Wa4qTc1ksUt3coF5yTvm7",
+                "object": "chat.completion",
+                "created": 1696676313,
+                "model": "gpt-3.5-turbo-0613",
+                "choices": [
+                    {
+                        "index": 0,
+                        "message": {
+                            "role": "assistant",
+                            "function_call": {
+                                "arguments": '{\n  "input": "2+2"\n}',
+                                "name": "Calculator",
+                            },
+                            "content": None,
+                        },
+                        "finish_reason": "function_call",
+                    }
+                ],
+                "usage": {
+                    "prompt_tokens": 5,
+                    "completion_tokens": 16,
+                    "total_tokens": 21,
+                },
+            }
+        ]
+        with patch.object(
+            openai.ChatCompletion,
+            "create",
+            side_effect=openai_mocks,
+        ), requests_mock.Mocker() as mock_request:
+            mock_request.post(langwatch.endpoint, json={})
+
+            with langwatch.openai.OpenAIChatCompletionTracer():
+                openai.ChatCompletion.create(
+                    model="gpt-3.5-turbo",
+                    messages=[{"role": "user", "content": "how much is 2 + 2?"}],
+                    functions=[
+                        {
+                            "name": "Calculator",
+                            "description": "useful for when you need to answer questions about math",
+                            "parameters": {
+                                "properties": {
+                                    "expression": {
+                                        "title": "expression",
+                                        "type": "string",
+                                    }
+                                },
+                                "required": ["expression"],
+                                "type": "object",
+                            },
+                        }
+                    ],
+                )
+
+            time.sleep(0.01)
+            first_span = mock_request.request_history[0].json()["spans"][0]
+            assert first_span["trace_id"].startswith("trace_")
+            assert first_span["vendor"] == "openai"
+            assert first_span["model"] == "gpt-3.5-turbo"
+            assert first_span["input"] == {
+                "type": "chat_messages",
+                "value": [{"role": "user", "content": "how much is 2 + 2?"}],
+            }
+            assert first_span["outputs"] == [
+                {
+                    "type": "chat_messages",
+                    "value": [
+                        {
+                            "role": "assistant",
+                            "content": None,
+                            "function_call": {
+                                "name": "Calculator",
+                                "arguments": '{\n  "input": "2+2"\n}',
+                            },
+                        }
+                    ],
+                }
+            ]
+            assert first_span["params"] == {
+                "temperature": 1.0,
+                "stream": False,
+                "functions": [
+                    {
+                        "name": "Calculator",
+                        "description": "useful for when you need to answer questions about math",
+                        "parameters": {
+                            "properties": {
+                                "expression": {"title": "expression", "type": "string"}
+                            },
+                            "required": ["expression"],
+                            "type": "object",
+                        },
+                    }
+                ],
+            }
+
+    @freeze_time("2022-01-01", auto_tick_seconds=15)
     def test_trace_session_captures_openai_streams(self):
         with patch.object(
             openai.ChatCompletion,
@@ -452,6 +552,62 @@ class TestOpenAIChatCompletionTracer:
                 create_openai_chat_completion_chunk(1, {"content": " you"}),
                 create_openai_chat_completion_chunk(0, {}),
                 create_openai_chat_completion_chunk(1, {}),
+            ]
+
+    @freeze_time("2022-01-01", auto_tick_seconds=15)
+    def test_trace_session_captures_openai_streams_with_functions(self):
+        with patch.object(
+            openai.ChatCompletion,
+            "create",
+            side_effect=[
+                create_openai_chat_completion_function_stream_mock(
+                    {"name": "Calculator", "arguments": '{\n  "input": "2+2"\n}'}
+                ),
+            ],
+        ), requests_mock.Mocker() as mock_request:
+            mock_request.post(langwatch.endpoint, json={})
+
+            with langwatch.openai.OpenAIChatCompletionTracer():
+                response = openai.ChatCompletion.create(
+                    model="gpt-3.5-turbo",
+                    messages=[{"role": "user", "content": "how much is 2 + 2?"}],
+                    stream=True,
+                    functions=[
+                        {
+                            "name": "Calculator",
+                            "description": "useful for when you need to answer questions about math",
+                            "parameters": {
+                                "properties": {
+                                    "expression": {
+                                        "title": "expression",
+                                        "type": "string",
+                                    }
+                                },
+                                "required": ["expression"],
+                                "type": "object",
+                            },
+                        }
+                    ],
+                )
+                for _ in response:
+                    pass # just to consume the stream
+
+            time.sleep(1.01)
+            first_span = mock_request.request_history[0].json()["spans"][0]
+            assert first_span["outputs"] == [
+                {
+                    "type": "chat_messages",
+                    "value": [
+                        {
+                            "role": "assistant",
+                            "function_call": {
+                                "arguments": '{\n  "input": "2+2"\n}',
+                                "name": "Calculator",
+                            },
+                            "content": None,
+                        }
+                    ],
+                }
             ]
 
     @pytest.mark.asyncio

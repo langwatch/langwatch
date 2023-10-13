@@ -4,10 +4,15 @@ from typing import Any, Dict, List, Literal, Optional, TypedDict, Union
 ChatRole = Literal["system", "user", "assistant", "function", "unknown"]
 
 
+class FunctionCall(TypedDict, total=False):
+    name: str
+    arguments: str
+
+
 class ChatMessage(TypedDict, total=False):
     role: ChatRole
-    content: str
-    name: Optional[str]
+    content: Optional[str]
+    function_call: Optional[FunctionCall]
 
 
 class TypedValueChatMessages(TypedDict):
