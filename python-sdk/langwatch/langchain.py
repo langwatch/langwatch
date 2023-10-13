@@ -131,7 +131,7 @@ class LangChainTracer(BaseContextTracer, BaseCallbackHandler):
         )
 
     def on_llm_new_token(self, token: str, **kwargs: Any) -> Any:
-        print("NOT IMPLEMENTED YET on_llm_new_token")
+        pass
 
     def on_llm_end(self, response: LLMResult, *, run_id: UUID, **kwargs: Any) -> Any:
         span = cast(Optional[LLMSpan], self.spans.get(str(run_id)))
