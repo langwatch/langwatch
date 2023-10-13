@@ -56,11 +56,11 @@ class TestLangChainTracer:
             chain = LLMChain(
                 llm=ChatOpenAI(),
                 prompt=chat_prompt,
-                # TODO: output_parser=CommaSeparatedListOutputParser(),
+                output_parser=CommaSeparatedListOutputParser(),
             )
             with langwatch.langchain.LangChainTracer() as langWatchCallback:
                 result = chain.run(text="colors", callbacks=[langWatchCallback])
-            assert result == "red, blue, green, yellow"
+            assert result == ["red", "blue", "green", "yellow"]
 
             time.sleep(0.01)
             request_history = [
@@ -77,6 +77,9 @@ class TestLangChainTracer:
             assert first_span["timestamps"]["finished_at"] >= int(
                 datetime(2022, 1, 1, 0, 0, 45).timestamp() * 1000
             )
+            assert first_span["outputs"] == [
+                {"type": "json", "value": {"text": ["red", "blue", "green", "yellow"]}}
+            ]
 
             assert second_span["type"] == "llm"
             assert second_span["trace_id"].startswith("trace_")
@@ -324,10 +327,6 @@ class TestLangChainTracer:
             request_history = [
                 r for r in mock_request.request_history if "langwatch" in r.url
             ]
-            # print(
-            #     "\n\nrequest_history[0].json()\n\n",
-            #     json.dumps(request_history[0].json(), indent=2),
-            # )
             spans = request_history[0].json()["spans"]
 
             first_llm_call = [span for span in spans if span["type"] == "llm"][0]
@@ -397,3 +396,46 @@ class TestLangChainTracer:
 
             assert "An error occurred!" in first_span["error"]["message"]
             assert "An error occurred!" in second_span["error"]["message"]
+
+    @freeze_time("2022-01-01", auto_tick_seconds=15)
+    def test_trace_lang_chain_expression_language(self):
+        with requests_mock.Mocker() as mock_request:
+            mock_request.post(langwatch.endpoint, json={})
+            mock_request.post(
+                "https://api.openai.com/v1/chat/completions",
+                json=create_openai_chat_completion_mock(
+                    "Why don't bears wear shoes?\n\nBecause they have bear feet!"
+                ),
+            )
+
+            model = ChatOpenAI()
+            prompt = ChatPromptTemplate.from_template("tell me a joke about {topic}")
+            chain = prompt | model
+
+            with langwatch.langchain.LangChainTracer() as langWatchCallback:
+                result = chain.invoke(
+                    {"topic": "bears"}, config={"callbacks": [langWatchCallback]}
+                )
+            assert (
+                result.content
+                == "Why don't bears wear shoes?\n\nBecause they have bear feet!"
+            )
+
+            time.sleep(0.501)
+            request_history = [
+                r for r in mock_request.request_history if "langwatch" in r.url
+            ]
+            first_span = request_history[0].json()["spans"][0]
+
+            assert first_span["type"] == "chain"
+            assert first_span["outputs"] == [
+                {
+                    "type": "chat_messages",
+                    "value": [
+                        {
+                            "role": "assistant",
+                            "content": "Why don't bears wear shoes?\n\nBecause they have bear feet!",
+                        }
+                    ],
+                }
+            ]

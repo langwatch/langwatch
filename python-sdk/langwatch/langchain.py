@@ -1,3 +1,4 @@
+import json
 from typing import Any, Dict, List, Literal, Optional, Union, cast
 from langchain.schema import (
     LLMResult,
@@ -27,7 +28,12 @@ from langwatch.types import (
     TypedValueText,
 )
 
-from langwatch.utils import capture_exception, list_get, milliseconds_timestamp
+from langwatch.utils import (
+    autoconvert_typed_values,
+    capture_exception,
+    list_get,
+    milliseconds_timestamp,
+)
 from uuid import UUID
 
 
@@ -50,7 +56,8 @@ def langchain_message_to_chat_message(message: BaseMessage) -> ChatMessage:
     elif isinstance(message, SystemMessage):
         role = "system"
     elif isinstance(message, FunctionMessage):
-        role = "function"
+        role = "assistant"
+        return ChatMessage(role="assistant", content=message.content, function_call=message.additional_kwargs)  # type: ignore
     else:
         role = "unknown"
     # TODO: handle function types! where is the name?
@@ -197,9 +204,7 @@ class LangChainTracer(BaseContextTracer, BaseCallbackHandler):
     def on_chain_end(
         self, outputs: Dict[str, Any], *, run_id: UUID, **kwargs: Any
     ) -> Any:
-        self._end_base_span(
-            run_id, outputs=[TypedValueJson(type="json", value=outputs)]
-        )
+        self._end_base_span(run_id, outputs=[self._autoconvert_output(outputs)])
 
     def on_chain_error(
         self, error: BaseException, *, run_id: UUID, **kwargs: Any
@@ -264,7 +269,7 @@ class LangChainTracer(BaseContextTracer, BaseCallbackHandler):
         run_id: UUID,
         **kwargs: Any,
     ) -> Any:
-        self._end_base_span(run_id, outputs=[TypedValueText(type="text", value=output)])
+        self._end_base_span(run_id, outputs=[self._autoconvert_output(output)])
 
     def on_tool_error(
         self, error: BaseException, *, run_id: UUID, **kwargs: Any
@@ -298,5 +303,18 @@ class LangChainTracer(BaseContextTracer, BaseCallbackHandler):
         **kwargs: Any,
     ) -> Any:
         self._end_base_span(
-            run_id, outputs=[TypedValueJson(type="json", value=finish.return_values)]
+            run_id, outputs=[self._autoconvert_output(finish.return_values)]
         )
+
+    def _autoconvert_output(self, output: Any) -> SpanOutput:
+        if isinstance(output, BaseMessage):
+            return TypedValueChatMessages(
+                type="chat_messages", value=[langchain_message_to_chat_message(output)]
+            )
+        elif type(output) == list and isinstance(list_get(output, 0), BaseMessage):
+            return TypedValueChatMessages(
+                type="chat_messages",
+                value=[langchain_message_to_chat_message(m) for m in output],
+            )
+        else:
+            return autoconvert_typed_values(output)

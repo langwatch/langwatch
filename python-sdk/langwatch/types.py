@@ -1,7 +1,7 @@
 from typing import Any, Dict, List, Literal, Optional, TypedDict, Union
 
 
-ChatRole = Literal["system", "user", "assistant", "function", "unknown"]
+ChatRole = Literal["system", "user", "assistant", "unknown"]
 
 
 class FunctionCall(TypedDict, total=False):
@@ -25,6 +25,11 @@ class TypedValueText(TypedDict):
     value: str
 
 
+class TypedValueRaw(TypedDict):
+    type: Literal["raw"]
+    value: str
+
+
 JSONSerializable = Union[str, int, float, bool, None, Dict[str, Any], List[Any]]
 
 
@@ -38,9 +43,9 @@ class ErrorCapture(TypedDict):
     stacktrace: List[str]
 
 
-SpanInput = Union[TypedValueText, TypedValueChatMessages, TypedValueJson]
+SpanInput = Union[TypedValueText, TypedValueChatMessages, TypedValueJson, TypedValueRaw]
 
-SpanOutput = Union[TypedValueText, TypedValueChatMessages, TypedValueJson]
+SpanOutput = Union[TypedValueText, TypedValueChatMessages, TypedValueJson, TypedValueRaw]
 
 
 class SpanMetrics(TypedDict, total=False):

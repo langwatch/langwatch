@@ -1,3 +1,4 @@
+import json
 import time
 import traceback
 from typing import (
@@ -12,7 +13,13 @@ from typing import (
     TypeVar,
 )
 
-from langwatch.types import ErrorCapture
+from langwatch.types import (
+    ErrorCapture,
+    SpanOutput,
+    TypedValueJson,
+    TypedValueRaw,
+    TypedValueText,
+)
 
 T = TypeVar("T")
 
@@ -71,3 +78,14 @@ def list_get(l, i, default=None):
         return l[i]
     except IndexError:
         return default
+
+
+def autoconvert_typed_values(value: Any) -> SpanOutput:
+    if type(value) == str:
+        return TypedValueText(type="text", value=value)
+    else:
+        try:
+            _ = json.dumps(value)
+            return TypedValueJson(type="json", value=value)
+        except:
+            return TypedValueRaw(type="raw", value=str(value))
