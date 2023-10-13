@@ -113,6 +113,14 @@ class LangChainTracer(BaseContextTracer, BaseCallbackHandler):
         input: SpanInput,
         **kwargs: Any,
     ):
+        params = SpanParams(
+            stream=kwargs.get("invocation_params", {}).get("stream", False),
+            temperature=kwargs.get("invocation_params", {}).get("temperature", None),
+        )
+        functions = kwargs.get("invocation_params", {}).get("functions", None)
+        if functions:
+            params["functions"] = functions
+
         return LLMSpan(
             type="llm",
             span_id=f"span_{run_id}",
@@ -122,12 +130,7 @@ class LangChainTracer(BaseContextTracer, BaseCallbackHandler):
             model=kwargs.get("invocation_params", {}).get("model_name", "unknown"),
             input=input,
             timestamps=SpanTimestamps(started_at=milliseconds_timestamp()),
-            params=SpanParams(
-                stream=kwargs.get("invocation_params", {}).get("stream", False),
-                temperature=kwargs.get("invocation_params", {}).get(
-                    "temperature", None
-                ),
-            ),
+            params=params,
         )
 
     def on_llm_new_token(self, token: str, **kwargs: Any) -> Any:

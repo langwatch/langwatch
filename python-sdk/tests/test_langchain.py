@@ -361,6 +361,20 @@ class TestLangChainTracer:
             # )
             spans = request_history[0].json()["spans"]
 
+            first_llm_call = [span for span in spans if span["type"] == "llm"][0]
+
+            assert first_llm_call["params"]["functions"] == [
+                {
+                    "name": "Calculator",
+                    "description": "useful for when you need to answer questions about math",
+                    "parameters": {
+                        "properties": {"__arg1": {"title": "__arg1", "type": "string"}},
+                        "required": ["__arg1"],
+                        "type": "object",
+                    },
+                }
+            ]
+
             calculator_tool = [
                 span
                 for span in spans

@@ -46,6 +46,7 @@ class SpanMetrics(TypedDict, total=False):
 class SpanParams(TypedDict, total=False):
     temperature: float
     stream: bool
+    functions: Optional[List[Dict[str, Any]]]
 
 
 class SpanTimestamps(TypedDict, total=False):
