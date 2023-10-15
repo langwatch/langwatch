@@ -5,7 +5,7 @@ import {
   type DefaultSession,
   type NextAuthOptions,
 } from "next-auth";
-import Auth0Provider, { Auth0Profile } from "next-auth/providers/auth0";
+import Auth0Provider, { type Auth0Profile } from "next-auth/providers/auth0";
 
 import { env } from "~/env.mjs";
 import { prisma } from "~/server/db";

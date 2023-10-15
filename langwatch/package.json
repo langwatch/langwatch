@@ -24,6 +24,7 @@
     "@trpc/react-query": "^10.34.0",
     "@trpc/server": "^10.34.0",
     "framer-motion": "^10.16.4",
+    "jsonwebtoken": "^9.0.2",
     "next": "^13.4.13",
     "next-auth": "^4.22.4",
     "react": "18.2.0",
@@ -37,6 +38,7 @@
   },
   "devDependencies": {
     "@types/eslint": "^8.44.2",
+    "@types/jsonwebtoken": "^9.0.3",
     "@types/node": "^18.16.0",
     "@types/react": "^18.2.20",
     "@types/react-dom": "^18.2.7",
@@ -44,6 +46,7 @@
     "@typescript-eslint/parser": "^6.3.0",
     "eslint": "^8.47.0",
     "eslint-config-next": "^13.4.13",
+    "prettier": "^3.0.3",
     "prisma": "^5.4.2",
     "typescript": "^5.1.6"
   },

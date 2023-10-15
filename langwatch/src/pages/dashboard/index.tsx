@@ -7,18 +7,28 @@ import {
   Tag,
   VStack,
 } from "@chakra-ui/react";
+import { type GetServerSideProps, type GetServerSidePropsContext } from "next";
+import { getSession } from "next-auth/react";
+import { type Session } from "next-auth";
 import {
-  type Icon,
-  Search,
-  User,
-  Bell,
   Activity,
-  Settings,
-  Filter,
+  Bell,
   Check,
+  Filter,
+  Search,
+  Settings,
+  User,
+  type Icon,
 } from "react-feather";
+import { getServerSideHelpers } from "../../utils/serverHelpers";
+import { type FullyLoadedOrganization } from "../../server/api/routers/organization";
 
-export default function Dashboard() {
+type Props = {
+  session: Session;
+  organizations: FullyLoadedOrganization[];
+};
+
+export default function Dashboard({ session, organizations }: Props) {
   const MenuButton = ({ icon, label }: { icon: Icon; label: string }) => {
     const IconElem = icon;
     return (
@@ -136,3 +146,51 @@ export default function Dashboard() {
     </HStack>
   );
 }
+
+export const getServerSideProps = (async (
+  context: GetServerSidePropsContext
+) => {
+  const session = await getSession(context);
+  if (!session) {
+    return {
+      redirect: {
+        destination: "/auth/signin",
+        permanent: false,
+      },
+    };
+  }
+
+  const helpers = await getServerSideHelpers(context);
+  const organizations: FullyLoadedOrganization[] =
+    await helpers.organization.getAll.fetch();
+
+  if (organizations.length == 0) {
+    return {
+      redirect: {
+        destination: "/onboarding/organization",
+        permanent: false,
+      },
+    };
+  }
+
+  if (
+    organizations.every((org) =>
+      org.teams.every((team) => team.projects.length == 0)
+    )
+  ) {
+    const firstTeamSlug = organizations.flatMap((org) => org.teams)[0]?.slug;
+    return {
+      redirect: {
+        destination: `/onboarding/${firstTeamSlug}/project`,
+        permanent: false,
+      },
+    };
+  }
+
+  return {
+    props: {
+      session,
+      organizations,
+    },
+  };
+}) satisfies GetServerSideProps<Props>;
