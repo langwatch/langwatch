@@ -11,7 +11,8 @@ export const projectRouter = createTRPCRouter({
       z.object({
         teamId: z.string(),
         name: z.string(),
-        techStack: z.string(),
+        language: z.string(),
+        framework: z.string(),
       })
     )
     .mutation(async ({ input, ctx }) => {
@@ -54,7 +55,8 @@ export const projectRouter = createTRPCRouter({
         data: {
           name: input.name,
           slug,
-          techStack: input.techStack,
+          language: input.language,
+          framework: input.framework,
           teamId: input.teamId,
           apiKey: generateApiKey(),
         },

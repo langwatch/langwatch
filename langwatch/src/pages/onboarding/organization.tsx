@@ -4,8 +4,10 @@ import {
   FormHelperText,
   FormLabel,
   HStack,
+  Heading,
   Input,
   VStack,
+  Text,
 } from "@chakra-ui/react";
 import { type GetServerSideProps, type GetServerSidePropsContext } from "next";
 import { type Session } from "next-auth";
@@ -50,7 +52,13 @@ export default function OrganizationOnboarding({ user }: Props) {
     <SetupLayout>
       {/* eslint-disable-next-line @typescript-eslint/no-misused-promises */}
       <form onSubmit={handleSubmit(onSubmit)}>
-        <VStack gap={4}>
+        <VStack gap={4} alignItems="left">
+          <Heading as="h1" fontSize="x-large">
+            Setup Organization
+          </Heading>
+          <Text paddingBottom={4} fontSize="14px">
+            Create the organization that will hold your projects on LangWatch
+          </Text>
           <FormControl>
             <FormLabel>Name</FormLabel>
             <Input type="text" disabled value={user.name ?? ""} />
@@ -67,16 +75,16 @@ export default function OrganizationOnboarding({ user }: Props) {
               name
             </FormHelperText>
           </FormControl>
-          {createOrganization.error && (
-            <p>Something went wrong! {createOrganization.error.message}</p>
-          )}
+          {createOrganization.error && <p>Something went wrong!</p>}
           <HStack width="full">
             <Button
               colorScheme="orange"
               type="submit"
               disabled={createOrganization.isLoading}
             >
-              {createOrganization.isLoading ? "Loading..." : "Next"}
+              {createOrganization.isLoading || createOrganization.isSuccess
+                ? "Loading..."
+                : "Next"}
             </Button>
           </HStack>
         </VStack>
