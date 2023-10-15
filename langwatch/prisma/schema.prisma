@@ -16,14 +16,14 @@ datasource db {
 }
 
 model Example {
-    id        String   @id @default(cuid())
+    id        String   @id @default(nanoid())
     createdAt DateTime @default(now())
     updatedAt DateTime @updatedAt
 }
 
 // Necessary for Next auth
 model Account {
-    id                String  @id @default(cuid())
+    id                String  @id @default(nanoid())
     userId            String
     type              String
     provider          String
@@ -38,24 +38,29 @@ model Account {
     user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
     @@unique([provider, providerAccountId])
+    @@index([userId])
 }
 
 model Session {
-    id           String   @id @default(cuid())
+    id           String   @id @default(nanoid())
     sessionToken String   @unique
     userId       String
     expires      DateTime
     user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@index([userId])
 }
 
 model User {
-    id            String    @id @default(cuid())
-    name          String?
-    email         String?   @unique
-    emailVerified DateTime?
-    image         String?
-    accounts      Account[]
-    sessions      Session[]
+    id              String             @id @default(nanoid())
+    name            String?
+    email           String?            @unique
+    emailVerified   DateTime?
+    image           String?
+    accounts        Account[]
+    sessions        Session[]
+    teamMemberships TeamUser[]
+    orgMemberships  OrganizationUser[]
 }
 
 model VerificationToken {
@@ -64,4 +69,65 @@ model VerificationToken {
     expires    DateTime
 
     @@unique([identifier, token])
+}
+
+enum UserRole {
+    ADMIN
+    MEMBER
+}
+
+model TeamUser {
+    userId String
+    teamId String
+    role   UserRole
+    user   User     @relation(fields: [userId], references: [id])
+    team   Team     @relation(fields: [teamId], references: [id])
+
+    @@id([userId, teamId])
+    @@index([teamId])
+    @@index([userId])
+}
+
+model OrganizationUser {
+    userId         String
+    organizationId String
+    role           UserRole
+    user           User         @relation(fields: [userId], references: [id])
+    organization   Organization @relation(fields: [organizationId], references: [id])
+
+    @@id([userId, organizationId])
+    @@index([organizationId])
+    @@index([userId])
+}
+
+model Team {
+    id             String       @id @default(nanoid())
+    name           String
+    slug           String
+    members        TeamUser[]
+    organizationId String
+    organization   Organization @relation(fields: [organizationId], references: [id])
+    projects       Project[]
+
+    @@index([organizationId])
+}
+
+model Organization {
+    id      String             @id @default(nanoid())
+    name    String
+    slug    String             @unique
+    members OrganizationUser[]
+    teams   Team[]
+}
+
+model Project {
+    id        String @id @default(nanoid())
+    name      String
+    slug      String
+    apiKey    String @unique
+    teamId    String
+    team      Team   @relation(fields: [teamId], references: [id])
+    techStack String
+
+    @@index([teamId])
 }

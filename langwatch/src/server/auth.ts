@@ -5,7 +5,7 @@ import {
   type DefaultSession,
   type NextAuthOptions,
 } from "next-auth";
-import Auth0Provider from "next-auth/providers/auth0";
+import Auth0Provider, { Auth0Profile } from "next-auth/providers/auth0";
 
 import { env } from "~/env.mjs";
 import { prisma } from "~/server/db";
@@ -38,21 +38,49 @@ declare module "next-auth" {
  */
 export const authOptions: NextAuthOptions = {
   callbacks: {
-    session: ({ session, user }) => ({
-      ...session,
-      user: {
-        ...session.user,
-        id: user.id,
-      },
-    }),
+    session: ({ session, user }) => {
+      return {
+        ...session,
+        user: {
+          ...session.user,
+          id: user.id,
+          email: user.email,
+        },
+      };
+    },
+    // signIn: async ({ user, account, profile }) => {
+    //   if (user && profile) {
+    //     console.log("signIn user", user);
+    //     console.log("signIn account", account);
+    //     console.log("signIn profile", profile);
+    //     await prisma.user.update({
+    //       where: {
+    //         id: user.id,
+    //       },
+    //       data: {
+    //         email: profile.email,
+    //       },
+    //     });
+    //   }
+
+    //   return true;
+    // },
   },
   adapter: PrismaAdapter(prisma),
   providers: [
     Auth0Provider({
       clientId: env.AUTH0_CLIENT_ID,
       clientSecret: env.AUTH0_CLIENT_SECRET,
-      issuer: env.AUTH0_ISSUER
-    })
+      issuer: env.AUTH0_ISSUER,
+      profile(profile: Auth0Profile) {
+        return {
+          id: profile.sub,
+          name: (profile.name as string) ?? profile.nickname,
+          email: profile.email,
+          image: profile.picture,
+        };
+      },
+    }),
     /**
      * ...add more providers here.
      *
