@@ -235,7 +235,7 @@ class TestOpenAICompletionTracer:
 
             with langwatch.openai.OpenAICompletionTracer():
                 openai.Completion.create(model="gpt-3.5-turbo-instruct", prompt="hi")
-                with langwatch.span("subtask"):
+                with langwatch.create_span("subtask"):
                     openai.Completion.create(
                         model="gpt-3.5-turbo-instruct", prompt="how"
                     )
@@ -259,6 +259,60 @@ class TestOpenAICompletionTracer:
 
             assert fourth_span["type"] == "span"
             assert fourth_span["name"] == "subtask"
+            assert fourth_span["trace_id"] == first_span["trace_id"]
+            assert fourth_span["span_id"].startswith("span_")
+            assert fourth_span["parent_id"] == None
+
+            assert second_span["type"] == "llm"
+            assert second_span["trace_id"] == first_span["trace_id"]
+            assert second_span["parent_id"] == fourth_span["span_id"]
+
+            assert third_span["type"] == "llm"
+            assert third_span["trace_id"] == first_span["trace_id"]
+            assert third_span["parent_id"] == fourth_span["span_id"]
+
+    @freeze_time("2022-01-01", auto_tick_seconds=15)
+    def test_trace_nested_spans_using_annotations(self):
+        with patch.object(
+            openai.Completion,
+            "create",
+            side_effect=[
+                create_openai_completion_mock(" there"),
+                create_openai_completion_mock(" are"),
+                create_openai_completion_mock("?"),
+            ],
+        ), requests_mock.Mocker() as mock_request:
+            mock_request.post(langwatch.endpoint, json={})
+
+            @langwatch.span()
+            def subtask(foo=None):
+                openai.Completion.create(model="gpt-3.5-turbo-instruct", prompt="how")
+                openai.Completion.create(model="gpt-3.5-turbo-instruct", prompt="you")
+
+                return foo
+
+            with langwatch.openai.OpenAICompletionTracer():
+                openai.Completion.create(model="gpt-3.5-turbo-instruct", prompt="hi")
+                subtask(foo="bar")
+
+            time.sleep(0.01)
+
+            (
+                first_span,
+                second_span,
+                third_span,
+                fourth_span,
+            ) = mock_request.request_history[0].json()["spans"]
+
+            assert first_span["type"] == "llm"
+            assert first_span["trace_id"].startswith("trace_")
+            assert first_span["span_id"].startswith("span_")
+            assert first_span["parent_id"] == None
+
+            assert fourth_span["type"] == "span"
+            assert fourth_span["name"] == "subtask"
+            assert fourth_span["input"] == {"type": "json", "value": {"foo": "bar"}}
+            assert fourth_span["outputs"] == [{"type": "text", "value": "bar"}]
             assert fourth_span["trace_id"] == first_span["trace_id"]
             assert fourth_span["span_id"].startswith("span_")
             assert fourth_span["parent_id"] == None
@@ -590,7 +644,7 @@ class TestOpenAIChatCompletionTracer:
                     ],
                 )
                 for _ in response:
-                    pass # just to consume the stream
+                    pass  # just to consume the stream
 
             time.sleep(1.01)
             first_span = mock_request.request_history[0].json()["spans"][0]

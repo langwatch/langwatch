@@ -9,9 +9,9 @@ For LLM and library-specific tracing functions, check out the other files on thi
 
 import os
 
-from langwatch.tracer import span
+from langwatch.tracer import span, create_span
 
 endpoint = "https://app.langwatch.ai/api/trace"
 api_key = os.environ.get("LANGWATCH_API_KEY")
 
-__all__ = ("endpoint", "api_key", "span")
+__all__ = ("endpoint", "api_key", "span", "create_span")
