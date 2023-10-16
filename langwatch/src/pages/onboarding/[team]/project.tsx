@@ -13,7 +13,7 @@ import {
   Text,
 } from "@chakra-ui/react";
 import { type Team } from "@prisma/client";
-import { type GetServerSidePropsContext } from "next";
+import { GetServerSideProps, type GetServerSidePropsContext } from "next";
 import { getSession } from "next-auth/react";
 import ErrorPage from "next/error";
 import { useRouter } from "next/router";
@@ -26,6 +26,7 @@ import { Python } from "../../../components/icons/Python";
 import { getServerSideHelpers } from "../../../utils/serverHelpers";
 import FeatherIcon from "feather-icons-react";
 import { OpenAI } from "../../../components/icons/OpenAI";
+import { withSignedInUser } from "../../../utils/auth";
 
 type ProjectFormData = {
   name: string;
@@ -68,7 +69,11 @@ function RadioCard(props: UseRadioProps & PropsWithChildren) {
   );
 }
 
-export default function ProjectOnboarding({ team }: { team: Team | null }) {
+type Props = {
+  team: Team | null;
+};
+
+export default function ProjectOnboarding({ team }: Props) {
   const { register, handleSubmit, setValue, getValues } =
     useForm<ProjectFormData>({
       defaultValues: {
@@ -88,13 +93,13 @@ export default function ProjectOnboarding({ team }: { team: Team | null }) {
       name: data.name,
       teamId: team.id,
       language: data.language,
-      framework: data.framework
+      framework: data.framework,
     });
   };
 
   useEffect(() => {
     if (createProject.isSuccess) {
-      void router.push("/dashboard");
+      void router.push("/");
     }
   }, [createProject.isSuccess, router]);
 
@@ -276,30 +281,19 @@ export default function ProjectOnboarding({ team }: { team: Team | null }) {
   );
 }
 
-export const getServerSideProps = async (
-  context: GetServerSidePropsContext
-) => {
-  const session = await getSession(context);
-  if (!session) {
+export const getServerSideProps = withSignedInUser(
+  async (context: GetServerSidePropsContext) => {
+    const helpers = await getServerSideHelpers(context);
+    const { team: teamSlug } = context.query;
+    const team =
+      typeof teamSlug == "string"
+        ? await helpers.team.getBySlug.fetch({ slug: teamSlug })
+        : null;
+
     return {
-      redirect: {
-        destination: "/auth/signin",
-        permanent: false,
+      props: {
+        team,
       },
     };
   }
-
-  const helpers = await getServerSideHelpers(context);
-  const { team: teamSlug } = context.query;
-  const team =
-    typeof teamSlug == "string"
-      ? await helpers.team.getBySlug.fetch({ slug: teamSlug })
-      : null;
-
-  return {
-    props: {
-      team,
-      session,
-    },
-  };
-};
+) satisfies GetServerSideProps<Props>;

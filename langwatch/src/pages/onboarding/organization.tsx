@@ -17,6 +17,7 @@ import { useEffect } from "react";
 import { useForm, type SubmitHandler } from "react-hook-form";
 import { api } from "~/utils/api";
 import { SetupLayout } from "~/components/SetupLayout";
+import { withSignedInUser } from "../../utils/auth";
 
 type OrganizationFormData = {
   organizationName: string;
@@ -93,23 +94,8 @@ export default function OrganizationOnboarding({ user }: Props) {
   );
 }
 
-export const getServerSideProps = (async (
-  context: GetServerSidePropsContext
-) => {
-  const session = await getSession(context);
-
-  if (!session) {
-    return {
-      redirect: {
-        destination: "/auth/signin",
-        permanent: false,
-      },
-    };
+export const getServerSideProps = withSignedInUser(
+  async (_context: GetServerSidePropsContext) => {
+    return { props: {} };
   }
-
-  return {
-    props: {
-      user: session.user,
-    },
-  };
-}) satisfies GetServerSideProps<Props>;
+) satisfies GetServerSideProps<Props>;
