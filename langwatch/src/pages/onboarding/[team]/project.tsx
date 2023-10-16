@@ -26,7 +26,7 @@ import { Python } from "../../../components/icons/Python";
 import { getServerSideHelpers } from "../../../utils/serverHelpers";
 import FeatherIcon from "feather-icons-react";
 import { OpenAI } from "../../../components/icons/OpenAI";
-import { withSignedInUser } from "../../../utils/auth";
+import { withSignedInUser } from "../../../server/props";
 
 type ProjectFormData = {
   name: string;

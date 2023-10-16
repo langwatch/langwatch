@@ -1,12 +1,12 @@
 import {
-  type GetServerSidePropsResult,
   type GetServerSidePropsContext,
+  type GetServerSidePropsResult,
 } from "next";
-import { getSession } from "next-auth/react";
 import { type Session } from "next-auth";
+import { getSession } from "next-auth/react";
 import { type ParsedUrlQuery } from "querystring";
-import { FullyLoadedOrganization } from "../server/api/routers/organization";
-import { getServerSideHelpers } from "./serverHelpers";
+import { type FullyLoadedOrganization } from "./api/routers/organization";
+import { getServerSideHelpers } from "../utils/serverHelpers";
 
 export function withSignedInUser<
   T extends ParsedUrlQuery,

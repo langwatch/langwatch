@@ -20,7 +20,7 @@ import {
   type Icon,
 } from "react-feather";
 import { type FullyLoadedOrganization } from "~/server/api/routers/organization";
-import { withSignedInUserAndData } from "../utils/auth";
+import { withSignedInUserAndData } from "../server/props";
 
 type Props = {
   user: Session["user"];

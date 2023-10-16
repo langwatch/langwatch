@@ -17,7 +17,7 @@ import { useEffect } from "react";
 import { useForm, type SubmitHandler } from "react-hook-form";
 import { api } from "~/utils/api";
 import { SetupLayout } from "~/components/SetupLayout";
-import { withSignedInUser } from "../../utils/auth";
+import { withSignedInUser } from "../../server/props";
 
 type OrganizationFormData = {
   organizationName: string;
