@@ -4,12 +4,12 @@ import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 
 type FullyLoadedTeam = Team & {
-  projects: Project[]
-}
+  projects: Project[];
+};
 
 export type FullyLoadedOrganization = Organization & {
-  teams: FullyLoadedTeam[]
-}
+  teams: FullyLoadedTeam[];
+};
 
 export const organizationRouter = createTRPCRouter({
   createAndAssign: protectedProcedure
@@ -68,22 +68,23 @@ export const organizationRouter = createTRPCRouter({
     const userId = ctx.session.user.id;
     const prisma = ctx.prisma;
 
-    const organizations : FullyLoadedOrganization[] = await prisma.organization.findMany({
-      where: {
-        members: {
-          some: {
-            userId: userId,
+    const organizations: FullyLoadedOrganization[] =
+      await prisma.organization.findMany({
+        where: {
+          members: {
+            some: {
+              userId: userId,
+            },
           },
         },
-      },
-      include: {
-        teams: {
-          include: {
-            projects: true,
+        include: {
+          teams: {
+            include: {
+              projects: true,
+            },
           },
         },
-      },
-    });
+      });
 
     return organizations;
   }),
