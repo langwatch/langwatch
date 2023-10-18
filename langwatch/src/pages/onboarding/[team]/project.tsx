@@ -4,29 +4,28 @@ import {
   FormControl,
   FormLabel,
   HStack,
+  Heading,
   Input,
-  type UseRadioProps,
+  Text,
   VStack,
   useRadio,
   useRadioGroup,
-  Heading,
-  Text,
+  type UseRadioProps,
 } from "@chakra-ui/react";
 import { type Team } from "@prisma/client";
-import { GetServerSideProps, type GetServerSidePropsContext } from "next";
-import { getSession } from "next-auth/react";
+import { type GetServerSideProps, type GetServerSidePropsContext } from "next";
 import ErrorPage from "next/error";
 import { useRouter } from "next/router";
-import { type PropsWithChildren, useEffect } from "react";
+import { useEffect, type PropsWithChildren } from "react";
+import { Code } from "react-feather";
 import { useForm, type SubmitHandler } from "react-hook-form";
 import { SetupLayout } from "~/components/SetupLayout";
 import { api } from "~/utils/api";
 import { JavaScript } from "../../../components/icons/JavaScript";
-import { Python } from "../../../components/icons/Python";
-import { getServerSideHelpers } from "../../../utils/serverHelpers";
-import FeatherIcon from "feather-icons-react";
 import { OpenAI } from "../../../components/icons/OpenAI";
+import { Python } from "../../../components/icons/Python";
 import { withSignedInUser } from "../../../server/props";
+import { getServerSideHelpers } from "../../../utils/serverHelpers";
 
 type ProjectFormData = {
   name: string;
@@ -128,7 +127,7 @@ export default function ProjectOnboarding({ team }: Props) {
       label: "JavaScript",
       icon: <JavaScript />,
     },
-    { value: "other", label: "Other", icon: <FeatherIcon icon="code" /> },
+    { value: "other", label: "Other", icon: <Code /> },
   ];
 
   const frameworkOptions = [
@@ -148,7 +147,7 @@ export default function ProjectOnboarding({ team }: Props) {
       value: "other",
       label: "Other",
       languages: ["python", "javascript", "other"],
-      icon: <FeatherIcon icon="code" />,
+      icon: <Code />,
     },
   ];
 
