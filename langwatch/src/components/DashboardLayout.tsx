@@ -140,7 +140,7 @@ export const DashboardLayout = ({
             </HStack>
           </Button>
           {currentRoute && (
-            <HStack gap={2} fontSize={12} color="gray.500">
+            <HStack gap={2} fontSize={13} color="gray.500">
               {router.pathname === "/" ? (
                 <Text>Dashboard</Text>
               ) : (
@@ -152,13 +152,16 @@ export const DashboardLayout = ({
           )}
           <Spacer />
           <InputGroup maxWidth="600px" borderColor="gray.300">
-            <InputLeftElement pointerEvents="none">
-              <Search color={gray400} />
+            <InputLeftElement paddingY={1.5} height="auto" pointerEvents="none">
+              <Search color={gray400} width={16} />
             </InputLeftElement>
             <Input
               type="search"
               placeholder="Search"
               _placeholder={{ color: "gray.800" }}
+              fontSize={14}
+              paddingY={1.5}
+              height="auto"
             />
           </InputGroup>
           <Spacer />
