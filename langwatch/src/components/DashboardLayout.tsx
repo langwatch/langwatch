@@ -1,4 +1,16 @@
-import { Box, Button, HStack, VStack, useTheme, Text } from "@chakra-ui/react";
+import {
+  Box,
+  Button,
+  HStack,
+  VStack,
+  useTheme,
+  Text,
+  Spacer,
+  Avatar,
+  Input,
+  InputGroup,
+  InputLeftElement,
+} from "@chakra-ui/react";
 import { type Session } from "next-auth";
 import Image from "next/image";
 import { useRouter } from "next/router";
@@ -12,6 +24,7 @@ import {
   type Icon,
   ChevronDown,
   ChevronRight,
+  Search,
 } from "react-feather";
 import { type FullyLoadedOrganization } from "~/server/api/routers/organization";
 import { findCurrentRoute, routes } from "../utils/routes";
@@ -27,6 +40,11 @@ export const DashboardLayout = ({
 }>) => {
   const router = useRouter();
   const currentRoute = findCurrentRoute(router.pathname);
+  const theme = useTheme();
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+  const orange400 = theme.colors.orange["400"];
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+  const gray400 = theme.colors.gray["400"];
 
   const MenuButton = ({
     icon,
@@ -38,16 +56,13 @@ export const DashboardLayout = ({
     path: string;
   }) => {
     const IconElem = icon;
-    const theme = useTheme();
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-    const orange = theme.colors.orange["400"];
 
     return (
       <Link href={path} aria-label={label}>
         <VStack>
           <IconElem
             size={24}
-            color={router.pathname === path ? orange : undefined}
+            color={router.pathname === path ? orange400 : undefined}
           />
         </VStack>
       </Link>
@@ -135,6 +150,24 @@ export const DashboardLayout = ({
               <Text>{currentRoute.title}</Text>
             </HStack>
           )}
+          <Spacer />
+          <InputGroup maxWidth="600px" borderColor="gray.300">
+            <InputLeftElement pointerEvents="none">
+              <Search color={gray400} />
+            </InputLeftElement>
+            <Input
+              type="search"
+              placeholder="Search"
+              _placeholder={{ color: "gray.800" }}
+            />
+          </InputGroup>
+          <Spacer />
+          <Avatar
+            name={user.name ?? undefined}
+            backgroundColor="orange.400"
+            color="white"
+            size="sm"
+          />
         </HStack>
         {children}
       </VStack>
