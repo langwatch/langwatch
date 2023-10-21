@@ -9,11 +9,13 @@
     "lint": "next lint",
     "start": "next start",
     "prisma:db:push": "npx prisma db push",
-    "test": "vitest"
+    "test": "vitest",
+    "elastic:index:create": "tsx src/task.ts elasticIndexCreate"
   },
   "dependencies": {
     "@chakra-ui/next-js": "^2.1.5",
     "@chakra-ui/react": "^2.8.1",
+    "@elastic/elasticsearch": "^8.10.0",
     "@emotion/react": "^11.11.1",
     "@emotion/styled": "^11.11.0",
     "@next-auth/prisma-adapter": "^1.0.7",
@@ -25,6 +27,7 @@
     "@trpc/next": "^10.34.0",
     "@trpc/react-query": "^10.34.0",
     "@trpc/server": "^10.34.0",
+    "debug": "^4.3.4",
     "framer-motion": "^10.16.4",
     "jsonwebtoken": "^9.0.2",
     "next": "^13.4.13",
@@ -40,6 +43,7 @@
     "zod": "^3.21.4"
   },
   "devDependencies": {
+    "@types/debug": "^4.1.10",
     "@types/eslint": "^8.44.2",
     "@types/jsonwebtoken": "^9.0.3",
     "@types/node": "^18.16.0",
@@ -53,6 +57,7 @@
     "node-mocks-http": "^1.13.0",
     "prettier": "^3.0.3",
     "prisma": "^5.4.2",
+    "tsx": "^3.14.0",
     "typescript": "^5.1.6",
     "vitest": "^0.34.6"
   },

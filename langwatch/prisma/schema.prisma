@@ -109,6 +109,7 @@ model Team {
     organization   Organization @relation(fields: [organizationId], references: [id])
     projects       Project[]
 
+    @@unique([organizationId, slug])
     @@index([organizationId])
 }
 
@@ -130,5 +131,6 @@ model Project {
     language  String
     framework String
 
+    @@unique([teamId, slug])
     @@index([teamId])
 }

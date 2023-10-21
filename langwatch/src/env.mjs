@@ -24,6 +24,8 @@ export const env = createEnv({
     AUTH0_CLIENT_SECRET: z.string().min(1),
     AUTH0_ISSUER: z.string().min(1),
     API_TOKEN_JWT_SECRET: z.string().min(1),
+    ELASTICSEARCH_NODE_URL: z.string().min(1),
+    ELASTICSEARCH_API_KEY: z.string().min(1),
   },
 
   /**
@@ -48,6 +50,8 @@ export const env = createEnv({
     AUTH0_CLIENT_SECRET: process.env.AUTH0_CLIENT_SECRET,
     AUTH0_ISSUER: process.env.AUTH0_ISSUER,
     API_TOKEN_JWT_SECRET: process.env.API_TOKEN_JWT_SECRET,
+    ELASTICSEARCH_NODE_URL: process.env.ELASTICSEARCH_NODE_URL,
+    ELASTICSEARCH_API_KEY: process.env.ELASTICSEARCH_API_KEY,
   },
   /**
    * Run `build` or `dev` with `SKIP_ENV_VALIDATION` to skip env validation.
