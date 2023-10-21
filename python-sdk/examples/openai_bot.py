@@ -5,6 +5,7 @@ import sys
 
 sys.path.append("..")
 import langwatch
+import langwatch.openai
 
 
 @cl.on_message
@@ -13,7 +14,7 @@ async def main(message: str):
         content="",
     )
 
-    with langwatch.OpenAITracer():
+    with langwatch.openai.OpenAITracer():
         completion = openai.ChatCompletion.create(
             model="gpt-3.5-turbo",
             messages=[

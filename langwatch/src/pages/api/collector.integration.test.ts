@@ -9,7 +9,6 @@ import {
   type ElasticSearchSpan,
 } from "../../server/tracer/types";
 import handler from "./collector";
-import { object } from "zod";
 
 const sampleSpan: BaseSpan = {
   type: "span",
@@ -50,7 +49,6 @@ describe("Collector API Endpoint", () => {
   test("should insert spans into Elasticsearch", async () => {
     const spanData = {
       spans: [sampleSpan],
-      trace_id: "sampleTraceId",
     };
 
     const { req, res }: { req: NextApiRequest; res: NextApiResponse } =
@@ -75,11 +73,11 @@ describe("Collector API Endpoint", () => {
 
     const indexedTrace = await esClient.getSource<Trace>({
       index: TRACE_INDEX,
-      id: spanData.trace_id,
+      id: sampleSpan.trace_id,
     });
 
     expect(indexedTrace).toEqual({
-      id: spanData.trace_id,
+      id: sampleSpan.trace_id,
       project_id: projectId,
       timestamps: {
         started_at: expect.any(Number),
@@ -98,7 +96,7 @@ describe("Collector API Endpoint", () => {
         completion_tokens: null,
         total_cost: null,
       },
-      error: null
+      error: null,
     });
   });
 

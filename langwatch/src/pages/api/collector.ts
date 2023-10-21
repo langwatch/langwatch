@@ -39,14 +39,12 @@ export default async function handler(
   }
 
   // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-  const traceId = req.body.trace_id;
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
   const sessionId = req.body.session_id;
   // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
   const userId = req.body.user_id;
 
   // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-  if (!req.body.spans || !traceId) {
+  if (!req.body.spans) {
     return res.status(400).json({ message: "Bad request" });
   }
 
@@ -56,6 +54,16 @@ export default async function handler(
     ...span,
     project_id: project.id,
   }));
+
+  const traceIds = Array.from(
+    new Set(spans.filter((span) => span.trace_id).map((span) => span.trace_id))
+  );
+  const traceId = traceIds[0];
+  if (!traceId || traceIds.length > 1) {
+    return res
+      .status(400)
+      .json({ message: "All spans must have the same trace id" });
+  }
 
   try {
     for (const span of spans) {
