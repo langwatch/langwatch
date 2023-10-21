@@ -83,8 +83,8 @@ class TestLangChainTracer:
 
             assert second_span["type"] == "llm"
             assert second_span["trace_id"].startswith("trace_")
-            assert second_span["span_id"].startswith("span_")
-            assert second_span["parent_id"] == first_span["span_id"]
+            assert second_span["id"].startswith("span_")
+            assert second_span["parent_id"] == first_span["id"]
             assert second_span["vendor"] == "openai"
             assert second_span["model"] == "gpt-3.5-turbo"
             assert second_span["input"] == {
@@ -222,8 +222,8 @@ class TestLangChainTracer:
 
             assert second_span["type"] == "llm"
             assert second_span["trace_id"].startswith("trace_")
-            assert second_span["span_id"].startswith("span_")
-            assert second_span["parent_id"] == first_span["span_id"]
+            assert second_span["id"].startswith("span_")
+            assert second_span["parent_id"] == first_span["id"]
             assert second_span["vendor"] == "openai"
             assert second_span["model"] == "gpt-3.5-turbo"
             assert second_span["input"] == {

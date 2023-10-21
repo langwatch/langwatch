@@ -2,17 +2,19 @@ import { type NextApiRequest, type NextApiResponse } from "next";
 import { createMocks } from "node-mocks-http";
 import { beforeAll, describe, expect, test } from "vitest";
 import { prisma } from "../../server/db";
-import { SPAN_INDEX, esClient } from "../../server/elasticsearch";
+import { SPAN_INDEX, TRACE_INDEX, esClient } from "../../server/elasticsearch";
 import {
-  type ElasticSearchSpan,
+  type Trace,
   type BaseSpan,
+  type ElasticSearchSpan,
 } from "../../server/tracer/types";
 import handler from "./collector";
+import { object } from "zod";
 
 const sampleSpan: BaseSpan = {
   type: "span",
   name: "sample-span",
-  span_id: "span_V1StGXR8_Z5jdHi6B-myT",
+  id: "span_V1StGXR8_Z5jdHi6B-myZ",
   parent_id: null,
   trace_id: "trace_Uakgb_J5m9g-0JDMbcJqLJ",
   input: { type: "text", value: "hello" },
@@ -48,6 +50,7 @@ describe("Collector API Endpoint", () => {
   test("should insert spans into Elasticsearch", async () => {
     const spanData = {
       spans: [sampleSpan],
+      trace_id: "sampleTraceId",
     };
 
     const { req, res }: { req: NextApiRequest; res: NextApiResponse } =
@@ -60,14 +63,43 @@ describe("Collector API Endpoint", () => {
       });
 
     await handler(req, res);
+    expect(res.statusCode).toBe(200);
 
     const indexedSpan = await esClient.getSource<ElasticSearchSpan>({
       index: SPAN_INDEX,
-      id: sampleSpan.span_id,
+      id: sampleSpan.id,
     });
 
     expect(indexedSpan).toMatchObject(sampleSpan);
     expect(indexedSpan.project_id).toBe(projectId);
+
+    const indexedTrace = await esClient.getSource<Trace>({
+      index: TRACE_INDEX,
+      id: spanData.trace_id,
+    });
+
+    expect(indexedTrace).toEqual({
+      id: spanData.trace_id,
+      project_id: projectId,
+      timestamps: {
+        started_at: expect.any(Number),
+        inserted_at: expect.any(Number),
+      },
+      input: {
+        value: "hello",
+      },
+      output: {
+        value: "world",
+      },
+      metrics: {
+        first_token_ms: null,
+        total_time_ms: expect.any(Number),
+        prompt_tokens: null,
+        completion_tokens: null,
+        total_cost: null,
+      },
+      error: null
+    });
   });
 
   test("should return 405 for non-POST requests", async () => {
@@ -94,7 +126,7 @@ describe("Collector API Endpoint", () => {
     const invalidSpan = {
       type: "invalidType",
       name: "TestName",
-      span_id: "1234",
+      id: "1234",
     };
 
     const { req, res }: { req: NextApiRequest; res: NextApiResponse } =

@@ -130,7 +130,7 @@ class LangChainTracer(BaseContextTracer, BaseCallbackHandler):
 
         return LLMSpan(
             type="llm",
-            span_id=f"span_{run_id}",
+            id=f"span_{run_id}",
             parent_id=f"span_{parent_run_id}" if parent_run_id else None,
             trace_id=self.trace_id,
             vendor=list_get(serialized.get("id", []), 2, "unknown").lower(),
@@ -242,7 +242,7 @@ class LangChainTracer(BaseContextTracer, BaseCallbackHandler):
         return BaseSpan(
             type=type,
             name=name,
-            span_id=f"span_{run_id}",
+            id=f"span_{run_id}",
             parent_id=f"span_{parent_run_id}" if parent_run_id else None,
             trace_id=self.trace_id,
             input=input,

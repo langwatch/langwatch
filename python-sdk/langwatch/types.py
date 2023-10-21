@@ -73,7 +73,7 @@ SpanTypes = Literal["span", "llm", "chain", "tool", "agent"]
 class BaseSpan(TypedDict):
     type: SpanTypes
     name: Optional[str]
-    span_id: str
+    id: str
     parent_id: Optional[str]
     trace_id: str
     input: Optional[SpanInput]
@@ -84,7 +84,7 @@ class BaseSpan(TypedDict):
 
 class LLMSpan(TypedDict, total=False):
     type: Literal["llm"]
-    span_id: str
+    id: str
     parent_id: Optional[str]
     trace_id: str
     vendor: str

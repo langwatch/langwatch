@@ -208,7 +208,7 @@ class OpenAICompletionTracer(BaseContextTracer):
     ) -> LLMSpan:
         return LLMSpan(
             type="llm",
-            span_id=f"span_{nanoid.generate()}",
+            id=f"span_{nanoid.generate()}",
             parent_id=self.get_parent_id(),
             trace_id=self.trace_id,
             vendor="openai",
@@ -419,7 +419,7 @@ class OpenAIChatCompletionTracer(BaseContextTracer):
             params["functions"] = functions
         return LLMSpan(
             type="llm",
-            span_id=f"span_{nanoid.generate()}",
+            id=f"span_{nanoid.generate()}",
             parent_id=self.get_parent_id(),
             trace_id=self.trace_id,
             vendor="openai",

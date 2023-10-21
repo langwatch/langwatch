@@ -39,18 +39,18 @@ interface TypedValueJson {
   value: JSONSerializable;
 }
 
-type SpanInput =
+export type SpanInput =
   | TypedValueText
   | TypedValueChatMessages
   | TypedValueJson
   | TypedValueRaw;
-type SpanOutput =
+export type SpanOutput =
   | TypedValueText
   | TypedValueChatMessages
   | TypedValueJson
   | TypedValueRaw;
 
-interface ErrorCapture {
+export interface ErrorCapture {
   message: string;
   stacktrace: string[];
 }
@@ -77,7 +77,7 @@ type SpanTypes = "span" | "llm" | "chain" | "tool" | "agent";
 export interface BaseSpan {
   type: SpanTypes;
   name?: string | null;
-  span_id: string;
+  id: string;
   parent_id?: string | null;
   trace_id: string;
   input?: SpanInput | null;
@@ -100,3 +100,23 @@ export type Span = LLMSpan | BaseSpan;
 // Zod type will not be generated for this one, check ts-to-zod.config.js
 export type ElasticSearchSpan = BaseSpan &
   Partial<Omit<LLMSpan, "type">> & { project_id: string };
+
+export type TraceInputOutput = { value: string; openai_embeddings?: number[] };
+
+export type Trace = {
+  id: string;
+  project_id: string;
+  session_id?: string;
+  user_id?: string;
+  timestamps: { started_at: number; inserted_at: number };
+  input: TraceInputOutput;
+  output?: TraceInputOutput;
+  metrics: {
+    first_token_ms?: number | null;
+    total_time_ms?: number | null;
+    prompt_tokens?: number | null;
+    completion_tokens?: number | null;
+    total_cost?: number | null;
+  };
+  error?: ErrorCapture | null;
+};
