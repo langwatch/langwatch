@@ -97,4 +97,6 @@ export interface LLMSpan extends BaseSpan {
 
 export type Span = LLMSpan | BaseSpan;
 
-export type ElasticSearchSpan = LLMSpan & BaseSpan & { project_id: string };
+// Zod type will not be generated for this one, check ts-to-zod.config.js
+export type ElasticSearchSpan = BaseSpan &
+  Partial<Omit<LLMSpan, "type">> & { project_id: string };

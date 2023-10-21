@@ -5,12 +5,13 @@
   "scripts": {
     "build": "next build --no-lint",
     "dev": "next dev",
-    "postinstall": "prisma generate && prisma db push",
+    "postinstall": "prisma generate && prisma db push && npm run types:zod:generate",
     "lint": "next lint",
     "start": "next start",
     "prisma:db:push": "npx prisma db push",
     "test": "vitest",
-    "elastic:index:create": "tsx src/task.ts elasticIndexCreate"
+    "elastic:index:create": "tsx src/task.ts elasticIndexCreate",
+    "types:zod:generate": "ts-to-zod src/server/tracer/types.ts src/server/tracer/types.generated.ts"
   },
   "dependencies": {
     "@chakra-ui/next-js": "^2.1.5",
@@ -57,6 +58,7 @@
     "node-mocks-http": "^1.13.0",
     "prettier": "^3.0.3",
     "prisma": "^5.4.2",
+    "ts-to-zod": "^3.2.0",
     "tsx": "^3.14.0",
     "typescript": "^5.1.6",
     "vitest": "^0.34.6"

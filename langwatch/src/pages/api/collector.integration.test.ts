@@ -1,10 +1,13 @@
-import handler from "./collector";
-import { createMocks } from "node-mocks-http";
-import { describe, test, expect, beforeAll } from "vitest";
 import { type NextApiRequest, type NextApiResponse } from "next";
+import { createMocks } from "node-mocks-http";
+import { beforeAll, describe, expect, test } from "vitest";
 import { prisma } from "../../server/db";
-import { Span, type BaseSpan } from "../../server/tracer/types";
 import { SPAN_INDEX, esClient } from "../../server/elasticsearch";
+import {
+  type ElasticSearchSpan,
+  type BaseSpan,
+} from "../../server/tracer/types";
+import handler from "./collector";
 
 const sampleSpan: BaseSpan = {
   type: "span",
@@ -58,12 +61,13 @@ describe("Collector API Endpoint", () => {
 
     await handler(req, res);
 
-    const indexedSpan = await esClient.getSource<Span>({
+    const indexedSpan = await esClient.getSource<ElasticSearchSpan>({
       index: SPAN_INDEX,
       id: sampleSpan.span_id,
     });
 
     expect(indexedSpan).toMatchObject(sampleSpan);
+    expect(indexedSpan.project_id).toBe(projectId);
   });
 
   test("should return 405 for non-POST requests", async () => {
@@ -86,5 +90,25 @@ describe("Collector API Endpoint", () => {
     expect(res.statusCode).toBe(401);
   });
 
-  // TODO: Add more tests like checking for valid/invalid tokens, successful insertion, etc.
+  test("should return 400 for invalid span format", async () => {
+    const invalidSpan = {
+      type: "invalidType",
+      name: "TestName",
+      span_id: "1234",
+    };
+
+    const { req, res }: { req: NextApiRequest; res: NextApiResponse } =
+      createMocks({
+        method: "POST",
+        headers: {
+          "X-Auth-Token": "test-auth-token",
+        },
+        body: {
+          spans: [invalidSpan],
+        },
+      });
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(400);
+  });
 });

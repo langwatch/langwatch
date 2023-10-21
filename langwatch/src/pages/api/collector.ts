@@ -1,7 +1,11 @@
 import { type NextApiRequest, type NextApiResponse } from "next";
 import { prisma } from "../../server/db"; // Adjust the import based on your setup
-import { type Span } from "../../server/tracer/types";
+import { type ElasticSearchSpan, type Span } from "../../server/tracer/types";
 import { SPAN_INDEX, esClient } from "../../server/elasticsearch";
+import { spanSchema } from "../../server/tracer/types.generated";
+import { getDebugger } from "../../utils/logger";
+
+const debug = getDebugger("langwatch:collector");
 
 export default async function handler(
   req: NextApiRequest,
@@ -33,7 +37,21 @@ export default async function handler(
     return res.status(400).json({ message: "Bad request" });
   }
 
-  const spans: Span[] = (req.body as Record<string, any>).spans;
+  const spans: ElasticSearchSpan[] = (
+    (req.body as Record<string, any>).spans as Span[]
+  ).map((span) => ({
+    ...span,
+    project_id: project.id,
+  }));
+
+  try {
+    for (const span of spans) {
+      spanSchema.parse(span);
+    }
+  } catch (error) {
+    debug("Invalid span received", error)
+    return res.status(400).json({ error: "Invalid span format." });
+  }
 
   const result = await esClient.helpers.bulk({
     datasource: spans,
