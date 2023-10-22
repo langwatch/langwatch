@@ -3,10 +3,8 @@ import {
   type GetServerSidePropsResult,
 } from "next";
 import { type Session } from "next-auth";
-import { getSession } from "next-auth/react";
 import { type ParsedUrlQuery } from "querystring";
-import { type FullyLoadedOrganization } from "./api/routers/organization";
-import { getServerSideHelpers } from "../utils/serverHelpers";
+import { getServerAuthSession } from "./auth";
 
 export function withSignedInUser<
   T extends ParsedUrlQuery,
@@ -18,8 +16,8 @@ export function withSignedInUser<
 ) {
   return async (
     context: GetServerSidePropsContext<T>
-  ): Promise<GetServerSidePropsResult<U & { user: Session["user"] }>> => {
-    const session = await getSession(context);
+  ): Promise<GetServerSidePropsResult<U & { session: Session }>> => {
+    const session = await getServerAuthSession(context);
 
     if (!session) {
       return {
@@ -38,63 +36,7 @@ export function withSignedInUser<
       ...data,
       props: {
         ...(await data.props),
-        user: session.user,
-      },
-    };
-  };
-}
-
-export function withSignedInUserAndData<
-  T extends ParsedUrlQuery,
-  U extends Record<string, any>,
->(
-  fn: (
-    context: GetServerSidePropsContext<T>
-  ) => Promise<GetServerSidePropsResult<U>>
-) {
-  return async (
-    context: GetServerSidePropsContext<T>
-  ): Promise<
-    GetServerSidePropsResult<
-      U & { user: Session["user"]; organizations: FullyLoadedOrganization[] }
-    >
-  > => {
-    const data = await withSignedInUser(fn)(context);
-
-    if (!hasProps(data)) return data;
-
-    const helpers = await getServerSideHelpers(context);
-    const organizations: FullyLoadedOrganization[] =
-      await helpers.organization.getAll.fetch();
-
-    if (organizations.length == 0) {
-      return {
-        redirect: {
-          destination: "/onboarding/organization",
-          permanent: false,
-        },
-      };
-    }
-
-    if (
-      organizations.every((org) =>
-        org.teams.every((team) => team.projects.length == 0)
-      )
-    ) {
-      const firstTeamSlug = organizations.flatMap((org) => org.teams)[0]?.slug;
-      return {
-        redirect: {
-          destination: `/onboarding/${firstTeamSlug}/project`,
-          permanent: false,
-        },
-      };
-    }
-
-    return {
-      ...data,
-      props: {
-        ...(await data.props),
-        organizations,
+        session,
       },
     };
   };

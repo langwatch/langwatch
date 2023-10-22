@@ -6,32 +6,29 @@ import {
   HStack,
   Heading,
   Input,
-  VStack,
   Text,
+  VStack,
 } from "@chakra-ui/react";
-import { type GetServerSideProps, type GetServerSidePropsContext } from "next";
-import { type Session } from "next-auth";
-import { getSession, useSession } from "next-auth/react";
 import { useRouter } from "next/router";
 import { useEffect } from "react";
 import { useForm, type SubmitHandler } from "react-hook-form";
-import { api } from "~/utils/api";
 import { SetupLayout } from "~/components/SetupLayout";
-import { withSignedInUser } from "../../server/props";
+import { api } from "~/utils/api";
+import { useRequiredSession } from "../../hooks/useRequiredSession";
+import { LoadingScreen } from "../../components/LoadingScreen";
 
 type OrganizationFormData = {
   organizationName: string;
 };
 
-type Props = {
-  user: Session["user"];
-};
+export default function OrganizationOnboarding() {
+  const { data: session } = useRequiredSession();
 
-export default function OrganizationOnboarding({ user }: Props) {
   const { register, handleSubmit } = useForm<OrganizationFormData>();
   const router = useRouter();
 
   const createOrganization = api.organization.createAndAssign.useMutation();
+  const apiContext = api.useContext();
 
   const onSubmit: SubmitHandler<OrganizationFormData> = (
     data: OrganizationFormData
@@ -43,11 +40,23 @@ export default function OrganizationOnboarding({ user }: Props) {
 
   useEffect(() => {
     if (createOrganization.isSuccess) {
-      void router.push(
-        `/onboarding/${createOrganization.data.teamSlug}/project`
-      );
+      void (async () => {
+        await apiContext.organization.getAll.refetch();
+        await router.push(
+          `/onboarding/${createOrganization.data.teamSlug}/project`
+        );
+      })();
     }
-  }, [createOrganization.data?.teamSlug, createOrganization.isSuccess, router]);
+  }, [
+    apiContext.organization.getAll,
+    createOrganization.data?.teamSlug,
+    createOrganization.isSuccess,
+    router,
+  ]);
+
+  if (!session) {
+    return <LoadingScreen />;
+  }
 
   return (
     <SetupLayout>
@@ -62,11 +71,11 @@ export default function OrganizationOnboarding({ user }: Props) {
           </Text>
           <FormControl>
             <FormLabel>Name</FormLabel>
-            <Input type="text" disabled value={user.name ?? ""} />
+            <Input type="text" disabled value={session.user.name ?? ""} />
           </FormControl>
           <FormControl>
             <FormLabel>Email</FormLabel>
-            <Input type="email" disabled value={user.email ?? ""} />
+            <Input type="email" disabled value={session.user.email ?? ""} />
           </FormControl>
           <FormControl>
             <FormLabel>Organization Name</FormLabel>
@@ -93,9 +102,3 @@ export default function OrganizationOnboarding({ user }: Props) {
     </SetupLayout>
   );
 }
-
-export const getServerSideProps = withSignedInUser(
-  async (_context: GetServerSidePropsContext) => {
-    return { props: {} };
-  }
-) satisfies GetServerSideProps<Props>;

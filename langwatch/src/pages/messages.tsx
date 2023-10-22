@@ -9,11 +9,9 @@ import {
   Tag,
   VStack,
 } from "@chakra-ui/react";
-import { type GetServerSideProps, type GetServerSidePropsContext } from "next";
 import { type Session } from "next-auth";
 import { Check, Filter, Search } from "react-feather";
 import { type FullyLoadedOrganization } from "~/server/api/routers/organization";
-import { withSignedInUserAndData } from "~/server/props";
 import { DashboardLayout } from "../components/DashboardLayout";
 
 type Props = {
@@ -105,9 +103,3 @@ export default function Dashboard({ user, organizations }: Props) {
     </DashboardLayout>
   );
 }
-
-export const getServerSideProps = withSignedInUserAndData(
-  async (_context: GetServerSidePropsContext) => {
-    return { props: {} };
-  }
-) satisfies GetServerSideProps<Props>;

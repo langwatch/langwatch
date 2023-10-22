@@ -24,3 +24,11 @@ a {
     }
   }
 }
+
+#nprogress .bar {
+  background: #ED8926;
+}
+
+#nprogress .peg {
+  box-shadow: 0 0 10px #ED8926,0 0 5px #ED8926;
+}

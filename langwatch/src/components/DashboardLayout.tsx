@@ -1,43 +1,37 @@
+import { Link } from "@chakra-ui/next-js";
 import {
+  Avatar,
   Box,
   Button,
   HStack,
-  VStack,
-  useTheme,
-  Text,
-  Spacer,
-  Avatar,
   Input,
   InputGroup,
   InputLeftElement,
+  Spacer,
+  Text,
+  VStack,
+  useTheme,
 } from "@chakra-ui/react";
-import { type Session } from "next-auth";
 import Image from "next/image";
 import { useRouter } from "next/router";
-import { type PropsWithChildren } from "react";
+import { useEffect, type PropsWithChildren } from "react";
 import {
+  ChevronDown,
+  ChevronRight,
   Database,
   Home,
   MessageSquare,
+  Search,
   Shield,
   TrendingUp,
   type Icon,
-  ChevronDown,
-  ChevronRight,
-  Search,
 } from "react-feather";
-import { type FullyLoadedOrganization } from "~/server/api/routers/organization";
+import { useRequiredSession } from "../hooks/useRequiredSession";
+import { api } from "../utils/api";
 import { findCurrentRoute, routes } from "../utils/routes";
-import { Link } from "@chakra-ui/next-js";
+import { LoadingScreen } from "./LoadingScreen";
 
-export const DashboardLayout = ({
-  user,
-  organizations,
-  children,
-}: PropsWithChildren<{
-  user: Session["user"];
-  organizations: FullyLoadedOrganization[];
-}>) => {
+export const DashboardLayout = ({ children }: PropsWithChildren) => {
   const router = useRouter();
   const currentRoute = findCurrentRoute(router.pathname);
   const theme = useTheme();
@@ -45,6 +39,36 @@ export const DashboardLayout = ({
   const orange400 = theme.colors.orange["400"];
   // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
   const gray400 = theme.colors.gray["400"];
+
+  const { data: session } = useRequiredSession();
+
+  const organizations = api.organization.getAll.useQuery(undefined, {
+    staleTime: Infinity,
+  });
+
+  useEffect(() => {
+    if (!organizations.data) return;
+
+    if (organizations.data.length == 0) {
+      void router.push("/onboarding/organization");
+    }
+
+    if (
+      organizations.data.every((org) =>
+        org.teams.every((team) => team.projects.length == 0)
+      )
+    ) {
+      const firstTeamSlug = organizations.data.flatMap((org) => org.teams)[0]
+        ?.slug;
+      void router.push(`/onboarding/${firstTeamSlug}/project`);
+    }
+  }, [organizations.data, router]);
+
+  if (!session || organizations.isLoading || organizations.data?.length == 0) {
+    return <LoadingScreen />;
+  }
+
+  const user = session.user;
 
   const MenuButton = ({
     icon,
@@ -71,7 +95,11 @@ export const DashboardLayout = ({
 
   return (
     <HStack width="full" minHeight="100vh" alignItems={"stretch"} spacing={0}>
-      <Box borderRightWidth="1px" borderRightColor="gray.300">
+      <Box
+        borderRightWidth="1px"
+        borderRightColor="gray.300"
+        background="white"
+      >
         <VStack
           paddingX={8}
           paddingY={8}

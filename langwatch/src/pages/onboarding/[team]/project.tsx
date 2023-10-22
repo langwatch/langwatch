@@ -24,8 +24,8 @@ import { api } from "~/utils/api";
 import { JavaScript } from "../../../components/icons/JavaScript";
 import { OpenAI } from "../../../components/icons/OpenAI";
 import { Python } from "../../../components/icons/Python";
-import { withSignedInUser } from "../../../server/props";
 import { getServerSideHelpers } from "../../../utils/serverHelpers";
+import { useRequiredSession } from "../../../hooks/useRequiredSession";
 
 type ProjectFormData = {
   name: string;
@@ -68,11 +68,9 @@ function RadioCard(props: UseRadioProps & PropsWithChildren) {
   );
 }
 
-type Props = {
-  team: Team | null;
-};
+export default function ProjectOnboarding() {
+  useRequiredSession();
 
-export default function ProjectOnboarding({ team }: Props) {
   const { register, handleSubmit, setValue, getValues } =
     useForm<ProjectFormData>({
       defaultValues: {
@@ -83,14 +81,20 @@ export default function ProjectOnboarding({ team }: Props) {
 
   const router = useRouter();
 
+  const { team: teamSlug } = router.query;
+  const team = api.team.getBySlug.useQuery({
+    slug: typeof teamSlug == "string" ? teamSlug : "",
+  });
+
   const createProject = api.project.create.useMutation();
+  const apiContext = api.useContext();
 
   const onSubmit: SubmitHandler<ProjectFormData> = (data: ProjectFormData) => {
-    if (!team) return;
+    if (!team.data) return;
 
     createProject.mutate({
       name: data.name,
-      teamId: team.id,
+      teamId: team.data.id,
       language: data.language,
       framework: data.framework,
     });
@@ -98,9 +102,17 @@ export default function ProjectOnboarding({ team }: Props) {
 
   useEffect(() => {
     if (createProject.isSuccess) {
-      void router.push("/");
+      void (async () => {
+        await apiContext.organization.getAll.refetch();
+        void router.push("/");
+      })();
     }
-  }, [createProject.isSuccess, router]);
+  }, [
+    apiContext.organization,
+    apiContext.organization.getAll,
+    createProject.isSuccess,
+    router,
+  ]);
 
   const IconWrapper = ({ children }: PropsWithChildren) => {
     return (
@@ -279,20 +291,3 @@ export default function ProjectOnboarding({ team }: Props) {
     </SetupLayout>
   );
 }
-
-export const getServerSideProps = withSignedInUser(
-  async (context: GetServerSidePropsContext) => {
-    const helpers = await getServerSideHelpers(context);
-    const { team: teamSlug } = context.query;
-    const team =
-      typeof teamSlug == "string"
-        ? await helpers.team.getBySlug.fetch({ slug: teamSlug })
-        : null;
-
-    return {
-      props: {
-        team,
-      },
-    };
-  }
-) satisfies GetServerSideProps<Props>;

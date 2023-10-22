@@ -12,6 +12,7 @@ import {
 import "~/styles/globals.scss";
 
 import { extendTheme } from "@chakra-ui/react";
+import debounce from "lodash.debounce";
 import { Inter } from "next/font/google";
 import Head from "next/head";
 import { useRouter } from "next/router";
@@ -25,6 +26,7 @@ export const theme = extendTheme({
     global: (_props: StyleFunctionProps) => ({
       body: {
         fontFamily: inter.style.fontFamily,
+        background: "#E5E7EB"
       },
     }),
   },
@@ -64,8 +66,13 @@ const LangWatch: AppType<{ session: Session | null }> = ({
   const router = useRouter();
 
   useEffect(() => {
-    const handleChangeStart = () => NProgress.start();
-    const handleChangeDone = () => NProgress.done();
+    NProgress.configure({ showSpinner: false });
+    const handleChangeStart = debounce(() => NProgress.start(), 200);
+    const handleChangeDone = () => {
+      handleChangeStart.cancel();
+      NProgress.done();
+      setTimeout(() => NProgress.done(), 200);
+    };
 
     router.events.on("routeChangeStart", handleChangeStart);
     router.events.on("routeChangeComplete", handleChangeDone);
@@ -79,7 +86,11 @@ const LangWatch: AppType<{ session: Session | null }> = ({
   }, [router]);
 
   return (
-    <SessionProvider session={session}>
+    <SessionProvider
+      session={session}
+      refetchInterval={5 * 60}
+      refetchOnWindowFocus={false}
+    >
       <ChakraProvider theme={theme}>
         <Head>
           <link
