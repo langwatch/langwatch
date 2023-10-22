@@ -31,6 +31,7 @@ import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject"
 import { useRequiredSession } from "../hooks/useRequiredSession";
 import { findCurrentRoute, getProjectRoutes } from "../utils/routes";
 import { LoadingScreen } from "./LoadingScreen";
+import { LogoIcon } from "./icons/LogoIcon";
 
 export const DashboardLayout = ({ children }: PropsWithChildren) => {
   const router = useRouter();
@@ -95,12 +96,7 @@ export const DashboardLayout = ({ children }: PropsWithChildren) => {
           top={0}
         >
           <Box fontSize={32} fontWeight="bold">
-            <Image
-              src="/images/logo-icon.svg"
-              alt="LangWatch Logo"
-              width="25"
-              height="34"
-            />
+            <LogoIcon width={25} height={34} />
           </Box>
           <VStack spacing={8}>
             <MenuButton
