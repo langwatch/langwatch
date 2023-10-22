@@ -1,0 +1,76 @@
+# This workflow will upload a Python Package using Twine when a release is created
+# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-python#publishing-to-package-registries
+
+# This workflow uses actions that are not certified by GitHub.
+# They are provided by a third-party and are governed by
+# separate terms of service, privacy policy, and support
+# documentation.
+
+name: Upload Python Package
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "python-sdk/**"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "python-sdk/**"
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with:
+          python-version: "3.x"
+
+      - uses: Gr1N/setup-poetry@v8
+      - uses: actions/cache@v2
+        with:
+          path: ~/.cache/pypoetry/virtualenvs
+          key: ${{ runner.os }}-poetry-${{ hashFiles('poetry.lock') }}
+
+      - name: Install dependencies
+        run: |
+          cd python-sdk
+          make install
+          pip install build
+
+      - name: Build package
+        run: |
+          cd python-sdk
+          python -m build
+
+      - name: Extract version from pyproject.toml
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          cd python-sdk
+          echo "PACKAGE_VERSION=$(poetry version --short)" >> $GITHUB_ENV
+
+      - name: Check if version exists on PyPI
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        id: check_version
+        run: |
+          RESPONSE=$(curl -s --head https://pypi.org/pypi/langwatch/${{ env.PACKAGE_VERSION }}/json)
+          if [[ $RESPONSE == *"200 OK"* ]]; then
+            echo "::set-output name=exists::true"
+          else
+            echo "::set-output name=exists::false"
+          fi
+
+      - name: Publish package
+        if: steps.check_version.outputs.exists == 'false' && github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: pypa/gh-action-pypi-publish@27b31702a0e7fc50959f5ad993c78deac1bdfc29
+        with:
+          packages_dir: python-sdk/dist/
+          user: __token__
+          password: ${{ secrets.PYPI_API_TOKEN }}

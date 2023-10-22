@@ -2,7 +2,7 @@
 name = "langwatch"
 version = "0.0.1"
 description = "Python SDK for LangWatch for monitoring your LLMs"
-authors = ["Rogerio Chaves <rogeriocfj@gmail.com>"]
+authors = ["Rogerio Chaves <rogerio@langwatch.ai>"]
 homepage = "https://github.com/langwatch/langwatch"
 classifiers = [
     "Development Status :: 4 - Beta",

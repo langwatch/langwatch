@@ -4,7 +4,6 @@ import openai
 import sys
 
 sys.path.append("..")
-import langwatch
 import langwatch.openai
 
 
