@@ -12,7 +12,7 @@ import {
 import { type Session } from "next-auth";
 import { Check, Filter, Search } from "react-feather";
 import { type FullyLoadedOrganization } from "~/server/api/routers/organization";
-import { DashboardLayout } from "../components/DashboardLayout";
+import { DashboardLayout } from "../../components/DashboardLayout";
 
 type Props = {
   user: Session["user"];
@@ -55,7 +55,7 @@ export default function Dashboard({ user, organizations }: Props) {
   };
 
   return (
-    <DashboardLayout user={user} organizations={organizations}>
+    <DashboardLayout>
       <VStack
         width="full"
         spacing={0}

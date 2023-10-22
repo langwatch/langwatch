@@ -12,9 +12,10 @@ import {
   VStack,
   useTheme,
 } from "@chakra-ui/react";
+import ErrorPage from "next/error";
 import Image from "next/image";
 import { useRouter } from "next/router";
-import { useEffect, type PropsWithChildren } from "react";
+import { type PropsWithChildren } from "react";
 import {
   ChevronDown,
   ChevronRight,
@@ -26,14 +27,13 @@ import {
   TrendingUp,
   type Icon,
 } from "react-feather";
+import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import { useRequiredSession } from "../hooks/useRequiredSession";
-import { api } from "../utils/api";
-import { findCurrentRoute, routes } from "../utils/routes";
+import { findCurrentRoute, getProjectRoutes } from "../utils/routes";
 import { LoadingScreen } from "./LoadingScreen";
 
 export const DashboardLayout = ({ children }: PropsWithChildren) => {
   const router = useRouter();
-  const currentRoute = findCurrentRoute(router.pathname);
   const theme = useTheme();
   // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
   const orange400 = theme.colors.orange["400"];
@@ -42,33 +42,20 @@ export const DashboardLayout = ({ children }: PropsWithChildren) => {
 
   const { data: session } = useRequiredSession();
 
-  const organizations = api.organization.getAll.useQuery(undefined, {
-    staleTime: Infinity,
-  });
+  const { isLoading, organization, team, project } =
+    useOrganizationTeamProject();
 
-  useEffect(() => {
-    if (!organizations.data) return;
-
-    if (organizations.data.length == 0) {
-      void router.push("/onboarding/organization");
-    }
-
-    if (
-      organizations.data.every((org) =>
-        org.teams.every((team) => team.projects.length == 0)
-      )
-    ) {
-      const firstTeamSlug = organizations.data.flatMap((org) => org.teams)[0]
-        ?.slug;
-      void router.push(`/onboarding/${firstTeamSlug}/project`);
-    }
-  }, [organizations.data, router]);
-
-  if (!session || organizations.isLoading || organizations.data?.length == 0) {
+  if (!session || isLoading || !organization || !team || !project) {
     return <LoadingScreen />;
   }
 
+  if (project && router.query.project !== project.slug) {
+    return <ErrorPage statusCode={404} />;
+  }
+
   const user = session.user;
+  const projectRoutes = getProjectRoutes(project);
+  const currentRoute = findCurrentRoute(project, router.pathname);
 
   const MenuButton = ({
     icon,
@@ -86,7 +73,7 @@ export const DashboardLayout = ({ children }: PropsWithChildren) => {
         <VStack>
           <IconElem
             size={24}
-            color={router.pathname === path ? orange400 : undefined}
+            color={currentRoute?.path === path ? orange400 : undefined}
           />
         </VStack>
       </Link>
@@ -117,29 +104,29 @@ export const DashboardLayout = ({ children }: PropsWithChildren) => {
           </Box>
           <VStack spacing={8}>
             <MenuButton
-              path={routes.home.path}
+              path={projectRoutes.home.path}
               icon={Home}
-              label={routes.home.title}
+              label={projectRoutes.home.title}
             />
             <MenuButton
-              path={routes.messages.path}
+              path={projectRoutes.messages.path}
               icon={MessageSquare}
-              label={routes.messages.title}
+              label={projectRoutes.messages.title}
             />
             <MenuButton
-              path={routes.analytics.path}
+              path={projectRoutes.analytics.path}
               icon={TrendingUp}
-              label={routes.analytics.title}
+              label={projectRoutes.analytics.title}
             />
             <MenuButton
-              path={routes.security.path}
+              path={projectRoutes.security.path}
               icon={Shield}
-              label={routes.security.title}
+              label={projectRoutes.security.title}
             />
             <MenuButton
-              path={routes.prompts.path}
+              path={projectRoutes.prompts.path}
               icon={Database}
-              label={routes.prompts.title}
+              label={projectRoutes.prompts.title}
             />
           </VStack>
         </VStack>
@@ -163,7 +150,7 @@ export const DashboardLayout = ({ children }: PropsWithChildren) => {
             fontWeight="normal"
           >
             <HStack gap={2}>
-              <Box>🦜 Ecommerce Bot</Box>
+              <Box>🦜 {project.name}</Box>
               <ChevronDown width={14} />
             </HStack>
           </Button>

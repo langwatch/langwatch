@@ -3,7 +3,7 @@ import slugify from "slugify";
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 
-type FullyLoadedTeam = Team & {
+export type FullyLoadedTeam = Team & {
   projects: Project[];
 };
 

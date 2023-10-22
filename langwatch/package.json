@@ -42,6 +42,7 @@
     "sass": "^1.66.1",
     "slugify": "^1.6.6",
     "superjson": "^1.13.1",
+    "usehooks-ts": "^2.9.1",
     "zod": "^3.22.4"
   },
   "devDependencies": {

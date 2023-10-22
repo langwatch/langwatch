@@ -12,8 +12,6 @@ import {
   useRadioGroup,
   type UseRadioProps,
 } from "@chakra-ui/react";
-import { type Team } from "@prisma/client";
-import { type GetServerSideProps, type GetServerSidePropsContext } from "next";
 import ErrorPage from "next/error";
 import { useRouter } from "next/router";
 import { useEffect, type PropsWithChildren } from "react";
@@ -24,8 +22,8 @@ import { api } from "~/utils/api";
 import { JavaScript } from "../../../components/icons/JavaScript";
 import { OpenAI } from "../../../components/icons/OpenAI";
 import { Python } from "../../../components/icons/Python";
-import { getServerSideHelpers } from "../../../utils/serverHelpers";
 import { useRequiredSession } from "../../../hooks/useRequiredSession";
+import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
 
 type ProjectFormData = {
   name: string;
@@ -80,11 +78,18 @@ export default function ProjectOnboarding() {
     });
 
   const router = useRouter();
+  const { organization } = useOrganizationTeamProject({
+    redirectToProjectOnboarding: false,
+  });
 
   const { team: teamSlug } = router.query;
-  const team = api.team.getBySlug.useQuery({
-    slug: typeof teamSlug == "string" ? teamSlug : "",
-  });
+  const team = api.team.getBySlug.useQuery(
+    {
+      slug: typeof teamSlug == "string" ? teamSlug : "",
+      organizationId: organization?.id ?? "",
+    },
+    { enabled: !!organization }
+  );
 
   const createProject = api.project.create.useMutation();
   const apiContext = api.useContext();
@@ -104,12 +109,13 @@ export default function ProjectOnboarding() {
     if (createProject.isSuccess) {
       void (async () => {
         await apiContext.organization.getAll.refetch();
-        void router.push("/");
+        void router.push(`/${createProject.data.projectSlug}`);
       })();
     }
   }, [
     apiContext.organization,
     apiContext.organization.getAll,
+    createProject.data?.projectSlug,
     createProject.isSuccess,
     router,
   ]);
@@ -193,7 +199,7 @@ export default function ProjectOnboarding() {
   const currentLanguage = getValues("language");
   const currentFramework = getValues("framework");
 
-  if (!team) {
+  if (team.isFetched && !team.data) {
     return <ErrorPage statusCode={404} />;
   }
 
