@@ -1,7 +1,7 @@
 from typing import Any, Dict, List, Literal, Optional, TypedDict, Union
 
 
-ChatRole = Literal["system", "user", "assistant", "unknown"]
+ChatRole = Literal["system", "user", "assistant", "function", "unknown"]
 
 
 class FunctionCall(TypedDict, total=False):

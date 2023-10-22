@@ -11,7 +11,12 @@ import os
 
 from langwatch.tracer import span, create_span
 
-endpoint = "https://app.langwatch.ai/api/trace"
+endpoint = (
+    os.environ.get("LANGWATCH_ENDPOINT") or "https://app.langwatch.ai/api/collector"
+)
 api_key = os.environ.get("LANGWATCH_API_KEY")
+
+if not api_key:
+    raise Exception("LANGWATCH_API_KEY is not set, go to https://langwatch.ai to set it up")
 
 __all__ = ("endpoint", "api_key", "span", "create_span")

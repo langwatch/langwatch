@@ -1,16 +1,18 @@
 import { type NextApiRequest, type NextApiResponse } from "next";
 import { prisma } from "../../server/db"; // Adjust the import based on your setup
-import {
-  type Trace,
-  type ElasticSearchSpan,
-  type Span,
-  type SpanOutput,
-  type SpanInput,
-  type ErrorCapture,
-} from "../../server/tracer/types";
 import { SPAN_INDEX, TRACE_INDEX, esClient } from "../../server/elasticsearch";
-import { spanSchema } from "../../server/tracer/types.generated";
+import {
+  type ElasticSearchInputOutput,
+  type ElasticSearchSpan,
+  type ErrorCapture,
+  type Span,
+  type SpanInput,
+  type SpanOutput,
+  type Trace,
+} from "../../server/tracer/types";
+import { spanValidatorSchema } from "../../server/tracer/types.generated";
 import { getDebugger } from "../../utils/logger";
+import * as Sentry from "@sentry/nextjs";
 
 const debug = getDebugger("langwatch:collector");
 
@@ -48,11 +50,18 @@ export default async function handler(
     return res.status(400).json({ message: "Bad request" });
   }
 
-  const spans: ElasticSearchSpan[] = (
-    (req.body as Record<string, any>).spans as Span[]
-  ).map((span) => ({
+  const spans = (req.body as Record<string, any>).spans as Span[];
+
+  const esSpans: ElasticSearchSpan[] = spans.map((span) => ({
     ...span,
+    input: span.input ? typedValueToElasticSearch(span.input) : null,
+    outputs: span.outputs.map(typedValueToElasticSearch),
     project_id: project.id,
+    // TODO: test
+    raw_response:
+      "raw_response" in span && span.raw_response
+        ? JSON.stringify(span.raw_response)
+        : null,
   }));
 
   const traceIds = Array.from(
@@ -65,13 +74,16 @@ export default async function handler(
       .json({ message: "All spans must have the same trace id" });
   }
 
-  try {
-    for (const span of spans) {
-      spanSchema.parse(span);
+  debug(`collecting traceId ${traceId}`);
+
+  for (const span of spans) {
+    try {
+      spanValidatorSchema.parse(span);
+    } catch (error) {
+      debug("Invalid span received", error, JSON.stringify(span, null, "  "));
+      Sentry.captureException(error);
+      return res.status(400).json({ error: "Invalid span format." });
     }
-  } catch (error) {
-    debug("Invalid span received", error);
-    return res.status(400).json({ error: "Invalid span format." });
   }
 
   // Create the trace
@@ -97,7 +109,7 @@ export default async function handler(
   });
 
   const result = await esClient.helpers.bulk({
-    datasource: spans,
+    datasource: esSpans,
     pipeline: "ent-search-generic-ingestion",
     onDocument: (doc) => ({
       index: { _index: SPAN_INDEX, _id: doc.id, routing: doc.trace_id },
@@ -113,7 +125,7 @@ export default async function handler(
 }
 
 // TODO: test
-const getFirstInputAsText = (spans: ElasticSearchSpan[]): string => {
+const getFirstInputAsText = (spans: Span[]): string => {
   // TODO: shouldn't it be sorted by parent-child?
   const input = spans.filter((span) => span.input)[0]?.input;
   if (!input) {
@@ -123,7 +135,7 @@ const getFirstInputAsText = (spans: ElasticSearchSpan[]): string => {
 };
 
 // TODO: test
-const getLastOutputAsText = (spans: ElasticSearchSpan[]): string => {
+const getLastOutputAsText = (spans: Span[]): string => {
   // TODO: shouldn't it be sorted by parent-child?
   const spansWithOutputs = spans.filter((span) => span.outputs.length > 0);
   const outputs = spansWithOutputs[spansWithOutputs.length - 1]?.outputs;
@@ -166,10 +178,17 @@ const typedValueToText = (typed: SpanInput | SpanOutput): string => {
   return "";
 };
 
+const typedValueToElasticSearch = (
+  typed: SpanInput | SpanOutput
+): ElasticSearchInputOutput => {
+  return {
+    type: typed.type,
+    value: JSON.stringify(typed.value),
+  };
+};
+
 // TODO: test
-const getLastOutputError = (
-  spans: ElasticSearchSpan[]
-): ErrorCapture | null => {
+const getLastOutputError = (spans: Span[]): ErrorCapture | null => {
   // TODO: shouldn't it be sorted by parent-child?
   const errorSpans = spans.filter((span) => span.error);
   const lastError = errorSpans[errorSpans.length - 1];

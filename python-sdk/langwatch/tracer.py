@@ -1,20 +1,21 @@
-from contextlib import contextmanager
+import asyncio
+from asyncio import Task
 import functools
-import json
 import threading
-from typing import Any, Dict, List, Literal, Optional, TypeVar, TypedDict
+from concurrent.futures import ThreadPoolExecutor
+from typing import Any, Dict, List, Optional, TypeVar
+
 import nanoid
 import requests
-from concurrent.futures import ThreadPoolExecutor
-from retry import retry
-
-import langwatch
 from langwatch.types import BaseSpan, ErrorCapture, Span, SpanTimestamps, SpanTypes
 from langwatch.utils import (
     autoconvert_typed_values,
     capture_exception,
     milliseconds_timestamp,
 )
+from retry import retry
+
+import langwatch
 
 T = TypeVar("T")
 
@@ -71,7 +72,7 @@ class ContextSpan:
                     input=autoconvert_typed_values(self.input) if self.input else None,
                     outputs=[autoconvert_typed_values(self.output)]
                     if self.output
-                    else [],  # TODO
+                    else [],  # TODO test?
                     error=error,  # TODO: test
                     timestamps=SpanTimestamps(
                         started_at=self.started_at, finished_at=finished_at
@@ -100,7 +101,9 @@ def span(name: Optional[str] = None, type: SpanTypes = "span"):
             if kwargs:
                 all_args.update(kwargs)
 
-            with create_span(name=(name or func.__name__), type=type, input=all_args) as span:
+            with create_span(
+                name=(name or func.__name__), type=type, input=all_args
+            ) as span:
                 output = func(*args, **kwargs)
                 span.output = output
                 return output
@@ -111,6 +114,9 @@ def span(name: Optional[str] = None, type: SpanTypes = "span"):
 
 
 class BaseContextTracer:
+    sent_once = False
+    scheduled_send: Optional[Task[None]] = None
+
     def __init__(self, trace_id: Optional[str] = None):
         self.spans: Dict[str, Span] = {}
         self.trace_id = trace_id or f"trace_{nanoid.generate()}"
@@ -120,12 +126,24 @@ class BaseContextTracer:
         return self
 
     def __exit__(self, _type, _value, _traceback):
-        send_spans(list(self.spans.values()))
+        self.delayed_send_spans()
         _local_context.current_tracer = None
+
+    def delayed_send_spans(self):
+        async def schedule():
+            await asyncio.sleep(1)
+            self.sent_once = True
+            send_spans(list(self.spans.values()))
+
+        if self.scheduled_send:
+            self.scheduled_send.cancel()
+        self.scheduled_send = asyncio.ensure_future(schedule())
 
     def append_span(self, span: Span):
         span["id"] = span.get("id", f"span_{nanoid.generate()}")
         self.spans[span["id"]] = span
+        if self.sent_once:
+            self.delayed_send_spans()  # send again if needed
 
     def get_parent_id(self):
         current_span: Optional[ContextSpan] = getattr(
@@ -141,7 +159,11 @@ executor = ThreadPoolExecutor(max_workers=10)
 
 @retry(tries=5, delay=0.5, backoff=3)
 def _send_spans(spans: List[Span]):
-    response = requests.post(langwatch.endpoint, json={"spans": spans})
+    response = requests.post(
+        langwatch.endpoint,
+        json={"spans": spans},
+        headers={"X-Auth-Token": str(langwatch.api_key)},
+    )
     response.raise_for_status()
 
 

@@ -1,4 +1,4 @@
-type ChatRole = "system" | "user" | "assistant" | "unknown";
+type ChatRole = "system" | "user" | "assistant" | "function" | "unknown";
 
 interface FunctionCall {
   name?: string;
@@ -97,9 +97,32 @@ export interface LLMSpan extends BaseSpan {
 
 export type Span = LLMSpan | BaseSpan;
 
+type SpanInputValidator = SpanInput & { value: any };
+type SpanOutputValidator = SpanInput & { value: any };
+
+export type SpanValidator = (
+  | Omit<LLMSpan, "input" | "outputs">
+  | Omit<BaseSpan, "input" | "outputs">
+) & {
+  input: SpanInputValidator;
+  outputs: SpanOutputValidator[];
+};
+
+export type ElasticSearchInputOutput = {
+  type: SpanInput["type"];
+  value: string;
+};
+
 // Zod type will not be generated for this one, check ts-to-zod.config.js
-export type ElasticSearchSpan = BaseSpan &
-  Partial<Omit<LLMSpan, "type">> & { project_id: string };
+export type ElasticSearchSpan = Omit<
+  BaseSpan & Partial<Omit<LLMSpan, "type" | "raw_response">>,
+  "input" | "outputs"
+> & {
+  project_id: string;
+  input?: ElasticSearchInputOutput | null;
+  outputs: ElasticSearchInputOutput[];
+  raw_response?: string | null;
+};
 
 export type TraceInputOutput = { value: string; openai_embeddings?: number[] };
 
