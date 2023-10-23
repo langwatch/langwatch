@@ -58,6 +58,7 @@ export interface ErrorCapture {
 interface SpanMetrics {
   prompt_tokens?: number | null;
   completion_tokens?: number | null;
+  tokens_estimated?: boolean | null;
 }
 
 interface SpanParams {
@@ -140,6 +141,7 @@ export type Trace = {
     prompt_tokens?: number | null;
     completion_tokens?: number | null;
     total_cost?: number | null;
+    tokens_estimated?: boolean | null;
   };
   error?: ErrorCapture | null;
 };

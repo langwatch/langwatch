@@ -26,7 +26,7 @@ export const theme = extendTheme({
     global: (_props: StyleFunctionProps) => ({
       body: {
         fontFamily: inter.style.fontFamily,
-        background: "#E5E7EB"
+        background: "#E5E7EB",
       },
     }),
   },
@@ -53,6 +53,14 @@ export const theme = extendTheme({
       baseStyle: {
         container: {
           boxShadow: "0px 4px 10px 0px rgba(0, 0, 0, 0.06)",
+        },
+      },
+    }),
+    Tag: defineStyleConfig({
+      baseStyle: {
+        container: {
+          borderRadius: "62px",
+          paddingX: 4,
         },
       },
     }),

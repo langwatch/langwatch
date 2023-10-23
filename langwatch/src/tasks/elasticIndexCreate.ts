@@ -46,6 +46,7 @@ const traceMapping: Record<keyof Trace, MappingProperty> = {
       total_time_ms: { type: "integer" },
       prompt_tokens: { type: "integer" },
       completion_tokens: { type: "integer" },
+      tokens_estimated: { type: "boolean" },
       total_cost: { type: "float" },
     },
   },
@@ -108,6 +109,7 @@ const spanMapping: Record<keyof ElasticSearchSpan, MappingProperty> = {
     properties: {
       prompt_tokens: { type: "integer" },
       completion_tokens: { type: "integer" },
+      tokens_estimated: { type: "boolean" },
     },
   },
 };

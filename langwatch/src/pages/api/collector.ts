@@ -5,6 +5,7 @@ import {
   type ElasticSearchInputOutput,
   type ElasticSearchSpan,
   type ErrorCapture,
+  type LLMSpan,
   type Span,
   type SpanInput,
   type SpanOutput,
@@ -13,6 +14,7 @@ import {
 import { spanValidatorSchema } from "../../server/tracer/types.generated";
 import { getDebugger } from "../../utils/logger";
 import * as Sentry from "@sentry/nextjs";
+import { countTokens } from "../../server/tracer/tokenCount";
 
 const debug = getDebugger("langwatch:collector");
 
@@ -50,7 +52,9 @@ export default async function handler(
     return res.status(400).json({ message: "Bad request" });
   }
 
-  const spans = (req.body as Record<string, any>).spans as Span[];
+  const spans = await addLLMTokensCount(
+    (req.body as Record<string, any>).spans as Span[]
+  );
 
   const esSpans: ElasticSearchSpan[] = spans.map((span) => ({
     ...span,
@@ -199,21 +203,14 @@ const getLastOutputError = (spans: Span[]): ErrorCapture | null => {
 };
 
 // TODO: test
-const computeTraceMetrics = (
-  spans: Span[]
-): {
-  first_token_ms: number | null;
-  total_time_ms: number | null;
-  prompt_tokens: number | null;
-  completion_tokens: number | null;
-  total_cost: number | null;
-} => {
+const computeTraceMetrics = (spans: Span[]): Trace["metrics"] => {
   let earliestStartedAt: number | null = null;
   let latestFirstTokenAt: number | null = null;
   let latestFinishedAt: number | null = null;
 
   let totalPromptTokens: number | null = null;
   let totalCompletionTokens: number | null = null;
+  let tokensEstimated = false;
 
   spans.forEach((span) => {
     if (
@@ -257,6 +254,9 @@ const computeTraceMetrics = (
         }
         totalCompletionTokens += span.metrics.completion_tokens;
       }
+      if (span.metrics.tokens_estimated) {
+        tokensEstimated = true;
+      }
     }
   });
 
@@ -272,5 +272,34 @@ const computeTraceMetrics = (
     prompt_tokens: totalPromptTokens,
     completion_tokens: totalCompletionTokens,
     total_cost: null,
+    tokens_estimated: tokensEstimated,
   };
+};
+
+// TODO: test
+const addLLMTokensCount = async (spans: Span[]) => {
+  for (const span of spans) {
+    if (span.type == "llm") {
+      const llmSpan = span as LLMSpan;
+      if (!llmSpan.metrics) {
+        llmSpan.metrics = {};
+      }
+      if (llmSpan.input && !llmSpan.metrics.prompt_tokens) {
+        llmSpan.metrics.prompt_tokens = await countTokens(
+          typedValueToText(llmSpan.input)
+        );
+        llmSpan.metrics.tokens_estimated = true;
+      }
+      if (llmSpan.outputs.length > 0 && !llmSpan.metrics.completion_tokens) {
+        let outputTokens = 0;
+        for (const output of llmSpan.outputs) {
+          outputTokens += await countTokens(typedValueToText(output));
+        }
+        llmSpan.metrics.completion_tokens = outputTokens;
+        llmSpan.metrics.tokens_estimated = true;
+      }
+      llmSpan.metrics.completion_tokens;
+    }
+  }
+  return spans;
 };

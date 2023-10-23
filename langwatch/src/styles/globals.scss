@@ -26,9 +26,25 @@ a {
 }
 
 #nprogress .bar {
-  background: #ED8926;
+  background: #ed8926;
 }
 
 #nprogress .peg {
-  box-shadow: 0 0 10px #ED8926,0 0 5px #ED8926;
+  box-shadow:
+    0 0 10px #ed8926,
+    0 0 5px #ed8926;
+}
+
+.markdown {
+  p {
+    padding: 6px 0;
+  }
+
+  ol,
+  ul {
+    padding-left: 40px;
+    &:dir(rtl) {
+      padding-right: 40px;
+    }
+  }
 }
