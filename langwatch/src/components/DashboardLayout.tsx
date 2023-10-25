@@ -32,6 +32,7 @@ import { useRequiredSession } from "../hooks/useRequiredSession";
 import { findCurrentRoute, getProjectRoutes } from "../utils/routes";
 import { LoadingScreen } from "./LoadingScreen";
 import { LogoIcon } from "./icons/LogoIcon";
+import Head from "next/head";
 
 export const DashboardLayout = ({ children }: PropsWithChildren) => {
   const router = useRouter();
@@ -83,6 +84,14 @@ export const DashboardLayout = ({ children }: PropsWithChildren) => {
 
   return (
     <HStack width="full" minHeight="100vh" alignItems={"stretch"} spacing={0}>
+      <Head>
+        <title>
+          LangWatch - {project.name}
+          {currentRoute && currentRoute.title != "Home"
+            ? ` - ${currentRoute?.title}`
+            : ""}
+        </title>
+      </Head>
       <Box
         borderRightWidth="1px"
         borderRightColor="gray.300"
