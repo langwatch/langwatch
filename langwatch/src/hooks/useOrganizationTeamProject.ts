@@ -2,14 +2,16 @@ import { useRouter } from "next/router";
 import { useEffect } from "react";
 import { useLocalStorage } from "usehooks-ts";
 import { api } from "../utils/api";
+import { useRequiredSession } from "./useRequiredSession";
 
 export const useOrganizationTeamProject = (
   { redirectToProjectOnboarding } = { redirectToProjectOnboarding: true }
 ) => {
+  useRequiredSession();
+
   const organizations = api.organization.getAll.useQuery(undefined, {
     staleTime: Infinity,
   });
-  console.log('organizations', organizations);
   const [organizationId, setOrganizationId] = useLocalStorage<string>(
     "selectedOrganizationId",
     ""

@@ -36,7 +36,6 @@ import { LogoIcon } from "./icons/LogoIcon";
 import Head from "next/head";
 
 const Breadcrumbs = ({ currentRoute }: { currentRoute: Route | undefined }) => {
-  const router = useRouter();
   const { project } = useOrganizationTeamProject();
 
   return (
@@ -87,8 +86,6 @@ export const DashboardLayout = ({
 
   const user = session.user;
   const currentRoute = findCurrentRoute(router.pathname);
-  console.log("currentRoute", currentRoute);
-  console.log("router.pathname", router.pathname);
 
   const MenuButton = ({
     icon,
