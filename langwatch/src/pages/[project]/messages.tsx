@@ -1,3 +1,4 @@
+import { Link } from "@chakra-ui/next-js";
 import {
   Alert,
   AlertIcon,
@@ -11,31 +12,29 @@ import {
   Skeleton,
   Spacer,
   Tag,
-  VStack,
   Text,
   Tooltip,
+  VStack,
 } from "@chakra-ui/react";
+import { formatDistanceToNow } from "date-fns";
 import {
-  Check,
   CheckCircle,
   Filter,
   HelpCircle,
   Maximize2,
   Search,
 } from "react-feather";
-import { DashboardLayout } from "../../components/DashboardLayout";
-import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import { api } from "../../utils/api";
+import Markdown from "react-markdown";
 import {
   getSlicedInput,
   getSlicedOutput,
   getTotalTokensDisplay,
 } from "~/mappers/trace";
-import Markdown from "react-markdown";
-import { formatDistanceToNow } from "date-fns";
-import { formatMilliseconds } from "../../utils/formatMilliseconds";
-import { Link } from "@chakra-ui/next-js";
+import { DashboardLayout } from "../../components/DashboardLayout";
+import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import type { Trace } from "../../server/tracer/types";
+import { api } from "../../utils/api";
+import { formatMilliseconds } from "../../utils/formatMilliseconds";
 
 export default function Messages() {
   const { project } = useOrganizationTeamProject();
