@@ -61,35 +61,39 @@ const SpanNode: React.FC<SpanNodeProps> = ({ span, level }) => {
     <VStack
       align="start"
       spacing={2}
-      paddingLeft={level * 20 + "px"}
+      marginLeft={level == 0 ? "0" : level == 1 ? "10px" : "26px"}
       position="relative"
     >
-      {level > 0 && (
-        <Box
-          position="absolute"
-          top="-56px"
-          left="36px"
-          bottom="54px"
-          width="1px"
-          bgColor="gray.400"
-          _before={{
-            content: "''",
-            width: "12px",
-            height: "12px",
-            borderColor: "gray.400",
-            borderStyle: "solid",
-            borderTopWidth: 0,
-            borderRightWidth: 0,
-            borderLeftWidth: "1px",
-            borderBottomWidth: "1px",
-            borderBottomLeftRadius: "6px",
-            position: "absolute",
-            bottom: "-4px",
-            left: "13px",
-            transform: "translateX(-100%)",
-          }}
-        />
-      )}
+      <Box
+        zIndex={1}
+        position="absolute"
+        top="27px"
+        marginLeft={level == 0 ? "21px" : "37px"}
+        bottom="56px"
+        width="1px"
+        bgColor="gray.400"
+        _before={
+          level > 0
+            ? {
+                content: "''",
+                width: "18px",
+                height: "12px",
+                borderColor: "gray.400",
+                borderStyle: "solid",
+                borderTopWidth: 0,
+                borderRightWidth: 0,
+                borderLeftWidth: "1px",
+                borderBottomWidth: "1px",
+                borderBottomLeftRadius: "6px",
+                position: "absolute",
+                top: "-19px",
+                left: "-7px",
+                transform: "translateX(-100%)",
+              }
+            : undefined
+        }
+      />
+
       <Link
         href={`/${project.slug}/messages/${span.trace_id}/${span.id}`}
         replace={true}
@@ -98,7 +102,7 @@ const SpanNode: React.FC<SpanNodeProps> = ({ span, level }) => {
         <HStack
           align="start"
           paddingY={2}
-          paddingX={8}
+          paddingX={level > 0 ? 8 : 4}
           paddingRight={14}
           borderRadius={6}
           background={span.id === currentSpanId ? "gray.200" : undefined}
@@ -114,6 +118,8 @@ const SpanNode: React.FC<SpanNodeProps> = ({ span, level }) => {
               borderRadius="100%"
               width="12px"
               height="12px"
+              position="relative"
+              zIndex={1}
             ></Box>
             <SpanTypeTag span={span} />
           </HStack>
