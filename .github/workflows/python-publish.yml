@@ -19,6 +19,7 @@ on:
       - main
     paths:
       - "python-sdk/**"
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -51,13 +52,13 @@ jobs:
           python -m build
 
       - name: Extract version from pyproject.toml
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main'
         run: |
           cd python-sdk
           echo "PACKAGE_VERSION=$(poetry version --short)" >> $GITHUB_ENV
 
       - name: Check if version exists on PyPI
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main'
         id: check_version
         run: |
           RESPONSE=$(curl -s --head https://pypi.org/pypi/langwatch/${{ env.PACKAGE_VERSION }}/json)
@@ -68,7 +69,7 @@ jobs:
           fi
 
       - name: Publish package
-        if: steps.check_version.outputs.exists == 'false' && github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: steps.check_version.outputs.exists == 'false' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main'
         uses: pypa/gh-action-pypi-publish@27b31702a0e7fc50959f5ad993c78deac1bdfc29
         with:
           packages_dir: python-sdk/dist/
