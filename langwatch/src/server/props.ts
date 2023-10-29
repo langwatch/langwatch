@@ -43,6 +43,5 @@ export function withSignedInUser<
 }
 
 export function hasProps(obj: any): obj is { props: Record<string, any> } {
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
   return !!obj.props;
 }

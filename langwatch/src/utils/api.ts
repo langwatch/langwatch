@@ -57,7 +57,6 @@ export const api = createTRPCNext<AppRouter>({
 
               if (
                 error instanceof TRPCClientError &&
-                // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-member-access
                 HTTP_STATUS_TO_NOT_RETRY.includes(error.data?.httpStatus ?? 0)
               ) {
                 return false;

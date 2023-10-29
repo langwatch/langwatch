@@ -47,6 +47,7 @@ export default function Messages() {
   const Message = ({ trace }: { trace: Trace }) => {
     return (
       <Link
+        width="100%"
         href={`/${project?.slug}/traces/${trace.id}`}
         _hover={{ textDecoration: "none" }}
       >

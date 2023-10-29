@@ -32,12 +32,9 @@ const config = {
       process.env.DEPENDENCY_INJECTION ??
       path.join(__dirname, "src", "injection.ts");
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     config.resolve.alias["@injected-dependencies"] = aliasPath;
     // TODO: find a less hacky way to make sure injected script will be compiled as well
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     const swcUseOptions = config.module.rules?.[1].oneOf?.[0].use;
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
     config.module.rules.push({ test: aliasPath, use: swcUseOptions });
 
     // eslint-disable-next-line @typescript-eslint/no-unsafe-return

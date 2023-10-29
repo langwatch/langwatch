@@ -42,12 +42,9 @@ export default async function handler(
     return res.status(401).json({ message: "Invalid auth token." });
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
   const sessionId = req.body.session_id;
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
   const userId = req.body.user_id;
 
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
   if (!req.body.spans) {
     return res.status(400).json({ message: "Bad request" });
   }
@@ -166,9 +163,8 @@ const typedValueToText = (typed: SpanInput | SpanOutput): string => {
   } else if (typed.type == "json") {
     try {
       const json = typed.value as any;
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       if (json.text) {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-member-access
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-return
         return json.text;
       }
       return JSON.stringify(typed.value);

@@ -1,8 +1,21 @@
 import type { Trace } from "../server/tracer/types";
 
-export const getSlicedInput = (trace: Trace) =>
-  trace.input.value.slice(0, 100) +
-  (trace.input.value.length >= 100 ? "..." : "");
+export const getSlicedInput = (trace: Trace) => {
+  const input = trace.input
+
+  let value = input.value;
+  try {
+    const json : any = JSON.parse(value)
+    if ("input" in json && typeof json.input === "string") {
+      value = json.input
+    }
+  } catch {
+    // ignore
+  }
+
+  return value.slice(0, 100) +
+    (value.length >= 100 ? "..." : "");
+}
 
 export const getSlicedOutput = (trace: Trace) =>
   (trace.output?.value.slice(0, 600) ?? "<empty>") +

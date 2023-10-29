@@ -41,9 +41,7 @@ export const DashboardLayout = ({
 }: PropsWithChildren<BackgroundProps>) => {
   const router = useRouter();
   const theme = useTheme();
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
   const orange400 = theme.colors.orange["400"];
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
   const gray400 = theme.colors.gray["400"];
 
   const { data: session } = useRequiredSession();

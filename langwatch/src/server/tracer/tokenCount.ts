@@ -19,7 +19,6 @@ let encoder: Tiktoken | undefined;
 const initTikToken = async () => {
   if (!model) {
     debug("Initializing gpt-3.5-turbo token count");
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-member-access
     model = await load((registry as any)[models["gpt-3.5-turbo"]]);
   }
   if (!encoder) {

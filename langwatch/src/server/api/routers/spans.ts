@@ -3,7 +3,7 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { SPAN_INDEX, esClient } from "../../elasticsearch";
-import type { Span } from "../../tracer/types";
+import type { ElasticSearchSpan } from "../../tracer/types";
 
 export const spansRouter = createTRPCRouter({
   getAllForTrace: protectedProcedure
@@ -21,7 +21,7 @@ export const spansRouter = createTRPCRouter({
         throw new TRPCError({ code: "UNAUTHORIZED" });
       }
 
-      const result = await esClient.search<Span>({
+      const result = await esClient.search<ElasticSearchSpan>({
         index: SPAN_INDEX,
         body: {
           query: {
