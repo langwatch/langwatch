@@ -77,7 +77,7 @@ export default function Messages() {
                   </Box>
                   <Box fontWeight="bold">{getSlicedInput(trace)}</Box>
                 </VStack>
-                {trace.error ? (
+                {trace.error && !trace.output?.value ? (
                   <VStack alignItems="flex-start" spacing={2}>
                     <Box
                       fontSize={11}
@@ -173,6 +173,16 @@ export default function Messages() {
                         </Box>
                       </>
                     )}
+                    {!!trace.error && trace.output?.value && (
+                      <>
+                        <Text>·</Text>
+                        <HStack>
+                          <Box width={2} height={2} background="red.400" borderRadius="100%"></Box>
+                          <Text>Exception ocurred</Text>
+                        </HStack>
+                      </>
+                    )}
+
                   </HStack>
                 </VStack>
                 <Spacer />

@@ -9,21 +9,28 @@ export const useOrganizationTeamProject = (
   const organizations = api.organization.getAll.useQuery(undefined, {
     staleTime: Infinity,
   });
+  console.log('organizations', organizations);
   const [organizationId, setOrganizationId] = useLocalStorage<string>(
     "selectedOrganizationId",
     ""
   );
   const [teamId, setTeamId] = useLocalStorage<string>("selectedTeamId", "");
-  const [localStorageProjectId, setProjectId] = useLocalStorage<string>(
-    "selectedProjectId",
+  const [localStorageProjectSlug, setProjectSlug] = useLocalStorage<string>(
+    "selectedProjectSlug",
     ""
   );
   const router = useRouter();
 
-  const projectId =
+  const projectSlug =
     typeof router.query.project == "string"
       ? router.query.project
-      : localStorageProjectId;
+      : localStorageProjectSlug;
+
+  const projectsMatchingSlug = organizations.data?.flatMap((org) =>
+    org.teams.flatMap((team) =>
+      team.projects.filter((project) => project.slug == projectSlug)
+    )
+  );
 
   const organization = organizations.data
     ? organizations.data.find((org) => org.id == organizationId) ??
@@ -34,7 +41,8 @@ export const useOrganizationTeamProject = (
       organization.teams[0]
     : undefined;
   const project = team
-    ? team.projects.find((project) => project.id == projectId) ??
+    ? team.projects.find((project) => project.slug == projectSlug) ??
+      projectsMatchingSlug?.[0] ??
       team.projects[0]
     : undefined;
 
@@ -45,16 +53,16 @@ export const useOrganizationTeamProject = (
     if (team && team.id !== teamId) {
       setTeamId(team.id);
     }
-    if (project && project.id !== projectId) {
-      setProjectId(project.id);
+    if (project && project.id !== projectSlug) {
+      setProjectSlug(project.id);
     }
   }, [
     organization,
     organizationId,
     project,
-    projectId,
+    projectSlug,
     setOrganizationId,
-    setProjectId,
+    setProjectSlug,
     setTeamId,
     team,
     teamId,
@@ -74,7 +82,14 @@ export const useOrganizationTeamProject = (
       void router.push(`/onboarding/${firstTeamSlug}/project`);
       return;
     }
-  }, [organization, organizations.data, project, redirectToProjectOnboarding, router, team]);
+  }, [
+    organization,
+    organizations.data,
+    project,
+    redirectToProjectOnboarding,
+    router,
+    team,
+  ]);
 
   if (organizations.isLoading) {
     return { isLoading: true };

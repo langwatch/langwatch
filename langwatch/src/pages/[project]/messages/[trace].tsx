@@ -1,3 +1,4 @@
+import { Link } from "@chakra-ui/next-js";
 import {
   Alert,
   AlertIcon,
@@ -10,18 +11,17 @@ import {
   Tooltip,
   VStack,
 } from "@chakra-ui/react";
-import { useRouter } from "next/router";
-import { useState, type PropsWithChildren, useEffect } from "react";
-import { DashboardLayout } from "~/components/DashboardLayout";
-import { getTotalTokensDisplay } from "../../../mappers/trace";
-import { api } from "../../../utils/api";
-import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
 import ErrorPage from "next/error";
-import { isNotFound } from "../../../utils/trpcError";
-import { formatMilliseconds } from "../../../utils/formatMilliseconds";
+import { useRouter } from "next/router";
+import { useEffect, type PropsWithChildren } from "react";
 import { Clock, HelpCircle } from "react-feather";
+import { DashboardLayout } from "~/components/DashboardLayout";
+import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
+import { getTotalTokensDisplay } from "../../../mappers/trace";
 import type { ElasticSearchSpan } from "../../../server/tracer/types";
-import { Link } from "@chakra-ui/next-js";
+import { api } from "../../../utils/api";
+import { formatMilliseconds } from "../../../utils/formatMilliseconds";
+import { isNotFound } from "../../../utils/trpcError";
 
 type SpanWithChildren = ElasticSearchSpan & { children: SpanWithChildren[] };
 
@@ -214,7 +214,7 @@ const SpanDuration = ({ span }: { span: ElasticSearchSpan }) => {
       <HStack
         spacing={"6px"}
         color={
-          duration > 30 * 1000
+          !!span.error || duration > 30 * 1000
             ? "red"
             : duration > 10 * 1000
             ? "yellow.600"
