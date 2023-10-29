@@ -131,9 +131,12 @@ class BaseContextTracer:
         _local_context.current_tracer = None
 
     def delayed_send_spans(self):
+        self._add_finished_at_to_missing_spans()
+
         if "PYTEST_CURRENT_TEST" in os.environ:
             send_spans(list(self.spans.values()))
             return
+
         async def schedule():
             await asyncio.sleep(1)
             self.sent_once = True
@@ -156,6 +159,15 @@ class BaseContextTracer:
         if current_span:
             return current_span.id
         return None
+
+    # Some spans get interrupted in the middle, for example by an exception, and we might end up never tagging their finish timestamp, so we do it here as a fallback
+    def _add_finished_at_to_missing_spans(self):
+        for span in self.spans.values():
+            if "timestamps" in span and (
+                "finished_at" not in span["timestamps"]
+                or span["timestamps"]["finished_at"] == None
+            ):
+                span["timestamps"]["finished_at"] = milliseconds_timestamp()
 
 
 executor = ThreadPoolExecutor(max_workers=10)

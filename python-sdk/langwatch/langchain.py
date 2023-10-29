@@ -183,6 +183,8 @@ class LangChainTracer(BaseContextTracer, BaseCallbackHandler):
         if span == None:
             return
         span["error"] = capture_exception(error)
+        if "timestamps" in span:
+            span["timestamps"]["finished_at"] = milliseconds_timestamp()
 
     def on_chain_start(
         self,
@@ -265,6 +267,8 @@ class LangChainTracer(BaseContextTracer, BaseCallbackHandler):
         if span == None:
             return
         span["error"] = capture_exception(error)
+        if "timestamps" in span:
+            span["timestamps"]["finished_at"] = milliseconds_timestamp()
 
     def on_tool_end(
         self,
@@ -292,7 +296,7 @@ class LangChainTracer(BaseContextTracer, BaseCallbackHandler):
         **kwargs: Any,
     ) -> Any:
         if str(run_id) in self.spans:
-            self.spans[str(run_id)]["type"] = "agent" # type: ignore
+            self.spans[str(run_id)]["type"] = "agent"  # type: ignore
 
     def on_agent_finish(
         self,
