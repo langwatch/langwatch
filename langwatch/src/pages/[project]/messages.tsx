@@ -47,7 +47,7 @@ export default function Messages() {
   const Message = ({ trace }: { trace: Trace }) => {
     return (
       <Link
-        width="100%"
+        width="full"
         href={`/${project?.slug}/traces/${trace.id}`}
         _hover={{ textDecoration: "none" }}
       >
@@ -95,7 +95,7 @@ export default function Messages() {
                 </VStack>
               </VStack>
               <Spacer />
-              <HStack width="100%" alignItems="flex-end">
+              <HStack width="full" alignItems="flex-end">
                 <VStack gap={4} alignItems="flex-start">
                   <HStack spacing={2}>
                     <Tag background="blue.50" color="blue.600">
@@ -106,14 +106,20 @@ export default function Messages() {
                     </Tag>
                   </HStack>
                   <HStack fontSize={12} color="gray.400">
-                    <Text>
-                      {formatDistanceToNow(
-                        new Date(trace.timestamps.started_at),
-                        {
-                          addSuffix: true,
-                        }
-                      )}
-                    </Text>
+                    <Tooltip
+                      label={new Date(
+                        trace.timestamps.started_at
+                      ).toLocaleString()}
+                    >
+                      <Text borderBottomWidth="1px" borderBottomColor="gray.300" borderBottomStyle="dashed">
+                        {formatDistanceToNow(
+                          new Date(trace.timestamps.started_at),
+                          {
+                            addSuffix: true,
+                          }
+                        )}
+                      </Text>
+                    </Tooltip>
                     {(!!trace.metrics.completion_tokens ||
                       !!trace.metrics.prompt_tokens) && (
                       <>
@@ -121,7 +127,7 @@ export default function Messages() {
                         <HStack>
                           <Box>{getTotalTokensDisplay(trace)}</Box>
                           {trace.metrics.tokens_estimated && (
-                            <Tooltip label="Token count is calculated by LangWatch when not available from the trace data">
+                            <Tooltip label="token count is calculated by LangWatch when not available from the trace data">
                               <HelpCircle width="14px" />
                             </Tooltip>
                           )}
