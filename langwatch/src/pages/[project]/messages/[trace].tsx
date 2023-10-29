@@ -47,9 +47,10 @@ function buildTree(
 interface SpanNodeProps {
   span: SpanWithChildren;
   level: number;
+  lastChild: boolean;
 }
 
-const SpanNode: React.FC<SpanNodeProps> = ({ span, level }) => {
+const SpanNode: React.FC<SpanNodeProps> = ({ span, level, lastChild }) => {
   const router = useRouter();
   const currentSpanId =
     typeof router.query.span === "string" ? router.query.span : undefined;
@@ -69,7 +70,7 @@ const SpanNode: React.FC<SpanNodeProps> = ({ span, level }) => {
         position="absolute"
         top="27px"
         marginLeft={level == 0 ? "21px" : "37px"}
-        bottom="56px"
+        bottom={lastChild ? "56px" : level == 0 ? "-37px" : "56px"}
         width="1px"
         bgColor="gray.400"
         _before={
@@ -142,8 +143,13 @@ const SpanNode: React.FC<SpanNodeProps> = ({ span, level }) => {
           </VStack>
         </HStack>
       </Link>
-      {span.children.map((childSpan) => (
-        <SpanNode key={childSpan.id} span={childSpan} level={level + 1} />
+      {span.children.map((childSpan, index) => (
+        <SpanNode
+          key={childSpan.id}
+          span={childSpan}
+          level={level + 1}
+          lastChild={index == span.children.length - 1}
+        />
       ))}
     </VStack>
   );
@@ -155,10 +161,17 @@ const TreeRenderer: React.FC<{ spans: ElasticSearchSpan[] }> = ({ spans }) => {
 
   return (
     <VStack flexShrink={0} spacing={6}>
-      {rootSpans.map((rootSpan) => {
+      {rootSpans.map((rootSpan, index) => {
         const span = tree[rootSpan.id];
         if (!span) return null;
-        return <SpanNode key={rootSpan.id} span={span} level={0} />;
+        return (
+          <SpanNode
+            key={rootSpan.id}
+            span={span}
+            level={0}
+            lastChild={index == rootSpans.length - 1}
+          />
+        );
       })}
     </VStack>
   );
