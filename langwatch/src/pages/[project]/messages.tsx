@@ -78,21 +78,39 @@ export default function Messages() {
                   </Box>
                   <Box fontWeight="bold">{getSlicedInput(trace)}</Box>
                 </VStack>
-                <VStack alignItems="flex-start" spacing={2}>
-                  <Box
-                    fontSize={11}
-                    color="gray.400"
-                    textTransform="uppercase"
-                    fontWeight="bold"
-                  >
-                    Generated
-                  </Box>
-                  <Box>
-                    <Markdown className="markdown">
-                      {getSlicedOutput(trace)}
-                    </Markdown>
-                  </Box>
-                </VStack>
+                {trace.error ? (
+                  <VStack alignItems="flex-start" spacing={2}>
+                    <Box
+                      fontSize={11}
+                      color="red.400"
+                      textTransform="uppercase"
+                      fontWeight="bold"
+                    >
+                      Exception
+                    </Box>
+                    <Text color="red.900">{trace.error.message}</Text>
+                  </VStack>
+                ) : (
+                  <VStack alignItems="flex-start" spacing={2}>
+                    <Box
+                      fontSize={11}
+                      color="gray.400"
+                      textTransform="uppercase"
+                      fontWeight="bold"
+                    >
+                      Generated
+                    </Box>
+                    <Box>
+                      {trace.output?.value ? (
+                        <Markdown className="markdown">
+                          {getSlicedOutput(trace)}
+                        </Markdown>
+                      ) : (
+                        <Text>{"<empty>"}</Text>
+                      )}
+                    </Box>
+                  </VStack>
+                )}
               </VStack>
               <Spacer />
               <HStack width="full" alignItems="flex-end">
@@ -111,7 +129,11 @@ export default function Messages() {
                         trace.timestamps.started_at
                       ).toLocaleString()}
                     >
-                      <Text borderBottomWidth="1px" borderBottomColor="gray.300" borderBottomStyle="dashed">
+                      <Text
+                        borderBottomWidth="1px"
+                        borderBottomColor="gray.300"
+                        borderBottomStyle="dashed"
+                      >
                         {formatDistanceToNow(
                           new Date(trace.timestamps.started_at),
                           {

@@ -109,7 +109,7 @@ const SpanNode: React.FC<SpanNodeProps> = ({ span, level }) => {
           <HStack spacing={4}>
             <Box
               background="white"
-              borderColor="gray.400"
+              borderColor={span.error ? "red.400" : "gray.400"}
               borderWidth="3px"
               borderRadius="100%"
               width="12px"
@@ -162,13 +162,15 @@ const SpanTypeTag = ({ span }: { span: ElasticSearchSpan }) => {
   return (
     <Tag
       colorScheme={
-        {
-          llm: "green",
-          agent: "blue",
-          chain: "blue",
-          tool: "orange",
-          span: "gray",
-        }[span.type]
+        span.error
+          ? "red"
+          : {
+              llm: "green",
+              agent: "blue",
+              chain: "blue",
+              tool: "orange",
+              span: "gray",
+            }[span.type]
       }
       fontSize={13}
     >
@@ -400,33 +402,57 @@ export default function Trace() {
                     {span.input?.value.toString()}
                   </Box>
                 </VStack>
-                <VStack alignItems="flex-start" spacing={2} width="full">
-                  <Box
-                    fontSize={13}
-                    color="gray.400"
-                    textTransform="uppercase"
-                    fontWeight="bold"
-                  >
-                    Generated
-                  </Box>
-                  {span.outputs.length == 0 && (
-                    <Text>No outputs generated</Text>
-                  )}
-                  {span.outputs.map((output, index) => (
+                {span.error ? (
+                  <VStack alignItems="flex-start" spacing={2} width="full">
                     <Box
-                      key={index}
-                      as="pre"
-                      borderRadius="6px"
-                      padding={4}
-                      borderWidth="1px"
-                      borderColor="gray.300"
-                      width="full"
-                      whiteSpace="pre-wrap"
+                      fontSize={13}
+                      color="red.400"
+                      textTransform="uppercase"
+                      fontWeight="bold"
                     >
-                      {output.value.toString()}
+                      Exception
                     </Box>
-                  ))}
-                </VStack>
+                    <Text color="red.900">
+                      <Box
+                        as="pre"
+                        borderRadius="6px"
+                        padding={4}
+                        borderWidth="1px"
+                        borderColor="gray.300"
+                        width="full"
+                        whiteSpace="pre-wrap"
+                      >
+                        {span.error.stacktrace}
+                      </Box>
+                    </Text>
+                  </VStack>
+                ) : (
+                  <VStack alignItems="flex-start" spacing={2} width="full">
+                    <Box
+                      fontSize={13}
+                      color="gray.400"
+                      textTransform="uppercase"
+                      fontWeight="bold"
+                    >
+                      Generated
+                    </Box>
+                    {span.outputs.length == 0 && <Text>{"<empty>"}</Text>}
+                    {span.outputs.map((output, index) => (
+                      <Box
+                        key={index}
+                        as="pre"
+                        borderRadius="6px"
+                        padding={4}
+                        borderWidth="1px"
+                        borderColor="gray.300"
+                        width="full"
+                        whiteSpace="pre-wrap"
+                      >
+                        {output.value.toString()}
+                      </Box>
+                    ))}
+                  </VStack>
+                )}
               </VStack>
             )}
           </HStack>
