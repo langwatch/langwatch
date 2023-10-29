@@ -1,6 +1,7 @@
 import asyncio
 from asyncio import Task
 import functools
+import os
 import threading
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Dict, List, Optional, TypeVar
@@ -130,6 +131,9 @@ class BaseContextTracer:
         _local_context.current_tracer = None
 
     def delayed_send_spans(self):
+        if "PYTEST_CURRENT_TEST" in os.environ:
+            send_spans(list(self.spans.values()))
+            return
         async def schedule():
             await asyncio.sleep(1)
             self.sent_once = True

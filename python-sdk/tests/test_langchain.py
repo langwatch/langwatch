@@ -319,7 +319,6 @@ class TestLangChainTracer:
 
             with langwatch.langchain.LangChainTracer() as langWatchCallback:
                 result = agent.run("how much is 2+2?", callbacks=[langWatchCallback])
-            print("\n\nresult\n\n", result)
 
             assert result == "2 + 2 is equal to 4."
 
@@ -354,13 +353,11 @@ class TestLangChainTracer:
                 {"type": "text", "value": "Answer: 4"}
             ]
 
-            calculator_agent = [
-                span
-                for span in spans
-                if span["type"] == "agent"
-                and "name" in span
-                and span["name"] == "Calculator"
-            ][0]
+            calculator_agent = [span for span in spans if span["type"] == "agent"][0]
+            assert calculator_agent["input"] == {
+                "type": "json",
+                "value": {"input": "how much is 2+2?"},
+            }
             assert calculator_agent["outputs"] == [
                 {"type": "json", "value": {"output": "2 + 2 is equal to 4."}}
             ]

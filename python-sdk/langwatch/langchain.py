@@ -291,13 +291,8 @@ class LangChainTracer(BaseContextTracer, BaseCallbackHandler):
         parent_run_id: Optional[UUID] = None,
         **kwargs: Any,
     ) -> Any:
-        self.spans[str(run_id)] = self._build_base_span(
-            type="agent",
-            run_id=run_id,
-            parent_run_id=parent_run_id,
-            name=action.tool,
-            input=self._autoconvert_typed_values(action.tool_input),
-        )
+        if str(run_id) in self.spans:
+            self.spans[str(run_id)]["type"] = "agent" # type: ignore
 
     def on_agent_finish(
         self,
