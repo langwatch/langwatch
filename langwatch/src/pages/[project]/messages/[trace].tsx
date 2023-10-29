@@ -91,7 +91,7 @@ const SpanNode: React.FC<SpanNodeProps> = ({ span, level }) => {
         />
       )}
       <Link
-        href={`/${project.slug}/traces/${span.trace_id}/${span.id}`}
+        href={`/${project.slug}/messages/${span.trace_id}/${span.id}`}
         replace={true}
         _hover={{ textDecoration: "none" }}
       >
@@ -231,7 +231,7 @@ export default function Trace() {
   useEffect(() => {
     if (!spanId && project && traceId && spans.data && spans.data[0]) {
       void router.replace(
-        `/${project.slug}/traces/${traceId}/${spans.data[0].id}`
+        `/${project.slug}/messages/${traceId}/${spans.data[0].id}`
       );
     }
   }, [project, router, spanId, spans.data, traceId]);
@@ -412,19 +412,18 @@ export default function Trace() {
                     >
                       Exception
                     </Box>
-                    <Text color="red.900">
-                      <Box
-                        as="pre"
-                        borderRadius="6px"
-                        padding={4}
-                        borderWidth="1px"
-                        borderColor="gray.300"
-                        width="full"
-                        whiteSpace="pre-wrap"
-                      >
-                        {span.error.stacktrace}
-                      </Box>
-                    </Text>
+                    <Box
+                      as="pre"
+                      borderRadius="6px"
+                      padding={4}
+                      borderWidth="1px"
+                      borderColor="gray.300"
+                      width="full"
+                      whiteSpace="pre-wrap"
+                      color="red.900"
+                    >
+                      {span.error.stacktrace}
+                    </Box>
                   </VStack>
                 ) : (
                   <VStack alignItems="flex-start" spacing={2} width="full">

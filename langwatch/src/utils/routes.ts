@@ -1,39 +1,48 @@
-import type { Project } from "@prisma/client";
-
-type Route = {
-  path: string;
-  title: string;
-};
-
-export const getProjectRoutes = (project: Project) => ({
+export const projectRoutes = {
   home: {
-    path: `/${project.slug}`,
+    path: "/[project]",
     title: "Home",
   },
   messages: {
-    path: `/${project.slug}/messages`,
+    path: "/[project]/messages",
     title: "Messages Explorer",
   },
   analytics: {
-    path: `/${project.slug}/analytics`,
+    path: "/[project]/analytics",
     title: "Analytics",
   },
   security: {
-    path: `/${project.slug}/security`,
+    path: "/[project]/security",
     title: "Security Checks",
   },
   prompts: {
-    path: `/${project.slug}/prompts`,
+    path: "/[project]/prompts",
     title: "Prompts DB",
   },
-});
+  message: {
+    path: "/[project]/messages/[trace]",
+    title: "Trace",
+    parent: "messages",
+  },
+  message_span: {
+    path: "/[project]/messages/[trace]/[span]",
+    title: "Trace",
+    parent: "messages",
+  },
+};
+
+export type Route = {
+  path: string;
+  title: string;
+  parent?: keyof typeof projectRoutes;
+};
+
+type RouteMap = Record<keyof typeof projectRoutes, Route>;
 
 export const findCurrentRoute = (
-  project: Project,
   currentPathname: string
 ): Route | undefined => {
-  const pathname = currentPathname.replace("[project]", project.slug);
-  return Object.values(getProjectRoutes(project)).find(
-    (route) => route.path === pathname
+  return Object.values(projectRoutes as RouteMap).find(
+    (route) => route.path === currentPathname
   );
 };

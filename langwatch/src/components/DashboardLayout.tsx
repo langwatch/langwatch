@@ -30,10 +30,38 @@ import {
 } from "react-feather";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import { useRequiredSession } from "../hooks/useRequiredSession";
-import { findCurrentRoute, getProjectRoutes } from "../utils/routes";
+import { findCurrentRoute, projectRoutes, type Route } from "../utils/routes";
 import { LoadingScreen } from "./LoadingScreen";
 import { LogoIcon } from "./icons/LogoIcon";
 import Head from "next/head";
+
+const Breadcrumbs = ({ currentRoute }: { currentRoute: Route | undefined }) => {
+  const router = useRouter();
+  const { project } = useOrganizationTeamProject();
+
+  return (
+    currentRoute && (
+      <HStack gap={2} fontSize={13} color="gray.500">
+        <Link href="/">Dashboard</Link>
+        {currentRoute.parent && (
+          <>
+            <ChevronRight width="12" />
+            <Link
+              href={projectRoutes[currentRoute.parent].path.replace(
+                "[project]",
+                project?.slug ?? ""
+              )}
+            >
+              {projectRoutes[currentRoute.parent].title}
+            </Link>
+          </>
+        )}
+        <ChevronRight width="12" />
+        <Text>{currentRoute.title}</Text>
+      </HStack>
+    )
+  );
+};
 
 export const DashboardLayout = ({
   children,
@@ -58,8 +86,9 @@ export const DashboardLayout = ({
   }
 
   const user = session.user;
-  const projectRoutes = getProjectRoutes(project);
-  const currentRoute = findCurrentRoute(project, router.pathname);
+  const currentRoute = findCurrentRoute(router.pathname);
+  console.log("currentRoute", currentRoute);
+  console.log("router.pathname", router.pathname);
 
   const MenuButton = ({
     icon,
@@ -72,13 +101,14 @@ export const DashboardLayout = ({
   }) => {
     const IconElem = icon;
 
+    const isActive =
+      currentRoute?.path === path ||
+      (path.includes("/messages") && router.pathname.includes("/messages"));
+
     return (
-      <Link href={path} aria-label={label}>
+      <Link href={path.replace("[project]", project.slug)} aria-label={label}>
         <VStack>
-          <IconElem
-            size={24}
-            color={currentRoute?.path === path ? orange400 : undefined}
-          />
+          <IconElem size={24} color={isActive ? orange400 : undefined} />
         </VStack>
       </Link>
     );
@@ -161,17 +191,7 @@ export const DashboardLayout = ({
               <ChevronDown width={14} />
             </HStack>
           </Button>
-          {currentRoute && (
-            <HStack gap={2} fontSize={13} color="gray.500">
-              {router.pathname === "/" ? (
-                <Text>Dashboard</Text>
-              ) : (
-                <Link href="/">Dashboard</Link>
-              )}
-              <ChevronRight width="12" />
-              <Text>{currentRoute.title}</Text>
-            </HStack>
-          )}
+          <Breadcrumbs currentRoute={currentRoute} />
           <Spacer />
           <InputGroup maxWidth="600px" borderColor="gray.300">
             <InputLeftElement paddingY={1.5} height="auto" pointerEvents="none">

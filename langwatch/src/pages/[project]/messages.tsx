@@ -48,7 +48,7 @@ export default function Messages() {
     return (
       <Link
         width="full"
-        href={`/${project?.slug}/traces/${trace.id}`}
+        href={`/${project?.slug}/messages/${trace.id}`}
         _hover={{ textDecoration: "none" }}
       >
         <Card
