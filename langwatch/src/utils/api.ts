@@ -4,7 +4,7 @@
  *
  * We also create a few inference helpers for input and output types.
  */
-import { httpBatchLink, loggerLink } from "@trpc/client";
+import { TRPCClientError, httpBatchLink, loggerLink } from "@trpc/client";
 import { createTRPCNext } from "@trpc/next";
 import { type inferRouterInputs, type inferRouterOutputs } from "@trpc/server";
 import superjson from "superjson";
@@ -16,6 +16,9 @@ const getBaseUrl = () => {
   if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`; // SSR should use vercel url
   return `http://localhost:${process.env.PORT ?? 3000}`; // dev SSR should use localhost
 };
+
+const MAX_RETRIES = 4;
+const HTTP_STATUS_TO_NOT_RETRY = [400, 401, 403, 404];
 
 /** A set of type-safe react-query hooks for your tRPC API. */
 export const api = createTRPCNext<AppRouter>({
@@ -43,6 +46,28 @@ export const api = createTRPCNext<AppRouter>({
           url: `${getBaseUrl()}/api/trpc`,
         }),
       ],
+
+      queryClientConfig: {
+        defaultOptions: {
+          queries: {
+            retry(failureCount, error) {
+              if (failureCount >= MAX_RETRIES) {
+                return false;
+              }
+
+              if (
+                error instanceof TRPCClientError &&
+                // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-member-access
+                HTTP_STATUS_TO_NOT_RETRY.includes(error.data?.httpStatus ?? 0)
+              ) {
+                return false;
+              }
+
+              return true;
+            },
+          },
+        },
+      },
     };
   },
   /**

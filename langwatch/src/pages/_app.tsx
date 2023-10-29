@@ -29,10 +29,13 @@ export const theme = extendTheme({
   styles: {
     global: (_props: StyleFunctionProps) => ({
       body: {
-        fontFamily: inter.style.fontFamily,
         background: "#E5E7EB",
       },
     }),
+  },
+  fonts: {
+    heading: inter.style.fontFamily,
+    body: inter.style.fontFamily,
   },
   colors: {
     gray: {

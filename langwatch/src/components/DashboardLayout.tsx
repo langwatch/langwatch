@@ -11,6 +11,7 @@ import {
   Text,
   VStack,
   useTheme,
+  type BackgroundProps,
 } from "@chakra-ui/react";
 import ErrorPage from "next/error";
 import Image from "next/image";
@@ -34,7 +35,10 @@ import { LoadingScreen } from "./LoadingScreen";
 import { LogoIcon } from "./icons/LogoIcon";
 import Head from "next/head";
 
-export const DashboardLayout = ({ children }: PropsWithChildren) => {
+export const DashboardLayout = ({
+  children,
+  ...bgProps
+}: PropsWithChildren<BackgroundProps>) => {
   const router = useRouter();
   const theme = useTheme();
   // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
@@ -136,7 +140,7 @@ export const DashboardLayout = ({ children }: PropsWithChildren) => {
           </VStack>
         </VStack>
       </Box>
-      <VStack width="full" spacing={0} background="gray.200">
+      <VStack width="full" spacing={0} background="gray.200" {...bgProps}>
         <HStack
           width="full"
           padding={4}

@@ -13,142 +13,158 @@ import {
   Tag,
   VStack,
   Text,
+  Tooltip,
 } from "@chakra-ui/react";
-import { Check, CheckCircle, Filter, Maximize2, Search } from "react-feather";
+import {
+  Check,
+  CheckCircle,
+  Filter,
+  HelpCircle,
+  Maximize2,
+  Search,
+} from "react-feather";
 import { DashboardLayout } from "../../components/DashboardLayout";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
-import type { Trace } from "../../server/tracer/types";
+import {
+  getSlicedInput,
+  getSlicedOutput,
+  getTotalTokensDisplay,
+} from "~/mappers/trace";
 import Markdown from "react-markdown";
 import { formatDistanceToNow } from "date-fns";
 import { formatMilliseconds } from "../../utils/formatMilliseconds";
+import { Link } from "@chakra-ui/next-js";
+import type { Trace } from "../../server/tracer/types";
 
 export default function Messages() {
   const { project } = useOrganizationTeamProject();
-  const traces = api.traces.getTraces.useQuery(
+  const traces = api.traces.getAllForProject.useQuery(
     { projectId: project?.id ?? "" },
     { enabled: !!project }
   );
 
   const Message = ({ trace }: { trace: Trace }) => {
     return (
-      <Card
-        padding={0}
-        cursor="pointer"
-        width="full"
-        transitionDuration="0.2s"
-        transitionTimingFunction="ease-in-out"
-        _hover={{
-          transform: "scale(1.04)",
-        }}
+      <Link
+        href={`/${project?.slug}/traces/${trace.id}`}
+        _hover={{ textDecoration: "none" }}
       >
-        <Box position="absolute" right={5} top={5}>
-          <Maximize2 />
-        </Box>
-        <CardBody padding={8} width="fill">
-          <VStack alignItems="flex-start" spacing={4} width="fill">
-            <VStack alignItems="flex-start" spacing={8}>
-              <VStack alignItems="flex-start" spacing={2}>
-                <Box
-                  fontSize={11}
-                  color="gray.400"
-                  textTransform="uppercase"
-                  fontWeight="bold"
-                >
-                  Input
-                </Box>
-                <Box fontWeight="bold">
-                  {trace.input.value.slice(0, 100)}
-                  {trace.input.value.length >= 100 && "..."}
-                </Box>
-              </VStack>
-              <VStack alignItems="flex-start" spacing={2}>
-                <Box
-                  fontSize={11}
-                  color="gray.400"
-                  textTransform="uppercase"
-                  fontWeight="bold"
-                >
-                  Generated
-                </Box>
-                <Box>
-                  <Markdown className="markdown">
-                    {(trace.output?.value.slice(0, 600) ?? "<empty>") +
-                      (trace.output && trace.output.value.length >= 600
-                        ? "..."
-                        : "")}
-                  </Markdown>
-                </Box>
-              </VStack>
-            </VStack>
-            <Spacer />
-            <HStack width="100%" alignItems="flex-end">
-              <VStack gap={4} alignItems="flex-start">
-                <HStack spacing={2}>
-                  <Tag background="blue.50" color="blue.600">
-                    Chatbot
-                  </Tag>
-                  <Tag background="orange.100" color="orange.600">
-                    Small Talk
-                  </Tag>
-                </HStack>
-                <HStack fontSize={12} color="gray.400">
-                  <Text>
-                    {formatDistanceToNow(
-                      new Date(trace.timestamps.started_at),
-                      {
-                        addSuffix: true,
-                      }
-                    )}
-                  </Text>
-                  {(!!trace.metrics.completion_tokens ||
-                    !!trace.metrics.prompt_tokens) && (
-                    <>
-                      <Text>·</Text>
-                      <Box>
-                        {(trace.metrics.completion_tokens ?? 0) +
-                          (trace.metrics.prompt_tokens ?? 0)}{" "}
-                        tokens
-                        {trace.metrics.tokens_estimated && " (estimated)"}
-                      </Box>
-                    </>
-                  )}
-                  {!!trace.metrics.first_token_ms && (
-                    <>
-                      <Text>·</Text>
-                      <Box>
-                        {formatMilliseconds(trace.metrics.first_token_ms)} to
-                        first token
-                      </Box>
-                    </>
-                  )}
-                  {!!trace.metrics.total_time_ms && (
-                    <>
-                      <Text>·</Text>
-                      <Box>
-                        {formatMilliseconds(trace.metrics.total_time_ms)} completion time
-                      </Box>
-                    </>
-                  )}
-                </HStack>
+        <Card
+          padding={0}
+          cursor="pointer"
+          width="full"
+          transitionDuration="0.2s"
+          transitionTimingFunction="ease-in-out"
+          _hover={{
+            transform: "scale(1.04)",
+          }}
+        >
+          <Box position="absolute" right={5} top={5}>
+            <Maximize2 />
+          </Box>
+          <CardBody padding={8} width="fill">
+            <VStack alignItems="flex-start" spacing={4} width="fill">
+              <VStack alignItems="flex-start" spacing={8}>
+                <VStack alignItems="flex-start" spacing={2}>
+                  <Box
+                    fontSize={11}
+                    color="gray.400"
+                    textTransform="uppercase"
+                    fontWeight="bold"
+                  >
+                    Input
+                  </Box>
+                  <Box fontWeight="bold">{getSlicedInput(trace)}</Box>
+                </VStack>
+                <VStack alignItems="flex-start" spacing={2}>
+                  <Box
+                    fontSize={11}
+                    color="gray.400"
+                    textTransform="uppercase"
+                    fontWeight="bold"
+                  >
+                    Generated
+                  </Box>
+                  <Box>
+                    <Markdown className="markdown">
+                      {getSlicedOutput(trace)}
+                    </Markdown>
+                  </Box>
+                </VStack>
               </VStack>
               <Spacer />
-              <Tag
-                variant="outline"
-                boxShadow="#DEDEDE 0px 0px 0px 1px inset"
-                color="green.600"
-                paddingY={1}
-                paddingX={2}
-              >
-                <Box paddingRight={2}>
-                  <CheckCircle />
-                </Box>
-                5/5 checks
-              </Tag>
-            </HStack>
-          </VStack>
-        </CardBody>
-      </Card>
+              <HStack width="100%" alignItems="flex-end">
+                <VStack gap={4} alignItems="flex-start">
+                  <HStack spacing={2}>
+                    <Tag background="blue.50" color="blue.600">
+                      Chatbot
+                    </Tag>
+                    <Tag background="orange.100" color="orange.600">
+                      Small Talk
+                    </Tag>
+                  </HStack>
+                  <HStack fontSize={12} color="gray.400">
+                    <Text>
+                      {formatDistanceToNow(
+                        new Date(trace.timestamps.started_at),
+                        {
+                          addSuffix: true,
+                        }
+                      )}
+                    </Text>
+                    {(!!trace.metrics.completion_tokens ||
+                      !!trace.metrics.prompt_tokens) && (
+                      <>
+                        <Text>·</Text>
+                        <HStack>
+                          <Box>{getTotalTokensDisplay(trace)}</Box>
+                          {trace.metrics.tokens_estimated && (
+                            <Tooltip label="Token count is calculated by LangWatch when not available from the trace data">
+                              <HelpCircle width="14px" />
+                            </Tooltip>
+                          )}
+                        </HStack>
+                      </>
+                    )}
+                    {!!trace.metrics.first_token_ms && (
+                      <>
+                        <Text>·</Text>
+                        <Box>
+                          {formatMilliseconds(trace.metrics.first_token_ms)} to
+                          first token
+                        </Box>
+                      </>
+                    )}
+                    {!!trace.metrics.total_time_ms && (
+                      <>
+                        <Text>·</Text>
+                        <Box>
+                          {formatMilliseconds(trace.metrics.total_time_ms)}{" "}
+                          completion time
+                        </Box>
+                      </>
+                    )}
+                  </HStack>
+                </VStack>
+                <Spacer />
+                <Tag
+                  variant="outline"
+                  boxShadow="#DEDEDE 0px 0px 0px 1px inset"
+                  color="green.600"
+                  paddingY={1}
+                  paddingX={2}
+                >
+                  <Box paddingRight={2}>
+                    <CheckCircle />
+                  </Box>
+                  5/5 checks
+                </Tag>
+              </HStack>
+            </VStack>
+          </CardBody>
+        </Card>
+      </Link>
     );
   };
 
@@ -180,6 +196,7 @@ export default function Messages() {
         spacing={0}
         position="sticky"
         top={0}
+        zIndex={1}
         background="white"
       >
         <Box position="relative" width="full">
