@@ -13,7 +13,7 @@
 /prisma/db.sqlite-journal
 
 # next.js
-/.next/
+.next*
 /out/
 next-env.d.ts
 

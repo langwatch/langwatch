@@ -4,10 +4,10 @@
   "private": true,
   "scripts": {
     "build": "next build --no-lint",
-    "dev": "next dev",
+    "dev": "NODE_ENV=development node src/server.js",
     "postinstall": "prisma generate && prisma db push && npm run types:zod:generate",
     "lint": "next lint",
-    "start": "next start",
+    "start": "node src/server.js",
     "prisma:db:push": "npx prisma db push",
     "test": "vitest",
     "elastic:index:create": "tsx src/task.ts elasticIndexCreate",

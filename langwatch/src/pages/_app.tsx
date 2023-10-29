@@ -18,8 +18,12 @@ import Head from "next/head";
 import { useRouter } from "next/router";
 import NProgress from "nprogress";
 import { useEffect } from "react";
+//@ts-ignore
+import _dependencies from "@injected-dependencies";
+import { type Dependencies } from "../injection";
 
 const inter = Inter({ subsets: ["latin"] });
+const dependencies = _dependencies as Dependencies;
 
 export const theme = extendTheme({
   styles: {
@@ -67,10 +71,10 @@ export const theme = extendTheme({
   },
 });
 
-const LangWatch: AppType<{ session: Session | null }> = ({
-  Component,
-  pageProps: { session, ...pageProps },
-}) => {
+const LangWatch: AppType<{
+  session: Session | null;
+  injected?: string | undefined;
+}> = ({ Component, pageProps: { session, ...pageProps } }) => {
   const router = useRouter();
 
   useEffect(() => {
