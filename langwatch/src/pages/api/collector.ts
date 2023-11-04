@@ -53,6 +53,16 @@ export default async function handler(
     (req.body as Record<string, any>).spans as Span[]
   );
 
+  for (const span of spans) {
+    try {
+      spanValidatorSchema.parse(span);
+    } catch (error) {
+      debug("Invalid span received", error, JSON.stringify(span, null, "  "));
+      Sentry.captureException(error);
+      return res.status(400).json({ error: "Invalid span format." });
+    }
+  }
+
   const esSpans: ElasticSearchSpan[] = spans.map((span) => ({
     ...span,
     input: span.input ? typedValueToElasticSearch(span.input) : null,
@@ -76,16 +86,6 @@ export default async function handler(
   }
 
   debug(`collecting traceId ${traceId}`);
-
-  for (const span of spans) {
-    try {
-      spanValidatorSchema.parse(span);
-    } catch (error) {
-      debug("Invalid span received", error, JSON.stringify(span, null, "  "));
-      Sentry.captureException(error);
-      return res.status(400).json({ error: "Invalid span format." });
-    }
-  }
 
   // Create the trace
   const trace: Trace = {

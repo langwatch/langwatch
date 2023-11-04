@@ -68,7 +68,21 @@ describe("Collector API Endpoint", () => {
       id: sampleSpan.id,
     });
 
-    expect(indexedSpan).toMatchObject(sampleSpan);
+    expect(indexedSpan).toMatchObject({
+      ...sampleSpan,
+      input: {
+        type: "text",
+        value: '"hello"',
+      },
+      outputs: [
+        {
+          type: "text",
+          value: '"world"',
+        },
+      ],
+      project_id: projectId,
+      raw_response: null,
+    });
     expect(indexedSpan.project_id).toBe(projectId);
 
     const indexedTrace = await esClient.getSource<Trace>({
@@ -95,6 +109,7 @@ describe("Collector API Endpoint", () => {
         prompt_tokens: null,
         completion_tokens: null,
         total_cost: null,
+        tokens_estimated: false,
       },
       error: null,
     });

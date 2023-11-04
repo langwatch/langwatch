@@ -26,6 +26,7 @@ export const env = createEnv({
     API_TOKEN_JWT_SECRET: z.string().min(1),
     ELASTICSEARCH_NODE_URL: z.string().min(1),
     ELASTICSEARCH_API_KEY: z.string().min(1),
+    REDIS_URL: z.string().min(1),
   },
 
   /**
@@ -52,6 +53,7 @@ export const env = createEnv({
     API_TOKEN_JWT_SECRET: process.env.API_TOKEN_JWT_SECRET,
     ELASTICSEARCH_NODE_URL: process.env.ELASTICSEARCH_NODE_URL,
     ELASTICSEARCH_API_KEY: process.env.ELASTICSEARCH_API_KEY,
+    REDIS_URL: process.env.REDIS_URL,
   },
   /**
    * Run `build` or `dev` with `SKIP_ENV_VALIDATION` to skip env validation.

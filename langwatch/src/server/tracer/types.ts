@@ -145,3 +145,20 @@ export type Trace = {
   };
   error?: ErrorCapture | null;
 };
+
+export type TraceCheck = {
+  id: string;
+  trace_id: string;
+  project_id: string;
+  check_type: string;
+  status: "scheduled" | "in_progress" | "failed" | "succeeded";
+  raw_result?: object;
+  result?: number;
+  error?: ErrorCapture | null;
+  retries?: number;
+  timestamps: {
+    inserted_at?: number;
+    started_at?: number;
+    finished_at?: number;
+  };
+};

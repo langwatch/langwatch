@@ -2,10 +2,15 @@ import { type MappingProperty } from "@elastic/elasticsearch/lib/api/types";
 import {
   EMBEDDING_DIMENSION,
   SPAN_INDEX,
+  TRACE_CHECKS_INDEX,
   TRACE_INDEX,
   esClient,
 } from "../server/elasticsearch";
-import { type Trace, type ElasticSearchSpan } from "../server/tracer/types";
+import {
+  type Trace,
+  type ElasticSearchSpan,
+  type TraceCheck,
+} from "../server/tracer/types";
 
 const traceMapping: Record<keyof Trace, MappingProperty> = {
   id: { type: "keyword" },
@@ -114,7 +119,30 @@ const spanMapping: Record<keyof ElasticSearchSpan, MappingProperty> = {
   },
 };
 
-export const createSpanIndex = async () => {
+const traceChecksMapping: Record<keyof TraceCheck, MappingProperty> = {
+  id: { type: "keyword" },
+  trace_id: { type: "keyword" },
+  project_id: { type: "keyword" },
+  check_type: { type: "keyword" },
+  status: { type: "keyword" },
+  raw_result: { type: "object" },
+  result: { type: "float" },
+  error: {
+    properties: {
+      message: { type: "text" },
+      stacktrace: { type: "text" },
+    },
+  },
+  retries: { type: "integer" },
+  timestamps: {
+    properties: {
+      started_at: { type: "date" },
+      finished_at: { type: "date" },
+    },
+  },
+};
+
+export const createIndexes = async () => {
   const spanExists = await esClient.indices.exists({ index: SPAN_INDEX });
   if (!spanExists) {
     await esClient.indices.create({
@@ -138,8 +166,22 @@ export const createSpanIndex = async () => {
     index: TRACE_INDEX,
     properties: traceMapping,
   });
+
+  const traceChecksExists = await esClient.indices.exists({
+    index: TRACE_CHECKS_INDEX,
+  });
+  if (!traceChecksExists) {
+    await esClient.indices.create({
+      index: TRACE_CHECKS_INDEX,
+      mappings: { properties: traceChecksMapping },
+    });
+  }
+  await esClient.indices.putMapping({
+    index: TRACE_CHECKS_INDEX,
+    properties: traceChecksMapping,
+  });
 };
 
 export default async function execute() {
-  await createSpanIndex();
+  await createIndexes();
 }

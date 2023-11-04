@@ -5,6 +5,8 @@ export const TRACE_INDEX = "search-traces";
 
 export const SPAN_INDEX = "search-spans";
 
+export const TRACE_CHECKS_INDEX = "search-trace-checks";
+
 export const EMBEDDING_DIMENSION = 1536;
 
 export const esClient = new Client({
