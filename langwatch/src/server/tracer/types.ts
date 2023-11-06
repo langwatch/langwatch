@@ -153,7 +153,7 @@ export type TraceCheck = {
   check_type: string;
   status: "scheduled" | "in_progress" | "failed" | "succeeded";
   raw_result?: object;
-  result?: number;
+  value?: number;
   error?: ErrorCapture | null;
   retries?: number;
   timestamps: {

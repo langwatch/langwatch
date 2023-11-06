@@ -16,7 +16,7 @@ import * as traceChecksWorker from "./worker";
 
 const mocks = vi.hoisted(() => {
   return {
-    traceChecksProcess: vi.fn(),
+    traceChecksProcess: vi.fn<any, Promise<traceChecksWorker.TraceCheckResult>>(),
   };
 });
 
@@ -83,6 +83,11 @@ describe("Check Queue Integration Tests", () => {
   });
 
   it('should schedule a trace check and update status to "scheduled" in ES', async () => {
+    mocks.traceChecksProcess.mockResolvedValue({
+      raw_result: { result: "it works" },
+      value: 1,
+    });
+
     const check_type = "test_check";
     const trace_id = `test-trace-id-${nanoid()}`;
     const project_id = "test-project-id";
@@ -106,7 +111,8 @@ describe("Check Queue Integration Tests", () => {
 
   it('should process a trace check successfully and update status to "succeeded" in ES', async () => {
     mocks.traceChecksProcess.mockResolvedValue({
-      result: "succeeded test works",
+      raw_result: { result: "succeeded test works" },
+      value: 1,
     });
 
     const check_type = "test_check";
@@ -128,6 +134,7 @@ describe("Check Queue Integration Tests", () => {
 
     expect(response.hits.hits).toHaveLength(1);
     expect(response.hits.hits[0]?._source?.status).toBe("succeeded");
+    expect(response.hits.hits[0]?._source?.value).toBe(1);
     expect(mocks.traceChecksProcess).toHaveBeenCalled();
   });
 

@@ -49,7 +49,7 @@ export const updateCheckStatusInES = async ({
   project_id,
   status,
   raw_result,
-  result,
+  value,
   error,
   retries,
 }: {
@@ -59,7 +59,7 @@ export const updateCheckStatusInES = async ({
   status: TraceCheck["status"];
   error?: any;
   raw_result?: object;
-  result?: number;
+  value?: number;
   retries?: number;
 }) => {
   const traceCheck: TraceCheck = {
@@ -69,7 +69,7 @@ export const updateCheckStatusInES = async ({
     check_type,
     status,
     ...(raw_result && { raw_result }),
-    ...(result && { result }),
+    ...(value && { value }),
     ...(error && { error: captureError(error) }),
     ...(retries && { retries }),
     timestamps: {
