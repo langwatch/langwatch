@@ -15,6 +15,7 @@ import { spanValidatorSchema } from "../../server/tracer/types.generated";
 import { getDebugger } from "../../utils/logger";
 import * as Sentry from "@sentry/nextjs";
 import { countTokens } from "../../server/tracer/tokenCount";
+import { scheduleTraceCheck } from "../../server/trace_checks/queue";
 
 const debug = getDebugger("langwatch:collector");
 
@@ -121,6 +122,12 @@ export default async function handler(
     console.error("Failed to insert to elasticsearch", result);
     return res.status(500).json({ message: "Something went wrong!" });
   }
+
+  void scheduleTraceCheck({
+    check_type: "pii_check",
+    trace_id: trace.id,
+    project_id: project.id
+  })
 
   return res.status(200).json({ message: "Traces received successfully." });
 }

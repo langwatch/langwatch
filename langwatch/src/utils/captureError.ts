@@ -1,6 +1,6 @@
 import type { ErrorCapture } from "../server/tracer/types";
 
-export const captureError = (error: Error): ErrorCapture => {
+export const captureError = (error: unknown): ErrorCapture => {
   if (error instanceof Error) {
     return {
       message: error.message,

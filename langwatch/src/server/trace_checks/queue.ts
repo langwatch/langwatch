@@ -1,22 +1,63 @@
+import { Queue } from "bullmq";
+import { connection } from "../redis";
 import { captureError } from "../../utils/captureError";
-import { TRACE_CHECKS_INDEX, esClient } from "../elasticsearch";
+import { esClient, TRACE_CHECKS_INDEX } from "../elasticsearch";
 import type { TraceCheck } from "../tracer/types";
 
-export const updateCheckStatusInES = async ({
+const traceChecksQueue = new Queue("trace_checks", {
+  connection,
+  defaultJobOptions: {
+    backoff: {
+      type: "exponential",
+      delay: 1000,
+    },
+  },
+});
+
+export const scheduleTraceCheck = async ({
+  check_type,
   trace_id,
   project_id,
+  delay,
+}: {
+  check_type: string;
+  trace_id: string;
+  project_id: string;
+  delay?: number;
+}) => {
+  await updateCheckStatusInES({
+    check_type,
+    trace_id,
+    project_id,
+    status: "scheduled",
+  });
+
+  await traceChecksQueue.add(
+    check_type,
+    { trace_id, project_id },
+    {
+      jobId: `${trace_id}/${check_type}`,
+      delay: delay ?? 5000,
+      attempts: 3,
+    }
+  );
+};
+
+export const updateCheckStatusInES = async ({
   check_type,
+  trace_id,
+  project_id,
   status,
   raw_result,
   result,
   error,
   retries,
 }: {
+  check_type: string;
   trace_id: string;
   project_id: string;
-  check_type: string;
   status: TraceCheck["status"];
-  error?: Error;
+  error?: any;
   raw_result?: object;
   result?: number;
   retries?: number;
