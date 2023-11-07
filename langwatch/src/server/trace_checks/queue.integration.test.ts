@@ -13,13 +13,11 @@ import { TRACE_CHECKS_INDEX, esClient } from "../elasticsearch";
 import type { TraceCheck } from "../tracer/types";
 import { scheduleTraceCheck, updateCheckStatusInES } from "./queue";
 import * as traceChecksWorker from "./worker";
+import type { TraceCheckResult } from "./types";
 
 const mocks = vi.hoisted(() => {
   return {
-    traceChecksProcess: vi.fn<
-      any,
-      Promise<traceChecksWorker.TraceCheckResult>
-    >(),
+    traceChecksProcess: vi.fn<any, Promise<TraceCheckResult>>(),
   };
 });
 

@@ -2,19 +2,12 @@ import { type Job, Worker } from "bullmq";
 import { connection } from "../redis";
 import { getDebugger } from "../../utils/logger";
 import { updateCheckStatusInES } from "./queue";
-import type {
-  TraceCheckDefinition,
-  TraceCheckJob,
-  TraceCheckResult,
-} from "./types";
-import { PIICheck } from "./piiCheck";
+import type { TraceCheckJob, TraceCheckResult } from "./types";
 import { esGetTraceById } from "../api/routers/traces";
 import { env } from "../../env.mjs";
+import { getTraceCheck } from "./registry";
 
 const debug = getDebugger("langwatch:trace_checks:workers");
-
-// TODO: allow checks to be run to be configurable by user
-const traceChecks: TraceCheckDefinition[] = [PIICheck];
 
 // TODO: allow processing in batch
 export const process = async (
@@ -26,14 +19,12 @@ export const process = async (
     throw "trace not found";
   }
 
-  for (const traceCheck of traceChecks) {
-    if (job.name == traceCheck.name) {
-      // TODO: send spans
-      return await traceCheck.execute(trace, []);
-    }
+  const traceCheck = getTraceCheck(job.name);
+  if (!traceCheck) {
+    throw "trace check not found";
   }
 
-  throw "trace check not found";
+  return await traceCheck.execute(trace, []);
 };
 
 export const start = (
@@ -83,8 +74,8 @@ export const start = (
   );
 
   worker.on("ready", () => {
-    debug("Worker active, waiting for jobs!")
-  })
+    debug("Worker active, waiting for jobs!");
+  });
 
   worker.on("failed", (job, err) => {
     debug(`Job ${job?.id} failed with error ${err.message}`);

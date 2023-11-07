@@ -1,8 +1,8 @@
 import { z } from "zod";
 
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
-import type { Trace } from "../../tracer/types";
-import { TRACE_INDEX, esClient } from "../../elasticsearch";
+import type { Trace, TraceCheck, TraceWithChecks } from "../../tracer/types";
+import { TRACE_CHECKS_INDEX, TRACE_INDEX, esClient } from "../../elasticsearch";
 import { TRPCError } from "@trpc/server";
 
 export const esGetTraceById = async (
@@ -37,7 +37,7 @@ export const tracesRouter = createTRPCRouter({
         throw new TRPCError({ code: "UNAUTHORIZED" });
       }
 
-      const result = await esClient.search<Trace>({
+      const tracesResult = await esClient.search<Trace>({
         index: TRACE_INDEX,
         size: 100,
         sort: {
@@ -52,11 +52,40 @@ export const tracesRouter = createTRPCRouter({
         },
       });
 
-      const traces = result.hits.hits
+      const traces = tracesResult.hits.hits
         .map((hit) => hit._source!)
         .filter((x) => x);
 
-      return traces;
+      const checksResult = await esClient.search<TraceCheck>({
+        index: TRACE_CHECKS_INDEX,
+        body: {
+          query: {
+            terms: {
+              trace_id: traces.map((trace) => trace.id),
+            },
+          },
+        },
+      });
+
+      const checksByTraceId: Record<string, TraceCheck[]> =
+        checksResult.hits.hits.reduce(
+          (acc: Record<string, TraceCheck[]>, hit) => {
+            const check = hit._source!;
+            if (!acc[check.trace_id]) {
+              acc[check.trace_id] = [];
+            }
+            acc[check.trace_id]?.push(check);
+            return acc;
+          },
+          {}
+        );
+
+      const tracesWithChecks: TraceWithChecks[] = traces.map((trace) => ({
+        ...trace,
+        checks: checksByTraceId[trace.id] ?? [],
+      }));
+
+      return tracesWithChecks;
     }),
   getById: protectedProcedure
     .input(z.object({ projectId: z.string(), traceId: z.string() }))

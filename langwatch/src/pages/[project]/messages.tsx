@@ -9,6 +9,13 @@ import {
   Container,
   HStack,
   Input,
+  Popover,
+  PopoverArrow,
+  PopoverBody,
+  PopoverContent,
+  PopoverHeader,
+  PopoverTrigger,
+  Portal,
   Skeleton,
   Spacer,
   Tag,
@@ -19,10 +26,12 @@ import {
 import { formatDistanceToNow } from "date-fns";
 import {
   CheckCircle,
+  Clock,
   Filter,
   HelpCircle,
   Maximize2,
   Search,
+  XCircle,
 } from "react-feather";
 import Markdown from "react-markdown";
 import {
@@ -32,9 +41,13 @@ import {
 } from "~/mappers/trace";
 import { DashboardLayout } from "../../components/DashboardLayout";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import type { Trace } from "../../server/tracer/types";
 import { api } from "../../utils/api";
 import { formatMilliseconds } from "../../utils/formatMilliseconds";
+import type { TraceWithChecks } from "../../server/tracer/types";
+import {
+  renderCheck,
+  verifyIfCheckPasses,
+} from "../../server/trace_checks/checkPassing";
 
 export default function Messages() {
   const { project } = useOrganizationTeamProject();
@@ -43,7 +56,15 @@ export default function Messages() {
     { enabled: !!project }
   );
 
-  const Message = ({ trace }: { trace: Trace }) => {
+  const Message = ({ trace }: { trace: TraceWithChecks }) => {
+    const checksDone = trace.checks.every(
+      (check) => check.status == "succeeded" || check.status == "failed"
+    );
+    const checkPasses = trace.checks.filter((check) =>
+      verifyIfCheckPasses(check)
+    ).length;
+    const totalChecks = trace.checks.length;
+
     return (
       <Link
         width="full"
@@ -177,27 +198,60 @@ export default function Messages() {
                       <>
                         <Text>·</Text>
                         <HStack>
-                          <Box width={2} height={2} background="red.400" borderRadius="100%"></Box>
+                          <Box
+                            width={2}
+                            height={2}
+                            background="red.400"
+                            borderRadius="100%"
+                          ></Box>
                           <Text>Exception ocurred</Text>
                         </HStack>
                       </>
                     )}
-
                   </HStack>
                 </VStack>
                 <Spacer />
-                <Tag
-                  variant="outline"
-                  boxShadow="#DEDEDE 0px 0px 0px 1px inset"
-                  color="green.600"
-                  paddingY={1}
-                  paddingX={2}
-                >
-                  <Box paddingRight={2}>
-                    <CheckCircle />
-                  </Box>
-                  5/5 checks
-                </Tag>
+                {totalChecks > 0 && (
+                  <Popover trigger="hover">
+                    <PopoverTrigger>
+                      <Tag
+                        variant="outline"
+                        boxShadow="#DEDEDE 0px 0px 0px 1px inset"
+                        color={
+                          !checksDone
+                            ? "yellow.600"
+                            : checkPasses == totalChecks
+                            ? "green.600"
+                            : "red.600"
+                        }
+                        paddingY={1}
+                        paddingX={2}
+                      >
+                        <Box paddingRight={2}>
+                          {!checksDone ? (
+                            <Clock />
+                          ) : checkPasses == totalChecks ? (
+                            <CheckCircle />
+                          ) : (
+                            <XCircle />
+                          )}
+                        </Box>
+                        {checkPasses}/{totalChecks} checks
+                      </Tag>
+                    </PopoverTrigger>
+                    <Portal>
+                      <Box zIndex="popover">
+                        <PopoverContent zIndex={2}>
+                          <PopoverArrow />
+                          <PopoverHeader>Trace Checks</PopoverHeader>
+                          <PopoverBody>
+                            {trace.checks.map((check) => renderCheck(check))}
+                          </PopoverBody>
+                        </PopoverContent>
+                      </Box>
+                    </Portal>
+                  </Popover>
+                )}
               </HStack>
             </VStack>
           </CardBody>

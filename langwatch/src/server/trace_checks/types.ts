@@ -11,9 +11,10 @@ export type TraceCheckResult = {
 };
 
 export type TraceCheckDefinition = {
-  name: string;
   execute: (
     trace: Trace,
     _spans: ElasticSearchSpan[]
   ) => Promise<TraceCheckResult>;
 };
+
+export type CheckTypes = "pii_check";

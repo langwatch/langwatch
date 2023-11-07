@@ -44,24 +44,23 @@ const execute = async (
 
   const findings = response.result?.findings;
 
-  if (findings?.length ?? 0 > 0) {
+  if (findings && findings.length > 0) {
     return {
       raw_result: {
         findings,
       },
-      value: 1,
+      value: findings.length,
     };
   }
 
   return {
     raw_result: {
-      findings,
+      findings: [],
     },
     value: 0,
   };
 };
 
 export const PIICheck: TraceCheckDefinition = {
-  name: "pii_check",
   execute,
 };
