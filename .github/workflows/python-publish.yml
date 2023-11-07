@@ -62,10 +62,10 @@ jobs:
         id: check_version
         run: |
           RESPONSE=$(curl -s --head https://pypi.org/pypi/langwatch/${{ env.PACKAGE_VERSION }}/json)
-          if [[ $RESPONSE == *"200 OK"* ]]; then
-            echo "::set-output name=exists::true"
+          if [[ $RESPONSE == *"HTTP/2 200"* ]]; then
+            echo "exists=true" >> $GITHUB_OUTPUT
           else
-            echo "::set-output name=exists::false"
+            echo "exists=false" >> $GITHUB_OUTPUT
           fi
 
       - name: Publish package
