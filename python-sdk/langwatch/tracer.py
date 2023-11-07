@@ -175,6 +175,8 @@ executor = ThreadPoolExecutor(max_workers=10)
 
 @retry(tries=5, delay=0.5, backoff=3)
 def _send_spans(spans: List[Span]):
+    if not langwatch.api_key:
+        return
     response = requests.post(
         langwatch.endpoint,
         json={"spans": spans},

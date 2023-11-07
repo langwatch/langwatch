@@ -23,8 +23,8 @@ class TestOpenAICompletionTracer:
             create_openai_completion_mock(" ah!"),
         ]
         with patch.object(
-            openai.Completion,
-            "create",
+            langwatch.openai,
+            "_original_completion_create",
             side_effect=openai_mocks,
         ), requests_mock.Mocker() as mock_request:
             mock_request.post(langwatch.endpoint, json={})
@@ -84,7 +84,9 @@ class TestOpenAICompletionTracer:
 
     def test_trace_session_captures_exceptions(self):
         with patch.object(
-            openai.Completion, "create", side_effect=Exception("An error occurred!")
+            langwatch.openai,
+            "_original_completion_create",
+            side_effect=Exception("An error occurred!"),
         ), requests_mock.Mocker() as mock_request:
             mock_request.post(langwatch.endpoint, json={})
 
@@ -106,8 +108,8 @@ class TestOpenAICompletionTracer:
             create_openai_completion_mock(" there"),
         ]
         with patch.object(
-            openai.Completion,
-            "acreate",
+            langwatch.openai,
+            "_original_completion_acreate",
             side_effect=openai_mocks,
         ), requests_mock.Mocker() as mock_request:
             mock_request.post(langwatch.endpoint, json={})
@@ -130,8 +132,8 @@ class TestOpenAICompletionTracer:
     @freeze_time("2022-01-01", auto_tick_seconds=15)
     def test_trace_session_captures_openai_streams(self):
         with patch.object(
-            openai.Completion,
-            "create",
+            langwatch.openai,
+            "_original_completion_create",
             side_effect=[
                 create_openai_completion_stream_mock(
                     [" there", " all", " good?"], [" how", " are", " you"]
@@ -185,8 +187,8 @@ class TestOpenAICompletionTracer:
     @pytest.mark.asyncio
     async def test_trace_session_captures_openai_async_streams(self):
         with patch.object(
-            openai.Completion,
-            "acreate",
+            langwatch.openai,
+            "_original_completion_acreate",
             side_effect=[
                 create_openai_completion_async_stream_mock(
                     [" there", " all", " good?"], [" how", " are", " you"]
@@ -223,8 +225,8 @@ class TestOpenAICompletionTracer:
     @freeze_time("2022-01-01", auto_tick_seconds=15)
     def test_trace_nested_spans(self):
         with patch.object(
-            openai.Completion,
-            "create",
+            langwatch.openai,
+            "_original_completion_create",
             side_effect=[
                 create_openai_completion_mock(" there"),
                 create_openai_completion_mock(" are"),
@@ -274,8 +276,8 @@ class TestOpenAICompletionTracer:
     @freeze_time("2022-01-01", auto_tick_seconds=15)
     def test_trace_nested_spans_using_annotations(self):
         with patch.object(
-            openai.Completion,
-            "create",
+            langwatch.openai,
+            "_original_completion_create",
             side_effect=[
                 create_openai_completion_mock(" there"),
                 create_openai_completion_mock(" are"),
@@ -334,8 +336,8 @@ class TestOpenAIChatCompletionTracer:
             create_openai_chat_completion_mock("bar baz"),
         ]
         with patch.object(
-            openai.ChatCompletion,
-            "create",
+            langwatch.openai,
+            "_original_chat_completion_create",
             side_effect=openai_mocks,
         ), requests_mock.Mocker() as mock_request:
             mock_request.post(langwatch.endpoint, json={})
@@ -385,7 +387,9 @@ class TestOpenAIChatCompletionTracer:
 
     def test_trace_session_captures_exceptions(self):
         with patch.object(
-            openai.ChatCompletion, "create", side_effect=Exception("An error occurred!")
+            langwatch.openai,
+            "_original_chat_completion_create",
+            side_effect=Exception("An error occurred!"),
         ), requests_mock.Mocker() as mock_request:
             mock_request.post(langwatch.endpoint, json={})
 
@@ -405,8 +409,8 @@ class TestOpenAIChatCompletionTracer:
             create_openai_chat_completion_mock("hi there!"),
         ]
         with patch.object(
-            openai.ChatCompletion,
-            "acreate",
+            langwatch.openai,
+            "_original_chat_completion_acreate",
             side_effect=openai_mocks,
         ), requests_mock.Mocker() as mock_request:
             mock_request.post(langwatch.endpoint, json={})
@@ -457,8 +461,8 @@ class TestOpenAIChatCompletionTracer:
             }
         ]
         with patch.object(
-            openai.ChatCompletion,
-            "create",
+            langwatch.openai,
+            "_original_chat_completion_create",
             side_effect=openai_mocks,
         ), requests_mock.Mocker() as mock_request:
             mock_request.post(langwatch.endpoint, json={})
@@ -530,8 +534,8 @@ class TestOpenAIChatCompletionTracer:
     @freeze_time("2022-01-01", auto_tick_seconds=15)
     def test_trace_session_captures_openai_streams(self):
         with patch.object(
-            openai.ChatCompletion,
-            "create",
+            langwatch.openai,
+            "_original_chat_completion_create",
             side_effect=[
                 create_openai_chat_completion_stream_mock(
                     ["Hi", " there", " all", " good?"], ["Hi", " how", " are", " you"]
@@ -611,8 +615,8 @@ class TestOpenAIChatCompletionTracer:
     @freeze_time("2022-01-01", auto_tick_seconds=15)
     def test_trace_session_captures_openai_streams_with_functions(self):
         with patch.object(
-            openai.ChatCompletion,
-            "create",
+            langwatch.openai,
+            "_original_chat_completion_create",
             side_effect=[
                 create_openai_chat_completion_function_stream_mock(
                     {"name": "Calculator", "arguments": '{\n  "input": "2+2"\n}'}
@@ -667,8 +671,8 @@ class TestOpenAIChatCompletionTracer:
     @pytest.mark.asyncio
     async def test_trace_session_captures_openai_async_streams(self):
         with patch.object(
-            openai.ChatCompletion,
-            "acreate",
+            langwatch.openai,
+            "_original_chat_completion_acreate",
             side_effect=[
                 create_openai_chat_completion_async_stream_mock(
                     ["Hi", " there", " all", " good?"], ["Hi", " how", " are", " you"]
@@ -721,12 +725,12 @@ class TestOpenAIChatCompletionTracer:
 class TestOpenAITracer:
     def test_traces_both_completion_and_chat_completion(self):
         with patch.object(
-            openai.Completion,
-            "create",
+            langwatch.openai,
+            "_original_completion_create",
             side_effect=[create_openai_completion_mock("foo")],
         ), patch.object(
-            openai.ChatCompletion,
-            "create",
+            langwatch.openai,
+            "_original_chat_completion_create",
             side_effect=[create_openai_chat_completion_mock("bar")],
         ), requests_mock.Mocker() as mock_request:
             with langwatch.openai.OpenAITracer():

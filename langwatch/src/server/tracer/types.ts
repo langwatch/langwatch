@@ -130,7 +130,7 @@ export type TraceInputOutput = { value: string; openai_embeddings?: number[] };
 export type Trace = {
   id: string;
   project_id: string;
-  session_id?: string;
+  thread_id?: string;
   user_id?: string;
   timestamps: { started_at: number; inserted_at: number };
   input: TraceInputOutput;

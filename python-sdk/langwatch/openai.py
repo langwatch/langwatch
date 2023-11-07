@@ -228,8 +228,8 @@ class OpenAICompletionTracer(BaseContextTracer):
         )
 
 
-_original_completion_create = openai.ChatCompletion.create
-_original_completion_acreate = openai.ChatCompletion.acreate
+_original_chat_completion_create = openai.ChatCompletion.create
+_original_chat_completion_acreate = openai.ChatCompletion.acreate
 
 
 class OpenAIChatCompletionTracer(BaseContextTracer):
@@ -240,13 +240,13 @@ class OpenAIChatCompletionTracer(BaseContextTracer):
 
     def __exit__(self, _type, _value, _traceback):
         super().__exit__(_type, _value, _traceback)
-        openai.Completion.create = _original_completion_create
-        openai.Completion.acreate = _original_completion_acreate
+        openai.Completion.create = _original_chat_completion_create
+        openai.Completion.acreate = _original_chat_completion_acreate
 
     def patched_completion_create(self, *args, **kwargs):
         started_at = milliseconds_timestamp()
         try:
-            response = _original_completion_create(*args, **kwargs)
+            response = _original_chat_completion_create(*args, **kwargs)
 
             if isinstance(response, Generator):
                 return capture_chunks_with_timings_and_reyield(
@@ -280,7 +280,7 @@ class OpenAIChatCompletionTracer(BaseContextTracer):
 
     async def patched_completion_acreate(self, *args, **kwargs):
         started_at = milliseconds_timestamp()
-        response = await _original_completion_acreate(*args, **kwargs)
+        response = await _original_chat_completion_acreate(*args, **kwargs)
 
         if isinstance(response, AsyncGenerator):
             return capture_async_chunks_with_timings_and_reyield(

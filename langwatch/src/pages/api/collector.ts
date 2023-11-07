@@ -43,7 +43,7 @@ export default async function handler(
     return res.status(401).json({ message: "Invalid auth token." });
   }
 
-  const sessionId = req.body.session_id;
+  const threadId = req.body.thread_id;
   const userId = req.body.user_id;
 
   if (!req.body.spans) {
@@ -92,7 +92,7 @@ export default async function handler(
   const trace: Trace = {
     id: traceId,
     project_id: project.id,
-    session_id: sessionId, // Optional: This will be undefined if not sent
+    thread_id: threadId, // Optional: This will be undefined if not sent
     user_id: userId, // Optional: This will be undefined if not sent
     timestamps: {
       started_at: Math.min(...spans.map((span) => span.timestamps.started_at)),
@@ -126,8 +126,8 @@ export default async function handler(
   void scheduleTraceCheck({
     check_type: "pii_check",
     trace_id: trace.id,
-    project_id: project.id
-  })
+    project_id: project.id,
+  });
 
   return res.status(200).json({ message: "Traces received successfully." });
 }

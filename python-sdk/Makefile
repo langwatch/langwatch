@@ -1,7 +1,7 @@
 .PHONY: test install
 
 test:
-	PYTHONPATH=$$PYTHONPATH:. poetry run pytest -s -vv -m "not integration" $(filter-out $@,$(MAKECMDGOALS))
+	LANGWATCH_API_KEY="testkey" PYTHONPATH=$$PYTHONPATH:. poetry run pytest -s -vv -m "not integration" $(filter-out $@,$(MAKECMDGOALS))
 
 install:
 	@if ! command -v poetry &> /dev/null; then \

@@ -15,7 +15,7 @@ import {
 const traceMapping: Record<keyof Trace, MappingProperty> = {
   id: { type: "keyword" },
   project_id: { type: "keyword" },
-  session_id: { type: "keyword" },
+  thread_id: { type: "keyword" },
   user_id: { type: "keyword" },
   timestamps: {
     properties: {
