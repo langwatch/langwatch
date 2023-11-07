@@ -298,7 +298,12 @@ export default function Trace() {
         spacing={10}
       >
         <VStack spacing={6} alignItems="flex-start" width="full">
-          <Heading as="h1">Trace Detail</Heading>
+          <HStack gap={5}>
+            <Heading as="h1">Trace Detail</Heading>
+            <Text color="gray.400" fontFamily="mono">
+              (ID: {traceId})
+            </Text>
+          </HStack>
           {trace.data ? (
             <HStack
               spacing={4}
@@ -306,10 +311,38 @@ export default function Trace() {
               borderBottomWidth={1}
               borderColor="gray.300"
               width="full"
+              align="flex-start"
             >
-              <SummaryItem label="ID">
-                <Text as="span" fontFamily="mono">
-                  {traceId}
+              <SummaryItem
+                label="User ID"
+                tooltip={
+                  !trace.data.user_id
+                    ? "Send the user_id to LangWatch to unlock various analysis per user, read more on our docs" /* TODO docs link */
+                    : undefined
+                }
+              >
+                <Text
+                  fontFamily={trace.data.thread_id ? "mono" : undefined}
+                  maxWidth="200px"
+                  wordBreak="break-all"
+                >
+                  {trace.data.user_id ?? "unknown"}
+                </Text>
+              </SummaryItem>
+              <SummaryItem
+                label="Thread ID"
+                tooltip={
+                  !trace.data.thread_id
+                    ? "Send the thread_id to LangWatch to group the messages as a part of a single context, read more on our docs" /* TODO docs link */
+                    : undefined
+                }
+              >
+                <Text
+                  fontFamily={trace.data.thread_id ? "mono" : undefined}
+                  maxWidth="200px"
+                  wordBreak="break-all"
+                >
+                  {trace.data.thread_id ?? "unknown"}
                 </Text>
               </SummaryItem>
               {(!!trace.data.metrics.completion_tokens ||
