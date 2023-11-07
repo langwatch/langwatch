@@ -36,7 +36,7 @@ const CHECK_RENDERING: Record<CheckTypes, (check: TraceCheck) => JSX.Element> =
           {findings && findings.length > 0
             ? findings.map(
                 (finding) =>
-                  `Detected ${finding.infoType?.name} near "${finding.quote}"`
+                  `Detected ${finding.infoType?.name} "${finding.quote}"`
               )
             : "No PII leak detected"}
         </>
