@@ -4,6 +4,10 @@ import type { CheckTypes } from "./types";
 import { CheckCircle, Clock, XCircle } from "react-feather";
 import type { google } from "@google-cloud/dlp/build/protos/protos";
 
+const CHECK_NAMES: Record<CheckTypes, string> = {
+  pii_check: "PII Check",
+};
+
 type PassesFn = (check: { raw_response?: string; value?: number }) => boolean;
 
 const CHECK_PASSES: Record<CheckTypes, PassesFn> = {
@@ -65,7 +69,16 @@ export const renderCheck = (check: TraceCheck): JSX.Element | null => {
             <XCircle />
           )}
         </Box>
-        {CHECK_RENDERING[checkType](check)}
+        <b>{CHECK_NAMES[checkType]}:</b>{" "}
+        {check.status == "succeeded"
+          ? CHECK_RENDERING[checkType](check)
+          : check.status == "failed"
+          ? "Error"
+          : check.status == "in_progress"
+          ? "Processing"
+          : check.status === "scheduled"
+          ? "Scheduled"
+          : "unknown"}
       </HStack>
     );
   }
