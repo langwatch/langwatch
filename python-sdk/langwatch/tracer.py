@@ -139,7 +139,6 @@ class BaseContextTracer:
 
     def delayed_send_spans(self):
         self._add_finished_at_to_missing_spans()
-        print("\n\nself.user_id\n\n", self.user_id)
 
         if "PYTEST_CURRENT_TEST" in os.environ:
             send_spans(
