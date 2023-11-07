@@ -118,9 +118,16 @@ class BaseContextTracer:
     sent_once = False
     scheduled_send: Optional[Task[None]] = None
 
-    def __init__(self, trace_id: Optional[str] = None):
+    def __init__(
+        self,
+        trace_id: Optional[str] = None,
+        user_id: Optional[str] = None,
+        thread_id: Optional[str] = None,
+    ):
         self.spans: Dict[str, Span] = {}
         self.trace_id = trace_id or f"trace_{nanoid.generate()}"
+        self.user_id = user_id
+        self.thread_id = thread_id
 
     def __enter__(self):
         _local_context.current_tracer = self
@@ -132,15 +139,24 @@ class BaseContextTracer:
 
     def delayed_send_spans(self):
         self._add_finished_at_to_missing_spans()
+        print("\n\nself.user_id\n\n", self.user_id)
 
         if "PYTEST_CURRENT_TEST" in os.environ:
-            send_spans(list(self.spans.values()))
+            send_spans(
+                spans=list(self.spans.values()),
+                user_id=self.user_id,
+                thread_id=self.thread_id,
+            )
             return
 
         async def schedule():
             await asyncio.sleep(1)
             self.sent_once = True
-            send_spans(list(self.spans.values()))
+            send_spans(
+                spans=list(self.spans.values()),
+                user_id=self.user_id,
+                thread_id=self.thread_id,
+            )
 
         if self.scheduled_send:
             self.scheduled_send.cancel()
@@ -174,18 +190,28 @@ executor = ThreadPoolExecutor(max_workers=10)
 
 
 @retry(tries=5, delay=0.5, backoff=3)
-def _send_spans(spans: List[Span]):
+def _send_spans(
+    spans: List[Span], user_id: Optional[str] = None, thread_id: Optional[str] = None
+):
+    json: dict[str, Any] = {"spans": spans}
+    if user_id:
+        json["user_id"] = user_id
+    if thread_id:
+        json["thread_id"] = thread_id
+
     if not langwatch.api_key:
         return
     response = requests.post(
         langwatch.endpoint,
-        json={"spans": spans},
+        json=json,
         headers={"X-Auth-Token": str(langwatch.api_key)},
     )
     response.raise_for_status()
 
 
-def send_spans(spans: List[Span]):
+def send_spans(
+    spans: List[Span], user_id: Optional[str] = None, thread_id: Optional[str] = None
+):
     if len(spans) == 0:
         return
-    executor.submit(_send_spans, spans)
+    executor.submit(_send_spans, spans, user_id, thread_id)

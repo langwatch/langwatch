@@ -67,8 +67,8 @@ def langchain_message_to_chat_message(message: BaseMessage) -> ChatMessage:
 class LangChainTracer(BaseContextTracer, BaseCallbackHandler):
     """Base callback handler that can be used to handle callbacks from langchain."""
 
-    def __init__(self, trace_id: Optional[str] = None) -> None:
-        super().__init__(trace_id)
+    def __init__(self, trace_id: Optional[str] = None, user_id: Optional[str] = None, thread_id: Optional[str] = None) -> None:
+        super().__init__(trace_id, user_id, thread_id)
 
     def on_llm_start(
         self,

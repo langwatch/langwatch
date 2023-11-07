@@ -58,7 +58,7 @@ class TestLangChainTracer:
                 prompt=chat_prompt,
                 output_parser=CommaSeparatedListOutputParser(),
             )
-            with langwatch.langchain.LangChainTracer() as langWatchCallback:
+            with langwatch.langchain.LangChainTracer(user_id="user-123", thread_id="thread-456") as langWatchCallback:
                 result = chain.run(text="colors", callbacks=[langWatchCallback])
             assert result == ["red", "blue", "green", "yellow"]
 
@@ -66,7 +66,11 @@ class TestLangChainTracer:
             request_history = [
                 r for r in mock_request.request_history if "langwatch" in r.url
             ]
-            first_span, second_span = request_history[0].json()["spans"]
+            trace_request = request_history[0].json()
+            assert trace_request["user_id"] == "user-123"
+            assert trace_request["thread_id"] == "thread-456"
+
+            first_span, second_span = trace_request["spans"]
 
             assert first_span["type"] == "chain"
             assert first_span["trace_id"].startswith("trace_")

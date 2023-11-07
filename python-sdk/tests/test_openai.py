@@ -29,7 +29,9 @@ class TestOpenAICompletionTracer:
         ), requests_mock.Mocker() as mock_request:
             mock_request.post(langwatch.endpoint, json={})
 
-            with langwatch.openai.OpenAICompletionTracer():
+            with langwatch.openai.OpenAICompletionTracer(
+                user_id="user-123", thread_id="thread-456"
+            ):
                 response = openai.Completion.create(
                     model="gpt-3.5-turbo-instruct", prompt="hi"
                 )
@@ -40,7 +42,13 @@ class TestOpenAICompletionTracer:
                 assert response == openai_mocks[1]
 
             time.sleep(0.01)
-            first_span = mock_request.request_history[0].json()["spans"][0]
+            trace_request = mock_request.request_history[0].json()
+
+            assert trace_request["user_id"] == "user-123"
+            assert trace_request["thread_id"] == "thread-456"
+
+            first_span, second_span = trace_request["spans"]
+
             assert first_span["trace_id"].startswith("trace_")
             assert first_span["vendor"] == "openai"
             assert first_span["model"] == "gpt-3.5-turbo-instruct"
@@ -64,7 +72,6 @@ class TestOpenAICompletionTracer:
                 datetime(2022, 1, 1, 0, 0, 15).timestamp() * 1000
             )
 
-            second_span = mock_request.request_history[0].json()["spans"][1]
             assert second_span["trace_id"] == first_span["trace_id"]
 
             with langwatch.openai.OpenAICompletionTracer():
@@ -733,7 +740,9 @@ class TestOpenAITracer:
             "_original_chat_completion_create",
             side_effect=[create_openai_chat_completion_mock("bar")],
         ), requests_mock.Mocker() as mock_request:
-            with langwatch.openai.OpenAITracer():
+            with langwatch.openai.OpenAITracer(
+                user_id="user-123", thread_id="thread-456"
+            ):
                 openai.Completion.create(
                     model="gpt-3.5-turbo-instruct", prompt="Hello Completion!"
                 )
