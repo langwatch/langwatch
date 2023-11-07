@@ -5,6 +5,22 @@ import type { Trace } from "../../tracer/types";
 import { TRACE_INDEX, esClient } from "../../elasticsearch";
 import { TRPCError } from "@trpc/server";
 
+export const esGetTraceById = async (
+  traceId: string
+): Promise<Trace | undefined> => {
+  const result = await esClient.search<Trace>({
+    index: TRACE_INDEX,
+    body: {
+      query: {
+        term: { id: traceId },
+      },
+    },
+    size: 1,
+  });
+
+  return result.hits.hits[0]?._source;
+};
+
 export const tracesRouter = createTRPCRouter({
   getAllForProject: protectedProcedure
     .input(z.object({ projectId: z.string() }))

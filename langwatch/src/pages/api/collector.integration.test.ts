@@ -13,9 +13,9 @@ import handler from "./collector";
 const sampleSpan: BaseSpan = {
   type: "span",
   name: "sample-span",
-  id: "span_V1StGXR8_Z5jdHi6B-myZ",
+  id: "span_V1StGXR8_Z5jdHi6B-myB",
   parent_id: null,
-  trace_id: "trace_Uakgb_J5m9g-0JDMbcJqLJ",
+  trace_id: "trace_test-trace_J5m9g-0JDMbcJqLK",
   input: { type: "text", value: "hello" },
   outputs: [{ type: "text", value: "world" }],
   error: null,

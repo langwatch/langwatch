@@ -16,7 +16,10 @@ import * as traceChecksWorker from "./worker";
 
 const mocks = vi.hoisted(() => {
   return {
-    traceChecksProcess: vi.fn<any, Promise<traceChecksWorker.TraceCheckResult>>(),
+    traceChecksProcess: vi.fn<
+      any,
+      Promise<traceChecksWorker.TraceCheckResult>
+    >(),
   };
 });
 
@@ -35,6 +38,9 @@ const getTraceCheck = async (traceId: string, checkType: string) => {
 
 describe("Check Queue Integration Tests", () => {
   let worker: Worker | undefined;
+  const trace_id = `test-trace-id-${nanoid()}`;
+  const trace_id_success = `test-trace-id-success-${nanoid()}`;
+  const trace_id_failure = `test-trace-id-failure-${nanoid()}`;
 
   beforeEach(() => {
     mocks.traceChecksProcess.mockReset();
@@ -50,15 +56,13 @@ describe("Check Queue Integration Tests", () => {
 
     console.log("Closing worker");
     await worker?.close();
-  });
 
-  beforeAll(async () => {
-    // Delete test documents to ensure each test starts fresh
+    // Delete test documents
     await esClient.deleteByQuery({
       index: TRACE_CHECKS_INDEX,
       body: {
         query: {
-          match: { trace_id: "test-trace-id" },
+          match: { trace_id: trace_id },
         },
       },
     });
@@ -67,7 +71,7 @@ describe("Check Queue Integration Tests", () => {
       index: TRACE_CHECKS_INDEX,
       body: {
         query: {
-          match: { trace_id: "test-trace-id-success" },
+          match: { trace_id: trace_id_success },
         },
       },
     });
@@ -76,7 +80,7 @@ describe("Check Queue Integration Tests", () => {
       index: TRACE_CHECKS_INDEX,
       body: {
         query: {
-          match: { trace_id: "test-trace-id-failure" },
+          match: { trace_id: trace_id_failure },
         },
       },
     });
@@ -89,7 +93,6 @@ describe("Check Queue Integration Tests", () => {
     });
 
     const check_type = "test_check";
-    const trace_id = `test-trace-id-${nanoid()}`;
     const project_id = "test-project-id";
 
     await scheduleTraceCheck({ check_type, trace_id, project_id });
@@ -116,7 +119,7 @@ describe("Check Queue Integration Tests", () => {
     });
 
     const check_type = "test_check";
-    const trace_id = `test-trace-id-success-${nanoid()}`;
+    const trace_id = trace_id_success;
     const project_id = "test-project-id";
 
     await scheduleTraceCheck({ check_type, trace_id, project_id, delay: 0 });
@@ -142,7 +145,7 @@ describe("Check Queue Integration Tests", () => {
     mocks.traceChecksProcess.mockRejectedValue("something wrong is not right");
 
     const check_type = "test_check";
-    const trace_id = `test-trace-id-failure-${nanoid()}`;
+    const trace_id = trace_id_failure;
     const project_id = "test-project-id";
 
     await scheduleTraceCheck({ check_type, trace_id, project_id, delay: 0 });

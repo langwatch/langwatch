@@ -3,8 +3,9 @@ import { connection } from "../redis";
 import { captureError } from "../../utils/captureError";
 import { esClient, TRACE_CHECKS_INDEX } from "../elasticsearch";
 import type { TraceCheck } from "../tracer/types";
+import type { TraceCheckJob } from "./types";
 
-const traceChecksQueue = new Queue("trace_checks", {
+const traceChecksQueue = new Queue<TraceCheckJob, any, string>("trace_checks", {
   connection,
   defaultJobOptions: {
     backoff: {

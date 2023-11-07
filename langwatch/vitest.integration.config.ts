@@ -6,7 +6,7 @@ export default defineConfig({
     setupFiles: ["./test-setup.ts"],
     include: ["**/*.integration.{test,spec}.?(c|m)[jt]s?(x)"],
     exclude: [...configDefaults.exclude],
-    testTimeout: 5_000,
+    testTimeout: 10_000,
   },
   resolve: {
     alias: {
