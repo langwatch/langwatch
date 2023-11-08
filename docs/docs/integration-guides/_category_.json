@@ -1,0 +1,10 @@
+{
+  "label": "Integration Guides",
+  "position": 3,
+  "link": {
+    "type": "generated-index",
+    "description": "Integrating LangWatch into your projects is designed to be a straightforward process. Regardless of the language or LLM service you are using, you can set up LangWatch with minimal configuration and start gathering valuable insights into your LLM's performance and user interactions. Here, we provide specific guides for integrating LangWatch with popular LLM services and libraries."
+  },
+  "collapsible": true,
+  "collapsed": false
+}
