@@ -5,19 +5,19 @@ sidebar_position: 4
 
 Understanding LangWatch concepts can be made easier with two practical examples: an AI travel assistant and a tool for generating blog posts. Let's dive into how each core concept of LangWatch applies to these examples.
 
-Imagine you've created an AI travel assistant that helps users plan their trips by conversing with them to suggest destinations, find the best prices for flights, and assist with bookings. On the other hand, you also have a platform that assists users in generating, critiquing, and refining blog posts, including SEO optimization.
+Imagine you've created an AI travel assistant that helps users plan their trips by conversing with them to suggest destinations, find the best prices for flights, and assist with bookings. On the other hand, you also have a platform that assists users in generating, and refining blog posts, including SEO optimization.
 
 ### Threads
 
-A **thread** in the context of the AI travel assistant represents a complete conversation with a user. It's the entire chat that groups all back-and-forth messages as the user inquires about different aspects of their travel plan. For the blog post tool, a thread is the creation process of a new blog post, encapsulating all interactions that contribute to its completion—from headline generation to the final SEO adjustments.
+A **thread** in the context of the AI travel assistant represents a complete conversation with a user. It's the entire chat that groups all back-and-forth messages as the user inquires about different aspects of their travel plan. For the blog post tool, a thread could be for example the creation process of a new blog post, encapsulating all interactions that contribute to its completion—from headline generation to the final SEO adjustments.
 
 ### Traces
 
-A **trace** in the travel assistant's framework is each distinct message. For example, when a user asks for the best prices to a destination, the trace would include the AI's search, retrieval of options, and presentation of results. In the blog post tool, a trace could be the generation of a catchy headline, the drafting of the body, or the application of SEO best practices. Each trace is a separate task or query handled by the AI.
+A **trace** in the travel assistant's framework is each distinct message. For example, when a user asks for the best prices to a destination, the trace would include the LLM suggestions, retrieval of options on API, and LLM generation of results. In the blog post tool, a trace could be the for example each time the user clicks to generate a new catchy headline option, clicks to generate the drafting of the body, or to apply the SEO best practices on top. Each trace is a separate task or query handled by the AI.
 
 ### Spans
 
-Within each trace, **spans** represent the individual steps taken to achieve the outcome. In the travel bot scenario, a span could be the AI's call to suggest potential destinations, another span for querying the airline price API, and a final span for formatting the response to present to the user. For the blog post tool, one span might be the initial text generation, followed by a subsequent span for critiquing the content, and another for refining the text based on the critique.
+Within each trace, **spans** represent the individual steps taken to achieve the outcome. In the travel bot scenario, a span could be the AI's call to suggest potential destinations, another span for querying the airline price API, and a final span for formatting the response to present to the user. For the blog post tool, one span might be the initial text generation, followed by a subsequent span for LLM to self-critiquing the content, and another span for the third LLM call refining the text based on the critique.
 
 ### LLM Checks
 
