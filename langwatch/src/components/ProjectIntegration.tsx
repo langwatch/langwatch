@@ -15,6 +15,8 @@ import {
 } from "@chakra-ui/react";
 import { DashboardLayout } from "./DashboardLayout";
 import { OpenAIPython } from "./integration-guides/OpenAIPython";
+import { LangChainPython } from "./integration-guides/LangChainPython";
+import { CustomRest } from "./integration-guides/CustomRest";
 
 export const ProjectIntegration = () => {
   const { project, isRefetching } = useOrganizationTeamProject({
@@ -39,6 +41,8 @@ export const ProjectIntegration = () => {
     },
   });
 
+  const IntegrationDocs = languageKey && framework?.languages[languageKey];
+
   return (
     <DashboardLayout backgroundColor="white">
       <VStack
@@ -48,7 +52,7 @@ export const ProjectIntegration = () => {
         alignSelf="flex-start"
         alignItems="flex-start"
         width="full"
-        spacing={10}
+        spacing={6}
       >
         <VStack
           align="flex-start"
@@ -72,7 +76,7 @@ export const ProjectIntegration = () => {
           </Text>
         </VStack>
         <div className="markdown">
-          <OpenAIPython apiKey={project?.apiKey} />
+          {IntegrationDocs && <IntegrationDocs apiKey={project?.apiKey} />}
         </div>
       </VStack>
     </DashboardLayout>

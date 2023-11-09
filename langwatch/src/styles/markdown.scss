@@ -6,7 +6,6 @@
   h3 {
     font-weight: bold;
     margin-top: 30px;
-    margin-bottom: 20px;
 
     &:first-child {
       margin-top: 0;
@@ -35,15 +34,27 @@
     margin-bottom: 20px;
   }
 
+  h1,
+  h2,
+  h3,
+  pre,
+  ol,
+  ul {
+    margin-bottom: 16px;
+  }
+
   pre {
     border-radius: 5px;
-    padding: 12px;
+    padding: 16px;
     max-width: 100%;
     word-break: break-all;
     white-space: pre-wrap;
   }
 
-  .hide-on-langwatch {
-    display: none;
+  code {
+    background: rgb(246, 247, 248);
+    border-radius: 5px;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    padding: 1.6px;
   }
 }

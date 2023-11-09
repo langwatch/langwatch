@@ -14,7 +14,12 @@ import {
 } from "@chakra-ui/react";
 import ErrorPage from "next/error";
 import { useRouter } from "next/router";
-import { useEffect, type PropsWithChildren } from "react";
+import {
+  useEffect,
+  type PropsWithChildren,
+  type ReactComponentElement,
+  type ReactElement,
+} from "react";
 import { Code } from "react-feather";
 import {
   useForm,
@@ -28,6 +33,9 @@ import { OpenAI } from "../../../components/icons/OpenAI";
 import { Python } from "../../../components/icons/Python";
 import { useRequiredSession } from "../../../hooks/useRequiredSession";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
+import { OpenAIPython } from "../../../components/integration-guides/OpenAIPython";
+import { CustomRest } from "../../../components/integration-guides/CustomRest";
+import { LangChainPython } from "../../../components/integration-guides/LangChainPython";
 
 export type ProjectFormData = {
   name: string;
@@ -176,21 +184,34 @@ export const techStackLanguageOptions = {
   other: { label: "Other", icon: <Code /> },
 };
 
+type LanguagesMap = {
+  [K in keyof typeof techStackLanguageOptions]?: React.FC<{
+    apiKey?: string;
+  }>;
+};
+
 export const techStackFrameworkOptions = {
   openai: {
     label: "OpenAI",
     icon: <OpenAI />,
-    languages: ["python", "javascript"],
+    languages: { python: OpenAIPython, javascript: CustomRest } as LanguagesMap,
   },
   langchain: {
     label: "LangChain",
     icon: <Box fontSize="32px">🦜</Box>,
-    languages: ["python", "javascript"],
+    languages: {
+      python: LangChainPython,
+      javascript: CustomRest,
+    } as LanguagesMap,
   },
   other: {
     label: "Other",
     icon: <Code />,
-    languages: ["python", "javascript", "other"],
+    languages: {
+      python: CustomRest,
+      javascript: CustomRest,
+      other: CustomRest,
+    } as LanguagesMap,
   },
 };
 
@@ -222,7 +243,9 @@ export const TechStackSelector = ({
     onChange: (value) => {
       const availableForLanguage = Object.entries(
         techStackFrameworkOptions
-      ).filter(([_, framework]) => framework.languages.includes(value));
+      ).filter(([_, framework]) =>
+        Object.keys(framework.languages).includes(value)
+      );
       form.setValue("language", value);
       if (availableForLanguage[0]) {
         form.setValue("framework", availableForLanguage[0][0]);
@@ -279,7 +302,9 @@ export const TechStackSelector = ({
           wrap="wrap"
         >
           {Object.entries(techStackFrameworkOptions)
-            .filter(([_, option]) => option.languages.includes(currentLanguage))
+            .filter(([_, option]) =>
+              Object.keys(option.languages).includes(currentLanguage)
+            )
             .map(([key, option]) => {
               const radio = frameworkGetRadioProps({ value: key });
               return (
