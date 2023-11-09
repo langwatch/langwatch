@@ -48,12 +48,26 @@ import {
   renderCheck,
   verifyIfCheckPasses,
 } from "../../server/trace_checks/checkPassing";
+import { ProjectIntegration } from "../../components/ProjectIntegration";
 
-export default function Messages() {
+export default function MessagesOrIntegrationGuide() {
   const { project } = useOrganizationTeamProject();
+
+  if (project && !project.firstMessage) {
+    return <ProjectIntegration />;
+  }
+
+  return <Messages />;
+}
+
+function Messages() {
+  const { project } = useOrganizationTeamProject();
+  // TODO: keep refetching also if there is any "pending" checks that are not too old
   const traces = api.traces.getAllForProject.useQuery(
     { projectId: project?.id ?? "" },
-    { enabled: !!project }
+    {
+      enabled: !!project,
+    }
   );
 
   const Message = ({ trace }: { trace: TraceWithChecks }) => {

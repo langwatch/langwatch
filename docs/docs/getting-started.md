@@ -104,7 +104,7 @@ with langwatch.langchain.LangChainTracer() as langWatchCallback:
 
 Now all your messages should be visible on your [LangWatch Dashboard](https://app.langwatch.ai), open it up to explore:
 
-![langwatch dashboard](../static/img/screenshot-messages.png)
+![langwatch dashboard](@site/static/img/screenshot-messages.png)
 
 ## What's Next?
 

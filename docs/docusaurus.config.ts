@@ -1,7 +1,7 @@
 import { themes as prismThemes } from "prism-react-renderer";
 import type { Config } from "@docusaurus/types";
 import type * as Preset from "@docusaurus/preset-classic";
-import { monkaiTheme } from "./monokaiTheme";
+import { monokaiTheme } from "./docs/integration-guides/utils/monokaiTheme";
 
 const config: Config = {
   title: "LangWatch",
@@ -134,8 +134,8 @@ const config: Config = {
       copyright: `Copyright © ${new Date().getFullYear()} Reasoning Engine, BV. Built with Docusaurus.`,
     },
     prism: {
-      theme: prismThemes.dracula,
-      darkTheme: prismThemes.dracula,
+      theme: monokaiTheme,
+      darkTheme: monokaiTheme,
       additionalLanguages: ["python", "bash"]
     },
   } satisfies Preset.ThemeConfig,

@@ -16,6 +16,7 @@ import { getDebugger } from "../../utils/logger";
 import * as Sentry from "@sentry/nextjs";
 import { countTokens } from "../../server/tracer/tokenCount";
 import { scheduleTraceCheck } from "../../server/trace_checks/queue";
+import type { Project } from "@prisma/client";
 
 const debug = getDebugger("langwatch:collector");
 
@@ -128,6 +129,8 @@ export default async function handler(
     trace_id: trace.id,
     project_id: project.id,
   });
+
+  await markProjectFirstMessage(project);
 
   return res.status(200).json({ message: "Traces received successfully." });
 }
@@ -305,4 +308,13 @@ const addLLMTokensCount = async (spans: Span[]) => {
     }
   }
   return spans;
+};
+
+const markProjectFirstMessage = async (project: Project) => {
+  if (!project.firstMessage) {
+    await prisma.project.update({
+      where: { id: project.id },
+      data: { firstMessage: true },
+    });
+  }
 };

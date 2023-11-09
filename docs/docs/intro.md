@@ -12,7 +12,7 @@ Welcome to LangWatch. Here we offer tools for the detailed observation and analy
 LangWatch provides a set of tools tailored to enhance the visibility into the operation of LLMs. Currently, it supports OpenAI and Langchain integrations, with the goal of providing you with a transparent and controlled environment for your LLMs' interactions and outputs.
 
 <!-- TODO: update screenshot -->
-![langwatch screenshot](../static/img/screenshot-langwatch.png)
+![langwatch screenshot](@site/static/img/screenshot-messages.png)
 
 ## Core Concepts
 

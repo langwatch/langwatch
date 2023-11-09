@@ -10,6 +10,7 @@ import {
   type StyleFunctionProps,
 } from "@chakra-ui/react";
 import "~/styles/globals.scss";
+import "~/styles/markdown.scss";
 
 import { extendTheme } from "@chakra-ui/react";
 import debounce from "lodash.debounce";

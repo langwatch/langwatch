@@ -5,7 +5,7 @@
   "scripts": {
     "build": "next build --no-lint",
     "dev": "NODE_ENV=development DEBUG=langwatch:* DEBUG_HIDE_DATE=true DEBUG_COLORS=true concurrently 'node src/server.js' 'npm run start:workers'",
-    "postinstall": "prisma generate && prisma db push && npm run types:zod:generate",
+    "postinstall": "cp -R ../docs/docs/integration-guides src/components/ && prisma generate && prisma db push && npm run types:zod:generate",
     "lint": "next lint",
     "start": "concurrently 'node src/server.js' 'npm run start:workers'",
     "start:workers": "tsx src/workers.ts",
@@ -44,6 +44,8 @@
     "next": "^13.4.13",
     "next-auth": "^4.22.4",
     "nprogress": "^0.2.0",
+    "prism-react-renderer": "^2.1.0",
+    "prismjs": "^1.29.0",
     "react": "18.2.0",
     "react-dom": "18.2.0",
     "react-feather": "^2.0.10",

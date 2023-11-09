@@ -5,12 +5,16 @@ import { api } from "../utils/api";
 import { useRequiredSession } from "./useRequiredSession";
 
 export const useOrganizationTeamProject = (
-  { redirectToProjectOnboarding } = { redirectToProjectOnboarding: true }
+  { redirectToProjectOnboarding, keepFetching } = {
+    redirectToProjectOnboarding: true,
+    keepFetching: false,
+  }
 ) => {
   useRequiredSession();
 
   const organizations = api.organization.getAll.useQuery(undefined, {
-    staleTime: Infinity,
+    staleTime: keepFetching ? undefined : Infinity,
+    refetchInterval: keepFetching ? 5_000 : undefined,
   });
   const [organizationId, setOrganizationId] = useLocalStorage<string>(
     "selectedOrganizationId",
@@ -93,9 +97,15 @@ export const useOrganizationTeamProject = (
     team,
   ]);
 
-  if (organizations.isLoading) {
+  if (organizations.isLoading && !organizations.isFetched) {
     return { isLoading: true };
   }
 
-  return { isLoading: false, organization, team, project };
+  return {
+    isLoading: false,
+    isRefetching: organizations.isRefetching,
+    organization,
+    team,
+    project,
+  };
 };

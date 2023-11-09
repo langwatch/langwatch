@@ -1,6 +1,6 @@
 ---
 sidebar_position: 3
-title: "Custom REST"
+title: Custom REST
 ---
 
 # REST Endpoint Integration

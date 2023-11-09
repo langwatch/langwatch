@@ -56,7 +56,7 @@ export const renderCheck = (check: TraceCheck): JSX.Element | null => {
     const checkPasses = verifyIfCheckPasses(check);
 
     return (
-      <HStack>
+      <HStack key={check.id}>
         <Box
           paddingRight={2}
           color={!done ? "yellow.600" : checkPasses ? "green.600" : "red.600"}

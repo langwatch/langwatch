@@ -1,5 +1,6 @@
 ---
 sidebar_position: 2
+title: LangChain Python Integration
 ---
 
 # LangChain Python Integration

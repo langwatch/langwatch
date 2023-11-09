@@ -16,7 +16,11 @@ import ErrorPage from "next/error";
 import { useRouter } from "next/router";
 import { useEffect, type PropsWithChildren } from "react";
 import { Code } from "react-feather";
-import { useForm, type SubmitHandler } from "react-hook-form";
+import {
+  useForm,
+  type SubmitHandler,
+  type UseFormReturn,
+} from "react-hook-form";
 import { SetupLayout } from "~/components/SetupLayout";
 import { api } from "~/utils/api";
 import { JavaScript } from "../../../components/icons/JavaScript";
@@ -25,7 +29,7 @@ import { Python } from "../../../components/icons/Python";
 import { useRequiredSession } from "../../../hooks/useRequiredSession";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
 
-type ProjectFormData = {
+export type ProjectFormData = {
   name: string;
   language: string;
   framework: string;
@@ -69,13 +73,12 @@ function RadioCard(props: UseRadioProps & PropsWithChildren) {
 export default function ProjectOnboarding() {
   useRequiredSession();
 
-  const { register, handleSubmit, setValue, getValues } =
-    useForm<ProjectFormData>({
-      defaultValues: {
-        language: "python",
-        framework: "openai",
-      },
-    });
+  const form = useForm<ProjectFormData>({
+    defaultValues: {
+      language: "python",
+      framework: "openai",
+    },
+  });
 
   const router = useRouter();
   const { organization } = useOrganizationTeamProject({
@@ -120,96 +123,14 @@ export default function ProjectOnboarding() {
     router,
   ]);
 
-  const IconWrapper = ({ children }: PropsWithChildren) => {
-    return (
-      <Box
-        width="32px"
-        height="32px"
-        display="flex"
-        alignItems="center"
-        justifyContent="center"
-      >
-        {children}
-      </Box>
-    );
-  };
-
-  const languageOptions = [
-    {
-      value: "python",
-      label: "Python",
-      icon: <Python />,
-    },
-    {
-      value: "javascript",
-      label: "JavaScript",
-      icon: <JavaScript />,
-    },
-    { value: "other", label: "Other", icon: <Code /> },
-  ];
-
-  const frameworkOptions = [
-    {
-      value: "openai",
-      label: "OpenAI",
-      icon: <OpenAI />,
-      languages: ["python", "javascript"],
-    },
-    {
-      value: "langchain",
-      label: "LangChain",
-      icon: <Box fontSize="32px">🦜</Box>,
-      languages: ["python", "javascript"],
-    },
-    {
-      value: "other",
-      label: "Other",
-      languages: ["python", "javascript", "other"],
-      icon: <Code />,
-    },
-  ];
-
-  const {
-    getRootProps: languageGetRootProps,
-    getRadioProps: languageGetRadioProps,
-  } = useRadioGroup({
-    name: "language",
-    defaultValue: languageOptions[0]?.value,
-    onChange: (value) => {
-      const availableForLanguage = frameworkOptions.filter((option) =>
-        option.languages.includes(value)
-      );
-      setValue("language", value);
-      if (availableForLanguage[0]) {
-        setValue("framework", availableForLanguage[0].value);
-      }
-    },
-  });
-  const {
-    getRootProps: frameworkGetRootProps,
-    getRadioProps: frameworkGetRadioProps,
-  } = useRadioGroup({
-    name: "framework",
-    defaultValue: frameworkOptions[0]?.value,
-    onChange: (value) => setValue("framework", value),
-  });
-
-  const languageGroup = languageGetRootProps();
-  const frameworkGroup = frameworkGetRootProps();
-  const currentLanguage = getValues("language");
-  const currentFramework = getValues("framework");
-
   if (team.isFetched && !team.data) {
     return <ErrorPage statusCode={404} />;
   }
 
-  register("language", { required: true });
-  register("framework", { required: true });
-
   return (
     <SetupLayout>
       {/* eslint-disable-next-line @typescript-eslint/no-misused-promises */}
-      <form onSubmit={handleSubmit(onSubmit)}>
+      <form onSubmit={form.handleSubmit(onSubmit)}>
         <VStack gap={4} alignItems="left">
           <Heading as="h1" fontSize="x-large">
             Create New Project
@@ -222,64 +143,9 @@ export default function ProjectOnboarding() {
           </Text>
           <FormControl>
             <FormLabel>Project Name</FormLabel>
-            <Input {...register("name", { required: true })} />
+            <Input {...form.register("name", { required: true })} />
           </FormControl>
-          <FormControl>
-            <FormLabel>Language</FormLabel>
-            <HStack
-              {...languageGroup}
-              spacing={6}
-              alignItems="stretch"
-              wrap="wrap"
-            >
-              {languageOptions.map((option) => {
-                const radio = languageGetRadioProps({ value: option.value });
-                return (
-                  <RadioCard
-                    key={option.value}
-                    {...radio}
-                    isChecked={currentLanguage == option.value}
-                  >
-                    <VStack width="64px">
-                      <IconWrapper>{option.icon}</IconWrapper>
-                      <Box fontSize="sm" textAlign="center">
-                        {option.label}
-                      </Box>
-                    </VStack>
-                  </RadioCard>
-                );
-              })}
-            </HStack>
-          </FormControl>
-          <FormControl>
-            <FormLabel>Library or Framework</FormLabel>
-            <HStack
-              {...frameworkGroup}
-              spacing={6}
-              alignItems="stretch"
-              wrap="wrap"
-            >
-              {frameworkOptions
-                .filter((option) => option.languages.includes(currentLanguage))
-                .map((option) => {
-                  const radio = frameworkGetRadioProps({ value: option.value });
-                  return (
-                    <RadioCard
-                      key={option.value}
-                      {...radio}
-                      isChecked={currentFramework == option.value}
-                    >
-                      <VStack width="64px">
-                        <IconWrapper>{option.icon}</IconWrapper>
-                        <Box fontSize="sm" textAlign="center">
-                          {option.label}
-                        </Box>
-                      </VStack>
-                    </RadioCard>
-                  );
-                })}
-            </HStack>
-          </FormControl>
+          <TechStackSelector form={form} />
           {createProject.error && <p>Something went wrong!</p>}
           <HStack width="full">
             <Button
@@ -297,3 +163,142 @@ export default function ProjectOnboarding() {
     </SetupLayout>
   );
 }
+
+export const techStackLanguageOptions = {
+  python: {
+    label: "Python",
+    icon: <Python />,
+  },
+  javascript: {
+    label: "JavaScript",
+    icon: <JavaScript />,
+  },
+  other: { label: "Other", icon: <Code /> },
+};
+
+export const techStackFrameworkOptions = {
+  openai: {
+    label: "OpenAI",
+    icon: <OpenAI />,
+    languages: ["python", "javascript"],
+  },
+  langchain: {
+    label: "LangChain",
+    icon: <Box fontSize="32px">🦜</Box>,
+    languages: ["python", "javascript"],
+  },
+  other: {
+    label: "Other",
+    icon: <Code />,
+    languages: ["python", "javascript", "other"],
+  },
+};
+
+export const TechStackSelector = ({
+  form,
+}: {
+  form: UseFormReturn<ProjectFormData>;
+}) => {
+  const IconWrapper = ({ children }: PropsWithChildren) => {
+    return (
+      <Box
+        width="32px"
+        height="32px"
+        display="flex"
+        alignItems="center"
+        justifyContent="center"
+      >
+        {children}
+      </Box>
+    );
+  };
+
+  const {
+    getRootProps: languageGetRootProps,
+    getRadioProps: languageGetRadioProps,
+  } = useRadioGroup({
+    name: "language",
+    defaultValue: Object.keys(techStackLanguageOptions)[0],
+    onChange: (value) => {
+      const availableForLanguage = Object.entries(
+        techStackFrameworkOptions
+      ).filter(([_, framework]) => framework.languages.includes(value));
+      form.setValue("language", value);
+      if (availableForLanguage[0]) {
+        form.setValue("framework", availableForLanguage[0][0]);
+      }
+    },
+  });
+  const {
+    getRootProps: frameworkGetRootProps,
+    getRadioProps: frameworkGetRadioProps,
+  } = useRadioGroup({
+    name: "framework",
+    defaultValue: Object.keys(techStackFrameworkOptions)[0],
+    onChange: (value) => form.setValue("framework", value),
+  });
+
+  const languageGroup = languageGetRootProps();
+  const frameworkGroup = frameworkGetRootProps();
+  const currentLanguage = form.getValues("language");
+  const currentFramework = form.getValues("framework");
+
+  form.register("language", { required: true });
+  form.register("framework", { required: true });
+
+  return (
+    <>
+      <FormControl>
+        <FormLabel>Language</FormLabel>
+        <HStack {...languageGroup} spacing={6} alignItems="stretch" wrap="wrap">
+          {Object.entries(techStackLanguageOptions).map(([key, option]) => {
+            const radio = languageGetRadioProps({ value: key });
+            return (
+              <RadioCard
+                key={key}
+                {...radio}
+                isChecked={currentLanguage == key}
+              >
+                <VStack width="64px">
+                  <IconWrapper>{option.icon}</IconWrapper>
+                  <Box fontSize="sm" textAlign="center">
+                    {option.label}
+                  </Box>
+                </VStack>
+              </RadioCard>
+            );
+          })}
+        </HStack>
+      </FormControl>
+      <FormControl>
+        <FormLabel>Library or Framework</FormLabel>
+        <HStack
+          {...frameworkGroup}
+          spacing={6}
+          alignItems="stretch"
+          wrap="wrap"
+        >
+          {Object.entries(techStackFrameworkOptions)
+            .filter(([_, option]) => option.languages.includes(currentLanguage))
+            .map(([key, option]) => {
+              const radio = frameworkGetRadioProps({ value: key });
+              return (
+                <RadioCard
+                  key={key}
+                  {...radio}
+                  isChecked={currentFramework == key}
+                >
+                  <VStack width="64px">
+                    <IconWrapper>{option.icon}</IconWrapper>
+                    <Box fontSize="sm" textAlign="center">
+                      {option.label}
+                    </Box>
+                  </VStack>
+                </RadioCard>
+              );
+            })}
+        </HStack>
+      </FormControl>
+    </>
+  );
+};

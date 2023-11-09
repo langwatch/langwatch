@@ -122,14 +122,15 @@ model Organization {
 }
 
 model Project {
-    id        String @id @default(nanoid())
-    name      String
-    slug      String
-    apiKey    String @unique
-    teamId    String
-    team      Team   @relation(fields: [teamId], references: [id])
-    language  String
-    framework String
+    id           String  @id @default(nanoid())
+    name         String
+    slug         String
+    apiKey       String  @unique
+    teamId       String
+    team         Team    @relation(fields: [teamId], references: [id])
+    language     String
+    framework    String
+    firstMessage Boolean @default(false)
 
     @@unique([teamId, slug])
     @@index([teamId])
