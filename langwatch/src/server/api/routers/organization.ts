@@ -27,13 +27,13 @@ export const organizationRouter = createTRPCRouter({
       const orgSlug =
         slugify(input.orgName, { lower: true, strict: true }) +
         "-" +
-        orgId.substring(0, 8);
+        orgId.substring(0, 6);
 
       const teamId = nanoid();
       const teamSlug =
         slugify(input.orgName, { lower: true, strict: true }) +
         "-" +
-        teamId.substring(0, 8);
+        teamId.substring(0, 6);
 
       await prisma.$transaction(async (prisma) => {
         // 1. Create the organization

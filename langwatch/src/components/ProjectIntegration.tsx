@@ -18,7 +18,7 @@ import { DashboardLayout } from "./DashboardLayout";
 
 export const ProjectIntegration = () => {
   const { project, isRefetching } = useOrganizationTeamProject({
-    keepFetching: false,
+    keepFetching: true,
   });
 
   const languageKey = project?.language as

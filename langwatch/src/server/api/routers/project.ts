@@ -39,7 +39,7 @@ export const projectRouter = createTRPCRouter({
       const slug =
         slugify(input.name, { lower: true, strict: true }) +
         "-" +
-        projectId.substring(0, 8);
+        projectId.substring(0, 6);
 
       const existingProject = await prisma.project.findFirst({
         where: {
