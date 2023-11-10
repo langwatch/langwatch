@@ -173,6 +173,8 @@ export const DashboardLayout = ({
         }))
       );
 
+    const currentProject = project;
+
     return (
       <Menu>
         <MenuButton
@@ -188,7 +190,9 @@ export const DashboardLayout = ({
           <HStack gap={2}>
             <ProjectTechStackIcon project={project} />
             <Box>{project.name}</Box>
-            <ChevronDown width={14} />
+            <Box>
+              <ChevronDown width={14} />
+            </Box>
           </HStack>
         </MenuButton>
         <Portal>
@@ -208,7 +212,14 @@ export const DashboardLayout = ({
                     {projectGroup.projects.map((project) => (
                       <Link
                         key={project.id}
-                        href={`/${project.slug}`}
+                        href={
+                          window.location.pathname.includes(currentProject.slug)
+                            ? window.location.pathname.replace(
+                                currentProject.slug,
+                                project.slug
+                              )
+                            : `/${project.slug}`
+                        }
                         _hover={{
                           textDecoration: "none",
                         }}
