@@ -8,10 +8,6 @@ export const CustomRest = ({ apiKey }: { apiKey?: string }) => {
         <li>
           Ensure you have <code>curl</code> installed on your system.
         </li>
-        <li>
-          Obtain your <code>LANGWATCH_API_KEY</code> from the LangWatch
-          dashboard.
-        </li>
       </ul>
       <h3>Configuration:</h3>
       <p>

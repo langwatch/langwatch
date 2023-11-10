@@ -12,6 +12,7 @@ import {
   HStack,
   Spacer,
   Spinner,
+  Link,
 } from "@chakra-ui/react";
 import { DashboardLayout } from "./DashboardLayout";
 import { OpenAIPython } from "./integration-guides/OpenAIPython";
@@ -78,6 +79,17 @@ export const ProjectIntegration = () => {
         <div className="markdown">
           {IntegrationDocs && <IntegrationDocs apiKey={project?.apiKey} />}
         </div>
+        <Text fontSize="14px">
+          Having issues? Messages not visible yet? Check out our{" "}
+          <Link
+            textDecoration="underline"
+            href="https://docs.langwatch.ai/docs/support"
+            target="_blank"
+          >
+            Troubleshooting & Support
+          </Link>{" "}
+          guide
+        </Text>
       </VStack>
     </DashboardLayout>
   );

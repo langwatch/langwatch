@@ -5,7 +5,10 @@ import { api } from "../utils/api";
 import { useRequiredSession } from "./useRequiredSession";
 
 export const useOrganizationTeamProject = (
-  { redirectToProjectOnboarding, keepFetching } = {
+  {
+    redirectToProjectOnboarding,
+    keepFetching,
+  }: { redirectToProjectOnboarding?: boolean; keepFetching?: boolean } = {
     redirectToProjectOnboarding: true,
     keepFetching: false,
   }
@@ -104,6 +107,7 @@ export const useOrganizationTeamProject = (
   return {
     isLoading: false,
     isRefetching: organizations.isRefetching,
+    organizations: organizations.data,
     organization,
     team,
     project,

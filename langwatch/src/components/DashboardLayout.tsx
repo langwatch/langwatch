@@ -7,14 +7,21 @@ import {
   Input,
   InputGroup,
   InputLeftElement,
+  Menu,
+  MenuButton,
+  MenuGroup,
+  MenuItem,
+  MenuList,
+  Portal,
   Spacer,
   Text,
   VStack,
   useTheme,
   type BackgroundProps,
 } from "@chakra-ui/react";
+import type { Project } from "@prisma/client";
 import ErrorPage from "next/error";
-import Image from "next/image";
+import Head from "next/head";
 import { useRouter } from "next/router";
 import { type PropsWithChildren } from "react";
 import {
@@ -23,6 +30,7 @@ import {
   Database,
   Home,
   MessageSquare,
+  Plus,
   Search,
   Shield,
   TrendingUp,
@@ -30,10 +38,10 @@ import {
 } from "react-feather";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import { useRequiredSession } from "../hooks/useRequiredSession";
+import { getTechStack } from "../pages/onboarding/[team]/project";
 import { findCurrentRoute, projectRoutes, type Route } from "../utils/routes";
 import { LoadingScreen } from "./LoadingScreen";
 import { LogoIcon } from "./icons/LogoIcon";
-import Head from "next/head";
 
 const Breadcrumbs = ({ currentRoute }: { currentRoute: Route | undefined }) => {
   const { project } = useOrganizationTeamProject();
@@ -73,10 +81,17 @@ export const DashboardLayout = ({
 
   const { data: session } = useRequiredSession();
 
-  const { isLoading, organization, team, project } =
+  const { isLoading, organization, organizations, team, project } =
     useOrganizationTeamProject();
 
-  if (!session || isLoading || !organization || !team || !project) {
+  if (
+    !session ||
+    isLoading ||
+    !organization ||
+    !organizations ||
+    !team ||
+    !project
+  ) {
     return <LoadingScreen />;
   }
 
@@ -87,7 +102,7 @@ export const DashboardLayout = ({
   const user = session.user;
   const currentRoute = findCurrentRoute(router.pathname);
 
-  const MenuButton = ({
+  const SideMenuLink = ({
     icon,
     label,
     path,
@@ -108,6 +123,116 @@ export const DashboardLayout = ({
           <IconElem size={24} color={isActive ? orange400 : undefined} />
         </VStack>
       </Link>
+    );
+  };
+
+  const ProjectTechStackIcon = ({ project }: { project: Project }) => {
+    const IconWrapper = ({ children }: PropsWithChildren) => {
+      return (
+        <Box
+          width="16px"
+          height="16px"
+          display="flex"
+          alignItems="center"
+          justifyContent="center"
+        >
+          {children}
+        </Box>
+      );
+    };
+
+    return (
+      <HStack spacing={0}>
+        <Box marginRight="-6px">
+          <IconWrapper>{getTechStack(project).language.icon}</IconWrapper>
+        </Box>
+        <IconWrapper>{getTechStack(project).framework.icon}</IconWrapper>
+      </HStack>
+    );
+  };
+
+  const ProjectSelector = () => {
+    const projectGroups = organizations
+      .sort((a, b) =>
+        a.name.toLowerCase() < b.name.toLowerCase()
+          ? -1
+          : a.name.toLowerCase() > b.name.toLowerCase()
+          ? 1
+          : 0
+      )
+      .flatMap((organization) =>
+        organization.teams.flatMap((team) => ({
+          organization,
+          team,
+          projects: team.projects,
+        }))
+      );
+
+    return (
+      <Menu>
+        <MenuButton
+          as={Button}
+          variant="outline"
+          borderColor="gray.300"
+          fontSize={13}
+          paddingX={4}
+          paddingY={1}
+          height="auto"
+          fontWeight="normal"
+        >
+          <HStack gap={2}>
+            <ProjectTechStackIcon project={project} />
+            <Box>{project.name}</Box>
+            <ChevronDown width={14} />
+          </HStack>
+        </MenuButton>
+        <Portal>
+          <Box zIndex="popover" padding={0}>
+            <MenuList>
+              <>
+                {projectGroups.map((projectGroup) => (
+                  <MenuGroup
+                    key={projectGroup.team.id}
+                    title={
+                      projectGroup.organization.name +
+                      (projectGroup.team.name !== projectGroup.organization.name
+                        ? " - " + projectGroup.team.name
+                        : "")
+                    }
+                  >
+                    {projectGroup.projects.map((project) => (
+                      <Link
+                        key={project.id}
+                        href={`/${project.slug}`}
+                        _hover={{
+                          textDecoration: "none",
+                        }}
+                      >
+                        <MenuItem
+                          icon={<ProjectTechStackIcon project={project} />}
+                          fontSize="14px"
+                        >
+                          {project.name}
+                        </MenuItem>
+                      </Link>
+                    ))}
+                    <Link
+                      href={`/onboarding/${projectGroup.team.slug}/project`}
+                      _hover={{
+                        textDecoration: "none",
+                      }}
+                    >
+                      <MenuItem icon={<Plus />} fontSize="14px">
+                        New Project
+                      </MenuItem>
+                    </Link>
+                  </MenuGroup>
+                ))}
+              </>
+            </MenuList>
+          </Box>
+        </Portal>
+      </Menu>
     );
   };
 
@@ -137,27 +262,27 @@ export const DashboardLayout = ({
             <LogoIcon width={25} height={34} />
           </Box>
           <VStack spacing={8}>
-            <MenuButton
+            <SideMenuLink
               path={projectRoutes.home.path}
               icon={Home}
               label={projectRoutes.home.title}
             />
-            <MenuButton
+            <SideMenuLink
               path={projectRoutes.messages.path}
               icon={MessageSquare}
               label={projectRoutes.messages.title}
             />
-            <MenuButton
+            <SideMenuLink
               path={projectRoutes.analytics.path}
               icon={TrendingUp}
               label={projectRoutes.analytics.title}
             />
-            <MenuButton
+            <SideMenuLink
               path={projectRoutes.security.path}
               icon={Shield}
               label={projectRoutes.security.title}
             />
-            <MenuButton
+            <SideMenuLink
               path={projectRoutes.prompts.path}
               icon={Database}
               label={projectRoutes.prompts.title}
@@ -174,20 +299,7 @@ export const DashboardLayout = ({
           borderBottomWidth="1px"
           borderBottomColor="gray.300"
         >
-          <Button
-            variant="outline"
-            borderColor="gray.300"
-            fontSize={13}
-            paddingX={4}
-            paddingY={1}
-            height="auto"
-            fontWeight="normal"
-          >
-            <HStack gap={2}>
-              <Box>🦜 {project.name}</Box>
-              <ChevronDown width={14} />
-            </HStack>
-          </Button>
+          <ProjectSelector />
           <Breadcrumbs currentRoute={currentRoute} />
           <Spacer />
           <InputGroup maxWidth="600px" borderColor="gray.300">

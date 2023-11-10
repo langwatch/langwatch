@@ -36,6 +36,7 @@ import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamPr
 import { OpenAIPython } from "../../../components/integration-guides/OpenAIPython";
 import { CustomRest } from "../../../components/integration-guides/CustomRest";
 import { LangChainPython } from "../../../components/integration-guides/LangChainPython";
+import type { Project } from "@prisma/client";
 
 export type ProjectFormData = {
   name: string;
@@ -214,6 +215,22 @@ export const techStackFrameworkOptions = {
     } as LanguagesMap,
   },
 };
+
+export const getTechStack = (project: Project) => {
+  const languageKey =
+    project.language as keyof typeof techStackLanguageOptions;
+  const frameworkKey =
+    project.framework as keyof typeof techStackFrameworkOptions;
+  return {
+    language:
+      techStackLanguageOptions[languageKey] ??
+      techStackLanguageOptions.other,
+    framework:
+      techStackFrameworkOptions[frameworkKey] ??
+      techStackFrameworkOptions.other,
+  };
+};
+
 
 export const TechStackSelector = ({
   form,

@@ -3,16 +3,6 @@ import { RenderCode } from "./utils/RenderCode";
 export const LangChainPython = ({ apiKey }: { apiKey?: string }) => {
   return (
     <div>
-      <h3>Prerequisites:</h3>
-      <ul>
-        <li>
-          Install the <code>langwatch</code> library via pip.
-        </li>
-        <li>
-          Obtain your <code>LANGWATCH_API_KEY</code> from the LangWatch
-          dashboard.
-        </li>
-      </ul>
       <h3>Installation:</h3>
       <RenderCode code={`pip install langwatch`} language="bash" />
       <h3>Configuration:</h3>
