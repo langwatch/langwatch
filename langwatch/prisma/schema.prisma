@@ -103,13 +103,12 @@ model OrganizationUser {
 model Team {
     id             String       @id @default(nanoid())
     name           String
-    slug           String
+    slug           String       @unique
     members        TeamUser[]
     organizationId String
     organization   Organization @relation(fields: [organizationId], references: [id])
     projects       Project[]
 
-    @@unique([organizationId, slug])
     @@index([organizationId])
 }
 
@@ -124,7 +123,7 @@ model Organization {
 model Project {
     id           String  @id @default(nanoid())
     name         String
-    slug         String
+    slug         String  @unique
     apiKey       String  @unique
     teamId       String
     team         Team    @relation(fields: [teamId], references: [id])
@@ -132,6 +131,5 @@ model Project {
     framework    String
     firstMessage Boolean @default(false)
 
-    @@unique([teamId, slug])
     @@index([teamId])
 }

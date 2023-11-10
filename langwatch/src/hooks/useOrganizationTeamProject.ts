@@ -50,9 +50,10 @@ export const useOrganizationTeamProject = (
       organization.teams[0]
     : undefined;
   const project = team
-    ? team.projects.find((project) => project.slug == projectSlug) ??
-      projectsMatchingSlug?.[0] ??
-      team.projects[0]
+    ? projectSlug
+      ? team.projects.find((project) => project.slug == projectSlug) ??
+        projectsMatchingSlug?.[0]
+      : team.projects[0]
     : undefined;
 
   useEffect(() => {
@@ -62,8 +63,8 @@ export const useOrganizationTeamProject = (
     if (team && team.id !== teamId) {
       setTeamId(team.id);
     }
-    if (project && project.id !== projectSlug) {
-      setProjectSlug(project.id);
+    if (project && project.slug !== projectSlug) {
+      setProjectSlug(project.slug);
     }
   }, [
     organization,

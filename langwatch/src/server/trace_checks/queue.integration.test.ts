@@ -52,7 +52,6 @@ describe("Check Queue Integration Tests", () => {
   afterAll(async () => {
     vi.restoreAllMocks();
 
-    console.log("Closing worker");
     await worker?.close();
 
     // Delete test documents

@@ -42,9 +42,12 @@ export default function OrganizationOnboarding() {
     if (createOrganization.isSuccess) {
       void (async () => {
         await apiContext.organization.getAll.refetch();
-        await router.push(
-          `/onboarding/${createOrganization.data.teamSlug}/project`
-        );
+        // For some reason even though we await for the refetch it's not done yet when we move pages
+        setTimeout(() => {
+          void router.push(
+            `/onboarding/${createOrganization.data.teamSlug}/project`
+          );
+        });
       })();
     }
   }, [
@@ -79,7 +82,7 @@ export default function OrganizationOnboarding() {
           </FormControl>
           <FormControl>
             <FormLabel>Organization Name</FormLabel>
-            <Input {...register("organizationName", { required: true })} />
+            <Input autoFocus {...register("organizationName", { required: true })} />
             <FormHelperText>
               If you are signing up for a personal account, you can use your own
               name

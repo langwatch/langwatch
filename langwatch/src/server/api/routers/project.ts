@@ -4,6 +4,7 @@ import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { env } from "../../../env.mjs";
 import jwt from "jsonwebtoken";
+import { nanoid } from "nanoid";
 
 export const projectRouter = createTRPCRouter({
   create: protectedProcedure
@@ -34,7 +35,11 @@ export const projectRouter = createTRPCRouter({
         });
       }
 
-      const slug = slugify(input.name, { lower: true, strict: true });
+      const projectId = nanoid();
+      const slug =
+        slugify(input.name, { lower: true, strict: true }) +
+        "-" +
+        projectId.substring(0, 8);
 
       const existingProject = await prisma.project.findFirst({
         where: {
@@ -53,6 +58,7 @@ export const projectRouter = createTRPCRouter({
 
       const project = await prisma.project.create({
         data: {
+          id: projectId,
           name: input.name,
           slug,
           language: input.language,

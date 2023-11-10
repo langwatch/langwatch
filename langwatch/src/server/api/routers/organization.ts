@@ -1,4 +1,5 @@
 import { type Organization, type Project, type Team } from "@prisma/client";
+import { nanoid } from "nanoid";
 import slugify from "slugify";
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
@@ -22,11 +23,23 @@ export const organizationRouter = createTRPCRouter({
       const userId = ctx.session.user.id;
       const prisma = ctx.prisma;
 
-      const orgSlug = slugify(input.orgName, { lower: true, strict: true });
+      const orgId = nanoid();
+      const orgSlug =
+        slugify(input.orgName, { lower: true, strict: true }) +
+        "-" +
+        orgId.substring(0, 8);
+
+      const teamId = nanoid();
+      const teamSlug =
+        slugify(input.orgName, { lower: true, strict: true }) +
+        "-" +
+        teamId.substring(0, 8);
+
       await prisma.$transaction(async (prisma) => {
         // 1. Create the organization
         const organization = await prisma.organization.create({
           data: {
+            id: orgId,
             name: input.orgName,
             slug: orgSlug,
           },
@@ -44,8 +57,9 @@ export const organizationRouter = createTRPCRouter({
         // 3. Create the default team
         const team = await prisma.team.create({
           data: {
+            id: teamId,
             name: input.orgName, // Same name as organization
-            slug: orgSlug, // Same as organization
+            slug: teamSlug, // Same as organization
             organizationId: organization.id,
           },
         });
@@ -61,7 +75,7 @@ export const organizationRouter = createTRPCRouter({
       });
 
       // Return success response
-      return { success: true, teamSlug: orgSlug };
+      return { success: true, teamSlug };
     }),
 
   getAll: protectedProcedure.query(async ({ ctx }) => {

@@ -1,9 +1,9 @@
 import { useForm } from "react-hook-form";
+import { type ProjectFormData } from "./TechStack";
 import {
   techStackLanguageOptions,
-  type ProjectFormData,
   techStackFrameworkOptions,
-} from "../pages/onboarding/[team]/project";
+} from "./TechStack";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import {
   Heading,
@@ -15,14 +15,10 @@ import {
   Link,
 } from "@chakra-ui/react";
 import { DashboardLayout } from "./DashboardLayout";
-import { OpenAIPython } from "./integration-guides/OpenAIPython";
-import { LangChainPython } from "./integration-guides/LangChainPython";
-import { CustomRest } from "./integration-guides/CustomRest";
 
 export const ProjectIntegration = () => {
   const { project, isRefetching } = useOrganizationTeamProject({
-    redirectToProjectOnboarding: true,
-    keepFetching: true,
+    keepFetching: false,
   });
 
   const languageKey = project?.language as

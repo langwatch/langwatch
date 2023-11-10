@@ -38,7 +38,7 @@ import {
 } from "react-feather";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import { useRequiredSession } from "../hooks/useRequiredSession";
-import { getTechStack } from "../pages/onboarding/[team]/project";
+import { getTechStack } from "./TechStack";
 import { findCurrentRoute, projectRoutes, type Route } from "../utils/routes";
 import { LoadingScreen } from "./LoadingScreen";
 import { LogoIcon } from "./icons/LogoIcon";
@@ -95,7 +95,11 @@ export const DashboardLayout = ({
     return <LoadingScreen />;
   }
 
-  if (project && router.query.project !== project.slug) {
+  if (
+    project &&
+    typeof router.query.project === "string" &&
+    router.query.project !== project.slug
+  ) {
     return <ErrorPage statusCode={404} />;
   }
 
@@ -152,19 +156,20 @@ export const DashboardLayout = ({
   };
 
   const ProjectSelector = () => {
+    const sortByName = (a: { name: string }, b: { name: string }) =>
+      a.name.toLowerCase() < b.name.toLowerCase()
+        ? -1
+        : a.name.toLowerCase() > b.name.toLowerCase()
+        ? 1
+        : 0;
+
     const projectGroups = organizations
-      .sort((a, b) =>
-        a.name.toLowerCase() < b.name.toLowerCase()
-          ? -1
-          : a.name.toLowerCase() > b.name.toLowerCase()
-          ? 1
-          : 0
-      )
+      .sort(sortByName)
       .flatMap((organization) =>
         organization.teams.flatMap((team) => ({
           organization,
           team,
-          projects: team.projects,
+          projects: team.projects.sort(sortByName),
         }))
       );
 
