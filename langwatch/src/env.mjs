@@ -28,6 +28,7 @@ export const env = createEnv({
     ELASTICSEARCH_API_KEY: z.string().min(1),
     REDIS_URL: z.string().min(1),
     GOOGLE_CREDENTIALS_JSON: z.string().min(1),
+    OPENAI_API_KEY: z.string().min(1),
   },
 
   /**
@@ -56,6 +57,7 @@ export const env = createEnv({
     ELASTICSEARCH_API_KEY: process.env.ELASTICSEARCH_API_KEY,
     REDIS_URL: process.env.REDIS_URL,
     GOOGLE_CREDENTIALS_JSON: process.env.GOOGLE_CREDENTIALS_JSON,
+    OPENAI_API_KEY: process.env.OPENAI_API_KEY,
   },
   /**
    * Run `build` or `dev` with `SKIP_ENV_VALIDATION` to skip env validation.

@@ -44,6 +44,7 @@
     "next": "^13.4.13",
     "next-auth": "^4.22.4",
     "nprogress": "^0.2.0",
+    "openai": "^4.17.4",
     "prism-react-renderer": "^2.1.0",
     "prismjs": "^1.29.0",
     "react": "18.2.0",

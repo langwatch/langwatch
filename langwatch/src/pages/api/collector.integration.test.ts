@@ -99,9 +99,11 @@ describe("Collector API Endpoint", () => {
       },
       input: {
         value: "hello",
+        openai_embeddings: expect.any(Array),
       },
       output: {
         value: "world",
+        openai_embeddings: expect.any(Array),
       },
       metrics: {
         first_token_ms: null,

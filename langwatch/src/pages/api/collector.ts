@@ -17,6 +17,7 @@ import * as Sentry from "@sentry/nextjs";
 import { countTokens } from "../../server/tracer/tokenCount";
 import { scheduleTraceCheck } from "../../server/trace_checks/queue";
 import type { Project } from "@prisma/client";
+import { getOpenAIEmbeddings } from "../../server/embeddings";
 
 const debug = getDebugger("langwatch:collector");
 
@@ -99,8 +100,8 @@ export default async function handler(
       started_at: Math.min(...spans.map((span) => span.timestamps.started_at)),
       inserted_at: Date.now(),
     },
-    input: { value: getFirstInputAsText(spans) },
-    output: { value: getLastOutputAsText(spans) },
+    input: await getTraceInput(spans),
+    output: await getTraceOutput(spans),
     metrics: computeTraceMetrics(spans),
     error: getLastOutputError(spans),
   };
@@ -134,6 +135,22 @@ export default async function handler(
 
   return res.status(200).json({ message: "Traces received successfully." });
 }
+
+const getTraceInput = async (spans: Span[]): Promise<Trace["input"]> => {
+  const value = getFirstInputAsText(spans);
+  const openai_embeddings = value
+    ? await getOpenAIEmbeddings(value)
+    : undefined;
+  return { value: value, openai_embeddings };
+};
+
+const getTraceOutput = async (spans: Span[]): Promise<Trace["output"]> => {
+  const value = getLastOutputAsText(spans);
+  const openai_embeddings = value
+    ? await getOpenAIEmbeddings(value)
+    : undefined;
+  return { value: value, openai_embeddings };
+};
 
 // TODO: test
 const getFirstInputAsText = (spans: Span[]): string => {
