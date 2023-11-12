@@ -35,6 +35,7 @@ import {
   Shield,
   TrendingUp,
   type Icon,
+  Settings,
 } from "react-feather";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import { useRequiredSession } from "../hooks/useRequiredSession";
@@ -84,6 +85,10 @@ export const DashboardLayout = ({
   const { isLoading, organization, organizations, team, project } =
     useOrganizationTeamProject();
 
+  if (typeof router.query.project === "string" && !isLoading && !project) {
+    return <ErrorPage statusCode={404} />;
+  }
+
   if (
     !session ||
     isLoading ||
@@ -93,14 +98,6 @@ export const DashboardLayout = ({
     !project
   ) {
     return <LoadingScreen />;
-  }
-
-  if (
-    project &&
-    typeof router.query.project === "string" &&
-    router.query.project !== project.slug
-  ) {
-    return <ErrorPage statusCode={404} />;
   }
 
   const user = session.user;
@@ -213,11 +210,11 @@ export const DashboardLayout = ({
                       <Link
                         key={project.id}
                         href={
-                          window.location.pathname.includes(currentProject.slug)
-                            ? window.location.pathname.replace(
-                                currentProject.slug,
-                                project.slug
-                              )
+                          currentRoute?.path.includes("[project]")
+                            ? currentRoute.path
+                                .replace("[project]", project.slug)
+                                .replace(/\[.*?\]/g, "")
+                                .replace(/\/\/+/g, "/")
                             : `/${project.slug}`
                         }
                         _hover={{
@@ -302,6 +299,11 @@ export const DashboardLayout = ({
               path={projectRoutes.prompts.path}
               icon={Database}
               label={projectRoutes.prompts.title}
+            />
+            <SideMenuLink
+              path={projectRoutes.settings.path}
+              icon={Settings}
+              label={projectRoutes.settings.title}
             />
           </VStack>
         </VStack>

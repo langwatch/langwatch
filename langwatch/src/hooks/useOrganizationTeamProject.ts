@@ -86,7 +86,7 @@ export const useOrganizationTeamProject = (
       return;
     }
 
-    if (redirectToProjectOnboarding && !project) {
+    if (redirectToProjectOnboarding && team.projects.length == 0) {
       const firstTeamSlug = organizations.data.flatMap((org) => org.teams)[0]
         ?.slug;
       void router.push(`/onboarding/${firstTeamSlug}/project`);

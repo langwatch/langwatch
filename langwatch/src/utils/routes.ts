@@ -29,6 +29,10 @@ export const projectRoutes = {
     title: "Trace",
     parent: "messages",
   },
+  settings: {
+    path: "/settings",
+    title: "Settings",
+  },
 };
 
 export type Route = {
