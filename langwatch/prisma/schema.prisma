@@ -15,27 +15,23 @@ datasource db {
     relationMode = "prisma"
 }
 
-model Example {
-    id        String   @id @default(nanoid())
-    createdAt DateTime @default(now())
-    updatedAt DateTime @updatedAt
-}
-
 // Necessary for Next auth
 model Account {
-    id                String  @id @default(nanoid())
+    id                String   @id @default(nanoid())
     userId            String
     type              String
     provider          String
     providerAccountId String
-    refresh_token     String? @db.Text
-    access_token      String? @db.Text
+    refresh_token     String?  @db.Text
+    access_token      String?  @db.Text
     expires_at        Int?
     token_type        String?
     scope             String?
-    id_token          String? @db.Text
+    id_token          String?  @db.Text
     session_state     String?
-    user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+    user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+    createdAt         DateTime @default(now())
+    updatedAt         DateTime @default(now()) @updatedAt
 
     @@unique([provider, providerAccountId])
     @@index([userId])
@@ -56,11 +52,13 @@ model User {
     name            String?
     email           String?            @unique
     emailVerified   DateTime?
-    image           String?
+    image           String?            @db.Text
     accounts        Account[]
     sessions        Session[]
     teamMemberships TeamUser[]
     orgMemberships  OrganizationUser[]
+    createdAt       DateTime           @default(now())
+    updatedAt       DateTime           @default(now()) @updatedAt
 }
 
 model VerificationToken {
@@ -77,11 +75,13 @@ enum UserRole {
 }
 
 model TeamUser {
-    userId String
-    teamId String
-    role   UserRole
-    user   User     @relation(fields: [userId], references: [id])
-    team   Team     @relation(fields: [teamId], references: [id])
+    userId    String
+    teamId    String
+    role      UserRole
+    user      User     @relation(fields: [userId], references: [id])
+    team      Team     @relation(fields: [teamId], references: [id])
+    createdAt DateTime @default(now())
+    updatedAt DateTime @default(now()) @updatedAt
 
     @@id([userId, teamId])
     @@index([teamId])
@@ -94,6 +94,8 @@ model OrganizationUser {
     role           UserRole
     user           User         @relation(fields: [userId], references: [id])
     organization   Organization @relation(fields: [organizationId], references: [id])
+    createdAt      DateTime     @default(now())
+    updatedAt      DateTime     @default(now()) @updatedAt
 
     @@id([userId, organizationId])
     @@index([organizationId])
@@ -108,28 +110,34 @@ model Team {
     organizationId String
     organization   Organization @relation(fields: [organizationId], references: [id])
     projects       Project[]
+    createdAt      DateTime     @default(now())
+    updatedAt      DateTime     @default(now()) @updatedAt
 
     @@index([organizationId])
 }
 
 model Organization {
-    id      String             @id @default(nanoid())
-    name    String
-    slug    String             @unique
-    members OrganizationUser[]
-    teams   Team[]
+    id        String             @id @default(nanoid())
+    name      String
+    slug      String             @unique
+    members   OrganizationUser[]
+    teams     Team[]
+    createdAt DateTime           @default(now())
+    updatedAt DateTime           @default(now()) @updatedAt
 }
 
 model Project {
-    id           String  @id @default(nanoid())
+    id           String   @id @default(nanoid())
     name         String
-    slug         String  @unique
-    apiKey       String  @unique
+    slug         String   @unique
+    apiKey       String   @unique
     teamId       String
-    team         Team    @relation(fields: [teamId], references: [id])
+    team         Team     @relation(fields: [teamId], references: [id])
     language     String
     framework    String
-    firstMessage Boolean @default(false)
+    firstMessage Boolean  @default(false)
+    createdAt    DateTime @default(now())
+    updatedAt    DateTime @default(now()) @updatedAt
 
     @@index([teamId])
 }
