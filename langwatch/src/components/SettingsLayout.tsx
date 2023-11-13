@@ -72,13 +72,19 @@ export const MenuLink = ({
 export const SettingsFormControl = ({
   label,
   helper,
+  isInvalid,
   children,
-}: PropsWithChildren<{ label: string; helper: string }>) => {
+}: PropsWithChildren<{
+  label: string;
+  helper: string;
+  isInvalid?: boolean;
+}>) => {
   return (
     <FormControl
       borderColor="gray.200"
       borderBottomWidth="1px"
       paddingY={4}
+      isInvalid={isInvalid}
       _last={{ border: "none" }}
     >
       <HStack>

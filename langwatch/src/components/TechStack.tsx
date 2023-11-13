@@ -192,3 +192,28 @@ export const TechStackSelector = ({
     </>
   );
 };
+
+export const ProjectTechStackIcon = ({ project }: { project: Project }) => {
+  const IconWrapper = ({ children }: PropsWithChildren) => {
+    return (
+      <Box
+        width="16px"
+        height="16px"
+        display="flex"
+        alignItems="center"
+        justifyContent="center"
+      >
+        {children}
+      </Box>
+    );
+  };
+
+  return (
+    <HStack spacing={0}>
+      <Box marginRight="-6px">
+        <IconWrapper>{getTechStack(project).language.icon}</IconWrapper>
+      </Box>
+      <IconWrapper>{getTechStack(project).framework.icon}</IconWrapper>
+    </HStack>
+  );
+};

@@ -1,4 +1,5 @@
 import { type Organization, type Project, type Team } from "@prisma/client";
+import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 import slugify from "slugify";
 import { z } from "zod";
@@ -102,4 +103,44 @@ export const organizationRouter = createTRPCRouter({
 
     return organizations;
   }),
+
+  update: protectedProcedure
+    .input(
+      z.object({
+        id: z.string(),
+        name: z.string(),
+        joinAllTeams: z.boolean(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const userId = ctx.session.user.id;
+      const prisma = ctx.prisma;
+
+      const organizationUser = await prisma.organizationUser.findFirst({
+        where: {
+          userId: userId,
+          organizationId: input.id,
+          role: "ADMIN",
+        },
+      });
+
+      if (!organizationUser) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "You don't have the necessary permissions",
+        });
+      }
+
+      await prisma.organization.update({
+        where: {
+          id: input.id,
+        },
+        data: {
+          name: input.name,
+          joinAllTeams: input.joinAllTeams,
+        },
+      });
+
+      return { success: true };
+    }),
 });

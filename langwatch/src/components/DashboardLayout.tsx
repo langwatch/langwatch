@@ -39,7 +39,7 @@ import {
 } from "react-feather";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import { useRequiredSession } from "../hooks/useRequiredSession";
-import { getTechStack } from "./TechStack";
+import { ProjectTechStackIcon, getTechStack } from "./TechStack";
 import { findCurrentRoute, projectRoutes, type Route } from "../utils/routes";
 import { LoadingScreen } from "./LoadingScreen";
 import { LogoIcon } from "./icons/LogoIcon";
@@ -127,31 +127,6 @@ export const DashboardLayout = ({
     );
   };
 
-  const ProjectTechStackIcon = ({ project }: { project: Project }) => {
-    const IconWrapper = ({ children }: PropsWithChildren) => {
-      return (
-        <Box
-          width="16px"
-          height="16px"
-          display="flex"
-          alignItems="center"
-          justifyContent="center"
-        >
-          {children}
-        </Box>
-      );
-    };
-
-    return (
-      <HStack spacing={0}>
-        <Box marginRight="-6px">
-          <IconWrapper>{getTechStack(project).language.icon}</IconWrapper>
-        </Box>
-        <IconWrapper>{getTechStack(project).framework.icon}</IconWrapper>
-      </HStack>
-    );
-  };
-
   const ProjectSelector = () => {
     const sortByName = (a: { name: string }, b: { name: string }) =>
       a.name.toLowerCase() < b.name.toLowerCase()
@@ -169,8 +144,6 @@ export const DashboardLayout = ({
           projects: team.projects.sort(sortByName),
         }))
       );
-
-    const currentProject = project;
 
     return (
       <Menu>
