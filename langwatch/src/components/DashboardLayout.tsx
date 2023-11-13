@@ -43,6 +43,7 @@ import { ProjectTechStackIcon, getTechStack } from "./TechStack";
 import { findCurrentRoute, projectRoutes, type Route } from "../utils/routes";
 import { LoadingScreen } from "./LoadingScreen";
 import { LogoIcon } from "./icons/LogoIcon";
+import type { FullyLoadedOrganization } from "../server/api/routers/organization";
 
 const Breadcrumbs = ({ currentRoute }: { currentRoute: Route | undefined }) => {
   const { project } = useOrganizationTeamProject();
@@ -71,13 +72,146 @@ const Breadcrumbs = ({ currentRoute }: { currentRoute: Route | undefined }) => {
   );
 };
 
+const SideMenuLink = ({
+  icon,
+  label,
+  path,
+  project,
+}: {
+  icon: Icon;
+  label: string;
+  path: string;
+  project: Project;
+}) => {
+  const router = useRouter();
+  const currentRoute = findCurrentRoute(router.pathname);
+
+  const theme = useTheme();
+  const orange400 = theme.colors.orange["400"];
+
+  const IconElem = icon;
+
+  const isActive =
+    currentRoute?.path === path ||
+    (path.includes("/messages") && router.pathname.includes("/messages"));
+
+  return (
+    <Link href={path.replace("[project]", project.slug)} aria-label={label}>
+      <VStack>
+        <IconElem size={24} color={isActive ? orange400 : undefined} />
+      </VStack>
+    </Link>
+  );
+};
+
+const ProjectSelector = ({
+  organizations,
+  project,
+}: {
+  organizations: FullyLoadedOrganization[];
+  project: Project;
+}) => {
+  const router = useRouter();
+  const currentRoute = findCurrentRoute(router.pathname);
+
+  const sortByName = (a: { name: string }, b: { name: string }) =>
+    a.name.toLowerCase() < b.name.toLowerCase()
+      ? -1
+      : a.name.toLowerCase() > b.name.toLowerCase()
+      ? 1
+      : 0;
+
+  const projectGroups = organizations.sort(sortByName).flatMap((organization) =>
+    organization.teams.flatMap((team) => ({
+      organization,
+      team,
+      projects: team.projects.sort(sortByName),
+    }))
+  );
+
+  return (
+    <Menu>
+      <MenuButton
+        as={Button}
+        variant="outline"
+        borderColor="gray.300"
+        fontSize={13}
+        paddingX={4}
+        paddingY={1}
+        height="auto"
+        fontWeight="normal"
+      >
+        <HStack gap={2}>
+          <ProjectTechStackIcon project={project} />
+          <Box>{project.name}</Box>
+          <Box>
+            <ChevronDown width={14} />
+          </Box>
+        </HStack>
+      </MenuButton>
+      <Portal>
+        <Box zIndex="popover" padding={0}>
+          <MenuList>
+            <>
+              {projectGroups.map((projectGroup) => (
+                <MenuGroup
+                  key={projectGroup.team.id}
+                  title={
+                    projectGroup.organization.name +
+                    (projectGroup.team.name !== projectGroup.organization.name
+                      ? " - " + projectGroup.team.name
+                      : "")
+                  }
+                >
+                  {projectGroup.projects.map((project) => (
+                    <Link
+                      key={project.id}
+                      href={
+                        currentRoute?.path.includes("[project]")
+                          ? currentRoute.path
+                              .replace("[project]", project.slug)
+                              .replace(/\[.*?\]/g, "")
+                              .replace(/\/\/+/g, "/")
+                          : `/${project.slug}`
+                      }
+                      _hover={{
+                        textDecoration: "none",
+                      }}
+                    >
+                      <MenuItem
+                        icon={<ProjectTechStackIcon project={project} />}
+                        fontSize="14px"
+                      >
+                        {project.name}
+                      </MenuItem>
+                    </Link>
+                  ))}
+                  <Link
+                    href={`/onboarding/${projectGroup.team.slug}/project`}
+                    _hover={{
+                      textDecoration: "none",
+                    }}
+                  >
+                    <MenuItem icon={<Plus />} fontSize="14px">
+                      New Project
+                    </MenuItem>
+                  </Link>
+                </MenuGroup>
+              ))}
+            </>
+          </MenuList>
+        </Box>
+      </Portal>
+    </Menu>
+  );
+};
+
 export const DashboardLayout = ({
   children,
   ...bgProps
 }: PropsWithChildren<BackgroundProps>) => {
   const router = useRouter();
   const theme = useTheme();
-  const orange400 = theme.colors.orange["400"];
   const gray400 = theme.colors.gray["400"];
 
   const { data: session } = useRequiredSession();
@@ -102,125 +236,6 @@ export const DashboardLayout = ({
 
   const user = session.user;
   const currentRoute = findCurrentRoute(router.pathname);
-
-  const SideMenuLink = ({
-    icon,
-    label,
-    path,
-  }: {
-    icon: Icon;
-    label: string;
-    path: string;
-  }) => {
-    const IconElem = icon;
-
-    const isActive =
-      currentRoute?.path === path ||
-      (path.includes("/messages") && router.pathname.includes("/messages"));
-
-    return (
-      <Link href={path.replace("[project]", project.slug)} aria-label={label}>
-        <VStack>
-          <IconElem size={24} color={isActive ? orange400 : undefined} />
-        </VStack>
-      </Link>
-    );
-  };
-
-  const ProjectSelector = () => {
-    const sortByName = (a: { name: string }, b: { name: string }) =>
-      a.name.toLowerCase() < b.name.toLowerCase()
-        ? -1
-        : a.name.toLowerCase() > b.name.toLowerCase()
-        ? 1
-        : 0;
-
-    const projectGroups = organizations
-      .sort(sortByName)
-      .flatMap((organization) =>
-        organization.teams.flatMap((team) => ({
-          organization,
-          team,
-          projects: team.projects.sort(sortByName),
-        }))
-      );
-
-    return (
-      <Menu>
-        <MenuButton
-          as={Button}
-          variant="outline"
-          borderColor="gray.300"
-          fontSize={13}
-          paddingX={4}
-          paddingY={1}
-          height="auto"
-          fontWeight="normal"
-        >
-          <HStack gap={2}>
-            <ProjectTechStackIcon project={project} />
-            <Box>{project.name}</Box>
-            <Box>
-              <ChevronDown width={14} />
-            </Box>
-          </HStack>
-        </MenuButton>
-        <Portal>
-          <Box zIndex="popover" padding={0}>
-            <MenuList>
-              <>
-                {projectGroups.map((projectGroup) => (
-                  <MenuGroup
-                    key={projectGroup.team.id}
-                    title={
-                      projectGroup.organization.name +
-                      (projectGroup.team.name !== projectGroup.organization.name
-                        ? " - " + projectGroup.team.name
-                        : "")
-                    }
-                  >
-                    {projectGroup.projects.map((project) => (
-                      <Link
-                        key={project.id}
-                        href={
-                          currentRoute?.path.includes("[project]")
-                            ? currentRoute.path
-                                .replace("[project]", project.slug)
-                                .replace(/\[.*?\]/g, "")
-                                .replace(/\/\/+/g, "/")
-                            : `/${project.slug}`
-                        }
-                        _hover={{
-                          textDecoration: "none",
-                        }}
-                      >
-                        <MenuItem
-                          icon={<ProjectTechStackIcon project={project} />}
-                          fontSize="14px"
-                        >
-                          {project.name}
-                        </MenuItem>
-                      </Link>
-                    ))}
-                    <Link
-                      href={`/onboarding/${projectGroup.team.slug}/project`}
-                      _hover={{
-                        textDecoration: "none",
-                      }}
-                    >
-                      <MenuItem icon={<Plus />} fontSize="14px">
-                        New Project
-                      </MenuItem>
-                    </Link>
-                  </MenuGroup>
-                ))}
-              </>
-            </MenuList>
-          </Box>
-        </Portal>
-      </Menu>
-    );
-  };
 
   return (
     <HStack width="full" minHeight="100vh" alignItems={"stretch"} spacing={0}>
@@ -252,31 +267,37 @@ export const DashboardLayout = ({
               path={projectRoutes.home.path}
               icon={Home}
               label={projectRoutes.home.title}
+              project={project}
             />
             <SideMenuLink
               path={projectRoutes.messages.path}
               icon={MessageSquare}
               label={projectRoutes.messages.title}
+              project={project}
             />
             <SideMenuLink
               path={projectRoutes.analytics.path}
               icon={TrendingUp}
               label={projectRoutes.analytics.title}
+              project={project}
             />
             <SideMenuLink
               path={projectRoutes.security.path}
               icon={Shield}
               label={projectRoutes.security.title}
+              project={project}
             />
             <SideMenuLink
               path={projectRoutes.prompts.path}
               icon={Database}
               label={projectRoutes.prompts.title}
+              project={project}
             />
             <SideMenuLink
               path={projectRoutes.settings.path}
               icon={Settings}
               label={projectRoutes.settings.title}
+              project={project}
             />
           </VStack>
         </VStack>
@@ -290,7 +311,7 @@ export const DashboardLayout = ({
           borderBottomWidth="1px"
           borderBottomColor="gray.300"
         >
-          <ProjectSelector />
+          <ProjectSelector organizations={organizations} project={project} />
           <Breadcrumbs currentRoute={currentRoute} />
           <Spacer />
           <InputGroup maxWidth="600px" borderColor="gray.300">

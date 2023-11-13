@@ -1,40 +1,27 @@
 import {
+  Button,
   Card,
   CardBody,
-  FormErrorMessage,
   HStack,
   Heading,
-  Input,
   LinkBox,
   LinkOverlay,
-  Spacer,
-  Spinner,
-  Switch,
   Table,
   Tbody,
   Td,
+  Text,
   Th,
   Thead,
   Tr,
   VStack,
-  Text,
-  Button,
 } from "@chakra-ui/react";
-import isEqual from "lodash.isequal";
-import { useEffect, useState } from "react";
-import { useForm, useWatch, type SubmitHandler } from "react-hook-form";
-import { useDebouncedCallback } from "use-debounce";
-import SettingsLayout, {
-  SettingsFormControl,
-} from "../../components/SettingsLayout";
+import NextLink from "next/link";
+import React from "react";
+import { Plus } from "react-feather";
+import SettingsLayout from "../../components/SettingsLayout";
+import { ProjectTechStackIcon } from "../../components/TechStack";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import type { FullyLoadedOrganization } from "../../server/api/routers/organization";
-import { api } from "../../utils/api";
-import { Link } from "@chakra-ui/next-js";
-import React from "react";
-import { ProjectTechStackIcon } from "../../components/TechStack";
-import NextLink from "next/link";
-import { Plus } from "react-feather";
 
 export default function Projects() {
   const { organization } = useOrganizationTeamProject();
