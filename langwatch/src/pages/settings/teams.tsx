@@ -57,7 +57,7 @@ function TeamsList({ teams }: { teams: TeamWithMembersAndProjects[] }) {
           </Heading>
           <Spacer />
           <NextLink href={`/settings/teams/new`}>
-            <Button as="a">
+            <Button as="a" size="sm" colorScheme="orange">
               <HStack spacing={2}>
                 <Plus size={20} />
                 <Text>Add new team</Text>

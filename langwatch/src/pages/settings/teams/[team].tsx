@@ -2,15 +2,24 @@ import {
   Breadcrumb,
   BreadcrumbItem,
   BreadcrumbLink,
+  Button,
   Card,
   CardBody,
   FormErrorMessage,
   HStack,
   Heading,
   Input,
+  LinkBox,
   Spacer,
   Spinner,
+  Table,
+  Tbody,
+  Td,
+  Th,
+  Thead,
+  Tr,
   VStack,
+  Text,
 } from "@chakra-ui/react";
 import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
@@ -22,7 +31,7 @@ import SettingsLayout, {
 import type { TeamWithMembersAndProjects } from "../../../server/api/routers/organization";
 import { api } from "../../../utils/api";
 import isEqual from "lodash.isequal";
-import { ChevronRight } from "react-feather";
+import { ChevronRight, Plus } from "react-feather";
 import NextLink from "next/link";
 
 type TeamFormData = {
@@ -137,6 +146,39 @@ function TeamForm({ team }: { team: TeamWithMembersAndProjects }) {
                 </SettingsFormControl>
               </VStack>
             </form>
+          </CardBody>
+        </Card>
+        <HStack width="full" marginTop={2}>
+          <Heading size="md" as="h2">
+            Members
+          </Heading>
+          <Spacer />
+          <NextLink href={`/settings/members`}>
+            <Button as="a" size="sm" colorScheme="orange">
+              <HStack spacing={2}>
+                <Text>Manage organization managers</Text>
+              </HStack>
+            </Button>
+          </NextLink>
+        </HStack>
+        <Card width="full">
+          <CardBody width="full" paddingY={0} paddingX={0}>
+            <Table variant="simple" width="full">
+              <Thead>
+                <Tr>
+                  <Th>Name</Th>
+                  <Th>Role</Th>
+                </Tr>
+              </Thead>
+              <Tbody>
+                {team.members.map((member) => (
+                  <LinkBox as="tr" key={team.id}>
+                    <Td>{member.user.name}</Td>
+                    <Td>{member.role}</Td>
+                  </LinkBox>
+                ))}
+              </Tbody>
+            </Table>
           </CardBody>
         </Card>
       </VStack>

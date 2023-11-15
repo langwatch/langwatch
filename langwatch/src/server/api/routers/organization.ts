@@ -1,8 +1,10 @@
 import {
   type Organization,
+  type OrganizationUser,
   type Project,
   type Team,
   type TeamUser,
+  type User,
 } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
@@ -18,9 +20,29 @@ export type FullyLoadedOrganization = Organization & {
   teams: TeamWithProjects[];
 };
 
+export type TeamMemberWithUser = TeamUser & {
+  user: User;
+};
+
+export type TeamMemberWithTeam = TeamUser & {
+  team: Team;
+};
+
 export type TeamWithMembersAndProjects = Team & {
-  members: TeamUser[];
+  members: TeamMemberWithUser[];
   projects: Project[];
+};
+
+export type UserWithTeams = User & {
+  teamMemberships: TeamMemberWithTeam[];
+};
+
+export type OrganizationMemberWithUser = OrganizationUser & {
+  user: UserWithTeams;
+};
+
+export type OrganizationWithMembersAndTheirTeams = Organization & {
+  members: OrganizationMemberWithUser[];
 };
 
 export const organizationRouter = createTRPCRouter({
@@ -152,5 +174,51 @@ export const organizationRouter = createTRPCRouter({
       });
 
       return { success: true };
+    }),
+
+  getOrganizationWithMembersAndTheirTeams: protectedProcedure
+    .input(
+      z.object({
+        id: z.string(),
+      })
+    )
+    .query(async ({ input, ctx }) => {
+      const userId = ctx.session.user.id;
+      const prisma = ctx.prisma;
+
+      const organization = await prisma.organization.findFirst({
+        where: {
+          id: input.id,
+          members: {
+            some: {
+              userId: userId,
+            },
+          },
+        },
+        include: {
+          members: {
+            include: {
+              user: {
+                include: {
+                  teamMemberships: {
+                    include: {
+                      team: true,
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      });
+
+      if (!organization) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Organization not found",
+        });
+      }
+
+      return organization;
     }),
 });

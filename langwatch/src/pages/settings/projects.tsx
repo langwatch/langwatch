@@ -61,7 +61,7 @@ function ProjectsList({
                       <Th>{team.name}</Th>
                       <Td textAlign="right">
                         <NextLink href={`/onboarding/${team.slug}/project`}>
-                          <Button as="a">
+                          <Button as="a" size="sm" colorScheme="orange">
                             <HStack spacing={2}>
                               <Plus size={20} />
                               <Text>Add new project</Text>
