@@ -1,16 +1,26 @@
-import { type Organization, type Project, type Team } from "@prisma/client";
+import {
+  type Organization,
+  type Project,
+  type Team,
+  type TeamUser,
+} from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 import slugify from "slugify";
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 
-export type FullyLoadedTeam = Team & {
+export type TeamWithProjects = Team & {
   projects: Project[];
 };
 
 export type FullyLoadedOrganization = Organization & {
-  teams: FullyLoadedTeam[];
+  teams: TeamWithProjects[];
+};
+
+export type TeamWithMembersAndProjects = Team & {
+  members: TeamUser[];
+  projects: Project[];
 };
 
 export const organizationRouter = createTRPCRouter({

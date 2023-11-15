@@ -44,7 +44,10 @@ export const MenuLink = ({
   children,
 }: PropsWithChildren<{ href: string }>) => {
   const router = useRouter();
-  const selected = router.pathname === href;
+  const selected =
+    href == "/settings"
+      ? router.pathname === href
+      : router.pathname.startsWith(href);
 
   return (
     <Link

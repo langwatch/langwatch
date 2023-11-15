@@ -57,7 +57,7 @@ function ProjectsList({
               {organization.teams.map((team) => (
                 <React.Fragment key={team.id}>
                   <Thead key={team.id}>
-                    <Tr borderRadius="10px">
+                    <Tr>
                       <Th>{team.name}</Th>
                       <Td textAlign="right">
                         <NextLink href={`/onboarding/${team.slug}/project`}>
@@ -78,7 +78,10 @@ function ProjectsList({
                           <Td>
                             <HStack gap={2}>
                               <ProjectTechStackIcon project={project} />
-                              <LinkOverlay href={`/${project.slug}/messages`}>
+                              <LinkOverlay
+                                as={NextLink}
+                                href={`/${project.slug}/messages`}
+                              >
                                 {project.name}
                               </LinkOverlay>
                             </HStack>
