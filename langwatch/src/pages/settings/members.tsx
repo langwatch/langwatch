@@ -40,6 +40,7 @@ import {
 } from "react-hook-form";
 import SettingsLayout from "../../components/SettingsLayout";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
+import { useToast } from "@chakra-ui/react";
 import type {
   OrganizationWithMembersAndTheirTeams,
   TeamWithProjects,
@@ -111,7 +112,15 @@ function MembersList({
     control,
     name: "invites",
   });
+  const pendingInvites =
+    api.organization.getOrganizationPendingInvites.useQuery(
+      {
+        id: organization?.id ?? "",
+      },
+      { enabled: !!organization }
+    );
   const createInvitesMutation = api.organization.createInvites.useMutation();
+  const toast = useToast();
 
   const onSubmit: SubmitHandler<MembersForm> = (data) => {
     createInvitesMutation.mutate(
@@ -126,8 +135,27 @@ function MembersList({
       },
       {
         onSuccess: () => {
+          toast({
+            title: "Invites sent successfully",
+            description: "All invites have been sent.",
+            status: "success",
+            duration: 5000,
+            isClosable: true,
+            position: "top-right",
+          });
           onAddMembersClose();
           resetForm();
+          void pendingInvites.refetch();
+        },
+        onError: () => {
+          toast({
+            title: "Sorry, something went wrong",
+            description: "Please try that again",
+            status: "error",
+            duration: 5000,
+            isClosable: true,
+            position: "top-right",
+          });
         },
       }
     );
@@ -193,6 +221,41 @@ function MembersList({
                 ))}
               </Tbody>
             </Table>
+
+            {pendingInvites.data && pendingInvites.data.length > 0 && (
+              <>
+                <Heading size="sm" as="h2" paddingY={4} marginLeft={6}>
+                  Pending Invites
+                </Heading>
+
+                <Table>
+                  <Thead>
+                    <Tr>
+                      <Th>Email</Th>
+                      <Th>Role</Th>
+                      <Th>Teams</Th>
+                    </Tr>
+                  </Thead>
+                  <Tbody>
+                    {pendingInvites.data?.map((invite) => (
+                      <Tr key={invite.id}>
+                        <Td>{invite.email}</Td>
+                        <Td>{invite.role}</Td>
+                        <Td>
+                          {invite.teamIds
+                            .split(",")
+                            .map(
+                              (teamId) =>
+                                teams.find((team) => team.id == teamId)?.name
+                            )
+                            .join(", ")}
+                        </Td>
+                      </Tr>
+                    ))}
+                  </Tbody>
+                </Table>
+              </>
+            )}
           </CardBody>
         </Card>
       </VStack>
@@ -289,27 +352,22 @@ function MembersList({
               </Button>
             </ModalBody>
             <ModalFooter>
-              <VStack align="end">
-                {createInvitesMutation.error && (
-                  <Text color="red">Sorry, something went wrong</Text>
-                )}
-                <Button
-                  colorScheme={
-                    createInvitesMutation.isLoading ? "gray" : "orange"
-                  }
-                  type="submit"
-                  disabled={!!createInvitesMutation.isLoading}
-                >
-                  <HStack>
-                    {createInvitesMutation.isLoading ? (
-                      <Spinner size="sm" />
-                    ) : (
-                      <Mail size={18} />
-                    )}
-                    <Text>Send invites</Text>
-                  </HStack>
-                </Button>
-              </VStack>
+              <Button
+                colorScheme={
+                  createInvitesMutation.isLoading ? "gray" : "orange"
+                }
+                type="submit"
+                disabled={!!createInvitesMutation.isLoading}
+              >
+                <HStack>
+                  {createInvitesMutation.isLoading ? (
+                    <Spinner size="sm" />
+                  ) : (
+                    <Mail size={18} />
+                  )}
+                  <Text>Send invites</Text>
+                </HStack>
+              </Button>
             </ModalFooter>
           </form>
         </ModalContent>

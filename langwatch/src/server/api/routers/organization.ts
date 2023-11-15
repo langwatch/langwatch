@@ -250,7 +250,7 @@ export const organizationRouter = createTRPCRouter({
               role: "ADMIN",
             },
           },
-        }
+        },
       });
 
       if (!organization) {
@@ -282,6 +282,18 @@ export const organizationRouter = createTRPCRouter({
             return null;
           }
 
+          // Checks that a pending invite does not already exist for this email and organization
+          const existingInvite = await prisma.organizationInvite.findFirst({
+            where: {
+              email: invite.email,
+              organizationId: input.organizationId,
+            },
+          });
+
+          if (existingInvite) {
+            return null;
+          }
+
           const inviteCode = nanoid();
           const savedInvite = await prisma.organizationInvite.create({
             data: {
@@ -294,7 +306,12 @@ export const organizationRouter = createTRPCRouter({
             },
           });
 
-          await sendInviteEmail({ req: ctx.req, email: invite.email, organization, inviteCode });
+          await sendInviteEmail({
+            req: ctx.req,
+            email: invite.email,
+            organization,
+            inviteCode,
+          });
 
           return savedInvite;
         })
@@ -302,5 +319,42 @@ export const organizationRouter = createTRPCRouter({
 
       // Filter out any null values (skipped invites)
       return invites.filter(Boolean);
+    }),
+  getOrganizationPendingInvites: protectedProcedure
+    .input(
+      z.object({
+        id: z.string(),
+      })
+    )
+    .query(async ({ input, ctx }) => {
+      const prisma = ctx.prisma;
+      const userId = ctx.session.user.id;
+
+      const organization = await prisma.organization.findFirst({
+        where: {
+          id: input.id,
+          members: {
+            some: {
+              userId: userId,
+              role: "ADMIN",
+            },
+          },
+        },
+      });
+
+      if (!organization) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "You must be an admin to view pending invites.",
+        });
+      }
+
+      const invites = await prisma.organizationInvite.findMany({
+        where: {
+          organizationId: input.id,
+        },
+      });
+
+      return invites;
     }),
 });
