@@ -280,11 +280,13 @@ export const organizationRouter = createTRPCRouter({
             return null;
           }
 
-          // Checks that a pending invite does not already exist for this email and organization
+          // Checks that a valid pending invite does not already exist for this email and organization
           const existingInvite = await prisma.organizationInvite.findFirst({
             where: {
               email: invite.email,
               organizationId: input.organizationId,
+              expiration: { gt: new Date() },
+              status: "PENDING",
             },
           });
 
@@ -304,14 +306,11 @@ export const organizationRouter = createTRPCRouter({
             },
           });
 
-          if (ctx.req) {
-            await sendInviteEmail({
-              req: ctx.req,
-              email: invite.email,
-              organization,
-              inviteCode,
-            });
-          }
+          await sendInviteEmail({
+            email: invite.email,
+            organization,
+            inviteCode,
+          });
 
           return savedInvite;
         })
@@ -352,9 +351,81 @@ export const organizationRouter = createTRPCRouter({
       const invites = await prisma.organizationInvite.findMany({
         where: {
           organizationId: input.id,
+          expiration: { gt: new Date() },
+          status: "PENDING",
         },
       });
 
       return invites;
+    }),
+  acceptInvite: protectedProcedure
+    .input(
+      z.object({
+        inviteCode: z.string(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const prisma = ctx.prisma;
+      const session = ctx.session;
+      const invite = await prisma.organizationInvite.findUnique({
+        where: { inviteCode: input.inviteCode },
+        include: { organization: true },
+      });
+
+      if (!invite || invite.expiration < new Date()) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Invite not found or has expired",
+        });
+      }
+
+      if (!session || !session.user || !session.user.email) {
+        throw new TRPCError({
+          code: "UNAUTHORIZED",
+          message: "You must be signed in to accept the invite",
+        });
+      }
+
+      if (invite.status === "ACCEPTED") {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Invite was already accepted",
+        });
+      }
+
+      if (session.user.email !== invite.email) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: `The invite was sent to ${invite.email}, but you are signed in as ${session.user.email}`,
+        });
+      }
+
+      await prisma.$transaction(async (prisma) => {
+        await prisma.organizationUser.create({
+          data: {
+            userId: session.user.id,
+            organizationId: invite.organizationId,
+            role: invite.role,
+          },
+        });
+
+        const teamIds = invite.teamIds.split(",");
+        for (const teamId of teamIds) {
+          await prisma.teamUser.create({
+            data: {
+              userId: session.user.id,
+              teamId: teamId,
+              role: invite.role,
+            },
+          });
+        }
+
+        await prisma.organizationInvite.update({
+          where: { id: invite.id },
+          data: { status: "ACCEPTED" },
+        });
+      });
+
+      return { success: true, invite };
     }),
 });

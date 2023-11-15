@@ -117,13 +117,14 @@ model Team {
 }
 
 model Organization {
-    id           String             @id @default(nanoid())
-    name         String
-    slug         String             @unique
-    members      OrganizationUser[]
-    teams        Team[]
-    createdAt    DateTime           @default(now())
-    updatedAt    DateTime           @default(now()) @updatedAt
+    id                 String               @id @default(nanoid())
+    name               String
+    slug               String               @unique
+    members            OrganizationUser[]
+    teams              Team[]
+    createdAt          DateTime             @default(now())
+    updatedAt          DateTime             @default(now()) @updatedAt
+    OrganizationInvite OrganizationInvite[]
 }
 
 model Project {
@@ -142,17 +143,23 @@ model Project {
     @@index([teamId])
 }
 
+enum INVITE_STATUS {
+    PENDING
+    ACCEPTED
+}
+
 model OrganizationInvite {
-    id             String   @id @default(nanoid())
+    id             String        @id @default(nanoid())
     email          String
-    inviteCode     String   @unique
+    inviteCode     String        @unique
     expiration     DateTime
-    status         String   @default("PENDING")
+    status         INVITE_STATUS @default(PENDING)
     organizationId String
+    organization   Organization  @relation(fields: [organizationId], references: [id])
     teamIds        String
     role           UserRole
-    createdAt      DateTime @default(now())
-    updatedAt      DateTime @default(now()) @updatedAt
+    createdAt      DateTime      @default(now())
+    updatedAt      DateTime      @default(now()) @updatedAt
 
     @@index([organizationId])
 }

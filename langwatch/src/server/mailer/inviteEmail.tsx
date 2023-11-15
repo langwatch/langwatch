@@ -6,16 +6,13 @@ import { Container } from "@react-email/container";
 import { Heading } from "@react-email/heading";
 import { Img } from "@react-email/img";
 import { env } from "../../env.mjs";
-import type { NextApiRequest } from "next";
 import type { Organization } from "@prisma/client";
 
 export const sendInviteEmail = async ({
-  req,
   email,
   organization,
   inviteCode,
 }: {
-  req: NextApiRequest;
   email: string;
   organization: Organization;
   inviteCode: string;
@@ -27,11 +24,7 @@ export const sendInviteEmail = async ({
 
   sgMail.setApiKey(env.SENDGRID_API_KEY);
 
-  const forwardedProto = req.headers["x-forwarded-proto"];
-  const protocol =
-    typeof forwardedProto === "string" ? forwardedProto : "https";
-  const host = req.headers.host;
-  const acceptInviteUrl = `${protocol}://${host}/accept-invite?inviteCode=${inviteCode}`;
+  const acceptInviteUrl = `${env.BASE_HOST}/invite/accept?inviteCode=${inviteCode}`;
 
   const emailHtml = render(
     <Html lang="en" dir="ltr">
