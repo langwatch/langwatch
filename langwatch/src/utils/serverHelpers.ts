@@ -10,6 +10,8 @@ async function createInnerTRPCContext(context: GetServerSidePropsContext) {
   return {
     prisma,
     session,
+    req: undefined,
+    res: undefined,
   };
 }
 

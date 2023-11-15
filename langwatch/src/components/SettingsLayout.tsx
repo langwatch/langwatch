@@ -5,9 +5,8 @@ import {
   FormHelperText,
   FormLabel,
   HStack,
-  Input,
   Spacer,
-  VStack,
+  VStack
 } from "@chakra-ui/react";
 import { useRouter } from "next/router";
 import { type PropsWithChildren } from "react";

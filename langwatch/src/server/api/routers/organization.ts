@@ -143,7 +143,6 @@ export const organizationRouter = createTRPCRouter({
       z.object({
         id: z.string(),
         name: z.string(),
-        joinAllTeams: z.boolean(),
       })
     )
     .mutation(async ({ input, ctx }) => {
@@ -171,7 +170,6 @@ export const organizationRouter = createTRPCRouter({
         },
         data: {
           name: input.name,
-          joinAllTeams: input.joinAllTeams,
         },
       });
 
@@ -306,12 +304,14 @@ export const organizationRouter = createTRPCRouter({
             },
           });
 
-          await sendInviteEmail({
-            req: ctx.req,
-            email: invite.email,
-            organization,
-            inviteCode,
-          });
+          if (ctx.req) {
+            await sendInviteEmail({
+              req: ctx.req,
+              email: invite.email,
+              organization,
+              inviteCode,
+            });
+          }
 
           return savedInvite;
         })

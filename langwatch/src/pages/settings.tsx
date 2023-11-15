@@ -7,7 +7,6 @@ import {
   Input,
   Spacer,
   Spinner,
-  Switch,
   VStack,
 } from "@chakra-ui/react";
 import isEqual from "lodash.isequal";
@@ -23,7 +22,6 @@ import { api } from "../utils/api";
 
 type OrganizationFormData = {
   name: string;
-  joinAllTeams: boolean;
 };
 
 export default function Settings() {
@@ -41,7 +39,6 @@ function SettingsForm({
 }) {
   const [defaultValues, setDefaultValues] = useState<OrganizationFormData>({
     name: organization.name,
-    joinAllTeams: organization.joinAllTeams,
   });
   const { register, handleSubmit, control, getFieldState } = useForm({
     defaultValues,
@@ -60,7 +57,6 @@ function SettingsForm({
         {
           id: organization.id,
           name: data.name,
-          joinAllTeams: data.joinAllTeams,
         },
         {
           onSuccess: () => {
@@ -125,14 +121,6 @@ function SettingsForm({
                     value={organization.slug}
                   />
                 </SettingsFormControl>
-                {organization.teams.length > 0 && (
-                  <SettingsFormControl
-                    label="All teams access"
-                    helper="Members of organization will also be members of all teams"
-                  >
-                    <Switch id="joinAllTeams" {...register("joinAllTeams")} />
-                  </SettingsFormControl>
-                )}
               </VStack>
             </form>
           </CardBody>

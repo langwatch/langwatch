@@ -1,6 +1,4 @@
 import {
-  Alert,
-  AlertIcon,
   Button,
   Card,
   CardBody,
@@ -28,6 +26,7 @@ import {
   Tr,
   VStack,
   useDisclosure,
+  useToast
 } from "@chakra-ui/react";
 import type { UserRole } from "@prisma/client";
 import { Select as MultiSelect } from "chakra-react-select";
@@ -40,7 +39,6 @@ import {
 } from "react-hook-form";
 import SettingsLayout from "../../components/SettingsLayout";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import { useToast } from "@chakra-ui/react";
 import type {
   OrganizationWithMembersAndTheirTeams,
   TeamWithProjects,

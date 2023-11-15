@@ -32,18 +32,18 @@ import {
   MessageSquare,
   Plus,
   Search,
+  Settings,
   Shield,
   TrendingUp,
   type Icon,
-  Settings,
 } from "react-feather";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import { useRequiredSession } from "../hooks/useRequiredSession";
-import { ProjectTechStackIcon, getTechStack } from "./TechStack";
+import type { FullyLoadedOrganization } from "../server/api/routers/organization";
 import { findCurrentRoute, projectRoutes, type Route } from "../utils/routes";
 import { LoadingScreen } from "./LoadingScreen";
+import { ProjectTechStackIcon } from "./TechStack";
 import { LogoIcon } from "./icons/LogoIcon";
-import type { FullyLoadedOrganization } from "../server/api/routers/organization";
 
 const Breadcrumbs = ({ currentRoute }: { currentRoute: Route | undefined }) => {
   const { project } = useOrganizationTeamProject();

@@ -26,8 +26,8 @@ import { prisma } from "~/server/db";
  */
 
 interface CreateContextOptions {
-  req: NextApiRequest;
-  res: NextApiResponse;
+  req?: NextApiRequest;
+  res?: NextApiResponse;
   session: Session | null;
 }
 

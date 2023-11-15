@@ -122,7 +122,6 @@ model Organization {
     slug         String             @unique
     members      OrganizationUser[]
     teams        Team[]
-    joinAllTeams Boolean            @default(true)
     createdAt    DateTime           @default(now())
     updatedAt    DateTime           @default(now()) @updatedAt
 }

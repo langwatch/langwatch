@@ -15,14 +15,17 @@ import {
   Table,
   Tbody,
   Td,
+  Text,
   Th,
   Thead,
   Tr,
   VStack,
-  Text,
 } from "@chakra-ui/react";
+import isEqual from "lodash.isequal";
+import NextLink from "next/link";
 import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
+import { ChevronRight } from "react-feather";
 import { useForm, useWatch, type SubmitHandler } from "react-hook-form";
 import { useDebouncedCallback } from "use-debounce";
 import SettingsLayout, {
@@ -30,9 +33,6 @@ import SettingsLayout, {
 } from "../../../components/SettingsLayout";
 import type { TeamWithMembersAndProjects } from "../../../server/api/routers/organization";
 import { api } from "../../../utils/api";
-import isEqual from "lodash.isequal";
-import { ChevronRight, Plus } from "react-feather";
-import NextLink from "next/link";
 
 type TeamFormData = {
   name: string;
