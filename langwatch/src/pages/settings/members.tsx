@@ -1,7 +1,4 @@
 import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
   Button,
   Card,
   CardBody,
@@ -10,17 +7,6 @@ import {
   Heading,
   Input,
   LinkBox,
-  Spacer,
-  Spinner,
-  Table,
-  Tbody,
-  Td,
-  Th,
-  Thead,
-  Tr,
-  VStack,
-  Text,
-  useDisclosure,
   Modal,
   ModalBody,
   ModalCloseButton,
@@ -28,23 +14,46 @@ import {
   ModalFooter,
   ModalHeader,
   ModalOverlay,
+  Select,
+  Spacer,
+  Spinner,
+  Table,
+  Tbody,
+  Td,
+  Text,
+  Th,
+  Thead,
+  Tr,
+  VStack,
+  useDisclosure,
 } from "@chakra-ui/react";
-import { useRouter } from "next/router";
-import { useEffect, useState } from "react";
-import { useForm, useWatch, type SubmitHandler } from "react-hook-form";
-import { useDebouncedCallback } from "use-debounce";
-import SettingsLayout, {
-  SettingsFormControl,
-} from "../../components/SettingsLayout";
-import type { OrganizationWithMembersAndTheirTeams } from "../../server/api/routers/organization";
-import { api } from "../../utils/api";
-import isEqual from "lodash.isequal";
-import { ChevronRight, Mail, Plus } from "react-feather";
-import NextLink from "next/link";
+import type { UserRole } from "@prisma/client";
+import { Select as MultiSelect } from "chakra-react-select";
+import { Mail, Plus, Trash } from "react-feather";
+import {
+  Controller,
+  useFieldArray,
+  useForm,
+  type SubmitHandler,
+} from "react-hook-form";
+import SettingsLayout from "../../components/SettingsLayout";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
+import type {
+  OrganizationWithMembersAndTheirTeams,
+  TeamWithProjects,
+} from "../../server/api/routers/organization";
+import { api } from "../../utils/api";
 
-type TeamFormData = {
-  name: string;
+type Option = { label: string; value: string };
+
+type InviteData = {
+  email: string;
+  teamOptions: Option[];
+  role: UserRole;
+};
+
+type MembersForm = {
+  invites: InviteData[];
 };
 
 export default function Members() {
@@ -58,21 +67,73 @@ export default function Members() {
       { enabled: !!organization }
     );
 
-  if (!organizationWithMembers.data) return <SettingsLayout />;
+  if (!organization || !organizationWithMembers.data) return <SettingsLayout />;
 
-  return <MembersList organization={organizationWithMembers.data} />;
+  return (
+    <MembersList
+      teams={organization.teams}
+      organization={organizationWithMembers.data}
+    />
+  );
 }
 
 function MembersList({
   organization,
+  teams,
 }: {
   organization: OrganizationWithMembersAndTheirTeams;
+  teams: TeamWithProjects[];
 }) {
+  const teamOptions = teams.map((team) => ({
+    label: team.name,
+    value: team.id,
+  }));
+
   const {
     isOpen: isAddMembersOpen,
     onOpen: onAddMembersOpen,
     onClose: onAddMembersClose,
   } = useDisclosure();
+  const {
+    register,
+    control,
+    handleSubmit,
+    formState: { errors },
+    reset: resetForm,
+  } = useForm<MembersForm>({
+    defaultValues: {
+      invites: [{ email: "", teamOptions: teamOptions, role: "MEMBER" }],
+    },
+  });
+  const { fields, append, remove } = useFieldArray({
+    control,
+    name: "invites",
+  });
+  const createInvitesMutation = api.organization.createInvites.useMutation();
+
+  const onSubmit: SubmitHandler<MembersForm> = (data) => {
+    createInvitesMutation.mutate(
+      {
+        organizationId: organization.id,
+        invites: data.invites.map((invite) => ({
+          ...invite,
+          teamIds: invite.teamOptions
+            .map((teamOption) => teamOption.value)
+            .join(","),
+        })),
+      },
+      {
+        onSuccess: () => {
+          onAddMembersClose();
+          resetForm();
+        },
+      }
+    );
+  };
+
+  const onAddField = () => {
+    append({ email: "", teamOptions, role: "MEMBER" });
+  };
 
   return (
     <SettingsLayout>
@@ -86,11 +147,10 @@ function MembersList({
       >
         <HStack width="full" marginTop={2}>
           <Heading size="lg" as="h1">
-            {organization.name} Members
+            Organization Members
           </Heading>
           <Spacer />
           <Button
-            as="a"
             size="sm"
             colorScheme="orange"
             onClick={() => onAddMembersOpen()}
@@ -135,21 +195,114 @@ function MembersList({
 
       <Modal isOpen={isAddMembersOpen} onClose={onAddMembersClose}>
         <ModalOverlay />
-        <ModalContent>
+        <ModalContent width="100%" maxWidth="1024px">
           <ModalHeader>Add members</ModalHeader>
           <ModalCloseButton />
-          <ModalBody>
-            {/* form with go here */}
-          </ModalBody>
-
-          <ModalFooter>
-            <Button colorScheme="orange" size="md" onClick={onAddMembersClose}>
-              <HStack>
-                <Mail size={18} />
-                <Text>Send invites</Text>
-              </HStack>
-            </Button>
-          </ModalFooter>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              void handleSubmit(onSubmit)(e);
+            }}
+          >
+            <ModalBody>
+              <Table variant="simple" width="100%">
+                <Thead>
+                  <Tr>
+                    <Th paddingLeft={0} paddingTop={0}>
+                      Email
+                    </Th>
+                    <Th paddingLeft={0} paddingTop={0}>
+                      Role
+                    </Th>
+                    <Th paddingLeft={0} paddingTop={0}>
+                      Teams
+                    </Th>
+                    <Th paddingLeft={0} paddingRight={0} paddingTop={0}></Th>
+                  </Tr>
+                </Thead>
+                <Tbody>
+                  {fields.map((field, index) => (
+                    <Tr key={field.id}>
+                      <Td paddingLeft={0} paddingY={2}>
+                        <Input
+                          placeholder="Enter email address"
+                          {...register(`invites.${index}.email`, {
+                            required: "Email is required",
+                          })}
+                        />
+                        <FormErrorMessage>
+                          {errors.invites?.[index]?.email &&
+                            "Email is required"}
+                        </FormErrorMessage>
+                      </Td>
+                      <Td width="20%" paddingLeft={0} paddingY={2}>
+                        <Select
+                          {...register(`invites.${index}.role`, {
+                            required: "Role is required",
+                          })}
+                        >
+                          <option value="ADMIN">Admin</option>
+                          <option value="MEMBER">Member</option>
+                        </Select>
+                        <FormErrorMessage>
+                          {errors.invites?.[index]?.role && "Role is required"}
+                        </FormErrorMessage>
+                      </Td>
+                      <Td width="35%" paddingLeft={0} paddingY={2}>
+                        <Controller
+                          control={control}
+                          name={`invites.${index}.teamOptions`}
+                          rules={{ required: "At least one team is required" }}
+                          render={({ field }) => (
+                            <MultiSelect
+                              {...field}
+                              options={teamOptions}
+                              isMulti
+                              closeMenuOnSelect={false}
+                              selectedOptionStyle="check"
+                              hideSelectedOptions={false}
+                              useBasicStyles
+                              variant="unstyled"
+                            />
+                          )}
+                        />
+                      </Td>
+                      <Td paddingLeft={0} paddingRight={0} paddingY={2}>
+                        <Button
+                          type="button"
+                          colorScheme="red"
+                          onClick={() => remove(index)}
+                        >
+                          <Trash size={18} />
+                        </Button>
+                      </Td>
+                    </Tr>
+                  ))}
+                </Tbody>
+              </Table>
+              <Button type="button" onClick={onAddField} marginTop={2}>
+                + Add Another
+              </Button>
+            </ModalBody>
+            <ModalFooter>
+              <Button
+                colorScheme={
+                  createInvitesMutation.isLoading ? "gray" : "orange"
+                }
+                type="submit"
+                disabled={!!createInvitesMutation.isLoading}
+              >
+                <HStack>
+                  {createInvitesMutation.isLoading ? (
+                    <Spinner size="sm" />
+                  ) : (
+                    <Mail size={18} />
+                  )}
+                  <Text>Send invites</Text>
+                </HStack>
+              </Button>
+            </ModalFooter>
+          </form>
         </ModalContent>
       </Modal>
     </SettingsLayout>

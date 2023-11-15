@@ -1,4 +1,5 @@
 import {
+  UserRole,
   type Organization,
   type OrganizationUser,
   type Project,
@@ -220,5 +221,77 @@ export const organizationRouter = createTRPCRouter({
       }
 
       return organization;
+    }),
+  createInvites: protectedProcedure
+    .input(
+      z.object({
+        organizationId: z.string(),
+        invites: z.array(
+          z.object({
+            email: z.string().email(),
+            teamIds: z.string(),
+            role: z.nativeEnum(UserRole),
+          })
+        ),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const prisma = ctx.prisma;
+      const userId = ctx.session.user.id;
+
+      // Check if the user is an admin of the organization
+      const isAdmin = await prisma.organizationUser.findFirst({
+        where: {
+          userId: userId,
+          organizationId: input.organizationId,
+          role: "ADMIN",
+        },
+      });
+
+      if (!isAdmin) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "You must be an admin to send invites.",
+        });
+      }
+
+      const invites = await Promise.all(
+        input.invites.map(async (invite) => {
+          if (!invite.email.trim() || !invite.teamIds.trim()) {
+            return null;
+          }
+
+          // Filter out team IDs that do not belong to the organization
+          const validTeamIds = (
+            await prisma.team.findMany({
+              where: {
+                id: { in: invite.teamIds.split(",") },
+                organizationId: input.organizationId,
+              },
+              select: { id: true },
+            })
+          ).map((team) => team.id);
+
+          // If no valid team IDs are found, skip this invite
+          if (validTeamIds.length === 0) {
+            return null;
+          }
+
+          const inviteCode = nanoid();
+          return await prisma.organizationInvite.create({
+            data: {
+              email: invite.email,
+              inviteCode: inviteCode,
+              expiration: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000), // 2 days from now
+              organizationId: input.organizationId,
+              teamIds: validTeamIds.join(","),
+              role: invite.role,
+            },
+          });
+        })
+      );
+
+      // Filter out any null values (skipped invites)
+      return invites.filter(Boolean);
     }),
 });

@@ -142,3 +142,18 @@ model Project {
 
     @@index([teamId])
 }
+
+model OrganizationInvite {
+    id             String   @id @default(nanoid())
+    email          String
+    inviteCode     String   @unique
+    expiration     DateTime
+    status         String   @default("PENDING")
+    organizationId String
+    teamIds        String
+    role           UserRole
+    createdAt      DateTime @default(now())
+    updatedAt      DateTime @default(now()) @updatedAt
+
+    @@index([organizationId])
+}
