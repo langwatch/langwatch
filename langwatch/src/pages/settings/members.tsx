@@ -1,4 +1,6 @@
 import {
+  Alert,
+  AlertIcon,
   Button,
   Card,
   CardBody,
@@ -167,6 +169,7 @@ function MembersList({
               <Thead>
                 <Tr>
                   <Th>Name</Th>
+                  <Th>Email</Th>
                   <Th>Role</Th>
                   <Th>Teams</Th>
                 </Tr>
@@ -175,6 +178,7 @@ function MembersList({
                 {organization.members.map((member) => (
                   <LinkBox as="tr" key={member.userId}>
                     <Td>{member.user.name}</Td>
+                    <Td>{member.user.email}</Td>
                     <Td>{member.role}</Td>
                     <Td>
                       {member.user.teamMemberships
@@ -285,22 +289,27 @@ function MembersList({
               </Button>
             </ModalBody>
             <ModalFooter>
-              <Button
-                colorScheme={
-                  createInvitesMutation.isLoading ? "gray" : "orange"
-                }
-                type="submit"
-                disabled={!!createInvitesMutation.isLoading}
-              >
-                <HStack>
-                  {createInvitesMutation.isLoading ? (
-                    <Spinner size="sm" />
-                  ) : (
-                    <Mail size={18} />
-                  )}
-                  <Text>Send invites</Text>
-                </HStack>
-              </Button>
+              <VStack align="end">
+                {createInvitesMutation.error && (
+                  <Text color="red">Sorry, something went wrong</Text>
+                )}
+                <Button
+                  colorScheme={
+                    createInvitesMutation.isLoading ? "gray" : "orange"
+                  }
+                  type="submit"
+                  disabled={!!createInvitesMutation.isLoading}
+                >
+                  <HStack>
+                    {createInvitesMutation.isLoading ? (
+                      <Spinner size="sm" />
+                    ) : (
+                      <Mail size={18} />
+                    )}
+                    <Text>Send invites</Text>
+                  </HStack>
+                </Button>
+              </VStack>
             </ModalFooter>
           </form>
         </ModalContent>

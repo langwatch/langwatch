@@ -12,6 +12,7 @@ import { nanoid } from "nanoid";
 import slugify from "slugify";
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
+import { sendInviteEmail } from "../../mailer/inviteEmail";
 
 export type TeamWithProjects = Team & {
   projects: Project[];
@@ -240,15 +241,19 @@ export const organizationRouter = createTRPCRouter({
       const userId = ctx.session.user.id;
 
       // Check if the user is an admin of the organization
-      const isAdmin = await prisma.organizationUser.findFirst({
+      const organization = await prisma.organization.findFirst({
         where: {
-          userId: userId,
-          organizationId: input.organizationId,
-          role: "ADMIN",
-        },
+          id: input.organizationId,
+          members: {
+            some: {
+              userId: userId,
+              role: "ADMIN",
+            },
+          },
+        }
       });
 
-      if (!isAdmin) {
+      if (!organization) {
         throw new TRPCError({
           code: "FORBIDDEN",
           message: "You must be an admin to send invites.",
@@ -278,7 +283,7 @@ export const organizationRouter = createTRPCRouter({
           }
 
           const inviteCode = nanoid();
-          return await prisma.organizationInvite.create({
+          const savedInvite = await prisma.organizationInvite.create({
             data: {
               email: invite.email,
               inviteCode: inviteCode,
@@ -288,6 +293,10 @@ export const organizationRouter = createTRPCRouter({
               role: invite.role,
             },
           });
+
+          await sendInviteEmail({ req: ctx.req, email: invite.email, organization, inviteCode });
+
+          return savedInvite;
         })
       );
 

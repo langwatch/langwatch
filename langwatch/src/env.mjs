@@ -29,6 +29,7 @@ export const env = createEnv({
     REDIS_URL: z.string().min(1),
     GOOGLE_CREDENTIALS_JSON: z.string().min(1),
     OPENAI_API_KEY: z.string().min(1),
+    SENDGRID_API_KEY: z.string().min(1).optional(),
   },
 
   /**
@@ -58,6 +59,7 @@ export const env = createEnv({
     REDIS_URL: process.env.REDIS_URL,
     GOOGLE_CREDENTIALS_JSON: process.env.GOOGLE_CREDENTIALS_JSON,
     OPENAI_API_KEY: process.env.OPENAI_API_KEY,
+    SENDGRID_API_KEY: process.env.SENDGRID_API_KEY,
   },
   /**
    * Run `build` or `dev` with `SKIP_ENV_VALIDATION` to skip env validation.
