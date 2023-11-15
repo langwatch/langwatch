@@ -93,7 +93,8 @@ const SideMenuLink = ({
 
   const isActive =
     currentRoute?.path === path ||
-    (path.includes("/messages") && router.pathname.includes("/messages"));
+    (path.includes("/messages") && router.pathname.includes("/messages")) ||
+    (path.includes("/settings") && router.pathname.includes("/settings"));
 
   return (
     <Link href={path.replace("[project]", project.slug)} aria-label={label}>
