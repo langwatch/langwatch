@@ -18,6 +18,7 @@ import {
   VStack,
   useTheme,
   type BackgroundProps,
+  Hide,
 } from "@chakra-ui/react";
 import type { Project } from "@prisma/client";
 import ErrorPage from "next/error";
@@ -313,7 +314,9 @@ export const DashboardLayout = ({
           borderBottomColor="gray.300"
         >
           <ProjectSelector organizations={organizations} project={project} />
-          <Breadcrumbs currentRoute={currentRoute} />
+          <Hide below="lg">
+            <Breadcrumbs currentRoute={currentRoute} />
+          </Hide>
           <Spacer />
           <InputGroup maxWidth="600px" borderColor="gray.300">
             <InputLeftElement paddingY={1.5} height="auto" pointerEvents="none">
