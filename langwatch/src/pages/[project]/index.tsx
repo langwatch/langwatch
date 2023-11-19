@@ -31,6 +31,7 @@ import {
   VStack,
   useDisclosure,
   useTheme,
+  useToast,
 } from "@chakra-ui/react";
 import {
   addDays,
@@ -68,6 +69,7 @@ export default function Index() {
   const [endDate, setEndDate] = useState(new Date());
   const { isOpen, onOpen, onClose } = useDisclosure();
   const daysDifference = differenceInCalendarDays(endDate, startDate) + 1;
+  const toast = useToast();
 
   const analytics = api.analytics.getTracesAnalyticsPerDay.useQuery(
     {
@@ -79,6 +81,17 @@ export default function Index() {
       enabled: !!project?.id && !!startDate && !!endDate,
       refetchOnMount: false,
       refetchOnWindowFocus: false,
+      onError: () => {
+        toast({
+          title: "Sorry, something went wrong",
+          description:
+            "Error loading analytics, please try refreshing the page.",
+          status: "error",
+          duration: 5000,
+          isClosable: true,
+          position: "top-right",
+        });
+      },
     }
   );
   const usageMetrics = api.analytics.getUsageMetrics.useQuery(

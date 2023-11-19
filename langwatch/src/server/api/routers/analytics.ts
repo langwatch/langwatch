@@ -2,84 +2,37 @@ import { z } from "zod";
 
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { TRACE_CHECKS_INDEX, TRACE_INDEX, esClient } from "../../elasticsearch";
+import type { PrismaClient } from "@prisma/client";
+import type { Session } from "next-auth";
+import { TRPCError } from "@trpc/server";
 
-const getTracesAnalyticsPerDay = async (
-  projectId: string,
-  startDateTimestamp: number,
-  endDateTimestamp: number
-) => {
-  const startDate = new Date(startDateTimestamp);
-  const endDate = new Date(endDateTimestamp);
-
-  const result = await esClient.search({
-    index: TRACE_INDEX,
-    body: {
-      aggs: {
-        traces_per_day: {
-          date_histogram: {
-            field: "timestamps.started_at",
-            calendar_interval: "day",
-            min_doc_count: 0,
-            extended_bounds: {
-              min: startDate.getTime(),
-              max: endDate.getTime(),
-            },
-          },
-          aggs: {
-            count: {
-              value_count: {
-                field: "id",
-              },
-            },
-            total_cost: {
-              sum: {
-                field: "metrics.total_cost",
-              },
-            },
-            prompt_tokens: {
-              sum: {
-                field: "metrics.prompt_tokens",
-              },
-            },
-            completion_tokens: {
-              sum: {
-                field: "metrics.completion_tokens",
-              },
-            },
+const checkUserPermissionForProject = async ({
+  ctx,
+  input,
+  next,
+}: {
+  ctx: { prisma: PrismaClient; session: Session };
+  input: { projectId: string };
+  next: () => any;
+}) => {
+  const teamUser = await ctx.prisma.teamUser.findFirst({
+    where: {
+      userId: ctx.session.user.id,
+      team: {
+        projects: {
+          some: {
+            id: input.projectId,
           },
         },
       },
-      query: {
-        //@ts-ignore
-        bool: {
-          filter: [
-            { term: { project_id: projectId } },
-            {
-              range: {
-                "timestamps.started_at": {
-                  gte: startDate.getTime(),
-                  lte: endDate.getTime(),
-                },
-              },
-            },
-          ],
-        },
-      },
-      size: 0,
     },
   });
 
-  const buckets: any[] | undefined = (
-    result.aggregations?.traces_per_day as any
-  )?.buckets;
+  if (!teamUser) {
+    throw new TRPCError({ code: "UNAUTHORIZED" });
+  }
 
-  return buckets?.map((bucket) => ({
-    date: bucket.key_as_string,
-    count: bucket.count.value,
-    total_cost: bucket.total_cost.value,
-    prompt_tokens: bucket.prompt_tokens.value,
-    completion_tokens: bucket.completion_tokens.value,
-  }));
+  return next();
 };
 
 export const analyticsRouter = createTRPCRouter({
@@ -91,12 +44,80 @@ export const analyticsRouter = createTRPCRouter({
         endDate: z.number(),
       })
     )
+    .use(checkUserPermissionForProject)
     .query(async ({ input }) => {
-      return getTracesAnalyticsPerDay(
-        input.projectId,
-        input.startDate,
-        input.endDate
-      );
+      const startDate = new Date(input.startDate);
+      const endDate = new Date(input.endDate);
+
+      const result = await esClient.search({
+        index: TRACE_INDEX,
+        body: {
+          aggs: {
+            traces_per_day: {
+              date_histogram: {
+                field: "timestamps.started_at",
+                calendar_interval: "day",
+                min_doc_count: 0,
+                extended_bounds: {
+                  min: startDate.getTime(),
+                  max: endDate.getTime(),
+                },
+              },
+              aggs: {
+                count: {
+                  value_count: {
+                    field: "id",
+                  },
+                },
+                total_cost: {
+                  sum: {
+                    field: "metrics.total_cost",
+                  },
+                },
+                prompt_tokens: {
+                  sum: {
+                    field: "metrics.prompt_tokens",
+                  },
+                },
+                completion_tokens: {
+                  sum: {
+                    field: "metrics.completion_tokens",
+                  },
+                },
+              },
+            },
+          },
+          query: {
+            //@ts-ignore
+            bool: {
+              filter: [
+                { term: { project_id: input.projectId } },
+                {
+                  range: {
+                    "timestamps.started_at": {
+                      gte: startDate.getTime(),
+                      lte: endDate.getTime(),
+                    },
+                  },
+                },
+              ],
+            },
+          },
+          size: 0,
+        },
+      });
+
+      const buckets: any[] | undefined = (
+        result.aggregations?.traces_per_day as any
+      )?.buckets;
+
+      return buckets?.map((bucket) => ({
+        date: bucket.key_as_string,
+        count: bucket.count.value,
+        total_cost: bucket.total_cost.value,
+        prompt_tokens: bucket.prompt_tokens.value,
+        completion_tokens: bucket.completion_tokens.value,
+      }));
     }),
   getUsageMetrics: protectedProcedure
     .input(
@@ -106,6 +127,7 @@ export const analyticsRouter = createTRPCRouter({
         endDate: z.number(),
       })
     )
+    .use(checkUserPermissionForProject)
     .query(async ({ input }) => {
       const { projectId, startDate, endDate } = input;
       const result = await esClient.search({
@@ -179,8 +201,8 @@ export const analyticsRouter = createTRPCRouter({
         endDate: z.number(),
       })
     )
+    .use(checkUserPermissionForProject)
     .query(async ({ input }) => {
-      // TODO user validation
       const { projectId, startDate, endDate } = input;
       const result = await esClient.search({
         index: TRACE_CHECKS_INDEX,
