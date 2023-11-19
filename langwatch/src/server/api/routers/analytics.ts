@@ -98,4 +98,69 @@ export const analyticsRouter = createTRPCRouter({
         input.endDate
       );
     }),
+  getUsageMetrics: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        startDate: z.number(),
+        endDate: z.number(),
+      })
+    )
+    .query(async ({ input }) => {
+      const { projectId, startDate, endDate } = input;
+      const result = await esClient.search({
+        index: TRACE_INDEX,
+        body: {
+          size: 0,
+          query: {
+            //@ts-ignore
+            bool: {
+              filter: [
+                { term: { project_id: projectId } },
+                {
+                  range: {
+                    "timestamps.started_at": {
+                      gte: startDate,
+                      lte: endDate,
+                    },
+                  },
+                },
+              ],
+            },
+          },
+        },
+        aggs: {
+          avg_tokens_per_trace: {
+            avg: {
+              script: {
+                source:
+                  "doc['metrics.prompt_tokens'].value + doc['metrics.completion_tokens'].value",
+              },
+            },
+          },
+          avg_total_cost_per_1000_traces: {
+            avg: {
+              field: "metrics.total_cost",
+            },
+          },
+          percentile_total_time_ms: {
+            percentiles: {
+              field: "metrics.total_time_ms",
+              percents: [90],
+            },
+          },
+        },
+      });
+
+      const aggregations: any = result.aggregations;
+
+      return {
+        avg_tokens_per_trace: aggregations?.avg_tokens_per_trace
+          .value as number,
+        avg_total_cost_per_1000_traces:
+          (aggregations?.avg_total_cost_per_1000_traces.value as number) * 1000,
+        percentile_90th_total_time_ms: aggregations?.percentile_total_time_ms
+          .values["90.0"] as number,
+      };
+    }),
 });

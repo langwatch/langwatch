@@ -75,6 +75,14 @@ export default function Index() {
     },
     { enabled: !!project?.id && !!startDate && !!endDate }
   );
+  const usageMetrics = api.analytics.getUsageMetrics.useQuery(
+    {
+      projectId: project?.id ?? "",
+      startDate: startOfDay(startDate).getTime(),
+      endDate: endOfDay(endDate).getTime(),
+    },
+    { enabled: !!project?.id && !!startDate && !!endDate }
+  );
   const messagesData = analytics.data?.slice(daysDifference);
   const messagesPreviousPeriod = analytics.data?.slice(0, daysDifference);
   const messagesTotal = analytics.data?.reduce(
@@ -184,7 +192,7 @@ export default function Index() {
           </Popover>
         </HStack>
         <Grid width="100%" templateColumns="1fr 0.5fr" gap={6}>
-          <GridItem>
+          <GridItem colSpan={2}>
             <Card>
               <CardBody>
                 <Tabs variant="unstyled">
@@ -258,17 +266,37 @@ export default function Index() {
           <GridItem>
             <Card>
               <CardHeader>
-                <Heading size="sm">Main Topics</Heading>
+                <Heading size="sm">Summary</Heading>
               </CardHeader>
-              <CardBody>TODO</CardBody>
-            </Card>
-          </GridItem>
-          <GridItem>
-            <Card>
-              <CardHeader>
-                <Heading size="sm">Business</Heading>
-              </CardHeader>
-              <CardBody>TODO</CardBody>
+              <CardBody>
+                <HStack spacing={0}>
+                  <SummaryMetric
+                    label="Average Total Tokens per Message"
+                    value={
+                      usageMetrics.data &&
+                      numeral(usageMetrics.data.avg_tokens_per_trace).format("0a")
+                    }
+                  />
+                  <SummaryMetric
+                    label="Average Total Cost / 1000 Messages"
+                    value={
+                      usageMetrics.data &&
+                      numeral(
+                        usageMetrics.data.avg_total_cost_per_1000_traces
+                      ).format("$0.00a")
+                    }
+                  />
+                  <SummaryMetric
+                    label="90th Percentile Total Response Time"
+                    value={
+                      usageMetrics.data &&
+                      Math.round(
+                        usageMetrics.data.percentile_90th_total_time_ms
+                      ) + "ms"
+                    }
+                  />
+                </HStack>
+              </CardBody>
             </Card>
           </GridItem>
           <GridItem>
@@ -282,6 +310,38 @@ export default function Index() {
         </Grid>
       </Container>
     </DashboardLayout>
+  );
+}
+
+function SummaryMetric({
+  label,
+  value,
+}: {
+  label: string;
+  value: string | number | undefined;
+}) {
+  return (
+    <VStack
+      maxWidth="180"
+      spacing={4}
+      align="start"
+      borderLeftWidth="1px"
+      borderLeftColor="gray.300"
+      paddingX={4}
+      _first={{ paddingLeft: 0, borderLeft: "none" }}
+    >
+      <Heading
+        fontSize="13"
+        color="gray.500"
+        fontWeight="normal"
+        lineHeight="1.5em"
+      >
+        {label}
+      </Heading>
+      <Text fontSize="28" fontWeight="600">
+        {value ? value : <UTF8WhitespaceHolder />}
+      </Text>
+    </VStack>
   );
 }
 
