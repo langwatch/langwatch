@@ -5,11 +5,11 @@ import { TRACE_INDEX, esClient } from "../../elasticsearch";
 
 const getTracesAnalyticsPerDay = async (
   projectId: string,
-  startDateStr: string,
-  endDateStr: string
+  startDateTimestamp: number,
+  endDateTimestamp: number
 ) => {
-  const startDate = new Date(startDateStr);
-  const endDate = new Date(endDateStr);
+  const startDate = new Date(startDateTimestamp);
+  const endDate = new Date(endDateTimestamp);
 
   const result = await esClient.search({
     index: TRACE_INDEX,
@@ -50,6 +50,7 @@ const getTracesAnalyticsPerDay = async (
         },
       },
       query: {
+        //@ts-ignore
         bool: {
           filter: [
             { term: { project_id: projectId } },
@@ -86,8 +87,8 @@ export const analyticsRouter = createTRPCRouter({
     .input(
       z.object({
         projectId: z.string(),
-        startDate: z.string(),
-        endDate: z.string(),
+        startDate: z.number(),
+        endDate: z.number(),
       })
     )
     .query(async ({ input }) => {

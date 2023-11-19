@@ -1,11 +1,24 @@
 import {
+  Button,
   Card,
   CardBody,
   CardHeader,
   Container,
+  FormControl,
+  FormLabel,
   Grid,
   GridItem,
+  HStack,
   Heading,
+  Input,
+  Popover,
+  PopoverArrow,
+  PopoverBody,
+  PopoverCloseButton,
+  PopoverContent,
+  PopoverHeader,
+  PopoverTrigger,
+  Spacer,
   Tab,
   TabIndicator,
   TabList,
@@ -14,51 +27,51 @@ import {
   Tabs,
   Text,
   VStack,
+  useDisclosure,
   useTheme,
 } from "@chakra-ui/react";
-import { DashboardLayout } from "~/components/DashboardLayout";
-import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import { useRouter } from "next/router";
 import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
+  addDays,
+  differenceInCalendarDays,
+  endOfDay,
+  format,
+  startOfDay,
+  subDays,
+} from "date-fns";
+import { useRouter } from "next/router";
+import numeral from "numeral";
+import { useEffect, useState } from "react";
+import { Calendar } from "react-feather";
+import {
   Bar,
   BarChart,
+  CartesianGrid,
+  Legend,
+  Line,
+  LineChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
 } from "recharts";
-import { format } from "date-fns";
-import { useState } from "react";
-import { addDays, differenceInCalendarDays } from "date-fns";
-import { useEffect } from "react";
-import { api } from "../../utils/api";
+import { DashboardLayout } from "~/components/DashboardLayout";
 import { UTF8WhitespaceHolder } from "../../components/misc/UTF8WhitespaceHolder";
-import numeral from "numeral";
+import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
+import { api } from "../../utils/api";
 
 export default function Index() {
   const router = useRouter();
   const { project } = useOrganizationTeamProject();
-  const [startDate, setStartDate] = useState(
-    format(addDays(new Date(), -15), "yyyy-MM-dd")
-  );
-  const [endDate, setEndDate] = useState(format(new Date(), "yyyy-MM-dd"));
-  const daysDifference = differenceInCalendarDays(
-    new Date(endDate),
-    new Date(startDate)
-  );
+  const [startDate, setStartDate] = useState(addDays(new Date(), -14));
+  const [endDate, setEndDate] = useState(new Date());
+  const { isOpen, onOpen, onClose } = useDisclosure();
+  const daysDifference = differenceInCalendarDays(endDate, startDate) + 1;
 
   const analytics = api.analytics.getTracesAnalyticsPerDay.useQuery(
     {
       projectId: project?.id ?? "",
-      startDate: format(
-        addDays(new Date(startDate), -daysDifference),
-        "yyyy-MM-dd"
-      ),
-      endDate: endDate,
+      startDate: addDays(startDate, -daysDifference).getTime(),
+      endDate: endOfDay(endDate).getTime(),
     },
     { enabled: !!project?.id && !!startDate && !!endDate }
   );
@@ -74,11 +87,39 @@ export default function Index() {
     (acc, curr) => acc + curr.total_cost,
     0
   );
-  const tokensData = analytics.data?.slice(15);
+  const tokensData = analytics.data?.slice(daysDifference);
   const tokensTotal = analytics.data?.reduce(
     (acc, curr) => acc + curr.prompt_tokens + curr.completion_tokens,
     0
   );
+  const quickSelectors = [
+    { label: "Last 7 days", days: 7 },
+    { label: "Last 15 days", days: 15 },
+    { label: "Last 30 days", days: 30 },
+    { label: "Last 90 days", days: 90 },
+    { label: "Last 6 months", days: 180 },
+    { label: "Last 1 year", days: 365 },
+  ];
+
+  const handleQuickSelect = (days: number) => {
+    const newEndDate = new Date();
+    const newStartDate = startOfDay(subDays(newEndDate, days - 1));
+    setStartDate(newStartDate);
+    setEndDate(newEndDate);
+    onClose();
+  };
+
+  const getDateRangeLabel = () => {
+    const quickSelect = quickSelectors.find(
+      (selector) => selector.days === daysDifference
+    );
+    return quickSelect
+      ? quickSelect.label
+      : `${format(new Date(startDate), "MMM d")} - ${format(
+          new Date(endDate),
+          "MMM d"
+        )}`;
+  };
 
   useEffect(() => {
     if (project && !project.firstMessage) {
@@ -89,31 +130,60 @@ export default function Index() {
   return (
     <DashboardLayout>
       <Container maxWidth="1200" padding={6}>
+        <HStack width="full" paddingBottom={6}>
+          <Spacer />
+          <Popover isOpen={isOpen} onClose={onClose} placement="bottom-end">
+            <PopoverTrigger>
+              <Button variant="outline" onClick={onOpen}>
+                <HStack>
+                  <Calendar size={16} />
+                  <Text>{getDateRangeLabel()}</Text>
+                </HStack>
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent width="fit-content">
+              <PopoverArrow />
+              <PopoverCloseButton />
+              <PopoverHeader>
+                <Heading size="sm">Select Date Range</Heading>
+              </PopoverHeader>
+              <PopoverBody padding={4}>
+                <HStack align="start" spacing={6}>
+                  <VStack spacing={4}>
+                    <FormControl>
+                      <FormLabel>Start Date</FormLabel>
+                      <Input
+                        type="date"
+                        value={format(startDate, "yyyy-MM-dd")}
+                        onChange={(e) => setStartDate(new Date(e.target.value))}
+                      />
+                    </FormControl>
+                    <FormControl>
+                      <FormLabel>End Date</FormLabel>
+                      <Input
+                        type="date"
+                        value={format(endDate, "yyyy-MM-dd")}
+                        onChange={(e) => setEndDate(new Date(e.target.value))}
+                      />
+                    </FormControl>
+                  </VStack>
+                  <VStack>
+                    {quickSelectors.map((selector) => (
+                      <Button
+                        width="full"
+                        key={selector.label}
+                        onClick={() => handleQuickSelect(selector.days)}
+                      >
+                        {selector.label}
+                      </Button>
+                    ))}
+                  </VStack>
+                </HStack>
+              </PopoverBody>
+            </PopoverContent>
+          </Popover>
+        </HStack>
         <Grid width="100%" templateColumns="1fr 0.5fr" gap={6}>
-          <GridItem colSpan={2}>
-            <Card>
-              <CardBody>
-                <Grid templateColumns="1fr 1fr" gap={6}>
-                  <GridItem>
-                    <Text mb={2}>Start Date</Text>
-                    <input
-                      type="date"
-                      value={startDate}
-                      onChange={(e) => setStartDate(e.target.value)}
-                    />
-                  </GridItem>
-                  <GridItem>
-                    <Text mb={2}>End Date</Text>
-                    <input
-                      type="date"
-                      value={endDate}
-                      onChange={(e) => setEndDate(e.target.value)}
-                    />
-                  </GridItem>
-                </Grid>
-              </CardBody>
-            </Card>
-          </GridItem>
           <GridItem>
             <Card>
               <CardBody>
