@@ -3,10 +3,13 @@ import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { TRACE_INDEX, esClient } from "../../elasticsearch";
 
-const getTracesAnalyticsPerDay = async (projectId: string, days = 30) => {
-  const endDate = new Date();
-  const startDate = new Date();
-  startDate.setDate(endDate.getDate() - days + 1);
+const getTracesAnalyticsPerDay = async (
+  projectId: string,
+  startDateStr: string,
+  endDateStr: string
+) => {
+  const startDate = new Date(startDateStr);
+  const endDate = new Date(endDateStr);
 
   const result = await esClient.search({
     index: TRACE_INDEX,
@@ -31,6 +34,16 @@ const getTracesAnalyticsPerDay = async (projectId: string, days = 30) => {
             total_cost: {
               sum: {
                 field: "metrics.total_cost",
+              },
+            },
+            prompt_tokens: {
+              sum: {
+                field: "metrics.prompt_tokens",
+              },
+            },
+            completion_tokens: {
+              sum: {
+                field: "metrics.completion_tokens",
               },
             },
           },
@@ -59,19 +72,29 @@ const getTracesAnalyticsPerDay = async (projectId: string, days = 30) => {
     result.aggregations?.traces_per_day as any
   )?.buckets;
 
-  console.log('', );
-
   return buckets?.map((bucket) => ({
     date: bucket.key_as_string,
     count: bucket.count.value,
     total_cost: bucket.total_cost.value,
+    prompt_tokens: bucket.prompt_tokens.value,
+    completion_tokens: bucket.completion_tokens.value,
   }));
 };
 
 export const analyticsRouter = createTRPCRouter({
   getTracesAnalyticsPerDay: protectedProcedure
-    .input(z.object({ projectId: z.string() }))
+    .input(
+      z.object({
+        projectId: z.string(),
+        startDate: z.string(),
+        endDate: z.string(),
+      })
+    )
     .query(async ({ input }) => {
-      return getTracesAnalyticsPerDay(input.projectId);
+      return getTracesAnalyticsPerDay(
+        input.projectId,
+        input.startDate,
+        input.endDate
+      );
     }),
 });
