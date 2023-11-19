@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
-import { TRACE_INDEX, esClient } from "../../elasticsearch";
+import { TRACE_CHECKS_INDEX, TRACE_INDEX, esClient } from "../../elasticsearch";
 
 const getTracesAnalyticsPerDay = async (
   projectId: string,
@@ -169,6 +169,61 @@ export const analyticsRouter = createTRPCRouter({
           ?.percentile_time_to_first_token.values["90.0"] as number,
         percentile_90th_total_time_ms: aggregations?.percentile_total_time_ms
           .values["90.0"] as number,
+      };
+    }),
+  getTraceCheckStatusCounts: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        startDate: z.number(),
+        endDate: z.number(),
+      })
+    )
+    .query(async ({ input }) => {
+      // TODO user validation
+      const { projectId, startDate, endDate } = input;
+      const result = await esClient.search({
+        index: TRACE_CHECKS_INDEX,
+        body: {
+          size: 0,
+          query: {
+            //@ts-ignore
+            bool: {
+              filter: [
+                { term: { project_id: projectId } },
+                {
+                  range: {
+                    "timestamps.inserted_at": {
+                      gte: startDate,
+                      lte: endDate,
+                    },
+                  },
+                },
+              ],
+            },
+          },
+          aggs: {
+            status_counts: {
+              terms: {
+                field: "status",
+              },
+            },
+          },
+        },
+      });
+
+      const buckets: any[] | undefined = (
+        result.aggregations?.status_counts as any
+      )?.buckets;
+
+      const statusCounts = buckets?.reduce((acc, bucket) => {
+        acc[bucket.key] = bucket.doc_count;
+        return acc;
+      }, {});
+
+      return {
+        failed: (statusCounts?.failed as number) || 0,
+        succeeded: (statusCounts?.succeeded as number) || 0,
       };
     }),
 });

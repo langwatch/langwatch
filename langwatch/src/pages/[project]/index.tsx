@@ -1,4 +1,5 @@
 import {
+  Box,
   Button,
   Card,
   CardBody,
@@ -18,6 +19,7 @@ import {
   PopoverContent,
   PopoverHeader,
   PopoverTrigger,
+  Skeleton,
   Spacer,
   Tab,
   TabIndicator,
@@ -41,7 +43,7 @@ import {
 import { useRouter } from "next/router";
 import numeral from "numeral";
 import { useEffect, useState } from "react";
-import { Calendar } from "react-feather";
+import { Calendar, CheckCircle, XCircle } from "react-feather";
 import {
   Bar,
   BarChart,
@@ -55,7 +57,6 @@ import {
   YAxis,
 } from "recharts";
 import { DashboardLayout } from "~/components/DashboardLayout";
-import { UTF8WhitespaceHolder } from "../../components/misc/UTF8WhitespaceHolder";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
 import { formatMilliseconds } from "../../utils/formatMilliseconds";
@@ -74,7 +75,11 @@ export default function Index() {
       startDate: addDays(startDate, -daysDifference).getTime(),
       endDate: endOfDay(endDate).getTime(),
     },
-    { enabled: !!project?.id && !!startDate && !!endDate }
+    {
+      enabled: !!project?.id && !!startDate && !!endDate,
+      refetchOnMount: false,
+      refetchOnWindowFocus: false,
+    }
   );
   const usageMetrics = api.analytics.getUsageMetrics.useQuery(
     {
@@ -82,8 +87,25 @@ export default function Index() {
       startDate: startOfDay(startDate).getTime(),
       endDate: endOfDay(endDate).getTime(),
     },
-    { enabled: !!project?.id && !!startDate && !!endDate }
+    {
+      enabled: !!project?.id && !!startDate && !!endDate,
+      refetchOnMount: false,
+      refetchOnWindowFocus: false,
+    }
   );
+  const traceCheckStatusCounts =
+    api.analytics.getTraceCheckStatusCounts.useQuery(
+      {
+        projectId: project?.id ?? "",
+        startDate: startOfDay(startDate).getTime(),
+        endDate: endOfDay(endDate).getTime(),
+      },
+      {
+        enabled: !!project?.id && !!startDate && !!endDate,
+        refetchOnMount: false,
+        refetchOnWindowFocus: false,
+      }
+    );
   const messagesData = analytics.data?.slice(daysDifference);
   const messagesPreviousPeriod = analytics.data?.slice(0, daysDifference);
   const messagesTotal = messagesData?.reduce(
@@ -202,7 +224,9 @@ export default function Index() {
                           {messagesTotal !== undefined ? (
                             numeral(messagesTotal).format("0a")
                           ) : (
-                            <UTF8WhitespaceHolder />
+                            <Box paddingY="0.25em">
+                              <Skeleton height="1em" width="80px" />
+                            </Box>
                           )}
                         </Text>
                       </VStack>
@@ -214,7 +238,9 @@ export default function Index() {
                           {costsTotal !== undefined ? (
                             numeral(costsTotal).format("$0.00a")
                           ) : (
-                            <UTF8WhitespaceHolder />
+                            <Box paddingY="0.25em">
+                              <Skeleton height="1em" width="80px" />
+                            </Box>
                           )}
                         </Text>
                       </VStack>
@@ -226,7 +252,9 @@ export default function Index() {
                           {tokensTotal !== undefined ? (
                             numeral(tokensTotal).format("0a")
                           ) : (
-                            <UTF8WhitespaceHolder />
+                            <Box paddingY="0.25em">
+                              <Skeleton height="1em" width="80px" />
+                            </Box>
                           )}
                         </Text>
                       </VStack>
@@ -303,11 +331,11 @@ export default function Index() {
                     label="90th Percentile Total Response Time"
                     value={
                       usageMetrics.data &&
-                      !!usageMetrics.data.percentile_90th_total_time_ms
+                      (!!usageMetrics.data.percentile_90th_total_time_ms
                         ? formatMilliseconds(
                             usageMetrics.data.percentile_90th_total_time_ms
                           )
-                        : "-"
+                        : "-")
                     }
                   />
                 </HStack>
@@ -315,11 +343,42 @@ export default function Index() {
             </Card>
           </GridItem>
           <GridItem>
-            <Card>
+            <Card height="full">
               <CardHeader>
                 <Heading size="sm">Validation Summary</Heading>
               </CardHeader>
-              <CardBody>TODO</CardBody>
+              <CardBody>
+                <VStack align="start" spacing={4}>
+                  <HStack>
+                    <Box color="red.600">
+                      <XCircle />
+                    </Box>
+                    <Text>
+                      {traceCheckStatusCounts.data ? (
+                        numeral(traceCheckStatusCounts.data.failed).format(
+                          "0a"
+                        ) + " failed checks"
+                      ) : (
+                        <Skeleton height="1em" width="140px" />
+                      )}
+                    </Text>
+                  </HStack>
+                  <HStack>
+                    <Box color="green.600">
+                      <CheckCircle />
+                    </Box>
+                    <Text>
+                      {traceCheckStatusCounts.data ? (
+                        numeral(traceCheckStatusCounts.data.succeeded).format(
+                          "0a"
+                        ) + " successful checks"
+                      ) : (
+                        <Skeleton height="1em" width="170px" />
+                      )}
+                    </Text>
+                  </HStack>
+                </VStack>
+              </CardBody>
             </Card>
           </GridItem>
         </Grid>
@@ -354,7 +413,13 @@ function SummaryMetric({
         {label}
       </Heading>
       <Text fontSize="28" fontWeight="600">
-        {value ? value : <UTF8WhitespaceHolder />}
+        {value ? (
+          value
+        ) : (
+          <Box paddingY="0.25em">
+            <Skeleton height="1em" width="80px" />
+          </Box>
+        )}
       </Text>
     </VStack>
   );
