@@ -58,6 +58,7 @@ import { DashboardLayout } from "~/components/DashboardLayout";
 import { UTF8WhitespaceHolder } from "../../components/misc/UTF8WhitespaceHolder";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
+import { formatMilliseconds } from "../../utils/formatMilliseconds";
 
 export default function Index() {
   const router = useRouter();
@@ -85,18 +86,15 @@ export default function Index() {
   );
   const messagesData = analytics.data?.slice(daysDifference);
   const messagesPreviousPeriod = analytics.data?.slice(0, daysDifference);
-  const messagesTotal = analytics.data?.reduce(
+  const messagesTotal = messagesData?.reduce(
     (acc, curr) => acc + curr.count,
     0
   );
   const costsData = analytics.data?.slice(daysDifference);
   const costsPreviousPeriod = analytics.data?.slice(0, daysDifference);
-  const costsTotal = analytics.data?.reduce(
-    (acc, curr) => acc + curr.total_cost,
-    0
-  );
+  const costsTotal = costsData?.reduce((acc, curr) => acc + curr.total_cost, 0);
   const tokensData = analytics.data?.slice(daysDifference);
-  const tokensTotal = analytics.data?.reduce(
+  const tokensTotal = tokensData?.reduce(
     (acc, curr) => acc + curr.prompt_tokens + curr.completion_tokens,
     0
   );
@@ -274,7 +272,9 @@ export default function Index() {
                     label="Average Total Tokens per Message"
                     value={
                       usageMetrics.data &&
-                      numeral(usageMetrics.data.avg_tokens_per_trace).format("0a")
+                      numeral(usageMetrics.data.avg_tokens_per_trace).format(
+                        "0a"
+                      )
                     }
                   />
                   <SummaryMetric
@@ -286,13 +286,28 @@ export default function Index() {
                       ).format("$0.00a")
                     }
                   />
+                  {(!usageMetrics.data ||
+                    usageMetrics.data.percentile_90th_time_to_first_token >
+                      0) && (
+                    <SummaryMetric
+                      label="90th Percentile Time to First Token"
+                      value={
+                        usageMetrics.data &&
+                        formatMilliseconds(
+                          usageMetrics.data.percentile_90th_time_to_first_token
+                        )
+                      }
+                    />
+                  )}
                   <SummaryMetric
                     label="90th Percentile Total Response Time"
                     value={
                       usageMetrics.data &&
-                      Math.round(
-                        usageMetrics.data.percentile_90th_total_time_ms
-                      ) + "ms"
+                      !!usageMetrics.data.percentile_90th_total_time_ms
+                        ? formatMilliseconds(
+                            usageMetrics.data.percentile_90th_total_time_ms
+                          )
+                        : "-"
                     }
                   />
                 </HStack>
@@ -359,70 +374,73 @@ function CurrentVsPreviousPeriodLineChart<T extends string>({
   const orange400 = theme.colors.orange["400"];
 
   const mergedData =
-    (data &&
-      previousPeriod?.map((entry, index) => {
-        return {
-          ...data[index],
-          previousPeriod: entry[dataKey],
-          previousDate: entry.date,
-        };
-      })) ??
-    [];
+    data &&
+    previousPeriod?.map((entry, index) => {
+      return {
+        ...data[index],
+        previousPeriod: entry[dataKey],
+        previousDate: entry.date,
+      };
+    });
   const formatDate = (date: string) => date && format(new Date(date), "MMM d");
 
   return (
     <ResponsiveContainer width="100%" height={300}>
-      <LineChart data={mergedData} margin={{ left: -10 }}>
-        <CartesianGrid vertical={false} strokeDasharray="5 7" />
-        <XAxis
-          dataKey="date"
-          tickFormatter={formatDate}
-          tickLine={false}
-          axisLine={false}
-          tick={{ fill: gray400 }}
-        />
-        <YAxis
-          axisLine={false}
-          tickLine={false}
-          tickCount={4}
-          tickMargin={20}
-          domain={[0, "dataMax"]}
-          tick={{ fill: gray400 }}
-        />
-        <Tooltip
-          labelFormatter={(_label, payload) => {
-            if (payload && payload.length == 1) {
-              return formatDate(payload[0]?.payload.date);
-            }
-            if (payload && payload.length == 2) {
-              return (
-                formatDate(payload[0]?.payload.date) +
-                " vs " +
-                formatDate(payload[1]?.payload.previousDate)
-              );
-            }
-          }}
-        />
-        <Legend />
-        <Line
-          type="linear"
-          dataKey={dataKey}
-          stroke={orange400}
-          strokeWidth={2.5}
-          dot={false}
-          activeDot={{ r: 8 }}
-          name="Messages"
-        />
-        <Line
-          type="linear"
-          dataKey="previousPeriod"
-          stroke="#ED892699"
-          strokeWidth={2.5}
-          strokeDasharray={"5 5"}
-          dot={false}
-          name="Previous Period"
-        />
-      </LineChart>
+      {mergedData ? (
+        <LineChart data={mergedData} margin={{ left: -10 }}>
+          <CartesianGrid vertical={false} strokeDasharray="5 7" />
+          <XAxis
+            dataKey="date"
+            tickFormatter={formatDate}
+            tickLine={false}
+            axisLine={false}
+            tick={{ fill: gray400 }}
+          />
+          <YAxis
+            axisLine={false}
+            tickLine={false}
+            tickCount={4}
+            tickMargin={20}
+            domain={[0, "dataMax"]}
+            tick={{ fill: gray400 }}
+          />
+          <Tooltip
+            labelFormatter={(_label, payload) => {
+              if (payload && payload.length == 1) {
+                return formatDate(payload[0]?.payload.date);
+              }
+              if (payload && payload.length == 2) {
+                return (
+                  formatDate(payload[0]?.payload.date) +
+                  " vs " +
+                  formatDate(payload[1]?.payload.previousDate)
+                );
+              }
+            }}
+          />
+          <Legend />
+          <Line
+            type="linear"
+            dataKey={dataKey}
+            stroke={orange400}
+            strokeWidth={2.5}
+            dot={false}
+            activeDot={{ r: 8 }}
+            name="Messages"
+          />
+          <Line
+            type="linear"
+            dataKey="previousPeriod"
+            stroke="#ED892699"
+            strokeWidth={2.5}
+            strokeDasharray={"5 5"}
+            dot={false}
+            name="Previous Period"
+          />
+        </LineChart>
+      ) : (
+        <div />
+      )}
     </ResponsiveContainer>
   );
 }

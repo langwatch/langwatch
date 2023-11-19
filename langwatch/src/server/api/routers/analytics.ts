@@ -134,13 +134,19 @@ export const analyticsRouter = createTRPCRouter({
             avg: {
               script: {
                 source:
-                  "doc['metrics.prompt_tokens'].value + doc['metrics.completion_tokens'].value",
+                  "if (doc['metrics.prompt_tokens'].size() > 0 && doc['metrics.completion_tokens'].size() > 0) { return doc['metrics.prompt_tokens'].value + doc['metrics.completion_tokens'].value } else { return 0 }",
               },
             },
           },
           avg_total_cost_per_1000_traces: {
             avg: {
               field: "metrics.total_cost",
+            },
+          },
+          percentile_time_to_first_token: {
+            percentiles: {
+              field: "metrics.first_token_ms",
+              percents: [90],
             },
           },
           percentile_total_time_ms: {
@@ -159,6 +165,8 @@ export const analyticsRouter = createTRPCRouter({
           .value as number,
         avg_total_cost_per_1000_traces:
           (aggregations?.avg_total_cost_per_1000_traces.value as number) * 1000,
+        percentile_90th_time_to_first_token: aggregations
+          ?.percentile_time_to_first_token.values["90.0"] as number,
         percentile_90th_total_time_ms: aggregations?.percentile_total_time_ms
           .values["90.0"] as number,
       };
