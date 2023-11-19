@@ -39,7 +39,7 @@ export const tracesRouter = createTRPCRouter({
 
       const tracesResult = await esClient.search<Trace>({
         index: TRACE_INDEX,
-        size: 100,
+        size: 1_000,
         sort: {
           "timestamps.started_at": {
             order: "desc",
@@ -59,6 +59,7 @@ export const tracesRouter = createTRPCRouter({
       const checksResult = await esClient.search<TraceCheck>({
         index: TRACE_CHECKS_INDEX,
         body: {
+          size: traces.length * 100,
           query: {
             terms: {
               trace_id: traces.map((trace) => trace.id),
