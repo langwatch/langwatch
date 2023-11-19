@@ -1,9 +1,10 @@
 import { z } from "zod";
 
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
-import type { Trace, TraceCheck, TraceWithChecks } from "../../tracer/types";
+import type { Trace, TraceCheck } from "../../tracer/types";
 import { TRACE_CHECKS_INDEX, TRACE_INDEX, esClient } from "../../elasticsearch";
 import { TRPCError } from "@trpc/server";
+import { checkUserPermissionForProject } from "../permission";
 
 export const esGetTraceById = async (
   traceId: string
@@ -24,19 +25,8 @@ export const esGetTraceById = async (
 export const tracesRouter = createTRPCRouter({
   getAllForProject: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .query(async ({ input, ctx }) => {
-      const userId = ctx.session.user.id;
-      const prisma = ctx.prisma;
-
-      const projectTeam = await prisma.project.findUnique({
-        where: { id: input.projectId },
-        select: { team: { select: { members: { where: { userId } } } } },
-      });
-
-      if (!projectTeam || projectTeam.team.members.length === 0) {
-        throw new TRPCError({ code: "UNAUTHORIZED" });
-      }
-
+    .use(checkUserPermissionForProject)
+    .query(async ({ input }) => {
       const tracesResult = await esClient.search<Trace>({
         index: TRACE_INDEX,
         size: 1_000,
@@ -56,53 +46,12 @@ export const tracesRouter = createTRPCRouter({
         .map((hit) => hit._source!)
         .filter((x) => x);
 
-      const checksResult = await esClient.search<TraceCheck>({
-        index: TRACE_CHECKS_INDEX,
-        body: {
-          size: traces.length * 100,
-          query: {
-            terms: {
-              trace_id: traces.map((trace) => trace.id),
-            },
-          },
-        },
-      });
-
-      const checksByTraceId: Record<string, TraceCheck[]> =
-        checksResult.hits.hits.reduce(
-          (acc: Record<string, TraceCheck[]>, hit) => {
-            const check = hit._source!;
-            if (!acc[check.trace_id]) {
-              acc[check.trace_id] = [];
-            }
-            acc[check.trace_id]?.push(check);
-            return acc;
-          },
-          {}
-        );
-
-      const tracesWithChecks: TraceWithChecks[] = traces.map((trace) => ({
-        ...trace,
-        checks: checksByTraceId[trace.id] ?? [],
-      }));
-
-      return tracesWithChecks;
+      return traces;
     }),
   getById: protectedProcedure
     .input(z.object({ projectId: z.string(), traceId: z.string() }))
-    .query(async ({ input, ctx }) => {
-      const userId = ctx.session.user.id;
-      const prisma = ctx.prisma;
-
-      const projectTeam = await prisma.project.findUnique({
-        where: { id: input.projectId },
-        select: { team: { select: { members: { where: { userId } } } } },
-      });
-
-      if (!projectTeam || projectTeam.team.members.length === 0) {
-        throw new TRPCError({ code: "UNAUTHORIZED" });
-      }
-
+    .use(checkUserPermissionForProject)
+    .query(async ({ input }) => {
       const result = await esClient.search<Trace>({
         index: TRACE_INDEX,
         body: {
@@ -126,5 +75,51 @@ export const tracesRouter = createTRPCRouter({
       }
 
       return trace;
+    }),
+  getTraceChecks: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        traceIds: z.array(z.string()),
+      })
+    )
+    .use(checkUserPermissionForProject)
+    .query(async ({ input }) => {
+      const { projectId, traceIds } = input;
+
+      const checksResult = await esClient.search<TraceCheck>({
+        index: TRACE_CHECKS_INDEX,
+        body: {
+          size: traceIds.length * 100, // Assuming a maximum of 100 checks per trace
+          query: {
+            //@ts-ignore
+            bool: {
+              filter: [
+                { terms: { trace_id: traceIds } },
+                { term: { project_id: projectId } },
+              ],
+            },
+          },
+        },
+      });
+
+      const traceChecks = checksResult.hits.hits
+        .map((hit) => hit._source!)
+        .filter((x) => x);
+
+      const checksPerTrace = traceChecks.reduce(
+        (acc, check) => {
+          if (check) {
+            if (!acc[check.trace_id]) {
+              acc[check.trace_id] = [];
+            }
+            acc[check.trace_id]!.push(check);
+          }
+          return acc;
+        },
+        {} as Record<string, TraceCheck[]>
+      );
+
+      return checksPerTrace;
     }),
 });

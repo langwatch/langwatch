@@ -43,12 +43,13 @@ import { DashboardLayout } from "../../components/DashboardLayout";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
 import { formatMilliseconds } from "../../utils/formatMilliseconds";
-import type { TraceWithChecks } from "../../server/tracer/types";
+import type { Trace, TraceCheck } from "../../server/tracer/types";
 import {
   renderCheck,
   verifyIfCheckPasses,
 } from "../../server/trace_checks/checkPassing";
 import { ProjectIntegration } from "../../components/ProjectIntegration";
+import type { Project } from "@prisma/client";
 
 export default function MessagesOrIntegrationGuide() {
   const { project } = useOrganizationTeamProject();
@@ -69,231 +70,11 @@ function Messages() {
       enabled: !!project,
     }
   );
-
-  const Message = ({ trace }: { trace: TraceWithChecks }) => {
-    const checksDone = trace.checks.every(
-      (check) => check.status == "succeeded" || check.status == "failed"
-    );
-    const checkPasses = trace.checks.filter((check) =>
-      verifyIfCheckPasses(check)
-    ).length;
-    const totalChecks = trace.checks.length;
-
-    return (
-      <Link
-        width="full"
-        href={`/${project?.slug}/messages/${trace.id}`}
-        _hover={{ textDecoration: "none" }}
-      >
-        <Card
-          padding={0}
-          cursor="pointer"
-          width="full"
-          transitionDuration="0.2s"
-          transitionTimingFunction="ease-in-out"
-          _hover={{
-            transform: "scale(1.04)",
-          }}
-        >
-          <Box position="absolute" right={5} top={5}>
-            <Maximize2 />
-          </Box>
-          <CardBody padding={8} width="fill">
-            <VStack alignItems="flex-start" spacing={4} width="fill">
-              <VStack alignItems="flex-start" spacing={8}>
-                <VStack alignItems="flex-start" spacing={2}>
-                  <Box
-                    fontSize={11}
-                    color="gray.400"
-                    textTransform="uppercase"
-                    fontWeight="bold"
-                  >
-                    Input
-                  </Box>
-                  <Box fontWeight="bold">{getSlicedInput(trace)}</Box>
-                </VStack>
-                {trace.error && !trace.output?.value ? (
-                  <VStack alignItems="flex-start" spacing={2}>
-                    <Box
-                      fontSize={11}
-                      color="red.400"
-                      textTransform="uppercase"
-                      fontWeight="bold"
-                    >
-                      Exception
-                    </Box>
-                    <Text color="red.900">{trace.error.message}</Text>
-                  </VStack>
-                ) : (
-                  <VStack alignItems="flex-start" spacing={2}>
-                    <Box
-                      fontSize={11}
-                      color="gray.400"
-                      textTransform="uppercase"
-                      fontWeight="bold"
-                    >
-                      Generated
-                    </Box>
-                    <Box>
-                      {trace.output?.value ? (
-                        <Markdown className="markdown">
-                          {getSlicedOutput(trace)}
-                        </Markdown>
-                      ) : (
-                        <Text>{"<empty>"}</Text>
-                      )}
-                    </Box>
-                  </VStack>
-                )}
-              </VStack>
-              <Spacer />
-              <HStack width="full" alignItems="flex-end">
-                <VStack gap={4} alignItems="flex-start">
-                  <HStack spacing={2}>
-                    <Tag background="blue.50" color="blue.600">
-                      Chatbot
-                    </Tag>
-                    <Tag background="orange.100" color="orange.600">
-                      Small Talk
-                    </Tag>
-                  </HStack>
-                  <HStack fontSize={12} color="gray.400">
-                    <Tooltip
-                      label={new Date(
-                        trace.timestamps.started_at
-                      ).toLocaleString()}
-                    >
-                      <Text
-                        borderBottomWidth="1px"
-                        borderBottomColor="gray.300"
-                        borderBottomStyle="dashed"
-                      >
-                        {formatDistanceToNow(
-                          new Date(trace.timestamps.started_at),
-                          {
-                            addSuffix: true,
-                          }
-                        )}
-                      </Text>
-                    </Tooltip>
-                    {(!!trace.metrics.completion_tokens ||
-                      !!trace.metrics.prompt_tokens) && (
-                      <>
-                        <Text>·</Text>
-                        <HStack>
-                          <Box>{getTotalTokensDisplay(trace)}</Box>
-                          {trace.metrics.tokens_estimated && (
-                            <Tooltip label="token count is calculated by LangWatch when not available from the trace data">
-                              <HelpCircle width="14px" />
-                            </Tooltip>
-                          )}
-                        </HStack>
-                      </>
-                    )}
-                    {!!trace.metrics.first_token_ms && (
-                      <>
-                        <Text>·</Text>
-                        <Box>
-                          {formatMilliseconds(trace.metrics.first_token_ms)} to
-                          first token
-                        </Box>
-                      </>
-                    )}
-                    {!!trace.metrics.total_time_ms && (
-                      <>
-                        <Text>·</Text>
-                        <Box>
-                          {formatMilliseconds(trace.metrics.total_time_ms)}{" "}
-                          completion time
-                        </Box>
-                      </>
-                    )}
-                    {!!trace.error && trace.output?.value && (
-                      <>
-                        <Text>·</Text>
-                        <HStack>
-                          <Box
-                            width={2}
-                            height={2}
-                            background="red.400"
-                            borderRadius="100%"
-                          ></Box>
-                          <Text>Exception ocurred</Text>
-                        </HStack>
-                      </>
-                    )}
-                  </HStack>
-                </VStack>
-                <Spacer />
-                {totalChecks > 0 && (
-                  <Popover trigger="hover">
-                    <PopoverTrigger>
-                      <Tag
-                        variant="outline"
-                        boxShadow="#DEDEDE 0px 0px 0px 1px inset"
-                        color={
-                          !checksDone
-                            ? "yellow.600"
-                            : checkPasses == totalChecks
-                            ? "green.600"
-                            : "red.600"
-                        }
-                        paddingY={1}
-                        paddingX={2}
-                      >
-                        <Box paddingRight={2}>
-                          {!checksDone ? (
-                            <Clock />
-                          ) : checkPasses == totalChecks ? (
-                            <CheckCircle />
-                          ) : (
-                            <XCircle />
-                          )}
-                        </Box>
-                        {checkPasses}/{totalChecks} checks
-                      </Tag>
-                    </PopoverTrigger>
-                    <Portal>
-                      <Box zIndex="popover">
-                        <PopoverContent zIndex={2}>
-                          <PopoverArrow />
-                          <PopoverHeader>Trace Checks</PopoverHeader>
-                          <PopoverBody>
-                            {trace.checks.map((check) => renderCheck(check))}
-                          </PopoverBody>
-                        </PopoverContent>
-                      </Box>
-                    </Portal>
-                  </Popover>
-                )}
-              </HStack>
-            </VStack>
-          </CardBody>
-        </Card>
-      </Link>
-    );
-  };
-
-  const MessageSkeleton = () => {
-    return (
-      <Card width="full" padding={0}>
-        <CardBody padding={8}>
-          <VStack alignItems="flex-start" spacing={4}>
-            <HStack spacing={12} width="full">
-              <Box fontSize={24} fontWeight="bold" width="full">
-                <Skeleton width="50%" height="20px" />
-              </Box>
-            </HStack>
-            <VStack gap={4} width="full">
-              <Skeleton width="full" height="20px" />
-              <Skeleton width="full" height="20px" />
-              <Skeleton width="full" height="20px" />
-            </VStack>
-          </VStack>
-        </CardBody>
-      </Card>
-    );
-  };
+  const traceIds = traces.data?.map((trace) => trace.id) ?? [];
+  const traceChecksQuery = api.traces.getTraceChecks.useQuery(
+    { projectId: project?.id ?? "", traceIds },
+    { enabled: traceIds.length > 0 }
+  );
 
   return (
     <DashboardLayout>
@@ -335,7 +116,14 @@ function Messages() {
       <Container maxWidth="1200" padding={6}>
         <VStack gap={6}>
           {traces.data && traces.data.length > 0 ? (
-            traces.data.map((trace) => <Message key={trace.id} trace={trace} />)
+            traces.data.map((trace) => (
+              <Message
+                key={trace.id}
+                project={project}
+                trace={trace}
+                checksMap={traceChecksQuery.data}
+              />
+            ))
           ) : traces.data ? (
             <Alert status="info">
               <AlertIcon />
@@ -358,3 +146,238 @@ function Messages() {
     </DashboardLayout>
   );
 }
+
+const Message = ({
+  project,
+  trace,
+  checksMap,
+}: {
+  project: Project | undefined;
+  trace: Trace;
+  checksMap: Record<string, TraceCheck[]> | undefined;
+}) => {
+  const traceChecks = checksMap ? checksMap[trace.id] ?? [] : [];
+  const checksDone = traceChecks.every(
+    (check) => check.status == "succeeded" || check.status == "failed"
+  );
+  const checkPasses = traceChecks.filter((check) =>
+    verifyIfCheckPasses(check)
+  ).length;
+  const totalChecks = traceChecks.length;
+
+  return (
+    <Link
+      width="full"
+      href={`/${project?.slug}/messages/${trace.id}`}
+      _hover={{ textDecoration: "none" }}
+    >
+      <Card
+        padding={0}
+        cursor="pointer"
+        width="full"
+        transitionDuration="0.2s"
+        transitionTimingFunction="ease-in-out"
+        _hover={{
+          transform: "scale(1.04)",
+        }}
+      >
+        <Box position="absolute" right={5} top={5}>
+          <Maximize2 />
+        </Box>
+        <CardBody padding={8} width="fill">
+          <VStack alignItems="flex-start" spacing={4} width="fill">
+            <VStack alignItems="flex-start" spacing={8}>
+              <VStack alignItems="flex-start" spacing={2}>
+                <Box
+                  fontSize={11}
+                  color="gray.400"
+                  textTransform="uppercase"
+                  fontWeight="bold"
+                >
+                  Input
+                </Box>
+                <Box fontWeight="bold">{getSlicedInput(trace)}</Box>
+              </VStack>
+              {trace.error && !trace.output?.value ? (
+                <VStack alignItems="flex-start" spacing={2}>
+                  <Box
+                    fontSize={11}
+                    color="red.400"
+                    textTransform="uppercase"
+                    fontWeight="bold"
+                  >
+                    Exception
+                  </Box>
+                  <Text color="red.900">{trace.error.message}</Text>
+                </VStack>
+              ) : (
+                <VStack alignItems="flex-start" spacing={2}>
+                  <Box
+                    fontSize={11}
+                    color="gray.400"
+                    textTransform="uppercase"
+                    fontWeight="bold"
+                  >
+                    Generated
+                  </Box>
+                  <Box>
+                    {trace.output?.value ? (
+                      <Markdown className="markdown">
+                        {getSlicedOutput(trace)}
+                      </Markdown>
+                    ) : (
+                      <Text>{"<empty>"}</Text>
+                    )}
+                  </Box>
+                </VStack>
+              )}
+            </VStack>
+            <Spacer />
+            <HStack width="full" alignItems="flex-end">
+              <VStack gap={4} alignItems="flex-start">
+                <HStack spacing={2}>
+                  <Tag background="blue.50" color="blue.600">
+                    Chatbot
+                  </Tag>
+                  <Tag background="orange.100" color="orange.600">
+                    Small Talk
+                  </Tag>
+                </HStack>
+                <HStack fontSize={12} color="gray.400">
+                  <Tooltip
+                    label={new Date(
+                      trace.timestamps.started_at
+                    ).toLocaleString()}
+                  >
+                    <Text
+                      borderBottomWidth="1px"
+                      borderBottomColor="gray.300"
+                      borderBottomStyle="dashed"
+                    >
+                      {formatDistanceToNow(
+                        new Date(trace.timestamps.started_at),
+                        {
+                          addSuffix: true,
+                        }
+                      )}
+                    </Text>
+                  </Tooltip>
+                  {(!!trace.metrics.completion_tokens ||
+                    !!trace.metrics.prompt_tokens) && (
+                    <>
+                      <Text>·</Text>
+                      <HStack>
+                        <Box>{getTotalTokensDisplay(trace)}</Box>
+                        {trace.metrics.tokens_estimated && (
+                          <Tooltip label="token count is calculated by LangWatch when not available from the trace data">
+                            <HelpCircle width="14px" />
+                          </Tooltip>
+                        )}
+                      </HStack>
+                    </>
+                  )}
+                  {!!trace.metrics.first_token_ms && (
+                    <>
+                      <Text>·</Text>
+                      <Box>
+                        {formatMilliseconds(trace.metrics.first_token_ms)} to
+                        first token
+                      </Box>
+                    </>
+                  )}
+                  {!!trace.metrics.total_time_ms && (
+                    <>
+                      <Text>·</Text>
+                      <Box>
+                        {formatMilliseconds(trace.metrics.total_time_ms)}{" "}
+                        completion time
+                      </Box>
+                    </>
+                  )}
+                  {!!trace.error && trace.output?.value && (
+                    <>
+                      <Text>·</Text>
+                      <HStack>
+                        <Box
+                          width={2}
+                          height={2}
+                          background="red.400"
+                          borderRadius="100%"
+                        ></Box>
+                        <Text>Exception ocurred</Text>
+                      </HStack>
+                    </>
+                  )}
+                </HStack>
+              </VStack>
+              <Spacer />
+              {!checksMap && <Skeleton width={100} height="1em" />}
+              {checksMap && totalChecks > 0 && (
+                <Popover trigger="hover">
+                  <PopoverTrigger>
+                    <Tag
+                      variant="outline"
+                      boxShadow="#DEDEDE 0px 0px 0px 1px inset"
+                      color={
+                        !checksDone
+                          ? "yellow.600"
+                          : checkPasses == totalChecks
+                          ? "green.600"
+                          : "red.600"
+                      }
+                      paddingY={1}
+                      paddingX={2}
+                    >
+                      <Box paddingRight={2}>
+                        {!checksDone ? (
+                          <Clock />
+                        ) : checkPasses == totalChecks ? (
+                          <CheckCircle />
+                        ) : (
+                          <XCircle />
+                        )}
+                      </Box>
+                      {checkPasses}/{totalChecks} checks
+                    </Tag>
+                  </PopoverTrigger>
+                  <Portal>
+                    <Box zIndex="popover">
+                      <PopoverContent zIndex={2}>
+                        <PopoverArrow />
+                        <PopoverHeader>Trace Checks</PopoverHeader>
+                        <PopoverBody>
+                          {traceChecks.map((check) => renderCheck(check))}
+                        </PopoverBody>
+                      </PopoverContent>
+                    </Box>
+                  </Portal>
+                </Popover>
+              )}
+            </HStack>
+          </VStack>
+        </CardBody>
+      </Card>
+    </Link>
+  );
+};
+
+const MessageSkeleton = () => {
+  return (
+    <Card width="full" padding={0}>
+      <CardBody padding={8}>
+        <VStack alignItems="flex-start" spacing={4}>
+          <HStack spacing={12} width="full">
+            <Box fontSize={24} fontWeight="bold" width="full">
+              <Skeleton width="50%" height="20px" />
+            </Box>
+          </HStack>
+          <VStack gap={4} width="full">
+            <Skeleton width="full" height="20px" />
+            <Skeleton width="full" height="20px" />
+            <Skeleton width="full" height="20px" />
+          </VStack>
+        </VStack>
+      </CardBody>
+    </Card>
+  );
+};

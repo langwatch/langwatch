@@ -2,38 +2,7 @@ import { z } from "zod";
 
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { TRACE_CHECKS_INDEX, TRACE_INDEX, esClient } from "../../elasticsearch";
-import type { PrismaClient } from "@prisma/client";
-import type { Session } from "next-auth";
-import { TRPCError } from "@trpc/server";
-
-const checkUserPermissionForProject = async ({
-  ctx,
-  input,
-  next,
-}: {
-  ctx: { prisma: PrismaClient; session: Session };
-  input: { projectId: string };
-  next: () => any;
-}) => {
-  const teamUser = await ctx.prisma.teamUser.findFirst({
-    where: {
-      userId: ctx.session.user.id,
-      team: {
-        projects: {
-          some: {
-            id: input.projectId,
-          },
-        },
-      },
-    },
-  });
-
-  if (!teamUser) {
-    throw new TRPCError({ code: "UNAUTHORIZED" });
-  }
-
-  return next();
-};
+import { checkUserPermissionForProject } from "../permission";
 
 export const analyticsRouter = createTRPCRouter({
   getTracesAnalyticsPerDay: protectedProcedure

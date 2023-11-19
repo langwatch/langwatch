@@ -162,7 +162,3 @@ export type TraceCheck = {
     finished_at?: number;
   };
 };
-
-export type TraceWithChecks = Trace & {
-  checks: TraceCheck[];
-};
