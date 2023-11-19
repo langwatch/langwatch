@@ -32,35 +32,44 @@ import {
   BarChart,
 } from "recharts";
 import { format } from "date-fns";
+import { useState } from "react";
+import { addDays, differenceInCalendarDays } from "date-fns";
 import { useEffect } from "react";
 import { api } from "../../utils/api";
 import { UTF8WhitespaceHolder } from "../../components/misc/UTF8WhitespaceHolder";
 import numeral from "numeral";
 
-const endDate = new Date();
-const startDate = new Date();
-startDate.setDate(endDate.getDate() - 30 + 1);
-
 export default function Index() {
   const router = useRouter();
   const { project } = useOrganizationTeamProject();
+  const [startDate, setStartDate] = useState(
+    format(addDays(new Date(), -15), "yyyy-MM-dd")
+  );
+  const [endDate, setEndDate] = useState(format(new Date(), "yyyy-MM-dd"));
+  const daysDifference = differenceInCalendarDays(
+    new Date(endDate),
+    new Date(startDate)
+  );
 
   const analytics = api.analytics.getTracesAnalyticsPerDay.useQuery(
     {
       projectId: project?.id ?? "",
-      startDate: startDate.toISOString(),
-      endDate: endDate.toISOString(),
+      startDate: format(
+        addDays(new Date(startDate), -daysDifference),
+        "yyyy-MM-dd"
+      ),
+      endDate: endDate,
     },
-    { enabled: !!project?.id }
+    { enabled: !!project?.id && !!startDate && !!endDate }
   );
-  const messagesData = analytics.data?.slice(15);
-  const messagesPreviousPeriod = analytics.data?.slice(0, 15);
+  const messagesData = analytics.data?.slice(daysDifference);
+  const messagesPreviousPeriod = analytics.data?.slice(0, daysDifference);
   const messagesTotal = analytics.data?.reduce(
     (acc, curr) => acc + curr.count,
     0
   );
-  const costsData = analytics.data?.slice(15);
-  const costsPreviousPeriod = analytics.data?.slice(0, 15);
+  const costsData = analytics.data?.slice(daysDifference);
+  const costsPreviousPeriod = analytics.data?.slice(0, daysDifference);
   const costsTotal = analytics.data?.reduce(
     (acc, curr) => acc + curr.total_cost,
     0
@@ -81,6 +90,30 @@ export default function Index() {
     <DashboardLayout>
       <Container maxWidth="1200" padding={6}>
         <Grid width="100%" templateColumns="1fr 0.5fr" gap={6}>
+          <GridItem colSpan={2}>
+            <Card>
+              <CardBody>
+                <Grid templateColumns="1fr 1fr" gap={6}>
+                  <GridItem>
+                    <Text mb={2}>Start Date</Text>
+                    <input
+                      type="date"
+                      value={startDate}
+                      onChange={(e) => setStartDate(e.target.value)}
+                    />
+                  </GridItem>
+                  <GridItem>
+                    <Text mb={2}>End Date</Text>
+                    <input
+                      type="date"
+                      value={endDate}
+                      onChange={(e) => setEndDate(e.target.value)}
+                    />
+                  </GridItem>
+                </Grid>
+              </CardBody>
+            </Card>
+          </GridItem>
           <GridItem>
             <Card>
               <CardBody>
