@@ -63,10 +63,11 @@ export const useOrganizationTeamProject = (
     if (team && team.id !== teamId) {
       setTeamId(team.id);
     }
-    if (project && project.slug !== projectSlug) {
+    if (project && project.slug !== localStorageProjectSlug) {
       setProjectSlug(project.slug);
     }
   }, [
+    localStorageProjectSlug,
     organization,
     organizationId,
     project,
