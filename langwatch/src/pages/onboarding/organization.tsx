@@ -63,7 +63,8 @@ export default function OrganizationOnboarding() {
 
   return (
     <SetupLayout>
-      <form onSubmit={void handleSubmit(onSubmit)}>
+      {/* eslint-disable-next-line @typescript-eslint/no-misused-promises */}
+      <form onSubmit={handleSubmit(onSubmit)}>
         <VStack gap={4} alignItems="left">
           <Heading as="h1" fontSize="x-large">
             Setup Organization

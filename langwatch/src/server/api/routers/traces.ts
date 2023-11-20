@@ -90,7 +90,7 @@ export const tracesRouter = createTRPCRouter({
       const checksResult = await esClient.search<TraceCheck>({
         index: TRACE_CHECKS_INDEX,
         body: {
-          size: Math.min(traceIds.length * 100, 10000), // Assuming a maximum of 100 checks per trace
+          size: Math.min(traceIds.length * 100, 10_000), // Assuming a maximum of 100 checks per trace
           query: {
             //@ts-ignore
             bool: {
