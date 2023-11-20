@@ -19,6 +19,7 @@ import Head from "next/head";
 import { useRouter } from "next/router";
 import NProgress from "nprogress";
 import { useEffect } from "react";
+import { Analytics } from '@vercel/analytics/react';
 //@ts-ignore
 import _dependencies from "@injected-dependencies";
 import { type Dependencies } from "../injection";
@@ -116,6 +117,7 @@ const LangWatch: AppType<{
           />
         </Head>
         <Component {...pageProps} />
+        <Analytics />
       </ChakraProvider>
     </SessionProvider>
   );
