@@ -20,6 +20,7 @@ import {
   type BackgroundProps,
   Hide,
 } from "@chakra-ui/react";
+import { signOut } from "next-auth/react";
 import type { Project } from "@prisma/client";
 import ErrorPage from "next/error";
 import Head from "next/head";
@@ -45,6 +46,7 @@ import { findCurrentRoute, projectRoutes, type Route } from "../utils/routes";
 import { LoadingScreen } from "./LoadingScreen";
 import { ProjectTechStackIcon } from "./TechStack";
 import { LogoIcon } from "./icons/LogoIcon";
+import { env } from "../env.mjs";
 
 const Breadcrumbs = ({ currentRoute }: { currentRoute: Route | undefined }) => {
   const { project } = useOrganizationTeamProject();
@@ -332,12 +334,23 @@ export const DashboardLayout = ({
             />
           </InputGroup>
           <Spacer />
-          <Avatar
-            name={user.name ?? undefined}
-            backgroundColor="orange.400"
-            color="white"
-            size="sm"
-          />
+          <Menu>
+            <MenuButton as={Button} variant="unstyled">
+              <Avatar
+                name={user.name ?? undefined}
+                backgroundColor="orange.400"
+                color="white"
+                size="sm"
+              />
+            </MenuButton>
+            <Portal>
+              <MenuList>
+                <MenuItem onClick={() => void router.push("/api/auth/signout")}>
+                  Logout
+                </MenuItem>
+              </MenuList>
+            </Portal>
+          </Menu>
         </HStack>
         {children}
       </VStack>
