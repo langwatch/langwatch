@@ -30,58 +30,71 @@ export const process = async (
 export const start = (
   processMock:
     | ((job: Job<any, any, string>) => Promise<TraceCheckResult>)
-    | undefined = undefined
+    | undefined = undefined,
+  maxRuntimeMs: number | undefined = undefined
 ) => {
-  const processFn = processMock ?? process;
+  return new Promise((resolve) => {
+    const processFn = processMock ?? process;
 
-  const worker = new Worker(
-    "trace_checks",
-    async (job) => {
-      if (env.NODE_ENV !== "test" && job.data.trace_id.includes("test-trace")) {
-        return;
+    const worker = new Worker(
+      "trace_checks",
+      async (job) => {
+        if (
+          env.NODE_ENV !== "test" &&
+          job.data.trace_id.includes("test-trace")
+        ) {
+          return;
+        }
+
+        try {
+          debug(`Processing job ${job.id} with data:`, job.data);
+          const result = await processFn(job);
+
+          await updateCheckStatusInES({
+            check_type: job.name,
+            trace_id: job.data.trace_id,
+            project_id: job.data.project_id,
+            status: "succeeded",
+            raw_result: result.raw_result,
+            value: result.value,
+          });
+          debug("Successfully processed job:", job.id);
+        } catch (error) {
+          await updateCheckStatusInES({
+            check_type: job.name,
+            trace_id: job.data.trace_id,
+            project_id: job.data.project_id,
+            status: "failed",
+            error: error,
+          });
+          debug("Failed to process job:", job.id, error);
+
+          throw error;
+        }
+      },
+      {
+        connection,
+        concurrency: 3,
       }
+    );
 
-      try {
-        debug(`Processing job ${job.id} with data:`, job.data);
-        const result = await processFn(job);
+    worker.on("ready", () => {
+      debug("Worker active, waiting for jobs!");
+    });
 
-        await updateCheckStatusInES({
-          check_type: job.name,
-          trace_id: job.data.trace_id,
-          project_id: job.data.project_id,
-          status: "succeeded",
-          raw_result: result.raw_result,
-          value: result.value,
+    worker.on("failed", (job, err) => {
+      debug(`Job ${job?.id} failed with error ${err.message}`);
+    });
+
+    debug("Trace checks worker registered");
+
+    if (maxRuntimeMs) {
+      setTimeout(() => {
+        void worker.close().then(() => {
+          debug("Worker finished pooling");
+          resolve(undefined);
         });
-        debug("Successfully processed job:", job.id);
-      } catch (error) {
-        await updateCheckStatusInES({
-          check_type: job.name,
-          trace_id: job.data.trace_id,
-          project_id: job.data.project_id,
-          status: "failed",
-          error: error,
-        });
-        debug("Failed to process job:", job.id, error);
-
-        throw error;
-      }
-    },
-    {
-      connection,
-      concurrency: 3,
+      }, maxRuntimeMs);
     }
-  );
-
-  worker.on("ready", () => {
-    debug("Worker active, waiting for jobs!");
   });
-
-  worker.on("failed", (job, err) => {
-    debug(`Job ${job?.id} failed with error ${err.message}`);
-  });
-
-  debug("Trace checks worker registered");
-
-  return worker;
 };
