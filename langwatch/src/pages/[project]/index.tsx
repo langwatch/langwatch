@@ -233,7 +233,7 @@ export default function Index() {
                     <Tab paddingX={0} paddingBottom={4}>
                       <VStack align="start">
                         <Text color="black">Messages</Text>
-                        <Text fontSize={24} color="black" fontWeight="bold">
+                        <Box fontSize={24} color="black" fontWeight="bold">
                           {messagesTotal !== undefined ? (
                             numeral(messagesTotal).format("0a")
                           ) : (
@@ -241,13 +241,13 @@ export default function Index() {
                               <Skeleton height="1em" width="80px" />
                             </Box>
                           )}
-                        </Text>
+                        </Box>
                       </VStack>
                     </Tab>
                     <Tab paddingX={0} paddingBottom={4}>
                       <VStack align="start">
                         <Text color="black">Cost</Text>
-                        <Text fontSize={24} color="black" fontWeight="bold">
+                        <Box fontSize={24} color="black" fontWeight="bold">
                           {costsTotal !== undefined ? (
                             numeral(costsTotal).format("$0.00a")
                           ) : (
@@ -255,13 +255,13 @@ export default function Index() {
                               <Skeleton height="1em" width="80px" />
                             </Box>
                           )}
-                        </Text>
+                        </Box>
                       </VStack>
                     </Tab>
                     <Tab paddingX={0} paddingBottom={4}>
                       <VStack align="start">
                         <Text color="black">Tokens</Text>
-                        <Text fontSize={24} color="black" fontWeight="bold">
+                        <Box fontSize={24} color="black" fontWeight="bold">
                           {tokensTotal !== undefined ? (
                             numeral(tokensTotal).format("0a")
                           ) : (
@@ -269,7 +269,7 @@ export default function Index() {
                               <Skeleton height="1em" width="80px" />
                             </Box>
                           )}
-                        </Text>
+                        </Box>
                       </VStack>
                     </Tab>
                   </TabList>
@@ -366,7 +366,7 @@ export default function Index() {
                     <Box color="red.600">
                       <XCircle />
                     </Box>
-                    <Text>
+                    <Box>
                       {traceCheckStatusCounts.data ? (
                         numeral(traceCheckStatusCounts.data.failed).format(
                           "0a"
@@ -374,13 +374,13 @@ export default function Index() {
                       ) : (
                         <Skeleton height="1em" width="140px" />
                       )}
-                    </Text>
+                    </Box>
                   </HStack>
                   <HStack>
                     <Box color="green.600">
                       <CheckCircle />
                     </Box>
-                    <Text>
+                    <Box>
                       {traceCheckStatusCounts.data ? (
                         numeral(traceCheckStatusCounts.data.succeeded).format(
                           "0a"
@@ -388,7 +388,7 @@ export default function Index() {
                       ) : (
                         <Skeleton height="1em" width="170px" />
                       )}
-                    </Text>
+                    </Box>
                   </HStack>
                 </VStack>
               </CardBody>
@@ -425,7 +425,7 @@ function SummaryMetric({
       >
         {label}
       </Heading>
-      <Text fontSize="28" fontWeight="600">
+      <Box fontSize="28" fontWeight="600">
         {value ? (
           value
         ) : (
@@ -433,7 +433,7 @@ function SummaryMetric({
             <Skeleton height="1em" width="80px" />
           </Box>
         )}
-      </Text>
+      </Box>
     </VStack>
   );
 }
