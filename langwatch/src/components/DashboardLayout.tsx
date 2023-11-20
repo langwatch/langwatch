@@ -345,7 +345,11 @@ export const DashboardLayout = ({
             </MenuButton>
             <Portal>
               <MenuList>
-                <MenuItem onClick={() => void router.push("/api/auth/signout")}>
+                <MenuItem
+                  onClick={() =>
+                    void signOut({ callbackUrl: window.location.origin })
+                  }
+                >
                   Logout
                 </MenuItem>
               </MenuList>
