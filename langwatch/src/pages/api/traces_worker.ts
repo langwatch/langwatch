@@ -8,7 +8,7 @@ export default async function handler(
   res: NextApiResponse
 ) {
   try {
-    const maxRuntimeMs = (maxDuration - 3) * 1000; // Little buffer of 3s
+    const maxRuntimeMs = (maxDuration - 60) * 1000; // Runs for a minute less than the max duration
 
     await start(undefined, maxRuntimeMs);
 

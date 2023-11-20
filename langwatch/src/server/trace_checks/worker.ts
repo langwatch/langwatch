@@ -90,8 +90,9 @@ export const start = (
 
     if (maxRuntimeMs) {
       setTimeout(() => {
+        debug("Max runtime reached, closing worker");
         void worker.close().then(() => {
-          debug("Worker finished pooling");
+          debug("Worker closed");
           resolve(undefined);
         });
       }, maxRuntimeMs);
