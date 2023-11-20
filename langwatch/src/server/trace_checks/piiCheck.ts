@@ -25,7 +25,6 @@ const execute = async (
         { name: "CREDIT_CARD_NUMBER" },
         { name: "IBAN_CODE" },
         { name: "IP_ADDRESS" },
-        { name: "LOCATION" },
         { name: "PASSPORT" },
         { name: "VAT_NUMBER" },
         { name: "MEDICAL_RECORD_NUMBER" },
