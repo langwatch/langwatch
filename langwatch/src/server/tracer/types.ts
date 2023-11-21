@@ -144,6 +144,9 @@ export type Trace = {
     tokens_estimated?: boolean | null;
   };
   error?: ErrorCapture | null;
+  search_embeddings: {
+    openai_embeddings?: number[];
+  };
 };
 
 export type TraceCheck = {

@@ -7,7 +7,7 @@ export const SPAN_INDEX = "search-spans";
 
 export const TRACE_CHECKS_INDEX = "search-trace-checks";
 
-export const EMBEDDING_DIMENSION = 1536;
+export const OPENAI_EMBEDDING_DIMENSION = 1536;
 
 export const esClient = new Client({
   node: env.ELASTICSEARCH_NODE_URL,

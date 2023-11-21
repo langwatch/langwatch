@@ -5,6 +5,7 @@ import type { Trace, TraceCheck } from "../../tracer/types";
 import { TRACE_CHECKS_INDEX, TRACE_INDEX, esClient } from "../../elasticsearch";
 import { TRPCError } from "@trpc/server";
 import { checkUserPermissionForProject } from "../permission";
+import { getOpenAIEmbeddings } from "../../embeddings";
 
 export const esGetTraceById = async (
   traceId: string
@@ -29,25 +30,57 @@ export const tracesRouter = createTRPCRouter({
         projectId: z.string(),
         startDate: z.number(),
         endDate: z.number(),
+        query: z.string().optional(),
       })
     )
     .use(checkUserPermissionForProject)
     .query(async ({ input }) => {
+      const embeddings = input.query
+        ? await getOpenAIEmbeddings(input.query)
+        : [];
+
       //@ts-ignore
       const tracesResult = await esClient.search<Trace>({
         index: TRACE_INDEX,
         size: 1_000,
-        sort: {
-          "timestamps.started_at": {
-            order: "desc",
-          },
-        },
+        ...(!input.query
+          ? {
+              sort: {
+                "timestamps.started_at": {
+                  order: "desc",
+                },
+              },
+            }
+          : {}),
         body: {
           query: {
             bool: {
-              must: {
-                term: { project_id: input.projectId },
-              },
+              must: [
+                {
+                  term: { project_id: input.projectId },
+                },
+                ...(input.query
+                  ? [
+                      {
+                        bool: {
+                          should: [
+                            {
+                              match: {
+                                "input.value": input.query,
+                              },
+                            },
+                            {
+                              match: {
+                                "output.value": input.query,
+                              },
+                            },
+                          ],
+                          minimum_should_match: 1,
+                        },
+                      },
+                    ]
+                  : []),
+              ],
               filter: {
                 range: {
                   "timestamps.started_at": {
@@ -57,6 +90,38 @@ export const tracesRouter = createTRPCRouter({
                   },
                 },
               },
+            },
+          },
+          ...(input.query
+            ? {
+                knn: {
+                  field: "search_embeddings.openai_embeddings",
+                  query_vector: embeddings,
+                  k: 10,
+                  num_candidates: 100,
+                },
+                rank: {
+                  rrf: { window_size: 1_000 },
+                },
+              }
+            : {}),
+          // Ensures proper filters are applied even with knn
+          post_filter: {
+            bool: {
+              must: [
+                {
+                  term: { project_id: input.projectId },
+                },
+                {
+                  range: {
+                    "timestamps.started_at": {
+                      gte: input.startDate,
+                      lte: input.endDate,
+                      format: "epoch_millis",
+                    },
+                  },
+                },
+              ],
             },
           },
         },

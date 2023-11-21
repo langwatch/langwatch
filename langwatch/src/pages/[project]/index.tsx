@@ -61,7 +61,7 @@ export default function Index() {
     {
       projectId: project?.id ?? "",
       startDate: addDays(startDate, -daysDifference).getTime(),
-      endDate: endOfDay(endDate).getTime(),
+      endDate: endDate.getTime(),
     },
     {
       enabled: !!project?.id && !!startDate && !!endDate,
@@ -83,8 +83,8 @@ export default function Index() {
   const usageMetrics = api.analytics.getUsageMetrics.useQuery(
     {
       projectId: project?.id ?? "",
-      startDate: startOfDay(startDate).getTime(),
-      endDate: endOfDay(endDate).getTime(),
+      startDate: startDate.getTime(),
+      endDate: endDate.getTime(),
     },
     {
       enabled: !!project?.id && !!startDate && !!endDate,
@@ -96,8 +96,8 @@ export default function Index() {
     api.analytics.getTraceCheckStatusCounts.useQuery(
       {
         projectId: project?.id ?? "",
-        startDate: startOfDay(startDate).getTime(),
-        endDate: endOfDay(endDate).getTime(),
+        startDate: startDate.getTime(),
+        endDate: endDate.getTime(),
       },
       {
         enabled: !!project?.id && !!startDate && !!endDate,

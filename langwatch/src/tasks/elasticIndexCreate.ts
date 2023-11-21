@@ -1,6 +1,6 @@
 import { type MappingProperty } from "@elastic/elasticsearch/lib/api/types";
 import {
-  EMBEDDING_DIMENSION,
+  OPENAI_EMBEDDING_DIMENSION,
   SPAN_INDEX,
   TRACE_CHECKS_INDEX,
   TRACE_INDEX,
@@ -29,7 +29,7 @@ const traceMapping: Record<keyof Trace, MappingProperty> = {
       openai_embeddings: {
         index: true,
         type: "dense_vector",
-        dims: EMBEDDING_DIMENSION,
+        dims: OPENAI_EMBEDDING_DIMENSION,
         similarity: "cosine",
       },
     },
@@ -40,7 +40,7 @@ const traceMapping: Record<keyof Trace, MappingProperty> = {
       openai_embeddings: {
         index: true,
         type: "dense_vector",
-        dims: EMBEDDING_DIMENSION,
+        dims: OPENAI_EMBEDDING_DIMENSION,
         similarity: "cosine",
       },
     },
@@ -59,6 +59,16 @@ const traceMapping: Record<keyof Trace, MappingProperty> = {
     properties: {
       message: { type: "text" },
       stacktrace: { type: "text" },
+    },
+  },
+  search_embeddings: {
+    properties: {
+      openai_embeddings: {
+        index: true,
+        type: "dense_vector",
+        dims: OPENAI_EMBEDDING_DIMENSION,
+        similarity: "cosine",
+      },
     },
   },
 };

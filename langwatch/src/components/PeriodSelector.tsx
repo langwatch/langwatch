@@ -19,6 +19,7 @@ import {
 import {
   addDays,
   differenceInCalendarDays,
+  endOfDay,
   format,
   startOfDay,
   subDays,
@@ -156,7 +157,7 @@ export function PeriodSelector({
                   type="date"
                   value={format(endDate, "yyyy-MM-dd")}
                   onChange={(e) =>
-                    setPeriod(startDate, new Date(e.target.value))
+                    setPeriod(startDate, endOfDay(new Date(e.target.value)))
                   }
                 />
               </FormControl>

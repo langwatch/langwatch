@@ -10,6 +10,7 @@ import {
   type SpanInput,
   type SpanOutput,
   type Trace,
+  type TraceInputOutput,
 } from "../../server/tracer/types";
 import { spanValidatorSchema } from "../../server/tracer/types.generated";
 import { getDebugger } from "../../utils/logger";
@@ -90,6 +91,17 @@ export default async function handler(
 
   debug(`collecting traceId ${traceId}`);
 
+  const [input, output] = await Promise.all([
+    getTraceInput(spans),
+    getTraceOutput(spans),
+  ]);
+  const error = getLastOutputError(spans);
+  const openAISearchEmbeddings = await getSearchEmbeddings(
+    input,
+    output,
+    error
+  );
+
   // Create the trace
   const trace: Trace = {
     id: traceId,
@@ -100,10 +112,13 @@ export default async function handler(
       started_at: Math.min(...spans.map((span) => span.timestamps.started_at)),
       inserted_at: Date.now(),
     },
-    input: await getTraceInput(spans),
-    output: await getTraceOutput(spans),
+    input,
+    output,
     metrics: computeTraceMetrics(spans),
-    error: getLastOutputError(spans),
+    error,
+    search_embeddings: {
+      openai_embeddings: openAISearchEmbeddings,
+    },
   };
 
   await esClient.index({
@@ -150,6 +165,19 @@ const getTraceOutput = async (spans: Span[]): Promise<Trace["output"]> => {
     ? await getOpenAIEmbeddings(value)
     : undefined;
   return { value: value, openai_embeddings };
+};
+
+export const getSearchEmbeddings = async (
+  input: TraceInputOutput,
+  output: TraceInputOutput | undefined,
+  error: ErrorCapture | null
+): Promise<number[] | undefined> => {
+  const terms = [input.value, output?.value ?? "", error?.message ?? ""];
+  if (terms.filter((term) => term).length == 0) {
+    return undefined;
+  }
+
+  return await getOpenAIEmbeddings(terms.join("\n\n"));
 };
 
 // TODO: test

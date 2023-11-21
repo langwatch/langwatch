@@ -7,6 +7,7 @@ const debug = getDebugger("langwatch:task");
 
 const TASKS = {
   elasticIndexCreate: require("./tasks/elasticIndexCreate"),
+  populateEmbeddings: require("./tasks/populateEmbeddings"),
 };
 
 const args = process.argv.slice(2);

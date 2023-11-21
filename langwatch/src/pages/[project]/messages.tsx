@@ -5,7 +5,6 @@ import {
   Box,
   Card,
   CardBody,
-  Checkbox,
   Container,
   HStack,
   Input,
@@ -27,7 +26,6 @@ import { formatDistanceToNow } from "date-fns";
 import {
   CheckCircle,
   Clock,
-  Filter,
   HelpCircle,
   Maximize2,
   Search,
@@ -55,6 +53,7 @@ import {
   PeriodSelector,
 } from "../../components/PeriodSelector";
 import { useRouter } from "next/router";
+import { useEffect, useState } from "react";
 
 export default function MessagesOrIntegrationGuide() {
   const { project } = useOrganizationTeamProject();
@@ -69,7 +68,7 @@ export default function MessagesOrIntegrationGuide() {
 function Messages() {
   const { project } = useOrganizationTeamProject();
   const router = useRouter();
-  const { period, setPeriod, daysDifference } = usePeriodSelector();
+  const { period, setPeriod } = usePeriodSelector(30);
 
   // TODO: keep refetching also if there is any "pending" checks that are not too old
   const traces = api.traces.getAllForProject.useQuery(
@@ -77,6 +76,7 @@ function Messages() {
       projectId: project?.id ?? "",
       startDate: period.startDate.getTime(),
       endDate: period.endDate.getTime(),
+      query: typeof router.query.query === "string" ? router.query.query : "",
     },
     {
       enabled: !!project,
@@ -107,13 +107,7 @@ function Messages() {
           <Box position="absolute" top={6} left={6}>
             <Search size={16} />
           </Box>
-          <Input
-            variant="unstyled"
-            placeholder={"Search"}
-            padding={5}
-            paddingLeft={12}
-            borderRadius={0}
-          />
+          <SearchInput />
           <PeriodSelector period={period} setPeriod={setPeriod} />
         </HStack>
       </VStack>
@@ -148,6 +142,40 @@ function Messages() {
         </VStack>
       </Container>
     </DashboardLayout>
+  );
+}
+
+function SearchInput() {
+  const [query, setQuery] = useState("");
+  const router = useRouter();
+
+  useEffect(() => {
+    setQuery((router.query.query as string) ?? "");
+  }, [router.query.query]);
+
+  return (
+    <form
+      style={{ width: "100%" }}
+      onSubmit={(e) => {
+        e.preventDefault();
+        void router.push({
+          query: {
+            ...router.query,
+            query: query ? query : undefined,
+          },
+        });
+      }}
+    >
+      <Input
+        variant="unstyled"
+        placeholder={"Search"}
+        padding={5}
+        paddingLeft={12}
+        borderRadius={0}
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+      />
+    </form>
   );
 }
 
