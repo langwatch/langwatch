@@ -50,8 +50,11 @@ import { formatMilliseconds } from "../../utils/formatMilliseconds";
 export default function Index() {
   const router = useRouter();
   const { project } = useOrganizationTeamProject();
-  const { startDate, setStartDate, endDate, setEndDate, daysDifference } =
-    usePeriodSelector();
+  const {
+    period: { startDate, endDate },
+    setPeriod,
+    daysDifference,
+  } = usePeriodSelector();
   const toast = useToast();
 
   const analytics = api.analytics.getTracesAnalyticsPerDay.useQuery(
@@ -129,11 +132,8 @@ export default function Index() {
         <HStack width="full" paddingBottom={6}>
           <Spacer />
           <PeriodSelector
-            startDate={startDate}
-            setStartDate={setStartDate}
-            endDate={endDate}
-            setEndDate={setEndDate}
-            daysDifference={daysDifference}
+            period={{ startDate, endDate }}
+            setPeriod={setPeriod}
           />
         </HStack>
         <Grid width="100%" templateColumns="1fr 0.5fr" gap={6}>

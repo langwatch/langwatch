@@ -50,6 +50,11 @@ import {
 } from "../../server/trace_checks/checkPassing";
 import { ProjectIntegration } from "../../components/ProjectIntegration";
 import type { Project } from "@prisma/client";
+import {
+  usePeriodSelector,
+  PeriodSelector,
+} from "../../components/PeriodSelector";
+import { useRouter } from "next/router";
 
 export default function MessagesOrIntegrationGuide() {
   const { project } = useOrganizationTeamProject();
@@ -63,6 +68,9 @@ export default function MessagesOrIntegrationGuide() {
 
 function Messages() {
   const { project } = useOrganizationTeamProject();
+  const router = useRouter();
+  const { period, setPeriod, daysDifference } = usePeriodSelector();
+
   // TODO: keep refetching also if there is any "pending" checks that are not too old
   const traces = api.traces.getAllForProject.useQuery(
     { projectId: project?.id ?? "" },
@@ -86,7 +94,12 @@ function Messages() {
         zIndex={1}
         background="white"
       >
-        <Box position="relative" width="full">
+        <HStack
+          position="relative"
+          width="full"
+          borderBottom="1px solid #E5E5E5"
+          paddingX={4}
+        >
           <Box position="absolute" top={6} left={6}>
             <Search size={16} />
           </Box>
@@ -96,9 +109,9 @@ function Messages() {
             padding={5}
             paddingLeft={12}
             borderRadius={0}
-            borderBottom="1px solid #E5E5E5"
           />
-        </Box>
+          <PeriodSelector period={period} setPeriod={setPeriod} />
+        </HStack>
       </VStack>
       <Container maxWidth="1200" padding={6}>
         <VStack gap={6}>

@@ -6,6 +6,7 @@ import { api } from "~/utils/api";
 
 import {
   ChakraProvider,
+  defineStyle,
   defineStyleConfig,
   type StyleFunctionProps,
 } from "@chakra-ui/react";
@@ -73,6 +74,13 @@ export const theme = extendTheme({
         },
       },
     }),
+    Button: defineStyleConfig({
+      variants: {
+        outline: defineStyle({
+          borderColor: "gray.300"
+        })
+      }
+    })
   },
 });
 

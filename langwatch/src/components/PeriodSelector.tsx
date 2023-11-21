@@ -23,37 +23,70 @@ import {
   startOfDay,
   subDays,
 } from "date-fns";
-import { useState } from "react";
+import { useRouter } from "next/router";
+import { useCallback, useMemo } from "react";
 import { Calendar } from "react-feather";
 
-export const usePeriodSelector = () => {
-  const [startDate, setStartDate] = useState(addDays(new Date(), -14));
-  const [endDate, setEndDate] = useState(new Date());
-  const daysDifference = differenceInCalendarDays(endDate, startDate) + 1;
+const getDaysDifference = (startDate: Date, endDate: Date) =>
+  differenceInCalendarDays(endDate, startDate) + 1;
+
+export const usePeriodSelector = (defaultNDays = 15) => {
+  const router = useRouter();
+
+  const startDate = useMemo(
+    () =>
+      typeof router.query.startDate === "string"
+        ? new Date(router.query.startDate)
+        : addDays(new Date(), -(defaultNDays - 1)),
+    [defaultNDays, router.query.startDate]
+  );
+  const endDate = useMemo(
+    () =>
+      typeof router.query.endDate === "string"
+        ? new Date(router.query.endDate)
+        : new Date(),
+    [router.query.endDate]
+  );
+
+  const daysDifference = getDaysDifference(startDate, endDate);
+
+  const setPeriod = useCallback(
+    (startDate: Date, endDate: Date) => {
+      void router.push(
+        {
+          query: {
+            ...router.query,
+            startDate: startDate.toISOString(),
+            endDate: endDate.toISOString(),
+          },
+        },
+        undefined,
+        { shallow: true }
+      );
+    },
+    [router]
+  );
 
   return {
-    startDate,
-    setStartDate,
-    endDate,
-    setEndDate,
+    period: { startDate, endDate },
+    setPeriod,
     daysDifference,
   };
 };
 
 export function PeriodSelector({
-  startDate,
-  setStartDate,
-  endDate,
-  setEndDate,
-  daysDifference,
+  period: { startDate, endDate },
+  setPeriod,
 }: {
-  startDate: Date;
-  setStartDate: (date: Date) => void;
-  endDate: Date;
-  setEndDate: (date: Date) => void;
-  daysDifference: number;
+  period: {
+    startDate: Date;
+    endDate: Date;
+  };
+  setPeriod: (startDate: Date, endDate: Date) => void;
 }) {
   const { isOpen, onOpen, onClose } = useDisclosure();
+
+  const daysDifference = getDaysDifference(startDate, endDate);
 
   const quickSelectors = [
     { label: "Last 7 days", days: 7 },
@@ -67,8 +100,7 @@ export function PeriodSelector({
   const handleQuickSelect = (days: number) => {
     const newEndDate = new Date();
     const newStartDate = startOfDay(subDays(newEndDate, days - 1));
-    setStartDate(newStartDate);
-    setEndDate(newEndDate);
+    setPeriod(newStartDate, newEndDate);
     onClose();
   };
 
@@ -108,7 +140,7 @@ export function PeriodSelector({
                 <Input
                   type="date"
                   value={format(startDate, "yyyy-MM-dd")}
-                  onChange={(e) => setStartDate(new Date(e.target.value))}
+                  onChange={(e) => setPeriod(new Date(e.target.value), endDate)}
                 />
               </FormControl>
               <FormControl>
@@ -116,7 +148,9 @@ export function PeriodSelector({
                 <Input
                   type="date"
                   value={format(endDate, "yyyy-MM-dd")}
-                  onChange={(e) => setEndDate(new Date(e.target.value))}
+                  onChange={(e) =>
+                    setPeriod(startDate, new Date(e.target.value))
+                  }
                 />
               </FormControl>
             </VStack>
