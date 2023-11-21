@@ -144,6 +144,7 @@ const ProjectSelector = ({
         paddingY={1}
         height="auto"
         fontWeight="normal"
+        minWidth="fit-content"
       >
         <HStack gap={2}>
           <ProjectTechStackIcon project={project} />
