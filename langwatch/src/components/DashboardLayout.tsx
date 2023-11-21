@@ -321,19 +321,25 @@ export const DashboardLayout = ({
             <Breadcrumbs currentRoute={currentRoute} />
           </Hide>
           <Spacer />
-          <InputGroup maxWidth="600px" borderColor="gray.300">
-            <InputLeftElement paddingY={1.5} height="auto" pointerEvents="none">
-              <Search color={gray400} width={16} />
-            </InputLeftElement>
-            <Input
-              type="search"
-              placeholder="Search"
-              _placeholder={{ color: "gray.800" }}
-              fontSize={14}
-              paddingY={1.5}
-              height="auto"
-            />
-          </InputGroup>
+          {currentRoute !== projectRoutes.messages && (
+            <InputGroup maxWidth="600px" borderColor="gray.300">
+              <InputLeftElement
+                paddingY={1.5}
+                height="auto"
+                pointerEvents="none"
+              >
+                <Search color={gray400} width={16} />
+              </InputLeftElement>
+              <Input
+                type="search"
+                placeholder="Search"
+                _placeholder={{ color: "gray.800" }}
+                fontSize={14}
+                paddingY={1.5}
+                height="auto"
+              />
+            </InputGroup>
+          )}
           <Spacer />
           <Menu>
             <MenuButton as={Button} variant="unstyled">

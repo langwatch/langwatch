@@ -99,19 +99,6 @@ function Messages() {
             borderBottom="1px solid #E5E5E5"
           />
         </Box>
-        <HStack
-          paddingY={5}
-          paddingX={6}
-          spacing={12}
-          width="full"
-          borderBottom="1px solid #E5E5E5"
-        >
-          <Filter size={24} />
-          <Spacer />
-          <Checkbox>Inbox Narrator</Checkbox>
-          <Checkbox>All models</Checkbox>
-          <Checkbox>Last 7 days</Checkbox>
-        </HStack>
       </VStack>
       <Container maxWidth="1200" padding={6}>
         <VStack gap={6}>
@@ -236,12 +223,10 @@ const Message = ({
             <HStack width="full" alignItems="flex-end">
               <VStack gap={4} alignItems="flex-start">
                 <HStack spacing={2}>
-                  <Tag background="blue.50" color="blue.600">
-                    Chatbot
-                  </Tag>
-                  <Tag background="orange.100" color="orange.600">
-                    Small Talk
-                  </Tag>
+                  {/* TODO: loop over models used */}
+                  {/* <Tag background="blue.50" color="blue.600">
+                    vendor/model
+                  </Tag> */}
                 </HStack>
                 <HStack fontSize={12} color="gray.400">
                   <Tooltip

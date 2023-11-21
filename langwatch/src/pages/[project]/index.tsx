@@ -1,24 +1,13 @@
 import {
   Box,
-  Button,
   Card,
   CardBody,
   CardHeader,
   Container,
-  FormControl,
-  FormLabel,
   Grid,
   GridItem,
   HStack,
   Heading,
-  Input,
-  Popover,
-  PopoverArrow,
-  PopoverBody,
-  PopoverCloseButton,
-  PopoverContent,
-  PopoverHeader,
-  PopoverTrigger,
   Skeleton,
   Spacer,
   Tab,
@@ -29,22 +18,14 @@ import {
   Tabs,
   Text,
   VStack,
-  useDisclosure,
   useTheme,
   useToast,
 } from "@chakra-ui/react";
-import {
-  addDays,
-  differenceInCalendarDays,
-  endOfDay,
-  format,
-  startOfDay,
-  subDays,
-} from "date-fns";
+import { addDays, endOfDay, format, startOfDay } from "date-fns";
 import { useRouter } from "next/router";
 import numeral from "numeral";
-import { useEffect, useState } from "react";
-import { Calendar, CheckCircle, XCircle } from "react-feather";
+import { useEffect } from "react";
+import { CheckCircle, XCircle } from "react-feather";
 import {
   Bar,
   BarChart,
@@ -58,6 +39,10 @@ import {
   YAxis,
 } from "recharts";
 import { DashboardLayout } from "~/components/DashboardLayout";
+import {
+  PeriodSelector,
+  usePeriodSelector,
+} from "../../components/PeriodSelector";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
 import { formatMilliseconds } from "../../utils/formatMilliseconds";
@@ -65,10 +50,8 @@ import { formatMilliseconds } from "../../utils/formatMilliseconds";
 export default function Index() {
   const router = useRouter();
   const { project } = useOrganizationTeamProject();
-  const [startDate, setStartDate] = useState(addDays(new Date(), -14));
-  const [endDate, setEndDate] = useState(new Date());
-  const { isOpen, onOpen, onClose } = useDisclosure();
-  const daysDifference = differenceInCalendarDays(endDate, startDate) + 1;
+  const { startDate, setStartDate, endDate, setEndDate, daysDifference } =
+    usePeriodSelector();
   const toast = useToast();
 
   const analytics = api.analytics.getTracesAnalyticsPerDay.useQuery(
@@ -133,34 +116,6 @@ export default function Index() {
     (acc, curr) => acc + curr.prompt_tokens + curr.completion_tokens,
     0
   );
-  const quickSelectors = [
-    { label: "Last 7 days", days: 7 },
-    { label: "Last 15 days", days: 15 },
-    { label: "Last 30 days", days: 30 },
-    { label: "Last 90 days", days: 90 },
-    { label: "Last 6 months", days: 180 },
-    { label: "Last 1 year", days: 365 },
-  ];
-
-  const handleQuickSelect = (days: number) => {
-    const newEndDate = new Date();
-    const newStartDate = startOfDay(subDays(newEndDate, days - 1));
-    setStartDate(newStartDate);
-    setEndDate(newEndDate);
-    onClose();
-  };
-
-  const getDateRangeLabel = () => {
-    const quickSelect = quickSelectors.find(
-      (selector) => selector.days === daysDifference
-    );
-    return quickSelect
-      ? quickSelect.label
-      : `${format(new Date(startDate), "MMM d")} - ${format(
-          new Date(endDate),
-          "MMM d"
-        )}`;
-  };
 
   useEffect(() => {
     if (project && !project.firstMessage) {
@@ -173,56 +128,13 @@ export default function Index() {
       <Container maxWidth="1200" padding={6}>
         <HStack width="full" paddingBottom={6}>
           <Spacer />
-          <Popover isOpen={isOpen} onClose={onClose} placement="bottom-end">
-            <PopoverTrigger>
-              <Button variant="outline" onClick={onOpen}>
-                <HStack>
-                  <Calendar size={16} />
-                  <Text>{getDateRangeLabel()}</Text>
-                </HStack>
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent width="fit-content">
-              <PopoverArrow />
-              <PopoverCloseButton />
-              <PopoverHeader>
-                <Heading size="sm">Select Date Range</Heading>
-              </PopoverHeader>
-              <PopoverBody padding={4}>
-                <HStack align="start" spacing={6}>
-                  <VStack spacing={4}>
-                    <FormControl>
-                      <FormLabel>Start Date</FormLabel>
-                      <Input
-                        type="date"
-                        value={format(startDate, "yyyy-MM-dd")}
-                        onChange={(e) => setStartDate(new Date(e.target.value))}
-                      />
-                    </FormControl>
-                    <FormControl>
-                      <FormLabel>End Date</FormLabel>
-                      <Input
-                        type="date"
-                        value={format(endDate, "yyyy-MM-dd")}
-                        onChange={(e) => setEndDate(new Date(e.target.value))}
-                      />
-                    </FormControl>
-                  </VStack>
-                  <VStack>
-                    {quickSelectors.map((selector) => (
-                      <Button
-                        width="full"
-                        key={selector.label}
-                        onClick={() => handleQuickSelect(selector.days)}
-                      >
-                        {selector.label}
-                      </Button>
-                    ))}
-                  </VStack>
-                </HStack>
-              </PopoverBody>
-            </PopoverContent>
-          </Popover>
+          <PeriodSelector
+            startDate={startDate}
+            setStartDate={setStartDate}
+            endDate={endDate}
+            setEndDate={setEndDate}
+            daysDifference={daysDifference}
+          />
         </HStack>
         <Grid width="100%" templateColumns="1fr 0.5fr" gap={6}>
           <GridItem colSpan={2}>
