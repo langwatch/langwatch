@@ -30,19 +30,26 @@ import { Calendar } from "react-feather";
 const getDaysDifference = (startDate: Date, endDate: Date) =>
   differenceInCalendarDays(endDate, startDate) + 1;
 
+const isValidDateString = (dateString: string) => {
+  const d = new Date(dateString);
+  return d instanceof Date && !isNaN(d as any);
+};
+
 export const usePeriodSelector = (defaultNDays = 15) => {
   const router = useRouter();
 
   const startDate = useMemo(
     () =>
-      typeof router.query.startDate === "string"
+      typeof router.query.startDate === "string" &&
+      isValidDateString(router.query.startDate)
         ? new Date(router.query.startDate)
         : addDays(new Date(), -(defaultNDays - 1)),
     [defaultNDays, router.query.startDate]
   );
   const endDate = useMemo(
     () =>
-      typeof router.query.endDate === "string"
+      typeof router.query.endDate === "string" &&
+      isValidDateString(router.query.endDate)
         ? new Date(router.query.endDate)
         : new Date(),
     [router.query.endDate]

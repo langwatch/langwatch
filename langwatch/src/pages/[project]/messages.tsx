@@ -73,7 +73,11 @@ function Messages() {
 
   // TODO: keep refetching also if there is any "pending" checks that are not too old
   const traces = api.traces.getAllForProject.useQuery(
-    { projectId: project?.id ?? "" },
+    {
+      projectId: project?.id ?? "",
+      startDate: period.startDate.getTime(),
+      endDate: period.endDate.getTime(),
+    },
     {
       enabled: !!project,
     }

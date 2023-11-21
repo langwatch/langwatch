@@ -24,9 +24,16 @@ export const esGetTraceById = async (
 
 export const tracesRouter = createTRPCRouter({
   getAllForProject: protectedProcedure
-    .input(z.object({ projectId: z.string() }))
+    .input(
+      z.object({
+        projectId: z.string(),
+        startDate: z.number(),
+        endDate: z.number(),
+      })
+    )
     .use(checkUserPermissionForProject)
     .query(async ({ input }) => {
+      //@ts-ignore
       const tracesResult = await esClient.search<Trace>({
         index: TRACE_INDEX,
         size: 1_000,
@@ -37,7 +44,20 @@ export const tracesRouter = createTRPCRouter({
         },
         body: {
           query: {
-            term: { project_id: input.projectId },
+            bool: {
+              must: {
+                term: { project_id: input.projectId },
+              },
+              filter: {
+                range: {
+                  "timestamps.started_at": {
+                    gte: input.startDate,
+                    lte: input.endDate,
+                    format: "epoch_millis",
+                  },
+                },
+              },
+            },
           },
         },
       });
