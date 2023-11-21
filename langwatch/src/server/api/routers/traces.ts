@@ -42,7 +42,14 @@ export const tracesRouter = createTRPCRouter({
       //@ts-ignore
       const tracesResult = await esClient.search<Trace>({
         index: TRACE_INDEX,
-        size: 1_000,
+        size: 100,
+        _source: {
+          excludes: [
+            "input.openai_embeddings",
+            "output.openai_embeddings",
+            "search_embeddings.openai_embeddings",
+          ],
+        },
         ...(!input.query
           ? {
               sort: {
@@ -101,7 +108,7 @@ export const tracesRouter = createTRPCRouter({
                   num_candidates: 100,
                 },
                 rank: {
-                  rrf: { window_size: 1_000 },
+                  rrf: { window_size: 100 },
                 },
               }
             : {}),
