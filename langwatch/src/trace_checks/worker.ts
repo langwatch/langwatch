@@ -2,7 +2,7 @@ import { type Job, Worker } from "bullmq";
 import { connection } from "../server/redis";
 import { getDebugger } from "../utils/logger";
 import { updateCheckStatusInES } from "./queue";
-import type { TraceCheckJob, TraceCheckResult } from "./types";
+import type { CheckTypes, TraceCheckJob, TraceCheckResult } from "./types";
 import { esGetTraceById } from "../server/api/routers/traces";
 import { env } from "../env.mjs";
 import { getTraceCheck } from "./backend/registry";
@@ -29,14 +29,14 @@ export const process = async (
 
 export const start = (
   processMock:
-    | ((job: Job<any, any, string>) => Promise<TraceCheckResult>)
+    | ((job: Job<any, any, CheckTypes>) => Promise<TraceCheckResult>)
     | undefined = undefined,
   maxRuntimeMs: number | undefined = undefined
 ) => {
   return new Promise((resolve) => {
     const processFn = processMock ?? process;
 
-    const worker = new Worker(
+    const worker = new Worker<any, any, CheckTypes>(
       "trace_checks",
       async (job) => {
         if (

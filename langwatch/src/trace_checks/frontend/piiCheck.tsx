@@ -1,4 +1,4 @@
-import { Text } from "@chakra-ui/react";
+import { Text, VStack } from "@chakra-ui/react";
 import type { TraceCheck } from "../../server/tracer/types";
 import type { TraceCheckFrontendDefinition } from "../types";
 import type { google } from "@google-cloud/dlp/build/protos/protos";
@@ -10,16 +10,20 @@ function CheckDetails({ check }: { check: TraceCheck }) {
       | undefined
   )?.findings;
 
+  const findingsNames = Array.from(
+    new Set((findings ?? []).map((finding) => finding.infoType?.name ?? ""))
+  );
+
   return (
-    <>
-      {findings && findings.length > 0
-        ? findings.map((finding) => (
-            <Text key={finding.findingId}>
-              Detected {finding.infoType?.name}
-            </Text>
-          ))
-        : "No PII leak detected"}
-    </>
+    <VStack align="start">
+      {findings && findings.length > 0 ? (
+        findingsNames.map((name, index) => (
+          <Text key={index}>Detected {name}</Text>
+        ))
+      ) : (
+        <Text>No PII leak detected</Text>
+      )}
+    </VStack>
   );
 }
 

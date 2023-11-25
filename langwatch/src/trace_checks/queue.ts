@@ -54,7 +54,7 @@ export const updateCheckStatusInES = async ({
   error,
   retries,
 }: {
-  check_type: string;
+  check_type: CheckTypes;
   trace_id: string;
   project_id: string;
   status: TraceCheck["status"];

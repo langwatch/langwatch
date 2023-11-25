@@ -3,6 +3,7 @@ import { env } from "../../env.mjs";
 import type { ElasticSearchSpan, Trace } from "../../server/tracer/types";
 import type { TraceCheckBackendDefinition, TraceCheckResult } from "../types";
 import { getDebugger } from "../../utils/logger";
+import type { google } from "@google-cloud/dlp/build/protos/protos";
 
 const debug = getDebugger("langwatch:trace_checks:piiCheck");
 
@@ -10,11 +11,9 @@ const debug = getDebugger("langwatch:trace_checks:piiCheck");
 const credentials = JSON.parse(env.GOOGLE_CREDENTIALS_JSON);
 const dlp = new DlpServiceClient({ credentials });
 
-const execute = async (
-  trace: Trace,
-  _spans: ElasticSearchSpan[]
-): Promise<TraceCheckResult> => {
-  debug("Checking PII for trace", trace.id);
+const dlpCheck = async (
+  text: string
+): Promise<google.privacy.dlp.v2.IFinding[] | null | undefined> => {
   const [response] = await dlp.inspectContent({
     parent: `projects/${credentials.project_id}/locations/global`,
     inspectConfig: {
@@ -37,33 +36,66 @@ const execute = async (
       includeQuote: true,
     },
     item: {
-      value: [trace.input.value, trace.output?.value ?? ""].join("\n\n"),
+      value: text,
     },
   });
 
-  const findings = response.result?.findings;
+  return response.result?.findings;
+};
 
-  if (findings && findings.length > 0) {
-    for (const finding of findings) {
-      finding.quote = "READACTED"; // prevent storing quote in ES
-    }
+export const piiCheck = async (
+  trace: Trace,
+  spans: ElasticSearchSpan[],
+  considerPIIInSpansAsFailure = false
+): Promise<{
+  quotes: string[];
+  traceCheckResult: TraceCheckResult;
+}> => {
+  debug("Checking PII for trace", trace.id);
 
-    return {
-      raw_result: {
-        findings,
-      },
-      value: findings.length,
-      status: "failed",
-    };
+  const traceText = [
+    trace.input.value,
+    trace.output?.value ?? "",
+    trace.error?.message ?? "",
+    trace.error?.stacktrace ?? "",
+  ].join("\n\n");
+  const spansText = spans
+    .flatMap((span) =>
+      [span.input?.value ?? "", span.error?.message ?? ""]
+        .concat(span.outputs.map((x) => x.value))
+        .concat(span.error?.stacktrace ?? [])
+    )
+    .join("\n\n");
+
+  const traceFindings = await dlpCheck(traceText);
+  const spansFindings = await dlpCheck(spansText);
+  const allFindings = (traceFindings ?? []).concat(spansFindings ?? []);
+  const reportedFindings = considerPIIInSpansAsFailure
+    ? allFindings
+    : traceFindings ?? [];
+
+  const quotes = allFindings.map((finding) => finding.quote!).filter((x) => x);
+  for (const finding of allFindings) {
+    finding.quote = "REDACTED"; // prevent storing quote in ES
   }
 
   return {
-    raw_result: {
-      findings: [],
+    quotes,
+    traceCheckResult: {
+      raw_result: {
+        findings: reportedFindings,
+      },
+      value: reportedFindings.length,
+      status: reportedFindings.length > 0 ? "failed" : "succeeded",
     },
-    value: 0,
-    status: "succeeded",
   };
+};
+
+const execute = async (
+  trace: Trace,
+  _spans: ElasticSearchSpan[]
+): Promise<TraceCheckResult> => {
+  return (await piiCheck(trace, _spans)).traceCheckResult;
 };
 
 export const PIICheck: TraceCheckBackendDefinition = {

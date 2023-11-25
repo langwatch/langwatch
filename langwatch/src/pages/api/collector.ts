@@ -15,10 +15,14 @@ import {
 import { spanValidatorSchema } from "../../server/tracer/types.generated";
 import { getDebugger } from "../../utils/logger";
 import * as Sentry from "@sentry/nextjs";
-import { scheduleTraceCheck } from "../../trace_checks/queue";
+import {
+  scheduleTraceCheck,
+  updateCheckStatusInES,
+} from "../../trace_checks/queue";
 import type { Project } from "@prisma/client";
 import { getOpenAIEmbeddings } from "../../server/embeddings";
 import { estimateCost, tokenizeAndEstimateCost } from "llm-cost";
+import { piiCheck } from "../../trace_checks/backend/piiCheck";
 
 const debug = getDebugger("langwatch:collector");
 
@@ -121,6 +125,8 @@ export default async function handler(
     },
   };
 
+  await cleanupPII(trace, esSpans);
+
   await esClient.index({
     index: TRACE_INDEX,
     id: trace.id,
@@ -140,11 +146,6 @@ export default async function handler(
     return res.status(500).json({ message: "Something went wrong!" });
   }
 
-  void scheduleTraceCheck({
-    check_type: "pii_check",
-    trace_id: trace.id,
-    project_id: project.id,
-  });
   void scheduleTraceCheck({
     check_type: "toxicity_check",
     trace_id: trace.id,
@@ -386,5 +387,61 @@ const markProjectFirstMessage = async (project: Project) => {
       where: { id: project.id },
       data: { firstMessage: true },
     });
+  }
+};
+
+const cleanupPII = async (
+  trace: Trace,
+  spans: ElasticSearchSpan[]
+): Promise<undefined> => {
+  const { quotes, traceCheckResult } = await piiCheck(trace, spans);
+
+  // TODO: check if PII check is even enabled
+  await updateCheckStatusInES({
+    check_type: "pii_check",
+    trace_id: trace.id,
+    project_id: trace.project_id,
+    status: traceCheckResult.status,
+    raw_result: traceCheckResult.raw_result,
+    value: traceCheckResult.value,
+  });
+
+  for (const quote of quotes) {
+    trace.input.value = trace.input.value.replace(quote, "[REDACTED]");
+    if (trace.output?.value) {
+      trace.output.value = trace.output.value.replace(quote, "[REDACTED]");
+    }
+    if (trace.error) {
+      trace.error.message = trace.error.message.replace(quote, "[REDACTED]");
+      // eslint-disable-next-line @typescript-eslint/no-for-in-array
+      for (const stacktraceIndex in trace.error.stacktrace) {
+        trace.error.stacktrace[stacktraceIndex] =
+          trace.error.stacktrace[stacktraceIndex]?.replace(
+            quote,
+            "[REDACTED]"
+          ) ?? "";
+      }
+    }
+    for (const span of spans) {
+      if (span.input?.value) {
+        span.input.value = span.input.value.replace(quote, "[REDACTED]");
+      }
+      for (const output of span.outputs) {
+        if (output.value) {
+          output.value = output.value.replace(quote, "[REDACTED]");
+        }
+      }
+      if (span.error) {
+        span.error.message = span.error.message.replace(quote, "[REDACTED]");
+        // eslint-disable-next-line @typescript-eslint/no-for-in-array
+        for (const stacktraceIndex in span.error.stacktrace) {
+          span.error.stacktrace[stacktraceIndex] =
+            span.error.stacktrace[stacktraceIndex]?.replace(
+              quote,
+              "[REDACTED]"
+            ) ?? "";
+        }
+      }
+    }
   }
 };

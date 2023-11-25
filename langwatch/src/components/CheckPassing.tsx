@@ -18,8 +18,9 @@ export function CheckPassing({ check }: { check: TraceCheck }) {
   const TraceCheckComponent = traceCheck.render;
 
   return (
-    <HStack key={check.id} spacing={4}>
+    <HStack align="start" spacing={2}>
       <Box
+        paddingRight={2}
         color={!done ? "yellow.600" : checkPasses ? "green.600" : "red.600"}
       >
         {!done /* TODO: differentiate in_progress and scheduled, also on the general one in Messages */ ? (

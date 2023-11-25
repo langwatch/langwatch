@@ -161,4 +161,6 @@ describe("Collector API Endpoint", () => {
 
     expect(res.statusCode).toBe(400);
   });
+
+  // TODO: add a PII cleanup test
 });
