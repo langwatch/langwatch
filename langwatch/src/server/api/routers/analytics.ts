@@ -155,7 +155,7 @@ export const analyticsRouter = createTRPCRouter({
         avg_tokens_per_trace: aggregations?.avg_tokens_per_trace
           .value as number,
         avg_total_cost_per_1000_traces:
-          (aggregations?.avg_total_cost_per_1000_traces.value as number) * 1000,
+          (aggregations?.avg_total_cost_per_1000_traces.value as number),
         percentile_90th_time_to_first_token: aggregations
           ?.percentile_time_to_first_token.values["90.0"] as number,
         percentile_90th_total_time_ms: aggregations?.percentile_total_time_ms

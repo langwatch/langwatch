@@ -158,7 +158,7 @@ export default function Index() {
                     </Tab>
                     <Tab paddingX={0} paddingBottom={4}>
                       <VStack align="start">
-                        <Text color="black">Cost</Text>
+                        <Text color="black">Total Cost</Text>
                         <Box fontSize={24} color="black" fontWeight="bold">
                           {costsTotal !== undefined ? (
                             numeral(costsTotal).format("$0.00a")
@@ -231,7 +231,7 @@ export default function Index() {
                     }
                   />
                   <SummaryMetric
-                    label="Average Total Cost / 1000 Messages"
+                    label="Average Cost per Message"
                     value={
                       usageMetrics.data &&
                       numeral(
