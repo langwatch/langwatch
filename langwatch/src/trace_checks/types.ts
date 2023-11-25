@@ -1,4 +1,8 @@
-import type { ElasticSearchSpan, Trace } from "../tracer/types";
+import type {
+  ElasticSearchSpan,
+  Trace,
+  TraceCheck,
+} from "../server/tracer/types";
 
 export type TraceCheckJob = {
   trace_id: string;
@@ -8,13 +12,19 @@ export type TraceCheckJob = {
 export type TraceCheckResult = {
   raw_result: object;
   value: number;
+  status: "failed" | "succeeded";
 };
 
-export type TraceCheckDefinition = {
+export type TraceCheckBackendDefinition = {
   execute: (
     trace: Trace,
     _spans: ElasticSearchSpan[]
   ) => Promise<TraceCheckResult>;
+};
+
+export type TraceCheckFrontendDefinition = {
+  name: string;
+  render: (props: { check: TraceCheck }) => JSX.Element;
 };
 
 export type CheckTypes = "pii_check";

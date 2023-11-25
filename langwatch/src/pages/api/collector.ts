@@ -15,7 +15,7 @@ import {
 import { spanValidatorSchema } from "../../server/tracer/types.generated";
 import { getDebugger } from "../../utils/logger";
 import * as Sentry from "@sentry/nextjs";
-import { scheduleTraceCheck } from "../../server/trace_checks/queue";
+import { scheduleTraceCheck } from "../../trace_checks/queue";
 import type { Project } from "@prisma/client";
 import { getOpenAIEmbeddings } from "../../server/embeddings";
 import { estimateCost, tokenizeAndEstimateCost } from "llm-cost";

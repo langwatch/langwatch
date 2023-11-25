@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { Trace } from "../tracer/types";
+import type { Trace } from "../../server/tracer/types";
 import { PIICheck } from "./piiCheck";
 import type { google } from "@google-cloud/dlp/build/protos/protos";
 

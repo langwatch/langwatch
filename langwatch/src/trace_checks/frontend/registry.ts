@@ -1,8 +1,8 @@
 import { PIICheck } from "./piiCheck";
-import type { CheckTypes, TraceCheckDefinition } from "./types";
+import type { CheckTypes, TraceCheckFrontendDefinition } from "../types";
 
 // TODO: allow checks to be run to be configurable by user
-export const AVAILABLE_TRACE_CHECKS: Record<CheckTypes, TraceCheckDefinition> =
+export const AVAILABLE_TRACE_CHECKS: Record<CheckTypes, TraceCheckFrontendDefinition> =
   {
     pii_check: PIICheck,
   };

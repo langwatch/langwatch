@@ -42,10 +42,7 @@ import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProje
 import { api } from "../../utils/api";
 import { formatMilliseconds } from "../../utils/formatMilliseconds";
 import type { Trace, TraceCheck } from "../../server/tracer/types";
-import {
-  renderCheck,
-  verifyIfCheckPasses,
-} from "../../server/trace_checks/checkPassing";
+import { CheckPassing } from "../../components/CheckPassing";
 import { ProjectIntegration } from "../../components/ProjectIntegration";
 import type { Project } from "@prisma/client";
 import {
@@ -193,8 +190,8 @@ const Message = ({
   const checksDone = traceChecks.every(
     (check) => check.status == "succeeded" || check.status == "failed"
   );
-  const checkPasses = traceChecks.filter((check) =>
-    verifyIfCheckPasses(check)
+  const checkPasses = traceChecks.filter(
+    (check) => check.status == "succeeded"
   ).length;
   const totalChecks = traceChecks.length;
 
@@ -313,7 +310,8 @@ const Message = ({
                       <Box>
                         {trace.metrics.total_cost > 0.01
                           ? numeral(trace.metrics.total_cost).format("$0.00a")
-                          : "< $0.01"} cost
+                          : "< $0.01"}{" "}
+                        cost
                       </Box>
                     </>
                   )}
@@ -383,11 +381,13 @@ const Message = ({
                   </PopoverTrigger>
                   <Portal>
                     <Box zIndex="popover">
-                      <PopoverContent zIndex={2}>
+                      <PopoverContent zIndex={2} width="fit-content">
                         <PopoverArrow />
                         <PopoverHeader>Trace Checks</PopoverHeader>
                         <PopoverBody>
-                          {traceChecks.map((check) => renderCheck(check))}
+                          {traceChecks.map((check) => (
+                            <CheckPassing key={check.id} check={check} />
+                          ))}
                         </PopoverBody>
                       </PopoverContent>
                     </Box>

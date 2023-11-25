@@ -1,7 +1,7 @@
 import { DlpServiceClient } from "@google-cloud/dlp";
 import { env } from "../../env.mjs";
-import type { ElasticSearchSpan, Trace } from "../tracer/types";
-import type { TraceCheckDefinition, TraceCheckResult } from "./types";
+import type { ElasticSearchSpan, Trace } from "../../server/tracer/types";
+import type { TraceCheckBackendDefinition, TraceCheckResult } from "../types";
 import { getDebugger } from "../../utils/logger";
 
 const debug = getDebugger("langwatch:trace_checks:piiCheck");
@@ -44,11 +44,16 @@ const execute = async (
   const findings = response.result?.findings;
 
   if (findings && findings.length > 0) {
+    for (const finding of findings) {
+      finding.quote = "READACTED"; // prevent storing quote in ES
+    }
+
     return {
       raw_result: {
         findings,
       },
       value: findings.length,
+      status: "failed",
     };
   }
 
@@ -57,9 +62,10 @@ const execute = async (
       findings: [],
     },
     value: 0,
+    status: "succeeded",
   };
 };
 
-export const PIICheck: TraceCheckDefinition = {
+export const PIICheck: TraceCheckBackendDefinition = {
   execute,
 };

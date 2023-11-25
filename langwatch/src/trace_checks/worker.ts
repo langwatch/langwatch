@@ -1,11 +1,11 @@
 import { type Job, Worker } from "bullmq";
-import { connection } from "../redis";
-import { getDebugger } from "../../utils/logger";
+import { connection } from "../server/redis";
+import { getDebugger } from "../utils/logger";
 import { updateCheckStatusInES } from "./queue";
 import type { TraceCheckJob, TraceCheckResult } from "./types";
-import { esGetTraceById } from "../api/routers/traces";
-import { env } from "../../env.mjs";
-import { getTraceCheck } from "./registry";
+import { esGetTraceById } from "../server/api/routers/traces";
+import { env } from "../env.mjs";
+import { getTraceCheck } from "./backend/registry";
 
 const debug = getDebugger("langwatch:trace_checks:workers");
 
@@ -54,7 +54,7 @@ export const start = (
             check_type: job.name,
             trace_id: job.data.trace_id,
             project_id: job.data.project_id,
-            status: "succeeded",
+            status: result.status,
             raw_result: result.raw_result,
             value: result.value,
           });
@@ -64,7 +64,7 @@ export const start = (
             check_type: job.name,
             trace_id: job.data.trace_id,
             project_id: job.data.project_id,
-            status: "failed",
+            status: "error",
             error: error,
           });
           debug("Failed to process job:", job.id, error);
