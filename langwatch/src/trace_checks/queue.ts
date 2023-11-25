@@ -3,7 +3,7 @@ import { connection } from "../server/redis";
 import { captureError } from "../utils/captureError";
 import { esClient, TRACE_CHECKS_INDEX } from "../server/elasticsearch";
 import type { TraceCheck } from "../server/tracer/types";
-import type { TraceCheckJob } from "./types";
+import type { CheckTypes, TraceCheckJob } from "./types";
 
 const traceChecksQueue = new Queue<TraceCheckJob, any, string>("trace_checks", {
   connection,
@@ -21,7 +21,7 @@ export const scheduleTraceCheck = async ({
   project_id,
   delay,
 }: {
-  check_type: string;
+  check_type: CheckTypes;
   trace_id: string;
   project_id: string;
   delay?: number;

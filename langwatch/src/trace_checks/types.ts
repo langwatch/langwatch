@@ -27,4 +27,15 @@ export type TraceCheckFrontendDefinition = {
   render: (props: { check: TraceCheck }) => JSX.Element;
 };
 
-export type CheckTypes = "pii_check";
+export type CheckTypes = "pii_check" | "toxicity_check";
+export type ModerationResult = {
+  id: string;
+  model: string;
+  results: ModerationResultEntry[];
+};
+
+export type ModerationResultEntry = {
+  flagged: boolean;
+  categories: Record<string, boolean>;
+  category_scores: Record<string, number>;
+};

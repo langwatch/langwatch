@@ -50,7 +50,7 @@ import {
   PeriodSelector,
 } from "../../components/PeriodSelector";
 import { useRouter } from "next/router";
-import { useEffect, useState } from "react";
+import { use, useEffect, useState } from "react";
 import numeral from "numeral";
 
 export default function MessagesOrIntegrationGuide() {
@@ -67,8 +67,10 @@ function Messages() {
   const { project } = useOrganizationTeamProject();
   const router = useRouter();
   const { period, setPeriod } = usePeriodSelector(30);
+  const [tracesCheckInterval, setTracesCheckInterval] = useState<
+    number | undefined
+  >();
 
-  // TODO: keep refetching also if there is any "pending" checks that are not too old
   const traces = api.traces.getAllForProject.useQuery(
     {
       projectId: project?.id ?? "",
@@ -78,13 +80,45 @@ function Messages() {
     },
     {
       enabled: !!project,
+      refetchOnWindowFocus: false, // there is a manual refetch on the useEffect below
     }
   );
   const traceIds = traces.data?.map((trace) => trace.id) ?? [];
   const traceChecksQuery = api.traces.getTraceChecks.useQuery(
     { projectId: project?.id ?? "", traceIds },
-    { enabled: traceIds.length > 0 }
+    {
+      enabled: traceIds.length > 0,
+      refetchInterval: tracesCheckInterval,
+      refetchOnWindowFocus: false,
+    }
   );
+
+  useEffect(() => {
+    if (traceChecksQuery.data) {
+      const pendingChecks = Object.values(traceChecksQuery.data)
+        .flatMap((checks) => checks)
+        .filter(
+          (check) =>
+            (check.status == "scheduled" || check.status == "in_progress") &&
+            (check.timestamps.inserted_at ?? 0) >
+              new Date().getTime() - 1000 * 60 * 60 * 1
+        );
+      if (pendingChecks.length > 0) {
+        setTracesCheckInterval(5000);
+      } else {
+        setTracesCheckInterval(undefined);
+      }
+    }
+  }, [traceChecksQuery.data]);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (document.hasFocus()) {
+        void traces.refetch();
+      }
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [traces]);
 
   return (
     <DashboardLayout>
@@ -385,9 +419,11 @@ const Message = ({
                         <PopoverArrow />
                         <PopoverHeader>Trace Checks</PopoverHeader>
                         <PopoverBody>
-                          {traceChecks.map((check) => (
-                            <CheckPassing key={check.id} check={check} />
-                          ))}
+                          <VStack align="start" spacing={2}>
+                            {traceChecks.map((check) => (
+                              <CheckPassing key={check.id} check={check} />
+                            ))}
+                          </VStack>
                         </PopoverBody>
                       </PopoverContent>
                     </Box>

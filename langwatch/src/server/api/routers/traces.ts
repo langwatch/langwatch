@@ -39,6 +39,12 @@ export const tracesRouter = createTRPCRouter({
         ? await getOpenAIEmbeddings(input.query)
         : [];
 
+      // If end date is very close to now, force it to be now, to allow frontend to keep refetching for new messages
+      const endDate =
+        new Date().getTime() - input.endDate < 1000 * 60 * 60
+          ? new Date().getTime()
+          : input.endDate;
+
       //@ts-ignore
       const tracesResult = await esClient.search<Trace>({
         index: TRACE_INDEX,
@@ -92,7 +98,7 @@ export const tracesRouter = createTRPCRouter({
                 range: {
                   "timestamps.started_at": {
                     gte: input.startDate,
-                    lte: input.endDate,
+                    lte: endDate,
                     format: "epoch_millis",
                   },
                 },
@@ -123,7 +129,7 @@ export const tracesRouter = createTRPCRouter({
                   range: {
                     "timestamps.started_at": {
                       gte: input.startDate,
-                      lte: input.endDate,
+                      lte: endDate,
                       format: "epoch_millis",
                     },
                   },

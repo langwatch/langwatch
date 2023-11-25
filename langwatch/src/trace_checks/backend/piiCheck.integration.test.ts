@@ -11,6 +11,7 @@ describe("PIICheck", () => {
       input: { value: "hi there" },
       metrics: {},
       timestamps: { started_at: Date.now(), inserted_at: Date.now() },
+      search_embeddings: { openai_embeddings: [] },
     };
     let response = await PIICheck.execute(sampleTrace, []);
     expect(response).toEqual({ raw_result: { findings: [] }, value: 0 });
@@ -23,6 +24,7 @@ describe("PIICheck", () => {
       },
       metrics: {},
       timestamps: { started_at: Date.now(), inserted_at: Date.now() },
+      search_embeddings: { openai_embeddings: [] },
     };
     response = await PIICheck.execute(samplePIITrace, []);
     const findings = (response.raw_result as any)

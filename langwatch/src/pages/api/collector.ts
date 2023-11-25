@@ -145,6 +145,11 @@ export default async function handler(
     trace_id: trace.id,
     project_id: project.id,
   });
+  void scheduleTraceCheck({
+    check_type: "toxicity_check",
+    trace_id: trace.id,
+    project_id: project.id,
+  });
 
   await markProjectFirstMessage(project);
 
