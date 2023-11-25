@@ -105,6 +105,9 @@ describe("Collector API Endpoint", () => {
         value: "world",
         openai_embeddings: expect.any(Array),
       },
+      search_embeddings: {
+        openai_embeddings: expect.any(Array),
+      },
       metrics: {
         first_token_ms: null,
         total_time_ms: expect.any(Number),

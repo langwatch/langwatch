@@ -125,6 +125,7 @@ const spanMapping: Record<keyof ElasticSearchSpan, MappingProperty> = {
       prompt_tokens: { type: "integer" },
       completion_tokens: { type: "integer" },
       tokens_estimated: { type: "boolean" },
+      cost: { type: "float" },
     },
   },
 };

@@ -59,6 +59,7 @@ interface SpanMetrics {
   prompt_tokens?: number | null;
   completion_tokens?: number | null;
   tokens_estimated?: boolean | null;
+  cost?: number | null;
 }
 
 interface SpanParams {

@@ -15,10 +15,10 @@ import {
 import { spanValidatorSchema } from "../../server/tracer/types.generated";
 import { getDebugger } from "../../utils/logger";
 import * as Sentry from "@sentry/nextjs";
-import { countTokens } from "../../server/tracer/tokenCount";
 import { scheduleTraceCheck } from "../../server/trace_checks/queue";
 import type { Project } from "@prisma/client";
 import { getOpenAIEmbeddings } from "../../server/embeddings";
+import { estimateCost, tokenizeAndEstimateCost } from "llm-cost";
 
 const debug = getDebugger("langwatch:collector");
 
@@ -262,6 +262,7 @@ const computeTraceMetrics = (spans: Span[]): Trace["metrics"] => {
   let totalPromptTokens: number | null = null;
   let totalCompletionTokens: number | null = null;
   let tokensEstimated = false;
+  let totalCost: number | null = null;
 
   spans.forEach((span) => {
     if (
@@ -308,6 +309,12 @@ const computeTraceMetrics = (spans: Span[]): Trace["metrics"] => {
       if (span.metrics.tokens_estimated) {
         tokensEstimated = true;
       }
+      if (span.metrics.cost !== undefined && span.metrics.cost !== null) {
+        if (!totalCost) {
+          totalCost = 0;
+        }
+        totalCost += span.metrics.cost;
+      }
     }
   });
 
@@ -322,7 +329,7 @@ const computeTraceMetrics = (spans: Span[]): Trace["metrics"] => {
         : null,
     prompt_tokens: totalPromptTokens,
     completion_tokens: totalCompletionTokens,
-    total_cost: null,
+    total_cost: totalCost,
     tokens_estimated: tokensEstimated,
   };
 };
@@ -336,20 +343,33 @@ const addLLMTokensCount = async (spans: Span[]) => {
         llmSpan.metrics = {};
       }
       if (llmSpan.input && !llmSpan.metrics.prompt_tokens) {
-        llmSpan.metrics.prompt_tokens = await countTokens(
-          typedValueToText(llmSpan.input)
-        );
+        llmSpan.metrics.prompt_tokens = (
+          await tokenizeAndEstimateCost({
+            model: llmSpan.model,
+            input: typedValueToText(llmSpan.input),
+          })
+        ).inputTokens;
         llmSpan.metrics.tokens_estimated = true;
       }
       if (llmSpan.outputs.length > 0 && !llmSpan.metrics.completion_tokens) {
         let outputTokens = 0;
         for (const output of llmSpan.outputs) {
-          outputTokens += await countTokens(typedValueToText(output));
+          outputTokens += (
+            await tokenizeAndEstimateCost({
+              model: llmSpan.model,
+              input: typedValueToText(output),
+            })
+          ).outputTokens;
         }
         llmSpan.metrics.completion_tokens = outputTokens;
         llmSpan.metrics.tokens_estimated = true;
       }
-      llmSpan.metrics.completion_tokens;
+
+      llmSpan.metrics.cost = estimateCost({
+        model: llmSpan.model,
+        inputTokens: llmSpan.metrics.prompt_tokens ?? 0,
+        outputTokens: llmSpan.metrics.completion_tokens ?? 0,
+      });
     }
   }
   return spans;
