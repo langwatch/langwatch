@@ -22,6 +22,7 @@ import type { ElasticSearchSpan } from "../../../server/tracer/types";
 import { api } from "../../../utils/api";
 import { formatMilliseconds } from "../../../utils/formatMilliseconds";
 import { isNotFound } from "../../../utils/trpcError";
+import numeral from "numeral";
 
 type SpanWithChildren = ElasticSearchSpan & { children: SpanWithChildren[] };
 
@@ -139,6 +140,15 @@ const SpanNode: React.FC<SpanNodeProps> = ({ span, level, lastChild }) => {
                   </Text>
                 </>
               )}
+              {span.metrics?.cost !== undefined &&
+                span.metrics?.cost !== null && (
+                  <>
+                    <Text>·</Text>
+                    <Text fontSize={13} color="gray.500">
+                      <SpanCost span={span} />
+                    </Text>
+                  </>
+                )}
             </HStack>
           </VStack>
         </HStack>
@@ -228,6 +238,12 @@ const SpanDuration = ({ span }: { span: ElasticSearchSpan }) => {
   );
 };
 
+const SpanCost = ({ span }: { span: ElasticSearchSpan }) => {
+  if (span.metrics?.cost === undefined) return null;
+
+  return numeral(span.metrics.cost).format("$0.00000a");
+};
+
 export default function Trace() {
   const router = useRouter();
   const traceId =
@@ -311,7 +327,7 @@ export default function Trace() {
               borderBottomWidth={1}
               borderColor="gray.300"
               width="full"
-              align="flex-start"
+              align="stretch"
             >
               <SummaryItem
                 label="User ID"
@@ -358,6 +374,17 @@ export default function Trace() {
                   {getTotalTokensDisplay(trace.data)}
                 </SummaryItem>
               )}
+              {trace.data.metrics.total_cost !== null &&
+                trace.data.metrics.total_cost !== undefined && (
+                  <SummaryItem
+                    label="Total Cost"
+                    tooltip={
+                      "Based on the number of input and output tokens for each LLM call"
+                    }
+                  >
+                    {numeral(trace.data.metrics.total_cost).format("$0.00000a")}
+                  </SummaryItem>
+                )}
               {trace.data.metrics.first_token_ms && (
                 <SummaryItem
                   label="Time to First Token"

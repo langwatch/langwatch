@@ -54,6 +54,7 @@ import {
 } from "../../components/PeriodSelector";
 import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
+import numeral from "numeral";
 
 export default function MessagesOrIntegrationGuide() {
   const { project } = useOrganizationTeamProject();
@@ -304,6 +305,16 @@ const Message = ({
                           </Tooltip>
                         )}
                       </HStack>
+                    </>
+                  )}
+                  {!!trace.metrics.total_cost && (
+                    <>
+                      <Text>·</Text>
+                      <Box>
+                        {trace.metrics.total_cost > 0.01
+                          ? numeral(trace.metrics.total_cost).format("$0.00a")
+                          : "< $0.01"} cost
+                      </Box>
                     </>
                   )}
                   {!!trace.metrics.first_token_ms && (
