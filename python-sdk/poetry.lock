@@ -1385,13 +1385,13 @@ test = ["responses (==0.22.0)"]
 
 [[package]]
 name = "opentelemetry-instrumentation"
-version = "0.40b0"
+version = "0.41b0"
 description = "Instrumentation Tools & Auto Instrumentation for OpenTelemetry Python"
 optional = false
 python-versions = ">=3.7"
 files = [
-    {file = "opentelemetry_instrumentation-0.40b0-py3-none-any.whl", hash = "sha256:789d3726e698aa9526dd247b461b9172f99a4345571546c4aecf40279679fc8e"},
-    {file = "opentelemetry_instrumentation-0.40b0.tar.gz", hash = "sha256:08bebe6a752514ed61e901e9fee5ccf06ae7533074442e707d75bb65f3e0aa17"},
+    {file = "opentelemetry_instrumentation-0.41b0-py3-none-any.whl", hash = "sha256:0ef9e5705ceca0205992a4a845ae4251ce6ec15a1206ca07c2b00afb0c5bd386"},
+    {file = "opentelemetry_instrumentation-0.41b0.tar.gz", hash = "sha256:214382ba10dfd29d4e24898a4c7ef18b7368178a6277a1aec95cdb75cabf4612"},
 ]
 
 [package.dependencies]
@@ -2185,20 +2185,20 @@ typing-extensions = ">=3.7.4"
 
 [[package]]
 name = "uptrace"
-version = "1.20.0"
+version = "1.20.3"
 description = "OpenTelemetry Python distribution for Uptrace"
 optional = false
 python-versions = ">=3.7"
 files = [
-    {file = "uptrace-1.20.0-py3-none-any.whl", hash = "sha256:1c5d454c1f81cec1b96792d79b96c630aa7f8e4368ffe2c933b052236bc5f0ea"},
-    {file = "uptrace-1.20.0.tar.gz", hash = "sha256:e617ea27cb8e9533877532cb43ba62d5cb820b8b876c33cc4821e57404cdb71d"},
+    {file = "uptrace-1.20.3-py3-none-any.whl", hash = "sha256:07a6e3487fc02ede74dfddba9afe67ab72b97d72ef8b26cd26b615452e8aff8f"},
+    {file = "uptrace-1.20.3.tar.gz", hash = "sha256:ba3fd8dccf0657df445a07c7403c854ea5a4aec61a6dc55b11f8c58ff12f21c9"},
 ]
 
 [package.dependencies]
-opentelemetry-api = "1.20.0"
-opentelemetry-exporter-otlp = "1.20.0"
-opentelemetry-instrumentation = "0.40b0"
-opentelemetry-sdk = "1.20.0"
+opentelemetry-api = ">=1.20,<2.0"
+opentelemetry-exporter-otlp = ">=1.20,<2.0"
+opentelemetry-instrumentation = ">=0.41b0,<1.0"
+opentelemetry-sdk = ">=1.20,<2.0"
 
 [[package]]
 name = "urllib3"
