@@ -25,7 +25,7 @@ import type { Project } from "@prisma/client";
 import ErrorPage from "next/error";
 import Head from "next/head";
 import { useRouter } from "next/router";
-import { type PropsWithChildren } from "react";
+import { useState, type PropsWithChildren } from "react";
 import {
   ChevronDown,
   ChevronRight,
@@ -46,7 +46,6 @@ import { findCurrentRoute, projectRoutes, type Route } from "../utils/routes";
 import { LoadingScreen } from "./LoadingScreen";
 import { ProjectTechStackIcon } from "./TechStack";
 import { LogoIcon } from "./icons/LogoIcon";
-import { env } from "../env.mjs";
 
 const Breadcrumbs = ({ currentRoute }: { currentRoute: Route | undefined }) => {
   const { project } = useOrganizationTeamProject();
@@ -224,6 +223,8 @@ export const DashboardLayout = ({
   const { isLoading, organization, organizations, team, project } =
     useOrganizationTeamProject();
 
+  const [query, setQuery] = useState("");
+
   if (typeof router.query.project === "string" && !isLoading && !project) {
     return <ErrorPage statusCode={404} />;
   }
@@ -322,23 +323,36 @@ export const DashboardLayout = ({
           </Hide>
           <Spacer />
           {currentRoute !== projectRoutes.messages && (
-            <InputGroup maxWidth="600px" borderColor="gray.300">
-              <InputLeftElement
-                paddingY={1.5}
-                height="auto"
-                pointerEvents="none"
-              >
-                <Search color={gray400} width={16} />
-              </InputLeftElement>
-              <Input
-                type="search"
-                placeholder="Search"
-                _placeholder={{ color: "gray.800" }}
-                fontSize={14}
-                paddingY={1.5}
-                height="auto"
-              />
-            </InputGroup>
+            <form
+              action={`${project.slug}/messages`}
+              method="GET"
+              style={{ width: "100%", maxWidth: "600px" }}
+              onSubmit={(e) => {
+                e.preventDefault();
+                void router.push(`${project.slug}/messages?query=${query}`);
+              }}
+            >
+              <InputGroup borderColor="gray.300">
+                <InputLeftElement
+                  paddingY={1.5}
+                  height="auto"
+                  pointerEvents="none"
+                >
+                  <Search color={gray400} width={16} />
+                </InputLeftElement>
+                <Input
+                  name="query"
+                  type="search"
+                  placeholder="Search"
+                  _placeholder={{ color: "gray.800" }}
+                  fontSize={14}
+                  paddingY={1.5}
+                  height="auto"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                />
+              </InputGroup>
+            </form>
           )}
           <Spacer />
           <Menu>

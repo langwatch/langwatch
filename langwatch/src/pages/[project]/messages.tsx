@@ -206,6 +206,7 @@ function SearchInput() {
         borderRadius={0}
         value={query}
         onChange={(e) => setQuery(e.target.value)}
+        autoFocus={!!router.query.query}
       />
     </form>
   );
