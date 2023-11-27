@@ -1,4 +1,8 @@
 import {
+  Alert,
+  AlertDescription,
+  AlertIcon,
+  AlertTitle,
   Box,
   Card,
   CardBody,
@@ -46,6 +50,7 @@ import {
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
 import { formatMilliseconds } from "../../utils/formatMilliseconds";
+import { Link } from "@chakra-ui/next-js";
 
 export default function Index() {
   const router = useRouter();
@@ -120,15 +125,41 @@ export default function Index() {
     0
   );
 
-  useEffect(() => {
-    if (project && !project.firstMessage) {
-      void router.push(`${project.slug}/messages`);
-    }
-  }, [project, router]);
+  // useEffect(() => {
+  //   if (project && !project.firstMessage) {
+  //     void router.push(`${project.slug}/messages`);
+  //   }
+  // }, [project, router]);
 
   return (
     <DashboardLayout>
       <Container maxWidth="1200" padding={6}>
+        {project && !project.firstMessage && (
+          <Alert
+            status="warning"
+            variant="left-accent"
+            marginBottom={6}
+          >
+            <AlertIcon alignSelf="start" />
+            <VStack align="start">
+              <AlertTitle>Setup pending</AlertTitle>
+              <AlertDescription>
+                <Text as="span">
+                  {
+                    "Your project is not set up yet so you won't be able to see any data on the dashboard, please go to the "
+                  }
+                </Text>
+                <Link
+                  textDecoration="underline"
+                  href={`/${project.slug}/messages`}
+                >
+                  setup
+                </Link>
+                <Text as="span"> page to get started.</Text>
+              </AlertDescription>
+            </VStack>
+          </Alert>
+        )}
         <HStack width="full" paddingBottom={6}>
           <Spacer />
           <PeriodSelector
