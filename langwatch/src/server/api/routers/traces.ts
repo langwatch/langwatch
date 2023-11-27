@@ -6,6 +6,7 @@ import { TRACE_CHECKS_INDEX, TRACE_INDEX, esClient } from "../../elasticsearch";
 import { TRPCError } from "@trpc/server";
 import { checkUserPermissionForProject } from "../permission";
 import { getOpenAIEmbeddings } from "../../embeddings";
+import similarity from "compute-cosine-similarity";
 
 export const esGetTraceById = async (
   traceId: string
@@ -51,7 +52,7 @@ export const tracesRouter = createTRPCRouter({
         size: 100,
         _source: {
           excludes: [
-            "input.openai_embeddings",
+            // "input.openai_embeddings",
             "output.openai_embeddings",
             "search_embeddings.openai_embeddings",
           ],
@@ -144,7 +145,60 @@ export const tracesRouter = createTRPCRouter({
         .map((hit) => hit._source!)
         .filter((x) => x);
 
-      return traces;
+      const similarityThreshold = 0.85;
+      const groups: Trace[][] = [];
+
+      for (const trace of traces) {
+        // Skip the document if it doesn't have input.openai_embeddings
+        if (!trace.input?.openai_embeddings) {
+          groups.push([trace]);
+          continue;
+        }
+
+        let grouped = false;
+        for (const group of groups) {
+          for (const member of group) {
+            // Only compare if member has embeddings
+            if (!member.input?.openai_embeddings) continue;
+
+            console.log(
+              "Similarity between",
+              `"${trace.input.value}"`,
+              "and",
+              `"${member.input.value}"`,
+              "=",
+              similarity(
+                trace.input.openai_embeddings,
+                member.input.openai_embeddings
+              )
+            );
+
+            if (
+              (similarity(
+                trace.input.openai_embeddings,
+                member.input.openai_embeddings
+              ) ?? 0) > similarityThreshold
+            ) {
+              group.push(trace);
+              grouped = true;
+              break;
+            }
+          }
+          if (grouped) break;
+        }
+        if (!grouped) {
+          groups.push([trace]);
+        }
+      }
+
+      // Remove embeddings to reduce payload size
+      for (const group of groups) {
+        for (const trace of group) {
+          delete trace.input?.openai_embeddings;
+        }
+      }
+
+      return groups;
     }),
   getById: protectedProcedure
     .input(z.object({ projectId: z.string(), traceId: z.string() }))

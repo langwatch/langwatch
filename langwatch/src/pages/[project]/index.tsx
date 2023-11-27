@@ -125,12 +125,6 @@ export default function Index() {
     0
   );
 
-  // useEffect(() => {
-  //   if (project && !project.firstMessage) {
-  //     void router.push(`${project.slug}/messages`);
-  //   }
-  // }, [project, router]);
-
   return (
     <DashboardLayout>
       <Container maxWidth="1200" padding={6}>

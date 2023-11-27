@@ -41,6 +41,7 @@
     "@vercel/analytics": "^1.1.1",
     "bullmq": "^4.12.8",
     "chakra-react-select": "^4.7.6",
+    "compute-cosine-similarity": "^1.1.0",
     "concurrently": "^8.2.2",
     "date-fns": "^2.30.0",
     "debug": "^4.3.4",

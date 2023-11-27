@@ -48,3 +48,37 @@ a {
     }
   }
 }
+
+/* Expanding card stack effect for grouped messages */
+
+.card-stack-content {
+  position: relative;
+}
+
+.card {
+  position: relative;
+  top: 0;
+  left: 0;
+  right: 0;
+  transition: all 0.3s ease-in-out;
+
+  &:first-child {
+    z-index: 2;
+  }
+
+  &:nth-child(2) {
+    z-index: 1;
+  }
+}
+
+.card-stack-content:not(.expanded) .card {
+  &:nth-child(2) {
+    left: 8px;
+    top: 10px;
+  }
+
+  &:nth-child(3) {
+    top: 20px;
+    left: 16px;
+  }
+}
