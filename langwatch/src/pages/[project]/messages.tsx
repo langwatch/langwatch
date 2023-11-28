@@ -3,11 +3,17 @@ import {
   Alert,
   AlertIcon,
   Box,
+  Button,
   Card,
   CardBody,
   Container,
   HStack,
   Input,
+  Menu,
+  MenuButton,
+  MenuGroup,
+  MenuItem,
+  MenuList,
   Popover,
   PopoverArrow,
   PopoverBody,
@@ -15,6 +21,7 @@ import {
   PopoverHeader,
   PopoverTrigger,
   Portal,
+  Radio,
   Skeleton,
   Spacer,
   Tag,
@@ -26,12 +33,14 @@ import type { Project } from "@prisma/client";
 import { formatDistanceToNow } from "date-fns";
 import { useRouter } from "next/router";
 import numeral from "numeral";
-import React, { createRef, useEffect, useState } from "react";
+import React, { createRef, useEffect, useRef, useState } from "react";
 import {
   CheckCircle,
+  ChevronDown,
   ChevronUp,
   Clock,
   HelpCircle,
+  Layers,
   Maximize2,
   Search,
   XCircle,
@@ -71,6 +80,7 @@ function Messages() {
   const [tracesCheckInterval, setTracesCheckInterval] = useState<
     number | undefined
   >();
+  const [groupBy] = useGroupBy();
 
   const traceGroups = api.traces.getAllForProject.useQuery(
     {
@@ -78,6 +88,7 @@ function Messages() {
       startDate: period.startDate.getTime(),
       endDate: period.endDate.getTime(),
       query: typeof router.query.query === "string" ? router.query.query : "",
+      groupBy,
     },
     {
       enabled: !!project,
@@ -175,6 +186,7 @@ function Messages() {
             <Search size={16} />
           </Box>
           <SearchInput />
+          <GroupingSelector />
           <PeriodSelector period={period} setPeriod={setPeriod} />
         </HStack>
       </VStack>
@@ -189,6 +201,12 @@ function Messages() {
                   key={groupIndex}
                   gap={6}
                   transition="all 0.2s ease-in-out"
+                  onClick={(e: React.MouseEvent<HTMLElement>) => {
+                    if (isExpanded && e.target !== e.currentTarget) return;
+                    if (traceGroup.length === 1) return;
+
+                    toggleGroup(groupIndex);
+                  }}
                   {...(isExpanded
                     ? {
                         className: "card-stack-content expanded",
@@ -196,6 +214,7 @@ function Messages() {
                         borderRadius: "10px",
                         padding: "40px",
                         width: "calc(100% + 80px)",
+                        cursor: "n-resize",
                       }
                     : {
                         className: "card-stack-content",
@@ -211,7 +230,6 @@ function Messages() {
                             : traceGroup.length > 1
                             ? -2
                             : 0,
-                        onClick: () => toggleGroup(groupIndex),
                         cursor: "pointer",
                         width: "full",
                         _hover: {
@@ -222,7 +240,7 @@ function Messages() {
                   {isExpanded && (
                     <HStack
                       width="full"
-                      cursor="pointer"
+                      cursor="n-resize"
                       justify="center"
                       marginTop="-40px"
                       marginBottom="-24px"
@@ -231,6 +249,32 @@ function Messages() {
                     >
                       <ChevronUp />
                     </HStack>
+                  )}
+                  {isExpanded && groupBy === "user_id" && (
+                    <Box
+                      position="absolute"
+                      left="64px"
+                      marginTop="-22px"
+                      fontSize={13}
+                      fontWeight={600}
+                      color="gray.500"
+                      cursor="default"
+                    >
+                      User ID: {traceGroup[0]?.user_id ?? "null"}
+                    </Box>
+                  )}
+                  {isExpanded && groupBy === "thread_id" && (
+                    <Box
+                      position="absolute"
+                      left="64px"
+                      marginTop="-22px"
+                      fontSize={13}
+                      fontWeight={600}
+                      color="gray.500"
+                      cursor="default"
+                    >
+                      Thread ID: {traceGroup[0]?.thread_id ?? "null"}
+                    </Box>
                   )}
                   {traceGroup
                     .slice(0, isExpanded ? traceGroup.length : 3)
@@ -596,5 +640,75 @@ function MessageSkeleton() {
         </VStack>
       </CardBody>
     </Card>
+  );
+}
+
+const groups = {
+  input: "Input",
+  output: "Output",
+  user_id: "User ID",
+  thread_id: "Thread ID",
+  none: "None",
+};
+
+const useGroupBy = () => {
+  const router = useRouter();
+
+  const groupBy =
+    (router.query.group_by as keyof typeof groups | undefined) ?? "input";
+
+  const setGroupBy = (group: keyof typeof groups) => {
+    void router.push(
+      {
+        query: {
+          ...router.query,
+          group_by: group,
+        },
+      },
+      undefined,
+      { shallow: true }
+    );
+  };
+
+  return [groupBy, setGroupBy] as [typeof groupBy, typeof setGroupBy];
+};
+
+function GroupingSelector() {
+  const ref = useRef<HTMLDivElement>(null);
+
+  const [groupBy, setGroupBy] = useGroupBy();
+
+  return (
+    <Menu initialFocusRef={ref}>
+      <MenuButton as={Button} variant="outline" minWidth="fit-content">
+        <HStack spacing={2}>
+          <Layers size={16} />
+          <Box>{groups[groupBy]}</Box>
+          <Box>
+            <ChevronDown width={14} />
+          </Box>
+        </HStack>
+      </MenuButton>
+      <Portal>
+        <Box zIndex="popover" padding={0}>
+          <MenuList>
+            <MenuGroup title="Group by">
+              {Object.entries(groups).map(([key, value]) => (
+                <MenuItem
+                  key={key}
+                  onClick={() => setGroupBy(key as keyof typeof groups)}
+                  {...(groupBy === key ? { ref: ref as any } : {})}
+                >
+                  <HStack spacing={2}>
+                    <Radio isChecked={groupBy === key} />
+                    <Text>{value}</Text>
+                  </HStack>
+                </MenuItem>
+              ))}
+            </MenuGroup>
+          </MenuList>
+        </Box>
+      </Portal>
+    </Menu>
   );
 }

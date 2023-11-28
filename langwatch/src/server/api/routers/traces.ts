@@ -32,6 +32,7 @@ export const tracesRouter = createTRPCRouter({
         startDate: z.number(),
         endDate: z.number(),
         query: z.string().optional(),
+        groupBy: z.string().optional(),
       })
     )
     .use(checkUserPermissionForProject)
@@ -52,9 +53,9 @@ export const tracesRouter = createTRPCRouter({
         size: 100,
         _source: {
           excludes: [
-            // "input.openai_embeddings",
-            "output.openai_embeddings",
             "search_embeddings.openai_embeddings",
+            ...(input.groupBy !== "input" ? ["input.openai_embeddings"] : []),
+            ...(input.groupBy !== "output" ? ["output.openai_embeddings"] : []),
           ],
         },
         ...(!input.query
@@ -145,12 +146,56 @@ export const tracesRouter = createTRPCRouter({
         .map((hit) => hit._source!)
         .filter((x) => x);
 
-      const similarityThreshold = 0.85;
       const groups: Trace[][] = [];
 
+      const groupingKeyPresent = (trace: Trace) => {
+        if (input.groupBy === "input") {
+          return !!trace.input?.openai_embeddings;
+        }
+        if (input.groupBy === "output") {
+          return !!trace.output?.openai_embeddings;
+        }
+        if (input.groupBy === "user_id") {
+          return !!trace.user_id;
+        }
+        if (input.groupBy === "thread_id") {
+          return !!trace.user_id;
+        }
+
+        return false;
+      };
+
+      const matchesGroup = (trace: Trace, member: Trace) => {
+        if (input.groupBy === "input") {
+          const similarityThreshold = 0.85;
+          return (
+            (similarity(
+              trace.input.openai_embeddings!,
+              member.input.openai_embeddings!
+            ) ?? 0) > similarityThreshold
+          );
+        }
+        if (input.groupBy === "output") {
+          const similarityThreshold = 0.9;
+          return (
+            (similarity(
+              trace.output!.openai_embeddings!,
+              member.output!.openai_embeddings!
+            ) ?? 0) > similarityThreshold
+          );
+        }
+        if (input.groupBy === "user_id") {
+          return trace.user_id === member.user_id;
+        }
+        if (input.groupBy === "thread_id") {
+          return trace.user_id === member.user_id;
+        }
+
+        return false;
+      };
+
       for (const trace of traces) {
-        // Skip the document if it doesn't have input.openai_embeddings
-        if (!trace.input?.openai_embeddings) {
+        if (!groupingKeyPresent(trace)) {
           groups.push([trace]);
           continue;
         }
@@ -158,27 +203,9 @@ export const tracesRouter = createTRPCRouter({
         let grouped = false;
         for (const group of groups) {
           for (const member of group) {
-            // Only compare if member has embeddings
-            if (!member.input?.openai_embeddings) continue;
+            if (!groupingKeyPresent(member)) continue;
 
-            console.log(
-              "Similarity between",
-              `"${trace.input.value}"`,
-              "and",
-              `"${member.input.value}"`,
-              "=",
-              similarity(
-                trace.input.openai_embeddings,
-                member.input.openai_embeddings
-              )
-            );
-
-            if (
-              (similarity(
-                trace.input.openai_embeddings,
-                member.input.openai_embeddings
-              ) ?? 0) > similarityThreshold
-            ) {
+            if (matchesGroup(trace, member)) {
               group.push(trace);
               grouped = true;
               break;
@@ -195,6 +222,7 @@ export const tracesRouter = createTRPCRouter({
       for (const group of groups) {
         for (const trace of group) {
           delete trace.input?.openai_embeddings;
+          delete trace.output?.openai_embeddings;
         }
       }
 

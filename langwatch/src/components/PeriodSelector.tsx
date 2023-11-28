@@ -1,4 +1,5 @@
 import {
+  Box,
   Button,
   FormControl,
   FormLabel,
@@ -26,7 +27,7 @@ import {
 } from "date-fns";
 import { useRouter } from "next/router";
 import { useCallback, useMemo } from "react";
-import { Calendar } from "react-feather";
+import { Calendar, ChevronDown } from "react-feather";
 
 const getDaysDifference = (startDate: Date, endDate: Date) =>
   differenceInCalendarDays(endDate, startDate) + 1;
@@ -127,10 +128,13 @@ export function PeriodSelector({
   return (
     <Popover isOpen={isOpen} onClose={onClose} placement="bottom-end">
       <PopoverTrigger>
-        <Button variant="outline" onClick={onOpen}>
-          <HStack>
+        <Button variant="outline" onClick={onOpen} minWidth="fit-content">
+          <HStack spacing={2}>
             <Calendar size={16} />
             <Text>{getDateRangeLabel()}</Text>
+            <Box>
+              <ChevronDown width={14} />
+            </Box>
           </HStack>
         </Button>
       </PopoverTrigger>
