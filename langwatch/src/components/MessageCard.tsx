@@ -208,6 +208,8 @@ export function MessageCard({
                 }
                 paddingY={1}
                 paddingX={2}
+                position="relative"
+                zIndex="popover"
               >
                 <Box paddingRight={2}>
                   {!checksDone ? (
