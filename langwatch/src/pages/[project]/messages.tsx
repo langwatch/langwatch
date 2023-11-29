@@ -182,7 +182,19 @@ function Messages() {
                   gap={0}
                   transition="all .2s linear"
                   onClick={(e: React.MouseEvent<HTMLElement>) => {
-                    if (isExpanded && e.target !== e.currentTarget) return;
+                    const hasCardClass = (
+                      element: HTMLElement | null
+                    ): boolean => {
+                      if (!element) return false;
+                      if (
+                        element.classList.contains("card") ||
+                        element.classList.contains("group-title")
+                      )
+                        return true;
+                      return hasCardClass(element.parentElement);
+                    };
+                    if (isExpanded && hasCardClass(e.target as HTMLElement))
+                      return;
                     if (traceGroup.length === 1) return;
 
                     toggleGroup(groupIndex);
@@ -225,13 +237,13 @@ function Messages() {
                       justify="center"
                       marginTop="-40px"
                       paddingY={3}
-                      onClick={() => toggleGroup(groupIndex)}
                     >
                       <ChevronUp />
                     </HStack>
                   )}
                   {isExpanded && groupBy === "user_id" && (
                     <Box
+                      className="group-title"
                       position="absolute"
                       left="64px"
                       marginTop="-22px"
@@ -245,6 +257,7 @@ function Messages() {
                   )}
                   {isExpanded && groupBy === "thread_id" && (
                     <Box
+                      className="group-title"
                       position="absolute"
                       left="64px"
                       marginTop="-22px"
