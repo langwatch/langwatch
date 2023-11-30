@@ -47,6 +47,21 @@ export const tracesRouter = createTRPCRouter({
           ? new Date().getTime()
           : input.endDate;
 
+      const queryConditions = [
+        {
+          term: { project_id: input.projectId },
+        },
+        {
+          range: {
+            "timestamps.started_at": {
+              gte: input.startDate,
+              lte: endDate,
+              format: "epoch_millis",
+            },
+          },
+        },
+      ];
+
       //@ts-ignore
       const tracesResult = await esClient.search<Trace>({
         index: TRACE_INDEX,
@@ -71,9 +86,7 @@ export const tracesRouter = createTRPCRouter({
           query: {
             bool: {
               must: [
-                {
-                  term: { project_id: input.projectId },
-                },
+                ...queryConditions,
                 ...(input.query
                   ? [
                       {
@@ -96,15 +109,6 @@ export const tracesRouter = createTRPCRouter({
                     ]
                   : []),
               ],
-              filter: {
-                range: {
-                  "timestamps.started_at": {
-                    gte: input.startDate,
-                    lte: endDate,
-                    format: "epoch_millis",
-                  },
-                },
-              },
             },
           },
           ...(input.query
@@ -123,20 +127,7 @@ export const tracesRouter = createTRPCRouter({
           // Ensures proper filters are applied even with knn
           post_filter: {
             bool: {
-              must: [
-                {
-                  term: { project_id: input.projectId },
-                },
-                {
-                  range: {
-                    "timestamps.started_at": {
-                      gte: input.startDate,
-                      lte: endDate,
-                      format: "epoch_millis",
-                    },
-                  },
-                },
-              ],
+              must: queryConditions,
             },
           },
         },
@@ -146,77 +137,7 @@ export const tracesRouter = createTRPCRouter({
         .map((hit) => hit._source!)
         .filter((x) => x);
 
-      const groups: Trace[][] = [];
-
-      const groupingKeyPresent = (trace: Trace) => {
-        if (input.groupBy === "input") {
-          return !!trace.input?.openai_embeddings;
-        }
-        if (input.groupBy === "output") {
-          return !!trace.output?.openai_embeddings;
-        }
-        if (input.groupBy === "user_id") {
-          return !!trace.user_id;
-        }
-        if (input.groupBy === "thread_id") {
-          return !!trace.user_id;
-        }
-
-        return false;
-      };
-
-      const matchesGroup = (trace: Trace, member: Trace) => {
-        if (input.groupBy === "input") {
-          const similarityThreshold = 0.85;
-          return (
-            (similarity(
-              trace.input.openai_embeddings!,
-              member.input.openai_embeddings!
-            ) ?? 0) > similarityThreshold
-          );
-        }
-        if (input.groupBy === "output") {
-          const similarityThreshold = 0.9;
-          return (
-            (similarity(
-              trace.output!.openai_embeddings!,
-              member.output!.openai_embeddings!
-            ) ?? 0) > similarityThreshold
-          );
-        }
-        if (input.groupBy === "user_id") {
-          return trace.user_id === member.user_id;
-        }
-        if (input.groupBy === "thread_id") {
-          return trace.user_id === member.user_id;
-        }
-
-        return false;
-      };
-
-      for (const trace of traces) {
-        if (!groupingKeyPresent(trace)) {
-          groups.push([trace]);
-          continue;
-        }
-
-        let grouped = false;
-        for (const group of groups) {
-          for (const member of group) {
-            if (!groupingKeyPresent(member)) continue;
-
-            if (matchesGroup(trace, member)) {
-              group.push(trace);
-              grouped = true;
-              break;
-            }
-          }
-          if (grouped) break;
-        }
-        if (!grouped) {
-          groups.push([trace]);
-        }
-      }
+      const groups = groupTraces(input.groupBy, traces);
 
       // Remove embeddings to reduce payload size
       for (const group of groups) {
@@ -303,3 +224,79 @@ export const tracesRouter = createTRPCRouter({
       return checksPerTrace;
     }),
 });
+
+const groupTraces = (groupBy: string | undefined, traces: Trace[]) => {
+  const groups: Trace[][] = [];
+
+  const groupingKeyPresent = (trace: Trace) => {
+    if (groupBy === "input") {
+      return !!trace.input?.openai_embeddings;
+    }
+    if (groupBy === "output") {
+      return !!trace.output?.openai_embeddings;
+    }
+    if (groupBy === "user_id") {
+      return !!trace.user_id;
+    }
+    if (groupBy === "thread_id") {
+      return !!trace.user_id;
+    }
+
+    return false;
+  };
+
+  const matchesGroup = (trace: Trace, member: Trace) => {
+    if (groupBy === "input") {
+      const similarityThreshold = 0.85;
+      return (
+        (similarity(
+          trace.input.openai_embeddings!,
+          member.input.openai_embeddings!
+        ) ?? 0) > similarityThreshold
+      );
+    }
+    if (groupBy === "output") {
+      const similarityThreshold = 0.9;
+      return (
+        (similarity(
+          trace.output!.openai_embeddings!,
+          member.output!.openai_embeddings!
+        ) ?? 0) > similarityThreshold
+      );
+    }
+    if (groupBy === "user_id") {
+      return trace.user_id === member.user_id;
+    }
+    if (groupBy === "thread_id") {
+      return trace.user_id === member.user_id;
+    }
+
+    return false;
+  };
+
+  for (const trace of traces) {
+    if (!groupingKeyPresent(trace)) {
+      groups.push([trace]);
+      continue;
+    }
+
+    let grouped = false;
+    for (const group of groups) {
+      for (const member of group) {
+        if (!groupingKeyPresent(member)) continue;
+
+        if (matchesGroup(trace, member)) {
+          group.push(trace);
+          grouped = true;
+          break;
+        }
+      }
+      if (grouped) break;
+    }
+    if (!grouped) {
+      groups.push([trace]);
+    }
+  }
+
+  return groups;
+};
