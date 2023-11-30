@@ -6,28 +6,37 @@ import {
   Card,
   CardBody,
   Container,
+  FormControl,
+  FormLabel,
   HStack,
+  Heading,
   Input,
   LinkBox,
-  LinkOverlay,
   Menu,
   MenuButton,
   MenuGroup,
   MenuItem,
   MenuList,
-  Portal,
+  Popover,
+  PopoverArrow,
+  PopoverBody,
+  PopoverCloseButton,
+  PopoverContent,
+  PopoverHeader,
+  PopoverTrigger,
   Radio,
   Skeleton,
   Text,
   VStack,
+  useDisclosure,
 } from "@chakra-ui/react";
 import type { Project } from "@prisma/client";
-import NextLink from "next/link";
 import { useRouter } from "next/router";
 import React, { createRef, useEffect, useRef, useState } from "react";
 import {
   ChevronDown,
   ChevronUp,
+  Filter,
   Layers,
   Maximize2,
   Search,
@@ -69,6 +78,14 @@ function Messages() {
       endDate: period.endDate.getTime(),
       query: typeof router.query.query === "string" ? router.query.query : "",
       groupBy,
+      user_id:
+        typeof router.query.user_id === "string"
+          ? router.query.user_id
+          : undefined,
+      thread_id:
+        typeof router.query.thread_id === "string"
+          ? router.query.thread_id
+          : undefined,
     },
     {
       enabled: !!project,
@@ -133,6 +150,7 @@ function Messages() {
             <Search size={16} />
           </Box>
           <SearchInput />
+          <FilterSelector />
           <GroupingSelector />
           <PeriodSelector period={period} setPeriod={setPeriod} />
         </HStack>
@@ -140,7 +158,11 @@ function Messages() {
       <Container maxWidth="1200" padding={6}>
         <VStack gap={6}>
           {project && traceGroups.data && traceGroups.data.length > 0 ? (
-            <ExpandableMessages project={project} traceGroups={traceGroups.data} checksMap={traceChecksQuery.data} />
+            <ExpandableMessages
+              project={project}
+              traceGroups={traceGroups.data}
+              checksMap={traceChecksQuery.data}
+            />
           ) : traceGroups.data ? (
             <Alert status="info">
               <AlertIcon />
@@ -164,7 +186,15 @@ function Messages() {
   );
 }
 
-function ExpandableMessages({ project, traceGroups, checksMap }: { project: Project, traceGroups: Trace[][], checksMap: Record<string, TraceCheck[]> | undefined; }) {
+function ExpandableMessages({
+  project,
+  traceGroups,
+  checksMap,
+}: {
+  project: Project;
+  traceGroups: Trace[][];
+  checksMap: Record<string, TraceCheck[]> | undefined;
+}) {
   const [expandedGroups, setExpandedGroups] = useState<Record<number, boolean>>(
     {}
   );
@@ -420,6 +450,82 @@ const useGroupBy = () => {
 
   return [groupBy, setGroupBy] as [typeof groupBy, typeof setGroupBy];
 };
+
+function FilterSelector() {
+  const { isOpen, onOpen, onClose } = useDisclosure();
+  const router = useRouter();
+  const [userId, setUserId] = useState("");
+  const [threadId, setThreadId] = useState("");
+
+  useEffect(() => {
+    const query = router.query;
+    if (typeof query.user_id === "string") setUserId(query.user_id);
+    if (typeof query.thread_id === "string") setThreadId(query.thread_id);
+  }, [router.query]);
+
+  const applyFilters = () => {
+    const query = {
+      ...router.query,
+      user_id: userId || undefined,
+      thread_id: threadId || undefined,
+    };
+    void router.push({ query });
+    onClose();
+  };
+
+  const getFilterLabel = () => {
+    const parts = [];
+    if (userId) parts.push(`User ID: ${userId}`);
+    if (threadId) parts.push(`Thread ID: ${threadId}`);
+    return parts.length > 0 ? parts.join(", ") : "Filter";
+  };
+
+  return (
+    <Popover isOpen={isOpen} onClose={onClose} placement="bottom-end">
+      <PopoverTrigger>
+        <Button variant="outline" onClick={onOpen} minWidth="fit-content">
+          <HStack spacing={2}>
+            <Filter size={16} />
+            <Text>{getFilterLabel()}</Text>
+            <Box>
+              <ChevronDown width={14} />
+            </Box>
+          </HStack>
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent width="fit-content">
+        <PopoverArrow />
+        <PopoverCloseButton />
+        <PopoverHeader>
+          <Heading size="sm">Filter Messages</Heading>
+        </PopoverHeader>
+        <PopoverBody padding={4}>
+          <VStack spacing={4}>
+            <FormControl>
+              <FormLabel>User ID</FormLabel>
+              <Input
+                value={userId}
+                onChange={(e) => setUserId(e.target.value)}
+                placeholder="Enter User ID"
+              />
+            </FormControl>
+            <FormControl>
+              <FormLabel>Thread ID</FormLabel>
+              <Input
+                value={threadId}
+                onChange={(e) => setThreadId(e.target.value)}
+                placeholder="Enter Thread ID"
+              />
+            </FormControl>
+            <Button colorScheme="orange" onClick={applyFilters} alignSelf="end">
+              Apply
+            </Button>
+          </VStack>
+        </PopoverBody>
+      </PopoverContent>
+    </Popover>
+  );
+}
 
 function GroupingSelector() {
   const ref = useRef<HTMLDivElement>(null);

@@ -33,6 +33,8 @@ export const tracesRouter = createTRPCRouter({
         endDate: z.number(),
         query: z.string().optional(),
         groupBy: z.string().optional(),
+        user_id: z.string().optional(),
+        thread_id: z.string().optional(),
       })
     )
     .use(checkUserPermissionForProject)
@@ -60,6 +62,8 @@ export const tracesRouter = createTRPCRouter({
             },
           },
         },
+        ...(input.user_id ? [{ term: { user_id: input.user_id } }] : []),
+        ...(input.thread_id ? [{ term: { thread_id: input.thread_id } }] : []),
       ];
 
       //@ts-ignore
