@@ -113,39 +113,6 @@ function Messages() {
     return () => clearInterval(interval);
   }, [traceGroups]);
 
-  // Card Expansion
-
-  const [expandedGroups, setExpandedGroups] = useState<Record<number, boolean>>(
-    {}
-  );
-
-  useEffect(() => {
-    if (!traceGroups.data) {
-      setExpandedGroups({});
-    }
-  }, [traceGroups.data]);
-
-  const toggleGroup = (index: number) => {
-    setExpandedGroups((prev) => ({
-      ...prev,
-      [index]: !prev[index],
-    }));
-  };
-
-  const [cardHeights, setCardHeights] = useState<Record<number, number>>({});
-  const cardRefs = (traceGroups.data ?? []).map(() => createRef<Element>());
-
-  useEffect(() => {
-    const newHeights: Record<number, number> = {};
-    cardRefs.forEach((ref, index) => {
-      if (ref.current) {
-        newHeights[index] = ref.current.clientHeight;
-      }
-    });
-    setCardHeights(newHeights);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [traceGroups.data]);
-
   return (
     <DashboardLayout>
       <VStack
@@ -172,131 +139,8 @@ function Messages() {
       </VStack>
       <Container maxWidth="1200" padding={6}>
         <VStack gap={6}>
-          {traceGroups.data && traceGroups.data.length > 0 ? (
-            traceGroups.data.map((traceGroup, groupIndex) => {
-              const isExpanded = !!expandedGroups[groupIndex];
-
-              return (
-                <VStack
-                  key={traceGroup[0]?.id ?? groupIndex}
-                  gap={0}
-                  transition="all .2s linear"
-                  onClick={(e: React.MouseEvent<HTMLElement>) => {
-                    const hasCardClass = (
-                      element: HTMLElement | null
-                    ): boolean => {
-                      if (!element) return false;
-                      if (
-                        element.classList.contains("card") ||
-                        element.classList.contains("group-title")
-                      )
-                        return true;
-                      return hasCardClass(element.parentElement);
-                    };
-                    if (isExpanded && hasCardClass(e.target as HTMLElement))
-                      return;
-                    if (traceGroup.length === 1) return;
-
-                    toggleGroup(groupIndex);
-                  }}
-                  {...(isExpanded
-                    ? {
-                        className: "card-stack-content expanded",
-                        background: "#ECEEF2",
-                        borderRadius: "10px",
-                        padding: "40px",
-                        width: "calc(100% + 80px)",
-                        cursor: "n-resize",
-                      }
-                    : {
-                        background: "#ECEEF200",
-                        className: "card-stack-content",
-                        marginBottom:
-                          traceGroup.length > 2
-                            ? 4
-                            : traceGroup.length > 1
-                            ? 2
-                            : 0,
-                        marginLeft:
-                          traceGroup.length > 2
-                            ? -4
-                            : traceGroup.length > 1
-                            ? -2
-                            : 0,
-                        cursor: "pointer",
-                        width: "full",
-                        _hover: {
-                          transform: "scale(1.04)",
-                        },
-                      })}
-                >
-                  {isExpanded && (
-                    <HStack
-                      width="full"
-                      cursor="n-resize"
-                      justify="center"
-                      marginTop="-40px"
-                      paddingY={3}
-                    >
-                      <ChevronUp />
-                    </HStack>
-                  )}
-                  {isExpanded && groupBy === "user_id" && (
-                    <Box
-                      className="group-title"
-                      position="absolute"
-                      left="64px"
-                      marginTop="-22px"
-                      fontSize={13}
-                      fontWeight={600}
-                      color="gray.500"
-                      cursor="default"
-                    >
-                      User ID: {traceGroup[0]?.user_id ?? "null"}
-                    </Box>
-                  )}
-                  {isExpanded && groupBy === "thread_id" && (
-                    <Box
-                      className="group-title"
-                      position="absolute"
-                      left="64px"
-                      marginTop="-22px"
-                      fontSize={13}
-                      fontWeight={600}
-                      color="gray.500"
-                      cursor="default"
-                    >
-                      Thread ID: {traceGroup[0]?.thread_id ?? "null"}
-                    </Box>
-                  )}
-                  <VStack width="full" gap={6}>
-                    {traceGroup
-                      .slice(0, isExpanded ? traceGroup.length : 3)
-                      .map((trace, traceIndex) => (
-                        <Message
-                          key={trace.id}
-                          ref={traceIndex === 0 ? cardRefs[groupIndex] : null}
-                          project={project}
-                          trace={trace}
-                          checksMap={traceChecksQuery.data}
-                          marginTop={
-                            isExpanded || traceIndex === 0
-                              ? "0"
-                              : `-${(cardHeights[groupIndex] ?? 0) + 24}px`
-                          }
-                          height={
-                            isExpanded || traceIndex === 0
-                              ? "auto"
-                              : `${cardHeights[groupIndex] ?? 0}px`
-                          }
-                          renderContent={traceIndex === 0 || isExpanded}
-                          expanded={isExpanded || traceGroup.length === 1}
-                        />
-                      ))}
-                  </VStack>
-                </VStack>
-              );
-            })
+          {project && traceGroups.data && traceGroups.data.length > 0 ? (
+            <ExpandableMessages project={project} traceGroups={traceGroups.data} checksMap={traceChecksQuery.data} />
           ) : traceGroups.data ? (
             <Alert status="info">
               <AlertIcon />
@@ -318,6 +162,177 @@ function Messages() {
       </Container>
     </DashboardLayout>
   );
+}
+
+function ExpandableMessages({ project, traceGroups, checksMap }: { project: Project, traceGroups: Trace[][], checksMap: Record<string, TraceCheck[]> | undefined; }) {
+  const [expandedGroups, setExpandedGroups] = useState<Record<number, boolean>>(
+    {}
+  );
+
+  const toggleGroup = (index: number) => {
+    setExpandedGroups((prev) => ({
+      ...prev,
+      [index]: !prev[index],
+    }));
+  };
+
+  const [cardHeights, setCardHeights] = useState<Record<number, number>>({});
+  const cardRefs = (traceGroups ?? []).map(() => createRef<Element>());
+  const [groupBy] = useGroupBy();
+
+  useEffect(() => {
+    const newHeights: Record<number, number> = {};
+    cardRefs.forEach((ref, index) => {
+      if (ref.current) {
+        newHeights[index] = ref.current.clientHeight;
+      }
+    });
+    setCardHeights(newHeights);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [traceGroups]);
+
+  return traceGroups.map((traceGroup, groupIndex) => {
+    const isExpanded = !!expandedGroups[groupIndex];
+
+    return (
+      <VStack
+        key={traceGroup[0]?.id ?? groupIndex}
+        gap={0}
+        transition="all .2s linear"
+        onClick={(e: React.MouseEvent<HTMLElement>) => {
+          const hasCardClass = (element: HTMLElement | null): boolean => {
+            if (!element) return false;
+            if (
+              element.classList.contains("card") ||
+              element.classList.contains("group-title")
+            )
+              return true;
+            return hasCardClass(element.parentElement);
+          };
+          if (isExpanded && hasCardClass(e.target as HTMLElement)) return;
+          if (traceGroup.length === 1) return;
+
+          toggleGroup(groupIndex);
+        }}
+        {...(isExpanded
+          ? {
+              className: "card-stack-content expanded",
+              background: "#ECEEF2",
+              borderRadius: "10px",
+              padding: "40px",
+              width: "calc(100% + 80px)",
+              cursor: "n-resize",
+            }
+          : {
+              background: "#ECEEF200",
+              className: "card-stack-content",
+              marginBottom:
+                traceGroup.length > 2 ? 4 : traceGroup.length > 1 ? 2 : 0,
+              marginLeft:
+                traceGroup.length > 2 ? -4 : traceGroup.length > 1 ? -2 : 0,
+              cursor: "pointer",
+              width: "full",
+              _hover: {
+                transform: "scale(1.04)",
+              },
+            })}
+      >
+        {isExpanded && (
+          <HStack
+            width="full"
+            cursor="n-resize"
+            justify="center"
+            marginTop="-40px"
+            paddingY={3}
+          >
+            <ChevronUp />
+          </HStack>
+        )}
+        {isExpanded && groupBy === "user_id" && (
+          <Box
+            className="group-title"
+            position="absolute"
+            left="64px"
+            marginTop="-22px"
+            fontSize={13}
+            fontWeight={600}
+            color="gray.500"
+            cursor="default"
+          >
+            User ID: {traceGroup[0]?.user_id ?? "null"}
+          </Box>
+        )}
+        {isExpanded && groupBy === "thread_id" && (
+          <Box
+            className="group-title"
+            position="absolute"
+            left="64px"
+            marginTop="-22px"
+            fontSize={13}
+            fontWeight={600}
+            color="gray.500"
+            cursor="default"
+          >
+            Thread ID: {traceGroup[0]?.thread_id ?? "null"}
+          </Box>
+        )}
+        <VStack width="full" gap={6}>
+          {traceGroup
+            .slice(0, isExpanded ? traceGroup.length : 3)
+            .map((trace, traceIndex) => {
+              const expanded = isExpanded || traceGroup.length === 1;
+              const renderContent = isExpanded || traceIndex === 0;
+
+              return (
+                <LinkBox
+                  as={Card}
+                  className="card"
+                  key={trace.id}
+                  ref={traceIndex === 0 ? cardRefs[groupIndex] : null}
+                  height={
+                    renderContent ? "auto" : `${cardHeights[groupIndex] ?? 0}px`
+                  }
+                  marginTop={
+                    renderContent
+                      ? "0"
+                      : `-${(cardHeights[groupIndex] ?? 0) + 24}px`
+                  }
+                  padding={0}
+                  cursor="pointer"
+                  width="full"
+                  transition="all .2s linear"
+                  border="1px solid"
+                  borderColor="gray.300"
+                  _hover={
+                    expanded
+                      ? {
+                          transform: "scale(1.04)",
+                        }
+                      : {}
+                  }
+                >
+                  {!expanded && (
+                    <Box position="absolute" right={5} top={5}>
+                      <Maximize2 />
+                    </Box>
+                  )}
+                  <CardBody padding={8} width="fill">
+                    {renderContent && (
+                      <MessageCard
+                        linkActive={expanded}
+                        project={project}
+                        trace={trace}
+                        checksMap={checksMap}
+                      />
+                    )}
+                  </CardBody>
+                </LinkBox>
+              );
+            })}
+        </VStack>
+      </VStack>
+    );
+  });
 }
 
 function SearchInput() {
@@ -354,66 +369,6 @@ function SearchInput() {
     </form>
   );
 }
-
-const Message = React.forwardRef(function Message(
-  {
-    project,
-    trace,
-    checksMap,
-    marginTop,
-    height,
-    renderContent,
-    expanded,
-  }: {
-    project: Project | undefined;
-    trace: Trace;
-    checksMap: Record<string, TraceCheck[]> | undefined;
-    marginTop: string;
-    height: string;
-    renderContent: boolean;
-    expanded: boolean;
-  },
-  ref
-) {
-  return (
-    <LinkBox
-      as={Card}
-      className="card"
-      ref={ref as any}
-      height={height}
-      marginTop={marginTop}
-      padding={0}
-      cursor="pointer"
-      width="full"
-      transition="all .2s linear"
-      border="1px solid"
-      borderColor="gray.300"
-      _hover={
-        expanded
-          ? {
-              transform: "scale(1.04)",
-            }
-          : {}
-      }
-    >
-      {!expanded && (
-        <Box position="absolute" right={5} top={5}>
-          <Maximize2 />
-        </Box>
-      )}
-      <CardBody padding={8} width="fill">
-        {renderContent && (
-          <MessageCard
-            linkActive={expanded}
-            project={project}
-            trace={trace}
-            checksMap={checksMap}
-          />
-        )}
-      </CardBody>
-    </LinkBox>
-  );
-});
 
 function MessageSkeleton() {
   return (

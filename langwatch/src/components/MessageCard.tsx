@@ -38,7 +38,7 @@ export function MessageCard({
   checksMap,
 }: {
   linkActive: boolean;
-  project: Project | undefined;
+  project: Project;
   trace: Trace;
   checksMap: Record<string, TraceCheck[]> | undefined;
 }) {
@@ -66,7 +66,7 @@ export function MessageCard({
           <Box fontWeight="bold">
             <LinkOverlay
               as={NextLink}
-              href={`/${project?.slug}/messages/${trace.id}`}
+              href={`/${project.slug}/messages/${trace.id}`}
               onClick={(e) => {
                 if (!linkActive) e.preventDefault();
               }}
