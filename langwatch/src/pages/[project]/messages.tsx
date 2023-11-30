@@ -209,6 +209,7 @@ function ExpandableMessages({
   const [cardHeights, setCardHeights] = useState<Record<number, number>>({});
   const cardRefs = (traceGroups ?? []).map(() => createRef<Element>());
   const [groupBy] = useGroupBy();
+  const [transitionsEnabled, setTransitionsEnabled] = useState(false);
 
   useEffect(() => {
     const newHeights: Record<number, number> = {};
@@ -218,6 +219,7 @@ function ExpandableMessages({
       }
     });
     setCardHeights(newHeights);
+    setTimeout(() => setTransitionsEnabled(true), 100);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [traceGroups]);
 
@@ -330,7 +332,7 @@ function ExpandableMessages({
                   padding={0}
                   cursor="pointer"
                   width="full"
-                  transition="all .2s linear"
+                  transition={transitionsEnabled ? "all .2s linear" : undefined}
                   border="1px solid"
                   borderColor="gray.300"
                   _hover={
