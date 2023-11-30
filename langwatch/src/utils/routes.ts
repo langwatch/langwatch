@@ -11,9 +11,9 @@ export const projectRoutes = {
     path: "/[project]/analytics",
     title: "Analytics",
   },
-  security: {
-    path: "/[project]/security",
-    title: "Security Checks",
+  checks: {
+    path: "/[project]/checks",
+    title: "Checks",
   },
   prompts: {
     path: "/[project]/prompts",

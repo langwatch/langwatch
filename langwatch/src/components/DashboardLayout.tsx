@@ -286,14 +286,14 @@ export const DashboardLayout = ({
               icon={TrendingUp}
               label={projectRoutes.analytics.title}
               project={project}
-            />
-            <SideMenuLink
-              path={projectRoutes.security.path}
+            />*/}
+            {/* <SideMenuLink
+              path={projectRoutes.checks.path}
               icon={Shield}
-              label={projectRoutes.security.title}
+              label={projectRoutes.checks.title}
               project={project}
-            />
-            <SideMenuLink
+            /> */}
+            {/*<SideMenuLink
               path={projectRoutes.prompts.path}
               icon={Database}
               label={projectRoutes.prompts.title}
