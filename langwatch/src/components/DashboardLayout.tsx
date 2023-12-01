@@ -308,7 +308,7 @@ export const DashboardLayout = ({
           </VStack>
         </VStack>
       </Box>
-      <VStack width="full" spacing={0} background="gray.200" {...bgProps}>
+      <VStack width="full" spacing={0} background="gray.100" {...bgProps}>
         <HStack
           position="relative"
           zIndex={3}

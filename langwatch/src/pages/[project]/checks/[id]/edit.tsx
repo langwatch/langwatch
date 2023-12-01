@@ -1,11 +1,22 @@
 import { useRouter } from "next/router";
-import { useToast } from "@chakra-ui/react";
+import {
+  Alert,
+  AlertIcon,
+  Card,
+  CardBody,
+  Container,
+  Heading,
+  Skeleton,
+  VStack,
+  useToast,
+} from "@chakra-ui/react";
 import CheckConfigForm, {
   type CheckConfigFormData,
 } from "../../../../components/CheckConfigForm";
 import { api } from "../../../../utils/api";
 import { useOrganizationTeamProject } from "../../../../hooks/useOrganizationTeamProject";
 import { DashboardLayout } from "../../../../components/DashboardLayout";
+import checks from "../../checks";
 
 export default function EditCheck() {
   const { project } = useOrganizationTeamProject();
@@ -13,13 +24,11 @@ export default function EditCheck() {
   const toast = useToast();
 
   const checkId = typeof router.query.id == "string" ? router.query.id : "";
-  const { data: check, isLoading } = api.checks.getById.useQuery(
+  const check = api.checks.getById.useQuery(
     { id: checkId, projectId: project?.id ?? "" },
     { enabled: !!project }
   );
   const updateCheck = api.checks.update.useMutation();
-
-  if (isLoading) return null;
 
   const onSubmit = async (data: CheckConfigFormData) => {
     if (!project) return;
@@ -38,6 +47,7 @@ export default function EditCheck() {
         isClosable: true,
       });
       void router.push(`/${project.slug}/checks`);
+      check.remove();
     } catch (error) {
       toast({
         title: "Failed to update check",
@@ -49,16 +59,44 @@ export default function EditCheck() {
     }
   };
 
-  const defaultValues = check
+  const defaultValues = check.data
     ? {
-        ...check,
-        checkType: check.checkType as CheckConfigFormData["checkType"],
+        ...check.data,
+        checkType: check.data.checkType as CheckConfigFormData["checkType"],
       }
     : undefined;
 
   return (
     <DashboardLayout>
-      <CheckConfigForm defaultValues={defaultValues} onSubmit={onSubmit} />
+      <Container maxWidth="1200" padding={6}>
+        <VStack align="start">
+          <Heading as="h1" size="xl" textAlign="center" my={6}>
+            Editing Check
+          </Heading>
+          {check.isLoading ? (
+            <Card width="full">
+              <CardBody>
+                <VStack gap={4} width="full">
+                  <Skeleton width="full" height="20px" />
+                  <Skeleton width="full" height="20px" />
+                  <Skeleton width="full" height="20px" />
+                </VStack>
+              </CardBody>
+            </Card>
+          ) : check.isError ? (
+            <Alert status="error">
+              <AlertIcon />
+              An error has occurred trying to load the check configs
+            </Alert>
+          ) : (
+            <CheckConfigForm
+              defaultValues={defaultValues}
+              onSubmit={onSubmit}
+              isLoading={updateCheck.isLoading}
+            />
+          )}
+        </VStack>
+      </Container>
     </DashboardLayout>
   );
 }

@@ -107,9 +107,9 @@ const SpanNode: React.FC<SpanNodeProps> = ({ span, level, lastChild }) => {
           paddingX={level > 0 ? 8 : 4}
           paddingRight={14}
           borderRadius={6}
-          background={span.id === currentSpanId ? "gray.200" : undefined}
+          background={span.id === currentSpanId ? "gray.100" : undefined}
           _hover={{
-            background: "gray.200",
+            background: "gray.100",
           }}
         >
           <HStack spacing={4}>

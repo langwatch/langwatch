@@ -45,7 +45,7 @@ export function RadioCard(props: UseRadioProps & PropsWithChildren) {
         }}
         _checked={{
           // borderColor: "orange.600",
-          backgroundColor: "gray.100",
+          backgroundColor: "gray.50",
           // borderWidth: "2px"
         }}
         px={5}

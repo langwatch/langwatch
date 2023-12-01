@@ -4,10 +4,12 @@ import { type AppType } from "next/app";
 
 import { api } from "~/utils/api";
 
+import { switchAnatomy } from "@chakra-ui/anatomy";
 import {
   ChakraProvider,
   defineStyle,
   defineStyleConfig,
+  createMultiStyleConfigHelpers,
   type StyleFunctionProps,
 } from "@chakra-ui/react";
 import "~/styles/globals.scss";
@@ -27,6 +29,10 @@ import { type Dependencies } from "../injection";
 
 const inter = Inter({ subsets: ["latin"] });
 const dependencies = _dependencies as Dependencies;
+
+// eslint-disable-next-line @typescript-eslint/unbound-method
+const { definePartsStyle, defineMultiStyleConfig } =
+  createMultiStyleConfigHelpers(switchAnatomy.keys);
 
 export const theme = extendTheme({
   styles: {
@@ -48,8 +54,9 @@ export const theme = extendTheme({
       500: "#51676C",
       400: "#9CA3AF",
       300: "#E5E7EB",
-      200: "#F2F4F8",
-      100: "#F7FAFC",
+      200: "#E6E9F0",
+      100: "#F2F4F8",
+      50: "#F7FAFC",
     },
     orange: {
       400: "#ED8926",
@@ -77,12 +84,26 @@ export const theme = extendTheme({
     Button: defineStyleConfig({
       variants: {
         outline: defineStyle({
-          borderColor: "gray.300"
-        })
-      }
-    })
+          borderColor: "gray.300",
+        }),
+      },
+    }),
+    Switch: defineMultiStyleConfig({
+      variants: {
+        darkerTrack: definePartsStyle({
+          track: {
+            background: "gray.400",
+            _checked: {
+              background: "blue.500",
+            },
+          },
+        }),
+      },
+    }),
   },
 });
+
+const handleChangeStart = debounce(() => NProgress.start(), 200);
 
 const LangWatch: AppType<{
   session: Session | null;
@@ -92,7 +113,6 @@ const LangWatch: AppType<{
 
   useEffect(() => {
     NProgress.configure({ showSpinner: false });
-    const handleChangeStart = debounce(() => NProgress.start(), 200);
     const handleChangeDone = () => {
       handleChangeStart.cancel();
       NProgress.done();

@@ -6,7 +6,9 @@ import {
   FormLabel,
   HStack,
   Spacer,
-  VStack
+  VStack,
+  type ComponentWithAs,
+  type StackProps,
 } from "@chakra-ui/react";
 import { useRouter } from "next/router";
 import { type PropsWithChildren } from "react";
@@ -55,7 +57,7 @@ export const MenuLink = ({
       paddingY={2}
       width="full"
       position="relative"
-      _hover={{ background: "gray.100" }}
+      _hover={{ background: "gray.50" }}
       _before={{
         content: '""',
         position: "absolute",
@@ -76,20 +78,21 @@ export const SettingsFormControl = ({
   helper,
   isInvalid,
   children,
+  align,
 }: PropsWithChildren<{
   label: string;
   helper: string;
   isInvalid?: boolean;
-}>) => {
+}> &
+  StackProps) => {
   return (
     <FormControl
-      borderColor="gray.200"
       borderBottomWidth="1px"
       paddingY={4}
       isInvalid={isInvalid}
       _last={{ border: "none" }}
     >
-      <HStack>
+      <HStack align={align}>
         <VStack align="start" spacing={1}>
           <FormLabel margin={0}>{label}</FormLabel>
           <FormHelperText margin={0} fontSize={12}>

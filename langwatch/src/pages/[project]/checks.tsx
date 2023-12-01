@@ -142,6 +142,7 @@ export default function Checks() {
                         onChange={() => handleToggle(config.id, config.enabled)}
                         position="relative"
                         zIndex={1}
+                        variant="darkerTrack"
                       />
                       <VStack flexGrow={1} align="start">
                         <Heading as="h3" size="md">

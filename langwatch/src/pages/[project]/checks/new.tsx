@@ -1,23 +1,23 @@
+import { Container, Heading, VStack, useToast } from "@chakra-ui/react";
 import { useRouter } from "next/router";
-import { useToast } from "@chakra-ui/react";
 import CheckConfigForm, {
   type CheckConfigFormData,
 } from "../../../components/CheckConfigForm";
-import { api } from "../../../utils/api";
-import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
 import { DashboardLayout } from "../../../components/DashboardLayout";
+import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
+import { api } from "../../../utils/api";
 
 export default function NewTraceCheckConfig() {
   const { project } = useOrganizationTeamProject();
   const router = useRouter();
   const toast = useToast();
-  const createTraceCheckConfig = api.checks.create.useMutation();
+  const createCheck = api.checks.create.useMutation();
 
   const onSubmit = async (data: CheckConfigFormData) => {
     if (!project) return;
 
     try {
-      await createTraceCheckConfig.mutateAsync({
+      await createCheck.mutateAsync({
         ...data,
         projectId: project.id,
         parameters: {},
@@ -42,7 +42,17 @@ export default function NewTraceCheckConfig() {
 
   return (
     <DashboardLayout>
-      <CheckConfigForm onSubmit={onSubmit} />
+      <Container maxWidth="1200" padding={6}>
+        <VStack align="start">
+          <Heading as="h1" size="xl" textAlign="center" my={6}>
+            New Check
+          </Heading>
+          <CheckConfigForm
+            onSubmit={onSubmit}
+            isLoading={createCheck.isLoading}
+          />
+        </VStack>
+      </Container>
     </DashboardLayout>
   );
 }
