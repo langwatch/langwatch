@@ -17,7 +17,7 @@
   },
   "dependencies": {
     "@chakra-ui/next-js": "^2.1.5",
-    "@chakra-ui/react": "^2.8.1",
+    "@chakra-ui/react": "^2.8.2",
     "@elastic/elasticsearch": "^8.10.0",
     "@emotion/react": "^11.11.1",
     "@emotion/styled": "^11.11.0",

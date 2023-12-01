@@ -1,18 +1,29 @@
 import {
-  Heading,
-  Button,
-  VStack,
-  HStack,
-  Switch,
-  useToast,
-  AlertIcon,
   Alert,
+  AlertIcon,
+  Box,
+  Button,
+  Card,
+  CardBody,
+  Container,
+  HStack,
+  Heading,
+  LinkBox,
+  LinkOverlay,
   Skeleton,
+  Spacer,
+  Spinner,
+  Switch,
+  Text,
+  VStack,
+  useToast,
 } from "@chakra-ui/react";
+import NextLink from "next/link";
 import { DashboardLayout } from "../../components/DashboardLayout";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
-import NextLink from "next/link";
+import { Link } from "@chakra-ui/next-js";
+import { ChevronLeft, ChevronRight } from "react-feather";
 
 export default function Checks() {
   const { project } = useOrganizationTeamProject();
@@ -54,7 +65,7 @@ export default function Checks() {
         enabled: !enabled,
       },
       {
-        onError: (error, _newConfig, context) => {
+        onError: (_error, _newConfig, context) => {
           if (context?.previousConfigs) {
             utils.checks.getAllForProject.setData(
               { projectId: project?.id ?? "" },
@@ -78,49 +89,85 @@ export default function Checks() {
 
   return (
     <DashboardLayout>
-      <VStack spacing={4} align="stretch">
-        <HStack justifyContent="space-between">
-          <Heading as="h1">Trace Check Configs</Heading>
-          <Button as={NextLink} href={`/${project.slug}/checks/new`}>
-            + Add Check
-          </Button>
-        </HStack>
-        {checks.isLoading ? (
-          <VStack gap={4} width="full">
-            <Skeleton width="full" height="20px" />
-            <Skeleton width="full" height="20px" />
-            <Skeleton width="full" height="20px" />
-          </VStack>
-        ) : checks.isError ? (
-          <Alert status="error">
-            <AlertIcon />
-            An error has occurred trying to load the check configs
-          </Alert>
-        ) : checks.data && checks.data.length > 0 ? (
-          checks.data.map((config) => (
-            <HStack key={config.id} justifyContent="space-between">
-              <span>{config.name}</span>
-              <HStack>
-                <Switch
-                  isChecked={config.enabled}
-                  onChange={() => handleToggle(config.id, config.enabled)}
-                />
-                <Button
-                  as={NextLink}
-                  href={`/${project.slug}/checks/${config.id}/edit`}
+      <Container maxWidth="1200" padding={6}>
+        <VStack width="fill" spacing={4} align="stretch">
+          <HStack paddingTop={4}>
+            <Heading as="h1">Automated Checks</Heading>
+            <Spacer />
+            {toggleConfig.isLoading && <Spinner size="lg" />}
+          </HStack>
+          <HStack align="end">
+            <Text>
+              Automated checks are run on the messages that sent for your
+              project.
+              <br />
+              You can use them to validate the output of your messages by using
+              the built-in checks or defining custom ones.
+            </Text>
+            <Spacer />
+            <Button
+              colorScheme="orange"
+              as={NextLink}
+              href={`/${project.slug}/checks/new`}
+            >
+              + Add Check
+            </Button>
+          </HStack>
+          <VStack width="full" paddingTop={6} spacing={4}>
+            {checks.isLoading ? (
+              <VStack gap={4} width="full">
+                <Skeleton width="full" height="20px" />
+                <Skeleton width="full" height="20px" />
+                <Skeleton width="full" height="20px" />
+              </VStack>
+            ) : checks.isError ? (
+              <Alert status="error">
+                <AlertIcon />
+                An error has occurred trying to load the check configs
+              </Alert>
+            ) : checks.data && checks.data.length > 0 ? (
+              checks.data.map((config) => (
+                <Card
+                  width="full"
+                  variant="filled"
+                  background="rgba(0,0,0,.05)"
+                  boxShadow="none"
+                  key={config.id}
                 >
-                  Edit
-                </Button>
-              </HStack>
-            </HStack>
-          ))
-        ) : (
-          <Alert status="info">
-            <AlertIcon />
-            No checks found
-          </Alert>
-        )}
-      </VStack>
+                  <CardBody width="full">
+                    <HStack width="full" spacing={6}>
+                      <Switch
+                        size="lg"
+                        isChecked={config.enabled}
+                        onChange={() => handleToggle(config.id, config.enabled)}
+                        position="relative"
+                        zIndex={1}
+                      />
+                      <VStack flexGrow={1} align="start">
+                        <Heading as="h3" size="md">
+                          {config.name}
+                        </Heading>
+                        <Text>Runs on every message</Text>
+                      </VStack>
+                      <LinkOverlay
+                        as={NextLink}
+                        href={`/${project.slug}/checks/${config.id}/edit`}
+                      >
+                        <ChevronRight />
+                      </LinkOverlay>
+                    </HStack>
+                  </CardBody>
+                </Card>
+              ))
+            ) : (
+              <Alert status="info">
+                <AlertIcon />
+                No checks found
+              </Alert>
+            )}
+          </VStack>
+        </VStack>
+      </Container>
     </DashboardLayout>
   );
 }
