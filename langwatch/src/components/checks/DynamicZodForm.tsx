@@ -12,7 +12,7 @@ import { Controller, useFieldArray, useFormContext } from "react-hook-form";
 import { z, type ZodType } from "zod";
 import type { CheckTypes } from "../../trace_checks/types";
 import { camelCaseToTitleCase } from "../../utils/stringCasing";
-import { SettingsFormControl } from "../SettingsLayout";
+import { HorizontalFormControl } from "../HorizontalFormControl";
 
 const parametersDescription: Record<
   CheckTypes,
@@ -53,7 +53,12 @@ const DynamicZodForm = ({
     if (fieldSchema instanceof z.ZodString) {
       return <Input {...register(fullPath)} />;
     } else if (fieldSchema instanceof z.ZodNumber) {
-      return <Input type="number" {...register(fullPath)} />;
+      return (
+        <Input
+          type="number"
+          {...register(fullPath, { setValueAs: (val) => +val })}
+        />
+      );
     } else if (fieldSchema instanceof z.ZodBoolean) {
       return (
         <HStack width="full" spacing={2}>
@@ -130,7 +135,7 @@ const DynamicZodForm = ({
     if (schema instanceof z.ZodObject) {
       return Object.keys(schema.shape).map((key) => (
         <React.Fragment key={key}>
-          <SettingsFormControl
+          <HorizontalFormControl
             label={
               parametersDescription[checkType as CheckTypes]?.[key]?.name ??
               camelCaseToTitleCase(key)
@@ -144,7 +149,7 @@ const DynamicZodForm = ({
               schema.shape[key],
               basePath ? `${basePath}.${key}` : key
             )}
-          </SettingsFormControl>
+          </HorizontalFormControl>
         </React.Fragment>
       ));
     }

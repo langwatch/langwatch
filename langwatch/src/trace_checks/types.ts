@@ -72,6 +72,10 @@ export type CustomCheckFields = "input" | "output";
 
 export type CustomCheckFailWhen = {
   condition: ">" | "<" | ">=" | "<=" | "==";
+  /**
+   * @minimum 0
+   * @maximum 1
+   */
   amount: number;
 };
 
@@ -163,6 +167,10 @@ export type CustomCheckPrecondition =
        * @maxLength 500
        */
       value: string;
+      /**
+       * @minimum 0
+       * @maximum 1
+       */
       threshold: string;
     };
 

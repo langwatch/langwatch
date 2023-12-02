@@ -1,15 +1,5 @@
 import { Link } from "@chakra-ui/next-js";
-import {
-  Box,
-  FormControl,
-  FormHelperText,
-  FormLabel,
-  HStack,
-  Spacer,
-  VStack,
-  type ComponentWithAs,
-  type StackProps,
-} from "@chakra-ui/react";
+import { HStack, VStack, type ComponentWithAs } from "@chakra-ui/react";
 import { useRouter } from "next/router";
 import { type PropsWithChildren } from "react";
 import { DashboardLayout } from "~/components/DashboardLayout";
@@ -70,38 +60,5 @@ export const MenuLink = ({
     >
       {children}
     </Link>
-  );
-};
-
-export const SettingsFormControl = ({
-  label,
-  helper,
-  isInvalid,
-  children,
-  align,
-}: PropsWithChildren<{
-  label: string;
-  helper: string;
-  isInvalid?: boolean;
-}> &
-  StackProps) => {
-  return (
-    <FormControl
-      borderBottomWidth="1px"
-      paddingY={4}
-      isInvalid={isInvalid}
-      _last={{ border: "none" }}
-    >
-      <HStack align={align}>
-        <VStack align="start" spacing={1}>
-          <FormLabel margin={0}>{label}</FormLabel>
-          <FormHelperText margin={0} fontSize={12}>
-            {helper}
-          </FormHelperText>
-        </VStack>
-        <Spacer />
-        <Box width="50%">{children}</Box>
-      </HStack>
-    </FormControl>
   );
 };

@@ -28,9 +28,8 @@ import { useEffect, useState } from "react";
 import { ChevronRight } from "react-feather";
 import { useForm, useWatch, type SubmitHandler } from "react-hook-form";
 import { useDebouncedCallback } from "use-debounce";
-import SettingsLayout, {
-  SettingsFormControl,
-} from "../../../components/SettingsLayout";
+import SettingsLayout from "../../../components/SettingsLayout";
+import { HorizontalFormControl } from "~/components/HorizontalFormControl";
 import type { TeamWithMembersAndProjects } from "../../../server/api/routers/organization";
 import { api } from "../../../utils/api";
 
@@ -121,7 +120,7 @@ function TeamForm({ team }: { team: TeamWithMembersAndProjects }) {
           <CardBody width="full" paddingY={2}>
             <form onSubmit={void handleSubmit(onSubmit)}>
               <VStack spacing={0}>
-                <SettingsFormControl
+                <HorizontalFormControl
                   label="Name"
                   helper="The name of your team"
                   isInvalid={!!getFieldState("name").error}
@@ -137,13 +136,13 @@ function TeamForm({ team }: { team: TeamWithMembersAndProjects }) {
                     })}
                   />
                   <FormErrorMessage>Name is required</FormErrorMessage>
-                </SettingsFormControl>
-                <SettingsFormControl
+                </HorizontalFormControl>
+                <HorizontalFormControl
                   label="Slug"
                   helper="The unique ID of your team"
                 >
                   <Input width="full" disabled type="text" value={team.slug} />
-                </SettingsFormControl>
+                </HorizontalFormControl>
               </VStack>
             </form>
           </CardBody>

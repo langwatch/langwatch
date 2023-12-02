@@ -1,14 +1,12 @@
 import {
   Alert,
   AlertIcon,
-  Box,
   Button,
   Card,
   CardBody,
   Container,
   HStack,
   Heading,
-  LinkBox,
   LinkOverlay,
   Skeleton,
   Spacer,
@@ -19,10 +17,10 @@ import {
   useToast,
 } from "@chakra-ui/react";
 import NextLink from "next/link";
+import { ChevronRight } from "react-feather";
 import { DashboardLayout } from "../../components/DashboardLayout";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
-import { ChevronRight } from "react-feather";
 
 export default function Checks() {
   const { project } = useOrganizationTeamProject();
@@ -108,6 +106,7 @@ export default function Checks() {
               colorScheme="orange"
               as={NextLink}
               href={`/${project.slug}/checks/new`}
+              minWidth="fit-content"
             >
               + Add Check
             </Button>

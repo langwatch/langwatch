@@ -1,23 +1,27 @@
 import {
-  VStack,
   Button,
-  Input,
-  Select,
-  Text,
   Card,
   CardBody,
   HStack,
+  Input,
+  Select,
   Spacer,
+  Text,
+  VStack,
 } from "@chakra-ui/react";
-import DynamicZodForm from "./DynamicZodForm";
-import { checksSchema } from "../../trace_checks/types.generated";
-import { CustomRuleField } from "./CustomRuleField";
-import { FormProvider, useFieldArray, useForm } from "react-hook-form";
-import slugify from "slugify";
-import { SettingsFormControl } from "../SettingsLayout";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect } from "react";
-import { customCheckRulesSchema } from "../../trace_checks/types.generated";
+import { FormProvider, useForm } from "react-hook-form";
+import slugify from "slugify";
+import { z } from "zod";
 import type { CheckTypes, Checks } from "../../trace_checks/types";
+import {
+  checkTypesSchema,
+  checksSchema,
+} from "../../trace_checks/types.generated";
+import { HorizontalFormControl } from "../HorizontalFormControl";
+import { CustomRuleField } from "./CustomRuleField";
+import DynamicZodForm from "./DynamicZodForm";
 
 const defaultParametersMap: Record<
   CheckTypes,
@@ -69,7 +73,15 @@ export default function CheckConfigForm({
 }: CheckConfigFormProps) {
   const form = useForm<CheckConfigFormData>({
     defaultValues,
-    // resolver: zodResolver(customCheckRulesSchema),
+    resolver: (data, ...args) => {
+      return zodResolver(
+        z.object({
+          name: z.string().min(1).max(255),
+          checkType: checkTypesSchema,
+          parameters: checksSchema.shape[data.checkType].shape.parameters,
+        })
+      )(data, ...args);
+    },
   });
 
   const {
@@ -117,7 +129,7 @@ export default function CheckConfigForm({
           <Card width="full">
             <CardBody>
               <VStack spacing={4}>
-                <SettingsFormControl
+                <HorizontalFormControl
                   label="Check Type"
                   helper="Select the type of check"
                   isInvalid={!!errors.checkType}
@@ -130,8 +142,8 @@ export default function CheckConfigForm({
                     <option value="pii_check">PII Check</option>
                     <option value="toxicity_check">Toxicity Check</option>
                   </Select>
-                </SettingsFormControl>
-                <SettingsFormControl
+                </HorizontalFormControl>
+                <HorizontalFormControl
                   label="Name"
                   helper="Used to identify the check and call it from the API"
                   isInvalid={!!errors.name}
@@ -147,7 +159,7 @@ export default function CheckConfigForm({
                       {slugify(nameValue || "", { lower: true, strict: true })}
                     </Text>
                   </VStack>
-                </SettingsFormControl>
+                </HorizontalFormControl>
                 {checkType === "custom" && <CustomRuleField />}
                 {checkType &&
                   checkType !== "custom" &&

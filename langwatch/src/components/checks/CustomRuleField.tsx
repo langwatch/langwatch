@@ -16,7 +16,7 @@ import type {
   CustomCheckFields,
   CustomCheckRule,
 } from "../../trace_checks/types";
-import { SettingsFormControl } from "../SettingsLayout";
+import { HorizontalFormControl } from "../HorizontalFormControl";
 import { HelpCircle, X } from "react-feather";
 
 const ruleOptions: Record<CustomCheckRule["rule"], string> = {
@@ -55,7 +55,7 @@ export const CustomRuleField = () => {
   );
 
   return (
-    <SettingsFormControl
+    <HorizontalFormControl
       label="Rules"
       helper="Define rules for this check to succeed"
     >
@@ -196,6 +196,7 @@ export const CustomRuleField = () => {
                             step="0.1"
                             placeholder="0.0"
                             {...field}
+                            onChange={(e) => field.onChange(+e.target.value)}
                           />
                         )}
                       />
@@ -219,6 +220,6 @@ export const CustomRuleField = () => {
           Add Rule
         </Button>
       </VStack>
-    </SettingsFormControl>
+    </HorizontalFormControl>
   );
 };
