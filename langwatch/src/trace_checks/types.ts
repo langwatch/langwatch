@@ -21,7 +21,7 @@ export type Checks = {
     };
   };
   toxicity_check: {
-    parameters: Record<string, never>;
+    parameters: Record<string, any>;
   };
   custom: {
     parameters: {

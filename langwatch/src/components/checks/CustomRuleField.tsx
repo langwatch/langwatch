@@ -20,8 +20,8 @@ import { HorizontalFormControl } from "../HorizontalFormControl";
 import { HelpCircle, X } from "react-feather";
 
 const ruleOptions: Record<CustomCheckRule["rule"], string> = {
-  contains: "contains",
   not_contains: "does not contain",
+  contains: "contains",
   is_similar_to: "is similar to",
   llm_boolean: "LLM boolean check",
   llm_score: "LLM score",
@@ -210,9 +210,9 @@ export const CustomRuleField = () => {
           onClick={() =>
             append({
               field: "output",
-              rule: "contains",
+              rule: "not_contains",
               value: "",
-              threshold: 0.85,
+              threshold: 0.7,
               failWhen: { condition: "<", amount: 0.5 },
             })
           }

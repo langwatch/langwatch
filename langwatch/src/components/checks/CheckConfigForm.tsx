@@ -46,8 +46,7 @@ const defaultParametersMap: Record<
         field: "output",
         rule: "not_contains",
         value: "",
-        //@ts-ignore
-        failWhen: { condition: "<", amount: 0.7 },
+        ...({ failWhen: { condition: "<", amount: 0.7 } } as any),
       },
     ],
   },
@@ -94,9 +93,12 @@ export default function CheckConfigForm({
   const checkType = watch("checkType");
 
   useEffect(() => {
-    const defaultValues = defaultParametersMap[checkType];
+    if (defaultValues?.parameters && defaultValues.checkType === checkType)
+      return;
 
-    const setDefaultValues = (
+    const defaultParameters = defaultParametersMap[checkType];
+
+    const setDefaultParameters = (
       defaultValues: Record<string, any>,
       prefix: string
     ) => {
@@ -108,7 +110,7 @@ export default function CheckConfigForm({
           !Array.isArray(value) &&
           value !== null
         ) {
-          setDefaultValues(value, `${prefix}.${key}`);
+          setDefaultParameters(value, `${prefix}.${key}`);
         } else {
           //@ts-ignore
           form.setValue(`${prefix}.${key}`, value);
@@ -116,8 +118,8 @@ export default function CheckConfigForm({
       });
     };
 
-    setDefaultValues(defaultValues, "parameters");
-  }, [checkType, form]);
+    setDefaultParameters(defaultParameters, "parameters");
+  }, [checkType, defaultValues?.checkType, defaultValues?.parameters, form]);
 
   const nameValue = watch("name");
 

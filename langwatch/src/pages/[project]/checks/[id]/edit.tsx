@@ -2,11 +2,18 @@ import { useRouter } from "next/router";
 import {
   Alert,
   AlertIcon,
+  Button,
   Card,
   CardBody,
   Container,
+  HStack,
   Heading,
+  Menu,
+  MenuButton,
+  MenuItem,
+  MenuList,
   Skeleton,
+  Spacer,
   VStack,
   useToast,
 } from "@chakra-ui/react";
@@ -16,7 +23,7 @@ import CheckConfigForm, {
 import { api } from "../../../../utils/api";
 import { useOrganizationTeamProject } from "../../../../hooks/useOrganizationTeamProject";
 import { DashboardLayout } from "../../../../components/DashboardLayout";
-import checks from "../../checks";
+import { ChevronDown, MoreVertical } from "react-feather";
 
 export default function EditCheck() {
   const { project } = useOrganizationTeamProject();
@@ -29,6 +36,7 @@ export default function EditCheck() {
     { enabled: !!project }
   );
   const updateCheck = api.checks.update.useMutation();
+  const deleteCheck = api.checks.delete.useMutation();
 
   const onSubmit = async (data: CheckConfigFormData) => {
     if (!project) return;
@@ -38,9 +46,8 @@ export default function EditCheck() {
         ...data,
         id: checkId,
         projectId: project.id,
-        parameters: {
-          rules: data.customRules,
-        },
+        preconditions: [],
+        parameters: data.parameters,
       });
       toast({
         title: "Check updated successfully",
@@ -61,20 +68,65 @@ export default function EditCheck() {
     }
   };
 
+  const handleDeleteCheck = () => {
+    if (!project) return;
+
+    if (window.confirm("Are you sure you want to delete this check?")) {
+      deleteCheck.mutate(
+        { id: checkId, projectId: project.id },
+        {
+          onSuccess: () => {
+            toast({
+              title: "Check deleted successfully",
+              status: "success",
+              duration: 5000,
+              isClosable: true,
+            });
+            void router.push(`/${project.slug}/checks`);
+          },
+          onError: () => {
+            toast({
+              title: "Failed to delete check",
+              description: "Please try again",
+              status: "error",
+              duration: 5000,
+              isClosable: true,
+            });
+          },
+        }
+      );
+    }
+  };
+
   const defaultValues = check.data
     ? {
         ...check.data,
         checkType: check.data.checkType as CheckConfigFormData["checkType"],
+        parameters: check.data.parameters as CheckConfigFormData["parameters"],
       }
     : undefined;
 
   return (
     <DashboardLayout>
       <Container maxWidth="1200" padding={6}>
-        <VStack align="start">
-          <Heading as="h1" size="xl" textAlign="center" my={6}>
-            Editing Check
-          </Heading>
+        <VStack align="start" spacing={4}>
+          <HStack align="end" width="full">
+            <Heading as="h1" size="xl" textAlign="center" paddingTop={4}>
+              Editing Check
+            </Heading>
+            <Spacer />
+            <Menu>
+              <MenuButton as={Button}>
+                <MoreVertical />
+              </MenuButton>
+              <MenuList>
+                <MenuItem color="red.600" onClick={handleDeleteCheck}>
+                  Delete Check
+                </MenuItem>
+              </MenuList>
+            </Menu>
+          </HStack>
+
           {check.isLoading ? (
             <Card width="full">
               <CardBody>

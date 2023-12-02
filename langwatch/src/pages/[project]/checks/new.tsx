@@ -44,8 +44,8 @@ export default function NewTraceCheckConfig() {
   return (
     <DashboardLayout>
       <Container maxWidth="1200" padding={6}>
-        <VStack align="start">
-          <Heading as="h1" size="xl" textAlign="center" my={6}>
+        <VStack align="start" spacing={4}>
+          <Heading as="h1" size="xl" textAlign="center" paddingTop={4}>
             New Check
           </Heading>
           <CheckConfigForm

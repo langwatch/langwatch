@@ -131,6 +131,19 @@ export const checksRouter = createTRPCRouter({
 
       return check;
     }),
+  delete: protectedProcedure
+    .input(z.object({ id: z.string(), projectId: z.string() }))
+    .use(checkUserPermissionForProject)
+    .mutation(async ({ input, ctx }) => {
+      const { id, projectId } = input;
+      const prisma = ctx.prisma;
+
+      await prisma.check.delete({
+        where: { id, projectId },
+      });
+
+      return { success: true };
+    }),
 });
 
 const validateCheckParameters = (checkType: string, parameters: any) => {

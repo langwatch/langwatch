@@ -161,7 +161,7 @@ export default function Checks() {
             ) : (
               <Alert status="info">
                 <AlertIcon />
-                No checks found
+                No checks configured
               </Alert>
             )}
           </VStack>
