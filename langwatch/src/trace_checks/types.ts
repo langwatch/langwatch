@@ -7,16 +7,16 @@ import type {
 export type Checks = {
   pii_check: {
     parameters: {
-      infoTypes: (
-        | "PHONE_NUMBER"
-        | "EMAIL_ADDRESS"
-        | "CREDIT_CARD_NUMBER"
-        | "IBAN_CODE"
-        | "IP_ADDRESS"
-        | "PASSPORT"
-        | "VAT_NUMBER"
-        | "MEDICAL_RECORD_NUMBER"
-      )[];
+      infoTypes: {
+        PHONE_NUMBER: boolean;
+        EMAIL_ADDRESS: boolean;
+        CREDIT_CARD_NUMBER: boolean;
+        IBAN_CODE: boolean;
+        IP_ADDRESS: boolean;
+        PASSPORT: boolean;
+        VAT_NUMBER: boolean;
+        MEDICAL_RECORD_NUMBER: boolean;
+      };
       minLikelihood: "POSSIBLE" | "LIKELY" | "VERY_LIKELY";
     };
   };

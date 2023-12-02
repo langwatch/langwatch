@@ -1,10 +1,18 @@
+import {
+  Button,
+  FormLabel,
+  HStack,
+  Input,
+  Select,
+  Switch,
+  VStack,
+} from "@chakra-ui/react";
 import React from "react";
-import { type ZodType, z } from "zod";
-import { useFormContext, useFieldArray, Controller } from "react-hook-form";
-import { Button, Input, Select, VStack, HStack } from "@chakra-ui/react";
-import { SettingsFormControl } from "./SettingsLayout";
-import { camelCaseToTitleCase } from "../utils/stringCasing";
+import { Controller, useFieldArray, useFormContext } from "react-hook-form";
+import { z, type ZodType } from "zod";
 import type { CheckTypes } from "../trace_checks/types";
+import { camelCaseToTitleCase } from "../utils/stringCasing";
+import { SettingsFormControl } from "./SettingsLayout";
 
 const parametersDescription: Record<
   CheckTypes,
@@ -44,6 +52,28 @@ const DynamicZodForm = ({
       return <Input {...register(fullPath)} />;
     } else if (fieldSchema instanceof z.ZodNumber) {
       return <Input type="number" {...register(fullPath)} />;
+    } else if (fieldSchema instanceof z.ZodBoolean) {
+      return (
+        <HStack width="full" spacing={2}>
+          <Controller
+            name={fullPath}
+            control={control}
+            render={({ field: { onChange, onBlur, value, name, ref } }) => (
+              <Switch
+                id={fullPath}
+                isChecked={value}
+                onChange={onChange}
+                onBlur={onBlur}
+                name={name}
+                ref={ref}
+              />
+            )}
+          />
+          <FormLabel htmlFor={fullPath} mb="0">
+            {fieldName.split(".").reverse()[0]}
+          </FormLabel>
+        </HStack>
+      );
     } else if (fieldSchema instanceof z.ZodUnion) {
       return (
         <Controller
@@ -79,13 +109,13 @@ const DynamicZodForm = ({
       );
     } else if (fieldSchema instanceof z.ZodObject) {
       return (
-        <>
+        <VStack spacing={2}>
           {Object.keys(fieldSchema.shape).map((key) => (
             <React.Fragment key={key}>
               {renderField(fieldSchema.shape[key], `${fieldName}.${key}`)}
             </React.Fragment>
           ))}
-        </>
+        </VStack>
       );
     }
 
