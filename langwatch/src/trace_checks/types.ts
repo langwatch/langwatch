@@ -4,11 +4,40 @@ import type {
   TraceCheck,
 } from "../server/tracer/types";
 
+export type Checks = {
+  pii_check: {
+    parameters: {
+      infoTypes: (
+        | "PHONE_NUMBER"
+        | "EMAIL_ADDRESS"
+        | "CREDIT_CARD_NUMBER"
+        | "IBAN_CODE"
+        | "IP_ADDRESS"
+        | "PASSPORT"
+        | "VAT_NUMBER"
+        | "MEDICAL_RECORD_NUMBER"
+      )[];
+      minLikelihood: "POSSIBLE" | "LIKELY" | "VERY_LIKELY";
+    };
+  };
+  toxicity_check: {
+    parameters: Record<string, never>;
+  };
+  custom: {
+    parameters: {
+      rules: CustomCheckRules;
+    };
+  };
+};
+
+export type CheckTypes = keyof Checks;
+
 export type TraceCheckJob = {
   trace_id: string;
   project_id: string;
 };
 
+// Zod type will not be generated for this one, check ts-to-zod.config.js
 export type TraceCheckResult = {
   raw_result: object;
   value: number;
@@ -27,7 +56,6 @@ export type TraceCheckFrontendDefinition = {
   render: (props: { check: TraceCheck }) => JSX.Element;
 };
 
-export type CheckTypes = "pii_check" | "toxicity_check";
 export type ModerationResult = {
   id: string;
   model: string;
@@ -39,3 +67,47 @@ export type ModerationResultEntry = {
   categories: Record<string, boolean>;
   category_scores: Record<string, number>;
 };
+
+type CustomCheckFields = "input" | "output";
+
+type CustomCheckFailWhen = {
+  condition: ">" | "<" | ">=" | "<=" | "==";
+  amount: number;
+};
+
+export type CustomCheckRule =
+  | { field: CustomCheckFields; rule: "contains"; value: string }
+  | { field: CustomCheckFields; rule: "not_contains"; value: string }
+  | {
+      field: CustomCheckFields;
+      rule: "is_similar_to";
+      value: string;
+      threshold: string;
+    }
+  | {
+      field: CustomCheckFields;
+      rule: "similarity_score";
+      value: string;
+      fail_when: CustomCheckFailWhen;
+    }
+  | { field: CustomCheckFields; rule: "llm_boolean"; value: string }
+  | {
+      field: CustomCheckFields;
+      rule: "llm_score";
+      value: string;
+      fail_when: CustomCheckFailWhen;
+    };
+
+export type CustomCheckRules = CustomCheckRule[];
+
+export type CustomCheckPrecondition =
+  | { field: CustomCheckFields; rule: "contains"; value: string }
+  | { field: CustomCheckFields; rule: "not_contains"; value: string }
+  | {
+      field: CustomCheckFields;
+      rule: "is_similar_to";
+      value: string;
+      threshold: string;
+    };
+
+export type CustomCheckPreconditions = CustomCheckPrecondition[];

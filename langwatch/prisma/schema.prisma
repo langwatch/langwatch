@@ -166,17 +166,18 @@ model OrganizationInvite {
 }
 
 model Check {
-    id         String   @id @default(nanoid())
-    projectId  String
-    project    Project  @relation(fields: [projectId], references: [id])
-    checkType  String
-    name       String
-    slug       String   @unique
-    enabled    Boolean  @default(true)
-    parameters Json
-    sample     Float    @default(1.0)
-    createdAt  DateTime @default(now())
-    updatedAt  DateTime @default(now()) @updatedAt
+    id            String   @id @default(nanoid())
+    projectId     String
+    project       Project  @relation(fields: [projectId], references: [id])
+    checkType     String
+    name          String
+    slug          String   @unique
+    enabled       Boolean  @default(true)
+    preconditions Json
+    parameters    Json
+    sample        Float    @default(1.0)
+    createdAt     DateTime @default(now())
+    updatedAt     DateTime @default(now()) @updatedAt
 
     @@unique([projectId, slug])
     @@index([projectId])

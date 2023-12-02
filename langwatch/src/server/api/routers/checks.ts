@@ -3,6 +3,10 @@ import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { checkUserPermissionForProject } from "../permission";
 import slugify from "slugify";
 import { TRPCError } from "@trpc/server";
+import {
+  checksSchema,
+  customCheckPreconditionsSchema,
+} from "../../../trace_checks/types.generated";
 
 export const checksRouter = createTRPCRouter({
   getAllForProject: protectedProcedure
@@ -40,14 +44,17 @@ export const checksRouter = createTRPCRouter({
         projectId: z.string(),
         name: z.string(),
         checkType: z.string(),
+        preconditions: customCheckPreconditionsSchema,
         parameters: z.object({}),
       })
     )
     .use(checkUserPermissionForProject)
     .mutation(async ({ input, ctx }) => {
-      const { projectId, name, checkType, parameters } = input;
+      const { projectId, name, checkType, preconditions, parameters } = input;
       const prisma = ctx.prisma;
       const slug = slugify(name, { lower: true, strict: true });
+
+      validateCheckParameters(checkType, parameters);
 
       const newCheck = await prisma.check.create({
         data: {
@@ -55,6 +62,7 @@ export const checksRouter = createTRPCRouter({
           name,
           checkType,
           slug,
+          preconditions,
           parameters,
         },
       });
@@ -68,15 +76,26 @@ export const checksRouter = createTRPCRouter({
         projectId: z.string(),
         name: z.string(),
         checkType: z.string(),
+        preconditions: customCheckPreconditionsSchema,
         parameters: z.object({}),
         enabled: z.boolean().optional(),
       })
     )
     .use(checkUserPermissionForProject)
     .mutation(async ({ input, ctx }) => {
-      const { id, projectId, name, checkType, parameters, enabled } = input;
+      const {
+        id,
+        projectId,
+        name,
+        checkType,
+        preconditions,
+        parameters,
+        enabled,
+      } = input;
       const prisma = ctx.prisma;
       const slug = slugify(name, { lower: true, strict: true });
+
+      validateCheckParameters(checkType, parameters);
 
       const updatedCheck = await prisma.check.update({
         where: { id, projectId },
@@ -84,6 +103,7 @@ export const checksRouter = createTRPCRouter({
           name,
           checkType,
           slug,
+          preconditions,
           parameters,
           ...(enabled !== undefined && { enabled }),
         },
@@ -112,3 +132,20 @@ export const checksRouter = createTRPCRouter({
       return check;
     }),
 });
+
+const validateCheckParameters = (checkType: string, parameters: any) => {
+  if (checkType === "custom") {
+    try {
+      checksSchema.parse({
+        [checkType]: {
+          parameters,
+        },
+      });
+    } catch (_error) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: "Invalid custom check parameters",
+      });
+    }
+  }
+};

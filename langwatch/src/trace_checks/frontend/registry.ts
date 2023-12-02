@@ -9,6 +9,12 @@ export const AVAILABLE_TRACE_CHECKS: Record<
 > = {
   pii_check: PIICheck,
   toxicity_check: ToxicityCheck,
+  custom: {
+    name: "Custom",
+    render: () => {
+      throw new Error("Not implemented");
+    },
+  },
 };
 
 export const getTraceCheck = (name: string) => {

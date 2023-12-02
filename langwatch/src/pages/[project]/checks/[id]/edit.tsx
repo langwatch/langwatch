@@ -38,7 +38,9 @@ export default function EditCheck() {
         ...data,
         id: checkId,
         projectId: project.id,
-        parameters: {},
+        parameters: {
+          rules: data.customRules,
+        },
       });
       toast({
         title: "Check updated successfully",
