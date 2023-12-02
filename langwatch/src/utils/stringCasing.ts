@@ -9,5 +9,6 @@ export const camelCaseToTitleCase = (input: string): string => {
       // Capitalize the first letter of each word
       .replace(/^./, (str) => str.toUpperCase())
       .replace(/ (\w)/g, (_, char) => ` ${char.toUpperCase()}`)
+      .replace(/(ip|iban|vat|pii)/gi, (str) => str.toUpperCase())
   );
 };

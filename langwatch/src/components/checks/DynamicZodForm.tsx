@@ -35,9 +35,11 @@ const parametersDescription: Record<
 
 const DynamicZodForm = ({
   schema,
+  checkType,
   prefix,
 }: {
   schema: ZodType;
+  checkType: string;
   prefix: string;
 }) => {
   const { control, register } = useFormContext();
@@ -70,7 +72,7 @@ const DynamicZodForm = ({
             )}
           />
           <FormLabel htmlFor={fullPath} mb="0">
-            {fieldName.split(".").reverse()[0]}
+            {camelCaseToTitleCase(fieldName.split(".").reverse()[0] ?? "")}
           </FormLabel>
         </HStack>
       );
@@ -130,12 +132,12 @@ const DynamicZodForm = ({
         <React.Fragment key={key}>
           <SettingsFormControl
             label={
-              parametersDescription[prefix as CheckTypes]?.[key]?.name ??
+              parametersDescription[checkType as CheckTypes]?.[key]?.name ??
               camelCaseToTitleCase(key)
             }
             helper={
-              parametersDescription[prefix as CheckTypes]?.[key]?.description ??
-              ""
+              parametersDescription[checkType as CheckTypes]?.[key]
+                ?.description ?? ""
             }
           >
             {renderField(

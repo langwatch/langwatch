@@ -17,18 +17,43 @@ import slugify from "slugify";
 import { SettingsFormControl } from "../SettingsLayout";
 import { useEffect } from "react";
 import { customCheckRulesSchema } from "../../trace_checks/types.generated";
-import type { CustomCheckRules } from "../../trace_checks/types";
+import type { CheckTypes, Checks } from "../../trace_checks/types";
+
+const defaultParametersMap: Record<
+  CheckTypes,
+  Checks[CheckTypes]["parameters"]
+> = {
+  pii_check: {
+    infoTypes: {
+      phoneNumber: true,
+      emailAddress: true,
+      creditCardNumber: true,
+      ibanCode: true,
+      ipAddress: true,
+      passport: true,
+      vatNumber: true,
+      medicalRecordNumber: true,
+    },
+    minLikelihood: "POSSIBLE",
+  },
+  custom: {
+    rules: [
+      {
+        field: "output",
+        rule: "not_contains",
+        value: "",
+        //@ts-ignore
+        failWhen: { condition: "<", amount: 0.7 },
+      },
+    ],
+  },
+  toxicity_check: {},
+};
 
 export interface CheckConfigFormData {
   name: string;
-  checkType: "pii_check" | "toxicity_check" | "custom";
-  customRules?: CustomCheckRules[];
-}
-
-export interface CheckConfigFormData {
-  name: string;
-  checkType: "pii_check" | "toxicity_check" | "custom";
-  customRules?: CustomCheckRules[];
+  checkType: CheckTypes;
+  parameters: Checks[CheckTypes]["parameters"];
 }
 
 interface CheckConfigFormProps {
@@ -46,25 +71,41 @@ export default function CheckConfigForm({
     defaultValues,
     // resolver: zodResolver(customCheckRulesSchema),
   });
+
   const {
-    control,
     register,
     handleSubmit,
     watch,
     formState: { errors },
   } = form;
 
-  const { fields: rulesFields, remove } = useFieldArray({
-    control,
-    name: "customRules",
-  });
-
   const checkType = watch("checkType");
+
   useEffect(() => {
-    if (checkType !== "custom") {
-      rulesFields.forEach((_, index) => remove(index));
-    }
-  }, [checkType, rulesFields, remove]);
+    const defaultValues = defaultParametersMap[checkType];
+
+    const setDefaultValues = (
+      defaultValues: Record<string, any>,
+      prefix: string
+    ) => {
+      if (!defaultValues) return;
+
+      Object.entries(defaultValues).forEach(([key, value]) => {
+        if (
+          typeof value === "object" &&
+          !Array.isArray(value) &&
+          value !== null
+        ) {
+          setDefaultValues(value, `${prefix}.${key}`);
+        } else {
+          //@ts-ignore
+          form.setValue(`${prefix}.${key}`, value);
+        }
+      });
+    };
+
+    setDefaultValues(defaultValues, "parameters");
+  }, [checkType, form]);
 
   const nameValue = watch("name");
 
@@ -113,7 +154,8 @@ export default function CheckConfigForm({
                   checksSchema.shape[checkType] && (
                     <DynamicZodForm
                       schema={checksSchema.shape[checkType].shape.parameters}
-                      prefix={checkType}
+                      checkType={checkType}
+                      prefix="parameters"
                     />
                   )}
               </VStack>

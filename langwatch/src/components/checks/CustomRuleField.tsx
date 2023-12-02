@@ -23,7 +23,6 @@ const ruleOptions: Record<CustomCheckRule["rule"], string> = {
   contains: "contains",
   not_contains: "does not contain",
   is_similar_to: "is similar to",
-  similarity_score: "similarity score",
   llm_boolean: "LLM boolean check",
   llm_score: "LLM score",
 };
@@ -43,10 +42,10 @@ const fieldOptions: Record<CustomCheckFields, string> = {
 
 export const CustomRuleField = () => {
   const { control, watch } = useFormContext();
-  const rules = watch("rules");
+  const rules = watch("parameters.rules");
   const { fields, append, remove } = useFieldArray({
     control,
-    name: "rules",
+    name: "parameters.rules",
   });
 
   const SmallLabel = ({ children }: PropsWithChildren) => (
@@ -87,11 +86,11 @@ export const CustomRuleField = () => {
               >
                 <X />
               </Button>
-              <SmallLabel>Check if</SmallLabel>
+              <SmallLabel>Check that</SmallLabel>
               <HStack>
                 <Controller
                   control={control}
-                  name={`rules.${index}.field`}
+                  name={`parameters.rules.${index}.field`}
                   render={({ field }) => (
                     <Select {...field} minWidth="fit-content">
                       {Object.entries(fieldOptions).map(([value, label]) => (
@@ -104,7 +103,7 @@ export const CustomRuleField = () => {
                 />
                 <Controller
                   control={control}
-                  name={`rules.${index}.rule`}
+                  name={`parameters.rules.${index}.rule`}
                   render={({ field }) => (
                     <Select {...field} minWidth="fit-content">
                       {Object.entries(ruleOptions).map(([value, label]) => (
@@ -118,7 +117,7 @@ export const CustomRuleField = () => {
               </HStack>
               <Controller
                 control={control}
-                name={`rules.${index}.value`}
+                name={`parameters.rules.${index}.value`}
                 render={({ field }) =>
                   rules[index].rule == "llm_boolean" ? (
                     <Textarea
@@ -135,62 +134,44 @@ export const CustomRuleField = () => {
                   )
                 }
               />
-              {rules[index]?.rule === "is_similar_to" && (
-                <>
-                  <HStack>
-                    <SmallLabel>With semantic similarity above </SmallLabel>
-                    <Tooltip
-                      label={`this is how similar the ${rules[index].field} must be to the provided text for the check to pass, scored from 0.0 to 1.0. Similarity between the two texts is calculated by the cosine similarity of their semantic vectors`}
-                    >
-                      <HelpCircle width="14px" />
-                    </Tooltip>
-                  </HStack>
-                  <Controller
-                    control={control}
-                    name={`rules.${index}.threshold`}
-                    render={({ field }) => (
-                      <Input
-                        type="number"
-                        min="0"
-                        max="1"
-                        step="0.1"
-                        placeholder="0.85"
-                        width="110px"
-                        {...field}
-                      />
-                    )}
-                  />
-                </>
-              )}
               {rules[index]?.rule &&
                 ["llm_boolean", "llm_score"].includes(rules[index].rule) && (
                   <>
                     <SmallLabel>Model</SmallLabel>
                     <Controller
                       control={control}
-                      name={`rules.${index}.model`}
+                      name={`parameters.rules.${index}.model`}
                       render={({ field }) => (
                         <Select {...field} minWidth="fit-content">
-                          {["gpt-4-1106-preview", "gpt-3.5"].map((value) => (
-                            <option key={value} value={value}>
-                              {value}
-                            </option>
-                          ))}
+                          {["gpt-4-1106-preview", "gpt-3.5-turbo"].map(
+                            (value) => (
+                              <option key={value} value={value}>
+                                {value}
+                              </option>
+                            )
+                          )}
                         </Select>
                       )}
                     />
                   </>
                 )}
               {rules[index]?.rule &&
-                ["similarity_score", "llm_score"].includes(
-                  rules[index].rule
-                ) && (
+                ["is_similar_to", "llm_score"].includes(rules[index].rule) && (
                   <>
-                    <SmallLabel>Fail when score is</SmallLabel>
+                    <HStack>
+                      <SmallLabel>Fail when score is</SmallLabel>
+                      {rules[index].rule == "is_similar_to" && (
+                        <Tooltip
+                          label={`this is how similar the ${rules[index].field} must be to the provided text for the check to pass, scored from 0.0 to 1.0. Similarity between the two texts is calculated by the cosine similarity of their semantic vectors`}
+                        >
+                          <HelpCircle width="14px" />
+                        </Tooltip>
+                      )}
+                    </HStack>
                     <HStack>
                       <Controller
                         control={control}
-                        name={`rules.${index}.fail_when.condition`}
+                        name={`parameters.rules.${index}.failWhen.condition`}
                         render={({ field }) => (
                           <Select {...field} minWidth="fit-content">
                             {Object.entries(conditionOptions).map(
@@ -205,7 +186,7 @@ export const CustomRuleField = () => {
                       />
                       <Controller
                         control={control}
-                        name={`rules.${index}.fail_when.amount`}
+                        name={`parameters.rules.${index}.failWhen.amount`}
                         render={({ field }) => (
                           <Input
                             width="110px"

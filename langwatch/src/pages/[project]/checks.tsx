@@ -22,8 +22,7 @@ import NextLink from "next/link";
 import { DashboardLayout } from "../../components/DashboardLayout";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
-import { Link } from "@chakra-ui/next-js";
-import { ChevronLeft, ChevronRight } from "react-feather";
+import { ChevronRight } from "react-feather";
 
 export default function Checks() {
   const { project } = useOrganizationTeamProject();

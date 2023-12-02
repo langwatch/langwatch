@@ -20,7 +20,8 @@ export default function NewTraceCheckConfig() {
       await createCheck.mutateAsync({
         ...data,
         projectId: project.id,
-        parameters: {},
+        preconditions: [],
+        parameters: data.parameters,
       });
       toast({
         title: "Check created successfully",

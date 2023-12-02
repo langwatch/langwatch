@@ -6,5 +6,12 @@
 module.exports = {
   input: "server/tracer/types.ts",
   output: "server/tracer/types.zod.ts",
-  nameFilter: (name) => !["ElasticSearchSpan", "ElasticSearchInputOutput", "TraceCheckResult"].includes(name),
+  nameFilter: (name) =>
+    ![
+      "ElasticSearchSpan",
+      "ElasticSearchInputOutput",
+      "TraceCheckResult",
+      "TraceCheckFrontendDefinition",
+      "TraceCheckBackendDefinition",
+    ].includes(name),
 };

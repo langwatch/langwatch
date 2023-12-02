@@ -8,14 +8,14 @@ export type Checks = {
   pii_check: {
     parameters: {
       infoTypes: {
-        PHONE_NUMBER: boolean;
-        EMAIL_ADDRESS: boolean;
-        CREDIT_CARD_NUMBER: boolean;
-        IBAN_CODE: boolean;
-        IP_ADDRESS: boolean;
-        PASSPORT: boolean;
-        VAT_NUMBER: boolean;
-        MEDICAL_RECORD_NUMBER: boolean;
+        phoneNumber: boolean;
+        emailAddress: boolean;
+        creditCardNumber: boolean;
+        ibanCode: boolean;
+        ipAddress: boolean;
+        passport: boolean;
+        vatNumber: boolean;
+        medicalRecordNumber: boolean;
       };
       minLikelihood: "POSSIBLE" | "LIKELY" | "VERY_LIKELY";
     };
@@ -76,42 +76,92 @@ export type CustomCheckFailWhen = {
 };
 
 export type CustomCheckRule =
-  | { field: CustomCheckFields; rule: "contains"; value: string }
-  | { field: CustomCheckFields; rule: "not_contains"; value: string }
   | {
       field: CustomCheckFields;
-      rule: "is_similar_to";
+      rule: "contains";
+      /**
+       * @minLength 1
+       * @maxLength 500
+       */
       value: string;
-      threshold: string;
     }
   | {
       field: CustomCheckFields;
-      rule: "similarity_score";
+      rule: "not_contains";
+      /**
+       * @minLength 1
+       * @maxLength 500
+       */
       value: string;
-      fail_when: CustomCheckFailWhen;
+    }
+  | {
+      field: CustomCheckFields;
+      rule: "is_similar_to";
+      /**
+       * @minLength 1
+       * @maxLength 500
+       */
+      value: string;
+      failWhen: CustomCheckFailWhen;
     }
   | {
       field: CustomCheckFields;
       rule: "llm_boolean";
+      /**
+       * @minLength 1
+       * @maxLength 2000
+       */
       value: string;
+      /**
+       * @minLength 1
+       * @maxLength 70
+       */
       model: string;
     }
   | {
       field: CustomCheckFields;
       rule: "llm_score";
+      /**
+       * @minLength 1
+       * @maxLength 2000
+       */
       value: string;
+      /**
+       * @minLength 1
+       * @maxLength 70
+       */
       model: string;
-      fail_when: CustomCheckFailWhen;
+      failWhen: CustomCheckFailWhen;
     };
 
 export type CustomCheckRules = CustomCheckRule[];
 
 export type CustomCheckPrecondition =
-  | { field: CustomCheckFields; rule: "contains"; value: string }
-  | { field: CustomCheckFields; rule: "not_contains"; value: string }
+  | {
+      field: CustomCheckFields;
+      rule: "contains";
+      /**
+       * @minLength 1
+       * @maxLength 500
+       */
+      value: string;
+    }
+  | {
+      field: CustomCheckFields;
+      rule: "not_contains";
+      /**
+       * @minLength 1
+       * @maxLength 500
+       */
+      value: string;
+    }
   | {
       field: CustomCheckFields;
       rule: "is_similar_to";
+      /**
+       * @minLength 1
+       * @maxLength 500
+       */
       value: string;
       threshold: string;
     };

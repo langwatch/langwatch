@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { ZodError, z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { checkUserPermissionForProject } from "../permission";
 import slugify from "slugify";
@@ -45,7 +45,7 @@ export const checksRouter = createTRPCRouter({
         name: z.string(),
         checkType: z.string(),
         preconditions: customCheckPreconditionsSchema,
-        parameters: z.object({}),
+        parameters: z.object({}).passthrough(),
       })
     )
     .use(checkUserPermissionForProject)
@@ -77,7 +77,7 @@ export const checksRouter = createTRPCRouter({
         name: z.string(),
         checkType: z.string(),
         preconditions: customCheckPreconditionsSchema,
-        parameters: z.object({}),
+        parameters: z.object({}).passthrough(),
         enabled: z.boolean().optional(),
       })
     )
@@ -136,16 +136,16 @@ export const checksRouter = createTRPCRouter({
 const validateCheckParameters = (checkType: string, parameters: any) => {
   if (checkType === "custom") {
     try {
-      checksSchema.parse({
-        [checkType]: {
-          parameters,
-        },
-      });
-    } catch (_error) {
-      throw new TRPCError({
-        code: "BAD_REQUEST",
-        message: "Invalid custom check parameters",
-      });
+      checksSchema.shape[checkType].shape.parameters.parse(parameters);
+    } catch (error) {
+      if (error instanceof ZodError) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: `Invalid custom check parameters: ${error as any}`,
+        });
+      } else {
+        throw error;
+      }
     }
   }
 };
