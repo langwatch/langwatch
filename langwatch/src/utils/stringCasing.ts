@@ -12,3 +12,6 @@ export const camelCaseToTitleCase = (input: string): string => {
       .replace(/(ip|iban|vat|pii)/gi, (str) => str.toUpperCase())
   );
 };
+
+export const camelCaseToLowerCase = (input: string): string =>
+  camelCaseToTitleCase(input).toLowerCase();

@@ -1,11 +1,10 @@
-import React, { type PropsWithChildren } from "react";
+import React from "react";
 import {
   Button,
   HStack,
   Select,
   Input,
   VStack,
-  Text,
   Box,
   Textarea,
   Tooltip,
@@ -18,6 +17,7 @@ import type {
 } from "../../trace_checks/types";
 import { HorizontalFormControl } from "../HorizontalFormControl";
 import { HelpCircle, X } from "react-feather";
+import { SmallLabel } from "../SmallLabel";
 
 const ruleOptions: Record<CustomCheckRule["rule"], string> = {
   not_contains: "does not contain",
@@ -47,12 +47,6 @@ export const CustomRuleField = () => {
     control,
     name: "parameters.rules",
   });
-
-  const SmallLabel = ({ children }: PropsWithChildren) => (
-    <Text fontSize={11} fontWeight="bold" textTransform="uppercase">
-      {children}
-    </Text>
-  );
 
   return (
     <HorizontalFormControl
@@ -193,7 +187,7 @@ export const CustomRuleField = () => {
                             type="number"
                             min="0"
                             max="1"
-                            step="0.1"
+                            step="0.05"
                             placeholder="0.0"
                             {...field}
                             onChange={(e) => field.onChange(+e.target.value)}
@@ -212,8 +206,7 @@ export const CustomRuleField = () => {
               field: "output",
               rule: "not_contains",
               value: "",
-              threshold: 0.7,
-              failWhen: { condition: "<", amount: 0.5 },
+              failWhen: { condition: "<", amount: 0.7 },
             })
           }
         >

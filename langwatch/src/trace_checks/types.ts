@@ -140,7 +140,7 @@ export type CustomCheckRule =
 
 export type CustomCheckRules = CustomCheckRule[];
 
-export type CustomCheckPrecondition =
+export type CheckPrecondition =
   | {
       field: CustomCheckFields;
       rule: "contains";
@@ -171,7 +171,7 @@ export type CustomCheckPrecondition =
        * @minimum 0
        * @maximum 1
        */
-      threshold: string;
+      threshold: number;
     };
 
-export type CustomCheckPreconditions = CustomCheckPrecondition[];
+export type CheckPreconditions = CheckPrecondition[];

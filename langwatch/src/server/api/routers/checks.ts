@@ -44,7 +44,7 @@ export const checksRouter = createTRPCRouter({
         projectId: z.string(),
         name: z.string(),
         checkType: z.string(),
-        preconditions: customCheckPreconditionsSchema,
+        preconditions: z.array(z.any()).optional(),
         parameters: z.object({}).passthrough(),
       })
     )
@@ -76,7 +76,7 @@ export const checksRouter = createTRPCRouter({
         projectId: z.string(),
         name: z.string(),
         checkType: z.string(),
-        preconditions: customCheckPreconditionsSchema,
+        preconditions: z.array(z.any()).optional(),
         parameters: z.object({}).passthrough(),
         enabled: z.boolean().optional(),
       })

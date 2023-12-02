@@ -14,14 +14,20 @@ import { useEffect } from "react";
 import { FormProvider, useForm } from "react-hook-form";
 import slugify from "slugify";
 import { z } from "zod";
-import type { CheckTypes, Checks } from "../../trace_checks/types";
+import type {
+  CheckPreconditions,
+  CheckTypes,
+  Checks,
+} from "../../trace_checks/types";
 import {
+  checkPreconditionsSchema,
   checkTypesSchema,
   checksSchema,
 } from "../../trace_checks/types.generated";
 import { HorizontalFormControl } from "../HorizontalFormControl";
 import { CustomRuleField } from "./CustomRuleField";
 import DynamicZodForm from "./DynamicZodForm";
+import { PreconditionsField } from "./PreconditionsField";
 
 const defaultParametersMap: Record<
   CheckTypes,
@@ -56,6 +62,7 @@ const defaultParametersMap: Record<
 export interface CheckConfigFormData {
   name: string;
   checkType: CheckTypes;
+  preconditions: CheckPreconditions;
   parameters: Checks[CheckTypes]["parameters"];
 }
 
@@ -77,6 +84,7 @@ export default function CheckConfigForm({
         z.object({
           name: z.string().min(1).max(255),
           checkType: checkTypesSchema,
+          preconditions: checkPreconditionsSchema,
           parameters: checksSchema.shape[data.checkType].shape.parameters,
         })
       )(data, ...args);
@@ -162,6 +170,7 @@ export default function CheckConfigForm({
                     </Text>
                   </VStack>
                 </HorizontalFormControl>
+                <PreconditionsField />
                 {checkType === "custom" && <CustomRuleField />}
                 {checkType &&
                   checkType !== "custom" &&

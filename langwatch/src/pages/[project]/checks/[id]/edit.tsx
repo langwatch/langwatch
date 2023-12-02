@@ -23,7 +23,7 @@ import CheckConfigForm, {
 import { api } from "../../../../utils/api";
 import { useOrganizationTeamProject } from "../../../../hooks/useOrganizationTeamProject";
 import { DashboardLayout } from "../../../../components/DashboardLayout";
-import { ChevronDown, MoreVertical } from "react-feather";
+import { MoreVertical } from "react-feather";
 
 export default function EditCheck() {
   const { project } = useOrganizationTeamProject();
@@ -46,7 +46,7 @@ export default function EditCheck() {
         ...data,
         id: checkId,
         projectId: project.id,
-        preconditions: [],
+        preconditions: data.preconditions,
         parameters: data.parameters,
       });
       toast({
@@ -102,6 +102,8 @@ export default function EditCheck() {
     ? {
         ...check.data,
         checkType: check.data.checkType as CheckConfigFormData["checkType"],
+        preconditions: check.data
+          .preconditions as CheckConfigFormData["preconditions"],
         parameters: check.data.parameters as CheckConfigFormData["parameters"],
       }
     : undefined;

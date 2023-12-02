@@ -21,6 +21,8 @@ import { ChevronRight } from "react-feather";
 import { DashboardLayout } from "../../components/DashboardLayout";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
+import type { CheckPreconditions } from "../../trace_checks/types";
+import { camelCaseToLowerCase } from "../../utils/stringCasing";
 
 export default function Checks() {
   const { project } = useOrganizationTeamProject();
@@ -124,40 +126,55 @@ export default function Checks() {
                 An error has occurred trying to load the check configs
               </Alert>
             ) : checks.data && checks.data.length > 0 ? (
-              checks.data.map((config) => (
-                <Card
-                  width="full"
-                  variant="filled"
-                  background="rgba(0,0,0,.05)"
-                  boxShadow="none"
-                  key={config.id}
-                >
-                  <CardBody width="full">
-                    <HStack width="full" spacing={6}>
-                      <Switch
-                        size="lg"
-                        isChecked={config.enabled}
-                        onChange={() => handleToggle(config.id, config.enabled)}
-                        position="relative"
-                        zIndex={1}
-                        variant="darkerTrack"
-                      />
-                      <VStack flexGrow={1} align="start">
-                        <Heading as="h3" size="md">
-                          {config.name}
-                        </Heading>
-                        <Text>Runs on every message</Text>
-                      </VStack>
-                      <LinkOverlay
-                        as={NextLink}
-                        href={`/${project.slug}/checks/${config.id}/edit`}
-                      >
-                        <ChevronRight />
-                      </LinkOverlay>
-                    </HStack>
-                  </CardBody>
-                </Card>
-              ))
+              checks.data.map((check) => {
+                const preconditions = check.preconditions as
+                  | CheckPreconditions
+                  | undefined;
+
+                return (
+                  <Card
+                    width="full"
+                    variant="filled"
+                    background="rgba(0,0,0,.05)"
+                    boxShadow="none"
+                    key={check.id}
+                  >
+                    <CardBody width="full">
+                      <HStack width="full" spacing={6}>
+                        <Switch
+                          size="lg"
+                          isChecked={check.enabled}
+                          onChange={() => handleToggle(check.id, check.enabled)}
+                          position="relative"
+                          zIndex={1}
+                          variant="darkerTrack"
+                        />
+                        <VStack flexGrow={1} align="start">
+                          <Heading as="h3" size="md">
+                            {check.name}
+                          </Heading>
+                          <Text>
+                            {!preconditions?.length
+                              ? "Runs on every message"
+                              : preconditions.length === 1
+                              ? `Runs when ${preconditions[0]
+                                  ?.field} ${camelCaseToLowerCase(
+                                  preconditions[0]?.rule ?? ""
+                                )} ${preconditions[0]?.value}`
+                              : `Runs on ${preconditions.length} preconditions`}
+                          </Text>
+                        </VStack>
+                        <LinkOverlay
+                          as={NextLink}
+                          href={`/${project.slug}/checks/${check.id}/edit`}
+                        >
+                          <ChevronRight />
+                        </LinkOverlay>
+                      </HStack>
+                    </CardBody>
+                  </Card>
+                );
+              })
             ) : (
               <Alert status="info">
                 <AlertIcon />
