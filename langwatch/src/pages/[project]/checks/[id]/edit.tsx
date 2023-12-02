@@ -12,7 +12,7 @@ import {
 } from "@chakra-ui/react";
 import CheckConfigForm, {
   type CheckConfigFormData,
-} from "../../../../components/CheckConfigForm";
+} from "../../../../components/checks/CheckConfigForm";
 import { api } from "../../../../utils/api";
 import { useOrganizationTeamProject } from "../../../../hooks/useOrganizationTeamProject";
 import { DashboardLayout } from "../../../../components/DashboardLayout";

@@ -2,7 +2,7 @@ import { Container, Heading, VStack, useToast } from "@chakra-ui/react";
 import { useRouter } from "next/router";
 import CheckConfigForm, {
   type CheckConfigFormData,
-} from "../../../components/CheckConfigForm";
+} from "../../../components/checks/CheckConfigForm";
 import { DashboardLayout } from "../../../components/DashboardLayout";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
 import { api } from "../../../utils/api";
@@ -49,6 +49,7 @@ export default function NewTraceCheckConfig() {
           </Heading>
           <CheckConfigForm
             onSubmit={onSubmit}
+            defaultValues={{ checkType: "custom" }}
             isLoading={createCheck.isLoading}
           />
         </VStack>

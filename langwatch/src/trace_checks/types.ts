@@ -68,9 +68,9 @@ export type ModerationResultEntry = {
   category_scores: Record<string, number>;
 };
 
-type CustomCheckFields = "input" | "output";
+export type CustomCheckFields = "input" | "output";
 
-type CustomCheckFailWhen = {
+export type CustomCheckFailWhen = {
   condition: ">" | "<" | ">=" | "<=" | "==";
   amount: number;
 };
@@ -90,11 +90,17 @@ export type CustomCheckRule =
       value: string;
       fail_when: CustomCheckFailWhen;
     }
-  | { field: CustomCheckFields; rule: "llm_boolean"; value: string }
+  | {
+      field: CustomCheckFields;
+      rule: "llm_boolean";
+      value: string;
+      model: string;
+    }
   | {
       field: CustomCheckFields;
       rule: "llm_score";
       value: string;
+      model: string;
       fail_when: CustomCheckFailWhen;
     };
 

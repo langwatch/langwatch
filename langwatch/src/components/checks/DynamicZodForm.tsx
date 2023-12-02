@@ -10,9 +10,9 @@ import {
 import React from "react";
 import { Controller, useFieldArray, useFormContext } from "react-hook-form";
 import { z, type ZodType } from "zod";
-import type { CheckTypes } from "../trace_checks/types";
-import { camelCaseToTitleCase } from "../utils/stringCasing";
-import { SettingsFormControl } from "./SettingsLayout";
+import type { CheckTypes } from "../../trace_checks/types";
+import { camelCaseToTitleCase } from "../../utils/stringCasing";
+import { SettingsFormControl } from "../SettingsLayout";
 
 const parametersDescription: Record<
   CheckTypes,
@@ -81,11 +81,13 @@ const DynamicZodForm = ({
           control={control}
           render={({ field }) => (
             <Select {...field}>
-              {fieldSchema.options.map((option, index) => (
-                <option key={index} value={option.value}>
-                  {option.value}
-                </option>
-              ))}
+              {fieldSchema.options.map(
+                (option: { value: string }, index: number) => (
+                  <option key={index} value={option.value}>
+                    {option.value}
+                  </option>
+                )
+              )}
             </Select>
           )}
         />

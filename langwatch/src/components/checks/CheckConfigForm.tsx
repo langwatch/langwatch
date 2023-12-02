@@ -10,14 +10,14 @@ import {
   Spacer,
 } from "@chakra-ui/react";
 import DynamicZodForm from "./DynamicZodForm";
-import { checksSchema } from "../trace_checks/types.generated";
+import { checksSchema } from "../../trace_checks/types.generated";
 import { CustomRuleField } from "./CustomRuleField";
 import { FormProvider, useFieldArray, useForm } from "react-hook-form";
 import slugify from "slugify";
-import { SettingsFormControl } from "./SettingsLayout";
+import { SettingsFormControl } from "../SettingsLayout";
 import { useEffect } from "react";
-import { customCheckRulesSchema } from "../trace_checks/types.generated";
-import type { CustomCheckRules } from "../trace_checks/types";
+import { customCheckRulesSchema } from "../../trace_checks/types.generated";
+import type { CustomCheckRules } from "../../trace_checks/types";
 
 export interface CheckConfigFormData {
   name: string;
@@ -32,7 +32,7 @@ export interface CheckConfigFormData {
 }
 
 interface CheckConfigFormProps {
-  defaultValues?: CheckConfigFormData;
+  defaultValues?: Partial<CheckConfigFormData>;
   onSubmit: (data: CheckConfigFormData) => Promise<void>;
   isLoading: boolean;
 }

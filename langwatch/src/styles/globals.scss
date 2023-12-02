@@ -49,6 +49,10 @@ a {
   }
 }
 
+div input[type="number"] {
+  appearance: auto;
+}
+
 /* Expanding card stack effect for grouped messages */
 
 .card-stack-content {
