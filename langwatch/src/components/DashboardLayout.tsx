@@ -156,7 +156,7 @@ const ProjectSelector = ({
       </MenuButton>
       <Portal>
         <Box zIndex="popover" padding={0}>
-          <MenuList>
+          <MenuList zIndex="popover">
             <>
               {projectGroups.map((projectGroup) => (
                 <MenuGroup
@@ -288,12 +288,12 @@ export const DashboardLayout = ({
               label={projectRoutes.analytics.title}
               project={project}
             />*/}
-            {/* <SideMenuLink
+            <SideMenuLink
               path={projectRoutes.checks.path}
               icon={Shield}
               label={projectRoutes.checks.title}
               project={project}
-            /> */}
+            />
             {/*<SideMenuLink
               path={projectRoutes.prompts.path}
               icon={Database}

@@ -140,7 +140,7 @@ export const CustomRuleField = () => {
                         {...field}
                       />
                       {rules[index].rule.includes("regex") && (
-                        <Text fontSize={16}>{"/g"}</Text>
+                        <Text fontSize={16}>{"/gi"}</Text>
                       )}
                     </HStack>
                   )

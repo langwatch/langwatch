@@ -27,14 +27,18 @@ const execute = async (
     let score = undefined;
     switch (rule.rule) {
       case "contains":
-        rulePassed = valueToCheck.includes(rule.value);
+        rulePassed = valueToCheck
+          .toLowerCase()
+          .includes(rule.value.toLowerCase());
         break;
       case "not_contains":
-        rulePassed = !valueToCheck.includes(rule.value);
+        rulePassed = !valueToCheck
+          .toLowerCase()
+          .includes(rule.value.toLowerCase());
         break;
       case "matches_regex":
         try {
-          const regex = new RegExp(rule.value);
+          const regex = new RegExp(rule.value, "gi");
           rulePassed = regex.test(valueToCheck);
         } catch (error) {
           throw new Error(`Invalid regex: ${rule.value}`);
@@ -42,7 +46,7 @@ const execute = async (
         break;
       case "not_matches_regex":
         try {
-          const regex = new RegExp(rule.value);
+          const regex = new RegExp(rule.value, "gi");
           rulePassed = !regex.test(valueToCheck);
         } catch (error) {
           throw new Error(`Invalid regex: ${rule.value}`);

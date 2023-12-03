@@ -154,6 +154,13 @@ export const checksRouter = createTRPCRouter({
         });
       }
 
+      await deleteEmbeddings(check.preconditions as CheckPreconditions);
+      if (check.checkType === "custom") {
+        await deleteEmbeddings(
+          (check.parameters as any).rules as CustomCheckRules
+        );
+      }
+
       return check;
     }),
   delete: protectedProcedure
@@ -194,6 +201,16 @@ const computeEmbeddings = async (
   for (const rule of rules) {
     if (rule.rule === "is_similar_to") {
       rule.openai_embeddings = await getOpenAIEmbeddings(rule.value);
+    }
+  }
+};
+
+const deleteEmbeddings = async (
+  rules: CheckPreconditions | CustomCheckRules
+): Promise<void> => {
+  for (const rule of rules) {
+    if (rule.rule === "is_similar_to") {
+      delete rule.openai_embeddings;
     }
   }
 };

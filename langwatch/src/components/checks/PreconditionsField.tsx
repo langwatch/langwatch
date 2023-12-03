@@ -109,7 +109,7 @@ export const PreconditionsField = ({
                   }
                 />
                 {preconditions[index]?.rule.includes("regex") && (
-                  <Text fontSize={16}>{"/g"}</Text>
+                  <Text fontSize={16}>{"/gi"}</Text>
                 )}
               </HStack>
               {preconditions[index]?.rule === "is_similar_to" && (
@@ -124,7 +124,8 @@ export const PreconditionsField = ({
                   </HStack>
                   <Controller
                     control={control}
-                    name={`parameters.rules.${index}.threshold`}
+                    name={`preconditions.${index}.threshold`}
+                    defaultValue={0.7}
                     render={({ field }) => (
                       <Input
                         width="110px"
@@ -134,7 +135,6 @@ export const PreconditionsField = ({
                         step="0.05"
                         placeholder="0.0"
                         {...field}
-                        value={field.value ?? 0.85}
                         onChange={(e) => field.onChange(+e.target.value)}
                       />
                     )}

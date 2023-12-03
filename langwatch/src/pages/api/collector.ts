@@ -26,7 +26,12 @@ import {
   convertToTraceCheckResult,
   piiCheck,
 } from "../../trace_checks/backend/piiCheck";
-import type { CheckTypes, Checks } from "../../trace_checks/types";
+import type {
+  CheckPreconditions,
+  CheckTypes,
+  Checks,
+} from "../../trace_checks/types";
+import similarity from "compute-cosine-similarity";
 
 const debug = getDebugger("langwatch:collector");
 
@@ -467,6 +472,67 @@ const cleanupPII = async (
   }
 };
 
+async function evaluatePreconditions(
+  trace: Trace,
+  preconditions: CheckPreconditions
+): Promise<boolean> {
+  for (const precondition of preconditions) {
+    const valueToCheck =
+      precondition.field === "input"
+        ? trace.input.value
+        : trace.output?.value ?? "";
+    switch (precondition.rule) {
+      case "contains":
+        if (
+          !valueToCheck.toLowerCase().includes(precondition.value.toLowerCase())
+        ) {
+          return false;
+        }
+        break;
+      case "not_contains":
+        if (
+          valueToCheck.toLowerCase().includes(precondition.value.toLowerCase())
+        ) {
+          return false;
+        }
+        break;
+      case "matches_regex":
+        try {
+          const regex = new RegExp(precondition.value, "gi");
+          if (!regex.test(valueToCheck)) {
+            return false;
+          }
+        } catch (error) {
+          console.error(
+            `Invalid regex in preconditions: ${precondition.value}`
+          );
+          return false;
+        }
+        break;
+      case "is_similar_to":
+        const embeddings = precondition.openai_embeddings ?? [];
+        if (
+          embeddings.length === 0 ||
+          !trace.search_embeddings.openai_embeddings
+        ) {
+          console.error(
+            "No embeddings provided for is_similar_to precondition."
+          );
+          return false;
+        }
+        const similarityScore = similarity(
+          embeddings,
+          trace.search_embeddings.openai_embeddings
+        );
+        if ((similarityScore ?? 0) < precondition.threshold) {
+          return false;
+        }
+        break;
+    }
+  }
+  return true;
+}
+
 const scheduleTraceChecks = async (trace: Trace) => {
   const checks = await prisma.check.findMany({
     where: {
@@ -478,16 +544,22 @@ const scheduleTraceChecks = async (trace: Trace) => {
 
   for (const check of checks) {
     if (Math.random() <= check.sample) {
-      debug(
-        `scheduling ${check.checkType} (checkId: ${check.id}) for trace ${trace.id}`
-      );
-      void scheduleTraceCheck({
-        check_id: check.id,
-        check_type: check.checkType as CheckTypes,
-        check_name: check.name,
-        trace_id: trace.id,
-        project_id: trace.project_id,
-      });
+      const preconditions = (check.preconditions ?? []) as CheckPreconditions;
+      const preconditionsMet =
+        preconditions.length === 0 ||
+        (await evaluatePreconditions(trace, preconditions));
+      if (preconditionsMet) {
+        debug(
+          `scheduling ${check.checkType} (checkId: ${check.id}) for trace ${trace.id}`
+        );
+        void scheduleTraceCheck({
+          check_id: check.id,
+          check_type: check.checkType as CheckTypes,
+          check_name: check.name,
+          trace_id: trace.id,
+          project_id: trace.project_id,
+        });
+      }
     }
   }
 };
