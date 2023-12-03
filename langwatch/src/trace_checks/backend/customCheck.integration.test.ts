@@ -191,4 +191,60 @@ describe("CustomCheck", () => {
       (notMatchesRegexFailResult.raw_result as any).failedRules
     ).toHaveLength(1);
   });
+
+  it("correctly applies the 'is_similar_to' rule", async () => {
+    const sampleTrace: Trace = {
+      id: "trace4",
+      project_id: "project4",
+      input: { value: "This is a test input." },
+      output: { value: "This is a test output." },
+      metrics: {},
+      timestamps: { started_at: Date.now(), inserted_at: Date.now() },
+      search_embeddings: { openai_embeddings: [0.1, 0.2, 0.3] },
+    };
+
+    const isSimilarToPassingRule: Checks["custom"]["parameters"] = {
+      rules: [
+        {
+          field: "input",
+          rule: "is_similar_to",
+          value: "This is a test input.",
+          openai_embeddings: [0.1, 0.2, 0.3],
+          failWhen: { condition: "<", amount: 0.5 },
+        },
+      ],
+    };
+
+    const isSimilarToFailingRule: Checks["custom"]["parameters"] = {
+      rules: [
+        {
+          field: "input",
+          rule: "is_similar_to",
+          value: "This is a different input.",
+          openai_embeddings: [0.4, 0.5, 0.6],
+          failWhen: { condition: ">", amount: 0.8 },
+        },
+      ],
+    };
+
+    const isSimilarToPassResult = await CustomCheck.execute(
+      sampleTrace,
+      [],
+      isSimilarToPassingRule
+    );
+    expect(isSimilarToPassResult.status).toBe("succeeded");
+    expect((isSimilarToPassResult.raw_result as any).failedRules).toHaveLength(
+      0
+    );
+
+    const isSimilarToFailingResult = await CustomCheck.execute(
+      sampleTrace,
+      [],
+      isSimilarToFailingRule
+    );
+    expect(isSimilarToFailingResult.status).toBe("failed");
+    expect(
+      (isSimilarToFailingResult.raw_result as any).failedRules
+    ).toHaveLength(1);
+  });
 });
