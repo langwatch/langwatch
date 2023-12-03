@@ -14,7 +14,7 @@ describe("ToxicityCheck", () => {
       search_embeddings: { openai_embeddings: [] },
     };
 
-    const response = await ToxicityCheck.execute(sampleTrace, []);
+    const response = await ToxicityCheck.execute(sampleTrace, [], {});
     const raw_result = response.raw_result as ModerationResult;
     expect(raw_result.results[0]?.categories.harassment).toBe(true);
     expect(response.value).toBeGreaterThan(0.9);

@@ -1,6 +1,7 @@
 import type { CheckTypes, TraceCheckBackendDefinition } from "../types";
 import { PIICheck } from "./piiCheck";
 import { ToxicityCheck } from "./toxicityCheck";
+import { CustomCheck } from "./customCheck";
 
 // TODO: allow checks to be run to be configurable by user
 export const AVAILABLE_TRACE_CHECKS: {
@@ -8,11 +9,7 @@ export const AVAILABLE_TRACE_CHECKS: {
 } = {
   pii_check: PIICheck,
   toxicity_check: ToxicityCheck,
-  custom: {
-    execute: async () => {
-      throw new Error("Not implemented");
-    },
-  },
+  custom: CustomCheck,
 };
 
 export const getCheckExecutor = (checkType: string) => {

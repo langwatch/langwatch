@@ -4,6 +4,7 @@ import {
   HStack,
   Input,
   Select,
+  Text,
   Tooltip,
   VStack,
 } from "@chakra-ui/react";
@@ -20,6 +21,7 @@ const ruleOptions: Record<CheckPrecondition["rule"], string> = {
   not_contains: "does not contain",
   contains: "contains",
   is_similar_to: "is similar to",
+  matches_regex: "matches regex",
 };
 
 const fieldOptions: Record<CustomCheckFields, string> = {
@@ -27,7 +29,11 @@ const fieldOptions: Record<CustomCheckFields, string> = {
   input: "input",
 };
 
-export const PreconditionsField = ({ runOn }: { runOn: JSX.Element | null }) => {
+export const PreconditionsField = ({
+  runOn,
+}: {
+  runOn: JSX.Element | null;
+}) => {
   const { control, watch } = useFormContext();
   const preconditions = watch("preconditions");
   const { fields, append, remove } = useFieldArray({
@@ -90,10 +96,22 @@ export const PreconditionsField = ({ runOn }: { runOn: JSX.Element | null }) => 
                   ))}
                 </Select>
               </HStack>
-              <Input
-                {...control.register(`preconditions.${index}.value`)}
-                placeholder="text"
-              />
+              <HStack width="full">
+                {preconditions[index]?.rule.includes("regex") && (
+                  <Text fontSize={16}>{"/"}</Text>
+                )}
+                <Input
+                  {...control.register(`preconditions.${index}.value`)}
+                  placeholder={
+                    preconditions[index]?.rule.includes("regex")
+                      ? "regex"
+                      : "text"
+                  }
+                />
+                {preconditions[index]?.rule.includes("regex") && (
+                  <Text fontSize={16}>{"/g"}</Text>
+                )}
+              </HStack>
               {preconditions[index]?.rule === "is_similar_to" && (
                 <>
                   <HStack>

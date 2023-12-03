@@ -103,6 +103,24 @@ export type CustomCheckRule =
     }
   | {
       field: CustomCheckFields;
+      rule: "matches_regex";
+      /**
+       * @minLength 1
+       * @maxLength 500
+       */
+      value: string;
+    }
+  | {
+      field: CustomCheckFields;
+      rule: "not_matches_regex";
+      /**
+       * @minLength 1
+       * @maxLength 500
+       */
+      value: string;
+    }
+  | {
+      field: CustomCheckFields;
       rule: "is_similar_to";
       /**
        * @minLength 1
@@ -157,6 +175,15 @@ export type CheckPrecondition =
   | {
       field: CustomCheckFields;
       rule: "not_contains";
+      /**
+       * @minLength 1
+       * @maxLength 500
+       */
+      value: string;
+    }
+  | {
+      field: CustomCheckFields;
+      rule: "matches_regex";
       /**
        * @minLength 1
        * @maxLength 500

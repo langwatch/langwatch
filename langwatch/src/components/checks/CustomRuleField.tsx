@@ -6,6 +6,7 @@ import {
   Input,
   VStack,
   Box,
+  Text,
   Textarea,
   Tooltip,
 } from "@chakra-ui/react";
@@ -23,6 +24,8 @@ const ruleOptions: Record<CustomCheckRule["rule"], string> = {
   not_contains: "does not contain",
   contains: "contains",
   is_similar_to: "is similar to",
+  not_matches_regex: "matches regex",
+  matches_regex: "does not match regex",
   llm_boolean: "LLM boolean check",
   llm_score: "LLM score",
 };
@@ -124,7 +127,22 @@ export const CustomRuleField = () => {
                       {...field}
                     />
                   ) : (
-                    <Input placeholder="text" {...field} />
+                    <HStack width="full">
+                      {rules[index].rule.includes("regex") && (
+                        <Text fontSize={16}>{"/"}</Text>
+                      )}
+                      <Input
+                        placeholder={
+                          rules[index]?.rule.includes("regex")
+                            ? "regex"
+                            : "text"
+                        }
+                        {...field}
+                      />
+                      {rules[index].rule.includes("regex") && (
+                        <Text fontSize={16}>{"/g"}</Text>
+                      )}
+                    </HStack>
                   )
                 }
               />
@@ -153,7 +171,11 @@ export const CustomRuleField = () => {
                 ["is_similar_to", "llm_score"].includes(rules[index].rule) && (
                   <>
                     <HStack>
-                      <SmallLabel>Fail when score is</SmallLabel>
+                      <SmallLabel>
+                        Fail when{" "}
+                        {rules[index].rule == "is_similar_to" && "similarity "}
+                        score is
+                      </SmallLabel>
                       {rules[index].rule == "is_similar_to" && (
                         <Tooltip
                           label={`this is how similar the ${rules[index].field} must be to the provided text for the check to pass, scored from 0.0 to 1.0. Similarity between the two texts is calculated by the cosine similarity of their semantic vectors`}
