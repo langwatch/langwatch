@@ -247,4 +247,55 @@ describe("CustomCheck", () => {
       (isSimilarToFailingResult.raw_result as any).failedRules
     ).toHaveLength(1);
   });
+
+  it("correctly applies the 'llm_boolean' and 'llm_score' rules", async () => {
+    const sampleTrace: Trace = {
+      id: "trace5",
+      project_id: "project5",
+      input: { value: "Sample input for LLM checks." },
+      output: { value: "It's sunny outside" },
+      metrics: {},
+      timestamps: { started_at: Date.now(), inserted_at: Date.now() },
+      search_embeddings: { openai_embeddings: [] },
+    };
+
+    const llmBooleanRule: Checks["custom"]["parameters"] = {
+      rules: [
+        {
+          field: "output",
+          rule: "llm_boolean",
+          value: "Please answer with true or false: Is this output positive?",
+          model: "gpt-3.5-turbo",
+        },
+      ],
+    };
+
+    const llmScoreRule: Checks["custom"]["parameters"] = {
+      rules: [
+        {
+          field: "output",
+          rule: "llm_score",
+          value:
+            "Please score from 0.0 to 1.0 how relevant this output is to the input",
+          model: "gpt-3.5-turbo",
+          failWhen: { condition: "<=", amount: 0.9 },
+        },
+      ],
+    };
+
+    const llmBooleanResult = await CustomCheck.execute(
+      sampleTrace,
+      [],
+      llmBooleanRule
+    );
+    expect(llmBooleanResult.status).toBe("succeeded");
+
+    const llmScoreResult = await CustomCheck.execute(
+      sampleTrace,
+      [],
+      llmScoreRule
+    );
+    expect(llmScoreResult.status).toBe("failed");
+    expect((llmScoreResult.raw_result as any).failedRules).toHaveLength(1);
+  });
 });

@@ -138,7 +138,7 @@ const traceChecksMapping: Record<keyof TraceCheck, MappingProperty> = {
   check_type: { type: "keyword" },
   check_name: { type: "text" },
   status: { type: "keyword" },
-  raw_result: { type: "object" },
+  raw_result: { type: "object", enabled: false },
   value: { type: "float" },
   error: {
     properties: {
@@ -151,6 +151,7 @@ const traceChecksMapping: Record<keyof TraceCheck, MappingProperty> = {
     properties: {
       started_at: { type: "date" },
       finished_at: { type: "date" },
+      inserted_at: { type: "date" },
     },
   },
 };

@@ -207,8 +207,16 @@ export const CustomRuleField = () => {
                           <Input
                             width="110px"
                             type="number"
-                            min="0"
-                            max="1"
+                            min={
+                              rules[index].rule == "is_similar_to"
+                                ? "0"
+                                : undefined
+                            }
+                            max={
+                              rules[index].rule == "is_similar_to"
+                                ? "1"
+                                : undefined
+                            }
                             step="0.05"
                             placeholder="0.0"
                             {...field}
@@ -228,6 +236,7 @@ export const CustomRuleField = () => {
               field: "output",
               rule: "not_contains",
               value: "",
+              model: "gpt-4-1106-preview",
               failWhen: { condition: "<", amount: 0.7 },
             })
           }

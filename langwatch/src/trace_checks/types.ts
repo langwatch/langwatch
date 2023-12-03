@@ -75,10 +75,6 @@ export type CustomCheckFields = "input" | "output";
 
 export type CustomCheckFailWhen = {
   condition: ">" | "<" | ">=" | "<=" | "==";
-  /**
-   * @minimum 0
-   * @maximum 1
-   */
   amount: number;
 };
 

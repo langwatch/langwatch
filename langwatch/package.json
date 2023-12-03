@@ -12,7 +12,7 @@
     "prisma:db:push": "npx prisma db push",
     "test": "DEBUG_HIDE_DATE=true DEBUG_COLORS=true vitest",
     "test:integration": "DEBUG_HIDE_DATE=true DEBUG_COLORS=true vitest -c vitest.integration.config.ts",
-    "elastic:index:create": "tsx src/task.ts elasticIndexCreate",
+    "elastic:index:create": "DEBUG=langwatch:* tsx src/task.ts elasticIndexCreate",
     "types:zod:generate": "ts-to-zod src/server/tracer/types.ts src/server/tracer/types.generated.ts && ts-to-zod src/trace_checks/types.ts src/trace_checks/types.generated.ts"
   },
   "dependencies": {
@@ -59,7 +59,7 @@
     "node-fetch": "^3.3.2",
     "nprogress": "^0.2.0",
     "numeral": "^2.0.6",
-    "openai": "^4.17.4",
+    "openai": "^4.20.1",
     "prism-react-renderer": "^2.1.0",
     "prismjs": "^1.29.0",
     "react": "18.2.0",

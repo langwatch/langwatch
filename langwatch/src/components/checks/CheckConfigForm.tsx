@@ -60,6 +60,7 @@ const defaultParametersMap: {
         field: "output",
         rule: "not_contains",
         value: "",
+        model: "gpt-4-1106-preview",
         ...({ failWhen: { condition: "<", amount: 0.7 } } as any),
       },
     ],
