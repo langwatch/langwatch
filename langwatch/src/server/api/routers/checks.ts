@@ -4,9 +4,14 @@ import { checkUserPermissionForProject } from "../permission";
 import slugify from "slugify";
 import { TRPCError } from "@trpc/server";
 import {
+  checkPreconditionsSchema,
   checksSchema,
-  customCheckPreconditionsSchema,
 } from "../../../trace_checks/types.generated";
+import type {
+  CheckPreconditions,
+  CustomCheckRules,
+} from "../../../trace_checks/types";
+import { getOpenAIEmbeddings } from "../../embeddings";
 
 export const checksRouter = createTRPCRouter({
   getAllForProject: protectedProcedure
@@ -44,7 +49,7 @@ export const checksRouter = createTRPCRouter({
         projectId: z.string(),
         name: z.string(),
         checkType: z.string(),
-        preconditions: z.array(z.any()).optional(),
+        preconditions: checkPreconditionsSchema,
         parameters: z.object({}).passthrough(),
       })
     )
@@ -56,6 +61,11 @@ export const checksRouter = createTRPCRouter({
 
       validateCheckParameters(checkType, parameters);
 
+      await computeEmbeddings(preconditions as CheckPreconditions);
+      if (checkType === "custom") {
+        await computeEmbeddings(parameters.rules as CustomCheckRules);
+      }
+
       const newCheck = await prisma.check.create({
         data: {
           projectId,
@@ -64,6 +74,7 @@ export const checksRouter = createTRPCRouter({
           slug,
           preconditions,
           parameters,
+          enabled: true,
         },
       });
 
@@ -76,7 +87,7 @@ export const checksRouter = createTRPCRouter({
         projectId: z.string(),
         name: z.string(),
         checkType: z.string(),
-        preconditions: z.array(z.any()).optional(),
+        preconditions: checkPreconditionsSchema,
         parameters: z.object({}).passthrough(),
         enabled: z.boolean().optional(),
       })
@@ -96,6 +107,11 @@ export const checksRouter = createTRPCRouter({
       const slug = slugify(name, { lower: true, strict: true });
 
       validateCheckParameters(checkType, parameters);
+
+      await computeEmbeddings(preconditions as CheckPreconditions);
+      if (checkType === "custom") {
+        await computeEmbeddings(parameters.rules as CustomCheckRules);
+      }
 
       const updatedCheck = await prisma.check.update({
         where: { id, projectId },
@@ -159,6 +175,16 @@ const validateCheckParameters = (checkType: string, parameters: any) => {
       } else {
         throw error;
       }
+    }
+  }
+};
+
+const computeEmbeddings = async (
+  rules: CheckPreconditions | CustomCheckRules
+): Promise<void> => {
+  for (const rule of rules) {
+    if (rule.rule === "is_similar_to") {
+      rule.openai_embeddings = await getOpenAIEmbeddings(rule.value);
     }
   }
 };
