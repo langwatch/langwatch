@@ -15,9 +15,9 @@ export const AVAILABLE_TRACE_CHECKS: {
   },
 };
 
-export const getTraceCheck = (name: string) => {
+export const getCheckExecutor = (checkType: string) => {
   for (const [key, val] of Object.entries(AVAILABLE_TRACE_CHECKS)) {
-    if (key === name) return val;
+    if (key === checkType) return val;
   }
   return undefined;
 };

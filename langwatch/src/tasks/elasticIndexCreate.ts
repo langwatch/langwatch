@@ -134,6 +134,7 @@ const traceChecksMapping: Record<keyof TraceCheck, MappingProperty> = {
   id: { type: "keyword" },
   trace_id: { type: "keyword" },
   project_id: { type: "keyword" },
+  check_id: { type: "keyword" },
   check_type: { type: "keyword" },
   status: { type: "keyword" },
   raw_result: { type: "object" },

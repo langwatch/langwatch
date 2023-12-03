@@ -34,6 +34,7 @@ export type Checks = {
 export type CheckTypes = keyof Checks;
 
 export type TraceCheckJob = {
+  check_id: string;
   trace_id: string;
   project_id: string;
 };

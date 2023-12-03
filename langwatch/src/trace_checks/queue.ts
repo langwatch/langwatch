@@ -16,17 +16,20 @@ const traceChecksQueue = new Queue<TraceCheckJob, any, string>("trace_checks", {
 });
 
 export const scheduleTraceCheck = async ({
+  check_id,
   check_type,
   trace_id,
   project_id,
   delay,
 }: {
+  check_id: string;
   check_type: CheckTypes;
   trace_id: string;
   project_id: string;
   delay?: number;
 }) => {
   await updateCheckStatusInES({
+    check_id,
     check_type,
     trace_id,
     project_id,
@@ -35,9 +38,9 @@ export const scheduleTraceCheck = async ({
 
   await traceChecksQueue.add(
     check_type,
-    { trace_id, project_id },
+    { check_id, trace_id, project_id },
     {
-      jobId: `${trace_id}/${check_type}`,
+      jobId: `trace_check_${trace_id}/${check_id}`,
       delay: delay ?? 5000,
       attempts: 3,
     }
@@ -45,6 +48,7 @@ export const scheduleTraceCheck = async ({
 };
 
 export const updateCheckStatusInES = async ({
+  check_id,
   check_type,
   trace_id,
   project_id,
@@ -54,6 +58,7 @@ export const updateCheckStatusInES = async ({
   error,
   retries,
 }: {
+  check_id: string;
   check_type: CheckTypes;
   trace_id: string;
   project_id: string;
@@ -64,9 +69,10 @@ export const updateCheckStatusInES = async ({
   retries?: number;
 }) => {
   const traceCheck: TraceCheck = {
-    id: `check_${trace_id}/${check_type}`,
+    id: `trace_check_${trace_id}/${check_id}`,
     trace_id,
     project_id,
+    check_id,
     check_type,
     status,
     ...(raw_result && { raw_result }),

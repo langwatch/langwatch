@@ -49,11 +49,11 @@ const dlpCheck = async (
 
 export const piiCheck = async (
   trace: Trace,
-  spans: ElasticSearchSpan[],
-  parameters: Checks["pii_check"]["parameters"] | undefined
+  spans: ElasticSearchSpan[]
 ): Promise<{
   quotes: string[];
-  traceCheckResult: TraceCheckResult;
+  traceFindings: google.privacy.dlp.v2.IFinding[];
+  spansFindings: google.privacy.dlp.v2.IFinding[];
 }> => {
   debug("Checking PII for trace", trace.id);
 
@@ -71,12 +71,9 @@ export const piiCheck = async (
     )
     .join("\n\n");
 
-  const traceFindings = await dlpCheck(traceText);
-  const spansFindings = await dlpCheck(spansText);
-  const allFindings = (traceFindings ?? []).concat(spansFindings ?? []);
-  const reportedFindings = parameters?.checkPiiInSpans
-    ? allFindings
-    : traceFindings ?? [];
+  const traceFindings = (await dlpCheck(traceText)) ?? [];
+  const spansFindings = (await dlpCheck(spansText)) ?? [];
+  const allFindings = traceFindings.concat(spansFindings);
 
   const quotes = allFindings.map((finding) => finding.quote!).filter((x) => x);
   for (const finding of allFindings) {
@@ -85,13 +82,62 @@ export const piiCheck = async (
 
   return {
     quotes,
-    traceCheckResult: {
-      raw_result: {
-        findings: reportedFindings,
-      },
-      value: reportedFindings.length,
-      status: reportedFindings.length > 0 ? "failed" : "succeeded",
+    traceFindings,
+    spansFindings,
+  };
+};
+
+export const convertToTraceCheckResult = (
+  {
+    traceFindings,
+    spansFindings,
+  }: {
+    traceFindings: google.privacy.dlp.v2.IFinding[];
+    spansFindings: google.privacy.dlp.v2.IFinding[];
+  },
+  parameters: Checks["pii_check"]["parameters"]
+): TraceCheckResult => {
+  const infoTypes = Object.entries(parameters.infoTypes ?? {})
+    .filter(([_key, value]) => value)
+    .map(([key]) => key);
+  const likelihoodIncluded = (likelihood: string) => {
+    const likelihoods = [
+      "VERY_UNLIKELY",
+      "UNLIKELY",
+      "POSSIBLE",
+      "LIKELY",
+      "VERY_LIKELY",
+    ];
+    return (
+      likelihoods.indexOf(likelihood) >=
+      likelihoods.indexOf(parameters.minLikelihood ?? "POSSIBLE")
+    );
+  };
+  const filteredTraces = traceFindings.filter(
+    (finding) =>
+      finding.infoType?.name &&
+      infoTypes.includes(finding.infoType?.name) &&
+      likelihoodIncluded(finding.likelihood?.toString() ?? "POSSIBLE")
+  );
+  const filteredSpans = traceFindings.filter(
+    (finding) =>
+      finding.infoType?.name &&
+      infoTypes.includes(finding.infoType?.name) &&
+      likelihoodIncluded(finding.likelihood?.toString() ?? "POSSIBLE")
+  );
+
+  const allFindings = filteredTraces.concat(filteredSpans);
+  const reportedFindings = parameters?.checkPiiInSpans
+    ? allFindings
+    : filteredTraces;
+
+  return {
+    raw_result: {
+      traceFindings,
+      spansFindings,
     },
+    value: reportedFindings.length,
+    status: reportedFindings.length > 0 ? "failed" : "succeeded",
   };
 };
 
@@ -100,7 +146,9 @@ const execute = async (
   spans: ElasticSearchSpan[],
   parameters: Checks["pii_check"]["parameters"]
 ): Promise<TraceCheckResult> => {
-  return (await piiCheck(trace, spans, parameters)).traceCheckResult;
+  const results = await piiCheck(trace, spans);
+
+  return convertToTraceCheckResult(results, parameters);
 };
 
 export const PIICheck: TraceCheckBackendDefinition<"pii_check"> = {

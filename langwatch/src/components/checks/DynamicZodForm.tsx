@@ -146,12 +146,12 @@ const DynamicZodForm = ({
         <React.Fragment key={key}>
           <HorizontalFormControl
             label={
-              parametersDescription[checkType as CheckTypes]?.[key]?.name ??
+              (parametersDescription as any)[checkType]?.[key]?.name ??
               camelCaseToTitleCase(key)
             }
             helper={
-              parametersDescription[checkType as CheckTypes]?.[key]
-                ?.description ?? ""
+              (parametersDescription as any)[checkType]?.[key]?.description ??
+              ""
             }
           >
             {renderField(

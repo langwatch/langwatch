@@ -1,12 +1,17 @@
 import { z } from "zod";
 
-import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
-import type { Trace, TraceCheck } from "../../tracer/types";
-import { TRACE_CHECKS_INDEX, TRACE_INDEX, esClient } from "../../elasticsearch";
 import { TRPCError } from "@trpc/server";
-import { checkUserPermissionForProject } from "../permission";
-import { getOpenAIEmbeddings } from "../../embeddings";
 import similarity from "compute-cosine-similarity";
+import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
+import {
+  SPAN_INDEX,
+  TRACE_CHECKS_INDEX,
+  TRACE_INDEX,
+  esClient,
+} from "../../elasticsearch";
+import { getOpenAIEmbeddings } from "../../embeddings";
+import type { ElasticSearchSpan, Trace, TraceCheck } from "../../tracer/types";
+import { checkUserPermissionForProject } from "../permission";
 
 export const esGetTraceById = async (
   traceId: string
@@ -22,6 +27,22 @@ export const esGetTraceById = async (
   });
 
   return result.hits.hits[0]?._source;
+};
+
+export const esGetSpansByTraceId = async (
+  traceId: string
+): Promise<ElasticSearchSpan[]> => {
+  const result = await esClient.search<ElasticSearchSpan>({
+    index: SPAN_INDEX,
+    body: {
+      query: {
+        term: { trace_id: traceId },
+      },
+    },
+    size: 1000,
+  });
+
+  return result.hits.hits.map((hit) => hit._source!).filter((hit) => hit);
 };
 
 export const tracesRouter = createTRPCRouter({

@@ -3,9 +3,13 @@ import { connection } from "../server/redis";
 import { getDebugger } from "../utils/logger";
 import { updateCheckStatusInES } from "./queue";
 import type { CheckTypes, TraceCheckJob, TraceCheckResult } from "./types";
-import { esGetTraceById } from "../server/api/routers/traces";
+import {
+  esGetSpansByTraceId,
+  esGetTraceById,
+} from "../server/api/routers/traces";
 import { env } from "../env.mjs";
-import { getTraceCheck } from "./backend/registry";
+import { getCheckExecutor } from "./backend/registry";
+import { prisma } from "../server/db";
 
 const debug = getDebugger("langwatch:trace_checks:workers");
 
@@ -14,17 +18,28 @@ export const process = async (
   job: Job<TraceCheckJob, any, string>
 ): Promise<TraceCheckResult> => {
   const trace = await esGetTraceById(job.data.trace_id);
-
+  const spans = await esGetSpansByTraceId(job.data.trace_id);
   if (!trace) {
     throw "trace not found";
   }
 
-  const traceCheck = getTraceCheck(job.name);
-  if (!traceCheck) {
-    throw "trace check not found";
+  const check = await prisma.check.findUnique({
+    where: { id: job.name },
+  });
+  if (!check) {
+    throw "check config not found";
   }
 
-  return await traceCheck.execute(trace, []);
+  const checkExecutor = getCheckExecutor(check.checkType);
+  if (!checkExecutor) {
+    throw `trace executor not found for ${check.checkType}`;
+  }
+
+  return await checkExecutor.execute(
+    trace,
+    spans,
+    (check.parameters ?? {}) as any
+  );
 };
 
 export const start = (
@@ -51,6 +66,7 @@ export const start = (
           const result = await processFn(job);
 
           await updateCheckStatusInES({
+            check_id: job.data.check_id,
             check_type: job.name,
             trace_id: job.data.trace_id,
             project_id: job.data.project_id,
@@ -61,6 +77,7 @@ export const start = (
           debug("Successfully processed job:", job.id);
         } catch (error) {
           await updateCheckStatusInES({
+            check_id: job.data.check_id,
             check_type: job.name,
             trace_id: job.data.trace_id,
             project_id: job.data.project_id,

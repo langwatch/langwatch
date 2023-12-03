@@ -22,7 +22,11 @@ import {
 import type { Project } from "@prisma/client";
 import { getOpenAIEmbeddings } from "../../server/embeddings";
 import { estimateCost, tokenizeAndEstimateCost } from "llm-cost";
-import { piiCheck } from "../../trace_checks/backend/piiCheck";
+import {
+  convertToTraceCheckResult,
+  piiCheck,
+} from "../../trace_checks/backend/piiCheck";
+import type { CheckTypes, Checks } from "../../trace_checks/types";
 
 const debug = getDebugger("langwatch:collector");
 
@@ -146,11 +150,7 @@ export default async function handler(
     return res.status(500).json({ message: "Something went wrong!" });
   }
 
-  void scheduleTraceCheck({
-    check_type: "toxicity_check",
-    trace_id: trace.id,
-    project_id: project.id,
-  });
+  void scheduleTraceChecks(trace);
 
   await markProjectFirstMessage(project);
 
@@ -394,17 +394,37 @@ const cleanupPII = async (
   trace: Trace,
   spans: ElasticSearchSpan[]
 ): Promise<undefined> => {
-  const { quotes, traceCheckResult } = await piiCheck(trace, spans, undefined);
+  const results = await piiCheck(trace, spans);
+  const { quotes } = results;
 
-  // TODO: check if PII check is even enabled
-  await updateCheckStatusInES({
-    check_type: "pii_check",
-    trace_id: trace.id,
-    project_id: trace.project_id,
-    status: traceCheckResult.status,
-    raw_result: traceCheckResult.raw_result,
-    value: traceCheckResult.value,
+  const piiChecks = await prisma.check.findMany({
+    where: {
+      projectId: trace.project_id,
+      enabled: true,
+      checkType: "pii_check",
+    },
   });
+
+  // PII checks must run on every message anyway for GDPR compliance, however not always the user wants
+  // that to fail the trace. So we only update the status if the check is enabled, accordingly to the
+  // check configuration, and sampling condition.
+  for (const piiCheck of piiChecks) {
+    if (piiCheck.sample >= Math.random()) {
+      const traceCheckResult = convertToTraceCheckResult(
+        results,
+        piiCheck.parameters as Checks["pii_check"]["parameters"]
+      );
+      await updateCheckStatusInES({
+        check_id: piiCheck.id,
+        check_type: "pii_check",
+        trace_id: trace.id,
+        project_id: trace.project_id,
+        status: traceCheckResult.status,
+        raw_result: traceCheckResult.raw_result,
+        value: traceCheckResult.value,
+      });
+    }
+  }
 
   for (const quote of quotes) {
     trace.input.value = trace.input.value.replace(quote, "[REDACTED]");
@@ -442,6 +462,27 @@ const cleanupPII = async (
             ) ?? "";
         }
       }
+    }
+  }
+};
+
+const scheduleTraceChecks = async (trace: Trace) => {
+  const checks = await prisma.check.findMany({
+    where: {
+      projectId: trace.project_id,
+      enabled: true,
+      checkType: { not: "pii_check" },
+    },
+  });
+
+  for (const check of checks) {
+    if (check.sample >= Math.random()) {
+      void scheduleTraceCheck({
+        check_id: check.id,
+        check_type: check.checkType as CheckTypes,
+        trace_id: trace.id,
+        project_id: trace.project_id,
+      });
     }
   }
 };

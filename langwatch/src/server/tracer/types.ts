@@ -154,6 +154,7 @@ export type TraceCheck = {
   id: string;
   trace_id: string;
   project_id: string;
+  check_id: string;
   check_type: string;
   status: "scheduled" | "in_progress" | "error" | "failed" | "succeeded";
   raw_result?: object;
