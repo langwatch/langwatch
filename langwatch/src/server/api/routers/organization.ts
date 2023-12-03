@@ -58,13 +58,13 @@ export const organizationRouter = createTRPCRouter({
       const userId = ctx.session.user.id;
       const prisma = ctx.prisma;
 
-      const orgId = nanoid();
+      const orgId = `organization_${nanoid()}`;
       const orgSlug =
         slugify(input.orgName, { lower: true, strict: true }) +
         "-" +
         orgId.substring(0, 6);
 
-      const teamId = nanoid();
+      const teamId = `team_${nanoid()}`;
       const teamSlug =
         slugify(input.orgName, { lower: true, strict: true }) +
         "-" +

@@ -12,6 +12,7 @@ import type {
   CustomCheckRules,
 } from "../../../trace_checks/types";
 import { getOpenAIEmbeddings } from "../../embeddings";
+import { nanoid } from "nanoid";
 
 export const checksRouter = createTRPCRouter({
   getAllForProject: protectedProcedure
@@ -71,6 +72,7 @@ export const checksRouter = createTRPCRouter({
 
       const newCheck = await prisma.check.create({
         data: {
+          id: `check_${nanoid()}`,
           projectId,
           name,
           checkType,

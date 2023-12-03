@@ -35,7 +35,7 @@ export const projectRouter = createTRPCRouter({
         });
       }
 
-      const projectId = nanoid();
+      const projectId = `project_${nanoid()}`;
       const slug =
         slugify(input.name, { lower: true, strict: true }) +
         "-" +
