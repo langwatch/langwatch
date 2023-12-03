@@ -1,3 +1,4 @@
+import { Link } from "@chakra-ui/next-js";
 import {
   Alert,
   AlertDescription,
@@ -25,10 +26,8 @@ import {
   useTheme,
   useToast,
 } from "@chakra-ui/react";
-import { addDays, endOfDay, format, startOfDay } from "date-fns";
-import { useRouter } from "next/router";
+import { addDays, format } from "date-fns";
 import numeral from "numeral";
-import { useEffect } from "react";
 import { CheckCircle, XCircle } from "react-feather";
 import {
   Bar,
@@ -50,10 +49,8 @@ import {
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
 import { formatMilliseconds } from "../../utils/formatMilliseconds";
-import { Link } from "@chakra-ui/next-js";
 
 export default function Index() {
-  const router = useRouter();
   const { project } = useOrganizationTeamProject();
   const {
     period: { startDate, endDate },
@@ -129,11 +126,7 @@ export default function Index() {
     <DashboardLayout>
       <Container maxWidth="1200" padding={6}>
         {project && !project.firstMessage && (
-          <Alert
-            status="warning"
-            variant="left-accent"
-            marginBottom={6}
-          >
+          <Alert status="warning" variant="left-accent" marginBottom={6}>
             <AlertIcon alignSelf="start" />
             <VStack align="start">
               <AlertTitle>Setup pending</AlertTitle>

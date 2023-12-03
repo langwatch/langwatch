@@ -4,7 +4,6 @@ import {
   HStack,
   Input,
   Select,
-  Text,
   Tooltip,
   VStack,
 } from "@chakra-ui/react";
