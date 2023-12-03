@@ -18,6 +18,7 @@ export type Checks = {
         medicalRecordNumber: boolean;
       };
       minLikelihood: "POSSIBLE" | "LIKELY" | "VERY_LIKELY";
+      checkPiiInSpans: boolean;
     };
   };
   toxicity_check: {
@@ -44,10 +45,11 @@ export type TraceCheckResult = {
   status: "failed" | "succeeded";
 };
 
-export type TraceCheckBackendDefinition = {
+export type TraceCheckBackendDefinition<T extends CheckTypes> = {
   execute: (
     trace: Trace,
-    _spans: ElasticSearchSpan[]
+    spans: ElasticSearchSpan[],
+    parameters: Checks[T]["parameters"]
   ) => Promise<TraceCheckResult>;
 };
 

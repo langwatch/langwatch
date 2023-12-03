@@ -1,7 +1,11 @@
 import fetch from "node-fetch";
 import { env } from "../../env.mjs";
 import type { ElasticSearchSpan, Trace } from "../../server/tracer/types";
-import type { TraceCheckBackendDefinition, TraceCheckResult } from "../types";
+import type {
+  Checks,
+  TraceCheckBackendDefinition,
+  TraceCheckResult,
+} from "../types";
 import type { ModerationResult } from "../types";
 import { getDebugger } from "../../utils/logger";
 
@@ -9,7 +13,8 @@ const debug = getDebugger("langwatch:trace_checks:toxicityCheck");
 
 const execute = async (
   trace: Trace,
-  _spans: ElasticSearchSpan[]
+  _spans: ElasticSearchSpan[],
+  _parameters: Checks["toxicity_check"]["parameters"]
 ): Promise<TraceCheckResult> => {
   debug("Checking toxicity for trace", trace.id);
   const content = [trace.input.value, trace.output?.value ?? ""].join("\n\n");
@@ -39,6 +44,6 @@ const execute = async (
   };
 };
 
-export const ToxicityCheck: TraceCheckBackendDefinition = {
+export const ToxicityCheck: TraceCheckBackendDefinition<"toxicity_check"> = {
   execute,
 };

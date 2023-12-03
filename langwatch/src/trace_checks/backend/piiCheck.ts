@@ -1,7 +1,11 @@
 import { DlpServiceClient } from "@google-cloud/dlp";
 import { env } from "../../env.mjs";
 import type { ElasticSearchSpan, Trace } from "../../server/tracer/types";
-import type { TraceCheckBackendDefinition, TraceCheckResult } from "../types";
+import type {
+  Checks,
+  TraceCheckBackendDefinition,
+  TraceCheckResult,
+} from "../types";
 import { getDebugger } from "../../utils/logger";
 import type { google } from "@google-cloud/dlp/build/protos/protos";
 
@@ -46,7 +50,7 @@ const dlpCheck = async (
 export const piiCheck = async (
   trace: Trace,
   spans: ElasticSearchSpan[],
-  considerPIIInSpansAsFailure = false
+  parameters: Checks["pii_check"]["parameters"] | undefined
 ): Promise<{
   quotes: string[];
   traceCheckResult: TraceCheckResult;
@@ -70,7 +74,7 @@ export const piiCheck = async (
   const traceFindings = await dlpCheck(traceText);
   const spansFindings = await dlpCheck(spansText);
   const allFindings = (traceFindings ?? []).concat(spansFindings ?? []);
-  const reportedFindings = considerPIIInSpansAsFailure
+  const reportedFindings = parameters?.checkPiiInSpans
     ? allFindings
     : traceFindings ?? [];
 
@@ -93,11 +97,12 @@ export const piiCheck = async (
 
 const execute = async (
   trace: Trace,
-  _spans: ElasticSearchSpan[]
+  spans: ElasticSearchSpan[],
+  parameters: Checks["pii_check"]["parameters"]
 ): Promise<TraceCheckResult> => {
-  return (await piiCheck(trace, _spans)).traceCheckResult;
+  return (await piiCheck(trace, spans, parameters)).traceCheckResult;
 };
 
-export const PIICheck: TraceCheckBackendDefinition = {
+export const PIICheck: TraceCheckBackendDefinition<"pii_check"> = {
   execute,
 };

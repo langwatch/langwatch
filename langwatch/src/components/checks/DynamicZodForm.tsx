@@ -10,14 +10,16 @@ import {
 import React from "react";
 import { Controller, useFieldArray, useFormContext } from "react-hook-form";
 import { z, type ZodType } from "zod";
-import type { CheckTypes } from "../../trace_checks/types";
+import type { CheckTypes, Checks } from "../../trace_checks/types";
 import { camelCaseToTitleCase } from "../../utils/stringCasing";
 import { HorizontalFormControl } from "../HorizontalFormControl";
 
-const parametersDescription: Record<
-  CheckTypes,
-  Record<string, { name?: string; description?: string }>
-> = {
+const parametersDescription: {
+  [K in CheckTypes]: Record<
+    keyof Checks[K]["parameters"],
+    { name?: string; description?: string }
+  >;
+} = {
   pii_check: {
     infoTypes: {
       name: "PII types to check",
@@ -28,9 +30,16 @@ const parametersDescription: Record<
       description:
         "The minimum confidence that a PII was found to fail the check",
     },
+    checkPiiInSpans: {
+      name: "Fail for PII in spans",
+      description:
+        "Whether this check fail is PII is identified in the inner spans of a message, or just in the final input and output",
+    },
   },
   toxicity_check: {},
-  custom: {},
+  custom: {
+    rules: {},
+  },
 };
 
 const DynamicZodForm = ({

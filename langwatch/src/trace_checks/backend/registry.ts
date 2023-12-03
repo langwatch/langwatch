@@ -3,10 +3,9 @@ import { PIICheck } from "./piiCheck";
 import { ToxicityCheck } from "./toxicityCheck";
 
 // TODO: allow checks to be run to be configurable by user
-export const AVAILABLE_TRACE_CHECKS: Record<
-  CheckTypes,
-  TraceCheckBackendDefinition
-> = {
+export const AVAILABLE_TRACE_CHECKS: {
+  [K in CheckTypes]: TraceCheckBackendDefinition<K>;
+} = {
   pii_check: PIICheck,
   toxicity_check: ToxicityCheck,
   custom: {

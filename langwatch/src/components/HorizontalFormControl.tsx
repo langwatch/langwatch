@@ -37,7 +37,7 @@ export function HorizontalFormControl({
           </FormHelperText>
         </VStack>
         <Spacer />
-        <Box width={["full", "full", "50%"]}>{children}</Box>
+        <Box minWidth={["full", "full", "50%"]}>{children}</Box>
       </HStack>
     </FormControl>
   );

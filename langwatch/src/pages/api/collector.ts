@@ -394,7 +394,7 @@ const cleanupPII = async (
   trace: Trace,
   spans: ElasticSearchSpan[]
 ): Promise<undefined> => {
-  const { quotes, traceCheckResult } = await piiCheck(trace, spans);
+  const { quotes, traceCheckResult } = await piiCheck(trace, spans, undefined);
 
   // TODO: check if PII check is even enabled
   await updateCheckStatusInES({
