@@ -417,6 +417,7 @@ const cleanupPII = async (
       await updateCheckStatusInES({
         check_id: piiCheck.id,
         check_type: "pii_check",
+        check_name: piiCheck.name,
         trace_id: trace.id,
         project_id: trace.project_id,
         status: traceCheckResult.status,
@@ -483,6 +484,7 @@ const scheduleTraceChecks = async (trace: Trace) => {
       void scheduleTraceCheck({
         check_id: check.id,
         check_type: check.checkType as CheckTypes,
+        check_name: check.name,
         trace_id: trace.id,
         project_id: trace.project_id,
       });

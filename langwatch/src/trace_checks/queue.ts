@@ -18,12 +18,14 @@ const traceChecksQueue = new Queue<TraceCheckJob, any, string>("trace_checks", {
 export const scheduleTraceCheck = async ({
   check_id,
   check_type,
+  check_name,
   trace_id,
   project_id,
   delay,
 }: {
   check_id: string;
   check_type: CheckTypes;
+  check_name: string;
   trace_id: string;
   project_id: string;
   delay?: number;
@@ -31,6 +33,7 @@ export const scheduleTraceCheck = async ({
   await updateCheckStatusInES({
     check_id,
     check_type,
+    check_name,
     trace_id,
     project_id,
     status: "scheduled",
@@ -50,6 +53,7 @@ export const scheduleTraceCheck = async ({
 export const updateCheckStatusInES = async ({
   check_id,
   check_type,
+  check_name,
   trace_id,
   project_id,
   status,
@@ -60,6 +64,7 @@ export const updateCheckStatusInES = async ({
 }: {
   check_id: string;
   check_type: CheckTypes;
+  check_name?: string;
   trace_id: string;
   project_id: string;
   status: TraceCheck["status"];
@@ -75,6 +80,7 @@ export const updateCheckStatusInES = async ({
     check_id,
     check_type,
     status,
+    ...(check_name && { check_name }),
     ...(raw_result && { raw_result }),
     ...(value && { value }),
     ...(error && { error: captureError(error) }),

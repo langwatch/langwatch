@@ -32,7 +32,7 @@ export function CheckPassing({ check }: { check: TraceCheck }) {
         )}
       </Box>
       <Text whiteSpace="nowrap">
-        <b>{traceCheck.name}:</b>
+        <b>{check.check_name || traceCheck.name}:</b>
       </Text>
       {check.status == "succeeded" || check.status == "failed" ? (
         <TraceCheckComponent check={check} />

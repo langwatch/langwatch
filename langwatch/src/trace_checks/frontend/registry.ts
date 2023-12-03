@@ -1,4 +1,5 @@
 import type { CheckTypes, TraceCheckFrontendDefinition } from "../types";
+import { CustomCheck } from "./customCheck";
 import { PIICheck } from "./piiCheck";
 import { ToxicityCheck } from "./toxicityCheck";
 
@@ -9,12 +10,7 @@ export const AVAILABLE_TRACE_CHECKS: Record<
 > = {
   pii_check: PIICheck,
   toxicity_check: ToxicityCheck,
-  custom: {
-    name: "Custom",
-    render: () => {
-      throw new Error("Not implemented");
-    },
-  },
+  custom: CustomCheck,
 };
 
 export const getTraceCheck = (name: string) => {

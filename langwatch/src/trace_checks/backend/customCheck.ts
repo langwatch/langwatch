@@ -43,7 +43,7 @@ const execute = async (
         }
         break;
       case "is_similar_to":
-        const embeddings = rule.openai_embeddings || [];
+        const embeddings = rule.openai_embeddings ?? [];
         if (embeddings.length === 0) {
           throw new Error("No embeddings provided for is_similar_to rule.");
         }
