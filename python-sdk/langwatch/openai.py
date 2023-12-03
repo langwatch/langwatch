@@ -215,7 +215,7 @@ class OpenAICompletionTracer(BaseContextTracer):
             trace_id=self.trace_id,
             vendor="openai",
             model=kwargs.get("model", "unknown"),
-            input=TypedValueText(type="text", value=kwargs.get("prompt", "")),
+            input=TypedValueText(type="text", value=kwargs.get("prompt", "")).copy(),
             outputs=outputs,
             raw_response=raw_response,
             error=error,
@@ -429,7 +429,7 @@ class OpenAIChatCompletionTracer(BaseContextTracer):
             vendor="openai",
             model=kwargs.get("model", "unknown"),
             input=TypedValueChatMessages(
-                type="chat_messages", value=kwargs.get("messages", [])
+                type="chat_messages", value=kwargs.get("messages", []).copy()
             ),
             outputs=outputs,
             raw_response=raw_response,
