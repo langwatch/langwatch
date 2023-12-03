@@ -15,6 +15,16 @@ export const projectRoutes = {
     path: "/[project]/checks",
     title: "Checks",
   },
+  checks_new: {
+    path: "/[project]/checks/new",
+    title: "New Check",
+    parent: "checks",
+  },
+  checks_edit: {
+    path: "/[project]/checks/[id]/edit",
+    title: "Editing Check",
+    parent: "checks",
+  },
   prompts: {
     path: "/[project]/prompts",
     title: "Prompts DB",
