@@ -476,7 +476,10 @@ const scheduleTraceChecks = async (trace: Trace) => {
   });
 
   for (const check of checks) {
-    if (check.sample >= Math.random()) {
+    if (Math.random() <= check.sample) {
+      debug(
+        `scheduling ${check.checkType} (checkId: ${check.id}) for trace ${trace.id}`
+      );
       void scheduleTraceCheck({
         check_id: check.id,
         check_type: check.checkType as CheckTypes,

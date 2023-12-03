@@ -44,7 +44,10 @@ export function MessageCard({
 }) {
   const traceChecks = checksMap ? checksMap[trace.id] ?? [] : [];
   const checksDone = traceChecks.every(
-    (check) => check.status == "succeeded" || check.status == "failed"
+    (check) =>
+      check.status == "succeeded" ||
+      check.status == "failed" ||
+      check.status == "error"
   );
   const checkPasses = traceChecks.filter(
     (check) => check.status == "succeeded"

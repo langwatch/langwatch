@@ -15,23 +15,27 @@ const debug = getDebugger("langwatch:trace_checks:piiCheck");
 const credentials = JSON.parse(env.GOOGLE_CREDENTIALS_JSON);
 const dlp = new DlpServiceClient({ credentials });
 
+const infoTypesMap: Record<
+  keyof Checks["pii_check"]["parameters"]["infoTypes"],
+  string
+> = {
+  phoneNumber: "PHONE_NUMBER",
+  emailAddress: "EMAIL_ADDRESS",
+  creditCardNumber: "CREDIT_CARD_NUMBER",
+  ibanCode: "IBAN_CODE",
+  ipAddress: "IP_ADDRESS",
+  passport: "PASSPORT",
+  vatNumber: "VAT_NUMBER",
+  medicalRecordNumber: "MEDICAL_RECORD_NUMBER",
+};
+
 const dlpCheck = async (
   text: string
 ): Promise<google.privacy.dlp.v2.IFinding[] | null | undefined> => {
   const [response] = await dlp.inspectContent({
     parent: `projects/${credentials.project_id}/locations/global`,
     inspectConfig: {
-      infoTypes: [
-        // TODO: allow this to be configurable by user
-        { name: "PHONE_NUMBER" },
-        { name: "EMAIL_ADDRESS" },
-        { name: "CREDIT_CARD_NUMBER" },
-        { name: "IBAN_CODE" },
-        { name: "IP_ADDRESS" },
-        { name: "PASSPORT" },
-        { name: "VAT_NUMBER" },
-        { name: "MEDICAL_RECORD_NUMBER" },
-      ],
+      infoTypes: Object.values(infoTypesMap).map((name) => ({ name })),
       minLikelihood: "POSSIBLE",
       limits: {
         maxFindingsPerRequest: 0, // (0 = server maximum)
@@ -72,7 +76,7 @@ export const piiCheck = async (
     .join("\n\n");
 
   const traceFindings = (await dlpCheck(traceText)) ?? [];
-  const spansFindings = (await dlpCheck(spansText)) ?? [];
+  const spansFindings = (spansText ? await dlpCheck(spansText) : []) ?? [];
   const allFindings = traceFindings.concat(spansFindings);
 
   const quotes = allFindings.map((finding) => finding.quote!).filter((x) => x);
@@ -99,7 +103,7 @@ export const convertToTraceCheckResult = (
 ): TraceCheckResult => {
   const infoTypes = Object.entries(parameters.infoTypes ?? {})
     .filter(([_key, value]) => value)
-    .map(([key]) => key);
+    .map(([key]) => (infoTypesMap as any)[key]);
   const likelihoodIncluded = (likelihood: string) => {
     const likelihoods = [
       "VERY_UNLIKELY",
@@ -119,7 +123,7 @@ export const convertToTraceCheckResult = (
       infoTypes.includes(finding.infoType?.name) &&
       likelihoodIncluded(finding.likelihood?.toString() ?? "POSSIBLE")
   );
-  const filteredSpans = traceFindings.filter(
+  const filteredSpans = spansFindings.filter(
     (finding) =>
       finding.infoType?.name &&
       infoTypes.includes(finding.infoType?.name) &&
@@ -133,8 +137,7 @@ export const convertToTraceCheckResult = (
 
   return {
     raw_result: {
-      traceFindings,
-      spansFindings,
+      findings: reportedFindings,
     },
     value: reportedFindings.length,
     status: reportedFindings.length > 0 ? "failed" : "succeeded",

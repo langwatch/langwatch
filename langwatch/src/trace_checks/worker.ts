@@ -24,10 +24,10 @@ export const process = async (
   }
 
   const check = await prisma.check.findUnique({
-    where: { id: job.name },
+    where: { id: job.data.check_id },
   });
   if (!check) {
-    throw "check config not found";
+    throw `check config ${job.data.check_id} not found`;
   }
 
   const checkExecutor = getCheckExecutor(check.checkType);
