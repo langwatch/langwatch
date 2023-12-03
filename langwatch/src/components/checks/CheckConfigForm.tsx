@@ -1,4 +1,10 @@
 import {
+  Accordion,
+  AccordionButton,
+  AccordionIcon,
+  AccordionItem,
+  AccordionPanel,
+  Box,
   Button,
   Card,
   CardBody,
@@ -7,11 +13,13 @@ import {
   Select,
   Spacer,
   Text,
+  Tooltip,
   VStack,
 } from "@chakra-ui/react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect } from "react";
-import { FormProvider, useForm } from "react-hook-form";
+import { HelpCircle } from "react-feather";
+import { Controller, FormProvider, useForm } from "react-hook-form";
 import slugify from "slugify";
 import { z } from "zod";
 import type {
@@ -29,10 +37,9 @@ import { CustomRuleField } from "./CustomRuleField";
 import DynamicZodForm from "./DynamicZodForm";
 import { PreconditionsField } from "./PreconditionsField";
 
-const defaultParametersMap: Record<
-  CheckTypes,
-  Checks[CheckTypes]["parameters"]
-> = {
+const defaultParametersMap: {
+  [K in CheckTypes]: Checks[K]["parameters"];
+} = {
   pii_check: {
     infoTypes: {
       phoneNumber: true,
@@ -45,6 +52,7 @@ const defaultParametersMap: Record<
       medicalRecordNumber: true,
     },
     minLikelihood: "POSSIBLE",
+    checkPiiInSpans: false,
   },
   custom: {
     rules: [
@@ -62,6 +70,7 @@ const defaultParametersMap: Record<
 export interface CheckConfigFormData {
   name: string;
   checkType: CheckTypes;
+  sample: number;
   preconditions: CheckPreconditions;
   parameters: Checks[CheckTypes]["parameters"];
 }
@@ -84,6 +93,7 @@ export default function CheckConfigForm({
         z.object({
           name: z.string().min(1).max(255),
           checkType: checkTypesSchema,
+          sample: z.number().min(0.01).max(1),
           preconditions: checkPreconditionsSchema,
           parameters: checksSchema.shape[data.checkType].shape.parameters,
         })
@@ -95,10 +105,14 @@ export default function CheckConfigForm({
     register,
     handleSubmit,
     watch,
+    control,
     formState: { errors },
   } = form;
 
   const checkType = watch("checkType");
+  const preconditions = watch("preconditions");
+  const nameValue = watch("name");
+  const sample = watch("sample");
 
   useEffect(() => {
     if (defaultValues?.parameters && defaultValues.checkType === checkType)
@@ -129,7 +143,15 @@ export default function CheckConfigForm({
     setDefaultParameters(defaultParameters, "parameters");
   }, [checkType, defaultValues?.checkType, defaultValues?.parameters, form]);
 
-  const nameValue = watch("name");
+  const runOn = (
+    <Text color="gray.500" fontStyle="italic">
+      This check will run on{" "}
+      {sample >= 1
+        ? "every message"
+        : `${+(sample * 100).toFixed(2)}% of messages`}
+      {preconditions?.length > 0 && " matching the preconditions"}
+    </Text>
+  );
 
   return (
     <FormProvider {...form}>
@@ -170,7 +192,19 @@ export default function CheckConfigForm({
                     </Text>
                   </VStack>
                 </HorizontalFormControl>
-                <PreconditionsField />
+                <PreconditionsField
+                  runOn={
+                    preconditions?.length === 0 ? (
+                      sample == 1 ? (
+                        runOn
+                      ) : (
+                        <Text color="gray.500" fontStyle="italic">
+                          No preconditions defined
+                        </Text>
+                      )
+                    ) : null
+                  }
+                />
                 {checkType === "custom" && <CustomRuleField />}
                 {checkType &&
                   checkType !== "custom" &&
@@ -181,6 +215,66 @@ export default function CheckConfigForm({
                       prefix="parameters"
                     />
                   )}
+                <Accordion
+                  defaultIndex={
+                    (defaultValues?.sample ?? 1) < 1 ? 0 : undefined
+                  }
+                  allowToggle={true}
+                  width="full"
+                  boxShadow="none"
+                  border="none"
+                >
+                  <AccordionItem width="full" border="none" padding={0}>
+                    <AccordionButton
+                      border="none"
+                      paddingX={5}
+                      paddingY={5}
+                      marginX={-5}
+                      marginY={-5}
+                      width="calc(100% + 40px)"
+                    >
+                      <Box flex="1" textAlign="left" fontWeight={500}>
+                        Advanced
+                      </Box>
+                      <AccordionIcon color="gray.400" />
+                    </AccordionButton>
+                    <AccordionPanel width="full" paddingX={0} marginTop={6}>
+                      <HorizontalFormControl
+                        label="Sampling"
+                        helper="Run this check only on a sample of messages (min 0.01, max 1.0)"
+                        isInvalid={!!errors.name}
+                        align="start"
+                      >
+                        <Controller
+                          control={control}
+                          name="sample"
+                          render={({ field }) => (
+                            <VStack align="start">
+                              <HStack>
+                                <Input
+                                  width="110px"
+                                  type="number"
+                                  min="0"
+                                  max="1"
+                                  step="0.1"
+                                  placeholder="0.0"
+                                  {...field}
+                                  onChange={(e) =>
+                                    field.onChange(+e.target.value)
+                                  }
+                                />
+                                <Tooltip label="You can use this to save costs on expensive checks if you have too many messages incomming. From 0.01 to run on 1% of the messages to 1.0 to run on 100% of the messages">
+                                  <HelpCircle width="14px" />
+                                </Tooltip>
+                              </HStack>
+                              {runOn}
+                            </VStack>
+                          )}
+                        />
+                      </HorizontalFormControl>
+                    </AccordionPanel>
+                  </AccordionItem>
+                </Accordion>
               </VStack>
             </CardBody>
           </Card>

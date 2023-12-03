@@ -46,8 +46,6 @@ export default function EditCheck() {
         ...data,
         id: checkId,
         projectId: project.id,
-        preconditions: data.preconditions,
-        parameters: data.parameters,
       });
       toast({
         title: "Check updated successfully",

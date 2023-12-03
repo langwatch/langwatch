@@ -28,7 +28,7 @@ const fieldOptions: Record<CustomCheckFields, string> = {
   input: "input",
 };
 
-export const PreconditionsField = () => {
+export const PreconditionsField = ({ runOn }: { runOn: JSX.Element | null }) => {
   const { control, watch } = useFormContext();
   const preconditions = watch("preconditions");
   const { fields, append, remove } = useFieldArray({
@@ -127,11 +127,7 @@ export const PreconditionsField = () => {
             </VStack>
           </Box>
         ))}
-        {fields.length === 0 && (
-          <Text color="gray.500" fontStyle="italic">
-            This check will run on every message
-          </Text>
-        )}
+        {runOn}
         <Button
           onClick={() =>
             append({

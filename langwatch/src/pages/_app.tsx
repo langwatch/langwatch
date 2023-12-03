@@ -139,7 +139,10 @@ const LangWatch: AppType<{
       refetchInterval={5 * 60}
       refetchOnWindowFocus={false}
     >
-      <ChakraProvider theme={theme}>
+      <ChakraProvider
+        theme={theme}
+        toastOptions={{ defaultOptions: { position: "top-right" } }}
+      >
         <Head>
           <title>LangWatch</title>
           <link

@@ -131,6 +131,11 @@ export default function Checks() {
                   | CheckPreconditions
                   | undefined;
 
+                const sample =
+                  check.sample >= 1
+                    ? "every message"
+                    : `${+(check.sample * 100).toFixed(2)}% of messages`;
+
                 return (
                   <Card
                     width="full"
@@ -155,13 +160,17 @@ export default function Checks() {
                           </Heading>
                           <Text>
                             {!preconditions?.length
-                              ? "Runs on every message"
+                              ? `Runs on ${sample}`
                               : preconditions.length === 1
-                              ? `Runs when ${preconditions[0]
+                              ? `Runs ${
+                                  check.sample < 1
+                                    ? "on " + sample + " in which"
+                                    : "when"
+                                } ${preconditions[0]
                                   ?.field} ${camelCaseToLowerCase(
                                   preconditions[0]?.rule ?? ""
                                 )} ${preconditions[0]?.value}`
-                              : `Runs on ${preconditions.length} preconditions`}
+                              : `Runs on ${sample} matching ${preconditions.length} preconditions`}
                           </Text>
                         </VStack>
                         <LinkOverlay

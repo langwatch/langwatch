@@ -20,8 +20,6 @@ export default function NewTraceCheckConfig() {
       await createCheck.mutateAsync({
         ...data,
         projectId: project.id,
-        preconditions: data.preconditions,
-        parameters: data.parameters,
       });
       toast({
         title: "Check created successfully",
@@ -50,7 +48,7 @@ export default function NewTraceCheckConfig() {
           </Heading>
           <CheckConfigForm
             onSubmit={onSubmit}
-            defaultValues={{ checkType: "custom" }}
+            defaultValues={{ checkType: "custom", sample: 1.0 }}
             isLoading={createCheck.isLoading}
           />
         </VStack>

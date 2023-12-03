@@ -23,6 +23,7 @@ export const checksRouter = createTRPCRouter({
 
       const checks = await prisma.check.findMany({
         where: { projectId },
+        orderBy: { createdAt: "asc" },
       });
 
       return checks;
@@ -51,11 +52,13 @@ export const checksRouter = createTRPCRouter({
         checkType: z.string(),
         preconditions: checkPreconditionsSchema,
         parameters: z.object({}).passthrough(),
+        sample: z.number().min(0).max(1),
       })
     )
     .use(checkUserPermissionForProject)
     .mutation(async ({ input, ctx }) => {
-      const { projectId, name, checkType, preconditions, parameters } = input;
+      const { projectId, name, checkType, preconditions, parameters, sample } =
+        input;
       const prisma = ctx.prisma;
       const slug = slugify(name, { lower: true, strict: true });
 
@@ -74,6 +77,7 @@ export const checksRouter = createTRPCRouter({
           slug,
           preconditions,
           parameters,
+          sample,
           enabled: true,
         },
       });
@@ -89,6 +93,7 @@ export const checksRouter = createTRPCRouter({
         checkType: z.string(),
         preconditions: checkPreconditionsSchema,
         parameters: z.object({}).passthrough(),
+        sample: z.number().min(0).max(1),
         enabled: z.boolean().optional(),
       })
     )
@@ -101,6 +106,7 @@ export const checksRouter = createTRPCRouter({
         checkType,
         preconditions,
         parameters,
+        sample,
         enabled,
       } = input;
       const prisma = ctx.prisma;
@@ -121,6 +127,7 @@ export const checksRouter = createTRPCRouter({
           slug,
           preconditions,
           parameters,
+          sample,
           ...(enabled !== undefined && { enabled }),
         },
       });
