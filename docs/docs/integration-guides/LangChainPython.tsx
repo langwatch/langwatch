@@ -18,7 +18,7 @@ export const LangChainPython = ({ apiKey }: { apiKey?: string }) => {
         Wrap your LangChain interactions with <code>LangChainTracer</code>.
       </p>
       <RenderCode
-        code={`import langwatch
+        code={`import langwatch.langchain
 from langchain.llms import ChatOpenAI
 from langchain.prompts import ChatPromptTemplate
 

@@ -19,7 +19,7 @@ export const OpenAIPython = ({ apiKey }: { apiKey?: string }) => {
         all interactions within its block.
       </p>
       <RenderCode
-        code={`import langwatch
+        code={`import langwatch.openai
 import openai
 
 # Set up the tracer context manager
