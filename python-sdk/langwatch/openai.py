@@ -22,7 +22,10 @@ from langwatch.utils import (
     safe_get,
 )
 
-import openai
+from openai import AsyncStream, OpenAI, AsyncOpenAI, Stream
+
+from openai.types import Completion
+from openai.types.chat import ChatCompletion, ChatCompletionChunk
 
 
 class OpenAITracer(BaseContextTracer):
@@ -30,12 +33,21 @@ class OpenAITracer(BaseContextTracer):
     Tracing for both Completion and ChatCompletion endpoints
     """
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        if "trace_id" not in kwargs:
-            kwargs["trace_id"] = self.trace_id
-        self.completion_tracer = OpenAICompletionTracer(*args, **kwargs)
-        self.chat_completion_tracer = OpenAIChatCompletionTracer(*args, **kwargs)
+    def __init__(
+        self,
+        instance: Union[OpenAI, AsyncOpenAI],
+        trace_id: Optional[str] = None,
+        user_id: Optional[str] = None,
+        thread_id: Optional[str] = None,
+    ):
+        super().__init__(trace_id=trace_id, user_id=user_id, thread_id=thread_id)
+        trace_id = self.trace_id
+        self.completion_tracer = OpenAICompletionTracer(
+            instance=instance, trace_id=trace_id, user_id=user_id, thread_id=thread_id
+        )
+        self.chat_completion_tracer = OpenAIChatCompletionTracer(
+            instance=instance, trace_id=trace_id, user_id=user_id, thread_id=thread_id
+        )
 
     def __enter__(self):
         super().__enter__()
@@ -48,29 +60,39 @@ class OpenAITracer(BaseContextTracer):
         self.chat_completion_tracer.__exit__(_type, _value, _traceback)
 
 
-_original_completion_create = openai.Completion.create
-_original_completion_acreate = openai.Completion.acreate
-
-
 class OpenAICompletionTracer(BaseContextTracer):
+    def __init__(
+        self,
+        instance: Union[OpenAI, AsyncOpenAI],
+        trace_id: Optional[str] = None,
+        user_id: Optional[str] = None,
+        thread_id: Optional[str] = None,
+    ):
+        self.instance = instance
+        super().__init__(trace_id=trace_id, user_id=user_id, thread_id=thread_id)
+
     def __enter__(self):
         super().__enter__()
-        openai.Completion.create = self.patched_completion_create
-        openai.Completion.acreate = self.patched_completion_acreate
+        self.instance.completions._original_create = self.instance.completions.create  # type: ignore
+        if isinstance(self.instance, AsyncOpenAI):
+            self.instance.completions.create = self.patched_completion_acreate  # type: ignore
+        else:
+            self.instance.completions.create = self.patched_completion_create  # type: ignore
 
     def __exit__(self, _type, _value, _traceback):
         super().__exit__(_type, _value, _traceback)
-        openai.Completion.create = _original_completion_create
-        openai.Completion.acreate = _original_completion_acreate
+        self.instance.completions.create = self.instance.completions._original_create  # type: ignore
 
     def patched_completion_create(self, *args, **kwargs):
         started_at = milliseconds_timestamp()
         try:
-            response = _original_completion_create(*args, **kwargs)
+            response: Union[Completion, Stream[Completion]] = cast(
+                Any, self.instance.completions
+            )._original_create(*args, **kwargs)
 
-            if isinstance(response, Generator):
+            if isinstance(response, Stream):
                 return capture_chunks_with_timings_and_reyield(
-                    response,
+                    cast(Generator[Completion, Any, Any], response),
                     lambda chunks, first_token_at, finished_at: self.handle_deltas(
                         chunks,
                         SpanTimestamps(
@@ -83,7 +105,7 @@ class OpenAICompletionTracer(BaseContextTracer):
                 )
             else:
                 finished_at = milliseconds_timestamp()
-                self.handle_list_or_dict(
+                self.handle_completion(
                     response,
                     SpanTimestamps(started_at=started_at, finished_at=finished_at),
                     **kwargs,
@@ -100,11 +122,13 @@ class OpenAICompletionTracer(BaseContextTracer):
 
     async def patched_completion_acreate(self, *args, **kwargs):
         started_at = milliseconds_timestamp()
-        response = await _original_completion_acreate(*args, **kwargs)
+        response: Union[Completion, AsyncStream[Completion]] = await cast(
+            Any, self.instance.completions
+        )._original_create(*args, **kwargs)
 
-        if isinstance(response, AsyncGenerator):
+        if isinstance(response, AsyncStream):
             return capture_async_chunks_with_timings_and_reyield(
-                response,
+                cast(AsyncGenerator[Completion, Any], response),
                 lambda chunks, first_token_at, finished_at: self.handle_deltas(
                     chunks,
                     SpanTimestamps(
@@ -117,7 +141,7 @@ class OpenAICompletionTracer(BaseContextTracer):
             )
         else:
             finished_at = milliseconds_timestamp()
-            self.handle_list_or_dict(
+            self.handle_completion(
                 response,
                 SpanTimestamps(started_at=started_at, finished_at=finished_at),
                 **kwargs,
@@ -126,20 +150,17 @@ class OpenAICompletionTracer(BaseContextTracer):
 
     def handle_deltas(
         self,
-        deltas: List[Union[Dict[Any, Any], List[Any]]],
+        deltas: List[Completion],
         timestamps: SpanTimestamps,
         **kwargs,
     ):
         raw_response = []
         text_outputs: Dict[int, str] = {}
         for delta in deltas:
-            delta = cast(Dict[Any, Any], delta)
-            raw_response.append(delta)
-            for choice in delta.get("choices", []):
-                index = choice.get("index", 0)
-                text_outputs[index] = text_outputs.get(index, "") + choice.get(
-                    "text", ""
-                )
+            raw_response.append(delta.model_dump())
+            for choice in delta.choices:
+                index = choice.index or 0
+                text_outputs[index] = text_outputs.get(index, "") + (choice.text or "")
 
         self.append_span(
             self.build_trace(
@@ -155,32 +176,28 @@ class OpenAICompletionTracer(BaseContextTracer):
             )
         )
 
-    def handle_list_or_dict(
+    def handle_completion(
         self,
-        res: Union[List[Any], Dict[Any, Any]],
+        response: Completion,
         timestamps: SpanTimestamps,
         **kwargs,
     ):
-        responses_list: List[dict] = res if isinstance(res, list) else [res]
-        for response in responses_list:
-            self.append_span(
-                self.build_trace(
-                    raw_response=response,
-                    outputs=[
-                        TypedValueText(type="text", value=output.get("text"))
-                        for output in response.get("choices", [])
-                    ],
-                    metrics=SpanMetrics(
-                        prompt_tokens=safe_get(response, "usage", "prompt_tokens"),
-                        completion_tokens=safe_get(
-                            response, "usage", "completion_tokens"
-                        ),
-                    ),
-                    timestamps=timestamps,
-                    error=None,
-                    **kwargs,
-                )
+        self.append_span(
+            self.build_trace(
+                raw_response=response.model_dump(),
+                outputs=[
+                    TypedValueText(type="text", value=output.text)
+                    for output in response.choices
+                ],
+                metrics=SpanMetrics(
+                    prompt_tokens=safe_get(response, "usage", "prompt_tokens"),
+                    completion_tokens=safe_get(response, "usage", "completion_tokens"),
+                ),
+                timestamps=timestamps,
+                error=None,
+                **kwargs,
             )
+        )
 
     def handle_exception(
         self,
@@ -228,29 +245,39 @@ class OpenAICompletionTracer(BaseContextTracer):
         )
 
 
-_original_chat_completion_create = openai.ChatCompletion.create
-_original_chat_completion_acreate = openai.ChatCompletion.acreate
-
-
 class OpenAIChatCompletionTracer(BaseContextTracer):
+    def __init__(
+        self,
+        instance: Union[OpenAI, AsyncOpenAI],
+        trace_id: Optional[str] = None,
+        user_id: Optional[str] = None,
+        thread_id: Optional[str] = None,
+    ):
+        self.instance = instance
+        super().__init__(trace_id=trace_id, user_id=user_id, thread_id=thread_id)
+
     def __enter__(self):
         super().__enter__()
-        openai.ChatCompletion.create = self.patched_completion_create
-        openai.ChatCompletion.acreate = self.patched_completion_acreate
+        self.instance.chat.completions._original_create = self.instance.chat.completions.create  # type: ignore
+        if isinstance(self.instance, AsyncOpenAI):
+            self.instance.chat.completions.create = self.patched_completion_acreate  # type: ignore
+        else:
+            self.instance.chat.completions.create = self.patched_completion_create  # type: ignore
 
     def __exit__(self, _type, _value, _traceback):
         super().__exit__(_type, _value, _traceback)
-        openai.Completion.create = _original_chat_completion_create
-        openai.Completion.acreate = _original_chat_completion_acreate
+        self.instance.chat.completions.create = self.instance.chat.completions._original_create  # type: ignore
 
     def patched_completion_create(self, *args, **kwargs):
         started_at = milliseconds_timestamp()
         try:
-            response = _original_chat_completion_create(*args, **kwargs)
+            response: Union[ChatCompletion, Stream[ChatCompletionChunk]] = cast(
+                Any, self.instance.chat.completions
+            )._original_create(*args, **kwargs)
 
-            if isinstance(response, Generator):
+            if isinstance(response, Stream):
                 return capture_chunks_with_timings_and_reyield(
-                    response,
+                    cast(Generator[ChatCompletionChunk, Any, Any], response),
                     lambda chunks, first_token_at, finished_at: self.handle_deltas(
                         chunks,
                         SpanTimestamps(
@@ -263,7 +290,7 @@ class OpenAIChatCompletionTracer(BaseContextTracer):
                 )
             else:
                 finished_at = milliseconds_timestamp()
-                self.handle_list_or_dict(
+                self.handle_completion(
                     response,
                     SpanTimestamps(started_at=started_at, finished_at=finished_at),
                     **kwargs,
@@ -280,11 +307,13 @@ class OpenAIChatCompletionTracer(BaseContextTracer):
 
     async def patched_completion_acreate(self, *args, **kwargs):
         started_at = milliseconds_timestamp()
-        response = await _original_chat_completion_acreate(*args, **kwargs)
+        response: Union[ChatCompletion, AsyncStream[ChatCompletionChunk]] = await cast(
+            Any, self.instance.chat.completions
+        )._original_create(*args, **kwargs)
 
-        if isinstance(response, AsyncGenerator):
+        if isinstance(response, AsyncStream):
             return capture_async_chunks_with_timings_and_reyield(
-                response,
+                cast(AsyncGenerator[ChatCompletionChunk, Any], response),
                 lambda chunks, first_token_at, finished_at: self.handle_deltas(
                     chunks,
                     SpanTimestamps(
@@ -297,7 +326,7 @@ class OpenAIChatCompletionTracer(BaseContextTracer):
             )
         else:
             finished_at = milliseconds_timestamp()
-            self.handle_list_or_dict(
+            self.handle_completion(
                 response,
                 SpanTimestamps(started_at=started_at, finished_at=finished_at),
                 **kwargs,
@@ -306,7 +335,7 @@ class OpenAIChatCompletionTracer(BaseContextTracer):
 
     def handle_deltas(
         self,
-        deltas: List[Union[Dict[Any, Any], List[Any]]],
+        deltas: List[ChatCompletionChunk],
         timestamps: SpanTimestamps,
         **kwargs,
     ):
@@ -314,36 +343,37 @@ class OpenAIChatCompletionTracer(BaseContextTracer):
         raw_response = []
         chat_outputs: Dict[int, List[ChatMessage]] = {}
         for delta in deltas:
-            delta = cast(Dict[Any, Any], delta)
-            raw_response.append(delta)
-            for choice in delta.get("choices", []):
-                index = choice.get("index", 0)
-                delta = choice.get("delta", {})
-                if "role" in delta:
+            raw_response.append(delta.model_dump())
+            for choice in delta.choices:
+                index = choice.index
+                delta = choice.delta
+                if delta.role:
                     chat_message: ChatMessage = {
-                        "role": delta.get("role"),
-                        "content": delta.get("content"),
+                        "role": delta.role,
+                        "content": delta.content,
                     }
-                    if "function_call" in delta:
-                        chat_message["function_call"] = delta["function_call"]
+                    # TODO: tool calls
+                    if delta.function_call:
+                        chat_message["function_call"] = {
+                            "name": delta.function_call.name or "",
+                            "arguments": delta.function_call.arguments or "",
+                        }
                     if index not in chat_outputs:
                         chat_outputs[index] = []
                     chat_outputs[index].append(chat_message)
-                elif "function_call" in delta:
+                elif delta.function_call:
                     last_item = chat_outputs[index][-1]
                     if "function_call" in last_item and last_item["function_call"]:
                         current_arguments = last_item["function_call"].get(
                             "arguments", ""
                         )
-                        last_item["function_call"][
-                            "arguments"
-                        ] = current_arguments + delta["function_call"].get(
-                            "arguments", ""
+                        last_item["function_call"]["arguments"] = current_arguments + (
+                            delta.function_call.arguments or ""
                         )
-                elif "content" in delta:
-                    chat_outputs[index][-1]["content"] = chat_outputs[index][-1].get(
-                        "content", ""
-                    ) + delta.get("content", "")
+                elif delta.content:
+                    chat_outputs[index][-1]["content"] = (
+                        chat_outputs[index][-1].get("content", "") or ""
+                    ) + delta.content
 
         self.append_span(
             self.build_trace(
@@ -359,34 +389,31 @@ class OpenAIChatCompletionTracer(BaseContextTracer):
             )
         )
 
-    def handle_list_or_dict(
+    def handle_completion(
         self,
-        res: Union[List[Any], Dict[Any, Any]],
+        response: ChatCompletion,
         timestamps: SpanTimestamps,
         **kwargs,
     ):
-        responses_list: List[dict] = res if isinstance(res, list) else [res]
-        for response in responses_list:
-            self.append_span(
-                self.build_trace(
-                    raw_response=response,
-                    outputs=[
-                        TypedValueChatMessages(
-                            type="chat_messages", value=[output.get("message")]
-                        )
-                        for output in response.get("choices", [])
-                    ],
-                    metrics=SpanMetrics(
-                        prompt_tokens=safe_get(response, "usage", "prompt_tokens"),
-                        completion_tokens=safe_get(
-                            response, "usage", "completion_tokens"
-                        ),
-                    ),
-                    timestamps=timestamps,
-                    error=None,
-                    **kwargs,
-                )
+        self.append_span(
+            self.build_trace(
+                raw_response=response.model_dump(),
+                outputs=[
+                    TypedValueChatMessages(
+                        type="chat_messages",
+                        value=[cast(ChatMessage, output.message.model_dump())],
+                    )
+                    for output in response.choices
+                ],
+                metrics=SpanMetrics(
+                    prompt_tokens=safe_get(response, "usage", "prompt_tokens"),
+                    completion_tokens=safe_get(response, "usage", "completion_tokens"),
+                ),
+                timestamps=timestamps,
+                error=None,
+                **kwargs,
             )
+        )
 
     def handle_exception(
         self,

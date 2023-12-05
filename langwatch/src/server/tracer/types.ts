@@ -1,4 +1,4 @@
-type ChatRole = "system" | "user" | "assistant" | "function" | "unknown";
+type ChatRole = "system" | "user" | "assistant" | "function" | "tool" | "unknown";
 
 interface FunctionCall {
   name?: string;

@@ -1,5 +1,7 @@
 import chainlit as cl
-import openai
+from openai import OpenAI
+
+client = OpenAI()
 
 import sys
 
@@ -8,24 +10,26 @@ import langwatch.openai
 
 
 @cl.on_message
-async def main(message: str):
+async def main(message: cl.Message):
     msg = cl.Message(
         content="",
     )
 
     with langwatch.openai.OpenAITracer():
-        completion = openai.ChatCompletion.create(
-            model="gpt-4",
+        completion = client.chat.completions.create(
+            model="gpt-3.5-turbo",
             messages=[
                 {
                     "role": "system",
                     "content": "You are a helpful assistant that only reply in short tweet-like responses, using lots of emojis.",
                 },
-                {"role": "user", "content": message},
+                {"role": "user", "content": message.content},
             ],
             stream=True,
         )
 
-    for delta in completion:
-        await msg.stream_token(delta.get("choices")[0].get("delta").get("content", ""))  # type: ignore
-    await msg.send()
+    for part in completion:
+        if token := part.choices[0].delta.content or "":
+            await msg.stream_token(token)
+
+    await msg.update()

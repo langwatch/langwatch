@@ -213,4 +213,8 @@ def send_spans(
 ):
     if len(spans) == 0:
         return
-    executor.submit(_send_spans, spans, user_id, thread_id)
+    if "PYTEST_CURRENT_TEST" in os.environ:
+        # Keep on the same thread for tests
+        _send_spans(spans, user_id, thread_id)
+    else:
+        executor.submit(_send_spans, spans, user_id, thread_id)

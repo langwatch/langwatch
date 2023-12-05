@@ -11,7 +11,10 @@ from typing import (
     Optional,
     Tuple,
     TypeVar,
+    Union,
 )
+
+from pydantic import BaseModel
 
 from langwatch.types import (
     ErrorCapture,
@@ -24,11 +27,16 @@ from langwatch.types import (
 T = TypeVar("T")
 
 
-def safe_get(d: Dict[str, Any], *keys: str) -> Optional[Any]:
+def safe_get(d: Union[Dict[str, Any], BaseModel], *keys: str) -> Optional[Any]:
     for key in keys:
-        if not isinstance(d, dict):
+        if d == None:
             return None
-        d = d.get(key)  # type: ignore
+        if isinstance(d, dict):
+            d = d.get(key, None)
+        if hasattr(d, key):
+            d = getattr(d, key)
+        else:
+            return None
     return d
 
 
@@ -67,9 +75,12 @@ async def capture_async_chunks_with_timings_and_reyield(
 
 
 def capture_exception(err: BaseException):
-    string_stacktrace = traceback.format_exception(
-        etype=type(err), value=err, tb=err.__traceback__
-    )
+    try:  # python < 3.10
+        string_stacktrace = traceback.format_exception(
+            etype=type(err), value=err, tb=err.__traceback__
+        )  # type: ignore
+    except:  # python 3.10+
+        string_stacktrace = traceback.format_exception(err)  # type: ignore
     return ErrorCapture(message=str(err), stacktrace=string_stacktrace)
 
 
