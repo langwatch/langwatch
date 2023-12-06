@@ -1,14 +1,27 @@
-type ChatRole = "system" | "user" | "assistant" | "function" | "tool" | "unknown";
+type ChatRole =
+  | "system"
+  | "user"
+  | "assistant"
+  | "function"
+  | "tool"
+  | "unknown";
 
 interface FunctionCall {
   name?: string;
   arguments?: string;
 }
 
+interface ToolCall {
+  id: string;
+  type: string;
+  function: FunctionCall;
+}
+
 interface ChatMessage {
   role?: ChatRole;
   content?: string | null;
-  function_call?: FunctionCall;
+  function_call?: FunctionCall | null;
+  tool_calls?: ToolCall[] | null;
 }
 
 interface TypedValueChatMessages {
@@ -63,9 +76,11 @@ interface SpanMetrics {
 }
 
 interface SpanParams {
-  temperature: number;
-  stream: boolean;
+  temperature?: number;
+  stream?: boolean;
   functions?: Record<string, any>[];
+  tools?: Record<string, any>[];
+  tool_choice?: string;
 }
 
 interface SpanTimestamps {
