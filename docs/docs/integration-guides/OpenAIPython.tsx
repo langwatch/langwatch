@@ -5,6 +5,13 @@ export const OpenAIPython = ({ apiKey }: { apiKey?: string }) => {
     <div>
       <h3>Installation:</h3>
       <RenderCode code={`pip install langwatch`} language="bash" />
+      <p>
+        <i>
+          <b>Note:</b> LangWatch supports openai library v1.3.7 and above, if
+          you need to integrate with an older version of openai (below v1.0.0),
+          install langwatch==0.0.3
+        </i>
+      </p>
       <h3>Configuration:</h3>
       <p>
         Ensure the <code>LANGWATCH_API_KEY</code> environment variable is set:
@@ -15,17 +22,19 @@ export const OpenAIPython = ({ apiKey }: { apiKey?: string }) => {
       />
       <h3>Usage:</h3>
       <p>
-        Use the <code>OpenAITracer</code> context manager to automatically trace
-        all interactions within its block.
+        Use the <code>OpenAITracer</code> context manager, passing the OpenAI
+        instance to it to automatically trace all interactions within its block
       </p>
       <RenderCode
         code={`import langwatch.openai
-import openai
+from openai import OpenAI
+
+client = OpenAI()
 
 # Set up the tracer context manager
-with langwatch.openai.OpenAITracer(user_id="user-123", thread_id="thread-456"):
+with langwatch.openai.OpenAITracer(client, user_id="user-123", thread_id="thread-456"):
     # Your interaction with OpenAI's API
-    completion = openai.ChatCompletion.create(
+    completion = client.ChatCompletion.create(
         model="gpt-4",
         messages=[
             {"role": "system", "content": "You are a helpful assistant."},

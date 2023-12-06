@@ -15,7 +15,7 @@ async def main(message: cl.Message):
         content="",
     )
 
-    with langwatch.openai.OpenAITracer():
+    with langwatch.openai.OpenAITracer(client):
         completion = client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[
