@@ -5,7 +5,9 @@ import {
   Button,
   Card,
   CardBody,
+  Checkbox,
   Container,
+  Divider,
   FormControl,
   FormLabel,
   HStack,
@@ -26,23 +28,26 @@ import {
   PopoverTrigger,
   Radio,
   Skeleton,
+  Spacer,
   Text,
+  Tooltip,
   VStack,
   useDisclosure,
 } from "@chakra-ui/react";
 import type { Project } from "@prisma/client";
 import { useRouter } from "next/router";
-import React, { createRef, useEffect, useRef, useState } from "react";
+import React, { createRef, useEffect, useMemo, useRef, useState } from "react";
 import {
   ChevronDown,
   ChevronUp,
   Filter,
+  HelpCircle,
   Layers,
   Maximize2,
   Search,
 } from "react-feather";
 import { DashboardLayout } from "../../components/DashboardLayout";
-import { MessageCard } from "../../components/MessageCard";
+import { MessageCard, type ColorMap } from "../../components/MessageCard";
 import {
   PeriodSelector,
   usePeriodSelector,
@@ -103,6 +108,18 @@ function Messages() {
     }
   );
 
+  const topicCounts = useMemo(() => {
+    const topicCounts: Record<string, number> = {};
+    for (const traceGroup of traceGroups.data ?? []) {
+      for (const trace of traceGroup) {
+        for (const topic of trace.topics ?? []) {
+          topicCounts[topic] = (topicCounts[topic] ?? 0) + 1;
+        }
+      }
+    }
+    return topicCounts;
+  }, [traceGroups.data]);
+
   useEffect(() => {
     if (traceChecksQuery.data) {
       const pendingChecks = Object.values(traceChecksQuery.data)
@@ -155,32 +172,77 @@ function Messages() {
           <PeriodSelector period={period} setPeriod={setPeriod} />
         </HStack>
       </VStack>
-      <Container maxWidth="1200" padding={6}>
-        <VStack gap={6}>
-          {project && traceGroups.data && traceGroups.data.length > 0 ? (
-            <ExpandableMessages
-              project={project}
-              traceGroups={traceGroups.data}
-              checksMap={traceChecksQuery.data}
-            />
-          ) : traceGroups.data ? (
-            <Alert status="info">
-              <AlertIcon />
-              No messages found
-            </Alert>
-          ) : traceGroups.isError ? (
-            <Alert status="error">
-              <AlertIcon />
-              An error has occurred trying to load the messages
-            </Alert>
-          ) : (
-            <>
-              <MessageSkeleton />
-              <MessageSkeleton />
-              <MessageSkeleton />
-            </>
-          )}
-        </VStack>
+      <Container maxWidth="1440" padding={6}>
+        <HStack align="start" spacing={10}>
+          <VStack gap={6} width="full">
+            {project && traceGroups.data && traceGroups.data.length > 0 ? (
+              <ExpandableMessages
+                project={project}
+                traceGroups={traceGroups.data}
+                checksMap={traceChecksQuery.data}
+              />
+            ) : traceGroups.data ? (
+              <Alert status="info">
+                <AlertIcon />
+                No messages found
+              </Alert>
+            ) : traceGroups.isError ? (
+              <Alert status="error">
+                <AlertIcon />
+                An error has occurred trying to load the messages
+              </Alert>
+            ) : (
+              <>
+                <MessageSkeleton />
+                <MessageSkeleton />
+                <MessageSkeleton />
+              </>
+            )}
+          </VStack>
+          <Card width="full" maxWidth="400px">
+            <CardBody width="full" padding={8}>
+              <Heading as="h2" size="md">
+                Topics
+              </Heading>
+              <VStack width="full" spacing={4} paddingTop={6} align="start">
+                {traceGroups.data && traceGroups.data.length > 0 ? (
+                  Object.keys(topicCounts).length > 0 ? (
+                    Object.entries(topicCounts)
+                      .sort((a, b) => (a[1] > b[1] ? -1 : 1))
+                      .map(([topic, count]) => (
+                        <React.Fragment key={topic}>
+                          <HStack spacing={4} width="full">
+                            <Checkbox spacing={3} flexGrow={1}>
+                              {topic}
+                            </Checkbox>
+                            <Text color="gray.500" fontSize={12}>
+                              {count}
+                            </Text>
+                          </HStack>
+                          <Divider _last={{ display: "none" }} />
+                        </React.Fragment>
+                      ))
+                  ) : (
+                    <HStack>
+                      <Text>No topics found</Text>
+                      <Tooltip label="Topics are assigned automatically to a group of messages. If you already have enough messages, it may take a day topics to be generated">
+                        <HelpCircle width="14px" />
+                      </Tooltip>
+                    </HStack>
+                  )
+                ) : traceGroups.isLoading ? (
+                  <>
+                    <Skeleton width="full" height="20px" />
+                    <Skeleton width="full" height="20px" />
+                    <Skeleton width="full" height="20px" />
+                  </>
+                ) : (
+                  <Text>No topics found</Text>
+                )}
+              </VStack>
+            </CardBody>
+          </Card>
+        </HStack>
       </Container>
     </DashboardLayout>
   );
@@ -222,6 +284,8 @@ function ExpandableMessages({
     setTimeout(() => setTransitionsEnabled(true), 100);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [traceGroups]);
+
+  const colorMap = useMemo(() => topicColorMap(traceGroups), [traceGroups]);
 
   return traceGroups.map((traceGroup, groupIndex) => {
     const isExpanded = !!expandedGroups[groupIndex];
@@ -355,6 +419,7 @@ function ExpandableMessages({
                         project={project}
                         trace={trace}
                         checksMap={checksMap}
+                        colorMap={colorMap}
                       />
                     )}
                   </CardBody>
@@ -564,3 +629,63 @@ function GroupingSelector() {
     </Menu>
   );
 }
+
+const topicColorMap = (traceGroups: Trace[][]): ColorMap => {
+  const allTopics = new Set(
+    traceGroups.flatMap((traces) =>
+      traces.flatMap((trace) =>
+        trace.topics
+          ? typeof trace.topics === "string"
+            ? [trace.topics]
+            : trace.topics
+          : []
+      )
+    )
+  );
+  const colors: { background: string; color: string }[] = [
+    {
+      background: "blue.50",
+      color: "blue.600",
+    },
+    {
+      background: "orange.100",
+      color: "orange.600",
+    },
+    {
+      background: "green.50",
+      color: "green.600",
+    },
+    {
+      background: "yellow.100",
+      color: "yellow.700",
+    },
+    {
+      background: "purple.50",
+      color: "purple.600",
+    },
+    {
+      background: "teal.50",
+      color: "teal.700",
+    },
+    {
+      background: "cyan.50",
+      color: "cyan.700",
+    },
+    {
+      background: "pink.50",
+      color: "pink.700",
+    },
+  ];
+
+  const colorMap: ColorMap = {};
+  for (const topic of allTopics.values()) {
+    let sum = 0;
+    for (let i = 0; i < topic.length; i++) {
+      sum += topic.charCodeAt(i);
+    }
+
+    colorMap[topic] = colors[sum % colors.length]!;
+  }
+
+  return colorMap;
+};

@@ -71,7 +71,7 @@ const traceMapping: Record<keyof Trace, MappingProperty> = {
       },
     },
   },
-  categories: {
+  topics: {
     type: "keyword",
   },
 };

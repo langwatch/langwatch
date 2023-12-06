@@ -31,16 +31,20 @@ import { CheckPassing } from "./CheckPassing";
 import type { Project } from "@prisma/client";
 import NextLink from "next/link";
 
+export type ColorMap = Record<string, { background: string; color: string }>;
+
 export function MessageCard({
   linkActive,
   project,
   trace,
   checksMap,
+  colorMap,
 }: {
   linkActive: boolean;
   project: Project;
   trace: Trace;
   checksMap: Record<string, TraceCheck[]> | undefined;
+  colorMap: ColorMap;
 }) {
   const traceChecks = checksMap ? checksMap[trace.id] ?? [] : [];
   const checksDone = traceChecks.every(
@@ -53,6 +57,8 @@ export function MessageCard({
     (check) => check.status == "succeeded"
   ).length;
   const totalChecks = traceChecks.length;
+  const topics =
+    (typeof trace.topics == "string" ? [trace.topics] : trace.topics) ?? [];
 
   return (
     <VStack alignItems="flex-start" spacing={4} width="fill">
@@ -120,6 +126,16 @@ export function MessageCard({
             {/* <Tag background="blue.50" color="blue.600">
                     vendor/model
                   </Tag> */}
+            {topics.map((topic) => (
+              <Tag
+                key={topic}
+                background={colorMap[topic]?.background}
+                color={colorMap[topic]?.color}
+                fontSize={12}
+              >
+                {topic}
+              </Tag>
+            ))}
           </HStack>
           <HStack fontSize={12} color="gray.400">
             <Tooltip

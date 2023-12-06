@@ -1,14 +1,14 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import { scheduleCategorization } from "../../trace_checks/queue";
+import { scheduleTopicClustering } from "../../trace_checks/queue";
 
 export default async function handler(
   _req: NextApiRequest,
   res: NextApiResponse
 ) {
   try {
-    await scheduleCategorization();
+    await scheduleTopicClustering();
 
-    res.status(200).json({ message: "Categorization scheduled" });
+    res.status(200).json({ message: "Topic clustering scheduled" });
   } catch (error: any) {
     res.status(500).json({
       message: "Error starting worker",

@@ -4,10 +4,12 @@ import { esClient } from "../server/elasticsearch";
 import { TRACE_INDEX } from "../server/api/routers/traces";
 import { getDebugger } from "../utils/logger";
 
-const debug = getDebugger("langwatch:categorization");
+const debug = getDebugger("langwatch:topicClustering");
 
-export const categorizeProject = async (projectId: string): Promise<void> => {
-  // Fetch last 5k traces for the project in last 3 months, with only id, input fields and their categories
+export const clusterTopicsForProject = async (
+  projectId: string
+): Promise<void> => {
+  // Fetch last 10k traces for the project in last 3 months, with only id, input fields and their topics
   const result = await esClient.search<Trace>({
     index: TRACE_INDEX,
     body: {
@@ -21,16 +23,16 @@ export const categorizeProject = async (projectId: string): Promise<void> => {
             {
               range: {
                 "timestamps.inserted_at": {
-                  gte: "now-3M/M",
-                  lt: "now/M",
+                  gte: "now-3M",
+                  lt: "now",
                 },
               },
             },
           ],
         },
       },
-      _source: ["id", "input", "categories"],
-      size: 5000,
+      _source: ["id", "input", "topics"],
+      size: 10000,
     },
   });
 
@@ -39,13 +41,17 @@ export const categorizeProject = async (projectId: string): Promise<void> => {
     .filter((hit) => hit);
 
   if (traces.length === 0) {
-    debug("No traces found for project", projectId, "skipping categorization");
+    debug(
+      "No traces found for project",
+      projectId,
+      "skipping topic clustering"
+    );
     return;
   }
 
-  debug("Categorizing", traces.length, "traces for project", projectId);
-  const categories = await categorizeTraces({
-    categories: traces.flatMap((trace) => trace.categories ?? []),
+  debug("Clustering topics for", traces.length, "traces on project", projectId);
+  const topics = await clusterTopicsForTraces({
+    topics: traces.flatMap((trace) => trace.topics ?? []),
     file: traces.map((trace) => ({
       _source: {
         id: trace.id,
@@ -54,16 +60,18 @@ export const categorizeProject = async (projectId: string): Promise<void> => {
     })),
   });
 
+  console.log("topics", topics);
+
   debug(
-    "Found categories for",
-    Object.keys(categories).length,
+    "Found topics for",
+    Object.keys(topics).length,
     "traces for project",
     projectId,
-    ", updating ES"
+    "- Updating ElasticSearch"
   );
-  const body = Object.entries(categories).flatMap(([traceId, category]) => [
+  const body = Object.entries(topics).flatMap(([traceId, topic]) => [
     { update: { _id: traceId } },
-    { doc: { categories: category } },
+    { doc: { topics: [topic] } },
   ]);
 
   await esClient.bulk({
@@ -71,23 +79,27 @@ export const categorizeProject = async (projectId: string): Promise<void> => {
     refresh: true,
     body,
   });
+
+  debug("Done! Project", projectId);
 };
 
-export type CategorizationParams = {
-  categories: string[];
+export type TopicClusteringParams = {
+  topics: string[];
   file: { _source: { id: string; input: Trace["input"] } }[];
 };
 
-export const categorizeTraces = async (
-  params: CategorizationParams
+export const clusterTopicsForTraces = async (
+  params: TopicClusteringParams
 ): Promise<Record<string, string>> => {
-  if (!env.CATEGORIZATION_SERVICE_URL) {
-    console.warn("Categorization service URL not set, skipping categorization");
+  if (!env.TOPIC_CLUSTERING_SERVICE_URL) {
+    console.warn(
+      "TopicClustering service URL not set, skipping topicClustering"
+    );
     return {};
   }
 
   const formData = new FormData();
-  formData.append("categories", params.categories.join(",") || " ");
+  formData.append("categories", params.topics.join(",") || " ");
 
   const file = new File(
     [params.file.map((line) => JSON.stringify(line)).join("\n")],
@@ -96,10 +108,15 @@ export const categorizeTraces = async (
   );
   formData.append("file", file);
 
-  const response = await fetch(env.CATEGORIZATION_SERVICE_URL, {
+  const response = await fetch(env.TOPIC_CLUSTERING_SERVICE_URL, {
     method: "POST",
     body: formData,
   });
+  if (!response.ok) {
+    throw new Error(
+      `TopicClustering service returned error: ${await response.text()}`
+    );
+  }
   const topics: Record<string, string> = await response.json();
 
   return topics;

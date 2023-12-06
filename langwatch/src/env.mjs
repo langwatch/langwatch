@@ -31,7 +31,7 @@ export const env = createEnv({
     GOOGLE_CREDENTIALS_JSON: z.string().min(1),
     OPENAI_API_KEY: z.string().min(1),
     SENDGRID_API_KEY: z.string().min(1).optional(),
-    CATEGORIZATION_SERVICE_URL: z.string().min(1).optional(),
+    TOPIC_CLUSTERING_SERVICE_URL: z.string().min(1).optional(),
   },
 
   /**
@@ -66,7 +66,7 @@ export const env = createEnv({
     GOOGLE_CREDENTIALS_JSON: process.env.GOOGLE_CREDENTIALS_JSON,
     OPENAI_API_KEY: process.env.OPENAI_API_KEY,
     SENDGRID_API_KEY: process.env.SENDGRID_API_KEY,
-    CATEGORIZATION_SERVICE_URL: process.env.CATEGORIZATION_SERVICE_URL,
+    TOPIC_CLUSTERING_SERVICE_URL: process.env.TOPIC_CLUSTERING_SERVICE_URL,
   },
   /**
    * Run `build` or `dev` with `SKIP_ENV_VALIDATION` to skip env validation.

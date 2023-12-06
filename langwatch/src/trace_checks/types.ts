@@ -39,7 +39,7 @@ export type TraceCheckJob = {
   project_id: string;
 };
 
-export type CategorizationJob = {
+export type TopicClusteringJob = {
   project_id: string;
 };
 

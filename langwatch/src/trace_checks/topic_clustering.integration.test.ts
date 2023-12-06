@@ -1,10 +1,13 @@
 import { describe, it, expect } from "vitest";
-import { categorizeTraces, type CategorizationParams } from "./categorization";
+import {
+  clusterTopicsForTraces,
+  type TopicClusteringParams,
+} from "./topic_clustering";
 import { getOpenAIEmbeddings } from "../server/embeddings";
 
-describe("Categorization Integration Test", () => {
-  it("cluster tracers into categories", async () => {
-    const traces: CategorizationParams["file"] = [
+describe("Topic Clustering Integration Test", () => {
+  it("cluster tracers into topics", async () => {
+    const traces: TopicClusteringParams["file"] = [
       {
         _source: {
           id: "trace_1",
@@ -37,9 +40,9 @@ describe("Categorization Integration Test", () => {
       );
     }
 
-    const categories = await categorizeTraces({ categories: [], file: traces });
+    const topics = await clusterTopicsForTraces({ topics: [], file: traces });
 
-    expect(categories).toEqual({
+    expect(topics).toEqual({
       trace_1: "Greetings and Salutations",
       trace_2: "Greetings and Salutations",
       trace_3: "Request for Repetition",

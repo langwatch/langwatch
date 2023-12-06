@@ -5,7 +5,7 @@
       "schedule": "*/4 * * * *"
     },
     {
-      "path": "/api/schedule_categorization",
+      "path": "/api/schedule_topic_clustering",
       "schedule": "0 0 * * *"
     }
   ]

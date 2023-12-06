@@ -3,7 +3,7 @@ import { connection } from "../server/redis";
 import { getDebugger } from "../utils/logger";
 import { updateCheckStatusInES } from "./queue";
 import type {
-  CategorizationJob,
+  TopicClusteringJob,
   CheckTypes,
   TraceCheckJob,
   TraceCheckResult,
@@ -15,7 +15,7 @@ import {
 import { env } from "../env.mjs";
 import { getCheckExecutor } from "./backend/registry";
 import { prisma } from "../server/db";
-import { categorizeProject } from "./categorization";
+import { clusterTopicsForProject } from "./topic_clustering";
 
 const debug = getDebugger("langwatch:workers");
 
@@ -111,12 +111,12 @@ export const start = (
 
     debug("Trace checks worker registered");
 
-    const categorizationWorker = new Worker<CategorizationJob, void, string>(
-      "categorization",
+    const topicClusteringWorker = new Worker<TopicClusteringJob, void, string>(
+      "topic_clustering",
       async (job) => {
         debug(`Processing job ${job.id} with data:`, job.data);
 
-        await categorizeProject(job.data.project_id);
+        await clusterTopicsForProject(job.data.project_id);
       },
       {
         connection,
@@ -124,22 +124,22 @@ export const start = (
       }
     );
 
-    categorizationWorker.on("ready", () => {
-      debug("Categorization worker active, waiting for jobs!");
+    topicClusteringWorker.on("ready", () => {
+      debug("Topic clustering worker active, waiting for jobs!");
     });
 
-    categorizationWorker.on("failed", (job, err) => {
+    topicClusteringWorker.on("failed", (job, err) => {
       debug(`Job ${job?.id} failed with error ${err.message}`);
     });
 
-    debug("Categorization checks worker registered");
+    debug("Topic clustering checks worker registered");
 
     if (maxRuntimeMs) {
       setTimeout(() => {
         debug("Max runtime reached, closing worker");
         void (async () => {
           await traceChecksWorker.close();
-          await categorizationWorker.close();
+          await topicClusteringWorker.close();
           resolve(undefined);
         })();
       }, maxRuntimeMs);

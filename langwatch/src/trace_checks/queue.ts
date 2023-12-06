@@ -3,7 +3,7 @@ import { connection } from "../server/redis";
 import { captureError } from "../utils/captureError";
 import { esClient, TRACE_CHECKS_INDEX } from "../server/elasticsearch";
 import type { TraceCheck } from "../server/tracer/types";
-import type { CategorizationJob, CheckTypes, TraceCheckJob } from "./types";
+import type { TopicClusteringJob, CheckTypes, TraceCheckJob } from "./types";
 import crypto from "crypto";
 import { prisma } from "../server/db";
 
@@ -17,8 +17,8 @@ const traceChecksQueue = new Queue<TraceCheckJob, any, string>("trace_checks", {
   },
 });
 
-const categorizationQueue = new Queue<CategorizationJob, void, string>(
-  "categorization",
+const topicClusteringQueue = new Queue<TopicClusteringJob, void, string>(
+  "topic_clustering",
   {
     connection,
     defaultJobOptions: {
@@ -125,7 +125,7 @@ export const updateCheckStatusInES = async ({
   });
 };
 
-export const scheduleCategorization = async () => {
+export const scheduleTopicClustering = async () => {
   const projects = await prisma.project.findMany({
     where: { firstMessage: true },
     select: { id: true },
@@ -141,10 +141,10 @@ export const scheduleCategorization = async () => {
     const yyyymmdd = new Date().toISOString().split("T")[0];
 
     return {
-      name: "categorization",
+      name: "topic_clustering",
       data: { project_id: project.id },
       opts: {
-        jobId: `categorization_${project.id}_${yyyymmdd}`,
+        jobId: `topic_clustering_${project.id}_${yyyymmdd}`,
         delay:
           distributionHour * 60 * 60 * 1000 + distributionMinute * 60 * 1000,
         attempts: 3,
@@ -152,5 +152,5 @@ export const scheduleCategorization = async () => {
     };
   });
 
-  await categorizationQueue.addBulk(jobs);
+  await topicClusteringQueue.addBulk(jobs);
 };
