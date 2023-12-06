@@ -90,6 +90,10 @@ function Messages() {
         typeof router.query.thread_id === "string"
           ? router.query.thread_id
           : undefined,
+      topics:
+        typeof router.query.topics === "string" && router.query.topics
+          ? router.query.topics.split(",")
+          : undefined,
     },
     {
       enabled: !!project,
@@ -197,6 +201,13 @@ function TopicsSelector() {
   const { project } = useOrganizationTeamProject();
   const router = useRouter();
   const { period } = usePeriodSelector(30);
+  const [selectedTopics, setSelectedTopics] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (router.query.topics) {
+      setSelectedTopics((router.query.topics as string).split(","));
+    }
+  }, [router.query.topics]);
 
   const topicCountsQuery = api.traces.getTopicCounts.useQuery(
     {
@@ -214,8 +225,32 @@ function TopicsSelector() {
     },
     {
       enabled: !!project,
+      refetchOnMount: false,
+      refetchOnReconnect: false,
+      refetchOnWindowFocus: false,
     }
   );
+
+  const handleTopicChange = (topic: string, isChecked: boolean) => {
+    setSelectedTopics((prevTopics) => {
+      const newTopics = isChecked
+        ? [...prevTopics, topic]
+        : prevTopics.filter((t) => t !== topic);
+      const topicsQuery =
+        newTopics.length > 0 ? newTopics.join(",") : undefined;
+      void router.push(
+        {
+          query: {
+            ...router.query,
+            topics: topicsQuery,
+          },
+        },
+        undefined,
+        { shallow: true }
+      );
+      return newTopics;
+    });
+  };
 
   return (
     <Card width="full" maxWidth="400px">
@@ -237,7 +272,14 @@ function TopicsSelector() {
                 .map(([topic, count]) => (
                   <React.Fragment key={topic}>
                     <HStack spacing={4} width="full">
-                      <Checkbox spacing={3} flexGrow={1}>
+                      <Checkbox
+                        spacing={3}
+                        flexGrow={1}
+                        isChecked={selectedTopics.includes(topic)}
+                        onChange={(e) =>
+                          handleTopicChange(topic, e.target.checked)
+                        }
+                      >
                         {topic}
                       </Checkbox>
                       <Text color="gray.500" fontSize={12}>

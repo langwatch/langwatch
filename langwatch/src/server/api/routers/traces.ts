@@ -56,6 +56,7 @@ export const tracesRouter = createTRPCRouter({
         groupBy: z.string().optional(),
         user_id: z.string().optional(),
         thread_id: z.string().optional(),
+        topics: z.array(z.string()).optional(),
       })
     )
     .use(checkUserPermissionForProject)
@@ -85,6 +86,7 @@ export const tracesRouter = createTRPCRouter({
         },
         ...(input.user_id ? [{ term: { user_id: input.user_id } }] : []),
         ...(input.thread_id ? [{ term: { thread_id: input.thread_id } }] : []),
+        ...(input.topics ? [{ terms: { topics: input.topics } }] : []),
       ];
 
       //@ts-ignore
@@ -293,7 +295,7 @@ export const tracesRouter = createTRPCRouter({
             topicCounts: {
               terms: {
                 field: "topics",
-                size: 1000, // Adjust size as needed
+                size: 10000,
               },
             },
           },
