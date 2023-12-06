@@ -71,6 +71,9 @@ const traceMapping: Record<keyof Trace, MappingProperty> = {
       },
     },
   },
+  categories: {
+    type: "keyword",
+  },
 };
 
 const spanMapping: Record<keyof ElasticSearchSpan, MappingProperty> = {

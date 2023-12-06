@@ -39,6 +39,10 @@ export type TraceCheckJob = {
   project_id: string;
 };
 
+export type CategorizationJob = {
+  project_id: string;
+};
+
 // Zod type will not be generated for this one, check ts-to-zod.config.js
 export type TraceCheckResult = {
   raw_result: object;

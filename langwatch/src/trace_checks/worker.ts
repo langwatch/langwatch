@@ -2,7 +2,12 @@ import { type Job, Worker } from "bullmq";
 import { connection } from "../server/redis";
 import { getDebugger } from "../utils/logger";
 import { updateCheckStatusInES } from "./queue";
-import type { CheckTypes, TraceCheckJob, TraceCheckResult } from "./types";
+import type {
+  CategorizationJob,
+  CheckTypes,
+  TraceCheckJob,
+  TraceCheckResult,
+} from "./types";
 import {
   esGetSpansByTraceId,
   esGetTraceById,
@@ -10,8 +15,9 @@ import {
 import { env } from "../env.mjs";
 import { getCheckExecutor } from "./backend/registry";
 import { prisma } from "../server/db";
+import { categorizeProject } from "./categorization";
 
-const debug = getDebugger("langwatch:trace_checks:workers");
+const debug = getDebugger("langwatch:workers");
 
 // TODO: allow processing in batch
 export const process = async (
@@ -51,7 +57,7 @@ export const start = (
   return new Promise((resolve) => {
     const processFn = processMock ?? process;
 
-    const worker = new Worker<any, any, CheckTypes>(
+    const traceChecksWorker = new Worker<any, any, CheckTypes>(
       "trace_checks",
       async (job) => {
         if (
@@ -95,23 +101,47 @@ export const start = (
       }
     );
 
-    worker.on("ready", () => {
-      debug("Worker active, waiting for jobs!");
+    traceChecksWorker.on("ready", () => {
+      debug("Trace worker active, waiting for jobs!");
     });
 
-    worker.on("failed", (job, err) => {
+    traceChecksWorker.on("failed", (job, err) => {
       debug(`Job ${job?.id} failed with error ${err.message}`);
     });
 
     debug("Trace checks worker registered");
 
+    const categorizationWorker = new Worker<CategorizationJob, void, string>(
+      "categorization",
+      async (job) => {
+        debug(`Processing job ${job.id} with data:`, job.data);
+
+        await categorizeProject(job.data.project_id);
+      },
+      {
+        connection,
+        concurrency: 3,
+      }
+    );
+
+    categorizationWorker.on("ready", () => {
+      debug("Categorization worker active, waiting for jobs!");
+    });
+
+    categorizationWorker.on("failed", (job, err) => {
+      debug(`Job ${job?.id} failed with error ${err.message}`);
+    });
+
+    debug("Categorization checks worker registered");
+
     if (maxRuntimeMs) {
       setTimeout(() => {
         debug("Max runtime reached, closing worker");
-        void worker.close().then(() => {
-          debug("Worker closed");
+        void (async () => {
+          await traceChecksWorker.close();
+          await categorizationWorker.close();
           resolve(undefined);
-        });
+        })();
       }, maxRuntimeMs);
     }
   });

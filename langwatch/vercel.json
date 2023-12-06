@@ -3,6 +3,10 @@
     {
       "path": "/api/traces_worker",
       "schedule": "*/4 * * * *"
+    },
+    {
+      "path": "/api/schedule_categorization",
+      "schedule": "0 0 * * *"
     }
   ]
 }

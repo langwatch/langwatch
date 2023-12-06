@@ -163,6 +163,7 @@ export type Trace = {
   search_embeddings: {
     openai_embeddings?: number[];
   };
+  categories?: string[];
 };
 
 export type TraceCheck = {

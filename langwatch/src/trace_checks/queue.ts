@@ -3,7 +3,9 @@ import { connection } from "../server/redis";
 import { captureError } from "../utils/captureError";
 import { esClient, TRACE_CHECKS_INDEX } from "../server/elasticsearch";
 import type { TraceCheck } from "../server/tracer/types";
-import type { CheckTypes, TraceCheckJob } from "./types";
+import type { CategorizationJob, CheckTypes, TraceCheckJob } from "./types";
+import crypto from "crypto";
+import { prisma } from "../server/db";
 
 const traceChecksQueue = new Queue<TraceCheckJob, any, string>("trace_checks", {
   connection,
@@ -14,6 +16,19 @@ const traceChecksQueue = new Queue<TraceCheckJob, any, string>("trace_checks", {
     },
   },
 });
+
+const categorizationQueue = new Queue<CategorizationJob, void, string>(
+  "categorization",
+  {
+    connection,
+    defaultJobOptions: {
+      backoff: {
+        type: "exponential",
+        delay: 5000,
+      },
+    },
+  }
+);
 
 export const scheduleTraceCheck = async ({
   check_id,
@@ -108,4 +123,34 @@ export const updateCheckStatusInES = async ({
     },
     refresh: true,
   });
+};
+
+export const scheduleCategorization = async () => {
+  const projects = await prisma.project.findMany({
+    where: { firstMessage: true },
+    select: { id: true },
+  });
+
+  const jobs = projects.map((project) => {
+    const hash = crypto.createHash("sha256");
+    hash.update(project.id);
+    const hashedValue = hash.digest("hex");
+    const hashNumber = parseInt(hashedValue, 16);
+    const distributionHour = hashNumber % (24 * 60);
+    const distributionMinute = hashNumber % 60;
+    const yyyymmdd = new Date().toISOString().split("T")[0];
+
+    return {
+      name: "categorization",
+      data: { project_id: project.id },
+      opts: {
+        jobId: `categorization_${project.id}_${yyyymmdd}`,
+        delay:
+          distributionHour * 60 * 60 * 1000 + distributionMinute * 60 * 1000,
+        attempts: 3,
+      },
+    };
+  });
+
+  await categorizationQueue.addBulk(jobs);
 };

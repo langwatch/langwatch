@@ -325,3 +325,5 @@ const groupTraces = (groupBy: string | undefined, traces: Trace[]) => {
 
   return groups;
 };
+
+export { TRACE_INDEX };

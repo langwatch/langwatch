@@ -3,6 +3,9 @@ import { getDebugger } from "./utils/logger";
 
 loadEnvConfig(process.cwd());
 
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const { connection: redis } = require("./server/redis");
+
 const debug = getDebugger("langwatch:task");
 
 const TASKS = {
@@ -31,6 +34,8 @@ const runAsync = async () => {
   } catch (e) {
     debug(`SCRIPT RUNNER: failed to execute ${taskName}`);
     debug(e);
+  } finally {
+    redis.disconnect();
   }
 };
 
