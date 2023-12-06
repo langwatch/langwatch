@@ -248,6 +248,70 @@ export const tracesRouter = createTRPCRouter({
 
       return checksPerTrace;
     }),
+  getTopicCounts: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        startDate: z.number(),
+        endDate: z.number(),
+        user_id: z.string().optional(),
+        thread_id: z.string().optional(),
+      })
+    )
+    .use(checkUserPermissionForProject)
+    .query(async ({ input }) => {
+      const { projectId, startDate, endDate, user_id, thread_id } = input;
+
+      const queryConditions = [
+        {
+          term: { project_id: projectId },
+        },
+        {
+          range: {
+            "timestamps.started_at": {
+              gte: startDate,
+              lte: endDate,
+              format: "epoch_millis",
+            },
+          },
+        },
+        ...(user_id ? [{ term: { user_id: user_id } }] : []),
+        ...(thread_id ? [{ term: { thread_id: thread_id } }] : []),
+      ];
+
+      const topicCountsResult = await esClient.search<Trace>({
+        index: TRACE_INDEX,
+        size: 0, // We do not need the actual documents, just the aggregations
+        body: {
+          query: {
+            //@ts-ignore
+            bool: {
+              must: queryConditions,
+            },
+          },
+          aggs: {
+            topicCounts: {
+              terms: {
+                field: "topics",
+                size: 1000, // Adjust size as needed
+              },
+            },
+          },
+        },
+      });
+
+      const buckets: { key: string; doc_count: number }[] =
+        (topicCountsResult.aggregations?.topicCounts as any)?.buckets ?? [];
+      const topicCounts = buckets.reduce(
+        (acc, bucket) => {
+          acc[bucket.key] = bucket.doc_count;
+          return acc;
+        },
+        {} as Record<string, number>
+      );
+
+      return topicCounts;
+    }),
 });
 
 const groupTraces = (groupBy: string | undefined, traces: Trace[]) => {

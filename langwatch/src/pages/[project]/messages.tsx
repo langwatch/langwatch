@@ -28,7 +28,6 @@ import {
   PopoverTrigger,
   Radio,
   Skeleton,
-  Spacer,
   Text,
   Tooltip,
   VStack,
@@ -107,18 +106,6 @@ function Messages() {
       refetchOnWindowFocus: false,
     }
   );
-
-  const topicCounts = useMemo(() => {
-    const topicCounts: Record<string, number> = {};
-    for (const traceGroup of traceGroups.data ?? []) {
-      for (const trace of traceGroup) {
-        for (const topic of trace.topics ?? []) {
-          topicCounts[topic] = (topicCounts[topic] ?? 0) + 1;
-        }
-      }
-    }
-    return topicCounts;
-  }, [traceGroups.data]);
 
   useEffect(() => {
     if (traceChecksQuery.data) {
@@ -199,52 +186,81 @@ function Messages() {
               </>
             )}
           </VStack>
-          <Card width="full" maxWidth="400px">
-            <CardBody width="full" padding={8}>
-              <Heading as="h2" size="md">
-                Topics
-              </Heading>
-              <VStack width="full" spacing={4} paddingTop={6} align="start">
-                {traceGroups.data && traceGroups.data.length > 0 ? (
-                  Object.keys(topicCounts).length > 0 ? (
-                    Object.entries(topicCounts)
-                      .sort((a, b) => (a[1] > b[1] ? -1 : 1))
-                      .map(([topic, count]) => (
-                        <React.Fragment key={topic}>
-                          <HStack spacing={4} width="full">
-                            <Checkbox spacing={3} flexGrow={1}>
-                              {topic}
-                            </Checkbox>
-                            <Text color="gray.500" fontSize={12}>
-                              {count}
-                            </Text>
-                          </HStack>
-                          <Divider _last={{ display: "none" }} />
-                        </React.Fragment>
-                      ))
-                  ) : (
-                    <HStack>
-                      <Text>No topics found</Text>
-                      <Tooltip label="Topics are assigned automatically to a group of messages. If you already have enough messages, it may take a day topics to be generated">
-                        <HelpCircle width="14px" />
-                      </Tooltip>
-                    </HStack>
-                  )
-                ) : traceGroups.isLoading ? (
-                  <>
-                    <Skeleton width="full" height="20px" />
-                    <Skeleton width="full" height="20px" />
-                    <Skeleton width="full" height="20px" />
-                  </>
-                ) : (
-                  <Text>No topics found</Text>
-                )}
-              </VStack>
-            </CardBody>
-          </Card>
+          <TopicsSelector />
         </HStack>
       </Container>
     </DashboardLayout>
+  );
+}
+
+function TopicsSelector() {
+  const { project } = useOrganizationTeamProject();
+  const router = useRouter();
+  const { period } = usePeriodSelector(30);
+
+  const topicCountsQuery = api.traces.getTopicCounts.useQuery(
+    {
+      projectId: project?.id ?? "",
+      startDate: period.startDate.getTime(),
+      endDate: period.endDate.getTime(),
+      user_id:
+        typeof router.query.user_id === "string"
+          ? router.query.user_id
+          : undefined,
+      thread_id:
+        typeof router.query.thread_id === "string"
+          ? router.query.thread_id
+          : undefined,
+    },
+    {
+      enabled: !!project,
+    }
+  );
+
+  return (
+    <Card width="full" maxWidth="400px">
+      <CardBody width="full" padding={8}>
+        <Heading as="h2" size="md">
+          Topics
+        </Heading>
+        <VStack width="full" spacing={4} paddingTop={6} align="start">
+          {topicCountsQuery.isLoading ? (
+            <>
+              <Skeleton width="full" height="20px" />
+              <Skeleton width="full" height="20px" />
+              <Skeleton width="full" height="20px" />
+            </>
+          ) : topicCountsQuery.data ? (
+            Object.keys(topicCountsQuery.data).length > 0 ? (
+              Object.entries(topicCountsQuery.data)
+                .sort((a, b) => (a[1] > b[1] ? -1 : 1))
+                .map(([topic, count]) => (
+                  <React.Fragment key={topic}>
+                    <HStack spacing={4} width="full">
+                      <Checkbox spacing={3} flexGrow={1}>
+                        {topic}
+                      </Checkbox>
+                      <Text color="gray.500" fontSize={12}>
+                        {count}
+                      </Text>
+                    </HStack>
+                    <Divider _last={{ display: "none" }} />
+                  </React.Fragment>
+                ))
+            ) : (
+              <HStack>
+                <Text>No topics found</Text>
+                <Tooltip label="Topics are assigned automatically to a group of messages. If you already have enough messages, it may take a day topics to be generated">
+                  <HelpCircle width="14px" />
+                </Tooltip>
+              </HStack>
+            )
+          ) : (
+            <Text>No topics found</Text>
+          )}
+        </VStack>
+      </CardBody>
+    </Card>
   );
 }
 
