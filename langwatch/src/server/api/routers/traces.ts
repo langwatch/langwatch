@@ -13,6 +13,45 @@ import { getOpenAIEmbeddings } from "../../embeddings";
 import type { ElasticSearchSpan, Trace, TraceCheck } from "../../tracer/types";
 import { checkUserPermissionForProject } from "../permission";
 
+const sharedTraceFilterInput = z.object({
+  projectId: z.string(),
+  startDate: z.number(),
+  endDate: z.number(),
+  user_id: z.string().optional(),
+  thread_id: z.string().optional(),
+});
+
+const generateQueryConditions = ({
+  projectId,
+  startDate,
+  endDate,
+  user_id,
+  thread_id,
+}: z.infer<typeof sharedTraceFilterInput>) => {
+  // If end date is very close to now, force it to be now, to allow frontend to keep refetching for new messages
+  const endDate_ =
+    new Date().getTime() - endDate < 1000 * 60 * 60
+      ? new Date().getTime()
+      : endDate;
+
+  return [
+    {
+      term: { project_id: projectId },
+    },
+    {
+      range: {
+        "timestamps.started_at": {
+          gte: startDate,
+          lte: endDate_,
+          format: "epoch_millis",
+        },
+      },
+    },
+    ...(user_id ? [{ term: { user_id: user_id } }] : []),
+    ...(thread_id ? [{ term: { thread_id: thread_id } }] : []),
+  ];
+};
+
 export const esGetTraceById = async (
   traceId: string
 ): Promise<Trace | undefined> => {
@@ -48,14 +87,9 @@ export const esGetSpansByTraceId = async (
 export const tracesRouter = createTRPCRouter({
   getAllForProject: protectedProcedure
     .input(
-      z.object({
-        projectId: z.string(),
-        startDate: z.number(),
-        endDate: z.number(),
+      sharedTraceFilterInput.extend({
         query: z.string().optional(),
         groupBy: z.string().optional(),
-        user_id: z.string().optional(),
-        thread_id: z.string().optional(),
         topics: z.array(z.string()).optional(),
       })
     )
@@ -65,27 +99,8 @@ export const tracesRouter = createTRPCRouter({
         ? await getOpenAIEmbeddings(input.query)
         : [];
 
-      // If end date is very close to now, force it to be now, to allow frontend to keep refetching for new messages
-      const endDate =
-        new Date().getTime() - input.endDate < 1000 * 60 * 60
-          ? new Date().getTime()
-          : input.endDate;
-
       const queryConditions = [
-        {
-          term: { project_id: input.projectId },
-        },
-        {
-          range: {
-            "timestamps.started_at": {
-              gte: input.startDate,
-              lte: endDate,
-              format: "epoch_millis",
-            },
-          },
-        },
-        ...(input.user_id ? [{ term: { user_id: input.user_id } }] : []),
-        ...(input.thread_id ? [{ term: { thread_id: input.thread_id } }] : []),
+        ...generateQueryConditions(input),
         ...(input.topics ? [{ terms: { topics: input.topics } }] : []),
       ];
 
@@ -251,35 +266,10 @@ export const tracesRouter = createTRPCRouter({
       return checksPerTrace;
     }),
   getTopicCounts: protectedProcedure
-    .input(
-      z.object({
-        projectId: z.string(),
-        startDate: z.number(),
-        endDate: z.number(),
-        user_id: z.string().optional(),
-        thread_id: z.string().optional(),
-      })
-    )
+    .input(sharedTraceFilterInput)
     .use(checkUserPermissionForProject)
     .query(async ({ input }) => {
-      const { projectId, startDate, endDate, user_id, thread_id } = input;
-
-      const queryConditions = [
-        {
-          term: { project_id: projectId },
-        },
-        {
-          range: {
-            "timestamps.started_at": {
-              gte: startDate,
-              lte: endDate,
-              format: "epoch_millis",
-            },
-          },
-        },
-        ...(user_id ? [{ term: { user_id: user_id } }] : []),
-        ...(thread_id ? [{ term: { thread_id: thread_id } }] : []),
-      ];
+      const queryConditions = generateQueryConditions(input);
 
       const topicCountsResult = await esClient.search<Trace>({
         index: TRACE_INDEX,
