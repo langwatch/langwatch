@@ -352,12 +352,24 @@ class OpenAIChatCompletionTracer(BaseContextTracer):
                         "role": delta.role,
                         "content": delta.content,
                     }
-                    # TODO: tool calls
                     if delta.function_call:
                         chat_message["function_call"] = {
                             "name": delta.function_call.name or "",
                             "arguments": delta.function_call.arguments or "",
                         }
+                    if delta.tool_calls:
+                        chat_message["tool_calls"] = [
+                            {
+                                "id": tool.id or "",
+                                "type": tool.type or "",
+                                "function": {
+                                    "name": safe_get(tool, "function", "name") or "",
+                                    "arguments": safe_get(tool, "function", "arguments")
+                                    or "",
+                                },
+                            }
+                            for tool in delta.tool_calls
+                        ]
                     if index not in chat_outputs:
                         chat_outputs[index] = []
                     chat_outputs[index].append(chat_message)
@@ -370,6 +382,21 @@ class OpenAIChatCompletionTracer(BaseContextTracer):
                         last_item["function_call"]["arguments"] = current_arguments + (
                             delta.function_call.arguments or ""
                         )
+                elif delta.tool_calls:
+                    last_item = chat_outputs[index][-1]
+                    if (
+                        "tool_calls" in last_item
+                        and last_item["tool_calls"]
+                        and len(last_item["tool_calls"]) > 0
+                    ):
+                        for tool in delta.tool_calls:
+                            last_item["tool_calls"][tool.index]["function"][
+                                "arguments"
+                            ] = last_item["tool_calls"][tool.index]["function"].get(
+                                "arguments", ""
+                            ) + (
+                                safe_get(tool, "function", "arguments") or ""
+                            )
                 elif delta.content:
                     chat_outputs[index][-1]["content"] = (
                         chat_outputs[index][-1].get("content", "") or ""
@@ -448,6 +475,12 @@ class OpenAIChatCompletionTracer(BaseContextTracer):
         functions = kwargs.get("functions", None)
         if functions:
             params["functions"] = functions
+        tools = kwargs.get("tools", None)
+        if tools:
+            params["tools"] = tools
+        tool_choice = kwargs.get("tool_choice", None)
+        if tool_choice:
+            params["tool_choice"] = tool_choice
         return LLMSpan(
             type="llm",
             id=f"span_{nanoid.generate()}",

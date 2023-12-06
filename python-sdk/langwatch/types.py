@@ -9,10 +9,17 @@ class FunctionCall(TypedDict, total=False):
     arguments: str
 
 
+class ToolCall(TypedDict):
+    id: str
+    type: str
+    function: FunctionCall
+
+
 class ChatMessage(TypedDict, total=False):
     role: ChatRole
     content: Optional[str]
     function_call: Optional[FunctionCall]
+    tool_calls: Optional[List[ToolCall]]
 
 
 class TypedValueChatMessages(TypedDict):
@@ -59,6 +66,8 @@ class SpanParams(TypedDict, total=False):
     temperature: float
     stream: bool
     functions: Optional[List[Dict[str, Any]]]
+    tools: Optional[List[Dict[str, Any]]]
+    tool_choice: Optional[str]
 
 
 class SpanTimestamps(TypedDict, total=False):

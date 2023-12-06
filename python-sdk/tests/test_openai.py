@@ -11,6 +11,7 @@ import requests_mock
 
 from tests.utils import *
 from pytest_httpx import HTTPXMock
+from openai.types.chat import ChatCompletionToolParam
 
 client = OpenAI()
 async_client = AsyncOpenAI()
@@ -700,6 +701,210 @@ class TestOpenAIChatCompletionTracer:
                             "name": "Calculator",
                         },
                         "content": None,
+                    }
+                ],
+            }
+        ]
+
+    @freeze_time("2022-01-01", auto_tick_seconds=15)
+    def test_trace_session_captures_openai_tool_calls(
+        self, httpx_mock: HTTPXMock, requests_mock: requests_mock.Mocker
+    ):
+        openai_mocks = [
+            {
+                "id": "chatcmpl-8Sf6QZXVnDyjAIQcmjcRiYeMKY49D",
+                "object": "chat.completion",
+                "created": 1701841874,
+                "model": "gpt-3.5-turbo-0613",
+                "choices": [
+                    {
+                        "index": 0,
+                        "message": {
+                            "role": "assistant",
+                            "content": None,
+                            "tool_calls": [
+                                {
+                                    "id": "call_hF48nuhUAwKVFQ3JZKdcSDZU",
+                                    "type": "function",
+                                    "function": {
+                                        "name": "get_current_weather",
+                                        "arguments": '{\n  "location": "Boston"\n}',
+                                    },
+                                }
+                            ],
+                        },
+                        "finish_reason": "tool_calls",
+                    }
+                ],
+                "usage": {
+                    "prompt_tokens": 82,
+                    "completion_tokens": 16,
+                    "total_tokens": 98,
+                },
+                "system_fingerprint": None,
+            }
+        ]
+        requests_mock.post(langwatch.endpoint, json={})
+        httpx_mock.add_callback(
+            one_mock_at_a_time(openai_mocks),
+            url="https://api.openai.com/v1/chat/completions",
+        )
+
+        tools : List[ChatCompletionToolParam] = [
+            {
+                "type": "function",
+                "function": {
+                    "name": "get_current_weather",
+                    "description": "Get the current weather in a given location",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "location": {
+                                "type": "string",
+                                "description": "The city and state, e.g. San Francisco, CA",
+                            },
+                            "unit": {
+                                "type": "string",
+                                "enum": ["celsius", "fahrenheit"],
+                            },
+                        },
+                        "required": ["location"],
+                    },
+                },
+            }
+        ]
+        with langwatch.openai.OpenAIChatCompletionTracer(client):
+            client.chat.completions.create(
+                model="gpt-3.5-turbo",
+                messages=[
+                    {"role": "user", "content": "What is the weather like in Boston?"}
+                ],
+                tools=tools,
+                tool_choice="auto",
+            )
+
+        time.sleep(0.01)
+        first_span = requests_mock.request_history[0].json()["spans"][0]
+        assert first_span["params"]["tools"] == tools
+        assert first_span["params"]["tool_choice"] == "auto"
+        assert first_span["outputs"] == [
+            {
+                "type": "chat_messages",
+                "value": [
+                    {
+                        "role": "assistant",
+                        "content": None,
+                        "function_call": None,
+                        "tool_calls": [
+                            {
+                                "id": "call_hF48nuhUAwKVFQ3JZKdcSDZU",
+                                "type": "function",
+                                "function": {
+                                    "name": "get_current_weather",
+                                    "arguments": '{\n  "location": "Boston"\n}',
+                                },
+                            }
+                        ],
+                    }
+                ],
+            }
+        ]
+
+    @freeze_time("2022-01-01", auto_tick_seconds=15)
+    def test_trace_session_captures_openai_streams_with_tools(
+        self, httpx_mock: HTTPXMock, requests_mock: requests_mock.Mocker
+    ):
+        requests_mock.post(langwatch.endpoint, json={})
+        httpx_mock.add_response(
+            stream=IteratorStream(
+                [
+                    str.encode(line + "\n\n")
+                    for line in """data: {"id":"chatcmpl-8Sf3okV8aZ95sKdzYJA9bVIU8aVts","object":"chat.completion.chunk","created":1701841712,"model":"gpt-3.5-turbo-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"role":"assistant","content":null,"tool_calls":[{"index":0,"id":"call_oTTUQg7fmAiF6MlGyQ2yLrh1","type":"function","function":{"name":"get_current_weather","arguments":""}}]},"finish_reason":null}]}
+
+data: {"id":"chatcmpl-8Sf3okV8aZ95sKdzYJA9bVIU8aVts","object":"chat.completion.chunk","created":1701841712,"model":"gpt-3.5-turbo-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"{\\n"}}]},"finish_reason":null}]}
+
+data: {"id":"chatcmpl-8Sf3okV8aZ95sKdzYJA9bVIU8aVts","object":"chat.completion.chunk","created":1701841712,"model":"gpt-3.5-turbo-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"\\""}}]},"finish_reason":null}]}
+
+data: {"id":"chatcmpl-8Sf3okV8aZ95sKdzYJA9bVIU8aVts","object":"chat.completion.chunk","created":1701841712,"model":"gpt-3.5-turbo-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"location"}}]},"finish_reason":null}]}
+
+data: {"id":"chatcmpl-8Sf3okV8aZ95sKdzYJA9bVIU8aVts","object":"chat.completion.chunk","created":1701841712,"model":"gpt-3.5-turbo-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"\\":"}}]},"finish_reason":null}]}
+
+data: {"id":"chatcmpl-8Sf3okV8aZ95sKdzYJA9bVIU8aVts","object":"chat.completion.chunk","created":1701841712,"model":"gpt-3.5-turbo-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":" \\""}}]},"finish_reason":null}]}
+
+data: {"id":"chatcmpl-8Sf3okV8aZ95sKdzYJA9bVIU8aVts","object":"chat.completion.chunk","created":1701841712,"model":"gpt-3.5-turbo-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"Boston"}}]},"finish_reason":null}]}
+
+data: {"id":"chatcmpl-8Sf3okV8aZ95sKdzYJA9bVIU8aVts","object":"chat.completion.chunk","created":1701841712,"model":"gpt-3.5-turbo-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":","}}]},"finish_reason":null}]}
+
+data: {"id":"chatcmpl-8Sf3okV8aZ95sKdzYJA9bVIU8aVts","object":"chat.completion.chunk","created":1701841712,"model":"gpt-3.5-turbo-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":" MA"}}]},"finish_reason":null}]}
+
+data: {"id":"chatcmpl-8Sf3okV8aZ95sKdzYJA9bVIU8aVts","object":"chat.completion.chunk","created":1701841712,"model":"gpt-3.5-turbo-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"\\"\\n"}}]},"finish_reason":null}]}
+
+data: {"id":"chatcmpl-8Sf3okV8aZ95sKdzYJA9bVIU8aVts","object":"chat.completion.chunk","created":1701841712,"model":"gpt-3.5-turbo-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"}"}}]},"finish_reason":null}]}
+
+data: {"id":"chatcmpl-8Sf3okV8aZ95sKdzYJA9bVIU8aVts","object":"chat.completion.chunk","created":1701841712,"model":"gpt-3.5-turbo-0613","system_fingerprint":null,"choices":[{"index":0,"delta":{},"finish_reason":"tool_calls"}]}
+
+data: [DONE]""".split(
+                        "\n\n"
+                    )
+                ]
+            ),
+            url="https://api.openai.com/v1/chat/completions",
+        )
+
+        with langwatch.openai.OpenAIChatCompletionTracer(client):
+            response = client.chat.completions.create(
+                model="gpt-3.5-turbo",
+                messages=[
+                    {"role": "user", "content": "What is the weather like in Boston?"}
+                ],
+                stream=True,
+                tools=[
+                    {
+                        "type": "function",
+                        "function": {
+                            "name": "get_current_weather",
+                            "description": "Get the current weather in a given location",
+                            "parameters": {
+                                "type": "object",
+                                "properties": {
+                                    "location": {
+                                        "type": "string",
+                                        "description": "The city and state, e.g. San Francisco, CA",
+                                    },
+                                    "unit": {
+                                        "type": "string",
+                                        "enum": ["celsius", "fahrenheit"],
+                                    },
+                                },
+                                "required": ["location"],
+                            },
+                        },
+                    }
+                ],
+                tool_choice="auto",
+            )
+            for _ in response:
+                pass  # just to consume the stream
+
+        time.sleep(0.01)
+        first_span = requests_mock.request_history[0].json()["spans"][0]
+        assert first_span["outputs"] == [
+            {
+                "type": "chat_messages",
+                "value": [
+                    {
+                        "role": "assistant",
+                        "content": None,
+                        "tool_calls": [
+                            {
+                                "id": "call_oTTUQg7fmAiF6MlGyQ2yLrh1",
+                                "type": "function",
+                                "function": {
+                                    "name": "get_current_weather",
+                                    "arguments": '{\n"location": "Boston, MA"\n}',
+                                },
+                            }
+                        ],
                     }
                 ],
             }
