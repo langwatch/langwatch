@@ -23,6 +23,7 @@ import { api } from "../../../utils/api";
 import { formatMilliseconds } from "../../../utils/formatMilliseconds";
 import { isNotFound } from "../../../utils/trpcError";
 import numeral from "numeral";
+import dynamic from "next/dynamic";
 
 type SpanWithChildren = ElasticSearchSpan & { children: SpanWithChildren[] };
 
@@ -478,7 +479,7 @@ export default function Trace() {
                     width="full"
                     whiteSpace="pre-wrap"
                   >
-                    {span.input?.value.toString()}
+                    <RenderInputOutput value={span.input?.value} />
                   </Box>
                 </VStack>
                 {span.error ? (
@@ -526,7 +527,7 @@ export default function Trace() {
                         width="full"
                         whiteSpace="pre-wrap"
                       >
-                        {output.value.toString()}
+                        <RenderInputOutput value={output.value} />
                       </Box>
                     ))}
                   </VStack>
@@ -548,5 +549,32 @@ export default function Trace() {
         )}
       </VStack>
     </DashboardLayout>
+  );
+}
+
+function RenderInputOutput({ value }: { value: string | undefined }) {
+  const ReactJson = dynamic(() => import("@microlink/react-json-view"), {
+    loading: () => <div />,
+  });
+
+  let json: object | undefined;
+  try {
+    if (value) {
+      json = JSON.parse(value);
+    }
+  } catch (e) {}
+
+  return typeof document !== "undefined" && json ? (
+    <ReactJson
+      src={json}
+      name={false}
+      displayDataTypes={false}
+      displayObjectSize={false}
+      enableClipboard={false}
+      //@ts-ignore
+      displayArrayKey={false}
+    />
+  ) : (
+    <Text>{value ?? ""}</Text>
   );
 }
