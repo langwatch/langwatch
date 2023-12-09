@@ -519,6 +519,14 @@ function SearchInput() {
         borderRadius={0}
         value={query}
         onChange={(e) => setQuery(e.target.value)}
+        onBlur={() => {
+          void router.push({
+            query: {
+              ...router.query,
+              query: query ? query : undefined,
+            },
+          });
+        }}
         autoFocus={!!router.query.query}
       />
     </form>
