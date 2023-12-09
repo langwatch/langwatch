@@ -55,7 +55,7 @@ export const ProjectIntegration = () => {
           align="flex-start"
           spacing={6}
           borderBottomWidth={1}
-          borderBottomColor="gray.300"
+          borderBottomColor="gray.400"
           width="full"
           paddingTop={6}
           paddingBottom={6}

@@ -1,4 +1,4 @@
-import Trace from "../[trace]";
+import Trace from ".";
 
 export default function Span() {
   return <Trace />;

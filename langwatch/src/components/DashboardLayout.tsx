@@ -318,7 +318,7 @@ export const DashboardLayout = ({
           gap={6}
           background="white"
           borderBottomWidth="1px"
-          borderBottomColor="gray.300"
+          borderBottomColor="gray.400"
         >
           <ProjectSelector organizations={organizations} project={project} />
           <Hide below="lg">

@@ -304,6 +304,41 @@ export const tracesRouter = createTRPCRouter({
 
       return topicCounts;
     }),
+  getTracesByThreadId: protectedProcedure
+    .input(z.object({ projectId: z.string(), threadId: z.string() }))
+    .use(checkUserPermissionForProject)
+    .query(async ({ input }) => {
+      const { projectId, threadId } = input;
+
+      const tracesResult = await esClient.search<Trace>({
+        index: TRACE_INDEX,
+        body: {
+          query: {
+            //@ts-ignore
+            bool: {
+              filter: [
+                { term: { project_id: projectId } },
+                { term: { thread_id: threadId } },
+              ],
+            },
+          },
+          sort: [
+            {
+              "timestamps.started_at": {
+                order: "asc",
+              },
+            },
+          ],
+          size: 1000,
+        },
+      });
+
+      const traces = tracesResult.hits.hits
+        .map((hit) => hit._source!)
+        .filter((x) => x);
+
+      return traces;
+    }),
 });
 
 const groupTraces = (groupBy: string | undefined, traces: Trace[]) => {
@@ -320,7 +355,7 @@ const groupTraces = (groupBy: string | undefined, traces: Trace[]) => {
       return !!trace.user_id;
     }
     if (groupBy === "thread_id") {
-      return !!trace.user_id;
+      return !!trace.thread_id;
     }
 
     return false;
@@ -349,7 +384,7 @@ const groupTraces = (groupBy: string | undefined, traces: Trace[]) => {
       return trace.user_id === member.user_id;
     }
     if (groupBy === "thread_id") {
-      return trace.user_id === member.user_id;
+      return trace.thread_id === member.thread_id;
     }
 
     return false;

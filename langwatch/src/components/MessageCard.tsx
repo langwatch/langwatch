@@ -143,7 +143,7 @@ export function MessageCard({
             >
               <Text
                 borderBottomWidth="1px"
-                borderBottomColor="gray.300"
+                borderBottomColor="gray.400"
                 borderBottomStyle="dashed"
               >
                 {formatDistanceToNow(new Date(trace.timestamps.started_at), {
