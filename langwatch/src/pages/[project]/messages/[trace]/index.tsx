@@ -1,144 +1,206 @@
-import { useOrganizationTeamProject } from "../../../../hooks/useOrganizationTeamProject";
-import { api } from "../../../../utils/api";
 import {
-  TraceDetailsLayout,
-  useTraceFromUrl,
-} from "../../../../components/traces/TraceDetailsLayout";
-import {
-  Alert,
-  AlertIcon,
   Avatar,
   Box,
-  HStack,
-  Skeleton,
-  Text,
-  VStack,
   Container,
-  Spinner,
-  Fade,
+  HStack,
+  Heading,
+  Skeleton,
+  Slide,
   Spacer,
+  Spinner,
+  Text,
   Tooltip,
+  VStack,
 } from "@chakra-ui/react";
-import { TraceSummary } from "../../../../components/traces/Summary";
-import type { Trace } from "../../../../server/tracer/types";
+import { format, formatDistanceToNow } from "date-fns";
+import ErrorPage from "next/error";
+import { useRouter } from "next/router";
+import React, {
+  useEffect,
+  useRef,
+  useState,
+  type PropsWithChildren,
+} from "react";
 import Markdown from "react-markdown";
-import React, { useEffect, useRef } from "react";
-import { formatDistanceToNow } from "date-fns";
+import { DashboardLayout } from "../../../../components/DashboardLayout";
+import { SpanTree } from "../../../../components/traces/SpanTree";
+import { TraceSummary } from "../../../../components/traces/Summary";
+import { useOrganizationTeamProject } from "../../../../hooks/useOrganizationTeamProject";
+import { useTraceDetailsState } from "../../../../hooks/useTraceDetailsState";
+import type { Trace } from "../../../../server/tracer/types";
+import { api } from "../../../../utils/api";
+import { isNotFound } from "../../../../utils/trpcError";
 
-export default function Conversation() {
-  const { trace } = useTraceFromUrl();
+export default function TraceDetails() {
+  const { traceId, trace, openTab } = useTraceDetailsState();
+  const [threadId, setThreadId] = useState<string | undefined>(undefined);
+
+  useEffect(() => {
+    if (trace.data?.thread_id) {
+      setThreadId(trace.data.thread_id);
+    }
+  }, [trace.data?.thread_id]);
+
+  if (isNotFound(trace.error)) {
+    return <ErrorPage statusCode={404} />;
+  }
+
+  return (
+    <DashboardLayout backgroundColor="white">
+      <VStack
+        maxWidth="1600"
+        paddingY={6}
+        paddingX={12}
+        alignSelf="flex-start"
+        alignItems="flex-start"
+        width="full"
+        spacing={10}
+      >
+        <VStack spacing={6} alignItems="flex-start" width="full">
+          <HStack
+            gap={5}
+            align={{ base: "start", md: "center" }}
+            flexDirection={{ base: "column", md: "row" }}
+          >
+            <Heading as="h1">Message Details</Heading>
+            <Text color="gray.400" fontFamily="mono">
+              (ID: {traceId})
+            </Text>
+          </HStack>
+          <TraceSummary />
+        </VStack>
+      </VStack>
+      <Box
+        alignSelf="flex-start"
+        alignItems="flex-start"
+        paddingX={12}
+        width="100%"
+        maxWidth={openTab ? "3200" : "1600"}
+      >
+        <HStack
+          align="start"
+          width="full"
+          spacing={0}
+          border="1px solid"
+          borderColor="gray.200"
+          alignItems="stretch"
+          height="100%"
+        >
+          <Box
+            transition="all 0.3s ease-in-out"
+            width={openTab ? "30%" : "full"}
+            maxHeight="100vh"
+            overflowX="hidden"
+            overflowY="auto"
+            position="sticky"
+            top={0}
+            id="conversation-scroll-container"
+          >
+            <Conversation threadId={threadId} />
+          </Box>
+          {openTab === "spans" && (
+            <Slide
+              transition={{ enter: { duration: 0.3, ease: "easeInOut" } }}
+              direction="right"
+              in={!!openTab}
+              style={{ position: "static" }}
+            >
+              <Box
+                background="white"
+                maxWidth="1600px"
+                borderLeft="1px solid"
+                borderColor="gray.200"
+                height="100%"
+              >
+                <SpanTree />
+              </Box>
+            </Slide>
+          )}
+        </HStack>
+      </Box>
+    </DashboardLayout>
+  );
+}
+
+function Conversation({ threadId }: { threadId?: string }) {
+  const { traceId, trace, openTab } = useTraceDetailsState();
   const { project } = useOrganizationTeamProject();
 
   const currentTraceRef = useRef<HTMLDivElement>(null);
   const threadTraces = api.traces.getTracesByThreadId.useQuery(
     {
       projectId: project?.id ?? "",
-      threadId: trace.data?.thread_id ?? "",
+      threadId: threadId ?? "",
     },
     {
-      enabled: !!project && !!trace.data?.thread_id,
+      enabled: !!project && !!threadId,
     }
   );
 
   useEffect(() => {
     if (threadTraces.data && threadTraces.data?.length > 0) {
-      currentTraceRef.current?.scrollIntoView({
-        behavior: "instant",
-        block: "center",
-      });
+      const container = document.getElementById(
+        "conversation-scroll-container"
+      )!;
+      container.scrollTop = currentTraceRef.current?.offsetTop ?? 0;
     }
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [!!threadTraces.data]);
 
   return (
-    <TraceDetailsLayout>
-      {trace.data ? (
-        <TraceSummary trace={trace.data} />
-      ) : trace.isError ? (
-        <Alert status="error">
-          <AlertIcon />
-          An error has occurred trying to load this trace
-        </Alert>
-      ) : (
-        <VStack gap={4} width="full">
-          <Skeleton width="full" height="20px" />
-          <Skeleton width="full" height="20px" />
-          <Skeleton width="full" height="20px" />
-        </VStack>
-      )}
-      <Box
-        border="1px solid"
-        borderColor="gray.200"
-        width="full"
-        maxHeight="calc(min(max(100vh - 400px, 700px), 100vh - 50px))"
-        overflowY="scroll"
-      >
-        {trace.data ? (
-          <VStack align="start" width="full" spacing={0}>
-            {trace.data.thread_id ? (
-              threadTraces.data ? (
-                threadTraces.data
-                  .filter(
-                    (trace_) =>
-                      trace_.id != trace.data.id &&
-                      trace_.timestamps.started_at <
-                        trace.data.timestamps.started_at
-                  )
-                  .map((trace) => (
-                    <TraceMessages key={trace.id} trace={trace} />
-                  ))
-              ) : threadTraces.isLoading ? (
-                <Container maxWidth="800px" paddingTop={8} paddingBottom={4}>
-                  <HStack spacing={3}>
-                    <Spinner size="sm" />
-                    <Text>Loading previous messages...</Text>
-                  </HStack>
-                </Container>
-              ) : threadTraces.error ? (
-                <Container maxWidth="800px" paddingTop={8} paddingBottom={4}>
-                  <Text color="red.500">
-                    Something went wrong trying to load previous messages
-                  </Text>
-                </Container>
-              ) : null
-            ) : (
+    <Box width="full" minWidth="800px">
+      {!!threadId || trace.data ? (
+        <VStack align="start" width="full" spacing={0}>
+          {threadId ? (
+            threadTraces.data ? (
+              threadTraces.data.map((trace) => (
+                <TraceMessages
+                  key={trace.id}
+                  trace={trace}
+                  ref={trace.id == traceId ? currentTraceRef : undefined}
+                  highlighted={
+                    trace.id == traceId ? threadTraces.data.length > 1 : false
+                  }
+                />
+              ))
+            ) : threadTraces.isLoading ? (
               <Container maxWidth="800px" paddingTop={8} paddingBottom={4}>
-                <Text fontStyle="italic" color="gray.500">
-                  Add the thread_id to capture and visualize the whole
-                  conversation. Read more on our docs.
+                <HStack spacing={3}>
+                  <Spinner size="sm" />
+                  <Text>Loading conversation messages...</Text>
+                </HStack>
+              </Container>
+            ) : threadTraces.error ? (
+              <Container maxWidth="800px" paddingTop={8} paddingBottom={4}>
+                <Text color="red.500">
+                  Something went wrong trying to load previous messages
                 </Text>
               </Container>
-            )}
-            <TraceMessages
-              trace={trace.data}
-              ref={currentTraceRef}
-              highlighted={threadTraces.data && threadTraces.data.length > 1}
-            />
-            {trace.data.thread_id && threadTraces.data
-              ? threadTraces.data
-                  .filter(
-                    (trace_) =>
-                      trace_.id != trace.data.id &&
-                      trace_.timestamps.started_at >
-                        trace.data.timestamps.started_at
-                  )
-                  .map((trace) => (
-                    <TraceMessages key={trace.id} trace={trace} />
-                  ))
-              : null}
+            ) : null
+          ) : null}
+          {trace.data && !threadTraces.data && (
+            <TraceMessages trace={trace.data} highlighted={!!openTab} />
+          )}
+          {!threadId && (
+            <Container maxWidth="800px" padding={8}>
+              <Text fontStyle="italic" color="gray.500">
+                Pass the thread_id on your integration to capture and visualize the whole
+                conversation or associated actions. Read more on our docs.
+              </Text>
+            </Container>
+          )}
+        </VStack>
+      ) : trace.isLoading ? (
+        <Container maxWidth="800px" padding={8}>
+          <VStack gap={4} width="full">
+            <Skeleton width="full" height="20px" />
+            <Skeleton width="full" height="20px" />
+            <Skeleton width="full" height="20px" />
           </VStack>
-        ) : trace.isLoading ? (
-          <Container maxWidth="800px" padding={8}>
-            <VStack gap={4} width="full">
-              <Skeleton width="full" height="20px" />
-              <Skeleton width="full" height="20px" />
-              <Skeleton width="full" height="20px" />
-            </VStack>
-          </Container>
-        ) : null}
-      </Box>
-    </TraceDetailsLayout>
+        </Container>
+      ) : null}
+    </Box>
   );
 }
 
@@ -154,8 +216,6 @@ const TraceMessages = React.forwardRef(function TraceMessages(
 ) {
   const { project } = useOrganizationTeamProject();
 
-  if (!project) return null;
-
   return (
     <VStack
       ref={ref as any}
@@ -165,18 +225,6 @@ const TraceMessages = React.forwardRef(function TraceMessages(
       _first={{ paddingTop: 4 }}
       _last={{ paddingBottom: 8 }}
     >
-      {highlighted && (
-        <Text
-          marginTop="-28px"
-          paddingX={4}
-          fontSize={13}
-          fontWeight={500}
-          color="blue.800"
-          animation="fadeIn 0.8s"
-        >
-          Selected message
-        </Text>
-      )}
       <Box
         width="full"
         transition="all 0.3s ease-in-out"
@@ -185,68 +233,90 @@ const TraceMessages = React.forwardRef(function TraceMessages(
         background={highlighted ? "blue.50" : "white"}
       >
         <Container maxWidth="800px">
-          <HStack align="start" spacing={3} paddingTop="20px">
-            <Avatar size="sm" />
-            <VStack
-              align="start"
-              spacing={0}
-              width="full"
-              className="content-hover"
-            >
-              <HStack width="full">
-                <Text fontWeight="bold">Input</Text>
-                <Spacer />
-                <Tooltip
-                  label={new Date(trace.timestamps.started_at).toLocaleString()}
-                >
-                  <Text color="gray.400" className="show-on-hover">
-                    {formatDistanceToNow(
-                      new Date(trace.timestamps.started_at),
-                      {
-                        addSuffix: true,
-                      }
-                    )}
-                  </Text>
-                </Tooltip>
-              </HStack>
-              <Text paddingY="6px" marginBottom="38px">
-                {trace.input.value}
-              </Text>
-            </VStack>
-          </HStack>
-          <HStack align="start" spacing={3}>
-            <Avatar size="sm" name={project.name} background="orange.400" />
-            <VStack
-              align="start"
-              spacing={0}
-              width="full"
-              className="content-hover"
-            >
-              <HStack width="full">
-                <Text fontWeight="bold">{project.name}</Text>
-                <Spacer />
-                <Tooltip
-                  label={new Date(
-                    trace.timestamps.inserted_at
-                  ).toLocaleString()}
-                >
-                  <Text color="gray.400" className="show-on-hover">
-                    {formatDistanceToNow(
-                      new Date(trace.timestamps.inserted_at),
-                      {
-                        addSuffix: true,
-                      }
-                    )}
-                  </Text>
-                </Tooltip>
-              </HStack>
-              <Markdown className="markdown markdown-conversation-history">
-                {trace.error ? trace.error.message : trace.output?.value}
-              </Markdown>
-            </VStack>
-          </HStack>
+          <Message
+            trace={trace}
+            author="Input"
+            avatar={<Avatar size="sm" />}
+            timestamp={trace.timestamps.started_at}
+            paddingTop="20px"
+          >
+            <Text paddingY="6px" marginBottom="38px">
+              {trace.input.value}
+            </Text>
+          </Message>
+          <Message
+            trace={trace}
+            author={project?.name ?? ""}
+            avatar={
+              <Avatar size="sm" name={project?.name} background="orange.400" />
+            }
+            timestamp={trace.timestamps.inserted_at}
+          >
+            <Markdown className="markdown markdown-conversation-history">
+              {trace.error ? trace.error.message : trace.output?.value}
+            </Markdown>
+          </Message>
         </Container>
       </Box>
     </VStack>
   );
 });
+
+function Message({
+  trace,
+  author,
+  avatar,
+  timestamp,
+  paddingTop,
+  children,
+}: PropsWithChildren<{
+  trace: Trace;
+  author: string;
+  avatar: React.ReactNode;
+  timestamp: number;
+  paddingTop?: string;
+}>) {
+  const router = useRouter();
+  const { project } = useOrganizationTeamProject();
+  const { traceId, openTab } = useTraceDetailsState();
+
+  // show time ago if less than a day old
+  const timestampDate = new Date(timestamp);
+  const timeAgo =
+    timestampDate.getTime() < Date.now() - 1000 * 60 * 60 * 24
+      ? format(timestampDate, "dd/MMM HH:mm")
+      : formatDistanceToNow(timestampDate, {
+          addSuffix: true,
+        });
+
+  if (!project) return null;
+
+  return (
+    <HStack
+      paddingTop={paddingTop}
+      align="start"
+      spacing={3}
+      cursor="pointer"
+      role="button"
+      onClick={() => {
+        if (openTab && traceId === trace.id) {
+          void router.push(`/${project.slug}/messages/${trace.id}`);
+        } else {
+          void router.push(`/${project.slug}/messages/${trace.id}/spans`);
+        }
+      }}
+    >
+      {avatar}
+      <VStack align="start" spacing={0} width="full" className="content-hover">
+        <HStack width="full">
+          <Text fontWeight="bold">{author}</Text>
+          <Spacer />
+          <Tooltip label={timestampDate.toLocaleString()}>
+            <Text color="gray.400">{timeAgo}</Text>
+          </Tooltip>
+        </HStack>
+        {children}
+      </VStack>
+    </HStack>
+  );
+}

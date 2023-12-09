@@ -11,22 +11,17 @@ import {
   Tooltip,
   VStack,
 } from "@chakra-ui/react";
-import ErrorPage from "next/error";
 import { useRouter } from "next/router";
 import numeral from "numeral";
 import { useEffect } from "react";
 import { Clock } from "react-feather";
-import {
-  TraceDetailsLayout,
-  useTraceFromUrl,
-} from "~/components/traces/TraceDetailsLayout";
-import { TraceSummary } from "../../../../../components/traces/Summary";
-import { useOrganizationTeamProject } from "../../../../../hooks/useOrganizationTeamProject";
-import type { ElasticSearchSpan } from "../../../../../server/tracer/types";
-import { api } from "../../../../../utils/api";
-import { formatMilliseconds } from "../../../../../utils/formatMilliseconds";
-import { isNotFound } from "../../../../../utils/trpcError";
-import { RenderInputOutput } from "../../../../../components/traces/RenderInputOutput";
+import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
+import type { ElasticSearchSpan } from "../../server/tracer/types";
+import { api } from "../../utils/api";
+import { formatMilliseconds } from "../../utils/formatMilliseconds";
+import { isNotFound } from "../../utils/trpcError";
+import { RenderInputOutput } from "./RenderInputOutput";
+import { useTraceDetailsState } from "../../hooks/useTraceDetailsState";
 
 type SpanWithChildren = ElasticSearchSpan & { children: SpanWithChildren[] };
 
@@ -101,7 +96,7 @@ const SpanNode: React.FC<SpanNodeProps> = ({ span, level, lastChild }) => {
       />
 
       <Link
-        href={`/${project.slug}/messages/${span.trace_id}/trace/${span.id}`}
+        href={`/${project.slug}/messages/${span.trace_id}/spans/${span.id}`}
         replace={true}
         _hover={{ textDecoration: "none" }}
       >
@@ -248,11 +243,9 @@ const SpanCost = ({ span }: { span: ElasticSearchSpan }) => {
   return numeral(span.metrics.cost).format("$0.00000a");
 };
 
-export default function Trace() {
-  const { traceId, trace } = useTraceFromUrl();
+export function SpanTree() {
+  const { traceId, spanId, trace } = useTraceDetailsState();
   const router = useRouter();
-  const spanId =
-    typeof router.query.span === "string" ? router.query.span : undefined;
   const { project } = useOrganizationTeamProject();
   const spans = api.spans.getAllForTrace.useQuery(
     { projectId: project?.id ?? "", traceId: traceId ?? "" },
@@ -265,31 +258,17 @@ export default function Trace() {
   useEffect(() => {
     if (!spanId && project && traceId && spans.data && spans.data[0]) {
       void router.replace(
-        `/${project.slug}/messages/${traceId}/trace/${spans.data[0].id}`
+        `/${project.slug}/messages/${traceId}/spans/${spans.data[0].id}`
       );
     }
   }, [project, router, spanId, spans.data, traceId]);
 
   if (isNotFound(trace.error)) {
-    return <ErrorPage statusCode={404} />;
+    return <Alert status="error">Trace not found</Alert>;
   }
 
   return (
-    <TraceDetailsLayout>
-      {trace.data ? (
-        <TraceSummary trace={trace.data} />
-      ) : trace.isError ? (
-        <Alert status="error">
-          <AlertIcon />
-          An error has occurred trying to load this trace
-        </Alert>
-      ) : (
-        <VStack gap={4} width="full">
-          <Skeleton width="full" height="20px" />
-          <Skeleton width="full" height="20px" />
-          <Skeleton width="full" height="20px" />
-        </VStack>
-      )}
+    <VStack width="full" padding={4}>
       {spans.data ? (
         <HStack align="start" width="full" spacing={10}>
           <TreeRenderer spans={spans.data} />
@@ -415,12 +394,12 @@ export default function Trace() {
           An error has occurred trying to load the trace spans
         </Alert>
       ) : (
-        <VStack gap={4} width="full">
+        <VStack gap={4} width="full" padding={4}>
           <Skeleton width="full" height="20px" />
           <Skeleton width="full" height="20px" />
           <Skeleton width="full" height="20px" />
         </VStack>
       )}
-    </TraceDetailsLayout>
+    </VStack>
   );
 }

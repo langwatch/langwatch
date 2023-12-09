@@ -28,6 +28,7 @@ import _dependencies from "@injected-dependencies";
 import { type Dependencies } from "../injection";
 
 const inter = Inter({ subsets: ["latin"] });
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const dependencies = _dependencies as Dependencies;
 
 // eslint-disable-next-line @typescript-eslint/unbound-method

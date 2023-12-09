@@ -75,7 +75,7 @@ export function MessageCard({
           <Box fontWeight="bold">
             <LinkOverlay
               as={NextLink}
-              href={`/${project.slug}/messages/${trace.id}`}
+              href={`/${project.slug}/messages/${trace.id}/spans`}
               onClick={(e) => {
                 if (!linkActive) e.preventDefault();
               }}

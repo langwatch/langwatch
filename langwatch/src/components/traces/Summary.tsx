@@ -1,9 +1,19 @@
-import { Box, HStack, Text, Tooltip, VStack } from "@chakra-ui/react";
-import type { Trace } from "../../server/tracer/types";
+import {
+  Alert,
+  AlertIcon,
+  Box,
+  HStack,
+  Skeleton,
+  Text,
+  Tooltip,
+  VStack
+} from "@chakra-ui/react";
 import numeral from "numeral";
-import type { PropsWithChildren } from "react";
+import React, { useEffect, useRef, useState, type PropsWithChildren } from "react";
 import { HelpCircle } from "react-feather";
+import { useTraceDetailsState } from "../../hooks/useTraceDetailsState";
 import { getTotalTokensDisplay } from "../../mappers/trace";
+import type { Trace } from "../../server/tracer/types";
 import { formatMilliseconds } from "../../utils/formatMilliseconds";
 
 const SummaryItem = ({
@@ -33,15 +43,49 @@ const SummaryItem = ({
   );
 };
 
-export const TraceSummary = ({ trace }: { trace: Trace }) => {
+export function TraceSummary() {
+  const { trace } = useTraceDetailsState();
+
+  const [height, setHeight] = useState<number | undefined>(undefined);
+  const summaryRef = useRef<HTMLDivElement>();
+
+  useEffect(() => {
+    if (trace.data && summaryRef.current) {
+      setHeight(summaryRef.current.offsetHeight);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [!!trace.data]);
+
+  return trace.data ? (
+    <TraceSummaryValues ref={summaryRef} trace={trace.data} />
+  ) : trace.isError ? (
+    <Alert status="error">
+      <AlertIcon />
+      An error has occurred trying to load this trace
+    </Alert>
+  ) : (
+    <VStack gap={4} width="full" minHeight={height ? height + "px" : height}>
+      <Skeleton width="full" height="20px" />
+      <Skeleton width="full" height="20px" />
+      <Skeleton width="full" height="20px" />
+    </VStack>
+  );
+}
+
+const TraceSummaryValues = React.forwardRef(function TraceSummaryValues(
+  { trace }: { trace: Trace },
+  ref
+) {
   return (
     <HStack
-      spacing={4}
       borderTopWidth={1}
       borderBottomWidth={1}
       borderColor="gray.300"
       width="full"
       align="stretch"
+      spacing={[0, 0, 0, 4]}
+      flexDirection={{ base: "column", lg: "row" }}
+      ref={ref as any}
     >
       <SummaryItem
         label="User ID"
@@ -116,4 +160,4 @@ export const TraceSummary = ({ trace }: { trace: Trace }) => {
       )}
     </HStack>
   );
-};
+});

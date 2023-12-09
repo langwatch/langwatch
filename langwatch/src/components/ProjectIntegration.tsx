@@ -31,13 +31,6 @@ export const ProjectIntegration = () => {
     | undefined;
   const framework = frameworkKey && techStackFrameworkOptions[frameworkKey];
 
-  const form = useForm<ProjectFormData>({
-    defaultValues: {
-      language: languageKey,
-      framework: frameworkKey,
-    },
-  });
-
   const IntegrationDocs = languageKey && framework?.languages[languageKey];
 
   return (

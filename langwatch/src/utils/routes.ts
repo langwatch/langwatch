@@ -34,9 +34,14 @@ export const projectRoutes = {
     title: "Trace",
     parent: "messages",
   },
-  message_span: {
-    path: "/[project]/messages/[trace]/[span]",
-    title: "Trace",
+  message_open_tab: {
+    path: "/[project]/messages/[trace]/[opentab]",
+    title: "trace",
+    parent: "messages",
+  },
+  message_open_tab_span: {
+    path: "/[project]/messages/[trace]/[opentab]/[span]",
+    title: "trace",
     parent: "messages",
   },
   settings: {

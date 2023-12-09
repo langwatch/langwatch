@@ -4,6 +4,7 @@ import {
   Box,
   Button,
   HStack,
+  Hide,
   Input,
   InputGroup,
   InputLeftElement,
@@ -18,10 +19,9 @@ import {
   VStack,
   useTheme,
   type BackgroundProps,
-  Hide,
 } from "@chakra-ui/react";
-import { signOut } from "next-auth/react";
 import type { Project } from "@prisma/client";
+import { signOut } from "next-auth/react";
 import ErrorPage from "next/error";
 import Head from "next/head";
 import { useRouter } from "next/router";
@@ -29,15 +29,13 @@ import { useState, type PropsWithChildren } from "react";
 import {
   ChevronDown,
   ChevronRight,
-  Database,
   Home,
   MessageSquare,
   Plus,
   Search,
   Settings,
   Shield,
-  TrendingUp,
-  type Icon,
+  type Icon
 } from "react-feather";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import { useRequiredSession } from "../hooks/useRequiredSession";
@@ -309,7 +307,13 @@ export const DashboardLayout = ({
           </VStack>
         </VStack>
       </Box>
-      <VStack width="full" spacing={0} background="gray.100" {...bgProps}>
+      <VStack
+        width="full"
+        maxWidth="calc(100vw - 90px)"
+        spacing={0}
+        background="gray.100"
+        {...bgProps}
+      >
         <HStack
           position="relative"
           zIndex={3}
@@ -318,7 +322,7 @@ export const DashboardLayout = ({
           gap={6}
           background="white"
           borderBottomWidth="1px"
-          borderBottomColor="gray.400"
+          borderBottomColor="gray.300"
         >
           <ProjectSelector organizations={organizations} project={project} />
           <Hide below="lg">
