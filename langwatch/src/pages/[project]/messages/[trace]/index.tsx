@@ -67,7 +67,6 @@ export default function TraceDetails() {
               (ID: {traceId})
             </Text>
           </HStack>
-          <TraceSummary />
         </VStack>
       </VStack>
       <Box
@@ -75,7 +74,7 @@ export default function TraceDetails() {
         alignItems="flex-start"
         paddingX={12}
         width="100%"
-        maxWidth={openTab ? "3200" : "1600"}
+        maxWidth={openTab ? "2300" : "1600"}
       >
         <HStack
           align="start"
@@ -88,7 +87,11 @@ export default function TraceDetails() {
         >
           <Box
             transition="all 0.3s ease-in-out"
-            width={openTab ? "30%" : "full"}
+            width={{
+              base: openTab ? "20%" : "full",
+              lg: openTab ? "30%" : "full",
+              xl: openTab ? "40%" : "full",
+            }}
             maxHeight="100vh"
             overflowX="hidden"
             overflowY="auto"
@@ -96,7 +99,7 @@ export default function TraceDetails() {
             top={0}
             id="conversation-scroll-container"
             background="gray.50"
-            paddingBottom="360px"
+            paddingBottom="220px"
           >
             <Conversation threadId={threadId} />
           </Box>
@@ -107,15 +110,16 @@ export default function TraceDetails() {
               in={!!openTab}
               style={{ position: "static" }}
             >
-              <Box
+              <VStack
                 background="white"
                 maxWidth="1600px"
                 borderLeft="1px solid"
                 borderColor="gray.200"
                 height="100%"
               >
+                <TraceSummary />
                 <SpanTree />
-              </Box>
+              </VStack>
             </Slide>
           )}
         </HStack>
@@ -161,9 +165,7 @@ function Conversation({ threadId }: { threadId?: string }) {
                   key={trace.id}
                   trace={trace}
                   ref={trace.id == traceId ? currentTraceRef : undefined}
-                  highlighted={
-                    trace.id == traceId ? threadTraces.data.length > 1 : false
-                  }
+                  highlighted={trace.id == traceId && !!openTab}
                 />
               ))
             ) : threadTraces.isLoading ? (

@@ -270,7 +270,7 @@ export function SpanTree() {
   return (
     <VStack width="full" padding={4}>
       {spans.data ? (
-        <HStack align="start" width="full" spacing={10}>
+        <HStack align="start" width="full" spacing={10} flexDirection={{ base: "column", xl: "row" }}>
           <TreeRenderer spans={spans.data} />
           {span && (
             <VStack flexGrow={1} spacing={3} align="start">

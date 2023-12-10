@@ -6,10 +6,15 @@ import {
   Skeleton,
   Text,
   Tooltip,
-  VStack
+  VStack,
 } from "@chakra-ui/react";
 import numeral from "numeral";
-import React, { useEffect, useRef, useState, type PropsWithChildren } from "react";
+import React, {
+  useEffect,
+  useRef,
+  useState,
+  type PropsWithChildren,
+} from "react";
 import { HelpCircle } from "react-feather";
 import { useTraceDetailsState } from "../../hooks/useTraceDetailsState";
 import { getTotalTokensDisplay } from "../../mappers/trace";
@@ -26,8 +31,10 @@ const SummaryItem = ({
       borderRightWidth="1px"
       borderRightColor="gray.300"
       alignItems="flex-start"
-      paddingY={6}
       paddingRight={4}
+      paddingLeft={{ base: 4, lg: 0 }}
+      paddingY={{ base: 3, lg: 6 }}
+      _first={{ paddingLeft: 4 }}
       _last={{ border: "none" }}
     >
       <HStack>
@@ -64,7 +71,14 @@ export function TraceSummary() {
       An error has occurred trying to load this trace
     </Alert>
   ) : (
-    <VStack gap={4} width="full" minHeight={height ? height + "px" : height}>
+    <VStack
+      gap={4}
+      paddingX={4}
+      paddingY={6}
+      width="full"
+      minHeight={height ? height + "px" : height}
+      display="none"
+    >
       <Skeleton width="full" height="20px" />
       <Skeleton width="full" height="20px" />
       <Skeleton width="full" height="20px" />
@@ -78,7 +92,6 @@ const TraceSummaryValues = React.forwardRef(function TraceSummaryValues(
 ) {
   return (
     <HStack
-      borderTopWidth={1}
       borderBottomWidth={1}
       borderColor="gray.300"
       width="full"
