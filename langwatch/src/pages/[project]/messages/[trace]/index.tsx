@@ -33,6 +33,8 @@ import { api } from "../../../../utils/api";
 import { isNotFound } from "../../../../utils/trpcError";
 
 export default function TraceDetails() {
+  const router = useRouter();
+  const { project } = useOrganizationTeamProject();
   const { traceId, trace, openTab } = useTraceDetailsState();
   const [threadId, setThreadId] = useState<string | undefined>(undefined);
 
@@ -120,6 +122,7 @@ export default function TraceDetails() {
           >
             <Conversation threadId={threadId} />
           </Box>
+
           {isTabOpen && (
             <Slide
               transition={{ enter: { duration: 0.3, ease: "easeInOut" } }}
@@ -127,16 +130,71 @@ export default function TraceDetails() {
               in={!!openTab}
               style={{ position: "static" }}
             >
-              <VStack
-                background="white"
-                maxWidth="1600px"
-                borderLeft="1px solid"
-                borderColor="gray.200"
-                height="100%"
+              <Box
+                position="sticky"
+                width="0"
+                height="16px"
+                zIndex={1}
+                top="calc(50% - 36px)"
+                background="red"
               >
-                <TraceSummary />
-                {openTab === "spans" && <SpanTree />}
-              </VStack>
+                <Box
+                  position="absolute"
+                  left="-34px"
+                  width="35px"
+                  height="72px"
+                  overflowX="hidden"
+                >
+                  <Box
+                    width="32px"
+                    height="32px"
+                    boxShadow="0px 0px 20px rgba(0,0,0,.2)"
+                    background="white"
+                    borderRadius="0 0 0 10px"
+                    border="1px solid"
+                    borderColor="gray.200"
+                    transform="rotateY(0deg) rotate(45deg)"
+                    position="absolute"
+                    top="20px"
+                    left="22px"
+                  ></Box>
+                </Box>
+              </Box>
+              <Box
+                width="100%"
+                height="100%"
+                overflowY="hidden"
+                paddingLeft="20px"
+                marginLeft="-20px"
+                position="relative"
+                marginTop="-16px"
+              >
+                <Box
+                  position="absolute"
+                  height="100%"
+                  top="0"
+                  left="0px"
+                  width="40px"
+                  cursor="e-resize"
+                  zIndex={2}
+                  onClick={() => {
+                    void router.replace(
+                      `/${project?.slug}/messages/${traceId}`
+                    );
+                  }}
+                ></Box>
+                <VStack
+                  background="white"
+                  maxWidth="1600px"
+                  borderLeft="1px solid"
+                  borderColor="gray.200"
+                  height="100%"
+                  boxShadow="2px 2px 20px rgba(0,0,0,.3)"
+                >
+                  <TraceSummary />
+                  {openTab === "spans" && <SpanTree />}
+                </VStack>
+              </Box>
             </Slide>
           )}
         </HStack>
@@ -171,10 +229,18 @@ function Conversation({ threadId }: { threadId?: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [!!threadTraces.data]);
 
+
   return (
     <Box width="full" minWidth="800px">
       {!!threadId || trace.data ? (
-        <VStack align="start" width="full" spacing={0} background="white">
+        <VStack
+          align="start"
+          width="full"
+          spacing={0}
+          background="white"
+          borderBottom="1px solid"
+          borderColor="gray.200"
+        >
           {threadId ? (
             threadTraces.data ? (
               threadTraces.data.map((trace) => (

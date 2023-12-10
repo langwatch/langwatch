@@ -35,7 +35,7 @@ import {
   Search,
   Settings,
   Shield,
-  type Icon
+  type Icon,
 } from "react-feather";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import { useRequiredSession } from "../hooks/useRequiredSession";
