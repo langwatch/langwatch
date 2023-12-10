@@ -42,6 +42,21 @@ export default function TraceDetails() {
     }
   }, [trace.data?.thread_id]);
 
+  const [initialDelay, setInitialDelay] = useState<boolean>(false);
+  const [isTabOpen, setTabOpen] = useState<boolean>(false);
+
+  useEffect(() => {
+    setTimeout(
+      () => {
+        const isOpen = (!!threadId || !!trace.data) && !!openTab;
+        setTabOpen(isOpen);
+        if (isOpen) setInitialDelay(true);
+      },
+      initialDelay ? 0 : 400
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [!!openTab, !!trace.data]);
+
   if (isNotFound(trace.error)) {
     return <ErrorPage statusCode={404} />;
   }
@@ -75,7 +90,7 @@ export default function TraceDetails() {
         alignItems="flex-start"
         paddingX={12}
         width="100%"
-        maxWidth={openTab ? "2300" : "1600"}
+        maxWidth={isTabOpen ? "2300" : "1600"}
       >
         <HStack
           align="start"
@@ -89,9 +104,9 @@ export default function TraceDetails() {
           <Box
             transition="all 0.3s ease-in-out"
             width={{
-              base: openTab ? "20%" : "full",
-              lg: openTab ? "30%" : "full",
-              xl: openTab ? "40%" : "full",
+              base: isTabOpen ? "20%" : "full",
+              lg: isTabOpen ? "30%" : "full",
+              xl: isTabOpen ? "40%" : "full",
             }}
             height="100vh"
             maxHeight="100vh"
@@ -105,7 +120,7 @@ export default function TraceDetails() {
           >
             <Conversation threadId={threadId} />
           </Box>
-          {openTab === "spans" && (
+          {isTabOpen && (
             <Slide
               transition={{ enter: { duration: 0.3, ease: "easeInOut" } }}
               direction="right"
@@ -120,7 +135,7 @@ export default function TraceDetails() {
                 height="100%"
               >
                 <TraceSummary />
-                <SpanTree />
+                {openTab === "spans" && <SpanTree />}
               </VStack>
             </Slide>
           )}
@@ -261,10 +276,10 @@ const TraceMessages = React.forwardRef(function TraceMessages(
     >
       <Box
         width="full"
-        transition="all 0.3s ease-in-out"
         borderY="1px solid"
         borderColor={highlighted ? "blue.500" : "white"}
         background={highlighted ? "blue.50" : "white"}
+        _hover={{ background: highlighted ? "blue.50" : "gray.50" }}
       >
         <Container maxWidth="800px">
           <Message
