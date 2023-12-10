@@ -115,7 +115,7 @@ export default function TraceDetails() {
             position="sticky"
             top={0}
             id="conversation-scroll-container"
-            background="gray.50"
+            background={trace.data ? "gray.50" : "white"}
             paddingBottom="220px"
           >
             <Conversation threadId={threadId} />
