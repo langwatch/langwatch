@@ -131,43 +131,12 @@ export default function TraceDetails() {
               style={{ position: "static" }}
             >
               <Box
-                position="sticky"
-                width="0"
-                height="16px"
-                zIndex={1}
-                top="calc(50% - 36px)"
-                background="red"
-              >
-                <Box
-                  position="absolute"
-                  left="-34px"
-                  width="35px"
-                  height="72px"
-                  overflowX="hidden"
-                >
-                  <Box
-                    width="32px"
-                    height="32px"
-                    boxShadow="0px 0px 20px rgba(0,0,0,.2)"
-                    background="white"
-                    borderRadius="0 0 0 10px"
-                    border="1px solid"
-                    borderColor="gray.200"
-                    transform="rotateY(0deg) rotate(45deg)"
-                    position="absolute"
-                    top="20px"
-                    left="22px"
-                  ></Box>
-                </Box>
-              </Box>
-              <Box
                 width="100%"
                 height="100%"
                 overflowY="hidden"
                 paddingLeft="20px"
                 marginLeft="-20px"
                 position="relative"
-                marginTop="-16px"
               >
                 <Box
                   position="absolute"
