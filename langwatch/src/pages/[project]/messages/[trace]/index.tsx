@@ -209,7 +209,8 @@ function Conversation({ threadId }: { threadId?: string }) {
           width="full"
           maxWidth="800px"
           background="white"
-          paddingY="20px"
+          paddingTop="20px"
+          paddingBottom="30px"
         >
           <VStack gap="40px" width="full" align="start" paddingTop="56px">
             <Message

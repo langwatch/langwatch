@@ -169,7 +169,7 @@ const TreeRenderer: React.FC<{ spans: ElasticSearchSpan[] }> = ({ spans }) => {
   const rootSpans = spans.filter((s) => !s.parent_id);
 
   return (
-    <VStack flexShrink={0} spacing={6}>
+    <VStack align="start" flexShrink={0} spacing={6}>
       {rootSpans.map((rootSpan, index) => {
         const span = tree[rootSpan.id];
         if (!span) return null;
@@ -270,7 +270,12 @@ export function SpanTree() {
   return (
     <VStack width="full" padding={4}>
       {spans.data ? (
-        <HStack align="start" width="full" spacing={10} flexDirection={{ base: "column", xl: "row" }}>
+        <HStack
+          align="start"
+          width="full"
+          spacing={10}
+          flexDirection={{ base: "column", xl: "row" }}
+        >
           <TreeRenderer spans={spans.data} />
           {span && (
             <VStack flexGrow={1} spacing={3} align="start">
