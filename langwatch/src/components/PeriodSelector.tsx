@@ -40,21 +40,33 @@ const isValidDateString = (dateString: string) => {
 export const usePeriodSelector = (defaultNDays = 15) => {
   const router = useRouter();
 
+  const now = useMemo(() => new Date(), []);
+  const thisHour = useMemo(
+    () =>
+      new Date(
+        now.getFullYear(),
+        now.getMonth(),
+        now.getDate(),
+        now.getHours()
+      ),
+    [now]
+  );
+
   const startDate = useMemo(
     () =>
       typeof router.query.startDate === "string" &&
       isValidDateString(router.query.startDate)
         ? new Date(router.query.startDate)
-        : addDays(new Date(), -(defaultNDays - 1)),
-    [defaultNDays, router.query.startDate]
+        : addDays(thisHour, -(defaultNDays - 1)),
+    [defaultNDays, router.query.startDate, thisHour]
   );
   const endDate = useMemo(
     () =>
       typeof router.query.endDate === "string" &&
       isValidDateString(router.query.endDate)
         ? new Date(router.query.endDate)
-        : new Date(),
-    [router.query.endDate]
+        : thisHour,
+    [router.query.endDate, thisHour]
   );
 
   const daysDifference = getDaysDifference(startDate, endDate);

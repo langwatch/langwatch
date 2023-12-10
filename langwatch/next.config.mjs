@@ -27,6 +27,10 @@ const config = {
 
   distDir: process.env.NEXTJS_DIST_DIR ?? ".next",
 
+  experimental: {
+    scrollRestoration: true,
+  },
+
   webpack: (config) => {
     const aliasPath =
       process.env.DEPENDENCY_INJECTION ??
