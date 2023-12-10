@@ -12,6 +12,7 @@ import {
   Text,
   Tooltip,
   VStack,
+  useBreakpointValue,
 } from "@chakra-ui/react";
 import { format, formatDistanceToNow } from "date-fns";
 import ErrorPage from "next/error";
@@ -46,6 +47,11 @@ export default function TraceDetails() {
 
   const [initialDelay, setInitialDelay] = useState<boolean>(false);
   const [isTabOpen, setTabOpen] = useState<boolean>(false);
+  const drawerWidth = useBreakpointValue({
+    base: "80%",
+    lg: "70%",
+    "2xl": "60%",
+  });
 
   useEffect(() => {
     setTimeout(
@@ -108,7 +114,7 @@ export default function TraceDetails() {
             width={{
               base: isTabOpen ? "20%" : "full",
               lg: isTabOpen ? "30%" : "full",
-              xl: isTabOpen ? "40%" : "full",
+              "2xl": isTabOpen ? "40%" : "full",
             }}
             height="100vh"
             maxHeight="100vh"
@@ -128,7 +134,7 @@ export default function TraceDetails() {
               transition={{ enter: { duration: 0.3, ease: "easeInOut" } }}
               direction="right"
               in={!!openTab}
-              style={{ position: "static" }}
+              style={{ position: "static", minWidth: drawerWidth }}
             >
               <Box
                 width="100%"
@@ -197,7 +203,6 @@ function Conversation({ threadId }: { threadId?: string }) {
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [!!threadTraces.data]);
-
 
   return (
     <Box width="full" minWidth="800px">
