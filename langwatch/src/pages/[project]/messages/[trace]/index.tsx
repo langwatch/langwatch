@@ -5,6 +5,7 @@ import {
   HStack,
   Heading,
   Skeleton,
+  SkeletonCircle,
   Slide,
   Spacer,
   Spinner,
@@ -92,6 +93,7 @@ export default function TraceDetails() {
               lg: openTab ? "30%" : "full",
               xl: openTab ? "40%" : "full",
             }}
+            height="100vh"
             maxHeight="100vh"
             overflowX="hidden"
             overflowY="auto"
@@ -148,7 +150,7 @@ function Conversation({ threadId }: { threadId?: string }) {
       const container = document.getElementById(
         "conversation-scroll-container"
       )!;
-      container.scrollTop = currentTraceRef.current?.offsetTop ?? 0;
+      container.scrollTop = (currentTraceRef.current?.offsetTop ?? 0) - 56;
     }
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -168,25 +170,31 @@ function Conversation({ threadId }: { threadId?: string }) {
                   highlighted={trace.id == traceId && !!openTab}
                 />
               ))
-            ) : threadTraces.isLoading ? (
-              <Container maxWidth="800px" paddingTop={4} paddingBottom={4}>
-                <HStack spacing={3}>
-                  <Spinner size="sm" />
-                  <Text>Loading messages...</Text>
-                </HStack>
-              </Container>
             ) : threadTraces.error ? (
               <Container maxWidth="800px" paddingTop={8} paddingBottom={4}>
                 <Text color="red.500">
                   Something went wrong trying to load previous messages
                 </Text>
               </Container>
-            ) : null
+            ) : (
+              <Container
+                maxWidth="800px"
+                height="56px"
+                paddingTop={4}
+                paddingBottom={4}
+              >
+                <HStack spacing={3}>
+                  <Spinner size="sm" />
+                  <Text>Loading messages...</Text>
+                </HStack>
+              </Container>
+            )
           ) : null}
+          {!threadId && <Box height="56px" />}
           {trace.data && !threadTraces.data && (
             <TraceMessages trace={trace.data} highlighted={!!openTab} />
           )}
-          {!threadId && (
+          {trace.data && !trace.data.thread_id && (
             <Container maxWidth="800px" padding={8}>
               <Text fontStyle="italic" color="gray.500">
                 Pass the thread_id on your integration to capture and visualize
@@ -197,11 +205,31 @@ function Conversation({ threadId }: { threadId?: string }) {
           )}
         </VStack>
       ) : trace.isLoading ? (
-        <Container maxWidth="800px" padding={8}>
-          <VStack gap={4} width="full">
-            <Skeleton width="full" height="20px" />
-            <Skeleton width="full" height="20px" />
-            <Skeleton width="full" height="20px" />
+        <Container
+          width="full"
+          maxWidth="800px"
+          background="white"
+          paddingY="20px"
+        >
+          <VStack gap="40px" width="full" align="start" paddingTop="56px">
+            <Message
+              author=""
+              avatar={<SkeletonCircle minWidth="32px" minHeight="32px" />}
+            >
+              <VStack gap={4} width="full" align="start">
+                <Skeleton width="600px" height="20px" />
+                <Skeleton width="600px" height="20px" />
+              </VStack>
+            </Message>
+            <Message
+              author=""
+              avatar={<SkeletonCircle minWidth="32px" minHeight="32px" />}
+            >
+              <VStack gap={4} width="full" align="start">
+                <Skeleton width="600px" height="20px" />
+                <Skeleton width="600px" height="20px" />
+              </VStack>
+            </Message>
           </VStack>
         </Container>
       ) : null}
@@ -275,10 +303,10 @@ function Message({
   paddingTop,
   children,
 }: PropsWithChildren<{
-  trace: Trace;
+  trace?: Trace;
   author: string;
   avatar: React.ReactNode;
-  timestamp: number;
+  timestamp?: number;
   paddingTop?: string;
 }>) {
   const router = useRouter();
@@ -286,24 +314,27 @@ function Message({
   const { traceId, openTab } = useTraceDetailsState();
 
   // show time ago if less than a day old
-  const timestampDate = new Date(timestamp);
-  const timeAgo =
-    timestampDate.getTime() < Date.now() - 1000 * 60 * 60 * 24
+  const timestampDate = timestamp ? new Date(timestamp) : undefined;
+  const timeAgo = timestampDate
+    ? timestampDate.getTime() < Date.now() - 1000 * 60 * 60 * 24
       ? format(timestampDate, "dd/MMM HH:mm")
       : formatDistanceToNow(timestampDate, {
           addSuffix: true,
-        });
+        })
+    : undefined;
 
   if (!project) return null;
 
   return (
     <HStack
+      width="full"
       paddingTop={paddingTop}
       align="start"
       spacing={3}
       cursor="pointer"
       role="button"
       onClick={() => {
+        if (!trace) return;
         if (openTab && traceId === trace.id) {
           void router.push(`/${project.slug}/messages/${trace.id}`);
         } else {
@@ -316,9 +347,11 @@ function Message({
         <HStack width="full">
           <Text fontWeight="bold">{author}</Text>
           <Spacer />
-          <Tooltip label={timestampDate.toLocaleString()}>
-            <Text color="gray.400">{timeAgo}</Text>
-          </Tooltip>
+          {timestampDate && timeAgo && (
+            <Tooltip label={timestampDate.toLocaleString()}>
+              <Text color="gray.400">{timeAgo}</Text>
+            </Tooltip>
+          )}
         </HStack>
         {children}
       </VStack>
