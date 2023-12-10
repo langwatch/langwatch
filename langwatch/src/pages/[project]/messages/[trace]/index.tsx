@@ -95,6 +95,8 @@ export default function TraceDetails() {
             position="sticky"
             top={0}
             id="conversation-scroll-container"
+            background="gray.50"
+            paddingBottom="360px"
           >
             <Conversation threadId={threadId} />
           </Box>
@@ -151,7 +153,7 @@ function Conversation({ threadId }: { threadId?: string }) {
   return (
     <Box width="full" minWidth="800px">
       {!!threadId || trace.data ? (
-        <VStack align="start" width="full" spacing={0}>
+        <VStack align="start" width="full" spacing={0} background="white">
           {threadId ? (
             threadTraces.data ? (
               threadTraces.data.map((trace) => (
@@ -165,10 +167,10 @@ function Conversation({ threadId }: { threadId?: string }) {
                 />
               ))
             ) : threadTraces.isLoading ? (
-              <Container maxWidth="800px" paddingTop={8} paddingBottom={4}>
+              <Container maxWidth="800px" paddingTop={4} paddingBottom={4}>
                 <HStack spacing={3}>
                   <Spinner size="sm" />
-                  <Text>Loading conversation messages...</Text>
+                  <Text>Loading messages...</Text>
                 </HStack>
               </Container>
             ) : threadTraces.error ? (
@@ -185,8 +187,9 @@ function Conversation({ threadId }: { threadId?: string }) {
           {!threadId && (
             <Container maxWidth="800px" padding={8}>
               <Text fontStyle="italic" color="gray.500">
-                Pass the thread_id on your integration to capture and visualize the whole
-                conversation or associated actions. Read more on our docs.
+                Pass the thread_id on your integration to capture and visualize
+                the whole conversation or associated actions. Read more on our
+                docs.
               </Text>
             </Container>
           )}
@@ -223,7 +226,7 @@ const TraceMessages = React.forwardRef(function TraceMessages(
       width="full"
       spacing={2}
       _first={{ paddingTop: 4 }}
-      _last={{ paddingBottom: 8 }}
+      _last={{ paddingBottom: 0 }}
     >
       <Box
         width="full"
