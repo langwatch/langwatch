@@ -337,7 +337,7 @@ function Message({
       onClick={() => {
         if (!trace) return;
         if (openTab && traceId === trace.id) {
-          void router.push(`/${project.slug}/messages/${trace.id}`);
+          void router.replace(`/${project.slug}/messages/${trace.id}`);
         } else {
           void router.push(`/${project.slug}/messages/${trace.id}/spans`);
         }
