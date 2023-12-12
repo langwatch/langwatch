@@ -8,6 +8,9 @@ import type {
   TraceCheckBackendDefinition,
   TraceCheckResult,
 } from "../types";
+import { estimateCost, tokenizeAndEstimateCost } from "llm-cost";
+import type { ChatCompletionMessageParam } from "openai/resources";
+import type { Money } from "../../utils/types";
 
 const execute = async (
   trace: Trace,
@@ -19,6 +22,10 @@ const execute = async (
     rule: CustomCheckRule;
     score: number | boolean | undefined;
   }[] = [];
+  const costs: { [K in Money["currency"]]: { amount: number; currency: K } } = {
+    USD: { amount: 0.0, currency: "USD" },
+    EUR: { amount: 0.0, currency: "EUR" },
+  };
   for (const rule of parameters.rules) {
     const valueToCheck =
       (rule.field === "input" ? trace.input.value : trace.output?.value) ?? "";
@@ -76,8 +83,10 @@ const execute = async (
           trace.input.value,
           rule.field === "output" ? trace.output?.value : undefined
         );
-        rulePassed = llmBoolResult === true;
-        score = llmBoolResult;
+        rulePassed = llmBoolResult.result === true;
+        score = llmBoolResult.result;
+        costs[llmBoolResult.cost.currency].amount += llmBoolResult.cost.amount;
+
         break;
       case "llm_score":
         const llmScoreResult = await handleLLMCheck(
@@ -86,9 +95,11 @@ const execute = async (
           rule.field === "output" ? trace.output?.value : undefined
         );
         rulePassed =
-          typeof llmScoreResult === "number" &&
-          !matchesFailWhenCondition(llmScoreResult, rule.failWhen);
-        score = llmScoreResult;
+          typeof llmScoreResult.result === "number" &&
+          !matchesFailWhenCondition(llmScoreResult.result, rule.failWhen);
+        score = llmScoreResult.result;
+        costs[llmScoreResult.cost.currency].amount += llmScoreResult.cost.amount;
+
         break;
     }
 
@@ -104,6 +115,7 @@ const execute = async (
     raw_result: { results, failedRules },
     value: failedRules.length,
     status: failedRules.length > 0 ? "failed" : "succeeded",
+    costs: Object.values(costs).filter((cost) => cost.amount > 0),
   };
 };
 
@@ -133,16 +145,18 @@ async function handleLLMCheck(
   rule: CustomCheckRule,
   input: string,
   output?: string
-): Promise<boolean | number | undefined> {
+): Promise<{ result: boolean | number | undefined; cost: Money }> {
   const openai = new OpenAI();
   const outputPart = output ? `# Output:\n\n${output}\n\n\n` : "";
+
+  const messages: Array<ChatCompletionMessageParam> = [
+    {
+      role: "user",
+      content: `# Input:\n\n${input}\n\n\n${outputPart}# Task\n\n${rule.value}\n\n`,
+    },
+  ];
   const chatCompletion = await openai.chat.completions.create({
-    messages: [
-      {
-        role: "user",
-        content: `# Input:\n\n${input}\n\n\n${outputPart}# Task\n\n${rule.value}\n\n`,
-      },
-    ],
+    messages,
     model: (rule as any).model ?? "gpt-3.5-turbo",
     temperature: 0.0,
     tool_choice: {
@@ -185,10 +199,25 @@ async function handleLLMCheck(
       "{}"
   );
 
+  const usage = chatCompletion.usage;
+  const cost = usage
+    ? estimateCost({
+        model: chatCompletion.model,
+        inputTokens: usage.prompt_tokens,
+        outputTokens: usage.completion_tokens,
+      })
+    : (
+        await tokenizeAndEstimateCost({
+          model: chatCompletion.model,
+          input: JSON.stringify(messages),
+          output: JSON.stringify(chatCompletion.choices[0]),
+        })
+      ).cost;
+
   if (rule.rule === "llm_boolean") {
-    return args.result;
+    return { result: args.result, cost: { amount: cost ?? 0, currency: "USD" } };
   } else {
-    return args.score;
+    return { result: args.score, cost: { amount: cost ?? 0, currency: "USD" } };
   }
 }
 

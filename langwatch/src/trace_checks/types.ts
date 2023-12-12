@@ -3,6 +3,7 @@ import type {
   Trace,
   TraceCheck,
 } from "../server/tracer/types";
+import type { Money } from "../utils/types";
 
 export type Checks = {
   pii_check: {
@@ -37,6 +38,7 @@ export type TraceCheckJob = {
   check_id: string;
   trace_id: string;
   project_id: string;
+  check_name: string;
 };
 
 export type TopicClusteringJob = {
@@ -48,6 +50,7 @@ export type TraceCheckResult = {
   raw_result: object;
   value: number;
   status: "failed" | "succeeded";
+  costs: Money[];
 };
 
 export type TraceCheckBackendDefinition<T extends CheckTypes> = {

@@ -56,7 +56,7 @@ export const scheduleTraceCheck = async ({
 
   await traceChecksQueue.add(
     check_type,
-    { check_id, trace_id, project_id },
+    { check_name, check_id, trace_id, project_id },
     {
       jobId: `trace_check_${trace_id}/${check_id}`,
       delay: delay ?? 5000,

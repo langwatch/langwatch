@@ -140,6 +140,7 @@ model Project {
     createdAt    DateTime @default(now())
     updatedAt    DateTime @default(now()) @updatedAt
     checks       Check[]
+    costs        Cost[]
 
     @@index([teamId])
 }
@@ -180,5 +181,23 @@ model Check {
     updatedAt     DateTime @default(now()) @updatedAt
 
     @@unique([projectId, slug])
+    @@index([projectId])
+}
+
+model Cost {
+    id            String   @id @default(nanoid())
+    projectId     String
+    project       Project  @relation(fields: [projectId], references: [id])
+    costType      String
+    referenceType String
+    referenceId   String
+    amount        Float
+    currency      String
+    createdAt     DateTime @default(now())
+    updatedAt     DateTime @default(now()) @updatedAt
+    extra_info    Json?
+
+    @@index([referenceType, referenceId])
+    @@index([costType])
     @@index([projectId])
 }

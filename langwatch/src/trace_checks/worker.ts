@@ -16,6 +16,7 @@ import { env } from "../env.mjs";
 import { getCheckExecutor } from "./backend/registry";
 import { prisma } from "../server/db";
 import { clusterTopicsForProject } from "./topic_clustering";
+import { nanoid } from "nanoid";
 
 const debug = getDebugger("langwatch:workers");
 
@@ -50,14 +51,14 @@ export const process = async (
 
 export const start = (
   processMock:
-    | ((job: Job<any, any, CheckTypes>) => Promise<TraceCheckResult>)
+    | ((job: Job<TraceCheckJob, any, CheckTypes>) => Promise<TraceCheckResult>)
     | undefined = undefined,
   maxRuntimeMs: number | undefined = undefined
 ) => {
   return new Promise((resolve) => {
     const processFn = processMock ?? process;
 
-    const traceChecksWorker = new Worker<any, any, CheckTypes>(
+    const traceChecksWorker = new Worker<TraceCheckJob, any, CheckTypes>(
       "trace_checks",
       async (job) => {
         if (
@@ -70,6 +71,21 @@ export const start = (
         try {
           debug(`Processing job ${job.id} with data:`, job.data);
           const result = await processFn(job);
+
+          for (const cost of result.costs) {
+            await prisma.cost.create({
+              data: {
+                id: `cost_${nanoid()}`,
+                projectId: job.data.project_id,
+                costType: `traceCheck/${job.data.check_name}`,
+                referenceType: "check",
+                referenceId: job.data.check_id,
+                amount: cost.amount,
+                currency: cost.currency,
+                extra_info: { trace_check_id: job.id },
+              },
+            });
+          }
 
           await updateCheckStatusInES({
             check_id: job.data.check_id,

@@ -289,6 +289,9 @@ describe("CustomCheck", () => {
       llmBooleanRule
     );
     expect(llmBooleanResult.status).toBe("succeeded");
+    expect(llmBooleanResult.costs).toEqual([
+      { currency: "USD", value: 0.00014800000000000002 },
+    ]);
 
     const llmScoreResult = await CustomCheck.execute(
       sampleTrace,
@@ -296,6 +299,9 @@ describe("CustomCheck", () => {
       llmScoreRule
     );
     expect(llmScoreResult.status).toBe("failed");
+    expect(llmScoreResult.costs).toEqual([
+      { currency: "USD", value: 0.0001645 },
+    ]);
     expect((llmScoreResult.raw_result as any).failedRules).toHaveLength(1);
   });
 });

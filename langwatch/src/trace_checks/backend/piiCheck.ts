@@ -141,6 +141,7 @@ export const convertToTraceCheckResult = (
     },
     value: reportedFindings.length,
     status: reportedFindings.length > 0 ? "failed" : "succeeded",
+    costs: [],
   };
 };
 

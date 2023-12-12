@@ -41,6 +41,7 @@ const execute = async (
     raw_result: moderationResult,
     value: highestScore ?? 0,
     status: flagged ? "failed" : "succeeded",
+    costs: [],
   };
 };
 
