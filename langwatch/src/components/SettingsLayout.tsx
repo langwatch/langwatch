@@ -23,6 +23,7 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
           <MenuLink href="/settings/projects">Projects</MenuLink>
           <MenuLink href="/settings/teams">Teams</MenuLink>
           <MenuLink href="/settings/members">Members</MenuLink>
+          <MenuLink href="/settings/billing">Billing</MenuLink>
         </VStack>
         {children}
       </HStack>

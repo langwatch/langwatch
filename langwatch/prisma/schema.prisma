@@ -193,13 +193,14 @@ model Cost {
     projectId     String
     project       Project  @relation(fields: [projectId], references: [id])
     costType      CostType
+    costName      String?
     referenceType String
     referenceId   String
     amount        Float
     currency      String
     createdAt     DateTime @default(now())
     updatedAt     DateTime @default(now()) @updatedAt
-    extra_info    Json?
+    extraInfo     Json?
 
     @@index([referenceType, referenceId])
     @@index([costType])

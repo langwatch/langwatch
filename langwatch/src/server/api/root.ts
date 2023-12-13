@@ -6,6 +6,7 @@ import { tracesRouter } from "./routers/traces";
 import { spansRouter } from "./routers/spans";
 import { analyticsRouter } from "./routers/analytics";
 import { checksRouter } from "./routers/checks";
+import { costsRouter } from "./routers/costs";
 
 /**
  * This is the primary router for your server.
@@ -20,6 +21,7 @@ export const appRouter = createTRPCRouter({
   spans: spansRouter,
   analytics: analyticsRouter,
   checks: checksRouter,
+  costs: costsRouter,
 });
 
 // export type definition of API

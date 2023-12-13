@@ -79,13 +79,13 @@ export const start = (
                 id: `cost_${nanoid()}`,
                 projectId: job.data.project_id,
                 costType: CostType.TRACE_CHECK,
+                costName: job.data.check_name,
                 referenceType: "check",
                 referenceId: job.data.check_id,
                 amount: cost.amount,
                 currency: cost.currency,
-                extra_info: {
+                extraInfo: {
                   trace_check_id: job.id,
-                  check_name: job.data.check_name,
                 },
               },
             });
