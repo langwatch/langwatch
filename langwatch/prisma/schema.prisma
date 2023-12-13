@@ -188,18 +188,23 @@ enum CostType {
     TRACE_CHECK
 }
 
+enum CostReferenceType {
+    CHECK
+    TRACE
+}
+
 model Cost {
-    id            String   @id @default(nanoid())
+    id            String            @id @default(nanoid())
     projectId     String
-    project       Project  @relation(fields: [projectId], references: [id])
+    project       Project           @relation(fields: [projectId], references: [id])
     costType      CostType
     costName      String?
-    referenceType String
+    referenceType CostReferenceType
     referenceId   String
     amount        Float
     currency      String
-    createdAt     DateTime @default(now())
-    updatedAt     DateTime @default(now()) @updatedAt
+    createdAt     DateTime          @default(now())
+    updatedAt     DateTime          @default(now()) @updatedAt
     extraInfo     Json?
 
     @@index([referenceType, referenceId])

@@ -17,7 +17,7 @@ import { getCheckExecutor } from "./backend/registry";
 import { prisma } from "../server/db";
 import { clusterTopicsForProject } from "./topic_clustering";
 import { nanoid } from "nanoid";
-import { CostType } from "@prisma/client";
+import { CostReferenceType, CostType } from "@prisma/client";
 
 const debug = getDebugger("langwatch:workers");
 
@@ -80,7 +80,7 @@ export const start = (
                 projectId: job.data.project_id,
                 costType: CostType.TRACE_CHECK,
                 costName: job.data.check_name,
-                referenceType: "check",
+                referenceType: CostReferenceType.CHECK,
                 referenceId: job.data.check_id,
                 amount: cost.amount,
                 currency: cost.currency,

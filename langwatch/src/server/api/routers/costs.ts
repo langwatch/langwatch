@@ -14,6 +14,12 @@ export const costsRouter = createTRPCRouter({
       const { startDate, endDate } = input;
       const prisma = ctx.prisma;
 
+      // If end date is very close to now, force it to be now to fetch most recent data
+      const endDate_ =
+        new Date().getTime() - endDate < 1000 * 60 * 60
+          ? new Date().getTime()
+          : endDate;
+
       const userProjects = await prisma.project.findMany({
         where: {
           OR: [
@@ -55,7 +61,7 @@ export const costsRouter = createTRPCRouter({
           costType: "TRACE_CHECK",
           createdAt: {
             gte: new Date(startDate),
-            lte: new Date(endDate),
+            lte: new Date(endDate_),
           },
         },
         _sum: { amount: true },
@@ -71,7 +77,7 @@ export const costsRouter = createTRPCRouter({
           },
           createdAt: {
             gte: new Date(startDate),
-            lte: new Date(endDate),
+            lte: new Date(endDate_),
           },
         },
         _sum: { amount: true },
