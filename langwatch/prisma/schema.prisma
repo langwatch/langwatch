@@ -184,11 +184,15 @@ model Check {
     @@index([projectId])
 }
 
+enum CostType {
+    TRACE_CHECK
+}
+
 model Cost {
     id            String   @id @default(nanoid())
     projectId     String
     project       Project  @relation(fields: [projectId], references: [id])
-    costType      String
+    costType      CostType
     referenceType String
     referenceId   String
     amount        Float
