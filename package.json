@@ -5,14 +5,19 @@
   "main": "index.js",
   "scripts": {
     "dev": "NODE_ENV=development node server.js",
-    "build": "TODO: be sure to expose the right env vars as well",
+    "build": "DEPENDENCY_INJECTION=$(pwd)/src/injection.ts EXTRA_INCLUDE=$(pwd)/src cp .env langwatch/langwatch/; cd langwatch/langwatch; npm run build",
     "test": "echo \"Error: no test specified\" && exit 1",
-    "postinstall": "cp .env langwatch/langwatch/; cd langwatch/langwatch; npm install"
+    "postinstall": "cp .env langwatch/langwatch/; cd langwatch/langwatch; npm install",
+    "prisma:db:push": "node prisma/generate-schema.js && npx prisma db push && cp -R node_modules/.prisma/* langwatch/langwatch/node_modules/.prisma/"
   },
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@prisma/client": "^5.6.0",
     "dotenv": "^16.3.1",
     "next": "^13.5.6"
+  },
+  "devDependencies": {
+    "prisma": "^5.6.0"
   }
 }

@@ -1,0 +1,69 @@
+@include "../langwatch/langwatch/prisma/schema.prisma"
+
+@extends
+model Organization {
+  stripeCustomerId String?        @unique
+  subscriptions    Subscription[]
+}
+
+enum PlanTypes {
+  FREE
+  STARTUP
+  ENTERPRISE
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  PAST_DUE
+  CANCELLED
+  INCOMPLETE
+  INCOMPLETE_EXPIRED
+  TRIALING
+  UNPAID
+}
+
+model Subscription {
+  id                   String             @id @default(nanoid())
+  organizationId       String
+  plan                 PlanTypes
+  stripeSubscriptionId String             @unique
+  status               SubscriptionStatus
+  startDate            DateTime
+  endDate              DateTime? // Nullable for ongoing subscriptions
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @default(now()) @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  invoices     Invoice[]
+
+  @@index([organizationId])
+}
+
+model Invoice {
+  id             String   @id @default(nanoid())
+  subscriptionId String
+  totalAmount    Float
+  currency       String
+  dueDate        DateTime
+  paid           Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @default(now()) @updatedAt
+
+  subscription Subscription  @relation(fields: [subscriptionId], references: [id])
+  lineItems    InvoiceItem[]
+
+  @@index([subscriptionId])
+}
+
+model InvoiceItem {
+  id          String   @id @default(nanoid())
+  invoiceId   String
+  description String
+  amount      Float
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id])
+
+  @@index([invoiceId])
+}
