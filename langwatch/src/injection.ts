@@ -1,8 +1,11 @@
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
+import { SubscriptionHandler } from "./server/subscriptionHandler";
+
 export interface Dependencies {
-  example?: string;
+  subscriptionHandler: typeof SubscriptionHandler;
 }
 
-const dependencies: Dependencies = {};
+const dependencies: Dependencies = {
+  subscriptionHandler: SubscriptionHandler,
+};
 
 export default dependencies;

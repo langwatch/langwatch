@@ -37,9 +37,16 @@ const config = {
       path.join(__dirname, "src", "injection.ts");
 
     config.resolve.alias["@injected-dependencies"] = aliasPath;
-    // TODO: find a less hacky way to make sure injected script will be compiled as well
-    const swcUseOptions = config.module.rules?.[1].oneOf?.[0].use;
-    config.module.rules.push({ test: aliasPath, use: swcUseOptions });
+
+    if (process.env.EXTRA_INCLUDE) {
+      // TODO: find a less hacky way to make sure injected src will be compiled as well
+      for (const rule of config.module.rules?.[1].oneOf ?? []) {
+        const includeIsArray = Array.isArray(rule.include);
+        if (includeIsArray) {
+          rule.include.push(process.env.EXTRA_INCLUDE);
+        }
+      }
+    }
 
     // eslint-disable-next-line @typescript-eslint/no-unsafe-return
     return config;

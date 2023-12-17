@@ -23,13 +23,8 @@ import { useRouter } from "next/router";
 import NProgress from "nprogress";
 import { useEffect } from "react";
 import { Analytics } from "@vercel/analytics/react";
-//@ts-ignore
-import _dependencies from "@injected-dependencies";
-import { type Dependencies } from "../injection";
 
 const inter = Inter({ subsets: ["latin"] });
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-const dependencies = _dependencies as Dependencies;
 
 // eslint-disable-next-line @typescript-eslint/unbound-method
 const { definePartsStyle, defineMultiStyleConfig } =

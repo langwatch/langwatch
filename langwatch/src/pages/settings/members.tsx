@@ -23,14 +23,15 @@ import {
   Text,
   Th,
   Thead,
+  Tooltip,
   Tr,
   VStack,
   useDisclosure,
-  useToast
+  useToast,
 } from "@chakra-ui/react";
 import type { UserRole } from "@prisma/client";
 import { Select as MultiSelect } from "chakra-react-select";
-import { Mail, Plus, Trash } from "react-feather";
+import { Lock, Mail, Plus, Trash } from "react-feather";
 import {
   Controller,
   useFieldArray,
@@ -44,6 +45,7 @@ import type {
   TeamWithProjects,
 } from "../../server/api/routers/organization";
 import { api } from "../../utils/api";
+import { type SubscriptionLimits } from "../../server/subscriptionHandler";
 
 type Option = { label: string; value: string };
 
@@ -67,13 +69,27 @@ export default function Members() {
       },
       { enabled: !!organization }
     );
+  const subscriptionLimits = api.subscription.getSubscriptionLimits.useQuery(
+    {
+      organizationId: organization?.id ?? "",
+    },
+    {
+      enabled: !!organization,
+    }
+  );
 
-  if (!organization || !organizationWithMembers.data) return <SettingsLayout />;
+  if (
+    !organization ||
+    !organizationWithMembers.data ||
+    !subscriptionLimits.data
+  )
+    return <SettingsLayout />;
 
   return (
     <MembersList
       teams={organization.teams}
       organization={organizationWithMembers.data}
+      subscriptionLimits={subscriptionLimits.data}
     />
   );
 }
@@ -81,9 +97,11 @@ export default function Members() {
 function MembersList({
   organization,
   teams,
+  subscriptionLimits,
 }: {
   organization: OrganizationWithMembersAndTheirTeams;
   teams: TeamWithProjects[];
+  subscriptionLimits: SubscriptionLimits;
 }) {
   const teamOptions = teams.map((team) => ({
     label: team.name,
@@ -178,16 +196,27 @@ function MembersList({
             Organization Members
           </Heading>
           <Spacer />
-          <Button
-            size="sm"
-            colorScheme="orange"
-            onClick={() => onAddMembersOpen()}
-          >
-            <HStack spacing={2}>
-              <Plus size={20} />
-              <Text>Add members</Text>
-            </HStack>
-          </Button>
+          {organization.members.length >= subscriptionLimits.maxMembers ? (
+            <Tooltip label="Upgrade your plan to add more members">
+              <Button size="sm" colorScheme="orange" isDisabled={true}>
+                <HStack spacing={2}>
+                  <Lock size={20} />
+                  <Text>Add members</Text>
+                </HStack>
+              </Button>
+            </Tooltip>
+          ) : (
+            <Button
+              size="sm"
+              colorScheme="orange"
+              onClick={() => onAddMembersOpen()}
+            >
+              <HStack spacing={2}>
+                <Plus size={20} />
+                <Text>Add members</Text>
+              </HStack>
+            </Button>
+          )}
         </HStack>
         <Card width="full">
           <CardBody width="full" paddingY={0} paddingX={0}>

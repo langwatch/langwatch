@@ -26,3 +26,26 @@ export const checkUserPermissionForProject = async ({
 
   return next();
 };
+
+export const checkUserPermissionForOrganization = async ({
+  ctx,
+  input,
+  next,
+}: {
+  ctx: { prisma: PrismaClient; session: Session };
+  input: { organizationId: string };
+  next: () => any;
+}) => {
+  const organizationUser = await ctx.prisma.organizationUser.findFirst({
+    where: {
+      userId: ctx.session.user.id,
+      organizationId: input.organizationId,
+    },
+  });
+
+  if (!organizationUser) {
+    throw new TRPCError({ code: "UNAUTHORIZED" });
+  }
+
+  return next();
+};
