@@ -1,0 +1,18 @@
+{
+  "name": "langwatch-sass",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "dev": "NODE_ENV=development node server.js",
+    "build": "TODO: be sure to expose the right env vars as well",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "postinstall": "cp .env langwatch/langwatch/; cd langwatch/langwatch; npm install"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "dotenv": "^16.3.1",
+    "next": "^13.5.6"
+  }
+}

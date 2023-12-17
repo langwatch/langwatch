@@ -1,0 +1,3 @@
+[submodule "langwatch"]
+	path = langwatch
+	url = https://github.com/langwatch/langwatch.git
