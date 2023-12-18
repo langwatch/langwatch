@@ -7,7 +7,7 @@
     "dev": "NODE_ENV=development DEBUG=langwatch:* DEBUG_HIDE_DATE=true DEBUG_COLORS=true concurrently 'node src/server.js' 'npm run start:workers'",
     "postinstall": "cp -R ../docs/docs/integration-guides src/components/ && npm run types:zod:generate",
     "lint": "next lint",
-    "start": "concurrently 'node src/server.js' 'npm run start:workers'",
+    "start": "next start",
     "start:workers": "tsx src/workers.ts",
     "prisma:db:push": "npx prisma db push",
     "test": "DEBUG_HIDE_DATE=true DEBUG_COLORS=true vitest",
