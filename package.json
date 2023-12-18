@@ -5,8 +5,9 @@
   "main": "index.js",
   "scripts": {
     "dev": "NODE_ENV=development node server.js",
-    "build": "DEPENDENCY_INJECTION_DIR=$(pwd)/src/injection/ EXTRA_INCLUDE=$(pwd)/src cp .env langwatch/langwatch/; cd langwatch/langwatch; npm run build",
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "export DEPENDENCY_INJECTION_DIR=$(pwd)/src/injection/; export EXTRA_INCLUDE=$(pwd)/src; cp .env langwatch/langwatch/; cd langwatch/langwatch; npm run build",
+    "start": "next start",
+    "preinstall": "git submodule update --init",
     "postinstall": "cp .env langwatch/langwatch/; cd langwatch/langwatch; npm install; cd ../../; npm run prisma:db:push",
     "prisma:db:push": "node prisma/generate-schema.js && npx prisma db push && cp -R node_modules/.prisma/* langwatch/langwatch/node_modules/.prisma/"
   },
@@ -15,7 +16,7 @@
   "dependencies": {
     "@prisma/client": "^5.6.0",
     "dotenv": "^16.3.1",
-    "next": "^13.5.6",
+    "next": "13.4.19",
     "react": "^18.2.0"
   },
   "devDependencies": {

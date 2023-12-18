@@ -1,0 +1,20 @@
+{
+  "framework": "nextjs",
+  "outputDirectory": "langwatch/langwatch/.next",
+  "crons": [
+    {
+      "path": "/api/traces_worker",
+      "schedule": "*/4 * * * *"
+    },
+    {
+      "path": "/api/schedule_topic_clustering",
+      "schedule": "0 0 * * *"
+    }
+  ],
+  "ignoreCommand": "git submodule update --init; exit 1",
+  "functions": {
+    "src/pages/api/**/*.ts": {
+      "memory": 1024
+    }
+  }
+}
