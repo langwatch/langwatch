@@ -2,41 +2,46 @@ import { PlanTypes, SubscriptionStatus } from "@prisma/client";
 
 import {
   SubscriptionHandler,
-  type SubscriptionLimits,
+  type PlanInfo,
 } from "../langwatch/langwatch/src/server/subscriptionHandler";
 import { prisma } from "../langwatch/langwatch/src/server/db";
 
-const PLAN_LIMITS: Record<PlanTypes, SubscriptionLimits> = {
+const PLAN_LIMITS: Record<PlanTypes, PlanInfo> = {
   [PlanTypes.FREE]: {
+    name: "Free",
+    free: true,
     maxMembers: 1,
   },
-  [PlanTypes.STARTUP]: {
-    maxMembers: 10,
+  [PlanTypes.TEAM]: {
+    name: "Team",
+    free: false,
+    maxMembers: 5,
+  },
+  [PlanTypes.BUSINESS]: {
+    name: "Business",
+    free: false,
+    maxMembers: 100,
   },
   [PlanTypes.ENTERPRISE]: {
+    name: "Enterprise",
+    free: false,
     maxMembers: 1000,
   },
 };
 
-const getActivePlanLimits = async (
-  organizationId: string
-): Promise<SubscriptionLimits> => {
-  const activeSubscription = await prisma.subscription.findFirst({
-    where: {
-      organizationId: organizationId,
-      status: {
-        in: [SubscriptionStatus.ACTIVE, SubscriptionStatus.TRIALING],
-      },
-    },
-  });
-
-  if (!activeSubscription) return PLAN_LIMITS[PlanTypes.FREE];
-
-  return PLAN_LIMITS[activeSubscription.plan];
-};
-
 export class SubscriptionHandlerSass extends SubscriptionHandler {
-  static async getLimits(organizationId: string): Promise<SubscriptionLimits> {
-    return await getActivePlanLimits(organizationId);
+  static async getActivePlan(organizationId: string): Promise<PlanInfo> {
+    const activeSubscription = await prisma.subscription.findFirst({
+      where: {
+        organizationId: organizationId,
+        status: {
+          in: [SubscriptionStatus.ACTIVE, SubscriptionStatus.TRIALING],
+        },
+      },
+    });
+
+    if (!activeSubscription) return PLAN_LIMITS[PlanTypes.FREE];
+
+    return PLAN_LIMITS[activeSubscription.plan];
   }
 }

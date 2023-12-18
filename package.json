@@ -7,7 +7,7 @@
     "dev": "NODE_ENV=development node server.js",
     "build": "DEPENDENCY_INJECTION=$(pwd)/src/injection.ts EXTRA_INCLUDE=$(pwd)/src cp .env langwatch/langwatch/; cd langwatch/langwatch; npm run build",
     "test": "echo \"Error: no test specified\" && exit 1",
-    "postinstall": "cp .env langwatch/langwatch/; cd langwatch/langwatch; npm install",
+    "postinstall": "cp .env langwatch/langwatch/; cd langwatch/langwatch; npm install; cd ../../; npm run prisma:db:push",
     "prisma:db:push": "node prisma/generate-schema.js && npx prisma db push && cp -R node_modules/.prisma/* langwatch/langwatch/node_modules/.prisma/"
   },
   "author": "",
