@@ -33,10 +33,11 @@ const config = {
 
   webpack: (config) => {
     const aliasPath =
-      process.env.DEPENDENCY_INJECTION ??
-      path.join(__dirname, "src", "injection.ts");
+      process.env.DEPENDENCY_INJECTION_DIR ??
+      path.join(__dirname, "src", "injection");
 
-    config.resolve.alias["@injected-dependencies"] = aliasPath;
+    config.resolve.alias["@injected-dependencies.client"] = path.join(aliasPath, "injection.client.ts");
+    config.resolve.alias["@injected-dependencies.server"] = path.join(aliasPath, "injection.server.ts");
 
     if (process.env.EXTRA_INCLUDE) {
       // TODO: find a less hacky way to make sure injected src will be compiled as well

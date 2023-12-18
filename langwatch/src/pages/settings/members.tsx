@@ -45,7 +45,7 @@ import type {
   TeamWithProjects,
 } from "../../server/api/routers/organization";
 import { api } from "../../utils/api";
-import { type SubscriptionLimits } from "../../server/subscriptionHandler";
+import { type PlanInfo } from "../../server/subscriptionHandler";
 
 type Option = { label: string; value: string };
 
@@ -69,7 +69,7 @@ export default function Members() {
       },
       { enabled: !!organization }
     );
-  const subscriptionLimits = api.subscription.getSubscriptionLimits.useQuery(
+  const activePlan = api.subscription.getActivePlan.useQuery(
     {
       organizationId: organization?.id ?? "",
     },
@@ -78,18 +78,14 @@ export default function Members() {
     }
   );
 
-  if (
-    !organization ||
-    !organizationWithMembers.data ||
-    !subscriptionLimits.data
-  )
+  if (!organization || !organizationWithMembers.data || !activePlan.data)
     return <SettingsLayout />;
 
   return (
     <MembersList
       teams={organization.teams}
       organization={organizationWithMembers.data}
-      subscriptionLimits={subscriptionLimits.data}
+      activePlan={activePlan.data}
     />
   );
 }
@@ -97,11 +93,11 @@ export default function Members() {
 function MembersList({
   organization,
   teams,
-  subscriptionLimits,
+  activePlan: subscriptionLimits,
 }: {
   organization: OrganizationWithMembersAndTheirTeams;
   teams: TeamWithProjects[];
-  subscriptionLimits: SubscriptionLimits;
+  activePlan: PlanInfo;
 }) {
   const teamOptions = teams.map((team) => ({
     label: team.name,

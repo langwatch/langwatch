@@ -1,4 +1,4 @@
-import { SubscriptionHandler } from "./server/subscriptionHandler";
+import { SubscriptionHandler } from "../server/subscriptionHandler";
 
 export interface Dependencies {
   subscriptionHandler: typeof SubscriptionHandler;

@@ -23,9 +23,20 @@ import {
   usePeriodSelector,
 } from "../../components/PeriodSelector";
 import { Link } from "@chakra-ui/next-js";
+import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 
-export default function Billing() {
+export default function Usage() {
+  const { organization } = useOrganizationTeamProject();
   const { period, setPeriod } = usePeriodSelector(30);
+
+  const activePlan = api.subscription.getActivePlan.useQuery(
+    {
+      organizationId: organization?.id ?? "",
+    },
+    {
+      enabled: !!organization,
+    }
+  );
 
   const aggregatedCosts = api.costs.getAggregatedCostsForOrganization.useQuery(
     {
@@ -47,7 +58,7 @@ export default function Billing() {
       >
         <HStack width="full" marginTop={2}>
           <Heading size="lg" as="h1">
-            Billing
+            Usage
           </Heading>
           <Spacer />
           <PeriodSelector period={period} setPeriod={setPeriod} />
@@ -61,6 +72,17 @@ export default function Billing() {
               paddingX={4}
               align="start"
             >
+              {activePlan.data && (
+                <>
+                  <Heading size="md" as="h2">
+                    Active Plan
+                  </Heading>
+                  <Text paddingBottom={4}>
+                    You are on the {activePlan.data.name} plan
+                    {activePlan.data.free && ", no payment is required"}
+                  </Text>
+                </>
+              )}
               <Heading size="md" as="h2">
                 Processing Costs
               </Heading>
@@ -84,7 +106,12 @@ export default function Billing() {
                 <Text>No costs</Text>
               ) : (
                 aggregatedCosts.data.map((costGroup) => (
-                  <VStack key={costGroup.project.id} align="start" spacing={4} width="full">
+                  <VStack
+                    key={costGroup.project.id}
+                    align="start"
+                    spacing={4}
+                    width="full"
+                  >
                     <Heading size="sm" as="h3">
                       {costGroup.project.name}
                     </Heading>
