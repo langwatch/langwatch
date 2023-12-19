@@ -47,8 +47,13 @@ describe("Collector API Endpoint", () => {
   });
 
   test("should insert spans into Elasticsearch", async () => {
-    const spanData = {
+    const traceData = {
+      trace_id: sampleSpan.trace_id,
       spans: [sampleSpan],
+      thread_id: "thread_test-thread_1",
+      user_id: "user_test-user_1",
+      customer_id: "customer_test-customer_1",
+      version: "test-version-1.0.0",
     };
 
     const { req, res }: { req: NextApiRequest; res: NextApiResponse } =
@@ -57,7 +62,7 @@ describe("Collector API Endpoint", () => {
         headers: {
           "X-Auth-Token": "test-auth-token",
         },
-        body: spanData,
+        body: traceData,
       });
 
     await handler(req, res);
@@ -117,6 +122,10 @@ describe("Collector API Endpoint", () => {
         tokens_estimated: false,
       },
       error: null,
+      thread_id: "thread_test-thread_1",
+      user_id: "user_test-user_1",
+      customer_id: "customer_test-customer_1",
+      version: "test-version-1.0.0",
     });
   });
 

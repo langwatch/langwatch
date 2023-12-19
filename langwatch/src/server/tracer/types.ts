@@ -148,6 +148,8 @@ export type Trace = {
   project_id: string;
   thread_id?: string;
   user_id?: string;
+  customer_id?: string;
+  version?: string;
   timestamps: { started_at: number; inserted_at: number };
   input: TraceInputOutput;
   output?: TraceInputOutput;

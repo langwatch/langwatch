@@ -59,8 +59,11 @@ export default async function handler(
     return res.status(401).json({ message: "Invalid auth token." });
   }
 
+  const traceId = req.body.trace_id;
   const threadId = req.body.thread_id;
   const userId = req.body.user_id;
+  const customerId = req.body.customer_id;
+  const version = req.body.version;
 
   if (!req.body.spans) {
     return res.status(400).json({ message: "Bad request" });
@@ -69,6 +72,11 @@ export default async function handler(
   const spans = await addLLMTokensCount(
     (req.body as Record<string, any>).spans as Span[]
   );
+  spans.forEach((span) => {
+    if (traceId && !span.trace_id) {
+      span.trace_id = traceId;
+    }
+  });
 
   for (const span of spans) {
     try {
@@ -95,8 +103,7 @@ export default async function handler(
   const traceIds = Array.from(
     new Set(spans.filter((span) => span.trace_id).map((span) => span.trace_id))
   );
-  const traceId = traceIds[0];
-  if (!traceId || traceIds.length > 1) {
+  if (!traceIds[0] || traceIds.length > 1 || traceIds[0] != traceId) {
     return res
       .status(400)
       .json({ message: "All spans must have the same trace id" });
@@ -121,6 +128,8 @@ export default async function handler(
     project_id: project.id,
     thread_id: threadId, // Optional: This will be undefined if not sent
     user_id: userId, // Optional: This will be undefined if not sent
+    customer_id: customerId,
+    version: version,
     timestamps: {
       started_at: Math.min(...spans.map((span) => span.timestamps.started_at)),
       inserted_at: Date.now(),
