@@ -33,6 +33,7 @@ import {
   VStack,
   useDisclosure,
 } from "@chakra-ui/react";
+import { Select as MultiSelect } from "chakra-react-select";
 import type { Project } from "@prisma/client";
 import { useRouter } from "next/router";
 import React, { createRef, useEffect, useMemo, useRef, useState } from "react";
@@ -93,6 +94,15 @@ function Messages() {
       topics:
         typeof router.query.topics === "string" && router.query.topics
           ? router.query.topics.split(",")
+          : undefined,
+      customer_ids:
+        typeof router.query.customer_ids === "string" &&
+        router.query.customer_ids
+          ? router.query.customer_ids.split(",")
+          : undefined,
+      version_ids:
+        typeof router.query.version_ids === "string" && router.query.version_ids
+          ? router.query.version_ids.split(",")
           : undefined,
     },
     {
@@ -221,6 +231,15 @@ function TopicsSelector() {
       thread_id:
         typeof router.query.thread_id === "string"
           ? router.query.thread_id
+          : undefined,
+      customer_ids:
+        typeof router.query.customer_ids === "string" &&
+        router.query.customer_ids
+          ? router.query.customer_ids.split(",")
+          : undefined,
+      version_ids:
+        typeof router.query.version_ids === "string" && router.query.version_ids
+          ? router.query.version_ids.split(",")
           : undefined,
     },
     {
@@ -586,9 +605,27 @@ const useGroupBy = () => {
 
 function FilterSelector() {
   const { isOpen, onOpen, onClose } = useDisclosure();
+  const { project } = useOrganizationTeamProject();
+  const [selectedCustomers, setSelectedCustomers] = useState<
+    { label: string; value: string }[]
+  >([]);
+  const [selectedVersions, setSelectedVersions] = useState<
+    { label: string; value: string }[]
+  >([]);
   const router = useRouter();
   const [userId, setUserId] = useState("");
   const [threadId, setThreadId] = useState("");
+
+  const customersAndVersions = api.traces.getCustomersAndVersions.useQuery(
+    {
+      projectId: project?.id ?? "",
+    },
+    {
+      enabled: !!project && isOpen,
+      refetchOnWindowFocus: false,
+      refetchOnMount: false,
+    }
+  );
 
   useEffect(() => {
     const query = router.query;
@@ -601,6 +638,11 @@ function FilterSelector() {
       ...router.query,
       user_id: userId || undefined,
       thread_id: threadId || undefined,
+      customer_ids:
+        selectedCustomers.map((customer) => customer.value).join(",") ||
+        undefined,
+      version_ids:
+        selectedVersions.map((version) => version.value).join(",") || undefined,
     };
     void router.push({ query });
     onClose();
@@ -650,6 +692,56 @@ function FilterSelector() {
                 placeholder="Enter Thread ID"
               />
             </FormControl>
+            {customersAndVersions.data &&
+              customersAndVersions.data.customers.length > 0 && (
+                <FormControl>
+                  <FormLabel>Customer ID</FormLabel>
+                  <MultiSelect
+                    options={customersAndVersions.data.customers.map(
+                      (customer) => ({
+                        label: customer,
+                        value: customer,
+                      })
+                    )}
+                    value={selectedCustomers}
+                    onChange={(items) => {
+                      setSelectedCustomers(
+                        items.map((item) => ({
+                          label: item.label,
+                          value: item.value,
+                        }))
+                      );
+                    }}
+                    placeholder="Select Customer IDs"
+                    isMulti
+                  />
+                </FormControl>
+              )}
+            {customersAndVersions.data &&
+              customersAndVersions.data.versions.length > 0 && (
+                <FormControl>
+                  <FormLabel>Versions</FormLabel>
+                  <MultiSelect
+                    options={customersAndVersions.data.versions.map(
+                      (version) => ({
+                        label: version,
+                        value: version,
+                      })
+                    )}
+                    value={selectedVersions}
+                    onChange={(items) => {
+                      setSelectedVersions(
+                        items.map((item) => ({
+                          label: item.label,
+                          value: item.value,
+                        }))
+                      );
+                    }}
+                    placeholder="Select Versions"
+                    isMulti
+                  />
+                </FormControl>
+              )}
             <Button colorScheme="orange" onClick={applyFilters} alignSelf="end">
               Apply
             </Button>
