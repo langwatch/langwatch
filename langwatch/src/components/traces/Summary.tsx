@@ -100,6 +100,17 @@ const TraceSummaryValues = React.forwardRef(function TraceSummaryValues(
       flexDirection={{ base: "column", lg: "row" }}
       ref={ref as any}
     >
+      {trace.customer_id && (
+        <SummaryItem label="Customer ID">
+          <Text
+            fontFamily={trace.customer_id ? "mono" : undefined}
+            maxWidth="200px"
+            wordBreak="break-all"
+          >
+            {trace.customer_id ?? "unknown"}
+          </Text>
+        </SummaryItem>
+      )}
       <SummaryItem
         label="User ID"
         tooltip={
@@ -132,6 +143,17 @@ const TraceSummaryValues = React.forwardRef(function TraceSummaryValues(
           {trace.thread_id ?? "unknown"}
         </Text>
       </SummaryItem>
+      {trace.version && (
+        <SummaryItem label="Version">
+          <Text
+            fontFamily={trace.version ? "mono" : undefined}
+            maxWidth="200px"
+            wordBreak="break-all"
+          >
+            {trace.version ?? "unknown"}
+          </Text>
+        </SummaryItem>
+      )}
       {(!!trace.metrics.completion_tokens || !!trace.metrics.prompt_tokens) && (
         <SummaryItem
           label="Total Tokens"

@@ -9,5 +9,8 @@ install:
 	fi
 	poetry install --all-extras
 
+example:
+	poetry run chainlit run -w $(filter-out $@,$(MAKECMDGOALS))
+
 %:
 	@:
