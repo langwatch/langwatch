@@ -37,15 +37,16 @@ Ensure that this environment variable is set before you run your application so 
 LangWatch provides an easy-to-use tracer for OpenAI's API. To start capturing data, wrap your API calls with `OpenAITracer`. Here's a quick example:
 
 ```python
+import langwatch.openai
+from openai import OpenAI
+
+client = OpenAI()
 import openai
-import langwatch
 
-# Ensure your OpenAI API key is set in your environment variables or set it manually
-openai.api_key = 'your-openai-api-key'
-
-# Use the LangWatch tracer for the OpenAI GPT-4 Chat model
-with langwatch.openai.OpenAITracer():
-    completion = openai.ChatCompletion.create(
+# Use the LangWatch tracer for the OpenAI model
+with langwatch.openai.OpenAITracer(client):
+    # Your interaction with OpenAI's API
+    completion = client.ChatCompletion.create(
         model="gpt-4",
         messages=[
             {
@@ -59,7 +60,6 @@ with langwatch.openai.OpenAITracer():
         ]
     )
 
-    # Assume the response contains one or more messages and print them
     for message in completion['messages']:
         if message['role'] == 'assistant':
             print(message['content'])
@@ -72,7 +72,7 @@ The tracer will capture all the pertinent data during its context's lifetime, au
 For a more granular analysis, LangWatch allows you to specify custom identifiers such as `user_id` and `thread_id`. This way, you can track interactions per user or conversation threads.
 
 ```python
-with langwatch.openai.OpenAITracer(user_id="user-123", thread_id="thread-456"):
+with langwatch.openai.OpenAITracer(client, user_id="user-123", thread_id="thread-456"):
     # Your OpenAI LLM API calls here
 ```
 
@@ -84,7 +84,7 @@ with langwatch.openai.OpenAITracer(user_id="user-123", thread_id="thread-456"):
 If you're using Langchain, you can integrate LangWatch in a similar fashion using `LangChainTracer`, but you have to pass `langWatchCallback` as a `callback` of the chain, which will capture all the steps going on inside your chain:
 
 ```python
-import langwatch
+import langwatch.langchain
 from langchain.llms import ChatOpenAI
 from langchain.prompts import ChatPromptTemplate
 
