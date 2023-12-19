@@ -10,3 +10,8 @@ If your preferred programming language or platform is not directly supported by 
 import { CustomRest } from "./CustomRest"
 
 <CustomRest />
+
+After following the above guide, your interactions with LLMs should now
+be captured by LangWatch. Once integrated, you can visit your LangWatch
+dashboard to view and analyze the traces collected from your
+applications.

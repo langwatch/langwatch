@@ -48,6 +48,16 @@ with langwatch.openai.OpenAITracer(client, user_id="user-123", thread_id="thread
         This will trace all spans within the block. Spans are created for each
         API call made to OpenAI during the lifecycle of a trace.
       </p>
+      <p>
+        It's optional but highly recommended to pass the <code>user_id</code> if
+        you want to leverage user-specific analytics and the{" "}
+        <code>thread_id</code> to group related traces together. Read more about
+        those and other concepts{" "}
+        <a href="https://docs.langwatch.ai/docs/concepts" target="_blank">
+          here
+        </a>
+        .
+      </p>
     </div>
   );
 };

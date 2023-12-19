@@ -42,15 +42,14 @@ with langwatch.langchain.LangChainTracer(user_id="user-123", thread_id="thread-4
         will be traced as an individual span within a trace.
       </p>
       <p>
-        For both integrations, it's crucial to pass the <code>user_id</code> if
+        It's optional but highly recommended to pass the <code>user_id</code> if
         you want to leverage user-specific analytics and the{" "}
-        <code>thread_id</code> to group related traces together.
-      </p>
-      <p>
-        After following the above guides, your interactions with LLMs should now
-        be captured by LangWatch. Once integrated, you can visit your LangWatch
-        dashboard to view and analyze the traces collected from your
-        applications.
+        <code>thread_id</code> to group related traces together. Read more about
+        those and other concepts{" "}
+        <a href="https://docs.langwatch.ai/docs/concepts" target="_blank">
+          here
+        </a>
+        .
       </p>
     </div>
   );

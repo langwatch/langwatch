@@ -45,11 +45,12 @@ curl -X POST "$ENDPOINT" \\
      -H "Content-Type: application/json" \\
      -d @- <<EOF
 {
+  "trace_id": "trace-123",
   "spans": [
     {
       "type": "llm",
-      "id": "span-123",
-      "trace_id": "trace-456",
+      "id": "span-456",
+      "trace_id": "trace-123",
       "vendor": "openai",
       "model": "gpt-4",
       "input": {
@@ -76,8 +77,10 @@ curl -X POST "$ENDPOINT" \\
       }
     }
   ],
-  "user_id": "your_user_identifier",
-  "thread_id": "your_thread_identifier"
+  "user_id": "optional_end_user_identifier",
+  "thread_id": "optional_thread_identifier",
+  "customer_id": "optional_platform_customer_identifier",
+  "version": "optional_versioning_information"
 }
 EOF`}
         language="bash"
@@ -90,7 +93,7 @@ EOF`}
       <p>
         For the type reference of how a <code>span</code> should look like,
         check out our{" "}
-        <a href="https://github.com/langwatch/langwatch/blob/main/python-sdk/langwatch/types.py#L113">
+        <a href="https://github.com/langwatch/langwatch/blob/main/python-sdk/langwatch/types.py#L118">
           types definitions
         </a>
         .
@@ -99,8 +102,8 @@ EOF`}
         <li style={{ visibility: "hidden", position: "absolute" }}></li>
         <li style={{ visibility: "hidden", position: "absolute" }}></li>
         <li>
-          Execute the <code>curl</code> command. If successful, LangWatch
-          will process your trace data.
+          Execute the <code>curl</code> command. If successful, LangWatch will
+          process your trace data.
         </li>
       </ol>
       <p>
@@ -110,8 +113,9 @@ EOF`}
         RESTful approach ensures you can benefit from LangWatch's capabilities.
       </p>
       <p>
-        Remember to handle errors and retries as needed. You might need to script additional
-        logic around the <code>curl</code> command to handle these cases.
+        Remember to handle errors and retries as needed. You might need to
+        script additional logic around the <code>curl</code> command to handle
+        these cases.
       </p>
     </div>
   );

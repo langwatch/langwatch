@@ -15,3 +15,8 @@ To track the interactions with LangChain, use the `LangChainTracer`.
 import { LangChainPython } from "./LangChainPython"
 
 <LangChainPython />
+
+After following the above guide, your interactions with LLMs should now
+be captured by LangWatch. Once integrated, you can visit your LangWatch
+dashboard to view and analyze the traces collected from your
+applications.
