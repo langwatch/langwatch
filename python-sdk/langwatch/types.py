@@ -110,9 +110,16 @@ class LLMSpan(TypedDict, total=False):
 Span = Union[LLMSpan, BaseSpan]
 
 
-class CollectorRESTParams(TypedDict, total=False):
+class Experiment(TypedDict):
+    id: str
+    variant: int
+
+
+class CollectorRESTParams(TypedDict):
     trace_id: str
     spans: List[Span]
     user_id: Optional[str]
     thread_id: Optional[str]
     customer_id: Optional[str]
+    version: Optional[str]
+    experiments: List[Experiment]

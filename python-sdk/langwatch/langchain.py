@@ -73,8 +73,9 @@ class LangChainTracer(BaseContextTracer, BaseCallbackHandler):
         user_id: Optional[str] = None,
         thread_id: Optional[str] = None,
         customer_id: Optional[str] = None,
+        version: Optional[str] = None,
     ) -> None:
-        super().__init__(trace_id, user_id, thread_id, customer_id)
+        super().__init__(trace_id, user_id, thread_id, customer_id, version)
 
     def on_llm_start(
         self,

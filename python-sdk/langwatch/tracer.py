@@ -127,16 +127,18 @@ class BaseContextTracer:
 
     def __init__(
         self,
-        trace_id: Optional[str] = None,
-        user_id: Optional[str] = None,
-        thread_id: Optional[str] = None,
-        customer_id: Optional[str] = None,
+        trace_id: Optional[str],
+        user_id: Optional[str],
+        thread_id: Optional[str],
+        customer_id: Optional[str],
+        version: Optional[str],
     ):
         self.spans: Dict[str, Span] = {}
         self.trace_id = trace_id or f"trace_{nanoid.generate()}"
         self.user_id = user_id
         self.thread_id = thread_id
         self.customer_id = customer_id
+        self.version = version
 
     def __enter__(self):
         _local_context.current_tracer = self
@@ -151,11 +153,15 @@ class BaseContextTracer:
 
         if "PYTEST_CURRENT_TEST" in os.environ:
             send_spans(
-                trace_id=self.trace_id,
-                spans=list(self.spans.values()),
-                user_id=self.user_id,
-                thread_id=self.thread_id,
-                customer_id=self.customer_id,
+                CollectorRESTParams(
+                    trace_id=self.trace_id,
+                    spans=list(self.spans.values()),
+                    user_id=self.user_id,
+                    thread_id=self.thread_id,
+                    customer_id=self.customer_id,
+                    version=self.version,
+                    experiments=[],
+                )
             )
             return
 
@@ -163,11 +169,15 @@ class BaseContextTracer:
             await asyncio.sleep(1)
             self.sent_once = True
             send_spans(
-                trace_id=self.trace_id,
-                spans=list(self.spans.values()),
-                user_id=self.user_id,
-                thread_id=self.thread_id,
-                customer_id=self.customer_id,
+                CollectorRESTParams(
+                    trace_id=self.trace_id,
+                    spans=list(self.spans.values()),
+                    user_id=self.user_id,
+                    thread_id=self.thread_id,
+                    customer_id=self.customer_id,
+                    version=self.version,
+                    experiments=[],
+                )
             )
 
         if self.scheduled_send:
@@ -202,42 +212,22 @@ executor = ThreadPoolExecutor(max_workers=10)
 
 
 @retry(tries=5, delay=0.5, backoff=3)
-def _send_spans(
-    trace_id: str,
-    spans: List[Span],
-    user_id: Optional[str],
-    thread_id: Optional[str],
-    customer_id: Optional[str],
-):
-    json: CollectorRESTParams = {"trace_id": trace_id, "spans": spans}
-    if user_id:
-        json["user_id"] = user_id
-    if thread_id:
-        json["thread_id"] = thread_id
-    if customer_id:
-        json["customer_id"] = customer_id
-
+def _send_spans(data: CollectorRESTParams):
     if not langwatch.api_key:
         return
     response = requests.post(
         langwatch.endpoint,
-        json=json,
+        json=data,
         headers={"X-Auth-Token": str(langwatch.api_key)},
     )
     response.raise_for_status()
 
 
-def send_spans(
-    trace_id: str,
-    spans: List[Span],
-    user_id: Optional[str],
-    thread_id: Optional[str],
-    customer_id: Optional[str],
-):
-    if len(spans) == 0:
+def send_spans(data: CollectorRESTParams):
+    if len(data["spans"]) == 0:
         return
     if "PYTEST_CURRENT_TEST" in os.environ:
         # Keep on the same thread for tests
-        _send_spans(trace_id, spans, user_id, thread_id, customer_id)
+        _send_spans(data)
     else:
-        executor.submit(trace_id, _send_spans, spans, user_id, thread_id, customer_id)
+        executor.submit(_send_spans, data)
