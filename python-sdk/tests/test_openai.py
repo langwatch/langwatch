@@ -374,6 +374,7 @@ class TestOpenAIChatCompletionTracer:
         time.sleep(0.01)
         trace_request = requests_mock.request_history[0].json()
 
+        assert trace_request["trace_id"].startswith("trace_")
         assert trace_request["user_id"] == "user-123"
         assert trace_request["thread_id"] == "thread-456"
         assert trace_request["customer_id"] == "customer-789"

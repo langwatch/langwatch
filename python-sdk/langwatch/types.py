@@ -111,6 +111,7 @@ Span = Union[LLMSpan, BaseSpan]
 
 
 class CollectorRESTParams(TypedDict, total=False):
+    trace_id: str
     spans: List[Span]
     user_id: Optional[str]
     thread_id: Optional[str]

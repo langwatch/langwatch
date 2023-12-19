@@ -151,6 +151,7 @@ class BaseContextTracer:
 
         if "PYTEST_CURRENT_TEST" in os.environ:
             send_spans(
+                trace_id=self.trace_id,
                 spans=list(self.spans.values()),
                 user_id=self.user_id,
                 thread_id=self.thread_id,
@@ -162,6 +163,7 @@ class BaseContextTracer:
             await asyncio.sleep(1)
             self.sent_once = True
             send_spans(
+                trace_id=self.trace_id,
                 spans=list(self.spans.values()),
                 user_id=self.user_id,
                 thread_id=self.thread_id,
@@ -201,12 +203,13 @@ executor = ThreadPoolExecutor(max_workers=10)
 
 @retry(tries=5, delay=0.5, backoff=3)
 def _send_spans(
+    trace_id: str,
     spans: List[Span],
     user_id: Optional[str],
     thread_id: Optional[str],
     customer_id: Optional[str],
 ):
-    json: CollectorRESTParams = {"spans": spans}
+    json: CollectorRESTParams = {"trace_id": trace_id, "spans": spans}
     if user_id:
         json["user_id"] = user_id
     if thread_id:
@@ -225,6 +228,7 @@ def _send_spans(
 
 
 def send_spans(
+    trace_id: str,
     spans: List[Span],
     user_id: Optional[str],
     thread_id: Optional[str],
@@ -234,6 +238,6 @@ def send_spans(
         return
     if "PYTEST_CURRENT_TEST" in os.environ:
         # Keep on the same thread for tests
-        _send_spans(spans, user_id, thread_id, customer_id)
+        _send_spans(trace_id, spans, user_id, thread_id, customer_id)
     else:
-        executor.submit(_send_spans, spans, user_id, thread_id, customer_id)
+        executor.submit(trace_id, _send_spans, spans, user_id, thread_id, customer_id)
