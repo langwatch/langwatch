@@ -90,7 +90,7 @@ EOF`}
       <p>
         For the type reference of how a <code>span</code> should look like,
         check out our{" "}
-        <a href="https://github.com/langwatch/langwatch/blob/main/python-sdk/langwatch/types.py#L73">
+        <a href="https://github.com/langwatch/langwatch/blob/main/python-sdk/langwatch/types.py#L113">
           types definitions
         </a>
         .

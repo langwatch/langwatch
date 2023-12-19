@@ -8,7 +8,7 @@ from typing import Any, Dict, List, Optional, TypeVar
 
 import nanoid
 import requests
-from langwatch.types import BaseSpan, ErrorCapture, Span, SpanTimestamps, SpanTypes
+from langwatch.types import BaseSpan, ErrorCapture, Span, SpanTimestamps, SpanTypes, CollectorRESTParams
 from langwatch.utils import (
     autoconvert_typed_values,
     capture_exception,
@@ -192,7 +192,7 @@ executor = ThreadPoolExecutor(max_workers=10)
 def _send_spans(
     spans: List[Span], user_id: Optional[str] = None, thread_id: Optional[str] = None
 ):
-    json: dict[str, Any] = {"spans": spans}
+    json: CollectorRESTParams = {"spans": spans}
     if user_id:
         json["user_id"] = user_id
     if thread_id:
