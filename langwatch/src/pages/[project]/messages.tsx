@@ -8,8 +8,6 @@ import {
   Checkbox,
   Container,
   Divider,
-  FormControl,
-  FormLabel,
   HStack,
   Heading,
   Input,
@@ -19,28 +17,18 @@ import {
   MenuGroup,
   MenuItem,
   MenuList,
-  Popover,
-  PopoverArrow,
-  PopoverBody,
-  PopoverCloseButton,
-  PopoverContent,
-  PopoverHeader,
-  PopoverTrigger,
   Radio,
   Skeleton,
   Text,
   Tooltip,
   VStack,
-  useDisclosure,
 } from "@chakra-ui/react";
-import { Select as MultiSelect } from "chakra-react-select";
 import type { Project } from "@prisma/client";
 import { useRouter } from "next/router";
 import React, { createRef, useEffect, useMemo, useRef, useState } from "react";
 import {
   ChevronDown,
   ChevronUp,
-  Filter,
   HelpCircle,
   Layers,
   Maximize2,
@@ -56,6 +44,8 @@ import { ProjectIntegration } from "../../components/ProjectIntegration";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import type { Trace, TraceCheck } from "../../server/tracer/types";
 import { api } from "../../utils/api";
+import { FilterSelector } from "../../components/FilterSelector";
+import { rotatingColors } from "../../utils/rotatingColors";
 
 export default function MessagesOrIntegrationGuide() {
   const { project } = useOrganizationTeamProject();
@@ -237,7 +227,7 @@ function TopicsSelector() {
         router.query.customer_ids
           ? router.query.customer_ids.split(",")
           : undefined,
-      version_ids:
+      versions:
         typeof router.query.version_ids === "string" && router.query.version_ids
           ? router.query.version_ids.split(",")
           : undefined,
@@ -603,155 +593,6 @@ const useGroupBy = () => {
   return [groupBy, setGroupBy] as [typeof groupBy, typeof setGroupBy];
 };
 
-function FilterSelector() {
-  const { isOpen, onOpen, onClose } = useDisclosure();
-  const { project } = useOrganizationTeamProject();
-  const [selectedCustomers, setSelectedCustomers] = useState<
-    { label: string; value: string }[]
-  >([]);
-  const [selectedVersions, setSelectedVersions] = useState<
-    { label: string; value: string }[]
-  >([]);
-  const router = useRouter();
-  const [userId, setUserId] = useState("");
-  const [threadId, setThreadId] = useState("");
-
-  const customersAndVersions = api.traces.getCustomersAndVersions.useQuery(
-    {
-      projectId: project?.id ?? "",
-    },
-    {
-      enabled: !!project && isOpen,
-      refetchOnWindowFocus: false,
-      refetchOnMount: false,
-    }
-  );
-
-  useEffect(() => {
-    const query = router.query;
-    if (typeof query.user_id === "string") setUserId(query.user_id);
-    if (typeof query.thread_id === "string") setThreadId(query.thread_id);
-  }, [router.query]);
-
-  const applyFilters = () => {
-    const query = {
-      ...router.query,
-      user_id: userId || undefined,
-      thread_id: threadId || undefined,
-      customer_ids:
-        selectedCustomers.map((customer) => customer.value).join(",") ||
-        undefined,
-      version_ids:
-        selectedVersions.map((version) => version.value).join(",") || undefined,
-    };
-    void router.push({ query });
-    onClose();
-  };
-
-  const getFilterLabel = () => {
-    const parts = [];
-    if (userId) parts.push(`User ID: ${userId}`);
-    if (threadId) parts.push(`Thread ID: ${threadId}`);
-    return parts.length > 0 ? parts.join(", ") : "Filter";
-  };
-
-  return (
-    <Popover isOpen={isOpen} onClose={onClose} placement="bottom-end">
-      <PopoverTrigger>
-        <Button variant="outline" onClick={onOpen} minWidth="fit-content">
-          <HStack spacing={2}>
-            <Filter size={16} />
-            <Text>{getFilterLabel()}</Text>
-            <Box>
-              <ChevronDown width={14} />
-            </Box>
-          </HStack>
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent width="fit-content">
-        <PopoverArrow />
-        <PopoverCloseButton />
-        <PopoverHeader>
-          <Heading size="sm">Filter Messages</Heading>
-        </PopoverHeader>
-        <PopoverBody padding={4}>
-          <VStack spacing={4}>
-            <FormControl>
-              <FormLabel>User ID</FormLabel>
-              <Input
-                value={userId}
-                onChange={(e) => setUserId(e.target.value)}
-                placeholder="Enter User ID"
-              />
-            </FormControl>
-            <FormControl>
-              <FormLabel>Thread ID</FormLabel>
-              <Input
-                value={threadId}
-                onChange={(e) => setThreadId(e.target.value)}
-                placeholder="Enter Thread ID"
-              />
-            </FormControl>
-            {customersAndVersions.data &&
-              customersAndVersions.data.customers.length > 0 && (
-                <FormControl>
-                  <FormLabel>Customer ID</FormLabel>
-                  <MultiSelect
-                    options={customersAndVersions.data.customers.map(
-                      (customer) => ({
-                        label: customer,
-                        value: customer,
-                      })
-                    )}
-                    value={selectedCustomers}
-                    onChange={(items) => {
-                      setSelectedCustomers(
-                        items.map((item) => ({
-                          label: item.label,
-                          value: item.value,
-                        }))
-                      );
-                    }}
-                    placeholder="Select Customer IDs"
-                    isMulti
-                  />
-                </FormControl>
-              )}
-            {customersAndVersions.data &&
-              customersAndVersions.data.versions.length > 0 && (
-                <FormControl>
-                  <FormLabel>Versions</FormLabel>
-                  <MultiSelect
-                    options={customersAndVersions.data.versions.map(
-                      (version) => ({
-                        label: version,
-                        value: version,
-                      })
-                    )}
-                    value={selectedVersions}
-                    onChange={(items) => {
-                      setSelectedVersions(
-                        items.map((item) => ({
-                          label: item.label,
-                          value: item.value,
-                        }))
-                      );
-                    }}
-                    placeholder="Select Versions"
-                    isMulti
-                  />
-                </FormControl>
-              )}
-            <Button colorScheme="orange" onClick={applyFilters} alignSelf="end">
-              Apply
-            </Button>
-          </VStack>
-        </PopoverBody>
-      </PopoverContent>
-    </Popover>
-  );
-}
-
 function GroupingSelector() {
   const ref = useRef<HTMLDivElement>(null);
 
@@ -800,40 +641,6 @@ const topicColorMap = (traceGroups: Trace[][]): ColorMap => {
       )
     )
   );
-  const colors: { background: string; color: string }[] = [
-    {
-      background: "blue.50",
-      color: "blue.600",
-    },
-    {
-      background: "orange.100",
-      color: "orange.600",
-    },
-    {
-      background: "green.50",
-      color: "green.600",
-    },
-    {
-      background: "yellow.100",
-      color: "yellow.700",
-    },
-    {
-      background: "purple.50",
-      color: "purple.600",
-    },
-    {
-      background: "teal.50",
-      color: "teal.700",
-    },
-    {
-      background: "cyan.50",
-      color: "cyan.700",
-    },
-    {
-      background: "pink.50",
-      color: "pink.700",
-    },
-  ];
 
   const colorMap: ColorMap = {};
   for (const topic of allTopics.values()) {
@@ -842,7 +649,7 @@ const topicColorMap = (traceGroups: Trace[][]): ColorMap => {
       sum += topic.charCodeAt(i);
     }
 
-    colorMap[topic] = colors[sum % colors.length]!;
+    colorMap[topic] = rotatingColors[sum % rotatingColors.length]!;
   }
 
   return colorMap;

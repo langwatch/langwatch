@@ -29,7 +29,7 @@ import { useState, type PropsWithChildren } from "react";
 import {
   ChevronDown,
   ChevronRight,
-  Home,
+  TrendingUp,
   MessageSquare,
   Plus,
   Search,
@@ -270,7 +270,7 @@ export const DashboardLayout = ({
           <VStack spacing={8}>
             <SideMenuLink
               path={projectRoutes.home.path}
-              icon={Home}
+              icon={TrendingUp}
               label={projectRoutes.home.title}
               project={project}
             />

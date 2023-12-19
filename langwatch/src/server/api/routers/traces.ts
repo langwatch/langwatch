@@ -20,7 +20,7 @@ const sharedTraceFilterInput = z.object({
   user_id: z.string().optional(),
   thread_id: z.string().optional(),
   customer_ids: z.array(z.string()).optional(),
-  version_ids: z.array(z.string()).optional(),
+  versions: z.array(z.string()).optional(),
 });
 
 const generateQueryConditions = ({
@@ -30,7 +30,7 @@ const generateQueryConditions = ({
   user_id,
   thread_id,
   customer_ids,
-  version_ids,
+  versions,
 }: z.infer<typeof sharedTraceFilterInput>) => {
   // If end date is very close to now, force it to be now, to allow frontend to keep refetching for new messages
   const endDate_ =
@@ -54,7 +54,7 @@ const generateQueryConditions = ({
     ...(user_id ? [{ term: { user_id: user_id } }] : []),
     ...(thread_id ? [{ term: { thread_id: thread_id } }] : []),
     ...(customer_ids ? [{ terms: { customer_id: customer_ids } }] : []),
-    ...(version_ids ? [{ terms: { version: version_ids } }] : []),
+    ...(versions ? [{ terms: { version: versions } }] : []),
   ];
 };
 
@@ -286,6 +286,7 @@ export const tracesRouter = createTRPCRouter({
           query: {
             //@ts-ignore
             bool: {
+              //@ts-ignore
               must: queryConditions,
             },
           },
