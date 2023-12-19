@@ -35,7 +35,7 @@ class TestOpenAICompletionTracer:
         )
 
         with langwatch.openai.OpenAICompletionTracer(
-            client, user_id="user-123", thread_id="thread-456"
+            client, user_id="user-123", thread_id="thread-456", customer_id="customer-789"
         ):
             response = client.completions.create(
                 model="gpt-3.5-turbo-instruct", prompt="hi"
@@ -51,6 +51,7 @@ class TestOpenAICompletionTracer:
 
         assert trace_request["user_id"] == "user-123"
         assert trace_request["thread_id"] == "thread-456"
+        assert trace_request["customer_id"] == "customer-789"
 
         first_span, second_span = trace_request["spans"]
 
@@ -358,7 +359,7 @@ class TestOpenAIChatCompletionTracer:
             url="https://api.openai.com/v1/chat/completions",
         )
 
-        with langwatch.openai.OpenAIChatCompletionTracer(client):
+        with langwatch.openai.OpenAIChatCompletionTracer(client, user_id="user-123", thread_id="thread-456", customer_id="customer-789"):
             response = client.chat.completions.create(
                 model="gpt-3.5-turbo",
                 messages=[{"role": "user", "content": "Hello!"}],
@@ -371,7 +372,13 @@ class TestOpenAIChatCompletionTracer:
             assert response.model_dump() == openai_mocks[1]
 
         time.sleep(0.01)
-        first_span = requests_mock.request_history[0].json()["spans"][0]
+        trace_request = requests_mock.request_history[0].json()
+
+        assert trace_request["user_id"] == "user-123"
+        assert trace_request["thread_id"] == "thread-456"
+        assert trace_request["customer_id"] == "customer-789"
+
+        first_span = trace_request["spans"][0]
         assert first_span["trace_id"].startswith("trace_")
         assert first_span["vendor"] == "openai"
         assert first_span["model"] == "gpt-3.5-turbo"
@@ -978,7 +985,7 @@ class TestOpenAITracer:
         )
 
         with langwatch.openai.OpenAITracer(
-            client, user_id="user-123", thread_id="thread-456"
+            client, user_id="user-123", thread_id="thread-456", customer_id="customer-789"
         ):
             client.completions.create(
                 model="gpt-3.5-turbo-instruct", prompt="Hello Completion!"

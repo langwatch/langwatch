@@ -39,8 +39,14 @@ class OpenAITracer(BaseContextTracer):
         trace_id: Optional[str] = None,
         user_id: Optional[str] = None,
         thread_id: Optional[str] = None,
+        customer_id: Optional[str] = None,
     ):
-        super().__init__(trace_id=trace_id, user_id=user_id, thread_id=thread_id)
+        super().__init__(
+            trace_id=trace_id,
+            user_id=user_id,
+            thread_id=thread_id,
+            customer_id=customer_id,
+        )
         trace_id = self.trace_id
         self.completion_tracer = OpenAICompletionTracer(
             instance=instance, trace_id=trace_id, user_id=user_id, thread_id=thread_id
@@ -67,9 +73,15 @@ class OpenAICompletionTracer(BaseContextTracer):
         trace_id: Optional[str] = None,
         user_id: Optional[str] = None,
         thread_id: Optional[str] = None,
+        customer_id: Optional[str] = None,
     ):
         self.instance = instance
-        super().__init__(trace_id=trace_id, user_id=user_id, thread_id=thread_id)
+        super().__init__(
+            trace_id=trace_id,
+            user_id=user_id,
+            thread_id=thread_id,
+            customer_id=customer_id,
+        )
 
     def __enter__(self):
         super().__enter__()
@@ -252,9 +264,15 @@ class OpenAIChatCompletionTracer(BaseContextTracer):
         trace_id: Optional[str] = None,
         user_id: Optional[str] = None,
         thread_id: Optional[str] = None,
+        customer_id: Optional[str] = None,
     ):
         self.instance = instance
-        super().__init__(trace_id=trace_id, user_id=user_id, thread_id=thread_id)
+        super().__init__(
+            trace_id=trace_id,
+            user_id=user_id,
+            thread_id=thread_id,
+            customer_id=customer_id,
+        )
 
     def __enter__(self):
         super().__enter__()

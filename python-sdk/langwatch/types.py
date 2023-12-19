@@ -114,3 +114,4 @@ class CollectorRESTParams(TypedDict, total=False):
     spans: List[Span]
     user_id: Optional[str]
     thread_id: Optional[str]
+    customer_id: Optional[str]

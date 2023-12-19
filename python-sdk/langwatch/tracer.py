@@ -8,7 +8,14 @@ from typing import Any, Dict, List, Optional, TypeVar
 
 import nanoid
 import requests
-from langwatch.types import BaseSpan, ErrorCapture, Span, SpanTimestamps, SpanTypes, CollectorRESTParams
+from langwatch.types import (
+    BaseSpan,
+    ErrorCapture,
+    Span,
+    SpanTimestamps,
+    SpanTypes,
+    CollectorRESTParams,
+)
 from langwatch.utils import (
     autoconvert_typed_values,
     capture_exception,
@@ -123,11 +130,13 @@ class BaseContextTracer:
         trace_id: Optional[str] = None,
         user_id: Optional[str] = None,
         thread_id: Optional[str] = None,
+        customer_id: Optional[str] = None,
     ):
         self.spans: Dict[str, Span] = {}
         self.trace_id = trace_id or f"trace_{nanoid.generate()}"
         self.user_id = user_id
         self.thread_id = thread_id
+        self.customer_id = customer_id
 
     def __enter__(self):
         _local_context.current_tracer = self
@@ -145,6 +154,7 @@ class BaseContextTracer:
                 spans=list(self.spans.values()),
                 user_id=self.user_id,
                 thread_id=self.thread_id,
+                customer_id=self.customer_id,
             )
             return
 
@@ -155,6 +165,7 @@ class BaseContextTracer:
                 spans=list(self.spans.values()),
                 user_id=self.user_id,
                 thread_id=self.thread_id,
+                customer_id=self.customer_id,
             )
 
         if self.scheduled_send:
@@ -190,13 +201,18 @@ executor = ThreadPoolExecutor(max_workers=10)
 
 @retry(tries=5, delay=0.5, backoff=3)
 def _send_spans(
-    spans: List[Span], user_id: Optional[str] = None, thread_id: Optional[str] = None
+    spans: List[Span],
+    user_id: Optional[str],
+    thread_id: Optional[str],
+    customer_id: Optional[str],
 ):
     json: CollectorRESTParams = {"spans": spans}
     if user_id:
         json["user_id"] = user_id
     if thread_id:
         json["thread_id"] = thread_id
+    if customer_id:
+        json["customer_id"] = customer_id
 
     if not langwatch.api_key:
         return
@@ -209,12 +225,15 @@ def _send_spans(
 
 
 def send_spans(
-    spans: List[Span], user_id: Optional[str] = None, thread_id: Optional[str] = None
+    spans: List[Span],
+    user_id: Optional[str],
+    thread_id: Optional[str],
+    customer_id: Optional[str],
 ):
     if len(spans) == 0:
         return
     if "PYTEST_CURRENT_TEST" in os.environ:
         # Keep on the same thread for tests
-        _send_spans(spans, user_id, thread_id)
+        _send_spans(spans, user_id, thread_id, customer_id)
     else:
-        executor.submit(_send_spans, spans, user_id, thread_id)
+        executor.submit(_send_spans, spans, user_id, thread_id, customer_id)
