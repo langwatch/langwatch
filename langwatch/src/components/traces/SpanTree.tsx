@@ -303,8 +303,9 @@ export function SpanTree() {
                   <Text>
                     <b>Tokens:</b>{" "}
                     {(span.metrics?.prompt_tokens ?? 0) +
-                      (span.metrics?.completion_tokens ?? 0)}{" "}
-                    tokens
+                      " prompt + " +
+                      (span.metrics?.completion_tokens ?? 0) +
+                      " completion"}
                   </Text>
                 )}
                 {(span.vendor !== undefined || span.model !== undefined) && (

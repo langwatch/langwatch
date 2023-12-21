@@ -5,13 +5,13 @@ import { prisma } from "../../server/db";
 import { SPAN_INDEX, TRACE_INDEX, esClient } from "../../server/elasticsearch";
 import {
   type Trace,
-  type BaseSpan,
   type ElasticSearchSpan,
+  type LLMSpan,
 } from "../../server/tracer/types";
 import handler from "./collector";
 
-const sampleSpan: BaseSpan = {
-  type: "span",
+const sampleSpan: LLMSpan = {
+  type: "llm",
   name: "sample-span",
   id: "span_V1StGXR8_Z5jdHi6B-myB",
   parent_id: null,
@@ -23,6 +23,10 @@ const sampleSpan: BaseSpan = {
     started_at: Date.now(),
     finished_at: Date.now() + 10,
   },
+  vendor: "openai",
+  model: "gpt-3.5-turbo",
+  params: {},
+  metrics: {},
 };
 
 describe("Collector API Endpoint", () => {
@@ -116,10 +120,10 @@ describe("Collector API Endpoint", () => {
       metrics: {
         first_token_ms: null,
         total_time_ms: expect.any(Number),
-        prompt_tokens: null,
-        completion_tokens: null,
-        total_cost: null,
-        tokens_estimated: false,
+        prompt_tokens: 1,
+        completion_tokens: 1,
+        total_cost: 0.0000035,
+        tokens_estimated: true,
       },
       error: null,
       thread_id: "thread_test-thread_1",

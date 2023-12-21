@@ -400,7 +400,7 @@ const addLLMTokensCount = async (spans: Span[]) => {
           outputTokens += (
             await tokenizeAndEstimateCost({
               model: llmSpan.model,
-              input: typedValueToText(output),
+              output: typedValueToText(output),
             })
           ).outputTokens;
         }
