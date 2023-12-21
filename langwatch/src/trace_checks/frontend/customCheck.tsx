@@ -49,5 +49,6 @@ function CustomCheckDetails({ check }: { check: TraceCheck }) {
 
 export const CustomCheck: TraceCheckFrontendDefinition = {
   name: "Custom",
+  description: "Build your own guardrails and measurements using heuristics or LLMs-on-LLMs evalution",
   render: CustomCheckDetails,
 };

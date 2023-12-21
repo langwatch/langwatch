@@ -39,11 +39,12 @@ export default function EditCheck() {
   const deleteCheck = api.checks.delete.useMutation();
 
   const onSubmit = async (data: CheckConfigFormData) => {
-    if (!project) return;
+    if (!project || !data.checkType) return;
 
     try {
       await updateCheck.mutateAsync({
         ...data,
+        checkType: data.checkType,
         id: checkId,
         projectId: project.id,
       });
@@ -53,7 +54,7 @@ export default function EditCheck() {
         duration: 5000,
         isClosable: true,
       });
-      void router.push(`/${project.slug}/checks`);
+      void router.push(`/${project.slug}/guardrails`);
       check.remove();
     } catch (error) {
       toast({
@@ -80,7 +81,7 @@ export default function EditCheck() {
               duration: 5000,
               isClosable: true,
             });
-            void router.push(`/${project.slug}/checks`);
+            void router.push(`/${project.slug}/guardrails`);
           },
           onError: () => {
             toast({

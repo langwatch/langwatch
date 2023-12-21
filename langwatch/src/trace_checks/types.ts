@@ -73,6 +73,7 @@ export type TraceCheckBackendDefinition<T extends CheckTypes> = {
 
 export type TraceCheckFrontendDefinition = {
   name: string;
+  description: string;
   render: (props: { check: TraceCheck }) => JSX.Element;
 };
 

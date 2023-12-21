@@ -12,16 +12,16 @@ export const projectRoutes = {
     title: "Analytics",
   },
   checks: {
-    path: "/[project]/checks",
+    path: "/[project]/guardrails",
     title: "Checks",
   },
   checks_new: {
-    path: "/[project]/checks/new",
+    path: "/[project]/guardrails/new",
     title: "New Check",
     parent: "checks",
   },
   checks_edit: {
-    path: "/[project]/checks/[id]/edit",
+    path: "/[project]/guardrails/[id]/edit",
     title: "Editing Check",
     parent: "checks",
   },

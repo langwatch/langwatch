@@ -91,7 +91,7 @@ export default function Checks() {
       <Container maxWidth="1200" padding={6}>
         <VStack width="fill" spacing={4} align="stretch">
           <HStack paddingTop={4}>
-            <Heading as="h1">Automated Checks</Heading>
+            <Heading as="h1">Guardrails and Measurements</Heading>
             <Spacer />
             {toggleConfig.isLoading && <Spinner size="lg" />}
           </HStack>
@@ -107,7 +107,7 @@ export default function Checks() {
             <Button
               colorScheme="orange"
               as={NextLink}
-              href={`/${project.slug}/checks/new`}
+              href={`/${project.slug}/guardrails/new`}
               minWidth="fit-content"
             >
               + Add Check
@@ -175,7 +175,7 @@ export default function Checks() {
                         </VStack>
                         <LinkOverlay
                           as={NextLink}
-                          href={`/${project.slug}/checks/${check.id}/edit`}
+                          href={`/${project.slug}/guardrails/${check.id}/edit`}
                         >
                           <ChevronRight />
                         </LinkOverlay>

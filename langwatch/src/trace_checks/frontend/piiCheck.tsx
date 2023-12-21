@@ -28,6 +28,7 @@ function CheckDetails({ check }: { check: TraceCheck }) {
 }
 
 export const PIICheck: TraceCheckFrontendDefinition = {
-  name: "PII Check",
+  name: "Google DLP PII Detection",
+  description: "Detects Personal Identifiable Information (PII) such as email addresses, phone numbers, credit card numbers, and more",
   render: CheckDetails,
 };

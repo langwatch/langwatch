@@ -14,11 +14,12 @@ export default function NewTraceCheckConfig() {
   const createCheck = api.checks.create.useMutation();
 
   const onSubmit = async (data: CheckConfigFormData) => {
-    if (!project) return;
+    if (!project || !data.checkType) return;
 
     try {
       await createCheck.mutateAsync({
         ...data,
+        checkType: data.checkType,
         projectId: project.id,
       });
       toast({
@@ -27,7 +28,7 @@ export default function NewTraceCheckConfig() {
         duration: 5000,
         isClosable: true,
       });
-      await router.push(`/${project.slug}/checks`);
+      await router.push(`/${project.slug}/guardrails`);
     } catch (error) {
       toast({
         title: "Failed to create check",
@@ -48,7 +49,7 @@ export default function NewTraceCheckConfig() {
           </Heading>
           <CheckConfigForm
             onSubmit={onSubmit}
-            defaultValues={{ checkType: "custom", sample: 1.0 }}
+            defaultValues={{ sample: 1.0 }}
             isLoading={createCheck.isLoading}
           />
         </VStack>

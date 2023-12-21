@@ -19,6 +19,7 @@ function CheckDetails({ check }: { check: TraceCheck }) {
 }
 
 export const ToxicityCheck: TraceCheckFrontendDefinition = {
-  name: "Toxicity Check",
+  name: "OpenAI Moderation",
+  description: "Detects hate speech, harassment, violence, and other toxic content",
   render: CheckDetails,
 };
