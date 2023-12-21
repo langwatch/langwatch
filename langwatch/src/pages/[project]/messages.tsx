@@ -25,7 +25,7 @@ import {
 } from "@chakra-ui/react";
 import type { Project } from "@prisma/client";
 import { useRouter } from "next/router";
-import React, { createRef, useEffect, useMemo, useRef, useState } from "react";
+import React, { createRef, useEffect, useRef, useState } from "react";
 import {
   ChevronDown,
   ChevronUp,
@@ -45,7 +45,6 @@ import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProje
 import type { Trace, TraceCheck } from "../../server/tracer/types";
 import { api } from "../../utils/api";
 import { FilterSelector } from "../../components/FilterSelector";
-import { getColorMap } from "../../utils/rotatingColors";
 import { getSingleQueryParam } from "../../utils/getSingleQueryParam";
 
 export default function MessagesOrIntegrationGuide() {
@@ -323,14 +322,6 @@ function ExpandableMessages({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [traceGroups]);
 
-  const colorMap = useMemo(
-    () =>
-      getColorMap(
-        traceGroups.flatMap((traces) => traces.map((trace) => trace.topics))
-      ),
-    [traceGroups]
-  );
-
   return traceGroups.map((traceGroup, groupIndex) => {
     const isExpanded = !!expandedGroups[groupIndex];
 
@@ -463,7 +454,6 @@ function ExpandableMessages({
                         project={project}
                         trace={trace}
                         checksMap={checksMap}
-                        colorMap={colorMap}
                       />
                     )}
                   </CardBody>

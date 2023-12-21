@@ -141,14 +141,18 @@ export default async function handler(
     error
   );
 
+  const nullToUndefined = <T>(value: T | null): T | undefined =>
+    // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
+    value === null ? undefined : value;
+
   // Create the trace
   const trace: Trace = {
     id: traceId,
     project_id: project.id,
-    thread_id: threadId, // Optional: This will be undefined if not sent
-    user_id: userId, // Optional: This will be undefined if not sent
-    customer_id: customerId,
-    labels: labels,
+    thread_id: nullToUndefined(threadId), // Optional: This will be undefined if not sent
+    user_id: nullToUndefined(userId), // Optional: This will be undefined if not sent
+    customer_id: nullToUndefined(customerId),
+    labels: nullToUndefined(labels),
     timestamps: {
       started_at: Math.min(...spans.map((span) => span.timestamps.started_at)),
       inserted_at: Date.now(),

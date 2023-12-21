@@ -21,7 +21,7 @@ import { useTraceDetailsState } from "../../hooks/useTraceDetailsState";
 import { getTotalTokensDisplay } from "../../mappers/trace";
 import type { Trace } from "../../server/tracer/types";
 import { formatMilliseconds } from "../../utils/formatMilliseconds";
-import { getColorMap } from "../../utils/rotatingColors";
+import { getColorForString } from "../../utils/rotatingColors";
 
 const SummaryItem = ({
   label,
@@ -92,8 +92,6 @@ const TraceSummaryValues = React.forwardRef(function TraceSummaryValues(
   { trace }: { trace: Trace },
   ref
 ) {
-  const colorMap = getColorMap(trace.labels ?? []);
-
   return (
     <HStack
       borderBottomWidth={1}
@@ -152,8 +150,8 @@ const TraceSummaryValues = React.forwardRef(function TraceSummaryValues(
           {trace.labels.map((label) => (
             <Tag
               key={label}
-              background={colorMap[label]?.background}
-              color={colorMap[label]?.color}
+              background={getColorForString(label).background}
+              color={getColorForString(label).color}
               fontSize={12}
             >
               {label}

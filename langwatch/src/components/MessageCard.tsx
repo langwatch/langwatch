@@ -30,20 +30,18 @@ import { formatMilliseconds } from "../utils/formatMilliseconds";
 import { CheckPassing } from "./CheckPassing";
 import type { Project } from "@prisma/client";
 import NextLink from "next/link";
-import type { ColorMap } from "../utils/rotatingColors";
+import { getColorForString } from "../utils/rotatingColors";
 
 export function MessageCard({
   linkActive,
   project,
   trace,
   checksMap,
-  colorMap,
 }: {
   linkActive: boolean;
   project: Project;
   trace: Trace;
   checksMap: Record<string, TraceCheck[]> | undefined;
-  colorMap: ColorMap;
 }) {
   const traceChecks = checksMap ? checksMap[trace.id] ?? [] : [];
   const checksDone = traceChecks.every(
@@ -128,11 +126,21 @@ export function MessageCard({
             {topics.map((topic) => (
               <Tag
                 key={topic}
-                background={colorMap[topic]?.background}
-                color={colorMap[topic]?.color}
+                background={getColorForString(topic).background}
+                color={getColorForString(topic).color}
                 fontSize={12}
               >
                 {topic}
+              </Tag>
+            ))}
+            {(trace.labels ?? []).map((label) => (
+              <Tag
+                key={label}
+                background={getColorForString(label).background}
+                color={getColorForString(label).color}
+                fontSize={12}
+              >
+                {label}
               </Tag>
             ))}
           </HStack>
