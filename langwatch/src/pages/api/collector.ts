@@ -230,7 +230,7 @@ const getFirstInputAsText = (spans: Span[]): string => {
   if (!input) {
     return "";
   }
-  return typedValueToText(input);
+  return typedValueToText(input, true);
 };
 
 // TODO: test
@@ -246,18 +246,27 @@ const getLastOutputAsText = (spans: Span[]): string => {
     return "";
   }
 
-  return typedValueToText(firstOutput);
+  return typedValueToText(firstOutput, true);
 };
 
 // TODO: test
-const typedValueToText = (typed: SpanInput | SpanOutput): string => {
+const typedValueToText = (
+  typed: SpanInput | SpanOutput,
+  last = false
+): string => {
   if (typed.type == "text") {
     return typed.value;
   } else if (typed.type == "chat_messages") {
-    const lastMessage = typed.value[typed.value.length - 1];
-    return lastMessage
-      ? lastMessage.content ?? JSON.stringify(lastMessage)
-      : "";
+    if (last) {
+      const lastMessage = typed.value[typed.value.length - 1];
+      return lastMessage
+        ? lastMessage.content ?? JSON.stringify(lastMessage)
+        : "";
+    } else {
+      return typed.value
+        .map((message) => message.content ?? JSON.stringify(message))
+        .join("");
+    }
   } else if (typed.type == "json") {
     try {
       const json = typed.value as any;

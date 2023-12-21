@@ -16,7 +16,13 @@ const sampleSpan: LLMSpan = {
   id: "span_V1StGXR8_Z5jdHi6B-myB",
   parent_id: null,
   trace_id: "trace_test-trace_J5m9g-0JDMbcJqLK",
-  input: { type: "text", value: "hello" },
+  input: {
+    type: "chat_messages",
+    value: [
+      { role: "system", content: "you are a helpful assistant" },
+      { role: "user", content: "hello" },
+    ],
+  },
   outputs: [{ type: "text", value: "world" }],
   error: null,
   timestamps: {
@@ -80,8 +86,8 @@ describe("Collector API Endpoint", () => {
     expect(indexedSpan).toMatchObject({
       ...sampleSpan,
       input: {
-        type: "text",
-        value: '"hello"',
+        type: "chat_messages",
+        value: JSON.stringify(sampleSpan.input?.value),
       },
       outputs: [
         {
@@ -120,9 +126,9 @@ describe("Collector API Endpoint", () => {
       metrics: {
         first_token_ms: null,
         total_time_ms: expect.any(Number),
-        prompt_tokens: 1,
+        prompt_tokens: 7,
         completion_tokens: 1,
-        total_cost: 0.0000035,
+        total_cost: 0.0000125,
         tokens_estimated: true,
       },
       error: null,
