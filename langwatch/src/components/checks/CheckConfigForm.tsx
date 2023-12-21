@@ -68,7 +68,21 @@ const defaultParametersMap: {
       },
     ],
   },
-  toxicity_check: {},
+  toxicity_check: {
+    categories: {
+      harassment: true,
+      "harassment/threatening": true,
+      hate: true,
+      "hate/threatening": true,
+      "self-harm": true,
+      "self-harm/intent": true,
+      "self-harm/instructions": true,
+      sexual: true,
+      "sexual/minors": true,
+      violence: true,
+      "violence/graphic": true,
+    },
+  },
 };
 
 export interface CheckConfigFormData {
@@ -202,8 +216,7 @@ export default function CheckConfigForm({
                     helper="Select the type of check"
                     isInvalid={!!errors.checkType}
                   >
-                    {AVAILABLE_TRACE_CHECKS[checkType].name}
-                    {" "}
+                    {AVAILABLE_TRACE_CHECKS[checkType].name}{" "}
                     <Button
                       variant="link"
                       onClick={() => {

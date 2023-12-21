@@ -36,7 +36,12 @@ const parametersDescription: {
         "Whether this check fail is PII is identified in the inner spans of a message, or just in the final input and output",
     },
   },
-  toxicity_check: {},
+  toxicity_check: {
+    categories: {
+      name: "Categories to check",
+      description: "The categories of moderation to check for",
+    }
+  },
   custom: {
     rules: {},
   },

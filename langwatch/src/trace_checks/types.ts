@@ -23,7 +23,21 @@ export type Checks = {
     };
   };
   toxicity_check: {
-    parameters: Record<string, any>;
+    parameters: {
+      categories: {
+        harassment: boolean;
+        "harassment/threatening": boolean;
+        hate: boolean;
+        "hate/threatening": boolean;
+        "self-harm": boolean;
+        "self-harm/intent": boolean;
+        "self-harm/instructions": boolean;
+        sexual: boolean;
+        "sexual/minors": boolean;
+        violence: boolean;
+        "violence/graphic": boolean;
+      };
+    };
   };
   custom: {
     parameters: {

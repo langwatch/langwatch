@@ -14,7 +14,7 @@ const debug = getDebugger("langwatch:trace_checks:toxicityCheck");
 const execute = async (
   trace: Trace,
   _spans: ElasticSearchSpan[],
-  _parameters: Checks["toxicity_check"]["parameters"]
+  parameters: Checks["toxicity_check"]["parameters"]
 ): Promise<TraceCheckResult> => {
   debug("Checking toxicity for trace", trace.id);
   const content = [trace.input.value, trace.output?.value ?? ""].join("\n\n");
@@ -30,10 +30,26 @@ const execute = async (
 
   const moderationResult = (await response.json()) as ModerationResult;
 
-  const flagged = moderationResult.results.some((result) => result.flagged);
+  const flagged = moderationResult.results.some((result) =>
+    Object.entries(result.categories)
+      .filter(
+        ([category]) =>
+          parameters.categories[category as keyof typeof parameters.categories]
+      )
+      .some(([, value]) => value)
+  );
   const highestScore = Math.max(
     ...moderationResult.results.map((result) =>
-      Math.max(...Object.values(result.category_scores))
+      Math.max(
+        ...Object.entries(result.category_scores)
+          .filter(
+            ([category]) =>
+              parameters.categories[
+                category as keyof typeof parameters.categories
+              ]
+          )
+          .map(([, value]) => value)
+      )
     )
   );
 
