@@ -145,6 +145,16 @@ export function MessageCard({
             ))}
           </HStack>
           <HStack fontSize={12} color="gray.400">
+            {!!trace.customer_id && (
+              <>
+                <Box>
+                  Customer ID:{" "}
+                  {trace.customer_id.substring(0, 16) +
+                    (trace.customer_id.length > 16 ? "..." : "")}
+                </Box>
+                <Text>·</Text>
+              </>
+            )}
             <Tooltip
               label={new Date(trace.timestamps.started_at).toLocaleString()}
             >

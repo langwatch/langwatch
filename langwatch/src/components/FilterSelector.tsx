@@ -77,11 +77,7 @@ export function FilterSelector() {
         );
       }
     }
-  }, [
-    customersAndLabels.data,
-    router.query.customer_ids,
-    router.query.labels,
-  ]);
+  }, [customersAndLabels.data, router.query.customer_ids, router.query.labels]);
 
   const applyFilters = () => {
     const query = {
@@ -91,8 +87,7 @@ export function FilterSelector() {
       customer_ids:
         selectedCustomers.map((customer) => customer.value).join(",") ||
         undefined,
-      labels:
-        selectedLabels.map((label) => label.value).join(",") || undefined,
+      labels: selectedLabels.map((label) => label.value).join(",") || undefined,
     };
     void router.push({ query });
     onClose();
@@ -114,7 +109,11 @@ export function FilterSelector() {
           .map((v) => v.label)
           .join(", ")}`
       );
-    return parts.length > 0 ? parts.join(", ") : "Filter";
+
+    const partsString = parts.length > 0 ? parts.join(", ") : "Filter";
+    return (
+      partsString.substring(0, 72) + (partsString.length > 72 ? "..." : "")
+    );
   };
 
   return (
@@ -184,12 +183,10 @@ export function FilterSelector() {
                 <FormControl>
                   <FormLabel>Labels</FormLabel>
                   <MultiSelect
-                    options={customersAndLabels.data.labels.map(
-                      (label) => ({
-                        label: label,
-                        value: label,
-                      })
-                    )}
+                    options={customersAndLabels.data.labels.map((label) => ({
+                      label: label,
+                      value: label,
+                    }))}
                     value={selectedLabels}
                     onChange={(items) => {
                       setSelectedLabels(
