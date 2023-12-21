@@ -72,6 +72,7 @@ function Messages() {
       startDate: period.startDate.getTime(),
       endDate: period.endDate.getTime(),
       query: getSingleQueryParam(router.query.query),
+      topics: getSingleQueryParam(router.query.topics)?.split(","),
       groupBy,
       user_id: getSingleQueryParam(router.query.user_id),
       thread_id: getSingleQueryParam(router.query.thread_id),
