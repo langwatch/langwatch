@@ -25,17 +25,17 @@ const debug = getDebugger("langwatch:workers");
 export const process = async (
   job: Job<TraceCheckJob, any, string>
 ): Promise<TraceCheckResult> => {
-  const trace = await esGetTraceById(job.data.trace_id);
-  const spans = await esGetSpansByTraceId(job.data.trace_id);
+  const trace = await esGetTraceById(job.data.trace.id);
+  const spans = await esGetSpansByTraceId(job.data.trace.id);
   if (!trace) {
     throw "trace not found";
   }
 
   const check = await prisma.check.findUnique({
-    where: { id: job.data.check_id },
+    where: { id: job.data.check.id },
   });
   if (!check) {
-    throw `check config ${job.data.check_id} not found`;
+    throw `check config ${job.data.check.id} not found`;
   }
 
   const checkExecutor = getCheckExecutor(check.checkType);
@@ -55,7 +55,13 @@ export const start = (
     | ((job: Job<TraceCheckJob, any, CheckTypes>) => Promise<TraceCheckResult>)
     | undefined = undefined,
   maxRuntimeMs: number | undefined = undefined
-) => {
+): Promise<
+  | {
+      traceChecksWorker: Worker<TraceCheckJob, any, CheckTypes>;
+      topicClusteringWorker: Worker<TopicClusteringJob, void, string>;
+    }
+  | undefined
+> => {
   return new Promise((resolve) => {
     const processFn = processMock ?? process;
 
@@ -64,7 +70,7 @@ export const start = (
       async (job) => {
         if (
           env.NODE_ENV !== "test" &&
-          job.data.trace_id.includes("test-trace")
+          job.data.trace.id.includes("test-trace")
         ) {
           return;
         }
@@ -77,11 +83,11 @@ export const start = (
             await prisma.cost.create({
               data: {
                 id: `cost_${nanoid()}`,
-                projectId: job.data.project_id,
+                projectId: job.data.trace.project_id,
                 costType: CostType.TRACE_CHECK,
-                costName: job.data.check_name,
+                costName: job.data.check.name,
                 referenceType: CostReferenceType.CHECK,
-                referenceId: job.data.check_id,
+                referenceId: job.data.check.id,
                 amount: cost.amount,
                 currency: cost.currency,
                 extraInfo: {
@@ -92,10 +98,8 @@ export const start = (
           }
 
           await updateCheckStatusInES({
-            check_id: job.data.check_id,
-            check_type: job.name,
-            trace_id: job.data.trace_id,
-            project_id: job.data.project_id,
+            check: job.data.check,
+            trace: job.data.trace,
             status: result.status,
             raw_result: result.raw_result,
             value: result.value,
@@ -103,10 +107,8 @@ export const start = (
           debug("Successfully processed job:", job.id);
         } catch (error) {
           await updateCheckStatusInES({
-            check_id: job.data.check_id,
-            check_type: job.name,
-            trace_id: job.data.trace_id,
-            project_id: job.data.project_id,
+            check: job.data.check,
+            trace: job.data.trace,
             status: "error",
             error: error,
           });
@@ -163,6 +165,8 @@ export const start = (
           resolve(undefined);
         })();
       }, maxRuntimeMs);
+    } else {
+      resolve({ traceChecksWorker, topicClusteringWorker });
     }
   });
 };

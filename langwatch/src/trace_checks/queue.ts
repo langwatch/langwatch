@@ -3,7 +3,7 @@ import { connection } from "../server/redis";
 import { captureError } from "../utils/captureError";
 import { esClient, TRACE_CHECKS_INDEX } from "../server/elasticsearch";
 import type { TraceCheck } from "../server/tracer/types";
-import type { TopicClusteringJob, CheckTypes, TraceCheckJob } from "./types";
+import type { TopicClusteringJob, TraceCheckJob } from "./types";
 import crypto from "crypto";
 import { prisma } from "../server/db";
 
@@ -31,57 +31,60 @@ const topicClusteringQueue = new Queue<TopicClusteringJob, void, string>(
 );
 
 export const scheduleTraceCheck = async ({
-  check_id,
-  check_type,
-  check_name,
-  trace_id,
-  project_id,
+  check,
+  trace,
   delay,
 }: {
-  check_id: string;
-  check_type: CheckTypes;
-  check_name: string;
-  trace_id: string;
-  project_id: string;
+  check: TraceCheckJob["check"];
+  trace: TraceCheckJob["trace"];
   delay?: number;
 }) => {
   await updateCheckStatusInES({
-    check_id,
-    check_type,
-    check_name,
-    trace_id,
-    project_id,
+    check,
+    trace: trace,
     status: "scheduled",
   });
 
   await traceChecksQueue.add(
-    check_type,
-    { check_name, check_id, trace_id, project_id },
+    check.type,
     {
-      jobId: `trace_check_${trace_id}/${check_id}`,
+      // Recreating the check object to avoid passing the whole check object and making the queue heavy, we pass only the keys we need
+      check: {
+        id: check.id,
+        type: check.type,
+        name: check.name,
+      },
+      // Recreating the trace object to avoid passing the whole trace object and making the queue heavy, we pass only the keys we need
+      trace: {
+        id: trace.id,
+        project_id: trace.project_id,
+        thread_id: trace.thread_id,
+        user_id: trace.user_id,
+        customer_id: trace.customer_id,
+        labels: trace.labels,
+      },
+    },
+    {
+      jobId: getTraceCheckId(trace.id, check.id),
       delay: delay ?? 5000,
       attempts: 3,
     }
   );
 };
 
+export const getTraceCheckId = (trace_id: string, check_id: string) => `trace_check_${trace_id}/${check_id}`;
+
 export const updateCheckStatusInES = async ({
-  check_id,
-  check_type,
-  check_name,
-  trace_id,
-  project_id,
+  check,
+  trace,
   status,
   raw_result,
   value,
   error,
   retries,
 }: {
-  check_id: string;
-  check_type: CheckTypes;
-  check_name?: string;
-  trace_id: string;
-  project_id: string;
+  check: TraceCheckJob["check"];
+  trace: TraceCheckJob["trace"];
   status: TraceCheck["status"];
   error?: any;
   raw_result?: object;
@@ -89,13 +92,17 @@ export const updateCheckStatusInES = async ({
   retries?: number;
 }) => {
   const traceCheck: TraceCheck = {
-    id: `trace_check_${trace_id}/${check_id}`,
-    trace_id,
-    project_id,
-    check_id,
-    check_type,
+    id: getTraceCheckId(trace.id, check.id),
+    trace_id: trace.id,
+    project_id: trace.project_id,
+    thread_id: trace.thread_id,
+    user_id: trace.user_id,
+    customer_id: trace.customer_id,
+    labels: trace.labels,
+    check_id: check.id,
+    check_type: check.type,
     status,
-    ...(check_name && { check_name }),
+    ...(check.name && { check_name: check.name }),
     ...(raw_result && { raw_result }),
     ...(value && { value }),
     ...(error && { error: captureError(error) }),

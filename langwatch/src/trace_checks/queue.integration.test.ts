@@ -11,9 +11,13 @@ import {
 } from "vitest";
 import { TRACE_CHECKS_INDEX, esClient } from "../server/elasticsearch";
 import type { TraceCheck } from "../server/tracer/types";
-import { scheduleTraceCheck, updateCheckStatusInES } from "./queue";
+import {
+  getTraceCheckId,
+  scheduleTraceCheck,
+  updateCheckStatusInES,
+} from "./queue";
 import * as traceChecksWorker from "./worker";
-import type { TraceCheckResult } from "./types";
+import type { CheckTypes, TraceCheckJob, TraceCheckResult } from "./types";
 
 const mocks = vi.hoisted(() => {
   return {
@@ -21,13 +25,13 @@ const mocks = vi.hoisted(() => {
   };
 });
 
-const getTraceCheck = async (traceId: string, checkType: string) => {
+const getTraceCheck = async (traceId: string, checkId: string) => {
   return await esClient.search({
     index: TRACE_CHECKS_INDEX,
     body: {
       query: {
         match: {
-          id: `check_${traceId}/${checkType}`,
+          id: getTraceCheckId(traceId, checkId),
         },
       },
     },
@@ -35,18 +39,25 @@ const getTraceCheck = async (traceId: string, checkType: string) => {
 };
 
 describe("Check Queue Integration Tests", () => {
-  let worker: Worker | undefined;
+  let worker: Worker<TraceCheckJob, any, CheckTypes> | undefined;
   const trace_id = `test-trace-id-${nanoid()}`;
   const trace_id_success = `test-trace-id-success-${nanoid()}`;
-  const trace_id_failure = `test-trace-id-failure-${nanoid()}`;
+  const trace_id_failed = `test-trace-id-failure-${nanoid()}`;
+  const trace_id_error = `test-trace-id-error-${nanoid()}`;
+  const check: TraceCheckJob["check"] = {
+    id: "check_123",
+    type: "custom",
+    name: "My Custom Check",
+  };
 
   beforeEach(() => {
     mocks.traceChecksProcess.mockReset();
   });
 
   beforeAll(async () => {
-    worker = traceChecksWorker.start(mocks.traceChecksProcess);
-    await worker.waitUntilReady();
+    const workers = await traceChecksWorker.start(mocks.traceChecksProcess);
+    worker = workers?.traceChecksWorker;
+    await worker?.waitUntilReady();
   });
 
   afterAll(async () => {
@@ -77,22 +88,39 @@ describe("Check Queue Integration Tests", () => {
       index: TRACE_CHECKS_INDEX,
       body: {
         query: {
-          match: { trace_id: trace_id_failure },
+          match: { trace_id: trace_id_failed },
+        },
+      },
+    });
+
+    await esClient.deleteByQuery({
+      index: TRACE_CHECKS_INDEX,
+      body: {
+        query: {
+          match: { trace_id: trace_id_error },
         },
       },
     });
   });
 
-  it('should schedule a trace check and update status to "scheduled" in ES', async () => {
+  it('should schedule a trace check and update status to "scheduled" in ES, making sure all the aggregation fields are also persisted', async () => {
     mocks.traceChecksProcess.mockResolvedValue({
       raw_result: { result: "it works" },
       value: 1,
+      status: "succeeded",
+      costs: [],
     });
 
-    const check_type = "test_check";
-    const project_id = "test-project-id";
+    const trace = {
+      id: trace_id,
+      project_id: "test-project-id",
+      user_id: "test_user_123",
+      thread_id: "test_thread_123",
+      customer_id: "test_customer_123",
+      labels: ["test_label_123"],
+    };
 
-    await scheduleTraceCheck({ check_type, trace_id, project_id });
+    await scheduleTraceCheck({ check, trace });
 
     // Wait for a bit to allow the job to be scheduled
     await new Promise((resolve) => setTimeout(resolve, 100));
@@ -101,34 +129,56 @@ describe("Check Queue Integration Tests", () => {
     const response = await esClient.search<TraceCheck>({
       index: TRACE_CHECKS_INDEX,
       query: {
-        term: { trace_id },
+        term: { trace_id: trace.id },
       },
     });
 
     expect(response.hits.hits).toHaveLength(1);
-    expect(response.hits.hits[0]?._source?.status).toBe("scheduled");
+
+    const traceCheck = response.hits.hits[0]?._source;
+    expect(traceCheck?.status).toBe("scheduled");
+
+    expect(traceCheck).toMatchObject({
+      check_id: check.id,
+      check_name: check.name,
+      check_type: check.type,
+      trace_id: trace.id,
+      project_id: "test-project-id",
+      user_id: "test_user_123",
+      thread_id: "test_thread_123",
+      customer_id: "test_customer_123",
+      labels: ["test_label_123"],
+    });
   });
 
   it('should process a trace check successfully and update status to "succeeded" in ES', async () => {
     mocks.traceChecksProcess.mockResolvedValue({
       raw_result: { result: "succeeded test works" },
       value: 1,
+      status: "succeeded",
+      costs: [],
     });
 
-    const check_type = "test_check";
-    const trace_id = trace_id_success;
-    const project_id = "test-project-id";
+    const trace = {
+      id: trace_id_success,
+      project_id: "test-project-id",
+    };
 
-    await scheduleTraceCheck({ check_type, trace_id, project_id, delay: 0 });
+    await scheduleTraceCheck({ check, trace });
 
     // Wait for the job to be completed
-    await new Promise((resolve) => worker?.on("completed", resolve));
+    await new Promise<void>(
+      (resolve) =>
+        worker?.on("completed", (args) => {
+          if (args.data.trace.id === trace_id_success) resolve();
+        })
+    );
 
     // Query ES to verify the status is "succeeded"
     const response = await esClient.search<TraceCheck>({
       index: TRACE_CHECKS_INDEX,
       query: {
-        term: { trace_id },
+        term: { trace_id: trace.id },
       },
     });
 
@@ -138,14 +188,52 @@ describe("Check Queue Integration Tests", () => {
     expect(mocks.traceChecksProcess).toHaveBeenCalled();
   });
 
-  it('should fail to process a trace check and update status to "failed" in ES', async () => {
+  it('should process a trace check that failed and update status to "failed" in ES', async () => {
+    mocks.traceChecksProcess.mockResolvedValue({
+      raw_result: { result: "succeeded test works" },
+      value: 1,
+      status: "failed",
+      costs: [],
+    });
+
+    const trace = {
+      id: trace_id_failed,
+      project_id: "test-project-id",
+    };
+
+    await scheduleTraceCheck({ check, trace });
+
+    // Wait for the job to be completed
+    await new Promise<void>(
+      (resolve) =>
+        worker?.on("completed", (args) => {
+          if (args.data.trace.id === trace_id_failed) resolve();
+        })
+    );
+
+    // Query ES to verify the status is "failed"
+    const response = await esClient.search<TraceCheck>({
+      index: TRACE_CHECKS_INDEX,
+      query: {
+        term: { trace_id: trace.id },
+      },
+    });
+
+    expect(response.hits.hits).toHaveLength(1);
+    expect(response.hits.hits[0]?._source?.status).toBe("failed");
+    expect(response.hits.hits[0]?._source?.value).toBe(1);
+    expect(mocks.traceChecksProcess).toHaveBeenCalled();
+  });
+
+  it('should errors out when a trace check throws an exception and update status to "error" in ES', async () => {
     mocks.traceChecksProcess.mockRejectedValue("something wrong is not right");
 
-    const check_type = "test_check";
-    const trace_id = trace_id_failure;
-    const project_id = "test-project-id";
+    const trace = {
+      id: trace_id_error,
+      project_id: "test-project-id",
+    };
 
-    await scheduleTraceCheck({ check_type, trace_id, project_id, delay: 0 });
+    await scheduleTraceCheck({ check, trace });
 
     // Wait for the worker to attempt to process the job
     await new Promise((resolve) => worker?.on("failed", resolve));
@@ -154,28 +242,32 @@ describe("Check Queue Integration Tests", () => {
     const response = await esClient.search<TraceCheck>({
       index: TRACE_CHECKS_INDEX,
       query: {
-        term: { trace_id },
+        term: { trace_id: trace.id },
       },
     });
 
     expect(response.hits.hits).toHaveLength(1);
-    expect(response.hits.hits[0]?._source?.status).toBe("failed");
+    expect(response.hits.hits[0]?._source?.status).toBe("error");
     expect(mocks.traceChecksProcess).toHaveBeenCalled();
   });
 });
 
 describe("updateCheckStatusInES", () => {
-  const traceId = "test-trace-id";
+  const traceId = `test-trace-id-${nanoid()}`;
   const projectId = "test-project-id";
-  const checkType = "pii_check";
+  const check: TraceCheckJob["check"] = {
+    id: "check_123",
+    type: "custom",
+    name: "My Custom Check",
+  };
 
-  beforeEach(async () => {
-    // Delete test documents to ensure each test starts fresh
+  afterAll(async () => {
+    // Delete test documents to not polute the db
     await esClient.deleteByQuery({
       index: TRACE_CHECKS_INDEX,
       body: {
         query: {
-          match: { trace_id: traceId },
+          match: { project_id: projectId },
         },
       },
     });
@@ -183,47 +275,59 @@ describe("updateCheckStatusInES", () => {
 
   it("should insert a new trace check if none exists", async () => {
     await updateCheckStatusInES({
-      trace_id: traceId,
-      project_id: projectId,
-      check_type: checkType,
+      check,
+      trace: {
+        id: traceId,
+        project_id: projectId,
+      },
       status: "scheduled",
     });
 
-    const response = await getTraceCheck(traceId, checkType);
+    const response = await getTraceCheck(traceId, check.id);
     expect((response.hits.total as any).value).toBe(1);
     const traceCheck = response.hits.hits[0]?._source;
     expect(traceCheck).toMatchObject({
+      id: getTraceCheckId(traceId, check.id),
+      check_id: check.id,
+      check_name: check.name,
+      check_type: check.type,
       trace_id: traceId,
-      project_id: projectId,
-      check_type: checkType,
       status: "scheduled",
+      project_id: projectId,
     });
   });
 
   it("should update an existing trace check", async () => {
     // Insert the initial document
     await updateCheckStatusInES({
-      trace_id: traceId,
-      project_id: projectId,
-      check_type: checkType,
+      check,
+      trace: {
+        id: traceId,
+        project_id: projectId,
+      },
       status: "scheduled",
     });
 
     // Update the document
     await updateCheckStatusInES({
-      trace_id: traceId,
-      project_id: projectId,
-      check_type: checkType,
+      check,
+      trace: {
+        id: traceId,
+        project_id: projectId,
+      },
       status: "in_progress",
     });
 
-    const response = await getTraceCheck(traceId, checkType);
+    const response = await getTraceCheck(traceId, check.id);
     expect((response.hits.total as any).value).toBe(1);
     const traceCheck = response.hits.hits[0]?._source;
     expect(traceCheck).toMatchObject({
+      id: getTraceCheckId(traceId, check.id),
+      check_id: check.id,
+      check_name: check.name,
+      check_type: check.type,
       trace_id: traceId,
       project_id: projectId,
-      check_type: checkType,
       status: "in_progress",
     });
   });

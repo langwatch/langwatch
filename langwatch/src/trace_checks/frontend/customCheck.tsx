@@ -17,13 +17,28 @@ function CustomCheckDetails({ check }: { check: TraceCheck }) {
     <VStack align="start">
       {failedRules.length > 0 ? (
         failedRules.map(({ rule, score }, index) => (
-          <Text key={index}>
-            Rule failed: {rule?.field} {camelCaseToLowerCase(rule?.rule ?? "")}{" "}
-            {`"${rule?.value}"`}{" "}
-            {score
-              ? `(got ${typeof score === "number" ? +score.toFixed(2) + " score" : score})`
-              : ""}
-          </Text>
+          <VStack key={index} align="start">
+            <Text>
+              Rule failed: {rule?.field}{" "}
+              {camelCaseToLowerCase(rule?.rule ?? "")}
+            </Text>
+            {rule?.value && <Text>{`Instruction: "${rule.value}"`}</Text>}
+            {typeof score !== "undefined" && (
+              <Text>
+                {`${
+                  rule && "failWhen" in rule
+                    ? "Fails when " +
+                      rule.failWhen.condition +
+                      " " +
+                      rule.failWhen.amount +
+                      ", "
+                    : ""
+                } ${rule && "failWhen" in rule ? "g" : "G"}ot ${
+                  typeof score === "number" ? +score.toFixed(2) : score
+                }`}
+              </Text>
+            )}
+          </VStack>
         ))
       ) : (
         <Text>Passed all rules</Text>

@@ -16,11 +16,11 @@ import {
   type SpanInput,
   type SpanOutput,
   type Trace,
-  type TraceInputOutput
+  type TraceInputOutput,
 } from "../../server/tracer/types";
 import {
   collectorRESTParamsValidatorSchema,
-  spanValidatorSchema
+  spanValidatorSchema,
 } from "../../server/tracer/types.generated";
 import {
   convertToTraceCheckResult,
@@ -448,11 +448,11 @@ const cleanupPII = async (
         piiCheck.parameters as Checks["pii_check"]["parameters"]
       );
       await updateCheckStatusInES({
-        check_id: piiCheck.id,
-        check_type: "pii_check",
-        check_name: piiCheck.name,
-        trace_id: trace.id,
-        project_id: trace.project_id,
+        check: {
+          ...piiCheck,
+          type: piiCheck.checkType as CheckTypes,
+        },
+        trace: trace,
         status: traceCheckResult.status,
         raw_result: traceCheckResult.raw_result,
         value: traceCheckResult.value,
@@ -581,11 +581,11 @@ const scheduleTraceChecks = async (trace: Trace) => {
           `scheduling ${check.checkType} (checkId: ${check.id}) for trace ${trace.id}`
         );
         void scheduleTraceCheck({
-          check_id: check.id,
-          check_type: check.checkType as CheckTypes,
-          check_name: check.name,
-          trace_id: trace.id,
-          project_id: trace.project_id,
+          check: {
+            ...check,
+            type: check.checkType as CheckTypes,
+          },
+          trace: trace,
         });
       }
     }

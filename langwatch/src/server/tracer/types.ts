@@ -146,10 +146,12 @@ export type TraceInputOutput = { value: string; openai_embeddings?: number[] };
 export type Trace = {
   id: string;
   project_id: string;
+  // Grouping Fields
   thread_id?: string;
   user_id?: string;
   customer_id?: string;
   labels?: string[];
+  // End Grouping Fields
   timestamps: { started_at: number; inserted_at: number };
   input: TraceInputOutput;
   output?: TraceInputOutput;
@@ -172,6 +174,12 @@ export type TraceCheck = {
   id: string;
   trace_id: string;
   project_id: string;
+  // Grouping Fields
+  thread_id?: string;
+  user_id?: string;
+  customer_id?: string;
+  labels?: string[];
+  // End Grouping Fields
   check_id: string;
   check_type: string;
   check_name: string;
@@ -195,11 +203,11 @@ export type Experiment = {
 export type CollectorRESTParams = {
   trace_id: string;
   spans: Span[];
-  user_id?: string | undefined;
-  thread_id?: string | undefined;
-  customer_id?: string | undefined;
-  labels?: string[] | undefined;
-  experiments?: Experiment[] | undefined;
+  user_id?: string | null | undefined;
+  thread_id?: string | null | undefined;
+  customer_id?: string | null | undefined;
+  labels?: string[] | null | undefined;
+  experiments?: Experiment[] | null | undefined;
 };
 
 export type CollectorRESTParamsValidator = Omit<CollectorRESTParams, "spans">;

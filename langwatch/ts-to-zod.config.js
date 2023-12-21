@@ -13,5 +13,6 @@ module.exports = {
       "TraceCheckResult",
       "TraceCheckFrontendDefinition",
       "TraceCheckBackendDefinition",
+      "TraceCheckJob",
     ].includes(name),
 };

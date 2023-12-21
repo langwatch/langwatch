@@ -34,11 +34,21 @@ export type Checks = {
 
 export type CheckTypes = keyof Checks;
 
+// Zod type will not be generated for this one, check ts-to-zod.config.js
 export type TraceCheckJob = {
-  check_id: string;
-  trace_id: string;
-  project_id: string;
-  check_name: string;
+  check: {
+    id: string;
+    type: CheckTypes;
+    name: string;
+  };
+  trace: {
+    id: string;
+    project_id: string;
+    thread_id?: string | undefined;
+    user_id?: string | undefined;
+    customer_id?: string | undefined;
+    labels?: string[] | undefined;
+  };
 };
 
 export type TopicClusteringJob = {

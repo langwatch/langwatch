@@ -35,7 +35,9 @@ async def main(message: cl.Message):
 
     msg = cl.Message(content="")
 
-    with langwatch.langchain.LangChainTracer() as langWatchCallback:
+    with langwatch.langchain.LangChainTracer(
+        customer_id="customer_example", labels=["v1.0.0"]
+    ) as langWatchCallback:
         async for chunk in runnable.astream(
             {"question": message.content},
             config=RunnableConfig(
