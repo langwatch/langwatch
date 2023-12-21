@@ -55,6 +55,7 @@ import { FilterSelector } from "../../components/FilterSelector";
 import { useRouter } from "next/router";
 import { useMemo } from "react";
 import { rotatingColors } from "../../utils/rotatingColors";
+import { getSingleQueryParam } from "../../utils/getSingleQueryParam";
 
 type GraphsDataNumbers = Record<
   string,
@@ -101,15 +102,10 @@ export default function Index() {
       projectId: project?.id ?? "",
       startDate: addDays(startDate, -daysDifference).getTime(),
       endDate: endDate.getTime(),
-      customer_ids:
-        typeof router.query.customer_ids === "string" &&
-        router.query.customer_ids
-          ? router.query.customer_ids.split(",")
-          : undefined,
-      versions:
-        typeof router.query.version_ids === "string" && router.query.version_ids
-          ? router.query.version_ids.split(",")
-          : undefined,
+      user_id: getSingleQueryParam(router.query.user_id),
+      thread_id: getSingleQueryParam(router.query.thread_id),
+      customer_ids: getSingleQueryParam(router.query.customer_ids)?.split(","),
+      versions: getSingleQueryParam(router.query.versions)?.split(","),
     },
     {
       enabled: !!project?.id && !!startDate && !!endDate,
@@ -133,6 +129,10 @@ export default function Index() {
       projectId: project?.id ?? "",
       startDate: startDate.getTime(),
       endDate: endDate.getTime(),
+      user_id: getSingleQueryParam(router.query.user_id),
+      thread_id: getSingleQueryParam(router.query.thread_id),
+      customer_ids: getSingleQueryParam(router.query.customer_ids)?.split(","),
+      versions: getSingleQueryParam(router.query.versions)?.split(","),
     },
     {
       enabled: !!project?.id && !!startDate && !!endDate,
@@ -146,6 +146,12 @@ export default function Index() {
         projectId: project?.id ?? "",
         startDate: startDate.getTime(),
         endDate: endDate.getTime(),
+        user_id: getSingleQueryParam(router.query.user_id),
+        thread_id: getSingleQueryParam(router.query.thread_id),
+        customer_ids: getSingleQueryParam(router.query.customer_ids)?.split(
+          ","
+        ),
+        versions: getSingleQueryParam(router.query.versions)?.split(","),
       },
       {
         enabled: !!project?.id && !!startDate && !!endDate,

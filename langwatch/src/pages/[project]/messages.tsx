@@ -46,6 +46,7 @@ import type { Trace, TraceCheck } from "../../server/tracer/types";
 import { api } from "../../utils/api";
 import { FilterSelector } from "../../components/FilterSelector";
 import { rotatingColors } from "../../utils/rotatingColors";
+import { getSingleQueryParam } from "../../utils/getSingleQueryParam";
 
 export default function MessagesOrIntegrationGuide() {
   const { project } = useOrganizationTeamProject();
@@ -71,29 +72,12 @@ function Messages() {
       projectId: project?.id ?? "",
       startDate: period.startDate.getTime(),
       endDate: period.endDate.getTime(),
-      query: typeof router.query.query === "string" ? router.query.query : "",
+      query: getSingleQueryParam(router.query.query),
       groupBy,
-      user_id:
-        typeof router.query.user_id === "string"
-          ? router.query.user_id
-          : undefined,
-      thread_id:
-        typeof router.query.thread_id === "string"
-          ? router.query.thread_id
-          : undefined,
-      topics:
-        typeof router.query.topics === "string" && router.query.topics
-          ? router.query.topics.split(",")
-          : undefined,
-      customer_ids:
-        typeof router.query.customer_ids === "string" &&
-        router.query.customer_ids
-          ? router.query.customer_ids.split(",")
-          : undefined,
-      version_ids:
-        typeof router.query.version_ids === "string" && router.query.version_ids
-          ? router.query.version_ids.split(",")
-          : undefined,
+      user_id: getSingleQueryParam(router.query.user_id),
+      thread_id: getSingleQueryParam(router.query.thread_id),
+      customer_ids: getSingleQueryParam(router.query.customer_ids)?.split(","),
+      versions: getSingleQueryParam(router.query.versions)?.split(","),
     },
     {
       enabled: !!project,
@@ -214,23 +198,10 @@ function TopicsSelector() {
       projectId: project?.id ?? "",
       startDate: period.startDate.getTime(),
       endDate: period.endDate.getTime(),
-      user_id:
-        typeof router.query.user_id === "string"
-          ? router.query.user_id
-          : undefined,
-      thread_id:
-        typeof router.query.thread_id === "string"
-          ? router.query.thread_id
-          : undefined,
-      customer_ids:
-        typeof router.query.customer_ids === "string" &&
-        router.query.customer_ids
-          ? router.query.customer_ids.split(",")
-          : undefined,
-      versions:
-        typeof router.query.version_ids === "string" && router.query.version_ids
-          ? router.query.version_ids.split(",")
-          : undefined,
+      user_id: getSingleQueryParam(router.query.user_id),
+      thread_id: getSingleQueryParam(router.query.thread_id),
+      customer_ids: getSingleQueryParam(router.query.customer_ids)?.split(","),
+      versions: getSingleQueryParam(router.query.versions)?.split(","),
     },
     {
       enabled: !!project,

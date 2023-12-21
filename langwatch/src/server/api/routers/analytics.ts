@@ -1,20 +1,57 @@
-import { string, z } from "zod";
+import { z } from "zod";
 
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { TRACE_CHECKS_INDEX, TRACE_INDEX, esClient } from "../../elasticsearch";
 import { checkUserPermissionForProject } from "../permission";
 
+const sharedAnalyticsFilterInput = z.object({
+  projectId: z.string(),
+  startDate: z.number(),
+  endDate: z.number(),
+  user_id: z.string().optional(),
+  thread_id: z.string().optional(),
+  customer_ids: z.array(z.string()).optional(),
+  versions: z.array(z.string()).optional(),
+});
+
+const generateQueryConditions = ({
+  projectId,
+  startDate,
+  endDate,
+  user_id,
+  thread_id,
+  customer_ids,
+  versions,
+}: z.infer<typeof sharedAnalyticsFilterInput>) => {
+  // If end date is very close to now, force it to be now, to allow frontend to keep refetching for new messages
+  const endDate_ =
+    new Date().getTime() - endDate < 1000 * 60 * 60
+      ? new Date().getTime()
+      : endDate;
+
+  return [
+    {
+      term: { project_id: projectId },
+    },
+    {
+      range: {
+        "timestamps.inserted_at": {
+          gte: startDate,
+          lte: endDate_,
+          format: "epoch_millis",
+        },
+      },
+    },
+    ...(user_id ? [{ term: { user_id: user_id } }] : []),
+    ...(thread_id ? [{ term: { thread_id: thread_id } }] : []),
+    ...(customer_ids ? [{ terms: { customer_id: customer_ids } }] : []),
+    ...(versions ? [{ terms: { version: versions } }] : []),
+  ];
+};
+
 export const analyticsRouter = createTRPCRouter({
   getTracesAnalyticsPerDay: protectedProcedure
-    .input(
-      z.object({
-        projectId: z.string(),
-        startDate: z.number(),
-        endDate: z.number(),
-        customer_ids: z.array(z.string()).optional(),
-        versions: z.array(z.string()).optional(),
-      })
-    )
+    .input(sharedAnalyticsFilterInput)
     .use(checkUserPermissionForProject)
     .query(async ({ input }) => {
       const startDate = new Date(input.startDate);
@@ -71,25 +108,9 @@ export const analyticsRouter = createTRPCRouter({
               : {}),
           },
           query: {
-            //@ts-ignore
             bool: {
-              filter: [
-                { term: { project_id: input.projectId } },
-                {
-                  range: {
-                    "timestamps.started_at": {
-                      gte: startDate.getTime(),
-                      lte: endDate.getTime(),
-                    },
-                  },
-                },
-                ...(input.customer_ids
-                  ? [{ terms: { customer_id: input.customer_ids } }]
-                  : []),
-                ...(input.versions
-                  ? [{ terms: { version: input.versions } }]
-                  : []),
-              ],
+              //@ts-ignore
+              filter: generateQueryConditions(input),
             },
           },
           size: 0,
@@ -136,34 +157,17 @@ export const analyticsRouter = createTRPCRouter({
       return aggregations;
     }),
   getUsageMetrics: protectedProcedure
-    .input(
-      z.object({
-        projectId: z.string(),
-        startDate: z.number(),
-        endDate: z.number(),
-      })
-    )
+    .input(sharedAnalyticsFilterInput)
     .use(checkUserPermissionForProject)
     .query(async ({ input }) => {
-      const { projectId, startDate, endDate } = input;
       const result = await esClient.search({
         index: TRACE_INDEX,
         body: {
           size: 0,
           query: {
-            //@ts-ignore
             bool: {
-              filter: [
-                { term: { project_id: projectId } },
-                {
-                  range: {
-                    "timestamps.started_at": {
-                      gte: startDate,
-                      lte: endDate,
-                    },
-                  },
-                },
-              ],
+              //@ts-ignore
+              filter: generateQueryConditions(input),
             },
           },
         },
@@ -210,34 +214,18 @@ export const analyticsRouter = createTRPCRouter({
       };
     }),
   getTraceCheckStatusCounts: protectedProcedure
-    .input(
-      z.object({
-        projectId: z.string(),
-        startDate: z.number(),
-        endDate: z.number(),
-      })
-    )
+    .input(sharedAnalyticsFilterInput)
     .use(checkUserPermissionForProject)
     .query(async ({ input }) => {
-      const { projectId, startDate, endDate } = input;
+      console.log('generateQueryConditions(input)', generateQueryConditions(input));
       const result = await esClient.search({
         index: TRACE_CHECKS_INDEX,
         body: {
           size: 0,
           query: {
-            //@ts-ignore
             bool: {
-              filter: [
-                { term: { project_id: projectId } },
-                {
-                  range: {
-                    "timestamps.inserted_at": {
-                      gte: startDate,
-                      lte: endDate,
-                    },
-                  },
-                },
-              ],
+              //@ts-ignore
+              filter: generateQueryConditions(input),
             },
           },
           aggs: {
