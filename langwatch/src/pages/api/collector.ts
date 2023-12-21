@@ -1,7 +1,13 @@
+import type { Project } from "@prisma/client";
+import * as Sentry from "@sentry/nextjs";
+import similarity from "compute-cosine-similarity";
+import { estimateCost, tokenizeAndEstimateCost } from "llm-cost";
 import { type NextApiRequest, type NextApiResponse } from "next";
 import { prisma } from "../../server/db"; // Adjust the import based on your setup
 import { SPAN_INDEX, TRACE_INDEX, esClient } from "../../server/elasticsearch";
+import { getOpenAIEmbeddings } from "../../server/embeddings";
 import {
+  type CollectorRESTParamsValidator,
   type ElasticSearchInputOutput,
   type ElasticSearchSpan,
   type ErrorCapture,
@@ -10,28 +16,26 @@ import {
   type SpanInput,
   type SpanOutput,
   type Trace,
-  type TraceInputOutput,
+  type TraceInputOutput
 } from "../../server/tracer/types";
-import { spanValidatorSchema } from "../../server/tracer/types.generated";
-import { getDebugger } from "../../utils/logger";
-import * as Sentry from "@sentry/nextjs";
 import {
-  scheduleTraceCheck,
-  updateCheckStatusInES,
-} from "../../trace_checks/queue";
-import type { Project } from "@prisma/client";
-import { getOpenAIEmbeddings } from "../../server/embeddings";
-import { estimateCost, tokenizeAndEstimateCost } from "llm-cost";
+  collectorRESTParamsValidatorSchema,
+  spanValidatorSchema
+} from "../../server/tracer/types.generated";
 import {
   convertToTraceCheckResult,
   piiCheck,
 } from "../../trace_checks/backend/piiCheck";
+import {
+  scheduleTraceCheck,
+  updateCheckStatusInES,
+} from "../../trace_checks/queue";
 import type {
   CheckPreconditions,
   CheckTypes,
   Checks,
 } from "../../trace_checks/types";
-import similarity from "compute-cosine-similarity";
+import { getDebugger } from "../../utils/logger";
 
 const debug = getDebugger("langwatch:collector");
 
@@ -59,11 +63,26 @@ export default async function handler(
     return res.status(401).json({ message: "Invalid auth token." });
   }
 
-  const traceId = req.body.trace_id;
-  const threadId = req.body.thread_id;
-  const userId = req.body.user_id;
-  const customerId = req.body.customer_id;
-  const version = req.body.version;
+  let params: CollectorRESTParamsValidator;
+  try {
+    params = collectorRESTParamsValidatorSchema.parse(req.body);
+  } catch (error) {
+    debug(
+      "Invalid trace received",
+      error,
+      JSON.stringify(req.body, null, "  ")
+    );
+    Sentry.captureException(error);
+    return res.status(400).json({ error: "Invalid trace format." });
+  }
+
+  const {
+    trace_id: traceId,
+    thread_id: threadId,
+    user_id: userId,
+    customer_id: customerId,
+    labels,
+  } = params;
 
   if (!req.body.spans) {
     return res.status(400).json({ message: "Bad request" });
@@ -129,7 +148,7 @@ export default async function handler(
     thread_id: threadId, // Optional: This will be undefined if not sent
     user_id: userId, // Optional: This will be undefined if not sent
     customer_id: customerId,
-    version: version,
+    labels: labels,
     timestamps: {
       started_at: Math.min(...spans.map((span) => span.timestamps.started_at)),
       inserted_at: Date.now(),

@@ -35,7 +35,7 @@ import {
   Search,
 } from "react-feather";
 import { DashboardLayout } from "../../components/DashboardLayout";
-import { MessageCard, type ColorMap } from "../../components/MessageCard";
+import { MessageCard } from "../../components/MessageCard";
 import {
   PeriodSelector,
   usePeriodSelector,
@@ -45,7 +45,7 @@ import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProje
 import type { Trace, TraceCheck } from "../../server/tracer/types";
 import { api } from "../../utils/api";
 import { FilterSelector } from "../../components/FilterSelector";
-import { rotatingColors } from "../../utils/rotatingColors";
+import { getColorMap } from "../../utils/rotatingColors";
 import { getSingleQueryParam } from "../../utils/getSingleQueryParam";
 
 export default function MessagesOrIntegrationGuide() {
@@ -77,7 +77,7 @@ function Messages() {
       user_id: getSingleQueryParam(router.query.user_id),
       thread_id: getSingleQueryParam(router.query.thread_id),
       customer_ids: getSingleQueryParam(router.query.customer_ids)?.split(","),
-      versions: getSingleQueryParam(router.query.versions)?.split(","),
+      labels: getSingleQueryParam(router.query.labels)?.split(","),
     },
     {
       enabled: !!project,
@@ -201,7 +201,7 @@ function TopicsSelector() {
       user_id: getSingleQueryParam(router.query.user_id),
       thread_id: getSingleQueryParam(router.query.thread_id),
       customer_ids: getSingleQueryParam(router.query.customer_ids)?.split(","),
-      versions: getSingleQueryParam(router.query.versions)?.split(","),
+      labels: getSingleQueryParam(router.query.labels)?.split(","),
     },
     {
       enabled: !!project,
@@ -323,7 +323,13 @@ function ExpandableMessages({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [traceGroups]);
 
-  const colorMap = useMemo(() => topicColorMap(traceGroups), [traceGroups]);
+  const colorMap = useMemo(
+    () =>
+      getColorMap(
+        traceGroups.flatMap((traces) => traces.map((trace) => trace.topics))
+      ),
+    [traceGroups]
+  );
 
   return traceGroups.map((traceGroup, groupIndex) => {
     const isExpanded = !!expandedGroups[groupIndex];
@@ -599,29 +605,3 @@ function GroupingSelector() {
     </Menu>
   );
 }
-
-const topicColorMap = (traceGroups: Trace[][]): ColorMap => {
-  const allTopics = new Set(
-    traceGroups.flatMap((traces) =>
-      traces.flatMap((trace) =>
-        trace.topics
-          ? typeof trace.topics === "string"
-            ? [trace.topics]
-            : trace.topics
-          : []
-      )
-    )
-  );
-
-  const colorMap: ColorMap = {};
-  for (const topic of allTopics.values()) {
-    let sum = 0;
-    for (let i = 0; i < topic.length; i++) {
-      sum += topic.charCodeAt(i);
-    }
-
-    colorMap[topic] = rotatingColors[sum % rotatingColors.length]!;
-  }
-
-  return colorMap;
-};

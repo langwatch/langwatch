@@ -30,8 +30,7 @@ import { formatMilliseconds } from "../utils/formatMilliseconds";
 import { CheckPassing } from "./CheckPassing";
 import type { Project } from "@prisma/client";
 import NextLink from "next/link";
-
-export type ColorMap = Record<string, { background: string; color: string }>;
+import type { ColorMap } from "../utils/rotatingColors";
 
 export function MessageCard({
   linkActive,

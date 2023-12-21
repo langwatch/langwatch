@@ -18,7 +18,7 @@ const traceMapping: Record<keyof Trace, MappingProperty> = {
   thread_id: { type: "keyword" },
   user_id: { type: "keyword" },
   customer_id: { type: "keyword" },
-  version: { type: "keyword" },
+  labels: { type: "keyword" },
   timestamps: {
     properties: {
       started_at: { type: "date" },

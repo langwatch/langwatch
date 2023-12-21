@@ -30,14 +30,14 @@ export function FilterSelector() {
   const [selectedCustomers, setSelectedCustomers] = useState<
     { label: string; value: string }[]
   >([]);
-  const [selectedVersions, setSelectedVersions] = useState<
+  const [selectedLabels, setSelectedLabels] = useState<
     { label: string; value: string }[]
   >([]);
   const router = useRouter();
   const [userId, setUserId] = useState("");
   const [threadId, setThreadId] = useState("");
 
-  const customersAndVersions = api.traces.getCustomersAndVersions.useQuery(
+  const customersAndLabels = api.traces.getCustomersAndLabels.useQuery(
     {
       projectId: project?.id ?? "",
     },
@@ -55,32 +55,32 @@ export function FilterSelector() {
   }, [router.query]);
 
   useEffect(() => {
-    if (customersAndVersions.data) {
+    if (customersAndLabels.data) {
       if (router.query.customer_ids) {
         const customerIds = Array.isArray(router.query.customer_ids)
           ? router.query.customer_ids
           : router.query.customer_ids.split(",");
         setSelectedCustomers(
-          customersAndVersions.data.customers
+          customersAndLabels.data.customers
             .filter((customer) => customerIds.includes(customer))
             .map((customer) => ({ label: customer, value: customer }))
         );
       }
-      if (router.query.version_ids) {
-        const versionIds = Array.isArray(router.query.version_ids)
-          ? router.query.version_ids
-          : router.query.version_ids.split(",");
-        setSelectedVersions(
-          customersAndVersions.data.versions
-            .filter((version) => versionIds.includes(version))
-            .map((version) => ({ label: version, value: version }))
+      if (router.query.labels) {
+        const labels = Array.isArray(router.query.labels)
+          ? router.query.labels
+          : router.query.labels.split(",");
+        setSelectedLabels(
+          customersAndLabels.data.labels
+            .filter((label) => labels.includes(label))
+            .map((label) => ({ label: label, value: label }))
         );
       }
     }
   }, [
-    customersAndVersions.data,
+    customersAndLabels.data,
     router.query.customer_ids,
-    router.query.version_ids,
+    router.query.labels,
   ]);
 
   const applyFilters = () => {
@@ -91,8 +91,8 @@ export function FilterSelector() {
       customer_ids:
         selectedCustomers.map((customer) => customer.value).join(",") ||
         undefined,
-      version_ids:
-        selectedVersions.map((version) => version.value).join(",") || undefined,
+      labels:
+        selectedLabels.map((label) => label.value).join(",") || undefined,
     };
     void router.push({ query });
     onClose();
@@ -108,9 +108,9 @@ export function FilterSelector() {
           selectedCustomers.length > 1 ? "s" : ""
         }: ${selectedCustomers.map((c) => c.label).join(", ")}`
       );
-    if (selectedVersions.length > 0)
+    if (selectedLabels.length > 0)
       parts.push(
-        `Version${selectedVersions.length > 1 ? "s" : ""}: ${selectedVersions
+        `Label${selectedLabels.length > 1 ? "s" : ""}: ${selectedLabels
           .map((v) => v.label)
           .join(", ")}`
       );
@@ -154,12 +154,12 @@ export function FilterSelector() {
                 placeholder="Enter Thread ID"
               />
             </FormControl>
-            {customersAndVersions.data &&
-              customersAndVersions.data.customers.length > 0 && (
+            {customersAndLabels.data &&
+              customersAndLabels.data.customers.length > 0 && (
                 <FormControl>
                   <FormLabel>Customer ID</FormLabel>
                   <MultiSelect
-                    options={customersAndVersions.data.customers.map(
+                    options={customersAndLabels.data.customers.map(
                       (customer) => ({
                         label: customer,
                         value: customer,
@@ -179,27 +179,27 @@ export function FilterSelector() {
                   />
                 </FormControl>
               )}
-            {customersAndVersions.data &&
-              customersAndVersions.data.versions.length > 0 && (
+            {customersAndLabels.data &&
+              customersAndLabels.data.labels.length > 0 && (
                 <FormControl>
-                  <FormLabel>Versions</FormLabel>
+                  <FormLabel>Labels</FormLabel>
                   <MultiSelect
-                    options={customersAndVersions.data.versions.map(
-                      (version) => ({
-                        label: version,
-                        value: version,
+                    options={customersAndLabels.data.labels.map(
+                      (label) => ({
+                        label: label,
+                        value: label,
                       })
                     )}
-                    value={selectedVersions}
+                    value={selectedLabels}
                     onChange={(items) => {
-                      setSelectedVersions(
+                      setSelectedLabels(
                         items.map((item) => ({
                           label: item.label,
                           value: item.value,
                         }))
                       );
                     }}
-                    placeholder="Select Versions"
+                    placeholder="Select Labels"
                     isMulti
                   />
                 </FormControl>

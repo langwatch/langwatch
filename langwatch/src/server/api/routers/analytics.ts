@@ -11,7 +11,7 @@ const sharedAnalyticsFilterInput = z.object({
   user_id: z.string().optional(),
   thread_id: z.string().optional(),
   customer_ids: z.array(z.string()).optional(),
-  versions: z.array(z.string()).optional(),
+  labels: z.array(z.string()).optional(),
 });
 
 const generateQueryConditions = ({
@@ -21,7 +21,7 @@ const generateQueryConditions = ({
   user_id,
   thread_id,
   customer_ids,
-  versions,
+  labels,
 }: z.infer<typeof sharedAnalyticsFilterInput>) => {
   // If end date is very close to now, force it to be now, to allow frontend to keep refetching for new messages
   const endDate_ =
@@ -45,7 +45,7 @@ const generateQueryConditions = ({
     ...(user_id ? [{ term: { user_id: user_id } }] : []),
     ...(thread_id ? [{ term: { thread_id: thread_id } }] : []),
     ...(customer_ids ? [{ terms: { customer_id: customer_ids } }] : []),
-    ...(versions ? [{ terms: { version: versions } }] : []),
+    ...(labels ? [{ terms: { labels: labels } }] : []),
   ];
 };
 
@@ -61,8 +61,8 @@ export const analyticsRouter = createTRPCRouter({
       if (input.customer_ids && input.customer_ids.length > 1) {
         aggregationFields.push("customer_id");
       }
-      if (input.versions && input.versions.length > 1) {
-        aggregationFields.push("version");
+      if (input.labels && input.labels.length > 1) {
+        aggregationFields.push("labels");
       }
 
       const aggregationQuery = {
@@ -217,7 +217,6 @@ export const analyticsRouter = createTRPCRouter({
     .input(sharedAnalyticsFilterInput)
     .use(checkUserPermissionForProject)
     .query(async ({ input }) => {
-      console.log('generateQueryConditions(input)', generateQueryConditions(input));
       const result = await esClient.search({
         index: TRACE_CHECKS_INDEX,
         body: {

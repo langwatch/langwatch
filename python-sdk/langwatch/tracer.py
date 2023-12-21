@@ -131,14 +131,14 @@ class BaseContextTracer:
         user_id: Optional[str],
         thread_id: Optional[str],
         customer_id: Optional[str],
-        version: Optional[str],
+        labels: List[str],
     ):
         self.spans: Dict[str, Span] = {}
         self.trace_id = trace_id or f"trace_{nanoid.generate()}"
         self.user_id = user_id
         self.thread_id = thread_id
         self.customer_id = customer_id
-        self.version = version
+        self.labels = labels
 
     def __enter__(self):
         _local_context.current_tracer = self
@@ -159,7 +159,7 @@ class BaseContextTracer:
                     user_id=self.user_id,
                     thread_id=self.thread_id,
                     customer_id=self.customer_id,
-                    version=self.version,
+                    labels=self.labels,
                     experiments=[],
                 )
             )
@@ -175,7 +175,7 @@ class BaseContextTracer:
                     user_id=self.user_id,
                     thread_id=self.thread_id,
                     customer_id=self.customer_id,
-                    version=self.version,
+                    labels=self.labels,
                     experiments=[],
                 )
             )

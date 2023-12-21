@@ -149,7 +149,7 @@ export type Trace = {
   thread_id?: string;
   user_id?: string;
   customer_id?: string;
-  version?: string;
+  labels?: string[];
   timestamps: { started_at: number; inserted_at: number };
   input: TraceInputOutput;
   output?: TraceInputOutput;
@@ -186,3 +186,20 @@ export type TraceCheck = {
     finished_at?: number;
   };
 };
+
+export type Experiment = {
+  id: string;
+  variant: number;
+};
+
+export type CollectorRESTParams = {
+  trace_id: string;
+  spans: Span[];
+  user_id?: string | undefined;
+  thread_id?: string | undefined;
+  customer_id?: string | undefined;
+  labels?: string[] | undefined;
+  experiments?: Experiment[] | undefined;
+};
+
+export type CollectorRESTParamsValidator = Omit<CollectorRESTParams, "spans">;

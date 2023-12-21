@@ -1,3 +1,5 @@
+export type ColorMap = Record<string, { background: string; color: string }>;
+
 export const rotatingColors: { background: string; color: string }[] = [
   {
     background: "orange.100",
@@ -32,3 +34,25 @@ export const rotatingColors: { background: string; color: string }[] = [
     color: "pink.700",
   },
 ];
+
+export const getColorMap = (
+  labels: (string[] | string | undefined)[]
+): ColorMap => {
+  const allTopics = new Set(
+    labels.flatMap((label) =>
+      typeof label == "string" ? [label ?? ""] : label ?? []
+    )
+  );
+
+  const colorMap: ColorMap = {};
+  for (const topic of allTopics.values()) {
+    let sum = 0;
+    for (let i = 0; i < topic.length; i++) {
+      sum += topic.charCodeAt(i);
+    }
+
+    colorMap[topic] = rotatingColors[sum % rotatingColors.length]!;
+  }
+
+  return colorMap;
+};

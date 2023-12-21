@@ -20,7 +20,7 @@ const sharedTraceFilterInput = z.object({
   user_id: z.string().optional(),
   thread_id: z.string().optional(),
   customer_ids: z.array(z.string()).optional(),
-  versions: z.array(z.string()).optional(),
+  labels: z.array(z.string()).optional(),
 });
 
 const generateQueryConditions = ({
@@ -30,7 +30,7 @@ const generateQueryConditions = ({
   user_id,
   thread_id,
   customer_ids,
-  versions,
+  labels,
 }: z.infer<typeof sharedTraceFilterInput>) => {
   // If end date is very close to now, force it to be now, to allow frontend to keep refetching for new messages
   const endDate_ =
@@ -54,7 +54,7 @@ const generateQueryConditions = ({
     ...(user_id ? [{ term: { user_id: user_id } }] : []),
     ...(thread_id ? [{ term: { thread_id: thread_id } }] : []),
     ...(customer_ids ? [{ terms: { customer_id: customer_ids } }] : []),
-    ...(versions ? [{ terms: { version: versions } }] : []),
+    ...(labels ? [{ terms: { labels: labels } }] : []),
   ];
 };
 
@@ -94,8 +94,6 @@ export const tracesRouter = createTRPCRouter({
   getAllForProject: protectedProcedure
     .input(
       sharedTraceFilterInput.extend({
-        customer_ids: z.array(z.string()).optional(),
-        version_ids: z.array(z.string()).optional(),
         query: z.string().optional(),
         groupBy: z.string().optional(),
         topics: z.array(z.string()).optional(),
@@ -313,7 +311,7 @@ export const tracesRouter = createTRPCRouter({
 
       return topicCounts;
     }),
-  getCustomersAndVersions: protectedProcedure
+  getCustomersAndLabels: protectedProcedure
     .input(
       z.object({
         projectId: z.string(),
@@ -321,7 +319,7 @@ export const tracesRouter = createTRPCRouter({
     )
     .use(checkUserPermissionForProject)
     .query(async ({ input }) => {
-      const customersVersionsResult = await esClient.search<Trace>({
+      const customersLabelsResult = await esClient.search<Trace>({
         index: TRACE_INDEX,
         size: 0, // We don't need the actual documents, just the aggregation results
         body: {
@@ -337,9 +335,9 @@ export const tracesRouter = createTRPCRouter({
                 size: 10000,
               },
             },
-            versions: {
+            labels: {
               terms: {
-                field: "version",
+                field: "labels",
                 size: 10000,
               },
             },
@@ -348,13 +346,13 @@ export const tracesRouter = createTRPCRouter({
       });
 
       const customers: { key: string; doc_count: number }[] =
-        (customersVersionsResult.aggregations?.customers as any)?.buckets ?? [];
-      const versions: { key: string; doc_count: number }[] =
-        (customersVersionsResult.aggregations?.versions as any)?.buckets ?? [];
+        (customersLabelsResult.aggregations?.customers as any)?.buckets ?? [];
+      const labels: { key: string; doc_count: number }[] =
+        (customersLabelsResult.aggregations?.labels as any)?.buckets ?? [];
 
       return {
         customers: customers.map((bucket) => bucket.key),
-        versions: versions.map((bucket) => bucket.key),
+        labels: labels.map((bucket) => bucket.key),
       };
     }),
   getTracesByThreadId: protectedProcedure

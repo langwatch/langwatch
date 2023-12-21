@@ -121,5 +121,5 @@ class CollectorRESTParams(TypedDict):
     user_id: Optional[str]
     thread_id: Optional[str]
     customer_id: Optional[str]
-    version: Optional[str]
+    labels: List[str]
     experiments: List[Experiment]

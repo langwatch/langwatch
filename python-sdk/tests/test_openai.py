@@ -367,7 +367,7 @@ class TestOpenAIChatCompletionTracer:
             user_id="user-123",
             thread_id="thread-456",
             customer_id="customer-789",
-            version="1.0.0",
+            labels=["1.0.0"],
         ):
             response = client.chat.completions.create(
                 model="gpt-3.5-turbo",
@@ -387,7 +387,7 @@ class TestOpenAIChatCompletionTracer:
         assert trace_request["user_id"] == "user-123"
         assert trace_request["thread_id"] == "thread-456"
         assert trace_request["customer_id"] == "customer-789"
-        assert trace_request["version"] == "1.0.0"
+        assert trace_request["labels"] == ["1.0.0"]
 
         first_span = trace_request["spans"][0]
         assert first_span["trace_id"].startswith("trace_")

@@ -4,6 +4,7 @@ import {
   Box,
   HStack,
   Skeleton,
+  Tag,
   Text,
   Tooltip,
   VStack,
@@ -20,6 +21,7 @@ import { useTraceDetailsState } from "../../hooks/useTraceDetailsState";
 import { getTotalTokensDisplay } from "../../mappers/trace";
 import type { Trace } from "../../server/tracer/types";
 import { formatMilliseconds } from "../../utils/formatMilliseconds";
+import { getColorMap } from "../../utils/rotatingColors";
 
 const SummaryItem = ({
   label,
@@ -90,6 +92,8 @@ const TraceSummaryValues = React.forwardRef(function TraceSummaryValues(
   { trace }: { trace: Trace },
   ref
 ) {
+  const colorMap = getColorMap(trace.labels ?? []);
+
   return (
     <HStack
       borderBottomWidth={1}
@@ -143,15 +147,18 @@ const TraceSummaryValues = React.forwardRef(function TraceSummaryValues(
           {trace.thread_id ?? "unknown"}
         </Text>
       </SummaryItem>
-      {trace.version && (
-        <SummaryItem label="Version">
-          <Text
-            fontFamily={trace.version ? "mono" : undefined}
-            maxWidth="200px"
-            wordBreak="break-all"
-          >
-            {trace.version ?? "unknown"}
-          </Text>
+      {trace.labels && (
+        <SummaryItem label="Labels">
+          {trace.labels.map((label) => (
+            <Tag
+              key={label}
+              background={colorMap[label]?.background}
+              color={colorMap[label]?.color}
+              fontSize={12}
+            >
+              {label}
+            </Tag>
+          ))}
         </SummaryItem>
       )}
       {(!!trace.metrics.completion_tokens || !!trace.metrics.prompt_tokens) && (

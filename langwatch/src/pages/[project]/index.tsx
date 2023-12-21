@@ -105,7 +105,7 @@ export default function Index() {
       user_id: getSingleQueryParam(router.query.user_id),
       thread_id: getSingleQueryParam(router.query.thread_id),
       customer_ids: getSingleQueryParam(router.query.customer_ids)?.split(","),
-      versions: getSingleQueryParam(router.query.versions)?.split(","),
+      labels: getSingleQueryParam(router.query.labels)?.split(","),
     },
     {
       enabled: !!project?.id && !!startDate && !!endDate,
@@ -132,7 +132,7 @@ export default function Index() {
       user_id: getSingleQueryParam(router.query.user_id),
       thread_id: getSingleQueryParam(router.query.thread_id),
       customer_ids: getSingleQueryParam(router.query.customer_ids)?.split(","),
-      versions: getSingleQueryParam(router.query.versions)?.split(","),
+      labels: getSingleQueryParam(router.query.labels)?.split(","),
     },
     {
       enabled: !!project?.id && !!startDate && !!endDate,
@@ -151,7 +151,7 @@ export default function Index() {
         customer_ids: getSingleQueryParam(router.query.customer_ids)?.split(
           ","
         ),
-        versions: getSingleQueryParam(router.query.versions)?.split(","),
+        labels: getSingleQueryParam(router.query.labels)?.split(","),
       },
       {
         enabled: !!project?.id && !!startDate && !!endDate,

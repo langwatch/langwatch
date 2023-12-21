@@ -27,6 +27,11 @@ The **user id** identifies the ID of the final user of the product. In the conte
 
 The **customer id** is used when you provide a platform for your customers to build LLM apps for their end users. For example, it would be if your are building a platform that allow _others_ to build AI assistants for _their_ users. Having the **customer id** allows LangWatch to group all metrics and messages per customer, which allows you to access LangWatch data through our APIs to build a custom analytics dashboard for your customers, so they can see how their own LLM assistants are behaving.
 
+### Labels
+
+You can use **labels** to organize and compare the traces sent to LangWatch for any comparison you want to do. You can for example apply different labels for different actions, for example a label `blogpost_title` for generating the blog post title and another `blogpost_keywords`, for generating keywords. You can use it for versioning as well, for example label the first implementation
+version as `v1.0.0`, then do a prompt engineering to improve the AI travel planner itenerary builder, and label it as `v1.0.1`. This way you can easily focus on each different functionality or compare versions on LangWatch dashboard.
+
 ### LLM Checks
 
 **LLM Checks** are the automated evaluations that occur during or after the AI's operations. For the travel assistant, an LLM Check might analyze the outputs to ensure there's no hallucinated information about flight prices or destinations. It could also verify the AI stays on topic during the travel planning process. In the blog post generation tool, LLM Checks would be crucial for ensuring that the generated content doesn't contain sensitive or prohibited topics, adhering to content guidelines and format requirements.

@@ -80,7 +80,7 @@ curl -X POST "$ENDPOINT" \\
   "user_id": "optional_end_user_identifier",
   "thread_id": "optional_thread_identifier",
   "customer_id": "optional_platform_customer_identifier",
-  "version": "optional_versioning_information"
+  "labels": ["optional_label_1", "optional_label_2"]
 }
 EOF`}
         language="bash"
