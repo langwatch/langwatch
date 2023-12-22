@@ -201,7 +201,7 @@ export type Experiment = {
 };
 
 export type CollectorRESTParams = {
-  trace_id: string;
+  trace_id?: string | null | undefined;
   spans: Span[];
   user_id?: string | null | undefined;
   thread_id?: string | null | undefined;

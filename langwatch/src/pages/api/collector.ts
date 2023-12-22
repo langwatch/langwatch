@@ -77,7 +77,7 @@ export default async function handler(
   }
 
   const {
-    trace_id: traceId,
+    trace_id: nullableTraceId,
     thread_id: threadId,
     user_id: userId,
     customer_id: customerId,
@@ -92,10 +92,14 @@ export default async function handler(
     (req.body as Record<string, any>).spans as Span[]
   );
   spans.forEach((span) => {
-    if (traceId && !span.trace_id) {
-      span.trace_id = traceId;
+    if (nullableTraceId && !span.trace_id) {
+      span.trace_id = nullableTraceId;
     }
   });
+  const traceId = nullableTraceId ?? spans[0]?.trace_id;
+  if (!traceId) {
+    return res.status(400).json({ message: "Trace ID not defined" });
+  }
 
   for (const span of spans) {
     try {
