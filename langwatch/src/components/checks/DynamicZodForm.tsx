@@ -40,11 +40,12 @@ const parametersDescription: {
     categories: {
       name: "Categories to check",
       description: "The categories of moderation to check for",
-    }
+    },
   },
   custom: {
     rules: {},
   },
+  jailbreak_check: {},
 };
 
 const DynamicZodForm = ({

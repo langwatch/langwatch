@@ -38,7 +38,10 @@ import { HorizontalFormControl } from "../HorizontalFormControl";
 import { CustomRuleField } from "./CustomRuleField";
 import DynamicZodForm from "./DynamicZodForm";
 import { PreconditionsField } from "./PreconditionsField";
-import { AVAILABLE_TRACE_CHECKS, getTraceCheck } from "../../trace_checks/frontend/registry";
+import {
+  AVAILABLE_TRACE_CHECKS,
+  getTraceCheck,
+} from "../../trace_checks/frontend/registry";
 
 // TODO: merge this onto the frontend registry
 const defaultParametersMap: {
@@ -84,6 +87,7 @@ const defaultParametersMap: {
       "violence/graphic": true,
     },
   },
+  jailbreak_check: {},
 };
 
 export interface CheckConfigFormData {
@@ -117,7 +121,7 @@ export default function CheckConfigForm({
           parameters:
             checksSchema.shape[data.checkType ?? "custom"].shape.parameters,
         })
-      )(data, ...args);
+      )({ ...data, parameters: data.parameters || {} }, ...args);
     },
   });
 
@@ -168,7 +172,13 @@ export default function CheckConfigForm({
     };
 
     setDefaultParameters(defaultParameters, "parameters");
-  }, [checkType, defaultValues?.checkType, defaultValues?.parameters, form]);
+  }, [
+    checkType,
+    defaultValues?.checkType,
+    defaultValues?.parameters,
+    form,
+    nameValue,
+  ]);
 
   const runOn = (
     <Text color="gray.500" fontStyle="italic">

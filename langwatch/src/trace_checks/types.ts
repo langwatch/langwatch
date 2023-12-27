@@ -22,6 +22,9 @@ export type Checks = {
       checkPiiInSpans: boolean;
     };
   };
+  jailbreak_check: {
+    parameters: Record<string, never>;
+  };
   toxicity_check: {
     parameters: {
       categories: {
@@ -102,6 +105,12 @@ export type ModerationResultEntry = {
   categories: Record<string, boolean>;
   category_scores: Record<string, number>;
 };
+
+export type JailbreakAnalysisResult = {
+  jailbreakAnalysis: {
+    detected: boolean;
+  };
+}
 
 export type CustomCheckFields = "input" | "output";
 

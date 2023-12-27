@@ -2,6 +2,7 @@ import type { CheckTypes, TraceCheckFrontendDefinition } from "../types";
 import { CustomCheck } from "./customCheck";
 import { PIICheck } from "./piiCheck";
 import { ToxicityCheck } from "./toxicityCheck";
+import { JailbreakCheck } from "./jailbreakCheck";
 
 // TODO: allow checks to be run to be configurable by user
 export const AVAILABLE_TRACE_CHECKS: Record<
@@ -10,6 +11,7 @@ export const AVAILABLE_TRACE_CHECKS: Record<
 > = {
   pii_check: PIICheck,
   toxicity_check: ToxicityCheck,
+  jailbreak_check: JailbreakCheck,
   custom: CustomCheck,
 };
 

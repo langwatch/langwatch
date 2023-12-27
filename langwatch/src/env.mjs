@@ -32,6 +32,8 @@ export const env = createEnv({
     OPENAI_API_KEY: z.string().min(1),
     SENDGRID_API_KEY: z.string().min(1).optional(),
     TOPIC_CLUSTERING_SERVICE_URL: z.string().min(1).optional(),
+    CONTENT_SAFETY_ENDPOINT: z.string().min(1).optional(),
+    CONTENT_SAFETY_SUBSCRIPTION_KEY: z.string().min(1).optional(),
   },
 
   /**
@@ -67,6 +69,9 @@ export const env = createEnv({
     OPENAI_API_KEY: process.env.OPENAI_API_KEY,
     SENDGRID_API_KEY: process.env.SENDGRID_API_KEY,
     TOPIC_CLUSTERING_SERVICE_URL: process.env.TOPIC_CLUSTERING_SERVICE_URL,
+    CONTENT_SAFETY_ENDPOINT: process.env.CONTENT_SAFETY_ENDPOINT,
+    CONTENT_SAFETY_SUBSCRIPTION_KEY:
+      process.env.CONTENT_SAFETY_SUBSCRIPTION_KEY,
   },
   /**
    * Run `build` or `dev` with `SKIP_ENV_VALIDATION` to skip env validation.
