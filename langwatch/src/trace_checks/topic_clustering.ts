@@ -3,6 +3,10 @@ import type { Trace } from "../server/tracer/types";
 import { esClient } from "../server/elasticsearch";
 import { TRACE_INDEX } from "../server/api/routers/traces";
 import { getDebugger } from "../utils/logger";
+import type { Money } from "../utils/types";
+import { prisma } from "../server/db";
+import { nanoid } from "nanoid";
+import { CostReferenceType, CostType } from "@prisma/client";
 
 const debug = getDebugger("langwatch:topicClustering");
 
@@ -50,7 +54,7 @@ export const clusterTopicsForProject = async (
   }
 
   debug("Clustering topics for", traces.length, "traces on project", projectId);
-  const topics = await clusterTopicsForTraces({
+  const clusteringResult = await clusterTopicsForTraces({
     topics: traces.flatMap((trace) => trace.topics ?? []),
     file: traces.map((trace) => ({
       _source: {
@@ -60,7 +64,8 @@ export const clusterTopicsForProject = async (
     })),
   });
 
-  console.log("topics", topics);
+  const topics = clusteringResult?.message_clusters ?? {};
+  const cost = clusteringResult?.costs;
 
   debug(
     "Found topics for",
@@ -80,6 +85,25 @@ export const clusterTopicsForProject = async (
     body,
   });
 
+  if (cost) {
+    await prisma.cost.create({
+      data: {
+        id: `cost_${nanoid()}`,
+        projectId: projectId,
+        costType: CostType.CLUSTERING,
+        costName: "Topics Clustering",
+        referenceType: CostReferenceType.PROJECT,
+        referenceId: projectId,
+        amount: cost.amount,
+        currency: cost.currency,
+        extraInfo: {
+          traces_count: traces.length,
+          topics_count: Object.keys(topics).length,
+        },
+      },
+    });
+  }
+
   debug("Done! Project", projectId);
 };
 
@@ -88,14 +112,19 @@ export type TopicClusteringParams = {
   file: { _source: { id: string; input: Trace["input"] } }[];
 };
 
+type ClusteringResult = {
+  message_clusters: Record<string, string>;
+  costs: Money;
+};
+
 export const clusterTopicsForTraces = async (
   params: TopicClusteringParams
-): Promise<Record<string, string>> => {
+): Promise<ClusteringResult | undefined> => {
   if (!env.TOPIC_CLUSTERING_SERVICE_URL) {
     console.warn(
       "TopicClustering service URL not set, skipping topicClustering"
     );
-    return {};
+    return;
   }
 
   const formData = new FormData();
@@ -117,7 +146,7 @@ export const clusterTopicsForTraces = async (
       `TopicClustering service returned error: ${await response.text()}`
     );
   }
-  const topics: Record<string, string> = await response.json();
+  const result: ClusteringResult = await response.json();
 
-  return topics;
+  return result;
 };
