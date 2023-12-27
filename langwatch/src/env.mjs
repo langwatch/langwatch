@@ -34,6 +34,7 @@ export const env = createEnv({
     TOPIC_CLUSTERING_SERVICE_URL: z.string().min(1).optional(),
     CONTENT_SAFETY_ENDPOINT: z.string().min(1).optional(),
     CONTENT_SAFETY_SUBSCRIPTION_KEY: z.string().min(1).optional(),
+    INCONSISTENCY_CHECKING_SERVICE_URL: z.string().min(1).optional(),
   },
 
   /**
@@ -72,6 +73,8 @@ export const env = createEnv({
     CONTENT_SAFETY_ENDPOINT: process.env.CONTENT_SAFETY_ENDPOINT,
     CONTENT_SAFETY_SUBSCRIPTION_KEY:
       process.env.CONTENT_SAFETY_SUBSCRIPTION_KEY,
+    INCONSISTENCY_CHECKING_SERVICE_URL:
+      process.env.INCONSISTENCY_CHECKING_SERVICE_URL,
   },
   /**
    * Run `build` or `dev` with `SKIP_ENV_VALIDATION` to skip env validation.

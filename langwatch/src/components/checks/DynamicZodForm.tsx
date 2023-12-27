@@ -46,6 +46,7 @@ const parametersDescription: {
     rules: {},
   },
   jailbreak_check: {},
+  inconsistency_check: {},
 };
 
 const DynamicZodForm = ({

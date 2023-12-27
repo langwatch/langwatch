@@ -88,6 +88,7 @@ const defaultParametersMap: {
     },
   },
   jailbreak_check: {},
+  inconsistency_check: {}
 };
 
 export interface CheckConfigFormData {

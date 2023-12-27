@@ -42,6 +42,9 @@ export type Checks = {
       };
     };
   };
+  inconsistency_check: {
+    parameters: Record<string, never>;
+  };
   custom: {
     parameters: {
       rules: CustomCheckRules;
@@ -94,6 +97,7 @@ export type TraceCheckFrontendDefinition = {
   render: (props: { check: TraceCheck }) => JSX.Element;
 };
 
+// API Types
 export type ModerationResult = {
   id: string;
   model: string;
@@ -110,8 +114,13 @@ export type JailbreakAnalysisResult = {
   jailbreakAnalysis: {
     detected: boolean;
   };
-}
+};
 
+export type InconsistencyCheckResult = {
+  sentences: string[];
+};
+
+// Custom Checks
 export type CustomCheckFields = "input" | "output";
 
 export type CustomCheckFailWhen = {
