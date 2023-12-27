@@ -1,7 +1,7 @@
 ![PyPI Version](https://img.shields.io/pypi/v/langwatch.svg)
 ![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)
 
-# LangWatch: Open-Source LLM Monitoring & Analytics Platform
+# LangWatch: LLM Monitoring & Analytics Platform
 
 LangWatch provides a suite of tools to track, visualize, and analyze interactions with LLMs focused on usability, helping both developers and non-technical team members to fine-tune performance and gain insights into user engagement.
 
