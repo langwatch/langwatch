@@ -13,7 +13,7 @@ function CheckDetails({ check }: { check: TraceCheck }) {
         ? Object.entries(categories).map(([category, value]) =>
             value ? <Text key={category}>Flagged for {category}</Text> : null
           )
-        : "No toxicity detected"}
+        : "No issues detected"}
     </Box>
   );
 }

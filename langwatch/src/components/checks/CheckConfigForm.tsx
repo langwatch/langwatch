@@ -38,8 +38,9 @@ import { HorizontalFormControl } from "../HorizontalFormControl";
 import { CustomRuleField } from "./CustomRuleField";
 import DynamicZodForm from "./DynamicZodForm";
 import { PreconditionsField } from "./PreconditionsField";
-import { AVAILABLE_TRACE_CHECKS } from "../../trace_checks/frontend/registry";
+import { AVAILABLE_TRACE_CHECKS, getTraceCheck } from "../../trace_checks/frontend/registry";
 
+// TODO: merge this onto the frontend registry
 const defaultParametersMap: {
   [K in CheckTypes]: Checks[K]["parameters"];
 } = {
@@ -138,6 +139,11 @@ export default function CheckConfigForm({
       return;
 
     if (!checkType) return;
+
+    const defaultName = getTraceCheck(checkType)?.name;
+    if (!nameValue && defaultName && checkType !== "custom") {
+      form.setValue("name", defaultName);
+    }
 
     const defaultParameters = defaultParametersMap[checkType];
 
