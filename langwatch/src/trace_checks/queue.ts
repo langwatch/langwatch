@@ -72,7 +72,8 @@ export const scheduleTraceCheck = async ({
   );
 };
 
-export const getTraceCheckId = (trace_id: string, check_id: string) => `trace_check_${trace_id}/${check_id}`;
+export const getTraceCheckId = (trace_id: string, check_id: string) =>
+  `trace_check_${trace_id}/${check_id}`;
 
 export const updateCheckStatusInES = async ({
   check,
@@ -152,8 +153,7 @@ export const scheduleTopicClustering = async () => {
       data: { project_id: project.id },
       opts: {
         jobId: `topic_clustering_${project.id}_${yyyymmdd}`,
-        delay:
-          distributionHour * 60 * 60 * 1000 + distributionMinute * 60 * 1000,
+        delay: distributionHour * 60 * 60 + distributionMinute * 60,
         attempts: 3,
       },
     };
