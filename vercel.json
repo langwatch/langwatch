@@ -8,7 +8,7 @@
     },
     {
       "path": "/api/schedule_topic_clustering",
-      "schedule": "0 0 * * *"
+      "schedule": "0 13 * * *"
     }
   ],
   "ignoreCommand": "git submodule update --init; exit 1",
