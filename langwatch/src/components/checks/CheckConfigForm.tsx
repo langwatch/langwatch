@@ -21,7 +21,12 @@ import {
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect } from "react";
 import { HelpCircle } from "react-feather";
-import { Controller, FormProvider, useForm } from "react-hook-form";
+import {
+  Controller,
+  FormProvider,
+  useFieldArray,
+  useForm,
+} from "react-hook-form";
 import slugify from "slugify";
 import { z } from "zod";
 import type {
@@ -90,6 +95,14 @@ export default function CheckConfigForm({
   const preconditions = watch("preconditions");
   const nameValue = watch("name");
   const sample = watch("sample");
+  const {
+    fields: fieldsPrecondition,
+    append: appendPrecondition,
+    remove: removePrecondition,
+  } = useFieldArray({
+    control,
+    name: "preconditions",
+  });
 
   useEffect(() => {
     if (defaultValues?.parameters && defaultValues.checkType === checkType)
@@ -102,7 +115,7 @@ export default function CheckConfigForm({
       form.setValue("name", defaultName);
     }
 
-    const defaultParameters = AVAILABLE_TRACE_CHECKS[checkType];
+    const traceCheck = AVAILABLE_TRACE_CHECKS[checkType];
 
     const setDefaultParameters = (
       defaultValues: Record<string, any>,
@@ -124,8 +137,19 @@ export default function CheckConfigForm({
       });
     };
 
-    setDefaultParameters(defaultParameters.default.parameters, "parameters");
+    setDefaultParameters(traceCheck.default.parameters, "parameters");
+    // Workaround to get the preconditions to show up due to weird react-hook-form not rerendering bug
+    const timeout = setTimeout(() => {
+      (traceCheck.default.preconditions ?? []).forEach((precondition) => {
+        appendPrecondition(precondition);
+      });
+    }, 10);
+
+    return () => {
+      clearTimeout(timeout);
+    };
   }, [
+    appendPrecondition,
     checkType,
     defaultValues?.checkType,
     defaultValues?.parameters,
@@ -229,6 +253,9 @@ export default function CheckConfigForm({
                         )
                       ) : null
                     }
+                    append={appendPrecondition}
+                    remove={removePrecondition}
+                    fields={fieldsPrecondition}
                   />
                   {checkType === "custom" && <CustomRuleField />}
                   {checkType &&

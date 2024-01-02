@@ -122,7 +122,7 @@ export const clusterTopicsForTraces = async (
 ): Promise<ClusteringResult | undefined> => {
   if (!env.LANGWATCH_GUARDRAILS_SERVICE) {
     console.warn(
-      "TopicClustering service URL not set, skipping topicClustering"
+      "Topic clustering service URL not set, skipping topic clustering"
     );
     return;
   }

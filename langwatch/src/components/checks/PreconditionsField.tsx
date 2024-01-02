@@ -31,15 +31,17 @@ const fieldOptions: Record<CustomCheckFields, string> = {
 
 export const PreconditionsField = ({
   runOn,
+  append,
+  remove,
+  fields,
 }: {
   runOn: JSX.Element | null;
+  append: (value: any) => void;
+  remove: (index: number) => void;
+  fields: Record<"id", string>[]
 }) => {
   const { control, watch } = useFormContext();
   const preconditions = watch("preconditions");
-  const { fields, append, remove } = useFieldArray({
-    control,
-    name: "preconditions",
-  });
 
   return (
     <HorizontalFormControl

@@ -103,6 +103,7 @@ export type TraceCheckFrontendDefinition<T extends CheckTypes> = {
   >;
   default: {
     parameters: Checks[T]["parameters"];
+    preconditions?: CheckPreconditions
   };
   render: (props: { check: TraceCheck }) => JSX.Element;
 };

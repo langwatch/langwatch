@@ -20,6 +20,7 @@ export const RagasAnswerRelevancyCheck: TraceCheckFrontendDefinition<"ragas_answ
     parametersDescription: {},
     default: {
       parameters: {},
+      preconditions: [{ field: "input", rule: "contains", value: "?" }],
     },
     render: CheckDetails,
   };

@@ -42,7 +42,6 @@ export default async function execute() {
         getSearchEmbeddings(trace.input, trace.output, trace.error ?? null),
       ]);
 
-    // console.log("updating", trace.id, [inputEmbeddings, outputEmbeddings, searchEmbeddings]);
     await esClient.update({
       index: TRACE_INDEX,
       id: trace.id,
