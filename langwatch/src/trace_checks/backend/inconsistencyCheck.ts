@@ -8,20 +8,23 @@ import type {
 import { env } from "../../env.mjs";
 
 const execute = async (trace: Trace): Promise<TraceCheckResult> => {
-  if (!env.INCONSISTENCY_CHECKING_SERVICE_URL) {
-    throw new Error("INCONSISTENCY_CHECKING_SERVICE_URL not set");
+  if (!env.LANGWATCH_GUARDRAILS_SERVICE) {
+    throw new Error("LANGWATCH_GUARDRAILS_SERVICE not set");
   }
 
-  const response = await fetch(env.INCONSISTENCY_CHECKING_SERVICE_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      input: trace.input.value,
-      output: trace.output?.value ?? "",
-    }),
-  });
+  const response = await fetch(
+    `${env.LANGWATCH_GUARDRAILS_SERVICE}/inconsistencies`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        input: trace.input.value,
+        output: trace.output?.value ?? "",
+      }),
+    }
+  );
 
   if (!response.ok) {
     throw new Error(

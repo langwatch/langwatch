@@ -120,7 +120,7 @@ type ClusteringResult = {
 export const clusterTopicsForTraces = async (
   params: TopicClusteringParams
 ): Promise<ClusteringResult | undefined> => {
-  if (!env.TOPIC_CLUSTERING_SERVICE_URL) {
+  if (!env.LANGWATCH_GUARDRAILS_SERVICE) {
     console.warn(
       "TopicClustering service URL not set, skipping topicClustering"
     );
@@ -137,7 +137,7 @@ export const clusterTopicsForTraces = async (
   );
   formData.append("file", file);
 
-  const response = await fetch(env.TOPIC_CLUSTERING_SERVICE_URL, {
+  const response = await fetch(`${env.LANGWATCH_GUARDRAILS_SERVICE}/topics`, {
     method: "POST",
     body: formData,
   });
