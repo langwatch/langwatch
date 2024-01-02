@@ -42,6 +42,9 @@ export type Checks = {
       };
     };
   };
+  ragas_answer_relevancy: {
+    parameters: Record<string, never>;
+  };
   inconsistency_check: {
     parameters: Record<string, never>;
   };
@@ -113,6 +116,19 @@ export type ModerationResultEntry = {
 export type JailbreakAnalysisResult = {
   jailbreakAnalysis: {
     detected: boolean;
+  };
+};
+
+export type RagasResult = {
+  scores: {
+    answer_relevancy?: number;
+    faithfulness?: number;
+    context_precision?: number;
+    context_recall?: number;
+  };
+  costs: {
+    amount: number;
+    currency: string;
   };
 };
 

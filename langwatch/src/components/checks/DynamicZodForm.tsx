@@ -46,6 +46,7 @@ const parametersDescription: {
     rules: {},
   },
   jailbreak_check: {},
+  ragas_answer_relevancy: {},
   inconsistency_check: {},
 };
 

@@ -4,6 +4,7 @@ import { PIICheck } from "./piiCheck";
 import { ToxicityCheck } from "./toxicityCheck";
 import { JailbreakCheck } from "./jailbreakCheck";
 import { InconsistencyCheck } from "./inconsistencyCheck";
+import { RagasAnswerRelevancyCheck } from "./ragasAnswerRelevancyCheck";
 
 // TODO: allow checks to be run to be configurable by user
 export const AVAILABLE_TRACE_CHECKS: Record<
@@ -13,6 +14,7 @@ export const AVAILABLE_TRACE_CHECKS: Record<
   pii_check: PIICheck,
   toxicity_check: ToxicityCheck,
   jailbreak_check: JailbreakCheck,
+  ragas_answer_relevancy: RagasAnswerRelevancyCheck,
   inconsistency_check: InconsistencyCheck,
   custom: CustomCheck,
 };

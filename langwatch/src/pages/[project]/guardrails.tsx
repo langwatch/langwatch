@@ -169,7 +169,7 @@ export default function Checks() {
                                 } ${preconditions[0]
                                   ?.field} ${camelCaseToLowerCase(
                                   preconditions[0]?.rule ?? ""
-                                )} ${preconditions[0]?.value}`
+                                )} "${preconditions[0]?.value}"`
                               : `Runs on ${sample} matching ${preconditions.length} preconditions`}
                           </Text>
                         </VStack>

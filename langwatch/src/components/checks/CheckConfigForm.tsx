@@ -88,7 +88,8 @@ const defaultParametersMap: {
     },
   },
   jailbreak_check: {},
-  inconsistency_check: {}
+  ragas_answer_relevancy: {},
+  inconsistency_check: {},
 };
 
 export interface CheckConfigFormData {
