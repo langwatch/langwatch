@@ -22,6 +22,12 @@ export const ToxicityCheck: TraceCheckFrontendDefinition<"toxicity_check"> = {
   name: "OpenAI Moderation",
   description:
     "Detects hate speech, harassment, violence, and other toxic content",
+  parametersDescription: {
+    categories: {
+      name: "Categories to check",
+      description: "The categories of moderation to check for",
+    },
+  },
   default: {
     parameters: {
       categories: {

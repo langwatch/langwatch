@@ -10,45 +10,9 @@ import {
 import React from "react";
 import { Controller, useFieldArray, useFormContext } from "react-hook-form";
 import { z, type ZodType } from "zod";
-import type { CheckTypes, Checks } from "../../trace_checks/types";
 import { camelCaseToTitleCase } from "../../utils/stringCasing";
 import { HorizontalFormControl } from "../HorizontalFormControl";
-
-const parametersDescription: {
-  [K in CheckTypes]: Record<
-    keyof Checks[K]["parameters"],
-    { name?: string; description?: string }
-  >;
-} = {
-  pii_check: {
-    infoTypes: {
-      name: "PII types to check",
-      description: "The types of PII that are relevant to check for",
-    },
-    minLikelihood: {
-      name: "PII probability threshold",
-      description:
-        "The minimum confidence that a PII was found to fail the check",
-    },
-    checkPiiInSpans: {
-      name: "Fail for PII in spans",
-      description:
-        "Whether this check fail is PII is identified in the inner spans of a message, or just in the final input and output",
-    },
-  },
-  toxicity_check: {
-    categories: {
-      name: "Categories to check",
-      description: "The categories of moderation to check for",
-    },
-  },
-  custom: {
-    rules: {},
-  },
-  jailbreak_check: {},
-  ragas_answer_relevancy: {},
-  inconsistency_check: {},
-};
+import { getTraceCheck } from "../../trace_checks/frontend/registry";
 
 const DynamicZodForm = ({
   schema,
@@ -154,12 +118,12 @@ const DynamicZodForm = ({
         <React.Fragment key={key}>
           <HorizontalFormControl
             label={
-              (parametersDescription as any)[checkType]?.[key]?.name ??
-              camelCaseToTitleCase(key)
+              (getTraceCheck(checkType)?.parametersDescription as any)?.[key]
+                ?.name ?? camelCaseToTitleCase(key)
             }
             helper={
-              (parametersDescription as any)[checkType]?.[key]?.description ??
-              ""
+              (getTraceCheck(checkType)?.parametersDescription as any)?.[key]
+                ?.description ?? ""
             }
           >
             {renderField(

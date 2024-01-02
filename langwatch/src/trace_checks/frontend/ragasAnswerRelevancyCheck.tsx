@@ -17,6 +17,7 @@ export const RagasAnswerRelevancyCheck: TraceCheckFrontendDefinition<"ragas_answ
   {
     name: "Ragas Answer Relevancy",
     description: "Evaluates how relevant the answer is to the input",
+    parametersDescription: {},
     default: {
       parameters: {},
     },

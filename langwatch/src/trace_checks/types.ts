@@ -97,9 +97,13 @@ export type TraceCheckBackendDefinition<T extends CheckTypes> = {
 export type TraceCheckFrontendDefinition<T extends CheckTypes> = {
   name: string;
   description: string;
+  parametersDescription: Record<
+    keyof Checks[T]["parameters"],
+    { name?: string; description?: string }
+  >;
   default: {
     parameters: Checks[T]["parameters"];
-  },
+  };
   render: (props: { check: TraceCheck }) => JSX.Element;
 };
 

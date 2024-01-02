@@ -24,6 +24,7 @@ export const JailbreakCheck: TraceCheckFrontendDefinition<"jailbreak_check"> = {
   name: "Jailbreak Detection",
   description:
     "Detects if the input attempts to Jailbreak the LLM to produce answers and execute tasks that it was not supposed to",
+  parametersDescription: {},
   default: {
     parameters: {},
   },

@@ -25,6 +25,7 @@ export const InconsistencyCheck: TraceCheckFrontendDefinition<"inconsistency_che
     name: "(Beta) Inconsistency Detection",
     description:
       "Detects inconsistencies between input and output text for hallucination prevention",
+    parametersDescription: {},
     default: {
       parameters: {},
     },

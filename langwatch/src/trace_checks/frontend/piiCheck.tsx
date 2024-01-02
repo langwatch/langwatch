@@ -31,6 +31,22 @@ export const PIICheck: TraceCheckFrontendDefinition<"pii_check"> = {
   name: "Google DLP PII Detection",
   description:
     "Detects Personal Identifiable Information (PII) such as email addresses, phone numbers, credit card numbers, and more",
+  parametersDescription: {
+    infoTypes: {
+      name: "PII types to check",
+      description: "The types of PII that are relevant to check for",
+    },
+    minLikelihood: {
+      name: "PII probability threshold",
+      description:
+        "The minimum confidence that a PII was found to fail the check",
+    },
+    checkPiiInSpans: {
+      name: "Fail for PII in spans",
+      description:
+        "Whether this check fail is PII is identified in the inner spans of a message, or just in the final input and output",
+    },
+  },
   default: {
     parameters: {
       infoTypes: {

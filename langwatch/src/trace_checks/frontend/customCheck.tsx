@@ -51,6 +51,9 @@ export const CustomCheck: TraceCheckFrontendDefinition<"custom"> = {
   name: "Custom",
   description:
     "Build your own guardrails and measurements using heuristics or LLMs-on-LLMs evalution",
+  parametersDescription: {
+    rules: {},
+  },
   default: {
     parameters: {
       rules: [
