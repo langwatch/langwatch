@@ -110,3 +110,32 @@ div input[type="number"] {
 .content-hover:hover .show-on-hover {
   display: block;
 }
+
+.animation-spinning {
+  animation-name: spin;
+  animation-duration: 1s;
+  animation-iteration-count: infinite;
+  animation-timing-function: linear;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.show-on-hover {
+  display: none;
+}
+
+.hide-refresh-on-hover:hover {
+  .refresh-icon {
+    display: none;
+  }
+  .show-on-hover {
+    display: block;
+  }
+}

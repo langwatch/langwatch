@@ -32,6 +32,9 @@ import {
   HelpCircle,
   Layers,
   Maximize2,
+  Pause,
+  Play,
+  RefreshCw,
   Search,
 } from "react-feather";
 import { DashboardLayout } from "../../components/DashboardLayout";
@@ -65,6 +68,7 @@ function Messages() {
     number | undefined
   >();
   const [groupBy] = useGroupBy();
+  const [liveUpdate, setLiveUpdate] = useState(true);
 
   const traceGroups = api.traces.getAllForProject.useQuery(
     {
@@ -115,12 +119,12 @@ function Messages() {
 
   useEffect(() => {
     const interval = setInterval(() => {
-      if (document.hasFocus()) {
+      if (liveUpdate && document.hasFocus()) {
         void traceGroups.refetch();
       }
     }, 5000);
     return () => clearInterval(interval);
-  }, [traceGroups]);
+  }, [liveUpdate, traceGroups]);
 
   return (
     <DashboardLayout>
@@ -145,6 +149,41 @@ function Messages() {
           <FilterSelector />
           <GroupingSelector />
           <PeriodSelector period={period} setPeriod={setPeriod} />
+          <Tooltip
+            label={
+              liveUpdate
+                ? "Pause real-time updates"
+                : "Enable real-time updates"
+            }
+          >
+            <Button
+              variant="ghost"
+              onClick={() => {
+                if (liveUpdate) {
+                  setLiveUpdate(false);
+                } else {
+                  setLiveUpdate(true);
+                  void traceGroups.refetch();
+                  void traceChecksQuery.refetch();
+                }
+              }}
+              className="hide-refresh-on-hover"
+            >
+              {!liveUpdate && <Play />}
+              {liveUpdate && (
+                <>
+                  <RefreshCw
+                    className={
+                      traceGroups.isLoading || traceGroups.isRefetching
+                        ? "refresh-icon animation-spinning"
+                        : "refresh-icon"
+                    }
+                  />
+                  <Pause className="show-on-hover" />
+                </>
+              )}
+            </Button>
+          </Tooltip>
         </HStack>
       </VStack>
       <Container maxWidth="1440" padding={6}>
