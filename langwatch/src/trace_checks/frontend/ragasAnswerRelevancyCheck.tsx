@@ -13,8 +13,12 @@ function CheckDetails({ check }: { check: TraceCheck }) {
   );
 }
 
-export const RagasAnswerRelevancyCheck: TraceCheckFrontendDefinition = {
-  name: "Ragas Answer Relevancy",
-  description: "Evaluates how relevant the answer is to the input",
-  render: CheckDetails,
-};
+export const RagasAnswerRelevancyCheck: TraceCheckFrontendDefinition<"ragas_answer_relevancy"> =
+  {
+    name: "Ragas Answer Relevancy",
+    description: "Evaluates how relevant the answer is to the input",
+    default: {
+      parameters: {},
+    },
+    render: CheckDetails,
+  };

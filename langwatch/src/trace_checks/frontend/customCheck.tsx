@@ -47,8 +47,22 @@ function CustomCheckDetails({ check }: { check: TraceCheck }) {
   );
 }
 
-export const CustomCheck: TraceCheckFrontendDefinition = {
+export const CustomCheck: TraceCheckFrontendDefinition<"custom"> = {
   name: "Custom",
-  description: "Build your own guardrails and measurements using heuristics or LLMs-on-LLMs evalution",
+  description:
+    "Build your own guardrails and measurements using heuristics or LLMs-on-LLMs evalution",
+  default: {
+    parameters: {
+      rules: [
+        {
+          field: "output",
+          rule: "not_contains",
+          value: "",
+          model: "gpt-4-1106-preview",
+          ...({ failWhen: { condition: "<", amount: 0.7 } } as any),
+        },
+      ],
+    },
+  },
   render: CustomCheckDetails,
 };

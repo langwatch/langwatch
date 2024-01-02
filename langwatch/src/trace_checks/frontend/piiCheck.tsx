@@ -27,8 +27,25 @@ function CheckDetails({ check }: { check: TraceCheck }) {
   );
 }
 
-export const PIICheck: TraceCheckFrontendDefinition = {
+export const PIICheck: TraceCheckFrontendDefinition<"pii_check"> = {
   name: "Google DLP PII Detection",
-  description: "Detects Personal Identifiable Information (PII) such as email addresses, phone numbers, credit card numbers, and more",
+  description:
+    "Detects Personal Identifiable Information (PII) such as email addresses, phone numbers, credit card numbers, and more",
+  default: {
+    parameters: {
+      infoTypes: {
+        phoneNumber: true,
+        emailAddress: true,
+        creditCardNumber: true,
+        ibanCode: true,
+        ipAddress: true,
+        passport: true,
+        vatNumber: true,
+        medicalRecordNumber: true,
+      },
+      minLikelihood: "POSSIBLE",
+      checkPiiInSpans: false,
+    },
+  },
   render: CheckDetails,
 };

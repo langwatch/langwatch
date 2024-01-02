@@ -43,55 +43,6 @@ import {
   getTraceCheck,
 } from "../../trace_checks/frontend/registry";
 
-// TODO: merge this onto the frontend registry
-const defaultParametersMap: {
-  [K in CheckTypes]: Checks[K]["parameters"];
-} = {
-  pii_check: {
-    infoTypes: {
-      phoneNumber: true,
-      emailAddress: true,
-      creditCardNumber: true,
-      ibanCode: true,
-      ipAddress: true,
-      passport: true,
-      vatNumber: true,
-      medicalRecordNumber: true,
-    },
-    minLikelihood: "POSSIBLE",
-    checkPiiInSpans: false,
-  },
-  custom: {
-    rules: [
-      {
-        field: "output",
-        rule: "not_contains",
-        value: "",
-        model: "gpt-4-1106-preview",
-        ...({ failWhen: { condition: "<", amount: 0.7 } } as any),
-      },
-    ],
-  },
-  toxicity_check: {
-    categories: {
-      harassment: true,
-      "harassment/threatening": true,
-      hate: true,
-      "hate/threatening": true,
-      "self-harm": true,
-      "self-harm/intent": true,
-      "self-harm/instructions": true,
-      sexual: true,
-      "sexual/minors": true,
-      violence: true,
-      "violence/graphic": true,
-    },
-  },
-  jailbreak_check: {},
-  ragas_answer_relevancy: {},
-  inconsistency_check: {},
-};
-
 export interface CheckConfigFormData {
   name: string;
   checkType: CheckTypes | undefined;
@@ -151,7 +102,7 @@ export default function CheckConfigForm({
       form.setValue("name", defaultName);
     }
 
-    const defaultParameters = defaultParametersMap[checkType];
+    const defaultParameters = AVAILABLE_TRACE_CHECKS[checkType];
 
     const setDefaultParameters = (
       defaultValues: Record<string, any>,
@@ -173,7 +124,7 @@ export default function CheckConfigForm({
       });
     };
 
-    setDefaultParameters(defaultParameters, "parameters");
+    setDefaultParameters(defaultParameters.default.parameters, "parameters");
   }, [
     checkType,
     defaultValues?.checkType,

@@ -20,9 +20,13 @@ function CheckDetails({ check }: { check: TraceCheck }) {
   );
 }
 
-export const InconsistencyCheck: TraceCheckFrontendDefinition = {
-  name: "(Beta) Inconsistency Detection",
-  description:
-    "Detects inconsistencies between input and output text for hallucination prevention",
-  render: CheckDetails,
-};
+export const InconsistencyCheck: TraceCheckFrontendDefinition<"inconsistency_check"> =
+  {
+    name: "(Beta) Inconsistency Detection",
+    description:
+      "Detects inconsistencies between input and output text for hallucination prevention",
+    default: {
+      parameters: {},
+    },
+    render: CheckDetails,
+  };

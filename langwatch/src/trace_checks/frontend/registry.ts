@@ -7,10 +7,9 @@ import { InconsistencyCheck } from "./inconsistencyCheck";
 import { RagasAnswerRelevancyCheck } from "./ragasAnswerRelevancyCheck";
 
 // TODO: allow checks to be run to be configurable by user
-export const AVAILABLE_TRACE_CHECKS: Record<
-  CheckTypes,
-  TraceCheckFrontendDefinition
-> = {
+export const AVAILABLE_TRACE_CHECKS: {
+  [K in CheckTypes]: TraceCheckFrontendDefinition<K>;
+} = {
   pii_check: PIICheck,
   toxicity_check: ToxicityCheck,
   jailbreak_check: JailbreakCheck,
