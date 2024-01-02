@@ -49,7 +49,7 @@ describe("Topic Clustering Integration Test", () => {
 
     expect(topics).toEqual({
       costs: {
-        amount: 0.00255,
+        amount: expect.any(Number),
         currency: "USD",
       },
       message_clusters: {

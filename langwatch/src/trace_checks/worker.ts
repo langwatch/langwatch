@@ -18,6 +18,7 @@ import { prisma } from "../server/db";
 import { clusterTopicsForProject } from "./topic_clustering";
 import { nanoid } from "nanoid";
 import { CostReferenceType, CostType } from "@prisma/client";
+import * as Sentry from "@sentry/nextjs";
 
 const debug = getDebugger("langwatch:workers");
 
@@ -129,6 +130,7 @@ export const start = (
 
     traceChecksWorker.on("failed", (job, err) => {
       debug(`Job ${job?.id} failed with error ${err.message}`);
+      Sentry.captureException(err);
     });
 
     debug("Trace checks worker registered");
@@ -152,6 +154,7 @@ export const start = (
 
     topicClusteringWorker.on("failed", (job, err) => {
       debug(`Job ${job?.id} failed with error ${err.message}`);
+      Sentry.captureException(err);
     });
 
     debug("Topic clustering checks worker registered");
