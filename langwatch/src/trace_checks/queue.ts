@@ -144,7 +144,7 @@ export const scheduleTopicClustering = async () => {
     hash.update(project.id);
     const hashedValue = hash.digest("hex");
     const hashNumber = parseInt(hashedValue, 16);
-    const distributionHour = hashNumber % (24 * 60);
+    const distributionHour = hashNumber % 24;
     const distributionMinute = hashNumber % 60;
     const yyyymmdd = new Date().toISOString().split("T")[0];
 
@@ -153,7 +153,7 @@ export const scheduleTopicClustering = async () => {
       data: { project_id: project.id },
       opts: {
         jobId: `topic_clustering_${project.id}_${yyyymmdd}`,
-        delay: distributionHour * 60 * 60 + distributionMinute * 60,
+        delay: distributionHour * 60 * 60 * 1000 + distributionMinute * 60 * 1000,
         attempts: 3,
       },
     };
