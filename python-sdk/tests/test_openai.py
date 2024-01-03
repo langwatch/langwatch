@@ -9,7 +9,7 @@ import langwatch
 import langwatch.openai
 import requests_mock
 
-from tests.utils import *
+from tests.utils import *  # type: ignore
 from pytest_httpx import HTTPXMock
 from openai.types.chat import ChatCompletionToolParam
 
@@ -979,6 +979,51 @@ data: [DONE]""".split(
         ]
         assert first_span["model"] == "gpt-3.5-turbo"
         assert first_span["params"] == {"temperature": 1, "stream": True}
+
+    def test_trace_rag(
+        self, httpx_mock: HTTPXMock, requests_mock: requests_mock.Mocker
+    ):
+        openai_mocks = [
+            create_openai_chat_completion_mock("The capital of France is Paris."),
+        ]
+        requests_mock.post(langwatch.endpoint, json={})
+        httpx_mock.add_callback(
+            one_mock_at_a_time(openai_mocks),
+            url="https://api.openai.com/v1/chat/completions",
+        )
+
+        with langwatch.openai.OpenAIChatCompletionTracer(client):
+            # TODO: optionally auto-detect input
+            with langwatch.capture_rag(
+                input="What is the capital of France?",
+                contexts=[
+                    "France is a country in Europe.",
+                    "Paris is the capital of France.",
+                ],
+            ):
+                response = client.chat.completions.create(
+                    model="gpt-3.5-turbo",
+                    messages=[
+                        {"role": "user", "content": "What is the capital of France?"}
+                    ],
+                )
+
+        time.sleep(0.01)
+
+        llm_span, rag_span = requests_mock.request_history[0].json()["spans"]
+
+        assert rag_span["type"] == "rag"
+        assert rag_span["input"]["value"] == "What is the capital of France?"
+        assert rag_span["contexts"] == [
+            "France is a country in Europe.",
+            "Paris is the capital of France.",
+        ]
+
+        assert llm_span["type"] == "llm"
+        assert (
+            llm_span["outputs"][0]["value"][0]["content"]
+            == response.choices[0].message.content
+        )
 
 
 class TestOpenAITracer:

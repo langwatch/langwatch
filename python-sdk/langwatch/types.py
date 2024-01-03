@@ -76,7 +76,7 @@ class SpanTimestamps(TypedDict, total=False):
     finished_at: int
 
 
-SpanTypes = Literal["span", "llm", "chain", "tool", "agent"]
+SpanTypes = Literal["span", "llm", "chain", "tool", "agent", "rag"]
 
 
 class BaseSpan(TypedDict):
@@ -107,7 +107,20 @@ class LLMSpan(TypedDict, total=False):
     timestamps: SpanTimestamps
 
 
-Span = Union[LLMSpan, BaseSpan]
+class RAGSpan(TypedDict, total=False):
+    type: Literal["rag"]
+    name: Optional[str]
+    id: str
+    parent_id: Optional[str]
+    trace_id: str
+    input: Optional[SpanInput]
+    outputs: List[SpanOutput]
+    error: Optional[ErrorCapture]
+    timestamps: SpanTimestamps
+    contexts: List[str]
+
+
+Span = Union[LLMSpan, RAGSpan, BaseSpan]
 
 
 class Experiment(TypedDict):

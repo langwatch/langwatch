@@ -198,6 +198,7 @@ const SpanTypeTag = ({ span }: { span: ElasticSearchSpan }) => {
               chain: "blue",
               tool: "orange",
               span: "gray",
+              rag: "red",
             }[span.type]
       }
       fontSize={13}
@@ -341,6 +342,44 @@ export function SpanTree() {
                   <RenderInputOutput value={span.input?.value} />
                 </Box>
               </VStack>
+              {span.contexts && (
+                <VStack
+                  alignItems="flex-start"
+                  spacing={2}
+                  paddingTop={4}
+                  width="full"
+                >
+                  <Box
+                    fontSize={13}
+                    color="gray.400"
+                    textTransform="uppercase"
+                    fontWeight="bold"
+                  >
+                    Contexts
+                  </Box>
+                  <Box
+                    as="pre"
+                    borderRadius="6px"
+                    padding={4}
+                    borderWidth="1px"
+                    borderColor="gray.300"
+                    width="full"
+                    whiteSpace="pre-wrap"
+                  >
+                    <RenderInputOutput
+                      value={JSON.stringify(
+                        span.contexts.map((context) => {
+                          try {
+                            return JSON.parse(context);
+                          } catch (_) {
+                            return context;
+                          }
+                        })
+                      )}
+                    />
+                  </Box>
+                </VStack>
+              )}
               {span.error ? (
                 <VStack alignItems="flex-start" spacing={2} width="full">
                   <Box

@@ -89,7 +89,7 @@ interface SpanTimestamps {
   finished_at: number;
 }
 
-type SpanTypes = "span" | "llm" | "chain" | "tool" | "agent";
+type SpanTypes = "span" | "llm" | "chain" | "tool" | "agent" | "rag";
 
 export interface BaseSpan {
   type: SpanTypes;
@@ -112,16 +112,22 @@ export interface LLMSpan extends BaseSpan {
   metrics: SpanMetrics;
 }
 
-export type Span = LLMSpan | BaseSpan;
+export interface RAGSpan extends BaseSpan {
+  type: "rag";
+  contexts: string[];
+}
+
+export type Span = LLMSpan | RAGSpan | BaseSpan;
 
 type SpanInputValidator = SpanInput & { value: any };
 type SpanOutputValidator = SpanInput & { value: any };
 
 export type SpanValidator = (
   | Omit<LLMSpan, "input" | "outputs">
+  | Omit<RAGSpan, "input" | "outputs">
   | Omit<BaseSpan, "input" | "outputs">
 ) & {
-  input: SpanInputValidator;
+  input?: SpanInputValidator | null;
   outputs: SpanOutputValidator[];
 };
 
@@ -132,7 +138,9 @@ export type ElasticSearchInputOutput = {
 
 // Zod type will not be generated for this one, check ts-to-zod.config.js
 export type ElasticSearchSpan = Omit<
-  BaseSpan & Partial<Omit<LLMSpan, "type" | "raw_response">>,
+  BaseSpan &
+    Partial<Omit<RAGSpan, "type">> &
+    Partial<Omit<LLMSpan, "type" | "raw_response">>,
   "input" | "outputs"
 > & {
   project_id: string;

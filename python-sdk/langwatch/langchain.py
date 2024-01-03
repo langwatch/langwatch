@@ -61,7 +61,7 @@ def langchain_message_to_chat_message(message: BaseMessage) -> ChatMessage:
     else:
         role = "unknown"
     # TODO: handle function types! where is the name?
-    return ChatMessage(role=role, content=message.content)
+    return ChatMessage(role=role, content=message.content) # type: ignore
 
 
 class LangChainTracer(BaseContextTracer, BaseCallbackHandler):

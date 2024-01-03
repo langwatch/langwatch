@@ -7,6 +7,8 @@ import {
   type Trace,
   type ElasticSearchSpan,
   type LLMSpan,
+  type RAGSpan,
+  type CollectorRESTParams,
 } from "../../server/tracer/types";
 import handler from "./collector";
 
@@ -57,7 +59,7 @@ describe("Collector API Endpoint", () => {
   });
 
   test("should insert spans into Elasticsearch", async () => {
-    const traceData = {
+    const traceData : CollectorRESTParams = {
       trace_id: sampleSpan.trace_id,
       spans: [sampleSpan],
       thread_id: "thread_test-thread_1",
@@ -98,7 +100,6 @@ describe("Collector API Endpoint", () => {
       project_id: projectId,
       raw_response: null,
     });
-    expect(indexedSpan.project_id).toBe(projectId);
 
     const indexedTrace = await esClient.getSource<Trace>({
       index: TRACE_INDEX,
@@ -179,6 +180,76 @@ describe("Collector API Endpoint", () => {
     await handler(req, res);
 
     expect(res.statusCode).toBe(400);
+  });
+
+  test.only("should insert RAGs, extracting the input and output from children spans if not available", async () => {
+    const traceId = "trace_test-trace_J5m9g-0JDMbcJqLK2"
+    const ragSpan: RAGSpan = {
+      type: "rag",
+      id: "span_V1StGXR8_Z5jdHi6B-myE",
+      trace_id: traceId,
+      contexts: [
+        "France is a country in Europe.",
+        "Paris is the capital of France.",
+      ],
+      outputs: [],
+      timestamps: sampleSpan.timestamps,
+    };
+    const llmSpan: LLMSpan = {
+      ...sampleSpan,
+      id: "span_V1StGXR8_Z5jdHi6B-myF",
+      parent_id: ragSpan.id,
+      trace_id: traceId,
+      input: {
+        type: "chat_messages",
+        value: [
+          { role: "system", content: "you are a helpful assistant" },
+          { role: "user", content: "What is the capital of France?" },
+        ],
+      },
+      outputs: [
+        {
+          type: "chat_messages",
+          value: [{ role: "assistant", content: "The capital of France is Paris." }],
+        },
+      ],
+    };
+
+    const traceData : CollectorRESTParams = {
+      trace_id: traceId,
+      spans: [llmSpan, ragSpan],
+    };
+
+    const { req, res }: { req: NextApiRequest; res: NextApiResponse } =
+      createMocks({
+        method: "POST",
+        headers: {
+          "X-Auth-Token": "test-auth-token",
+        },
+        body: traceData,
+      });
+
+    await handler(req, res);
+    expect(res.statusCode).toBe(200);
+
+    const indexedRagSpan = await esClient.getSource<ElasticSearchSpan>({
+      index: SPAN_INDEX,
+      id: ragSpan.id,
+    });
+
+    expect(indexedRagSpan).toMatchObject({
+      input: {
+        type: "text",
+        value: '"What is the capital of France?"',
+      },
+      outputs: [
+        {
+          type: "text",
+          value: '"The capital of France is Paris."',
+        },
+      ],
+      project_id: projectId,
+    });
   });
 
   // TODO: add a PII cleanup test

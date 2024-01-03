@@ -36,6 +36,8 @@ import type {
   Checks,
 } from "../../trace_checks/types";
 import { getDebugger } from "../../utils/logger";
+import { addInputAndOutputForRAGs } from "./collector/rag";
+import { getFirstInputAsText, getLastOutputAsText, typedValueToText } from "./collector/common";
 
 const debug = getDebugger("langwatch:collector");
 
@@ -88,9 +90,9 @@ export default async function handler(
     return res.status(400).json({ message: "Bad request" });
   }
 
-  const spans = await addLLMTokensCount(
+  const spans = addInputAndOutputForRAGs(await addLLMTokensCount(
     (req.body as Record<string, any>).spans as Span[]
-  );
+  ));
   spans.forEach((span) => {
     if (nullableTraceId && !span.trace_id) {
       span.trace_id = nullableTraceId;
@@ -225,68 +227,6 @@ export const getSearchEmbeddings = async (
   }
 
   return await getOpenAIEmbeddings(terms.join("\n\n"));
-};
-
-// TODO: test
-const getFirstInputAsText = (spans: Span[]): string => {
-  // TODO: shouldn't it be sorted by parent-child?
-  const input = spans.filter((span) => span.input)[0]?.input;
-  if (!input) {
-    return "";
-  }
-  return typedValueToText(input, true);
-};
-
-// TODO: test
-const getLastOutputAsText = (spans: Span[]): string => {
-  // TODO: shouldn't it be sorted by parent-child?
-  const spansWithOutputs = spans.filter((span) => span.outputs.length > 0);
-  const outputs = spansWithOutputs[spansWithOutputs.length - 1]?.outputs;
-  if (!outputs) {
-    return "";
-  }
-  const firstOutput = outputs[0];
-  if (!firstOutput) {
-    return "";
-  }
-
-  return typedValueToText(firstOutput, true);
-};
-
-// TODO: test
-const typedValueToText = (
-  typed: SpanInput | SpanOutput,
-  last = false
-): string => {
-  if (typed.type == "text") {
-    return typed.value;
-  } else if (typed.type == "chat_messages") {
-    if (last) {
-      const lastMessage = typed.value[typed.value.length - 1];
-      return lastMessage
-        ? lastMessage.content ?? JSON.stringify(lastMessage)
-        : "";
-    } else {
-      return typed.value
-        .map((message) => message.content ?? JSON.stringify(message))
-        .join("");
-    }
-  } else if (typed.type == "json") {
-    try {
-      const json = typed.value as any;
-      if (json.text) {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-return
-        return json.text;
-      }
-      return JSON.stringify(typed.value);
-    } catch (_e) {
-      return typed.value?.toString() ?? "";
-    }
-  } else if (typed.type == "raw") {
-    return typed.value;
-  }
-
-  return "";
 };
 
 const typedValueToElasticSearch = (

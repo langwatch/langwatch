@@ -133,6 +133,7 @@ const spanMapping: Record<keyof ElasticSearchSpan, MappingProperty> = {
       cost: { type: "float" },
     },
   },
+  contexts: { type: "text" },
 };
 
 const traceChecksMapping: Record<keyof TraceCheck, MappingProperty> = {
