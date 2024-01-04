@@ -548,14 +548,12 @@ const scheduleTraceChecks = async (trace: Trace, spans: Span[]) => {
   for (const check of checks) {
     if (Math.random() <= check.sample) {
       const preconditions = (check.preconditions ?? []) as CheckPreconditions;
-      const preconditionsMet =
-        preconditions.length === 0 ||
-        (await evaluatePreconditions(
-          check.checkType,
-          trace,
-          spans,
-          preconditions
-        ));
+      const preconditionsMet = await evaluatePreconditions(
+        check.checkType,
+        trace,
+        spans,
+        preconditions
+      );
       if (preconditionsMet) {
         debug(
           `scheduling ${check.checkType} (checkId: ${check.id}) for trace ${trace.id}`
