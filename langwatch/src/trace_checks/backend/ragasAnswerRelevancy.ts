@@ -33,13 +33,19 @@ const execute = async (trace: Trace): Promise<TraceCheckResult> => {
 
   if (!response.ok) {
     throw new Error(
-      `RAGAS answer relevancy check API returned an error: ${response.statusText}`
+      `Ragas answer relevancy check API returned an error: ${response.statusText}`
     );
   }
 
   const result = (await response.json()) as RagasResult;
-  const relevancyScore = result.scores.answer_relevancy ?? 0;
+  const relevancyScore = result.scores.answer_relevancy;
   const costs = result.costs;
+
+  if (typeof relevancyScore === "undefined") {
+    throw new Error(
+      `Ragas answer relevancy check API did not return a score: ${JSON.stringify(result)}`
+    );
+  }
 
   return {
     raw_result: result,
@@ -51,7 +57,7 @@ const execute = async (trace: Trace): Promise<TraceCheckResult> => {
   };
 };
 
-export const RagasAnswerRelevancyCheck: TraceCheckBackendDefinition<"ragas_answer_relevancy"> =
+export const RagasAnswerRelevancy: TraceCheckBackendDefinition<"ragas_answer_relevancy"> =
   {
     execute,
   };

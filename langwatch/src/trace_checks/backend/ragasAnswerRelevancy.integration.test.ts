@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { RagasAnswerRelevancyCheck } from "./ragasAnswerRelevancyCheck";
+import { RagasAnswerRelevancy } from "./ragasAnswerRelevancy";
 import type { Trace } from "../../server/tracer/types";
 import type { RagasResult } from "../types";
 
-describe("RagasAnswerRelevancyCheck Integration", () => {
+describe("RagasAnswerRelevancy Integration", () => {
   it("evaluates answer relevancy with a real request", async () => {
     const sampleTrace: Trace = {
       id: "integration-test",
@@ -15,7 +15,7 @@ describe("RagasAnswerRelevancyCheck Integration", () => {
       search_embeddings: {},
     };
 
-    const response = await RagasAnswerRelevancyCheck.execute(sampleTrace, [], {});
+    const response = await RagasAnswerRelevancy.execute(sampleTrace, [], {});
 
     const answer_relevancy = (response.raw_result as RagasResult).scores.answer_relevancy
     expect(answer_relevancy).toBeGreaterThan(0.99);

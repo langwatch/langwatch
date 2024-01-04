@@ -104,6 +104,8 @@ export default function CheckConfigForm({
     name: "preconditions",
   });
 
+  const check = checkType && getTraceCheck(checkType);
+
   useEffect(() => {
     if (defaultValues?.parameters && defaultValues.checkType === checkType)
       return;
@@ -243,7 +245,7 @@ export default function CheckConfigForm({
                   </HorizontalFormControl>
                   <PreconditionsField
                     runOn={
-                      preconditions?.length === 0 ? (
+                      preconditions?.length === 0 && !check?.requiresRag ? (
                         sample == 1 ? (
                           runOn
                         ) : (

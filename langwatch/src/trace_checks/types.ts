@@ -45,6 +45,12 @@ export type Checks = {
   ragas_answer_relevancy: {
     parameters: Record<string, never>;
   };
+  ragas_faithfulness: {
+    parameters: Record<string, never>;
+  };
+  ragas_context_precision: {
+    parameters: Record<string, never>;
+  };
   inconsistency_check: {
     parameters: Record<string, never>;
   };
@@ -87,6 +93,8 @@ export type TraceCheckResult = {
 };
 
 export type TraceCheckBackendDefinition<T extends CheckTypes> = {
+  // TODO: should not be duplicated between front and backend
+  requiresRag?: boolean;
   execute: (
     trace: Trace,
     spans: ElasticSearchSpan[],
@@ -97,13 +105,14 @@ export type TraceCheckBackendDefinition<T extends CheckTypes> = {
 export type TraceCheckFrontendDefinition<T extends CheckTypes> = {
   name: string;
   description: string;
+  requiresRag?: boolean;
   parametersDescription: Record<
     keyof Checks[T]["parameters"],
     { name?: string; description?: string }
   >;
   default: {
     parameters: Checks[T]["parameters"];
-    preconditions?: CheckPreconditions
+    preconditions?: CheckPreconditions;
   };
   render: (props: { check: TraceCheck }) => JSX.Element;
 };

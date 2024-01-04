@@ -16,6 +16,7 @@ import type {
 import { HorizontalFormControl } from "../HorizontalFormControl";
 import { HelpCircle, X } from "react-feather";
 import { SmallLabel } from "../SmallLabel";
+import { getTraceCheck } from "../../trace_checks/frontend/registry";
 
 const ruleOptions: Record<CheckPrecondition["rule"], string> = {
   not_contains: "does not contain",
@@ -38,10 +39,13 @@ export const PreconditionsField = ({
   runOn: JSX.Element | null;
   append: (value: any) => void;
   remove: (index: number) => void;
-  fields: Record<"id", string>[]
+  fields: Record<"id", string>[];
 }) => {
   const { control, watch } = useFormContext();
   const preconditions = watch("preconditions");
+  const checkType = watch("checkType");
+
+  const check = getTraceCheck(checkType);
 
   return (
     <HorizontalFormControl
@@ -49,6 +53,23 @@ export const PreconditionsField = ({
       helper="Conditions that must be met for this check to run"
     >
       <VStack align="start" spacing={4}>
+        {check?.requiresRag && (
+          <Box borderLeft="4px solid" borderLeftColor="blue.400" width="full">
+            <VStack
+              borderLeftColor="reset"
+              padding={3}
+              width="full"
+              align="start"
+              position="relative"
+            >
+              <Text>Requires a RAG</Text>
+              <Text color="gray.500" fontStyle="italic">
+                This precondition is necessary to run this evaluation and cannot
+                be removed
+              </Text>
+            </VStack>
+          </Box>
+        )}
         {fields.map((field, index) => (
           <Box
             key={field.id}

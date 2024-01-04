@@ -37,7 +37,12 @@ import type {
 } from "../../trace_checks/types";
 import { getDebugger } from "../../utils/logger";
 import { addInputAndOutputForRAGs } from "./collector/rag";
-import { getFirstInputAsText, getLastOutputAsText, typedValueToText } from "./collector/common";
+import {
+  getFirstInputAsText,
+  getLastOutputAsText,
+  typedValueToText,
+} from "./collector/common";
+import { getCheckExecutor } from "../../trace_checks/backend/registry";
 
 const debug = getDebugger("langwatch:collector");
 
@@ -90,9 +95,9 @@ export default async function handler(
     return res.status(400).json({ message: "Bad request" });
   }
 
-  const spans = addInputAndOutputForRAGs(await addLLMTokensCount(
-    (req.body as Record<string, any>).spans as Span[]
-  ));
+  const spans = addInputAndOutputForRAGs(
+    await addLLMTokensCount((req.body as Record<string, any>).spans as Span[])
+  );
   spans.forEach((span) => {
     if (nullableTraceId && !span.trace_id) {
       span.trace_id = nullableTraceId;
@@ -193,7 +198,7 @@ export default async function handler(
     return res.status(500).json({ message: "Something went wrong!" });
   }
 
-  void scheduleTraceChecks(trace);
+  void scheduleTraceChecks(trace, spans);
 
   await markProjectFirstMessage(project);
 
@@ -330,6 +335,7 @@ const computeTraceMetrics = (spans: Span[]): Trace["metrics"] => {
   };
 };
 
+// TODO: extract to separate file
 // TODO: test
 const addLLMTokensCount = async (spans: Span[]) => {
   for (const span of spans) {
@@ -380,6 +386,7 @@ const markProjectFirstMessage = async (project: Project) => {
   }
 };
 
+// TODO: extract to separate file
 const cleanupPII = async (
   trace: Trace,
   spans: ElasticSearchSpan[]
@@ -457,10 +464,21 @@ const cleanupPII = async (
   }
 };
 
+// TODO: extract to separate file
 async function evaluatePreconditions(
+  checkType: string,
   trace: Trace,
+  spans: Span[],
   preconditions: CheckPreconditions
 ): Promise<boolean> {
+  const check = getCheckExecutor(checkType);
+
+  if (check?.requiresRag) {
+    if (!spans.some((span) => span.type === "rag")) {
+      return false;
+    }
+  }
+
   for (const precondition of preconditions) {
     const valueToCheck =
       precondition.field === "input"
@@ -518,7 +536,7 @@ async function evaluatePreconditions(
   return true;
 }
 
-const scheduleTraceChecks = async (trace: Trace) => {
+const scheduleTraceChecks = async (trace: Trace, spans: Span[]) => {
   const checks = await prisma.check.findMany({
     where: {
       projectId: trace.project_id,
@@ -532,7 +550,12 @@ const scheduleTraceChecks = async (trace: Trace) => {
       const preconditions = (check.preconditions ?? []) as CheckPreconditions;
       const preconditionsMet =
         preconditions.length === 0 ||
-        (await evaluatePreconditions(trace, preconditions));
+        (await evaluatePreconditions(
+          check.checkType,
+          trace,
+          spans,
+          preconditions
+        ));
       if (preconditionsMet) {
         debug(
           `scheduling ${check.checkType} (checkId: ${check.id}) for trace ${trace.id}`
