@@ -1,4 +1,4 @@
-import { getSearchEmbeddings } from "../pages/api/collector";
+import { getSearchEmbeddings } from "~/pages/api/collector/trace";
 import { TRACE_INDEX, esClient } from "../server/elasticsearch";
 import { getOpenAIEmbeddings } from "../server/embeddings";
 import { type Trace } from "../server/tracer/types";
