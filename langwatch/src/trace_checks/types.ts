@@ -1,8 +1,3 @@
-import type {
-  ElasticSearchSpan,
-  Trace,
-  TraceCheck,
-} from "../server/tracer/types";
 import type { Money } from "../utils/types";
 
 export type Checks = {
@@ -104,31 +99,6 @@ export type TraceCheckDefinition<T extends CheckTypes> = {
     parameters: Checks[T]["parameters"];
     preconditions?: CheckPreconditions;
   };
-};
-
-export type TraceCheckBackendDefinition<T extends CheckTypes> = {
-  // TODO: should not be duplicated between front and backend
-  requiresRag?: boolean;
-  execute: (
-    trace: Trace,
-    spans: ElasticSearchSpan[],
-    parameters: Checks[T]["parameters"]
-  ) => Promise<TraceCheckResult>;
-};
-
-export type TraceCheckFrontendDefinition<T extends CheckTypes> = {
-  name: string;
-  description: string;
-  requiresRag?: boolean;
-  parametersDescription: Record<
-    keyof Checks[T]["parameters"],
-    { name?: string; description?: string }
-  >;
-  default: {
-    parameters: Checks[T]["parameters"];
-    preconditions?: CheckPreconditions;
-  };
-  render: (props: { check: TraceCheck }) => JSX.Element;
 };
 
 // API Types

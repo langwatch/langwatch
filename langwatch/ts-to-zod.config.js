@@ -11,8 +11,7 @@ module.exports = {
       "ElasticSearchSpan",
       "ElasticSearchInputOutput",
       "TraceCheckResult",
-      "TraceCheckFrontendDefinition",
-      "TraceCheckBackendDefinition",
+      "TraceCheckDefinition",
       "TraceCheckJob",
     ].includes(name),
 };
