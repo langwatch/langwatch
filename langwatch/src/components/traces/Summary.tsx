@@ -18,7 +18,7 @@ import React, {
 } from "react";
 import { HelpCircle } from "react-feather";
 import { useTraceDetailsState } from "../../hooks/useTraceDetailsState";
-import { getTotalTokensDisplay } from "../../mappers/trace";
+import { getTotalTokensDisplay } from "~/utils/getTotalTokensDisplay";
 import type { Trace } from "../../server/tracer/types";
 import { formatMilliseconds } from "../../utils/formatMilliseconds";
 import { getColorForString } from "../../utils/rotatingColors";

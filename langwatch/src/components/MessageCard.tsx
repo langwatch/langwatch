@@ -20,11 +20,7 @@ import { formatDistanceToNow } from "date-fns";
 import numeral from "numeral";
 import { CheckCircle, Clock, HelpCircle, XCircle } from "react-feather";
 import Markdown from "react-markdown";
-import {
-  getSlicedInput,
-  getSlicedOutput,
-  getTotalTokensDisplay,
-} from "../mappers/trace";
+import { getTotalTokensDisplay } from "~/utils/getTotalTokensDisplay";
 import type { Trace, TraceCheck } from "../server/tracer/types";
 import { formatMilliseconds } from "../utils/formatMilliseconds";
 import { CheckPassing } from "./CheckPassing";
@@ -280,3 +276,35 @@ export function MessageCard({
     </VStack>
   );
 }
+
+const getSlicedInput = (trace: Trace) => {
+  const input = trace.input;
+
+  let value = input.value;
+  try {
+    const json: any = JSON.parse(value);
+    if (
+      "input" in json &&
+      typeof json.input === "string" &&
+      json.input.length > 0
+    ) {
+      value = json.input;
+    }
+  } catch {
+    // ignore
+  }
+
+  return (
+    (value ? value.slice(0, 100) : "<empty>") +
+    (value.length >= 100 ? "..." : "")
+  );
+};
+
+const getSlicedOutput = (trace: Trace) => {
+  const value = trace.output?.value.slice(0, 600);
+
+  return (
+    (value ? value : "<empty>") +
+    (trace.output && trace.output.value.length >= 600 ? "..." : "")
+  );
+};

@@ -19,6 +19,7 @@ describe("PIICheck", () => {
       checkPiiInSpans: true,
     });
     expect(response).toEqual({
+      costs: [],
       raw_result: { findings: [] },
       status: "succeeded",
       value: 0,
