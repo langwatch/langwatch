@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { RagasContextPrecision } from "./ragasContextPrecision";
+import { ragasContextPrecision } from "./ragasContextPrecision";
 import type { ElasticSearchSpan, Trace } from "../../server/tracer/types";
 import type { RagasResult } from "../types";
 
@@ -32,11 +32,7 @@ describe("RagasContextPrecision Integration", () => {
       },
     ];
 
-    const response = await RagasContextPrecision.execute(
-      sampleTrace,
-      sampleSpans,
-      {}
-    );
+    const response = await ragasContextPrecision(sampleTrace, sampleSpans);
 
     const context_precision = (response.raw_result as RagasResult).scores
       .context_precision;

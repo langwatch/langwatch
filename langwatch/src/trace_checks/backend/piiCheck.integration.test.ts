@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Trace } from "../../server/tracer/types";
-import { PIICheck } from "./piiCheck";
+import { piiCheck } from "./piiCheck";
 import type { google } from "@google-cloud/dlp/build/protos/protos";
 
 describe("PIICheck", () => {
@@ -13,7 +13,7 @@ describe("PIICheck", () => {
       timestamps: { started_at: Date.now(), inserted_at: Date.now() },
       search_embeddings: { openai_embeddings: [] },
     };
-    let response = await PIICheck.execute(sampleTrace, [], {
+    let response = await piiCheck(sampleTrace, [], {
       infoTypes: { creditCardNumber: true } as any,
       minLikelihood: "POSSIBLE",
       checkPiiInSpans: true,
@@ -34,7 +34,7 @@ describe("PIICheck", () => {
       timestamps: { started_at: Date.now(), inserted_at: Date.now() },
       search_embeddings: { openai_embeddings: [] },
     };
-    response = await PIICheck.execute(samplePIITrace, [], {
+    response = await piiCheck(samplePIITrace, [], {
       infoTypes: { creditCardNumber: true } as any,
       minLikelihood: "POSSIBLE",
       checkPiiInSpans: true,

@@ -1,14 +1,12 @@
 import fetch from "node-fetch";
 import type { Trace } from "../../server/tracer/types";
-import type {
-  TraceCheckResult,
-  TraceCheckBackendDefinition,
-  RagasResult,
-} from "../types";
+import type { TraceCheckResult, RagasResult } from "../types";
 import { env } from "../../env.mjs";
 import type { Money } from "../../utils/types";
 
-const execute = async (trace: Trace): Promise<TraceCheckResult> => {
+export const ragasAnswerRelevancy = async (
+  trace: Trace
+): Promise<TraceCheckResult> => {
   if (!env.LANGWATCH_GUARDRAILS_SERVICE) {
     throw new Error("LANGWATCH_GUARDRAILS_SERVICE not set");
   }
@@ -43,7 +41,9 @@ const execute = async (trace: Trace): Promise<TraceCheckResult> => {
 
   if (typeof relevancyScore === "undefined") {
     throw new Error(
-      `Ragas answer relevancy check API did not return a score: ${JSON.stringify(result)}`
+      `Ragas answer relevancy check API did not return a score: ${JSON.stringify(
+        result
+      )}`
     );
   }
 
@@ -56,8 +56,3 @@ const execute = async (trace: Trace): Promise<TraceCheckResult> => {
     ],
   };
 };
-
-export const RagasAnswerRelevancy: TraceCheckBackendDefinition<"ragas_answer_relevancy"> =
-  {
-    execute,
-  };

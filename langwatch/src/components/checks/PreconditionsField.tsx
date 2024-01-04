@@ -16,7 +16,7 @@ import type {
 import { HorizontalFormControl } from "../HorizontalFormControl";
 import { HelpCircle, X } from "react-feather";
 import { SmallLabel } from "../SmallLabel";
-import { getTraceCheck } from "../../trace_checks/frontend/registry";
+import { getTraceCheckDefinitions } from "../../trace_checks/registry";
 
 const ruleOptions: Record<CheckPrecondition["rule"], string> = {
   not_contains: "does not contain",
@@ -45,7 +45,7 @@ export const PreconditionsField = ({
   const preconditions = watch("preconditions");
   const checkType = watch("checkType");
 
-  const check = getTraceCheck(checkType);
+  const check = getTraceCheckDefinitions(checkType);
 
   return (
     <HorizontalFormControl

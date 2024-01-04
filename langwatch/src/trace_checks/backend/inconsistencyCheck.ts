@@ -1,13 +1,11 @@
 import fetch from "node-fetch";
 import type { Trace } from "../../server/tracer/types";
-import type {
-  InconsistencyCheckResult,
-  TraceCheckBackendDefinition,
-  TraceCheckResult,
-} from "../types";
+import type { InconsistencyCheckResult, TraceCheckResult } from "../types";
 import { env } from "../../env.mjs";
 
-const execute = async (trace: Trace): Promise<TraceCheckResult> => {
+export const inconsistencyCheck = async (
+  trace: Trace
+): Promise<TraceCheckResult> => {
   if (!env.LANGWATCH_GUARDRAILS_SERVICE) {
     throw new Error("LANGWATCH_GUARDRAILS_SERVICE not set");
   }
@@ -42,8 +40,3 @@ const execute = async (trace: Trace): Promise<TraceCheckResult> => {
     costs: [],
   };
 };
-
-export const InconsistencyCheck: TraceCheckBackendDefinition<"inconsistency_check"> =
-  {
-    execute,
-  };

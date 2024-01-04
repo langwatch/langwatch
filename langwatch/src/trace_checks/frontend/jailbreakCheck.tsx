@@ -1,11 +1,8 @@
 import { Box, Text } from "@chakra-ui/react";
 import type { TraceCheck } from "../../server/tracer/types";
-import type {
-  JailbreakAnalysisResult,
-  TraceCheckFrontendDefinition,
-} from "../types";
+import type { JailbreakAnalysisResult } from "../types";
 
-function CheckDetails({ check }: { check: TraceCheck }) {
+export function JailbreakCheck({ check }: { check: TraceCheck }) {
   const detected = (check.raw_result as JailbreakAnalysisResult)
     .jailbreakAnalysis.detected;
 
@@ -19,14 +16,3 @@ function CheckDetails({ check }: { check: TraceCheck }) {
     </Box>
   );
 }
-
-export const JailbreakCheck: TraceCheckFrontendDefinition<"jailbreak_check"> = {
-  name: "Jailbreak Detection",
-  description:
-    "Detects if the input attempts to Jailbreak the LLM to produce answers and execute tasks that it was not supposed to",
-  parametersDescription: {},
-  default: {
-    parameters: {},
-  },
-  render: CheckDetails,
-};

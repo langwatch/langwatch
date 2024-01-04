@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { RagasFaithfulness } from "./ragasFaithfulness";
+import { ragasFaithfulness } from "./ragasFaithfulness";
 import type { Trace, ElasticSearchSpan } from "../../server/tracer/types";
 import type { RagasResult } from "../types";
 
@@ -31,11 +31,7 @@ describe("RagasFaithfulness Integration", () => {
         ],
       },
     ];
-    const response = await RagasFaithfulness.execute(
-      sampleTrace,
-      sampleSpans,
-      {}
-    );
+    const response = await ragasFaithfulness(sampleTrace, sampleSpans);
 
     const faithfulnessScore = (response.raw_result as RagasResult).scores
       .faithfulness;

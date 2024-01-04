@@ -24,7 +24,7 @@ import {
 } from "../../server/tracer/types.generated";
 import {
   convertToTraceCheckResult,
-  piiCheck,
+  runPiiCheck,
 } from "../../trace_checks/backend/piiCheck";
 import {
   scheduleTraceCheck,
@@ -42,7 +42,7 @@ import {
   getLastOutputAsText,
   typedValueToText,
 } from "./collector/common";
-import { getCheckExecutor } from "../../trace_checks/backend/registry";
+import { getTraceCheckDefinitions } from "../../trace_checks/registry";
 
 const debug = getDebugger("langwatch:collector");
 
@@ -391,7 +391,7 @@ const cleanupPII = async (
   trace: Trace,
   spans: ElasticSearchSpan[]
 ): Promise<undefined> => {
-  const results = await piiCheck(trace, spans);
+  const results = await runPiiCheck(trace, spans);
   const { quotes } = results;
 
   const piiChecks = await prisma.check.findMany({
@@ -471,9 +471,9 @@ async function evaluatePreconditions(
   spans: Span[],
   preconditions: CheckPreconditions
 ): Promise<boolean> {
-  const check = getCheckExecutor(checkType);
+  const checkDefinitions = getTraceCheckDefinitions(checkType);
 
-  if (check?.requiresRag) {
+  if (checkDefinitions?.requiresRag) {
     if (!spans.some((span) => span.type === "rag")) {
       return false;
     }

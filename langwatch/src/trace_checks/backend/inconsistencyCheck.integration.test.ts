@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { InconsistencyCheck } from "./inconsistencyCheck";
+import { inconsistencyCheck } from "./inconsistencyCheck";
 import type { Trace } from "../../server/tracer/types";
 import type { InconsistencyCheckResult } from "../types";
 
@@ -18,7 +18,7 @@ describe("InconsistencyCheck", () => {
       search_embeddings: {},
     };
 
-    const response = await InconsistencyCheck.execute(sampleTrace, [], {});
+    const response = await inconsistencyCheck(sampleTrace);
     expect(
       (response.raw_result as InconsistencyCheckResult).sentences
     ).toContain("The grass is blue.");
@@ -37,7 +37,7 @@ describe("InconsistencyCheck", () => {
       search_embeddings: {},
     };
 
-    const response = await InconsistencyCheck.execute(sampleTrace, [], {});
+    const response = await inconsistencyCheck(sampleTrace);
     expect(
       (response.raw_result as InconsistencyCheckResult).sentences
     ).toHaveLength(0);

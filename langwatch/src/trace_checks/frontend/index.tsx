@@ -1,4 +1,4 @@
-import type { CheckTypes, TraceCheckFrontendDefinition } from "../types";
+import type { CheckTypes } from "../types";
 import { CustomCheck } from "./customCheck";
 import { PIICheck } from "./piiCheck";
 import { ToxicityCheck } from "./toxicityCheck";
@@ -7,10 +7,10 @@ import { InconsistencyCheck } from "./inconsistencyCheck";
 import { RagasAnswerRelevancy } from "./ragasAnswerRelevancy";
 import { RagasFaithfulness } from "./ragasFaithfulness";
 import { RagasContextPrecision } from "./ragasContextPrecision";
+import type { TraceCheck } from "../../server/tracer/types";
 
-// TODO: allow checks to be run to be configurable by user
-export const AVAILABLE_TRACE_CHECKS: {
-  [K in CheckTypes]: TraceCheckFrontendDefinition<K>;
+export const RENDER_TRACE_CHECKS: {
+  [K in CheckTypes]: (props: { check: TraceCheck }) => JSX.Element;
 } = {
   pii_check: PIICheck,
   toxicity_check: ToxicityCheck,
@@ -22,9 +22,9 @@ export const AVAILABLE_TRACE_CHECKS: {
   custom: CustomCheck,
 };
 
-export const getTraceCheck = (name: string) => {
-  for (const [key, val] of Object.entries(AVAILABLE_TRACE_CHECKS)) {
-    if (key === name) return val;
-  }
-  return undefined;
-};
+export function TraceCheckDetails({ check }: { check: TraceCheck }) {
+  const Renderer = RENDER_TRACE_CHECKS[check.check_type as CheckTypes];
+  if (!Renderer) return null;
+
+  return <Renderer check={check} />;
+}

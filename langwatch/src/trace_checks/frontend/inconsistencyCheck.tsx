@@ -1,9 +1,8 @@
 import { Text, VStack } from "@chakra-ui/react";
 import type { TraceCheck } from "../../server/tracer/types";
-import type { TraceCheckFrontendDefinition } from "../types";
 import type { InconsistencyCheckResult } from "../types";
 
-function CheckDetails({ check }: { check: TraceCheck }) {
+export function InconsistencyCheck({ check }: { check: TraceCheck }) {
   const inconsistencyResult = check.raw_result as InconsistencyCheckResult;
   const sentences = inconsistencyResult.sentences;
 
@@ -19,15 +18,3 @@ function CheckDetails({ check }: { check: TraceCheck }) {
     </VStack>
   );
 }
-
-export const InconsistencyCheck: TraceCheckFrontendDefinition<"inconsistency_check"> =
-  {
-    name: "(Beta) Inconsistency Detection",
-    description:
-      "Detects inconsistencies between input and output text for hallucination prevention",
-    parametersDescription: {},
-    default: {
-      parameters: {},
-    },
-    render: CheckDetails,
-  };

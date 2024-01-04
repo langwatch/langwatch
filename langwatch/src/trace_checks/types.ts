@@ -92,6 +92,20 @@ export type TraceCheckResult = {
   costs: Money[];
 };
 
+export type TraceCheckDefinition<T extends CheckTypes> = {
+  name: string;
+  description: string;
+  requiresRag?: boolean;
+  parametersDescription: Record<
+    keyof Checks[T]["parameters"],
+    { name?: string; description?: string }
+  >;
+  default: {
+    parameters: Checks[T]["parameters"];
+    preconditions?: CheckPreconditions;
+  };
+};
+
 export type TraceCheckBackendDefinition<T extends CheckTypes> = {
   // TODO: should not be duplicated between front and backend
   requiresRag?: boolean;

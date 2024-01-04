@@ -2,7 +2,8 @@ import { Box, HStack, Text } from "@chakra-ui/react";
 import type { TraceCheck } from "../server/tracer/types";
 import type { CheckTypes } from "../trace_checks/types";
 import { CheckCircle, Clock, XCircle } from "react-feather";
-import { getTraceCheck } from "../trace_checks/frontend/registry";
+import { getTraceCheckDefinitions } from "../trace_checks/registry";
+import { TraceCheckDetails } from "../trace_checks/frontend";
 
 export function CheckPassing({ check }: { check: TraceCheck }) {
   const checkType = check.check_type as CheckTypes;
@@ -12,10 +13,9 @@ export function CheckPassing({ check }: { check: TraceCheck }) {
     check.status === "failed" ||
     check.status === "error";
   const checkPasses = check.status === "succeeded";
-  const traceCheck = getTraceCheck(checkType);
+  const traceCheck = getTraceCheckDefinitions(checkType);
 
   if (!traceCheck) return null;
-  const TraceCheckComponent = traceCheck.render;
 
   return (
     <HStack align="start" spacing={2}>
@@ -35,7 +35,7 @@ export function CheckPassing({ check }: { check: TraceCheck }) {
         <b>{check.check_name || traceCheck.name}:</b>
       </Text>
       {check.status == "succeeded" || check.status == "failed" ? (
-        <TraceCheckComponent check={check} />
+        <TraceCheckDetails check={check} />
       ) : check.status == "error" ? (
         <Text>Error</Text>
       ) : check.status == "in_progress" ? (

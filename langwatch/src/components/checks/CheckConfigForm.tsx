@@ -45,8 +45,8 @@ import DynamicZodForm from "./DynamicZodForm";
 import { PreconditionsField } from "./PreconditionsField";
 import {
   AVAILABLE_TRACE_CHECKS,
-  getTraceCheck,
-} from "../../trace_checks/frontend/registry";
+  getTraceCheckDefinitions,
+} from "../../trace_checks/registry";
 
 export interface CheckConfigFormData {
   name: string;
@@ -104,7 +104,7 @@ export default function CheckConfigForm({
     name: "preconditions",
   });
 
-  const check = checkType && getTraceCheck(checkType);
+  const check = checkType && getTraceCheckDefinitions(checkType);
 
   useEffect(() => {
     if (defaultValues?.parameters && defaultValues.checkType === checkType)
@@ -112,7 +112,7 @@ export default function CheckConfigForm({
 
     if (!checkType) return;
 
-    const defaultName = getTraceCheck(checkType)?.name;
+    const defaultName = getTraceCheckDefinitions(checkType)?.name;
     if (!nameValue && defaultName && checkType !== "custom") {
       form.setValue("name", defaultName);
     }

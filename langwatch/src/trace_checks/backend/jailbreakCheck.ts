@@ -3,7 +3,9 @@ import { env } from "../../env.mjs";
 import type { Trace } from "../../server/tracer/types";
 import type { JailbreakAnalysisResult, TraceCheckResult } from "../types";
 
-const execute = async (trace: Trace): Promise<TraceCheckResult> => {
+export const jailbreakCheck = async (
+  trace: Trace
+): Promise<TraceCheckResult> => {
   const content = trace.input.value;
 
   const response = await fetch(
@@ -27,8 +29,4 @@ const execute = async (trace: Trace): Promise<TraceCheckResult> => {
     status: detected ? "failed" : "succeeded",
     costs: [],
   };
-};
-
-export const JailbreakCheck = {
-  execute,
 };

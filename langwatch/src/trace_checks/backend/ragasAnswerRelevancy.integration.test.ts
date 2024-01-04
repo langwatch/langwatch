@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { RagasAnswerRelevancy } from "./ragasAnswerRelevancy";
+import { ragasAnswerRelevancy } from "./ragasAnswerRelevancy";
 import type { Trace } from "../../server/tracer/types";
 import type { RagasResult } from "../types";
 
@@ -15,7 +15,7 @@ describe("RagasAnswerRelevancy Integration", () => {
       search_embeddings: {},
     };
 
-    const response = await RagasAnswerRelevancy.execute(sampleTrace, [], {});
+    const response = await ragasAnswerRelevancy(sampleTrace);
 
     const answer_relevancy = (response.raw_result as RagasResult).scores.answer_relevancy
     expect(answer_relevancy).toBeGreaterThan(0.99);

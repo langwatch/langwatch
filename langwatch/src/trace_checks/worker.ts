@@ -13,7 +13,7 @@ import {
   esGetTraceById,
 } from "../server/api/routers/traces";
 import { env } from "../env.mjs";
-import { getCheckExecutor } from "./backend/registry";
+import { getCheckExecutor } from "./backend";
 import { prisma } from "../server/db";
 import { clusterTopicsForProject } from "./topic_clustering";
 import { nanoid } from "nanoid";
@@ -44,7 +44,7 @@ export const process = async (
     throw `trace executor not found for ${check.checkType}`;
   }
 
-  return await checkExecutor.execute(
+  return await checkExecutor(
     trace,
     spans,
     (check.parameters ?? {}) as any

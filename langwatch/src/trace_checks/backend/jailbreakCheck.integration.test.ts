@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { JailbreakCheck } from "./jailbreakCheck";
+import { jailbreakCheck } from "./jailbreakCheck";
 import type { Trace } from "../../server/tracer/types";
 
 describe("JailbreakCheck", () => {
@@ -13,7 +13,7 @@ describe("JailbreakCheck", () => {
       search_embeddings: { openai_embeddings: [] },
     };
 
-    const response = await JailbreakCheck.execute(sampleTrace);
+    const response = await jailbreakCheck(sampleTrace);
     expect(response.value).toBe(1);
     expect(response.status).toBe("failed");
   });
@@ -28,7 +28,7 @@ describe("JailbreakCheck", () => {
       search_embeddings: { openai_embeddings: [] },
     };
 
-    const response = await JailbreakCheck.execute(sampleTrace);
+    const response = await jailbreakCheck(sampleTrace);
     expect(response.value).toBe(0);
     expect(response.status).toBe("succeeded");
   });

@@ -1,9 +1,9 @@
 import { Text, VStack } from "@chakra-ui/react";
 import type { TraceCheck } from "../../server/tracer/types";
-import type { CustomCheckRule, TraceCheckFrontendDefinition } from "../types";
+import type { CustomCheckRule } from "../types";
 import { camelCaseToLowerCase } from "../../utils/stringCasing";
 
-function CustomCheckDetails({ check }: { check: TraceCheck }) {
+export function CustomCheck({ check }: { check: TraceCheck }) {
   const failedRules =
     (
       check.raw_result as {
@@ -46,26 +46,3 @@ function CustomCheckDetails({ check }: { check: TraceCheck }) {
     </VStack>
   );
 }
-
-export const CustomCheck: TraceCheckFrontendDefinition<"custom"> = {
-  name: "Custom",
-  description:
-    "Build your own guardrails and measurements using heuristics or LLMs-on-LLMs evalution",
-  parametersDescription: {
-    rules: {},
-  },
-  default: {
-    parameters: {
-      rules: [
-        {
-          field: "output",
-          rule: "not_contains",
-          value: "",
-          model: "gpt-4-1106-preview",
-          ...({ failWhen: { condition: "<", amount: 0.7 } } as any),
-        },
-      ],
-    },
-  },
-  render: CustomCheckDetails,
-};

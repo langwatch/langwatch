@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CustomCheck } from "./customCheck";
+import { customCheck } from "./customCheck";
 import type { Trace } from "../../server/tracer/types";
 import type { Checks } from "../types";
 
@@ -35,7 +35,7 @@ describe("CustomCheck", () => {
       ],
     };
 
-    const containsResult = await CustomCheck.execute(
+    const containsResult = await customCheck(
       sampleTrace,
       [],
       passingRule
@@ -43,7 +43,7 @@ describe("CustomCheck", () => {
     expect(containsResult.status).toBe("succeeded");
     expect((containsResult.raw_result as any).failedRules).toHaveLength(0);
 
-    const notContainsResult = await CustomCheck.execute(
+    const notContainsResult = await customCheck(
       sampleTrace,
       [],
       failingRule
@@ -83,7 +83,7 @@ describe("CustomCheck", () => {
       ],
     };
 
-    const notContainsResult = await CustomCheck.execute(
+    const notContainsResult = await customCheck(
       sampleTrace,
       [],
       passingRule
@@ -91,7 +91,7 @@ describe("CustomCheck", () => {
     expect(notContainsResult.status).toBe("succeeded");
     expect((notContainsResult.raw_result as any).failedRules).toHaveLength(0);
 
-    const containsResult = await CustomCheck.execute(
+    const containsResult = await customCheck(
       sampleTrace,
       [],
       failingRule
@@ -151,7 +151,7 @@ describe("CustomCheck", () => {
       ],
     };
 
-    const matchesRegexPassResult = await CustomCheck.execute(
+    const matchesRegexPassResult = await customCheck(
       sampleTrace,
       [],
       matchesRegexPassingRule
@@ -161,7 +161,7 @@ describe("CustomCheck", () => {
       0
     );
 
-    const matchesRegexFailResult = await CustomCheck.execute(
+    const matchesRegexFailResult = await customCheck(
       sampleTrace,
       [],
       matchesRegexFailingRule
@@ -171,7 +171,7 @@ describe("CustomCheck", () => {
       1
     );
 
-    const notMatchesRegexPassResult = await CustomCheck.execute(
+    const notMatchesRegexPassResult = await customCheck(
       sampleTrace,
       [],
       notMatchesRegexPassingRule
@@ -181,7 +181,7 @@ describe("CustomCheck", () => {
       (notMatchesRegexPassResult.raw_result as any).failedRules
     ).toHaveLength(0);
 
-    const notMatchesRegexFailResult = await CustomCheck.execute(
+    const notMatchesRegexFailResult = await customCheck(
       sampleTrace,
       [],
       notMatchesRegexFailingRule
@@ -227,7 +227,7 @@ describe("CustomCheck", () => {
       ],
     };
 
-    const isSimilarToPassResult = await CustomCheck.execute(
+    const isSimilarToPassResult = await customCheck(
       sampleTrace,
       [],
       isSimilarToPassingRule
@@ -237,7 +237,7 @@ describe("CustomCheck", () => {
       0
     );
 
-    const isSimilarToFailingResult = await CustomCheck.execute(
+    const isSimilarToFailingResult = await customCheck(
       sampleTrace,
       [],
       isSimilarToFailingRule
@@ -283,24 +283,24 @@ describe("CustomCheck", () => {
       ],
     };
 
-    const llmBooleanResult = await CustomCheck.execute(
+    const llmBooleanResult = await customCheck(
       sampleTrace,
       [],
       llmBooleanRule
     );
     expect(llmBooleanResult.status).toBe("succeeded");
     expect(llmBooleanResult.costs).toEqual([
-      { currency: "USD", value: 0.00014800000000000002 },
+      { currency: "USD", amount: 0.00014800000000000002 },
     ]);
 
-    const llmScoreResult = await CustomCheck.execute(
+    const llmScoreResult = await customCheck(
       sampleTrace,
       [],
       llmScoreRule
     );
     expect(llmScoreResult.status).toBe("failed");
     expect(llmScoreResult.costs).toEqual([
-      { currency: "USD", value: 0.0001645 },
+      { currency: "USD", amount: 0.0001645 },
     ]);
     expect((llmScoreResult.raw_result as any).failedRules).toHaveLength(1);
   });

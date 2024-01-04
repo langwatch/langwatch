@@ -5,14 +5,13 @@ import type {
   Checks,
   CustomCheckFailWhen,
   CustomCheckRule,
-  TraceCheckBackendDefinition,
   TraceCheckResult,
 } from "../types";
 import { estimateCost, tokenizeAndEstimateCost } from "llm-cost";
 import type { ChatCompletionMessageParam } from "openai/resources";
 import type { Money } from "../../utils/types";
 
-const execute = async (
+export const customCheck = async (
   trace: Trace,
   _spans: ElasticSearchSpan[],
   parameters: Checks["custom"]["parameters"]
@@ -98,7 +97,8 @@ const execute = async (
           typeof llmScoreResult.result === "number" &&
           !matchesFailWhenCondition(llmScoreResult.result, rule.failWhen);
         score = llmScoreResult.result;
-        costs[llmScoreResult.cost.currency].amount += llmScoreResult.cost.amount;
+        costs[llmScoreResult.cost.currency].amount +=
+          llmScoreResult.cost.amount;
 
         break;
     }
@@ -215,12 +215,11 @@ async function handleLLMCheck(
       ).cost;
 
   if (rule.rule === "llm_boolean") {
-    return { result: args.result, cost: { amount: cost ?? 0, currency: "USD" } };
+    return {
+      result: args.result,
+      cost: { amount: cost ?? 0, currency: "USD" },
+    };
   } else {
     return { result: args.score, cost: { amount: cost ?? 0, currency: "USD" } };
   }
 }
-
-export const CustomCheck: TraceCheckBackendDefinition<"custom"> = {
-  execute,
-};

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ToxicityCheck } from "./toxicityCheck";
+import { toxicityCheck } from "./toxicityCheck";
 import type { Trace } from "../../server/tracer/types";
 import type { ModerationResult } from "../types";
 
@@ -14,7 +14,7 @@ describe("ToxicityCheck", () => {
       search_embeddings: { openai_embeddings: [] },
     };
 
-    const response = await ToxicityCheck.execute(sampleTrace, [], {
+    const response = await toxicityCheck(sampleTrace, [], {
       categories: {
         harassment: true,
         "harassment/threatening": true,
@@ -45,7 +45,7 @@ describe("ToxicityCheck", () => {
       search_embeddings: { openai_embeddings: [] },
     };
 
-    const response = await ToxicityCheck.execute(sampleTrace, [], {
+    const response = await toxicityCheck(sampleTrace, [], {
       categories: {
         harassment: false,
         "harassment/threatening": true,

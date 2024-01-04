@@ -12,7 +12,7 @@ import { Controller, useFieldArray, useFormContext } from "react-hook-form";
 import { z, type ZodType } from "zod";
 import { camelCaseToTitleCase } from "../../utils/stringCasing";
 import { HorizontalFormControl } from "../HorizontalFormControl";
-import { getTraceCheck } from "../../trace_checks/frontend/registry";
+import { getTraceCheckDefinitions } from "../../trace_checks/registry";
 
 const DynamicZodForm = ({
   schema,
@@ -118,11 +118,11 @@ const DynamicZodForm = ({
         <React.Fragment key={key}>
           <HorizontalFormControl
             label={
-              (getTraceCheck(checkType)?.parametersDescription as any)?.[key]
+              (getTraceCheckDefinitions(checkType)?.parametersDescription as any)?.[key]
                 ?.name ?? camelCaseToTitleCase(key)
             }
             helper={
-              (getTraceCheck(checkType)?.parametersDescription as any)?.[key]
+              (getTraceCheckDefinitions(checkType)?.parametersDescription as any)?.[key]
                 ?.description ?? ""
             }
           >

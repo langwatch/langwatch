@@ -2,14 +2,10 @@ import fetch from "node-fetch";
 import { env } from "../../env.mjs";
 import type { ElasticSearchSpan, Trace } from "../../server/tracer/types";
 import type { Money } from "../../utils/types";
-import type {
-  RagasResult,
-  TraceCheckBackendDefinition,
-  TraceCheckResult,
-} from "../types";
+import type { RagasResult, TraceCheckResult } from "../types";
 import { getRAGInfo } from "../utils";
 
-const execute = async (
+export const ragasFaithfulness = async (
   _trace: Trace,
   spans: ElasticSearchSpan[]
 ): Promise<TraceCheckResult> => {
@@ -64,9 +60,3 @@ const execute = async (
     ],
   };
 };
-
-export const RagasFaithfulness: TraceCheckBackendDefinition<"ragas_faithfulness"> =
-  {
-    requiresRag: true,
-    execute,
-  };
