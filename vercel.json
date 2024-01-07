@@ -16,5 +16,6 @@
     "src/pages/api/**/*.ts": {
       "memory": 512
     }
-  }
+  },
+  "regions": ["arn1"]
 }
