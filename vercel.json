@@ -14,7 +14,7 @@
   "ignoreCommand": "git submodule update --init; exit 1",
   "functions": {
     "src/pages/api/**/*.ts": {
-      "memory": 1024
+      "memory": 512
     }
   }
 }
