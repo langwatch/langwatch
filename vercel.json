@@ -17,5 +17,5 @@
       "memory": 512
     }
   },
-  "regions": ["arn1"]
+  "regions": ["fra1"]
 }
