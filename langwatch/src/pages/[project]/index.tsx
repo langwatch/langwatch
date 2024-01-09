@@ -49,6 +49,18 @@ import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProje
 import { api } from "../../utils/api";
 import { formatMilliseconds } from "../../utils/formatMilliseconds";
 import { getSingleQueryParam } from "../../utils/getSingleQueryParam";
+import {
+  LLMCallsCountGraph,
+  LLMCallsCountSummary,
+} from "../../components/analytics/LLMCallsCountGraph";
+import {
+  ThreadsCountGraph,
+  ThreadsCountSummary,
+} from "../../components/analytics/ThreadsCountGraph";
+import {
+  UsersCountGraph,
+  UsersCountSummary,
+} from "../../components/analytics/UsersCountGraph";
 
 export default function Index() {
   const { project } = useOrganizationTeamProject();
@@ -119,7 +131,10 @@ export default function Index() {
             </VStack>
           </Alert>
         )}
-        <HStack width="full" paddingBottom={6}>
+        <HStack width="full" align="top">
+          <Heading as={"h1"} size="lg" paddingBottom={6} paddingTop={1}>
+            User Metrics
+          </Heading>
           <Spacer />
           <FilterSelector />
           <PeriodSelector
@@ -138,6 +153,62 @@ export default function Index() {
                         <Text color="black">Messages</Text>
                         <Box fontSize={24} color="black" fontWeight="bold">
                           <MessagesCountSummary />
+                        </Box>
+                      </VStack>
+                    </Tab>
+                    <Tab paddingX={0} paddingBottom={4}>
+                      <VStack align="start">
+                        <Text color="black">Threads</Text>
+                        <Box fontSize={24} color="black" fontWeight="bold">
+                          <ThreadsCountSummary />
+                        </Box>
+                      </VStack>
+                    </Tab>
+                    <Tab paddingX={0} paddingBottom={4}>
+                      <VStack align="start">
+                        <Text color="black">Users</Text>
+                        <Box fontSize={24} color="black" fontWeight="bold">
+                          <UsersCountSummary />
+                        </Box>
+                      </VStack>
+                    </Tab>
+                  </TabList>
+                  <TabIndicator
+                    mt="-1.5px"
+                    height="4px"
+                    bg="orange.400"
+                    borderRadius="1px"
+                  />
+                  <TabPanels>
+                    <TabPanel>
+                      <MessagesCountGraph />
+                    </TabPanel>
+                    <TabPanel>
+                      <ThreadsCountGraph />
+                    </TabPanel>
+                    <TabPanel>
+                      <UsersCountGraph />
+                    </TabPanel>
+                  </TabPanels>
+                </Tabs>
+              </CardBody>
+            </Card>
+          </GridItem>
+        </Grid>
+        <Heading as={"h1"} size="lg" paddingBottom={6} paddingTop={10}>
+          LLM Metrics
+        </Heading>
+        <Grid width="100%" templateColumns="1fr 0.5fr" gap={6}>
+          <GridItem colSpan={2}>
+            <Card>
+              <CardBody>
+                <Tabs variant="unstyled">
+                  <TabList gap={12}>
+                    <Tab paddingX={0} paddingBottom={4}>
+                      <VStack align="start">
+                        <Text color="black">LLM Calls</Text>
+                        <Box fontSize={24} color="black" fontWeight="bold">
+                          <LLMCallsCountSummary />
                         </Box>
                       </VStack>
                     </Tab>
@@ -166,7 +237,7 @@ export default function Index() {
                   />
                   <TabPanels>
                     <TabPanel>
-                      <MessagesCountGraph />
+                      <LLMCallsCountGraph />
                     </TabPanel>
                     <TabPanel>
                       <LLMCostSumGraph />

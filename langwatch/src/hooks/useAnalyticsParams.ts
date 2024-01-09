@@ -30,6 +30,11 @@ export const useAnalyticsParams = () => {
       enabled: !!project && !!startDate && !!endDate,
       refetchOnMount: false,
       refetchOnWindowFocus: false,
+      trpc: {
+        context: {
+          skipBatch: true,
+        },
+      },
     },
   };
 };

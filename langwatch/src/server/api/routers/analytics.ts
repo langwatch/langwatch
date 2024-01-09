@@ -17,10 +17,21 @@ import {
   tokensSumAggregated,
   tokensSumVsPreviousPeriod,
 } from "./analytics/tokens";
+import { llmCallsCountAggregated } from "./analytics/llmCalls";
+import {
+  threadsCountAggregated,
+  threadsCountVsPreviousPeriod,
+} from "./analytics/threads";
+import { usersCountAggregated, usersCountVsPreviousPeriod } from "./analytics/users";
 
 export const analyticsRouter = createTRPCRouter({
   messagesCountVsPreviousPeriod,
   messagesCountAggregated,
+  threadsCountVsPreviousPeriod,
+  threadsCountAggregated,
+  usersCountVsPreviousPeriod,
+  usersCountAggregated,
+  llmCallsCountAggregated,
   llmCostSumVsPreviousPeriod,
   llmCostSumAggregated,
   tokensSumVsPreviousPeriod,

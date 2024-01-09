@@ -1,8 +1,9 @@
 import { addDays, differenceInCalendarDays } from "date-fns";
 import { z } from "zod";
-import { TRACE_INDEX } from "../traces";
+import { TRACE_INDEX, SPAN_INDEX } from "../traces";
 import { esClient } from "../../../elasticsearch";
 import type { AggregationsAggregationContainer } from "@elastic/elasticsearch/lib/api/types";
+import type { Trace } from "../../../tracer/types";
 
 export const sharedAnalyticsFilterInput = z.object({
   projectId: z.string(),
@@ -16,7 +17,7 @@ export const sharedAnalyticsFilterInput = z.object({
 
 export const sharedAnalyticsFilterInputWithAggregations =
   sharedAnalyticsFilterInput.extend({
-    aggregations: z.array(z.enum(["customer_id", "labels"])),
+    aggregations: z.array(z.enum(["customer_id", "labels", "model"])),
   });
 
 export const generateQueryConditions = ({
@@ -54,6 +55,37 @@ export const generateQueryConditions = ({
   ];
 };
 
+export const spanQueryConditions = ({
+  traceIds,
+  projectId,
+  startDate,
+  endDate,
+}: z.infer<typeof sharedAnalyticsFilterInput> & { traceIds: string[] }) => {
+  // If end date is very close to now, force it to be now, to allow frontend to keep refetching for new messages
+  const endDate_ =
+    new Date().getTime() - endDate < 1000 * 60 * 60
+      ? new Date().getTime()
+      : endDate;
+
+  return [
+    {
+      term: { project_id: projectId },
+    },
+    {
+      range: {
+        "timestamps.started_at": {
+          gte: startDate,
+          lte: endDate_,
+          format: "epoch_millis",
+        },
+      },
+    },
+    {
+      terms: { trace_id: traceIds },
+    },
+  ];
+};
+
 export const dateTicks = (startDate: Date, endDate: Date, field: string) => {
   return {
     field: field,
@@ -78,6 +110,69 @@ export const currentVsPreviousTracesAggregation = async <
   input: z.infer<typeof sharedAnalyticsFilterInput>;
   aggs: Record<keyof T, AggregationsAggregationContainer>;
 }) => {
+  const { previousPeriodStartDate } = currentVsPreviousDates(input);
+
+  return currentVsPreviousElasticSearchAggregation<T>({
+    input,
+    aggs,
+    index: TRACE_INDEX,
+    conditions: generateQueryConditions({
+      ...input,
+      startDate: previousPeriodStartDate.getTime(),
+    }),
+  });
+};
+
+export const currentVsPreviousSpansAggregation = async <
+  T extends Record<string, any>,
+>({
+  aggs,
+  input,
+  extraConditions,
+}: {
+  input: z.infer<typeof sharedAnalyticsFilterInput>;
+  aggs: Record<keyof T, AggregationsAggregationContainer>;
+  extraConditions?: any[];
+}) => {
+  const { previousPeriodStartDate } = currentVsPreviousDates(input);
+
+  const tracesResult = await esClient.search<Trace>({
+    index: TRACE_INDEX,
+    body: {
+      _source: ["id"],
+      size: 10000,
+      query: {
+        bool: {
+          //@ts-ignore
+          filter: generateQueryConditions({
+            ...input,
+            startDate: previousPeriodStartDate.getTime(),
+          }),
+        },
+      },
+    },
+  });
+
+  const traceIds = tracesResult.hits.hits.map((hit) => hit._source!.id);
+
+  return currentVsPreviousElasticSearchAggregation<T>({
+    input,
+    aggs,
+    index: SPAN_INDEX,
+    conditions: [
+      ...spanQueryConditions({
+        ...input,
+        startDate: previousPeriodStartDate.getTime(),
+        traceIds,
+      }),
+      ...(extraConditions ?? []),
+    ],
+  });
+};
+
+const currentVsPreviousDates = (
+  input: z.infer<typeof sharedAnalyticsFilterInput>
+) => {
   const startDate = new Date(input.startDate);
   const endDate = new Date(input.endDate);
   const daysDifference = getDaysDifference(startDate, endDate);
@@ -85,6 +180,25 @@ export const currentVsPreviousTracesAggregation = async <
     new Date(input.startDate),
     -daysDifference
   );
+
+  return { previousPeriodStartDate, endDate, daysDifference };
+};
+
+const currentVsPreviousElasticSearchAggregation = async <
+  T extends Record<string, any>,
+>({
+  aggs,
+  input,
+  index,
+  conditions,
+}: {
+  input: z.infer<typeof sharedAnalyticsFilterInput>;
+  aggs: Record<keyof T, AggregationsAggregationContainer>;
+  index: "search-traces" | "search-spans";
+  conditions: any[];
+}) => {
+  const { previousPeriodStartDate, endDate, daysDifference } =
+    currentVsPreviousDates(input);
 
   const aggregateQuery = {
     traces_per_day: {
@@ -98,18 +212,15 @@ export const currentVsPreviousTracesAggregation = async <
   };
 
   const result = await esClient.search({
-    index: TRACE_INDEX,
+    index,
     body: {
       aggs: {
         ...aggregateQuery,
       },
       query: {
+        //@ts-ignore
         bool: {
-          //@ts-ignore
-          filter: generateQueryConditions({
-            ...input,
-            startDate: previousPeriodStartDate.getTime(),
-          }),
+          filter: conditions,
         },
       },
       size: 0,
@@ -144,6 +255,70 @@ export const groupedTracesAggregation = async <T extends Record<string, any>>({
   input: z.infer<typeof sharedAnalyticsFilterInputWithAggregations>;
   aggs: Record<keyof T, AggregationsAggregationContainer>;
 }) => {
+  return groupedElasticSearchAggregation<T>({
+    input,
+    aggs,
+    index: TRACE_INDEX,
+    conditions: generateQueryConditions(input),
+  });
+};
+
+export const groupedSpansAggregation = async <T extends Record<string, any>>({
+  aggs,
+  input,
+  extraConditions,
+}: {
+  input: z.infer<typeof sharedAnalyticsFilterInputWithAggregations>;
+  aggs: Record<keyof T, AggregationsAggregationContainer>;
+  extraConditions?: any[];
+}) => {
+  const { previousPeriodStartDate } = currentVsPreviousDates(input);
+
+  const tracesResult = await esClient.search<Trace>({
+    index: TRACE_INDEX,
+    body: {
+      _source: ["id"],
+      size: 10000,
+      query: {
+        bool: {
+          //@ts-ignore
+          filter: generateQueryConditions({
+            ...input,
+            startDate: previousPeriodStartDate.getTime(),
+          }),
+        },
+      },
+    },
+  });
+
+  const traceIds = tracesResult.hits.hits.map((hit) => hit._source!.id);
+
+  return groupedElasticSearchAggregation<T>({
+    input,
+    aggs,
+    index: SPAN_INDEX,
+    conditions: [
+      ...spanQueryConditions({
+        ...input,
+        startDate: previousPeriodStartDate.getTime(),
+        traceIds,
+      }),
+      ...(extraConditions ?? []),
+    ],
+  });
+};
+
+const groupedElasticSearchAggregation = async <T extends Record<string, any>>({
+  aggs,
+  input,
+  index,
+  conditions,
+}: {
+  input: z.infer<typeof sharedAnalyticsFilterInputWithAggregations>;
+  aggs: Record<keyof T, AggregationsAggregationContainer>;
+  index: "search-traces" | "search-spans";
+  conditions: any[];
+}) => {
   const startDate = new Date(input.startDate);
   const endDate = new Date(input.endDate);
 
@@ -173,15 +348,15 @@ export const groupedTracesAggregation = async <T extends Record<string, any>>({
   );
 
   const result = await esClient.search({
-    index: TRACE_INDEX,
+    index,
     body: {
       aggs: {
         ...aggregationQueries,
       },
       query: {
+        //@ts-ignore
         bool: {
-          //@ts-ignore
-          filter: generateQueryConditions(input),
+          filter: conditions,
         },
       },
       size: 0,
