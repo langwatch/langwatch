@@ -156,7 +156,7 @@ export const analyticsRouter = createTRPCRouter({
 
       return aggregations;
     }),
-  getUsageMetrics: protectedProcedure
+  getSummaryMetrics: protectedProcedure
     .input(sharedAnalyticsFilterInput)
     .use(checkUserPermissionForProject)
     .query(async ({ input }) => {

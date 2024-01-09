@@ -124,7 +124,7 @@ export default function Index() {
       },
     }
   );
-  const usageMetrics = api.analytics.getUsageMetrics.useQuery(
+  const summaryMetrics = api.analytics.getSummaryMetrics.useQuery(
     {
       projectId: project?.id ?? "",
       startDate: startDate.getTime(),
@@ -340,8 +340,8 @@ export default function Index() {
                   <SummaryMetric
                     label="Average Total Tokens per Message"
                     value={
-                      usageMetrics.data &&
-                      numeral(usageMetrics.data.avg_tokens_per_trace).format(
+                      summaryMetrics.data &&
+                      numeral(summaryMetrics.data.avg_tokens_per_trace).format(
                         "0a"
                       )
                     }
@@ -349,21 +349,21 @@ export default function Index() {
                   <SummaryMetric
                     label="Average Cost per Message"
                     value={
-                      usageMetrics.data &&
+                      summaryMetrics.data &&
                       numeral(
-                        usageMetrics.data.avg_total_cost_per_1000_traces
+                        summaryMetrics.data.avg_total_cost_per_1000_traces
                       ).format("$0.00a")
                     }
                   />
-                  {(!usageMetrics.data ||
-                    usageMetrics.data.percentile_90th_time_to_first_token >
+                  {(!summaryMetrics.data ||
+                    summaryMetrics.data.percentile_90th_time_to_first_token >
                       0) && (
                     <SummaryMetric
                       label="90th Percentile Time to First Token"
                       value={
-                        usageMetrics.data &&
+                        summaryMetrics.data &&
                         formatMilliseconds(
-                          usageMetrics.data.percentile_90th_time_to_first_token
+                          summaryMetrics.data.percentile_90th_time_to_first_token
                         )
                       }
                     />
@@ -371,10 +371,10 @@ export default function Index() {
                   <SummaryMetric
                     label="90th Percentile Total Response Time"
                     value={
-                      usageMetrics.data &&
-                      (!!usageMetrics.data.percentile_90th_total_time_ms
+                      summaryMetrics.data &&
+                      (!!summaryMetrics.data.percentile_90th_total_time_ms
                         ? formatMilliseconds(
-                            usageMetrics.data.percentile_90th_total_time_ms
+                            summaryMetrics.data.percentile_90th_total_time_ms
                           )
                         : "-")
                     }
