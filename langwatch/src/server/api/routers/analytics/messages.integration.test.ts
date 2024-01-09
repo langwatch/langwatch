@@ -1,10 +1,9 @@
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { getTestUser } from "../../../../utils/testUtils";
-import { esClient } from "../../../elasticsearch";
+import { TRACE_INDEX, esClient } from "../../../elasticsearch";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
-import { TRACE_INDEX } from "../traces";
 import type { Trace } from "../../../tracer/types";
 
 describe("Analytics Endpoint Integration Tests", () => {

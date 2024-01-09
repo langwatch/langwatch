@@ -1,7 +1,6 @@
 import { addDays, differenceInCalendarDays } from "date-fns";
 import { z } from "zod";
-import { TRACE_INDEX, SPAN_INDEX } from "../traces";
-import { esClient } from "../../../elasticsearch";
+import { SPAN_INDEX, TRACE_INDEX, esClient } from "../../../elasticsearch";
 import type { AggregationsAggregationContainer } from "@elastic/elasticsearch/lib/api/types";
 import type { Trace } from "../../../tracer/types";
 
@@ -194,7 +193,7 @@ const currentVsPreviousElasticSearchAggregation = async <
 }: {
   input: z.infer<typeof sharedAnalyticsFilterInput>;
   aggs: Record<keyof T, AggregationsAggregationContainer>;
-  index: "search-traces" | "search-spans";
+  index: typeof TRACE_INDEX | typeof SPAN_INDEX;
   conditions: any[];
 }) => {
   const { previousPeriodStartDate, endDate, daysDifference } =
@@ -316,7 +315,7 @@ const groupedElasticSearchAggregation = async <T extends Record<string, any>>({
 }: {
   input: z.infer<typeof sharedAnalyticsFilterInputWithAggregations>;
   aggs: Record<keyof T, AggregationsAggregationContainer>;
-  index: "search-traces" | "search-spans";
+  index: typeof TRACE_INDEX | typeof SPAN_INDEX;
   conditions: any[];
 }) => {
   const startDate = new Date(input.startDate);

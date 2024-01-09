@@ -24,7 +24,6 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { useRouter } from "next/router";
 import numeral from "numeral";
 import { CheckCircle, XCircle } from "react-feather";
 import { DashboardLayout } from "~/components/DashboardLayout";
@@ -34,6 +33,10 @@ import {
   usePeriodSelector,
 } from "../../components/PeriodSelector";
 import {
+  LLMCallsCountGraph,
+  LLMCallsCountSummary,
+} from "../../components/analytics/LLMCallsCountGraph";
+import {
   LLMCostSumGraph,
   LLMCostSumSummary,
 } from "../../components/analytics/LLMCostSumGraph";
@@ -42,25 +45,21 @@ import {
   MessagesCountSummary,
 } from "../../components/analytics/MessagesCountGraph";
 import {
-  TokensSumGraph,
-  TokensSumSummary,
-} from "../../components/analytics/TokensGraph";
-import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import { api } from "../../utils/api";
-import { formatMilliseconds } from "../../utils/formatMilliseconds";
-import { getSingleQueryParam } from "../../utils/getSingleQueryParam";
-import {
-  LLMCallsCountGraph,
-  LLMCallsCountSummary,
-} from "../../components/analytics/LLMCallsCountGraph";
-import {
   ThreadsCountGraph,
   ThreadsCountSummary,
 } from "../../components/analytics/ThreadsCountGraph";
 import {
+  TokensSumGraph,
+  TokensSumSummary,
+} from "../../components/analytics/TokensGraph";
+import {
   UsersCountGraph,
   UsersCountSummary,
 } from "../../components/analytics/UsersCountGraph";
+import { useAnalyticsParams } from "../../hooks/useAnalyticsParams";
+import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
+import { api } from "../../utils/api";
+import { formatMilliseconds } from "../../utils/formatMilliseconds";
 
 export default function Index() {
   const { project } = useOrganizationTeamProject();
@@ -68,42 +67,17 @@ export default function Index() {
     period: { startDate, endDate },
     setPeriod,
   } = usePeriodSelector();
-  const router = useRouter();
+
+  const { analyticsParams, queryOpts } = useAnalyticsParams();
 
   const summaryMetrics = api.analytics.getSummaryMetrics.useQuery(
-    {
-      projectId: project?.id ?? "",
-      startDate: startDate.getTime(),
-      endDate: endDate.getTime(),
-      user_id: getSingleQueryParam(router.query.user_id),
-      thread_id: getSingleQueryParam(router.query.thread_id),
-      customer_ids: getSingleQueryParam(router.query.customer_ids)?.split(","),
-      labels: getSingleQueryParam(router.query.labels)?.split(","),
-    },
-    {
-      enabled: !!project?.id && !!startDate && !!endDate,
-      refetchOnMount: false,
-      refetchOnWindowFocus: false,
-    }
+    analyticsParams,
+    queryOpts
   );
   const traceCheckStatusCounts =
     api.analytics.getTraceCheckStatusCounts.useQuery(
-      {
-        projectId: project?.id ?? "",
-        startDate: startDate.getTime(),
-        endDate: endDate.getTime(),
-        user_id: getSingleQueryParam(router.query.user_id),
-        thread_id: getSingleQueryParam(router.query.thread_id),
-        customer_ids: getSingleQueryParam(router.query.customer_ids)?.split(
-          ","
-        ),
-        labels: getSingleQueryParam(router.query.labels)?.split(","),
-      },
-      {
-        enabled: !!project?.id && !!startDate && !!endDate,
-        refetchOnMount: false,
-        refetchOnWindowFocus: false,
-      }
+      analyticsParams,
+      queryOpts
     );
 
   return (

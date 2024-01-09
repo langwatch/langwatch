@@ -15,7 +15,7 @@ import {
 } from "recharts";
 import numeral from "numeral";
 
-type CurrentVsPreviousNumericalData<T> = {
+type CurrentVsPreviousNumericalData<T extends string> = {
   currentPeriod: ({ date: string } & Record<T, number>)[];
   previousPeriod: ({ date: string } & Record<T, number>)[];
 };
@@ -107,7 +107,7 @@ export function CurrentVsPreviousPeriodLineChart<T extends string>({
   );
 }
 
-type AggregatedNumericalData<T> = Record<
+type AggregatedNumericalData<T extends string> = Record<
   string,
   ({ date: string } & Record<T, number>)[]
 >;

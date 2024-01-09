@@ -5,10 +5,6 @@ import {
 } from "../../hooks/useAnalyticsParams";
 import { api } from "../../utils/api";
 import numeral from "numeral";
-import {
-  AggregatedLineChart,
-  CurrentVsPreviousPeriodLineChart,
-} from "./LineChart";
 import { useGetRotatingColorForCharts } from "../../hooks/useGetRotatingColorForCharts";
 import { format } from "date-fns";
 import {

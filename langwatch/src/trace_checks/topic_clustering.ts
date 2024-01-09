@@ -1,7 +1,6 @@
 import { env } from "../env.mjs";
 import type { Trace } from "../server/tracer/types";
-import { esClient } from "../server/elasticsearch";
-import { TRACE_INDEX } from "../server/api/routers/traces";
+import { TRACE_INDEX, esClient } from "../server/elasticsearch";
 import { getDebugger } from "../utils/logger";
 import type { Money } from "../utils/types";
 import { prisma } from "../server/db";
