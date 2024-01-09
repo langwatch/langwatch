@@ -23,107 +23,41 @@ import {
   Tabs,
   Text,
   VStack,
-  useTheme,
-  useToast,
 } from "@chakra-ui/react";
-import { addDays, format } from "date-fns";
+import { useRouter } from "next/router";
 import numeral from "numeral";
 import { CheckCircle, XCircle } from "react-feather";
-import {
-  Area,
-  AreaChart,
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Legend,
-  Line,
-  LineChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
 import { DashboardLayout } from "~/components/DashboardLayout";
+import { FilterSelector } from "../../components/FilterSelector";
 import {
   PeriodSelector,
   usePeriodSelector,
 } from "../../components/PeriodSelector";
+import {
+  LLMCostSumGraph,
+  LLMCostSumSummary,
+} from "../../components/analytics/LLMCostSumGraph";
+import {
+  MessagesCountGraph,
+  MessagesCountSummary,
+} from "../../components/analytics/MessagesCountGraph";
+import {
+  TokensSumGraph,
+  TokensSumSummary,
+} from "../../components/analytics/TokensGraph";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
 import { formatMilliseconds } from "../../utils/formatMilliseconds";
-import { FilterSelector } from "../../components/FilterSelector";
-import { useRouter } from "next/router";
-import { useMemo } from "react";
-import { rotatingColors } from "../../utils/rotatingColors";
 import { getSingleQueryParam } from "../../utils/getSingleQueryParam";
-
-type GraphsDataNumbers = Record<
-  string,
-  {
-    currentPeriod: { date: string; value: number }[];
-    previousPeriod: { date: string; value: number }[];
-  }
->;
-
-type GraphsDataTokens = Record<
-  string,
-  {
-    currentPeriod: {
-      date: string;
-      prompt_tokens: number;
-      completion_tokens: number;
-    }[];
-    previousPeriod: {
-      date: string;
-      prompt_tokens: number;
-      completion_tokens: number;
-    }[];
-  }
->;
-
-type GraphsData = {
-  messages: GraphsDataNumbers;
-  costs: GraphsDataNumbers;
-  tokens: GraphsDataTokens;
-};
 
 export default function Index() {
   const { project } = useOrganizationTeamProject();
   const {
     period: { startDate, endDate },
     setPeriod,
-    daysDifference,
   } = usePeriodSelector();
-  const toast = useToast();
   const router = useRouter();
 
-  const analytics = api.analytics.getTracesAnalyticsPerDay.useQuery(
-    {
-      projectId: project?.id ?? "",
-      startDate: addDays(startDate, -daysDifference).getTime(),
-      endDate: endDate.getTime(),
-      user_id: getSingleQueryParam(router.query.user_id),
-      thread_id: getSingleQueryParam(router.query.thread_id),
-      customer_ids: getSingleQueryParam(router.query.customer_ids)?.split(","),
-      labels: getSingleQueryParam(router.query.labels)?.split(","),
-    },
-    {
-      enabled: !!project?.id && !!startDate && !!endDate,
-      refetchOnMount: false,
-      refetchOnWindowFocus: false,
-      onError: () => {
-        toast({
-          title: "Sorry, something went wrong",
-          description:
-            "Error loading analytics, please try refreshing the page.",
-          status: "error",
-          duration: 5000,
-          isClosable: true,
-          position: "top-right",
-        });
-      },
-    }
-  );
   const summaryMetrics = api.analytics.getSummaryMetrics.useQuery(
     {
       projectId: project?.id ?? "",
@@ -159,69 +93,6 @@ export default function Index() {
         refetchOnWindowFocus: false,
       }
     );
-
-  const { graphsData, messagesTotal, costsTotal, tokensTotal } = useMemo(() => {
-    let messagesTotal = 0;
-    let costsTotal = 0;
-    let tokensTotal = 0;
-
-    const graphsData = Object.entries(analytics.data ?? {}).reduce(
-      (acc, [key, aggregation]) => {
-        const data = aggregation.slice(daysDifference);
-        const previousPeriod = aggregation.slice(0, daysDifference);
-
-        messagesTotal += data.reduce((acc, curr) => acc + curr.count, 0);
-        costsTotal += data.reduce((acc, curr) => acc + curr.total_cost, 0);
-        tokensTotal += data.reduce(
-          (acc, curr) => acc + curr.prompt_tokens + curr.completion_tokens,
-          0
-        );
-
-        if (!acc.messages) acc.messages = {};
-        acc.messages[key] = {
-          currentPeriod: data.map((item) => ({
-            date: item.date,
-            value: item.count,
-          })),
-          previousPeriod: previousPeriod.map((item) => ({
-            date: item.date,
-            value: item.count,
-          })),
-        };
-
-        if (!acc.costs) acc.costs = {};
-        acc.costs[key] = {
-          currentPeriod: data.map((item) => ({
-            date: item.date,
-            value: item.total_cost,
-          })),
-          previousPeriod: previousPeriod.map((item) => ({
-            date: item.date,
-            value: item.total_cost,
-          })),
-        };
-
-        if (!acc.tokens) acc.tokens = {};
-        acc.tokens[key] = {
-          currentPeriod: data.map((item) => ({
-            date: item.date,
-            prompt_tokens: item.prompt_tokens,
-            completion_tokens: item.completion_tokens,
-          })),
-          previousPeriod: previousPeriod.map((item) => ({
-            date: item.date,
-            prompt_tokens: item.prompt_tokens,
-            completion_tokens: item.completion_tokens,
-          })),
-        };
-
-        return acc;
-      },
-      {} as GraphsData
-    );
-
-    return { graphsData, messagesTotal, costsTotal, tokensTotal };
-  }, [analytics.data, daysDifference]);
 
   return (
     <DashboardLayout>
@@ -266,13 +137,7 @@ export default function Index() {
                       <VStack align="start">
                         <Text color="black">Messages</Text>
                         <Box fontSize={24} color="black" fontWeight="bold">
-                          {messagesTotal !== undefined ? (
-                            numeral(messagesTotal).format("0a")
-                          ) : (
-                            <Box paddingY="0.25em">
-                              <Skeleton height="1em" width="80px" />
-                            </Box>
-                          )}
+                          <MessagesCountSummary />
                         </Box>
                       </VStack>
                     </Tab>
@@ -280,13 +145,7 @@ export default function Index() {
                       <VStack align="start">
                         <Text color="black">Total Cost</Text>
                         <Box fontSize={24} color="black" fontWeight="bold">
-                          {costsTotal !== undefined ? (
-                            numeral(costsTotal).format("$0.00a")
-                          ) : (
-                            <Box paddingY="0.25em">
-                              <Skeleton height="1em" width="80px" />
-                            </Box>
-                          )}
+                          <LLMCostSumSummary />
                         </Box>
                       </VStack>
                     </Tab>
@@ -294,13 +153,7 @@ export default function Index() {
                       <VStack align="start">
                         <Text color="black">Tokens</Text>
                         <Box fontSize={24} color="black" fontWeight="bold">
-                          {tokensTotal !== undefined ? (
-                            numeral(tokensTotal).format("0a")
-                          ) : (
-                            <Box paddingY="0.25em">
-                              <Skeleton height="1em" width="80px" />
-                            </Box>
-                          )}
+                          <TokensSumSummary />
                         </Box>
                       </VStack>
                     </Tab>
@@ -313,17 +166,13 @@ export default function Index() {
                   />
                   <TabPanels>
                     <TabPanel>
-                      <CurrentVsPreviousPeriodLineChart
-                        data={graphsData.messages}
-                      />
+                      <MessagesCountGraph />
                     </TabPanel>
                     <TabPanel>
-                      <CurrentVsPreviousPeriodLineChart
-                        data={graphsData.messages}
-                      />
+                      <LLMCostSumGraph />
                     </TabPanel>
                     <TabPanel>
-                      <TokensChart data={graphsData.tokens} />
+                      <TokensSumGraph />
                     </TabPanel>
                   </TabPanels>
                 </Tabs>
@@ -363,7 +212,8 @@ export default function Index() {
                       value={
                         summaryMetrics.data &&
                         formatMilliseconds(
-                          summaryMetrics.data.percentile_90th_time_to_first_token
+                          summaryMetrics.data
+                            .percentile_90th_time_to_first_token
                         )
                       }
                     />
@@ -463,205 +313,5 @@ function SummaryMetric({
         )}
       </Box>
     </VStack>
-  );
-}
-
-const useGetRotatingColorForCharts = () => {
-  const theme = useTheme();
-
-  return (index: number) => {
-    const [name, number] =
-      rotatingColors[index % rotatingColors.length]!.color.split(".");
-    return theme.colors[name ?? ""][+(number ?? "") - 200];
-  };
-};
-
-function CurrentVsPreviousPeriodLineChart({
-  data,
-}: {
-  data: GraphsDataNumbers | undefined;
-}) {
-  const getColor = useGetRotatingColorForCharts();
-  const theme = useTheme();
-  const gray400 = theme.colors.gray["400"];
-
-  const formatDate = (date: string) => date && format(new Date(date), "MMM d");
-
-  const mergedData: Record<string, number | string>[] = [];
-  for (const [key, agg] of Object.entries(data ?? {})) {
-    if (!data) continue;
-
-    for (const [index, entry] of agg.currentPeriod.entries()) {
-      if (!mergedData[index]) mergedData[index] = { date: entry.date };
-      mergedData[index]![key] = entry.value;
-    }
-  }
-
-  const currentAndPreviousData = data?.default?.previousPeriod?.map(
-    (entry, index) => {
-      return {
-        ...data.default?.currentPeriod[index],
-        previousValue: entry.value,
-        previousDate: entry.date,
-      };
-    }
-  );
-
-  const Chart = data?.default ? LineChart : AreaChart;
-
-  return (
-    <ResponsiveContainer width="100%" height={300}>
-      {data ? (
-        <Chart
-          data={currentAndPreviousData ? currentAndPreviousData : mergedData}
-          margin={{ left: -10 }}
-        >
-          <CartesianGrid vertical={false} strokeDasharray="5 7" />
-          <XAxis
-            dataKey="date"
-            tickFormatter={formatDate}
-            tickLine={false}
-            axisLine={false}
-            tick={{ fill: gray400 }}
-          />
-          <YAxis
-            axisLine={false}
-            tickLine={false}
-            tickCount={4}
-            tickMargin={20}
-            domain={[0, "dataMax"]}
-            tick={{ fill: gray400 }}
-          />
-          <Tooltip
-            labelFormatter={(_label, payload) => {
-              if (payload && payload.length == 1) {
-                return formatDate(payload[0]?.payload.date);
-              }
-              if (payload && payload.length == 2) {
-                return (
-                  formatDate(payload[0]?.payload.date) +
-                  (payload[1]?.payload.previousDate
-                    ? " vs " + formatDate(payload[1]?.payload.previousDate)
-                    : "")
-                );
-              }
-            }}
-          />
-          <Legend />
-          {data.default ? (
-            <>
-              <Line
-                type="linear"
-                dataKey="value"
-                stroke={getColor(0)}
-                strokeWidth={2.5}
-                dot={false}
-                activeDot={{ r: 8 }}
-                name="Messages"
-              />
-              <Line
-                type="linear"
-                dataKey="previousValue"
-                stroke="#ED892699"
-                strokeWidth={2.5}
-                strokeDasharray={"5 5"}
-                dot={false}
-                name="Previous Period"
-              />
-            </>
-          ) : (
-            Object.keys(data ?? {}).map((agg, index) => (
-              <Area
-                key={agg}
-                type="linear"
-                dataKey={agg}
-                stroke={getColor(index)}
-                fill={getColor(index)}
-                strokeWidth={2.5}
-                dot={false}
-                activeDot={{ r: 8 }}
-                name={agg}
-              />
-            ))
-          )}
-        </Chart>
-      ) : (
-        <div />
-      )}
-    </ResponsiveContainer>
-  );
-}
-
-function TokensChart({ data }: { data: GraphsDataTokens | undefined }) {
-  const getColor = useGetRotatingColorForCharts();
-  const theme = useTheme();
-  const gray400 = theme.colors.gray["400"];
-  const orange400 = theme.colors.orange["400"];
-  const blue400 = theme.colors.blue["400"];
-
-  const formatDate = (date: string) => date && format(new Date(date), "MMM d");
-
-  const mergedData: Record<string, number | string>[] = [];
-  for (const [key, agg] of Object.entries(data ?? {})) {
-    if (!data) continue;
-
-    for (const [index, entry] of agg.currentPeriod.entries()) {
-      if (!mergedData[index]) mergedData[index] = { date: entry.date };
-      mergedData[index]![key] = entry.prompt_tokens + entry.completion_tokens;
-    }
-  }
-
-  return (
-    <ResponsiveContainer width="100%" height={300}>
-      <BarChart
-        data={data?.default ? data.default.currentPeriod : mergedData}
-        margin={{ left: -10 }}
-      >
-        <CartesianGrid vertical={false} strokeDasharray="5 7" />
-        <XAxis
-          dataKey="date"
-          tickFormatter={formatDate}
-          tickLine={false}
-          axisLine={false}
-          tick={{ fill: gray400 }}
-        />
-        <YAxis
-          axisLine={false}
-          tickLine={false}
-          tickCount={4}
-          tickMargin={20}
-          domain={[0, "dataMax"]}
-          tick={{ fill: gray400 }}
-        />
-        <Tooltip labelFormatter={formatDate} />
-        <Legend />
-        {data?.default ? (
-          <>
-            <Bar
-              stackId="tokens"
-              dataKey="prompt_tokens"
-              fill={blue400}
-              name="Prompt Tokens"
-            />
-            <Bar
-              stackId="tokens"
-              dataKey="completion_tokens"
-              fill={orange400}
-              name="Completion Tokens"
-            />
-          </>
-        ) : (
-          Object.keys(data ?? {}).map((agg, index) => (
-            <Bar
-              key={agg}
-              stackId="tokens"
-              dataKey={agg}
-              fill={getColor(index)}
-              name={agg}
-            />
-          ))
-        )}
-      </BarChart>
-    </ResponsiveContainer>
   );
 }
