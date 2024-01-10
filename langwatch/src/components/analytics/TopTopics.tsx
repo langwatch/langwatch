@@ -60,13 +60,13 @@ export function TopTopics() {
   const topTopics = topicCountsQuery.data
     ? Object.entries(topicCountsQuery.data)
         .sort((a, b) => (a[1] > b[1] ? -1 : 1))
-        .slice(0, 7)
+        .slice(0, 5)
     : [];
 
   const topTopicCount = topTopics[0] ? topTopics[0][1] : 1;
 
   return (
-    <Card width="full" height="full" maxWidth="400px">
+    <Card width="full" maxWidth="400px" height="331px">
       <CardBody width="full" paddingTop={6}>
         <Heading as="h2" size="md">
           Top Topics

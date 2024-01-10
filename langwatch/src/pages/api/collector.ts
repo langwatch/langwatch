@@ -27,6 +27,7 @@ import {
 import { addLLMTokensCount, computeTraceMetrics } from "./collector/metrics";
 import { scheduleTraceChecks } from "./collector/traceChecks";
 import { cleanupPII } from "./collector/cleanupPII";
+import { scoreSatisfactionFromInput } from "./collector/satisfaction";
 
 export const debug = getDebugger("langwatch:collector");
 
@@ -185,6 +186,12 @@ export default async function handler(
   void scheduleTraceChecks(trace, spans);
 
   await markProjectFirstMessage(project);
+
+  try {
+    await scoreSatisfactionFromInput(trace.id, trace.input);
+  } catch {
+    console.warn("Failed to score satisfaction for", trace.id);
+  }
 
   return res.status(200).json({ message: "Traces received successfully." });
 }

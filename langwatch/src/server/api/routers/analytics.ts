@@ -24,6 +24,7 @@ import {
 } from "./analytics/threads";
 import { usersCountAggregated, usersCountVsPreviousPeriod } from "./analytics/users";
 import { sessionsVsPreviousPeriod } from "./analytics/sessions";
+import { satisfactionVsPreviousPeriod } from "./analytics/satisfaction";
 
 export const analyticsRouter = createTRPCRouter({
   messagesCountVsPreviousPeriod,
@@ -33,6 +34,7 @@ export const analyticsRouter = createTRPCRouter({
   usersCountVsPreviousPeriod,
   usersCountAggregated,
   sessionsVsPreviousPeriod,
+  satisfactionVsPreviousPeriod,
   llmCallsCountAggregated,
   llmCostSumVsPreviousPeriod,
   llmCostSumAggregated,

@@ -236,7 +236,11 @@ const currentVsPreviousElasticSearchAggregation = async <
       date: value.key_as_string,
     } as T & { date: string };
     for (const key of Object.keys(aggs)) {
-      aggregation[key as keyof T] = value[key].value;
+      aggregation[key as keyof T] = value[key].value !== undefined
+        ? value[key].value
+        : value[key].buckets?.[0]?.doc_count !== undefined
+        ? value[key].buckets[0].doc_count
+        : undefined;
     }
     return aggregation;
   });

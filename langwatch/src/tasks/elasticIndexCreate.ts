@@ -34,6 +34,7 @@ const traceMapping: Record<keyof Trace, MappingProperty> = {
         dims: OPENAI_EMBEDDING_DIMENSION,
         similarity: "cosine",
       },
+      satisfaction_score: { type: "float" },
     },
   },
   output: {

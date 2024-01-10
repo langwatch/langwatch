@@ -27,7 +27,9 @@ const ThreadsCountVsPreviousPeriodGraph = () => {
     queryOpts
   );
 
-  return <CurrentVsPreviousPeriodLineChart data={data} valueKey="count" />;
+  return (
+    <CurrentVsPreviousPeriodLineChart data={data} valueKey="count" />
+  );
 };
 
 const ThreadsCountAggregatedGraph = () => {

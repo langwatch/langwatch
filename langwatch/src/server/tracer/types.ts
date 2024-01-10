@@ -149,7 +149,13 @@ export type ElasticSearchSpan = Omit<
   raw_response?: string | null;
 };
 
-export type TraceInputOutput = { value: string; openai_embeddings?: number[] };
+export type TraceInput = {
+  value: string;
+  openai_embeddings?: number[];
+  satisfaction_score?: number;
+};
+
+export type TraceOutput = { value: string; openai_embeddings?: number[] };
 
 export type Trace = {
   id: string;
@@ -161,8 +167,8 @@ export type Trace = {
   labels?: string[];
   // End Grouping Fields
   timestamps: { started_at: number; inserted_at: number };
-  input: TraceInputOutput;
-  output?: TraceInputOutput;
+  input: TraceInput;
+  output?: TraceOutput;
   metrics: {
     first_token_ms?: number | null;
     total_time_ms?: number | null;

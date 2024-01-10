@@ -63,6 +63,7 @@ import { formatMilliseconds } from "../../utils/formatMilliseconds";
 import { SummaryMetric } from "../../components/analytics/SummaryMetric";
 import { SessionsSummary } from "../../components/analytics/SessionsSummary";
 import { TopTopics } from "../../components/analytics/TopTopics";
+import { SatisfactionPieChart } from "../../components/analytics/SatisfactionGraph";
 
 export default function Index() {
   const { project } = useOrganizationTeamProject();
@@ -119,9 +120,9 @@ export default function Index() {
             setPeriod={setPeriod}
           />
         </HStack>
-        <Grid width="100%" templateColumns="1fr 0.5fr" gap={6}>
-          <GridItem>
-            <Card>
+        <HStack align="start" gap={6} width="100%">
+          <VStack align="start" width="full" flexGrow={1} gap={6}>
+            <Card width="full">
               <CardBody>
                 <Tabs variant="unstyled">
                   <TabList gap={12}>
@@ -170,14 +171,14 @@ export default function Index() {
                 </Tabs>
               </CardBody>
             </Card>
-          </GridItem>
-          <GridItem>
-            <TopTopics />
-          </GridItem>
-          <GridItem colSpan={2}>
+
             <SessionsSummary />
-          </GridItem>
-        </Grid>
+          </VStack>
+          <VStack align="start" width="50%" gap={6}>
+            <TopTopics />
+            <SatisfactionPieChart />
+          </VStack>
+        </HStack>
         <Heading as={"h1"} size="lg" paddingBottom={6} paddingTop={10}>
           LLM Metrics
         </Heading>

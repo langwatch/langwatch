@@ -1,5 +1,5 @@
 import { getOpenAIEmbeddings } from "../../../server/embeddings";
-import type { TraceInputOutput, ErrorCapture, Span, Trace } from "../../../server/tracer/types";
+import type { ErrorCapture, Span, Trace, TraceOutput, TraceInput } from "../../../server/tracer/types";
 import { getFirstInputAsText, getLastOutputAsText } from "./common";
 
 export const getTraceInput = async (spans: Span[]): Promise<Trace["input"]> => {
@@ -19,8 +19,8 @@ export const getTraceOutput = async (spans: Span[]): Promise<Trace["output"]> =>
 };
 
 export const getSearchEmbeddings = async (
-  input: TraceInputOutput,
-  output: TraceInputOutput | undefined,
+  input: TraceInput,
+  output: TraceOutput | undefined,
   error: ErrorCapture | null
 ): Promise<number[] | undefined> => {
   const terms = [input.value, output?.value ?? "", error?.message ?? ""];
