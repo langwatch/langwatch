@@ -48,7 +48,6 @@ export function CurrentVsPreviousPeriodLineChart<T extends string>({
   return (
     <ResponsiveContainer
       key={currentAndPreviousData ? valueKey : "loading"}
-      width="100%"
       height={300}
     >
       <LineChart
@@ -142,7 +141,6 @@ export function AggregatedLineChart<T extends string>({
   return (
     <ResponsiveContainer
       key={mergedData ? valueKey : "loading"}
-      width="100%"
       height={300}
     >
       <AreaChart

@@ -12,11 +12,12 @@ export const sharedAnalyticsFilterInput = z.object({
   thread_id: z.string().optional(),
   customer_ids: z.array(z.string()).optional(),
   labels: z.array(z.string()).optional(),
+  topics: z.array(z.string()).optional(),
 });
 
 export const sharedAnalyticsFilterInputWithAggregations =
   sharedAnalyticsFilterInput.extend({
-    aggregations: z.array(z.enum(["customer_id", "labels", "model"])),
+    aggregations: z.array(z.enum(["customer_id", "labels", "model", "topics"])),
   });
 
 export const generateTraceQueryConditions = ({
@@ -27,6 +28,7 @@ export const generateTraceQueryConditions = ({
   thread_id,
   customer_ids,
   labels,
+  topics,
 }: z.infer<typeof sharedAnalyticsFilterInput>) => {
   // If end date is very close to now, force it to be now, to allow frontend to keep refetching for new messages
   const endDate_ =
@@ -51,6 +53,7 @@ export const generateTraceQueryConditions = ({
     ...(thread_id ? [{ term: { thread_id: thread_id } }] : []),
     ...(customer_ids ? [{ terms: { customer_id: customer_ids } }] : []),
     ...(labels ? [{ terms: { labels: labels } }] : []),
+    ...(topics ? [{ terms: { topics: topics } }] : []),
   ];
 };
 

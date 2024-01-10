@@ -1,4 +1,4 @@
-import { Box, Heading, Skeleton, Spacer, VStack } from "@chakra-ui/react";
+import { Box, Heading, Skeleton, VStack } from "@chakra-ui/react";
 import numeral from "numeral";
 
 export function SummaryMetric({

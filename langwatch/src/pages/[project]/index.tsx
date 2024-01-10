@@ -62,6 +62,7 @@ import { api } from "../../utils/api";
 import { formatMilliseconds } from "../../utils/formatMilliseconds";
 import { SummaryMetric } from "../../components/analytics/SummaryMetric";
 import { SessionsSummary } from "../../components/analytics/SessionsSummary";
+import { TopTopics } from "../../components/analytics/TopTopics";
 
 export default function Index() {
   const { project } = useOrganizationTeamProject();
@@ -119,7 +120,7 @@ export default function Index() {
           />
         </HStack>
         <Grid width="100%" templateColumns="1fr 0.5fr" gap={6}>
-          <GridItem colSpan={2}>
+          <GridItem>
             <Card>
               <CardBody>
                 <Tabs variant="unstyled">
@@ -171,6 +172,9 @@ export default function Index() {
             </Card>
           </GridItem>
           <GridItem>
+            <TopTopics />
+          </GridItem>
+          <GridItem colSpan={2}>
             <SessionsSummary />
           </GridItem>
         </Grid>

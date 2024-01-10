@@ -23,6 +23,7 @@ export const useAnalyticsParams = () => {
       user_id: getSingleQueryParam(router.query.user_id),
       thread_id: getSingleQueryParam(router.query.thread_id),
       customer_ids: getCustomerIds(router),
+      topics: getTopics(router),
       labels: getLabels(router),
       aggregations: aggregations,
     },
@@ -49,10 +50,12 @@ const getAggregators = (
 ): {
   customer_id?: string[];
   labels?: string[];
+  topics?: string[];
 } => {
   const aggregators = {
     customer_id: getCustomerIds(router),
     labels: getLabels(router),
+    topics: getTopics(router),
   };
   for (const [key, items] of Object.entries(aggregators)) {
     if ((items ?? []).length < 2) {
@@ -67,3 +70,6 @@ const getCustomerIds = (router: NextRouter) =>
 
 const getLabels = (router: NextRouter) =>
   getSingleQueryParam(router.query.labels)?.split(",");
+
+const getTopics = (router: NextRouter) =>
+  getSingleQueryParam(router.query.topics)?.split(",");

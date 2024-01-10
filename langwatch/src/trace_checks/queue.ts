@@ -153,8 +153,9 @@ export const scheduleTopicClustering = async () => {
       data: { project_id: project.id },
       opts: {
         jobId: `topic_clustering_${project.id}_${yyyymmdd}`,
-        delay: distributionHour * 60 * 60 * 1000 + distributionMinute * 60 * 1000,
-        attempts: 3,
+        delay:
+          distributionHour * 60 * 60 * 1000 + distributionMinute * 60 * 1000,
+        attempts: 5,
       },
     };
   });

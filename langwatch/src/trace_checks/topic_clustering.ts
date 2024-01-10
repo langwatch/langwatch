@@ -55,12 +55,17 @@ export const clusterTopicsForProject = async (
   debug("Clustering topics for", traces.length, "traces on project", projectId);
   const clusteringResult = await clusterTopicsForTraces({
     topics: traces.flatMap((trace) => trace.topics ?? []),
-    file: traces.map((trace) => ({
-      _source: {
-        id: trace.id,
-        input: trace.input,
-      },
-    })),
+    file: traces
+      .map((trace) => ({
+        _source: {
+          id: trace.id,
+          input: trace.input,
+        },
+      }))
+      .filter(
+        (trace) =>
+          !!trace._source.input.openai_embeddings && !!trace._source.input.value
+      ),
   });
 
   const topics = clusteringResult?.message_clusters ?? {};
