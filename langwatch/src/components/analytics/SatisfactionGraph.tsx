@@ -1,16 +1,19 @@
 import {
-  Box,
   Card,
   CardBody,
   CardHeader,
-  Center,
   HStack,
   Heading,
-  Skeleton,
   useTheme,
 } from "@chakra-ui/react";
-import { Cell, Pie, PieChart, ResponsiveContainer, Text } from "recharts";
-import { Legend } from "recharts";
+import {
+  Cell,
+  Legend,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Text,
+} from "recharts";
 import { useAnalyticsParams } from "../../hooks/useAnalyticsParams";
 import { api } from "../../utils/api";
 

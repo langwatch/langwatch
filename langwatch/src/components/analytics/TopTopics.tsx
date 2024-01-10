@@ -1,22 +1,20 @@
-import { useRouter } from "next/router";
 import {
+  Box,
   Card,
   CardBody,
-  VStack,
-  Skeleton,
-  HStack,
   Checkbox,
+  HStack,
   Heading,
+  Skeleton,
   Text,
   Tooltip,
-  Box,
-  Spacer,
+  VStack,
 } from "@chakra-ui/react";
-import React, { useState, useEffect } from "react";
+import { useRouter } from "next/router";
+import React, { useEffect, useState } from "react";
 import { HelpCircle } from "react-feather";
-import { api } from "../../utils/api";
 import { useAnalyticsParams } from "../../hooks/useAnalyticsParams";
-import { getColorForString } from "../../utils/rotatingColors";
+import { api } from "../../utils/api";
 
 export function TopTopics() {
   const { analyticsParams, queryOpts } = useAnalyticsParams();
