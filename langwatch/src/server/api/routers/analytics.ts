@@ -3,7 +3,7 @@ import { TRACE_CHECKS_INDEX, TRACE_INDEX, esClient } from "../../elasticsearch";
 import { checkUserPermissionForProject } from "../permission";
 import {
   sharedAnalyticsFilterInput,
-  generateQueryConditions,
+  generateTraceQueryConditions,
 } from "./analytics/common";
 import {
   messagesCountAggregated,
@@ -23,6 +23,7 @@ import {
   threadsCountVsPreviousPeriod,
 } from "./analytics/threads";
 import { usersCountAggregated, usersCountVsPreviousPeriod } from "./analytics/users";
+import { sessionsVsPreviousPeriod } from "./analytics/sessions";
 
 export const analyticsRouter = createTRPCRouter({
   messagesCountVsPreviousPeriod,
@@ -31,6 +32,7 @@ export const analyticsRouter = createTRPCRouter({
   threadsCountAggregated,
   usersCountVsPreviousPeriod,
   usersCountAggregated,
+  sessionsVsPreviousPeriod,
   llmCallsCountAggregated,
   llmCostSumVsPreviousPeriod,
   llmCostSumAggregated,
@@ -47,7 +49,7 @@ export const analyticsRouter = createTRPCRouter({
           query: {
             bool: {
               //@ts-ignore
-              filter: generateQueryConditions(input),
+              filter: generateTraceQueryConditions(input),
             },
           },
         },
@@ -104,7 +106,7 @@ export const analyticsRouter = createTRPCRouter({
           query: {
             bool: {
               //@ts-ignore
-              filter: generateQueryConditions(input),
+              filter: generateTraceQueryConditions(input),
             },
           },
           aggs: {

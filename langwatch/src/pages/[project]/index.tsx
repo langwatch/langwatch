@@ -60,6 +60,8 @@ import { useAnalyticsParams } from "../../hooks/useAnalyticsParams";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
 import { formatMilliseconds } from "../../utils/formatMilliseconds";
+import { SummaryMetric } from "../../components/analytics/SummaryMetric";
+import { SessionsSummary } from "../../components/analytics/SessionsSummary";
 
 export default function Index() {
   const { project } = useOrganizationTeamProject();
@@ -168,6 +170,9 @@ export default function Index() {
               </CardBody>
             </Card>
           </GridItem>
+          <GridItem>
+            <SessionsSummary />
+          </GridItem>
         </Grid>
         <Heading as={"h1"} size="lg" paddingBottom={6} paddingTop={10}>
           LLM Metrics
@@ -233,45 +238,39 @@ export default function Index() {
                 <HStack spacing={0}>
                   <SummaryMetric
                     label="Average Total Tokens per Message"
-                    value={
-                      summaryMetrics.data &&
-                      numeral(summaryMetrics.data.avg_tokens_per_trace).format(
-                        "0a"
-                      )
-                    }
+                    current={summaryMetrics.data?.avg_tokens_per_trace}
                   />
                   <SummaryMetric
                     label="Average Cost per Message"
-                    value={
-                      summaryMetrics.data &&
-                      numeral(
-                        summaryMetrics.data.avg_total_cost_per_1000_traces
-                      ).format("$0.00a")
+                    current={
+                      summaryMetrics.data?.avg_total_cost_per_1000_traces
                     }
+                    format="$0.00a"
                   />
                   {(!summaryMetrics.data ||
                     summaryMetrics.data.percentile_90th_time_to_first_token >
                       0) && (
                     <SummaryMetric
                       label="90th Percentile Time to First Token"
-                      value={
-                        summaryMetrics.data &&
-                        formatMilliseconds(
-                          summaryMetrics.data
-                            .percentile_90th_time_to_first_token
-                        )
+                      current={
+                        summaryMetrics.data?.percentile_90th_time_to_first_token
                       }
+                      format={formatMilliseconds}
                     />
                   )}
                   <SummaryMetric
                     label="90th Percentile Total Response Time"
-                    value={
+                    current={
                       summaryMetrics.data &&
                       (!!summaryMetrics.data.percentile_90th_total_time_ms
-                        ? formatMilliseconds(
-                            summaryMetrics.data.percentile_90th_total_time_ms
-                          )
+                        ? summaryMetrics.data.percentile_90th_total_time_ms
                         : "-")
+                    }
+                    format={
+                      !summaryMetrics.data ||
+                      summaryMetrics.data?.percentile_90th_total_time_ms
+                        ? formatMilliseconds
+                        : () => "-"
                     }
                   />
                 </HStack>
@@ -320,43 +319,5 @@ export default function Index() {
         </Grid>
       </Container>
     </DashboardLayout>
-  );
-}
-
-function SummaryMetric({
-  label,
-  value,
-}: {
-  label: string;
-  value: string | number | undefined;
-}) {
-  return (
-    <VStack
-      maxWidth="180"
-      spacing={4}
-      align="start"
-      borderLeftWidth="1px"
-      borderLeftColor="gray.300"
-      paddingX={4}
-      _first={{ paddingLeft: 0, borderLeft: "none" }}
-    >
-      <Heading
-        fontSize="13"
-        color="gray.500"
-        fontWeight="normal"
-        lineHeight="1.5em"
-      >
-        {label}
-      </Heading>
-      <Box fontSize="28" fontWeight="600">
-        {value ? (
-          value
-        ) : (
-          <Box paddingY="0.25em">
-            <Skeleton height="1em" width="80px" />
-          </Box>
-        )}
-      </Box>
-    </VStack>
   );
 }

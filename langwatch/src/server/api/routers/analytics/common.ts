@@ -19,7 +19,7 @@ export const sharedAnalyticsFilterInputWithAggregations =
     aggregations: z.array(z.enum(["customer_id", "labels", "model"])),
   });
 
-export const generateQueryConditions = ({
+export const generateTraceQueryConditions = ({
   projectId,
   startDate,
   endDate,
@@ -115,7 +115,7 @@ export const currentVsPreviousTracesAggregation = async <
     input,
     aggs,
     index: TRACE_INDEX,
-    conditions: generateQueryConditions({
+    conditions: generateTraceQueryConditions({
       ...input,
       startDate: previousPeriodStartDate.getTime(),
     }),
@@ -143,7 +143,7 @@ export const currentVsPreviousSpansAggregation = async <
       query: {
         bool: {
           //@ts-ignore
-          filter: generateQueryConditions({
+          filter: generateTraceQueryConditions({
             ...input,
             startDate: previousPeriodStartDate.getTime(),
           }),
@@ -169,7 +169,7 @@ export const currentVsPreviousSpansAggregation = async <
   });
 };
 
-const currentVsPreviousDates = (
+export const currentVsPreviousDates = (
   input: z.infer<typeof sharedAnalyticsFilterInput>
 ) => {
   const startDate = new Date(input.startDate);
@@ -258,7 +258,7 @@ export const groupedTracesAggregation = async <T extends Record<string, any>>({
     input,
     aggs,
     index: TRACE_INDEX,
-    conditions: generateQueryConditions(input),
+    conditions: generateTraceQueryConditions(input),
   });
 };
 
@@ -281,7 +281,7 @@ export const groupedSpansAggregation = async <T extends Record<string, any>>({
       query: {
         bool: {
           //@ts-ignore
-          filter: generateQueryConditions({
+          filter: generateTraceQueryConditions({
             ...input,
             startDate: previousPeriodStartDate.getTime(),
           }),
