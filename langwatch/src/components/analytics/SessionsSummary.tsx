@@ -47,6 +47,7 @@ export const SessionsSummary = () => {
             }
             format="0%"
             tooltip="Percentage of users who only sent a single message and never used it again"
+            increaseIs="bad"
           />
           <SummaryMetric
             label="Returning Users"
