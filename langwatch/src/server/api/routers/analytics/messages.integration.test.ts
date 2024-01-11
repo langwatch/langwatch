@@ -61,12 +61,12 @@ describe("Analytics Endpoint Integration Tests", () => {
 
     expect(response).toEqual({
       previousPeriod: [
-        { date: expect.any(String), messages_count: 0 },
-        { date: expect.any(String), messages_count: 0 },
+        { date: expect.any(String), count: 0 },
+        { date: expect.any(String), count: 0 },
       ],
       currentPeriod: [
-        { date: expect.any(String), messages_count: 0 },
-        { date: expect.any(String), messages_count: 2 },
+        { date: expect.any(String), count: 0 },
+        { date: expect.any(String), count: 2 },
       ],
     });
   });
@@ -93,12 +93,12 @@ describe("Analytics Endpoint Integration Tests", () => {
 
     expect(response).toEqual({
       "customer-id-1": [
-        { date: expect.any(String), messages_count: 0 },
-        { date: expect.any(String), messages_count: 1 },
+        { date: expect.any(String), count: 0 },
+        { date: expect.any(String), count: 1 },
       ],
       "customer-id-2": [
-        { date: expect.any(String), messages_count: 0 },
-        { date: expect.any(String), messages_count: 1 },
+        { date: expect.any(String), count: 0 },
+        { date: expect.any(String), count: 1 },
       ],
     });
   });

@@ -9,6 +9,7 @@ import {
   AggregatedLineChart,
   CurrentVsPreviousPeriodLineChart,
 } from "./LineChart";
+import { SummaryMetricValue } from "./SummaryMetric";
 
 export const LLMCostSumGraph = () => {
   const isAggregated = useIsAggregated();
@@ -68,10 +69,21 @@ export const LLMCostSumSummary = () => {
     );
   }
 
-  let total = 0;
+  let current = 0;
+  let previous = 0;
   for (const entry of data.currentPeriod) {
-    total += entry.total_cost;
+    current += entry.total_cost;
+  }
+  for (const entry of data.previousPeriod) {
+    previous += entry.total_cost;
   }
 
-  return numeral(total).format("$0.00a");
+  return (
+    <SummaryMetricValue
+      current={current}
+      previous={previous}
+      format="$0.00a"
+      increaseIs="bad"
+    />
+  );
 };

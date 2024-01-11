@@ -90,6 +90,8 @@ const SatisfactionPieChartChart = () => {
     const x = cx + radius * Math.cos(-midAngle * RADIAN);
     const y = cy + radius * Math.sin(-midAngle * RADIAN);
 
+    if (percent < 0.01) return null;
+
     return (
       <text
         x={x}

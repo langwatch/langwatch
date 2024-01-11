@@ -11,11 +11,11 @@ export const messagesCountVsPreviousPeriod = protectedProcedure
   .input(sharedAnalyticsFilterInput)
   .use(checkUserPermissionForProject)
   .query(async ({ input }) => {
-    return await currentVsPreviousTracesAggregation<{ messages_count: number }>(
+    return await currentVsPreviousTracesAggregation<{ count: number }>(
       {
         input,
         aggs: {
-          messages_count: { value_count: { field: "id" } },
+          count: { value_count: { field: "id" } },
         },
       }
     );
@@ -25,10 +25,10 @@ export const messagesCountAggregated = protectedProcedure
   .input(sharedAnalyticsFilterInputWithAggregations)
   .use(checkUserPermissionForProject)
   .query(async ({ input }) => {
-    return await groupedTracesAggregation<{ messages_count: number }>({
+    return await groupedTracesAggregation<{ count: number }>({
       input,
       aggs: {
-        messages_count: { value_count: { field: "id" } },
+        count: { value_count: { field: "id" } },
       },
     });
   });

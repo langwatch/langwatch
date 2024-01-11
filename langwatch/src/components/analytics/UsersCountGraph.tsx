@@ -9,6 +9,7 @@ import {
   AggregatedLineChart,
   CurrentVsPreviousPeriodLineChart,
 } from "./LineChart";
+import { SummaryMetricValue } from "./SummaryMetric";
 
 export const UsersCountGraph = () => {
   const isAggregated = useIsAggregated();
@@ -56,10 +57,14 @@ export const UsersCountSummary = () => {
     );
   }
 
-  let total = 0;
+  let current = 0;
+  let previous = 0;
   for (const entry of data.currentPeriod) {
-    total += entry.count;
+    current += entry.count;
+  }
+  for (const entry of data.previousPeriod) {
+    previous += entry.count;
   }
 
-  return numeral(total).format("0a");
+  return <SummaryMetricValue current={current} previous={previous} />;
 };

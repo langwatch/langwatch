@@ -39,6 +39,12 @@ export const SessionsSummary = () => {
                   (data.currentPeriod.total_users || 1)
                 : undefined
             }
+            previous={
+              data
+                ? data.previousPeriod.bouncing_users_count /
+                  (data.previousPeriod.total_users || 1)
+                : undefined
+            }
             format="0%"
             tooltip="Percentage of users who only sent a single message and never used it again"
           />
@@ -48,6 +54,12 @@ export const SessionsSummary = () => {
               data
                 ? data.currentPeriod.returning_users_count /
                   (data.currentPeriod.total_users || 1)
+                : undefined
+            }
+            previous={
+              data
+                ? data.previousPeriod.returning_users_count /
+                  (data.previousPeriod.total_users || 1)
                 : undefined
             }
             format="0%"
@@ -60,15 +72,22 @@ export const SessionsSummary = () => {
                 ? data.currentPeriod.average_duration_per_user_session / 1000
                 : undefined
             }
+            previous={
+              data
+                ? data.previousPeriod.average_duration_per_user_session / 1000
+                : undefined
+            }
             format="00:00:00"
           />
           <SummaryMetric
             label="Average Sessions per User"
             current={data?.currentPeriod.average_sessions_per_user}
+            previous={data?.previousPeriod.average_sessions_per_user}
           />
           <SummaryMetric
             label="Average Threads per Session"
             current={data?.currentPeriod.average_threads_per_user_session}
+            previous={data?.previousPeriod.average_threads_per_user_session}
           />
         </HStack>
       </CardBody>

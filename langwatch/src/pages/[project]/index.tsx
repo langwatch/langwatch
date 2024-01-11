@@ -44,6 +44,8 @@ import {
   MessagesCountGraph,
   MessagesCountSummary,
 } from "../../components/analytics/MessagesCountGraph";
+import { SatisfactionPieChart } from "../../components/analytics/SatisfactionGraph";
+import { SessionsSummary } from "../../components/analytics/SessionsSummary";
 import {
   ThreadsCountGraph,
   ThreadsCountSummary,
@@ -52,6 +54,7 @@ import {
   TokensSumGraph,
   TokensSumSummary,
 } from "../../components/analytics/TokensGraph";
+import { TopTopics } from "../../components/analytics/TopTopics";
 import {
   UsersCountGraph,
   UsersCountSummary,
@@ -59,11 +62,7 @@ import {
 import { useAnalyticsParams } from "../../hooks/useAnalyticsParams";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
-import { formatMilliseconds } from "../../utils/formatMilliseconds";
-import { SummaryMetric } from "../../components/analytics/SummaryMetric";
-import { SessionsSummary } from "../../components/analytics/SessionsSummary";
-import { TopTopics } from "../../components/analytics/TopTopics";
-import { SatisfactionPieChart } from "../../components/analytics/SatisfactionGraph";
+import { LLMSummary } from "../../components/analytics/LLMSummary";
 
 export default function Index() {
   const { project } = useOrganizationTeamProject();
@@ -74,10 +73,6 @@ export default function Index() {
 
   const { analyticsParams, queryOpts } = useAnalyticsParams();
 
-  const summaryMetrics = api.analytics.getSummaryMetrics.useQuery(
-    analyticsParams,
-    queryOpts
-  );
   const traceCheckStatusCounts =
     api.analytics.getTraceCheckStatusCounts.useQuery(
       analyticsParams,
@@ -120,7 +115,11 @@ export default function Index() {
             setPeriod={setPeriod}
           />
         </HStack>
-        <Grid width="100%" templateColumns={["1fr", "1fr", "1fr", "1fr 0.5fr"]} gap={6}>
+        <Grid
+          width="100%"
+          templateColumns={["1fr", "1fr", "1fr", "1fr 0.5fr"]}
+          gap={6}
+        >
           <GridItem>
             <Card>
               <CardBody>
@@ -238,52 +237,7 @@ export default function Index() {
             </Card>
           </GridItem>
           <GridItem>
-            <Card>
-              <CardHeader>
-                <Heading size="sm">Summary</Heading>
-              </CardHeader>
-              <CardBody>
-                <HStack spacing={0}>
-                  <SummaryMetric
-                    label="Average Total Tokens per Message"
-                    current={summaryMetrics.data?.avg_tokens_per_trace}
-                  />
-                  <SummaryMetric
-                    label="Average Cost per Message"
-                    current={
-                      summaryMetrics.data?.avg_total_cost_per_1000_traces
-                    }
-                    format="$0.00a"
-                  />
-                  {(!summaryMetrics.data ||
-                    summaryMetrics.data.percentile_90th_time_to_first_token >
-                      0) && (
-                    <SummaryMetric
-                      label="90th Percentile Time to First Token"
-                      current={
-                        summaryMetrics.data?.percentile_90th_time_to_first_token
-                      }
-                      format={formatMilliseconds}
-                    />
-                  )}
-                  <SummaryMetric
-                    label="90th Percentile Total Response Time"
-                    current={
-                      summaryMetrics.data &&
-                      (!!summaryMetrics.data.percentile_90th_total_time_ms
-                        ? summaryMetrics.data.percentile_90th_total_time_ms
-                        : "-")
-                    }
-                    format={
-                      !summaryMetrics.data ||
-                      summaryMetrics.data?.percentile_90th_total_time_ms
-                        ? formatMilliseconds
-                        : () => "-"
-                    }
-                  />
-                </HStack>
-              </CardBody>
-            </Card>
+            <LLMSummary />
           </GridItem>
           <GridItem>
             <Card height="full">

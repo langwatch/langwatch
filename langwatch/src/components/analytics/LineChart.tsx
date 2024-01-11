@@ -139,10 +139,7 @@ export function AggregatedLineChart<T extends string>({
   }
 
   return (
-    <ResponsiveContainer
-      key={mergedData ? valueKey : "loading"}
-      height={300}
-    >
+    <ResponsiveContainer key={mergedData ? valueKey : "loading"} height={300}>
       <AreaChart
         data={mergedData}
         margin={{ left: (valueFormat ?? "0a").length * 4 - 10 }}

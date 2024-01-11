@@ -4,6 +4,7 @@ import { checkUserPermissionForProject } from "../permission";
 import {
   sharedAnalyticsFilterInput,
   generateTraceQueryConditions,
+  currentVsPreviousDates,
 } from "./analytics/common";
 import {
   messagesCountAggregated,
@@ -17,12 +18,18 @@ import {
   tokensSumAggregated,
   tokensSumVsPreviousPeriod,
 } from "./analytics/tokens";
-import { llmCallsCountAggregated } from "./analytics/llmCalls";
+import {
+  llmCallsCountAggregated,
+  llmCallsCountVsPreviousPeriod,
+} from "./analytics/llmCalls";
 import {
   threadsCountAggregated,
   threadsCountVsPreviousPeriod,
 } from "./analytics/threads";
-import { usersCountAggregated, usersCountVsPreviousPeriod } from "./analytics/users";
+import {
+  usersCountAggregated,
+  usersCountVsPreviousPeriod,
+} from "./analytics/users";
 import { sessionsVsPreviousPeriod } from "./analytics/sessions";
 import { satisfactionVsPreviousPeriod } from "./analytics/satisfaction";
 
@@ -35,6 +42,7 @@ export const analyticsRouter = createTRPCRouter({
   usersCountAggregated,
   sessionsVsPreviousPeriod,
   satisfactionVsPreviousPeriod,
+  llmCallsCountVsPreviousPeriod,
   llmCallsCountAggregated,
   llmCostSumVsPreviousPeriod,
   llmCostSumAggregated,
@@ -44,57 +52,74 @@ export const analyticsRouter = createTRPCRouter({
     .input(sharedAnalyticsFilterInput)
     .use(checkUserPermissionForProject)
     .query(async ({ input }) => {
-      const result = await esClient.search({
-        index: TRACE_INDEX,
-        body: {
-          size: 0,
-          query: {
-            bool: {
-              //@ts-ignore
-              filter: generateTraceQueryConditions(input),
-            },
-          },
-        },
-        aggs: {
-          avg_tokens_per_trace: {
-            avg: {
-              script: {
-                source:
-                  "if (doc['metrics.prompt_tokens'].size() > 0 && doc['metrics.completion_tokens'].size() > 0) { return doc['metrics.prompt_tokens'].value + doc['metrics.completion_tokens'].value } else { return 0 }",
+      const { previousPeriodStartDate } = currentVsPreviousDates(input);
+
+      const summaryQuery = (startDate: number, endDate: number) =>
+        esClient.search({
+          index: TRACE_INDEX,
+          body: {
+            size: 0,
+            query: {
+              bool: {
+                //@ts-ignore
+                filter: generateTraceQueryConditions({
+                  ...input,
+                  startDate,
+                  endDate,
+                }),
               },
             },
           },
-          avg_total_cost_per_1000_traces: {
-            avg: {
-              field: "metrics.total_cost",
+          aggs: {
+            avg_tokens_per_trace: {
+              avg: {
+                script: {
+                  source:
+                    "if (doc['metrics.prompt_tokens'].size() > 0 && doc['metrics.completion_tokens'].size() > 0) { return doc['metrics.prompt_tokens'].value + doc['metrics.completion_tokens'].value } else { return 0 }",
+                },
+              },
+            },
+            avg_total_cost_per_1000_traces: {
+              avg: {
+                field: "metrics.total_cost",
+              },
+            },
+            percentile_time_to_first_token: {
+              percentiles: {
+                field: "metrics.first_token_ms",
+                percents: [90],
+              },
+            },
+            percentile_total_time_ms: {
+              percentiles: {
+                field: "metrics.total_time_ms",
+                percents: [90],
+              },
             },
           },
-          percentile_time_to_first_token: {
-            percentiles: {
-              field: "metrics.first_token_ms",
-              percents: [90],
-            },
-          },
-          percentile_total_time_ms: {
-            percentiles: {
-              field: "metrics.total_time_ms",
-              percents: [90],
-            },
-          },
-        },
-      });
+        });
 
-      const aggregations: any = result.aggregations;
+      const [currentPeriod, previousPeriod] = await Promise.all([
+        summaryQuery(input.startDate, input.endDate),
+        summaryQuery(previousPeriodStartDate.getTime(), input.startDate),
+      ]);
+
+      const mapAggregations = ({ aggregations }: { aggregations: any }) => {
+        return {
+          avg_tokens_per_trace: aggregations?.avg_tokens_per_trace
+            .value as number,
+          avg_total_cost_per_1000_traces: aggregations
+            ?.avg_total_cost_per_1000_traces.value as number,
+          percentile_90th_time_to_first_token: aggregations
+            ?.percentile_time_to_first_token.values["90.0"] as number,
+          percentile_90th_total_time_ms: aggregations?.percentile_total_time_ms
+            .values["90.0"] as number,
+        };
+      };
 
       return {
-        avg_tokens_per_trace: aggregations?.avg_tokens_per_trace
-          .value as number,
-        avg_total_cost_per_1000_traces: aggregations
-          ?.avg_total_cost_per_1000_traces.value as number,
-        percentile_90th_time_to_first_token: aggregations
-          ?.percentile_time_to_first_token.values["90.0"] as number,
-        percentile_90th_total_time_ms: aggregations?.percentile_total_time_ms
-          .values["90.0"] as number,
+        currentPeriod: mapAggregations(currentPeriod as any),
+        previousPeriod: mapAggregations(previousPeriod as any),
       };
     }),
   getTraceCheckStatusCounts: protectedProcedure

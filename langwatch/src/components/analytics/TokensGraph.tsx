@@ -17,6 +17,7 @@ import {
   Tooltip,
   BarChart,
 } from "recharts";
+import { SummaryMetricValue } from "./SummaryMetric";
 
 export const TokensSumGraph = () => {
   const isAggregated = useIsAggregated();
@@ -64,12 +65,16 @@ export const TokensSumSummary = () => {
     );
   }
 
-  let total = 0;
+  let current = 0;
+  let previous = 0;
   for (const entry of data.currentPeriod) {
-    total += entry.prompt_tokens + entry.completion_tokens;
+    current += entry.prompt_tokens + entry.completion_tokens;
+  }
+  for (const entry of data.previousPeriod) {
+    previous += entry.prompt_tokens + entry.completion_tokens;
   }
 
-  return numeral(total).format("0a");
+  return <SummaryMetricValue current={current} previous={previous} increaseIs="neutral" />;
 };
 
 type TokensGraphData = Record<

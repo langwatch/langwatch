@@ -4,11 +4,11 @@ import {
   useIsAggregated,
 } from "../../hooks/useAnalyticsParams";
 import { api } from "../../utils/api";
-import numeral from "numeral";
 import {
   AggregatedLineChart,
   CurrentVsPreviousPeriodLineChart,
 } from "./LineChart";
+import { SummaryMetricValue } from "./SummaryMetric";
 
 export const MessagesCountGraph = () => {
   const isAggregated = useIsAggregated();
@@ -27,7 +27,7 @@ const MessagesCountVsPreviousPeriodGraph = () => {
     queryOpts
   );
 
-  return <CurrentVsPreviousPeriodLineChart data={data} valueKey="messages_count" />;
+  return <CurrentVsPreviousPeriodLineChart data={data} valueKey="count" />;
 };
 
 const MessagesCountAggregatedGraph = () => {
@@ -37,7 +37,7 @@ const MessagesCountAggregatedGraph = () => {
     queryOpts
   );
 
-  return <AggregatedLineChart data={data} valueKey="messages_count" />;
+  return <AggregatedLineChart data={data} valueKey="count" />;
 };
 
 export const MessagesCountSummary = () => {
@@ -56,10 +56,14 @@ export const MessagesCountSummary = () => {
     );
   }
 
-  let total = 0;
+  let current = 0;
+  let previous = 0;
   for (const entry of data.currentPeriod) {
-    total += entry.messages_count;
+    current += entry.count;
+  }
+  for (const entry of data.previousPeriod) {
+    previous += entry.count;
   }
 
-  return numeral(total).format("0a");
+  return <SummaryMetricValue current={current} previous={previous} />;
 };
