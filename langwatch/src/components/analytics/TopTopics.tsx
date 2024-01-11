@@ -64,7 +64,7 @@ export function TopTopics() {
   const topTopicCount = topTopics[0] ? topTopics[0][1] : 1;
 
   return (
-    <Card width="full" maxWidth="400px" height="331px">
+    <Card width="full" height="331px">
       <CardBody width="full" paddingTop={6}>
         <Heading as="h2" size="md">
           Top Topics

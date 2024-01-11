@@ -120,9 +120,9 @@ export default function Index() {
             setPeriod={setPeriod}
           />
         </HStack>
-        <HStack align="start" gap={6} width="100%">
-          <VStack align="start" width="full" flexGrow={1} gap={6}>
-            <Card width="full">
+        <Grid width="100%" templateColumns={["1fr", "1fr", "1fr", "1fr 0.5fr"]} gap={6}>
+          <GridItem>
+            <Card>
               <CardBody>
                 <Tabs variant="unstyled">
                   <TabList gap={12}>
@@ -171,14 +171,17 @@ export default function Index() {
                 </Tabs>
               </CardBody>
             </Card>
-
+          </GridItem>
+          <GridItem rowSpan={2}>
+            <VStack spacing={6}>
+              <TopTopics />
+              <SatisfactionPieChart />
+            </VStack>
+          </GridItem>
+          <GridItem>
             <SessionsSummary />
-          </VStack>
-          <VStack align="start" width="50%" gap={6}>
-            <TopTopics />
-            <SatisfactionPieChart />
-          </VStack>
-        </HStack>
+          </GridItem>
+        </Grid>
         <Heading as={"h1"} size="lg" paddingBottom={6} paddingTop={10}>
           LLM Metrics
         </Heading>
