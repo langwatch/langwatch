@@ -2,6 +2,7 @@ import { Text, VStack } from "@chakra-ui/react";
 import type { TraceCheck } from "../../server/tracer/types";
 import type { CustomCheckRule } from "../types";
 import { camelCaseToLowerCase } from "../../utils/stringCasing";
+import { toFixedWithoutRounding } from "../../utils/toFixedWithoutRounding";
 
 export function CustomCheck({ check }: { check: TraceCheck }) {
   const failedRules =
@@ -34,7 +35,9 @@ export function CustomCheck({ check }: { check: TraceCheck }) {
                       ", "
                     : ""
                 } ${rule && "failWhen" in rule ? "g" : "G"}ot ${
-                  typeof score === "number" ? +score.toFixed(2) : score
+                  typeof score === "number"
+                    ? toFixedWithoutRounding(+score, 2)
+                    : score
                 }`}
               </Text>
             )}

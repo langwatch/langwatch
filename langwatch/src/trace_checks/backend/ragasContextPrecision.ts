@@ -6,7 +6,7 @@ import type { RagasResult, TraceCheckResult } from "../types";
 import { getRAGInfo } from "../utils";
 
 export const ragasContextPrecision = async (
-  _trace: Trace,
+  trace: Trace,
   spans: ElasticSearchSpan[]
 ): Promise<TraceCheckResult> => {
   if (!env.LANGWATCH_GUARDRAILS_SERVICE) {
@@ -28,14 +28,15 @@ export const ragasContextPrecision = async (
         answer: output,
         contexts: contexts,
         ground_truths: null,
-        model: "gpt-3.5-turbo-1106",
+        model: "gpt-3.5-turbo-0613",
       }),
     }
   );
 
   if (!response.ok) {
+    const error = await response.text();
     throw new Error(
-      `Ragas context precision check API returned an error: ${response.statusText}`
+      `Ragas context precision check API returned an error: ${error} for trace ${trace.id}`
     );
   }
 

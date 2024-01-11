@@ -84,7 +84,7 @@ export const esGetSpansByTraceId = async (
         term: { trace_id: traceId },
       },
     },
-    size: 1000,
+    size: 10000,
   });
 
   return result.hits.hits.map((hit) => hit._source!).filter((hit) => hit);

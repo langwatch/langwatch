@@ -1,6 +1,7 @@
 import { Text, VStack } from "@chakra-ui/react";
 import type { TraceCheck } from "../../server/tracer/types";
 import type { RagasResult } from "../types";
+import { toFixedWithoutRounding } from "../../utils/toFixedWithoutRounding";
 
 export function RagasContextPrecision({ check }: { check: TraceCheck }) {
   const result = check.raw_result as RagasResult;
@@ -8,7 +9,10 @@ export function RagasContextPrecision({ check }: { check: TraceCheck }) {
 
   return (
     <VStack align="start">
-      <Text>Context Precision Score: {contextPrecisionScore?.toFixed(2)}</Text>
+      <Text>
+        Context Precision Score:{" "}
+        {toFixedWithoutRounding(contextPrecisionScore, 2)}
+      </Text>
     </VStack>
   );
 }
