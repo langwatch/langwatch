@@ -80,14 +80,17 @@ export default async function handler(
     return res.status(400).json({ message: "Bad request" });
   }
 
-  const spans = addInputAndOutputForRAGs(
-    await addLLMTokensCount((req.body as Record<string, any>).spans as Span[])
-  );
+  let spans = (req.body as Record<string, any>).spans as Span[];
   spans.forEach((span) => {
     if (nullableTraceId && !span.trace_id) {
       span.trace_id = nullableTraceId;
     }
+    // Makes outputs optional, but our system still expects it to be an array
+    if (typeof span.outputs === "undefined") {
+      span.outputs = [];
+    }
   });
+
   const traceId = nullableTraceId ?? spans[0]?.trace_id;
   if (!traceId) {
     return res.status(400).json({ message: "Trace ID not defined" });
@@ -101,7 +104,20 @@ export default async function handler(
       Sentry.captureException(error);
       return res.status(400).json({ error: "Invalid span format." });
     }
+
+    if (
+      (span.timestamps.started_at &&
+        span.timestamps.started_at.toString().length === 10) ||
+      (span.timestamps.finished_at &&
+        span.timestamps.finished_at.toString().length === 10) ||
+      (span.timestamps.first_token_at &&
+        span.timestamps.first_token_at.toString().length === 10)
+    ) {
+      return res.status(400).json({ error: "Timestamps should be in milliseconds not in seconds, please multiply it by 1000" });
+    }
   }
+
+  spans = addInputAndOutputForRAGs(await addLLMTokensCount(spans));
 
   const esSpans: ElasticSearchSpan[] = spans.map((span) => ({
     ...span,
