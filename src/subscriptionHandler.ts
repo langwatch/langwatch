@@ -31,6 +31,13 @@ const PLAN_LIMITS: Record<PlanTypes, PlanInfo> = {
 
 export class SubscriptionHandlerSass extends SubscriptionHandler {
   static async getActivePlan(organizationId: string): Promise<PlanInfo> {
+    if (
+      organizationId === "organization_erk6Bmlfzxw2YMyzWdo8O" ||
+      organizationId === "HXECRq2mRfSQpxTiSCcsS"
+    ) {
+      return PLAN_LIMITS[PlanTypes.BUSINESS];
+    }
+
     const activeSubscription = await prisma.subscription.findFirst({
       where: {
         organizationId: organizationId,
