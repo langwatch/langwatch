@@ -102,7 +102,7 @@ export function TopTopics() {
                       }
                     >
                       <HStack width="full">
-                        <Text flexGrow={1} isTruncated>
+                        <Text flexGrow={1} noOfLines={1}>
                           {topic}
                         </Text>
                         <Text color="gray.500" fontSize={12}>

@@ -48,23 +48,6 @@ export const authOptions: NextAuthOptions = {
         },
       };
     },
-    // signIn: async ({ user, account, profile }) => {
-    //   if (user && profile) {
-    //     console.log("signIn user", user);
-    //     console.log("signIn account", account);
-    //     console.log("signIn profile", profile);
-    //     await prisma.user.update({
-    //       where: {
-    //         id: user.id,
-    //       },
-    //       data: {
-    //         email: profile.email,
-    //       },
-    //     });
-    //   }
-
-    //   return true;
-    // },
   },
   adapter: PrismaAdapter(prisma),
   providers: [

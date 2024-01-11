@@ -246,21 +246,6 @@ const currentVsPreviousElasticSearchAggregation = async <
     return aggregation;
   });
 
-  console.log("daysDifference", JSON.stringify(daysDifference, undefined, 2));
-  console.log(
-    "previousPeriodStartDate",
-    JSON.stringify(previousPeriodStartDate, undefined, 2)
-  );
-  console.log("endDate", JSON.stringify(endDate, undefined, 2));
-  console.log(
-    "dateTicks",
-    JSON.stringify(
-      dateTicks(previousPeriodStartDate, endDate, "timestamps.started_at"),
-      undefined,
-      2
-    )
-  );
-
   const previousPeriod = aggregations.slice(0, daysDifference);
   const currentPeriod = aggregations.slice(daysDifference);
 
