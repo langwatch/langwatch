@@ -1,16 +1,19 @@
-import { Box, Heading, Skeleton, VStack } from "@chakra-ui/react";
+import { Box, Heading, Skeleton, Tooltip, VStack } from "@chakra-ui/react";
 import numeral from "numeral";
+import { HelpCircle } from "react-feather";
 
 export function SummaryMetric({
   label,
   current,
   previous,
   format,
+  tooltip,
 }: {
   label: string;
   current?: number | string;
   previous?: number;
   format?: ((value: number) => string) | ((value: string) => string) | string;
+  tooltip?: string;
 }) {
   return (
     <VStack
@@ -30,6 +33,19 @@ export function SummaryMetric({
         lineHeight="1.5em"
       >
         {label}
+        {tooltip && (
+          <Tooltip label={tooltip}>
+            <HelpCircle
+              style={{
+                display: "inline-block",
+                verticalAlign: "middle",
+                marginTop: "-3px",
+                marginLeft: "4px",
+              }}
+              width="14px"
+            />
+          </Tooltip>
+        )}
       </Heading>
       <Box fontSize="28" fontWeight="600">
         {current !== undefined ? (

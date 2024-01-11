@@ -40,6 +40,7 @@ export const SessionsSummary = () => {
                 : undefined
             }
             format="0%"
+            tooltip="Percentage of users who only sent a single message and never used it again"
           />
           <SummaryMetric
             label="Returning Users"
@@ -50,6 +51,7 @@ export const SessionsSummary = () => {
                 : undefined
             }
             format="0%"
+            tooltip="Percentage of users who came back and initiated more than one session, hours appart"
           />
           <SummaryMetric
             label="Average Session Duration"
