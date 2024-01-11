@@ -34,7 +34,7 @@ const generateQueryConditions = ({
 }: z.infer<typeof sharedTraceFilterInput>) => {
   // If end date is very close to now, force it to be now, to allow frontend to keep refetching for new messages
   const endDate_ =
-    new Date().getTime() - endDate < 1000 * 60 * 60
+    new Date().getTime() - endDate < 1000 * 60 * 60 * 2
       ? new Date().getTime()
       : endDate;
 
