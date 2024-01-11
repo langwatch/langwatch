@@ -13,37 +13,111 @@ import {
   PieChart,
   ResponsiveContainer,
   Text,
+  XAxis,
 } from "recharts";
 import { useAnalyticsParams } from "../../hooks/useAnalyticsParams";
 import { api } from "../../utils/api";
+import numeral from "numeral";
+import { MetricChange } from "./SummaryMetric";
 
 export const SatisfactionPieChart = () => {
+  const { analyticsParams, queryOpts } = useAnalyticsParams();
+  const { data } = api.analytics.satisfactionVsPreviousPeriod.useQuery(
+    analyticsParams,
+    queryOpts
+  );
+
+  const { positiveNeutralRatio, positiveNeutralRatioPrevious } = getCounts(data);
+
   return (
     <Card width="full" height="335px">
       <CardHeader>
         <HStack>
           <Heading size="sm">User Satisfaction</Heading>
+          {data && positiveNeutralRatioPrevious > 0 && (
+            <MetricChange
+              current={positiveNeutralRatio}
+              previous={positiveNeutralRatioPrevious}
+            />
+          )}
         </HStack>
       </CardHeader>
       <CardBody padding={0} marginTop="-24px">
-        <SatisfactionPieChartChart />
+        <SatisfactionPieChartChart data={data} />
       </CardBody>
     </Card>
   );
 };
 
-const SatisfactionPieChartChart = () => {
+const getCounts = (
+  data:
+    | {
+        currentPeriod: {
+          positive: number;
+          negative: number;
+          neutral: number;
+        }[];
+        previousPeriod: {
+          positive: number;
+          negative: number;
+          neutral: number;
+        }[];
+      }
+    | undefined
+) => {
+  let positive = 0;
+  let negative = 0;
+  let neutral = 0;
+  for (const entry of data?.currentPeriod ?? []) {
+    positive += entry.positive;
+    negative += entry.negative;
+    neutral += entry.neutral;
+  }
+  const total = positive + negative + neutral;
+  const positiveNeutralRatio = (positive + neutral) / total;
+
+  let positiveNeutralPrevious = 0;
+  let totalPrevious = 0;
+  for (const entry of data?.previousPeriod ?? []) {
+    positiveNeutralPrevious += entry.positive + entry.neutral;
+    totalPrevious += entry.positive + entry.negative + entry.neutral;
+  }
+  const positiveNeutralRatioPrevious = positiveNeutralPrevious / totalPrevious;
+
+  return {
+    positive,
+    negative,
+    neutral,
+    positiveNeutralRatio,
+    positiveNeutralRatioPrevious,
+  };
+};
+
+const SatisfactionPieChartChart = ({
+  data,
+}: {
+  data:
+    | {
+        currentPeriod: {
+          positive: number;
+          negative: number;
+          neutral: number;
+        }[];
+        previousPeriod: {
+          positive: number;
+          negative: number;
+          neutral: number;
+        }[];
+      }
+    | undefined;
+}) => {
   const theme = useTheme();
   const gray = theme.colors.gray["300"];
   const green = theme.colors.green["400"];
   const red = theme.colors.red["400"];
   const COLORS = [green, red, gray];
 
-  const { analyticsParams, queryOpts } = useAnalyticsParams();
-  const { data } = api.analytics.satisfactionVsPreviousPeriod.useQuery(
-    analyticsParams,
-    queryOpts
-  );
+  const { positive, negative, neutral, positiveNeutralRatio } = getCounts(data);
 
   if (!data) {
     return (
@@ -51,15 +125,6 @@ const SatisfactionPieChartChart = () => {
         <div />
       </ResponsiveContainer>
     );
-  }
-
-  let positive = 0;
-  let negative = 0;
-  let neutral = 0;
-  for (const entry of data.currentPeriod) {
-    positive += entry.positive;
-    negative += entry.negative;
-    neutral += entry.neutral;
   }
 
   const chartData = [
@@ -128,15 +193,26 @@ const SatisfactionPieChartChart = () => {
           ))}
         </Pie>
         <Legend formatter={renderLegendText} />
-        <Text
-          x={200}
-          y={200}
+        <text
+          x="50%"
+          y="43%"
+          fill={positiveNeutralRatio > 0.9 ? green : red}
           textAnchor="middle"
           dominantBaseline="middle"
-          style={{ fontSize: "13px" }}
+          style={{ fontSize: "28px", fontWeight: 600 }}
         >
-          {positive}
-        </Text>
+          {numeral(positiveNeutralRatio).format("0%")}
+        </text>
+        <text
+          x="50%"
+          y="52%"
+          fill={positiveNeutralRatio > 0.9 ? green : red}
+          textAnchor="middle"
+          dominantBaseline="middle"
+          style={{ fontSize: "13px", fontWeight: 600 }}
+        >
+          Pos + Neutral
+        </text>
       </PieChart>
     </ResponsiveContainer>
   );
