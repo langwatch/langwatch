@@ -23,17 +23,10 @@ export type Checks = {
   toxicity_check: {
     parameters: {
       categories: {
-        harassment: boolean;
-        "harassment/threatening": boolean;
-        hate: boolean;
-        "hate/threatening": boolean;
-        "self-harm": boolean;
-        "self-harm/intent": boolean;
-        "self-harm/instructions": boolean;
-        sexual: boolean;
-        "sexual/minors": boolean;
-        violence: boolean;
-        "violence/graphic": boolean;
+        hate: boolean,
+        selfHarm: boolean,
+        sexual: boolean,
+        violence: boolean,
       };
     };
   };
@@ -102,16 +95,15 @@ export type TraceCheckDefinition<T extends CheckTypes> = {
 };
 
 // API Types
+export type ModerationCategories = "Hate" | "SelfHarm" | "Sexual" | "Violence"
+
 export type ModerationResult = {
-  id: string;
-  model: string;
-  results: ModerationResultEntry[];
+  categoriesAnalysis: ModerationResultEntry[];
 };
 
 export type ModerationResultEntry = {
-  flagged: boolean;
-  categories: Record<string, boolean>;
-  category_scores: Record<string, number>;
+  category: ModerationCategories;
+  severity: number;
 };
 
 export type JailbreakAnalysisResult = {

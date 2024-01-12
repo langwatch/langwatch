@@ -16,21 +16,15 @@ describe("ToxicityCheck", () => {
 
     const response = await toxicityCheck(sampleTrace, [], {
       categories: {
-        harassment: true,
-        "harassment/threatening": true,
         hate: true,
-        "hate/threatening": true,
-        "self-harm": true,
-        "self-harm/intent": true,
-        "self-harm/instructions": true,
+        selfHarm: true,
         sexual: true,
-        "sexual/minors": true,
         violence: true,
-        "violence/graphic": true,
       },
     });
     const raw_result = response.raw_result as ModerationResult;
-    expect(raw_result.results[0]?.categories.harassment).toBe(true);
+    expect(raw_result.categoriesAnalysis[0]?.category).toBe("Hate");
+    expect(raw_result.categoriesAnalysis[0]?.severity).toBe(2);
     expect(response.value).toBeGreaterThan(0.9);
     expect(response.status).toBe("failed");
   });
@@ -47,21 +41,14 @@ describe("ToxicityCheck", () => {
 
     const response = await toxicityCheck(sampleTrace, [], {
       categories: {
-        harassment: false,
-        "harassment/threatening": true,
-        hate: true,
-        "hate/threatening": true,
-        "self-harm": true,
-        "self-harm/intent": true,
-        "self-harm/instructions": true,
+        hate: false,
+        selfHarm: true,
         sexual: true,
-        "sexual/minors": true,
         violence: true,
-        "violence/graphic": true,
       },
     });
     const raw_result = response.raw_result as ModerationResult;
-    expect(raw_result.results[0]?.categories.harassment).toBe(true);
+    expect(raw_result.categoriesAnalysis[0]?.category).not.toBe("Hate");
     expect(response.value).toBeLessThan(0.1);
     expect(response.status).toBe("succeeded");
   });

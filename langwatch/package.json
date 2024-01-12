@@ -16,6 +16,7 @@
     "types:zod:generate": "ts-to-zod src/server/tracer/types.ts src/server/tracer/types.generated.ts && ts-to-zod src/trace_checks/types.ts src/trace_checks/types.generated.ts"
   },
   "dependencies": {
+    "@azure/openai": "^1.0.0-beta.10",
     "@chakra-ui/next-js": "^2.1.5",
     "@chakra-ui/react": "^2.8.2",
     "@elastic/elasticsearch": "^8.10.0",

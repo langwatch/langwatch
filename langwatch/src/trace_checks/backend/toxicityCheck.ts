@@ -1,7 +1,7 @@
 import fetch from "node-fetch";
 import { env } from "../../env.mjs";
 import type { ElasticSearchSpan, Trace } from "../../server/tracer/types";
-import type { Checks, TraceCheckResult } from "../types";
+import type { Checks, ModerationCategories, TraceCheckResult } from "../types";
 import type { ModerationResult } from "../types";
 import { getDebugger } from "../../utils/logger";
 
@@ -15,38 +15,39 @@ export const toxicityCheck = async (
   debug("Checking toxicity for trace", trace.id);
   const content = [trace.input.value, trace.output?.value ?? ""].join("\n\n");
 
-  const response = await fetch("https://api.openai.com/v1/moderations", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${env.OPENAI_API_KEY}`,
-    },
-    body: JSON.stringify({ input: content }),
-  });
+  const categoriesMap: Record<ModerationCategories, boolean> = {
+    Hate: parameters.categories.hate,
+    SelfHarm: parameters.categories.selfHarm,
+    Sexual: parameters.categories.sexual,
+    Violence: parameters.categories.violence,
+  };
+  const categories = Object.keys(categoriesMap).filter(
+    (key) => categoriesMap[key as keyof typeof categoriesMap]
+  ) as ModerationCategories[];
+
+  const response = await fetch(
+    `${env.CONTENT_SAFETY_ENDPOINT}/contentsafety/text:analyze?api-version=2023-10-15-preview`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Ocp-Apim-Subscription-Key": env.CONTENT_SAFETY_SUBSCRIPTION_KEY ?? "",
+      },
+      body: JSON.stringify({
+        text: content,
+        categories,
+        outputType: "EightSeverityLevels",
+      }),
+    }
+  );
 
   const moderationResult = (await response.json()) as ModerationResult;
 
-  const flagged = moderationResult.results.some((result) =>
-    Object.entries(result.categories)
-      .filter(
-        ([category]) =>
-          parameters.categories[category as keyof typeof parameters.categories]
-      )
-      .some(([, value]) => value)
+  const flagged = moderationResult.categoriesAnalysis.some(
+    (result) => result.severity > 0
   );
   const highestScore = Math.max(
-    ...moderationResult.results.map((result) =>
-      Math.max(
-        ...Object.entries(result.category_scores)
-          .filter(
-            ([category]) =>
-              parameters.categories[
-                category as keyof typeof parameters.categories
-              ]
-          )
-          .map(([, value]) => value)
-      )
-    )
+    ...moderationResult.categoriesAnalysis.map((result) => result.severity)
   );
 
   return {

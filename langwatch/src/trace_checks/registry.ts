@@ -41,9 +41,9 @@ export const AVAILABLE_TRACE_CHECKS: {
     },
   },
   toxicity_check: {
-    name: "OpenAI Moderation",
+    name: "Azure Content Safety Moderation",
     description:
-      "Detects hate speech, harassment, violence, and other toxic content",
+      "Detects hate speech, self-harm, sexual and violent content",
     parametersDescription: {
       categories: {
         name: "Categories to check",
@@ -53,23 +53,16 @@ export const AVAILABLE_TRACE_CHECKS: {
     default: {
       parameters: {
         categories: {
-          harassment: true,
-          "harassment/threatening": true,
           hate: true,
-          "hate/threatening": true,
-          "self-harm": true,
-          "self-harm/intent": true,
-          "self-harm/instructions": true,
+          selfHarm: true,
           sexual: true,
-          "sexual/minors": true,
           violence: true,
-          "violence/graphic": true,
         },
       },
     },
   },
   jailbreak_check: {
-    name: "Jailbreak Detection",
+    name: "Azure Jailbreak Detection",
     description:
       "Detects if the input attempts to Jailbreak the LLM to produce answers and execute tasks that it was not supposed to",
     parametersDescription: {},
