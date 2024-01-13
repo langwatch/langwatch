@@ -50,17 +50,28 @@ curl -X POST "$ENDPOINT" \\
     {
       "type": "llm",
       "id": "span-456",
-      "trace_id": "trace-123",
       "vendor": "openai",
       "model": "gpt-4",
       "input": {
-        "type": "text",
-        "value": "Input text for the LLM"
+        "type": "chat_messages",
+        "value": [
+          {
+            "role": "user",
+            "content": "Input to the LLM"
+          }
+        ]
       },
       "outputs": [
         {
-          "type": "text",
-          "value": "Output from the LLM"
+          "type": "chat_messages",
+          "value": [
+              {
+                  "role": "assistant",
+                  "content": "Output from the LLM",
+                  "function_call": null,
+                  "tool_calls": []
+              }
+          ]
         }
       ],
       "params": {
@@ -72,8 +83,8 @@ curl -X POST "$ENDPOINT" \\
         "completion_tokens": 150
       },
       "timestamps": {
-        "started_at": 1617981376,
-        "finished_at": 1617981378
+        "started_at": 1617981376000,
+        "finished_at": 1617981378000
       }
     }
   ],
@@ -95,6 +106,16 @@ EOF`}
         check out our{" "}
         <a href="https://github.com/langwatch/langwatch/blob/main/python-sdk/langwatch/types.py#L118">
           types definitions
+        </a>
+        .
+      </p>
+      <p>
+        It's optional but highly recommended to pass the <code>user_id</code> if
+        you want to leverage user-specific analytics and the{" "}
+        <code>thread_id</code> to group related traces together. Read more about
+        those and other concepts{" "}
+        <a href="https://docs.langwatch.ai/docs/concepts" target="_blank">
+          here
         </a>
         .
       </p>

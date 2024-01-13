@@ -993,7 +993,6 @@ data: [DONE]""".split(
         )
 
         with langwatch.openai.OpenAIChatCompletionTracer(client):
-            # TODO: optionally auto-detect input
             with langwatch.capture_rag(
                 input="What is the capital of France?",
                 contexts=[
