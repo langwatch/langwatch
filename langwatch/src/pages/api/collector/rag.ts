@@ -1,4 +1,4 @@
-import type { RAGSpan, Span } from "../../../server/tracer/types";
+import type { RAGChunk, RAGSpan, Span } from "../../../server/tracer/types";
 import {
   flattenSpanTree,
   getFirstInputAsText,
@@ -6,6 +6,7 @@ import {
   organizeSpansIntoTree,
   type SpanWithChildren,
 } from "./common";
+import crypto from "crypto";
 
 export const addInputAndOutputForRAGs = (spans: Span[]): Span[] => {
   const inputOutputMap: Record<
@@ -53,4 +54,54 @@ export const addInputAndOutputForRAGs = (spans: Span[]): Span[] => {
   recursiveExtractInputAndOutput(spansTree);
 
   return fillInputOutputMap(spans);
+};
+
+export const extractRAGTextualContext = (contexts: RAGChunk[]) => {
+  return contexts.map((context) => {
+    return extractChunkTextualContent(context.content);
+  });
+};
+
+const extractChunkTextualContent = (object: any): string => {
+  let content = object;
+  if (typeof content === "string") {
+    try {
+      content = JSON.parse(content);
+    } catch {
+      return object;
+    }
+  }
+  if (Array.isArray(content)) {
+    return content
+      .map(extractChunkTextualContent)
+      .filter((x) => x)
+      .join("\n");
+  }
+  if (typeof content === "object") {
+    return Object.values(content)
+      .map(extractChunkTextualContent)
+      .filter((x) => x)
+      .join("\n");
+  }
+
+  return "";
+};
+
+export const maybeAddIdsToContextList = (
+  contexts: RAGChunk["content"][]
+): RAGChunk[] => {
+  const everyWithoutId =
+    Array.isArray(contexts) &&
+    contexts.every(
+      (context) => typeof context !== "object" || !("id" in context)
+    );
+  if (!everyWithoutId) return contexts as RAGChunk[];
+
+  return contexts.map((content) => ({
+    document_id: crypto
+      .createHash("md5")
+      .update(extractChunkTextualContent(content))
+      .digest("hex"),
+    content: content,
+  }));
 };

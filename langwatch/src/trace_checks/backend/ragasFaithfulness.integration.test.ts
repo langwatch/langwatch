@@ -26,8 +26,8 @@ describe("RagasFaithfulness Integration", () => {
         project_id: "integration-test",
         timestamps: { started_at: Date.now(), finished_at: Date.now() },
         contexts: [
-          "France is a country in Europe.",
-          "Paris is a city in France.",
+          { document_id: "context-0", content: "France is a country in Europe." },
+          { document_id: "context-1", content: "Paris is a city in France." },
         ],
       },
     ];

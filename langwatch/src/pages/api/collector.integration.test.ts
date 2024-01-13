@@ -59,7 +59,7 @@ describe("Collector API Endpoint", () => {
   });
 
   test("should insert spans into Elasticsearch", async () => {
-    const traceData : CollectorRESTParams = {
+    const traceData: CollectorRESTParams = {
       trace_id: sampleSpan.trace_id,
       spans: [sampleSpan],
       thread_id: "thread_test-thread_1",
@@ -182,15 +182,19 @@ describe("Collector API Endpoint", () => {
     expect(res.statusCode).toBe(400);
   });
 
-  test.only("should insert RAGs, extracting the input and output from children spans if not available", async () => {
-    const traceId = "trace_test-trace_J5m9g-0JDMbcJqLK2"
+  test("should insert RAGs, extracting the input and output from children spans if not available", async () => {
+    const traceId = "trace_test-trace_J5m9g-0JDMbcJqLK2";
     const ragSpan: RAGSpan = {
       type: "rag",
       id: "span_V1StGXR8_Z5jdHi6B-myE",
       trace_id: traceId,
       contexts: [
-        "France is a country in Europe.",
-        "Paris is the capital of France.",
+        { document_id: "context-1", content: "France is a country in Europe." },
+        {
+          document_id: "context-2",
+          chunk_id: 1 as any, // check if api allow for numbers
+          content: "Paris is the capital of France.",
+        },
       ],
       outputs: [],
       timestamps: sampleSpan.timestamps,
@@ -210,12 +214,14 @@ describe("Collector API Endpoint", () => {
       outputs: [
         {
           type: "chat_messages",
-          value: [{ role: "assistant", content: "The capital of France is Paris." }],
+          value: [
+            { role: "assistant", content: "The capital of France is Paris." },
+          ],
         },
       ],
     };
 
-    const traceData : CollectorRESTParams = {
+    const traceData: CollectorRESTParams = {
       trace_id: traceId,
       spans: [llmSpan, ragSpan],
     };
@@ -248,7 +254,79 @@ describe("Collector API Endpoint", () => {
           value: '"The capital of France is Paris."',
         },
       ],
+      contexts: [
+        { id: "context-1", content: "France is a country in Europe." },
+        { id: "context-2", content: "Paris is the capital of France." },
+      ],
       project_id: projectId,
+    });
+  });
+
+  test("should insert text-only RAG contexts too for backwards-compatibility", async () => {
+    const traceId = "trace_test-trace_J5m9g-0JDMbcJqLK2";
+    const ragSpan: RAGSpan = {
+      type: "rag",
+      id: "span_V1StGXR8_Z5jdHi6B-myE",
+      trace_id: traceId,
+      contexts: [
+        "France is a country in Europe.",
+        "Paris is the capital of France.",
+      ] as any,
+      outputs: [],
+      timestamps: sampleSpan.timestamps,
+    };
+    const llmSpan: LLMSpan = {
+      ...sampleSpan,
+      id: "span_V1StGXR8_Z5jdHi6B-myF",
+      parent_id: ragSpan.id,
+      trace_id: traceId,
+      input: {
+        type: "chat_messages",
+        value: [
+          { role: "system", content: "you are a helpful assistant" },
+          { role: "user", content: "What is the capital of France?" },
+        ],
+      },
+      outputs: [
+        {
+          type: "chat_messages",
+          value: [
+            { role: "assistant", content: "The capital of France is Paris." },
+          ],
+        },
+      ],
+    };
+
+    const traceData: CollectorRESTParams = {
+      trace_id: traceId,
+      spans: [llmSpan, ragSpan],
+    };
+
+    const { req, res }: { req: NextApiRequest; res: NextApiResponse } =
+      createMocks({
+        method: "POST",
+        headers: {
+          "X-Auth-Token": "test-auth-token",
+        },
+        body: traceData,
+      });
+
+    await handler(req, res);
+    expect(res.statusCode).toBe(200);
+
+    const indexedRagSpan = await esClient.getSource<ElasticSearchSpan>({
+      index: SPAN_INDEX,
+      id: ragSpan.id,
+    });
+
+    expect(indexedRagSpan).toMatchObject({
+      contexts: [
+        { id: expect.any(String), content: '"France is a country in Europe."' },
+        {
+          id: expect.any(String),
+          content: '"Paris is the capital of France."',
+        },
+      ],
     });
   });
 

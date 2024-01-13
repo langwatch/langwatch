@@ -18,7 +18,10 @@ import {
   spanValidatorSchema,
 } from "../../server/tracer/types.generated";
 import { getDebugger } from "../../utils/logger";
-import { addInputAndOutputForRAGs } from "./collector/rag";
+import {
+  addInputAndOutputForRAGs,
+  maybeAddIdsToContextList,
+} from "./collector/rag";
 import {
   getSearchEmbeddings,
   getTraceInput,
@@ -89,6 +92,20 @@ export default async function handler(
     if (typeof span.outputs === "undefined") {
       span.outputs = [];
     }
+    if ("contexts" in span) {
+      // Keep retrocompatibility of RAG as a simple string list
+      span.contexts = maybeAddIdsToContextList(span.contexts);
+      // Allow number ids
+      span.contexts = span.contexts.map((context) => ({
+        ...context,
+        ...(typeof context.document_id === "number"
+          ? { document_id: `${context.document_id as number}` }
+          : {}),
+        ...(typeof context.chunk_id === "number"
+          ? { chunk_id: `${context.chunk_id as number}` }
+          : {}),
+      }));
+    }
   });
 
   const traceId = nullableTraceId ?? spans[0]?.trace_id;
@@ -113,7 +130,10 @@ export default async function handler(
       (span.timestamps.first_token_at &&
         span.timestamps.first_token_at.toString().length === 10)
     ) {
-      return res.status(400).json({ error: "Timestamps should be in milliseconds not in seconds, please multiply it by 1000" });
+      return res.status(400).json({
+        error:
+          "Timestamps should be in milliseconds not in seconds, please multiply it by 1000",
+      });
     }
   }
 

@@ -112,9 +112,15 @@ export interface LLMSpan extends BaseSpan {
   metrics: SpanMetrics;
 }
 
+export interface RAGChunk {
+  document_id: string;
+  chunk_id?: string | null;
+  content: string | Record<string, any> | any[];
+}
+
 export interface RAGSpan extends BaseSpan {
   type: "rag";
-  contexts: string[];
+  contexts: RAGChunk[];
 }
 
 export type Span = LLMSpan | RAGSpan | BaseSpan;

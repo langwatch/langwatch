@@ -997,8 +997,16 @@ data: [DONE]""".split(
             with langwatch.capture_rag(
                 input="What is the capital of France?",
                 contexts=[
-                    "France is a country in Europe.",
-                    "Paris is the capital of France.",
+                    {
+                        "document_id": "doc-1",
+                        "chunk_id": "0",
+                        "content": "France is a country in Europe.",
+                    },
+                    {
+                        "document_id": "doc-2",
+                        "chunk_id": "0",
+                        "content": "Paris is the capital of France.",
+                    },
                 ],
             ):
                 response = client.chat.completions.create(
@@ -1015,8 +1023,16 @@ data: [DONE]""".split(
         assert rag_span["type"] == "rag"
         assert rag_span["input"]["value"] == "What is the capital of France?"
         assert rag_span["contexts"] == [
-            "France is a country in Europe.",
-            "Paris is the capital of France.",
+            {
+                "document_id": "doc-1",
+                "chunk_id": "0",
+                "content": "France is a country in Europe.",
+            },
+            {
+                "document_id": "doc-2",
+                "chunk_id": "0",
+                "content": "Paris is the capital of France.",
+            },
         ]
 
         assert llm_span["type"] == "llm"

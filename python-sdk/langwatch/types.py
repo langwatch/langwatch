@@ -107,6 +107,12 @@ class LLMSpan(TypedDict, total=False):
     timestamps: SpanTimestamps
 
 
+class RAGChunk(TypedDict, total=False):
+    document_id: str
+    chunk_id: Optional[str]
+    content: Union[str, dict, list]
+
+
 class RAGSpan(TypedDict, total=False):
     type: Literal["rag"]
     name: Optional[str]
@@ -117,7 +123,7 @@ class RAGSpan(TypedDict, total=False):
     outputs: List[SpanOutput]
     error: Optional[ErrorCapture]
     timestamps: SpanTimestamps
-    contexts: List[str]
+    contexts: List[RAGChunk]
 
 
 Span = Union[LLMSpan, RAGSpan, BaseSpan]

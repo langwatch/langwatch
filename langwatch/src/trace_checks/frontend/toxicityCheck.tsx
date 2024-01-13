@@ -4,7 +4,9 @@ import type { ModerationResult } from "../types";
 
 export function ToxicityCheck({ check }: { check: TraceCheck }) {
   const moderationResult = check.raw_result as ModerationResult;
-  const categories = moderationResult.results[0]?.categories;
+  const categories = moderationResult.categoriesAnalysis
+    .filter((result) => result.severity > 0)
+    .map((result) => result.category);
 
   return (
     <Box>

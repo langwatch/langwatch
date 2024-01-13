@@ -369,11 +369,17 @@ export function SpanTree() {
                     <RenderInputOutput
                       value={JSON.stringify(
                         span.contexts.map((context) => {
-                          try {
-                            return JSON.parse(context);
-                          } catch (_) {
-                            return context;
+                          if (typeof context.content === "string") {
+                            try {
+                              return {
+                                ...context,
+                                content: JSON.parse(context.content),
+                              };
+                            } catch (_) {
+                              return context;
+                            }
                           }
+                          return context;
                         })
                       )}
                     />

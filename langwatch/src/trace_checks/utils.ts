@@ -3,6 +3,7 @@ import {
   organizeSpansIntoTree,
   typedValueToText,
 } from "../pages/api/collector/common";
+import { extractRAGTextualContext } from "../pages/api/collector/rag";
 import type {
   ElasticSearchSpan,
   Span,
@@ -10,7 +11,9 @@ import type {
   SpanOutput,
 } from "../server/tracer/types";
 
-export const getRAGInfo = (spans: ElasticSearchSpan[]) => {
+export const getRAGInfo = (
+  spans: ElasticSearchSpan[]
+): { input: string; output: string; contexts: string[] } => {
   const sortedSpans = flattenSpanTree(
     organizeSpansIntoTree(spans as Span[]),
     "inside-out"
@@ -22,7 +25,7 @@ export const getRAGInfo = (spans: ElasticSearchSpan[]) => {
     throw new Error("No 'rag' type span available");
   }
 
-  const contexts = lastRagSpan.contexts ?? [];
+  const contexts = extractRAGTextualContext(lastRagSpan.contexts ?? []);
   if (!lastRagSpan) {
     throw new Error("RAG span does not have contexts");
   }

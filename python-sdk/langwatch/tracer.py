@@ -11,6 +11,7 @@ import requests
 from langwatch.types import (
     BaseSpan,
     ErrorCapture,
+    RAGChunk,
     RAGSpan,
     Span,
     SpanTimestamps,
@@ -102,14 +103,14 @@ class ContextSpan:
 
 
 class ContextRAGSpan(ContextSpan):
-    contexts: List[str]
+    contexts: List[RAGChunk]
 
     def __init__(
         self,
         id: str,
         name: Optional[str],
         input: Any = None,
-        contexts: List[str] = [],
+        contexts: List[RAGChunk] = [],
     ) -> None:
         super().__init__(id, name, type="rag", input=input)
         self.contexts = contexts
@@ -135,7 +136,7 @@ def create_span(
     )
 
 
-def capture_rag(contexts: List[str], input: Optional[str] = None, name: str = "RetrievalAugmentedGeneration"):
+def capture_rag(contexts: List[RAGChunk], input: Optional[str] = None, name: str = "RetrievalAugmentedGeneration"):
     return ContextRAGSpan(
         id=f"span_{nanoid.generate()}", name=name, input=input, contexts=contexts
     )
