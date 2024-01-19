@@ -1,13 +1,13 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { getServerAuthSession } from "../../../../langwatch/langwatch/src/server/auth";
 import { prisma } from "../../../../langwatch/langwatch/src/server/db";
-import { isAdmin } from "../../../utils/isAdmin";
+import { getNextAuthSessionToken, isAdmin } from "../../../utils/auth";
 
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
-  const sessionToken = req.cookies["next-auth.session-token"];
+  const sessionToken = getNextAuthSessionToken(req);
   const session = await getServerAuthSession({ req, res });
   const user = (session?.user as any).impersonator
     ? (session?.user as any).impersonator

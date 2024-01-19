@@ -1,7 +1,7 @@
 import { type GetServerSidePropsContext, type NextPage } from "next";
 import { getSession } from "next-auth/react";
 import dynamic from "next/dynamic";
-import { isAdmin } from "../../utils/isAdmin";
+import { isAdmin } from "../../utils/auth";
 
 const AdminApp = dynamic(() => import("../../components/AdminApp"), {
   ssr: false,

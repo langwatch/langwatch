@@ -2,7 +2,7 @@ import { defaultHandler } from "ra-data-simple-prisma";
 import { prisma } from "../../../../langwatch/langwatch/src/server/db";
 import type { NextApiRequest, NextApiResponse } from "next";
 import { getServerAuthSession } from "../../../../langwatch/langwatch/src/server/auth";
-import { isAdmin } from "../../../utils/isAdmin";
+import { isAdmin } from "../../../utils/auth";
 
 export default async function handler(
   req: NextApiRequest,

@@ -2,13 +2,14 @@ import type { Dependencies } from "../../langwatch/langwatch/src/injection/injec
 import { prisma } from "../../langwatch/langwatch/src/server/db";
 import { getServerSideProps as adminGetServerSideProps } from "../pages/admin";
 import { SubscriptionHandlerSass } from "../subscriptionHandler";
-import { isAdmin } from "../utils/isAdmin";
+import { getNextAuthSessionToken, isAdmin } from "../utils/auth";
 import adminResource from "../pages/extra_api/admin/[resource]";
 import impersonate from "../pages/extra_api/admin/impersonate";
 
 const dependencies: Dependencies = {
   subscriptionHandler: SubscriptionHandlerSass,
-  sessionHandler: async ({ session, user, sessionToken }) => {
+  sessionHandler: async ({ req, session, user }) => {
+    const sessionToken = getNextAuthSessionToken(req);
     if (!isAdmin(user) || !sessionToken) return null;
 
     const dbSession = await prisma.session.findUnique({
