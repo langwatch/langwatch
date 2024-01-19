@@ -44,6 +44,7 @@ import { findCurrentRoute, projectRoutes, type Route } from "../utils/routes";
 import { LoadingScreen } from "./LoadingScreen";
 import { ProjectTechStackIcon } from "./TechStack";
 import { LogoIcon } from "./icons/LogoIcon";
+import { dependencies } from "../injection/dependencies.client";
 
 const Breadcrumbs = ({ currentRoute }: { currentRoute: Route | undefined }) => {
   const { project } = useOrganizationTeamProject();
@@ -372,7 +373,8 @@ export const DashboardLayout = ({
               />
             </MenuButton>
             <Portal>
-              <MenuList>
+              <MenuList zIndex="popover">
+                {dependencies.ExtraMenuItems && <dependencies.ExtraMenuItems />}
                 <MenuItem
                   onClick={() =>
                     void signOut({ callbackUrl: window.location.origin })

@@ -63,8 +63,45 @@ import { useAnalyticsParams } from "../../hooks/useAnalyticsParams";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
 import { LLMSummary } from "../../components/analytics/LLMSummary";
+import { useRouter } from "next/router";
+import { dependencies } from "../../injection/dependencies.client";
+import { dependencies as serverDependencies } from "../../injection/dependencies.server";
+import type { GetServerSidePropsContext } from "next";
 
-export default function Index() {
+export default function ProjectRouter() {
+  const router = useRouter();
+
+  const path =
+    "/" +
+    (typeof router.query.project == "string" ? router.query.project : "/");
+
+  const Page = dependencies.extraPagesRoutes?.[path];
+  if (Page) {
+    return <Page />;
+  }
+
+  return Index();
+}
+
+export const getServerSideProps = async (
+  context: GetServerSidePropsContext
+) => {
+  const path =
+    "/" +
+    (typeof context.query.project == "string" ? context.query.project : "/");
+
+  const serverSideProps =
+    serverDependencies.extraPagesGetServerSideProps?.[path];
+  if (serverSideProps) {
+    return serverSideProps(context);
+  }
+
+  return {
+    props: {},
+  };
+};
+
+function Index() {
   const { project } = useOrganizationTeamProject();
   const {
     period: { startDate, endDate },

@@ -9,6 +9,7 @@ import Auth0Provider, { type Auth0Profile } from "next-auth/providers/auth0";
 
 import { env } from "~/env.mjs";
 import { prisma } from "~/server/db";
+import { dependencies } from "../injection/dependencies.server";
 
 /**
  * Module augmentation for `next-auth` types. Allows us to add custom properties to the `session`
@@ -36,9 +37,20 @@ declare module "next-auth" {
  *
  * @see https://next-auth.js.org/configuration/options
  */
-export const authOptions: NextAuthOptions = {
+export const authOptions = (
+  sessionToken: string | undefined
+): NextAuthOptions => ({
   callbacks: {
-    session: ({ session, user }) => {
+    session: async ({ session, user }) => {
+      if (dependencies.sessionHandler) {
+        const newSession = await dependencies.sessionHandler({
+          session,
+          user,
+          sessionToken,
+        });
+        if (newSession) return newSession;
+      }
+
       return {
         ...session,
         user: {
@@ -75,7 +87,7 @@ export const authOptions: NextAuthOptions = {
      * @see https://next-auth.js.org/providers/github
      */
   ],
-};
+});
 
 /**
  * Wrapper for `getServerSession` so that you don't need to import the `authOptions` in every file.
@@ -86,5 +98,6 @@ export const getServerAuthSession = (ctx: {
   req: GetServerSidePropsContext["req"];
   res: GetServerSidePropsContext["res"];
 }) => {
-  return getServerSession(ctx.req, ctx.res, authOptions);
+  const sessionToken = ctx.req.cookies["next-auth.session-token"];
+  return getServerSession(ctx.req, ctx.res, authOptions(sessionToken));
 };
