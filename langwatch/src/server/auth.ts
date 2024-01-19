@@ -1,5 +1,5 @@
 import { PrismaAdapter } from "@next-auth/prisma-adapter";
-import { type GetServerSidePropsContext } from "next";
+import { type GetServerSidePropsContext, type NextApiRequest } from "next";
 import {
   getServerSession,
   type DefaultSession,
@@ -38,15 +38,15 @@ declare module "next-auth" {
  * @see https://next-auth.js.org/configuration/options
  */
 export const authOptions = (
-  sessionToken: string | undefined
+  req: NextApiRequest | GetServerSidePropsContext["req"]
 ): NextAuthOptions => ({
   callbacks: {
     session: async ({ session, user }) => {
       if (dependencies.sessionHandler) {
         const newSession = await dependencies.sessionHandler({
+          req,
           session,
           user,
-          sessionToken,
         });
         if (newSession) return newSession;
       }
@@ -98,6 +98,5 @@ export const getServerAuthSession = (ctx: {
   req: GetServerSidePropsContext["req"];
   res: GetServerSidePropsContext["res"];
 }) => {
-  const sessionToken = ctx.req.cookies["next-auth.session-token"];
-  return getServerSession(ctx.req, ctx.res, authOptions(sessionToken));
+  return getServerSession(ctx.req, ctx.res, authOptions(ctx.req));
 };

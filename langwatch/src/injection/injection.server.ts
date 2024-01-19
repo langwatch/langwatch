@@ -9,9 +9,9 @@ import type {
 export interface Dependencies {
   subscriptionHandler: typeof SubscriptionHandler;
   sessionHandler?: (params: {
+    req: NextApiRequest | GetServerSidePropsContext["req"];
     session: any;
     user: any;
-    sessionToken: string | undefined;
   }) => Awaitable<DefaultSession | Session | null>;
   extraPagesGetServerSideProps?: Record<
     string,
@@ -19,7 +19,10 @@ export interface Dependencies {
   >;
   extraApiRoutes?: Record<
     string,
-    (req: NextApiRequest, res: NextApiResponse) => Promise<void | NextApiResponse<any>>
+    (
+      req: NextApiRequest,
+      res: NextApiResponse
+    ) => Promise<void | NextApiResponse<any>>
   >;
 }
 
