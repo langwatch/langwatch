@@ -17,7 +17,10 @@
     "@prisma/client": "^5.6.0",
     "dotenv": "^16.3.1",
     "next": "13.4.19",
-    "react": "^18.2.0"
+    "next-auth": "^4.24.5",
+    "ra-data-simple-prisma": "^3.1.2",
+    "react": "^18.2.0",
+    "react-admin": "^4.16.6"
   },
   "devDependencies": {
     "@types/react": "^18.2.45",

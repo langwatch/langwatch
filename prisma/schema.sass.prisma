@@ -1,6 +1,11 @@
 @include "../langwatch/langwatch/prisma/schema.prisma"
 
 @extends
+model Session {
+  impersonating Json?
+}
+
+@extends
 model Organization {
   stripeCustomerId String?        @unique
   subscriptions    Subscription[]
