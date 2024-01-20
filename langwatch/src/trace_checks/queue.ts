@@ -155,10 +155,29 @@ export const scheduleTopicClustering = async () => {
         jobId: `topic_clustering_${project.id}_${yyyymmdd}`,
         delay:
           distributionHour * 60 * 60 * 1000 + distributionMinute * 60 * 1000,
-        attempts: 5,
+        attempts: 3,
       },
     };
   });
 
   await topicClusteringQueue.addBulk(jobs);
+};
+
+export const scheduleTopicClusteringNextPage = async (
+  projectId: string,
+  searchAfter: [number, string]
+) => {
+  const yyyymmdd = new Date().toISOString().split("T")[0];
+
+  await topicClusteringQueue.add(
+    "topic_clustering",
+    { project_id: projectId, search_after: searchAfter },
+    {
+      jobId: `topic_clustering_${projectId}_${yyyymmdd}_${searchAfter.join(
+        "_"
+      )}`,
+      delay: 1000,
+      attempts: 3,
+    }
+  );
 };

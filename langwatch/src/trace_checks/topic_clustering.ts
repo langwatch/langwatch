@@ -3,16 +3,43 @@ import type { Trace } from "../server/tracer/types";
 import { TRACE_INDEX, esClient } from "../server/elasticsearch";
 import { getDebugger } from "../utils/logger";
 import type { Money } from "../utils/types";
+import http2 from "http2";
+import FormData from "form-data";
 import { prisma } from "../server/db";
 import { nanoid } from "nanoid";
 import { CostReferenceType, CostType } from "@prisma/client";
+import { scheduleTopicClusteringNextPage } from "./queue";
 
 const debug = getDebugger("langwatch:topicClustering");
 
 export const clusterTopicsForProject = async (
-  projectId: string
+  projectId: string,
+  searchAfter?: [number, string]
 ): Promise<void> => {
-  // Fetch last 10k traces for the project in last 3 months, with only id, input fields and their topics
+  const tracesCount = await esClient.count({
+    index: TRACE_INDEX,
+    body: {
+      query: {
+        term: {
+          project_id: projectId,
+        },
+      },
+    },
+  });
+
+  // We do not re-cluster the messages unless there is less than 1k because that would be very little to settle on clusters
+  let presenceCondition = {};
+  if (tracesCount.count > 1000) {
+    presenceCondition = {
+      must_not: {
+        exists: {
+          field: "topics",
+        },
+      },
+    };
+  }
+
+  // Fetch last 500 traces that were not classified in last 3 months, sorted and paginated, with only id, input fields and their topics
   const result = await esClient.search<Trace>({
     index: TRACE_INDEX,
     body: {
@@ -32,10 +59,13 @@ export const clusterTopicsForProject = async (
               },
             },
           ],
+          ...presenceCondition,
         },
       },
-      _source: ["id", "input", "topics"],
-      size: 10000,
+      _source: ["id", "input"],
+      sort: [{ "timestamps.inserted_at": "desc" }, { id: "asc" }],
+      ...(searchAfter ? { search_after: searchAfter } : {}),
+      size: 500,
     },
   });
 
@@ -52,9 +82,55 @@ export const clusterTopicsForProject = async (
     return;
   }
 
+  await clusterTraces(projectId, traces);
+
+  // If results are not close to empty, schedule the seek for next page
+  if (result.hits.hits.length > 10) {
+    const lastTraceSort = result.hits.hits.reverse()[0]?.sort as
+      | [number, string]
+      | undefined;
+    if (lastTraceSort) {
+      debug(
+        "Scheduling the next page for clustering for project",
+        projectId,
+        "next page",
+        lastTraceSort
+      );
+      await scheduleTopicClusteringNextPage(projectId, lastTraceSort);
+    }
+  }
+
+  debug("Done! Project", projectId);
+};
+
+export const clusterTraces = async (projectId: string, traces: Trace[]) => {
+  const topicsAgg = await esClient.search({
+    index: TRACE_INDEX,
+    body: {
+      size: 0, // We don't need the actual documents, just the aggregation
+      query: {
+        term: {
+          project_id: projectId,
+        },
+      },
+      aggs: {
+        unique_topics: {
+          terms: {
+            field: "topics",
+            size: 10000,
+          },
+        },
+      },
+    },
+  });
+
+  const existingTopics = (
+    topicsAgg.aggregations?.unique_topics as any
+  )?.buckets.map((bucket: any) => bucket.key);
+
   debug("Clustering topics for", traces.length, "traces on project", projectId);
-  const clusteringResult = await clusterTopicsForTraces({
-    topics: traces.flatMap((trace) => trace.topics ?? []),
+  const clusteringResult = await clusterTopicsForTraces(projectId, {
+    topics: existingTopics,
     file: traces
       .map((trace) => ({
         _source: {
@@ -107,8 +183,6 @@ export const clusterTopicsForProject = async (
       },
     });
   }
-
-  debug("Done! Project", projectId);
 };
 
 export type TopicClusteringParams = {
@@ -122,6 +196,7 @@ type ClusteringResult = {
 };
 
 export const clusterTopicsForTraces = async (
+  projectId: string,
   params: TopicClusteringParams
 ): Promise<ClusteringResult | undefined> => {
   if (!env.LANGWATCH_GUARDRAILS_SERVICE) {
@@ -134,23 +209,71 @@ export const clusterTopicsForTraces = async (
   const formData = new FormData();
   formData.append("categories", params.topics.join(",") || " ");
 
-  const file = new File(
-    [params.file.map((line) => JSON.stringify(line)).join("\n")],
-    "traces.jsonl",
-    { type: "application/jsonl" }
+  const fileContent = params.file
+    .map((line) => JSON.stringify(line))
+    .join("\n");
+  debug(
+    "Uploading",
+    fileContent.length / 125000,
+    "mb of traces data for project",
+    projectId
   );
-  formData.append("file", file);
 
-  const response = await fetch(`${env.LANGWATCH_GUARDRAILS_SERVICE}/topics`, {
-    method: "POST",
-    body: formData,
+  const buffer = Buffer.from(fileContent);
+  formData.append("file", buffer, {
+    filename: "traces.jsonl",
+    contentType: "application/jsonl",
   });
-  if (!response.ok) {
-    throw new Error(
-      `TopicClustering service returned error: ${await response.text()}`
-    );
-  }
-  const result: ClusteringResult = await response.json();
 
-  return result;
+  const headers = Object.assign({}, formData.getHeaders(), {
+    ":method": "POST",
+    ":path": "/topics",
+  });
+
+  // HTTP/2 on Google Cloud Run has no payload limit, where HTTP/1.1 has a 32mb limit
+  // which we cannot increase, so here we have to force HTTP/2 to be used
+  // Create an HTTP/2 client
+  const client = http2.connect(env.LANGWATCH_GUARDRAILS_SERVICE);
+
+  // Convert FormData to a readable stream
+  const formBuffer = formData.getBuffer();
+  const req = client.request(headers);
+  req.end(formBuffer);
+
+  return await new Promise((resolve, reject) => {
+    let status: string | undefined;
+    req.on("response", (headers, _flags) => {
+      status = headers[":status"]?.toString();
+    });
+
+    req.setEncoding("utf8");
+    let data = "";
+    req.on("data", (chunk) => {
+      data += chunk;
+    });
+
+    req.on("error", (err) => {
+      reject(err);
+    });
+
+    req.on("end", () => {
+      client.close();
+      if (
+        status &&
+        (parseInt(status, 10) < 200 || parseInt(status, 10) > 299)
+      ) {
+        reject(
+          new Error(`TopicClustering service returned error: ${status} ${data}`)
+        );
+        return;
+      }
+
+      try {
+        const result: ClusteringResult = JSON.parse(data);
+        resolve(result);
+      } catch (err) {
+        reject(err);
+      }
+    });
+  });
 };

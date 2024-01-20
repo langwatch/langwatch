@@ -45,7 +45,7 @@ describe("Topic Clustering Integration Test", () => {
       );
     }
 
-    const topics = await clusterTopicsForTraces({ topics: [], file: traces });
+    const topics = await clusterTopicsForTraces("project_id", { topics: [], file: traces });
 
     expect(topics).toEqual({
       costs: {

@@ -140,7 +140,7 @@ export const start = (
       async (job) => {
         debug(`Processing job ${job.id} with data:`, job.data);
 
-        await clusterTopicsForProject(job.data.project_id);
+        await clusterTopicsForProject(job.data.project_id, job.data.search_after);
       },
       {
         connection,

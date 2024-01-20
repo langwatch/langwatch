@@ -23,10 +23,10 @@ export type Checks = {
   toxicity_check: {
     parameters: {
       categories: {
-        hate: boolean,
-        selfHarm: boolean,
-        sexual: boolean,
-        violence: boolean,
+        hate: boolean;
+        selfHarm: boolean;
+        sexual: boolean;
+        violence: boolean;
       };
     };
   };
@@ -70,6 +70,7 @@ export type TraceCheckJob = {
 
 export type TopicClusteringJob = {
   project_id: string;
+  search_after?: [number, string];
 };
 
 // Zod type will not be generated for this one, check ts-to-zod.config.js
@@ -95,7 +96,7 @@ export type TraceCheckDefinition<T extends CheckTypes> = {
 };
 
 // API Types
-export type ModerationCategories = "Hate" | "SelfHarm" | "Sexual" | "Violence"
+export type ModerationCategories = "Hate" | "SelfHarm" | "Sexual" | "Violence";
 
 export type ModerationResult = {
   categoriesAnalysis: ModerationResultEntry[];
