@@ -25,7 +25,7 @@ import { useOrganizationTeamProject } from "../../../../hooks/useOrganizationTea
 import { DashboardLayout } from "../../../../components/DashboardLayout";
 import { MoreVertical } from "react-feather";
 
-export default function EditCheck() {
+export default function EditTraceCheck() {
   const { project } = useOrganizationTeamProject();
   const router = useRouter();
   const toast = useToast();

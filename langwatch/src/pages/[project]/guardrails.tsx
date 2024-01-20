@@ -107,7 +107,7 @@ export default function Checks() {
             <Button
               colorScheme="orange"
               as={NextLink}
-              href={`/${project.slug}/guardrails/new`}
+              href={`/${project.slug}/guardrails/new/choose`}
               minWidth="fit-content"
             >
               + Add Check

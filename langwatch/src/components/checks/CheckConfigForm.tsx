@@ -47,6 +47,7 @@ import {
   AVAILABLE_TRACE_CHECKS,
   getTraceCheckDefinitions,
 } from "../../trace_checks/registry";
+import { useRouter } from "next/router";
 
 export interface CheckConfigFormData {
   name: string;
@@ -103,8 +104,19 @@ export default function CheckConfigForm({
     control,
     name: "preconditions",
   });
-
   const check = checkType && getTraceCheckDefinitions(checkType);
+
+  const router = useRouter();
+  const isChoosing = router.pathname.endsWith("/choose");
+
+  useEffect(() => {
+    if (!checkType && !isChoosing) {
+      void router.replace({
+        pathname: router.pathname + "/choose",
+        query: router.query,
+      });
+    }
+  }, [checkType, isChoosing, router]);
 
   useEffect(() => {
     if (defaultValues?.parameters && defaultValues.checkType === checkType)
@@ -173,7 +185,7 @@ export default function CheckConfigForm({
     <FormProvider {...form}>
       {/* eslint-disable-next-line @typescript-eslint/no-misused-promises */}
       <form onSubmit={handleSubmit(onSubmit)} style={{ width: "100%" }}>
-        {!checkType ? (
+        {!checkType || isChoosing ? (
           <Grid templateColumns="repeat(3, 1fr)" gap={6}>
             {Object.entries(AVAILABLE_TRACE_CHECKS).map(([key, check]) => (
               <GridItem
@@ -190,6 +202,10 @@ export default function CheckConfigForm({
                 }}
                 onClick={() => {
                   form.setValue("checkType", key as CheckTypes);
+                  void router.push({
+                    pathname: router.pathname.replace("/choose", ""),
+                    query: router.query,
+                  });
                 }}
               >
                 <VStack align="start" spacing={4}>
@@ -215,7 +231,10 @@ export default function CheckConfigForm({
                     <Button
                       variant="link"
                       onClick={() => {
-                        form.setValue("checkType", undefined);
+                        void router.push({
+                          pathname: router.pathname + "/choose",
+                          query: router.query,
+                        });
                       }}
                       marginLeft={4}
                       fontWeight="normal"

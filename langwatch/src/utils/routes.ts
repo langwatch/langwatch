@@ -15,9 +15,19 @@ export const projectRoutes = {
     path: "/[project]/guardrails",
     title: "Checks",
   },
+  checks_new_choose: {
+    path: "/[project]/guardrails/new/choose",
+    title: "New Check",
+    parent: "checks",
+  },
   checks_new: {
     path: "/[project]/guardrails/new",
     title: "New Check",
+    parent: "checks",
+  },
+  checks_edit_choose: {
+    path: "/[project]/guardrails/[id]/edit/choose",
+    title: "Editing Check",
     parent: "checks",
   },
   checks_edit: {
