@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "dev": "NODE_ENV=development node server.js",
+    "dev": "NODE_ENV=development DEBUG=langwatch:* node server.js",
     "build": "export DEPENDENCY_INJECTION_DIR=$(pwd)/src/injection/; export EXTRA_INCLUDE=$(pwd)/src; cp .env langwatch/langwatch/; cd langwatch/langwatch; npm run build",
     "start": "next start",
     "preinstall": "git submodule update --init",
