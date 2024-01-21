@@ -15,7 +15,7 @@ LangWatch provides a suite of tools to track, visualize, and analyze interaction
 - ✨ **Easier \~Vibe Checking\~**: A clean, friendly interface focused on usability with automatic topic clustering, so you can deep dive on the messages being generated and really get a deep understanding of how your LLM is behaving, finding insights to iterate.
 - 🚀 **User Analytics**: Metrics on engagement, user interactions and more insights into users behaviour so you can improve your product.
 - 🐛 **Detailed Debugging**: Capture every step in the chain of your LLM calls, with all metadata and history, grouping by threads and user for easy troubleshooting and reproduction.
-- 🛡️ **Guardrails**: Detect PII leak with Google DLP, toxic language with OpenAI Moderation and many others LangWatch Guardrails available to monitor your LLM outputs and trigger alerts. Build custom Guardrails yourself with semantic matching or another LLM on top evaluating the response.
+- 🛡️ **Guardrails**: Detect PII leak with Google DLP, toxic language with Azure Moderation and many others LangWatch Guardrails available to monitor your LLM outputs and trigger alerts. Build custom Guardrails yourself with semantic matching or another LLM on top evaluating the response.
 
 ## Quickstart
 

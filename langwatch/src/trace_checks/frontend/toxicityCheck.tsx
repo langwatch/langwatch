@@ -8,15 +8,19 @@ export function ToxicityCheck({ check }: { check: TraceCheck }) {
     return <Box>Moderation Result did not load</Box>;
   }
 
-  const categories = moderationResult.categoriesAnalysis
-    .filter((result) => result.severity > 0)
-    .map((result) => result.category);
+  const detectedCategories = moderationResult.categoriesAnalysis.filter(
+    (result) => result.severity > 0
+  );
 
   return (
     <Box>
-      {categories && Object.entries(categories).some(([_, value]) => value)
-        ? Object.entries(categories).map(([category, value]) =>
-            value ? <Text key={category}>Flagged for {category}</Text> : null
+      {detectedCategories.length > 0
+        ? detectedCategories.map((result) =>
+            result ? (
+              <Text key={result.category}>
+                Flagged for {result.category} (severity {result.severity})
+              </Text>
+            ) : null
           )
         : "No issues detected"}
     </Box>
