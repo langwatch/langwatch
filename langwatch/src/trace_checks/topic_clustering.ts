@@ -152,18 +152,22 @@ export const clusterTraces = async (projectId: string, traces: Trace[]) => {
     Object.keys(topics).length,
     "traces for project",
     projectId,
-    "- Updating ElasticSearch"
+    Object.keys(topics).length > 0
+      ? "- Updating ElasticSearch"
+      : "- Skipping ElasticSearch update"
   );
   const body = Object.entries(topics).flatMap(([traceId, topic]) => [
     { update: { _id: traceId } },
     { doc: { topics: [topic] } },
   ]);
 
-  await esClient.bulk({
-    index: TRACE_INDEX,
-    refresh: true,
-    body,
-  });
+  if (body.length > 0) {
+    await esClient.bulk({
+      index: TRACE_INDEX,
+      refresh: true,
+      body,
+    });
+  }
 
   if (cost) {
     await prisma.cost.create({
