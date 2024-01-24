@@ -12,6 +12,7 @@ const TASKS = {
   elasticIndexCreate: require("./tasks/elasticIndexCreate"),
   populateEmbeddings: require("./tasks/populateEmbeddings"),
   elasticReindex: require("./tasks/elasticReindex"),
+  clearTopics: require("./tasks/clearTopics"),
 };
 
 const args = process.argv.slice(2);

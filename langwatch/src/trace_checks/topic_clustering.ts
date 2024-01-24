@@ -39,7 +39,7 @@ export const clusterTopicsForProject = async (
     };
   }
 
-  // Fetch last 500 traces that were not classified in last 3 months, sorted and paginated, with only id, input fields and their topics
+  // Fetch last 1000 traces that were not classified in last 3 months, sorted and paginated, with only id, input fields and their topics
   const result = await esClient.search<Trace>({
     index: TRACE_INDEX,
     body: {
@@ -63,9 +63,9 @@ export const clusterTopicsForProject = async (
         },
       },
       _source: ["id", "input"],
-      sort: [{ "timestamps.inserted_at": "desc" }, { id: "asc" }],
+      sort: [{ "timestamps.inserted_at": "asc" }, { id: "asc" }],
       ...(searchAfter ? { search_after: searchAfter } : {}),
-      size: 500,
+      size: 1000,
     },
   });
 
