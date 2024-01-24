@@ -54,7 +54,7 @@ function SettingsForm({
 
       updateOrganization.mutate(
         {
-          id: organization.id,
+          organizationId: organization.id,
           name: data.name,
         },
         {

@@ -1,6 +1,6 @@
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { TRACE_CHECKS_INDEX, TRACE_INDEX, esClient } from "../../elasticsearch";
-import { checkUserPermissionForProject } from "../permission";
+import { TeamRoleGroup, checkUserPermissionForProject } from "../permission";
 import {
   sharedAnalyticsFilterInput,
   generateTraceQueryConditions,
@@ -50,7 +50,7 @@ export const analyticsRouter = createTRPCRouter({
   tokensSumAggregated,
   getSummaryMetrics: protectedProcedure
     .input(sharedAnalyticsFilterInput)
-    .use(checkUserPermissionForProject)
+    .use(checkUserPermissionForProject(TeamRoleGroup.ANALYTICS_VIEW))
     .query(async ({ input }) => {
       const { previousPeriodStartDate } = currentVsPreviousDates(input);
 
@@ -124,7 +124,7 @@ export const analyticsRouter = createTRPCRouter({
     }),
   getTraceCheckStatusCounts: protectedProcedure
     .input(sharedAnalyticsFilterInput)
-    .use(checkUserPermissionForProject)
+    .use(checkUserPermissionForProject(TeamRoleGroup.ANALYTICS_VIEW))
     .query(async ({ input }) => {
       const result = await esClient.search({
         index: TRACE_CHECKS_INDEX,

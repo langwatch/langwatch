@@ -1,5 +1,5 @@
 import { TRACE_INDEX, esClient } from "../../../elasticsearch";
-import { checkUserPermissionForProject } from "../../permission";
+import { TeamRoleGroup, checkUserPermissionForProject } from "../../permission";
 import { protectedProcedure } from "../../trpc";
 import {
   currentVsPreviousDates,
@@ -9,7 +9,7 @@ import {
 
 export const sessionsVsPreviousPeriod = protectedProcedure
   .input(sharedAnalyticsFilterInput)
-  .use(checkUserPermissionForProject)
+  .use(checkUserPermissionForProject(TeamRoleGroup.ANALYTICS_VIEW))
   .query(async ({ input }) => {
     const { previousPeriodStartDate } = currentVsPreviousDates(input);
 

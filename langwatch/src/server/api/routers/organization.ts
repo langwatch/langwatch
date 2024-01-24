@@ -14,6 +14,12 @@ import slugify from "slugify";
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { sendInviteEmail } from "../../mailer/inviteEmail";
+import {
+  OrganizationRoleGroup,
+  TeamRoleGroup,
+  checkUserPermissionForOrganization,
+  checkUserPermissionForTeam,
+} from "../permission";
 
 export type TeamWithProjects = Team & {
   projects: Project[];
@@ -142,9 +148,14 @@ export const organizationRouter = createTRPCRouter({
   update: protectedProcedure
     .input(
       z.object({
-        id: z.string(),
+        organizationId: z.string(),
         name: z.string(),
       })
+    )
+    .use(
+      checkUserPermissionForOrganization(
+        OrganizationRoleGroup.ORGANIZATION_MANAGE
+      )
     )
     .mutation(async ({ input, ctx }) => {
       const userId = ctx.session.user.id;
@@ -153,7 +164,7 @@ export const organizationRouter = createTRPCRouter({
       const organizationUser = await prisma.organizationUser.findFirst({
         where: {
           userId: userId,
-          organizationId: input.id,
+          organizationId: input.organizationId,
           role: "ADMIN",
         },
       });
@@ -167,7 +178,7 @@ export const organizationRouter = createTRPCRouter({
 
       await prisma.organization.update({
         where: {
-          id: input.id,
+          id: input.organizationId,
         },
         data: {
           name: input.name,
@@ -180,8 +191,13 @@ export const organizationRouter = createTRPCRouter({
   getOrganizationWithMembersAndTheirTeams: protectedProcedure
     .input(
       z.object({
-        id: z.string(),
+        organizationId: z.string(),
       })
+    )
+    .use(
+      checkUserPermissionForOrganization(
+        OrganizationRoleGroup.ORGANIZATION_VIEW
+      )
     )
     .query(async ({ input, ctx }) => {
       const userId = ctx.session.user.id;
@@ -189,7 +205,7 @@ export const organizationRouter = createTRPCRouter({
 
       const organization = await prisma.organization.findFirst({
         where: {
-          id: input.id,
+          id: input.organizationId,
           members: {
             some: {
               userId: userId,
@@ -234,6 +250,11 @@ export const organizationRouter = createTRPCRouter({
           })
         ),
       })
+    )
+    .use(
+      checkUserPermissionForOrganization(
+        OrganizationRoleGroup.ORGANIZATION_MANAGE
+      )
     )
     .mutation(async ({ input, ctx }) => {
       const prisma = ctx.prisma;
@@ -323,35 +344,20 @@ export const organizationRouter = createTRPCRouter({
   getOrganizationPendingInvites: protectedProcedure
     .input(
       z.object({
-        id: z.string(),
+        organizationId: z.string(),
       })
+    )
+    .use(
+      checkUserPermissionForOrganization(
+        OrganizationRoleGroup.ORGANIZATION_VIEW
+      )
     )
     .query(async ({ input, ctx }) => {
       const prisma = ctx.prisma;
-      const userId = ctx.session.user.id;
-
-      const organization = await prisma.organization.findFirst({
-        where: {
-          id: input.id,
-          members: {
-            some: {
-              userId: userId,
-              role: "ADMIN",
-            },
-          },
-        },
-      });
-
-      if (!organization) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "You must be an admin to view pending invites.",
-        });
-      }
 
       const invites = await prisma.organizationInvite.findMany({
         where: {
-          organizationId: input.id,
+          organizationId: input.organizationId,
           expiration: { gt: new Date() },
           status: "PENDING",
         },
@@ -436,5 +442,32 @@ export const organizationRouter = createTRPCRouter({
       });
 
       return { success: true, invite };
+    }),
+
+  updateTeamMemberRole: protectedProcedure
+    .input(
+      z.object({
+        teamId: z.string(),
+        userId: z.string(),
+        role: z.nativeEnum(TeamUserRole),
+      })
+    )
+    .use(checkUserPermissionForTeam(TeamRoleGroup.TEAM_MEMBERS_MANAGE))
+    .mutation(async ({ input, ctx }) => {
+      const prisma = ctx.prisma;
+
+      await prisma.teamUser.update({
+        where: {
+          userId_teamId: {
+            userId: input.userId,
+            teamId: input.teamId,
+          },
+        },
+        data: {
+          role: input.role,
+        },
+      });
+
+      return { success: true };
     }),
 });

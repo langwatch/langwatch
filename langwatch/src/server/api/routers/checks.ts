@@ -1,6 +1,6 @@
 import { ZodError, z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
-import { checkUserPermissionForProject } from "../permission";
+import { TeamRoleGroup, checkUserPermissionForProject } from "../permission";
 import slugify from "slugify";
 import { TRPCError } from "@trpc/server";
 import {
@@ -17,7 +17,7 @@ import { nanoid } from "nanoid";
 export const checksRouter = createTRPCRouter({
   getAllForProject: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .use(checkUserPermissionForProject)
+    .use(checkUserPermissionForProject(TeamRoleGroup.GUARDRAILS_VIEW))
     .query(async ({ input, ctx }) => {
       const { projectId } = input;
       const prisma = ctx.prisma;
@@ -33,7 +33,7 @@ export const checksRouter = createTRPCRouter({
     .input(
       z.object({ id: z.string(), projectId: z.string(), enabled: z.boolean() })
     )
-    .use(checkUserPermissionForProject)
+    .use(checkUserPermissionForProject(TeamRoleGroup.GUARDRAILS_MANAGE))
     .mutation(async ({ input, ctx }) => {
       const { id, enabled, projectId } = input;
       const prisma = ctx.prisma;
@@ -56,7 +56,7 @@ export const checksRouter = createTRPCRouter({
         sample: z.number().min(0).max(1),
       })
     )
-    .use(checkUserPermissionForProject)
+    .use(checkUserPermissionForProject(TeamRoleGroup.GUARDRAILS_MANAGE))
     .mutation(async ({ input, ctx }) => {
       const { projectId, name, checkType, preconditions, parameters, sample } =
         input;
@@ -99,7 +99,7 @@ export const checksRouter = createTRPCRouter({
         enabled: z.boolean().optional(),
       })
     )
-    .use(checkUserPermissionForProject)
+    .use(checkUserPermissionForProject(TeamRoleGroup.GUARDRAILS_MANAGE))
     .mutation(async ({ input, ctx }) => {
       const {
         id,
@@ -138,7 +138,7 @@ export const checksRouter = createTRPCRouter({
     }),
   getById: protectedProcedure
     .input(z.object({ id: z.string(), projectId: z.string() }))
-    .use(checkUserPermissionForProject)
+    .use(checkUserPermissionForProject(TeamRoleGroup.GUARDRAILS_VIEW))
     .query(async ({ input, ctx }) => {
       const { id, projectId } = input;
       const prisma = ctx.prisma;
@@ -165,7 +165,7 @@ export const checksRouter = createTRPCRouter({
     }),
   delete: protectedProcedure
     .input(z.object({ id: z.string(), projectId: z.string() }))
-    .use(checkUserPermissionForProject)
+    .use(checkUserPermissionForProject(TeamRoleGroup.GUARDRAILS_MANAGE))
     .mutation(async ({ input, ctx }) => {
       const { id, projectId } = input;
       const prisma = ctx.prisma;

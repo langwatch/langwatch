@@ -1,4 +1,4 @@
-import { checkUserPermissionForProject } from "../../permission";
+import { TeamRoleGroup, checkUserPermissionForProject } from "../../permission";
 import { protectedProcedure } from "../../trpc";
 import {
   currentVsPreviousTracesAggregation,
@@ -9,7 +9,7 @@ import {
 
 export const tokensSumVsPreviousPeriod = protectedProcedure
   .input(sharedAnalyticsFilterInput)
-  .use(checkUserPermissionForProject)
+  .use(checkUserPermissionForProject(TeamRoleGroup.ANALYTICS_VIEW))
   .query(async ({ input }) => {
     return await currentVsPreviousTracesAggregation<{
       prompt_tokens: number;
@@ -27,7 +27,7 @@ export const tokensSumVsPreviousPeriod = protectedProcedure
 
 export const tokensSumAggregated = protectedProcedure
   .input(sharedAnalyticsFilterInputWithAggregations)
-  .use(checkUserPermissionForProject)
+  .use(checkUserPermissionForProject(TeamRoleGroup.ANALYTICS_VIEW))
   .query(async ({ input }) => {
     return await groupedTracesAggregation<{
       prompt_tokens: number;

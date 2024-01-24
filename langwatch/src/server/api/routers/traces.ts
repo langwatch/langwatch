@@ -11,7 +11,7 @@ import {
 } from "../../elasticsearch";
 import { getOpenAIEmbeddings } from "../../embeddings";
 import type { ElasticSearchSpan, Trace, TraceCheck } from "../../tracer/types";
-import { checkUserPermissionForProject } from "../permission";
+import { TeamRoleGroup, checkUserPermissionForProject } from "../permission";
 
 const sharedTraceFilterInput = z.object({
   projectId: z.string(),
@@ -99,7 +99,7 @@ export const tracesRouter = createTRPCRouter({
         topics: z.array(z.string()).optional(),
       })
     )
-    .use(checkUserPermissionForProject)
+    .use(checkUserPermissionForProject(TeamRoleGroup.MESSAGES_VIEW))
     .query(async ({ input }) => {
       const embeddings = input.query
         ? await getOpenAIEmbeddings(input.query)
@@ -199,7 +199,7 @@ export const tracesRouter = createTRPCRouter({
     }),
   getById: protectedProcedure
     .input(z.object({ projectId: z.string(), traceId: z.string() }))
-    .use(checkUserPermissionForProject)
+    .use(checkUserPermissionForProject(TeamRoleGroup.MESSAGES_VIEW))
     .query(async ({ input }) => {
       const result = await esClient.search<Trace>({
         index: TRACE_INDEX,
@@ -232,7 +232,7 @@ export const tracesRouter = createTRPCRouter({
         traceIds: z.array(z.string()),
       })
     )
-    .use(checkUserPermissionForProject)
+    .use(checkUserPermissionForProject(TeamRoleGroup.MESSAGES_VIEW))
     .query(async ({ input }) => {
       const { projectId, traceIds } = input;
 
@@ -273,7 +273,7 @@ export const tracesRouter = createTRPCRouter({
     }),
   getTopicCounts: protectedProcedure
     .input(sharedTraceFilterInput)
-    .use(checkUserPermissionForProject)
+    .use(checkUserPermissionForProject(TeamRoleGroup.MESSAGES_VIEW))
     .query(async ({ input }) => {
       const queryConditions = generateQueryConditions(input);
 
@@ -317,7 +317,7 @@ export const tracesRouter = createTRPCRouter({
         projectId: z.string(),
       })
     )
-    .use(checkUserPermissionForProject)
+    .use(checkUserPermissionForProject(TeamRoleGroup.MESSAGES_VIEW))
     .query(async ({ input }) => {
       const customersLabelsResult = await esClient.search<Trace>({
         index: TRACE_INDEX,
@@ -357,7 +357,7 @@ export const tracesRouter = createTRPCRouter({
     }),
   getTracesByThreadId: protectedProcedure
     .input(z.object({ projectId: z.string(), threadId: z.string() }))
-    .use(checkUserPermissionForProject)
+    .use(checkUserPermissionForProject(TeamRoleGroup.MESSAGES_VIEW))
     .query(async ({ input }) => {
       const { projectId, threadId } = input;
 

@@ -1,4 +1,4 @@
-import { checkUserPermissionForProject } from "../../permission";
+import { TeamRoleGroup, checkUserPermissionForProject } from "../../permission";
 import { protectedProcedure } from "../../trpc";
 import {
   currentVsPreviousSpansAggregation,
@@ -9,7 +9,7 @@ import {
 
 export const llmCallsCountVsPreviousPeriod = protectedProcedure
   .input(sharedAnalyticsFilterInput)
-  .use(checkUserPermissionForProject)
+  .use(checkUserPermissionForProject(TeamRoleGroup.ANALYTICS_VIEW))
   .query(async ({ input }) => {
     return await currentVsPreviousSpansAggregation<{ count: number }>({
       input,
@@ -22,7 +22,7 @@ export const llmCallsCountVsPreviousPeriod = protectedProcedure
 
 export const llmCallsCountAggregated = protectedProcedure
   .input(sharedAnalyticsFilterInputWithAggregations)
-  .use(checkUserPermissionForProject)
+  .use(checkUserPermissionForProject(TeamRoleGroup.ANALYTICS_VIEW))
   .query(async ({ input }) => {
     return await groupedSpansAggregation<{ count: number }>({
       input,

@@ -20,18 +20,29 @@ import {
   Thead,
   Tr,
   VStack,
+  useToast,
 } from "@chakra-ui/react";
 import isEqual from "lodash.isequal";
 import NextLink from "next/link";
 import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
 import { ChevronRight } from "react-feather";
-import { useForm, useWatch, type SubmitHandler } from "react-hook-form";
+import {
+  useForm,
+  useWatch,
+  type SubmitHandler,
+  Controller,
+} from "react-hook-form";
 import { useDebouncedCallback } from "use-debounce";
 import SettingsLayout from "../../../components/SettingsLayout";
 import { HorizontalFormControl } from "~/components/HorizontalFormControl";
-import type { TeamWithMembersAndProjects } from "../../../server/api/routers/organization";
+import type {
+  TeamMemberWithUser,
+  TeamWithMembersAndProjects,
+} from "../../../server/api/routers/organization";
 import { api } from "../../../utils/api";
+import { TeamUserRole } from "@prisma/client";
+import { Select as MultiSelect, chakraComponents } from "chakra-react-select";
 
 type TeamFormData = {
   name: string;
@@ -155,7 +166,7 @@ function TeamForm({ team }: { team: TeamWithMembersAndProjects }) {
           <NextLink href={`/settings/members`}>
             <Button as="a" size="sm" colorScheme="orange">
               <HStack spacing={2}>
-                <Text>Manage organization managers</Text>
+                <Text>Manage organization members</Text>
               </HStack>
             </Button>
           </NextLink>
@@ -165,7 +176,7 @@ function TeamForm({ team }: { team: TeamWithMembersAndProjects }) {
             <Table variant="simple" width="full">
               <Thead>
                 <Tr>
-                  <Th>Name</Th>
+                  <Th width="48%">Name</Th>
                   <Th>Role</Th>
                 </Tr>
               </Thead>
@@ -173,7 +184,9 @@ function TeamForm({ team }: { team: TeamWithMembersAndProjects }) {
                 {team.members.map((member) => (
                   <LinkBox as="tr" key={team.id}>
                     <Td>{member.user.name}</Td>
-                    <Td>{member.role}</Td>
+                    <Td>
+                      <TeamUserRoleField member={member} />
+                    </Td>
                   </LinkBox>
                 ))}
               </Tbody>
@@ -184,3 +197,121 @@ function TeamForm({ team }: { team: TeamWithMembersAndProjects }) {
     </SettingsLayout>
   );
 }
+
+const TeamUserRoleField = ({ member }: { member: TeamMemberWithUser }) => {
+  const teamRolesOptions: {
+    [K in TeamUserRole]: { label: string; value: K; description: string };
+  } = {
+    [TeamUserRole.ADMIN]: {
+      label: "Admin",
+      value: TeamUserRole.ADMIN,
+      description: "Can manage team and add or remove members",
+    },
+    [TeamUserRole.MEMBER]: {
+      label: "Member",
+      value: TeamUserRole.MEMBER,
+      description: "Can setup the project, see costs, add or remove guardrails",
+    },
+    [TeamUserRole.VIEWER]: {
+      label: "Viewer",
+      value: TeamUserRole.VIEWER,
+      description:
+        "Can only view analytics, messages and guardrails results, cannot see costs, debugging data or modify anything",
+    },
+  };
+
+  type TeamUserRoleForm = {
+    role: (typeof teamRolesOptions)[TeamUserRole];
+  };
+
+  const {
+    control,
+    handleSubmit,
+    formState: { errors },
+    reset: resetForm,
+  } = useForm<TeamUserRoleForm>({
+    defaultValues: {
+      role: teamRolesOptions[member.role],
+    },
+  });
+
+  const updateTeamMemberRoleMutation =
+    api.organization.updateTeamMemberRole.useMutation();
+  const toast = useToast();
+
+  const onSubmit: SubmitHandler<TeamUserRoleForm> = (data) => {
+    updateTeamMemberRoleMutation.mutate(
+      {
+        teamId: member.teamId,
+        userId: member.userId,
+        role: data.role.value,
+      },
+      {
+        onError: () => {
+          toast({
+            title: "Failed to update user role",
+            description: "Please try that again",
+            status: "error",
+            duration: 5000,
+            isClosable: true,
+            position: "top-right",
+          });
+          resetForm();
+        },
+      }
+    );
+  };
+
+  return (
+    <VStack align="start">
+      <Controller
+        control={control}
+        name={`role`}
+        rules={{ required: "User role is required" }}
+        render={({ field }) => (
+          <HStack spacing={6}>
+            <MultiSelect
+              {...field}
+              options={Object.values(teamRolesOptions)}
+              hideSelectedOptions={false}
+              isSearchable={false}
+              useBasicStyles
+              onChange={(value) => {
+                field.onChange(value);
+                void handleSubmit(onSubmit)();
+              }}
+              components={{
+                Menu: ({ children, ...props }) => (
+                  <chakraComponents.Menu
+                    {...props}
+                    innerProps={{
+                      ...props.innerProps,
+                      style: { width: "300px" },
+                    }}
+                  >
+                    {children}
+                  </chakraComponents.Menu>
+                ),
+                Option: ({ children, ...props }) => (
+                  <chakraComponents.Option {...props}>
+                    <VStack align="start">
+                      <Text>{children}</Text>
+                      <Text
+                        color={props.isSelected ? "white" : "gray.500"}
+                        fontSize={13}
+                      >
+                        {props.data.description}
+                      </Text>
+                    </VStack>
+                  </chakraComponents.Option>
+                ),
+              }}
+            />
+            {updateTeamMemberRoleMutation.isLoading && <Spinner size="sm" />}
+          </HStack>
+        )}
+      />
+      <FormErrorMessage>{errors.role && "Role is required"}</FormErrorMessage>
+    </VStack>
+  );
+};

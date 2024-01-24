@@ -64,7 +64,7 @@ export default function Members() {
   const organizationWithMembers =
     api.organization.getOrganizationWithMembersAndTheirTeams.useQuery(
       {
-        id: organization?.id ?? "",
+        organizationId: organization?.id ?? "",
       },
       { enabled: !!organization }
     );
@@ -126,7 +126,7 @@ function MembersList({
   const pendingInvites =
     api.organization.getOrganizationPendingInvites.useQuery(
       {
-        id: organization?.id ?? "",
+        organizationId: organization?.id ?? "",
       },
       { enabled: !!organization }
     );
@@ -325,7 +325,7 @@ function MembersList({
                             "Email is required"}
                         </FormErrorMessage>
                       </Td>
-                      <Td width="25%" paddingLeft={0} paddingY={2}>
+                      <Td width="24%" paddingLeft={0} paddingY={2}>
                         <Controller
                           control={control}
                           name={`invites.${index}.role`}
@@ -357,6 +357,14 @@ function MembersList({
                               isSearchable={false}
                               useBasicStyles
                               components={{
+                                Menu: ({ children, ...props }) => (
+                                  <chakraComponents.Menu
+                                    {...props}
+                                    innerProps={{ ...props.innerProps, style: { width: "300px" } }}
+                                  >
+                                    {children}
+                                  </chakraComponents.Menu>
+                                ),
                                 Option: ({ children, ...props }) => (
                                   <chakraComponents.Option {...props}>
                                     <VStack align="start">

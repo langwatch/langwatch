@@ -19,7 +19,6 @@ import {
   VStack,
   useTheme,
   type BackgroundProps,
-  MenuDivider,
 } from "@chakra-ui/react";
 import type { Project } from "@prisma/client";
 import { signOut } from "next-auth/react";
