@@ -19,6 +19,7 @@ import {
   VStack,
   useTheme,
   type BackgroundProps,
+  MenuDivider,
 } from "@chakra-ui/react";
 import type { Project } from "@prisma/client";
 import { signOut } from "next-auth/react";
@@ -375,13 +376,15 @@ export const DashboardLayout = ({
             <Portal>
               <MenuList zIndex="popover">
                 {dependencies.ExtraMenuItems && <dependencies.ExtraMenuItems />}
-                <MenuItem
-                  onClick={() =>
-                    void signOut({ callbackUrl: window.location.origin })
-                  }
-                >
-                  Logout
-                </MenuItem>
+                <MenuGroup title={`${session.user.name} (${session.user.email})`}>
+                  <MenuItem
+                    onClick={() =>
+                      void signOut({ callbackUrl: window.location.origin })
+                    }
+                  >
+                    Logout
+                  </MenuItem>
+                </MenuGroup>
               </MenuList>
             </Portal>
           </Menu>

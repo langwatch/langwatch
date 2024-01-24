@@ -14,7 +14,6 @@ import {
   ModalFooter,
   ModalHeader,
   ModalOverlay,
-  Select,
   Spacer,
   Spinner,
   Table,
@@ -29,8 +28,8 @@ import {
   useDisclosure,
   useToast,
 } from "@chakra-ui/react";
-import type { UserRole } from "@prisma/client";
-import { Select as MultiSelect } from "chakra-react-select";
+import { OrganizationUserRole } from "@prisma/client";
+import { Select as MultiSelect, chakraComponents } from "chakra-react-select";
 import { Lock, Mail, Plus, Trash } from "react-feather";
 import {
   Controller,
@@ -47,12 +46,12 @@ import type {
 import { api } from "../../utils/api";
 import { type PlanInfo } from "../../server/subscriptionHandler";
 
-type Option = { label: string; value: string };
+type Option = { label: string; value: string; description?: string };
 
 type InviteData = {
   email: string;
   teamOptions: Option[];
-  role: UserRole;
+  role?: Option;
 };
 
 type MembersForm = {
@@ -117,7 +116,7 @@ function MembersList({
     reset: resetForm,
   } = useForm<MembersForm>({
     defaultValues: {
-      invites: [{ email: "", teamOptions: teamOptions, role: "MEMBER" }],
+      invites: [{ email: "", teamOptions: teamOptions }],
     },
   });
   const { fields, append, remove } = useFieldArray({
@@ -139,7 +138,8 @@ function MembersList({
       {
         organizationId: organization.id,
         invites: data.invites.map((invite) => ({
-          ...invite,
+          email: invite.email,
+          role: invite.role!.value as OrganizationUserRole,
           teamIds: invite.teamOptions
             .map((teamOption) => teamOption.value)
             .join(","),
@@ -174,7 +174,7 @@ function MembersList({
   };
 
   const onAddField = () => {
-    append({ email: "", teamOptions, role: "MEMBER" });
+    append({ email: "", teamOptions });
   };
 
   return (
@@ -325,15 +325,59 @@ function MembersList({
                             "Email is required"}
                         </FormErrorMessage>
                       </Td>
-                      <Td width="20%" paddingLeft={0} paddingY={2}>
-                        <Select
-                          {...register(`invites.${index}.role`, {
-                            required: "Role is required",
-                          })}
-                        >
-                          <option value="ADMIN">Admin</option>
-                          <option value="MEMBER">Member</option>
-                        </Select>
+                      <Td width="25%" paddingLeft={0} paddingY={2}>
+                        <Controller
+                          control={control}
+                          name={`invites.${index}.role`}
+                          rules={{ required: "User role is required" }}
+                          render={({ field }) => (
+                            <MultiSelect
+                              {...field}
+                              options={[
+                                {
+                                  label: "Admin",
+                                  value: OrganizationUserRole.ADMIN,
+                                  description:
+                                    "Can manage organization and add or remove members",
+                                },
+                                {
+                                  label: "Member",
+                                  value: OrganizationUserRole.MEMBER,
+                                  description:
+                                    "Can manage their own projects and view other projects",
+                                },
+                                {
+                                  label: "External / Viewer",
+                                  value: OrganizationUserRole.EXTERNAL,
+                                  description:
+                                    "Can only view projects they are invited to, cannot see costs",
+                                },
+                              ]}
+                              hideSelectedOptions={false}
+                              isSearchable={false}
+                              useBasicStyles
+                              components={{
+                                Option: ({ children, ...props }) => (
+                                  <chakraComponents.Option {...props}>
+                                    <VStack align="start">
+                                      <Text>{children}</Text>
+                                      <Text
+                                        color={
+                                          props.isSelected
+                                            ? "white"
+                                            : "gray.500"
+                                        }
+                                        fontSize={13}
+                                      >
+                                        {props.data.description}
+                                      </Text>
+                                    </VStack>
+                                  </chakraComponents.Option>
+                                ),
+                              }}
+                            />
+                          )}
+                        />
                         <FormErrorMessage>
                           {errors.invites?.[index]?.role && "Role is required"}
                         </FormErrorMessage>

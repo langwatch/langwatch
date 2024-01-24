@@ -69,15 +69,22 @@ model VerificationToken {
     @@unique([identifier, token])
 }
 
-enum UserRole {
+enum TeamUserRole {
     ADMIN
     MEMBER
+    VIEWER
+}
+
+enum OrganizationUserRole {
+    ADMIN
+    MEMBER
+    EXTERNAL
 }
 
 model TeamUser {
     userId    String
     teamId    String
-    role      UserRole
+    role      TeamUserRole
     user      User     @relation(fields: [userId], references: [id])
     team      Team     @relation(fields: [teamId], references: [id])
     createdAt DateTime @default(now())
@@ -91,7 +98,7 @@ model TeamUser {
 model OrganizationUser {
     userId         String
     organizationId String
-    role           UserRole
+    role           OrganizationUserRole
     user           User         @relation(fields: [userId], references: [id])
     organization   Organization @relation(fields: [organizationId], references: [id])
     createdAt      DateTime     @default(now())
@@ -159,7 +166,7 @@ model OrganizationInvite {
     organizationId String
     organization   Organization  @relation(fields: [organizationId], references: [id])
     teamIds        String
-    role           UserRole
+    role           OrganizationUserRole
     createdAt      DateTime      @default(now())
     updatedAt      DateTime      @default(now()) @updatedAt
 

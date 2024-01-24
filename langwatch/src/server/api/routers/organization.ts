@@ -1,11 +1,12 @@
 import {
-  UserRole,
+  OrganizationUserRole,
   type Organization,
   type OrganizationUser,
   type Project,
   type Team,
   type TeamUser,
   type User,
+  TeamUserRole,
 } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
@@ -229,7 +230,7 @@ export const organizationRouter = createTRPCRouter({
           z.object({
             email: z.string().email(),
             teamIds: z.string(),
-            role: z.nativeEnum(UserRole),
+            role: z.nativeEnum(OrganizationUserRole),
           })
         ),
       })
@@ -409,13 +410,21 @@ export const organizationRouter = createTRPCRouter({
           },
         });
 
+        const organizationToTeamRoleMap: {
+          [K in OrganizationUserRole]: TeamUserRole;
+        } = {
+          [OrganizationUserRole.ADMIN]: TeamUserRole.ADMIN,
+          [OrganizationUserRole.MEMBER]: TeamUserRole.MEMBER,
+          [OrganizationUserRole.EXTERNAL]: TeamUserRole.VIEWER,
+        };
+
         const teamIds = invite.teamIds.split(",");
         for (const teamId of teamIds) {
           await prisma.teamUser.create({
             data: {
               userId: session.user.id,
               teamId: teamId,
-              role: invite.role,
+              role: organizationToTeamRoleMap[invite.role],
             },
           });
         }

@@ -1,4 +1,4 @@
-import { UserRole } from "@prisma/client";
+import { OrganizationUserRole, TeamUserRole } from "@prisma/client";
 import { prisma } from "../server/db";
 
 export async function getTestUser() {
@@ -82,7 +82,7 @@ export async function getTestUser() {
       data: {
         userId: user.id,
         teamId: team.id,
-        role: UserRole.MEMBER,
+        role: TeamUserRole.MEMBER,
       },
     });
   }
@@ -100,7 +100,7 @@ export async function getTestUser() {
       data: {
         userId: user.id,
         organizationId: organization.id,
-        role: UserRole.MEMBER,
+        role: OrganizationUserRole.MEMBER,
       },
     });
   }
