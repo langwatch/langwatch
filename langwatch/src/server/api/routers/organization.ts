@@ -470,4 +470,77 @@ export const organizationRouter = createTRPCRouter({
 
       return { success: true };
     }),
+
+  getAllOrganizationMembers: protectedProcedure
+    .input(
+      z.object({
+        organizationId: z.string(),
+      })
+    )
+    .use(
+      checkUserPermissionForOrganization(
+        OrganizationRoleGroup.ORGANIZATION_VIEW
+      )
+    )
+    .query(async ({ input, ctx }) => {
+      const prisma = ctx.prisma;
+
+      const users = await prisma.user.findMany({
+        where: {
+          orgMemberships: {
+            some: {
+              organizationId: input.organizationId,
+            },
+          },
+        },
+      });
+
+      return users;
+    }),
+
+  createTeamWithMembers: protectedProcedure
+    .input(
+      z.object({
+        organizationId: z.string(),
+        name: z.string(),
+        members: z.array(
+          z.object({
+            userId: z.string(),
+            role: z.nativeEnum(TeamUserRole),
+          })
+        ),
+      })
+    )
+    .use(
+      checkUserPermissionForOrganization(
+        OrganizationRoleGroup.ORGANIZATION_MANAGE
+      )
+    )
+    .mutation(async ({ input, ctx }) => {
+      const prisma = ctx.prisma;
+      const teamId = `team_${nanoid()}`;
+      const teamSlug =
+        slugify(input.name, { lower: true, strict: true }) +
+        "-" +
+        teamId.substring(0, 6);
+
+      const team = await prisma.team.create({
+        data: {
+          id: teamId,
+          name: input.name,
+          slug: teamSlug,
+          organizationId: input.organizationId,
+        },
+      });
+
+      await prisma.teamUser.createMany({
+        data: input.members.map((member) => ({
+          userId: member.userId,
+          teamId: team.id,
+          role: member.role,
+        })),
+      });
+
+      return team;
+    }),
 });

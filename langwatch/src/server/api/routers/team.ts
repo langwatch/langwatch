@@ -75,6 +75,10 @@ export const teamRouter = createTRPCRouter({
         },
       });
 
+      if (!team) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Team not found." });
+      }
+
       return team;
     }),
   update: protectedProcedure
