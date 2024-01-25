@@ -20,7 +20,7 @@ import NextLink from "next/link";
 import { Plus } from "react-feather";
 import SettingsLayout from "../../components/SettingsLayout";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import type { TeamWithMembersAndProjects } from "../../server/api/routers/organization";
+import type { TeamWithProjectsAndMembersAndUsers } from "../../server/api/routers/organization";
 import { api } from "../../utils/api";
 
 export default function Teams() {
@@ -38,7 +38,7 @@ export default function Teams() {
   return <TeamsList teams={teams.data} />;
 }
 
-function TeamsList({ teams }: { teams: TeamWithMembersAndProjects[] }) {
+function TeamsList({ teams }: { teams: TeamWithProjectsAndMembersAndUsers[] }) {
   return (
     <SettingsLayout>
       <VStack

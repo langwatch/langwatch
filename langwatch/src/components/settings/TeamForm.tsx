@@ -31,7 +31,7 @@ import {
   type SubmitHandler,
   type UseFormReturn,
 } from "react-hook-form";
-import type { TeamWithMembersAndProjects } from "../../server/api/routers/organization";
+import type { TeamWithProjectsAndMembersAndUsers } from "../../server/api/routers/organization";
 import { api } from "../../utils/api";
 import { HorizontalFormControl } from "../HorizontalFormControl";
 import {
@@ -58,7 +58,7 @@ export const TeamForm = ({
   isLoading,
 }: {
   organizationId: string;
-  team?: TeamWithMembersAndProjects;
+  team?: TeamWithProjectsAndMembersAndUsers;
   form: UseFormReturn<TeamFormData, any, undefined>;
   onSubmit: SubmitHandler<TeamFormData>;
   isLoading: boolean;

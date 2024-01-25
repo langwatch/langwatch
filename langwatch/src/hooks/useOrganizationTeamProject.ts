@@ -47,6 +47,7 @@ export const useOrganizationTeamProject = (
     : undefined;
   const team = organization
     ? organization.teams.find((team) => team.id == teamId) ??
+      organization.teams.find((team) => team.projects.length > 0) ??
       organization.teams[0]
     : undefined;
   const project = team
@@ -82,12 +83,15 @@ export const useOrganizationTeamProject = (
   useEffect(() => {
     if (!organizations.data) return;
 
-    if (!organization || !team) {
+    if (!organization) {
       void router.push("/onboarding/organization");
       return;
     }
 
-    if (redirectToProjectOnboarding && team.projects.length == 0) {
+    if (
+      redirectToProjectOnboarding &&
+      !organization.teams.some((team) => team.projects.length > 0)
+    ) {
       const firstTeamSlug = organizations.data.flatMap((org) => org.teams)[0]
         ?.slug;
       void router.push(`/onboarding/${firstTeamSlug}/project`);

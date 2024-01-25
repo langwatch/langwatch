@@ -40,17 +40,11 @@ export const teamRouter = createTRPCRouter({
       )
     )
     .query(async ({ input, ctx }) => {
-      const userId = ctx.session.user.id;
       const prisma = ctx.prisma;
 
       const teams = await prisma.team.findMany({
         where: {
           organizationId: input.organizationId,
-          members: {
-            some: {
-              userId: userId,
-            },
-          },
         },
         include: {
           members: {
@@ -67,17 +61,11 @@ export const teamRouter = createTRPCRouter({
   getTeamWithMembers: protectedProcedure
     .input(z.object({ slug: z.string() }))
     .query(async ({ input, ctx }) => {
-      const userId = ctx.session.user.id;
       const prisma = ctx.prisma;
 
       const team = await prisma.team.findFirst({
         where: {
           slug: input.slug,
-          members: {
-            some: {
-              userId: userId,
-            },
-          },
         },
         include: {
           members: {
@@ -92,6 +80,13 @@ export const teamRouter = createTRPCRouter({
       if (!team) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Team not found." });
       }
+
+      await checkUserPermissionForTeam(TeamRoleGroup.TEAM_MEMBERS_MANAGE)({
+        ctx,
+        input: { teamId: team.id },
+        // eslint-disable-next-line @typescript-eslint/no-empty-function
+        next: () => {},
+      });
 
       return team;
     }),

@@ -8,7 +8,7 @@ import {
   TeamForm,
   type TeamFormData,
 } from "../../../components/settings/TeamForm";
-import type { TeamWithMembersAndProjects } from "../../../server/api/routers/organization";
+import type { TeamWithProjectsAndMembersAndUsers } from "../../../server/api/routers/organization";
 import { api } from "../../../utils/api";
 import { teamRolesOptions } from "../../../components/settings/TeamUserRoleField";
 import { TeamProjectsList } from "../projects";
@@ -29,7 +29,7 @@ export default function EditTeamPage() {
   return <EditTeam team={team.data} />;
 }
 
-function EditTeam({ team }: { team: TeamWithMembersAndProjects }) {
+function EditTeam({ team }: { team: TeamWithProjectsAndMembersAndUsers }) {
   const [defaultValues, setDefaultValues] = useState<TeamFormData>({
     name: team.name,
     members: team.members.map((member) => ({

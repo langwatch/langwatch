@@ -25,8 +25,13 @@ export type TeamWithProjects = Team & {
   projects: Project[];
 };
 
+export type TeamWithProjectsAndMembers = TeamWithProjects & {
+  members: TeamUser[];
+};
+
 export type FullyLoadedOrganization = Organization & {
-  teams: TeamWithProjects[];
+  members: OrganizationUser[];
+  teams: TeamWithProjectsAndMembers[];
 };
 
 export type TeamMemberWithUser = TeamUser & {
@@ -37,7 +42,7 @@ export type TeamMemberWithTeam = TeamUser & {
   team: Team;
 };
 
-export type TeamWithMembersAndProjects = Team & {
+export type TeamWithProjectsAndMembersAndUsers = Team & {
   members: TeamMemberWithUser[];
   projects: Project[];
 };
@@ -134,15 +139,44 @@ export const organizationRouter = createTRPCRouter({
               userId: userId,
             },
           },
+          teams: {
+            some: {
+              members: {
+                every: {
+                  userId: userId,
+                },
+              },
+            },
+          },
         },
         include: {
+          members: true,
           teams: {
             include: {
+              members: true,
               projects: true,
             },
           },
         },
       });
+
+    for (const organization of organizations) {
+      organization.members = organization.members.filter(
+        (member) => member.userId === userId
+      );
+      const isExternal =
+        organization.members[0]?.role !== "ADMIN" &&
+        organization.members[0]?.role !== "MEMBER";
+
+      organization.teams = organization.teams.filter((team) => {
+        team.members = team.members.filter(
+          (member) => member.userId === userId
+        );
+        return isExternal
+          ? team.members.some((member) => member.userId === userId)
+          : true;
+      });
+    }
 
     return organizations;
   }),
