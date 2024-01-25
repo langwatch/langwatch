@@ -1,46 +1,45 @@
 import {
-  VStack,
+  Breadcrumb,
   BreadcrumbItem,
   BreadcrumbLink,
-  HStack,
-  Spacer,
-  Spinner,
+  Button,
   Card,
   CardBody,
-  Input,
   FormErrorMessage,
-  Thead,
-  Tr,
-  Th,
-  Tbody,
-  LinkBox,
-  Td,
-  Breadcrumb,
+  HStack,
   Heading,
-  Text,
+  Input,
+  Spacer,
+  Spinner,
   Table,
-  Button,
+  Tbody,
+  Td,
+  Text,
+  Th,
+  Thead,
   Tooltip,
+  Tr,
+  VStack,
 } from "@chakra-ui/react";
-import { ChevronRight, HelpCircle, Trash } from "react-feather";
-import { HorizontalFormControl } from "../HorizontalFormControl";
-import type { TeamWithMembersAndProjects } from "../../server/api/routers/organization";
+import { TeamUserRole } from "@prisma/client";
+import { Select as MultiSelect, chakraComponents } from "chakra-react-select";
 import NextLink from "next/link";
+import { ChevronRight, HelpCircle, Plus, Trash } from "react-feather";
 import {
+  Controller,
   useFieldArray,
   type SubmitHandler,
   type UseFormReturn,
-  Controller,
 } from "react-hook-form";
+import type { TeamWithMembersAndProjects } from "../../server/api/routers/organization";
+import { api } from "../../utils/api";
+import { HorizontalFormControl } from "../HorizontalFormControl";
 import {
   TeamRoleSelect,
-  TeamUserRoleField,
   teamRolesOptions,
   type TeamUserRoleForm,
 } from "./TeamUserRoleField";
-import { Select as MultiSelect, chakraComponents } from "chakra-react-select";
-import { TeamUserRole } from "@prisma/client";
-import { api } from "../../utils/api";
+import { TeamProjectsList } from "../../pages/settings/projects";
 
 export type TeamFormData = {
   name: string;
@@ -273,6 +272,40 @@ export const TeamForm = ({
               Create
             </Button>
           </HStack>
+        )}
+        {team && (
+          <>
+            <HStack width="full" marginTop={2}>
+              <Heading size="md" as="h2">
+                Projects
+              </Heading>
+              <Spacer />
+              <Button
+                as={NextLink}
+                href={`/onboarding/${team.slug}/project`}
+                size="sm"
+                colorScheme="orange"
+              >
+                <HStack spacing={2}>
+                  <Plus size={20} />
+                  <Text>Add new project</Text>
+                </HStack>
+              </Button>
+            </HStack>
+            <Card width="full">
+              <CardBody width="full" paddingY={0} paddingX={0}>
+                <Table variant="simple" width="full">
+                  <Thead>
+                    <Tr>
+                      <Th>{team.name}</Th>
+                      <Td textAlign="right"></Td>
+                    </Tr>
+                  </Thead>
+                  <TeamProjectsList team={team} />
+                </Table>
+              </CardBody>
+            </Card>
+          </>
         )}
       </VStack>
     </form>

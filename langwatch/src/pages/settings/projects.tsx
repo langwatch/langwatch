@@ -21,7 +21,10 @@ import { Plus } from "react-feather";
 import SettingsLayout from "../../components/SettingsLayout";
 import { ProjectTechStackIcon } from "../../components/TechStack";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import type { FullyLoadedOrganization } from "../../server/api/routers/organization";
+import type {
+  FullyLoadedOrganization,
+  TeamWithProjects,
+} from "../../server/api/routers/organization";
 
 export default function Projects() {
   const { organization } = useOrganizationTeamProject();
@@ -74,32 +77,7 @@ function ProjectsList({
                       </Td>
                     </Tr>
                   </Thead>
-                  <Tbody>
-                    {team.projects.map((project) => (
-                      <Tr key={project.id}>
-                        <LinkBox>
-                          <Td>
-                            <HStack gap={2}>
-                              <ProjectTechStackIcon project={project} />
-                              <LinkOverlay
-                                as={NextLink}
-                                href={`/${project.slug}/messages`}
-                              >
-                                {project.name}
-                              </LinkOverlay>
-                            </HStack>
-                          </Td>
-                        </LinkBox>
-                      </Tr>
-                    ))}
-                    {team.projects.length === 0 && (
-                      <Tr>
-                        <Td>
-                          <Text>No projects on this team</Text>
-                        </Td>
-                      </Tr>
-                    )}
-                  </Tbody>
+                  <TeamProjectsList team={team} />
                 </React.Fragment>
               ))}
             </Table>
@@ -107,5 +85,33 @@ function ProjectsList({
         </Card>
       </VStack>
     </SettingsLayout>
+  );
+}
+
+export function TeamProjectsList({ team }: { team: TeamWithProjects }) {
+  return (
+    <Tbody>
+      {team.projects.map((project) => (
+        <Tr key={project.id}>
+          <LinkBox>
+            <Td>
+              <HStack gap={2}>
+                <ProjectTechStackIcon project={project} />
+                <LinkOverlay as={NextLink} href={`/${project.slug}/messages`}>
+                  {project.name}
+                </LinkOverlay>
+              </HStack>
+            </Td>
+          </LinkBox>
+        </Tr>
+      ))}
+      {team.projects.length === 0 && (
+        <Tr>
+          <Td>
+            <Text>No projects on this team</Text>
+          </Td>
+        </Tr>
+      )}
+    </Tbody>
   );
 }
