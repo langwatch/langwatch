@@ -1,6 +1,7 @@
 import { PrismaClient } from "@prisma/client";
 
 import { env } from "~/env.mjs";
+import { guardEnMasse } from "../utils/dbMassDeleteProtection";
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
@@ -12,5 +13,7 @@ export const prisma =
     log:
       env.NODE_ENV === "development" ? ["query", "error", "warn"] : ["error"],
   });
+
+prisma.$use(guardEnMasse);
 
 if (env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;

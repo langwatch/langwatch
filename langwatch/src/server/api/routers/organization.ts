@@ -65,17 +65,19 @@ export const organizationRouter = createTRPCRouter({
       const userId = ctx.session.user.id;
       const prisma = ctx.prisma;
 
-      const orgId = `organization_${nanoid()}`;
+      const orgNanoId = nanoid();
+      const orgId = `organization_${orgNanoId}`;
       const orgSlug =
         slugify(input.orgName, { lower: true, strict: true }) +
         "-" +
-        orgId.substring(0, 6);
+        orgNanoId.substring(0, 6);
 
-      const teamId = `team_${nanoid()}`;
+      const teamNanoId = nanoid();
+      const teamId = `team_${teamNanoId}`;
       const teamSlug =
         slugify(input.orgName, { lower: true, strict: true }) +
         "-" +
-        teamId.substring(0, 6);
+        teamNanoId.substring(0, 6);
 
       await prisma.$transaction(async (prisma) => {
         // 1. Create the organization
@@ -496,51 +498,5 @@ export const organizationRouter = createTRPCRouter({
       });
 
       return users;
-    }),
-
-  createTeamWithMembers: protectedProcedure
-    .input(
-      z.object({
-        organizationId: z.string(),
-        name: z.string(),
-        members: z.array(
-          z.object({
-            userId: z.string(),
-            role: z.nativeEnum(TeamUserRole),
-          })
-        ),
-      })
-    )
-    .use(
-      checkUserPermissionForOrganization(
-        OrganizationRoleGroup.ORGANIZATION_MANAGE
-      )
-    )
-    .mutation(async ({ input, ctx }) => {
-      const prisma = ctx.prisma;
-      const teamId = `team_${nanoid()}`;
-      const teamSlug =
-        slugify(input.name, { lower: true, strict: true }) +
-        "-" +
-        teamId.substring(0, 6);
-
-      const team = await prisma.team.create({
-        data: {
-          id: teamId,
-          name: input.name,
-          slug: teamSlug,
-          organizationId: input.organizationId,
-        },
-      });
-
-      await prisma.teamUser.createMany({
-        data: input.members.map((member) => ({
-          userId: member.userId,
-          teamId: team.id,
-          role: member.role,
-        })),
-      });
-
-      return team;
     }),
 });

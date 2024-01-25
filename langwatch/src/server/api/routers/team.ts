@@ -1,7 +1,16 @@
+import { TeamUserRole } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
+import {
+  checkUserPermissionForOrganization,
+  checkUserPermissionForTeam,
+  OrganizationRoleGroup,
+  TeamRoleGroup,
+} from "../permission";
+import { nanoid } from "nanoid";
+import slugify from "slugify";
 
 export const teamRouter = createTRPCRouter({
   getBySlug: protectedProcedure
@@ -25,6 +34,11 @@ export const teamRouter = createTRPCRouter({
     }),
   getTeamsWithMembers: protectedProcedure
     .input(z.object({ organizationId: z.string() }))
+    .use(
+      checkUserPermissionForOrganization(
+        OrganizationRoleGroup.ORGANIZATION_VIEW
+      )
+    )
     .query(async ({ input, ctx }) => {
       const userId = ctx.session.user.id;
       const prisma = ctx.prisma;
@@ -84,38 +98,91 @@ export const teamRouter = createTRPCRouter({
   update: protectedProcedure
     .input(
       z.object({
-        id: z.string(),
+        teamId: z.string(),
         name: z.string(),
+        members: z.array(
+          z.object({
+            userId: z.string(),
+            role: z.nativeEnum(TeamUserRole),
+          })
+        ),
       })
     )
+    .use(checkUserPermissionForTeam(TeamRoleGroup.TEAM_MEMBERS_MANAGE))
     .mutation(async ({ input, ctx }) => {
-      const userId = ctx.session.user.id;
       const prisma = ctx.prisma;
-
-      const teamUser = await prisma.teamUser.findFirst({
-        where: {
-          userId: userId,
-          teamId: input.id,
-          role: "ADMIN",
-        },
-      });
-
-      if (!teamUser) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "You don't have the necessary permissions",
-        });
-      }
 
       await prisma.team.update({
         where: {
-          id: input.id,
+          id: input.teamId,
         },
         data: {
           name: input.name,
         },
       });
 
+      if (input.members.length > 0) {
+        await prisma.teamUser.deleteMany({
+          where: {
+            teamId: input.teamId,
+          },
+        });
+
+        await prisma.teamUser.createMany({
+          data: input.members.map((member) => ({
+            userId: member.userId,
+            teamId: input.teamId,
+            role: member.role,
+          })),
+        });
+      }
+
       return { success: true };
+    }),
+  createTeamWithMembers: protectedProcedure
+    .input(
+      z.object({
+        organizationId: z.string(),
+        name: z.string(),
+        members: z.array(
+          z.object({
+            userId: z.string(),
+            role: z.nativeEnum(TeamUserRole),
+          })
+        ),
+      })
+    )
+    .use(
+      checkUserPermissionForOrganization(
+        OrganizationRoleGroup.ORGANIZATION_MANAGE
+      )
+    )
+    .mutation(async ({ input, ctx }) => {
+      const prisma = ctx.prisma;
+      const teamNanoId = nanoid();
+      const teamId = `team_${teamNanoId}`;
+      const teamSlug =
+        slugify(input.name, { lower: true, strict: true }) +
+        "-" +
+        teamNanoId.substring(0, 6);
+
+      const team = await prisma.team.create({
+        data: {
+          id: teamId,
+          name: input.name,
+          slug: teamSlug,
+          organizationId: input.organizationId,
+        },
+      });
+
+      await prisma.teamUser.createMany({
+        data: input.members.map((member) => ({
+          userId: member.userId,
+          teamId: team.id,
+          role: member.role,
+        })),
+      });
+
+      return team;
     }),
 });

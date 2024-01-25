@@ -10,6 +10,7 @@ import {
   VStack,
   useRadio,
   type UseRadioProps,
+  Select,
 } from "@chakra-ui/react";
 import ErrorPage from "next/error";
 import { useRouter } from "next/router";
@@ -69,6 +70,8 @@ export default function ProjectOnboarding() {
       framework: "openai",
     },
   });
+  const { watch } = form;
+  const teamId = watch("teamId");
 
   const router = useRouter();
   const { organization } = useOrganizationTeamProject({
@@ -80,6 +83,16 @@ export default function ProjectOnboarding() {
     { slug: typeof teamSlug == "string" ? teamSlug : "" },
     { enabled: !!organization }
   );
+  const teams = api.team.getTeamsWithMembers.useQuery(
+    { organizationId: organization?.id ?? "" },
+    { enabled: !!organization }
+  );
+
+  useEffect(() => {
+    if (team.data) {
+      form.setValue("teamId", team.data.id);
+    }
+  }, [form, team.data]);
 
   const createProject = api.project.create.useMutation();
   const apiContext = api.useContext();
@@ -88,8 +101,10 @@ export default function ProjectOnboarding() {
     if (!team.data) return;
 
     createProject.mutate({
+      organizationId: organization?.id ?? "",
       name: data.name,
-      teamId: team.data.id,
+      teamId: data.teamId == "NEW" ? undefined : data.teamId,
+      newTeamName: data.newTeamName,
       language: data.language,
       framework: data.framework,
     });
@@ -135,6 +150,30 @@ export default function ProjectOnboarding() {
             <FormLabel>Project Name</FormLabel>
             <Input {...form.register("name", { required: true })} />
           </FormControl>
+          {teams.data &&
+            teams.data.some((team) => team.projects.length > 0) && (
+              <>
+                <FormControl>
+                  <FormLabel>Team</FormLabel>
+                  <Select {...form.register("teamId", { required: true })}>
+                    {teams.data?.map((team) => (
+                      <option key={team.id} value={team.id}>
+                        {team.name}
+                      </option>
+                    ))}
+                    <option value="NEW">(+) Create new team</option>
+                  </Select>
+                </FormControl>
+                {teamId == "NEW" && (
+                  <FormControl>
+                    <FormLabel>New Team Name</FormLabel>
+                    <Input
+                      {...form.register("newTeamName", { required: true })}
+                    />
+                  </FormControl>
+                )}
+              </>
+            )}
           <TechStackSelector form={form} />
           {createProject.error && <p>Something went wrong!</p>}
           <HStack width="full">

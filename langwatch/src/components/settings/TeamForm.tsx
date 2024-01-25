@@ -47,6 +47,7 @@ export type TeamFormData = {
   members: {
     userId?: { label: string; value: string };
     role: TeamUserRoleForm["role"];
+    saved: boolean;
   }[];
 };
 
@@ -139,13 +140,14 @@ export const TeamForm = ({
           </Heading>
           <Spacer />
           {team && (
-            <NextLink href={`/settings/members`}>
-              <Button as="a" size="sm" colorScheme="orange">
-                <HStack spacing={2}>
-                  <Text>Manage organization members</Text>
-                </HStack>
-              </Button>
-            </NextLink>
+            <Button
+              as={NextLink}
+              href={`/settings/members`}
+              size="sm"
+              colorScheme="orange"
+            >
+              <Text>Manage organization members</Text>
+            </Button>
           )}
         </HStack>
         <Card width="full">
@@ -159,21 +161,16 @@ export const TeamForm = ({
                 </Tr>
               </Thead>
               <Tbody>
-                {team ? (
-                  team.members.map((member) => (
-                    <LinkBox as="tr" key={team.id}>
-                      <Td>{member.user.name}</Td>
-                      <Td>
-                        <TeamUserRoleField member={member} />
-                      </Td>
-                    </LinkBox>
-                  ))
-                ) : (
-                  <>
-                    {members.fields.map((member, index) => (
-                      <Tr key={index}>
-                        <Td>
-                          <HStack width="full">
+                {members.fields.map((member, index) => (
+                  <Tr key={index}>
+                    <Td>
+                      <HStack width="full">
+                        {member.saved ? (
+                          <>
+                            <Text>{member.userId?.label}</Text>
+                          </>
+                        ) : (
+                          <>
                             <Controller
                               control={control}
                               name={`members.${index}.userId`}
@@ -225,47 +222,46 @@ export const TeamForm = ({
                             >
                               <HelpCircle width="14px" />
                             </Tooltip>
-                          </HStack>
-                        </Td>
-                        <Td>
-                          <Controller
-                            control={control}
-                            name={`members.${index}.role`}
-                            rules={{ required: "User role is required" }}
-                            render={({ field }) => (
-                              <TeamRoleSelect field={field} />
-                            )}
-                          />
-                        </Td>
-                        <Td paddingLeft={0} paddingRight={0} paddingY={2}>
-                          <Button
-                            type="button"
-                            colorScheme="red"
-                            onClick={() => members.remove(index)}
-                          >
-                            <Trash size={18} />
-                          </Button>
-                        </Td>
-                      </Tr>
-                    ))}
-                    <Tr>
-                      <Td colSpan={4}>
-                        <Button
-                          type="button"
-                          onClick={() => {
-                            members.append({
-                              userId: undefined,
-                              role: teamRolesOptions[TeamUserRole.MEMBER],
-                            });
-                          }}
-                          marginTop={2}
-                        >
-                          + Add Another
-                        </Button>
-                      </Td>
-                    </Tr>
-                  </>
-                )}
+                          </>
+                        )}
+                      </HStack>
+                    </Td>
+                    <Td>
+                      <Controller
+                        control={control}
+                        name={`members.${index}.role`}
+                        rules={{ required: "User role is required" }}
+                        render={({ field }) => <TeamRoleSelect field={field} />}
+                      />
+                    </Td>
+                    <Td paddingLeft={0} paddingRight={0} paddingY={2}>
+                      <Button
+                        type="button"
+                        colorScheme="red"
+                        onClick={() => members.remove(index)}
+                      >
+                        <Trash size={18} />
+                      </Button>
+                    </Td>
+                  </Tr>
+                ))}
+                <Tr>
+                  <Td colSpan={4}>
+                    <Button
+                      type="button"
+                      onClick={() => {
+                        members.append({
+                          userId: undefined,
+                          role: teamRolesOptions[TeamUserRole.MEMBER],
+                          saved: false,
+                        });
+                      }}
+                      marginTop={2}
+                    >
+                      + Add Another
+                    </Button>
+                  </Td>
+                </Tr>
               </Tbody>
             </Table>
           </CardBody>

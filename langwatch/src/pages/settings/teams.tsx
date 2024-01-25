@@ -20,9 +20,7 @@ import NextLink from "next/link";
 import { Plus } from "react-feather";
 import SettingsLayout from "../../components/SettingsLayout";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import type {
-  TeamWithMembersAndProjects
-} from "../../server/api/routers/organization";
+import type { TeamWithMembersAndProjects } from "../../server/api/routers/organization";
 import { api } from "../../utils/api";
 
 export default function Teams() {
@@ -56,14 +54,17 @@ function TeamsList({ teams }: { teams: TeamWithMembersAndProjects[] }) {
             Teams
           </Heading>
           <Spacer />
-          <NextLink href={`/settings/teams/new`}>
-            <Button as="a" size="sm" colorScheme="orange">
-              <HStack spacing={2}>
-                <Plus size={20} />
-                <Text>Add new team</Text>
-              </HStack>
-            </Button>
-          </NextLink>
+          <Button
+            as={NextLink}
+            href={`/settings/teams/new`}
+            size="sm"
+            colorScheme="orange"
+          >
+            <HStack spacing={2}>
+              <Plus size={20} />
+              <Text>Add new team</Text>
+            </HStack>
+          </Button>
         </HStack>
         <Card width="full">
           <CardBody width="full" paddingY={0} paddingX={0}>

@@ -33,6 +33,7 @@ function NewTeam({ organization }: { organization: FullyLoadedOrganization }) {
             value: session?.user.id ?? "",
           },
           role: teamRolesOptions[TeamUserRole.ADMIN],
+          saved: false,
         },
       ],
     },
@@ -40,7 +41,7 @@ function NewTeam({ organization }: { organization: FullyLoadedOrganization }) {
   const toast = useToast();
   const router = useRouter();
 
-  const createTeam = api.organization.createTeamWithMembers.useMutation();
+  const createTeam = api.team.createTeamWithMembers.useMutation();
 
   const onSubmit: SubmitHandler<TeamFormData> = useCallback(
     (data: TeamFormData) => {

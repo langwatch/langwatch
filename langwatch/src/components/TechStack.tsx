@@ -23,6 +23,8 @@ export type ProjectFormData = {
   name: string;
   language: string;
   framework: string;
+  teamId: string;
+  newTeamName: string;
 };
 
 export const techStackLanguageOptions = {

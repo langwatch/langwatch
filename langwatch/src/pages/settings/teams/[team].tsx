@@ -10,6 +10,7 @@ import {
 } from "../../../components/settings/TeamForm";
 import type { TeamWithMembersAndProjects } from "../../../server/api/routers/organization";
 import { api } from "../../../utils/api";
+import { teamRolesOptions } from "../../../components/settings/TeamUserRoleField";
 
 export default function EditTeamPage() {
   const router = useRouter();
@@ -29,7 +30,14 @@ export default function EditTeamPage() {
 function EditTeam({ team }: { team: TeamWithMembersAndProjects }) {
   const [defaultValues, setDefaultValues] = useState<TeamFormData>({
     name: team.name,
-    members: [],
+    members: team.members.map((member) => ({
+      userId: {
+        label: `${member.user.name} (${member.user.email})`,
+        value: member.user.id,
+      },
+      role: teamRolesOptions[member.role],
+      saved: true,
+    })),
   });
   const form = useForm({
     defaultValues,
@@ -47,8 +55,12 @@ function EditTeam({ team }: { team: TeamWithMembersAndProjects }) {
 
       updateTeam.mutate(
         {
-          id: team.id,
+          teamId: team.id,
           name: data.name,
+          members: data.members.map((member) => ({
+            userId: member.userId?.value ?? "",
+            role: member.role.value,
+          })),
         },
         {
           onSuccess: () => {

@@ -22,6 +22,7 @@ const teamRolePermissionMapping = {
   GUARDRAILS_MANAGE: [TeamUserRole.ADMIN, TeamUserRole.MEMBER],
   TEAM_MEMBERS_VIEW: [TeamUserRole.ADMIN, TeamUserRole.MEMBER],
   TEAM_MEMBERS_MANAGE: [TeamUserRole.ADMIN],
+  TEAM_CREATE_NEW_PROJECTS: [TeamUserRole.ADMIN],
 };
 
 const organizationRolePermissionMapping = {

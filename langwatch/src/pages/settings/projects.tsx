@@ -60,14 +60,17 @@ function ProjectsList({
                     <Tr>
                       <Th>{team.name}</Th>
                       <Td textAlign="right">
-                        <NextLink href={`/onboarding/${team.slug}/project`}>
-                          <Button as="a" size="sm" colorScheme="orange">
-                            <HStack spacing={2}>
-                              <Plus size={20} />
-                              <Text>Add new project</Text>
-                            </HStack>
-                          </Button>
-                        </NextLink>
+                        <Button
+                          as={NextLink}
+                          href={`/onboarding/${team.slug}/project`}
+                          size="sm"
+                          colorScheme="orange"
+                        >
+                          <HStack spacing={2}>
+                            <Plus size={20} />
+                            <Text>Add new project</Text>
+                          </HStack>
+                        </Button>
                       </Td>
                     </Tr>
                   </Thead>
@@ -89,6 +92,13 @@ function ProjectsList({
                         </LinkBox>
                       </Tr>
                     ))}
+                    {team.projects.length === 0 && (
+                      <Tr>
+                        <Td>
+                          <Text>No projects on this team</Text>
+                        </Td>
+                      </Tr>
+                    )}
                   </Tbody>
                 </React.Fragment>
               ))}
