@@ -40,6 +40,7 @@ export default function Usage() {
 
   const aggregatedCosts = api.costs.getAggregatedCostsForOrganization.useQuery(
     {
+      organizationId: organization?.id ?? "",
       startDate: period.startDate.getTime(),
       endDate: period.endDate.getTime(),
     },
