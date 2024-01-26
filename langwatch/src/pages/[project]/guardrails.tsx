@@ -106,14 +106,16 @@ export default function Checks() {
               the built-in checks or defining custom ones.
             </Text>
             <Spacer />
-            <Button
-              colorScheme="orange"
-              as={NextLink}
-              href={`/${project.slug}/guardrails/new/choose`}
-              minWidth="fit-content"
-            >
-              + Add Check
-            </Button>
+            {hasTeamPermission(TeamRoleGroup.GUARDRAILS_MANAGE) && (
+              <Button
+                colorScheme="orange"
+                as={NextLink}
+                href={`/${project.slug}/guardrails/new/choose`}
+                minWidth="fit-content"
+              >
+                + Add Check
+              </Button>
+            )}
           </HStack>
           <VStack width="full" paddingTop={6} spacing={4}>
             {checks.isLoading ? (
