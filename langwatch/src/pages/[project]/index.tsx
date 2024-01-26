@@ -68,6 +68,10 @@ import { dependencies } from "../../injection/dependencies.client";
 import { dependencies as serverDependencies } from "../../injection/dependencies.server";
 import type { GetServerSidePropsContext } from "next";
 import { TeamRoleGroup } from "../../server/api/permission";
+import {
+  DocumentsCountsSummary,
+  DocumentsCountsTable,
+} from "../../components/analytics/DocumentsCountsTable";
 
 export default function ProjectRouter() {
   const router = useRouter();
@@ -103,19 +107,7 @@ export const getServerSideProps = async (
 };
 
 function Index() {
-  const { project, hasTeamPermission } = useOrganizationTeamProject();
-  const {
-    period: { startDate, endDate },
-    setPeriod,
-  } = usePeriodSelector();
-
-  const { analyticsParams, queryOpts } = useAnalyticsParams();
-
-  const traceCheckStatusCounts =
-    api.analytics.getTraceCheckStatusCounts.useQuery(
-      analyticsParams,
-      queryOpts
-    );
+  const { project } = useOrganizationTeamProject();
 
   return (
     <DashboardLayout>
@@ -142,186 +134,263 @@ function Index() {
             </VStack>
           </Alert>
         )}
-        <HStack width="full" align="top">
-          <Heading as={"h1"} size="lg" paddingBottom={6} paddingTop={1}>
-            User Metrics
-          </Heading>
-          <Spacer />
-          <FilterSelector />
-          <PeriodSelector
-            period={{ startDate, endDate }}
-            setPeriod={setPeriod}
-          />
-        </HStack>
-        <Grid
-          width="100%"
-          templateColumns={["1fr", "1fr", "1fr", "1fr 0.5fr"]}
-          gap={6}
-        >
-          <GridItem>
-            <Card>
-              <CardBody>
-                <Tabs variant="unstyled">
-                  <TabList gap={12}>
-                    <Tab paddingX={0} paddingBottom={4}>
-                      <VStack align="start">
-                        <Text color="black">Messages</Text>
-                        <Box fontSize={24} color="black" fontWeight="bold">
-                          <MessagesCountSummary />
-                        </Box>
-                      </VStack>
-                    </Tab>
-                    <Tab paddingX={0} paddingBottom={4}>
-                      <VStack align="start">
-                        <Text color="black">Threads</Text>
-                        <Box fontSize={24} color="black" fontWeight="bold">
-                          <ThreadsCountSummary />
-                        </Box>
-                      </VStack>
-                    </Tab>
-                    <Tab paddingX={0} paddingBottom={4}>
-                      <VStack align="start">
-                        <Text color="black">Users</Text>
-                        <Box fontSize={24} color="black" fontWeight="bold">
-                          <UsersCountSummary />
-                        </Box>
-                      </VStack>
-                    </Tab>
-                  </TabList>
-                  <TabIndicator
-                    mt="-1.5px"
-                    height="4px"
-                    bg="orange.400"
-                    borderRadius="1px"
-                  />
-                  <TabPanels>
-                    <TabPanel>
-                      <MessagesCountGraph />
-                    </TabPanel>
-                    <TabPanel>
-                      <ThreadsCountGraph />
-                    </TabPanel>
-                    <TabPanel>
-                      <UsersCountGraph />
-                    </TabPanel>
-                  </TabPanels>
-                </Tabs>
-              </CardBody>
-            </Card>
-          </GridItem>
-          <GridItem rowSpan={2}>
-            <VStack spacing={6}>
-              <TopTopics />
-              <SatisfactionPieChart />
-            </VStack>
-          </GridItem>
-          <GridItem>
-            <SessionsSummary />
-          </GridItem>
-        </Grid>
-        <Heading as={"h1"} size="lg" paddingBottom={6} paddingTop={10}>
-          LLM Metrics
-        </Heading>
-        <Grid width="100%" templateColumns="1fr 0.5fr" gap={6}>
-          <GridItem colSpan={2}>
-            <Card>
-              <CardBody>
-                <Tabs variant="unstyled">
-                  <TabList gap={12}>
-                    <Tab paddingX={0} paddingBottom={4}>
-                      <VStack align="start">
-                        <Text color="black">LLM Calls</Text>
-                        <Box fontSize={24} color="black" fontWeight="bold">
-                          <LLMCallsCountSummary />
-                        </Box>
-                      </VStack>
-                    </Tab>
-                    {hasTeamPermission(TeamRoleGroup.COST_VIEW) && (
-                      <Tab paddingX={0} paddingBottom={4}>
-                        <VStack align="start">
-                          <Text color="black">Total Cost</Text>
-                          <Box fontSize={24} color="black" fontWeight="bold">
-                            <LLMCostSumSummary />
-                          </Box>
-                        </VStack>
-                      </Tab>
-                    )}
-                    <Tab paddingX={0} paddingBottom={4}>
-                      <VStack align="start">
-                        <Text color="black">Tokens</Text>
-                        <Box fontSize={24} color="black" fontWeight="bold">
-                          <TokensSumSummary />
-                        </Box>
-                      </VStack>
-                    </Tab>
-                  </TabList>
-                  <TabIndicator
-                    mt="-1.5px"
-                    height="4px"
-                    bg="orange.400"
-                    borderRadius="1px"
-                  />
-                  <TabPanels>
-                    <TabPanel>
-                      <LLMCallsCountGraph />
-                    </TabPanel>
-                    {hasTeamPermission(TeamRoleGroup.COST_VIEW) && (
-                      <TabPanel>
-                        <LLMCostSumGraph />
-                      </TabPanel>
-                    )}
-                    <TabPanel>
-                      <TokensSumGraph />
-                    </TabPanel>
-                  </TabPanels>
-                </Tabs>
-              </CardBody>
-            </Card>
-          </GridItem>
-          <GridItem>
-            <LLMSummary />
-          </GridItem>
-          <GridItem>
-            <Card height="full">
-              <CardHeader>
-                <Heading size="sm">Validation Summary</Heading>
-              </CardHeader>
-              <CardBody>
-                <VStack align="start" spacing={4}>
-                  <HStack>
-                    <Box color="red.600">
-                      <XCircle />
-                    </Box>
-                    <Box>
-                      {traceCheckStatusCounts.data ? (
-                        numeral(traceCheckStatusCounts.data.failed).format(
-                          "0a"
-                        ) + " failed checks"
-                      ) : (
-                        <Skeleton height="1em" width="140px" />
-                      )}
-                    </Box>
-                  </HStack>
-                  <HStack>
-                    <Box color="green.600">
-                      <CheckCircle />
-                    </Box>
-                    <Box>
-                      {traceCheckStatusCounts.data ? (
-                        numeral(traceCheckStatusCounts.data.succeeded).format(
-                          "0a"
-                        ) + " successful checks"
-                      ) : (
-                        <Skeleton height="1em" width="170px" />
-                      )}
-                    </Box>
-                  </HStack>
-                </VStack>
-              </CardBody>
-            </Card>
-          </GridItem>
-        </Grid>
+        <UserMetrics />
+        <LLMMetrics />
+        <DocumentsMetrics />
       </Container>
     </DashboardLayout>
+  );
+}
+
+function UserMetrics() {
+  const {
+    period: { startDate, endDate },
+    setPeriod,
+  } = usePeriodSelector();
+
+  return (
+    <>
+      <HStack width="full" align="top">
+        <Heading as={"h1"} size="lg" paddingBottom={6} paddingTop={1}>
+          User Metrics
+        </Heading>
+        <Spacer />
+        <FilterSelector />
+        <PeriodSelector period={{ startDate, endDate }} setPeriod={setPeriod} />
+      </HStack>
+      <Grid
+        width="100%"
+        templateColumns={["1fr", "1fr", "1fr", "1fr 0.5fr"]}
+        gap={6}
+      >
+        <GridItem>
+          <Card>
+            <CardBody>
+              <Tabs variant="unstyled">
+                <TabList gap={12}>
+                  <Tab paddingX={0} paddingBottom={4}>
+                    <VStack align="start">
+                      <Text color="black">Messages</Text>
+                      <Box fontSize={24} color="black" fontWeight="bold">
+                        <MessagesCountSummary />
+                      </Box>
+                    </VStack>
+                  </Tab>
+                  <Tab paddingX={0} paddingBottom={4}>
+                    <VStack align="start">
+                      <Text color="black">Threads</Text>
+                      <Box fontSize={24} color="black" fontWeight="bold">
+                        <ThreadsCountSummary />
+                      </Box>
+                    </VStack>
+                  </Tab>
+                  <Tab paddingX={0} paddingBottom={4}>
+                    <VStack align="start">
+                      <Text color="black">Users</Text>
+                      <Box fontSize={24} color="black" fontWeight="bold">
+                        <UsersCountSummary />
+                      </Box>
+                    </VStack>
+                  </Tab>
+                </TabList>
+                <TabIndicator
+                  mt="-1.5px"
+                  height="4px"
+                  bg="orange.400"
+                  borderRadius="1px"
+                />
+                <TabPanels>
+                  <TabPanel>
+                    <MessagesCountGraph />
+                  </TabPanel>
+                  <TabPanel>
+                    <ThreadsCountGraph />
+                  </TabPanel>
+                  <TabPanel>
+                    <UsersCountGraph />
+                  </TabPanel>
+                </TabPanels>
+              </Tabs>
+            </CardBody>
+          </Card>
+        </GridItem>
+        <GridItem rowSpan={2}>
+          <VStack spacing={6}>
+            <TopTopics />
+            <SatisfactionPieChart />
+          </VStack>
+        </GridItem>
+        <GridItem>
+          <SessionsSummary />
+        </GridItem>
+      </Grid>
+    </>
+  );
+}
+
+function LLMMetrics() {
+  const { analyticsParams, queryOpts } = useAnalyticsParams();
+  const traceCheckStatusCounts =
+    api.analytics.getTraceCheckStatusCounts.useQuery(
+      analyticsParams,
+      queryOpts
+    );
+  const { hasTeamPermission } = useOrganizationTeamProject();
+
+  return (
+    <>
+      <Heading as={"h1"} size="lg" paddingBottom={6} paddingTop={10}>
+        LLM Metrics
+      </Heading>
+      <Grid width="100%" templateColumns="1fr 0.5fr" gap={6}>
+        <GridItem colSpan={2}>
+          <Card>
+            <CardBody>
+              <Tabs variant="unstyled">
+                <TabList gap={12}>
+                  <Tab paddingX={0} paddingBottom={4}>
+                    <VStack align="start">
+                      <Text color="black">LLM Calls</Text>
+                      <Box fontSize={24} color="black" fontWeight="bold">
+                        <LLMCallsCountSummary />
+                      </Box>
+                    </VStack>
+                  </Tab>
+                  {hasTeamPermission(TeamRoleGroup.COST_VIEW) && (
+                    <Tab paddingX={0} paddingBottom={4}>
+                      <VStack align="start">
+                        <Text color="black">Total Cost</Text>
+                        <Box fontSize={24} color="black" fontWeight="bold">
+                          <LLMCostSumSummary />
+                        </Box>
+                      </VStack>
+                    </Tab>
+                  )}
+                  <Tab paddingX={0} paddingBottom={4}>
+                    <VStack align="start">
+                      <Text color="black">Tokens</Text>
+                      <Box fontSize={24} color="black" fontWeight="bold">
+                        <TokensSumSummary />
+                      </Box>
+                    </VStack>
+                  </Tab>
+                </TabList>
+                <TabIndicator
+                  mt="-1.5px"
+                  height="4px"
+                  bg="orange.400"
+                  borderRadius="1px"
+                />
+                <TabPanels>
+                  <TabPanel>
+                    <LLMCallsCountGraph />
+                  </TabPanel>
+                  {hasTeamPermission(TeamRoleGroup.COST_VIEW) && (
+                    <TabPanel>
+                      <LLMCostSumGraph />
+                    </TabPanel>
+                  )}
+                  <TabPanel>
+                    <TokensSumGraph />
+                  </TabPanel>
+                </TabPanels>
+              </Tabs>
+            </CardBody>
+          </Card>
+        </GridItem>
+        <GridItem>
+          <LLMSummary />
+        </GridItem>
+        <GridItem>
+          <Card height="full">
+            <CardHeader>
+              <Heading size="sm">Validation Summary</Heading>
+            </CardHeader>
+            <CardBody>
+              <VStack align="start" spacing={4}>
+                <HStack>
+                  <Box color="red.600">
+                    <XCircle />
+                  </Box>
+                  <Box>
+                    {traceCheckStatusCounts.data ? (
+                      numeral(traceCheckStatusCounts.data.failed).format("0a") +
+                      " failed checks"
+                    ) : (
+                      <Skeleton height="1em" width="140px" />
+                    )}
+                  </Box>
+                </HStack>
+                <HStack>
+                  <Box color="green.600">
+                    <CheckCircle />
+                  </Box>
+                  <Box>
+                    {traceCheckStatusCounts.data ? (
+                      numeral(traceCheckStatusCounts.data.succeeded).format(
+                        "0a"
+                      ) + " successful checks"
+                    ) : (
+                      <Skeleton height="1em" width="170px" />
+                    )}
+                  </Box>
+                </HStack>
+              </VStack>
+            </CardBody>
+          </Card>
+        </GridItem>
+      </Grid>
+    </>
+  );
+}
+
+function DocumentsMetrics() {
+  const { analyticsParams, queryOpts } = useAnalyticsParams();
+  const documents = api.analytics.topUsedDocuments.useQuery(
+    analyticsParams,
+    queryOpts
+  );
+
+  const count = documents.data?.totalUniqueDocuments;
+
+  if (!count || count === 0) {
+    return null;
+  }
+
+  return (
+    <>
+      <HStack width="full" align="top">
+        <Heading as={"h1"} size="lg" paddingBottom={6} paddingTop={10}>
+          Documents
+        </Heading>
+      </HStack>
+      <Card>
+        <CardBody>
+          <Tabs variant="unstyled">
+            <TabList gap={12}>
+              <Tab paddingX={0} paddingBottom={4}>
+                <VStack align="start">
+                  <Text color="black">Total documents</Text>
+                  <Box fontSize={24} color="black" fontWeight="bold">
+                    <DocumentsCountsSummary />
+                  </Box>
+                </VStack>
+              </Tab>
+            </TabList>
+            <TabIndicator
+              mt="-1.5px"
+              height="4px"
+              bg="orange.400"
+              borderRadius="1px"
+            />
+            <TabPanels>
+              <TabPanel paddingX={0}>
+                <DocumentsCountsTable />
+              </TabPanel>
+            </TabPanels>
+          </Tabs>
+        </CardBody>
+      </Card>
+    </>
   );
 }

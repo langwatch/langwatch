@@ -32,6 +32,7 @@ import {
 } from "./analytics/users";
 import { sessionsVsPreviousPeriod } from "./analytics/sessions";
 import { satisfactionVsPreviousPeriod } from "./analytics/satisfaction";
+import { topUsedDocuments } from "./analytics/documents";
 
 export const analyticsRouter = createTRPCRouter({
   messagesCountVsPreviousPeriod,
@@ -48,6 +49,7 @@ export const analyticsRouter = createTRPCRouter({
   llmCostSumAggregated,
   tokensSumVsPreviousPeriod,
   tokensSumAggregated,
+  topUsedDocuments,
   getSummaryMetrics: protectedProcedure
     .input(sharedAnalyticsFilterInput)
     .use(checkUserPermissionForProject(TeamRoleGroup.ANALYTICS_VIEW))
