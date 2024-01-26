@@ -6,7 +6,7 @@ import {
 import { TRPCError } from "@trpc/server";
 import type { Session } from "next-auth";
 
-const teamRolePermissionMapping = {
+export const teamRolePermissionMapping = {
   ANALYTICS_VIEW: [
     TeamUserRole.ADMIN,
     TeamUserRole.MEMBER,
@@ -14,6 +14,7 @@ const teamRolePermissionMapping = {
   ],
   COST_VIEW: [TeamUserRole.ADMIN, TeamUserRole.MEMBER],
   MESSAGES_VIEW: [TeamUserRole.ADMIN, TeamUserRole.MEMBER, TeamUserRole.VIEWER],
+  SPANS_DEBUG: [TeamUserRole.ADMIN, TeamUserRole.MEMBER],
   GUARDRAILS_VIEW: [
     TeamUserRole.ADMIN,
     TeamUserRole.MEMBER,
@@ -25,7 +26,7 @@ const teamRolePermissionMapping = {
   TEAM_CREATE_NEW_PROJECTS: [TeamUserRole.ADMIN],
 };
 
-const organizationRolePermissionMapping = {
+export const organizationRolePermissionMapping = {
   ORGANIZATION_VIEW: [OrganizationUserRole.ADMIN, OrganizationUserRole.MEMBER],
   ORGANIZATION_MANAGE: [OrganizationUserRole.ADMIN],
 };
@@ -55,32 +56,40 @@ export const checkUserPermissionForProject =
     input: { projectId: string };
     next: () => any;
   }) => {
-    const projectTeam = await ctx.prisma.project.findUnique({
-      where: { id: input.projectId },
-      select: {
-        team: {
-          select: { members: { where: { userId: ctx.session.user.id } } },
-        },
-      },
-    });
-
-    const teamMember = projectTeam?.team.members.find(
-      (member) => member.userId === ctx.session.user.id
-    );
-
-    if (
-      !projectTeam ||
-      projectTeam.team.members.length === 0 ||
-      !teamMember ||
-      !(teamRolePermissionMapping[roleGroup] as TeamUserRole[]).includes(
-        teamMember.role
-      )
-    ) {
+    if (!(await backendHasTeamProjectPermission(ctx, input, roleGroup))) {
       throw new TRPCError({ code: "UNAUTHORIZED" });
     }
 
     return next();
   };
+
+export const backendHasTeamProjectPermission = async (
+  ctx: { prisma: PrismaClient; session: Session },
+  input: { projectId: string },
+  roleGroup: keyof typeof TeamRoleGroup
+) => {
+  const projectTeam = await ctx.prisma.project.findUnique({
+    where: { id: input.projectId },
+    select: {
+      team: {
+        select: { members: { where: { userId: ctx.session.user.id } } },
+      },
+    },
+  });
+
+  const teamMember = projectTeam?.team.members.find(
+    (member) => member.userId === ctx.session.user.id
+  );
+
+  return (
+    projectTeam &&
+    projectTeam.team.members.length > 0 &&
+    teamMember &&
+    (teamRolePermissionMapping[roleGroup] as TeamUserRole[]).includes(
+      teamMember.role
+    )
+  );
+};
 
 export const checkUserPermissionForTeam =
   (roleGroup: keyof typeof TeamRoleGroup) =>
@@ -93,44 +102,52 @@ export const checkUserPermissionForTeam =
     input: { teamId: string };
     next: () => any;
   }) => {
-    const team = await ctx.prisma.team.findUnique({
-      where: { id: input.teamId },
-    });
-    const organizationId = team?.organizationId;
-    if (!organizationId) {
-      throw "Organization not found for team";
-    }
-
-    const organizationUser = await ctx.prisma.organizationUser.findFirst({
-      where: {
-        userId: ctx.session.user.id,
-        organizationId,
-      },
-    });
-
-    // Organization ADMINs can do anything on all teams
-    if (organizationUser?.role === OrganizationUserRole.ADMIN) {
-      return next();
-    }
-
-    const teamUser = await ctx.prisma.teamUser.findFirst({
-      where: {
-        userId: ctx.session.user.id,
-        teamId: input.teamId,
-      },
-    });
-
-    if (
-      !teamUser ||
-      !(teamRolePermissionMapping[roleGroup] as TeamUserRole[]).includes(
-        teamUser.role
-      )
-    ) {
+    if (!(await backendHasTeamPermission(ctx, input, roleGroup))) {
       throw new TRPCError({ code: "UNAUTHORIZED" });
     }
 
     return next();
   };
+
+export const backendHasTeamPermission = async (
+  ctx: { prisma: PrismaClient; session: Session },
+  input: { teamId: string },
+  roleGroup: keyof typeof TeamRoleGroup
+) => {
+  const team = await ctx.prisma.team.findUnique({
+    where: { id: input.teamId },
+  });
+  const organizationId = team?.organizationId;
+  if (!organizationId) {
+    throw "Organization not found for team";
+  }
+
+  const organizationUser = await ctx.prisma.organizationUser.findFirst({
+    where: {
+      userId: ctx.session.user.id,
+      organizationId,
+    },
+  });
+
+  // Organization ADMINs can do anything on all teams
+  if (organizationUser?.role === OrganizationUserRole.ADMIN) {
+    return true;
+  }
+
+  const teamUser = await ctx.prisma.teamUser.findFirst({
+    where: {
+      userId: ctx.session.user.id,
+      teamId: input.teamId,
+    },
+  });
+
+  return (
+    teamUser &&
+    (teamRolePermissionMapping[roleGroup] as TeamUserRole[]).includes(
+      teamUser.role
+    )
+  );
+};
 
 export const checkUserPermissionForOrganization =
   (roleGroup: keyof typeof OrganizationRoleGroup) =>
@@ -143,21 +160,29 @@ export const checkUserPermissionForOrganization =
     input: { organizationId: string };
     next: () => any;
   }) => {
-    const organizationUser = await ctx.prisma.organizationUser.findFirst({
-      where: {
-        userId: ctx.session.user.id,
-        organizationId: input.organizationId,
-      },
-    });
-
-    if (
-      !organizationUser ||
-      !(
-        organizationRolePermissionMapping[roleGroup] as OrganizationUserRole[]
-      ).includes(organizationUser.role)
-    ) {
+    if (!(await backendHasOrganizationPermission(ctx, input, roleGroup))) {
       throw new TRPCError({ code: "UNAUTHORIZED" });
     }
 
     return next();
   };
+
+export const backendHasOrganizationPermission = async (
+  ctx: { prisma: PrismaClient; session: Session },
+  input: { organizationId: string },
+  roleGroup: keyof typeof OrganizationRoleGroup
+) => {
+  const organizationUser = await ctx.prisma.organizationUser.findFirst({
+    where: {
+      userId: ctx.session.user.id,
+      organizationId: input.organizationId,
+    },
+  });
+
+  return (
+    organizationUser &&
+    (
+      organizationRolePermissionMapping[roleGroup] as OrganizationUserRole[]
+    ).includes(organizationUser.role)
+  );
+};

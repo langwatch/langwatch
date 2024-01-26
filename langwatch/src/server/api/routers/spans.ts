@@ -4,10 +4,12 @@ import { TRPCError } from "@trpc/server";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { SPAN_INDEX, esClient } from "../../elasticsearch";
 import type { ElasticSearchSpan } from "../../tracer/types";
+import { TeamRoleGroup, checkUserPermissionForProject } from "../permission";
 
 export const spansRouter = createTRPCRouter({
   getAllForTrace: protectedProcedure
     .input(z.object({ projectId: z.string(), traceId: z.string() }))
+    .use(checkUserPermissionForProject(TeamRoleGroup.SPANS_DEBUG))
     .query(async ({ input, ctx }) => {
       const userId = ctx.session.user.id;
       const prisma = ctx.prisma;

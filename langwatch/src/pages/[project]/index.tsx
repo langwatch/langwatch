@@ -67,6 +67,7 @@ import { useRouter } from "next/router";
 import { dependencies } from "../../injection/dependencies.client";
 import { dependencies as serverDependencies } from "../../injection/dependencies.server";
 import type { GetServerSidePropsContext } from "next";
+import { TeamRoleGroup } from "../../server/api/permission";
 
 export default function ProjectRouter() {
   const router = useRouter();
@@ -102,7 +103,7 @@ export const getServerSideProps = async (
 };
 
 function Index() {
-  const { project } = useOrganizationTeamProject();
+  const { project, hasTeamPermission } = useOrganizationTeamProject();
   const {
     period: { startDate, endDate },
     setPeriod,
@@ -235,14 +236,16 @@ function Index() {
                         </Box>
                       </VStack>
                     </Tab>
-                    <Tab paddingX={0} paddingBottom={4}>
-                      <VStack align="start">
-                        <Text color="black">Total Cost</Text>
-                        <Box fontSize={24} color="black" fontWeight="bold">
-                          <LLMCostSumSummary />
-                        </Box>
-                      </VStack>
-                    </Tab>
+                    {hasTeamPermission(TeamRoleGroup.COST_VIEW) && (
+                      <Tab paddingX={0} paddingBottom={4}>
+                        <VStack align="start">
+                          <Text color="black">Total Cost</Text>
+                          <Box fontSize={24} color="black" fontWeight="bold">
+                            <LLMCostSumSummary />
+                          </Box>
+                        </VStack>
+                      </Tab>
+                    )}
                     <Tab paddingX={0} paddingBottom={4}>
                       <VStack align="start">
                         <Text color="black">Tokens</Text>
@@ -262,9 +265,11 @@ function Index() {
                     <TabPanel>
                       <LLMCallsCountGraph />
                     </TabPanel>
-                    <TabPanel>
-                      <LLMCostSumGraph />
-                    </TabPanel>
+                    {hasTeamPermission(TeamRoleGroup.COST_VIEW) && (
+                      <TabPanel>
+                        <LLMCostSumGraph />
+                      </TabPanel>
+                    )}
                     <TabPanel>
                       <TokensSumGraph />
                     </TabPanel>

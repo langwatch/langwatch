@@ -3,8 +3,11 @@ import { formatMilliseconds } from "../../utils/formatMilliseconds";
 import { SummaryMetric } from "./SummaryMetric";
 import { useAnalyticsParams } from "../../hooks/useAnalyticsParams";
 import { api } from "../../utils/api";
+import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
+import { TeamRoleGroup } from "../../server/api/permission";
 
 export const LLMSummary = () => {
+  const { hasTeamPermission } = useOrganizationTeamProject();
   const { analyticsParams, queryOpts } = useAnalyticsParams();
 
   const summaryMetrics = api.analytics.getSummaryMetrics.useQuery(
@@ -25,17 +28,21 @@ export const LLMSummary = () => {
             previous={summaryMetrics.data?.previousPeriod.avg_tokens_per_trace}
             increaseIs="neutral"
           />
-          <SummaryMetric
-            label="Average Cost per Message"
-            current={
-              summaryMetrics.data?.currentPeriod.avg_total_cost_per_1000_traces
-            }
-            previous={
-              summaryMetrics.data?.previousPeriod.avg_total_cost_per_1000_traces
-            }
-            format="$0.00a"
-            increaseIs="bad"
-          />
+          {hasTeamPermission(TeamRoleGroup.COST_VIEW) && (
+            <SummaryMetric
+              label="Average Cost per Message"
+              current={
+                summaryMetrics.data?.currentPeriod
+                  .avg_total_cost_per_1000_traces
+              }
+              previous={
+                summaryMetrics.data?.previousPeriod
+                  .avg_total_cost_per_1000_traces
+              }
+              format="$0.00a"
+              increaseIs="bad"
+            />
+          )}
           {(!summaryMetrics.data ||
             summaryMetrics.data.currentPeriod
               .percentile_90th_time_to_first_token > 0) && (

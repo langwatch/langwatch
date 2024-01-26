@@ -32,10 +32,11 @@ import { useTraceDetailsState } from "../../../../hooks/useTraceDetailsState";
 import type { Trace } from "../../../../server/tracer/types";
 import { api } from "../../../../utils/api";
 import { isNotFound } from "../../../../utils/trpcError";
+import { TeamRoleGroup } from "../../../../server/api/permission";
 
 export default function TraceDetails() {
   const router = useRouter();
-  const { project } = useOrganizationTeamProject();
+  const { project, hasTeamPermission } = useOrganizationTeamProject();
   const { traceId, trace, openTab } = useTraceDetailsState();
   const [threadId, setThreadId] = useState<string | undefined>(undefined);
 
@@ -54,6 +55,7 @@ export default function TraceDetails() {
   });
 
   useEffect(() => {
+    if (!hasTeamPermission(TeamRoleGroup.SPANS_DEBUG)) return;
     setTimeout(
       () => {
         const isOpen = (!!threadId || !!trace.data) && !!openTab;

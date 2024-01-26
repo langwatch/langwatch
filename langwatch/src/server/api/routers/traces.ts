@@ -11,7 +11,12 @@ import {
 } from "../../elasticsearch";
 import { getOpenAIEmbeddings } from "../../embeddings";
 import type { ElasticSearchSpan, Trace, TraceCheck } from "../../tracer/types";
-import { TeamRoleGroup, checkUserPermissionForProject } from "../permission";
+import {
+  TeamRoleGroup,
+  checkUserPermissionForProject,
+  backendHasOrganizationPermission,
+  backendHasTeamProjectPermission,
+} from "../permission";
 
 const sharedTraceFilterInput = z.object({
   projectId: z.string(),
@@ -100,7 +105,7 @@ export const tracesRouter = createTRPCRouter({
       })
     )
     .use(checkUserPermissionForProject(TeamRoleGroup.MESSAGES_VIEW))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
       const embeddings = input.query
         ? await getOpenAIEmbeddings(input.query)
         : [];
@@ -109,6 +114,12 @@ export const tracesRouter = createTRPCRouter({
         ...generateQueryConditions(input),
         ...(input.topics ? [{ terms: { topics: input.topics } }] : []),
       ];
+
+      const canSeeCosts = await backendHasTeamProjectPermission(
+        ctx,
+        input,
+        TeamRoleGroup.COST_VIEW
+      );
 
       //@ts-ignore
       const tracesResult = await esClient.search<Trace>({
@@ -119,6 +130,7 @@ export const tracesRouter = createTRPCRouter({
             "search_embeddings.openai_embeddings",
             ...(input.groupBy !== "input" ? ["input.openai_embeddings"] : []),
             ...(input.groupBy !== "output" ? ["output.openai_embeddings"] : []),
+            ...(canSeeCosts ? [] : ["metrics.total_cost"]),
           ],
         },
         ...(!input.query
@@ -200,9 +212,25 @@ export const tracesRouter = createTRPCRouter({
   getById: protectedProcedure
     .input(z.object({ projectId: z.string(), traceId: z.string() }))
     .use(checkUserPermissionForProject(TeamRoleGroup.MESSAGES_VIEW))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      const canSeeCosts = await backendHasTeamProjectPermission(
+        ctx,
+        input,
+        TeamRoleGroup.COST_VIEW
+      );
+
+      //@ts-ignore
       const result = await esClient.search<Trace>({
         index: TRACE_INDEX,
+        size: 1,
+        _source: {
+          excludes: [
+            "search_embeddings.openai_embeddings",
+            "input.openai_embeddings",
+            "output.openai_embeddings",
+            ...(canSeeCosts ? [] : ["metrics.total_cost"]),
+          ],
+        },
         body: {
           query: {
             //@ts-ignore
@@ -214,7 +242,6 @@ export const tracesRouter = createTRPCRouter({
             },
           },
         },
-        size: 1,
       });
 
       const trace = result.hits.hits[0]?._source;

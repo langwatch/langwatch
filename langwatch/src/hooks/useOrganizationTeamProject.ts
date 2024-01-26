@@ -3,6 +3,13 @@ import { useEffect } from "react";
 import { useLocalStorage } from "usehooks-ts";
 import { api } from "../utils/api";
 import { useRequiredSession } from "./useRequiredSession";
+import {
+  organizationRolePermissionMapping,
+  type OrganizationRoleGroup,
+  type TeamRoleGroup,
+  teamRolePermissionMapping,
+} from "../server/api/permission";
+import type { OrganizationUserRole, TeamUserRole } from "@prisma/client";
 
 export const useOrganizationTeamProject = (
   {
@@ -107,8 +114,35 @@ export const useOrganizationTeamProject = (
   ]);
 
   if (organizations.isLoading && !organizations.isFetched) {
-    return { isLoading: true };
+    return {
+      isLoading: true,
+      hasTeamPermission: () => false,
+      hasOrganizationPermission: () => false,
+    };
   }
+
+  const organizationRole = organization?.members[0]?.role;
+  const teamRole = team?.members[0]?.role;
+
+  const hasOrganizationPermission = (
+    roleGroup: keyof typeof OrganizationRoleGroup
+  ) => {
+    return (
+      organizationRole &&
+      (
+        organizationRolePermissionMapping[roleGroup] as OrganizationUserRole[]
+      ).includes(organizationRole)
+    );
+  };
+
+  const hasTeamPermission = (roleGroup: keyof typeof TeamRoleGroup) => {
+    return (
+      teamRole &&
+      (teamRolePermissionMapping[roleGroup] as TeamUserRole[]).includes(
+        teamRole
+      )
+    );
+  };
 
   return {
     isLoading: false,
@@ -117,5 +151,7 @@ export const useOrganizationTeamProject = (
     organization,
     team,
     project,
+    hasOrganizationPermission,
+    hasTeamPermission,
   };
 };

@@ -21,11 +21,13 @@ import { ChevronRight } from "react-feather";
 import { DashboardLayout } from "../../components/DashboardLayout";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
-import type { CheckPreconditions } from "../../trace_checks/types";
+import type { CheckPreconditions, CheckTypes } from "../../trace_checks/types";
 import { camelCaseToLowerCase } from "../../utils/stringCasing";
+import { TeamRoleGroup } from "../../server/api/permission";
+import { AVAILABLE_TRACE_CHECKS } from "../../trace_checks/registry";
 
 export default function Checks() {
-  const { project } = useOrganizationTeamProject();
+  const { project, hasTeamPermission } = useOrganizationTeamProject();
   const checks = api.checks.getAllForProject.useQuery(
     {
       projectId: project?.id ?? "",
@@ -146,18 +148,33 @@ export default function Checks() {
                   >
                     <CardBody width="full">
                       <HStack width="full" spacing={6}>
-                        <Switch
-                          size="lg"
-                          isChecked={check.enabled}
-                          onChange={() => handleToggle(check.id, check.enabled)}
-                          position="relative"
-                          zIndex={1}
-                          variant="darkerTrack"
-                        />
+                        {hasTeamPermission(TeamRoleGroup.GUARDRAILS_MANAGE) && (
+                          <Switch
+                            size="lg"
+                            isChecked={check.enabled}
+                            onChange={() =>
+                              handleToggle(check.id, check.enabled)
+                            }
+                            position="relative"
+                            zIndex={1}
+                            variant="darkerTrack"
+                          />
+                        )}
                         <VStack flexGrow={1} align="start">
                           <Heading as="h3" size="md">
                             {check.name}
                           </Heading>
+                          {!hasTeamPermission(
+                            TeamRoleGroup.GUARDRAILS_MANAGE
+                          ) && (
+                            <Text>
+                              {
+                                AVAILABLE_TRACE_CHECKS[
+                                  check.checkType as CheckTypes
+                                ].description
+                              }
+                            </Text>
+                          )}
                           <Text>
                             {!preconditions?.length
                               ? `Runs on ${sample}`
@@ -173,12 +190,14 @@ export default function Checks() {
                               : `Runs on ${sample} matching ${preconditions.length} preconditions`}
                           </Text>
                         </VStack>
-                        <LinkOverlay
-                          as={NextLink}
-                          href={`/${project.slug}/guardrails/${check.id}/edit`}
-                        >
-                          <ChevronRight />
-                        </LinkOverlay>
+                        {hasTeamPermission(TeamRoleGroup.GUARDRAILS_MANAGE) && (
+                          <LinkOverlay
+                            as={NextLink}
+                            href={`/${project.slug}/guardrails/${check.id}/edit`}
+                          >
+                            <ChevronRight />
+                          </LinkOverlay>
+                        )}
                       </HStack>
                     </CardBody>
                   </Card>

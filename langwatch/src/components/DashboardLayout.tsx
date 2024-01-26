@@ -20,7 +20,7 @@ import {
   useTheme,
   type BackgroundProps,
 } from "@chakra-ui/react";
-import type { Project } from "@prisma/client";
+import { OrganizationUserRole, type Project } from "@prisma/client";
 import { signOut } from "next-auth/react";
 import ErrorPage from "next/error";
 import Head from "next/head";
@@ -45,6 +45,7 @@ import { LoadingScreen } from "./LoadingScreen";
 import { ProjectTechStackIcon } from "./TechStack";
 import { LogoIcon } from "./icons/LogoIcon";
 import { dependencies } from "../injection/dependencies.client";
+import { OrganizationRoleGroup } from "../server/api/permission";
 
 const Breadcrumbs = ({ currentRoute }: { currentRoute: Route | undefined }) => {
   const { project } = useOrganizationTeamProject();
@@ -116,6 +117,7 @@ const ProjectSelector = ({
 }) => {
   const router = useRouter();
   const currentRoute = findCurrentRoute(router.pathname);
+  const { data: session } = useRequiredSession();
 
   const sortByName = (a: { name: string }, b: { name: string }) =>
     a.name.toLowerCase() < b.name.toLowerCase()
@@ -157,51 +159,57 @@ const ProjectSelector = ({
         <Box zIndex="popover" padding={0}>
           <MenuList zIndex="popover">
             <>
-              {projectGroups.map((projectGroup) => (
-                <MenuGroup
-                  key={projectGroup.team.id}
-                  title={
-                    projectGroup.organization.name +
-                    (projectGroup.team.name !== projectGroup.organization.name
-                      ? " - " + projectGroup.team.name
-                      : "")
-                  }
-                >
-                  {projectGroup.projects.map((project) => (
+              {projectGroups
+                .filter((projectGroup) =>
+                  projectGroup.team.members.some(
+                    (member) => member.userId === session?.user.id
+                  )
+                )
+                .map((projectGroup) => (
+                  <MenuGroup
+                    key={projectGroup.team.id}
+                    title={
+                      projectGroup.organization.name +
+                      (projectGroup.team.name !== projectGroup.organization.name
+                        ? " - " + projectGroup.team.name
+                        : "")
+                    }
+                  >
+                    {projectGroup.projects.map((project) => (
+                      <Link
+                        key={project.id}
+                        href={
+                          currentRoute?.path.includes("[project]")
+                            ? currentRoute.path
+                                .replace("[project]", project.slug)
+                                .replace(/\[.*?\]/g, "")
+                                .replace(/\/\/+/g, "/")
+                            : `/${project.slug}`
+                        }
+                        _hover={{
+                          textDecoration: "none",
+                        }}
+                      >
+                        <MenuItem
+                          icon={<ProjectTechStackIcon project={project} />}
+                          fontSize="14px"
+                        >
+                          {project.name}
+                        </MenuItem>
+                      </Link>
+                    ))}
                     <Link
-                      key={project.id}
-                      href={
-                        currentRoute?.path.includes("[project]")
-                          ? currentRoute.path
-                              .replace("[project]", project.slug)
-                              .replace(/\[.*?\]/g, "")
-                              .replace(/\/\/+/g, "/")
-                          : `/${project.slug}`
-                      }
+                      href={`/onboarding/${projectGroup.team.slug}/project`}
                       _hover={{
                         textDecoration: "none",
                       }}
                     >
-                      <MenuItem
-                        icon={<ProjectTechStackIcon project={project} />}
-                        fontSize="14px"
-                      >
-                        {project.name}
+                      <MenuItem icon={<Plus />} fontSize="14px">
+                        New Project
                       </MenuItem>
                     </Link>
-                  ))}
-                  <Link
-                    href={`/onboarding/${projectGroup.team.slug}/project`}
-                    _hover={{
-                      textDecoration: "none",
-                    }}
-                  >
-                    <MenuItem icon={<Plus />} fontSize="14px">
-                      New Project
-                    </MenuItem>
-                  </Link>
-                </MenuGroup>
-              ))}
+                  </MenuGroup>
+                ))}
             </>
           </MenuList>
         </Box>
@@ -220,8 +228,14 @@ export const DashboardLayout = ({
 
   const { data: session } = useRequiredSession();
 
-  const { isLoading, organization, organizations, team, project } =
-    useOrganizationTeamProject();
+  const {
+    isLoading,
+    organization,
+    organizations,
+    team,
+    project,
+    hasOrganizationPermission
+  } = useOrganizationTeamProject();
 
   const [query, setQuery] = useState("");
 
@@ -299,12 +313,14 @@ export const DashboardLayout = ({
               label={projectRoutes.prompts.title}
               project={project}
             /> */}
-            <SideMenuLink
-              path={projectRoutes.settings.path}
-              icon={Settings}
-              label={projectRoutes.settings.title}
-              project={project}
-            />
+            {hasOrganizationPermission(OrganizationRoleGroup.ORGANIZATION_VIEW) && (
+              <SideMenuLink
+                path={projectRoutes.settings.path}
+                icon={Settings}
+                label={projectRoutes.settings.title}
+                project={project}
+              />
+            )}
           </VStack>
         </VStack>
       </Box>
@@ -375,7 +391,9 @@ export const DashboardLayout = ({
             <Portal>
               <MenuList zIndex="popover">
                 {dependencies.ExtraMenuItems && <dependencies.ExtraMenuItems />}
-                <MenuGroup title={`${session.user.name} (${session.user.email})`}>
+                <MenuGroup
+                  title={`${session.user.name} (${session.user.email})`}
+                >
                   <MenuItem
                     onClick={() =>
                       void signOut({ callbackUrl: window.location.origin })
