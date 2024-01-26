@@ -122,7 +122,6 @@ export const useOrganizationTeamProject = (
   }
 
   const organizationRole = organization?.members[0]?.role;
-  const teamRole = team?.members[0]?.role;
 
   const hasOrganizationPermission = (
     roleGroup: keyof typeof OrganizationRoleGroup
@@ -135,7 +134,11 @@ export const useOrganizationTeamProject = (
     );
   };
 
-  const hasTeamPermission = (roleGroup: keyof typeof TeamRoleGroup) => {
+  const hasTeamPermission = (
+    roleGroup: keyof typeof TeamRoleGroup,
+    team_ = team
+  ) => {
+    const teamRole = team_?.members[0]?.role;
     return (
       teamRole &&
       (teamRolePermissionMapping[roleGroup] as TeamUserRole[]).includes(

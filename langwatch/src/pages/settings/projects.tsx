@@ -25,6 +25,7 @@ import type {
   FullyLoadedOrganization,
   TeamWithProjects,
 } from "../../server/api/routers/organization";
+import { TeamRoleGroup } from "../../server/api/permission";
 
 export default function Projects() {
   const { organization } = useOrganizationTeamProject();
@@ -39,6 +40,8 @@ function ProjectsList({
 }: {
   organization: FullyLoadedOrganization;
 }) {
+  const { hasTeamPermission } = useOrganizationTeamProject();
+
   return (
     <SettingsLayout>
       <VStack
@@ -63,17 +66,22 @@ function ProjectsList({
                     <Tr>
                       <Th>{team.name}</Th>
                       <Td textAlign="right">
-                        <Button
-                          as={NextLink}
-                          href={`/onboarding/${team.slug}/project`}
-                          size="sm"
-                          colorScheme="orange"
-                        >
-                          <HStack spacing={2}>
-                            <Plus size={20} />
-                            <Text>Add new project</Text>
-                          </HStack>
-                        </Button>
+                        {hasTeamPermission(
+                          TeamRoleGroup.TEAM_CREATE_NEW_PROJECTS,
+                          team
+                        ) && (
+                          <Button
+                            as={NextLink}
+                            href={`/onboarding/${team.slug}/project`}
+                            size="sm"
+                            colorScheme="orange"
+                          >
+                            <HStack spacing={2}>
+                              <Plus size={20} />
+                              <Text>Add new project</Text>
+                            </HStack>
+                          </Button>
+                        )}
                       </Td>
                     </Tr>
                   </Thead>

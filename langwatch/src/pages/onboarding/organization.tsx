@@ -8,6 +8,7 @@ import {
   Input,
   Text,
   VStack,
+  useToast,
 } from "@chakra-ui/react";
 import { useRouter } from "next/router";
 import { useEffect } from "react";
@@ -24,8 +25,13 @@ type OrganizationFormData = {
 export default function OrganizationOnboarding() {
   const { data: session } = useRequiredSession();
 
-  const { register, handleSubmit } = useForm<OrganizationFormData>();
+  const {
+    register,
+    handleSubmit,
+    reset: resetForm,
+  } = useForm<OrganizationFormData>();
   const router = useRouter();
+  const toast = useToast();
 
   const createOrganization = api.organization.createAndAssign.useMutation();
   const apiContext = api.useContext();
@@ -33,9 +39,24 @@ export default function OrganizationOnboarding() {
   const onSubmit: SubmitHandler<OrganizationFormData> = (
     data: OrganizationFormData
   ) => {
-    createOrganization.mutate({
-      orgName: data.organizationName,
-    });
+    createOrganization.mutate(
+      {
+        orgName: data.organizationName,
+      },
+      {
+        onError: () => {
+          toast({
+            title: "Failed to create organization",
+            description: "Please try that again",
+            status: "error",
+            duration: 5000,
+            isClosable: true,
+            position: "top-right",
+          });
+          resetForm();
+        },
+      }
+    );
   };
 
   useEffect(() => {

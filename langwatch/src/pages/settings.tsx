@@ -7,17 +7,20 @@ import {
   Input,
   Spacer,
   Spinner,
+  Text,
   VStack,
+  useToast,
 } from "@chakra-ui/react";
 import isEqual from "lodash.isequal";
 import { useEffect, useState } from "react";
 import { useForm, useWatch, type SubmitHandler } from "react-hook-form";
 import { useDebouncedCallback } from "use-debounce";
-import SettingsLayout from "../components/SettingsLayout";
 import { HorizontalFormControl } from "~/components/HorizontalFormControl";
+import SettingsLayout from "../components/SettingsLayout";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import type { FullyLoadedOrganization } from "../server/api/routers/organization";
 import { api } from "../utils/api";
+import { OrganizationRoleGroup } from "../server/api/permission";
 
 type OrganizationFormData = {
   name: string;
@@ -36,6 +39,7 @@ function SettingsForm({
 }: {
   organization: FullyLoadedOrganization;
 }) {
+  const { hasOrganizationPermission } = useOrganizationTeamProject();
   const [defaultValues, setDefaultValues] = useState<OrganizationFormData>({
     name: organization.name,
   });
@@ -45,6 +49,7 @@ function SettingsForm({
   const formWatch = useWatch({ control });
   const updateOrganization = api.organization.update.useMutation();
   const apiContext = api.useContext();
+  const toast = useToast();
 
   const onSubmit: SubmitHandler<OrganizationFormData> = useDebouncedCallback(
     (data: OrganizationFormData) => {
@@ -60,6 +65,16 @@ function SettingsForm({
         {
           onSuccess: () => {
             void apiContext.organization.getAll.refetch();
+          },
+          onError: () => {
+            toast({
+              title: "Failed to create organization",
+              description: "Please try that again",
+              status: "error",
+              duration: 5000,
+              isClosable: true,
+              position: "top-right",
+            });
           },
         }
       );
@@ -97,28 +112,42 @@ function SettingsForm({
                   helper="The name of your organization"
                   isInvalid={!!getFieldState("name").error}
                 >
-                  <Input
-                    width="full"
-                    type="text"
-                    {...register("name", {
-                      required: true,
-                      validate: (value) => {
-                        if (!value.trim()) return false;
-                      },
-                    })}
-                  />
-                  <FormErrorMessage>Name is required</FormErrorMessage>
+                  {hasOrganizationPermission(
+                    OrganizationRoleGroup.ORGANIZATION_MANAGE
+                  ) ? (
+                    <>
+                      <Input
+                        width="full"
+                        type="text"
+                        {...register("name", {
+                          required: true,
+                          validate: (value) => {
+                            if (!value.trim()) return false;
+                          },
+                        })}
+                      />
+                      <FormErrorMessage>Name is required</FormErrorMessage>
+                    </>
+                  ) : (
+                    <Text>{organization.name}</Text>
+                  )}
                 </HorizontalFormControl>
                 <HorizontalFormControl
                   label="Slug"
                   helper="The unique ID of your organization"
                 >
-                  <Input
-                    width="full"
-                    disabled
-                    type="text"
-                    value={organization.slug}
-                  />
+                  {hasOrganizationPermission(
+                    OrganizationRoleGroup.ORGANIZATION_MANAGE
+                  ) ? (
+                    <Input
+                      width="full"
+                      disabled
+                      type="text"
+                      value={organization.slug}
+                    />
+                  ) : (
+                    <Text>{organization.slug}</Text>
+                  )}
                 </HorizontalFormControl>
               </VStack>
             </form>
