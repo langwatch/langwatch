@@ -90,7 +90,7 @@ export const useOrganizationTeamProject = (
   useEffect(() => {
     if (!organizations.data) return;
 
-    if (!organization) {
+    if (!organization || !team) {
       void router.push("/onboarding/organization");
       return;
     }

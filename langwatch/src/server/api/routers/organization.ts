@@ -142,7 +142,7 @@ export const organizationRouter = createTRPCRouter({
           teams: {
             some: {
               members: {
-                every: {
+                some: {
                   userId: userId,
                 },
               },
