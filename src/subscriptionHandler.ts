@@ -33,7 +33,8 @@ export class SubscriptionHandlerSass extends SubscriptionHandler {
   static async getActivePlan(organizationId: string): Promise<PlanInfo> {
     if (
       organizationId === "organization_erk6Bmlfzxw2YMyzWdo8O" ||
-      organizationId === "HXECRq2mRfSQpxTiSCcsS"
+      organizationId === "HXECRq2mRfSQpxTiSCcsS" ||
+      organizationId === "XpdrHl5j4YrD6VWJffq5k"
     ) {
       return PLAN_LIMITS[PlanTypes.BUSINESS];
     }
