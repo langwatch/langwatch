@@ -65,13 +65,6 @@ export const guardEnMasse: any = async (params: any, next: any) => {
     safeWord: safeWordDelete,
   });
 
-  /* MASS FIND PROTECTION MIDDLEWARE */
-  _guardEnMasse({
-    actions: ["findMany"],
-    params,
-    safeWord: safeWordFind,
-  });
-
   /* MASS UPDATE PROTECTION MIDDLEWARE */
   _guardEnMasse({
     actions: ["updateMany"],

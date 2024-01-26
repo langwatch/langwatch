@@ -139,15 +139,6 @@ export const organizationRouter = createTRPCRouter({
               userId: userId,
             },
           },
-          teams: {
-            some: {
-              members: {
-                some: {
-                  userId: userId,
-                },
-              },
-            },
-          },
         },
         include: {
           members: true,
