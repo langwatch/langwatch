@@ -5,13 +5,6 @@ export const OpenAIPython = ({ apiKey }: { apiKey?: string }) => {
     <div>
       <h3>Installation:</h3>
       <RenderCode code={`pip install langwatch`} language="bash" />
-      <p>
-        <i>
-          <b>Note:</b> LangWatch supports openai library v1.3.7 and above, if
-          you need to integrate with an older version of openai (below v1.0.0),
-          install langwatch==0.0.3
-        </i>
-      </p>
       <h3>Configuration:</h3>
       <p>
         Ensure the <code>LANGWATCH_API_KEY</code> environment variable is set:
