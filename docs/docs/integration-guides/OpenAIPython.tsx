@@ -34,7 +34,7 @@ client = OpenAI()
 # Use the LangWatch tracer for the OpenAI model
 with langwatch.openai.OpenAITracer(client, user_id="user-123", thread_id="thread-456"):
     # Your interaction with OpenAI's API
-    completion = client.ChatCompletion.create(
+    completion = client.chat.completions.create(
         model="gpt-4",
         messages=[
             {"role": "system", "content": "You are a helpful assistant."},

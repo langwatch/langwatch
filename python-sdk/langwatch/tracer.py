@@ -1,9 +1,8 @@
-import asyncio
-from asyncio import Task
 import functools
 import os
 import threading
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import Future, ThreadPoolExecutor
+import time
 from typing import Any, Dict, List, Optional, TypeVar
 
 import nanoid
@@ -136,7 +135,11 @@ def create_span(
     )
 
 
-def capture_rag(contexts: List[RAGChunk], input: Optional[str] = None, name: str = "RetrievalAugmentedGeneration"):
+def capture_rag(
+    contexts: List[RAGChunk],
+    input: Optional[str] = None,
+    name: str = "RetrievalAugmentedGeneration",
+):
     return ContextRAGSpan(
         id=f"span_{nanoid.generate()}", name=name, input=input, contexts=contexts
     )
@@ -164,9 +167,12 @@ def span(name: Optional[str] = None, type: SpanTypes = "span"):
     return _span
 
 
+executor = ThreadPoolExecutor(max_workers=10)
+
+
 class BaseContextTracer:
     sent_once = False
-    scheduled_send: Optional[Task[None]] = None
+    scheduled_send: Optional[Future[None]] = None
 
     def __init__(
         self,
@@ -194,7 +200,7 @@ class BaseContextTracer:
     def delayed_send_spans(self):
         self._add_finished_at_to_missing_spans()
 
-        if "PYTEST_CURRENT_TEST" in os.environ:
+        def send_spans_sync():
             send_spans(
                 CollectorRESTParams(
                     trace_id=self.trace_id,
@@ -206,26 +212,21 @@ class BaseContextTracer:
                     experiments=[],
                 )
             )
+
+        if "PYTEST_CURRENT_TEST" in os.environ:
+            # Keep on the same thread for tests
+            send_spans_sync()
             return
 
-        async def schedule():
-            await asyncio.sleep(1)
+        def run_in_thread():
+            time.sleep(1)  # wait for other spans to be added
             self.sent_once = True
-            send_spans(
-                CollectorRESTParams(
-                    trace_id=self.trace_id,
-                    spans=list(self.spans.values()),
-                    user_id=self.user_id,
-                    thread_id=self.thread_id,
-                    customer_id=self.customer_id,
-                    labels=self.labels,
-                    experiments=[],
-                )
-            )
+            send_spans_sync()
 
-        if self.scheduled_send:
+        if self.scheduled_send and not self.scheduled_send.done():
             self.scheduled_send.cancel()
-        self.scheduled_send = asyncio.ensure_future(schedule())
+
+        self.scheduled_send = executor.submit(run_in_thread)
 
     def append_span(self, span: Span):
         span["id"] = span.get("id", f"span_{nanoid.generate()}")
@@ -251,11 +252,10 @@ class BaseContextTracer:
                 span["timestamps"]["finished_at"] = milliseconds_timestamp()
 
 
-executor = ThreadPoolExecutor(max_workers=10)
-
-
 @retry(tries=5, delay=0.5, backoff=3)
-def _send_spans(data: CollectorRESTParams):
+def send_spans(data: CollectorRESTParams):
+    if len(data["spans"]) == 0:
+        return
     if not langwatch.api_key:
         return
     response = requests.post(
@@ -264,13 +264,3 @@ def _send_spans(data: CollectorRESTParams):
         headers={"X-Auth-Token": str(langwatch.api_key)},
     )
     response.raise_for_status()
-
-
-def send_spans(data: CollectorRESTParams):
-    if len(data["spans"]) == 0:
-        return
-    if "PYTEST_CURRENT_TEST" in os.environ:
-        # Keep on the same thread for tests
-        _send_spans(data)
-    else:
-        executor.submit(_send_spans, data)

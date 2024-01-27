@@ -46,7 +46,7 @@ import openai
 # Use the LangWatch tracer for the OpenAI model
 with langwatch.openai.OpenAITracer(client):
     # Your interaction with OpenAI's API
-    completion = client.ChatCompletion.create(
+    completion = client.chat.completions.create(
         model="gpt-4",
         messages=[
             {

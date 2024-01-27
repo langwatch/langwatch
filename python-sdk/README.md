@@ -5,10 +5,13 @@ Go to [https://langwatch.ai](https://langwatch.ai) to setup your account.
 To trace OpenAI calls:
 
 ```diff
+from openai import OpenAI
 + import langwatch.openai
 
-+ with langwatch.openai.OpenAITracer():
-    completion = openai.ChatCompletion.create(
+client = OpenAI()
+
++ with langwatch.openai.OpenAITracer(client):
+    completion = client.chat.completions.create(
         model="gpt-3.5-turbo",
         messages=[
             {
