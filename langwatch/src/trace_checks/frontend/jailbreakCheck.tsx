@@ -3,8 +3,8 @@ import type { TraceCheck } from "../../server/tracer/types";
 import type { JailbreakAnalysisResult } from "../types";
 
 export function JailbreakCheck({ check }: { check: TraceCheck }) {
-  const detected = (check.raw_result as JailbreakAnalysisResult)
-    .jailbreakAnalysis.detected;
+  const detected = (check.raw_result as JailbreakAnalysisResult | undefined)
+    ?.jailbreakAnalysis?.detected;
 
   return (
     <Box>
