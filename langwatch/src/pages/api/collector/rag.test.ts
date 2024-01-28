@@ -38,17 +38,17 @@ describe("RAG", () => {
 
     expect(maybeAddIdsToContextList(contexts)).toEqual([
       {
-        id: "acbd18db4cc2f85cedef654fccc4a4d8",
+        document_id: "acbd18db4cc2f85cedef654fccc4a4d8",
         content: "foo",
       },
       {
-        id: "37b51d194a7513e45b56f6524f2d51f2",
+        document_id: "37b51d194a7513e45b56f6524f2d51f2",
         content: "bar",
       },
     ]);
 
     contexts = [
-      { id: "1", content: "foo" },
+      { document_id: "1", content: "foo" },
       { content: "bar" },
     ];
 

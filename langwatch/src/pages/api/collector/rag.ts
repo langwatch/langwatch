@@ -93,7 +93,7 @@ export const maybeAddIdsToContextList = (
   const everyWithoutId =
     Array.isArray(contexts) &&
     contexts.every(
-      (context) => typeof context !== "object" || !("id" in context)
+      (context) => typeof context !== "object" || !("document_id" in context)
     );
   if (!everyWithoutId) return contexts as RAGChunk[];
 

@@ -10,7 +10,8 @@
     "start": "next start",
     "start:workers": "tsx src/workers.ts",
     "prisma:db:push": "npx prisma db push",
-    "test": "DEBUG=langwatch:* DEBUG_HIDE_DATE=true DEBUG_COLORS=true vitest",
+    "test": "npm run test:unit -- --run --bail=1 && npm run test:integration -- --run --bail=1 --single-thread",
+    "test:unit": "DEBUG=langwatch:* DEBUG_HIDE_DATE=true DEBUG_COLORS=true vitest",
     "test:integration": "DEBUG=langwatch:* DEBUG_HIDE_DATE=true DEBUG_COLORS=true vitest -c vitest.integration.config.ts",
     "elastic:index:create": "DEBUG=langwatch:* tsx src/task.ts elasticIndexCreate",
     "types:zod:generate": "ts-to-zod src/server/tracer/types.ts src/server/tracer/types.generated.ts && ts-to-zod src/trace_checks/types.ts src/trace_checks/types.generated.ts"

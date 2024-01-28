@@ -115,6 +115,7 @@ describe("Collector API Endpoint", () => {
       },
       input: {
         value: "hello",
+        satisfaction_score: expect.any(Number),
         openai_embeddings: expect.any(Array),
       },
       output: {
@@ -255,8 +256,11 @@ describe("Collector API Endpoint", () => {
         },
       ],
       contexts: [
-        { id: "context-1", content: "France is a country in Europe." },
-        { id: "context-2", content: "Paris is the capital of France." },
+        { document_id: "context-1", content: "France is a country in Europe." },
+        {
+          document_id: "context-2",
+          content: "Paris is the capital of France.",
+        },
       ],
       project_id: projectId,
     });
@@ -319,15 +323,16 @@ describe("Collector API Endpoint", () => {
       id: ragSpan.id,
     });
 
-    expect(indexedRagSpan).toMatchObject({
-      contexts: [
-        { id: expect.any(String), content: '"France is a country in Europe."' },
-        {
-          id: expect.any(String),
-          content: '"Paris is the capital of France."',
-        },
-      ],
-    });
+    expect(indexedRagSpan.contexts).toMatchObject([
+      {
+        document_id: expect.any(String),
+        content: "France is a country in Europe.",
+      },
+      {
+        document_id: expect.any(String),
+        content: "Paris is the capital of France.",
+      },
+    ]);
   });
 
   // TODO: add a PII cleanup test

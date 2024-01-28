@@ -52,6 +52,7 @@ describe("/api/track_event", () => {
       },
       body: {
         id: "my_event_id",
+        trace_id: "trace_123",
         event_type: "thumbs_up_down",
         metrics: { vote: 1 },
         event_details: { feedback: "Great!" },
@@ -89,6 +90,7 @@ describe("/api/track_event", () => {
       },
       body: {
         // Missing required fields like event_type
+        trace_id: "trace_123",
         metrics: { vote: 1 },
         event_details: { feedback: "Great!" },
         timestamp: Date.now(),
@@ -104,6 +106,7 @@ describe("/api/track_event", () => {
     const { req, res } = createMocks({
       method: "POST",
       body: {
+        trace_id: "trace_123",
         event_type: "thumbs_up",
         metrics: { vote: 1 },
         event_details: { feedback: "Great!" },
