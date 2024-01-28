@@ -75,7 +75,7 @@ describe("/api/track_event", () => {
     });
   });
 
-  it("should store a valid event in Elasticsearch", async () => {
+  it("should store a valid event in ElasticSearch", async () => {
     const { req, res } = createMocks({
       method: "POST",
       headers: {
@@ -159,8 +159,8 @@ describe("/api/track_event", () => {
       project_id: project.id,
       trace_id: traceId,
       event_type: "thumbs_up_down",
-      metrics: { vote: 1 },
-      event_details: { feedback: "Great!" },
+      metrics: [{ key: "vote", value: 1 }],
+      event_details: [{ key: "feedback", value: "Great!" }],
       timestamps: {
         started_at: expect.any(Number),
         inserted_at: expect.any(Number),

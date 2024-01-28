@@ -1,23 +1,20 @@
 import {
   Card,
   CardBody,
-  CardHeader,
   HStack,
-  Heading,
+  Tab,
+  TabIndicator,
+  TabList,
+  TabPanel,
+  TabPanels,
+  Tabs,
+  Text,
   useTheme,
 } from "@chakra-ui/react";
-import {
-  Cell,
-  Legend,
-  Pie,
-  PieChart,
-  ResponsiveContainer,
-  Text,
-  XAxis,
-} from "recharts";
+import numeral from "numeral";
+import { Cell, Legend, Pie, PieChart, ResponsiveContainer } from "recharts";
 import { useAnalyticsParams } from "../../hooks/useAnalyticsParams";
 import { api } from "../../utils/api";
-import numeral from "numeral";
 import { MetricChange } from "./SummaryMetric";
 
 export const SatisfactionPieChart = () => {
@@ -26,24 +23,73 @@ export const SatisfactionPieChart = () => {
     analyticsParams,
     queryOpts
   );
+  const { data: thumbsUpDownRawData } =
+    api.analytics.thumbsUpDownVsPreviousPeriod.useQuery(
+      analyticsParams,
+      queryOpts
+    );
+  const thumbsUpDownData = thumbsUpDownRawData && {
+    currentPeriod: thumbsUpDownRawData.currentPeriod.map((entry) => ({
+      date: entry.date,
+      positive: entry.metrics.positive.doc_count,
+      negative: entry.metrics.negative.doc_count,
+    })),
+    previousPeriod: thumbsUpDownRawData.currentPeriod.map((entry) => ({
+      date: entry.date,
+      positive: entry.metrics.positive.doc_count,
+      negative: entry.metrics.negative.doc_count,
+    })),
+  };
 
-  const { positiveNeutralRatio, positiveNeutralRatioPrevious } = getCounts(data);
+  const { positiveNeutralRatio, positiveNeutralRatioPrevious } =
+    getCounts(data);
+
+  const {
+    positiveNeutralRatio: positiveRatioThumbsUpDown,
+    positiveNeutralRatioPrevious: positiveRatioThumbsUpDownPrevious,
+  } = getCounts(thumbsUpDownData);
 
   return (
     <Card width="full" height="335px">
-      <CardHeader>
-        <HStack>
-          <Heading size="sm">User Satisfaction</Heading>
-          {data && positiveNeutralRatioPrevious > 0 && (
-            <MetricChange
-              current={positiveNeutralRatio}
-              previous={positiveNeutralRatioPrevious}
-            />
-          )}
-        </HStack>
-      </CardHeader>
-      <CardBody padding={0} marginTop="-24px">
-        <SatisfactionPieChartChart data={data} />
+      <CardBody padding={0}>
+        <Tabs variant="unstyled">
+          <TabList gap={0}>
+            <Tab width="50%" fontSize={14} paddingX={2} paddingY={4}>
+              <HStack flexWrap="nowrap">
+                <Text noOfLines={1}>Input Sentiment</Text>
+                {data && positiveNeutralRatioPrevious > 0 && (
+                  <MetricChange
+                    current={positiveNeutralRatio}
+                    previous={positiveNeutralRatioPrevious}
+                  />
+                )}
+              </HStack>
+            </Tab>
+            <Tab width="50%" fontSize={14} paddingX={2} paddingY={4}>
+              <HStack flexWrap="nowrap">
+                <Text noOfLines={1}>Thumbs Up/Down</Text>
+                {data && positiveRatioThumbsUpDownPrevious > 0 && (
+                  <MetricChange
+                    current={positiveRatioThumbsUpDown}
+                    previous={positiveRatioThumbsUpDownPrevious}
+                  />
+                )}
+              </HStack>
+            </Tab>
+          </TabList>
+          <TabIndicator height="4px" bg="orange.400" borderRadius="1px" />
+          <TabPanels>
+            <TabPanel padding={0}>
+              <SatisfactionPieChartChart data={data} />
+            </TabPanel>
+            <TabPanel padding={0}>
+              <SatisfactionPieChartChart
+                data={thumbsUpDownData}
+                useNeutral={false}
+              />
+            </TabPanel>
+          </TabPanels>
+        </Tabs>
       </CardBody>
     </Card>
   );
@@ -55,12 +101,12 @@ const getCounts = (
         currentPeriod: {
           positive: number;
           negative: number;
-          neutral: number;
+          neutral?: number;
         }[];
         previousPeriod: {
           positive: number;
           negative: number;
-          neutral: number;
+          neutral?: number;
         }[];
       }
     | undefined
@@ -71,7 +117,7 @@ const getCounts = (
   for (const entry of data?.currentPeriod ?? []) {
     positive += entry.positive;
     negative += entry.negative;
-    neutral += entry.neutral;
+    neutral += entry.neutral ?? 0;
   }
   const total = positive + negative + neutral;
   const positiveNeutralRatio = (positive + neutral) / total;
@@ -79,8 +125,8 @@ const getCounts = (
   let positiveNeutralPrevious = 0;
   let totalPrevious = 0;
   for (const entry of data?.previousPeriod ?? []) {
-    positiveNeutralPrevious += entry.positive + entry.neutral;
-    totalPrevious += entry.positive + entry.negative + entry.neutral;
+    positiveNeutralPrevious += entry.positive + (entry.neutral ?? 0);
+    totalPrevious += entry.positive + entry.negative + (entry.neutral ?? 0);
   }
   const positiveNeutralRatioPrevious = positiveNeutralPrevious / totalPrevious;
 
@@ -95,21 +141,23 @@ const getCounts = (
 
 const SatisfactionPieChartChart = ({
   data,
+  useNeutral = true,
 }: {
   data:
     | {
         currentPeriod: {
           positive: number;
           negative: number;
-          neutral: number;
+          neutral?: number;
         }[];
         previousPeriod: {
           positive: number;
           negative: number;
-          neutral: number;
+          neutral?: number;
         }[];
       }
     | undefined;
+  useNeutral?: boolean;
 }) => {
   const theme = useTheme();
   const gray = theme.colors.gray["300"];
@@ -121,7 +169,7 @@ const SatisfactionPieChartChart = ({
 
   if (!data) {
     return (
-      <ResponsiveContainer key="satisfaction" width="100%" height={300}>
+      <ResponsiveContainer key="satisfaction" width="100%" height={280}>
         <div />
       </ResponsiveContainer>
     );
@@ -130,7 +178,7 @@ const SatisfactionPieChartChart = ({
   const chartData = [
     { name: "Positive", value: positive },
     { name: "Negative", value: negative },
-    { name: "Neutral", value: neutral },
+    ...(useNeutral ? [{ name: "Neutral", value: neutral }] : []),
   ];
 
   const RADIAN = Math.PI / 180;
@@ -177,8 +225,10 @@ const SatisfactionPieChartChart = ({
     return <span style={{ color: newColor, fontSize: "15px" }}>{value}</span>;
   };
 
+  const goodRatioThreshold = useNeutral ? 0.9 : 0.5;
+
   return (
-    <ResponsiveContainer key="satisfaction" width="100%" height={300}>
+    <ResponsiveContainer key="satisfaction" width="100%" height={280}>
       <PieChart>
         <Pie
           data={chartData}
@@ -196,7 +246,7 @@ const SatisfactionPieChartChart = ({
         <text
           x="50%"
           y="43%"
-          fill={positiveNeutralRatio > 0.9 ? green : red}
+          fill={positiveNeutralRatio > goodRatioThreshold ? green : red}
           textAnchor="middle"
           dominantBaseline="middle"
           style={{ fontSize: "28px", fontWeight: 600 }}
@@ -206,12 +256,12 @@ const SatisfactionPieChartChart = ({
         <text
           x="50%"
           y="52%"
-          fill={positiveNeutralRatio > 0.9 ? green : red}
+          fill={positiveNeutralRatio > goodRatioThreshold ? green : red}
           textAnchor="middle"
           dominantBaseline="middle"
           style={{ fontSize: "13px", fontWeight: 600 }}
         >
-          Pos + Neutral
+          {useNeutral ? "Pos + Neutral" : "Positive"}
         </text>
       </PieChart>
     </ResponsiveContainer>

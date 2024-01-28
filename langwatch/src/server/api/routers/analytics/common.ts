@@ -1,6 +1,11 @@
 import { addDays, differenceInCalendarDays } from "date-fns";
 import { z } from "zod";
-import { SPAN_INDEX, TRACE_INDEX, esClient } from "../../../elasticsearch";
+import {
+  EVENTS_INDEX,
+  SPAN_INDEX,
+  TRACE_INDEX,
+  esClient,
+} from "../../../elasticsearch";
 import type { AggregationsAggregationContainer } from "@elastic/elasticsearch/lib/api/types";
 import type { Trace } from "../../../tracer/types";
 
@@ -172,6 +177,33 @@ export const currentVsPreviousSpansAggregation = async <
   });
 };
 
+export const currentVsPreviousEventsAggregation = async <
+  T extends Record<string, any>,
+>({
+  aggs,
+  input,
+  extraConditions,
+}: {
+  input: z.infer<typeof sharedAnalyticsFilterInput>;
+  aggs: Record<keyof T, AggregationsAggregationContainer>;
+  extraConditions?: any[];
+}) => {
+  const { previousPeriodStartDate } = currentVsPreviousDates(input);
+
+  return currentVsPreviousElasticSearchAggregation<T>({
+    input,
+    aggs,
+    index: EVENTS_INDEX,
+    conditions: [
+      ...generateTraceQueryConditions({
+        ...input,
+        startDate: previousPeriodStartDate.getTime(),
+      }),
+      ...(extraConditions ?? []),
+    ],
+  });
+};
+
 export const currentVsPreviousDates = (
   input: z.infer<typeof sharedAnalyticsFilterInput>
 ) => {
@@ -196,7 +228,7 @@ const currentVsPreviousElasticSearchAggregation = async <
 }: {
   input: z.infer<typeof sharedAnalyticsFilterInput>;
   aggs: Record<keyof T, AggregationsAggregationContainer>;
-  index: typeof TRACE_INDEX | typeof SPAN_INDEX;
+  index: typeof TRACE_INDEX | typeof SPAN_INDEX | typeof EVENTS_INDEX;
   conditions: any[];
 }) => {
   const { previousPeriodStartDate, endDate, daysDifference } =
@@ -241,6 +273,8 @@ const currentVsPreviousElasticSearchAggregation = async <
           ? value[key].value
           : value[key].buckets?.[0]?.doc_count !== undefined
           ? value[key].buckets[0].doc_count
+          : typeof value[key] === "object"
+          ? value[key]
           : undefined;
     }
     return aggregation;

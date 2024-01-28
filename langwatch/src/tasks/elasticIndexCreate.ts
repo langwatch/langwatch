@@ -181,12 +181,14 @@ const eventsMapping: Record<keyof Event, MappingProperty> = {
   project_id: { type: "keyword" },
   event_type: { type: "text" },
   metrics: {
+    type: "nested",
     properties: {
       key: { type: "keyword" },
       value: { type: "float" },
     },
   },
   event_details: {
+    type: "nested",
     properties: {
       key: { type: "keyword" },
       value: { type: "text" },

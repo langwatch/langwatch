@@ -19,7 +19,8 @@
     "verbatimModuleSyntax": true,
     "baseUrl": ".",
     "paths": {
-      "~/*": ["./src/*"]
+      "~/*": ["./src/*"],
+      "@injected-dependencies.server": ["./src/injection/injection.server.ts"],
     }
   },
   "include": [

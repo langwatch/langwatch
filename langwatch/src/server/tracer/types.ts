@@ -249,6 +249,11 @@ export type Event = {
   timestamps: { started_at: number; inserted_at: number };
 };
 
+export type ElasticSearchEvent = Omit<Event, "metrics" | "event_details"> & {
+  metrics: { key: string; value: number }[];
+  event_details: { key: string; value: string }[];
+};
+
 export type TrackEventRESTParamsValidator = Omit<
   Event,
   "id" | "project_id" | "timestamps" | "event_details"

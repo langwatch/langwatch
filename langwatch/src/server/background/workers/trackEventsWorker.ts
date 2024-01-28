@@ -1,16 +1,21 @@
+import type { GetResponse } from "@elastic/elasticsearch/lib/api/types";
 import * as Sentry from "@sentry/nextjs";
 import { Worker } from "bullmq";
 import type { TrackEventJob } from "~/server/background/types";
+import {
+  type ElasticSearchEvent,
+  type Trace
+} from "../../../server/tracer/types";
 import { getDebugger } from "../../../utils/logger";
-import { connection } from "../../redis";
-import { type Event, type Trace } from "../../../server/tracer/types";
 import { EVENTS_INDEX, TRACE_INDEX, esClient } from "../../elasticsearch";
+import { connection } from "../../redis";
+import {
+  elasticSearchEventSchema
+} from "../../tracer/types.generated";
 import {
   TRACK_EVENTS_QUEUE_NAME,
   trackEventsQueue,
 } from "../queues/trackEventsQueue";
-import type { GetResponse } from "@elastic/elasticsearch/lib/api/types";
-import { eventSchema } from "../../tracer/types.generated";
 
 const debug = getDebugger("langwatch:workers:trackEventWorker");
 
@@ -20,17 +25,25 @@ export const startTrackEventsWorker = () => {
     async (job) => {
       debug(`Processing job ${job.id} with data:`, job.data);
 
-      let event: Event = {
+      let event: ElasticSearchEvent = {
         ...job.data.event,
         project_id: job.data.project_id,
-        event_details: job.data.event.event_details ?? {},
+        metrics: Object.entries(job.data.event.metrics).map(([key, value]) => ({
+          key,
+          value,
+        })),
+        event_details: job.data.event.event_details
+          ? Object.entries(job.data.event.event_details).map(
+              ([key, value]) => ({ key, value })
+            )
+          : [],
         timestamps: {
           started_at: job.data.event.timestamp,
           inserted_at: Date.now(),
         },
       };
       // use zod to remove any other keys that may be present but not allowed
-      event = eventSchema.parse(event);
+      event = elasticSearchEventSchema.parse(event);
 
       // Try to copy grouping keys from trace if event is connected to one
       if (event.trace_id) {
