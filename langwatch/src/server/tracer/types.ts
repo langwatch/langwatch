@@ -230,4 +230,20 @@ export type CollectorRESTParams = {
   experiments?: Experiment[] | null | undefined;
 };
 
+export type Event = {
+  id?: string; // auto generated unless you want to guarantee idempotency
+  event_type: string; // Type of event (e.g., 'thumbs_up_down', 'add_to_cart')
+  project_id: string;
+  metrics: Record<string, number>;
+  event_details: Record<string, string>;
+  // Grouping Fields
+  trace_id?: string;
+  thread_id?: string;
+  user_id?: string;
+  customer_id?: string;
+  labels?: string[];
+  // End Grouping Fields
+  timestamps: { started_at: number; inserted_at: number };
+};
+
 export type CollectorRESTParamsValidator = Omit<CollectorRESTParams, "spans">;
