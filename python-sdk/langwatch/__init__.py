@@ -13,7 +13,7 @@ from warnings import warn
 from langwatch.tracer import span, create_span, capture_rag
 
 endpoint = (
-    os.environ.get("LANGWATCH_ENDPOINT") or "https://app.langwatch.ai/api/collector"
+    os.environ.get("LANGWATCH_ENDPOINT") or "https://app.langwatch.ai"
 )
 api_key = os.environ.get("LANGWATCH_API_KEY")
 

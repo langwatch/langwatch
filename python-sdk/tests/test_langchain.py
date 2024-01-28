@@ -38,7 +38,7 @@ class TestLangChainTracer:
     def test_trace_lang_chain_chat_calls(
         self, httpx_mock: HTTPXMock, requests_mock: requests_mock.Mocker
     ):
-        requests_mock.post(langwatch.endpoint, json={})
+        requests_mock.post(langwatch.endpoint + "/api/collector", json={})
         httpx_mock.add_response(
             json=create_openai_chat_completion_mock("red, blue, green, yellow"),
             url="https://api.openai.com/v1/chat/completions",
@@ -128,7 +128,7 @@ class TestLangChainTracer:
     def test_trace_lang_chain_completion(
         self, httpx_mock: HTTPXMock, requests_mock: requests_mock.Mocker
     ):
-        requests_mock.post(langwatch.endpoint, json={})
+        requests_mock.post(langwatch.endpoint + "/api/collector", json={})
         httpx_mock.add_response(
             json=create_openai_completion_mock("red, blue, green, yellow"),
             url="https://api.openai.com/v1/completions",
@@ -185,7 +185,7 @@ class TestLangChainTracer:
     def test_trace_lang_chain_streaming_chat_calls(
         self, httpx_mock: HTTPXMock, requests_mock: requests_mock.Mocker
     ):
-        requests_mock.post(langwatch.endpoint, json={})
+        requests_mock.post(langwatch.endpoint + "/api/collector", json={})
         httpx_mock.add_response(
             stream=create_openai_chat_completion_stream_mock(
                 ["red,", " blue,", " green,", " yellow"]
@@ -264,7 +264,7 @@ class TestLangChainTracer:
     def test_trace_agents_functions_and_tools(
         self, httpx_mock: HTTPXMock, requests_mock: requests_mock.Mocker
     ):  # TODO: test without functions?
-        requests_mock.post(langwatch.endpoint, json={})
+        requests_mock.post(langwatch.endpoint + "/api/collector", json={})
         httpx_mock.add_callback(
             one_mock_at_a_time(
                 [
@@ -367,7 +367,7 @@ class TestLangChainTracer:
     def test_trace_errors(
         self, httpx_mock: HTTPXMock, requests_mock: requests_mock.Mocker
     ):
-        requests_mock.post(langwatch.endpoint, json={})
+        requests_mock.post(langwatch.endpoint + "/api/collector", json={})
         httpx_mock.add_exception(
             Exception("An error occurred!"),
             url="https://api.openai.com/v1/chat/completions",
@@ -400,7 +400,7 @@ class TestLangChainTracer:
     def test_trace_lang_chain_expression_language(
         self, httpx_mock: HTTPXMock, requests_mock: requests_mock.Mocker
     ):
-        requests_mock.post(langwatch.endpoint, json={})
+        requests_mock.post(langwatch.endpoint + "/api/collector", json={})
         httpx_mock.add_response(
             json=create_openai_chat_completion_mock(
                 "Why don't bears wear shoes?\n\nBecause they have bear feet!"

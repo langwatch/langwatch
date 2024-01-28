@@ -28,7 +28,7 @@ class TestOpenAICompletionTracer:
             create_openai_completion_mock(" you!"),
             create_openai_completion_mock(" ah!"),
         ]
-        requests_mock.post(langwatch.endpoint, json={})
+        requests_mock.post(langwatch.endpoint + "/api/collector", json={})
         httpx_mock.add_callback(
             one_mock_at_a_time(openai_mocks),
             url="https://api.openai.com/v1/completions",
@@ -106,7 +106,7 @@ class TestOpenAICompletionTracer:
             "create",
             side_effect=Exception("An error occurred!"),
         ):
-            requests_mock.post(langwatch.endpoint, json={})
+            requests_mock.post(langwatch.endpoint + "/api/collector", json={})
 
             with pytest.raises(Exception) as err:
                 with langwatch.openai.OpenAICompletionTracer(client):
@@ -127,7 +127,7 @@ class TestOpenAICompletionTracer:
         openai_mocks = [
             create_openai_completion_mock(" there"),
         ]
-        requests_mock.post(langwatch.endpoint, json={})
+        requests_mock.post(langwatch.endpoint + "/api/collector", json={})
         httpx_mock.add_callback(
             one_mock_at_a_time(openai_mocks),
             url="https://api.openai.com/v1/completions",
@@ -152,7 +152,7 @@ class TestOpenAICompletionTracer:
     def test_trace_session_captures_openai_streams(
         self, httpx_mock: HTTPXMock, requests_mock: requests_mock.Mocker
     ):
-        requests_mock.post(langwatch.endpoint, json={})
+        requests_mock.post(langwatch.endpoint + "/api/collector", json={})
         httpx_mock.add_response(
             stream=create_openai_completion_stream_mock(
                 [" there", " all", " good?"], [" how", " are", " you"]
@@ -206,7 +206,7 @@ class TestOpenAICompletionTracer:
     async def test_trace_session_captures_openai_async_streams(
         self, httpx_mock: HTTPXMock, requests_mock: requests_mock.Mocker
     ):
-        requests_mock.post(langwatch.endpoint, json={})
+        requests_mock.post(langwatch.endpoint + "/api/collector", json={})
         httpx_mock.add_response(
             stream=create_openai_completion_stream_mock(
                 [" there", " all", " good?"], [" how", " are", " you"]
@@ -243,7 +243,7 @@ class TestOpenAICompletionTracer:
     def test_trace_nested_spans(
         self, httpx_mock: HTTPXMock, requests_mock: requests_mock.Mocker
     ):
-        requests_mock.post(langwatch.endpoint, json={})
+        requests_mock.post(langwatch.endpoint + "/api/collector", json={})
         httpx_mock.add_callback(
             one_mock_at_a_time(
                 [
@@ -293,7 +293,7 @@ class TestOpenAICompletionTracer:
     def test_trace_nested_spans_using_annotations(
         self, httpx_mock: HTTPXMock, requests_mock: requests_mock.Mocker
     ):
-        requests_mock.post(langwatch.endpoint, json={})
+        requests_mock.post(langwatch.endpoint + "/api/collector", json={})
         httpx_mock.add_callback(
             one_mock_at_a_time(
                 [
@@ -356,7 +356,7 @@ class TestOpenAIChatCompletionTracer:
             create_openai_chat_completion_mock("hi there!"),
             create_openai_chat_completion_mock("bar baz"),
         ]
-        requests_mock.post(langwatch.endpoint, json={})
+        requests_mock.post(langwatch.endpoint + "/api/collector", json={})
         httpx_mock.add_callback(
             one_mock_at_a_time(openai_mocks),
             url="https://api.openai.com/v1/chat/completions",
@@ -439,7 +439,7 @@ class TestOpenAIChatCompletionTracer:
             "create",
             side_effect=Exception("An error occurred!"),
         ):
-            requests_mock.post(langwatch.endpoint, json={})
+            requests_mock.post(langwatch.endpoint + "/api/collector", json={})
 
             with pytest.raises(Exception) as err:
                 with langwatch.openai.OpenAIChatCompletionTracer(client):
@@ -458,7 +458,7 @@ class TestOpenAIChatCompletionTracer:
         openai_mocks = [
             create_openai_chat_completion_mock("hi there!"),
         ]
-        requests_mock.post(langwatch.endpoint, json={})
+        requests_mock.post(langwatch.endpoint + "/api/collector", json={})
         httpx_mock.add_callback(
             one_mock_at_a_time(openai_mocks),
             url="https://api.openai.com/v1/chat/completions",
@@ -518,7 +518,7 @@ class TestOpenAIChatCompletionTracer:
                 },
             }
         ]
-        requests_mock.post(langwatch.endpoint, json={})
+        requests_mock.post(langwatch.endpoint + "/api/collector", json={})
         httpx_mock.add_callback(
             one_mock_at_a_time(openai_mocks),
             url="https://api.openai.com/v1/chat/completions",
@@ -593,7 +593,7 @@ class TestOpenAIChatCompletionTracer:
     def test_trace_session_captures_openai_streams(
         self, httpx_mock: HTTPXMock, requests_mock: requests_mock.Mocker
     ):
-        requests_mock.post(langwatch.endpoint, json={})
+        requests_mock.post(langwatch.endpoint + "/api/collector", json={})
         httpx_mock.add_response(
             stream=create_openai_chat_completion_stream_mock(
                 ["Hi", " there", " all", " good?"], ["Hi", " how", " are", " you"]
@@ -673,7 +673,7 @@ class TestOpenAIChatCompletionTracer:
     def test_trace_session_captures_openai_streams_with_functions(
         self, httpx_mock: HTTPXMock, requests_mock: requests_mock.Mocker
     ):
-        requests_mock.post(langwatch.endpoint, json={})
+        requests_mock.post(langwatch.endpoint + "/api/collector", json={})
         httpx_mock.add_response(
             stream=create_openai_chat_completion_function_stream_mock(
                 {"name": "Calculator", "arguments": '{\n  "input": "2+2"\n}'}
@@ -762,7 +762,7 @@ class TestOpenAIChatCompletionTracer:
                 "system_fingerprint": None,
             }
         ]
-        requests_mock.post(langwatch.endpoint, json={})
+        requests_mock.post(langwatch.endpoint + "/api/collector", json={})
         httpx_mock.add_callback(
             one_mock_at_a_time(openai_mocks),
             url="https://api.openai.com/v1/chat/completions",
@@ -832,7 +832,7 @@ class TestOpenAIChatCompletionTracer:
     def test_trace_session_captures_openai_streams_with_tools(
         self, httpx_mock: HTTPXMock, requests_mock: requests_mock.Mocker
     ):
-        requests_mock.post(langwatch.endpoint, json={})
+        requests_mock.post(langwatch.endpoint + "/api/collector", json={})
         httpx_mock.add_response(
             stream=IteratorStream(
                 [
@@ -932,7 +932,7 @@ data: [DONE]""".split(
     async def test_trace_session_captures_openai_async_streams(
         self, httpx_mock: HTTPXMock, requests_mock: requests_mock.Mocker
     ):
-        requests_mock.post(langwatch.endpoint, json={})
+        requests_mock.post(langwatch.endpoint + "/api/collector", json={})
         httpx_mock.add_response(
             stream=create_openai_chat_completion_stream_mock(
                 ["Hi", " there", " all", " good?"], ["Hi", " how", " are", " you"]
@@ -986,7 +986,7 @@ data: [DONE]""".split(
         openai_mocks = [
             create_openai_chat_completion_mock("The capital of France is Paris."),
         ]
-        requests_mock.post(langwatch.endpoint, json={})
+        requests_mock.post(langwatch.endpoint + "/api/collector", json={})
         httpx_mock.add_callback(
             one_mock_at_a_time(openai_mocks),
             url="https://api.openai.com/v1/chat/completions",
@@ -1045,7 +1045,7 @@ class TestOpenAITracer:
     def test_traces_both_completion_and_chat_completion(
         self, httpx_mock: HTTPXMock, requests_mock: requests_mock.Mocker
     ):
-        requests_mock.post(langwatch.endpoint, json={})
+        requests_mock.post(langwatch.endpoint + "/api/collector", json={})
         httpx_mock.add_callback(
             one_mock_at_a_time([create_openai_completion_mock("foo")]),
             url="https://api.openai.com/v1/completions",

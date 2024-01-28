@@ -259,7 +259,7 @@ def send_spans(data: CollectorRESTParams):
     if not langwatch.api_key:
         return
     response = requests.post(
-        langwatch.endpoint,
+        langwatch.endpoint + "/api/collector",
         json=data,
         headers={"X-Auth-Token": str(langwatch.api_key)},
     )
