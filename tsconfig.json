@@ -19,7 +19,10 @@
     "verbatimModuleSyntax": true,
     "baseUrl": ".",
     "paths": {
-      "~/*": ["./src/*"]
+      "~/server/*": ["./langwatch/langwatch/src/server/*"],
+      "~/env.mjs": ["./langwatch/langwatch/src/env.mjs"],
+      "~/*": ["./src/*"],
+      "@injected-dependencies.server": ["./src/injection/injection.server.ts"],
     }
   },
   "include": [

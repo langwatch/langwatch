@@ -4,9 +4,10 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "dev": "NODE_ENV=development DEBUG=langwatch:* node server.js",
+    "dev": "NODE_ENV=development DEBUG=langwatch:* DEBUG_HIDE_DATE=true DEBUG_COLORS=true concurrently 'node server.js' 'npm run start:workers'",
     "build": "export DEPENDENCY_INJECTION_DIR=$(pwd)/src/injection/; export EXTRA_INCLUDE=$(pwd)/src; cp .env langwatch/langwatch/; cd langwatch/langwatch; npm run build",
     "start": "next start",
+    "start:workers": "tsx src/workers.ts",
     "preinstall": "git submodule update --init",
     "postinstall": "cp .env langwatch/langwatch/; cd langwatch/langwatch; npm install; cd ../../; npm run prisma:db:push",
     "prisma:db:push": "node prisma/generate-schema.js && npx prisma db push && cp -R node_modules/.prisma/* langwatch/langwatch/node_modules/.prisma/"
@@ -24,6 +25,8 @@
   },
   "devDependencies": {
     "@types/react": "^18.2.45",
-    "prisma": "^5.6.0"
+    "concurrently": "^8.2.2",
+    "prisma": "^5.6.0",
+    "tsx": "^4.7.0"
   }
 }
