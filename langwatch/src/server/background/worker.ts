@@ -1,16 +1,16 @@
 import { type Worker, type Job } from "bullmq";
 import { getCheckExecutor } from "../../trace_checks/backend";
+import type { CheckTypes, TraceCheckResult } from "../../trace_checks/types";
 import type {
-  CheckTypes,
   TopicClusteringJob,
   TraceCheckJob,
-  TraceCheckResult,
-} from "../../trace_checks/types";
+} from "~/server/background/types";
 import { getDebugger } from "../../utils/logger";
 import { esGetSpansByTraceId, esGetTraceById } from "../api/routers/traces";
 import { prisma } from "../db";
 import { startTopicClusteringWorker } from "./workers/topicClusteringWorker";
 import { startTraceChecksWorker } from "./workers/traceChecksWorker";
+import { startTrackEventsWorker } from "./workers/trackEventsWorker";
 
 const debug = getDebugger("langwatch:workers");
 
@@ -55,17 +55,18 @@ export const start = (
     const processFn = processMock ?? process;
 
     const traceChecksWorker = startTraceChecksWorker(processFn);
-    debug("Trace checks worker registered");
-
     const topicClusteringWorker = startTopicClusteringWorker();
-    debug("Topic clustering checks worker registered");
+    const trackEventsWorker = startTrackEventsWorker();
 
     if (maxRuntimeMs) {
       setTimeout(() => {
         debug("Max runtime reached, closing worker");
         void (async () => {
-          await traceChecksWorker.close();
-          await topicClusteringWorker.close();
+          await Promise.all([
+            traceChecksWorker.close(),
+            topicClusteringWorker.close(),
+            trackEventsWorker.close(),
+          ]);
           resolve(undefined);
         })();
       }, maxRuntimeMs);

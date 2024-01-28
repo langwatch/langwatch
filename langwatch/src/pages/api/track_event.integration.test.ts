@@ -1,12 +1,21 @@
+import type { Worker } from "bullmq";
 import { createMocks } from "node-mocks-http";
 import { describe, expect, it, beforeAll, afterAll } from "vitest";
 import { prisma } from "../../server/db";
 import { EVENTS_INDEX, esClient } from "../../server/elasticsearch";
 import handler from "./track_event";
 import type { Project } from "@prisma/client";
+import { startTrackEventsWorker } from "../../server/background/workers/trackEventsWorker";
+import type { TrackEventJob } from "../../server/background/types";
 
 describe("/api/track_event", () => {
+  let worker: Worker<TrackEventJob, void, string>;
   let project: Project;
+
+  beforeAll(async () => {
+    worker = startTrackEventsWorker();
+    await worker.waitUntilReady();
+  });
 
   beforeAll(async () => {
     await prisma.project.deleteMany({
@@ -25,6 +34,8 @@ describe("/api/track_event", () => {
   });
 
   afterAll(async () => {
+    await worker?.close();
+
     // Clean up the test project
     await prisma.project.delete({
       where: {
@@ -64,8 +75,16 @@ describe("/api/track_event", () => {
 
     expect(res.statusCode).toBe(200);
     expect(res._getJSONData()).toEqual({
-      message: "Event tracked successfully.",
+      message: "Event tracked",
     });
+
+    // Wait for the job to be completed
+    await new Promise<void>(
+      (resolve) =>
+        worker?.on("completed", (args) => {
+          if (args.data.event.id.includes("my_event_id")) resolve();
+        })
+    );
 
     const eventId = `event_${project.id}_my_event_id`;
     const event = await esClient.get<Event>({

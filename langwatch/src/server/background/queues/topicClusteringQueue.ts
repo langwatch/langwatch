@@ -1,11 +1,13 @@
 import { Queue } from "bullmq";
 import { connection } from "../../redis";
-import type { TopicClusteringJob } from "../../../trace_checks/types";
+import type { TopicClusteringJob } from "~/server/background/types";
 import crypto from "crypto";
 import { prisma } from "../../db";
 
+export const TOPIC_CLUSTERING_QUEUE_NAME = "topic_clustering";
+
 const topicClusteringQueue = new Queue<TopicClusteringJob, void, string>(
-  "topic_clustering",
+  TOPIC_CLUSTERING_QUEUE_NAME,
   {
     connection,
     defaultJobOptions: {

@@ -5,19 +5,19 @@ import { nanoid } from "nanoid";
 import { env } from "../../../env.mjs";
 import type {
   CheckTypes,
-  TraceCheckJob,
   TraceCheckResult
 } from "../../../trace_checks/types";
+import type { TraceCheckJob } from "~/server/background/types";
 import { prisma } from "../../db";
 import { connection } from "../../redis";
-import { updateCheckStatusInES } from "../queues/traceChecksQueue";
+import { TRACE_CHECKS_QUEUE_NAME, updateCheckStatusInES } from "../queues/traceChecksQueue";
 import { getDebugger } from "../../../utils/logger";
 
 const debug = getDebugger("langwatch:workers:traceChecksWorker");
 
 export const startTraceChecksWorker = (processFn: (job: Job<TraceCheckJob, any, CheckTypes>) => Promise<TraceCheckResult>) => {
   const traceChecksWorker = new Worker<TraceCheckJob, any, CheckTypes>(
-    "trace_checks",
+    TRACE_CHECKS_QUEUE_NAME,
     async (job) => {
       if (
         env.NODE_ENV !== "test" &&
@@ -83,5 +83,6 @@ export const startTraceChecksWorker = (processFn: (job: Job<TraceCheckJob, any, 
     Sentry.captureException(err);
   });
 
+  debug("Trace checks worker registered");
   return traceChecksWorker;
 }

@@ -1,15 +1,16 @@
 import * as Sentry from "@sentry/nextjs";
 import { Worker } from "bullmq";
-import type { TopicClusteringJob } from "../../../trace_checks/types";
+import type { TopicClusteringJob } from "~/server/background/types";
 import { getDebugger } from "../../../utils/logger";
 import { connection } from "../../redis";
 import { clusterTopicsForProject } from "../../topicClustering/topicClustering";
+import { TOPIC_CLUSTERING_QUEUE_NAME } from "../queues/topicClusteringQueue";
 
 const debug = getDebugger("langwatch:workers:topicClusteringWorker");
 
 export const startTopicClusteringWorker = () => {
   const topicClusteringWorker = new Worker<TopicClusteringJob, void, string>(
-    "topic_clustering",
+    TOPIC_CLUSTERING_QUEUE_NAME,
     async (job) => {
       debug(`Processing job ${job.id} with data:`, job.data);
 
@@ -30,5 +31,6 @@ export const startTopicClusteringWorker = () => {
     Sentry.captureException(err);
   });
 
+  debug("Topic clustering checks worker registered");
   return topicClusteringWorker;
 };

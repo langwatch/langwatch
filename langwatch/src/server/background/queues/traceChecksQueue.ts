@@ -3,18 +3,22 @@ import { connection } from "../../redis";
 import { captureError } from "../../../utils/captureError";
 import { esClient, TRACE_CHECKS_INDEX } from "../../elasticsearch";
 import type { TraceCheck } from "../../tracer/types";
-import type { TraceCheckJob } from "../../../trace_checks/types";
+import type { TraceCheckJob } from "~/server/background/types";
 
-const traceChecksQueue = new Queue<TraceCheckJob, any, string>("trace_checks", {
-  connection,
-  defaultJobOptions: {
-    backoff: {
-      type: "exponential",
-      delay: 1000,
+export const TRACE_CHECKS_QUEUE_NAME = "trace_checks";
+
+const traceChecksQueue = new Queue<TraceCheckJob, any, string>(
+  TRACE_CHECKS_QUEUE_NAME,
+  {
+    connection,
+    defaultJobOptions: {
+      backoff: {
+        type: "exponential",
+        delay: 1000,
+      },
     },
-  },
-});
-
+  }
+);
 
 export const scheduleTraceCheck = async ({
   check,
@@ -118,5 +122,3 @@ export const updateCheckStatusInES = async ({
     refresh: true,
   });
 };
-
-

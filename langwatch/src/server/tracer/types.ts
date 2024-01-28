@@ -230,6 +230,8 @@ export type CollectorRESTParams = {
   experiments?: Experiment[] | null | undefined;
 };
 
+export type CollectorRESTParamsValidator = Omit<CollectorRESTParams, "spans">;
+
 export type Event = {
   id: string;
   event_type: string; // Type of event (e.g., 'thumbs_up_down', 'add_to_cart')
@@ -255,5 +257,3 @@ export type TrackEventRESTParamsValidator = Omit<
   event_details?: Record<string, string>;
   timestamp?: number; // The timestamp when the event occurred
 };
-
-export type CollectorRESTParamsValidator = Omit<CollectorRESTParams, "spans">;

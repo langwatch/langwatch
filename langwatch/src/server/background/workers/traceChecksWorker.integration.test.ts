@@ -17,7 +17,8 @@ import {
   updateCheckStatusInES,
 } from "../queues/traceChecksQueue";
 import * as traceChecksWorker from "../worker";
-import type { CheckTypes, TraceCheckJob, TraceCheckResult } from "../../../trace_checks/types";
+import type { CheckTypes, TraceCheckResult } from "../../../trace_checks/types";
+import type { TraceCheckJob } from "~/server/background/types";
 
 const mocks = vi.hoisted(() => {
   return {
