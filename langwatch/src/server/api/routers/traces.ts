@@ -14,7 +14,6 @@ import type { ElasticSearchSpan, Trace, TraceCheck } from "../../tracer/types";
 import {
   TeamRoleGroup,
   checkUserPermissionForProject,
-  backendHasOrganizationPermission,
   backendHasTeamProjectPermission,
 } from "../permission";
 

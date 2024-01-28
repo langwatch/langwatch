@@ -1,7 +1,7 @@
 import similarity from "compute-cosine-similarity";
 import { prisma } from "../../../server/db";
 import { type Span, type Trace } from "../../../server/tracer/types";
-import { scheduleTraceCheck } from "../../../trace_checks/queue";
+import { scheduleTraceCheck } from "../../../server/background/queues/traceChecksQueue";
 import { getTraceCheckDefinitions } from "../../../trace_checks/registry";
 import type {
   CheckPreconditions,

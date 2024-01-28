@@ -1,5 +1,3 @@
-import { useForm } from "react-hook-form";
-import { type ProjectFormData } from "./TechStack";
 import {
   techStackLanguageOptions,
   techStackFrameworkOptions,

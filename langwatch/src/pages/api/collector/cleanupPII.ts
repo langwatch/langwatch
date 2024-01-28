@@ -4,7 +4,7 @@ import {
   convertToTraceCheckResult,
   runPiiCheck
 } from "../../../trace_checks/backend/piiCheck";
-import { updateCheckStatusInES } from "../../../trace_checks/queue";
+import { updateCheckStatusInES } from "../../../server/background/queues/traceChecksQueue";
 import type { CheckTypes, Checks } from "../../../trace_checks/types";
 
 // TODO: extract to separate file

@@ -3,7 +3,7 @@ import { env } from "../../env.mjs";
 import type { ElasticSearchSpan, Trace } from "../../server/tracer/types";
 import type { Money } from "../../utils/types";
 import type { RagasResult, TraceCheckResult } from "../types";
-import { getRAGInfo } from "../utils";
+import { getRAGInfo } from "../../server/tracer/utils";
 
 export const ragasFaithfulness = async (
   _trace: Trace,

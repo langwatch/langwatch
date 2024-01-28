@@ -20,7 +20,7 @@ import {
   useTheme,
   type BackgroundProps,
 } from "@chakra-ui/react";
-import { OrganizationUserRole, type Project } from "@prisma/client";
+import { type Project } from "@prisma/client";
 import { signOut } from "next-auth/react";
 import ErrorPage from "next/error";
 import Head from "next/head";

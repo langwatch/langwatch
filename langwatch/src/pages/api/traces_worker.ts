@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import { start } from "../../trace_checks/worker";
+import { start } from "../../server/background/worker";
 
 export const maxDuration = 300; // This is also used by Vercel directly for the maximum runtime of this as a serverless function in seconds, don't rename it: https://vercel.com/docs/functions/configuring-functions/duration
 

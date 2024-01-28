@@ -11,8 +11,6 @@ import {
 import type { TeamWithProjectsAndMembersAndUsers } from "../../../server/api/routers/organization";
 import { api } from "../../../utils/api";
 import { teamRolesOptions } from "../../../components/settings/TeamUserRoleField";
-import { TeamProjectsList } from "../projects";
-import { Table } from "@chakra-ui/react";
 
 export default function EditTeamPage() {
   const router = useRouter();

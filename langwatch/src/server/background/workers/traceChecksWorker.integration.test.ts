@@ -9,15 +9,15 @@ import {
   it,
   vi,
 } from "vitest";
-import { TRACE_CHECKS_INDEX, esClient } from "../server/elasticsearch";
-import type { TraceCheck } from "../server/tracer/types";
+import { TRACE_CHECKS_INDEX, esClient } from "../../elasticsearch";
+import type { TraceCheck } from "../../tracer/types";
 import {
   getTraceCheckId,
   scheduleTraceCheck,
   updateCheckStatusInES,
-} from "./queue";
-import * as traceChecksWorker from "./worker";
-import type { CheckTypes, TraceCheckJob, TraceCheckResult } from "./types";
+} from "../queues/traceChecksQueue";
+import * as traceChecksWorker from "../worker";
+import type { CheckTypes, TraceCheckJob, TraceCheckResult } from "../../../trace_checks/types";
 
 const mocks = vi.hoisted(() => {
   return {

@@ -2,14 +2,14 @@ import {
   flattenSpanTree,
   organizeSpansIntoTree,
   typedValueToText,
-} from "../pages/api/collector/common";
-import { extractRAGTextualContext } from "../pages/api/collector/rag";
+} from "../../pages/api/collector/common";
+import { extractRAGTextualContext } from "../../pages/api/collector/rag";
 import type {
   ElasticSearchSpan,
   Span,
   SpanInput,
   SpanOutput,
-} from "../server/tracer/types";
+} from "./types";
 
 export const getRAGInfo = (
   spans: ElasticSearchSpan[]

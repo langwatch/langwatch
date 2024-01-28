@@ -1,5 +1,4 @@
 import { Box, Skeleton } from "@chakra-ui/react";
-import numeral from "numeral";
 import { useAnalyticsParams } from "../../hooks/useAnalyticsParams";
 import { api } from "../../utils/api";
 import { AggregatedLineChart } from "./LineChart";

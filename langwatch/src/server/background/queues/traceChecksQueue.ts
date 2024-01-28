@@ -1,11 +1,9 @@
 import { Queue } from "bullmq";
-import { connection } from "../server/redis";
-import { captureError } from "../utils/captureError";
-import { esClient, TRACE_CHECKS_INDEX } from "../server/elasticsearch";
-import type { TraceCheck } from "../server/tracer/types";
-import type { TopicClusteringJob, TraceCheckJob } from "./types";
-import crypto from "crypto";
-import { prisma } from "../server/db";
+import { connection } from "../../redis";
+import { captureError } from "../../../utils/captureError";
+import { esClient, TRACE_CHECKS_INDEX } from "../../elasticsearch";
+import type { TraceCheck } from "../../tracer/types";
+import type { TraceCheckJob } from "../../../trace_checks/types";
 
 const traceChecksQueue = new Queue<TraceCheckJob, any, string>("trace_checks", {
   connection,
@@ -17,18 +15,6 @@ const traceChecksQueue = new Queue<TraceCheckJob, any, string>("trace_checks", {
   },
 });
 
-const topicClusteringQueue = new Queue<TopicClusteringJob, void, string>(
-  "topic_clustering",
-  {
-    connection,
-    defaultJobOptions: {
-      backoff: {
-        type: "exponential",
-        delay: 5000,
-      },
-    },
-  }
-);
 
 export const scheduleTraceCheck = async ({
   check,
@@ -133,51 +119,4 @@ export const updateCheckStatusInES = async ({
   });
 };
 
-export const scheduleTopicClustering = async () => {
-  const projects = await prisma.project.findMany({
-    where: { firstMessage: true },
-    select: { id: true },
-  });
 
-  const jobs = projects.map((project) => {
-    const hash = crypto.createHash("sha256");
-    hash.update(project.id);
-    const hashedValue = hash.digest("hex");
-    const hashNumber = parseInt(hashedValue, 16);
-    const distributionHour = hashNumber % 24;
-    const distributionMinute = hashNumber % 60;
-    const yyyymmdd = new Date().toISOString().split("T")[0];
-
-    return {
-      name: "topic_clustering",
-      data: { project_id: project.id },
-      opts: {
-        jobId: `topic_clustering_${project.id}_${yyyymmdd}`,
-        delay:
-          distributionHour * 60 * 60 * 1000 + distributionMinute * 60 * 1000,
-        attempts: 3,
-      },
-    };
-  });
-
-  await topicClusteringQueue.addBulk(jobs);
-};
-
-export const scheduleTopicClusteringNextPage = async (
-  projectId: string,
-  searchAfter: [number, string]
-) => {
-  const yyyymmdd = new Date().toISOString().split("T")[0];
-
-  await topicClusteringQueue.add(
-    "topic_clustering",
-    { project_id: projectId, search_after: searchAfter },
-    {
-      jobId: `topic_clustering_${projectId}_${yyyymmdd}_${searchAfter.join(
-        "_"
-      )}`,
-      delay: 1000,
-      attempts: 3,
-    }
-  );
-};

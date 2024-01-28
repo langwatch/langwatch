@@ -3,12 +3,12 @@ import {
   clusterTopicsForProject,
   clusterTopicsForTraces,
   type TopicClusteringParams,
-} from "./topic_clustering";
-import { getOpenAIEmbeddings } from "../server/embeddings";
-import { TRACE_INDEX, esClient } from "../server/elasticsearch";
-import type { Trace } from "../server/tracer/types";
+} from "./topicClustering";
+import { getOpenAIEmbeddings } from "../embeddings";
+import { TRACE_INDEX, esClient } from "../elasticsearch";
+import type { Trace } from "../tracer/types";
 import { CostType } from "@prisma/client";
-import { prisma } from "../server/db";
+import { prisma } from "../db";
 
 describe("Topic Clustering Integration Test", () => {
   it("cluster tracers into topics", async () => {

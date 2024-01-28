@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import { scheduleTopicClustering } from "../../trace_checks/queue";
+import { scheduleTopicClustering } from "~/server/background/queues/topicClusteringQueue";
 
 export default async function handler(
   _req: NextApiRequest,

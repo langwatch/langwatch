@@ -1,14 +1,14 @@
-import { env } from "../env.mjs";
-import type { Trace } from "../server/tracer/types";
-import { TRACE_INDEX, esClient } from "../server/elasticsearch";
-import { getDebugger } from "../utils/logger";
-import type { Money } from "../utils/types";
+import { env } from "../../env.mjs";
+import type { Trace } from "../tracer/types";
+import { TRACE_INDEX, esClient } from "../elasticsearch";
+import { getDebugger } from "../../utils/logger";
+import type { Money } from "../../utils/types";
 import http2 from "http2";
 import FormData from "form-data";
-import { prisma } from "../server/db";
+import { prisma } from "../db";
 import { nanoid } from "nanoid";
 import { CostReferenceType, CostType } from "@prisma/client";
-import { scheduleTopicClusteringNextPage } from "./queue";
+import { scheduleTopicClusteringNextPage } from "../background/queues/topicClusteringQueue";
 
 const debug = getDebugger("langwatch:topicClustering");
 
