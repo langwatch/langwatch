@@ -2,15 +2,24 @@ import type { Worker } from "bullmq";
 import { createMocks } from "node-mocks-http";
 import { describe, expect, it, beforeAll, afterAll } from "vitest";
 import { prisma } from "../../server/db";
-import { EVENTS_INDEX, esClient } from "../../server/elasticsearch";
+import {
+  EVENTS_INDEX,
+  TRACE_INDEX,
+  esClient,
+} from "../../server/elasticsearch";
 import handler from "./track_event";
 import type { Project } from "@prisma/client";
 import { startTrackEventsWorker } from "../../server/background/workers/trackEventsWorker";
 import type { TrackEventJob } from "../../server/background/types";
+import type { Trace } from "../../server/tracer/types";
+import { nanoid } from "nanoid";
+import type { GetResponse } from "@elastic/elasticsearch/lib/api/types";
+import debug from "debug";
 
 describe("/api/track_event", () => {
   let worker: Worker<TrackEventJob, void, string>;
   let project: Project;
+  let traceId: string;
 
   beforeAll(async () => {
     worker = startTrackEventsWorker();
@@ -31,6 +40,9 @@ describe("/api/track_event", () => {
         teamId: "some-team",
       },
     });
+
+    // Create a trace entry in Elasticsearch with grouping keys for the test
+    traceId = `test-trace-${nanoid()}`;
   });
 
   afterAll(async () => {
@@ -42,6 +54,14 @@ describe("/api/track_event", () => {
         id: project.id,
       },
     });
+
+    // Clean up the trace
+    await esClient.delete({
+      index: TRACE_INDEX,
+      id: traceId,
+      refresh: true,
+    });
+
     // Clean up the events created during the test in Elasticsearch
     await esClient.deleteByQuery({
       index: EVENTS_INDEX,
@@ -63,7 +83,7 @@ describe("/api/track_event", () => {
       },
       body: {
         id: "my_event_id",
-        trace_id: "trace_123",
+        trace_id: traceId,
         event_type: "thumbs_up_down",
         metrics: { vote: 1 },
         event_details: { feedback: "Great!" },
@@ -78,6 +98,32 @@ describe("/api/track_event", () => {
       message: "Event tracked",
     });
 
+    // Save trace after sending the event
+    const testTraceData: Trace = {
+      id: traceId,
+      project_id: project.id,
+      input: {
+        value: "Test input for trace",
+      },
+      output: {
+        value: "Test output for trace",
+      },
+      timestamps: { started_at: Date.now(), inserted_at: Date.now() },
+      thread_id: "test-thread",
+      user_id: "test-user",
+      customer_id: "test-customer",
+      labels: ["test-label"],
+      metrics: {},
+      search_embeddings: {},
+    };
+
+    await esClient.index({
+      index: TRACE_INDEX,
+      id: traceId,
+      document: testTraceData,
+      refresh: true,
+    });
+
     // Wait for the job to be completed
     await new Promise<void>(
       (resolve) =>
@@ -87,21 +133,48 @@ describe("/api/track_event", () => {
     );
 
     const eventId = `event_${project.id}_my_event_id`;
-    const event = await esClient.get<Event>({
-      index: EVENTS_INDEX,
-      id: eventId,
-    });
+    let event: GetResponse<Event>;
+    try {
+      event = await esClient.get<Event>({
+        index: EVENTS_INDEX,
+        id: eventId,
+      });
+    } catch {
+      // Wait once more for the job to be completed
+      await new Promise<void>(
+        (resolve) =>
+          worker?.on("completed", (args) => {
+            if (args.data.event.id.includes("my_event_id")) resolve();
+          })
+      );
+      event = await esClient.get<Event>({
+        index: EVENTS_INDEX,
+        id: eventId,
+      });
+    }
 
     expect(event).toBeDefined();
     expect(event._source).toMatchObject({
+      id: eventId,
+      project_id: project.id,
+      trace_id: traceId,
       event_type: "thumbs_up_down",
       metrics: { vote: 1 },
       event_details: { feedback: "Great!" },
-      project_id: project.id,
+      timestamps: {
+        started_at: expect.any(Number),
+        inserted_at: expect.any(Number),
+      },
+      // Grouping keys from the trace even though even was sent earlier
+      thread_id: "test-thread",
+      user_id: "test-user",
+      customer_id: "test-customer",
+      labels: ["test-label"],
     });
   });
 
   it("should return an error for invalid event data", async () => {
+    const namespaces = debug.disable();
     const { req, res } = createMocks({
       method: "POST",
       headers: {
@@ -117,6 +190,7 @@ describe("/api/track_event", () => {
     });
 
     await handler(req, res);
+    debug.enable(namespaces);
 
     expect(res.statusCode).toBe(400);
   });

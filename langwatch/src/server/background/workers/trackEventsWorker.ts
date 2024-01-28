@@ -3,9 +3,14 @@ import { Worker } from "bullmq";
 import type { TrackEventJob } from "~/server/background/types";
 import { getDebugger } from "../../../utils/logger";
 import { connection } from "../../redis";
-import { type Event } from "../../../server/tracer/types";
-import { EVENTS_INDEX, esClient } from "../../elasticsearch";
-import { TRACK_EVENTS_QUEUE_NAME } from "../queues/trackEventsQueue";
+import { type Event, type Trace } from "../../../server/tracer/types";
+import { EVENTS_INDEX, TRACE_INDEX, esClient } from "../../elasticsearch";
+import {
+  TRACK_EVENTS_QUEUE_NAME,
+  trackEventsQueue,
+} from "../queues/trackEventsQueue";
+import type { GetResponse } from "@elastic/elasticsearch/lib/api/types";
+import { eventSchema } from "../../tracer/types.generated";
 
 const debug = getDebugger("langwatch:workers:trackEventWorker");
 
@@ -15,22 +20,51 @@ export const startTrackEventsWorker = () => {
     async (job) => {
       debug(`Processing job ${job.id} with data:`, job.data);
 
-      const event: Event = {
-        id: job.data.event.id,
-        event_type: job.data.event.event_type,
+      let event: Event = {
+        ...job.data.event,
         project_id: job.data.project_id,
-        metrics: job.data.event.metrics,
         event_details: job.data.event.event_details ?? {},
-        trace_id: job.data.event.trace_id,
-        thread_id: job.data.event.thread_id,
-        user_id: job.data.event.user_id,
-        customer_id: job.data.event.customer_id,
-        labels: job.data.event.labels,
         timestamps: {
-          started_at: job.data.event.timestamp ?? Date.now(),
+          started_at: job.data.event.timestamp,
           inserted_at: Date.now(),
         },
       };
+      // use zod to remove any other keys that may be present but not allowed
+      event = eventSchema.parse(event);
+
+      // Try to copy grouping keys from trace if event is connected to one
+      if (event.trace_id) {
+        let traceResult: GetResponse<Trace> | undefined = undefined;
+        try {
+          traceResult = await esClient.get<Trace>({
+            index: TRACE_INDEX,
+            id: event.trace_id,
+          });
+        } catch {}
+
+        const trace = traceResult?._source;
+        if (trace) {
+          event = {
+            ...event,
+            // Copy grouping keys
+            thread_id: trace.thread_id,
+            user_id: trace.user_id,
+            customer_id: trace.customer_id,
+            labels: trace.labels,
+          };
+        } else if (job.data.postpone_count < 3) {
+          const delay = 5 * Math.pow(2, job.data.postpone_count);
+          await trackEventsQueue.add(
+            "track_event",
+            { ...job.data, postpone_count: job.data.postpone_count + 1 },
+            {
+              jobId: `track_event_${event.id}_${job.data.postpone_count}`,
+              delay: delay * 1000,
+            }
+          );
+          return;
+        }
+      }
 
       await esClient.index({
         index: EVENTS_INDEX,
