@@ -231,12 +231,13 @@ export type CollectorRESTParams = {
 };
 
 export type Event = {
-  id?: string; // auto generated unless you want to guarantee idempotency
+  id: string;
   event_type: string; // Type of event (e.g., 'thumbs_up_down', 'add_to_cart')
   project_id: string;
   metrics: Record<string, number>;
   event_details: Record<string, string>;
   // Grouping Fields
+  // TODO: need a form to reconcile those with their traces if a trace_id is available
   trace_id?: string;
   thread_id?: string;
   user_id?: string;
@@ -244,6 +245,15 @@ export type Event = {
   labels?: string[];
   // End Grouping Fields
   timestamps: { started_at: number; inserted_at: number };
+};
+
+export type TrackEventRESTParamsValidator = Omit<
+  Event,
+  "id" | "project_id" | "timestamps" | "event_details"
+> & {
+  id?: string; // auto generated unless you want to guarantee idempotency
+  event_details?: Record<string, string>;
+  timestamp?: number; // The timestamp when the event occurred
 };
 
 export type CollectorRESTParamsValidator = Omit<CollectorRESTParams, "spans">;

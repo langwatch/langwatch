@@ -25,7 +25,7 @@ from openai import OpenAI
 client = OpenAI()
 
 # Use the LangWatch tracer for the OpenAI model
-with langwatch.openai.OpenAITracer(client, user_id="user-123", thread_id="thread-456"):
+with langwatch.openai.OpenAITracer(client, user_id="optional-user-123", thread_id="optional-thread-456"):
     # Your interaction with OpenAI's API
     completion = client.chat.completions.create(
         model="gpt-4",
@@ -44,8 +44,8 @@ with langwatch.openai.OpenAITracer(client, user_id="user-123", thread_id="thread
       <p>
         It's optional but highly recommended to pass the <code>user_id</code> if
         you want to leverage user-specific analytics and the{" "}
-        <code>thread_id</code> to group related traces together. Read more about
-        those and other concepts{" "}
+        <code>thread_id</code> to group related traces together. To connect it
+        to an event later on. Read more about those and other concepts{" "}
         <a href="https://docs.langwatch.ai/docs/concepts" target="_blank">
           here
         </a>
