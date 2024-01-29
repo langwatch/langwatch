@@ -13,7 +13,7 @@ Field: `trace_id`
 
 A **trace** in the travel assistant's framework is each distinct message as a whole, no matter how many chain steps it has inside. For example, when a user asks for the best prices to a destination, the trace would include the LLM suggestions, retrieval of options on API, and LLM generation of results. In the blog post tool, a trace could be for example each time the generation of a new catchy headline option, the generation of a draft for the body, or the SEO keywords generation. Each trace is a separate end-to-end generation handled by the AI.
 
-The `trace_id` is by default randomly generated if you don't provide one, however, to keep control of your traces and connect them to events like [Thumbs Up/Down](../user-events/thumbs_up_down), we recommend generating a random id on your side, using, for example the [nanoid](https://pypi.org/project/nanoid/) library.
+The `trace_id` is by default randomly generated if you don't provide one, however, to keep control of your traces and connect them to events like [Thumbs Up/Down](./user-events/thumbs-up-down), we recommend generating a random id on your side, using, for example the [nanoid](https://pypi.org/project/nanoid/) library.
 
 ### Spans
 

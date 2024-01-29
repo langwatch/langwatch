@@ -2,6 +2,7 @@ import {
   Card,
   CardBody,
   HStack,
+  Link,
   Tab,
   TabIndicator,
   TabList,
@@ -46,7 +47,9 @@ export const SatisfactionPieChart = () => {
 
   const {
     positiveNeutralRatio: positiveRatioThumbsUpDown,
-    positiveNeutralRatioPrevious: positiveRatioThumbsUpDownPrevious,
+    positiveNeutralRatioPrevious: previousPositiveRatioThumbsUpDown,
+    total: totalThumbsUpDown,
+    totalPrevious: totalPreviousThumbsUpDown,
   } = getCounts(thumbsUpDownData);
 
   return (
@@ -68,10 +71,10 @@ export const SatisfactionPieChart = () => {
             <Tab width="50%" fontSize={14} paddingX={2} paddingY={4}>
               <HStack flexWrap="nowrap">
                 <Text noOfLines={1}>Thumbs Up/Down</Text>
-                {data && positiveRatioThumbsUpDownPrevious > 0 && (
+                {data && previousPositiveRatioThumbsUpDown > 0 && (
                   <MetricChange
                     current={positiveRatioThumbsUpDown}
-                    previous={positiveRatioThumbsUpDownPrevious}
+                    previous={previousPositiveRatioThumbsUpDown}
                   />
                 )}
               </HStack>
@@ -83,10 +86,25 @@ export const SatisfactionPieChart = () => {
               <SatisfactionPieChartChart data={data} />
             </TabPanel>
             <TabPanel padding={0}>
-              <SatisfactionPieChartChart
-                data={thumbsUpDownData}
-                useNeutral={false}
-              />
+              {totalThumbsUpDown == 0 && totalPreviousThumbsUpDown == 0 ? (
+                <Text padding={6} fontSize={14}>
+                  No events for thumbs up/down were captured in the selected
+                  period. Check our{" "}
+                  <Link
+                    href="https://docs.langwatch.ai/docs/user-events/thumbs-up-down"
+                    target="_blank"
+                    color="orange.400"
+                  >
+                    documentation
+                  </Link>{" "}
+                  on how to set it up.
+                </Text>
+              ) : (
+                <SatisfactionPieChartChart
+                  data={thumbsUpDownData}
+                  useNeutral={false}
+                />
+              )}
             </TabPanel>
           </TabPanels>
         </Tabs>
@@ -134,6 +152,8 @@ const getCounts = (
     positive,
     negative,
     neutral,
+    total,
+    totalPrevious,
     positiveNeutralRatio,
     positiveNeutralRatioPrevious,
   };
