@@ -179,7 +179,7 @@ model Check {
     project       Project  @relation(fields: [projectId], references: [id])
     checkType     String
     name          String
-    slug          String   @unique
+    slug          String
     enabled       Boolean  @default(true)
     preconditions Json
     parameters    Json
