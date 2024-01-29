@@ -1,0 +1,9 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "paths": {
+      "~/*": ["./src/*"],
+      "@injected-dependencies.server": ["./src/injection/injection.server.ts"]
+    }
+  }
+}

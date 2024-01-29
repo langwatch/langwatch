@@ -8,7 +8,7 @@
     "postinstall": "cp -R ../docs/docs/integration-guides src/components/ && npm run types:zod:generate",
     "lint": "next lint",
     "start": "next start",
-    "start:workers": "tsx src/workers.ts",
+    "start:workers": "tsx --tsconfig tsconfig.workers.json src/workers.ts",
     "prisma:db:push": "npx prisma db push",
     "test": "npm run test:unit -- --run --bail=1 && npm run test:integration -- --run --bail=1 --single-thread",
     "test:unit": "DEBUG=langwatch:* DEBUG_HIDE_DATE=true DEBUG_COLORS=true vitest",
