@@ -332,6 +332,8 @@ describe("updateCheckStatusInES", () => {
   };
 
   afterAll(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+
     // Delete test documents to not polute the db
     await esClient.deleteByQuery({
       index: TRACE_CHECKS_INDEX,
