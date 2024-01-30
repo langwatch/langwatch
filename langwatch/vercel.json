@@ -1,7 +1,7 @@
 {
   "crons": [
     {
-      "path": "/api/traces_worker",
+      "path": "/api/start_workers",
       "schedule": "*/4 * * * *"
     },
     {
