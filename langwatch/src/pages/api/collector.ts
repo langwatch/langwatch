@@ -31,6 +31,7 @@ import { addLLMTokensCount, computeTraceMetrics } from "./collector/metrics";
 import { scheduleTraceChecks } from "./collector/traceChecks";
 import { cleanupPII } from "./collector/cleanupPII";
 import { scoreSatisfactionFromInput } from "./collector/satisfaction";
+import crypto from "crypto";
 
 export const debug = getDebugger("langwatch:collector");
 
@@ -113,6 +114,15 @@ export default async function handler(
     return res.status(400).json({ message: "Trace ID not defined" });
   }
 
+  const traceIds = Array.from(
+    new Set(spans.filter((span) => span.trace_id).map((span) => span.trace_id))
+  );
+  if (!traceIds[0] || traceIds.length > 1 || traceIds[0] != traceId) {
+    return res
+      .status(400)
+      .json({ message: "All spans must have the same trace id" });
+  }
+
   for (const span of spans) {
     try {
       spanValidatorSchema.parse(span);
@@ -137,6 +147,17 @@ export default async function handler(
     }
   }
 
+  const paramsMD5 = crypto
+    .createHash("md5")
+    .update(JSON.stringify({ ...params, spans }))
+    .digest("hex");
+  const existingMD5s = await fetchExistingMD5s(traceId, project.id);
+  if (existingMD5s?.includes(paramsMD5)) {
+    return res.status(200).json({ message: "No changes" });
+  }
+
+  debug(`collecting traceId ${traceId}`);
+
   spans = addInputAndOutputForRAGs(await addLLMTokensCount(spans));
 
   const esSpans: ElasticSearchSpan[] = spans.map((span) => ({
@@ -150,17 +171,6 @@ export default async function handler(
         ? JSON.stringify(span.raw_response)
         : null,
   }));
-
-  const traceIds = Array.from(
-    new Set(spans.filter((span) => span.trace_id).map((span) => span.trace_id))
-  );
-  if (!traceIds[0] || traceIds.length > 1 || traceIds[0] != traceId) {
-    return res
-      .status(400)
-      .json({ message: "All spans must have the same trace id" });
-  }
-
-  debug(`collecting traceId ${traceId}`);
 
   const [input, output] = await Promise.all([
     getTraceInput(spans),
@@ -196,15 +206,10 @@ export default async function handler(
     search_embeddings: {
       openai_embeddings: openAISearchEmbeddings,
     },
+    indexing_md5s: [...(existingMD5s ?? []), paramsMD5],
   };
 
   await cleanupPII(trace, esSpans);
-
-  await esClient.index({
-    index: TRACE_INDEX,
-    id: trace.id,
-    body: trace,
-  });
 
   const result = await esClient.helpers.bulk({
     datasource: esSpans,
@@ -218,6 +223,12 @@ export default async function handler(
     console.error("Failed to insert to elasticsearch", result);
     return res.status(500).json({ message: "Something went wrong!" });
   }
+
+  await esClient.index({
+    index: TRACE_INDEX,
+    id: trace.id,
+    body: trace,
+  });
 
   void scheduleTraceChecks(trace, spans);
 
@@ -259,4 +270,28 @@ const markProjectFirstMessage = async (project: Project) => {
       data: { firstMessage: true },
     });
   }
+};
+
+const fetchExistingMD5s = async (
+  traceId: string,
+  projectId: string
+): Promise<Trace["indexing_md5s"] | undefined> => {
+  const existingTraceResponse = await esClient.search<Trace>({
+    index: TRACE_INDEX,
+    body: {
+      query: {
+        //@ts-ignore
+        bool: {
+          must: [
+            { term: { trace_id: traceId } },
+            { term: { project_id: projectId } },
+          ],
+        },
+      },
+      _source: ["indexing_md5s"],
+    },
+  });
+
+  const existingTrace = existingTraceResponse.hits.hits[0]?._source;
+  return existingTrace?.indexing_md5s;
 };

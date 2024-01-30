@@ -35,31 +35,40 @@ export const scheduleTraceCheck = async ({
     status: "scheduled",
   });
 
-  await traceChecksQueue.add(
-    check.type,
-    {
-      // Recreating the check object to avoid passing the whole check object and making the queue heavy, we pass only the keys we need
-      check: {
-        id: check.id,
-        type: check.type,
-        name: check.name,
-      },
-      // Recreating the trace object to avoid passing the whole trace object and making the queue heavy, we pass only the keys we need
-      trace: {
-        id: trace.id,
-        project_id: trace.project_id,
-        thread_id: trace.thread_id,
-        user_id: trace.user_id,
-        customer_id: trace.customer_id,
-        labels: trace.labels,
-      },
-    },
-    {
-      jobId: getTraceCheckId(trace.id, check.id),
-      delay: delay ?? 5000,
-      attempts: 3,
+  const jobId = getTraceCheckId(trace.id, check.id);
+  const currentJob = await traceChecksQueue.getJob(jobId);
+  if (currentJob) {
+    const state = await currentJob.getState();
+    if (state == "completed" || state == "failed") {
+      await currentJob.retry(state);
     }
-  );
+  } else {
+    await traceChecksQueue.add(
+      check.type,
+      {
+        // Recreating the check object to avoid passing the whole check object and making the queue heavy, we pass only the keys we need
+        check: {
+          id: check.id,
+          type: check.type,
+          name: check.name,
+        },
+        // Recreating the trace object to avoid passing the whole trace object and making the queue heavy, we pass only the keys we need
+        trace: {
+          id: trace.id,
+          project_id: trace.project_id,
+          thread_id: trace.thread_id,
+          user_id: trace.user_id,
+          customer_id: trace.customer_id,
+          labels: trace.labels,
+        },
+      },
+      {
+        jobId,
+        delay: delay ?? 5000,
+        attempts: 3,
+      }
+    );
+  }
 };
 
 export const getTraceCheckId = (trace_id: string, check_id: string) =>

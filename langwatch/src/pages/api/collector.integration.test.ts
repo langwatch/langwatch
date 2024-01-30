@@ -28,8 +28,8 @@ const sampleSpan: LLMSpan = {
   outputs: [{ type: "text", value: "world" }],
   error: null,
   timestamps: {
-    started_at: Date.now(),
-    finished_at: Date.now() + 10,
+    started_at: 1706623872769,
+    finished_at: 1706623872769 + 10,
   },
   vendor: "openai",
   model: "gpt-3.5-turbo",
@@ -138,6 +138,7 @@ describe("Collector API Endpoint", () => {
       user_id: "user_test-user_1",
       customer_id: "customer_test-customer_1",
       labels: ["test-label-1.0.0"],
+      indexing_md5s: ["36b966cf1f1c7baf5b3073ef477a8237"],
     });
   });
 

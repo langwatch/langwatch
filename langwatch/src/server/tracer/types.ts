@@ -188,6 +188,7 @@ export type Trace = {
     openai_embeddings?: number[];
   };
   topics?: string[];
+  indexing_md5s?: string[];
 };
 
 export type TraceCheck = {

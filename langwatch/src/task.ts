@@ -9,6 +9,7 @@ const { connection: redis } = require("./server/redis");
 const debug = getDebugger("langwatch:task");
 
 const TASKS = {
+  fixScheduledTraceChecks: require("./tasks/fixScheduledTraceChecks"),
   elasticIndexCreate: require("./tasks/elasticIndexCreate"),
   populateEmbeddings: require("./tasks/populateEmbeddings"),
   elasticReindex: require("./tasks/elasticReindex"),

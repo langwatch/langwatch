@@ -251,6 +251,75 @@ describe("Check Queue Integration Tests", () => {
     expect(response.hits.hits[0]?._source?.status).toBe("error");
     expect(mocks.traceChecksProcess).toHaveBeenCalled();
   });
+
+  it("should re-process a trace check that is already successfull again if requested", async () => {
+    mocks.traceChecksProcess.mockResolvedValue({
+      raw_result: { result: "succeeded test works" },
+      value: 1,
+      status: "succeeded",
+      costs: [],
+    });
+
+    const trace = {
+      id: trace_id_success,
+      project_id: "test-project-id",
+    };
+
+    await scheduleTraceCheck({ check, trace });
+
+    // Wait for the job to be completed
+    await new Promise<void>(
+      (resolve) =>
+        worker?.on("completed", (args) => {
+          if (args.data.trace.id === trace_id_success) resolve();
+        })
+    );
+
+    // Query ES to verify the status is "succeeded"
+    let response = await esClient.search<TraceCheck>({
+      index: TRACE_CHECKS_INDEX,
+      query: {
+        term: { trace_id: trace.id },
+      },
+    });
+
+    expect(response.hits.hits[0]?._source?.status).toBe("succeeded");
+    expect(response.hits.hits[0]?._source?.value).toBe(1);
+    expect(mocks.traceChecksProcess).toHaveBeenCalled();
+
+    // Process the job again
+    await scheduleTraceCheck({ check, trace });
+
+    // Query ES to verify the status is "scheduled"
+    response = await esClient.search<TraceCheck>({
+      index: TRACE_CHECKS_INDEX,
+      query: {
+        term: { trace_id: trace.id },
+      },
+    });
+
+    expect(response.hits.hits[0]?._source?.status).toBe("scheduled");
+
+    // Wait for the job to be completed
+    await new Promise<void>(
+      (resolve) =>
+        worker?.on("completed", (args) => {
+          if (args.data.trace.id === trace_id_success) resolve();
+        })
+    );
+
+    // Query ES to verify the status is "succeeded"
+    response = await esClient.search<TraceCheck>({
+      index: TRACE_CHECKS_INDEX,
+      query: {
+        term: { trace_id: trace.id },
+      },
+    });
+
+    expect(response.hits.hits[0]?._source?.status).toBe("succeeded");
+    expect(response.hits.hits[0]?._source?.value).toBe(1);
+    expect(mocks.traceChecksProcess).toHaveBeenCalled();
+  });
 });
 
 describe("updateCheckStatusInES", () => {

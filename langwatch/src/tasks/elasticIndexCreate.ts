@@ -79,6 +79,9 @@ const traceMapping: Record<keyof Trace, MappingProperty> = {
   topics: {
     type: "keyword",
   },
+  indexing_md5s: {
+    type: "keyword",
+  }
 };
 
 const spanMapping: Record<keyof ElasticSearchSpan, MappingProperty> = {
