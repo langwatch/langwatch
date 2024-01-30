@@ -83,8 +83,8 @@ curl -X POST "$ENDPOINT" \\
         "completion_tokens": 150
       },
       "timestamps": {
-        "started_at": 1617981376000,
-        "finished_at": 1617981378000
+        "started_at": 1706628806000,
+        "finished_at": 1706628808000
       }
     }
   ],

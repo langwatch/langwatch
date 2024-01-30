@@ -240,7 +240,7 @@ export default async function handler(
     console.warn("Failed to score satisfaction for", trace.id);
   }
 
-  return res.status(200).json({ message: "Traces received successfully." });
+  return res.status(200).json({ message: "Trace received successfully." });
 }
 
 const typedValueToElasticSearch = (
@@ -279,11 +279,12 @@ const fetchExistingMD5s = async (
   const existingTraceResponse = await esClient.search<Trace>({
     index: TRACE_INDEX,
     body: {
+      size: 1,
       query: {
         //@ts-ignore
         bool: {
           must: [
-            { term: { trace_id: traceId } },
+            { term: { id: traceId } },
             { term: { project_id: projectId } },
           ],
         },
