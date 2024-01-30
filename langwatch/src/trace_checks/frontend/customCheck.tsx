@@ -23,7 +23,12 @@ export function CustomCheck({ check }: { check: TraceCheck }) {
               Rule failed: {rule?.field}{" "}
               {camelCaseToLowerCase(rule?.rule ?? "")}
             </Text>
-            {rule?.value && <Text>{`Instruction: "${rule.value}"`}</Text>}
+            {rule?.value && (
+              <Text>{`Instruction: "${
+                rule.value.substring(0, 100) +
+                (rule.value.length > 100 ? "..." : "")
+              }"`}</Text>
+            )}
             {typeof score !== "undefined" && (
               <Text>
                 {`${
