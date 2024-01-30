@@ -3,7 +3,7 @@
   "outputDirectory": "langwatch/langwatch/.next",
   "crons": [
     {
-      "path": "/api/traces_worker",
+      "path": "/api/start_workers",
       "schedule": "*/4 * * * *"
     },
     {
