@@ -6,7 +6,7 @@ import type { ModerationResult } from "../types";
 describe("ToxicityCheck", () => {
   it("detects toxicity on traces", async () => {
     const sampleTrace: Trace = {
-      id: "foo",
+      trace_id: "foo",
       project_id: "foo",
       input: { value: "fuck you" },
       metrics: {},
@@ -31,7 +31,7 @@ describe("ToxicityCheck", () => {
 
   it("does not check for toxicity in categories that are not marked", async () => {
     const sampleTrace: Trace = {
-      id: "foo",
+      trace_id: "foo",
       project_id: "foo",
       input: { value: "fuck you" },
       metrics: {},

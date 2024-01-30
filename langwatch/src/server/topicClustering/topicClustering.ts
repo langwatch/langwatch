@@ -62,7 +62,7 @@ export const clusterTopicsForProject = async (
           ...presenceCondition,
         },
       },
-      _source: ["id", "input"],
+      _source: ["trace_id", "input"],
       sort: [{ "timestamps.inserted_at": "asc" }, { id: "asc" }],
       ...(searchAfter ? { search_after: searchAfter } : {}),
       size: 1000,
@@ -134,7 +134,7 @@ export const clusterTraces = async (projectId: string, traces: Trace[]) => {
     file: traces
       .map((trace) => ({
         _source: {
-          id: trace.id,
+          id: trace.trace_id,
           input: trace.input,
         },
       }))

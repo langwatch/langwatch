@@ -2,7 +2,13 @@ import type { Project } from "@prisma/client";
 import * as Sentry from "@sentry/nextjs";
 import { type NextApiRequest, type NextApiResponse } from "next";
 import { prisma } from "../../server/db"; // Adjust the import based on your setup
-import { SPAN_INDEX, TRACE_INDEX, esClient } from "../../server/elasticsearch";
+import {
+  SPAN_INDEX,
+  TRACE_INDEX,
+  esClient,
+  spanIndexId,
+  traceIndexId,
+} from "../../server/elasticsearch";
 import {
   type CollectorRESTParamsValidator,
   type ElasticSearchInputOutput,
@@ -86,6 +92,10 @@ export default async function handler(
 
   let spans = (req.body as Record<string, any>).spans as Span[];
   spans.forEach((span) => {
+    // We changed "id" to "span_id", but we still want to support "id" for retrocompatibility for a while
+    if ("id" in span) {
+      span.span_id = span.id as string;
+    }
     if (nullableTraceId && !span.trace_id) {
       span.trace_id = nullableTraceId;
     }
@@ -189,7 +199,7 @@ export default async function handler(
 
   // Create the trace
   const trace: Trace = {
-    id: traceId,
+    trace_id: traceId,
     project_id: project.id,
     thread_id: nullToUndefined(threadId), // Optional: This will be undefined if not sent
     user_id: nullToUndefined(userId), // Optional: This will be undefined if not sent
@@ -215,7 +225,11 @@ export default async function handler(
     datasource: esSpans,
     pipeline: "ent-search-generic-ingestion",
     onDocument: (doc) => ({
-      index: { _index: SPAN_INDEX, _id: doc.id, routing: doc.trace_id },
+      index: {
+        _index: SPAN_INDEX,
+        _id: spanIndexId({ spanId: doc.span_id, projectId: project.id }),
+        routing: traceIndexId({ traceId, projectId: project.id }),
+      },
     }),
   });
 
@@ -226,7 +240,7 @@ export default async function handler(
 
   await esClient.index({
     index: TRACE_INDEX,
-    id: trace.id,
+    id: traceIndexId({ traceId, projectId: project.id }),
     body: trace,
   });
 
@@ -235,9 +249,13 @@ export default async function handler(
   await markProjectFirstMessage(project);
 
   try {
-    await scoreSatisfactionFromInput(trace.id, trace.input);
+    await scoreSatisfactionFromInput({
+      traceId: trace.trace_id,
+      projectId: trace.project_id,
+      input: trace.input,
+    });
   } catch {
-    console.warn("Failed to score satisfaction for", trace.id);
+    console.warn("Failed to score satisfaction for", trace.trace_id);
   }
 
   return res.status(200).json({ message: "Trace received successfully." });
@@ -284,7 +302,7 @@ const fetchExistingMD5s = async (
         //@ts-ignore
         bool: {
           must: [
-            { term: { id: traceId } },
+            { term: { trace_id: traceId } },
             { term: { project_id: projectId } },
           ],
         },

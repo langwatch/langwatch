@@ -21,7 +21,7 @@ export const startTraceChecksWorker = (processFn: (job: Job<TraceCheckJob, any, 
     async (job) => {
       if (
         env.NODE_ENV !== "test" &&
-        job.data.trace.id.includes("test-trace")
+        job.data.trace.trace_id.includes("test-trace")
       ) {
         return;
       }

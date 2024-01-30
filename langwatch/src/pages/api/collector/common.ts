@@ -100,13 +100,13 @@ export const organizeSpansIntoTree = (spans: Span[]): SpanWithChildren[] => {
 
   // Initialize each span with an empty children array
   sortedSpans.forEach((span) => {
-    spanMap.set(span.id, { ...span, children: [] });
+    spanMap.set(span.span_id, { ...span, children: [] });
   });
 
   // Assign children to their respective parents
   sortedSpans.forEach((span) => {
     if (span.parent_id && spanMap.has(span.parent_id)) {
-      spanMap.get(span.parent_id)!.children.push(spanMap.get(span.id)!);
+      spanMap.get(span.parent_id)!.children.push(spanMap.get(span.span_id)!);
     }
   });
 

@@ -62,30 +62,24 @@ const generateQueryConditions = ({
   ];
 };
 
-export const esGetTraceById = async (
-  traceId: string
-): Promise<Trace | undefined> => {
-  const result = await esClient.search<Trace>({
-    index: TRACE_INDEX,
-    body: {
-      query: {
-        term: { id: traceId },
-      },
-    },
-    size: 1,
-  });
-
-  return result.hits.hits[0]?._source;
-};
-
-export const esGetSpansByTraceId = async (
-  traceId: string
-): Promise<ElasticSearchSpan[]> => {
+export const esGetSpansByTraceId = async ({
+  traceId,
+  projectId,
+}: {
+  traceId: string;
+  projectId: string;
+}): Promise<ElasticSearchSpan[]> => {
   const result = await esClient.search<ElasticSearchSpan>({
     index: SPAN_INDEX,
     body: {
       query: {
-        term: { trace_id: traceId },
+        //@ts-ignore
+        bool: {
+          must: [
+            { term: { trace_id: traceId } },
+            { term: { project_id: projectId } },
+          ],
+        },
       },
     },
     size: 10000,
@@ -235,7 +229,7 @@ export const tracesRouter = createTRPCRouter({
             //@ts-ignore
             bool: {
               filter: [
-                { term: { id: input.traceId } },
+                { term: { trace_id: input.traceId } },
                 { term: { project_id: input.projectId } },
               ],
             },

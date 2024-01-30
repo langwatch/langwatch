@@ -49,7 +49,7 @@ curl -X POST "$ENDPOINT" \\
   "spans": [
     {
       "type": "llm",
-      "id": "span-456",
+      "span_id": "span-456",
       "vendor": "openai",
       "model": "gpt-4",
       "input": {

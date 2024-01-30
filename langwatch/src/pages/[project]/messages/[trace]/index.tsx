@@ -221,10 +221,10 @@ function Conversation({ threadId }: { threadId?: string }) {
             threadTraces.data ? (
               threadTraces.data.map((trace) => (
                 <TraceMessages
-                  key={trace.id}
+                  key={trace.trace_id}
                   trace={trace}
-                  ref={trace.id == traceId ? currentTraceRef : undefined}
-                  highlighted={trace.id == traceId && !!openTab}
+                  ref={trace.trace_id == traceId ? currentTraceRef : undefined}
+                  highlighted={trace.trace_id == traceId && !!openTab}
                 />
               ))
             ) : threadTraces.error ? (
@@ -393,10 +393,10 @@ function Message({
       role="button"
       onClick={() => {
         if (!trace) return;
-        if (openTab && traceId === trace.id) {
-          void router.replace(`/${project.slug}/messages/${trace.id}`);
+        if (openTab && traceId === trace.trace_id) {
+          void router.replace(`/${project.slug}/messages/${trace.trace_id}`);
         } else {
-          void router.push(`/${project.slug}/messages/${trace.id}/spans`);
+          void router.push(`/${project.slug}/messages/${trace.trace_id}/spans`);
         }
       }}
     >

@@ -1,5 +1,9 @@
 import { env } from "../../../env.mjs";
-import { TRACE_INDEX, esClient } from "../../../server/elasticsearch";
+import {
+  TRACE_INDEX,
+  esClient,
+  traceIndexId,
+} from "../../../server/elasticsearch";
 import type { Trace } from "../../../server/tracer/types";
 
 type SatisfactionScoreResult = {
@@ -10,16 +14,23 @@ type SatisfactionScoreResult = {
   label: string;
 };
 
-export const scoreSatisfactionFromInput = async (
-  trace_id: string,
-  input: Trace["input"]
-): Promise<void> => {
+export const scoreSatisfactionFromInput = async ({
+  traceId,
+  projectId,
+  input,
+}: {
+  traceId: string;
+  projectId: string;
+  input: Trace["input"];
+}): Promise<void> => {
   if (!env.LANGWATCH_GUARDRAILS_SERVICE) {
     throw new Error("LANGWATCH_GUARDRAILS_SERVICE not set");
   }
 
   if (!input.openai_embeddings) {
-    console.warn(`Trace ID ${trace_id} input does not have embeddings, skipping the job`);
+    console.warn(
+      `Trace ID ${traceId} input does not have embeddings, skipping the job`
+    );
     return;
   }
 
@@ -46,7 +57,7 @@ export const scoreSatisfactionFromInput = async (
 
   await esClient.update({
     index: TRACE_INDEX,
-    id: trace_id,
+    id: traceIndexId({ traceId: traceId, projectId: projectId }),
     body: {
       doc: {
         input: {

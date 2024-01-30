@@ -182,7 +182,7 @@ export const currentVsPreviousSpansAggregation = async <
   const tracesResult = await esClient.search<Trace>({
     index: TRACE_INDEX,
     body: {
-      _source: ["id"],
+      _source: ["trace_id"],
       size: 10000,
       query: {
         bool: {
@@ -196,7 +196,7 @@ export const currentVsPreviousSpansAggregation = async <
     },
   });
 
-  const traceIds = tracesResult.hits.hits.map((hit) => hit._source!.id);
+  const traceIds = tracesResult.hits.hits.map((hit) => hit._source!.trace_id);
 
   return currentVsPreviousElasticSearchAggregation<T>({
     input,
@@ -354,7 +354,7 @@ export const groupedSpansAggregation = async <T extends Record<string, any>>({
   const tracesResult = await esClient.search<Trace>({
     index: TRACE_INDEX,
     body: {
-      _source: ["id"],
+      _source: ["trace_id"],
       size: 10000,
       query: {
         bool: {
@@ -368,7 +368,7 @@ export const groupedSpansAggregation = async <T extends Record<string, any>>({
     },
   });
 
-  const traceIds = tracesResult.hits.hits.map((hit) => hit._source!.id);
+  const traceIds = tracesResult.hits.hits.map((hit) => hit._source!.trace_id);
 
   return groupedElasticSearchAggregation<T>({
     input,

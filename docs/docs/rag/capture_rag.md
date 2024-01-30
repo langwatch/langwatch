@@ -59,7 +59,7 @@ curl -X POST "https://app.langwatch.ai/api/collector" \\
     {
       "type": "rag",
       "name": null,
-      "id": "span-123",
+      "span_id": "span-123",
       "input": {
           "type": "text",
           "value": "What is the capital of France?"
@@ -85,7 +85,7 @@ curl -X POST "https://app.langwatch.ai/api/collector" \\
     # highlight-end
     {
       "type": "llm",
-      "id": "span-456",
+      "span_id": "span-456",
       # highlight-next-line
       "parent_id": "span-123",
       "vendor": "openai",

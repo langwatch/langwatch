@@ -6,7 +6,7 @@ import type { google } from "@google-cloud/dlp/build/protos/protos";
 describe("PIICheck", () => {
   it("detects PII on traces", async () => {
     const sampleTrace: Trace = {
-      id: "foo",
+      trace_id: "foo",
       project_id: "foo",
       input: { value: "hi there" },
       metrics: {},
@@ -26,7 +26,7 @@ describe("PIICheck", () => {
     });
 
     const samplePIITrace: Trace = {
-      id: "foo",
+      trace_id: "foo",
       project_id: "foo",
       input: {
         value: "hi there, my credit card number is 4012-8888-8888-1881",

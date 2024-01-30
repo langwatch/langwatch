@@ -37,7 +37,7 @@ export const scheduleTraceCheck = async ({
   });
 
   const jobId = traceCheckIndexId({
-    traceId: trace.id,
+    traceId: trace.trace_id,
     checkId: check.id,
     projectId: trace.project_id,
   });
@@ -59,7 +59,7 @@ export const scheduleTraceCheck = async ({
         },
         // Recreating the trace object to avoid passing the whole trace object and making the queue heavy, we pass only the keys we need
         trace: {
-          id: trace.id,
+          trace_id: trace.trace_id,
           project_id: trace.project_id,
           thread_id: trace.thread_id,
           user_id: trace.user_id,
@@ -95,11 +95,11 @@ export const updateCheckStatusInES = async ({
 }) => {
   const traceCheck: TraceCheck = {
     id: traceCheckIndexId({
-      traceId: trace.id,
+      traceId: trace.trace_id,
       checkId: check.id,
       projectId: trace.project_id,
     }),
-    trace_id: trace.id,
+    trace_id: trace.trace_id,
     project_id: trace.project_id,
     thread_id: trace.thread_id,
     user_id: trace.user_id,
@@ -123,7 +123,11 @@ export const updateCheckStatusInES = async ({
 
   await esClient.update({
     index: TRACE_CHECKS_INDEX,
-    id: traceCheck.id,
+    id: traceCheckIndexId({
+      traceId: trace.trace_id,
+      checkId: check.id,
+      projectId: trace.project_id,
+    }),
     body: {
       doc: traceCheck,
       upsert: {

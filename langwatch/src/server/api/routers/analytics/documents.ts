@@ -18,7 +18,7 @@ export const topUsedDocuments = protectedProcedure
     const tracesResult = await esClient.search<Trace>({
       index: TRACE_INDEX,
       body: {
-        _source: ["id"],
+        _source: ["trace_id"],
         size: 10000,
         query: {
           bool: {
@@ -32,7 +32,7 @@ export const topUsedDocuments = protectedProcedure
       },
     });
 
-    const traceIds = tracesResult.hits.hits.map((hit) => hit._source!.id);
+    const traceIds = tracesResult.hits.hits.map((hit) => hit._source!.trace_id);
 
     const result = await esClient.search({
       index: SPAN_INDEX,

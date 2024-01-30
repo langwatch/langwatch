@@ -38,9 +38,13 @@ export default async function handler(
       if (!trace) continue;
 
       try {
-        await scoreSatisfactionFromInput(trace.id, trace.input);
+        await scoreSatisfactionFromInput({
+          traceId: trace.trace_id,
+          projectId: trace.project_id,
+          input: trace.input,
+        });
       } catch {
-        console.warn(`Trace ID ${trace.id} failed to score satisfaction`);
+        console.warn(`Trace ID ${trace.trace_id} failed to score satisfaction`);
       }
 
       console.log(

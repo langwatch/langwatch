@@ -14,7 +14,7 @@ export const llmCallsCountVsPreviousPeriod = protectedProcedure
     return await currentVsPreviousSpansAggregation<{ count: number }>({
       input,
       aggs: {
-        count: { value_count: { field: "id" } },
+        count: { value_count: { field: "span_id" } },
       },
       extraConditions: [{ term: { type: "llm" } }],
     });
@@ -27,7 +27,7 @@ export const llmCallsCountAggregated = protectedProcedure
     return await groupedSpansAggregation<{ count: number }>({
       input,
       aggs: {
-        count: { value_count: { field: "id" } },
+        count: { value_count: { field: "span_id" } },
       },
       extraConditions: [{ term: { type: "llm" } }],
     });

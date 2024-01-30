@@ -92,11 +92,11 @@ interface SpanTimestamps {
 type SpanTypes = "span" | "llm" | "chain" | "tool" | "agent" | "rag";
 
 export interface BaseSpan {
-  type: SpanTypes;
-  name?: string | null;
-  id: string;
+  span_id: string;
   parent_id?: string | null;
   trace_id: string;
+  type: SpanTypes;
+  name?: string | null;
   input?: SpanInput | null;
   outputs: SpanOutput[];
   error?: ErrorCapture | null;
@@ -164,7 +164,7 @@ export type TraceInput = {
 export type TraceOutput = { value: string; openai_embeddings?: number[] };
 
 export type Trace = {
-  id: string;
+  trace_id: string;
   project_id: string;
   // Grouping Fields
   thread_id?: string;
@@ -192,8 +192,8 @@ export type Trace = {
 };
 
 export type TraceCheck = {
-  id: string;
   trace_id: string;
+  check_id: string;
   project_id: string;
   // Grouping Fields
   thread_id?: string;
@@ -201,7 +201,6 @@ export type TraceCheck = {
   customer_id?: string;
   labels?: string[];
   // End Grouping Fields
-  check_id: string;
   check_type: string;
   check_name: string;
   status: "scheduled" | "in_progress" | "error" | "failed" | "succeeded";
@@ -217,7 +216,7 @@ export type TraceCheck = {
 };
 
 export type Experiment = {
-  id: string;
+  experiment_id: string;
   variant: number;
 };
 
@@ -234,7 +233,7 @@ export type CollectorRESTParams = {
 export type CollectorRESTParamsValidator = Omit<CollectorRESTParams, "spans">;
 
 export type Event = {
-  id: string;
+  event_id: string;
   event_type: string; // Type of event (e.g., 'thumbs_up_down', 'add_to_cart')
   project_id: string;
   metrics: Record<string, number>;
@@ -257,9 +256,9 @@ export type ElasticSearchEvent = Omit<Event, "metrics" | "event_details"> & {
 
 export type TrackEventRESTParamsValidator = Omit<
   Event,
-  "id" | "project_id" | "timestamps" | "event_details"
+  "event_id" | "project_id" | "timestamps" | "event_details"
 > & {
-  id?: string; // auto generated unless you want to guarantee idempotency
+  event_id?: string; // auto generated unless you want to guarantee idempotency
   event_details?: Record<string, string>;
   timestamp?: number; // The timestamp when the event occurred
 };

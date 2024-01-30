@@ -15,7 +15,7 @@ import {
 } from "../server/tracer/types";
 
 const traceMapping: Record<keyof Trace, MappingProperty> = {
-  id: { type: "keyword" },
+  trace_id: { type: "keyword" },
   project_id: { type: "keyword" },
   thread_id: { type: "keyword" },
   user_id: { type: "keyword" },
@@ -88,7 +88,7 @@ const spanMapping: Record<keyof ElasticSearchSpan, MappingProperty> = {
   project_id: { type: "keyword" },
   type: { type: "keyword" },
   name: { type: "text" },
-  id: { type: "keyword" },
+  span_id: { type: "keyword" },
   parent_id: { type: "keyword" },
   trace_id: { type: "keyword" },
   input: {
@@ -150,7 +150,6 @@ const spanMapping: Record<keyof ElasticSearchSpan, MappingProperty> = {
 };
 
 const traceChecksMapping: Record<keyof TraceCheck, MappingProperty> = {
-  id: { type: "keyword" },
   trace_id: { type: "keyword" },
   project_id: { type: "keyword" },
   thread_id: { type: "keyword" },
@@ -180,7 +179,7 @@ const traceChecksMapping: Record<keyof TraceCheck, MappingProperty> = {
 };
 
 const eventsMapping: Record<keyof Event, MappingProperty> = {
-  id: { type: "keyword" },
+  event_id: { type: "keyword" },
   project_id: { type: "keyword" },
   event_type: { type: "text" },
   metrics: {

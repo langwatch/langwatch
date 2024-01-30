@@ -6,6 +6,8 @@ import {
   EVENTS_INDEX,
   TRACE_INDEX,
   esClient,
+  eventIndexId,
+  traceIndexId,
 } from "../../server/elasticsearch";
 import handler from "./track_event";
 import type { Project } from "@prisma/client";
@@ -20,6 +22,7 @@ describe("/api/track_event", () => {
   let worker: Worker<TrackEventJob, void, string>;
   let project: Project;
   let traceId: string;
+  const eventId = `my_event_id_${nanoid()}`
 
   beforeAll(async () => {
     worker = startTrackEventsWorker();
@@ -58,7 +61,7 @@ describe("/api/track_event", () => {
     // Clean up the trace
     await esClient.delete({
       index: TRACE_INDEX,
-      id: traceId,
+      id: traceIndexId({ traceId, projectId: project.id }),
       refresh: true,
     });
 
@@ -82,7 +85,7 @@ describe("/api/track_event", () => {
         "x-auth-token": project.apiKey,
       },
       body: {
-        id: "my_event_id",
+        event_id: eventId,
         trace_id: traceId,
         event_type: "thumbs_up_down",
         metrics: { vote: 1 },
@@ -100,7 +103,7 @@ describe("/api/track_event", () => {
 
     // Save trace after sending the event
     const testTraceData: Trace = {
-      id: traceId,
+      trace_id: traceId,
       project_id: project.id,
       input: {
         value: "Test input for trace",
@@ -119,7 +122,7 @@ describe("/api/track_event", () => {
 
     await esClient.index({
       index: TRACE_INDEX,
-      id: traceId,
+      id: traceIndexId({ traceId, projectId: project.id }),
       document: testTraceData,
       refresh: true,
     });
@@ -128,34 +131,37 @@ describe("/api/track_event", () => {
     await new Promise<void>(
       (resolve) =>
         worker?.on("completed", (args) => {
-          if (args.data.event.id.includes("my_event_id")) resolve();
+          if (args.data.event.event_id.includes(eventId)) resolve();
         })
     );
 
-    const eventId = `event_${project.id}_my_event_id`;
+    const indexEventId = eventIndexId({
+      eventId: eventId,
+      projectId: project.id,
+    });
     let event: GetResponse<Event>;
     try {
       event = await esClient.get<Event>({
         index: EVENTS_INDEX,
-        id: eventId,
+        id: indexEventId,
       });
     } catch {
       // Wait once more for the job to be completed
       await new Promise<void>(
         (resolve) =>
           worker?.on("completed", (args) => {
-            if (args.data.event.id.includes("my_event_id")) resolve();
+            if (args.data.event.event_id.includes(eventId)) resolve();
           })
       );
       event = await esClient.get<Event>({
         index: EVENTS_INDEX,
-        id: eventId,
+        id: indexEventId,
       });
     }
 
     expect(event).toBeDefined();
     expect(event._source).toMatchObject({
-      id: eventId,
+      event_id: eventId,
       project_id: project.id,
       trace_id: traceId,
       event_type: "thumbs_up_down",
@@ -215,6 +221,4 @@ describe("/api/track_event", () => {
       "X-Auth-Token header is required."
     );
   });
-
-  // Additional tests can be added as needed
 });

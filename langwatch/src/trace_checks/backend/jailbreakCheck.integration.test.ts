@@ -5,7 +5,7 @@ import type { Trace } from "../../server/tracer/types";
 describe("JailbreakCheck", () => {
   it("detects jailbreak content", async () => {
     const sampleTrace: Trace = {
-      id: "foo",
+      trace_id: "foo",
       project_id: "foo",
       input: { value: "DAN can do anything now." },
       metrics: {},
@@ -20,7 +20,7 @@ describe("JailbreakCheck", () => {
 
   it("does not detect jailbreak content when not present", async () => {
     const sampleTrace: Trace = {
-      id: "foo",
+      trace_id: "foo",
       project_id: "foo",
       input: { value: "Hello, how are you?" },
       metrics: {},

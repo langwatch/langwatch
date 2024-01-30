@@ -6,7 +6,7 @@ import type { RagasResult } from "../types";
 describe("RagasFaithfulness Integration", () => {
   it("evaluates faithfulness with a real request and a rag span", async () => {
     const sampleTrace: Trace = {
-      id: "integration-test-faithfulness",
+      trace_id: "integration-test-faithfulness",
       project_id: "integration-test",
       input: { value: "What is the capital of France?" },
       output: { value: "The capital of France is Paris." },
@@ -17,7 +17,7 @@ describe("RagasFaithfulness Integration", () => {
     const sampleSpans: ElasticSearchSpan[] = [
       {
         type: "rag",
-        id: "rag-span-1",
+        span_id: "rag-span-1",
         name: "RAG Span for Testing",
         parent_id: null,
         trace_id: "integration-test",

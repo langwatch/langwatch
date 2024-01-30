@@ -39,7 +39,7 @@ export function MessageCard({
   trace: Trace;
   checksMap: Record<string, TraceCheck[]> | undefined;
 }) {
-  const traceChecks = checksMap ? checksMap[trace.id] ?? [] : [];
+  const traceChecks = checksMap ? checksMap[trace.trace_id] ?? [] : [];
   const checksDone = traceChecks.every(
     (check) =>
       check.status == "succeeded" ||
@@ -68,7 +68,7 @@ export function MessageCard({
           <Box fontWeight="bold">
             <LinkOverlay
               as={NextLink}
-              href={`/${project.slug}/messages/${trace.id}/spans`}
+              href={`/${project.slug}/messages/${trace.trace_id}/spans`}
               onClick={(e) => {
                 if (!linkActive) e.preventDefault();
               }}
@@ -263,7 +263,10 @@ export function MessageCard({
                   <PopoverBody>
                     <VStack align="start" spacing={2}>
                       {traceChecks.map((check) => (
-                        <CheckPassing key={check.id} check={check} />
+                        <CheckPassing
+                          key={check.trace_id + "/" + check.check_id}
+                          check={check}
+                        />
                       ))}
                     </VStack>
                   </PopoverBody>

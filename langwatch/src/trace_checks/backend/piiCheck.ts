@@ -55,7 +55,7 @@ export const runPiiCheck = async (
   traceFindings: google.privacy.dlp.v2.IFinding[];
   spansFindings: google.privacy.dlp.v2.IFinding[];
 }> => {
-  debug("Checking PII for trace", trace.id);
+  debug("Checking PII for trace", trace.trace_id);
 
   const traceText = [
     trace.input.value,

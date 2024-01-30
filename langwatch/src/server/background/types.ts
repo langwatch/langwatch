@@ -8,7 +8,7 @@ export type TraceCheckJob = {
     name: string;
   };
   trace: {
-    id: string;
+    trace_id: string;
     project_id: string;
     thread_id?: string | undefined;
     user_id?: string | undefined;
@@ -25,5 +25,5 @@ export type TopicClusteringJob = {
 export type TrackEventJob = {
   project_id: string;
   postpone_count: number;
-  event: TrackEventRESTParamsValidator & { id: string; timestamp: number };
+  event: TrackEventRESTParamsValidator & { event_id: string; timestamp: number };
 };

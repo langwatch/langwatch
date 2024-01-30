@@ -6,11 +6,13 @@ import type {
   TraceCheckJob,
 } from "~/server/background/types";
 import { getDebugger } from "../../utils/logger";
-import { esGetSpansByTraceId, esGetTraceById } from "../api/routers/traces";
+import { esGetSpansByTraceId } from "../api/routers/traces";
 import { prisma } from "../db";
 import { startTopicClusteringWorker } from "./workers/topicClusteringWorker";
 import { startTraceChecksWorker } from "./workers/traceChecksWorker";
 import { startTrackEventsWorker } from "./workers/trackEventsWorker";
+import { TRACE_INDEX, esClient, traceIndexId } from "../elasticsearch";
+import type { Trace } from "../tracer/types";
 
 const debug = getDebugger("langwatch:workers");
 
@@ -18,8 +20,17 @@ const debug = getDebugger("langwatch:workers");
 export const process = async (
   job: Job<TraceCheckJob, any, string>
 ): Promise<TraceCheckResult> => {
-  const trace = await esGetTraceById(job.data.trace.id);
-  const spans = await esGetSpansByTraceId(job.data.trace.id);
+  const trace = await esClient.getSource<Trace>({
+    index: TRACE_INDEX,
+    id: traceIndexId({
+      traceId: job.data.trace.trace_id,
+      projectId: job.data.trace.project_id,
+    }),
+  });
+  const spans = await esGetSpansByTraceId({
+    traceId: job.data.trace.trace_id,
+    projectId: job.data.trace.project_id,
+  });
   if (!trace) {
     throw "trace not found";
   }

@@ -19,14 +19,14 @@ describe("Span organizing and flattening tests", () => {
     // Top level spans
     {
       ...commonSpanProps,
-      id: "1",
+      span_id: "1",
       parent_id: null,
       timestamps: { started_at: 100, finished_at: 500 },
       input: { type: "text", value: "topmost input" },
     },
     {
       ...commonSpanProps,
-      id: "2",
+      span_id: "2",
       parent_id: null,
       timestamps: { started_at: 200, finished_at: 600 },
       outputs: [{ type: "text", value: "bottommost output" }],
@@ -35,13 +35,13 @@ describe("Span organizing and flattening tests", () => {
     // Children of span 1
     {
       ...commonSpanProps,
-      id: "1-2",
+      span_id: "1-2",
       parent_id: "1",
       timestamps: { started_at: 300, finished_at: 700 },
     },
     {
       ...commonSpanProps,
-      id: "1-1",
+      span_id: "1-1",
       parent_id: "1",
       timestamps: { started_at: 150, finished_at: 450 },
     },
@@ -49,7 +49,7 @@ describe("Span organizing and flattening tests", () => {
     // Children of span 2
     {
       ...commonSpanProps,
-      id: "2-1",
+      span_id: "2-1",
       parent_id: "2",
       timestamps: { started_at: 250, finished_at: 550 },
     },
@@ -57,7 +57,7 @@ describe("Span organizing and flattening tests", () => {
     // Child of span 1-2 (nested child)
     {
       ...commonSpanProps,
-      id: "1-2-1",
+      span_id: "1-2-1",
       parent_id: "1-2",
       timestamps: { started_at: 350, finished_at: 375 },
     },
@@ -66,29 +66,29 @@ describe("Span organizing and flattening tests", () => {
   it("should organize spans into a parent-child hierarchy", () => {
     const organized = organizeSpansIntoTree(spans);
     expect(organized.length).toBe(2); // Two top level spans
-    expect(organized[0]?.id).toBe("1");
-    expect(organized[1]?.id).toBe("2");
+    expect(organized[0]?.span_id).toBe("1");
+    expect(organized[1]?.span_id).toBe("2");
     expect(organized[0]?.children.length).toBe(2); // Two children for span 1
-    expect(organized[0]?.children[0]?.id).toBe("1-1");
-    expect(organized[0]?.children[1]?.id).toBe("1-2");
+    expect(organized[0]?.children[0]?.span_id).toBe("1-1");
+    expect(organized[0]?.children[1]?.span_id).toBe("1-2");
     expect(organized[0]?.children[1]?.children.length).toBe(1); // One nested child
-    expect(organized[0]?.children[1]?.children[0]?.id).toBe("1-2-1");
+    expect(organized[0]?.children[1]?.children[0]?.span_id).toBe("1-2-1");
   });
 
   it("should flatten spans in finishing order inside-out", () => {
     const organized = organizeSpansIntoTree(spans);
     const flattened = flattenSpanTree(organized, "inside-out");
     expect(flattened.length).toBe(6);
-    expect(flattened[0]?.id).toBe("1-2-1"); // Deepest child of the topmost span with the last started_at
-    expect(flattened[5]?.id).toBe("2"); // Last span should be the topmost parent with the last started_at
+    expect(flattened[0]?.span_id).toBe("1-2-1"); // Deepest child of the topmost span with the last started_at
+    expect(flattened[5]?.span_id).toBe("2"); // Last span should be the topmost parent with the last started_at
   });
 
   it("should flatten spans in finishing order outside-in", () => {
     const organized = organizeSpansIntoTree(spans);
     const flattened = flattenSpanTree(organized, "outside-in");
     expect(flattened.length).toBe(6);
-    expect(flattened[0]?.id).toBe("1"); // Topmost span with the first started_at
-    expect(flattened[5]?.id).toBe("2-1"); // Deepest child of the last topmost span with the last started_at
+    expect(flattened[0]?.span_id).toBe("1"); // Topmost span with the first started_at
+    expect(flattened[5]?.span_id).toBe("2-1"); // Deepest child of the last topmost span with the last started_at
   });
 
   it("should get the very first input as text", () => {

@@ -6,7 +6,7 @@ import type { Checks } from "../types";
 describe("CustomCheck", () => {
   it("correctly applies the 'contains' rule", async () => {
     const sampleTrace: Trace = {
-      id: "trace1",
+      trace_id: "trace1",
       project_id: "project1",
       input: { value: "Hello, World!" },
       output: { value: "Goodbye, World!" },
@@ -54,7 +54,7 @@ describe("CustomCheck", () => {
 
   it("correctly applies the 'not_contains' rule", async () => {
     const sampleTrace: Trace = {
-      id: "trace2",
+      trace_id: "trace2",
       project_id: "project2",
       input: { value: "Hello, World!" },
       output: { value: "Goodbye, World!" },
@@ -102,7 +102,7 @@ describe("CustomCheck", () => {
 
   it("correctly applies the 'matches_regex' and 'not_matches_regex' rules", async () => {
     const sampleTrace: Trace = {
-      id: "trace3",
+      trace_id: "trace3",
       project_id: "project3",
       input: { value: "User123" },
       output: { value: "Error code 404" },
@@ -194,7 +194,7 @@ describe("CustomCheck", () => {
 
   it("correctly applies the 'is_similar_to' rule", async () => {
     const sampleTrace: Trace = {
-      id: "trace4",
+      trace_id: "trace4",
       project_id: "project4",
       input: { value: "This is a test input." },
       output: { value: "This is a test output." },
@@ -250,7 +250,7 @@ describe("CustomCheck", () => {
 
   it("correctly applies the 'llm_boolean' and 'llm_score' rules", async () => {
     const sampleTrace: Trace = {
-      id: "trace5",
+      trace_id: "trace5",
       project_id: "project5",
       input: { value: "Sample input for LLM checks." },
       output: { value: "It's sunny outside" },

@@ -272,22 +272,22 @@ class TestOpenAICompletionTracer:
 
         assert first_span["type"] == "llm"
         assert first_span["trace_id"].startswith("trace_")
-        assert first_span["id"].startswith("span_")
+        assert first_span["span_id"].startswith("span_")
         assert first_span["parent_id"] == None
 
         assert fourth_span["type"] == "span"
         assert fourth_span["name"] == "subtask"
         assert fourth_span["trace_id"] == first_span["trace_id"]
-        assert fourth_span["id"].startswith("span_")
+        assert fourth_span["span_id"].startswith("span_")
         assert fourth_span["parent_id"] == None
 
         assert second_span["type"] == "llm"
         assert second_span["trace_id"] == first_span["trace_id"]
-        assert second_span["parent_id"] == fourth_span["id"]
+        assert second_span["parent_id"] == fourth_span["span_id"]
 
         assert third_span["type"] == "llm"
         assert third_span["trace_id"] == first_span["trace_id"]
-        assert third_span["parent_id"] == fourth_span["id"]
+        assert third_span["parent_id"] == fourth_span["span_id"]
 
     @freeze_time("2022-01-01", auto_tick_seconds=15)
     def test_trace_nested_spans_using_annotations(
@@ -327,7 +327,7 @@ class TestOpenAICompletionTracer:
 
         assert first_span["type"] == "llm"
         assert first_span["trace_id"].startswith("trace_")
-        assert first_span["id"].startswith("span_")
+        assert first_span["span_id"].startswith("span_")
         assert first_span["parent_id"] == None
 
         assert fourth_span["type"] == "span"
@@ -335,16 +335,16 @@ class TestOpenAICompletionTracer:
         assert fourth_span["input"] == {"type": "json", "value": {"foo": "bar"}}
         assert fourth_span["outputs"] == [{"type": "text", "value": "bar"}]
         assert fourth_span["trace_id"] == first_span["trace_id"]
-        assert fourth_span["id"].startswith("span_")
+        assert fourth_span["span_id"].startswith("span_")
         assert fourth_span["parent_id"] == None
 
         assert second_span["type"] == "llm"
         assert second_span["trace_id"] == first_span["trace_id"]
-        assert second_span["parent_id"] == fourth_span["id"]
+        assert second_span["parent_id"] == fourth_span["span_id"]
 
         assert third_span["type"] == "llm"
         assert third_span["trace_id"] == first_span["trace_id"]
-        assert third_span["parent_id"] == fourth_span["id"]
+        assert third_span["parent_id"] == fourth_span["span_id"]
 
 
 class TestOpenAIChatCompletionTracer:

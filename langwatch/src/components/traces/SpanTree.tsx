@@ -31,11 +31,11 @@ function buildTree(
   const lookup: Record<string, SpanWithChildren> = {};
 
   spans.forEach((span) => {
-    lookup[span.id] = { ...span, children: [] };
+    lookup[span.span_id] = { ...span, children: [] };
   });
 
   spans.forEach((span) => {
-    const lookupSpan = lookup[span.id];
+    const lookupSpan = lookup[span.span_id];
     if (span.parent_id && lookup[span.parent_id] && lookupSpan) {
       lookup[span.parent_id]?.children.push?.(lookupSpan);
     }
@@ -96,7 +96,7 @@ const SpanNode: React.FC<SpanNodeProps> = ({ span, level, lastChild }) => {
       />
 
       <Link
-        href={`/${project.slug}/messages/${span.trace_id}/spans/${span.id}`}
+        href={`/${project.slug}/messages/${span.trace_id}/spans/${span.span_id}`}
         replace={true}
         _hover={{ textDecoration: "none" }}
       >
@@ -106,7 +106,7 @@ const SpanNode: React.FC<SpanNodeProps> = ({ span, level, lastChild }) => {
           paddingX={level > 0 ? 8 : 4}
           paddingRight={14}
           borderRadius={6}
-          background={span.id === currentSpanId ? "gray.100" : undefined}
+          background={span.span_id === currentSpanId ? "gray.100" : undefined}
           _hover={{
             background: "gray.100",
           }}
@@ -154,7 +154,7 @@ const SpanNode: React.FC<SpanNodeProps> = ({ span, level, lastChild }) => {
       </Link>
       {span.children.map((childSpan, index) => (
         <SpanNode
-          key={childSpan.id}
+          key={childSpan.span_id}
           span={childSpan}
           level={level + 1}
           lastChild={index == span.children.length - 1}
@@ -171,11 +171,11 @@ const TreeRenderer: React.FC<{ spans: ElasticSearchSpan[] }> = ({ spans }) => {
   return (
     <VStack align="start" flexShrink={0} spacing={6}>
       {rootSpans.map((rootSpan, index) => {
-        const span = tree[rootSpan.id];
+        const span = tree[rootSpan.span_id];
         if (!span) return null;
         return (
           <SpanNode
-            key={rootSpan.id}
+            key={rootSpan.span_id}
             span={span}
             level={0}
             lastChild={index == rootSpans.length - 1}
@@ -253,13 +253,13 @@ export function SpanTree() {
     { enabled: !!project && !!traceId, refetchOnWindowFocus: false }
   );
   const span = spanId
-    ? spans.data?.find((span) => span.id === spanId)
+    ? spans.data?.find((span) => span.span_id === spanId)
     : undefined;
 
   useEffect(() => {
     if (!spanId && project && traceId && spans.data && spans.data[0]) {
       void router.replace(
-        `/${project.slug}/messages/${traceId}/spans/${spans.data[0].id}`
+        `/${project.slug}/messages/${traceId}/spans/${spans.data[0].span_id}`
       );
     }
   }, [project, router, spanId, spans.data, traceId]);

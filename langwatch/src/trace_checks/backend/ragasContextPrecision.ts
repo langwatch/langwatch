@@ -36,7 +36,7 @@ export const ragasContextPrecision = async (
   if (!response.ok) {
     const error = await response.text();
     throw new Error(
-      `Ragas context precision check API returned an error: ${error} for trace ${trace.id}`
+      `Ragas context precision check API returned an error: ${error} for trace ${trace.trace_id}`
     );
   }
 

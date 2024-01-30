@@ -16,7 +16,7 @@ export const addInputAndOutputForRAGs = (spans: Span[]): Span[] => {
 
   const fillInputOutputMap = (spans: Span[]): Span[] => {
     return spans.map((span) => {
-      const inputOutput = inputOutputMap[span.id];
+      const inputOutput = inputOutputMap[span.span_id];
       if (!inputOutput) {
         return span;
       }
@@ -40,7 +40,7 @@ export const addInputAndOutputForRAGs = (spans: Span[]): Span[] => {
       const input = getFirstInputAsText(flatChildren);
       const output = getLastOutputAsText(flatChildren);
 
-      inputOutputMap[span.id] = {
+      inputOutputMap[span.span_id] = {
         input: span.input ? span.input : { type: "text", value: input },
         outputs:
           span.outputs.length > 0

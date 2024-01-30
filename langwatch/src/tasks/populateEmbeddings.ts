@@ -1,5 +1,5 @@
 import { getSearchEmbeddings } from "~/pages/api/collector/trace";
-import { TRACE_INDEX, esClient } from "../server/elasticsearch";
+import { TRACE_INDEX, esClient, traceIndexId } from "../server/elasticsearch";
 import { getOpenAIEmbeddings } from "../server/embeddings";
 import { type Trace } from "../server/tracer/types";
 
@@ -44,7 +44,10 @@ export default async function execute() {
 
     await esClient.update({
       index: TRACE_INDEX,
-      id: trace.id,
+      id: traceIndexId({
+        traceId: trace.trace_id,
+        projectId: trace.project_id,
+      }),
       body: {
         doc: {
           ...(inputEmbeddings

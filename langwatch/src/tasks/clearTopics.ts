@@ -1,4 +1,4 @@
-import { TRACE_INDEX, esClient } from "../server/elasticsearch";
+import { TRACE_INDEX, esClient, traceIndexId } from "../server/elasticsearch";
 import { type Trace } from "../server/tracer/types";
 
 export default async function execute() {
@@ -6,7 +6,7 @@ export default async function execute() {
     index: TRACE_INDEX,
     body: {
       size: 10_000,
-      _source: ["id"],
+      _source: ["trace_id", "project_id"],
       query: {
         //@ts-ignore
         bool: {
@@ -33,7 +33,14 @@ export default async function execute() {
     if (!trace) continue;
 
     body = body.concat([
-      { update: { _id: trace.id } },
+      {
+        update: {
+          _id: traceIndexId({
+            traceId: trace.trace_id,
+            projectId: trace.project_id,
+          }),
+        },
+      },
       { doc: { topics: null } },
     ]);
 

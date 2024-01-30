@@ -82,7 +82,7 @@ SpanTypes = Literal["span", "llm", "chain", "tool", "agent", "rag"]
 class BaseSpan(TypedDict):
     type: SpanTypes
     name: Optional[str]
-    id: str
+    span_id: str
     parent_id: Optional[str]
     trace_id: str
     input: Optional[SpanInput]
@@ -93,7 +93,7 @@ class BaseSpan(TypedDict):
 
 class LLMSpan(TypedDict, total=False):
     type: Literal["llm"]
-    id: str
+    span_id: str
     parent_id: Optional[str]
     trace_id: str
     vendor: str
@@ -116,7 +116,7 @@ class RAGChunk(TypedDict, total=False):
 class RAGSpan(TypedDict, total=False):
     type: Literal["rag"]
     name: Optional[str]
-    id: str
+    span_id: str
     parent_id: Optional[str]
     trace_id: str
     input: Optional[SpanInput]
@@ -130,7 +130,7 @@ Span = Union[LLMSpan, RAGSpan, BaseSpan]
 
 
 class Experiment(TypedDict):
-    id: str
+    experiment_id: str
     variant: int
 
 

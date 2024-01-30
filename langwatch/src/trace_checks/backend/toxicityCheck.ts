@@ -12,7 +12,7 @@ export const toxicityCheck = async (
   _spans: ElasticSearchSpan[],
   parameters: Checks["toxicity_check"]["parameters"]
 ): Promise<TraceCheckResult> => {
-  debug("Checking toxicity for trace", trace.id);
+  debug("Checking toxicity for trace", trace.trace_id);
   const content = [trace.input.value, trace.output?.value ?? ""].join("\n\n");
 
   const categoriesMap: Record<ModerationCategories, boolean> = {

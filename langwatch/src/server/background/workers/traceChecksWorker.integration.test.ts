@@ -117,7 +117,7 @@ describe("Check Queue Integration Tests", () => {
     });
 
     const trace = {
-      id: trace_id,
+      trace_id: trace_id,
       project_id: "test-project-id",
       user_id: "test_user_123",
       thread_id: "test_thread_123",
@@ -134,7 +134,7 @@ describe("Check Queue Integration Tests", () => {
     const response = await esClient.search<TraceCheck>({
       index: TRACE_CHECKS_INDEX,
       query: {
-        term: { trace_id: trace.id },
+        term: { trace_id: trace.trace_id },
       },
     });
 
@@ -147,7 +147,7 @@ describe("Check Queue Integration Tests", () => {
       check_id: check.id,
       check_name: check.name,
       check_type: check.type,
-      trace_id: trace.id,
+      trace_id: trace.trace_id,
       project_id: "test-project-id",
       user_id: "test_user_123",
       thread_id: "test_thread_123",
@@ -165,7 +165,7 @@ describe("Check Queue Integration Tests", () => {
     });
 
     const trace = {
-      id: trace_id_success,
+      trace_id: trace_id_success,
       project_id: "test-project-id",
     };
 
@@ -175,7 +175,7 @@ describe("Check Queue Integration Tests", () => {
     await new Promise<void>(
       (resolve) =>
         worker?.on("completed", (args) => {
-          if (args.data.trace.id === trace_id_success) resolve();
+          if (args.data.trace.trace_id === trace_id_success) resolve();
         })
     );
 
@@ -183,7 +183,7 @@ describe("Check Queue Integration Tests", () => {
     const response = await esClient.search<TraceCheck>({
       index: TRACE_CHECKS_INDEX,
       query: {
-        term: { trace_id: trace.id },
+        term: { trace_id: trace.trace_id },
       },
     });
 
@@ -202,7 +202,7 @@ describe("Check Queue Integration Tests", () => {
     });
 
     const trace = {
-      id: trace_id_failed,
+      trace_id: trace_id_failed,
       project_id: "test-project-id",
     };
 
@@ -212,7 +212,7 @@ describe("Check Queue Integration Tests", () => {
     await new Promise<void>(
       (resolve) =>
         worker?.on("completed", (args) => {
-          if (args.data.trace.id === trace_id_failed) resolve();
+          if (args.data.trace.trace_id === trace_id_failed) resolve();
         })
     );
 
@@ -220,7 +220,7 @@ describe("Check Queue Integration Tests", () => {
     const response = await esClient.search<TraceCheck>({
       index: TRACE_CHECKS_INDEX,
       query: {
-        term: { trace_id: trace.id },
+        term: { trace_id: trace.trace_id },
       },
     });
 
@@ -234,7 +234,7 @@ describe("Check Queue Integration Tests", () => {
     mocks.traceChecksProcess.mockRejectedValue("something wrong is not right");
 
     const trace = {
-      id: trace_id_error,
+      trace_id: trace_id_error,
       project_id: "test-project-id",
     };
 
@@ -247,7 +247,7 @@ describe("Check Queue Integration Tests", () => {
     const response = await esClient.search<TraceCheck>({
       index: TRACE_CHECKS_INDEX,
       query: {
-        term: { trace_id: trace.id },
+        term: { trace_id: trace.trace_id },
       },
     });
 
@@ -265,7 +265,7 @@ describe("Check Queue Integration Tests", () => {
     });
 
     const trace = {
-      id: trace_id_success,
+      trace_id: trace_id_success,
       project_id: "test-project-id",
     };
 
@@ -275,7 +275,7 @@ describe("Check Queue Integration Tests", () => {
     await new Promise<void>(
       (resolve) =>
         worker?.on("completed", (args) => {
-          if (args.data.trace.id === trace_id_success) resolve();
+          if (args.data.trace.trace_id === trace_id_success) resolve();
         })
     );
 
@@ -283,7 +283,7 @@ describe("Check Queue Integration Tests", () => {
     let response = await esClient.search<TraceCheck>({
       index: TRACE_CHECKS_INDEX,
       query: {
-        term: { trace_id: trace.id },
+        term: { trace_id: trace.trace_id },
       },
     });
 
@@ -298,7 +298,7 @@ describe("Check Queue Integration Tests", () => {
     response = await esClient.search<TraceCheck>({
       index: TRACE_CHECKS_INDEX,
       query: {
-        term: { trace_id: trace.id },
+        term: { trace_id: trace.trace_id },
       },
     });
 
@@ -308,7 +308,7 @@ describe("Check Queue Integration Tests", () => {
     await new Promise<void>(
       (resolve) =>
         worker?.on("completed", (args) => {
-          if (args.data.trace.id === trace_id_success) resolve();
+          if (args.data.trace.trace_id === trace_id_success) resolve();
         })
     );
 
@@ -316,7 +316,7 @@ describe("Check Queue Integration Tests", () => {
     response = await esClient.search<TraceCheck>({
       index: TRACE_CHECKS_INDEX,
       query: {
-        term: { trace_id: trace.id },
+        term: { trace_id: trace.trace_id },
       },
     });
 
@@ -353,7 +353,7 @@ describe("updateCheckStatusInES", () => {
     await updateCheckStatusInES({
       check,
       trace: {
-        id: traceId,
+        trace_id: traceId,
         project_id: projectId,
       },
       status: "scheduled",
@@ -378,7 +378,7 @@ describe("updateCheckStatusInES", () => {
     await updateCheckStatusInES({
       check,
       trace: {
-        id: traceId,
+        trace_id: traceId,
         project_id: projectId,
       },
       status: "scheduled",
@@ -388,7 +388,7 @@ describe("updateCheckStatusInES", () => {
     await updateCheckStatusInES({
       check,
       trace: {
-        id: traceId,
+        trace_id: traceId,
         project_id: projectId,
       },
       status: "in_progress",

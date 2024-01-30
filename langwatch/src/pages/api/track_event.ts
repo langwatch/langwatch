@@ -4,9 +4,7 @@ import { type NextApiRequest, type NextApiResponse } from "next";
 import { z } from "zod";
 import { trackEventsQueue } from "../../server/background/queues/trackEventsQueue";
 import { prisma } from "../../server/db"; // Adjust the import based on your setup
-import {
-  type TrackEventRESTParamsValidator
-} from "../../server/tracer/types";
+import { type TrackEventRESTParamsValidator } from "../../server/tracer/types";
 import { trackEventRESTParamsValidatorSchema } from "../../server/tracer/types.generated";
 import { getDebugger } from "../../utils/logger";
 
@@ -106,16 +104,14 @@ export default async function handler(
     }
   }
 
-  const eventId = body.id
-    ? `event_${project.id}_${body.id}`
-    : `event_${nanoid()}`;
+  const eventId = body.event_id ?? `event_${nanoid()}`;
 
   await trackEventsQueue.add(
     "track_event",
     {
       project_id: project.id,
       postpone_count: 0,
-      event: { ...body, id: eventId, timestamp: body.timestamp ?? Date.now() },
+      event: { ...body, event_id: eventId, timestamp: body.timestamp ?? Date.now() },
     },
     {
       jobId: `track_event_${eventId}`,

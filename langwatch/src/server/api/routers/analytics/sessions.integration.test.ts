@@ -1,7 +1,7 @@
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { getTestUser } from "../../../../utils/testUtils";
-import { TRACE_INDEX, esClient } from "../../../elasticsearch";
+import { TRACE_INDEX, esClient, traceIndexId } from "../../../elasticsearch";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
 import type { Trace } from "../../../tracer/types";
@@ -10,7 +10,7 @@ describe("Sessions Endpoint Integration Tests", () => {
   const sampleTraces: Partial<Trace>[] = [
     // Two messages on the same session
     {
-      id: `test-trace-id-${nanoid()}`,
+      trace_id: `test-trace-id-${nanoid()}`,
       project_id: "test-project-id",
       user_id: "test-user-id",
       timestamps: {
@@ -22,7 +22,7 @@ describe("Sessions Endpoint Integration Tests", () => {
       thread_id: "test-thread-id",
     },
     {
-      id: `test-trace-id-${nanoid()}`,
+      trace_id: `test-trace-id-${nanoid()}`,
       project_id: "test-project-id",
       user_id: "test-user-id",
       timestamps: {
@@ -35,7 +35,7 @@ describe("Sessions Endpoint Integration Tests", () => {
     },
     // One message on another session
     {
-      id: `test-trace-id-${nanoid()}`,
+      trace_id: `test-trace-id-${nanoid()}`,
       project_id: "test-project-id",
       user_id: "test-user-id",
       timestamps: {
@@ -51,7 +51,7 @@ describe("Sessions Endpoint Integration Tests", () => {
     },
     // One message on yet another session
     {
-      id: `test-trace-id-${nanoid()}`,
+      trace_id: `test-trace-id-${nanoid()}`,
       project_id: "test-project-id",
       user_id: "test-user-id",
       timestamps: {
@@ -64,7 +64,7 @@ describe("Sessions Endpoint Integration Tests", () => {
     },
     // Different user
     {
-      id: `test-trace-id-${nanoid()}`,
+      trace_id: `test-trace-id-${nanoid()}`,
       project_id: "test-project-id",
       user_id: "test-user-id-2",
       timestamps: {
@@ -81,7 +81,14 @@ describe("Sessions Endpoint Integration Tests", () => {
     await esClient.bulk({
       index: TRACE_INDEX,
       body: sampleTraces.flatMap((trace) => [
-        { index: { _id: trace.id } },
+        {
+          index: {
+            _id: traceIndexId({
+              traceId: trace.trace_id ?? "",
+              projectId: trace.project_id ?? "",
+            }),
+          },
+        },
         trace,
       ]),
       refresh: true,

@@ -14,7 +14,7 @@ export const messagesCountVsPreviousPeriod = protectedProcedure
     return await currentVsPreviousTracesAggregation<{ count: number }>({
       input,
       aggs: {
-        count: { value_count: { field: "id" } },
+        count: { value_count: { field: "trace_id" } },
       },
     });
   });
@@ -26,7 +26,7 @@ export const messagesCountAggregated = protectedProcedure
     return await groupedTracesAggregation<{ count: number }>({
       input,
       aggs: {
-        count: { value_count: { field: "id" } },
+        count: { value_count: { field: "trace_id" } },
       },
     });
   });

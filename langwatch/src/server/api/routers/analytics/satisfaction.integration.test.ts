@@ -9,7 +9,7 @@ import type { Trace } from "../../../tracer/types";
 describe("Satisfaction Endpoint Integration Tests", () => {
   const sampleTraces: Partial<Trace>[] = [
     {
-      id: `test-trace-id-${nanoid()}`,
+      trace_id: `test-trace-id-${nanoid()}`,
       project_id: "test-project-id",
       user_id: "test-user-id",
       input: {
@@ -25,7 +25,7 @@ describe("Satisfaction Endpoint Integration Tests", () => {
       thread_id: "test-thread-id",
     },
     {
-      id: `test-trace-id-${nanoid()}`,
+      trace_id: `test-trace-id-${nanoid()}`,
       project_id: "test-project-id",
       user_id: "test-user-id",
       input: {
@@ -41,7 +41,7 @@ describe("Satisfaction Endpoint Integration Tests", () => {
       thread_id: "test-thread-id",
     },
     {
-      id: `test-trace-id-${nanoid()}`,
+      trace_id: `test-trace-id-${nanoid()}`,
       project_id: "test-project-id",
       user_id: "test-user-id",
       input: {
@@ -62,7 +62,7 @@ describe("Satisfaction Endpoint Integration Tests", () => {
     await esClient.bulk({
       index: TRACE_INDEX,
       body: sampleTraces.flatMap((trace) => [
-        { index: { _id: trace.id } },
+        { index: { _id: trace.trace_id } },
         trace,
       ]),
       refresh: true,

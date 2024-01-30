@@ -6,7 +6,7 @@ import type { InconsistencyCheckResult } from "../types";
 describe.skip("InconsistencyCheck", () => {
   it("detects inconsistencies in traces", async () => {
     const sampleTrace: Trace = {
-      id: "foo",
+      trace_id: "foo",
       project_id: "foo",
       input: {
         value:
@@ -28,7 +28,7 @@ describe.skip("InconsistencyCheck", () => {
 
   it("succeeds with no inconsistencies in traces", async () => {
     const sampleTrace: Trace = {
-      id: "bar",
+      trace_id: "bar",
       project_id: "bar",
       input: { value: "The sky is clear. The car is new." },
       output: { value: "The sky is clear. The car is new." },

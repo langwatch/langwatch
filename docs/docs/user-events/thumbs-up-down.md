@@ -37,8 +37,6 @@ To use the thumbs_up_down event it's important that you have used an explicit `t
 }
 ```
 
-The `trace_id` should be the same one used when integrating
-
 ### Example
 
 ```bash

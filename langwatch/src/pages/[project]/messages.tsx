@@ -89,7 +89,7 @@ function Messages() {
     }
   );
   const traceIds =
-    traceGroups.data?.flatMap((group) => group.map((trace) => trace.id)) ?? [];
+    traceGroups.data?.flatMap((group) => group.map((trace) => trace.trace_id)) ?? [];
   const traceChecksQuery = api.traces.getTraceChecks.useQuery(
     { projectId: project?.id ?? "", traceIds },
     {
@@ -367,7 +367,7 @@ function ExpandableMessages({
 
     return (
       <VStack
-        key={traceGroup[0]?.id ?? groupIndex}
+        key={traceGroup[0]?.trace_id ?? groupIndex}
         gap={0}
         transition="all .2s linear"
         onClick={(e: React.MouseEvent<HTMLElement>) => {
@@ -458,7 +458,7 @@ function ExpandableMessages({
                 <LinkBox
                   as={Card}
                   className="card"
-                  key={trace.id}
+                  key={trace.trace_id}
                   ref={traceIndex === 0 ? cardRefs[groupIndex] : null}
                   height={
                     renderContent ? "auto" : `${cardHeights[groupIndex] ?? 0}px`

@@ -1,7 +1,4 @@
-import {
-  TRACE_CHECKS_INDEX,
-  esClient,
-} from "../server/elasticsearch";
+import { TRACE_CHECKS_INDEX, esClient } from "../server/elasticsearch";
 import { type TraceCheck } from "../server/tracer/types";
 import type { CheckTypes } from "../trace_checks/types";
 
@@ -10,7 +7,7 @@ export default async function execute() {
     index: TRACE_CHECKS_INDEX,
     body: {
       size: 10_000,
-      _source: ["id", "value", "check_type", "raw_result"],
+      _source: ["value", "check_type", "raw_result"],
       query: {
         //@ts-ignore
         bool: {
@@ -78,7 +75,7 @@ export default async function execute() {
       continue;
 
     body = body.concat([
-      { update: { _id: traceCheck.id } },
+      { update: { _id: result.hits.hits[i]?._id } },
       {
         doc: {
           status: quickLogic(

@@ -22,7 +22,7 @@ from langchain.agents import load_tools, initialize_agent, Tool
 from langchain.agents.agent import AgentExecutor
 from langchain.agents.openai_functions_agent.base import OpenAIFunctionsAgent
 
-from tests.utils import *
+from tests.utils import * # type: ignore
 
 
 class CommaSeparatedListOutputParser(BaseOutputParser):
@@ -92,8 +92,8 @@ class TestLangChainTracer:
 
         assert second_span["type"] == "llm"
         assert second_span["trace_id"].startswith("trace_")
-        assert second_span["id"].startswith("span_")
-        assert second_span["parent_id"] == first_span["id"]
+        assert second_span["span_id"].startswith("span_")
+        assert second_span["parent_id"] == first_span["span_id"]
         assert second_span["vendor"] == "openai"
         assert second_span["model"] == "gpt-3.5-turbo"
         assert second_span["input"] == {
@@ -231,8 +231,8 @@ class TestLangChainTracer:
 
         assert second_span["type"] == "llm"
         assert second_span["trace_id"].startswith("trace_")
-        assert second_span["id"].startswith("span_")
-        assert second_span["parent_id"] == first_span["id"]
+        assert second_span["span_id"].startswith("span_")
+        assert second_span["parent_id"] == first_span["span_id"]
         assert second_span["vendor"] == "openai"
         assert second_span["model"] == "gpt-3.5-turbo"
         assert second_span["input"] == {

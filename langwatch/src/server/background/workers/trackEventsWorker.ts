@@ -4,14 +4,18 @@ import { Worker } from "bullmq";
 import type { TrackEventJob } from "~/server/background/types";
 import {
   type ElasticSearchEvent,
-  type Trace
+  type Trace,
 } from "../../../server/tracer/types";
 import { getDebugger } from "../../../utils/logger";
-import { EVENTS_INDEX, TRACE_INDEX, esClient } from "../../elasticsearch";
-import { connection } from "../../redis";
 import {
-  elasticSearchEventSchema
-} from "../../tracer/types.generated";
+  EVENTS_INDEX,
+  TRACE_INDEX,
+  esClient,
+  eventIndexId,
+  traceIndexId,
+} from "../../elasticsearch";
+import { connection } from "../../redis";
+import { elasticSearchEventSchema } from "../../tracer/types.generated";
 import {
   TRACK_EVENTS_QUEUE_NAME,
   trackEventsQueue,
@@ -51,7 +55,10 @@ export const startTrackEventsWorker = () => {
         try {
           traceResult = await esClient.get<Trace>({
             index: TRACE_INDEX,
-            id: event.trace_id,
+            id: traceIndexId({
+              traceId: event.trace_id,
+              projectId: job.data.project_id,
+            }),
           });
         } catch {}
 
@@ -71,7 +78,7 @@ export const startTrackEventsWorker = () => {
             "track_event",
             { ...job.data, postpone_count: job.data.postpone_count + 1 },
             {
-              jobId: `track_event_${event.id}_${job.data.postpone_count}`,
+              jobId: `track_event_${event.event_id}_${job.data.postpone_count}`,
               delay: delay * 1000,
             }
           );
@@ -81,7 +88,10 @@ export const startTrackEventsWorker = () => {
 
       await esClient.index({
         index: EVENTS_INDEX,
-        id: event.id,
+        id: eventIndexId({
+          eventId: event.event_id,
+          projectId: event.project_id,
+        }),
         body: event,
       });
     },

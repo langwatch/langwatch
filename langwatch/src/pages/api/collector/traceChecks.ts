@@ -93,7 +93,7 @@ export const scheduleTraceChecks = async (trace: Trace, spans: Span[]) => {
       );
       if (preconditionsMet) {
         debug(
-          `scheduling ${check.checkType} (checkId: ${check.id}) for trace ${trace.id}`
+          `scheduling ${check.checkType} (checkId: ${check.id}) for trace ${trace.trace_id}`
         );
         void scheduleTraceCheck({
           check: {

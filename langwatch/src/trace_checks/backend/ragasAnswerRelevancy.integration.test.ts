@@ -6,7 +6,7 @@ import type { RagasResult } from "../types";
 describe("RagasAnswerRelevancy Integration", () => {
   it("evaluates answer relevancy with a real request", async () => {
     const sampleTrace: Trace = {
-      id: "integration-test",
+      trace_id: "integration-test",
       project_id: "integration-test",
       input: { value: "What is the capital of France?" },
       output: { value: "The capital of France is Paris." },

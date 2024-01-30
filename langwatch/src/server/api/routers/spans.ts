@@ -27,7 +27,13 @@ export const spansRouter = createTRPCRouter({
         index: SPAN_INDEX,
         body: {
           query: {
-            term: { trace_id: input.traceId },
+            //@ts-ignore
+            bool: {
+              must: [
+                { term: { trace_id: input.traceId } },
+                { term: { project_id: input.projectId } },
+              ],
+            },
           },
         },
       });

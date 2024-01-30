@@ -2,7 +2,13 @@ import { type NextApiRequest, type NextApiResponse } from "next";
 import { createMocks } from "node-mocks-http";
 import { beforeAll, describe, expect, test } from "vitest";
 import { prisma } from "../../server/db";
-import { SPAN_INDEX, TRACE_INDEX, esClient } from "../../server/elasticsearch";
+import {
+  SPAN_INDEX,
+  TRACE_INDEX,
+  esClient,
+  spanIndexId,
+  traceIndexId,
+} from "../../server/elasticsearch";
 import {
   type Trace,
   type ElasticSearchSpan,
@@ -11,11 +17,13 @@ import {
   type CollectorRESTParams,
 } from "../../server/tracer/types";
 import handler from "./collector";
+import type { Project } from "@prisma/client";
+import { nanoid } from "nanoid";
 
 const sampleSpan: LLMSpan = {
   type: "llm",
   name: "sample-span",
-  id: "span_V1StGXR8_Z5jdHi6B-myB",
+  span_id: "span_V1StGXR8_Z5jdHi6B-myB",
   parent_id: null,
   trace_id: "trace_test-trace_J5m9g-0JDMbcJqLK",
   input: {
@@ -39,23 +47,22 @@ const sampleSpan: LLMSpan = {
 
 describe("Collector API Endpoint", () => {
   // TODO: add project id
-  let projectId: string | undefined;
+  let project: Project | undefined;
 
   beforeAll(async () => {
     await prisma.project.deleteMany({
       where: { slug: "--test-project" },
     });
-    const project = await prisma.project.create({
+    project = await prisma.project.create({
       data: {
         name: "Test Project",
         slug: "--test-project",
         language: "python",
         framework: "openai",
-        apiKey: "test-auth-token",
+        apiKey: `test-auth-token-${nanoid()}`,
         teamId: "some-team",
       },
     });
-    projectId = project.id;
   });
 
   test("should insert spans into Elasticsearch", async () => {
@@ -72,7 +79,7 @@ describe("Collector API Endpoint", () => {
       createMocks({
         method: "POST",
         headers: {
-          "X-Auth-Token": "test-auth-token",
+          "X-Auth-Token": project?.apiKey,
         },
         body: traceData,
       });
@@ -82,7 +89,14 @@ describe("Collector API Endpoint", () => {
 
     const indexedSpan = await esClient.getSource<ElasticSearchSpan>({
       index: SPAN_INDEX,
-      id: sampleSpan.id,
+      id: spanIndexId({
+        spanId: sampleSpan.span_id,
+        projectId: project?.id ?? "",
+      }),
+      routing: traceIndexId({
+        traceId: sampleSpan.trace_id,
+        projectId: project?.id ?? "",
+      }),
     });
 
     expect(indexedSpan).toMatchObject({
@@ -97,18 +111,21 @@ describe("Collector API Endpoint", () => {
           value: '"world"',
         },
       ],
-      project_id: projectId,
+      project_id: project?.id,
       raw_response: null,
     });
 
     const indexedTrace = await esClient.getSource<Trace>({
       index: TRACE_INDEX,
-      id: sampleSpan.trace_id,
+      id: traceIndexId({
+        traceId: sampleSpan.trace_id,
+        projectId: project?.id ?? "",
+      }),
     });
 
     expect(indexedTrace).toEqual({
-      id: sampleSpan.trace_id,
-      project_id: projectId,
+      trace_id: sampleSpan.trace_id,
+      project_id: project?.id,
       timestamps: {
         started_at: expect.any(Number),
         inserted_at: expect.any(Number),
@@ -138,7 +155,7 @@ describe("Collector API Endpoint", () => {
       user_id: "user_test-user_1",
       customer_id: "customer_test-customer_1",
       labels: ["test-label-1.0.0"],
-      indexing_md5s: ["36b966cf1f1c7baf5b3073ef477a8237"],
+      indexing_md5s: ["702375442be05a005a7dffc756bdf10b"],
     });
   });
 
@@ -173,7 +190,7 @@ describe("Collector API Endpoint", () => {
       createMocks({
         method: "POST",
         headers: {
-          "X-Auth-Token": "test-auth-token",
+          "X-Auth-Token": project?.apiKey,
         },
         body: {
           spans: [invalidSpan],
@@ -188,7 +205,7 @@ describe("Collector API Endpoint", () => {
     const traceId = "trace_test-trace_J5m9g-0JDMbcJqLK2";
     const ragSpan: RAGSpan = {
       type: "rag",
-      id: "span_V1StGXR8_Z5jdHi6B-myE",
+      span_id: "span_V1StGXR8_Z5jdHi6B-myE",
       trace_id: traceId,
       contexts: [
         { document_id: "context-1", content: "France is a country in Europe." },
@@ -203,8 +220,8 @@ describe("Collector API Endpoint", () => {
     };
     const llmSpan: LLMSpan = {
       ...sampleSpan,
-      id: "span_V1StGXR8_Z5jdHi6B-myF",
-      parent_id: ragSpan.id,
+      span_id: "span_V1StGXR8_Z5jdHi6B-myF",
+      parent_id: ragSpan.span_id,
       trace_id: traceId,
       input: {
         type: "chat_messages",
@@ -232,7 +249,7 @@ describe("Collector API Endpoint", () => {
       createMocks({
         method: "POST",
         headers: {
-          "X-Auth-Token": "test-auth-token",
+          "X-Auth-Token": project?.apiKey,
         },
         body: traceData,
       });
@@ -242,7 +259,14 @@ describe("Collector API Endpoint", () => {
 
     const indexedRagSpan = await esClient.getSource<ElasticSearchSpan>({
       index: SPAN_INDEX,
-      id: ragSpan.id,
+      id: spanIndexId({
+        spanId: ragSpan.span_id,
+        projectId: project?.id ?? "",
+      }),
+      routing: traceIndexId({
+        traceId,
+        projectId: project?.id ?? "",
+      }),
     });
 
     expect(indexedRagSpan).toMatchObject({
@@ -263,7 +287,7 @@ describe("Collector API Endpoint", () => {
           content: "Paris is the capital of France.",
         },
       ],
-      project_id: projectId,
+      project_id: project?.id,
     });
   });
 
@@ -271,7 +295,7 @@ describe("Collector API Endpoint", () => {
     const traceId = "trace_test-trace_J5m9g-0JDMbcJqLK2";
     const ragSpan: RAGSpan = {
       type: "rag",
-      id: "span_V1StGXR8_Z5jdHi6B-myE",
+      span_id: "span_V1StGXR8_Z5jdHi6B-myE",
       trace_id: traceId,
       contexts: [
         "France is a country in Europe.",
@@ -282,8 +306,8 @@ describe("Collector API Endpoint", () => {
     };
     const llmSpan: LLMSpan = {
       ...sampleSpan,
-      id: "span_V1StGXR8_Z5jdHi6B-myF",
-      parent_id: ragSpan.id,
+      span_id: "span_V1StGXR8_Z5jdHi6B-myF",
+      parent_id: ragSpan.span_id,
       trace_id: traceId,
       input: {
         type: "chat_messages",
@@ -311,7 +335,7 @@ describe("Collector API Endpoint", () => {
       createMocks({
         method: "POST",
         headers: {
-          "X-Auth-Token": "test-auth-token",
+          "X-Auth-Token": project?.apiKey,
         },
         body: traceData,
       });
@@ -321,7 +345,14 @@ describe("Collector API Endpoint", () => {
 
     const indexedRagSpan = await esClient.getSource<ElasticSearchSpan>({
       index: SPAN_INDEX,
-      id: ragSpan.id,
+      id: spanIndexId({
+        spanId: ragSpan.span_id,
+        projectId: project?.id ?? "",
+      }),
+      routing: traceIndexId({
+        traceId,
+        projectId: project?.id ?? "",
+      }),
     });
 
     expect(indexedRagSpan.contexts).toMatchObject([
