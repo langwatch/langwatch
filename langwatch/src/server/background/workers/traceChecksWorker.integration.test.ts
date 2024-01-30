@@ -12,10 +12,10 @@ import {
 import { TRACE_CHECKS_INDEX, esClient } from "../../elasticsearch";
 import type { TraceCheck } from "../../tracer/types";
 import {
-  getTraceCheckId,
   scheduleTraceCheck,
   updateCheckStatusInES,
 } from "../queues/traceChecksQueue";
+import { traceCheckIndexId } from "~/server/elasticsearch";
 import * as traceChecksWorker from "../worker";
 import type { CheckTypes, TraceCheckResult } from "../../../trace_checks/types";
 import type { TraceCheckJob } from "~/server/background/types";
@@ -26,13 +26,17 @@ const mocks = vi.hoisted(() => {
   };
 });
 
-const getTraceCheck = async (traceId: string, checkId: string) => {
+const getTraceCheck = async (
+  traceId: string,
+  checkId: string,
+  projectId: string
+) => {
   return await esClient.search({
     index: TRACE_CHECKS_INDEX,
     body: {
       query: {
         match: {
-          id: getTraceCheckId(traceId, checkId),
+          id: traceCheckIndexId({ traceId, checkId, projectId }),
         },
       },
     },
@@ -355,11 +359,11 @@ describe("updateCheckStatusInES", () => {
       status: "scheduled",
     });
 
-    const response = await getTraceCheck(traceId, check.id);
+    const response = await getTraceCheck(traceId, check.id, projectId);
     expect((response.hits.total as any).value).toBe(1);
     const traceCheck = response.hits.hits[0]?._source;
     expect(traceCheck).toMatchObject({
-      id: getTraceCheckId(traceId, check.id),
+      id: traceCheckIndexId({ traceId, checkId: check.id, projectId }),
       check_id: check.id,
       check_name: check.name,
       check_type: check.type,
@@ -390,11 +394,11 @@ describe("updateCheckStatusInES", () => {
       status: "in_progress",
     });
 
-    const response = await getTraceCheck(traceId, check.id);
+    const response = await getTraceCheck(traceId, check.id, projectId);
     expect((response.hits.total as any).value).toBe(1);
     const traceCheck = response.hits.hits[0]?._source;
     expect(traceCheck).toMatchObject({
-      id: getTraceCheckId(traceId, check.id),
+      id: traceCheckIndexId({ traceId, checkId: check.id, projectId }),
       check_id: check.id,
       check_name: check.name,
       check_type: check.type,

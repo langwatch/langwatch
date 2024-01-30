@@ -17,3 +17,37 @@ export const esClient = new Client({
     apiKey: env.ELASTICSEARCH_API_KEY,
   },
 });
+
+export const traceIndexId = ({
+  traceId,
+  projectId,
+}: {
+  traceId: string;
+  projectId: string;
+}) => `${projectId}/${traceId}`;
+
+export const spanIndexId = ({
+  spanId,
+  projectId,
+}: {
+  spanId: string;
+  projectId: string;
+}) => `${projectId}/${spanId}`;
+
+export const traceCheckIndexId = ({
+  traceId,
+  checkId,
+  projectId,
+}: {
+  traceId: string;
+  checkId: string;
+  projectId: string;
+}) => `${projectId}/${traceId}/${checkId}`;
+
+export const eventIndexId = ({
+  eventId,
+  projectId,
+}: {
+  eventId: string;
+  projectId: string;
+}) => `${projectId}/${eventId}`;

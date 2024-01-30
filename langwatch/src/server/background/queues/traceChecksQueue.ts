@@ -4,6 +4,7 @@ import { captureError } from "../../../utils/captureError";
 import { esClient, TRACE_CHECKS_INDEX } from "../../elasticsearch";
 import type { TraceCheck } from "../../tracer/types";
 import type { TraceCheckJob } from "~/server/background/types";
+import { traceCheckIndexId } from "~/server/elasticsearch";
 
 export const TRACE_CHECKS_QUEUE_NAME = "trace_checks";
 
@@ -35,7 +36,11 @@ export const scheduleTraceCheck = async ({
     status: "scheduled",
   });
 
-  const jobId = getTraceCheckId(trace.id, check.id);
+  const jobId = traceCheckIndexId({
+    traceId: trace.id,
+    checkId: check.id,
+    projectId: trace.project_id,
+  });
   const currentJob = await traceChecksQueue.getJob(jobId);
   if (currentJob) {
     const state = await currentJob.getState();
@@ -71,9 +76,6 @@ export const scheduleTraceCheck = async ({
   }
 };
 
-export const getTraceCheckId = (trace_id: string, check_id: string) =>
-  `trace_check_${trace_id}/${check_id}`;
-
 export const updateCheckStatusInES = async ({
   check,
   trace,
@@ -92,7 +94,11 @@ export const updateCheckStatusInES = async ({
   retries?: number;
 }) => {
   const traceCheck: TraceCheck = {
-    id: getTraceCheckId(trace.id, check.id),
+    id: traceCheckIndexId({
+      traceId: trace.id,
+      checkId: check.id,
+      projectId: trace.project_id,
+    }),
     trace_id: trace.id,
     project_id: trace.project_id,
     thread_id: trace.thread_id,
