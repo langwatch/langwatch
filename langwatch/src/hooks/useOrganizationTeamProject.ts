@@ -42,9 +42,11 @@ export const useOrganizationTeamProject = (
       ? router.query.project
       : localStorageProjectSlug;
 
-  const projectsMatchingSlug = organizations.data?.flatMap((org) =>
+  const projectsTeamsMatchingSlug = organizations.data?.flatMap((org) =>
     org.teams.flatMap((team) =>
-      team.projects.filter((project) => project.slug == projectSlug)
+      team.projects
+        .filter((project) => project.slug == projectSlug)
+        .map((project) => ({ project, team }))
     )
   );
 
@@ -52,16 +54,15 @@ export const useOrganizationTeamProject = (
     ? organizations.data.find((org) => org.id == organizationId) ??
       organizations.data[0]
     : undefined;
-  const team = organization
+  const team = projectsTeamsMatchingSlug?.[0]
+    ? projectsTeamsMatchingSlug?.[0].team
+    : organization
     ? organization.teams.find((team) => team.id == teamId) ??
       organization.teams.find((team) => team.projects.length > 0) ??
       organization.teams[0]
     : undefined;
   const project = team
-    ? projectSlug
-      ? team.projects.find((project) => project.slug == projectSlug) ??
-        projectsMatchingSlug?.[0]
-      : team.projects[0]
+    ? projectsTeamsMatchingSlug?.[0]?.project ?? team.projects[0]
     : undefined;
 
   useEffect(() => {

@@ -5,6 +5,7 @@ import {
   sharedAnalyticsFilterInput,
   generateTraceQueryConditions,
   currentVsPreviousDates,
+  generateTraceChecksQueryConditions,
 } from "./analytics/common";
 import {
   messagesCountAggregated,
@@ -34,6 +35,7 @@ import { sessionsVsPreviousPeriod } from "./analytics/sessions";
 import { satisfactionVsPreviousPeriod } from "./analytics/satisfaction";
 import { topUsedDocuments } from "./analytics/documents";
 import { thumbsUpDownVsPreviousPeriod } from "./analytics/thumbsUpDown";
+import type { TraceCheck } from "../../tracer/types";
 
 export const analyticsRouter = createTRPCRouter({
   messagesCountVsPreviousPeriod,
@@ -130,14 +132,14 @@ export const analyticsRouter = createTRPCRouter({
     .input(sharedAnalyticsFilterInput)
     .use(checkUserPermissionForProject(TeamRoleGroup.ANALYTICS_VIEW))
     .query(async ({ input }) => {
-      const result = await esClient.search({
+      const result = await esClient.search<TraceCheck>({
         index: TRACE_CHECKS_INDEX,
         body: {
           size: 0,
           query: {
             bool: {
               //@ts-ignore
-              filter: generateTraceQueryConditions(input),
+              filter: generateTraceChecksQueryConditions(input),
             },
           },
           aggs: {

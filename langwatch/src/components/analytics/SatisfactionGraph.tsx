@@ -86,7 +86,7 @@ export const SatisfactionPieChart = () => {
               <SatisfactionPieChartChart data={data} />
             </TabPanel>
             <TabPanel padding={0}>
-              {totalThumbsUpDown == 0 && totalPreviousThumbsUpDown == 0 ? (
+              {thumbsUpDownData && totalThumbsUpDown == 0 && totalPreviousThumbsUpDown == 0 ? (
                 <Text padding={6} fontSize={14}>
                   No events for thumbs up/down were captured in the selected
                   period. Check our{" "}

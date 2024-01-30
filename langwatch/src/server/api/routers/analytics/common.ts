@@ -62,6 +62,42 @@ export const generateTraceQueryConditions = ({
   ];
 };
 
+export const generateTraceChecksQueryConditions = ({
+  projectId,
+  startDate,
+  endDate,
+  user_id,
+  thread_id,
+  customer_ids,
+  labels,
+}: z.infer<typeof sharedAnalyticsFilterInput>) => {
+  // If end date is very close to now, force it to be now, to allow frontend to keep refetching for new messages
+  const endDate_ =
+    new Date().getTime() - endDate < 1000 * 60 * 60
+      ? new Date().getTime()
+      : endDate;
+
+  return [
+    {
+      term: { project_id: projectId },
+    },
+    {
+      range: {
+        "timestamps.inserted_at": {
+          gte: startDate,
+          lte: endDate_,
+          format: "epoch_millis",
+        },
+      },
+    },
+    ...(user_id ? [{ term: { user_id: user_id } }] : []),
+    ...(thread_id ? [{ term: { thread_id: thread_id } }] : []),
+    ...(customer_ids ? [{ terms: { customer_id: customer_ids } }] : []),
+    ...(labels ? [{ terms: { labels: labels } }] : []),
+    // ...(topics ? [{ terms: { topics: topics } }] : []),
+  ];
+};
+
 export const spanQueryConditions = ({
   traceIds,
   projectId,
