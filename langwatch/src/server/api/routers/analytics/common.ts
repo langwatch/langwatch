@@ -413,7 +413,7 @@ const groupedElasticSearchAggregation = async <T extends Record<string, any>>({
   const aggregationQueries = input.aggregations.reduce(
     (acc, field) => {
       acc[field] = {
-        terms: { field, size: 100 },
+        terms: { field, size: 100, missing: `unknown ${field}` },
         aggs: aggregateQuery,
       };
       return acc;
