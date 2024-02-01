@@ -20,7 +20,7 @@ export const sessionsVsPreviousPeriod = protectedProcedure
           aggs: {
             user_sessions: {
               terms: {
-                field: "user_id",
+                field: "metadata.user_id",
                 size: 10000, // Adjust based on expected number of unique users
               },
               aggs: {
@@ -32,7 +32,7 @@ export const sessionsVsPreviousPeriod = protectedProcedure
                   aggs: {
                     distinct_threads: {
                       cardinality: {
-                        field: "thread_id",
+                        field: "metadata.thread_id",
                       },
                     },
                     session_duration: {
@@ -102,7 +102,7 @@ export const sessionsVsPreviousPeriod = protectedProcedure
             },
             total_users: {
               cardinality: {
-                field: "user_id",
+                field: "metadata.user_id",
               },
             },
             total_sessions: {

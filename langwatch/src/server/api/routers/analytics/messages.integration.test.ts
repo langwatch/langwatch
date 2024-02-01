@@ -15,8 +15,10 @@ describe("Analytics Endpoint Integration Tests", () => {
         inserted_at: new Date().getTime(),
         started_at: new Date().getTime(),
       },
-      customer_id: "customer-id-1",
-      labels: ["test-messages"],
+      metadata: {
+        customer_id: "customer-id-1",
+        labels: ["test-messages"],
+      },
     },
     {
       trace_id: `test-trace-id-${nanoid()}`,
@@ -25,8 +27,10 @@ describe("Analytics Endpoint Integration Tests", () => {
         inserted_at: new Date().getTime(),
         started_at: new Date().getTime(),
       },
-      customer_id: "customer-id-2",
-      labels: ["test-messages"],
+      metadata: {
+        customer_id: "customer-id-2",
+        labels: ["test-messages"],
+      },
     },
   ];
 

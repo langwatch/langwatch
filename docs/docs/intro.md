@@ -9,9 +9,10 @@ Welcome to LangWatch. Here we offer tools for the detailed observation and analy
 
 ## What is LangWatch?
 
-LangWatch provides a set of tools tailored to enhance the visibility into the operation of LLMs. Currently, it supports OpenAI and Langchain integrations, with the goal of providing you with a transparent and controlled environment for your LLMs' interactions and outputs.
+LangWatch provides a set of tools tailored to enhance the visibility into the operation of LLMs. Currently, it supports OpenAI and LangChain integrations, with the goal of providing you with a transparent and controlled environment for your LLMs' interactions and outputs.
 
 <!-- TODO: update screenshot -->
+
 ![langwatch screenshot](@site/static/img/screenshot-messages.png)
 
 ## Core Concepts
@@ -26,11 +27,11 @@ To make the most out of LangWatch, you'll need to be acquainted with several key
 
 - **User**: Users are the end-users interacting with your LLM. By sending us user identifiers along with traces, LangWatch enables you to perform per-user analysis and obtain insights on individual user behaviors.
 
-- **LLM Checks**: Automated evaluations carried out by LangWatch, LLM Checks analyze the LLM outputs to ensure quality and compliance. They help identify issues such as PII leaks, hallucinations, or content inconsistencies, enhancing the reliability of your LLM applications.
+Read more on [concepts](./concepts).
 
 ## Supported LLMs
 
-LangWatch's current integrations with OpenAI and Langchain are just the beginning. We're working to support more models and languages, aiming to offer a robust, expandable tool for a variety of LLM applications.
+LangWatch's current integrations with OpenAI and LangChain are just the beginning. We're working to support more models and languages, aiming to offer a robust, expandable tool for a variety of LLM applications.
 
 In this documentation, you'll find guides and examples on integrating LangWatch with your LLMs, understanding the output and data provided, and leveraging our tools to improve the functionality of your AI applications.
 

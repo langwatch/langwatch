@@ -8,6 +8,7 @@ describe("RagasFaithfulness Integration", () => {
     const sampleTrace: Trace = {
       trace_id: "integration-test-faithfulness",
       project_id: "integration-test",
+      metadata: {},
       input: { value: "What is the capital of France?" },
       output: { value: "The capital of France is Paris." },
       metrics: {},

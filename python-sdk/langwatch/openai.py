@@ -8,6 +8,7 @@ from langwatch.types import (
     ErrorCapture,
     SpanMetrics,
     SpanOutput,
+    TraceMetadata,
     TypedValueChatMessages,
     TypedValueText,
     SpanParams,
@@ -37,24 +38,18 @@ class OpenAITracer(BaseContextTracer):
         self,
         instance: Union[OpenAI, AsyncOpenAI],
         trace_id: Optional[str] = None,
-        user_id: Optional[str] = None,
-        thread_id: Optional[str] = None,
-        customer_id: Optional[str] = None,
-        labels: List[str] = [],
+        metadata: Optional[TraceMetadata] = None,
     ):
         super().__init__(
             trace_id=trace_id,
-            user_id=user_id,
-            thread_id=thread_id,
-            customer_id=customer_id,
-            labels=labels,
+            metadata=metadata,
         )
         trace_id = self.trace_id
         self.completion_tracer = OpenAICompletionTracer(
-            instance=instance, trace_id=trace_id, user_id=user_id, thread_id=thread_id
+            instance=instance, trace_id=trace_id, metadata=metadata
         )
         self.chat_completion_tracer = OpenAIChatCompletionTracer(
-            instance=instance, trace_id=trace_id, user_id=user_id, thread_id=thread_id
+            instance=instance, trace_id=trace_id, metadata=metadata
         )
 
     def __enter__(self):
@@ -73,18 +68,12 @@ class OpenAICompletionTracer(BaseContextTracer):
         self,
         instance: Union[OpenAI, AsyncOpenAI],
         trace_id: Optional[str] = None,
-        user_id: Optional[str] = None,
-        thread_id: Optional[str] = None,
-        customer_id: Optional[str] = None,
-        labels: List[str] = [],
+        metadata: Optional[TraceMetadata] = None,
     ):
         self.instance = instance
         super().__init__(
             trace_id=trace_id,
-            user_id=user_id,
-            thread_id=thread_id,
-            customer_id=customer_id,
-            labels=labels,
+            metadata=metadata,
         )
 
     def __enter__(self):
@@ -266,18 +255,12 @@ class OpenAIChatCompletionTracer(BaseContextTracer):
         self,
         instance: Union[OpenAI, AsyncOpenAI],
         trace_id: Optional[str] = None,
-        user_id: Optional[str] = None,
-        thread_id: Optional[str] = None,
-        customer_id: Optional[str] = None,
-        labels: List[str] = [],
+        metadata: Optional[TraceMetadata] = None,
     ):
         self.instance = instance
         super().__init__(
             trace_id=trace_id,
-            user_id=user_id,
-            thread_id=thread_id,
-            customer_id=customer_id,
-            labels=labels,
+            metadata=metadata,
         )
 
     def __enter__(self):

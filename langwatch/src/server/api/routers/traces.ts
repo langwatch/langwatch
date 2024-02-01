@@ -16,6 +16,7 @@ import {
   checkUserPermissionForProject,
   backendHasTeamProjectPermission,
 } from "../permission";
+import { generateTraceQueryConditions } from "./analytics/common";
 
 const sharedTraceFilterInput = z.object({
   projectId: z.string(),
@@ -26,41 +27,6 @@ const sharedTraceFilterInput = z.object({
   customer_ids: z.array(z.string()).optional(),
   labels: z.array(z.string()).optional(),
 });
-
-const generateQueryConditions = ({
-  projectId,
-  startDate,
-  endDate,
-  user_id,
-  thread_id,
-  customer_ids,
-  labels,
-}: z.infer<typeof sharedTraceFilterInput>) => {
-  // If end date is very close to now, force it to be now, to allow frontend to keep refetching for new messages
-  const endDate_ =
-    new Date().getTime() - endDate < 1000 * 60 * 60 * 2
-      ? new Date().getTime()
-      : endDate;
-
-  return [
-    {
-      term: { project_id: projectId },
-    },
-    {
-      range: {
-        "timestamps.started_at": {
-          gte: startDate,
-          lte: endDate_,
-          format: "epoch_millis",
-        },
-      },
-    },
-    ...(user_id ? [{ term: { user_id: user_id } }] : []),
-    ...(thread_id ? [{ term: { thread_id: thread_id } }] : []),
-    ...(customer_ids ? [{ terms: { customer_id: customer_ids } }] : []),
-    ...(labels ? [{ terms: { labels: labels } }] : []),
-  ];
-};
 
 export const esGetSpansByTraceId = async ({
   traceId,
@@ -104,7 +70,7 @@ export const tracesRouter = createTRPCRouter({
         : [];
 
       const queryConditions = [
-        ...generateQueryConditions(input),
+        ...generateTraceQueryConditions(input),
         ...(input.topics ? [{ terms: { topics: input.topics } }] : []),
       ];
 
@@ -295,7 +261,7 @@ export const tracesRouter = createTRPCRouter({
     .input(sharedTraceFilterInput)
     .use(checkUserPermissionForProject(TeamRoleGroup.MESSAGES_VIEW))
     .query(async ({ input }) => {
-      const queryConditions = generateQueryConditions(input);
+      const queryConditions = generateTraceQueryConditions(input);
 
       const topicCountsResult = await esClient.search<Trace>({
         index: TRACE_INDEX,
@@ -311,7 +277,7 @@ export const tracesRouter = createTRPCRouter({
           aggs: {
             topicCounts: {
               terms: {
-                field: "topics",
+                field: "metadata.topics",
                 size: 10000,
               },
             },
@@ -351,13 +317,13 @@ export const tracesRouter = createTRPCRouter({
           aggs: {
             customers: {
               terms: {
-                field: "customer_id",
+                field: "metadata.customer_id",
                 size: 10000,
               },
             },
             labels: {
               terms: {
-                field: "labels",
+                field: "metadata.labels",
                 size: 10000,
               },
             },
@@ -389,7 +355,7 @@ export const tracesRouter = createTRPCRouter({
             bool: {
               filter: [
                 { term: { project_id: projectId } },
-                { term: { thread_id: threadId } },
+                { term: { "metadata.thread_id": threadId } },
               ],
             },
           },
@@ -423,10 +389,10 @@ const groupTraces = (groupBy: string | undefined, traces: Trace[]) => {
       return !!trace.output?.openai_embeddings;
     }
     if (groupBy === "user_id") {
-      return !!trace.user_id;
+      return !!trace.metadata.user_id;
     }
     if (groupBy === "thread_id") {
-      return !!trace.thread_id;
+      return !!trace.metadata.thread_id;
     }
 
     return false;
@@ -452,10 +418,10 @@ const groupTraces = (groupBy: string | undefined, traces: Trace[]) => {
       );
     }
     if (groupBy === "user_id") {
-      return trace.user_id === member.user_id;
+      return trace.metadata.user_id === member.metadata.user_id;
     }
     if (groupBy === "thread_id") {
-      return trace.thread_id === member.thread_id;
+      return trace.metadata.thread_id === member.metadata.thread_id;
     }
 
     return false;

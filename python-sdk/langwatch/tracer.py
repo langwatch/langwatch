@@ -16,6 +16,7 @@ from langwatch.types import (
     SpanTimestamps,
     SpanTypes,
     CollectorRESTParams,
+    TraceMetadata,
 )
 from langwatch.utils import (
     autoconvert_typed_values,
@@ -41,7 +42,11 @@ class ContextSpan:
     started_at: int
 
     def __init__(
-        self, span_id: str, name: Optional[str], type: SpanTypes = "span", input: Any = None
+        self,
+        span_id: str,
+        name: Optional[str],
+        type: SpanTypes = "span",
+        input: Any = None,
     ) -> None:
         self.span_id = span_id
         self.name = name
@@ -177,17 +182,11 @@ class BaseContextTracer:
     def __init__(
         self,
         trace_id: Optional[str],
-        user_id: Optional[str],
-        thread_id: Optional[str],
-        customer_id: Optional[str],
-        labels: List[str],
+        metadata: Optional[TraceMetadata],
     ):
         self.spans: Dict[str, Span] = {}
         self.trace_id = trace_id or f"trace_{nanoid.generate()}"
-        self.user_id = user_id
-        self.thread_id = thread_id
-        self.customer_id = customer_id
-        self.labels = labels
+        self.metadata = metadata
 
     def __enter__(self):
         _local_context.current_tracer = self
@@ -204,12 +203,8 @@ class BaseContextTracer:
             send_spans(
                 CollectorRESTParams(
                     trace_id=self.trace_id,
+                    metadata=self.metadata,
                     spans=list(self.spans.values()),
-                    user_id=self.user_id,
-                    thread_id=self.thread_id,
-                    customer_id=self.customer_id,
-                    labels=self.labels,
-                    experiments=[],
                 )
             )
 

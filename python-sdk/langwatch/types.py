@@ -134,11 +134,15 @@ class Experiment(TypedDict):
     variant: int
 
 
-class CollectorRESTParams(TypedDict):
-    trace_id: str
-    spans: List[Span]
+class TraceMetadata(TypedDict, total=False):
     user_id: Optional[str]
     thread_id: Optional[str]
     customer_id: Optional[str]
     labels: List[str]
     experiments: List[Experiment]
+
+
+class CollectorRESTParams(TypedDict):
+    trace_id: str
+    metadata: Optional[TraceMetadata]
+    spans: List[Span]

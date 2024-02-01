@@ -69,10 +69,12 @@ describe("Collector API Endpoint", () => {
     const traceData: CollectorRESTParams = {
       trace_id: sampleSpan.trace_id,
       spans: [sampleSpan],
-      thread_id: "thread_test-thread_1",
-      user_id: "user_test-user_1",
-      customer_id: "customer_test-customer_1",
-      labels: ["test-label-1.0.0"],
+      metadata: {
+        thread_id: "thread_test-thread_1",
+        user_id: "user_test-user_1",
+        customer_id: "customer_test-customer_1",
+        labels: ["test-label-1.0.0"],
+      }
     };
 
     const { req, res }: { req: NextApiRequest; res: NextApiResponse } =

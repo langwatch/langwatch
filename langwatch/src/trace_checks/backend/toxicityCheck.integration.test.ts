@@ -8,6 +8,7 @@ describe("ToxicityCheck", () => {
     const sampleTrace: Trace = {
       trace_id: "foo",
       project_id: "foo",
+      metadata: {},
       input: { value: "fuck you" },
       metrics: {},
       timestamps: { started_at: Date.now(), inserted_at: Date.now() },
@@ -33,6 +34,7 @@ describe("ToxicityCheck", () => {
     const sampleTrace: Trace = {
       trace_id: "foo",
       project_id: "foo",
+      metadata: {},
       input: { value: "fuck you" },
       metrics: {},
       timestamps: { started_at: Date.now(), inserted_at: Date.now() },

@@ -37,6 +37,7 @@ Ensure that this environment variable is set before you run your application so 
 LangWatch provides an easy-to-use tracer for OpenAI's API. To start capturing data, wrap your API calls with `OpenAITracer`. Here's a quick example:
 
 ```python
+# highlight-next-line
 import langwatch.openai
 from openai import OpenAI
 
@@ -44,6 +45,7 @@ client = OpenAI()
 import openai
 
 # Use the LangWatch tracer for the OpenAI model
+# highlight-next-line
 with langwatch.openai.OpenAITracer(client):
     # Your interaction with OpenAI's API
     completion = client.chat.completions.create(
@@ -67,17 +69,21 @@ with langwatch.openai.OpenAITracer(client):
 
 The tracer will capture all the pertinent data during its context's lifetime, automatically associating the data with the API key set in your environment.
 
-## Custom Trace Identifiers
+## Metadata
 
-For a more granular analysis, LangWatch allows you to specify custom identifiers such as `user_id` and `thread_id`. This way, you can track interactions per user or conversation threads.
+For a more granular analysis, LangWatch allows you to specify metadata such as `user_id` and `thread_id`. This way, you can track interactions per user or conversation threads.
 
 ```python
-with langwatch.openai.OpenAITracer(client, user_id="user-123", thread_id="thread-456"):
+with langwatch.openai.OpenAITracer(client, metadata={"user_id": "user-123", "thread_id": "thread-456"}):
     # Your OpenAI LLM API calls here
 ```
 
 - `user_id` should uniquely identify the end-user of your application.
 - `thread_id` is useful for grouping a series of related interactions, like a chat session.
+- `labels` generic strings to tag your messages in any way you prefer, can also be used for versioning.
+- `customer_id` identifying your customer building on top of your platform
+
+Read more about those metadata keys on our [concepts](./concepts) page.
 
 ## Langchain Integration
 

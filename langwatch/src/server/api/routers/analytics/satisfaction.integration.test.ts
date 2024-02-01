@@ -11,7 +11,12 @@ describe("Satisfaction Endpoint Integration Tests", () => {
     {
       trace_id: `test-trace-id-${nanoid()}`,
       project_id: "test-project-id",
-      user_id: "test-user-id",
+      metadata: {
+        user_id: "test-user-id",
+        customer_id: "customer-id-1",
+        labels: ["test-messages"],
+        thread_id: "test-thread-id",
+      },
       input: {
         value: "I am happy",
         satisfaction_score: 0.9,
@@ -20,14 +25,16 @@ describe("Satisfaction Endpoint Integration Tests", () => {
         inserted_at: new Date().getTime(),
         started_at: new Date().getTime(),
       },
-      customer_id: "customer-id-1",
-      labels: ["test-messages"],
-      thread_id: "test-thread-id",
     },
     {
       trace_id: `test-trace-id-${nanoid()}`,
       project_id: "test-project-id",
-      user_id: "test-user-id",
+      metadata: {
+        user_id: "test-user-id",
+        customer_id: "customer-id-1",
+        labels: ["test-messages"],
+        thread_id: "test-thread-id",
+      },
       input: {
         value: "I am neutral",
         satisfaction_score: 0.05,
@@ -36,14 +43,16 @@ describe("Satisfaction Endpoint Integration Tests", () => {
         inserted_at: new Date().getTime(),
         started_at: new Date().getTime(),
       },
-      customer_id: "customer-id-1",
-      labels: ["test-messages"],
-      thread_id: "test-thread-id",
     },
     {
       trace_id: `test-trace-id-${nanoid()}`,
       project_id: "test-project-id",
-      user_id: "test-user-id",
+      metadata: {
+        user_id: "test-user-id",
+        customer_id: "customer-id-1",
+        labels: ["test-messages"],
+        thread_id: "test-thread-id",
+      },
       input: {
         value: "I am sad",
         satisfaction_score: -0.9,
@@ -52,9 +61,6 @@ describe("Satisfaction Endpoint Integration Tests", () => {
         inserted_at: new Date().getTime(),
         started_at: new Date().getTime(),
       },
-      customer_id: "customer-id-1",
-      labels: ["test-messages"],
-      thread_id: "test-thread-id",
     },
   ];
 

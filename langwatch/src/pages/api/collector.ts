@@ -65,6 +65,23 @@ export default async function handler(
     return res.status(401).json({ message: "Invalid auth token." });
   }
 
+  // We migrated those keys to inside metadata, but we still want to support them for retrocompatibility for a while
+  if (!("metadata" in req.body)) {
+    req.body.metadata = {};
+    if ("thread_id" in req.body) {
+      req.body.metadata.thread_id = req.body.thread_id;
+    }
+    if ("user_id" in req.body) {
+      req.body.metadata.user_id = req.body.user_id;
+    }
+    if ("customer_id" in req.body) {
+      req.body.metadata.customer_id = req.body.customer_id;
+    }
+    if ("labels" in req.body) {
+      req.body.metadata.labels = req.body.labels;
+    }
+  }
+
   let params: CollectorRESTParamsValidator;
   try {
     params = collectorRESTParamsValidatorSchema.parse(req.body);
@@ -78,13 +95,13 @@ export default async function handler(
     return res.status(400).json({ error: "Invalid trace format." });
   }
 
+  const { trace_id: nullableTraceId } = params;
   const {
-    trace_id: nullableTraceId,
     thread_id: threadId,
     user_id: userId,
     customer_id: customerId,
     labels,
-  } = params;
+  } = params.metadata ?? {};
 
   if (!req.body.spans) {
     return res.status(400).json({ message: "Bad request" });
@@ -201,10 +218,12 @@ export default async function handler(
   const trace: Trace = {
     trace_id: traceId,
     project_id: project.id,
-    thread_id: nullToUndefined(threadId), // Optional: This will be undefined if not sent
-    user_id: nullToUndefined(userId), // Optional: This will be undefined if not sent
-    customer_id: nullToUndefined(customerId),
-    labels: nullToUndefined(labels),
+    metadata: {
+      thread_id: nullToUndefined(threadId), // Optional: This will be undefined if not sent
+      user_id: nullToUndefined(userId), // Optional: This will be undefined if not sent
+      customer_id: nullToUndefined(customerId),
+      labels: nullToUndefined(labels),
+    },
     timestamps: {
       started_at: Math.min(...spans.map((span) => span.timestamps.started_at)),
       inserted_at: Date.now(),

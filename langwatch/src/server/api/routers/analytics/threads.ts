@@ -14,7 +14,7 @@ export const threadsCountVsPreviousPeriod = protectedProcedure
     return await currentVsPreviousTracesAggregation<{ count: number }>({
       input,
       aggs: {
-        count: { cardinality: { field: "thread_id" } },
+        count: { cardinality: { field: "metadata.thread_id" } },
       },
     });
   });
@@ -26,7 +26,7 @@ export const threadsCountAggregated = protectedProcedure
     return await groupedTracesAggregation<{ count: number }>({
       input,
       aggs: {
-        count: { cardinality: { field: "thread_id" } },
+        count: { cardinality: { field: "metadata.thread_id" } },
       },
     });
   });

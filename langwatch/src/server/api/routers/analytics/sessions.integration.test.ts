@@ -12,39 +12,45 @@ describe("Sessions Endpoint Integration Tests", () => {
     {
       trace_id: `test-trace-id-${nanoid()}`,
       project_id: "test-project-id",
-      user_id: "test-user-id",
+      metadata: {
+        user_id: "test-user-id",
+        customer_id: "customer-id-1",
+        labels: ["test-messages"],
+        thread_id: "test-thread-id",
+      },
       timestamps: {
         inserted_at: new Date().getTime(),
         started_at: new Date().getTime(),
       },
-      customer_id: "customer-id-1",
-      labels: ["test-messages"],
-      thread_id: "test-thread-id",
     },
     {
       trace_id: `test-trace-id-${nanoid()}`,
       project_id: "test-project-id",
-      user_id: "test-user-id",
+      metadata: {
+        user_id: "test-user-id",
+        customer_id: "customer-id-1",
+        labels: ["test-messages"],
+        thread_id: "test-thread-id",
+      },
       timestamps: {
         inserted_at: new Date().getTime(),
         started_at: new Date().getTime() - 1 * 2 * 60 * 1000, // 2 minutes ago
       },
-      customer_id: "customer-id-1",
-      labels: ["test-messages"],
-      thread_id: "test-thread-id",
     },
     // One message on another session
     {
       trace_id: `test-trace-id-${nanoid()}`,
       project_id: "test-project-id",
-      user_id: "test-user-id",
+      metadata: {
+        user_id: "test-user-id",
+        customer_id: "customer-id-2",
+        labels: ["test-messages"],
+        thread_id: "test-thread-id-2",
+      },
       timestamps: {
         inserted_at: new Date().getTime(),
         started_at: new Date().getTime() - 1 * 61 * 60 * 1000, // 1 hour and a minute ago,
       },
-      customer_id: "customer-id-2",
-      labels: ["test-messages"],
-      thread_id: "test-thread-id-2",
       metrics: {
         total_time_ms: 2000,
       },
@@ -53,27 +59,31 @@ describe("Sessions Endpoint Integration Tests", () => {
     {
       trace_id: `test-trace-id-${nanoid()}`,
       project_id: "test-project-id",
-      user_id: "test-user-id",
+      metadata: {
+        user_id: "test-user-id",
+        customer_id: "customer-id-2",
+        labels: ["test-messages"],
+        thread_id: "test-thread-id-2",
+      },
       timestamps: {
         inserted_at: new Date().getTime(),
         started_at: new Date().getTime() - 2 * 61 * 60 * 1000, // 2 hours and a minute ago,
       },
-      customer_id: "customer-id-2",
-      labels: ["test-messages"],
-      thread_id: "test-thread-id-2",
     },
     // Different user
     {
       trace_id: `test-trace-id-${nanoid()}`,
       project_id: "test-project-id",
-      user_id: "test-user-id-2",
+      metadata: {
+        user_id: "test-user-id-2",
+        customer_id: "customer-id-2",
+        labels: ["test-messages"],
+        thread_id: "test-thread-id-2",
+      },
       timestamps: {
         inserted_at: new Date().getTime(),
         started_at: new Date().getTime(),
       },
-      customer_id: "customer-id-2",
-      labels: ["test-messages"],
-      thread_id: "test-thread-id-2",
     },
   ];
 

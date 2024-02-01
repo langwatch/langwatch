@@ -166,12 +166,13 @@ export type TraceOutput = { value: string; openai_embeddings?: number[] };
 export type Trace = {
   trace_id: string;
   project_id: string;
-  // Grouping Fields
-  thread_id?: string;
-  user_id?: string;
-  customer_id?: string;
-  labels?: string[];
-  // End Grouping Fields
+  metadata: {
+    thread_id?: string;
+    user_id?: string;
+    customer_id?: string;
+    labels?: string[];
+    topics?: string[];
+  };
   timestamps: { started_at: number; inserted_at: number };
   input: TraceInput;
   output?: TraceOutput;
@@ -187,7 +188,6 @@ export type Trace = {
   search_embeddings: {
     openai_embeddings?: number[];
   };
-  topics?: string[];
   indexing_md5s?: string[];
 };
 
@@ -195,12 +195,6 @@ export type TraceCheck = {
   trace_id: string;
   check_id: string;
   project_id: string;
-  // Grouping Fields
-  thread_id?: string;
-  user_id?: string;
-  customer_id?: string;
-  labels?: string[];
-  // End Grouping Fields
   check_type: string;
   check_name: string;
   status: "scheduled" | "in_progress" | "error" | "failed" | "succeeded";
@@ -213,6 +207,13 @@ export type TraceCheck = {
     started_at?: number;
     finished_at?: number;
   };
+  trace_metadata: {
+    thread_id?: string;
+    user_id?: string;
+    customer_id?: string;
+    labels?: string[];
+    topics?: string[];
+  };
 };
 
 export type Experiment = {
@@ -223,11 +224,13 @@ export type Experiment = {
 export type CollectorRESTParams = {
   trace_id?: string | null | undefined;
   spans: Span[];
-  user_id?: string | null | undefined;
-  thread_id?: string | null | undefined;
-  customer_id?: string | null | undefined;
-  labels?: string[] | null | undefined;
-  experiments?: Experiment[] | null | undefined;
+  metadata?: {
+    user_id?: string | null | undefined;
+    thread_id?: string | null | undefined;
+    customer_id?: string | null | undefined;
+    labels?: string[] | null | undefined;
+    experiments?: Experiment[] | null | undefined;
+  };
 };
 
 export type CollectorRESTParamsValidator = Omit<CollectorRESTParams, "spans">;
@@ -238,14 +241,16 @@ export type Event = {
   project_id: string;
   metrics: Record<string, number>;
   event_details: Record<string, string>;
-  // Grouping Fields
-  // TODO: need a form to reconcile those with their traces if a trace_id is available
+
   trace_id?: string;
-  thread_id?: string;
-  user_id?: string;
-  customer_id?: string;
-  labels?: string[];
-  // End Grouping Fields
+  // TODO: need a form to reconcile those with their traces if a trace_id is available
+  trace_metadata: {
+    thread_id?: string;
+    user_id?: string;
+    customer_id?: string;
+    labels?: string[];
+    topics?: string[];
+  };
   timestamps: { started_at: number; inserted_at: number };
 };
 
@@ -256,7 +261,7 @@ export type ElasticSearchEvent = Omit<Event, "metrics" | "event_details"> & {
 
 export type TrackEventRESTParamsValidator = Omit<
   Event,
-  "event_id" | "project_id" | "timestamps" | "event_details"
+  "event_id" | "project_id" | "timestamps" | "event_details" | "trace_metadata"
 > & {
   event_id?: string; // auto generated unless you want to guarantee idempotency
   event_details?: Record<string, string>;

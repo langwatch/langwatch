@@ -20,6 +20,7 @@ describe("Satisfaction Scoring Integration Test", () => {
     timestamps: { started_at: Date.now(), inserted_at: Date.now() },
     metrics: {},
     search_embeddings: {},
+    metadata: {}
   };
 
   beforeAll(async () => {

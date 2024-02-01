@@ -54,11 +54,13 @@ export const generateTraceQueryConditions = ({
         },
       },
     },
-    ...(user_id ? [{ term: { user_id: user_id } }] : []),
-    ...(thread_id ? [{ term: { thread_id: thread_id } }] : []),
-    ...(customer_ids ? [{ terms: { customer_id: customer_ids } }] : []),
-    ...(labels ? [{ terms: { labels: labels } }] : []),
-    ...(topics ? [{ terms: { topics: topics } }] : []),
+    ...(user_id ? [{ term: { "metadata.user_id": user_id } }] : []),
+    ...(thread_id ? [{ term: { "metadata.thread_id": thread_id } }] : []),
+    ...(customer_ids
+      ? [{ terms: { "metadata.customer_id": customer_ids } }]
+      : []),
+    ...(labels ? [{ terms: { "metadata.labels": labels } }] : []),
+    ...(topics ? [{ terms: { "metadata.topics": topics } }] : []),
   ];
 };
 
@@ -90,10 +92,50 @@ export const generateTraceChecksQueryConditions = ({
         },
       },
     },
-    ...(user_id ? [{ term: { user_id: user_id } }] : []),
-    ...(thread_id ? [{ term: { thread_id: thread_id } }] : []),
-    ...(customer_ids ? [{ terms: { customer_id: customer_ids } }] : []),
-    ...(labels ? [{ terms: { labels: labels } }] : []),
+    ...(user_id ? [{ term: { "trace_metadata.user_id": user_id } }] : []),
+    ...(thread_id ? [{ term: { "trace_metadata.thread_id": thread_id } }] : []),
+    ...(customer_ids
+      ? [{ terms: { "trace_metadata.customer_id": customer_ids } }]
+      : []),
+    ...(labels ? [{ terms: { "trace_metadata.labels": labels } }] : []),
+    // ...(topics ? [{ terms: { topics: topics } }] : []),
+  ];
+};
+
+export const generateEventsQueryConditions = ({
+  projectId,
+  startDate,
+  endDate,
+  user_id,
+  thread_id,
+  customer_ids,
+  labels,
+}: z.infer<typeof sharedAnalyticsFilterInput>) => {
+  // If end date is very close to now, force it to be now, to allow frontend to keep refetching for new messages
+  const endDate_ =
+    new Date().getTime() - endDate < 1000 * 60 * 60
+      ? new Date().getTime()
+      : endDate;
+
+  return [
+    {
+      term: { project_id: projectId },
+    },
+    {
+      range: {
+        "timestamps.started_at": {
+          gte: startDate,
+          lte: endDate_,
+          format: "epoch_millis",
+        },
+      },
+    },
+    ...(user_id ? [{ term: { "trace_metadata.user_id": user_id } }] : []),
+    ...(thread_id ? [{ term: { "trace_metadata.thread_id": thread_id } }] : []),
+    ...(customer_ids
+      ? [{ terms: { "trace_metadata.customer_id": customer_ids } }]
+      : []),
+    ...(labels ? [{ terms: { "trace_metadata.labels": labels } }] : []),
     // ...(topics ? [{ terms: { topics: topics } }] : []),
   ];
 };
@@ -231,7 +273,7 @@ export const currentVsPreviousEventsAggregation = async <
     aggs,
     index: EVENTS_INDEX,
     conditions: [
-      ...generateTraceQueryConditions({
+      ...generateEventsQueryConditions({
         ...input,
         startDate: previousPeriodStartDate.getTime(),
       }),
@@ -413,7 +455,11 @@ const groupedElasticSearchAggregation = async <T extends Record<string, any>>({
   const aggregationQueries = input.aggregations.reduce(
     (acc, field) => {
       acc[field] = {
-        terms: { field, size: 100, missing: `unknown ${field}` },
+        terms: {
+          field: `metadata.${field}`,
+          size: 100,
+          missing: `unknown ${field}`,
+        },
         aggs: aggregateQuery,
       };
       return acc;

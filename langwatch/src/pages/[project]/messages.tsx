@@ -430,7 +430,7 @@ function ExpandableMessages({
             color="gray.500"
             cursor="default"
           >
-            User ID: {traceGroup[0]?.user_id ?? "null"}
+            User ID: {traceGroup[0]?.metadata.user_id ?? "null"}
           </Box>
         )}
         {isExpanded && groupBy === "thread_id" && (
@@ -444,7 +444,7 @@ function ExpandableMessages({
             color="gray.500"
             cursor="default"
           >
-            Thread ID: {traceGroup[0]?.thread_id ?? "null"}
+            Thread ID: {traceGroup[0]?.metadata.thread_id ?? "null"}
           </Box>
         )}
         <VStack width="full" gap={6}>

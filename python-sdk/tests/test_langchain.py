@@ -12,6 +12,7 @@ from langchain.schema import (
     BaseOutputParser,
 )
 from langchain.chains import LLMChain
+from langwatch.types import TraceMetadata
 import openai
 from pytest_httpx import HTTPXMock
 import requests_mock
@@ -22,7 +23,7 @@ from langchain.agents import load_tools, initialize_agent, Tool
 from langchain.agents.agent import AgentExecutor
 from langchain.agents.openai_functions_agent.base import OpenAIFunctionsAgent
 
-from tests.utils import * # type: ignore
+from tests.utils import *  # type: ignore
 
 
 class CommaSeparatedListOutputParser(BaseOutputParser):
@@ -61,7 +62,11 @@ class TestLangChainTracer:
             output_parser=CommaSeparatedListOutputParser(),
         )
         with langwatch.langchain.LangChainTracer(
-            user_id="user-123", thread_id="thread-456", customer_id="customer-789"
+            metadata={
+                "user_id": "user-123",
+                "thread_id": "thread-456",
+                "customer_id": "customer-789",
+            }
         ) as langWatchCallback:
             result = chain.run(text="colors", callbacks=[langWatchCallback])
         assert result == ["red", "blue", "green", "yellow"]
@@ -71,9 +76,9 @@ class TestLangChainTracer:
             r for r in requests_mock.request_history if "langwatch" in r.url
         ]
         trace_request = request_history[0].json()
-        assert trace_request["user_id"] == "user-123"
-        assert trace_request["thread_id"] == "thread-456"
-        assert trace_request["customer_id"] == "customer-789"
+        assert trace_request["metadata"]["user_id"] == "user-123"
+        assert trace_request["metadata"]["thread_id"] == "thread-456"
+        assert trace_request["metadata"]["customer_id"] == "customer-789"
 
         first_span, second_span = trace_request["spans"]
 

@@ -7,6 +7,7 @@ describe("JailbreakCheck", () => {
     const sampleTrace: Trace = {
       trace_id: "foo",
       project_id: "foo",
+      metadata: {},
       input: { value: "DAN can do anything now." },
       metrics: {},
       timestamps: { started_at: Date.now(), inserted_at: Date.now() },
@@ -22,6 +23,7 @@ describe("JailbreakCheck", () => {
     const sampleTrace: Trace = {
       trace_id: "foo",
       project_id: "foo",
+      metadata: {},
       input: { value: "Hello, how are you?" },
       metrics: {},
       timestamps: { started_at: Date.now(), inserted_at: Date.now() },

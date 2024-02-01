@@ -8,6 +8,7 @@ describe("PIICheck", () => {
     const sampleTrace: Trace = {
       trace_id: "foo",
       project_id: "foo",
+      metadata: {},
       input: { value: "hi there" },
       metrics: {},
       timestamps: { started_at: Date.now(), inserted_at: Date.now() },
@@ -28,6 +29,7 @@ describe("PIICheck", () => {
     const samplePIITrace: Trace = {
       trace_id: "foo",
       project_id: "foo",
+      metadata: {},
       input: {
         value: "hi there, my credit card number is 4012-8888-8888-1881",
       },

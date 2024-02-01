@@ -45,9 +45,3 @@ Field: `labels`
 
 You can use **labels** to organize and compare the traces sent to LangWatch for any comparison you want to do. You can for example apply different labels for different actions, for example a label `blogpost_title` for generating the blog post title and another `blogpost_keywords`, for generating keywords. You can use it for versioning as well, for example label the first implementation
 version as `v1.0.0`, then do a prompt engineering to improve the AI travel planner itenerary builder, and label it as `v1.0.1`. This way you can easily focus on each different functionality or compare versions on LangWatch dashboard.
-
-### LLM Checks
-
-**LLM Checks** are the automated evaluations that occur during or after the AI's operations. For the travel assistant, an LLM Check might analyze the outputs to ensure there's no hallucinated information about flight prices or destinations. It could also verify the AI stays on topic during the travel planning process. In the blog post generation tool, LLM Checks would be crucial for ensuring that the generated content doesn't contain sensitive or prohibited topics, adhering to content guidelines and format requirements.
-
-In both examples, these concepts serve as the backbone of LangWatch's functionality. They allow for detailed monitoring and analysis of how the AI operates, ensuring that every interaction, whether it be a single request for travel advice or a step in crafting a blog post, is recorded, analyzed, and optimized for future interactions. By applying these concepts to your AI applications, you can leverage LangWatch to provide a seamless and compliant user experience.

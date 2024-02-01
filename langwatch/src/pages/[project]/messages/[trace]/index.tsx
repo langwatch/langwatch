@@ -41,10 +41,10 @@ export default function TraceDetails() {
   const [threadId, setThreadId] = useState<string | undefined>(undefined);
 
   useEffect(() => {
-    if (trace.data?.thread_id) {
-      setThreadId(trace.data.thread_id);
+    if (trace.data?.metadata.thread_id) {
+      setThreadId(trace.data.metadata.thread_id);
     }
-  }, [trace.data?.thread_id]);
+  }, [trace.data?.metadata.thread_id]);
 
   const [initialDelay, setInitialDelay] = useState<boolean>(false);
   const [isTabOpen, setTabOpen] = useState<boolean>(false);
@@ -251,7 +251,7 @@ function Conversation({ threadId }: { threadId?: string }) {
           {trace.data && !threadTraces.data && (
             <TraceMessages trace={trace.data} highlighted={!!openTab} />
           )}
-          {trace.data && !trace.data.thread_id && (
+          {trace.data && !trace.data.metadata.thread_id && (
             <Container maxWidth="800px" padding={8}>
               <Text fontStyle="italic" color="gray.500">
                 Pass the thread_id on your integration to capture and visualize

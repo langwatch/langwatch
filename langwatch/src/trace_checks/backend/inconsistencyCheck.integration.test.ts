@@ -8,6 +8,7 @@ describe.skip("InconsistencyCheck", () => {
     const sampleTrace: Trace = {
       trace_id: "foo",
       project_id: "foo",
+      metadata: {},
       input: {
         value:
           "The grass is green. The house is red. The sky is blue. What is true?",
@@ -30,6 +31,7 @@ describe.skip("InconsistencyCheck", () => {
     const sampleTrace: Trace = {
       trace_id: "bar",
       project_id: "bar",
+      metadata: {},
       input: { value: "The sky is clear. The car is new." },
       output: { value: "The sky is clear. The car is new." },
       metrics: {},

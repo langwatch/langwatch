@@ -45,6 +45,7 @@ export const startTrackEventsWorker = () => {
           started_at: job.data.event.timestamp,
           inserted_at: Date.now(),
         },
+        trace_metadata: {}
       };
       // use zod to remove any other keys that may be present but not allowed
       event = elasticSearchEventSchema.parse(event);
@@ -66,11 +67,9 @@ export const startTrackEventsWorker = () => {
         if (trace) {
           event = {
             ...event,
-            // Copy grouping keys
-            thread_id: trace.thread_id,
-            user_id: trace.user_id,
-            customer_id: trace.customer_id,
-            labels: trace.labels,
+            trace_metadata: {
+              ...trace.metadata,
+            }
           };
         } else if (job.data.postpone_count < 3) {
           const delay = 5 * Math.pow(2, job.data.postpone_count);

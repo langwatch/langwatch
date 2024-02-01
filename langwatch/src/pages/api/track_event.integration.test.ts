@@ -22,7 +22,7 @@ describe("/api/track_event", () => {
   let worker: Worker<TrackEventJob, void, string>;
   let project: Project;
   let traceId: string;
-  const eventId = `my_event_id_${nanoid()}`
+  const eventId = `my_event_id_${nanoid()}`;
 
   beforeAll(async () => {
     worker = startTrackEventsWorker();
@@ -112,10 +112,12 @@ describe("/api/track_event", () => {
         value: "Test output for trace",
       },
       timestamps: { started_at: Date.now(), inserted_at: Date.now() },
-      thread_id: "test-thread",
-      user_id: "test-user",
-      customer_id: "test-customer",
-      labels: ["test-label"],
+      metadata: {
+        thread_id: "test-thread",
+        user_id: "test-user",
+        customer_id: "test-customer",
+        labels: ["test-label"],
+      },
       metrics: {},
       search_embeddings: {},
     };

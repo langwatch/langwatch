@@ -8,6 +8,7 @@ describe("CustomCheck", () => {
     const sampleTrace: Trace = {
       trace_id: "trace1",
       project_id: "project1",
+      metadata: {},
       input: { value: "Hello, World!" },
       output: { value: "Goodbye, World!" },
       metrics: {},
@@ -56,6 +57,7 @@ describe("CustomCheck", () => {
     const sampleTrace: Trace = {
       trace_id: "trace2",
       project_id: "project2",
+      metadata: {},
       input: { value: "Hello, World!" },
       output: { value: "Goodbye, World!" },
       metrics: {},
@@ -104,6 +106,7 @@ describe("CustomCheck", () => {
     const sampleTrace: Trace = {
       trace_id: "trace3",
       project_id: "project3",
+      metadata: {},
       input: { value: "User123" },
       output: { value: "Error code 404" },
       metrics: {},
@@ -196,6 +199,7 @@ describe("CustomCheck", () => {
     const sampleTrace: Trace = {
       trace_id: "trace4",
       project_id: "project4",
+      metadata: {},
       input: { value: "This is a test input." },
       output: { value: "This is a test output." },
       metrics: {},
@@ -252,6 +256,7 @@ describe("CustomCheck", () => {
     const sampleTrace: Trace = {
       trace_id: "trace5",
       project_id: "project5",
+      metadata: {},
       input: { value: "Sample input for LLM checks." },
       output: { value: "It's sunny outside" },
       metrics: {},

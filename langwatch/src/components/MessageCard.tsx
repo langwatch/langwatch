@@ -51,7 +51,7 @@ export function MessageCard({
   ).length;
   const totalChecks = traceChecks.length;
   const topics =
-    (typeof trace.topics == "string" ? [trace.topics] : trace.topics) ?? [];
+    (typeof trace.metadata.topics == "string" ? [trace.metadata.topics] : trace.metadata.topics) ?? [];
 
   return (
     <VStack alignItems="flex-start" spacing={4} width="fill">
@@ -129,7 +129,7 @@ export function MessageCard({
                 {topic}
               </Tag>
             ))}
-            {(trace.labels ?? []).map((label) => (
+            {(trace.metadata.labels ?? []).map((label) => (
               <Tag
                 key={label}
                 background={getColorForString(label).background}
@@ -141,12 +141,12 @@ export function MessageCard({
             ))}
           </HStack>
           <HStack fontSize={12} color="gray.400">
-            {!!trace.customer_id && (
+            {!!trace.metadata.customer_id && (
               <>
                 <Box>
                   Customer ID:{" "}
-                  {trace.customer_id.substring(0, 16) +
-                    (trace.customer_id.length > 16 ? "..." : "")}
+                  {trace.metadata.customer_id.substring(0, 16) +
+                    (trace.metadata.customer_id.length > 16 ? "..." : "")}
                 </Box>
                 <Text>·</Text>
               </>

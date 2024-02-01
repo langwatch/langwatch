@@ -28,7 +28,12 @@ prompt = ChatPromptTemplate.from_template("tell me a joke about {topic}")
 chain = prompt | model
 
 # Use the tracer context manager
-with langwatch.langchain.LangChainTracer(user_id="user-123", thread_id="thread-456") as langWatchCallback:
+with langwatch.langchain.LangChainTracer(
+  metadata={
+    "user_id": "optional-user-123",
+    "thread_id": "optional-thread-456",
+  }
+) as langWatchCallback:
     # Invoke LangChain with LangWatch callbacks
     result = chain.invoke(
         {"topic": "bears"},

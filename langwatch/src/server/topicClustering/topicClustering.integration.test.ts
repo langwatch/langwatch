@@ -172,6 +172,7 @@ describe("Topic Clustering Integration Test", () => {
         timestamps: { started_at: Date.now(), inserted_at: Date.now() },
         metrics: {},
         search_embeddings: {},
+        metadata: {}
       },
       {
         trace_id: "trace_2",
@@ -180,6 +181,7 @@ describe("Topic Clustering Integration Test", () => {
         timestamps: { started_at: Date.now(), inserted_at: Date.now() },
         metrics: {},
         search_embeddings: {},
+        metadata: {}
       },
       // Add more test traces as needed
     ];
@@ -240,7 +242,7 @@ describe("Topic Clustering Integration Test", () => {
       expect(traces.length).toBeGreaterThan(0);
       traces.forEach((trace) => {
         expect(trace).toHaveProperty("topics");
-        expect(trace?.topics).not.toHaveLength(0);
+        expect(trace?.metadata.topics).not.toHaveLength(0);
       });
 
       // Verify that a cost entry was inserted into the database

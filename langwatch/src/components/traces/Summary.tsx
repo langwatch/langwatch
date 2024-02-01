@@ -102,52 +102,52 @@ const TraceSummaryValues = React.forwardRef(function TraceSummaryValues(
       flexDirection={{ base: "column", lg: "row" }}
       ref={ref as any}
     >
-      {trace.customer_id && (
+      {trace.metadata.customer_id && (
         <SummaryItem label="Customer ID">
           <Text
-            fontFamily={trace.customer_id ? "mono" : undefined}
+            fontFamily={trace.metadata.customer_id ? "mono" : undefined}
             maxWidth="200px"
             wordBreak="break-all"
           >
-            {trace.customer_id ?? "unknown"}
+            {trace.metadata.customer_id ?? "unknown"}
           </Text>
         </SummaryItem>
       )}
       <SummaryItem
         label="User ID"
         tooltip={
-          !trace.user_id
+          !trace.metadata.user_id
             ? "Send the user_id to LangWatch to unlock various analysis per user, read more on our docs" /* TODO docs link */
             : undefined
         }
       >
         <Text
-          fontFamily={trace.thread_id ? "mono" : undefined}
+          fontFamily={trace.metadata.thread_id ? "mono" : undefined}
           maxWidth="200px"
           wordBreak="break-all"
         >
-          {trace.user_id ?? "unknown"}
+          {trace.metadata.user_id ?? "unknown"}
         </Text>
       </SummaryItem>
       <SummaryItem
         label="Thread ID"
         tooltip={
-          !trace.thread_id
+          !trace.metadata.thread_id
             ? "Send the thread_id to LangWatch to group the messages as a part of a single context, read more on our docs" /* TODO docs link */
             : undefined
         }
       >
         <Text
-          fontFamily={trace.thread_id ? "mono" : undefined}
+          fontFamily={trace.metadata.thread_id ? "mono" : undefined}
           maxWidth="200px"
           wordBreak="break-all"
         >
-          {trace.thread_id ?? "unknown"}
+          {trace.metadata.thread_id ?? "unknown"}
         </Text>
       </SummaryItem>
-      {trace.labels && (
+      {trace.metadata.labels && (
         <SummaryItem label="Labels">
-          {trace.labels.map((label) => (
+          {trace.metadata.labels.map((label) => (
             <Tag
               key={label}
               background={getColorForString(label).background}

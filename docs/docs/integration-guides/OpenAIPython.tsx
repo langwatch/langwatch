@@ -25,7 +25,13 @@ from openai import OpenAI
 client = OpenAI()
 
 # Use the LangWatch tracer for the OpenAI model
-with langwatch.openai.OpenAITracer(client, user_id="optional-user-123", thread_id="optional-thread-456"):
+with langwatch.openai.OpenAITracer(
+  client,
+  metadata={
+      "user_id": "optional-user-123",
+      "thread_id": "optional-thread-456",
+  },
+):
     # Your interaction with OpenAI's API
     completion = client.chat.completions.create(
         model="gpt-4",

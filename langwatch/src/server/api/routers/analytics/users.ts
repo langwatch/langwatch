@@ -14,7 +14,7 @@ export const usersCountVsPreviousPeriod = protectedProcedure
     return await currentVsPreviousTracesAggregation<{ count: number }>({
       input,
       aggs: {
-        count: { cardinality: { field: "user_id" } },
+        count: { cardinality: { field: "metadata.user_id" } },
       },
     });
   });
@@ -26,7 +26,7 @@ export const usersCountAggregated = protectedProcedure
     return await groupedTracesAggregation<{ count: number }>({
       input,
       aggs: {
-        count: { cardinality: { field: "user_id" } },
+        count: { cardinality: { field: "metadata.user_id" } },
       },
     });
   });

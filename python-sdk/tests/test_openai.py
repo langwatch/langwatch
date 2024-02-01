@@ -36,9 +36,11 @@ class TestOpenAICompletionTracer:
 
         with langwatch.openai.OpenAICompletionTracer(
             client,
-            user_id="user-123",
-            thread_id="thread-456",
-            customer_id="customer-789",
+            metadata={
+                "user_id": "user-123",
+                "thread_id": "thread-456",
+                "customer_id": "customer-789",
+            },
         ):
             response = client.completions.create(
                 model="gpt-3.5-turbo-instruct", prompt="hi"
@@ -52,9 +54,9 @@ class TestOpenAICompletionTracer:
         time.sleep(0.01)
         trace_request = requests_mock.request_history[0].json()
 
-        assert trace_request["user_id"] == "user-123"
-        assert trace_request["thread_id"] == "thread-456"
-        assert trace_request["customer_id"] == "customer-789"
+        assert trace_request["metadata"]["user_id"] == "user-123"
+        assert trace_request["metadata"]["thread_id"] == "thread-456"
+        assert trace_request["metadata"]["customer_id"] == "customer-789"
 
         first_span, second_span = trace_request["spans"]
 
@@ -364,10 +366,12 @@ class TestOpenAIChatCompletionTracer:
 
         with langwatch.openai.OpenAIChatCompletionTracer(
             client,
-            user_id="user-123",
-            thread_id="thread-456",
-            customer_id="customer-789",
-            labels=["1.0.0"],
+            metadata={
+                "user_id": "user-123",
+                "thread_id": "thread-456",
+                "customer_id": "customer-789",
+                "labels": ["1.0.0"],
+            },
         ):
             response = client.chat.completions.create(
                 model="gpt-3.5-turbo",
@@ -384,10 +388,10 @@ class TestOpenAIChatCompletionTracer:
         trace_request = requests_mock.request_history[0].json()
 
         assert trace_request["trace_id"].startswith("trace_")
-        assert trace_request["user_id"] == "user-123"
-        assert trace_request["thread_id"] == "thread-456"
-        assert trace_request["customer_id"] == "customer-789"
-        assert trace_request["labels"] == ["1.0.0"]
+        assert trace_request["metadata"]["user_id"] == "user-123"
+        assert trace_request["metadata"]["thread_id"] == "thread-456"
+        assert trace_request["metadata"]["customer_id"] == "customer-789"
+        assert trace_request["metadata"]["labels"] == ["1.0.0"]
 
         first_span = trace_request["spans"][0]
         assert first_span["trace_id"].startswith("trace_")
@@ -1057,9 +1061,11 @@ class TestOpenAITracer:
 
         with langwatch.openai.OpenAITracer(
             client,
-            user_id="user-123",
-            thread_id="thread-456",
-            customer_id="customer-789",
+            metadata={
+                "user_id": "user-123",
+                "thread_id": "thread-456",
+                "customer_id": "customer-789",
+            },
         ):
             client.completions.create(
                 model="gpt-3.5-turbo-instruct", prompt="Hello Completion!"

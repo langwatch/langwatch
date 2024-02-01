@@ -23,6 +23,7 @@ from langwatch.types import (
     SpanParams,
     SpanTimestamps,
     LLMSpan,
+    TraceMetadata,
     TypedValueChatMessages,
     TypedValueJson,
     TypedValueText,
@@ -70,12 +71,9 @@ class LangChainTracer(BaseContextTracer, BaseCallbackHandler):
     def __init__(
         self,
         trace_id: Optional[str] = None,
-        user_id: Optional[str] = None,
-        thread_id: Optional[str] = None,
-        customer_id: Optional[str] = None,
-        labels: List[str] = [],
+        metadata: Optional[TraceMetadata] = None,
     ) -> None:
-        super().__init__(trace_id, user_id, thread_id, customer_id, labels)
+        super().__init__(trace_id, metadata)
 
     def on_llm_start(
         self,

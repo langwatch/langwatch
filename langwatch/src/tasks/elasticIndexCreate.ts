@@ -11,16 +11,28 @@ import {
   type Trace,
   type ElasticSearchSpan,
   type TraceCheck,
-  type Event,
+  type ElasticSearchEvent,
 } from "../server/tracer/types";
 
-const traceMapping: Record<keyof Trace, MappingProperty> = {
+type ElasticSearchMappingFrom<T> = {
+  [K in keyof Required<T>]:
+    | { properties: Record<keyof Required<T[K]>, MappingProperty> }
+    | { type: string; enabled?: boolean }
+    | { type: "nested"; properties: Record<string, MappingProperty> };
+};
+
+const traceMapping: ElasticSearchMappingFrom<Trace> = {
   trace_id: { type: "keyword" },
   project_id: { type: "keyword" },
-  thread_id: { type: "keyword" },
-  user_id: { type: "keyword" },
-  customer_id: { type: "keyword" },
-  labels: { type: "keyword" },
+  metadata: {
+    properties: {
+      thread_id: { type: "keyword" },
+      user_id: { type: "keyword" },
+      customer_id: { type: "keyword" },
+      labels: { type: "keyword" },
+      topics: { type: "keyword" },
+    },
+  },
   timestamps: {
     properties: {
       started_at: { type: "date" },
@@ -76,15 +88,12 @@ const traceMapping: Record<keyof Trace, MappingProperty> = {
       },
     },
   },
-  topics: {
-    type: "keyword",
-  },
   indexing_md5s: {
     type: "keyword",
-  }
+  },
 };
 
-const spanMapping: Record<keyof ElasticSearchSpan, MappingProperty> = {
+const spanMapping: ElasticSearchMappingFrom<ElasticSearchSpan> = {
   project_id: { type: "keyword" },
   type: { type: "keyword" },
   name: { type: "text" },
@@ -149,14 +158,10 @@ const spanMapping: Record<keyof ElasticSearchSpan, MappingProperty> = {
   },
 };
 
-const traceChecksMapping: Record<keyof TraceCheck, MappingProperty> = {
+const traceChecksMapping: ElasticSearchMappingFrom<TraceCheck> = {
   trace_id: { type: "keyword" },
-  project_id: { type: "keyword" },
-  thread_id: { type: "keyword" },
-  user_id: { type: "keyword" },
-  customer_id: { type: "keyword" },
-  labels: { type: "keyword" },
   check_id: { type: "keyword" },
+  project_id: { type: "keyword" },
   check_type: { type: "keyword" },
   check_name: { type: "text" },
   status: { type: "keyword" },
@@ -176,9 +181,18 @@ const traceChecksMapping: Record<keyof TraceCheck, MappingProperty> = {
       inserted_at: { type: "date" },
     },
   },
+  trace_metadata: {
+    properties: {
+      thread_id: { type: "keyword" },
+      user_id: { type: "keyword" },
+      customer_id: { type: "keyword" },
+      labels: { type: "keyword" },
+      topics: { type: "keyword" },
+    },
+  },
 };
 
-const eventsMapping: Record<keyof Event, MappingProperty> = {
+const eventsMapping: ElasticSearchMappingFrom<ElasticSearchEvent> = {
   event_id: { type: "keyword" },
   project_id: { type: "keyword" },
   event_type: { type: "text" },
@@ -196,17 +210,20 @@ const eventsMapping: Record<keyof Event, MappingProperty> = {
       value: { type: "text" },
     },
   },
-  // Grouping fields
-  trace_id: { type: "keyword" },
-  thread_id: { type: "keyword" },
-  user_id: { type: "keyword" },
-  customer_id: { type: "keyword" },
-  labels: { type: "keyword" },
-  // End grouping fields
   timestamps: {
     properties: {
       started_at: { type: "date" },
       inserted_at: { type: "date" },
+    },
+  },
+  trace_id: { type: "keyword" }, // optional, later we will have events on thread or user level
+  trace_metadata: {
+    properties: {
+      thread_id: { type: "keyword" },
+      user_id: { type: "keyword" },
+      customer_id: { type: "keyword" },
+      labels: { type: "keyword" },
+      topics: { type: "keyword" },
     },
   },
 };
@@ -216,24 +233,24 @@ export const createIndexes = async () => {
   if (!spanExists) {
     await esClient.indices.create({
       index: SPAN_INDEX,
-      mappings: { properties: spanMapping },
+      mappings: { properties: spanMapping as Record<string, MappingProperty> },
     });
   }
   await esClient.indices.putMapping({
     index: SPAN_INDEX,
-    properties: spanMapping,
+    properties: spanMapping as Record<string, MappingProperty>,
   });
 
   const traceExists = await esClient.indices.exists({ index: TRACE_INDEX });
   if (!traceExists) {
     await esClient.indices.create({
       index: TRACE_INDEX,
-      mappings: { properties: traceMapping },
+      mappings: { properties: traceMapping as Record<string, MappingProperty> },
     });
   }
   await esClient.indices.putMapping({
     index: TRACE_INDEX,
-    properties: traceMapping,
+    properties: traceMapping as Record<string, MappingProperty>,
   });
 
   const traceChecksExists = await esClient.indices.exists({
@@ -242,24 +259,28 @@ export const createIndexes = async () => {
   if (!traceChecksExists) {
     await esClient.indices.create({
       index: TRACE_CHECKS_INDEX,
-      mappings: { properties: traceChecksMapping },
+      mappings: {
+        properties: traceChecksMapping as Record<string, MappingProperty>,
+      },
     });
   }
   await esClient.indices.putMapping({
     index: TRACE_CHECKS_INDEX,
-    properties: traceChecksMapping,
+    properties: traceChecksMapping as Record<string, MappingProperty>,
   });
 
   const eventsExists = await esClient.indices.exists({ index: EVENTS_INDEX });
   if (!eventsExists) {
     await esClient.indices.create({
       index: EVENTS_INDEX,
-      mappings: { properties: eventsMapping },
+      mappings: {
+        properties: eventsMapping as Record<string, MappingProperty>,
+      },
     });
   }
   await esClient.indices.putMapping({
     index: EVENTS_INDEX,
-    properties: eventsMapping,
+    properties: eventsMapping as Record<string, MappingProperty>,
   });
 };
 
