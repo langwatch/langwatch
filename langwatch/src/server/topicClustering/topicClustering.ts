@@ -33,7 +33,7 @@ export const clusterTopicsForProject = async (
     presenceCondition = {
       must_not: {
         exists: {
-          field: "topics",
+          field: "metadata.topics",
         },
       },
     };
@@ -116,7 +116,7 @@ export const clusterTraces = async (projectId: string, traces: Trace[]) => {
       aggs: {
         unique_topics: {
           terms: {
-            field: "topics",
+            field: "metadata.topics",
             size: 10000,
           },
         },
@@ -158,7 +158,7 @@ export const clusterTraces = async (projectId: string, traces: Trace[]) => {
   );
   const body = Object.entries(topics).flatMap(([traceId, topic]) => [
     { update: { _id: traceId } },
-    { doc: { topics: [topic] } },
+    { doc: { metadata: { topics: [topic] } } },
   ]);
 
   if (body.length > 0) {

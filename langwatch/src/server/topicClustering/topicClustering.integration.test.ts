@@ -234,7 +234,7 @@ describe("Topic Clustering Integration Test", () => {
         query: {
           term: { project_id: testProjectId },
         },
-        _source: ["trace_id", "topics"],
+        _source: ["trace_id", "metadata.topics"],
       });
 
       const traces = result.hits.hits.map((hit) => hit._source);

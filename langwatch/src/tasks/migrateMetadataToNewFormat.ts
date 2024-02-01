@@ -27,7 +27,7 @@ const migrateTraces = async () => {
           },
         },
       },
-      size: 10_000,
+      size: 5_000,
     },
   });
 
@@ -99,7 +99,7 @@ const migrateTraceChecks = async () => {
           },
         },
       },
-      size: 10_000,
+      size: 5_000,
     },
   });
 
@@ -171,7 +171,7 @@ const migrateEvents = async () => {
           },
         },
       },
-      size: 10_000,
+      size: 5_000,
     },
   });
 
