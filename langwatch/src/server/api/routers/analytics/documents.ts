@@ -51,29 +51,22 @@ export const topUsedDocuments = protectedProcedure
           },
         },
         aggs: {
-          documents: {
-            nested: {
-              path: "contexts",
+          total_unique_documents: {
+            cardinality: {
+              field: "contexts.document_id",
+            },
+          },
+          top_documents: {
+            terms: {
+              field: "contexts.document_id",
+              size: 10,
             },
             aggs: {
-              total_unique_documents: {
-                cardinality: {
-                  field: "contexts.document_id",
-                },
-              },
-              top_documents: {
-                terms: {
-                  field: "contexts.document_id",
-                  size: 10,
-                },
-                aggs: {
-                  top_content: {
-                    top_hits: {
-                      size: 1,
-                      _source: {
-                        includes: ["contexts.content"],
-                      },
-                    },
+              top_content: {
+                top_hits: {
+                  size: 1,
+                  _source: {
+                    includes: ["contexts.content"],
                   },
                 },
               },
@@ -84,15 +77,15 @@ export const topUsedDocuments = protectedProcedure
     });
 
     const topDocuments = (
-      result.aggregations?.documents as any
-    )?.top_documents.buckets.map((bucket: any) => ({
+      result.aggregations?.top_documents as any
+    )?.buckets.map((bucket: any) => ({
       documentId: bucket.key,
       count: bucket.doc_count,
-      content: bucket.top_content.hits.hits[0]._source.content,
+      content: bucket.top_content.hits.hits[0]._source.contexts[0].content,
     })) as { documentId: string; count: number; content: string }[];
 
     const totalUniqueDocuments = (
-      (result.aggregations?.documents as any)?.total_unique_documents
+      result.aggregations?.total_unique_documents as any
     )?.value as number;
 
     return {

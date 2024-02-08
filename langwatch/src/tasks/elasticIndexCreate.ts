@@ -5,7 +5,9 @@ import {
   SPAN_INDEX,
   TRACE_CHECKS_INDEX,
   TRACE_INDEX,
+  TRACES_PIVOT_INDEX,
   esClient,
+  TRACES_PIVOT_TRANSFORM,
 } from "../server/elasticsearch";
 import {
   type ElasticSearchSpan,
@@ -13,12 +15,17 @@ import {
   type ElasticSearchEvent,
   type ElasticSearchTrace,
 } from "../server/tracer/types";
+import omit from "lodash.omit";
 
 type ElasticSearchMappingFrom<T> = {
   [K in keyof Required<T>]:
     | { properties: Record<keyof Required<T[K]>, MappingProperty> }
     | { type: string; enabled?: boolean }
-    | { type: "nested"; properties: Record<string, MappingProperty> };
+    | {
+        type: "nested";
+        include_in_parent?: boolean;
+        properties: Record<string, MappingProperty>;
+      };
 };
 
 const traceMapping: ElasticSearchMappingFrom<ElasticSearchTrace> = {
@@ -152,7 +159,6 @@ const spanMapping: ElasticSearchMappingFrom<ElasticSearchSpan> = {
     },
   },
   contexts: {
-    type: "nested",
     properties: {
       document_id: { type: "keyword" },
       chunk_id: { type: "keyword" },
@@ -166,7 +172,7 @@ const traceChecksMapping: ElasticSearchMappingFrom<TraceCheck> = {
   check_id: { type: "keyword" },
   project_id: { type: "keyword" },
   check_type: { type: "keyword" },
-  check_name: { type: "text" },
+  check_name: { type: "keyword" },
   status: { type: "keyword" },
   raw_result: { type: "object", enabled: false },
   value: { type: "float" },
@@ -199,9 +205,10 @@ const traceChecksMapping: ElasticSearchMappingFrom<TraceCheck> = {
 const eventsMapping: ElasticSearchMappingFrom<ElasticSearchEvent> = {
   event_id: { type: "keyword" },
   project_id: { type: "keyword" },
-  event_type: { type: "text" },
+  event_type: { type: "keyword" },
   metrics: {
     type: "nested",
+    include_in_parent: true,
     properties: {
       key: { type: "keyword" },
       value: { type: "float" },
@@ -209,9 +216,10 @@ const eventsMapping: ElasticSearchMappingFrom<ElasticSearchEvent> = {
   },
   event_details: {
     type: "nested",
+    include_in_parent: true,
     properties: {
       key: { type: "keyword" },
-      value: { type: "text" },
+      value: { type: "keyword" },
     },
   },
   timestamps: {
@@ -232,6 +240,267 @@ const eventsMapping: ElasticSearchMappingFrom<ElasticSearchEvent> = {
     },
   },
 };
+
+const tracesPivotMapping = {
+  trace: {
+    properties: {
+      ...(omit(
+        traceMapping,
+        "input",
+        "output",
+        "search_embeddings",
+        "error",
+        "indexing_md5s"
+      ) as Record<string, MappingProperty>),
+      input: { properties: { satisfaction_score: { type: "float" } } },
+      has_error: {
+        type: "boolean",
+      },
+    } as Record<string, MappingProperty>,
+  },
+  spans: {
+    type: "nested",
+    properties: {
+      ...(omit(
+        spanMapping,
+        "name",
+        "input",
+        "outputs",
+        "error",
+        "raw_response",
+        "params",
+        "contexts"
+      ) as Record<string, MappingProperty>),
+      has_error: {
+        type: "boolean",
+      },
+      params: {
+        properties: {
+          temperature: { type: "float" },
+          stream: { type: "boolean" },
+        },
+      },
+    } as Record<string, MappingProperty>,
+  },
+  contexts: {
+    type: "nested",
+    properties: {
+      document_id: { type: "keyword" },
+      chunk_id: { type: "keyword" },
+    } as Record<string, MappingProperty>,
+  },
+  trace_checks: {
+    type: "nested",
+    properties: {
+      ...(omit(
+        traceChecksMapping,
+        "raw_result",
+        "error",
+        "trace_metadata"
+      ) as Record<string, MappingProperty>),
+      has_error: {
+        type: "boolean",
+      },
+    } as Record<string, MappingProperty>,
+  },
+  events: {
+    type: "nested",
+    properties: {
+      ...(omit(
+        eventsMapping,
+        "trace_metadata",
+        "metrics",
+        "event_details"
+      ) as Record<string, MappingProperty>),
+      metrics: {
+        ...omit(eventsMapping.metrics, "include_in_parent"),
+      },
+      event_details: {
+        ...omit(eventsMapping.event_details, "include_in_parent"),
+      },
+    } as Record<string, MappingProperty>,
+  },
+};
+
+async function createPivotTableTransform() {
+  const getCopyScript = (
+    mapping: Record<string, MappingProperty>,
+    stateKey: string,
+    namespacePrefix = "",
+    parents: string[] = []
+  ) => {
+    let copyScript = "";
+    for (const [key, value] of Object.entries(mapping)) {
+      if ("properties" in value && value.properties) {
+        copyScript += getCopyScript(
+          value.properties,
+          stateKey,
+          namespacePrefix,
+          [...parents, key]
+        );
+      } else if (key == "has_error") {
+        copyScript += `
+          if (doc.containsKey('error') && !doc['error'].empty) {
+            ${stateKey}.put('has_error', true);
+          }
+        `;
+      } else {
+        const keyPath = [...parents, key].join(".");
+        copyScript += `
+          if (doc.containsKey('${namespacePrefix}${keyPath}') && !doc['${namespacePrefix}${keyPath}'].empty) {
+            ${stateKey}.put('${keyPath}', doc['${namespacePrefix}${keyPath}'].value);
+          }
+        `;
+      }
+    }
+
+    return copyScript;
+  };
+
+  const { trace, spans, contexts, trace_checks, events } = tracesPivotMapping;
+
+  const traceMappingScript = getCopyScript(trace.properties, "state.trace");
+  const spansMappingScript = getCopyScript(spans.properties, "span");
+  const contextsMappingScript = getCopyScript(
+    contexts.properties,
+    "context",
+    "contexts."
+  );
+  const traceChecksMappingScript = getCopyScript(
+    trace_checks.properties,
+    "trace_check"
+  );
+  const eventsMappingScript = getCopyScript(events.properties, "event");
+
+  const reduceListScript = `
+    List all = new ArrayList();
+    for (state in states) {
+      all.addAll(state);
+    }
+    return all;
+  `;
+
+  try {
+    const transform = await esClient.transform.getTransform({
+      transform_id: TRACES_PIVOT_TRANSFORM,
+    });
+    if (transform) {
+      console.log(TRACES_PIVOT_TRANSFORM, "already exists, skipping");
+      return;
+    }
+  } catch {}
+
+  await esClient.transform.putTransform({
+    transform_id: TRACES_PIVOT_TRANSFORM,
+    body: {
+      source: {
+        index: [TRACE_INDEX, SPAN_INDEX, TRACE_CHECKS_INDEX, EVENTS_INDEX],
+      },
+      dest: {
+        index: TRACES_PIVOT_INDEX,
+      },
+      pivot: {
+        group_by: {
+          project_trace_id: {
+            terms: {
+              script: {
+                source: "doc['project_id'].value + '/' + doc['trace_id'].value",
+              },
+            },
+          },
+        },
+        aggregations: {
+          trace: {
+            scripted_metric: {
+              init_script: "state.trace = new HashMap();",
+              map_script: `
+                  if (doc['_index'].value == '${TRACE_INDEX}') {
+                    ${traceMappingScript}
+                  }
+                `,
+              combine_script: "return state.trace;",
+              reduce_script: `
+                  Map result = new HashMap();
+                  for (state in states) {
+                    result.putAll(state);
+                  }
+                  return result;
+                `,
+            },
+          },
+          spans: {
+            scripted_metric: {
+              init_script: "state.spans = new ArrayList();",
+              map_script: `
+                  if (doc['_index'].value == '${SPAN_INDEX}') {
+                    Map span = new HashMap();
+                    ${spansMappingScript}
+                    state.spans.add(span);
+                  }
+                `,
+              combine_script: "return state.spans;",
+              reduce_script: reduceListScript,
+            },
+          },
+          contexts: {
+            scripted_metric: {
+              init_script: "state.contexts = new ArrayList();",
+              map_script: `
+                      if (doc['_index'].value == '${SPAN_INDEX}') {
+                        Map context = new HashMap();
+                        ${contextsMappingScript}
+                        if (!context.empty) {
+                          state.contexts.add(context);
+                        }
+                      }
+                    `,
+              combine_script: "return state.contexts;",
+              reduce_script: reduceListScript,
+            },
+          },
+          trace_checks: {
+            scripted_metric: {
+              init_script: "state.trace_checks = new ArrayList();",
+              map_script: `
+                  if (doc['_index'].value == '${TRACE_CHECKS_INDEX}') {
+                    Map trace_check = new HashMap();
+                    ${traceChecksMappingScript}
+                    state.trace_checks.add(trace_check);
+                  }
+                `,
+              combine_script: "return state.trace_checks;",
+              reduce_script: reduceListScript,
+            },
+          },
+          events: {
+            scripted_metric: {
+              init_script: "state.events = new ArrayList();",
+              map_script: `
+                  if (doc['_index'].value == '${EVENTS_INDEX}') {
+                    Map event = new HashMap();
+                    ${eventsMappingScript}
+                    state.events.add(event);
+                  }
+                `,
+              combine_script: "return state.events;",
+              reduce_script: reduceListScript,
+            },
+          },
+        },
+      },
+      sync: {
+        time: {
+          field: "timestamps.updated_at",
+          delay: "60s",
+        },
+      },
+    },
+  });
+
+  await esClient.transform.startTransform({
+    transform_id: TRACES_PIVOT_TRANSFORM,
+  });
+}
 
 export const createIndexes = async () => {
   const spanExists = await esClient.indices.exists({ index: SPAN_INDEX });
@@ -287,6 +556,24 @@ export const createIndexes = async () => {
     index: EVENTS_INDEX,
     properties: eventsMapping as Record<string, MappingProperty>,
   });
+
+  const tracesPivotExists = await esClient.indices.exists({
+    index: TRACES_PIVOT_INDEX,
+  });
+  if (!tracesPivotExists) {
+    await esClient.indices.create({
+      index: TRACES_PIVOT_INDEX,
+      mappings: {
+        properties: tracesPivotMapping as Record<string, MappingProperty>,
+      },
+    });
+  }
+  await esClient.indices.putMapping({
+    index: TRACES_PIVOT_INDEX,
+    properties: tracesPivotMapping as Record<string, MappingProperty>,
+  });
+
+  await createPivotTableTransform();
 };
 
 export default async function execute() {
