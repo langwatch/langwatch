@@ -4,6 +4,7 @@ import {
   TRACE_CHECKS_INDEX,
   TRACE_INDEX,
   esClient,
+  traceIndexId,
 } from "../server/elasticsearch";
 
 const migrateIndex = async (index: string) => {
@@ -15,7 +16,7 @@ const migrateIndex = async (index: string) => {
     response = await esClient.search({
       index,
       _source: {
-        includes: ["timestamps"],
+        includes: ["timestamps", "trace_id", "project_id"],
       },
       body: {
         query: {
@@ -36,19 +37,30 @@ const migrateIndex = async (index: string) => {
     const records = response.hits.hits;
     results = results.concat(records);
     searchAfter = records[records.length - 1]?.sort;
-    process.stdout.write(
-      `\rFetched ${results.length} hits`
-    );
+    process.stdout.write(`\rFetched ${results.length} hits`);
   } while (response.hits.hits.length > 0);
 
   let bulkActions = [];
   for (let i = 0; i < results.length; i++) {
     const hit = results[i];
     if (!hit) continue;
-    const trace = hit._source;
-    if (!trace) continue;
+    const item = hit._source;
+    if (!item) continue;
 
-    bulkActions.push({ update: { _index: index, _id: hit._id } });
+    bulkActions.push({
+      update: {
+        _index: index,
+        _id: hit._id,
+        ...(index === SPAN_INDEX && item.trace_id && item.project_id
+          ? {
+              routing: traceIndexId({
+                traceId: item.trace_id,
+                projectId: item.project_id,
+              }),
+            }
+          : {}),
+      },
+    });
 
     bulkActions.push({
       script: {
