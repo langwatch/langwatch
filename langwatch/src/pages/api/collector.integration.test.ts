@@ -74,7 +74,7 @@ describe("Collector API Endpoint", () => {
         user_id: "user_test-user_1",
         customer_id: "customer_test-customer_1",
         labels: ["test-label-1.0.0"],
-      }
+      },
     };
 
     const { req, res }: { req: NextApiRequest; res: NextApiResponse } =
@@ -113,6 +113,10 @@ describe("Collector API Endpoint", () => {
           value: '"world"',
         },
       ],
+      timestamps: {
+        ...sampleSpan.timestamps,
+        inserted_at: expect.any(Number),
+      },
       project_id: project?.id,
       raw_response: null,
     });
@@ -128,6 +132,12 @@ describe("Collector API Endpoint", () => {
     expect(indexedTrace).toEqual({
       trace_id: sampleSpan.trace_id,
       project_id: project?.id,
+      metadata: {
+        thread_id: "thread_test-thread_1",
+        user_id: "user_test-user_1",
+        customer_id: "customer_test-customer_1",
+        labels: ["test-label-1.0.0"],
+      },
       timestamps: {
         started_at: expect.any(Number),
         inserted_at: expect.any(Number),
@@ -153,11 +163,7 @@ describe("Collector API Endpoint", () => {
         tokens_estimated: true,
       },
       error: null,
-      thread_id: "thread_test-thread_1",
-      user_id: "user_test-user_1",
-      customer_id: "customer_test-customer_1",
-      labels: ["test-label-1.0.0"],
-      indexing_md5s: ["702375442be05a005a7dffc756bdf10b"],
+      indexing_md5s: ["9e7f36289d01caa77b81fdab403bb28b"],
     });
   });
 

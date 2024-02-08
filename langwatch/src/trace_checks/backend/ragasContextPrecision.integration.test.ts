@@ -25,7 +25,7 @@ describe("RagasContextPrecision Integration", () => {
         input: { type: "text", value: "What is the capital of France?" },
         outputs: [{ type: "text", value: "The capital of France is Paris." }],
         project_id: "integration-test",
-        timestamps: { started_at: Date.now(), finished_at: Date.now() },
+        timestamps: { inserted_at: Date.now(), started_at: Date.now(), finished_at: Date.now() },
         contexts: [
           { document_id: "context-0", content: "France is a country in Europe." },
           { document_id: "context-1", content: "Paris is a city in France." },

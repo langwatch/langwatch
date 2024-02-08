@@ -153,6 +153,7 @@ export type ElasticSearchSpan = Omit<
   input?: ElasticSearchInputOutput | null;
   outputs: ElasticSearchInputOutput[];
   raw_response?: string | null;
+  timestamps: SpanTimestamps & { inserted_at: number };
 };
 
 export type TraceInput = {

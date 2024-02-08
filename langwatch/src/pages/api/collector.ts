@@ -192,6 +192,10 @@ export default async function handler(
     input: span.input ? typedValueToElasticSearch(span.input) : null,
     outputs: span.outputs.map(typedValueToElasticSearch),
     project_id: project.id,
+    timestamps: {
+      ...span.timestamps,
+      inserted_at: Date.now(),
+    },
     // TODO: test
     raw_response:
       "raw_response" in span && span.raw_response

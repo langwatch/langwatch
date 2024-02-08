@@ -125,6 +125,7 @@ const spanMapping: ElasticSearchMappingFrom<ElasticSearchSpan> = {
   },
   timestamps: {
     properties: {
+      inserted_at: { type: "date" },
       started_at: { type: "date" },
       first_token_at: { type: "date" },
       finished_at: { type: "date" },
