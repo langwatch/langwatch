@@ -8,10 +8,10 @@ import {
   esClient,
 } from "../server/elasticsearch";
 import {
-  type Trace,
   type ElasticSearchSpan,
   type TraceCheck,
   type ElasticSearchEvent,
+  type ElasticSearchTrace,
 } from "../server/tracer/types";
 
 type ElasticSearchMappingFrom<T> = {
@@ -21,7 +21,7 @@ type ElasticSearchMappingFrom<T> = {
     | { type: "nested"; properties: Record<string, MappingProperty> };
 };
 
-const traceMapping: ElasticSearchMappingFrom<Trace> = {
+const traceMapping: ElasticSearchMappingFrom<ElasticSearchTrace> = {
   trace_id: { type: "keyword" },
   project_id: { type: "keyword" },
   metadata: {
@@ -37,6 +37,7 @@ const traceMapping: ElasticSearchMappingFrom<Trace> = {
     properties: {
       started_at: { type: "date" },
       inserted_at: { type: "date" },
+      updated_at: { type: "date" },
     },
   },
   input: {
@@ -129,6 +130,7 @@ const spanMapping: ElasticSearchMappingFrom<ElasticSearchSpan> = {
       started_at: { type: "date" },
       first_token_at: { type: "date" },
       finished_at: { type: "date" },
+      updated_at: { type: "date" },
     },
   },
   vendor: { type: "keyword" },
@@ -180,6 +182,7 @@ const traceChecksMapping: ElasticSearchMappingFrom<TraceCheck> = {
       started_at: { type: "date" },
       finished_at: { type: "date" },
       inserted_at: { type: "date" },
+      updated_at: { type: "date" },
     },
   },
   trace_metadata: {
@@ -215,6 +218,7 @@ const eventsMapping: ElasticSearchMappingFrom<ElasticSearchEvent> = {
     properties: {
       started_at: { type: "date" },
       inserted_at: { type: "date" },
+      updated_at: { type: "date" },
     },
   },
   trace_id: { type: "keyword" }, // optional, later we will have events on thread or user level

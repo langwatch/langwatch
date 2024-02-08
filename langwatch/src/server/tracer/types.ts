@@ -153,7 +153,7 @@ export type ElasticSearchSpan = Omit<
   input?: ElasticSearchInputOutput | null;
   outputs: ElasticSearchInputOutput[];
   raw_response?: string | null;
-  timestamps: SpanTimestamps & { inserted_at: number };
+  timestamps: SpanTimestamps & { inserted_at: number; updated_at: number };
 };
 
 export type TraceInput = {
@@ -192,6 +192,12 @@ export type Trace = {
   indexing_md5s?: string[];
 };
 
+export type ElasticSearchTrace = Trace & {
+  timestamps: Trace["timestamps"] & {
+    updated_at: number;
+  };
+};
+
 export type TraceCheck = {
   trace_id: string;
   check_id: string;
@@ -207,6 +213,7 @@ export type TraceCheck = {
     inserted_at?: number;
     started_at?: number;
     finished_at?: number;
+    updated_at: number;
   };
   trace_metadata: {
     thread_id?: string;
@@ -252,7 +259,7 @@ export type Event = {
     labels?: string[];
     topics?: string[];
   };
-  timestamps: { started_at: number; inserted_at: number };
+  timestamps: { started_at: number; inserted_at: number; updated_at: number };
 };
 
 export type ElasticSearchEvent = Omit<Event, "metrics" | "event_details"> & {

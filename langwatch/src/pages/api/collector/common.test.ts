@@ -21,14 +21,14 @@ describe("Span organizing and flattening tests", () => {
       ...commonSpanProps,
       span_id: "1",
       parent_id: null,
-      timestamps: { inserted_at: 100, started_at: 100, finished_at: 500 },
+      timestamps: { started_at: 100, finished_at: 500 },
       input: { type: "text", value: "topmost input" },
     },
     {
       ...commonSpanProps,
       span_id: "2",
       parent_id: null,
-      timestamps: { inserted_at: 100, started_at: 200, finished_at: 600 },
+      timestamps: { started_at: 200, finished_at: 600 },
       outputs: [{ type: "text", value: "bottommost output" }],
     },
 
@@ -37,13 +37,13 @@ describe("Span organizing and flattening tests", () => {
       ...commonSpanProps,
       span_id: "1-2",
       parent_id: "1",
-      timestamps: { inserted_at: 100, started_at: 300, finished_at: 700 },
+      timestamps: { started_at: 300, finished_at: 700 },
     },
     {
       ...commonSpanProps,
       span_id: "1-1",
       parent_id: "1",
-      timestamps: { inserted_at: 100, started_at: 150, finished_at: 450 },
+      timestamps: { started_at: 150, finished_at: 450 },
     },
 
     // Children of span 2
@@ -51,7 +51,7 @@ describe("Span organizing and flattening tests", () => {
       ...commonSpanProps,
       span_id: "2-1",
       parent_id: "2",
-      timestamps: { inserted_at: 100, started_at: 250, finished_at: 550 },
+      timestamps: { started_at: 250, finished_at: 550 },
     },
 
     // Child of span 1-2 (nested child)
@@ -59,7 +59,7 @@ describe("Span organizing and flattening tests", () => {
       ...commonSpanProps,
       span_id: "1-2-1",
       parent_id: "1-2",
-      timestamps: { inserted_at: 100, started_at: 350, finished_at: 375 },
+      timestamps: { started_at: 350, finished_at: 375 },
     },
   ];
 

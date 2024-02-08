@@ -13,6 +13,7 @@ import {
   type CollectorRESTParamsValidator,
   type ElasticSearchInputOutput,
   type ElasticSearchSpan,
+  type ElasticSearchTrace,
   type ErrorCapture,
   type Span,
   type SpanInput,
@@ -195,6 +196,7 @@ export default async function handler(
     timestamps: {
       ...span.timestamps,
       inserted_at: Date.now(),
+      updated_at: Date.now(),
     },
     // TODO: test
     raw_response:
@@ -219,7 +221,7 @@ export default async function handler(
     value === null ? undefined : value;
 
   // Create the trace
-  const trace: Trace = {
+  const trace: ElasticSearchTrace = {
     trace_id: traceId,
     project_id: project.id,
     metadata: {
@@ -231,6 +233,7 @@ export default async function handler(
     timestamps: {
       started_at: Math.min(...spans.map((span) => span.timestamps.started_at)),
       inserted_at: Date.now(),
+      updated_at: Date.now(),
     },
     input,
     output,

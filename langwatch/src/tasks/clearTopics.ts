@@ -41,7 +41,12 @@ export default async function execute() {
           }),
         },
       },
-      { doc: { topics: null } },
+      {
+        doc: {
+          metadata: { topics: null },
+          timestamps: { updated_at: Date.now() },
+        },
+      },
     ]);
 
     process.stdout.write(`\r${i + 1}/${totalRecords} records to be updated`);

@@ -118,6 +118,7 @@ export const updateCheckStatusInES = async ({
       ...((status == "succeeded" || status == "failed") && {
         finished_at: Date.now(),
       }),
+      updated_at: Date.now(),
     },
   };
 

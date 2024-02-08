@@ -57,6 +57,7 @@ export default async function execute() {
             ? { "output.openai_embeddings": outputEmbeddings }
             : {}),
           "search_embeddings.openai_embeddings": searchEmbeddings,
+          "timestamp.updated_at": Date.now(),
         },
       },
     });

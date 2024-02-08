@@ -44,6 +44,7 @@ export const startTrackEventsWorker = () => {
         timestamps: {
           started_at: job.data.event.timestamp,
           inserted_at: Date.now(),
+          updated_at: Date.now(),
         },
         trace_metadata: {}
       };

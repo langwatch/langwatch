@@ -1,5 +1,5 @@
 import { env } from "../../env.mjs";
-import type { Trace } from "../tracer/types";
+import type { ElasticSearchTrace, Trace } from "../tracer/types";
 import { TRACE_INDEX, esClient } from "../elasticsearch";
 import { getDebugger } from "../../utils/logger";
 import type { Money } from "../../utils/types";
@@ -158,7 +158,12 @@ export const clusterTraces = async (projectId: string, traces: Trace[]) => {
   );
   const body = Object.entries(topics).flatMap(([traceId, topic]) => [
     { update: { _id: traceId } },
-    { doc: { metadata: { topics: [topic] } } },
+    {
+      doc: {
+        metadata: { topics: [topic] },
+        timestamps: { updated_at: Date.now() },
+      } as Partial<ElasticSearchTrace>,
+    },
   ]);
 
   if (body.length > 0) {
