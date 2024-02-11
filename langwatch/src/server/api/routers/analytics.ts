@@ -36,8 +36,10 @@ import { satisfactionVsPreviousPeriod } from "./analytics/satisfaction";
 import { topUsedDocuments } from "./analytics/documents";
 import { thumbsUpDownVsPreviousPeriod } from "./analytics/thumbsUpDown";
 import type { TraceCheck } from "../../tracer/types";
+import { getTimeseries } from "./analytics/timeseries";
 
 export const analyticsRouter = createTRPCRouter({
+  getTimeseries,
   messagesCountVsPreviousPeriod,
   messagesCountAggregated,
   threadsCountVsPreviousPeriod,

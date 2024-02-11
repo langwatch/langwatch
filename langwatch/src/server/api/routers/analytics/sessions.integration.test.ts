@@ -105,6 +105,19 @@ describe("Sessions Endpoint Integration Tests", () => {
     });
   });
 
+  afterAll(async () => {
+    await esClient.deleteByQuery({
+      index: TRACE_INDEX,
+      body: {
+        query: {
+          terms: {
+            "metadata.labels": ["test-messages"],
+          },
+        },
+      },
+    });
+  });
+
   it("get sessions per user from previous vs current period", async () => {
     const user = await getTestUser();
 
@@ -141,19 +154,6 @@ describe("Sessions Endpoint Integration Tests", () => {
         average_duration_per_user_session: 0,
         bouncing_users_count: 0,
         returning_users_count: 0,
-      },
-    });
-  });
-
-  afterAll(async () => {
-    await esClient.deleteByQuery({
-      index: TRACE_INDEX,
-      body: {
-        query: {
-          terms: {
-            labels: ["test-messages"],
-          },
-        },
       },
     });
   });
