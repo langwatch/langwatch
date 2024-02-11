@@ -1,7 +1,4 @@
-import type {
-  AggregationsAggregationContainer,
-  QueryDslBoolQuery,
-} from "@elastic/elasticsearch/lib/api/types";
+import type { AggregationsAggregationContainer } from "@elastic/elasticsearch/lib/api/types";
 import { z } from "zod";
 import type {
   ElasticSearchSpan,
@@ -12,7 +9,7 @@ import type {
 import type { DeepRequired } from "../../utils/types";
 
 export type AnalyticsMetric = {
-  name: string;
+  label: string;
   allowedAggregations: AggregationTypes[];
   aggregation: (
     aggregation: AggregationTypes
@@ -21,7 +18,7 @@ export type AnalyticsMetric = {
 };
 
 export type AnalyticsGroup = {
-  name: string;
+  label: string;
   aggregation: () => AggregationsAggregationContainer;
 };
 

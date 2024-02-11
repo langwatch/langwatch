@@ -3,30 +3,16 @@ import type {
   QueryDslBoolQuery,
   QueryDslQueryContainer,
 } from "@elastic/elasticsearch/lib/api/types";
-import { z } from "zod";
+import { type z } from "zod";
+import { getGroup, getMetric } from "~/server/analytics/registry";
 import {
-  analyticsMetrics,
-  flattenAnalyticsMetricsEnum,
-  type AnalyticsMetricsGroupsEnum,
-  type FlattenAnalyticsMetricsEnum,
   pipelineAggregationsToElasticSearch,
-  pipelineFields,
-  flattenAnalyticsGroupsEnum,
+  analyticsPipelines,
   type FlattenAnalyticsGroupsEnum,
-  analyticsGroups,
-  type AnalyticsGroupsGroupsEnum,
+  timeseriesInput,
+  type SeriesInputType,
 } from "../../../analytics/registry";
-import {
-  aggregationTypesEnum,
-  sharedFiltersInputSchema,
-  type AnalyticsMetric,
-  pipelineFieldsEnum,
-  pipelineAggregationTypesEnum,
-  type PipelineAggregationTypes,
-  type PipelineFields,
-  type AggregationTypes,
-  type AnalyticsGroup,
-} from "../../../analytics/types";
+import { sharedFiltersInputSchema } from "../../../analytics/types";
 import { TRACES_PIVOT_INDEX, esClient } from "../../../elasticsearch";
 import { TeamRoleGroup, checkUserPermissionForProject } from "../../permission";
 import { protectedProcedure } from "../../trpc";
@@ -71,46 +57,8 @@ export const generateTracesPivotQueryConditions = ({
   ];
 };
 
-export const getMetric = (
-  groupMetric: FlattenAnalyticsMetricsEnum
-): AnalyticsMetric => {
-  const [group, metric_] = groupMetric.split(".") as [
-    AnalyticsMetricsGroupsEnum,
-    string,
-  ];
-  return (analyticsMetrics[group] as any)[metric_];
-};
-
-export const getGroup = (
-  groupMetric: FlattenAnalyticsGroupsEnum
-): AnalyticsGroup => {
-  const [group, field] = groupMetric.split(".") as [
-    AnalyticsGroupsGroupsEnum,
-    string,
-  ];
-  return (analyticsGroups[group] as any)[field];
-};
-
-const metricInput = z.object({
-  metric: z.enum(flattenAnalyticsMetricsEnum),
-  aggregation: aggregationTypesEnum,
-  pipeline: z.optional(
-    z.object({
-      field: pipelineFieldsEnum,
-      aggregation: pipelineAggregationTypesEnum,
-    })
-  ),
-});
-
-type MetricInputType = z.infer<typeof metricInput>;
-
 export const getTimeseries = protectedProcedure
-  .input(
-    sharedFiltersInputSchema.extend({
-      metrics: z.array(metricInput),
-      groupBy: z.optional(z.enum(flattenAnalyticsGroupsEnum)),
-    })
-  )
+  .input(sharedFiltersInputSchema.extend(timeseriesInput.shape))
   .use(checkUserPermissionForProject(TeamRoleGroup.ANALYTICS_VIEW))
   .query(async ({ input }) => {
     const { previousPeriodStartDate, endDate, daysDifference } =
@@ -123,7 +71,7 @@ export const getTimeseries = protectedProcedure
     ) as any;
 
     let aggs = Object.fromEntries(
-      input.metrics.flatMap(({ metric, aggregation, pipeline }) => {
+      input.series.flatMap(({ metric, aggregation, pipeline }) => {
         const metric_ = getMetric(metric);
 
         const metricAggregations = metric_.aggregation(aggregation);
@@ -138,7 +86,7 @@ export const getTimeseries = protectedProcedure
           aggregationQuery = {
             [pipelineBucketsPath]: {
               terms: {
-                field: pipelineFields[pipeline.field],
+                field: analyticsPipelines[pipeline.field].field,
                 size: 10000,
               },
               aggs: aggregationQuery,
@@ -185,7 +133,10 @@ export const getTimeseries = protectedProcedure
 
     const aggregations: ({ date: string } & (
       | Record<string, number>
-      | Record<FlattenAnalyticsGroupsEnum, Record<string, number>[]>
+      | Record<
+          FlattenAnalyticsGroupsEnum,
+          Record<string, Record<string, number>>
+        >
     ))[] = (result.aggregations?.traces_per_day as any)?.buckets.map(
       (day_bucket: any) => {
         let aggregationResult: Record<string, any> = {
@@ -193,15 +144,13 @@ export const getTimeseries = protectedProcedure
         };
 
         if (input.groupBy) {
-          const groupResult = day_bucket[input.groupBy].buckets.map(
-            (group_bucket: any) => {
-              return {
-                [group_bucket.key]: extractResultForBucket(
-                  input.metrics,
-                  group_bucket
-                ),
-              };
-            }
+          const groupResult = Object.fromEntries(
+            day_bucket[input.groupBy].buckets.map((group_bucket: any) => {
+              return [
+                group_bucket.key,
+                extractResultForBucket(input.series, group_bucket),
+              ];
+            })
           );
           aggregationResult = {
             ...aggregationResult,
@@ -210,7 +159,7 @@ export const getTimeseries = protectedProcedure
         } else {
           aggregationResult = {
             ...aggregationResult,
-            ...extractResultForBucket(input.metrics, day_bucket),
+            ...extractResultForBucket(input.series, day_bucket),
           };
         }
 
@@ -227,18 +176,16 @@ export const getTimeseries = protectedProcedure
     };
   });
 
-const extractResultForBucket = (metrics: MetricInputType[], bucket: any) => {
+const extractResultForBucket = (seriesList: SeriesInputType[], bucket: any) => {
   return Object.fromEntries(
-    metrics.flatMap((metric) => {
-      return Object.entries(
-        extractResult(metric, bucket)
-      );
+    seriesList.flatMap((series) => {
+      return Object.entries(extractResult(series, bucket));
     })
   );
 };
 
 const extractResult = (
-  { metric, aggregation, pipeline }: MetricInputType,
+  { metric, aggregation, pipeline }: SeriesInputType,
   result: any
 ) => {
   const metric_ = getMetric(metric);
@@ -256,7 +203,7 @@ const extractResult = (
 };
 
 const pipelinePath = (
-  metric: MetricInputType["metric"],
-  aggregation: MetricInputType["aggregation"],
-  pipeline: Required<MetricInputType>["pipeline"]
+  metric: SeriesInputType["metric"],
+  aggregation: SeriesInputType["aggregation"],
+  pipeline: Required<SeriesInputType>["pipeline"]
 ) => `${metric}/${aggregation}/${pipeline.field}/${pipeline.aggregation}`;

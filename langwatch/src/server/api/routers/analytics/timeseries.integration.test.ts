@@ -185,7 +185,7 @@ describe("Timeseries Graph Integration Tests", () => {
           labels: ["test-messages"],
         },
       },
-      metrics: [
+      series: [
         { metric: "volume.trace_id", aggregation: "cardinality" },
         {
           metric: "volume.trace_id",
@@ -233,7 +233,7 @@ describe("Timeseries Graph Integration Tests", () => {
           labels: ["test-messages"],
         },
       },
-      metrics: [
+      series: [
         { metric: "volume.trace_id", aggregation: "cardinality" },
         {
           metric: "volume.trace_id",
@@ -253,28 +253,24 @@ describe("Timeseries Graph Integration Tests", () => {
 
     expect(response.currentPeriod[1]).toEqual({
       date: expect.any(String),
-      "topics.topics": [
-        {
-          greetings: {
-            "volume.trace_id/cardinality": 2,
-            "volume.trace_id/cardinality/user_id/avg": 1,
-            "volume.thread_id/cardinality": 2,
-            "sentiment.thumbs_up_down/cardinality": 2,
-            "sentiment.thumbs_up_down/sum": 0,
-            "sentiment.thumbs_up_down/min": -1,
-          },
+      "topics.topics": {
+        greetings: {
+          "volume.trace_id/cardinality": 2,
+          "volume.trace_id/cardinality/user_id/avg": 1,
+          "volume.thread_id/cardinality": 2,
+          "sentiment.thumbs_up_down/cardinality": 2,
+          "sentiment.thumbs_up_down/sum": 0,
+          "sentiment.thumbs_up_down/min": -1,
         },
-        {
-          poems: {
-            "volume.trace_id/cardinality": 1,
-            "volume.trace_id/cardinality/user_id/avg": 1,
-            "volume.thread_id/cardinality": 1,
-            "sentiment.thumbs_up_down/cardinality": 1,
-            "sentiment.thumbs_up_down/sum": 1,
-            "sentiment.thumbs_up_down/min": 1,
-          },
+        poems: {
+          "volume.trace_id/cardinality": 1,
+          "volume.trace_id/cardinality/user_id/avg": 1,
+          "volume.thread_id/cardinality": 1,
+          "sentiment.thumbs_up_down/cardinality": 1,
+          "sentiment.thumbs_up_down/sum": 1,
+          "sentiment.thumbs_up_down/min": 1,
         },
-      ],
+      },
     });
   });
 });

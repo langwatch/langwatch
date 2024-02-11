@@ -1,3 +1,4 @@
+import { z } from "zod";
 import {
   allAggregationTypes,
   type AggregationTypes,
@@ -7,11 +8,14 @@ import {
   type PipelineFields,
   type PipelineAggregationTypes,
   type AnalyticsGroup,
+  aggregationTypesEnum,
+  pipelineAggregationTypesEnum,
+  pipelineFieldsEnum,
 } from "./types";
 
 const simpleFieldAnalytics = (
   field: string
-): Omit<AnalyticsMetric, "name" | "allowedAggregations"> => ({
+): Omit<AnalyticsMetric, "label" | "allowedAggregations"> => ({
   aggregation: (aggregation: AggregationTypes) => ({
     [`${field.replaceAll(".", "_")}_${aggregation}`]: {
       [aggregation]: { field },
@@ -24,29 +28,29 @@ const simpleFieldAnalytics = (
 export const analyticsMetrics = {
   volume: {
     trace_id: {
-      name: "Messages",
+      label: "Messages",
       allowedAggregations: ["cardinality"],
       ...simpleFieldAnalytics("trace.trace_id"),
     },
     user_id: {
-      name: "Users",
+      label: "Users",
       allowedAggregations: ["cardinality"],
       ...simpleFieldAnalytics("trace.metadata.user_id"),
     },
     thread_id: {
-      name: "Threads",
+      label: "Threads",
       allowedAggregations: ["cardinality"],
       ...simpleFieldAnalytics("trace.metadata.thread_id"),
     },
   },
   sentiment: {
     input_sentiment: {
-      name: "Input Sentiment",
+      label: "Input Sentiment Score",
       allowedAggregations: allAggregationTypes,
       ...simpleFieldAnalytics("trace.input.satisfaction_score"),
     },
     thumbs_up_down: {
-      name: "Thumbs Up/Down",
+      label: "Thumbs Up/Down Score",
       allowedAggregations: allAggregationTypes,
       aggregation: (aggregation) => ({
         [`thumbs_up_down_${aggregation}`]: {
@@ -154,11 +158,25 @@ export const tracesPivotFilterQueries: {
   },
 };
 
-export const pipelineFields: { [K in PipelineFields]: string } = {
-  trace_id: "trace.trace_id",
-  user_id: "trace.metadata.user_id",
-  thread_id: "trace.metadata.thread_id",
-  customer_id: "trace.metadata.customer_id",
+export const analyticsPipelines: {
+  [K in PipelineFields]: { label: string; field: string };
+} = {
+  trace_id: {
+    label: "per message",
+    field: "trace.trace_id",
+  },
+  user_id: {
+    label: "per user",
+    field: "trace.metadata.user_id",
+  },
+  thread_id: {
+    label: "per thread",
+    field: "trace.metadata.thread_id",
+  },
+  customer_id: {
+    label: "per customer",
+    field: "trace.metadata.customer_id",
+  },
 };
 
 export const pipelineAggregationsToElasticSearch: {
@@ -171,32 +189,48 @@ export const pipelineAggregationsToElasticSearch: {
   cumulative_sum: "cumulative_sum",
 };
 
+export const pipelineAggregations: Record<PipelineAggregationTypes, string> = {
+  avg: "average",
+  sum: "sum",
+  min: "minimum",
+  max: "maximum",
+  cumulative_sum: "cumulative sum",
+};
+
+export const metricAggregations: Record<AggregationTypes, string> = {
+  cardinality: "count",
+  avg: "average",
+  sum: "sum",
+  min: "minimum",
+  max: "maximum",
+};
+
 const simpleFieldGroupping = (name: string, field: string): AnalyticsGroup => ({
-  name,
+  label: name,
   aggregation: () => ({
     terms: {
       field: field,
       size: 100,
-      missing: `unknown ${name}`,
+      missing: "unknown",
     },
   }),
 });
 
 export const analyticsGroups = {
   topics: {
-    topics: simpleFieldGroupping("Topics", "trace.metadata.topics"),
+    topics: simpleFieldGroupping("Topic", "trace.metadata.topics"),
   },
   metadata: {
-    user_id: simpleFieldGroupping("Users", "trace.metadata.user_id"),
+    user_id: simpleFieldGroupping("User", "trace.metadata.user_id"),
 
-    thread_id: simpleFieldGroupping("Threads", "trace.metadata.thread_id"),
+    thread_id: simpleFieldGroupping("Thread", "trace.metadata.thread_id"),
 
     customer_id: simpleFieldGroupping(
       "Customer ID",
       "trace.metadata.customer_id"
     ),
 
-    labels: simpleFieldGroupping("Labels", "trace.metadata.labels"),
+    labels: simpleFieldGroupping("Label", "trace.metadata.labels"),
   },
 } satisfies Record<string, Record<string, AnalyticsGroup>>;
 
@@ -213,3 +247,41 @@ export const flattenAnalyticsGroupsEnum = Object.keys(analyticsGroups).flatMap(
       (subkey) => [key, subkey].join(".")
     )
 ) as [FlattenAnalyticsGroupsEnum, ...FlattenAnalyticsGroupsEnum[]];
+
+export const getMetric = (
+  groupMetric: FlattenAnalyticsMetricsEnum
+): AnalyticsMetric => {
+  const [group, metric_] = groupMetric.split(".") as [
+    AnalyticsMetricsGroupsEnum,
+    string,
+  ];
+  return (analyticsMetrics[group] as any)[metric_];
+};
+
+export const getGroup = (
+  groupMetric: FlattenAnalyticsGroupsEnum
+): AnalyticsGroup => {
+  const [group, field] = groupMetric.split(".") as [
+    AnalyticsGroupsGroupsEnum,
+    string,
+  ];
+  return (analyticsGroups[group] as any)[field];
+};
+
+export const seriesInput = z.object({
+  metric: z.enum(flattenAnalyticsMetricsEnum),
+  aggregation: aggregationTypesEnum,
+  pipeline: z.optional(
+    z.object({
+      field: pipelineFieldsEnum,
+      aggregation: pipelineAggregationTypesEnum,
+    })
+  ),
+});
+
+export type SeriesInputType = z.infer<typeof seriesInput>;
+
+export const timeseriesInput = z.object({
+  series: z.array(seriesInput),
+  groupBy: z.optional(z.enum(flattenAnalyticsGroupsEnum)),
+})
