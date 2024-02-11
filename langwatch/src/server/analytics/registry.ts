@@ -12,6 +12,7 @@ import {
   pipelineAggregationTypesEnum,
   pipelineFieldsEnum,
 } from "./types";
+import type { AggregationsAggregationContainer } from "@elastic/elasticsearch/lib/api/types";
 
 const simpleFieldAnalytics = (
   field: string
@@ -26,7 +27,7 @@ const simpleFieldAnalytics = (
 });
 
 export const analyticsMetrics = {
-  volume: {
+  metadata: {
     trace_id: {
       label: "Messages",
       allowedAggregations: ["cardinality"],
@@ -80,9 +81,10 @@ export const analyticsMetrics = {
                           child: {
                             filter: {
                               bool: {
-                                must: [
-                                  { term: { "events.metrics.key": "vote" } },
-                                ],
+                                // TODO: why is this not working
+                                // must: [
+                                //   { term: { "events.metrics.key": "vote" } },
+                                // ],
                                 must_not: {
                                   term: { "events.metrics.value": 0 },
                                 },
@@ -207,13 +209,17 @@ export const metricAggregations: Record<AggregationTypes, string> = {
 
 const simpleFieldGroupping = (name: string, field: string): AnalyticsGroup => ({
   label: name,
-  aggregation: () => ({
-    terms: {
-      field: field,
-      size: 100,
-      missing: "unknown",
+  aggregation: (aggToGroup) => ({
+    [`${field}_group`]: {
+      terms: {
+        field: field,
+        size: 100,
+        missing: "unknown",
+      },
+      aggs: aggToGroup,
     },
   }),
+  extractionPath: () => `${field}_group>buckets`,
 });
 
 export const analyticsGroups = {
@@ -231,6 +237,143 @@ export const analyticsGroups = {
     ),
 
     labels: simpleFieldGroupping("Label", "trace.metadata.labels"),
+
+    model: {
+      label: "Model",
+      aggregation: (aggToGroup) => ({
+        model_group: {
+          nested: {
+            path: "spans",
+          },
+          aggs: {
+            child: {
+              terms: {
+                field: "spans.model",
+                size: 100,
+                missing: "unknown",
+              },
+              aggs: {
+                back_to_root: {
+                  reverse_nested: {},
+                  aggs: aggToGroup,
+                },
+              },
+            },
+          },
+        },
+      }),
+      extractionPath: () => "model_group>child>buckets>back_to_root",
+    },
+  },
+  sentiment: {
+    input_sentiment: {
+      label: "Input Sentiment",
+      aggregation: (aggToGroup) => ({
+        input_sentiment_group: {
+          filters: {
+            filters: {
+              positive: {
+                script: {
+                  script: {
+                    source:
+                      "doc['trace.input.satisfaction_score'].size() == 0 ? false : doc['trace.input.satisfaction_score'].value >= 0.1",
+                    lang: "painless",
+                  },
+                },
+              },
+              negative: {
+                script: {
+                  script: {
+                    source:
+                      "doc['trace.input.satisfaction_score'].size() == 0 ? false : doc['trace.input.satisfaction_score'].value <= -0.1",
+                    lang: "painless",
+                  },
+                },
+              },
+              neutral: {
+                script: {
+                  script: {
+                    source:
+                      "doc['trace.input.satisfaction_score'].size() == 0 ? false : (doc['trace.input.satisfaction_score'].value < 0.1 && doc['trace.input.satisfaction_score'].value > -0.1)",
+                    lang: "painless",
+                  },
+                },
+              },
+            },
+          },
+          aggs: aggToGroup,
+        },
+      }),
+      extractionPath: () => "input_sentiment_group>buckets",
+    },
+    thumbs_up_down: {
+      label: "Thumbs Up/Down",
+      aggregation: (aggToGroup) => {
+        const actualGrouping: AggregationsAggregationContainer = {
+          filters: {
+            filters: {
+              positive: {
+                script: {
+                  script: {
+                    source:
+                      // TODO: check also for key type == vote
+                      // "doc['events.metrics.key'].size() == 0 ? false : doc['events.metrics.key'].value == 'vote'",
+                      "doc['events.metrics.value'].size() == 0 ? false : doc['events.metrics.value'].value == 1",
+                    lang: "painless",
+                  },
+                },
+              },
+              negative: {
+                script: {
+                  script: {
+                    source:
+                      // TODO: check also for key type == vote
+                      // "doc['events.metrics.key'].size() == 0 ? false : doc['events.metrics.key'].value == 'vote'",
+                      "doc['events.metrics.value'].size() == 0 ? false : doc['events.metrics.value'].value == -1",
+                    lang: "painless",
+                  },
+                },
+              },
+            },
+          },
+          aggs: {
+            back_to_root: {
+              reverse_nested: {},
+              aggs: aggToGroup,
+            },
+          },
+        };
+
+        return {
+          thumbs_up_down_group: {
+            nested: {
+              path: "events",
+            },
+            aggs: {
+              child: {
+                filter: {
+                  bool: {
+                    must: [{ term: { "events.event_type": "thumbs_up_down" } }],
+                  } as any,
+                },
+                aggs: {
+                  filter: {
+                    nested: {
+                      path: "events.metrics",
+                    },
+                    aggs: {
+                      child: actualGrouping,
+                    },
+                  },
+                },
+              },
+            },
+          },
+        };
+      },
+      extractionPath: () =>
+        "thumbs_up_down_group>child>filter>child>buckets>back_to_root",
+    },
   },
 } satisfies Record<string, Record<string, AnalyticsGroup>>;
 
@@ -284,4 +427,4 @@ export type SeriesInputType = z.infer<typeof seriesInput>;
 export const timeseriesInput = z.object({
   series: z.array(seriesInput),
   groupBy: z.optional(z.enum(flattenAnalyticsGroupsEnum)),
-})
+});

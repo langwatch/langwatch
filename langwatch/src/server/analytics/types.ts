@@ -19,7 +19,10 @@ export type AnalyticsMetric = {
 
 export type AnalyticsGroup = {
   label: string;
-  aggregation: () => AggregationsAggregationContainer;
+  aggregation: (
+    aggToGroup: Record<string, AggregationsAggregationContainer>
+  ) => Record<string, AggregationsAggregationContainer>;
+  extractionPath: () => string;
 };
 
 export const aggregationTypesEnum = z.enum([

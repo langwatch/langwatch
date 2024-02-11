@@ -106,12 +106,7 @@ export const getTimeseries = protectedProcedure
 
     if (input.groupBy) {
       const group = getGroup(input.groupBy);
-      aggs = {
-        [input.groupBy]: {
-          ...group.aggregation(),
-          aggs,
-        },
-      };
+      aggs = group.aggregation(aggs);
     }
 
     const result = await esClient.search({
@@ -148,13 +143,43 @@ export const getTimeseries = protectedProcedure
         };
 
         if (input.groupBy) {
+          const group = getGroup(input.groupBy);
+          const extractionPath = group.extractionPath();
+          let buckets = day_bucket;
+          const [pathsBeforeBuckets, pathsAfterBuckets] =
+            extractionPath.split(">buckets");
+          for (const path of pathsBeforeBuckets!.split(">")) {
+            buckets = buckets[path];
+          }
+          buckets = buckets.buckets;
+
+          if (!buckets) {
+            throw `Could not find buckets for ${input.groupBy} groupBy at ${extractionPath}`;
+          }
           const groupResult = Object.fromEntries(
-            day_bucket[input.groupBy].buckets.map((group_bucket: any) => {
-              return [
-                group_bucket.key,
-                extractResultForBucket(input.series, group_bucket),
-              ];
-            })
+            Array.isArray(buckets)
+              ? buckets.map((group_bucket: any) => {
+                  return [
+                    group_bucket.key,
+                    extractResultForBucket(
+                      input.series,
+                      pathsAfterBuckets,
+                      group_bucket
+                    ),
+                  ];
+                })
+              : Object.entries(buckets).map(
+                  ([key, group_bucket]: [string, any]) => {
+                    return [
+                      key,
+                      extractResultForBucket(
+                        input.series,
+                        pathsAfterBuckets,
+                        group_bucket
+                      ),
+                    ];
+                  }
+                )
           );
           aggregationResult = {
             ...aggregationResult,
@@ -163,7 +188,7 @@ export const getTimeseries = protectedProcedure
         } else {
           aggregationResult = {
             ...aggregationResult,
-            ...extractResultForBucket(input.series, day_bucket),
+            ...extractResultForBucket(input.series, undefined, day_bucket),
           };
         }
 
@@ -180,26 +205,39 @@ export const getTimeseries = protectedProcedure
     };
   });
 
-const extractResultForBucket = (seriesList: SeriesInputType[], bucket: any) => {
+const extractResultForBucket = (
+  seriesList: SeriesInputType[],
+  pathsAfterBuckets: string | undefined,
+  bucket: any
+) => {
   return Object.fromEntries(
     seriesList.flatMap((series) => {
-      return Object.entries(extractResult(series, bucket));
+      return Object.entries(extractResult(series, pathsAfterBuckets, bucket));
     })
   );
 };
 
 const extractResult = (
   { metric, aggregation, pipeline }: SeriesInputType,
+  pathsAfterBuckets: string | undefined,
   result: any
 ) => {
+  let current = result;
+  if (pathsAfterBuckets) {
+    for (const path of pathsAfterBuckets.split(">")) {
+      if (path) {
+        current = current[path];
+      }
+    }
+  }
+
   const metric_ = getMetric(metric);
   const paths = metric_.extractionPath(aggregation).split(">");
   if (pipeline) {
     const pipelinePath_ = pipelinePath(metric, aggregation, pipeline);
-    return { [pipelinePath_]: result[pipelinePath_].value };
+    return { [pipelinePath_]: current[pipelinePath_].value };
   }
 
-  let current = result;
   for (const path of paths) {
     current = current[path];
   }

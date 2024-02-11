@@ -208,16 +208,16 @@ describe("Timeseries Graph Integration Tests", () => {
         },
       },
       series: [
-        { metric: "volume.trace_id", aggregation: "cardinality" },
+        { metric: "metadata.trace_id", aggregation: "cardinality" },
         {
-          metric: "volume.trace_id",
+          metric: "metadata.trace_id",
           aggregation: "cardinality",
           pipeline: {
             field: "user_id",
             aggregation: "avg",
           },
         },
-        { metric: "volume.thread_id", aggregation: "cardinality" },
+        { metric: "metadata.thread_id", aggregation: "cardinality" },
         { metric: "sentiment.thumbs_up_down", aggregation: "cardinality" },
         { metric: "sentiment.thumbs_up_down", aggregation: "sum" },
         { metric: "sentiment.thumbs_up_down", aggregation: "min" },
@@ -226,14 +226,14 @@ describe("Timeseries Graph Integration Tests", () => {
 
     expect(response.currentPeriod[1]).toEqual({
       date: expect.any(String),
-      "volume.trace_id/cardinality": 3,
-      "volume.trace_id/cardinality/user_id/avg": 1.5,
-      "volume.thread_id/cardinality": 3,
+      "metadata.trace_id/cardinality": 3,
+      "metadata.trace_id/cardinality/user_id/avg": 1.5,
+      "metadata.thread_id/cardinality": 3,
       "sentiment.thumbs_up_down/cardinality": 3,
       "sentiment.thumbs_up_down/sum": 1,
       "sentiment.thumbs_up_down/min": -1,
     });
-    expect((response.previousPeriod[1] as any)["volume.trace_id/cardinality"]).toBe(1);
+    expect((response.previousPeriod[1] as any)["metadata.trace_id/cardinality"]).toBe(1);
   });
 
   it("should return grouped metrics correctly", async () => {
@@ -257,16 +257,16 @@ describe("Timeseries Graph Integration Tests", () => {
         },
       },
       series: [
-        { metric: "volume.trace_id", aggregation: "cardinality" },
+        { metric: "metadata.trace_id", aggregation: "cardinality" },
         {
-          metric: "volume.trace_id",
+          metric: "metadata.trace_id",
           aggregation: "cardinality",
           pipeline: {
             field: "user_id",
             aggregation: "avg",
           },
         },
-        { metric: "volume.thread_id", aggregation: "cardinality" },
+        { metric: "metadata.thread_id", aggregation: "cardinality" },
         { metric: "sentiment.thumbs_up_down", aggregation: "cardinality" },
         { metric: "sentiment.thumbs_up_down", aggregation: "sum" },
         { metric: "sentiment.thumbs_up_down", aggregation: "min" },
@@ -278,17 +278,17 @@ describe("Timeseries Graph Integration Tests", () => {
       date: expect.any(String),
       "topics.topics": {
         greetings: {
-          "volume.trace_id/cardinality": 2,
-          "volume.trace_id/cardinality/user_id/avg": 1,
-          "volume.thread_id/cardinality": 2,
+          "metadata.trace_id/cardinality": 2,
+          "metadata.trace_id/cardinality/user_id/avg": 1,
+          "metadata.thread_id/cardinality": 2,
           "sentiment.thumbs_up_down/cardinality": 2,
           "sentiment.thumbs_up_down/sum": 0,
           "sentiment.thumbs_up_down/min": -1,
         },
         poems: {
-          "volume.trace_id/cardinality": 1,
-          "volume.trace_id/cardinality/user_id/avg": 1,
-          "volume.thread_id/cardinality": 1,
+          "metadata.trace_id/cardinality": 1,
+          "metadata.trace_id/cardinality/user_id/avg": 1,
+          "metadata.thread_id/cardinality": 1,
           "sentiment.thumbs_up_down/cardinality": 1,
           "sentiment.thumbs_up_down/sum": 1,
           "sentiment.thumbs_up_down/min": 1,

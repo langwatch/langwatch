@@ -113,7 +113,7 @@ const defaultValues: CustomGraphFormData = {
   series: [
     {
       name: "Messages count",
-      metric: "volume.trace_id",
+      metric: "metadata.trace_id",
       aggregation: "cardinality",
       pipeline: {
         field: "",
@@ -244,7 +244,7 @@ function CustomGraphForm({
           onClick={() => {
             seriesFields.append({
               name: "Users count",
-              metric: "volume.user_id",
+              metric: "metadata.user_id",
               aggregation: "cardinality",
               pipeline: {
                 field: "",
