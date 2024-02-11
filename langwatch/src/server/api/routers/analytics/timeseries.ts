@@ -94,6 +94,7 @@ export const getTimeseries = protectedProcedure
             [pipelinePath_]: {
               [pipelineAggregationsToElasticSearch[pipeline.aggregation]]: {
                 buckets_path: `${pipelineBucketsPath}>${metricPath}`,
+                gap_policy: "insert_zeros",
               },
             },
           };

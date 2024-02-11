@@ -1,21 +1,7 @@
-import type { z } from "zod";
-import { useAnalyticsParams } from "../../hooks/useAnalyticsParams";
-import {
-  getMetric,
-  metricAggregations,
-  type FlattenAnalyticsMetricsEnum,
-  type timeseriesInput,
-  pipelineAggregations,
-  analyticsPipelines,
-  getGroup,
-} from "../../server/analytics/registry";
-import { api } from "../../utils/api";
-import type { inferRouterOutputs } from "@trpc/server";
-import type { AppRouter } from "../../server/api/root";
-import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
-import type { TRPCClientErrorLike } from "@trpc/client";
-import { useGetRotatingColorForCharts } from "../../hooks/useGetRotatingColorForCharts";
 import { useTheme } from "@chakra-ui/react";
+import type { TRPCClientErrorLike } from "@trpc/client";
+import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
+import type { inferRouterOutputs } from "@trpc/server";
 import { format } from "date-fns";
 import numeral from "numeral";
 import {
@@ -32,8 +18,17 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import type { Unpacked } from "../../utils/types";
+import type { z } from "zod";
+import { useAnalyticsParams } from "../../hooks/useAnalyticsParams";
+import { useGetRotatingColorForCharts } from "../../hooks/useGetRotatingColorForCharts";
+import {
+  getGroup,
+  type timeseriesInput
+} from "../../server/analytics/registry";
+import type { AppRouter } from "../../server/api/root";
+import { api } from "../../utils/api";
 import { uppercaseFirstLetterLowerCaseRest } from "../../utils/stringCasing";
+import type { Unpacked } from "../../utils/types";
 
 export type CustomGraphInput = {
   graphId: string;
@@ -60,8 +55,8 @@ export function CustomGraph({ input }: { input: CustomGraphInput }) {
     },
     queryOpts
   );
-  const currentAndPreviousData = shapeDataForGraph(input, timeseries);
 
+  const currentAndPreviousData = shapeDataForGraph(input, timeseries);
   const expectedKeys = Array.from(
     new Set(
       currentAndPreviousData?.flatMap((entry) =>
@@ -71,6 +66,11 @@ export function CustomGraph({ input }: { input: CustomGraphInput }) {
       ) ?? []
     )
   );
+  const currentAndPreviousDataFilled = fillEmptyData(
+    currentAndPreviousData,
+    expectedKeys
+  );
+
   const seriesByKey = Object.fromEntries(
     input.series.map((series) => {
       const key = [
@@ -128,11 +128,11 @@ export function CustomGraph({ input }: { input: CustomGraphInput }) {
 
   return (
     <ResponsiveContainer
-      key={currentAndPreviousData ? input.graphId : "loading"}
+      key={currentAndPreviousDataFilled ? input.graphId : "loading"}
       height={500}
     >
       <GraphComponent
-        data={currentAndPreviousData}
+        data={currentAndPreviousDataFilled}
         margin={{ left: (valueFormat ?? "0a").length * 4 - 10 }}
       >
         <CartesianGrid vertical={false} strokeDasharray="5 7" />
@@ -166,6 +166,7 @@ export function CustomGraph({ input }: { input: CustomGraphInput }) {
         <Legend />
         {(expectedKeys ?? []).map((aggKey, index) => (
           <>
+            {/* @ts-ignore */}
             <GraphElement
               key={aggKey}
               type="linear"
@@ -178,6 +179,7 @@ export function CustomGraph({ input }: { input: CustomGraphInput }) {
               name={nameForSeries(aggKey)}
             />
             {input.includePrevious && (
+              // @ts-ignore
               <GraphElement
                 key={"previous>" + aggKey}
                 type="linear"
@@ -205,7 +207,7 @@ const shapeDataForGraph = (
     TRPCClientErrorLike<AppRouter>
   >
 ) => {
-  const flattenGroupDataAndFillNulls = (
+  const flattenGroupData = (
     data: NonNullable<(typeof timeseries)["data"]>["currentPeriod"]
   ) => {
     const groupBy = input.groupBy;
@@ -229,19 +231,13 @@ const shapeDataForGraph = (
         };
       });
     }
-    return data.map((entry) =>
-      Object.fromEntries(
-        Object.entries(entry).map(([key, value]) => [key, value ?? 0])
-      )
-    ) as ({ date: string } & Record<string, number>)[];
+    return data;
   };
 
   const flattenCurrentPeriod =
-    timeseries.data &&
-    flattenGroupDataAndFillNulls(timeseries.data.currentPeriod);
+    timeseries.data && flattenGroupData(timeseries.data.currentPeriod);
   const flattenPreviousPeriod =
-    timeseries.data &&
-    flattenGroupDataAndFillNulls(timeseries.data.previousPeriod);
+    timeseries.data && flattenGroupData(timeseries.data.previousPeriod);
 
   const currentAndPreviousData =
     flattenCurrentPeriod &&
@@ -257,5 +253,24 @@ const shapeDataForGraph = (
       };
     });
 
-  return currentAndPreviousData;
+  return currentAndPreviousData as
+    | ({ date: string } & Record<string, number>)[]
+    | undefined;
+};
+
+const fillEmptyData = (
+  data: ReturnType<typeof shapeDataForGraph>,
+  expectedKeys: string[]
+) => {
+  if (!data) return data;
+  const filledData = data.map((entry) => {
+    const filledEntry = { ...entry };
+    expectedKeys.forEach((key) => {
+      if (filledEntry[key] === null || filledEntry[key] === undefined) {
+        filledEntry[key] = 0;
+      }
+    });
+    return filledEntry;
+  });
+  return filledData;
 };

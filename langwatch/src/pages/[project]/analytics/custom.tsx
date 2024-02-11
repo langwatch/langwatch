@@ -8,7 +8,6 @@ import {
   Button,
   Card,
   CardBody,
-  Checkbox,
   Container,
   FormControl,
   FormLabel,
@@ -18,27 +17,35 @@ import {
   Spacer,
   Switch,
   Text,
-  VStack,
+  VStack
 } from "@chakra-ui/react";
 import { Select as MultiSelect, chakraComponents } from "chakra-react-select";
-import { use, useEffect, useState } from "react";
-import { BarChart2, Check, Trash, TrendingUp, Triangle } from "react-feather";
+import { useEffect, useState } from "react";
+import { BarChart2, Trash, TrendingUp, Triangle } from "react-feather";
 import {
   Controller,
   useFieldArray,
   useForm,
-  type UseFieldArrayReturn,
   type FieldArrayWithId,
-  Form,
+  type UseFieldArrayReturn
 } from "react-hook-form";
 import { DashboardLayout } from "../../../components/DashboardLayout";
+import { FilterSelector } from "../../../components/FilterSelector";
+import {
+  PeriodSelector,
+  usePeriodSelector,
+} from "../../../components/PeriodSelector";
+import {
+  CustomGraph,
+  type CustomGraphInput,
+} from "../../../components/analytics/CustomGraph";
 import {
   analyticsGroups,
   analyticsMetrics,
+  analyticsPipelines,
   getMetric,
   metricAggregations,
   pipelineAggregations,
-  analyticsPipelines,
   type FlattenAnalyticsGroupsEnum,
   type FlattenAnalyticsMetricsEnum,
 } from "../../../server/analytics/registry";
@@ -53,10 +60,6 @@ import {
   camelCaseToTitleCase,
   uppercaseFirstLetterLowerCaseRest,
 } from "../../../utils/stringCasing";
-import {
-  CustomGraph,
-  type CustomGraphInput,
-} from "../../../components/analytics/CustomGraph";
 
 export interface CustomGraphFormData {
   graphType: {
@@ -120,6 +123,10 @@ export default function AnalyticsCustomGraph() {
     control: form.control,
     name: "series",
   });
+  const {
+    period: { startDate, endDate },
+    setPeriod,
+  } = usePeriodSelector();
 
   const formData = form.watch();
 
@@ -127,12 +134,20 @@ export default function AnalyticsCustomGraph() {
     <DashboardLayout>
       <Container maxWidth="1600" padding={6}>
         <VStack width="full" align="start" spacing={6}>
-          <Heading size="lg" paddingTop={1}>
-            Custom Graph
-          </Heading>
+          <HStack width="full" align="top">
+            <Heading as={"h1"} size="lg" paddingTop={1}>
+              Custom Graph
+            </Heading>
+            <Spacer />
+            <FilterSelector />
+            <PeriodSelector
+              period={{ startDate, endDate }}
+              setPeriod={setPeriod}
+            />
+          </HStack>
           <Card width="full">
             <CardBody>
-              <HStack width="full" align="start" minHeight="800px" spacing={8}>
+              <HStack width="full" align="start" minHeight="500px" spacing={8}>
                 <CustomGraphForm form={form} seriesFields={seriesFields} />
                 <Box
                   border="1px solid"
@@ -406,7 +421,7 @@ function SeriesField({
             {...form.control.register(`series.${index}.pipeline.field`)}
             minWidth="fit-content"
           >
-            <option value=""></option>
+            <option value="">all</option>
             {Object.entries(analyticsPipelines)
               .filter(([key, _]) =>
                 metric.includes("trace_id") ? key !== "trace_id" : true
