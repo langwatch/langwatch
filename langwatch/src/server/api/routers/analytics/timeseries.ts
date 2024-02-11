@@ -120,7 +120,10 @@ export const getTimeseries = protectedProcedure
         size: 0,
         query: {
           bool: {
-            filter: generateTracesPivotQueryConditions(input),
+            filter: generateTracesPivotQueryConditions({
+              ...input,
+              startDate: previousPeriodStartDate.getTime(),
+            }),
           } as QueryDslBoolQuery,
         },
         aggs: {

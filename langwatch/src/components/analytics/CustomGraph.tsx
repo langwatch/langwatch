@@ -23,16 +23,17 @@ import { useAnalyticsParams } from "../../hooks/useAnalyticsParams";
 import { useGetRotatingColorForCharts } from "../../hooks/useGetRotatingColorForCharts";
 import {
   getGroup,
-  type timeseriesInput
+  type timeseriesInput,
 } from "../../server/analytics/registry";
 import type { AppRouter } from "../../server/api/root";
 import { api } from "../../utils/api";
 import { uppercaseFirstLetterLowerCaseRest } from "../../utils/stringCasing";
 import type { Unpacked } from "../../utils/types";
+import React from "react";
 
 export type CustomGraphInput = {
   graphId: string;
-  graphType: "line" | "bar" | "area";
+  graphType: "line" | "bar" | "stacked_bar" | "area" | "stacked_area";
   series: (Unpacked<z.infer<typeof timeseriesInput>["series"]> & {
     name: string;
   })[];
@@ -119,12 +120,11 @@ export function CustomGraph({ input }: { input: CustomGraphInput }) {
       ? numeral(value).format("0.00a")
       : numeral(value).format(valueFormat ?? "0a");
 
-  const [GraphComponent, GraphElement] =
-    input.graphType === "area"
-      ? [AreaChart, Area]
-      : input.graphType === "bar"
-      ? [BarChart, Bar]
-      : [LineChart, Line];
+  const [GraphComponent, GraphElement] = input.graphType.includes("area")
+    ? [AreaChart, Area]
+    : input.graphType.includes("bar")
+    ? [BarChart, Bar]
+    : [LineChart, Line];
 
   return (
     <ResponsiveContainer
@@ -165,13 +165,18 @@ export function CustomGraph({ input }: { input: CustomGraphInput }) {
         />
         <Legend />
         {(expectedKeys ?? []).map((aggKey, index) => (
-          <>
+          <React.Fragment key={aggKey}>
             {/* @ts-ignore */}
             <GraphElement
               key={aggKey}
               type="linear"
               dataKey={aggKey}
               stroke={getColor(index)}
+              stackId={
+                ["stacked_bar", "stacked_area"].includes(input.graphType)
+                  ? "same"
+                  : undefined
+              }
               fill={getColor(index)}
               strokeWidth={2.5}
               dot={false}
@@ -184,6 +189,11 @@ export function CustomGraph({ input }: { input: CustomGraphInput }) {
                 key={"previous>" + aggKey}
                 type="linear"
                 dataKey={"previous>" + aggKey}
+                stackId={
+                  ["stacked_bar", "stacked_area"].includes(input.graphType)
+                    ? "same"
+                    : undefined
+                }
                 stroke={getColor(index) + "99"}
                 fill={getColor(index) + "99"}
                 strokeWidth={2.5}
@@ -193,7 +203,7 @@ export function CustomGraph({ input }: { input: CustomGraphInput }) {
                 name={"Previous " + nameForSeries(aggKey)}
               />
             )}
-          </>
+          </React.Fragment>
         ))}
       </GraphComponent>
     </ResponsiveContainer>
@@ -268,6 +278,13 @@ const fillEmptyData = (
     expectedKeys.forEach((key) => {
       if (filledEntry[key] === null || filledEntry[key] === undefined) {
         filledEntry[key] = 0;
+      }
+      const previousKey = `previous>${key}`;
+      if (
+        filledEntry[previousKey] === null ||
+        filledEntry[previousKey] === undefined
+      ) {
+        filledEntry[previousKey] = 0;
       }
     });
     return filledEntry;

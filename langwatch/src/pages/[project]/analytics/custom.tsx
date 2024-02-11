@@ -92,8 +92,18 @@ const chartOptions: CustomGraphFormData["graphType"][] = [
     icon: <Triangle />,
   },
   {
+    label: "Stacked Area Chart",
+    value: "stacked_area",
+    icon: <Triangle />,
+  },
+  {
     label: "Bar Chart",
     value: "bar",
+    icon: <BarChart2 />,
+  },
+  {
+    label: "Stacked Bar Chart",
+    value: "stacked_bar",
     icon: <BarChart2 />,
   },
 ];
@@ -308,7 +318,6 @@ function SeriesFieldItem({
   seriesFields: UseFieldArrayReturn<CustomGraphFormData, "series", "id">;
 }) {
   const name = form.watch(`series.${index}.name`);
-  console.log("name", name);
 
   return (
     <AccordionItem

@@ -132,6 +132,28 @@ describe("Timeseries Graph Integration Tests", () => {
         },
       ],
     },
+    // older message
+    {
+      trace: {
+        trace_id: `test-trace-id-${nanoid()}`,
+        project_id: "test-project-id",
+        metadata: {
+          user_id: "test-user-id",
+          customer_id: "customer-id-1",
+          labels: ["test-messages"],
+          thread_id: "test-thread-id",
+          topics: ["greetings"],
+        },
+        timestamps: {
+          inserted_at: new Date().getTime() - 24 * 60 * 60 * 1000 * 2,
+          started_at: new Date().getTime() - 24 * 60 * 60 * 1000 * 2,
+          updated_at: new Date().getTime() - 24 * 60 * 60 * 1000 * 2,
+        },
+        metrics: {},
+        input: {},
+        has_error: false,
+      },
+    },
   ];
 
   beforeAll(async () => {
@@ -211,6 +233,7 @@ describe("Timeseries Graph Integration Tests", () => {
       "sentiment.thumbs_up_down/sum": 1,
       "sentiment.thumbs_up_down/min": -1,
     });
+    expect((response.previousPeriod[1] as any)["volume.trace_id/cardinality"]).toBe(1);
   });
 
   it("should return grouped metrics correctly", async () => {
