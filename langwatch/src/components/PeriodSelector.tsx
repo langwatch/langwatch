@@ -37,7 +37,7 @@ const isValidDateString = (dateString: string) => {
   return d instanceof Date && !isNaN(d as any);
 };
 
-export const usePeriodSelector = (defaultNDays = 15) => {
+export const usePeriodSelector = (defaultNDays = 30) => {
   const router = useRouter();
 
   const now = useMemo(() => new Date(), []);

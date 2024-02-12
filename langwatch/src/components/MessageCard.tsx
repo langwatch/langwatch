@@ -51,7 +51,9 @@ export function MessageCard({
   ).length;
   const totalChecks = traceChecks.length;
   const topics =
-    (typeof trace.metadata.topics == "string" ? [trace.metadata.topics] : trace.metadata.topics) ?? [];
+    (typeof trace.metadata.topics == "string"
+      ? [trace.metadata.topics]
+      : trace.metadata.topics) ?? [];
 
   return (
     <VStack alignItems="flex-start" spacing={4} width="fill">

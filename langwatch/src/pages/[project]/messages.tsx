@@ -49,12 +49,18 @@ import type { Trace, TraceCheck } from "../../server/tracer/types";
 import { api } from "../../utils/api";
 import { FilterSelector } from "../../components/FilterSelector";
 import { getSingleQueryParam } from "../../utils/getSingleQueryParam";
+import { MessagesDevMode } from "~/components/MessagesDevMode";
 
 export default function MessagesOrIntegrationGuide() {
   const { project } = useOrganizationTeamProject();
+  const router = useRouter();
 
   if (project && !project.firstMessage) {
     return <ProjectIntegration />;
+  }
+
+  if (router.query.mode === "dev") {
+    return <MessagesDevMode />;
   }
 
   return <Messages />;
@@ -89,7 +95,9 @@ function Messages() {
     }
   );
   const traceIds =
-    traceGroups.data?.flatMap((group) => group.map((trace) => trace.trace_id)) ?? [];
+    traceGroups.data?.flatMap((group) =>
+      group.map((trace) => trace.trace_id)
+    ) ?? [];
   const traceChecksQuery = api.traces.getTraceChecks.useQuery(
     { projectId: project?.id ?? "", traceIds },
     {

@@ -22,6 +22,7 @@ import { formatMilliseconds } from "../../utils/formatMilliseconds";
 import { isNotFound } from "../../utils/trpcError";
 import { RenderInputOutput } from "./RenderInputOutput";
 import { useTraceDetailsState } from "../../hooks/useTraceDetailsState";
+import { durationColor } from "~/utils/durationColor";
 
 type SpanWithChildren = ElasticSearchSpan & { children: SpanWithChildren[] };
 
@@ -223,13 +224,7 @@ const SpanDuration = ({ span }: { span: ElasticSearchSpan }) => {
     >
       <HStack
         spacing={"6px"}
-        color={
-          !!span.error || duration > 30 * 1000
-            ? "red"
-            : duration > 10 * 1000
-            ? "yellow.600"
-            : "green"
-        }
+        color={span.error ? "red" : durationColor("span", duration)}
       >
         <Clock width={12} />
         <Text>{formatMilliseconds(duration)}</Text>
