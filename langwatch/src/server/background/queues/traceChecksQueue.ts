@@ -110,7 +110,7 @@ export const updateCheckStatusInES = async ({
     status,
     ...(check.name && { check_name: check.name }),
     ...(raw_result && { raw_result }),
-    ...(value && { value }),
+    ...(value !== undefined && { value }),
     ...(error && { error: captureError(error) }),
     ...(retries && { retries }),
     timestamps: {

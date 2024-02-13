@@ -61,6 +61,7 @@ export type TraceCheckResult = {
 export type TraceCheckDefinition<T extends CheckTypes> = {
   name: string;
   description: string;
+  valueDisplayType: "boolean" | "number";
   requiresRag?: boolean;
   parametersDescription: Record<
     keyof Checks[T]["parameters"],

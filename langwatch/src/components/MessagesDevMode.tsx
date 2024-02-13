@@ -18,27 +18,45 @@ import {
   CardHeader,
   Text,
   Skeleton,
+  Box,
+  Popover,
+  PopoverTrigger,
+  FormControl,
+  FormLabel,
+  Input,
+  PopoverArrow,
+  PopoverBody,
+  PopoverCloseButton,
+  PopoverContent,
+  PopoverHeader,
+  VStack,
+  useDisclosure,
+  Checkbox,
 } from "@chakra-ui/react";
 import { DashboardLayout } from "./DashboardLayout";
 import { FilterSelector } from "./FilterSelector";
 import { PeriodSelector, usePeriodSelector } from "./PeriodSelector";
 import { useRouter } from "next/router";
-import { useState } from "react";
+import { use, useEffect, useState } from "react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { getSingleQueryParam } from "~/utils/getSingleQueryParam";
 import { api } from "~/utils/api";
 import { formatMilliseconds } from "~/utils/formatMilliseconds";
 import { durationColor } from "~/utils/durationColor";
 import numeral from "numeral";
+import { getTraceCheckDefinitions } from "~/trace_checks/registry";
+import { Select as MultiSelect, type MultiValue } from "chakra-react-select";
+import { ChevronDown, Filter, List } from "react-feather";
+import { threadId } from "worker_threads";
+import type { Trace } from "~/server/tracer/types";
 
 export function MessagesDevMode() {
+  const router = useRouter();
+  const { project } = useOrganizationTeamProject();
   const {
     period: { startDate, endDate },
     setPeriod,
   } = usePeriodSelector();
-
-  const router = useRouter();
-  const { project } = useOrganizationTeamProject();
 
   const traceGroups = api.traces.getAllForProject.useQuery(
     {
@@ -59,6 +77,147 @@ export function MessagesDevMode() {
     }
   );
 
+  const traceIds =
+    traceGroups.data?.flatMap((group) =>
+      group.map((trace) => trace.trace_id)
+    ) ?? [];
+
+  const traceChecksQuery = api.traces.getTraceChecks.useQuery(
+    { projectId: project?.id ?? "", traceIds },
+    {
+      enabled: traceIds.length > 0,
+      refetchInterval: undefined,
+      refetchOnWindowFocus: false,
+    }
+  );
+
+  const checksAvailable = Object.fromEntries(
+    Object.values(traceChecksQuery.data ?? {}).flatMap((checks) =>
+      checks.map((check) => [check.check_id, check.check_name])
+    )
+  );
+
+  const headerColumns: Record<
+    string,
+    (trace: Trace, index: number) => React.ReactNode
+  > = {
+    Timestamp: (trace, index) => (
+      <Td key={index}>
+        {new Date(trace.timestamps.started_at).toLocaleString()}
+      </Td>
+    ),
+    Input: (trace, index) => (
+      <Td key={index}>
+        <Text noOfLines={1} maxWidth="300px">
+          {trace.input.value}
+        </Text>
+      </Td>
+    ),
+    Output: (trace, index) =>
+      trace.error ? (
+        <Td key={index}>
+          <Text noOfLines={1} maxWidth="300px" color="red.400">
+            {trace.error.message}
+          </Text>
+        </Td>
+      ) : (
+        <Td key={index}>
+          <Text noOfLines={1} maxWidth="300px">
+            {trace.output?.value}
+          </Text>
+        </Td>
+      ),
+    "First Token": (trace, index) => (
+      <Td key={index} isNumeric>
+        <Text
+          color={durationColor("first_token", trace.metrics.first_token_ms)}
+        >
+          {trace.metrics.first_token_ms
+            ? numeral(trace.metrics.first_token_ms / 1000).format("0.[0]") + "s"
+            : "-"}
+        </Text>
+      </Td>
+    ),
+    "Completion Time": (trace, index) => (
+      <Td key={index} isNumeric>
+        <Text color={durationColor("total_time", trace.metrics.total_time_ms)}>
+          {trace.metrics.total_time_ms
+            ? numeral(trace.metrics.total_time_ms / 1000).format("0.[0]") + "s"
+            : "-"}
+        </Text>
+      </Td>
+    ),
+    "Completion Token": (trace, index) => (
+      <Td key={index} isNumeric>
+        {trace.metrics.completion_tokens}
+      </Td>
+    ),
+    "Prompt Tokens": (trace, index) => (
+      <Td key={index} isNumeric>
+        {trace.metrics.prompt_tokens}
+      </Td>
+    ),
+    "Total Cost": (trace, index) => (
+      <Td key={index} isNumeric>
+        <Text>{numeral(trace.metrics.total_cost).format("$0.00[000]")}</Text>
+      </Td>
+    ),
+    ...Object.fromEntries(
+      Object.entries(checksAvailable).map(([checkId, checkName]) => [
+        checkName,
+        (trace, index) => {
+          const traceCheck = traceChecksQuery.data?.[trace.trace_id]?.find(
+            (traceCheck_) => traceCheck_.check_id === checkId
+          );
+          const checkDefinition = getTraceCheckDefinitions(
+            traceCheck?.check_type ?? ""
+          );
+
+          return (
+            <Td key={index}>
+              {traceCheck?.status === "failed" ? (
+                <Text color="red.400">
+                  {checkDefinition?.valueDisplayType == "boolean"
+                    ? "Fail"
+                    : numeral(traceCheck?.value).format("0.[00]") ?? 0}
+                </Text>
+              ) : traceCheck?.status === "succeeded" ? (
+                <Text color="green.400">
+                  {checkDefinition?.valueDisplayType == "boolean"
+                    ? "Pass"
+                    : numeral(traceCheck?.value).format("0.[00]") ?? 0}
+                </Text>
+              ) : (
+                <Text>{traceCheck?.status ?? "-"}</Text>
+              )}
+            </Td>
+          );
+        },
+      ])
+    ),
+  };
+
+  const [selectedHeaderColumns, setSelectedHeaderColumns] = useState<
+    Record<keyof typeof headerColumns, boolean>
+  >(
+    Object.fromEntries(
+      Object.keys(headerColumns).map((column) => [column, true])
+    )
+  );
+
+  useEffect(() => {
+    setSelectedHeaderColumns({
+      ...selectedHeaderColumns,
+      ...Object.fromEntries(
+        Object.values(checksAvailable)
+          .filter((key) => !Object.keys(selectedHeaderColumns).includes(key))
+          .map((column) => [column, true])
+      ),
+    });
+  }, [checksAvailable, selectedHeaderColumns]);
+
+  const { isOpen, onOpen, onClose } = useDisclosure();
+
   return (
     <DashboardLayout>
       <Container maxWidth="1600" padding="6">
@@ -67,26 +226,62 @@ export function MessagesDevMode() {
             Messages
           </Heading>
           <Spacer />
-          <FilterSelector />
           <PeriodSelector
             period={{ startDate, endDate }}
             setPeriod={setPeriod}
           />
+          <Popover isOpen={isOpen} onClose={onClose} placement="bottom-end">
+            <PopoverTrigger>
+              <Button variant="outline" onClick={onOpen} minWidth="fit-content">
+                <HStack spacing={2}>
+                  <List size={16} />
+                  <Text>Columns</Text>
+                  <Box>
+                    <ChevronDown width={14} />
+                  </Box>
+                </HStack>
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent width="fit-content">
+              <PopoverArrow />
+              <PopoverCloseButton />
+              <PopoverHeader>
+                <Heading size="sm">Filter Messages</Heading>
+              </PopoverHeader>
+              <PopoverBody padding={4}>
+                <VStack align="start" spacing={2}>
+                  {Object.keys(headerColumns).map((column, index) => (
+                    <Checkbox
+                      key={index}
+                      isChecked={selectedHeaderColumns[column]}
+                      onChange={() => {
+                        setSelectedHeaderColumns({
+                          ...selectedHeaderColumns,
+                          [column]: !selectedHeaderColumns[column],
+                        });
+                      }}
+                    >
+                      {column}
+                    </Checkbox>
+                  ))}
+                </VStack>
+              </PopoverBody>
+            </PopoverContent>
+          </Popover>
+
+          <FilterSelector />
         </HStack>
         <Card>
           <CardBody>
             <TableContainer>
               <Table variant="simple">
-                <TableCaption>
-                  Imperial to metric conversion factors
-                </TableCaption>
                 <Thead>
                   <Tr>
-                    <Th>Timestamp</Th>
-                    <Th>Input</Th>
-                    <Th>Output</Th>
-                    <Th isNumeric>First Token</Th>
-                    <Th isNumeric>Completion Time</Th>
+                    {Object.entries(selectedHeaderColumns)
+                      .filter(([_, checked]) => checked)
+                      .map(([column, _], index) => (
+                        <Th key={index}>{column}</Th>
+                      ))}
                   </Tr>
                 </Thead>
                 <Tbody>
@@ -102,53 +297,12 @@ export function MessagesDevMode() {
                           );
                         }}
                       >
-                        <Td>{trace.timestamps.started_at}</Td>
-                        <Td>
-                          <Text noOfLines={1} maxWidth="300px">
-                            {trace.input.value}
-                          </Text>
-                        </Td>
-                        <Td>
-                          {trace.error ? (
-                            <Text
-                              noOfLines={1}
-                              maxWidth="300px"
-                              color="red.400"
-                            >
-                              {trace.error.message}
-                            </Text>
-                          ) : (
-                            <Text noOfLines={1} maxWidth="300px">
-                              {trace.output?.value}
-                            </Text>
+                        {Object.entries(selectedHeaderColumns)
+                          .filter(([_, checked]) => checked)
+                          .map(
+                            ([column, _], index) =>
+                              headerColumns[column]?.(trace, index)
                           )}
-                        </Td>
-                        <Td
-                          isNumeric
-                          color={durationColor(
-                            "first_token",
-                            trace.metrics.first_token_ms
-                          )}
-                        >
-                          {trace.metrics.first_token_ms
-                            ? numeral(
-                                trace.metrics.first_token_ms / 1000
-                              ).format("0.[0]") + "s"
-                            : "-"}
-                        </Td>
-                        <Td
-                          isNumeric
-                          color={durationColor(
-                            "total_time",
-                            trace.metrics.first_token_ms
-                          )}
-                        >
-                          {trace.metrics.total_time_ms
-                            ? numeral(
-                                trace.metrics.total_time_ms / 1000
-                              ).format("0.[0]") + "s"
-                            : "-"}
-                        </Td>
                       </Tr>
                     ))
                   )}

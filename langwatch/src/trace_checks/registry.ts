@@ -7,6 +7,7 @@ export const AVAILABLE_TRACE_CHECKS: {
     name: "Google DLP PII Detection",
     description:
       "Detects Personal Identifiable Information (PII) such as email addresses, phone numbers, credit card numbers, and more",
+    valueDisplayType: "boolean",
     parametersDescription: {
       infoTypes: {
         name: "PII types to check",
@@ -42,8 +43,8 @@ export const AVAILABLE_TRACE_CHECKS: {
   },
   toxicity_check: {
     name: "Azure Content Safety Moderation",
-    description:
-      "Detects hate speech, self-harm, sexual and violent content",
+    description: "Detects hate speech, self-harm, sexual and violent content",
+    valueDisplayType: "boolean",
     parametersDescription: {
       categories: {
         name: "Categories to check",
@@ -65,6 +66,7 @@ export const AVAILABLE_TRACE_CHECKS: {
     name: "Azure Jailbreak Detection",
     description:
       "Detects if the input attempts to Jailbreak the LLM to produce answers and execute tasks that it was not supposed to",
+    valueDisplayType: "boolean",
     parametersDescription: {},
     default: {
       parameters: {},
@@ -73,6 +75,7 @@ export const AVAILABLE_TRACE_CHECKS: {
   ragas_answer_relevancy: {
     name: "Ragas Answer Relevancy",
     description: "Evaluates how relevant the answer is to the input",
+    valueDisplayType: "number",
     parametersDescription: {},
     default: {
       parameters: {},
@@ -84,6 +87,7 @@ export const AVAILABLE_TRACE_CHECKS: {
     requiresRag: true,
     description:
       "For RAG messages, evaluates the factual consistency of the generated answer against the RAG provided context",
+    valueDisplayType: "number",
     parametersDescription: {},
     default: {
       parameters: {},
@@ -94,6 +98,7 @@ export const AVAILABLE_TRACE_CHECKS: {
     requiresRag: true,
     description:
       "For RAG messages, evaluates the ratio of relevance from the RAG provided contexts to the input",
+    valueDisplayType: "number",
     parametersDescription: {},
     default: {
       parameters: {},
@@ -103,6 +108,7 @@ export const AVAILABLE_TRACE_CHECKS: {
     name: "(Beta) Inconsistency Detection",
     description:
       "Detects inconsistencies between input and output text for hallucination prevention",
+    valueDisplayType: "number",
     parametersDescription: {},
     default: {
       parameters: {},
@@ -112,6 +118,7 @@ export const AVAILABLE_TRACE_CHECKS: {
     name: "Custom",
     description:
       "Build your own guardrails and measurements using heuristics or LLMs-on-LLMs evalution",
+    valueDisplayType: "boolean", // TODO: handle custom llm value score
     parametersDescription: {
       rules: {},
     },
