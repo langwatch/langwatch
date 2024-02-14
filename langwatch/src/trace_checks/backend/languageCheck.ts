@@ -45,13 +45,15 @@ export const languageCheck = async (
   } else if (
     (parameters.checkFor === "input_language" ||
       parameters.checkFor === "input_matches_output") &&
-    languages.input
+    languages.input &&
+    parameters.expectedLanguage !== "any"
   ) {
     match = languages.input.includes(parameters.expectedLanguage);
   } else if (
     (parameters.checkFor === "output_language" ||
       parameters.checkFor === "input_matches_output") &&
-    languages.output
+    languages.output &&
+    parameters.expectedLanguage !== "any"
   ) {
     match = languages.output.includes(parameters.expectedLanguage);
   }

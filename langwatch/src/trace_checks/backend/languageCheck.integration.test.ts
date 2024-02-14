@@ -49,7 +49,6 @@ describe("LanguageCheck Integration", () => {
     expect(result.value).toBe(1);
   });
 
-
   it("passes if it could not detect language", async () => {
     const sampleTrace: Trace = {
       trace_id: "integration-test-language-specific",
@@ -65,6 +64,28 @@ describe("LanguageCheck Integration", () => {
     const parameters: Checks["language_check"]["parameters"] = {
       checkFor: "input_matches_output",
       expectedLanguage: "EN",
+    };
+
+    const result = await languageCheck(sampleTrace, [], parameters);
+    expect(result.status).toBe("succeeded");
+    expect(result.value).toBe(1);
+  });
+
+  it("should be okay if 'any' language is expected", async () => {
+    const sampleTrace: Trace = {
+      trace_id: "integration-test-language-specific",
+      project_id: "integration-test",
+      metadata: {},
+      input: { value: "small text" },
+      output: { value: "hello how is it going my friend? testing" },
+      metrics: {},
+      timestamps: { started_at: Date.now(), inserted_at: Date.now() },
+      search_embeddings: {},
+    };
+
+    const parameters: Checks["language_check"]["parameters"] = {
+      checkFor: "input_matches_output",
+      expectedLanguage: "any",
     };
 
     const result = await languageCheck(sampleTrace, [], parameters);
