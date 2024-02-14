@@ -19,13 +19,15 @@ import {
   VStack,
   useTheme,
   type BackgroundProps,
+  Stack,
+  Switch,
 } from "@chakra-ui/react";
 import { type Project } from "@prisma/client";
 import { signOut } from "next-auth/react";
 import ErrorPage from "next/error";
 import Head from "next/head";
 import { useRouter } from "next/router";
-import { useState, type PropsWithChildren } from "react";
+import { useState, type PropsWithChildren, useEffect } from "react";
 import {
   ChevronDown,
   ChevronRight,
@@ -46,6 +48,7 @@ import { ProjectTechStackIcon } from "./TechStack";
 import { LogoIcon } from "./icons/LogoIcon";
 import { dependencies } from "../injection/dependencies.client";
 import { OrganizationRoleGroup } from "../server/api/permission";
+import { useDevView } from "../hooks/DevViewProvider";
 
 const Breadcrumbs = ({ currentRoute }: { currentRoute: Route | undefined }) => {
   const { project } = useOrganizationTeamProject();
@@ -225,6 +228,7 @@ export const DashboardLayout = ({
   const router = useRouter();
   const theme = useTheme();
   const gray400 = theme.colors.gray["400"];
+  const { isDevViewEnabled, toggleDevView } = useDevView();
 
   const { data: session } = useRequiredSession();
 
@@ -234,7 +238,7 @@ export const DashboardLayout = ({
     organizations,
     team,
     project,
-    hasOrganizationPermission
+    hasOrganizationPermission,
   } = useOrganizationTeamProject();
 
   const [query, setQuery] = useState("");
@@ -313,7 +317,9 @@ export const DashboardLayout = ({
               label={projectRoutes.prompts.title}
               project={project}
             /> */}
-            {hasOrganizationPermission(OrganizationRoleGroup.ORGANIZATION_VIEW) && (
+            {hasOrganizationPermission(
+              OrganizationRoleGroup.ORGANIZATION_VIEW
+            ) && (
               <SideMenuLink
                 path={projectRoutes.settings.path}
                 icon={Settings}
@@ -380,6 +386,21 @@ export const DashboardLayout = ({
           )}
           <Spacer />
           <Menu>
+            {currentRoute === projectRoutes.messages && (
+              <>
+                <Text color="black" fontSize="sm">
+                  Dev Mode
+                </Text>
+                <Stack align="center" direction="row">
+                  <Switch
+                    size={"lg"}
+                    onChange={toggleDevView}
+                    isChecked={isDevViewEnabled}
+                  />
+                </Stack>
+              </>
+            )}
+
             <MenuButton as={Button} variant="unstyled">
               <Avatar
                 name={user.name ?? undefined}

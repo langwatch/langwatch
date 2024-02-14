@@ -23,6 +23,7 @@ import { useRouter } from "next/router";
 import NProgress from "nprogress";
 import { useEffect } from "react";
 import { Analytics } from "@vercel/analytics/react";
+import { DevViewProvider } from "~/hooks/DevViewProvider";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -153,7 +154,10 @@ const LangWatch: AppType<{
             href="https://cdnjs.cloudflare.com/ajax/libs/nprogress/0.2.0/nprogress.min.css"
           />
         </Head>
-        <Component {...pageProps} />
+        <DevViewProvider>
+          <Component {...pageProps} />
+        </DevViewProvider>
+
         <Analytics />
       </ChakraProvider>
     </SessionProvider>
