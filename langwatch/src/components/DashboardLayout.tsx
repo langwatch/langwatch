@@ -48,6 +48,7 @@ import { ProjectTechStackIcon } from "./TechStack";
 import { LogoIcon } from "./icons/LogoIcon";
 import { dependencies } from "../injection/dependencies.client";
 import { OrganizationRoleGroup } from "../server/api/permission";
+import { useDevView } from "../hooks/DevViewProvider";
 
 const Breadcrumbs = ({ currentRoute }: { currentRoute: Route | undefined }) => {
   const { project } = useOrganizationTeamProject();
@@ -227,7 +228,7 @@ export const DashboardLayout = ({
   const router = useRouter();
   const theme = useTheme();
   const gray400 = theme.colors.gray["400"];
-  const [devMode, setDevMode] = useState(false);
+  const { isDevViewEnabled, toggleDevView } = useDevView();
 
   const { data: session } = useRequiredSession();
 
@@ -241,30 +242,6 @@ export const DashboardLayout = ({
   } = useOrganizationTeamProject();
 
   const [query, setQuery] = useState("");
-
-  useEffect(() => {
-    const mode = router.query.mode;
-    if (mode === "dev") {
-      setDevMode(true);
-    }
-  }, [router.query.mode]);
-
-  const handleModeChange = () => {
-    console.log(devMode);
-    setDevMode((devMode) => !devMode);
-    const mode = devMode ? "" : "dev";
-
-    const query = {
-      ...router.query,
-      mode: mode,
-    };
-    void router.push({ query });
-
-    // void router.replace({
-    //   pathname: router.pathname,
-    //   query: query,
-    // });
-  };
 
   if (typeof router.query.project === "string" && !isLoading && !project) {
     return <ErrorPage statusCode={404} />;
@@ -417,8 +394,8 @@ export const DashboardLayout = ({
                 <Stack align="center" direction="row">
                   <Switch
                     size={"lg"}
-                    onChange={handleModeChange}
-                    isChecked={devMode}
+                    onChange={toggleDevView}
+                    isChecked={isDevViewEnabled}
                   />
                 </Stack>
               </>
