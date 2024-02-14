@@ -251,10 +251,12 @@ export function SpanTree() {
     ? spans.data?.find((span) => span.span_id === spanId)
     : undefined;
 
+  const messagesPath = router.asPath.split("/")[2];
+
   useEffect(() => {
     if (!spanId && project && traceId && spans.data && spans.data[0]) {
       void router.replace(
-        `/${project.slug}/messages/${traceId}/spans/${spans.data[0].span_id}`
+        `/${project.slug}/${messagesPath}/${traceId}/spans/${spans.data[0].span_id}`
       );
     }
   }, [project, router, spanId, spans.data, traceId]);

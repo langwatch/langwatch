@@ -36,6 +36,7 @@ import type { Trace } from "../../../../server/tracer/types";
 import { api } from "../../../../utils/api";
 import { isNotFound } from "../../../../utils/trpcError";
 import { TeamRoleGroup } from "../../../../server/api/permission";
+import { MessagesDevMode } from "~/components/MessagesDevMode";
 
 export default function TraceDetails() {
   const router = useRouter();
@@ -68,6 +69,10 @@ export default function TraceDetails() {
 
   if (isNotFound(trace.error)) {
     return <ErrorPage statusCode={404} />;
+  }
+
+  if (router.query.mode === "dev") {
+    return <MessagesDevMode />;
   }
 
   return (
