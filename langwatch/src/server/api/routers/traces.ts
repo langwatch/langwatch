@@ -71,7 +71,7 @@ export const tracesRouter = createTRPCRouter({
 
       const queryConditions = [
         ...generateTraceQueryConditions(input),
-        ...(input.topics ? [{ terms: { topics: input.topics } }] : []),
+        ...(input.topics ? [{ terms: { "metadata.topics": input.topics } }] : []),
       ];
 
       const canSeeCosts = await backendHasTeamProjectPermission(
