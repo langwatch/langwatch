@@ -24,7 +24,7 @@ describe("LanguageCheck Integration", () => {
     const result = await languageCheck(sampleTrace, [], parameters);
 
     expect(result.status).toBe("failed");
-    expect(result.value).toBe(1);
+    expect(result.value).toBe(0);
   });
 
   it("evaluates language check with a specific expected language", async () => {
@@ -46,7 +46,7 @@ describe("LanguageCheck Integration", () => {
 
     const result = await languageCheck(sampleTrace, [], parameters);
     expect(result.status).toBe("succeeded");
-    expect(result.value).toBe(0);
+    expect(result.value).toBe(1);
   });
 
 
@@ -69,6 +69,6 @@ describe("LanguageCheck Integration", () => {
 
     const result = await languageCheck(sampleTrace, [], parameters);
     expect(result.status).toBe("succeeded");
-    expect(result.value).toBe(0);
+    expect(result.value).toBe(1);
   });
 });

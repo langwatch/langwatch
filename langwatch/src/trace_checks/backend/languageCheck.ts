@@ -42,9 +42,17 @@ export const languageCheck = async (
       languages.match &&
       (parameters.expectedLanguage === "any" ||
         languages.input.includes(parameters.expectedLanguage));
-  } else if (parameters.checkFor === "input_language" && languages.input) {
+  } else if (
+    (parameters.checkFor === "input_language" ||
+      parameters.checkFor === "input_matches_output") &&
+    languages.input
+  ) {
     match = languages.input.includes(parameters.expectedLanguage);
-  } else if (parameters.checkFor === "output_language" && languages.output) {
+  } else if (
+    (parameters.checkFor === "output_language" ||
+      parameters.checkFor === "input_matches_output") &&
+    languages.output
+  ) {
     match = languages.output.includes(parameters.expectedLanguage);
   }
 
