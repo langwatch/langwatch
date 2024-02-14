@@ -87,6 +87,13 @@ export const theme = extendTheme({
         }),
       },
     }),
+    Drawer: defineStyleConfig({
+      sizes: {
+        span: {
+          dialog: { maxWidth: "70%" },
+        },
+      },
+    }),
     Switch: defineMultiStyleConfig({
       variants: {
         darkerTrack: definePartsStyle({

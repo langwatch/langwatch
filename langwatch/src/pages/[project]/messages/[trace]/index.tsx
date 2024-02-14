@@ -2,17 +2,20 @@ import {
   Avatar,
   Box,
   Container,
+  Drawer,
+  DrawerBody,
+  DrawerCloseButton,
+  DrawerContent,
+  DrawerHeader,
   HStack,
   Heading,
   Skeleton,
   SkeletonCircle,
-  Slide,
   Spacer,
   Spinner,
   Text,
   Tooltip,
   VStack,
-  useBreakpointValue,
 } from "@chakra-ui/react";
 import { format, formatDistanceToNow } from "date-fns";
 import ErrorPage from "next/error";
@@ -48,11 +51,6 @@ export default function TraceDetails() {
 
   const [initialDelay, setInitialDelay] = useState<boolean>(false);
   const [isTabOpen, setTabOpen] = useState<boolean>(false);
-  const drawerWidth = useBreakpointValue({
-    base: "80%",
-    lg: "70%",
-    "2xl": "60%",
-  });
 
   useEffect(() => {
     if (!hasTeamPermission(TeamRoleGroup.SPANS_DEBUG)) return;
@@ -60,6 +58,7 @@ export default function TraceDetails() {
       () => {
         const isOpen = (!!threadId || !!trace.data) && !!openTab;
         setTabOpen(isOpen);
+
         if (isOpen) setInitialDelay(true);
       },
       initialDelay ? 0 : 400
@@ -113,11 +112,7 @@ export default function TraceDetails() {
         >
           <Box
             transition="all 0.3s ease-in-out"
-            width={{
-              base: isTabOpen ? "20%" : "full",
-              lg: isTabOpen ? "30%" : "full",
-              "2xl": isTabOpen ? "40%" : "full",
-            }}
+            width={"full"}
             height="100vh"
             maxHeight="100vh"
             overflowX="hidden"
@@ -130,50 +125,24 @@ export default function TraceDetails() {
           >
             <Conversation threadId={threadId} />
           </Box>
-
-          {isTabOpen && (
-            <Slide
-              transition={{ enter: { duration: 0.3, ease: "easeInOut" } }}
-              direction="right"
-              in={!!openTab}
-              style={{ position: "static", minWidth: drawerWidth }}
-            >
-              <Box
-                width="100%"
-                height="100%"
-                overflowY="hidden"
-                paddingLeft="20px"
-                marginLeft="-20px"
-                position="relative"
-              >
-                <Box
-                  position="absolute"
-                  height="100%"
-                  top="0"
-                  left="0px"
-                  width="40px"
-                  cursor="e-resize"
-                  zIndex={2}
-                  onClick={() => {
-                    void router.replace(
-                      `/${project?.slug}/messages/${traceId}`
-                    );
-                  }}
-                ></Box>
-                <VStack
-                  background="white"
-                  maxWidth="1600px"
-                  borderLeft="1px solid"
-                  borderColor="gray.200"
-                  height="100%"
-                  boxShadow="2px 2px 20px rgba(0,0,0,.3)"
-                >
-                  <TraceSummary />
-                  {openTab === "spans" && <SpanTree />}
-                </VStack>
-              </Box>
-            </Slide>
-          )}
+          <Drawer
+            isOpen={isTabOpen}
+            placement="right"
+            size={"span"}
+            onClose={() => {
+              setTabOpen(false);
+              void router.replace(`/${project?.slug}/messages/${traceId}`);
+            }}
+          >
+            <DrawerContent>
+              <DrawerCloseButton />
+              <DrawerHeader>Message Info</DrawerHeader>
+              <DrawerBody>
+                <TraceSummary />
+                {openTab === "spans" && <SpanTree />}
+              </DrawerBody>
+            </DrawerContent>
+          </Drawer>
         </HStack>
       </Box>
     </DashboardLayout>
