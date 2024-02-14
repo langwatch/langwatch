@@ -276,16 +276,23 @@ export const DashboardLayout = ({
         borderRightColor="gray.300"
         background="white"
       >
-        <VStack
-          paddingX={8}
-          paddingY={8}
-          spacing={16}
-          position="sticky"
-          top={0}
-        >
+        <VStack paddingX={6} paddingY={8} spacing={8} position="sticky" top={0}>
           <Box fontSize={32} fontWeight="bold">
             <LogoIcon width={25} height={34} />
           </Box>
+          <Text
+            whiteSpace="nowrap"
+            bg="blue.500"
+            color="white"
+            paddingX="2"
+            paddingY="1"
+            borderRadius="lg"
+            fontSize={11}
+            fontWeight="bold"
+            hidden={!isDevViewEnabled}
+          >
+            Dev Mode
+          </Text>
           <VStack spacing={8}>
             <SideMenuLink
               path={projectRoutes.home.path}
@@ -388,9 +395,6 @@ export const DashboardLayout = ({
           <Menu>
             {currentRoute === projectRoutes.messages && (
               <>
-                <Text color="black" fontSize="sm">
-                  Dev Mode
-                </Text>
                 <Stack align="center" direction="row">
                   <Switch
                     size={"lg"}
@@ -404,7 +408,7 @@ export const DashboardLayout = ({
             <MenuButton as={Button} variant="unstyled">
               <Avatar
                 name={user.name ?? undefined}
-                backgroundColor="orange.400"
+                backgroundColor={isDevViewEnabled ? "blue.500" : "orange.400"}
                 color="white"
                 size="sm"
               />

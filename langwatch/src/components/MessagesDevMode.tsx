@@ -306,7 +306,7 @@ export function MessagesDevMode() {
                         cursor="pointer"
                         onClick={() => {
                           void router.replace(
-                            `/${project?.slug}/messages-dev/${trace.trace_id}/spans`
+                            `/${project?.slug}/messages/${trace.trace_id}/spans`
                           );
                         }}
                       >
@@ -322,7 +322,7 @@ export function MessagesDevMode() {
                   {traceGroups.isFetching &&
                     Array.from({ length: 3 }).map((_, i) => (
                       <Tr key={i}>
-                        {Array.from({ length: 5 }).map((_, i) => (
+                        {Array.from({ length: 8 }).map((_, i) => (
                           <Td key={i}>
                             <Skeleton height="20px" />
                           </Td>
@@ -340,7 +340,7 @@ export function MessagesDevMode() {
         placement="right"
         size={"span"}
         onClose={() => {
-          void router.replace(`/${project?.slug}/messages-dev`);
+          void router.replace(`/${project?.slug}/messages`);
         }}
       >
         <DrawerContent>
