@@ -11,12 +11,13 @@ import {
 import { Controller, useFormContext } from "react-hook-form";
 import type {
   CheckPrecondition,
-  CustomCheckFields,
+  CheckPreconditionFields,
 } from "../../trace_checks/types";
 import { HorizontalFormControl } from "../HorizontalFormControl";
 import { HelpCircle, X } from "react-feather";
 import { SmallLabel } from "../SmallLabel";
 import { getTraceCheckDefinitions } from "../../trace_checks/registry";
+import { useEffect } from "react";
 
 const ruleOptions: Record<CheckPrecondition["rule"], string> = {
   not_contains: "does not contain",
@@ -25,9 +26,10 @@ const ruleOptions: Record<CheckPrecondition["rule"], string> = {
   matches_regex: "matches regex",
 };
 
-const fieldOptions: Record<CustomCheckFields, string> = {
+const fieldOptions: Record<CheckPreconditionFields, string> = {
   output: "output",
   input: "input",
+  "metadata.labels": "metadata.labels",
 };
 
 export const PreconditionsField = ({
@@ -41,11 +43,26 @@ export const PreconditionsField = ({
   remove: (index: number) => void;
   fields: Record<"id", string>[];
 }) => {
-  const { control, watch } = useFormContext();
+  const { control, watch, setValue } = useFormContext();
   const preconditions = watch("preconditions");
   const checkType = watch("checkType");
 
   const check = getTraceCheckDefinitions(checkType);
+
+  useEffect(() => {
+    for (const precondition of preconditions) {
+      if (
+        precondition.rule === "is_similar_to" &&
+        !["input", "output"].includes(precondition.field)
+      ) {
+        setValue(
+          `preconditions.${preconditions.indexOf(precondition)}.rule`,
+          "contains"
+        );
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [JSON.stringify(preconditions), setValue]); // has to stringify otherwise it will not trigger
 
   return (
     <HorizontalFormControl
@@ -112,11 +129,17 @@ export const PreconditionsField = ({
                   {...control.register(`preconditions.${index}.rule`)}
                   minWidth="fit-content"
                 >
-                  {Object.entries(ruleOptions).map(([value, label]) => (
-                    <option key={value} value={value}>
-                      {label}
-                    </option>
-                  ))}
+                  {Object.entries(ruleOptions)
+                    .filter(
+                      ([value, _]) =>
+                        value !== "is_similar_to" ||
+                        ["input", "output"].includes(preconditions[index].field)
+                    )
+                    .map(([value, label]) => (
+                      <option key={value} value={value}>
+                        {label}
+                      </option>
+                    ))}
                 </Select>
               </HStack>
               <HStack width="full">

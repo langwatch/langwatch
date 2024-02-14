@@ -5,7 +5,7 @@ import { scheduleTraceCheck } from "../../../server/background/queues/traceCheck
 import { getTraceCheckDefinitions } from "../../../trace_checks/registry";
 import type {
   CheckPreconditions,
-  CheckTypes
+  CheckTypes,
 } from "../../../trace_checks/types";
 import { debug } from "../collector";
 
@@ -24,24 +24,42 @@ async function evaluatePreconditions(
   }
 
   for (const precondition of preconditions) {
-    const valueToCheck = precondition.field === "input"
-      ? trace.input.value
-      : trace.output?.value ?? "";
+    const valueMap = {
+      input: trace.input.value,
+      output: trace.output?.value ?? "",
+      "metadata.labels": trace.metadata.labels ?? [],
+    };
+    const valueToCheck = valueMap[precondition.field];
+    const valueToCheckArrayOrLowercase = Array.isArray(valueToCheck)
+      ? valueToCheck
+      : valueToCheck.toLowerCase();
+    const valueToCheckStringOrStringified = Array.isArray(valueToCheck)
+      ? JSON.stringify(valueToCheck)
+      : valueToCheck.toLowerCase();
+
     switch (precondition.rule) {
       case "contains":
-        if (!valueToCheck.toLowerCase().includes(precondition.value.toLowerCase())) {
+        if (
+          !valueToCheckArrayOrLowercase.includes(
+            precondition.value.toLowerCase()
+          )
+        ) {
           return false;
         }
         break;
       case "not_contains":
-        if (valueToCheck.toLowerCase().includes(precondition.value.toLowerCase())) {
+        if (
+          valueToCheckArrayOrLowercase.includes(
+            precondition.value.toLowerCase()
+          )
+        ) {
           return false;
         }
         break;
       case "matches_regex":
         try {
           const regex = new RegExp(precondition.value, "gi");
-          if (!regex.test(valueToCheck)) {
+          if (!regex.test(valueToCheckStringOrStringified)) {
             return false;
           }
         } catch (error) {
@@ -52,18 +70,27 @@ async function evaluatePreconditions(
         }
         break;
       case "is_similar_to":
-        const embeddings = precondition.openai_embeddings ?? [];
-        if (embeddings.length === 0 ||
-          !trace.search_embeddings.openai_embeddings) {
+        const embeddingsMap = {
+          input: trace.input.openai_embeddings ?? [],
+          output: trace.output?.openai_embeddings ?? [],
+          "metadata.labels": null,
+        };
+        const embeddings = embeddingsMap[precondition.field];
+        if (!embeddings) {
           console.error(
-            "No embeddings provided for is_similar_to precondition."
+            `${precondition.field} is not available for embeddings match`
           );
           return false;
         }
-        const similarityScore = similarity(
-          embeddings,
-          trace.search_embeddings.openai_embeddings
-        );
+
+        const preconditionEmbeddings = precondition.openai_embeddings;
+        if (!preconditionEmbeddings || preconditionEmbeddings.length === 0) {
+          console.error(
+            `No embeddings provided for is_similar_to precondition on ${precondition.field} field.`
+          );
+          return false;
+        }
+        const similarityScore = similarity(preconditionEmbeddings, embeddings);
         if ((similarityScore ?? 0) < precondition.threshold) {
           return false;
         }

@@ -291,9 +291,11 @@ export type CustomCheckRule =
 
 export type CustomCheckRules = CustomCheckRule[];
 
+export type CheckPreconditionFields = "input" | "output" | "metadata.labels";
+
 export type CheckPrecondition =
   | {
-      field: CustomCheckFields;
+      field: CheckPreconditionFields;
       rule: "contains";
       /**
        * @minLength 1
@@ -302,7 +304,7 @@ export type CheckPrecondition =
       value: string;
     }
   | {
-      field: CustomCheckFields;
+      field: CheckPreconditionFields;
       rule: "not_contains";
       /**
        * @minLength 1
@@ -311,7 +313,7 @@ export type CheckPrecondition =
       value: string;
     }
   | {
-      field: CustomCheckFields;
+      field: CheckPreconditionFields;
       rule: "matches_regex";
       /**
        * @minLength 1
@@ -320,7 +322,7 @@ export type CheckPrecondition =
       value: string;
     }
   | {
-      field: CustomCheckFields;
+      field: CheckPreconditionFields;
       rule: "is_similar_to";
       /**
        * @minLength 1
