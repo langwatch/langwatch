@@ -19,13 +19,15 @@ import {
   VStack,
   useTheme,
   type BackgroundProps,
+  Stack,
+  Switch,
 } from "@chakra-ui/react";
 import { type Project } from "@prisma/client";
 import { signOut } from "next-auth/react";
 import ErrorPage from "next/error";
 import Head from "next/head";
 import { useRouter } from "next/router";
-import { useState, type PropsWithChildren } from "react";
+import { useState, type PropsWithChildren, useEffect } from "react";
 import {
   ChevronDown,
   ChevronRight,
@@ -225,6 +227,7 @@ export const DashboardLayout = ({
   const router = useRouter();
   const theme = useTheme();
   const gray400 = theme.colors.gray["400"];
+  const [devMode, setDevMode] = useState(false);
 
   const { data: session } = useRequiredSession();
 
@@ -234,10 +237,34 @@ export const DashboardLayout = ({
     organizations,
     team,
     project,
-    hasOrganizationPermission
+    hasOrganizationPermission,
   } = useOrganizationTeamProject();
 
   const [query, setQuery] = useState("");
+
+  useEffect(() => {
+    const mode = router.query.mode;
+    if (mode === "dev") {
+      setDevMode(true);
+    }
+  }, [router.query.mode]);
+
+  const handleModeChange = () => {
+    console.log(devMode);
+    setDevMode((devMode) => !devMode);
+    const mode = devMode ? "" : "dev";
+
+    const query = {
+      ...router.query,
+      mode: mode,
+    };
+    void router.push({ query });
+
+    // void router.replace({
+    //   pathname: router.pathname,
+    //   query: query,
+    // });
+  };
 
   if (typeof router.query.project === "string" && !isLoading && !project) {
     return <ErrorPage statusCode={404} />;
@@ -313,7 +340,9 @@ export const DashboardLayout = ({
               label={projectRoutes.prompts.title}
               project={project}
             /> */}
-            {hasOrganizationPermission(OrganizationRoleGroup.ORGANIZATION_VIEW) && (
+            {hasOrganizationPermission(
+              OrganizationRoleGroup.ORGANIZATION_VIEW
+            ) && (
               <SideMenuLink
                 path={projectRoutes.settings.path}
                 icon={Settings}
@@ -380,6 +409,21 @@ export const DashboardLayout = ({
           )}
           <Spacer />
           <Menu>
+            {currentRoute === projectRoutes.messages && (
+              <>
+                <Text color="black" fontSize="sm">
+                  Dev Mode
+                </Text>
+                <Stack align="center" direction="row">
+                  <Switch
+                    size={"lg"}
+                    onChange={handleModeChange}
+                    isChecked={devMode}
+                  />
+                </Stack>
+              </>
+            )}
+
             <MenuButton as={Button} variant="unstyled">
               <Avatar
                 name={user.name ?? undefined}
