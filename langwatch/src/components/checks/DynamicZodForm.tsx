@@ -13,6 +13,11 @@ import { z, type ZodType } from "zod";
 import { camelCaseToTitleCase } from "../../utils/stringCasing";
 import { HorizontalFormControl } from "../HorizontalFormControl";
 import { getTraceCheckDefinitions } from "../../trace_checks/registry";
+import type {
+  CheckTypes,
+  Checks,
+  TraceCheckDefinition,
+} from "../../trace_checks/types";
 
 const DynamicZodForm = ({
   schema,
@@ -25,9 +30,10 @@ const DynamicZodForm = ({
 }) => {
   const { control, register } = useFormContext();
 
-  const renderField = (
+  const renderField = <T extends CheckTypes>(
     fieldSchema: ZodType,
-    fieldName: string
+    fieldName: string,
+    checkDefinition: TraceCheckDefinition<T> | undefined
   ): React.JSX.Element | null => {
     const fullPath = prefix ? `${prefix}.${fieldName}` : fieldName;
 
@@ -72,7 +78,11 @@ const DynamicZodForm = ({
               {fieldSchema.options.map(
                 (option: { value: string }, index: number) => (
                   <option key={index} value={option.value}>
-                    {option.value}
+                    {(
+                      checkDefinition?.parametersDescription[
+                        fieldName as keyof Checks[T]["parameters"]
+                      ]?.labels as any
+                    )?.[option.value] ?? option.value}
                   </option>
                 )
               )}
@@ -90,7 +100,11 @@ const DynamicZodForm = ({
         <VStack>
           {fields.map((field, index) => (
             <HStack key={field.id}>
-              {renderField(fieldSchema.element, `${fieldName}.${index}`)}
+              {renderField(
+                fieldSchema.element,
+                `${fieldName}.${index}`,
+                checkDefinition
+              )}
               <Button onClick={() => remove(index)}>Remove</Button>
             </HStack>
           ))}
@@ -102,7 +116,11 @@ const DynamicZodForm = ({
         <VStack spacing={2}>
           {Object.keys(fieldSchema.shape).map((key) => (
             <React.Fragment key={key}>
-              {renderField(fieldSchema.shape[key], `${fieldName}.${key}`)}
+              {renderField(
+                fieldSchema.shape[key],
+                `${fieldName}.${key}`,
+                checkDefinition
+              )}
             </React.Fragment>
           ))}
         </VStack>
@@ -114,21 +132,24 @@ const DynamicZodForm = ({
 
   const renderSchema = (schema: ZodType, basePath = "") => {
     if (schema instanceof z.ZodObject) {
+      const checkDefinition = getTraceCheckDefinitions(checkType);
+
       return Object.keys(schema.shape).map((key) => (
         <React.Fragment key={key}>
           <HorizontalFormControl
             label={
-              (getTraceCheckDefinitions(checkType)?.parametersDescription as any)?.[key]
-                ?.name ?? camelCaseToTitleCase(key)
+              (checkDefinition?.parametersDescription as any)?.[key]?.name ??
+              camelCaseToTitleCase(key)
             }
             helper={
-              (getTraceCheckDefinitions(checkType)?.parametersDescription as any)?.[key]
+              (checkDefinition?.parametersDescription as any)?.[key]
                 ?.description ?? ""
             }
           >
             {renderField(
               schema.shape[key],
-              basePath ? `${basePath}.${key}` : key
+              basePath ? `${basePath}.${key}` : key,
+              checkDefinition
             )}
           </HorizontalFormControl>
         </React.Fragment>

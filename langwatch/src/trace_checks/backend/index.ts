@@ -3,6 +3,7 @@ import type { CheckTypes, Checks, TraceCheckResult } from "../types";
 import { customCheck } from "./customCheck";
 import { inconsistencyCheck } from "./inconsistencyCheck";
 import { jailbreakCheck } from "./jailbreakCheck";
+import { languageCheck } from "./languageCheck";
 import { piiCheck } from "./piiCheck";
 import { ragasAnswerRelevancy } from "./ragasAnswerRelevancy";
 import { ragasContextPrecision } from "./ragasContextPrecision";
@@ -24,6 +25,7 @@ export const TRACE_CHECKS_EXECUTORS: {
   ragas_faithfulness: ragasFaithfulness,
   ragas_context_precision: ragasContextPrecision,
   inconsistency_check: inconsistencyCheck,
+  language_check: languageCheck,
 };
 
 export const getCheckExecutor = (checkType: string) => {

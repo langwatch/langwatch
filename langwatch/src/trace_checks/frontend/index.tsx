@@ -8,6 +8,7 @@ import { RagasAnswerRelevancy } from "./ragasAnswerRelevancy";
 import { RagasFaithfulness } from "./ragasFaithfulness";
 import { RagasContextPrecision } from "./ragasContextPrecision";
 import type { TraceCheck } from "../../server/tracer/types";
+import { LanguageCheck } from "./languageCheck";
 
 export const RENDER_TRACE_CHECKS: {
   [K in CheckTypes]: (props: { check: TraceCheck }) => JSX.Element;
@@ -19,6 +20,7 @@ export const RENDER_TRACE_CHECKS: {
   ragas_faithfulness: RagasFaithfulness,
   ragas_context_precision: RagasContextPrecision,
   inconsistency_check: InconsistencyCheck,
+  language_check: LanguageCheck,
   custom: CustomCheck,
 };
 

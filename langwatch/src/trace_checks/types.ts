@@ -42,6 +42,88 @@ export type Checks = {
   inconsistency_check: {
     parameters: Record<string, never>;
   };
+  language_check: {
+    parameters: {
+      checkFor: "input_matches_output" | "input_language" | "output_language";
+      expectedLanguage:
+        | "any"
+        | "AF"
+        | "AR"
+        | "AZ"
+        | "BE"
+        | "BG"
+        | "BN"
+        | "BS"
+        | "CA"
+        | "CS"
+        | "CY"
+        | "DA"
+        | "DE"
+        | "EL"
+        | "EN"
+        | "EO"
+        | "ES"
+        | "ET"
+        | "EU"
+        | "FA"
+        | "FI"
+        | "FR"
+        | "GA"
+        | "GU"
+        | "HE"
+        | "HI"
+        | "HR"
+        | "HU"
+        | "HY"
+        | "ID"
+        | "IS"
+        | "IT"
+        | "JA"
+        | "KA"
+        | "KK"
+        | "KO"
+        | "LA"
+        | "LG"
+        | "LT"
+        | "LV"
+        | "MI"
+        | "MK"
+        | "MN"
+        | "MR"
+        | "MS"
+        | "NB"
+        | "NL"
+        | "NN"
+        | "PA"
+        | "PL"
+        | "PT"
+        | "RO"
+        | "RU"
+        | "SK"
+        | "SL"
+        | "SN"
+        | "SO"
+        | "SQ"
+        | "SR"
+        | "ST"
+        | "SV"
+        | "SW"
+        | "TA"
+        | "TE"
+        | "TH"
+        | "TL"
+        | "TN"
+        | "TR"
+        | "TS"
+        | "UK"
+        | "UR"
+        | "VI"
+        | "XH"
+        | "YO"
+        | "ZH"
+        | "ZU";
+    };
+  };
   custom: {
     parameters: {
       rules: CustomCheckRules;
@@ -63,10 +145,15 @@ export type TraceCheckDefinition<T extends CheckTypes> = {
   description: string;
   valueDisplayType: "boolean" | "number";
   requiresRag?: boolean;
-  parametersDescription: Record<
-    keyof Checks[T]["parameters"],
-    { name?: string; description?: string }
-  >;
+  parametersDescription: {
+    [K in keyof Checks[T]["parameters"]]: {
+      name?: string;
+      description?: string;
+      labels?: Checks[T]["parameters"][K] extends string
+        ? { [V in Checks[T]["parameters"][K]]: string }
+        : never;
+    };
+  };
   default: {
     parameters: Checks[T]["parameters"];
     preconditions?: CheckPreconditions;
@@ -106,6 +193,14 @@ export type RagasResult = {
 
 export type InconsistencyCheckResult = {
   sentences: string[];
+};
+
+export type LanguageCheckApiResponse = {
+  languages: {
+    match: boolean;
+    input?: string[];
+    output?: string[];
+  };
 };
 
 // Custom Checks
