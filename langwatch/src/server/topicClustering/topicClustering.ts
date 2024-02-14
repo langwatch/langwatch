@@ -1,6 +1,6 @@
 import { env } from "../../env.mjs";
 import type { ElasticSearchTrace, Trace } from "../tracer/types";
-import { TRACE_INDEX, esClient } from "../elasticsearch";
+import { TRACE_INDEX, esClient, traceIndexId } from "../elasticsearch";
 import { getDebugger } from "../../utils/logger";
 import type { Money } from "../../utils/types";
 import http2 from "http2";
@@ -14,7 +14,8 @@ const debug = getDebugger("langwatch:topicClustering");
 
 export const clusterTopicsForProject = async (
   projectId: string,
-  searchAfter?: [number, string]
+  searchAfter?: [number, string],
+  scheduleNextPage = true
 ): Promise<void> => {
   const tracesCount = await esClient.count({
     index: TRACE_INDEX,
@@ -63,7 +64,7 @@ export const clusterTopicsForProject = async (
         },
       },
       _source: ["trace_id", "input"],
-      sort: [{ "timestamps.inserted_at": "asc" }, { id: "asc" }],
+      sort: [{ "timestamps.inserted_at": "asc" }, { trace_id: "asc" }],
       ...(searchAfter ? { search_after: searchAfter } : {}),
       size: 1000,
     },
@@ -96,7 +97,11 @@ export const clusterTopicsForProject = async (
         "next page",
         lastTraceSort
       );
-      await scheduleTopicClusteringNextPage(projectId, lastTraceSort);
+      if (scheduleNextPage) {
+        await scheduleTopicClusteringNextPage(projectId, lastTraceSort);
+      } else {
+        debug("Skipping scheduling next page for project", projectId, "which would be", lastTraceSort);
+      }
     }
   }
 
@@ -157,7 +162,7 @@ export const clusterTraces = async (projectId: string, traces: Trace[]) => {
       : "- Skipping ElasticSearch update"
   );
   const body = Object.entries(topics).flatMap(([traceId, topic]) => [
-    { update: { _id: traceId } },
+    { update: { _id: traceIndexId({ traceId, projectId }) } },
     {
       doc: {
         metadata: { topics: [topic] },
