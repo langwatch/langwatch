@@ -2,10 +2,14 @@ import { useOrganizationTeamProject } from "./useOrganizationTeamProject";
 import { api } from "../utils/api";
 import { useRouter } from "next/router";
 
-export function useTraceDetailsState() {
+export function useTraceDetailsState(trace_id?: string) {
   const router = useRouter();
   const traceId =
-    typeof router.query.trace === "string" ? router.query.trace : undefined;
+    typeof router.query.trace === "string"
+      ? router.query.trace
+      : trace_id
+      ? trace_id
+      : undefined;
   const spanId =
     typeof router.query.span === "string" ? router.query.span : undefined;
   const openTab =

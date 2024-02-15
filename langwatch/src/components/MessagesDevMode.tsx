@@ -47,13 +47,14 @@ import { ChevronDown, List } from "react-feather";
 import type { Trace } from "~/server/tracer/types";
 import { SpanTree } from "./traces/SpanTree";
 import { TraceSummary } from "./traces/Summary";
-import { useTraceDetailsState } from "~/hooks/useTraceDetailsState";
 import { useRef } from "react";
 
 export function MessagesDevMode() {
   const router = useRouter();
   const { project } = useOrganizationTeamProject();
-  const { openTab } = useTraceDetailsState();
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [traceId, setTraceId] = useState<string | null>(null);
+
   const {
     period: { startDate, endDate },
     setPeriod,
@@ -206,7 +207,7 @@ export function MessagesDevMode() {
     )
   );
 
-  const isFirstRender = useRef(true); // Create a ref to track the first render
+  const isFirstRender = useRef(true);
 
   useEffect(() => {
     if (
@@ -214,7 +215,7 @@ export function MessagesDevMode() {
       !traceChecksQuery.isFetching &&
       isFirstRender.current
     ) {
-      isFirstRender.current = false; // Set the flag to false after the first render
+      isFirstRender.current = false;
 
       setSelectedHeaderColumns((prevSelectedHeaderColumns) => ({
         ...prevSelectedHeaderColumns,
@@ -233,7 +234,7 @@ export function MessagesDevMode() {
 
   return (
     <DashboardLayout>
-      <Container maxWidth="1600" padding="6">
+      <Container maxWidth="1400" padding="6">
         <HStack width="full" align="top">
           <Heading as={"h1"} size="lg" paddingBottom={6} paddingTop={1}>
             Messages
@@ -305,9 +306,8 @@ export function MessagesDevMode() {
                         role="button"
                         cursor="pointer"
                         onClick={() => {
-                          void router.replace(
-                            `/${project?.slug}/messages/${trace.trace_id}/spans`
-                          );
+                          setTraceId(trace.trace_id);
+                          setIsDrawerOpen(true);
                         }}
                       >
                         {Object.entries(selectedHeaderColumns)
@@ -336,19 +336,19 @@ export function MessagesDevMode() {
         </Card>
       </Container>
       <Drawer
-        isOpen={openTab === "spans"}
+        isOpen={isDrawerOpen}
         placement="right"
         size={"span"}
         onClose={() => {
-          void router.replace(`/${project?.slug}/messages`);
+          setIsDrawerOpen(false);
         }}
       >
         <DrawerContent>
           <DrawerCloseButton />
           <DrawerHeader>Message Info</DrawerHeader>
           <DrawerBody>
-            <TraceSummary />
-            {openTab === "spans" && <SpanTree />}
+            <TraceSummary traceId={traceId ?? ""} />
+            <SpanTree traceId={traceId ?? ""} />
           </DrawerBody>
         </DrawerContent>
       </Drawer>

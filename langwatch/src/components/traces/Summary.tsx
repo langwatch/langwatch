@@ -52,8 +52,11 @@ const SummaryItem = ({
   );
 };
 
-export function TraceSummary() {
-  const { trace } = useTraceDetailsState();
+type TraceSummaryProps = {
+  traceId?: string;
+};
+export function TraceSummary(props?: TraceSummaryProps) {
+  const { trace } = useTraceDetailsState(props?.traceId);
 
   const [height, setHeight] = useState<number | undefined>(undefined);
   const summaryRef = useRef<HTMLDivElement>();

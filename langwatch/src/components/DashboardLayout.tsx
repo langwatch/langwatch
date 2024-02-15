@@ -90,9 +90,13 @@ const SideMenuLink = ({
 }) => {
   const router = useRouter();
   const currentRoute = findCurrentRoute(router.pathname);
+  const { isDevViewEnabled } = useDevView();
 
   const theme = useTheme();
   const orange400 = theme.colors.orange["400"];
+  const blue500 = theme.colors.blue["500"];
+
+  const activeColor = isDevViewEnabled ? blue500 : orange400;
 
   const IconElem = icon;
 
@@ -105,7 +109,7 @@ const SideMenuLink = ({
   return (
     <Link href={path.replace("[project]", project.slug)} aria-label={label}>
       <VStack>
-        <IconElem size={24} color={isActive ? orange400 : undefined} />
+        <IconElem size={24} color={isActive ? activeColor : undefined} />
       </VStack>
     </Link>
   );
@@ -121,6 +125,8 @@ const ProjectSelector = ({
   const router = useRouter();
   const currentRoute = findCurrentRoute(router.pathname);
   const { data: session } = useRequiredSession();
+
+  console.log(router.pathname.includes("messages"));
 
   const sortByName = (a: { name: string }, b: { name: string }) =>
     a.name.toLowerCase() < b.name.toLowerCase()
@@ -393,18 +399,15 @@ export const DashboardLayout = ({
           )}
           <Spacer />
           <Menu>
-            {currentRoute === projectRoutes.messages && (
-              <>
-                <Stack align="center" direction="row">
-                  <Switch
-                    size={"lg"}
-                    onChange={toggleDevView}
-                    isChecked={isDevViewEnabled}
-                  />
-                </Stack>
-              </>
-            )}
-
+            <Stack align="center" direction="row">
+              {router.pathname.includes("messages") && (
+                <Switch
+                  size="lg"
+                  onChange={toggleDevView}
+                  isChecked={isDevViewEnabled}
+                />
+              )}
+            </Stack>
             <MenuButton as={Button} variant="unstyled">
               <Avatar
                 name={user.name ?? undefined}

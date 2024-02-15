@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState } from "react";
+import { useRouter } from "next/router";
+import React, { createContext, useContext, useState, useEffect } from "react";
 
 interface DevViewContextType {
   isDevViewEnabled: boolean;
@@ -17,9 +18,20 @@ export const useDevView = (): DevViewContextType => {
 
 export const DevViewProvider = ({ children }) => {
   const [isDevViewEnabled, setIsDevViewEnabled] = useState(false);
+  const router = useRouter();
+
+  console.log(router.query.mode);
+
+  useEffect(() => {
+    const modeQueryParam = router.query.mode as string;
+    setIsDevViewEnabled(modeQueryParam === "dev");
+  }, [router.query.mode]);
 
   const toggleDevView = () => {
     setIsDevViewEnabled((prev) => !prev);
+    const mode = !isDevViewEnabled ? "dev" : "";
+
+    void router.replace({ query: { ...router.query, mode } });
   };
 
   return (

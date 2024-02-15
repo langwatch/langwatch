@@ -239,24 +239,37 @@ const SpanCost = ({ span }: { span: ElasticSearchSpan }) => {
   return numeral(span.metrics.cost).format("$0.00000a");
 };
 
-export function SpanTree() {
-  const { traceId, spanId, trace } = useTraceDetailsState();
+type SpanTreeProps = {
+  traceId?: string;
+};
+export function SpanTree(props?: SpanTreeProps) {
+  const { traceId, spanId, trace } = useTraceDetailsState(props.traceId);
   const router = useRouter();
   const { project } = useOrganizationTeamProject();
   const spans = api.spans.getAllForTrace.useQuery(
     { projectId: project?.id ?? "", traceId: traceId ?? "" },
     { enabled: !!project && !!traceId, refetchOnWindowFocus: false }
   );
+
+  const spanIdDev = spans?.data ? spans.data[0]?.span_id : undefined;
+
   const span = spanId
-    ? spans.data?.find((span) => span.span_id === spanId)
+    ? spans.data?.find((span) => span.span_id === spanIdDev)
+    : spanIdDev
+    ? spans.data?.[0]
     : undefined;
 
-  const messagesPath = router.asPath.split("/")[2];
-
   useEffect(() => {
-    if (!spanId && project && traceId && spans.data && spans.data[0]) {
+    if (
+      !spanId &&
+      project &&
+      traceId &&
+      spans.data &&
+      spans.data[0] &&
+      router.query.mode !== "dev"
+    ) {
       void router.replace(
-        `/${project.slug}/${messagesPath}/${traceId}/spans/${spans.data[0].span_id}`
+        `/${project.slug}/messages/${traceId}/spans/${spans.data[0].span_id}`
       );
     }
   }, [project, router, spanId, spans.data, traceId]);
