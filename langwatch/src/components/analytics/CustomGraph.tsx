@@ -4,6 +4,7 @@ import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
 import type { inferRouterOutputs } from "@trpc/server";
 import { format } from "date-fns";
 import numeral from "numeral";
+import React from "react";
 import {
   Area,
   AreaChart,
@@ -27,9 +28,8 @@ import {
 } from "../../server/analytics/registry";
 import type { AppRouter } from "../../server/api/root";
 import { api } from "../../utils/api";
-import { uppercaseFirstLetterLowerCaseRest } from "../../utils/stringCasing";
+import { uppercaseFirstLetter } from "../../utils/stringCasing";
 import type { Unpacked } from "../../utils/types";
-import React from "react";
 
 export type CustomGraphInput = {
   graphId: string;
@@ -71,6 +71,20 @@ export function CustomGraph({ input }: { input: CustomGraphInput }) {
     currentAndPreviousData,
     expectedKeys
   );
+  const sortedKeys = expectedKeys.sort((a, b) => {
+    const totalA =
+      currentAndPreviousDataFilled?.reduce(
+        (acc, entry) => acc + (entry[a] ?? 0),
+        0
+      ) ?? 0;
+    const totalB =
+      currentAndPreviousDataFilled?.reduce(
+        (acc, entry) => acc + (entry[b] ?? 0),
+        0
+      ) ?? 0;
+
+    return totalB - totalA;
+  });
 
   const seriesByKey = Object.fromEntries(
     input.series.map((series) => {
@@ -106,7 +120,7 @@ export function CustomGraph({ input }: { input: CustomGraphInput }) {
     return input.series.length > 1
       ? (series?.name ?? aggKey) + (groupName ? ` (${groupName})` : "")
       : groupName
-      ? uppercaseFirstLetterLowerCaseRest(groupName)
+      ? uppercaseFirstLetter(groupName)
       : series?.name ?? aggKey;
   };
 
@@ -163,8 +177,14 @@ export function CustomGraph({ input }: { input: CustomGraphInput }) {
             );
           }}
         />
-        <Legend />
-        {(expectedKeys ?? []).map((aggKey, index) => (
+        <Legend
+          wrapperStyle={{
+            padding: "0 2rem",
+            maxHeight: "15%",
+            overflow: "auto",
+          }}
+        />
+        {(sortedKeys ?? []).map((aggKey, index) => (
           <React.Fragment key={aggKey}>
             {/* @ts-ignore */}
             <GraphElement
