@@ -1,4 +1,5 @@
 import { useRouter } from "next/router";
+import type { PropsWithChildren } from "react";
 import React, { createContext, useContext, useState, useEffect } from "react";
 
 interface DevViewContextType {
@@ -16,7 +17,7 @@ export const useDevView = (): DevViewContextType => {
   return context;
 };
 
-export const DevViewProvider = ({ children }) => {
+export const DevViewProvider = ({ children }: PropsWithChildren) => {
   const [isDevViewEnabled, setIsDevViewEnabled] = useState(false);
   const router = useRouter();
 
