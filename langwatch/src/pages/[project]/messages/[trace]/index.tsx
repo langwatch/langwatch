@@ -38,6 +38,7 @@ import { isNotFound } from "../../../../utils/trpcError";
 import { TeamRoleGroup } from "../../../../server/api/permission";
 import { MessagesDevMode } from "~/components/MessagesDevMode";
 import { useDevView } from "../../../../hooks/DevViewProvider";
+import { Maximize2, Minimize2, type Icon } from "react-feather";
 
 export default function TraceDetails() {
   const router = useRouter();
@@ -45,6 +46,11 @@ export default function TraceDetails() {
   const { traceId, trace, openTab } = useTraceDetailsState();
   const [threadId, setThreadId] = useState<string | undefined>(undefined);
   const { isDevViewEnabled } = useDevView();
+  const [traceView, setTraceView] = useState<"span" | "full">("span");
+
+  const toggleView = () => {
+    setTraceView((prevView) => (prevView === "span" ? "full" : "span"));
+  };
 
   useEffect(() => {
     if (trace.data?.metadata.thread_id) {
@@ -135,15 +141,25 @@ export default function TraceDetails() {
           <Drawer
             isOpen={isTabOpen}
             placement="right"
-            size={"span"}
+            size={traceView}
             onClose={() => {
               setTabOpen(false);
+              setTraceView("span");
               void router.replace(`/${project?.slug}/messages/${traceId}`);
             }}
           >
             <DrawerContent>
-              <DrawerCloseButton />
-              <DrawerHeader>Message Info</DrawerHeader>
+              <DrawerHeader>
+                <HStack>
+                  {traceView === "span" ? (
+                    <Maximize2 onClick={toggleView} cursor={"pointer"} />
+                  ) : (
+                    <Minimize2 onClick={toggleView} cursor={"pointer"} />
+                  )}
+                  <Text>Trace Details</Text>
+                  <DrawerCloseButton />
+                </HStack>
+              </DrawerHeader>
               <DrawerBody>
                 <TraceSummary />
                 {openTab === "spans" && <SpanTree />}

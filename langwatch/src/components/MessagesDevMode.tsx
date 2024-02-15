@@ -48,12 +48,18 @@ import type { Trace } from "~/server/tracer/types";
 import { SpanTree } from "./traces/SpanTree";
 import { TraceSummary } from "./traces/Summary";
 import { useRef } from "react";
+import { Maximize2, Minimize2, type Icon } from "react-feather";
 
 export function MessagesDevMode() {
   const router = useRouter();
   const { project } = useOrganizationTeamProject();
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [traceId, setTraceId] = useState<string | null>(null);
+  const [traceView, setTraceView] = useState<"span" | "full">("span");
+
+  const toggleView = () => {
+    setTraceView((prevView) => (prevView === "span" ? "full" : "span"));
+  };
 
   const {
     period: { startDate, endDate },
@@ -338,14 +344,24 @@ export function MessagesDevMode() {
       <Drawer
         isOpen={isDrawerOpen}
         placement="right"
-        size={"span"}
+        size={traceView}
         onClose={() => {
           setIsDrawerOpen(false);
+          setTraceView("span");
         }}
       >
         <DrawerContent>
-          <DrawerCloseButton />
-          <DrawerHeader>Message Info</DrawerHeader>
+          <DrawerHeader>
+            <HStack>
+              {traceView === "span" ? (
+                <Maximize2 onClick={toggleView} cursor={"pointer"} />
+              ) : (
+                <Minimize2 onClick={toggleView} cursor={"pointer"} />
+              )}
+              <Text>Trace Details</Text>
+              <DrawerCloseButton />
+            </HStack>
+          </DrawerHeader>
           <DrawerBody>
             <TraceSummary traceId={traceId ?? ""} />
             <SpanTree traceId={traceId ?? ""} />
