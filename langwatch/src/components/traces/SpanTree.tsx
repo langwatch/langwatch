@@ -243,7 +243,7 @@ type SpanTreeProps = {
   traceId?: string;
 };
 export function SpanTree(props?: SpanTreeProps) {
-  const { traceId, spanId, trace } = useTraceDetailsState(props.traceId);
+  const { traceId, spanId, trace } = useTraceDetailsState(props?.traceId);
   const router = useRouter();
   const { project } = useOrganizationTeamProject();
   const spans = api.spans.getAllForTrace.useQuery(
