@@ -13,21 +13,22 @@ import {
   FormLabel,
   HStack,
   Heading,
+  Input,
   Select,
   Spacer,
   Switch,
   Text,
-  VStack
+  VStack,
 } from "@chakra-ui/react";
 import { Select as MultiSelect, chakraComponents } from "chakra-react-select";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type Dispatch, type SetStateAction } from "react";
 import { BarChart2, Trash, TrendingUp, Triangle } from "react-feather";
 import {
   Controller,
   useFieldArray,
   useForm,
   type FieldArrayWithId,
-  type UseFieldArrayReturn
+  type UseFieldArrayReturn,
 } from "react-hook-form";
 import { DashboardLayout } from "../../../components/DashboardLayout";
 import { FilterSelector } from "../../../components/FilterSelector";
@@ -237,21 +238,31 @@ function CustomGraphForm({
               field={field}
               index={index}
               seriesFields={seriesFields}
+              setExpandedSeries={setExpandedSeries}
             />
           ))}
         </Accordion>
         <Button
           onClick={() => {
-            seriesFields.append({
-              name: "Users count",
-              metric: "metadata.user_id",
-              aggregation: "cardinality",
-              pipeline: {
-                field: "",
-                aggregation: "avg",
+            const index = seriesFields.fields.length;
+            seriesFields.append(
+              {
+                name: "Users count",
+                metric: "metadata.user_id",
+                aggregation: "cardinality",
+                pipeline: {
+                  field: "",
+                  aggregation: "avg",
+                },
               },
-            });
-            setExpandedSeries([seriesFields.fields.length]);
+              { shouldFocus: false }
+            );
+            setTimeout(() => {
+              form.resetField(`series.${index}.name`, {
+                defaultValue: "Users count",
+              });
+            }, 0);
+            setExpandedSeries([index]);
             if (!form.getFieldState("includePrevious")?.isTouched) {
               form.setValue("includePrevious", false);
             }
@@ -311,14 +322,14 @@ function SeriesFieldItem({
   field,
   index,
   seriesFields,
+  setExpandedSeries,
 }: {
   form: ReturnType<typeof useForm<CustomGraphFormData>>;
   field: FieldArrayWithId<CustomGraphFormData, "series", "id">;
   index: number;
   seriesFields: UseFieldArrayReturn<CustomGraphFormData, "series", "id">;
+  setExpandedSeries: Dispatch<SetStateAction<number | number[]>>;
 }) {
-  const name = form.watch(`series.${index}.name`);
-
   return (
     <AccordionItem
       key={field.id}
@@ -326,9 +337,26 @@ function SeriesFieldItem({
       borderColor="gray.200"
       marginBottom={4}
     >
-      <AccordionButton background="gray.100" fontWeight="bold">
-        <HStack width="full">
-          <Text>{name}</Text>
+      <AccordionButton background="gray.100" fontWeight="bold" paddingLeft={1}>
+        <HStack width="full" spacing={4}>
+          <Input
+            {...form.control.register(`series.${index}.name`)}
+            border="none"
+            paddingX={3}
+            onClick={(e) => {
+              e.stopPropagation();
+            }}
+            onDoubleClick={() => {
+              setExpandedSeries((prev) => {
+                if (Array.isArray(prev)) {
+                  return prev.includes(index)
+                    ? prev.filter((i) => i !== index)
+                    : [...prev, index];
+                }
+                return prev;
+              });
+            }}
+          />
           <Spacer />
           {seriesFields.fields.length > 1 && (
             <Trash
@@ -382,7 +410,9 @@ function SeriesField({
         .join(" ")
     );
 
-    form.setValue(`series.${index}.name`, name);
+    if (!form.getFieldState(`series.${index}.name`)?.isTouched) {
+      form.setValue(`series.${index}.name`, name);
+    }
   }, [aggregation, form, index, metric, pipelineAggregation, pipelineField]);
 
   return (
