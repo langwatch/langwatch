@@ -21,8 +21,6 @@ export const DevViewProvider = ({ children }: PropsWithChildren) => {
   const [isDevViewEnabled, setIsDevViewEnabled] = useState(false);
   const router = useRouter();
 
-  console.log(router.query.mode);
-
   useEffect(() => {
     const modeQueryParam = router.query.mode as string;
     setIsDevViewEnabled(modeQueryParam === "dev");

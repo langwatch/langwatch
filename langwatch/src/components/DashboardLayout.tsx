@@ -126,8 +126,6 @@ const ProjectSelector = ({
   const currentRoute = findCurrentRoute(router.pathname);
   const { data: session } = useRequiredSession();
 
-  console.log(router.pathname.includes("messages"));
-
   const sortByName = (a: { name: string }, b: { name: string }) =>
     a.name.toLowerCase() < b.name.toLowerCase()
       ? -1
