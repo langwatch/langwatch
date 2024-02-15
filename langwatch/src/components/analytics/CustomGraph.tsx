@@ -73,27 +73,28 @@ export function CustomGraph({ input }: { input: CustomGraphInput }) {
     currentAndPreviousData,
     expectedKeys
   );
-  const sortedKeys = expectedKeys.reverse().sort((a, b) => {
-    if (
-      a.startsWith("positive>") ||
-      a.startsWith("negative>")
-    ) {
-      return 0;
-    }
-    if (a.startsWith("neutral>")) return 1;
-    const totalA =
+  const keysToSum = Object.fromEntries(
+    expectedKeys.map((key) => [
+      key,
       currentAndPreviousDataFilled?.reduce(
-        (acc, entry) => acc + (entry[a] ?? 0),
+        (acc, entry) => acc + (entry[key] ?? 0),
         0
-      ) ?? 0;
-    const totalB =
-      currentAndPreviousDataFilled?.reduce(
-        (acc, entry) => acc + (entry[b] ?? 0),
-        0
-      ) ?? 0;
+      ),
+    ])
+  );
+  const sortedKeys = expectedKeys
+    .reverse()
+    .filter((key) => keysToSum[key]! > 0)
+    .sort((a, b) => {
+      if (a.startsWith("positive>") || a.startsWith("negative>")) {
+        return 0;
+      }
+      if (a.startsWith("neutral>")) return 1;
+      const totalA = keysToSum[a]!;
+      const totalB = keysToSum[b]!;
 
-    return totalB - totalA;
-  });
+      return totalB - totalA;
+    });
 
   const seriesByKey = Object.fromEntries(
     input.series.map((series) => {

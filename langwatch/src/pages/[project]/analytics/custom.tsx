@@ -486,9 +486,9 @@ function SeriesField({
   );
 
   const metricField = form.control.register(`series.${index}.metric`);
+  const metric_ = metric ? getMetric(metric) : undefined;
 
   useEffect(() => {
-    const metric_ = metric ? getMetric(metric)?.label ?? metric : undefined;
     const aggregation_ = aggregation
       ? metricAggregations[aggregation] ?? aggregation
       : undefined;
@@ -501,7 +501,7 @@ function SeriesField({
         : undefined;
 
     const name = uppercaseFirstLetterLowerCaseRest(
-      [pipelineAggregation_, metric_, aggregation_, pipeline_]
+      [pipelineAggregation_, metric_?.label, aggregation_, pipeline_]
         .filter((x) => x)
         .join(" ")
     );
@@ -509,10 +509,20 @@ function SeriesField({
     if (!form.getFieldState(`series.${index}.name`)?.isTouched) {
       form.setValue(`series.${index}.name`, name);
     }
-    if (!form.getFieldState(`series.${index}.colorSet`)?.isTouched) {
-      form.setValue(`series.${index}.colorSet`, getMetric(metric).colorSet);
+    if (!form.getFieldState(`series.${index}.colorSet`)?.isTouched && metric_) {
+      form.setValue(`series.${index}.colorSet`, metric_.colorSet);
     }
-  }, [aggregation, form, index, metric, pipelineAggregation, pipelineField]);
+  }, [
+    aggregation,
+    form,
+    index,
+    metric,
+    metric_,
+    metric_?.colorSet,
+    metric_?.label,
+    pipelineAggregation,
+    pipelineField,
+  ]);
 
   return (
     <VStack align="start" width="full" spacing={4}>

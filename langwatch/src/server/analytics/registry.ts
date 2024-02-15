@@ -86,10 +86,9 @@ export const analyticsMetrics = {
                           child: {
                             filter: {
                               bool: {
-                                // TODO: why is this not working
-                                // must: [
-                                //   { term: { "events.metrics.key": "vote" } },
-                                // ],
+                                must: [
+                                  { term: { "events.metrics.key": "vote" } },
+                                ],
                                 must_not: {
                                   term: { "events.metrics.value": 0 },
                                 },
@@ -321,9 +320,7 @@ export const analyticsGroups = {
                 script: {
                   script: {
                     source:
-                      // TODO: check also for key type == vote
-                      // "doc['events.metrics.key'].size() == 0 ? false : doc['events.metrics.key'].value == 'vote'",
-                      "doc['events.metrics.value'].size() == 0 ? false : doc['events.metrics.value'].value == 1",
+                      "doc['events.metrics.key'].size() > 0 && doc['events.metrics.value'].size() > 0 && doc['events.metrics.key'].value == 'vote' && doc['events.metrics.value'].value == 1",
                     lang: "painless",
                   },
                 },
@@ -332,9 +329,7 @@ export const analyticsGroups = {
                 script: {
                   script: {
                     source:
-                      // TODO: check also for key type == vote
-                      // "doc['events.metrics.key'].size() == 0 ? false : doc['events.metrics.key'].value == 'vote'",
-                      "doc['events.metrics.value'].size() == 0 ? false : doc['events.metrics.value'].value == -1",
+                      "doc['events.metrics.key'].size() > 0 && doc['events.metrics.value'].size() > 0 && doc['events.metrics.key'].value == 'vote' && doc['events.metrics.value'].value == -1",
                     lang: "painless",
                   },
                 },

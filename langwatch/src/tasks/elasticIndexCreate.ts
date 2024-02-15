@@ -341,7 +341,42 @@ async function createPivotTableTransform() {
   ) => {
     let copyScript = "";
     for (const [key, value] of Object.entries(mapping)) {
-      if ("properties" in value && value.properties) {
+      if (
+        "properties" in value &&
+        value.properties &&
+        value.type === "nested"
+      ) {
+        const propertyKeys = Object.keys(value.properties);
+        const keyPath = [...parents, key].join(".");
+
+        copyScript += `
+            List ${key}_list = new ArrayList();
+
+            for (int i = 0; i < doc['${namespacePrefix}${key}.${
+              propertyKeys[0]
+            }'].size(); ++i) {
+              Map ${key}_item = new HashMap();
+              ${propertyKeys
+                .map((propertyKey) => {
+                  return `
+                    if (doc.containsKey('${namespacePrefix}${key}.${propertyKey}') && doc['${namespacePrefix}${key}.${propertyKey}'].size() > i) {
+                      if (doc['${namespacePrefix}${key}.${propertyKey}'].size() > 1) {
+                        ${key}_item.put('${propertyKey}', doc['${namespacePrefix}${key}.${propertyKey}'][i]);
+                      } else {
+                        ${key}_item.put('${propertyKey}', doc['${namespacePrefix}${key}.${propertyKey}'].value);
+                      }
+
+                    }
+                  `;
+                })
+                .join("\n")}
+
+              ${key}_list.add(${key}_item);
+            }
+
+            ${stateKey}.put('${keyPath}', ${key}_list);
+        `;
+      } else if ("properties" in value && value.properties) {
         copyScript += getCopyScript(
           value.properties,
           stateKey,
@@ -523,7 +558,7 @@ async function createPivotTableTransform() {
       },
       settings: {
         max_page_search_size: 100,
-      }
+      },
     },
   });
 

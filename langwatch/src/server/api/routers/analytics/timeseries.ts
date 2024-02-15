@@ -241,7 +241,10 @@ const extractResult = (
   for (const path of paths) {
     current = current[path];
   }
-  return { [`${metric}/${aggregation}`]: current.value };
+  return {
+    [`${metric}/${aggregation}`]:
+      current && typeof current === "object" ? current.value : current,
+  };
 };
 
 const pipelinePath = (
