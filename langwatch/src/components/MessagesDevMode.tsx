@@ -2,11 +2,9 @@ import {
   Table,
   Thead,
   Tbody,
-  Tfoot,
   Tr,
   Th,
   Td,
-  TableCaption,
   TableContainer,
   HStack,
   Heading,
@@ -15,15 +13,11 @@ import {
   Button,
   Card,
   CardBody,
-  CardHeader,
   Text,
   Skeleton,
   Box,
   Popover,
   PopoverTrigger,
-  FormControl,
-  FormLabel,
-  Input,
   PopoverArrow,
   PopoverBody,
   PopoverCloseButton,
@@ -32,6 +26,11 @@ import {
   VStack,
   useDisclosure,
   Checkbox,
+  Drawer,
+  DrawerBody,
+  DrawerCloseButton,
+  DrawerContent,
+  DrawerHeader,
 } from "@chakra-ui/react";
 import { DashboardLayout } from "./DashboardLayout";
 import { FilterSelector } from "./FilterSelector";
@@ -41,18 +40,21 @@ import { use, useEffect, useState } from "react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { getSingleQueryParam } from "~/utils/getSingleQueryParam";
 import { api } from "~/utils/api";
-import { formatMilliseconds } from "~/utils/formatMilliseconds";
 import { durationColor } from "~/utils/durationColor";
 import numeral from "numeral";
 import { getTraceCheckDefinitions } from "~/trace_checks/registry";
-import { Select as MultiSelect, type MultiValue } from "chakra-react-select";
-import { ChevronDown, Filter, List } from "react-feather";
-import { threadId } from "worker_threads";
+import { ChevronDown, List } from "react-feather";
 import type { Trace } from "~/server/tracer/types";
+import { SpanTree } from "./traces/SpanTree";
+import { TraceSummary } from "./traces/Summary";
+import { useRef } from "react";
 
 export function MessagesDevMode() {
   const router = useRouter();
   const { project } = useOrganizationTeamProject();
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [traceId, setTraceId] = useState<string | null>(null);
+
   const {
     period: { startDate, endDate },
     setPeriod,
@@ -205,22 +207,34 @@ export function MessagesDevMode() {
     )
   );
 
+  const isFirstRender = useRef(true);
+
   useEffect(() => {
-    setSelectedHeaderColumns({
-      ...selectedHeaderColumns,
-      ...Object.fromEntries(
-        Object.values(checksAvailable)
-          .filter((key) => !Object.keys(selectedHeaderColumns).includes(key))
-          .map((column) => [column, true])
-      ),
-    });
-  }, [checksAvailable, selectedHeaderColumns]);
+    if (
+      traceChecksQuery.isFetched &&
+      !traceChecksQuery.isFetching &&
+      isFirstRender.current
+    ) {
+      isFirstRender.current = false;
+
+      setSelectedHeaderColumns((prevSelectedHeaderColumns) => ({
+        ...prevSelectedHeaderColumns,
+        ...Object.fromEntries(
+          Object.values(checksAvailable)
+            .filter(
+              (key) => !Object.keys(prevSelectedHeaderColumns).includes(key)
+            )
+            .map((column) => [column, true])
+        ),
+      }));
+    }
+  }, [traceChecksQuery, checksAvailable]);
 
   const { isOpen, onOpen, onClose } = useDisclosure();
 
   return (
     <DashboardLayout>
-      <Container maxWidth="1600" padding="6">
+      <Container maxWidth="1400" padding="6">
         <HStack width="full" align="top">
           <Heading as={"h1"} size="lg" paddingBottom={6} paddingTop={1}>
             Messages
@@ -292,9 +306,8 @@ export function MessagesDevMode() {
                         role="button"
                         cursor="pointer"
                         onClick={() => {
-                          void router.push(
-                            `/${project?.slug}/messages/${trace.trace_id}/spans`
-                          );
+                          setTraceId(trace.trace_id);
+                          setIsDrawerOpen(true);
                         }}
                       >
                         {Object.entries(selectedHeaderColumns)
@@ -309,7 +322,7 @@ export function MessagesDevMode() {
                   {traceGroups.isFetching &&
                     Array.from({ length: 3 }).map((_, i) => (
                       <Tr key={i}>
-                        {Array.from({ length: 5 }).map((_, i) => (
+                        {Array.from({ length: 8 }).map((_, i) => (
                           <Td key={i}>
                             <Skeleton height="20px" />
                           </Td>
@@ -322,6 +335,23 @@ export function MessagesDevMode() {
           </CardBody>
         </Card>
       </Container>
+      <Drawer
+        isOpen={isDrawerOpen}
+        placement="right"
+        size={"span"}
+        onClose={() => {
+          setIsDrawerOpen(false);
+        }}
+      >
+        <DrawerContent>
+          <DrawerCloseButton />
+          <DrawerHeader>Message Info</DrawerHeader>
+          <DrawerBody>
+            <TraceSummary traceId={traceId ?? ""} />
+            <SpanTree traceId={traceId ?? ""} />
+          </DrawerBody>
+        </DrawerContent>
+      </Drawer>
     </DashboardLayout>
   );
 }

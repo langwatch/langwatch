@@ -36,12 +36,15 @@ import type { Trace } from "../../../../server/tracer/types";
 import { api } from "../../../../utils/api";
 import { isNotFound } from "../../../../utils/trpcError";
 import { TeamRoleGroup } from "../../../../server/api/permission";
+import { MessagesDevMode } from "~/components/MessagesDevMode";
+import { useDevView } from "../../../../hooks/DevViewProvider";
 
 export default function TraceDetails() {
   const router = useRouter();
   const { project, hasTeamPermission } = useOrganizationTeamProject();
   const { traceId, trace, openTab } = useTraceDetailsState();
   const [threadId, setThreadId] = useState<string | undefined>(undefined);
+  const { isDevViewEnabled } = useDevView();
 
   useEffect(() => {
     if (trace.data?.metadata.thread_id) {
@@ -68,6 +71,10 @@ export default function TraceDetails() {
 
   if (isNotFound(trace.error)) {
     return <ErrorPage statusCode={404} />;
+  }
+
+  if (isDevViewEnabled) {
+    return <MessagesDevMode />;
   }
 
   return (

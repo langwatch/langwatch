@@ -50,16 +50,19 @@ import { api } from "../../utils/api";
 import { FilterSelector } from "../../components/FilterSelector";
 import { getSingleQueryParam } from "../../utils/getSingleQueryParam";
 import { MessagesDevMode } from "~/components/MessagesDevMode";
+import { useDevView } from "../../hooks/DevViewProvider";
 
 export default function MessagesOrIntegrationGuide() {
   const { project } = useOrganizationTeamProject();
   const router = useRouter();
 
+  const { isDevViewEnabled } = useDevView();
+
   if (project && !project.firstMessage) {
     return <ProjectIntegration />;
   }
 
-  if (router.query.mode === "dev") {
+  if (isDevViewEnabled) {
     return <MessagesDevMode />;
   }
 
