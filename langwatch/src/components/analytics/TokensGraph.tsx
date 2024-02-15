@@ -4,7 +4,6 @@ import {
   useIsAggregated,
 } from "../../hooks/useAnalyticsParams";
 import { api } from "../../utils/api";
-import numeral from "numeral";
 import { useGetRotatingColorForCharts } from "../../hooks/useGetRotatingColorForCharts";
 import { format } from "date-fns";
 import {
@@ -146,7 +145,7 @@ function TokensChart({ data }: { data: TokensGraphData | undefined }) {
               key={agg}
               stackId="tokens"
               dataKey={agg}
-              fill={getColor(index)}
+              fill={getColor("colors", index)}
               name={agg}
             />
           ))

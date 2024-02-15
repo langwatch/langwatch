@@ -86,7 +86,7 @@ export function CurrentVsPreviousPeriodLineChart<T extends string>({
         <Line
           type="linear"
           dataKey={valueKey}
-          stroke={getColor(0)}
+          stroke={getColor("colors", 0)}
           strokeWidth={2.5}
           dot={false}
           activeDot={{ r: 8 }}
@@ -173,8 +173,8 @@ export function AggregatedLineChart<T extends string>({
             key={agg}
             type="linear"
             dataKey={agg}
-            stroke={getColor(index)}
-            fill={getColor(index)}
+            stroke={getColor("colors", index)}
+            fill={getColor("colors", index)}
             strokeWidth={2.5}
             dot={false}
             activeDot={{ r: 8 }}

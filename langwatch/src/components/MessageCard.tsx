@@ -124,8 +124,8 @@ export function MessageCard({
             {topics.map((topic) => (
               <Tag
                 key={topic}
-                background={getColorForString(topic).background}
-                color={getColorForString(topic).color}
+                background={getColorForString("colors", topic).background}
+                color={getColorForString("colors", topic).color}
                 fontSize={12}
               >
                 {topic}
@@ -134,8 +134,8 @@ export function MessageCard({
             {(trace.metadata.labels ?? []).map((label) => (
               <Tag
                 key={label}
-                background={getColorForString(label).background}
-                color={getColorForString(label).color}
+                background={getColorForString("colors", label).background}
+                color={getColorForString("colors", label).color}
                 fontSize={12}
               >
                 {label}

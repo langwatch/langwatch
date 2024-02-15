@@ -1,4 +1,4 @@
-import { useTheme } from "@chakra-ui/react";
+import { Alert, AlertIcon, Box, Spinner, useTheme } from "@chakra-ui/react";
 import type { TRPCClientErrorLike } from "@trpc/client";
 import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
 import type { inferRouterOutputs } from "@trpc/server";
@@ -30,12 +30,14 @@ import type { AppRouter } from "../../server/api/root";
 import { api } from "../../utils/api";
 import { uppercaseFirstLetter } from "../../utils/stringCasing";
 import type { Unpacked } from "../../utils/types";
+import type { RotatingColorSet } from "../../utils/rotatingColors";
 
 export type CustomGraphInput = {
   graphId: string;
   graphType: "line" | "bar" | "stacked_bar" | "area" | "stacked_area";
   series: (Unpacked<z.infer<typeof timeseriesInput>["series"]> & {
     name: string;
+    colorSet: RotatingColorSet;
   })[];
   groupBy: z.infer<typeof timeseriesInput>["groupBy"];
   includePrevious: boolean;
@@ -71,7 +73,14 @@ export function CustomGraph({ input }: { input: CustomGraphInput }) {
     currentAndPreviousData,
     expectedKeys
   );
-  const sortedKeys = expectedKeys.sort((a, b) => {
+  const sortedKeys = expectedKeys.reverse().sort((a, b) => {
+    if (
+      a.startsWith("positive>") ||
+      a.startsWith("negative>")
+    ) {
+      return 0;
+    }
+    if (a.startsWith("neutral>")) return 1;
     const totalA =
       currentAndPreviousDataFilled?.reduce(
         (acc, entry) => acc + (entry[a] ?? 0),
@@ -101,7 +110,7 @@ export function CustomGraph({ input }: { input: CustomGraphInput }) {
     })
   );
 
-  const nameForSeries = (aggKey: string) => {
+  const getSeries = (aggKey: string) => {
     let groupKey: string | undefined;
     let seriesKey = aggKey;
 
@@ -111,6 +120,12 @@ export function CustomGraph({ input }: { input: CustomGraphInput }) {
       seriesKey = parts[1]!;
     }
     const series = seriesByKey[seriesKey];
+
+    return { series, groupKey };
+  };
+
+  const nameForSeries = (aggKey: string) => {
+    const { series, groupKey } = getSeries(aggKey);
 
     const group =
       input.groupBy && groupKey ? getGroup(input.groupBy) : undefined;
@@ -122,6 +137,13 @@ export function CustomGraph({ input }: { input: CustomGraphInput }) {
       : groupName
       ? uppercaseFirstLetter(groupName)
       : series?.name ?? aggKey;
+  };
+
+  const colorForSeries = (aggKey: string, index: number): string => {
+    const { series } = getSeries(aggKey);
+
+    const colorSet: RotatingColorSet = series?.colorSet ?? "grayTones";
+    return getColor(colorSet, index);
   };
 
   const getColor = useGetRotatingColorForCharts();
@@ -141,92 +163,116 @@ export function CustomGraph({ input }: { input: CustomGraphInput }) {
     : [LineChart, Line];
 
   return (
-    <ResponsiveContainer
-      key={currentAndPreviousDataFilled ? input.graphId : "loading"}
-      height={500}
+    <Box
+      width="full"
+      height="full"
+      position="relative"
+      paddingX={4}
+      paddingY={8}
     >
-      <GraphComponent
-        data={currentAndPreviousDataFilled}
-        margin={{ left: (valueFormat ?? "0a").length * 4 - 10 }}
+      {timeseries.isFetching && (
+        <Spinner position="absolute" right={4} top={4} />
+      )}
+      {timeseries.error && (
+        <Alert
+          status="error"
+          position="absolute"
+          variant="left-accent"
+          width="fit-content"
+          right={4}
+          top={4}
+        >
+          <AlertIcon />
+          Error loading graph data
+        </Alert>
+      )}
+      <ResponsiveContainer
+        key={currentAndPreviousDataFilled ? input.graphId : "loading"}
+        height={500}
       >
-        <CartesianGrid vertical={false} strokeDasharray="5 7" />
-        <XAxis
-          dataKey="date"
-          tickFormatter={formatDate}
-          tickLine={false}
-          axisLine={false}
-          tick={{ fill: gray400 }}
-        />
-        <YAxis
-          axisLine={false}
-          tickLine={false}
-          tickCount={4}
-          tickMargin={20}
-          domain={[0, "dataMax"]}
-          tick={{ fill: gray400 }}
-          tickFormatter={valueFormatter}
-        />
-        <Tooltip
-          formatter={valueFormatter}
-          labelFormatter={(_label, payload) => {
-            return (
-              formatDate(payload[0]?.payload.date) +
-              (input.includePrevious && payload[1]?.payload["previous>date"]
-                ? " vs " + formatDate(payload[1]?.payload["previous>date"])
-                : "")
-            );
-          }}
-        />
-        <Legend
-          wrapperStyle={{
-            padding: "0 2rem",
-            maxHeight: "15%",
-            overflow: "auto",
-          }}
-        />
-        {(sortedKeys ?? []).map((aggKey, index) => (
-          <React.Fragment key={aggKey}>
-            {/* @ts-ignore */}
-            <GraphElement
-              key={aggKey}
-              type="linear"
-              dataKey={aggKey}
-              stroke={getColor(index)}
-              stackId={
-                ["stacked_bar", "stacked_area"].includes(input.graphType)
-                  ? "same"
-                  : undefined
-              }
-              fill={getColor(index)}
-              strokeWidth={2.5}
-              dot={false}
-              activeDot={{ r: 8 }}
-              name={nameForSeries(aggKey)}
-            />
-            {input.includePrevious && (
-              // @ts-ignore
+        <GraphComponent
+          data={currentAndPreviousDataFilled}
+          margin={{ left: (valueFormat ?? "0a").length * 4 - 10 }}
+        >
+          <CartesianGrid vertical={false} strokeDasharray="5 7" />
+          <XAxis
+            dataKey="date"
+            tickFormatter={formatDate}
+            tickLine={false}
+            axisLine={false}
+            tick={{ fill: gray400 }}
+          />
+          <YAxis
+            axisLine={false}
+            tickLine={false}
+            tickCount={4}
+            tickMargin={20}
+            domain={[0, "dataMax"]}
+            tick={{ fill: gray400 }}
+            tickFormatter={valueFormatter}
+          />
+          <Tooltip
+            formatter={valueFormatter}
+            labelFormatter={(_label, payload) => {
+              return (
+                formatDate(payload[0]?.payload.date) +
+                (input.includePrevious && payload[1]?.payload["previous>date"]
+                  ? " vs " + formatDate(payload[1]?.payload["previous>date"])
+                  : "")
+              );
+            }}
+          />
+          <Legend
+            wrapperStyle={{
+              padding: "0 2rem",
+              maxHeight: "15%",
+              overflow: "auto",
+            }}
+          />
+          {(sortedKeys ?? []).map((aggKey, index) => (
+            <React.Fragment key={aggKey}>
+              {/* @ts-ignore */}
               <GraphElement
-                key={"previous>" + aggKey}
+                key={aggKey}
                 type="linear"
-                dataKey={"previous>" + aggKey}
+                dataKey={aggKey}
+                stroke={colorForSeries(aggKey, index)}
                 stackId={
                   ["stacked_bar", "stacked_area"].includes(input.graphType)
                     ? "same"
                     : undefined
                 }
-                stroke={getColor(index) + "99"}
-                fill={getColor(index) + "99"}
+                fill={colorForSeries(aggKey, index)}
                 strokeWidth={2.5}
-                strokeDasharray={"5 5"}
                 dot={false}
                 activeDot={{ r: 8 }}
-                name={"Previous " + nameForSeries(aggKey)}
+                name={nameForSeries(aggKey)}
               />
-            )}
-          </React.Fragment>
-        ))}
-      </GraphComponent>
-    </ResponsiveContainer>
+              {input.includePrevious && (
+                // @ts-ignore
+                <GraphElement
+                  key={"previous>" + aggKey}
+                  type="linear"
+                  dataKey={"previous>" + aggKey}
+                  stackId={
+                    ["stacked_bar", "stacked_area"].includes(input.graphType)
+                      ? "same"
+                      : undefined
+                  }
+                  stroke={colorForSeries(aggKey, index) + "99"}
+                  fill={colorForSeries(aggKey, index) + "99"}
+                  strokeWidth={2.5}
+                  strokeDasharray={"5 5"}
+                  dot={false}
+                  activeDot={{ r: 8 }}
+                  name={"Previous " + nameForSeries(aggKey)}
+                />
+              )}
+            </React.Fragment>
+          ))}
+        </GraphComponent>
+      </ResponsiveContainer>
+    </Box>
   );
 }
 

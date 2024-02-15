@@ -16,7 +16,7 @@ import type { AggregationsAggregationContainer } from "@elastic/elasticsearch/li
 
 const simpleFieldAnalytics = (
   field: string
-): Omit<AnalyticsMetric, "label" | "allowedAggregations"> => ({
+): Omit<AnalyticsMetric, "label" | "colorSet" | "allowedAggregations"> => ({
   aggregation: (aggregation: AggregationTypes) => ({
     [`${field.replaceAll(".", "_")}_${aggregation}`]: {
       [aggregation]: { field },
@@ -30,16 +30,19 @@ export const analyticsMetrics = {
   metadata: {
     trace_id: {
       label: "Messages",
+      colorSet: "orangeTones",
       allowedAggregations: ["cardinality"],
       ...simpleFieldAnalytics("trace.trace_id"),
     },
     user_id: {
       label: "Users",
+      colorSet: "blueTones",
       allowedAggregations: ["cardinality"],
       ...simpleFieldAnalytics("trace.metadata.user_id"),
     },
     thread_id: {
       label: "Threads",
+      colorSet: "greenTones",
       allowedAggregations: ["cardinality"],
       ...simpleFieldAnalytics("trace.metadata.thread_id"),
     },
@@ -47,11 +50,13 @@ export const analyticsMetrics = {
   sentiment: {
     input_sentiment: {
       label: "Input Sentiment Score",
+      colorSet: "yellowTones",
       allowedAggregations: allAggregationTypes,
       ...simpleFieldAnalytics("trace.input.satisfaction_score"),
     },
     thumbs_up_down: {
       label: "Thumbs Up/Down Score",
+      colorSet: "purpleTones",
       allowedAggregations: allAggregationTypes,
       aggregation: (aggregation) => ({
         [`thumbs_up_down_${aggregation}`]: {

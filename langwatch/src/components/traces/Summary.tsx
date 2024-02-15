@@ -153,8 +153,8 @@ const TraceSummaryValues = React.forwardRef(function TraceSummaryValues(
           {trace.metadata.labels.map((label) => (
             <Tag
               key={label}
-              background={getColorForString(label).background}
-              color={getColorForString(label).color}
+              background={getColorForString("colors", label).background}
+              color={getColorForString("colors", label).color}
               fontSize={12}
             >
               {label}

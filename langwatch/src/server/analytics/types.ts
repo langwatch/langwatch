@@ -7,9 +7,11 @@ import type {
   TraceCheck,
 } from "../tracer/types";
 import type { DeepRequired } from "../../utils/types";
+import type { RotatingColorSet } from "../../utils/rotatingColors";
 
 export type AnalyticsMetric = {
   label: string;
+  colorSet: RotatingColorSet;
   allowedAggregations: AggregationTypes[];
   aggregation: (
     aggregation: AggregationTypes

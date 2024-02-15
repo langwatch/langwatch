@@ -15,40 +15,40 @@ import {
   MenuList,
   Portal,
   Spacer,
+  Stack,
+  Switch,
   Text,
   VStack,
   useTheme,
   type BackgroundProps,
-  Stack,
-  Switch,
 } from "@chakra-ui/react";
 import { type Project } from "@prisma/client";
 import { signOut } from "next-auth/react";
 import ErrorPage from "next/error";
 import Head from "next/head";
 import { useRouter } from "next/router";
-import { useState, type PropsWithChildren, useEffect } from "react";
+import { useState, type PropsWithChildren } from "react";
 import {
   ChevronDown,
   ChevronRight,
-  TrendingUp,
   MessageSquare,
   Plus,
   Search,
   Settings,
   Shield,
+  TrendingUp,
   type Icon,
 } from "react-feather";
+import { useDevView } from "../hooks/DevViewProvider";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import { useRequiredSession } from "../hooks/useRequiredSession";
+import { dependencies } from "../injection/dependencies.client";
+import { OrganizationRoleGroup } from "../server/api/permission";
 import type { FullyLoadedOrganization } from "../server/api/routers/organization";
 import { findCurrentRoute, projectRoutes, type Route } from "../utils/routes";
 import { LoadingScreen } from "./LoadingScreen";
 import { ProjectTechStackIcon } from "./TechStack";
 import { LogoIcon } from "./icons/LogoIcon";
-import { dependencies } from "../injection/dependencies.client";
-import { OrganizationRoleGroup } from "../server/api/permission";
-import { useDevView } from "../hooks/DevViewProvider";
 
 const Breadcrumbs = ({ currentRoute }: { currentRoute: Route | undefined }) => {
   const { project } = useOrganizationTeamProject();

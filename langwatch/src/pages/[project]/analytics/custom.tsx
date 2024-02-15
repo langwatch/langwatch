@@ -8,17 +8,23 @@ import {
   Button,
   Card,
   CardBody,
+  Center,
   Container,
   FormControl,
   FormLabel,
   HStack,
   Heading,
   Input,
+  Menu,
+  MenuButton,
+  MenuItem,
+  MenuList,
   Select,
   Spacer,
   Switch,
   Text,
   VStack,
+  useTheme,
 } from "@chakra-ui/react";
 import { Select as MultiSelect, chakraComponents } from "chakra-react-select";
 import { useEffect, useState, type Dispatch, type SetStateAction } from "react";
@@ -58,9 +64,14 @@ import type {
   PipelineFields,
 } from "../../../server/analytics/types";
 import {
+  rotatingColors,
+  type RotatingColorSet,
+} from "../../../utils/rotatingColors";
+import {
   camelCaseToTitleCase,
   uppercaseFirstLetterLowerCaseRest,
 } from "../../../utils/stringCasing";
+import { useDebounceValue } from "usehooks-ts";
 
 export interface CustomGraphFormData {
   graphType: {
@@ -70,6 +81,7 @@ export interface CustomGraphFormData {
   };
   series: {
     name: string;
+    colorSet: RotatingColorSet;
     metric: FlattenAnalyticsMetricsEnum;
     aggregation: AggregationTypes;
     pipeline: {
@@ -114,6 +126,7 @@ const defaultValues: CustomGraphFormData = {
   series: [
     {
       name: "Messages count",
+      colorSet: "orangeTones",
       metric: "metadata.trace_id",
       aggregation: "cardinality",
       pipeline: {
@@ -139,7 +152,15 @@ export default function AnalyticsCustomGraph() {
     setPeriod,
   } = usePeriodSelector();
 
-  const formData = form.watch();
+  const formData = JSON.stringify(form.watch() ?? {});
+  const [debouncedFormData, setDebouncedFormData] = useDebounceValue(
+    formData,
+    400
+  );
+
+  useEffect(() => {
+    setDebouncedFormData(formData);
+  }, [formData, setDebouncedFormData]);
 
   return (
     <DashboardLayout>
@@ -160,15 +181,11 @@ export default function AnalyticsCustomGraph() {
             <CardBody>
               <HStack width="full" align="start" minHeight="500px" spacing={8}>
                 <CustomGraphForm form={form} seriesFields={seriesFields} />
-                <Box
-                  border="1px solid"
-                  borderColor="gray.200"
-                  width="full"
-                  paddingX={4}
-                  paddingY={8}
-                >
+                <Box border="1px solid" borderColor="gray.200" width="full">
                   <CustomGraph
-                    input={customGraphFormToCustomGraphInput(formData)}
+                    input={customGraphFormToCustomGraphInput(
+                      JSON.parse(debouncedFormData) as CustomGraphFormData
+                    )}
                   />
                 </Box>
               </HStack>
@@ -198,6 +215,7 @@ const customGraphFormToCustomGraphInput = (
       }
       return {
         name: series.name,
+        colorSet: series.colorSet,
         metric: series.metric,
         aggregation: series.aggregation,
       };
@@ -248,6 +266,7 @@ function CustomGraphForm({
             seriesFields.append(
               {
                 name: "Users count",
+                colorSet: "blueTones",
                 metric: "metadata.user_id",
                 aggregation: "cardinality",
                 pipeline: {
@@ -330,6 +349,28 @@ function SeriesFieldItem({
   seriesFields: UseFieldArrayReturn<CustomGraphFormData, "series", "id">;
   setExpandedSeries: Dispatch<SetStateAction<number | number[]>>;
 }) {
+  const theme = useTheme();
+  const colorSet = form.watch(`series.${index}.colorSet`);
+  const coneColors = rotatingColors[colorSet].map((color, i) => {
+    const [name, number] = color.color.split(".");
+    const color_ = theme.colors[name ?? ""][+(number ?? "")];
+    const len = rotatingColors[colorSet].length;
+
+    return `${color_} ${(i / len) * 100}%, ${color_} ${((i + 1) / len) * 100}%`;
+  });
+
+  const seriesLength = form.watch(`series`).length;
+  const groupBy = form.watch("groupBy");
+
+  useEffect(() => {
+    if (seriesLength === 1 && groupBy) {
+      form.setValue(
+        `series.${index}.colorSet`,
+        groupBy.startsWith("sentiment") ? "positiveNegativeNeutral" : "colors"
+      );
+    }
+  }, [form, groupBy, index, seriesLength]);
+
   return (
     <AccordionItem
       key={field.id}
@@ -339,24 +380,79 @@ function SeriesFieldItem({
     >
       <AccordionButton background="gray.100" fontWeight="bold" paddingLeft={1}>
         <HStack width="full" spacing={4}>
-          <Input
-            {...form.control.register(`series.${index}.name`)}
-            border="none"
-            paddingX={3}
-            onClick={(e) => {
-              e.stopPropagation();
-            }}
-            onDoubleClick={() => {
-              setExpandedSeries((prev) => {
-                if (Array.isArray(prev)) {
-                  return prev.includes(index)
-                    ? prev.filter((i) => i !== index)
-                    : [...prev, index];
-                }
-                return prev;
-              });
-            }}
-          />
+          <HStack spacing={1}>
+            <Menu>
+              <MenuButton
+                as={Button}
+                variant="unstyled"
+                onClick={(e) => {
+                  e.stopPropagation();
+                }}
+              >
+                <Center>
+                  <Box
+                    width="32px"
+                    height="32px"
+                    borderRadius="100%"
+                    background={`conic-gradient(from -${
+                      360 / coneColors.length
+                    }deg, ${coneColors.join(", ")})`}
+                  ></Box>
+                </Center>
+              </MenuButton>
+              <MenuList>
+                {Object.entries(rotatingColors).map(([key, colorSet]) => (
+                  <MenuItem
+                    key={key}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      form.setValue(
+                        `series.${index}.colorSet`,
+                        key as RotatingColorSet,
+                        { shouldTouch: true }
+                      );
+                    }}
+                  >
+                    <VStack align="start" spacing={2}>
+                      <Text>{camelCaseToTitleCase(key)}</Text>
+                      <HStack spacing={0} paddingLeft="12px">
+                        {colorSet.map((color, i) => {
+                          return (
+                            <Box
+                              key={i}
+                              width="32px"
+                              height="32px"
+                              borderRadius="100%"
+                              backgroundColor={color.color}
+                              marginLeft="-12px"
+                            ></Box>
+                          );
+                        })}
+                      </HStack>
+                    </VStack>
+                  </MenuItem>
+                ))}
+              </MenuList>
+            </Menu>
+            <Input
+              {...form.control.register(`series.${index}.name`)}
+              border="none"
+              paddingX={2}
+              onClick={(e) => {
+                e.stopPropagation();
+              }}
+              onDoubleClick={() => {
+                setExpandedSeries((prev) => {
+                  if (Array.isArray(prev)) {
+                    return prev.includes(index)
+                      ? prev.filter((i) => i !== index)
+                      : [...prev, index];
+                  }
+                  return prev;
+                });
+              }}
+            />
+          </HStack>
           <Spacer />
           {seriesFields.fields.length > 1 && (
             <Trash
@@ -412,6 +508,9 @@ function SeriesField({
 
     if (!form.getFieldState(`series.${index}.name`)?.isTouched) {
       form.setValue(`series.${index}.name`, name);
+    }
+    if (!form.getFieldState(`series.${index}.colorSet`)?.isTouched) {
+      form.setValue(`series.${index}.colorSet`, getMetric(metric).colorSet);
     }
   }, [aggregation, form, index, metric, pipelineAggregation, pipelineField]);
 

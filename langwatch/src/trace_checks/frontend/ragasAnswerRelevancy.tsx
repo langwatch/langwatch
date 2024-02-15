@@ -1,7 +1,6 @@
 import { Text, VStack } from "@chakra-ui/react";
 import type { TraceCheck } from "../../server/tracer/types";
 import type { RagasResult } from "../types";
-import { toFixedWithoutRounding } from "../../utils/toFixedWithoutRounding";
 import numeral from "numeral";
 
 export function RagasAnswerRelevancy({ check }: { check: TraceCheck }) {
