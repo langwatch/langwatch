@@ -428,7 +428,6 @@ async function createPivotTableTransform() {
       },
       pivot: {
         group_by: {
-          // TODO: make this a keyword field
           project_trace_id: {
             terms: {
               script: {
@@ -522,6 +521,9 @@ async function createPivotTableTransform() {
           delay: "60s",
         },
       },
+      settings: {
+        max_page_search_size: 100,
+      }
     },
   });
 
