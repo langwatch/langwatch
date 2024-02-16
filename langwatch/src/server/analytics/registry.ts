@@ -627,6 +627,34 @@ export const analyticsGroups = {
         "thumbs_up_down_group>child>filter>child>buckets>back_to_root",
     },
   },
+  events: {
+    event_type: {
+      label: "Event Type",
+      aggregation: (aggToGroup) => ({
+        check_state_group: {
+          nested: {
+            path: "events",
+          },
+          aggs: {
+            child: {
+              terms: {
+                field: "events.event_type",
+                size: 100,
+                missing: "unknown",
+              },
+              aggs: {
+                back_to_root: {
+                  reverse_nested: {},
+                  aggs: aggToGroup,
+                },
+              },
+            },
+          },
+        },
+      }),
+      extractionPath: () => "check_state_group>child>buckets>back_to_root",
+    },
+  },
   evaluations: {
     check_state: {
       label: "Check State",
