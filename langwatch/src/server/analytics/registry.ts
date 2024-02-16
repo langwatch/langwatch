@@ -586,6 +586,15 @@ export const analyticsGroups = {
                   },
                 },
               },
+              neutral: {
+                script: {
+                  script: {
+                    source:
+                      "doc['events.metrics.key'].size() > 0 && doc['events.metrics.value'].size() > 0 && doc['events.metrics.key'].value == 'vote' && doc['events.metrics.value'].value == 0",
+                    lang: "painless",
+                  },
+                },
+              },
             },
           },
           aggs: {

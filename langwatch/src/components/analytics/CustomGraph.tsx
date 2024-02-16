@@ -83,13 +83,8 @@ export function CustomGraph({ input }: { input: CustomGraphInput }) {
     ])
   );
   const sortedKeys = expectedKeys
-    .reverse()
     .filter((key) => keysToSum[key]! > 0)
     .sort((a, b) => {
-      if (a.startsWith("positive>") || a.startsWith("negative>")) {
-        return 0;
-      }
-      if (a.startsWith("neutral>")) return 1;
       const totalA = keysToSum[a]!;
       const totalB = keysToSum[b]!;
 
@@ -141,9 +136,24 @@ export function CustomGraph({ input }: { input: CustomGraphInput }) {
   };
 
   const colorForSeries = (aggKey: string, index: number): string => {
-    const { series } = getSeries(aggKey);
+    const { series, groupKey } = getSeries(aggKey);
 
     const colorSet: RotatingColorSet = series?.colorSet ?? "grayTones";
+
+    if (colorSet === "positiveNegativeNeutral" && groupKey) {
+      const [positive, negative, neutral] = [0, 1, 2];
+      const colorMap: Record<string, number> = {
+        positive,
+        negative,
+        neutral,
+        error: negative,
+        failed: negative,
+        succeeded: positive,
+      };
+
+      return getColor(colorSet, colorMap[groupKey] ?? neutral);
+    }
+
     return getColor(colorSet, index);
   };
 
