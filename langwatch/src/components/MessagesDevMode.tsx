@@ -61,7 +61,7 @@ export function MessagesDevMode() {
   const [traceView, setTraceView] = useState<"span" | "full">("span");
   const [totalHits, setTotalHits] = useState<number>(0);
   const [pageOffset, setPageOffset] = useState<number>(0);
-  const [pageSize, setPageSize] = useState<number>(10);
+  const [pageSize, setPageSize] = useState<number>(25);
 
   const toggleView = () => {
     setTraceView((prevView) => (prevView === "span" ? "full" : "span"));
@@ -237,11 +237,17 @@ export function MessagesDevMode() {
     setPageOffset(0);
   }
 
-
+  interface SearchTotalHits {
+    value: number;
+  }
   useEffect(() => {
     if (traceGroups.isFetched) {
 
-      setTotalHits(traceGroups.data?.tracesResult.hits.total?.value);
+      const totalHits: number = (
+        (traceGroups.data?.tracesResult?.hits?.total as SearchTotalHits)?.value || 0
+      );
+
+      setTotalHits(totalHits);
 
     }
   })
@@ -381,7 +387,7 @@ export function MessagesDevMode() {
 
           <Select placeholder='' maxW='70px' size='sm' onChange={(e) => changePageSize(parseInt(e.target.value))} borderColor={'black'} borderRadius={'lg'}>
             <option value='10'>10</option>
-            <option value='25'>25</option>
+            <option value='25' selected={true}>25</option>
             <option value='50'>50</option>
             <option value='100'>100</option>
             <option value='250'>250</option>
