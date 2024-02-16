@@ -130,8 +130,8 @@ const ProjectSelector = ({
     a.name.toLowerCase() < b.name.toLowerCase()
       ? -1
       : a.name.toLowerCase() > b.name.toLowerCase()
-      ? 1
-      : 0;
+        ? 1
+        : 0;
 
   const projectGroups = organizations.sort(sortByName).flatMap((organization) =>
     organization.teams.flatMap((team) => ({
@@ -188,9 +188,9 @@ const ProjectSelector = ({
                         href={
                           currentRoute?.path.includes("[project]")
                             ? currentRoute.path
-                                .replace("[project]", project.slug)
-                                .replace(/\[.*?\]/g, "")
-                                .replace(/\/\/+/g, "/")
+                              .replace("[project]", project.slug)
+                              .replace(/\[.*?\]/g, "")
+                              .replace(/\/\/+/g, "/")
                             : `/${project.slug}`
                         }
                         _hover={{
@@ -331,13 +331,13 @@ export const DashboardLayout = ({
             {hasOrganizationPermission(
               OrganizationRoleGroup.ORGANIZATION_VIEW
             ) && (
-              <SideMenuLink
-                path={projectRoutes.settings.path}
-                icon={Settings}
-                label={projectRoutes.settings.title}
-                project={project}
-              />
-            )}
+                <SideMenuLink
+                  path={projectRoutes.settings.path}
+                  icon={Settings}
+                  label={projectRoutes.settings.title}
+                  project={project}
+                />
+              )}
           </VStack>
         </VStack>
       </Box>

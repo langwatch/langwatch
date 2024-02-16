@@ -31,6 +31,8 @@ import {
   DrawerCloseButton,
   DrawerContent,
   DrawerHeader,
+  ChakraProvider,
+  Select,
 } from "@chakra-ui/react";
 import { DashboardLayout } from "./DashboardLayout";
 import { FilterSelector } from "./FilterSelector";
@@ -43,12 +45,13 @@ import { api } from "~/utils/api";
 import { durationColor } from "~/utils/durationColor";
 import numeral from "numeral";
 import { getTraceCheckDefinitions } from "~/trace_checks/registry";
-import { ChevronDown, List } from "react-feather";
+import { ChevronDown, List, ChevronLeft, ChevronRight } from "react-feather";
 import type { Trace } from "~/server/tracer/types";
 import { SpanTree } from "./traces/SpanTree";
 import { TraceSummary } from "./traces/Summary";
 import { useRef } from "react";
 import { Maximize2, Minimize2, type Icon } from "react-feather";
+
 
 export function MessagesDevMode() {
   const router = useRouter();
@@ -56,6 +59,9 @@ export function MessagesDevMode() {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [traceId, setTraceId] = useState<string | null>(null);
   const [traceView, setTraceView] = useState<"span" | "full">("span");
+  const [totalHits, setTotalHits] = useState<number>(0);
+  const [pageOffset, setPageOffset] = useState<number>(0);
+  const [pageSize, setPageSize] = useState<number>(10);
 
   const toggleView = () => {
     setTraceView((prevView) => (prevView === "span" ? "full" : "span"));
@@ -78,6 +84,8 @@ export function MessagesDevMode() {
       thread_id: getSingleQueryParam(router.query.thread_id),
       customer_ids: getSingleQueryParam(router.query.customer_ids)?.split(","),
       labels: getSingleQueryParam(router.query.labels)?.split(","),
+      pageOffset: pageOffset,
+      pageSize: pageSize,
     },
     {
       enabled: !!project,
@@ -86,7 +94,7 @@ export function MessagesDevMode() {
   );
 
   const traceIds =
-    traceGroups.data?.flatMap((group) =>
+    traceGroups.data?.groups.flatMap((group) =>
       group.map((trace) => trace.trace_id)
     ) ?? [];
 
@@ -213,6 +221,31 @@ export function MessagesDevMode() {
     )
   );
 
+  const nextPage = () => {
+    setPageOffset(pageOffset + pageSize);
+    //setPageSize(pageSize);
+  }
+
+  const prevPage = () => {
+    if (pageOffset > 0) {
+      setPageOffset(pageOffset - pageSize);
+    }
+  }
+
+  const changePageSize = (size: number) => {
+    setPageSize(size);
+    setPageOffset(0);
+  }
+
+
+  useEffect(() => {
+    if (traceGroups.isFetched) {
+
+      setTotalHits(traceGroups.data?.tracesResult.hits.total?.value);
+
+    }
+  })
+
   const isFirstRender = useRef(true);
 
   useEffect(() => {
@@ -240,7 +273,7 @@ export function MessagesDevMode() {
 
   return (
     <DashboardLayout>
-      <Container maxWidth="1400" padding="6">
+      <Container maxW={'calc(100vw - 200px)'} padding={6}>
         <HStack width="full" align="top">
           <Heading as={"h1"} size="lg" paddingBottom={6} paddingTop={1}>
             Messages
@@ -305,7 +338,7 @@ export function MessagesDevMode() {
                   </Tr>
                 </Thead>
                 <Tbody>
-                  {traceGroups.data?.flatMap((traceGroup) =>
+                  {traceGroups.data?.groups.flatMap((traceGroup) =>
                     traceGroup.map((trace) => (
                       <Tr
                         key={trace.trace_id}
@@ -325,7 +358,7 @@ export function MessagesDevMode() {
                       </Tr>
                     ))
                   )}
-                  {traceGroups.isFetching &&
+                  {traceGroups.isLoading &&
                     Array.from({ length: 3 }).map((_, i) => (
                       <Tr key={i}>
                         {Array.from({ length: 8 }).map((_, i) => (
@@ -336,10 +369,28 @@ export function MessagesDevMode() {
                       </Tr>
                     ))}
                 </Tbody>
+
               </Table>
             </TableContainer>
+
           </CardBody>
         </Card>
+
+        <HStack padding={6}>
+          <Text>Items per page </Text>
+
+          <Select placeholder='' maxW='70px' size='sm' onChange={(e) => changePageSize(parseInt(e.target.value))} borderColor={'black'} borderRadius={'lg'}>
+            <option value='10'>10</option>
+            <option value='25'>25</option>
+            <option value='50'>50</option>
+            <option value='100'>100</option>
+            <option value='250'>250</option>
+          </Select>
+          <Text marginLeft={'20px'}> {`${pageOffset + 1}`} - {`${(pageOffset + pageSize) > totalHits ? totalHits : pageOffset + pageSize}`} of {`${totalHits}`} items</Text>
+          <Button width={10} padding={0} onClick={prevPage} isDisabled={pageOffset === 0}><ChevronLeft /></Button>
+          <Button width={10} padding={0} isDisabled={(pageOffset + pageSize) >= totalHits} onClick={nextPage}><ChevronRight /></Button>
+        </HStack>
+
       </Container>
       <Drawer
         isOpen={isDrawerOpen}
@@ -368,6 +419,6 @@ export function MessagesDevMode() {
           </DrawerBody>
         </DrawerContent>
       </Drawer>
-    </DashboardLayout>
+    </DashboardLayout >
   );
 }

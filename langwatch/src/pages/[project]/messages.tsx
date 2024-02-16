@@ -98,7 +98,7 @@ function Messages() {
     }
   );
   const traceIds =
-    traceGroups.data?.flatMap((group) =>
+    traceGroups.data?.groups.flatMap((group) =>
       group.map((trace) => trace.trace_id)
     ) ?? [];
   const traceChecksQuery = api.traces.getTraceChecks.useQuery(
@@ -110,6 +110,8 @@ function Messages() {
     }
   );
 
+
+
   useEffect(() => {
     if (traceChecksQuery.data) {
       const pendingChecks = Object.values(traceChecksQuery.data)
@@ -118,7 +120,7 @@ function Messages() {
           (check) =>
             (check.status == "scheduled" || check.status == "in_progress") &&
             (check.timestamps.inserted_at ?? 0) >
-              new Date().getTime() - 1000 * 60 * 60 * 1
+            new Date().getTime() - 1000 * 60 * 60 * 1
         );
       if (pendingChecks.length > 0) {
         setTracesCheckInterval(5000);
@@ -200,10 +202,10 @@ function Messages() {
       <Container maxWidth="1440" padding={6}>
         <HStack align="start" spacing={10}>
           <VStack gap={6} width="full">
-            {project && traceGroups.data && traceGroups.data.length > 0 ? (
+            {project && traceGroups.data && traceGroups.data.groups.length > 0 ? (
               <ExpandableMessages
                 project={project}
-                traceGroups={traceGroups.data}
+                traceGroups={traceGroups.data.groups}
                 checksMap={traceChecksQuery.data}
               />
             ) : traceGroups.data ? (
@@ -356,6 +358,7 @@ function ExpandableMessages({
     }));
   };
 
+
   const [cardHeights, setCardHeights] = useState<Record<number, number>>({});
   const cardRefs = (traceGroups ?? []).map(() => createRef<Element>());
   const [groupBy] = useGroupBy();
@@ -398,26 +401,26 @@ function ExpandableMessages({
         }}
         {...(isExpanded
           ? {
-              className: "card-stack-content expanded",
-              background: "#ECEEF2",
-              borderRadius: "10px",
-              padding: "40px",
-              width: "calc(100% + 80px)",
-              cursor: "n-resize",
-            }
+            className: "card-stack-content expanded",
+            background: "#ECEEF2",
+            borderRadius: "10px",
+            padding: "40px",
+            width: "calc(100% + 80px)",
+            cursor: "n-resize",
+          }
           : {
-              background: "#ECEEF200",
-              className: "card-stack-content",
-              marginBottom:
-                traceGroup.length > 2 ? 4 : traceGroup.length > 1 ? 2 : 0,
-              marginLeft:
-                traceGroup.length > 2 ? -4 : traceGroup.length > 1 ? -2 : 0,
-              cursor: "pointer",
-              width: "full",
-              _hover: {
-                transform: "scale(1.04)",
-              },
-            })}
+            background: "#ECEEF200",
+            className: "card-stack-content",
+            marginBottom:
+              traceGroup.length > 2 ? 4 : traceGroup.length > 1 ? 2 : 0,
+            marginLeft:
+              traceGroup.length > 2 ? -4 : traceGroup.length > 1 ? -2 : 0,
+            cursor: "pointer",
+            width: "full",
+            _hover: {
+              transform: "scale(1.04)",
+            },
+          })}
       >
         {isExpanded && (
           <HStack
@@ -488,8 +491,8 @@ function ExpandableMessages({
                   _hover={
                     expanded
                       ? {
-                          transform: "scale(1.04)",
-                        }
+                        transform: "scale(1.04)",
+                      }
                       : {}
                   }
                 >

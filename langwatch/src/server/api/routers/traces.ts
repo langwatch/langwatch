@@ -26,6 +26,8 @@ const sharedTraceFilterInput = z.object({
   thread_id: z.string().optional(),
   customer_ids: z.array(z.string()).optional(),
   labels: z.array(z.string()).optional(),
+  pageOffset: z.number().optional(),
+  pageSize: z.number().optional(),
 });
 
 export const esGetSpansByTraceId = async ({
@@ -71,7 +73,9 @@ export const tracesRouter = createTRPCRouter({
 
       const queryConditions = [
         ...generateTraceQueryConditions(input),
-        ...(input.topics ? [{ terms: { "metadata.topics": input.topics } }] : []),
+        ...(input.topics
+          ? [{ terms: { "metadata.topics": input.topics } }]
+          : []),
       ];
 
       const canSeeCosts = await backendHasTeamProjectPermission(
@@ -80,10 +84,14 @@ export const tracesRouter = createTRPCRouter({
         TeamRoleGroup.COST_VIEW
       );
 
+      const pageSize = input.pageSize ? input.pageSize : 100;
+      const pageOffset = input.pageOffset ? input.pageOffset : 0;
+
       //@ts-ignore
       const tracesResult = await esClient.search<Trace>({
         index: TRACE_INDEX,
-        size: 100,
+        from: pageOffset,
+        size: pageSize,
         _source: {
           excludes: [
             "search_embeddings.openai_embeddings",
@@ -166,7 +174,7 @@ export const tracesRouter = createTRPCRouter({
         }
       }
 
-      return groups;
+      return {groups, tracesResult}
     }),
   getById: protectedProcedure
     .input(z.object({ projectId: z.string(), traceId: z.string() }))
