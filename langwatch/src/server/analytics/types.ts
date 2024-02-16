@@ -1,4 +1,4 @@
-import type { AggregationsAggregationContainer } from "@elastic/elasticsearch/lib/api/types";
+import type { AggregationsAggregationContainer, MappingRuntimeField } from "@elastic/elasticsearch/lib/api/types";
 import { z } from "zod";
 import type {
   ElasticSearchSpan,
@@ -20,6 +20,7 @@ export type AnalyticsMetric = {
   requiresSubkey?: {
     filter: FilterField;
   };
+  runtimeMappings?: Record<string, MappingRuntimeField>;
   allowedAggregations: AggregationTypes[];
   aggregation: (
     aggregation: AggregationTypes,

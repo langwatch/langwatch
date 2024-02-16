@@ -1,5 +1,6 @@
 import type {
   AggregationsAggregationContainer,
+  MappingRuntimeField,
   QueryDslBoolQuery,
   QueryDslQueryContainer,
 } from "@elastic/elasticsearch/lib/api/types";
@@ -71,6 +72,7 @@ export const getTimeseries = protectedProcedure
       "trace.timestamps.started_at"
     ) as any;
 
+    let runtimeMappings: Record<string, MappingRuntimeField> = {};
     let aggs = Object.fromEntries(
       input.series.flatMap(({ metric, aggregation, pipeline, key, subkey }) => {
         const metric_ = getMetric(metric);
@@ -118,6 +120,13 @@ export const getTimeseries = protectedProcedure
           };
         }
 
+        if (metric_.runtimeMappings) {
+          runtimeMappings = {
+            ...runtimeMappings,
+            ...metric_.runtimeMappings,
+          };
+        }
+
         return Object.entries(aggregationQuery);
       })
     );
@@ -139,6 +148,9 @@ export const getTimeseries = protectedProcedure
             }),
           } as QueryDslBoolQuery,
         },
+        ...(Object.keys(runtimeMappings).length > 0
+          ? { runtime_mappings: runtimeMappings }
+          : {}),
         aggs: {
           traces_per_day: {
             date_histogram,

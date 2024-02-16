@@ -26,13 +26,10 @@ import {
   Text,
   VStack,
   useTheme,
-  type ChakraProps,
 } from "@chakra-ui/react";
 import {
   Select as MultiSelect,
-  AsyncSelect as MultiAsyncSelect,
   chakraComponents,
-  type MultiValue,
   type SingleValue,
 } from "chakra-react-select";
 import { useEffect, useState, type Dispatch, type SetStateAction } from "react";
@@ -41,13 +38,13 @@ import {
   Controller,
   useFieldArray,
   useForm,
-  type FieldArrayWithId,
-  type UseFieldArrayReturn,
-  type UseFormRegisterReturn,
   type ControllerRenderProps,
+  type FieldArrayWithId,
   type FieldValues,
   type Path,
+  type UseFieldArrayReturn,
 } from "react-hook-form";
+import { useDebounceValue } from "usehooks-ts";
 import { DashboardLayout } from "../../../components/DashboardLayout";
 import { FilterSelector } from "../../../components/FilterSelector";
 import {
@@ -58,6 +55,7 @@ import {
   CustomGraph,
   type CustomGraphInput,
 } from "../../../components/analytics/CustomGraph";
+import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
 import {
   analyticsGroups,
   analyticsMetrics,
@@ -75,6 +73,8 @@ import type {
   PipelineAggregationTypes,
   PipelineFields,
 } from "../../../server/analytics/types";
+import type { FilterField } from "../../../server/filters/types";
+import { api } from "../../../utils/api";
 import {
   rotatingColors,
   type RotatingColorSet,
@@ -83,10 +83,6 @@ import {
   camelCaseToTitleCase,
   uppercaseFirstLetterLowerCaseRest,
 } from "../../../utils/stringCasing";
-import { useDebounceValue } from "usehooks-ts";
-import { api } from "../../../utils/api";
-import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
-import type { FilterField } from "../../../server/filters/types";
 
 export interface CustomGraphFormData {
   graphType: {
@@ -397,7 +393,9 @@ function SeriesFieldItem({
     if (seriesLength === 1 && groupBy) {
       form.setValue(
         `series.${index}.colorSet`,
-        groupBy.startsWith("sentiment") ? "positiveNegativeNeutral" : "colors"
+        groupBy.startsWith("sentiment") || groupBy.startsWith("evaluations")
+          ? "positiveNegativeNeutral"
+          : "colors"
       );
     }
   }, [form, groupBy, index, seriesLength]);
@@ -707,11 +705,11 @@ function FilterSelectField<T extends FieldValues, U extends Path<T>>({
       }
     },
   };
-  const current = options.find((option) => option.value === field.value)
+  const current = options.find((option) => option.value === field.value);
 
   useEffect(() => {
-    if (!current && !emptyOption && options.length > 0) {
-      field.onChange(options[0]!.value)
+    if (current === undefined && options.length > 0) {
+      field.onChange(options[0]!.value);
     }
   }, [current, emptyOption, field, options]);
 

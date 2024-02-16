@@ -279,6 +279,95 @@ export const analyticsMetrics = {
       },
     },
   },
+  evaluations: {
+    checks: {
+      label: "Checks",
+      colorSet: "tealTones",
+      allowedAggregations: ["cardinality"],
+      requiresKey: {
+        filter: "trace_checks.check_id",
+        optional: true,
+      },
+      runtimeMappings: {
+        trace_id_and_check_id: {
+          type: "keyword",
+          script:
+            "emit(doc['trace_checks.trace_id'].value + ' ' + doc['trace_checks.check_id'].value)",
+        },
+      },
+      aggregation: (aggregation, key) => ({
+        [`checks_${aggregation}`]: {
+          nested: {
+            path: "trace_checks",
+          },
+          aggs: {
+            child: {
+              filter: {
+                bool: {
+                  must: [
+                    key
+                      ? { term: { "trace_checks.check_id": key } }
+                      : { match_all: {} },
+                  ],
+                } as any,
+              },
+              aggs: {
+                cardinality: {
+                  cardinality: { field: "trace_id_and_check_id" },
+                },
+              } as any,
+            },
+          },
+        },
+      }),
+      extractionPath: (aggregation: AggregationTypes) => {
+        return `checks_${aggregation}>child>cardinality`;
+      },
+    },
+    evaluation_score: {
+      label: "Evaluation Score",
+      colorSet: "tealTones",
+      allowedAggregations: allAggregationTypes.filter(
+        (agg) => agg != "cardinality"
+      ),
+      requiresKey: {
+        filter: "trace_checks.check_id",
+      },
+      aggregation: (aggregation, key, subkey) => {
+        if (!key || !subkey)
+          throw new Error(
+            `Key and subkey are required for event_score ${aggregation} metric`
+          );
+
+        return {
+          [`evaluation_score_${aggregation}_${key}_${subkey}`]: {
+            nested: {
+              path: "trace_checks",
+            },
+            aggs: {
+              child: {
+                filter: {
+                  bool: {
+                    must: [{ term: { "trace_checks.check_id": key } }],
+                  } as any,
+                },
+                aggs: {
+                  child: {
+                    [aggregation]: {
+                      field: "trace_checks.value",
+                    },
+                  },
+                },
+              },
+            },
+          },
+        };
+      },
+      extractionPath: (aggregation: AggregationTypes, key, subkey) => {
+        return `evaluation_score_${aggregation}_${key}_${subkey}>child>child`;
+      },
+    },
+  },
 } satisfies Record<string, Record<string, AnalyticsMetric>>;
 
 export type AnalyticsMetricsGroupsEnum = keyof typeof analyticsMetrics;
@@ -536,6 +625,34 @@ export const analyticsGroups = {
       },
       extractionPath: () =>
         "thumbs_up_down_group>child>filter>child>buckets>back_to_root",
+    },
+  },
+  evaluations: {
+    check_state: {
+      label: "Check State",
+      aggregation: (aggToGroup) => ({
+        check_state_group: {
+          nested: {
+            path: "trace_checks",
+          },
+          aggs: {
+            child: {
+              terms: {
+                field: "trace_checks.status",
+                size: 100,
+                missing: "unknown",
+              },
+              aggs: {
+                back_to_root: {
+                  reverse_nested: {},
+                  aggs: aggToGroup,
+                },
+              },
+            },
+          },
+        },
+      }),
+      extractionPath: () => "check_state_group>child>buckets>back_to_root",
     },
   },
 } satisfies Record<string, Record<string, AnalyticsGroup>>;
