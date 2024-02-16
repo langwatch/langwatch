@@ -116,6 +116,169 @@ export const analyticsMetrics = {
       },
     },
   },
+  events: {
+    event_type: {
+      label: "Event Type",
+      colorSet: "purpleTones",
+      allowedAggregations: ["cardinality"],
+      requiresKey: {
+        filter: "events.event_type",
+        optional: true,
+      },
+      aggregation: (aggregation, key) => ({
+        [`event_type_${aggregation}`]: {
+          nested: {
+            path: "events",
+          },
+          aggs: {
+            child: {
+              filter: {
+                bool: {
+                  must: [
+                    key
+                      ? { term: { "events.event_type": key } }
+                      : { match_all: {} },
+                  ],
+                } as any,
+              },
+              aggs: {
+                cardinality: {
+                  cardinality: { field: "events.event_id" },
+                },
+              } as any,
+            },
+          },
+        },
+      }),
+      extractionPath: (aggregation: AggregationTypes) => {
+        return `event_type_${aggregation}>child>cardinality`;
+      },
+    },
+    event_score: {
+      label: "Event Score",
+      colorSet: "purpleTones",
+      allowedAggregations: allAggregationTypes.filter(
+        (agg) => agg != "cardinality"
+      ),
+      requiresKey: {
+        filter: "events.event_type",
+      },
+      requiresSubkey: {
+        filter: "events.metrics.key",
+      },
+      aggregation: (aggregation, key, subkey) => {
+        if (!key || !subkey)
+          throw new Error(
+            `Key and subkey are required for event_score ${aggregation} metric`
+          );
+
+        return {
+          [`event_score_${aggregation}_${key}_${subkey}`]: {
+            nested: {
+              path: "events",
+            },
+            aggs: {
+              child: {
+                filter: {
+                  bool: {
+                    must: [{ term: { "events.event_type": key } }],
+                  } as any,
+                },
+                aggs: {
+                  child: {
+                    nested: {
+                      path: "events.metrics",
+                    },
+                    aggs: {
+                      child: {
+                        filter: {
+                          bool: {
+                            must: [{ term: { "events.metrics.key": subkey } }],
+                          } as any,
+                        },
+                        aggs: {
+                          child: {
+                            [aggregation]: {
+                              field: "events.metrics.value",
+                            },
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        };
+      },
+      extractionPath: (aggregation: AggregationTypes, key, subkey) => {
+        return `event_score_${aggregation}_${key}_${subkey}>child>child>child>child`;
+      },
+    },
+    event_details: {
+      label: "Event Details",
+      colorSet: "purpleTones",
+      allowedAggregations: ["cardinality"],
+      requiresKey: {
+        filter: "events.event_type",
+      },
+      requiresSubkey: {
+        filter: "events.event_details.key",
+      },
+      aggregation: (aggregation, key, subkey) => {
+        if (!key || !subkey)
+          throw new Error(
+            `Key and subkey are required for event_score ${aggregation} metric`
+          );
+
+        return {
+          [`event_score_${aggregation}_${key}_${subkey}`]: {
+            nested: {
+              path: "events",
+            },
+            aggs: {
+              child: {
+                filter: {
+                  bool: {
+                    must: [{ term: { "events.event_type": key } }],
+                  } as any,
+                },
+                aggs: {
+                  child: {
+                    nested: {
+                      path: "events.event_details",
+                    },
+                    aggs: {
+                      child: {
+                        filter: {
+                          bool: {
+                            must: [
+                              { term: { "events.event_details.key": subkey } },
+                            ],
+                          } as any,
+                        },
+                        aggs: {
+                          child: {
+                            cardinality: {
+                              field: "events.event_details.value",
+                            },
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        };
+      },
+      extractionPath: (aggregation: AggregationTypes, key, subkey) => {
+        return `event_score_${aggregation}_${key}_${subkey}>child>child>child>child`;
+      },
+    },
+  },
 } satisfies Record<string, Record<string, AnalyticsMetric>>;
 
 export type AnalyticsMetricsGroupsEnum = keyof typeof analyticsMetrics;
@@ -413,6 +576,8 @@ export const getGroup = (
 
 export const seriesInput = z.object({
   metric: z.enum(flattenAnalyticsMetricsEnum),
+  key: z.optional(z.string()),
+  subkey: z.optional(z.string()),
   aggregation: aggregationTypesEnum,
   pipeline: z.optional(
     z.object({

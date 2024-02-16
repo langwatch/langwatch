@@ -38,7 +38,7 @@ import { isNotFound } from "../../../../utils/trpcError";
 import { TeamRoleGroup } from "../../../../server/api/permission";
 import { MessagesDevMode } from "~/components/MessagesDevMode";
 import { useDevView } from "../../../../hooks/DevViewProvider";
-import { Maximize2, Minimize2, type Icon } from "react-feather";
+import { Maximize2, Minimize2 } from "react-feather";
 
 export default function TraceDetails() {
   const router = useRouter();

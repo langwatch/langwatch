@@ -12,6 +12,7 @@ import {
   Container,
   FormControl,
   FormLabel,
+  Grid,
   HStack,
   Heading,
   Input,
@@ -25,8 +26,15 @@ import {
   Text,
   VStack,
   useTheme,
+  type ChakraProps,
 } from "@chakra-ui/react";
-import { Select as MultiSelect, chakraComponents } from "chakra-react-select";
+import {
+  Select as MultiSelect,
+  AsyncSelect as MultiAsyncSelect,
+  chakraComponents,
+  type MultiValue,
+  type SingleValue,
+} from "chakra-react-select";
 import { useEffect, useState, type Dispatch, type SetStateAction } from "react";
 import { BarChart2, Trash, TrendingUp, Triangle } from "react-feather";
 import {
@@ -35,6 +43,10 @@ import {
   useForm,
   type FieldArrayWithId,
   type UseFieldArrayReturn,
+  type UseFormRegisterReturn,
+  type ControllerRenderProps,
+  type FieldValues,
+  type Path,
 } from "react-hook-form";
 import { DashboardLayout } from "../../../components/DashboardLayout";
 import { FilterSelector } from "../../../components/FilterSelector";
@@ -72,6 +84,9 @@ import {
   uppercaseFirstLetterLowerCaseRest,
 } from "../../../utils/stringCasing";
 import { useDebounceValue } from "usehooks-ts";
+import { api } from "../../../utils/api";
+import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
+import type { FilterField } from "../../../server/filters/types";
 
 export interface CustomGraphFormData {
   graphType: {
@@ -83,6 +98,8 @@ export interface CustomGraphFormData {
     name: string;
     colorSet: RotatingColorSet;
     metric: FlattenAnalyticsMetricsEnum;
+    key?: string;
+    subkey?: string;
     aggregation: AggregationTypes;
     pipeline: {
       field: PipelineFields | "";
@@ -162,6 +179,12 @@ export default function AnalyticsCustomGraph() {
     setDebouncedFormData(formData);
   }, [formData, setDebouncedFormData]);
 
+  const customGraphInput =
+    debouncedFormData &&
+    customGraphFormToCustomGraphInput(
+      JSON.parse(debouncedFormData) as CustomGraphFormData
+    );
+
   return (
     <DashboardLayout>
       <Container maxWidth="1600" padding={6}>
@@ -182,11 +205,7 @@ export default function AnalyticsCustomGraph() {
               <HStack width="full" align="start" minHeight="500px" spacing={8}>
                 <CustomGraphForm form={form} seriesFields={seriesFields} />
                 <Box border="1px solid" borderColor="gray.200" width="full">
-                  <CustomGraph
-                    input={customGraphFormToCustomGraphInput(
-                      JSON.parse(debouncedFormData) as CustomGraphFormData
-                    )}
-                  />
+                  {customGraphInput && <CustomGraph input={customGraphInput} />}
                 </Box>
               </HStack>
             </CardBody>
@@ -199,7 +218,17 @@ export default function AnalyticsCustomGraph() {
 
 const customGraphFormToCustomGraphInput = (
   formData: CustomGraphFormData
-): CustomGraphInput => {
+): CustomGraphInput | undefined => {
+  for (const series of formData.series) {
+    const metric = getMetric(series.metric);
+    if (metric.requiresKey && !metric.requiresKey.optional && !series.key) {
+      return undefined;
+    }
+    if (metric.requiresSubkey && !series.subkey) {
+      return undefined;
+    }
+  }
+
   return {
     graphId: "custom",
     graphType: formData.graphType.value,
@@ -218,6 +247,8 @@ const customGraphFormToCustomGraphInput = (
         colorSet: series.colorSet,
         metric: series.metric,
         aggregation: series.aggregation,
+        key: series.key,
+        subkey: series.subkey,
       };
     }),
     groupBy: formData.groupBy || undefined,
@@ -380,7 +411,7 @@ function SeriesFieldItem({
     >
       <AccordionButton background="gray.100" fontWeight="bold" paddingLeft={1}>
         <HStack width="full" spacing={4}>
-          <HStack spacing={1}>
+          <HStack width="full" spacing={1}>
             <Menu>
               <MenuButton
                 as={Button}
@@ -453,7 +484,6 @@ function SeriesFieldItem({
               }}
             />
           </HStack>
-          <Spacer />
           {seriesFields.fields.length > 1 && (
             <Trash
               role="button"
@@ -480,6 +510,7 @@ function SeriesField({
 }) {
   const metric = form.watch(`series.${index}.metric`);
   const aggregation = form.watch(`series.${index}.aggregation`);
+  const key = form.watch(`series.${index}.key`);
   const pipelineField = form.watch(`series.${index}.pipeline.field`);
   const pipelineAggregation = form.watch(
     `series.${index}.pipeline.aggregation`
@@ -528,9 +559,10 @@ function SeriesField({
     <VStack align="start" width="full" spacing={4}>
       <FormControl>
         <FormLabel>Metric</FormLabel>
-        <HStack width="full">
+        <Grid width="full" gap={3} templateColumns="repeat(4, 1fr)">
           <Select
             {...metricField}
+            gridColumn="span 2"
             onChange={(e) => {
               const metric_ = getMetric(e.target.value as any);
               if (!metric_.allowedAggregations.includes(aggregation)) {
@@ -555,9 +587,41 @@ function SeriesField({
               </optgroup>
             ))}
           </Select>
+          {metric_?.requiresKey && (
+            <Box gridColumn="span 2">
+              <Controller
+                control={form.control}
+                name={`series.${index}.key`}
+                render={({ field }) => (
+                  <FilterSelectField
+                    field={field}
+                    filter={metric_.requiresKey!.filter}
+                    emptyOption={
+                      metric_.requiresKey!.optional ? "all" : undefined
+                    }
+                  />
+                )}
+              />
+            </Box>
+          )}
+          {metric_?.requiresSubkey && key && (
+            <Box gridColumn="span 2">
+              <Controller
+                control={form.control}
+                name={`series.${index}.subkey`}
+                render={({ field }) => (
+                  <FilterSelectField
+                    field={field}
+                    key_={key}
+                    filter={metric_.requiresSubkey!.filter}
+                  />
+                )}
+              />
+            </Box>
+          )}
           <Select
+            gridColumn="span 1"
             {...form.control.register(`series.${index}.aggregation`)}
-            minWidth="fit-content"
           >
             {getMetric(metric).allowedAggregations.map((agg) => (
               <option key={agg} value={agg}>
@@ -566,8 +630,8 @@ function SeriesField({
             ))}
           </Select>
           <Select
+            gridColumn="span 1"
             {...form.control.register(`series.${index}.pipeline.field`)}
-            minWidth="fit-content"
           >
             <option value="">all</option>
             {Object.entries(analyticsPipelines)
@@ -580,7 +644,7 @@ function SeriesField({
                 </option>
               ))}
           </Select>
-        </HStack>
+        </Grid>
       </FormControl>
       {pipelineField && (
         <FormControl>
@@ -598,6 +662,71 @@ function SeriesField({
         </FormControl>
       )}
     </VStack>
+  );
+}
+
+function FilterSelectField<T extends FieldValues, U extends Path<T>>({
+  field,
+  key_,
+  filter,
+  emptyOption,
+}: {
+  field: ControllerRenderProps<T, U>;
+  key_?: string;
+  filter: FilterField;
+  emptyOption?: string;
+}) {
+  const { project } = useOrganizationTeamProject();
+  const [query, setQuery] = useState("");
+  const filterData = api.analytics.dataForFilter.useQuery(
+    {
+      projectId: project?.id ?? "",
+      field: filter,
+      key: key_,
+      query: query,
+    },
+    {
+      enabled: !!project,
+    }
+  );
+
+  const emptyOption_ = emptyOption ? [{ value: "", label: emptyOption }] : [];
+
+  const options: { value: string; label: string }[] = emptyOption_.concat(
+    filterData.data?.options.map(({ field, label }) => ({
+      value: field,
+      label,
+    })) ?? []
+  );
+
+  const field_ = {
+    ...field,
+    onChange: (option: SingleValue<{ value: string; label: string }>) => {
+      if (option) {
+        field.onChange(option.value);
+      }
+    },
+  };
+  const current = options.find((option) => option.value === field.value)
+
+  useEffect(() => {
+    if (!current && !emptyOption && options.length > 0) {
+      field.onChange(options[0]!.value)
+    }
+  }, [current, emptyOption, field, options]);
+
+  return (
+    <MultiSelect
+      {...field_}
+      menuPortalTarget={document.body}
+      isLoading={filterData.isLoading}
+      onInputChange={(input) => {
+        setQuery(input);
+      }}
+      options={options as any}
+      value={current}
+      isSearchable={true}
+    />
   );
 }
 

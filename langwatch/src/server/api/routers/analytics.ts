@@ -37,9 +37,11 @@ import { topUsedDocuments } from "./analytics/documents";
 import { thumbsUpDownVsPreviousPeriod } from "./analytics/thumbsUpDown";
 import type { TraceCheck } from "../../tracer/types";
 import { getTimeseries } from "./analytics/timeseries";
+import { dataForFilter } from "./analytics/dataForFilter";
 
 export const analyticsRouter = createTRPCRouter({
   getTimeseries,
+  dataForFilter,
   messagesCountVsPreviousPeriod,
   messagesCountAggregated,
   threadsCountVsPreviousPeriod,

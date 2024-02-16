@@ -8,15 +8,29 @@ import type {
 } from "../tracer/types";
 import type { DeepRequired } from "../../utils/types";
 import type { RotatingColorSet } from "../../utils/rotatingColors";
+import type { FilterField } from "../filters/types";
 
 export type AnalyticsMetric = {
   label: string;
   colorSet: RotatingColorSet;
+  requiresKey?: {
+    filter: FilterField;
+    optional?: boolean;
+  };
+  requiresSubkey?: {
+    filter: FilterField;
+  };
   allowedAggregations: AggregationTypes[];
   aggregation: (
-    aggregation: AggregationTypes
+    aggregation: AggregationTypes,
+    key: string | undefined,
+    subkey: string | undefined
   ) => Record<string, AggregationsAggregationContainer>;
-  extractionPath: (aggregations: AggregationTypes) => string;
+  extractionPath: (
+    aggregations: AggregationTypes,
+    key: string | undefined,
+    subkey: string | undefined
+  ) => string;
 };
 
 export type AnalyticsGroup = {

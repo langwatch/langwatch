@@ -54,7 +54,6 @@ import { useDevView } from "../../hooks/DevViewProvider";
 
 export default function MessagesOrIntegrationGuide() {
   const { project } = useOrganizationTeamProject();
-  const router = useRouter();
 
   const { isDevViewEnabled } = useDevView();
 

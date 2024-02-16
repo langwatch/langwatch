@@ -17,6 +17,7 @@ import { TRACES_PIVOT_INDEX, esClient } from "../../../elasticsearch";
 import { TeamRoleGroup, checkUserPermissionForProject } from "../../permission";
 import { protectedProcedure } from "../../trpc";
 import { currentVsPreviousDates, dateTicks } from "./common";
+import { TRPCError } from "@trpc/server";
 
 export const generateTracesPivotQueryConditions = ({
   projectId,
@@ -71,16 +72,33 @@ export const getTimeseries = protectedProcedure
     ) as any;
 
     let aggs = Object.fromEntries(
-      input.series.flatMap(({ metric, aggregation, pipeline }) => {
+      input.series.flatMap(({ metric, aggregation, pipeline, key, subkey }) => {
         const metric_ = getMetric(metric);
 
-        const metricAggregations = metric_.aggregation(aggregation);
+        if (metric_.requiresKey && !metric_.requiresKey.optional && !key) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: `Metric ${metric} requires a key to be defined`,
+          });
+        }
+        if (metric_.requiresSubkey && !subkey) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: `Metric ${metric} requires a subkey to be defined`,
+          });
+        }
+
+        const metricAggregations = metric_.aggregation(
+          aggregation,
+          key,
+          subkey
+        );
 
         let aggregationQuery: Record<string, AggregationsAggregationContainer> =
           metricAggregations;
         if (pipeline) {
           const pipelineBucketsPath = `${metric}.${aggregation}.${pipeline.field}`;
-          const metricPath = metric_.extractionPath(aggregation);
+          const metricPath = metric_.extractionPath(aggregation, key, subkey);
           const pipelinePath_ = pipelinePath(metric, aggregation, pipeline);
 
           aggregationQuery = {
@@ -218,7 +236,7 @@ const extractResultForBucket = (
 };
 
 const extractResult = (
-  { metric, aggregation, pipeline }: SeriesInputType,
+  { metric, aggregation, pipeline, key, subkey }: SeriesInputType,
   pathsAfterBuckets: string | undefined,
   result: any
 ) => {
@@ -232,7 +250,7 @@ const extractResult = (
   }
 
   const metric_ = getMetric(metric);
-  const paths = metric_.extractionPath(aggregation).split(">");
+  const paths = metric_.extractionPath(aggregation, key, subkey).split(">");
   if (pipeline) {
     const pipelinePath_ = pipelinePath(metric, aggregation, pipeline);
     return { [pipelinePath_]: current[pipelinePath_].value };
