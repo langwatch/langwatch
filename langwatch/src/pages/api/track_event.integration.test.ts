@@ -119,7 +119,6 @@ describe("/api/track_event", () => {
         labels: ["test-label"],
       },
       metrics: {},
-      search_embeddings: {},
     };
 
     await esClient.index({

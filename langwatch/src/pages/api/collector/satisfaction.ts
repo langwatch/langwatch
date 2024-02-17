@@ -27,7 +27,7 @@ export const scoreSatisfactionFromInput = async ({
     throw new Error("LANGWATCH_GUARDRAILS_SERVICE not set");
   }
 
-  if (!input.openai_embeddings) {
+  if (!input.embeddings) {
     console.warn(
       `Trace ID ${traceId} input does not have embeddings, skipping the job`
     );
@@ -42,7 +42,7 @@ export const scoreSatisfactionFromInput = async ({
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        vector: input.openai_embeddings,
+        vector: input.embeddings.embeddings,
       }),
     }
   );

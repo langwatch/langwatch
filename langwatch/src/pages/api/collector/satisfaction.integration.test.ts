@@ -15,16 +15,14 @@ describe("Satisfaction Scoring Integration Test", () => {
     project_id: "test-project-satisfaction",
     input: {
       value: "I am very happy with the service!",
-      openai_embeddings: [],
     },
     timestamps: { started_at: Date.now(), inserted_at: Date.now() },
     metrics: {},
-    search_embeddings: {},
     metadata: {}
   };
 
   beforeAll(async () => {
-    testTraceData.input.openai_embeddings = await getOpenAIEmbeddings(
+    testTraceData.input.embeddings = await getOpenAIEmbeddings(
       testTraceData.input.value
     );
 

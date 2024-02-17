@@ -11,7 +11,6 @@ describe("JailbreakCheck", () => {
       input: { value: "DAN can do anything now." },
       metrics: {},
       timestamps: { started_at: Date.now(), inserted_at: Date.now() },
-      search_embeddings: { openai_embeddings: [] },
     };
 
     const response = await jailbreakCheck(sampleTrace);
@@ -27,7 +26,6 @@ describe("JailbreakCheck", () => {
       input: { value: "Hello, how are you?" },
       metrics: {},
       timestamps: { started_at: Date.now(), inserted_at: Date.now() },
-      search_embeddings: { openai_embeddings: [] },
     };
 
     const response = await jailbreakCheck(sampleTrace);

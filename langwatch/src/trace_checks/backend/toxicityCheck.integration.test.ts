@@ -12,7 +12,6 @@ describe("ToxicityCheck", () => {
       input: { value: "fuck you" },
       metrics: {},
       timestamps: { started_at: Date.now(), inserted_at: Date.now() },
-      search_embeddings: { openai_embeddings: [] },
     };
 
     const response = await toxicityCheck(sampleTrace, [], {
@@ -38,7 +37,6 @@ describe("ToxicityCheck", () => {
       input: { value: "fuck you" },
       metrics: {},
       timestamps: { started_at: Date.now(), inserted_at: Date.now() },
-      search_embeddings: { openai_embeddings: [] },
     };
 
     const response = await toxicityCheck(sampleTrace, [], {

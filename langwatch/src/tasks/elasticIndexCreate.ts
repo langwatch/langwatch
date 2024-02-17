@@ -63,23 +63,33 @@ const traceMapping: ElasticSearchMappingFrom<ElasticSearchTrace> = {
   input: {
     properties: {
       value: { type: "text" },
-      openai_embeddings: {
-        index: true,
-        type: "dense_vector",
-        dims: OPENAI_EMBEDDING_DIMENSION,
-        similarity: "cosine",
-      },
       satisfaction_score: { type: "float" },
+      embeddings: {
+        properties: {
+          model: { type: "keyword" },
+          embeddings: {
+            index: true,
+            type: "dense_vector",
+            dims: OPENAI_EMBEDDING_DIMENSION,
+            similarity: "cosine",
+          },
+        },
+      },
     },
   },
   output: {
     properties: {
       value: { type: "text" },
-      openai_embeddings: {
-        index: true,
-        type: "dense_vector",
-        dims: OPENAI_EMBEDDING_DIMENSION,
-        similarity: "cosine",
+      embeddings: {
+        properties: {
+          model: { type: "keyword" },
+          embeddings: {
+            index: true,
+            type: "dense_vector",
+            dims: OPENAI_EMBEDDING_DIMENSION,
+            similarity: "cosine",
+          },
+        },
       },
     },
   },
@@ -97,16 +107,6 @@ const traceMapping: ElasticSearchMappingFrom<ElasticSearchTrace> = {
     properties: {
       message: { type: "text" },
       stacktrace: { type: "text" } as any,
-    },
-  },
-  search_embeddings: {
-    properties: {
-      openai_embeddings: {
-        index: true,
-        type: "dense_vector",
-        dims: OPENAI_EMBEDDING_DIMENSION,
-        similarity: "cosine",
-      },
     },
   },
   indexing_md5s: {
@@ -268,7 +268,6 @@ const tracesPivotMapping: ElasticSearchMappingFrom<
         traceMapping,
         "input",
         "output",
-        "search_embeddings",
         "error",
         "indexing_md5s"
       ),

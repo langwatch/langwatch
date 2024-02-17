@@ -256,7 +256,7 @@ export type CustomCheckRule =
        * @maxLength 500
        */
       value: string;
-      openai_embeddings?: number[];
+      embeddings?: { model: string; embeddings: number[] };
       failWhen: CustomCheckFailWhen;
     }
   | {
@@ -333,7 +333,7 @@ export type CheckPrecondition =
        * @minimum 0
        * @maximum 1
        */
-      openai_embeddings?: number[];
+      embeddings?: { model: string; embeddings: number[] };
       threshold: number;
     };
 

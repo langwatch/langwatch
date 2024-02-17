@@ -13,7 +13,6 @@ describe("LanguageCheck Integration", () => {
       output: { value: "ola como vai voce eu vou bem obrigado" },
       metrics: {},
       timestamps: { started_at: Date.now(), inserted_at: Date.now() },
-      search_embeddings: {},
     };
 
     const parameters: Checks["language_check"]["parameters"] = {
@@ -36,7 +35,6 @@ describe("LanguageCheck Integration", () => {
       output: { value: "hello how is it going my friend? testing" },
       metrics: {},
       timestamps: { started_at: Date.now(), inserted_at: Date.now() },
-      search_embeddings: {},
     };
 
     const parameters: Checks["language_check"]["parameters"] = {
@@ -58,7 +56,6 @@ describe("LanguageCheck Integration", () => {
       output: { value: "small text" },
       metrics: {},
       timestamps: { started_at: Date.now(), inserted_at: Date.now() },
-      search_embeddings: {},
     };
 
     const parameters: Checks["language_check"]["parameters"] = {
@@ -80,7 +77,6 @@ describe("LanguageCheck Integration", () => {
       output: { value: "hello how is it going my friend? testing" },
       metrics: {},
       timestamps: { started_at: Date.now(), inserted_at: Date.now() },
-      search_embeddings: {},
     };
 
     const parameters: Checks["language_check"]["parameters"] = {

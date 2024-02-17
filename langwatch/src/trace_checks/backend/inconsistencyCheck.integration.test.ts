@@ -16,7 +16,6 @@ describe.skip("InconsistencyCheck", () => {
       output: { value: "The grass is blue. The house is red." },
       metrics: {},
       timestamps: { started_at: Date.now(), inserted_at: Date.now() },
-      search_embeddings: {},
     };
 
     const response = await inconsistencyCheck(sampleTrace);
@@ -36,7 +35,6 @@ describe.skip("InconsistencyCheck", () => {
       output: { value: "The sky is clear. The car is new." },
       metrics: {},
       timestamps: { started_at: Date.now(), inserted_at: Date.now() },
-      search_embeddings: {},
     };
 
     const response = await inconsistencyCheck(sampleTrace);

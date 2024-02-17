@@ -13,7 +13,6 @@ describe("CustomCheck", () => {
       output: { value: "Goodbye, World!" },
       metrics: {},
       timestamps: { started_at: Date.now(), inserted_at: Date.now() },
-      search_embeddings: { openai_embeddings: [] },
     };
 
     const passingRule: Checks["custom"]["parameters"] = {
@@ -36,19 +35,11 @@ describe("CustomCheck", () => {
       ],
     };
 
-    const containsResult = await customCheck(
-      sampleTrace,
-      [],
-      passingRule
-    );
+    const containsResult = await customCheck(sampleTrace, [], passingRule);
     expect(containsResult.status).toBe("succeeded");
     expect((containsResult.raw_result as any).failedRules).toHaveLength(0);
 
-    const notContainsResult = await customCheck(
-      sampleTrace,
-      [],
-      failingRule
-    );
+    const notContainsResult = await customCheck(sampleTrace, [], failingRule);
     expect(notContainsResult.status).toBe("failed");
     expect((notContainsResult.raw_result as any).failedRules).toHaveLength(1);
   });
@@ -62,7 +53,6 @@ describe("CustomCheck", () => {
       output: { value: "Goodbye, World!" },
       metrics: {},
       timestamps: { started_at: Date.now(), inserted_at: Date.now() },
-      search_embeddings: { openai_embeddings: [] },
     };
 
     const passingRule: Checks["custom"]["parameters"] = {
@@ -85,19 +75,11 @@ describe("CustomCheck", () => {
       ],
     };
 
-    const notContainsResult = await customCheck(
-      sampleTrace,
-      [],
-      passingRule
-    );
+    const notContainsResult = await customCheck(sampleTrace, [], passingRule);
     expect(notContainsResult.status).toBe("succeeded");
     expect((notContainsResult.raw_result as any).failedRules).toHaveLength(0);
 
-    const containsResult = await customCheck(
-      sampleTrace,
-      [],
-      failingRule
-    );
+    const containsResult = await customCheck(sampleTrace, [], failingRule);
     expect(containsResult.status).toBe("failed");
     expect((containsResult.raw_result as any).failedRules).toHaveLength(1);
   });
@@ -111,7 +93,6 @@ describe("CustomCheck", () => {
       output: { value: "Error code 404" },
       metrics: {},
       timestamps: { started_at: Date.now(), inserted_at: Date.now() },
-      search_embeddings: { openai_embeddings: [] },
     };
 
     const matchesRegexPassingRule: Checks["custom"]["parameters"] = {
@@ -204,7 +185,6 @@ describe("CustomCheck", () => {
       output: { value: "This is a test output." },
       metrics: {},
       timestamps: { started_at: Date.now(), inserted_at: Date.now() },
-      search_embeddings: { openai_embeddings: [0.1, 0.2, 0.3] },
     };
 
     const isSimilarToPassingRule: Checks["custom"]["parameters"] = {
@@ -213,7 +193,10 @@ describe("CustomCheck", () => {
           field: "input",
           rule: "is_similar_to",
           value: "This is a test input.",
-          openai_embeddings: [0.1, 0.2, 0.3],
+          embeddings: {
+            model: "text-embedding-3-small",
+            embeddings: [0.1, 0.2, 0.3],
+          },
           failWhen: { condition: "<", amount: 0.5 },
         },
       ],
@@ -225,7 +208,10 @@ describe("CustomCheck", () => {
           field: "input",
           rule: "is_similar_to",
           value: "This is a different input.",
-          openai_embeddings: [0.4, 0.5, 0.6],
+          embeddings: {
+            model: "text-embedding-3-small",
+            embeddings: [0.4, 0.5, 0.6],
+          },
           failWhen: { condition: ">", amount: 0.8 },
         },
       ],
@@ -261,7 +247,6 @@ describe("CustomCheck", () => {
       output: { value: "It's sunny outside" },
       metrics: {},
       timestamps: { started_at: Date.now(), inserted_at: Date.now() },
-      search_embeddings: { openai_embeddings: [] },
     };
 
     const llmBooleanRule: Checks["custom"]["parameters"] = {
@@ -288,21 +273,13 @@ describe("CustomCheck", () => {
       ],
     };
 
-    const llmBooleanResult = await customCheck(
-      sampleTrace,
-      [],
-      llmBooleanRule
-    );
+    const llmBooleanResult = await customCheck(sampleTrace, [], llmBooleanRule);
     expect(llmBooleanResult.status).toBe("succeeded");
     expect(llmBooleanResult.costs).toEqual([
       { currency: "USD", amount: 0.00014800000000000002 },
     ]);
 
-    const llmScoreResult = await customCheck(
-      sampleTrace,
-      [],
-      llmScoreRule
-    );
+    const llmScoreResult = await customCheck(sampleTrace, [], llmScoreRule);
     expect(llmScoreResult.status).toBe("failed");
     expect(llmScoreResult.costs).toEqual([
       { currency: "USD", amount: 0.0001645 },

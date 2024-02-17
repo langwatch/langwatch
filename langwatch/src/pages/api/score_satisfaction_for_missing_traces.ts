@@ -29,7 +29,7 @@ export default async function handler(
 
     const records = result.hits.hits
       .map((hit) => hit._source!)
-      .filter((x) => x?.input?.openai_embeddings);
+      .filter((x) => x?.input?.embeddings?.embeddings);
 
     console.log("Going to update", records.length, "records");
 

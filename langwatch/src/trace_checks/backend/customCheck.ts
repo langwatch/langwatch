@@ -59,11 +59,16 @@ export const customCheck = async (
         }
         break;
       case "is_similar_to":
-        const embeddings = rule.openai_embeddings ?? [];
+        const embeddings = rule.embeddings?.embeddings ?? [];
         if (embeddings.length === 0) {
           throw new Error("No embeddings provided for is_similar_to rule.");
         }
-        const traceEmbeddings = trace.search_embeddings.openai_embeddings;
+        const embeddingsMap = {
+          input: trace.input.embeddings?.embeddings ?? [],
+          output: trace.output?.embeddings?.embeddings ?? [],
+          "metadata.labels": null,
+        };
+        const traceEmbeddings = embeddingsMap[rule.field];
         if (!traceEmbeddings) {
           throw new Error(
             "No embeddings found in trace for is_similar_to rule."
@@ -103,8 +108,8 @@ export const customCheck = async (
         break;
     }
 
-    if ("openai_embeddings" in rule) {
-      delete rule.openai_embeddings;
+    if ("embeddings" in rule) {
+      delete rule.embeddings;
     }
     if (!rulePassed) {
       failedRules.push({ rule, score });

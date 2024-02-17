@@ -158,11 +158,14 @@ export type ElasticSearchSpan = Omit<
 
 export type TraceInput = {
   value: string;
-  openai_embeddings?: number[];
+  embeddings?: { model: string; embeddings: number[] };
   satisfaction_score?: number;
 };
 
-export type TraceOutput = { value: string; openai_embeddings?: number[] };
+export type TraceOutput = {
+  value: string;
+  embeddings?: { model: string; embeddings: number[] };
+};
 
 export type Trace = {
   trace_id: string;
@@ -186,9 +189,6 @@ export type Trace = {
     tokens_estimated?: boolean | null;
   };
   error?: ErrorCapture | null;
-  search_embeddings: {
-    openai_embeddings?: number[];
-  };
   indexing_md5s?: string[];
 };
 

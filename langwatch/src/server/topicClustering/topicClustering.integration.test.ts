@@ -137,7 +137,7 @@ describe("Topic Clustering Integration Test", () => {
     ];
 
     for (const trace of traces) {
-      trace._source.input.openai_embeddings = await getOpenAIEmbeddings(
+      trace._source.input.embeddings = await getOpenAIEmbeddings(
         trace._source.input.value
       );
     }
@@ -153,8 +153,12 @@ describe("Topic Clustering Integration Test", () => {
     });
 
     try {
-      expect(topics?.message_clusters.trace_3).toEqual("Request for repetition");
-      expect(topics?.message_clusters.trace_4).toEqual("Request for repetition");
+      expect(topics?.message_clusters.trace_3).toEqual(
+        "Request for repetition"
+      );
+      expect(topics?.message_clusters.trace_4).toEqual(
+        "Request for repetition"
+      );
     } catch {
       expect(topics?.message_clusters.trace_3).toEqual("Asking for repetition");
       expect(topics?.message_clusters.trace_4).toEqual("Asking for repetition");
@@ -171,8 +175,7 @@ describe("Topic Clustering Integration Test", () => {
         input: { value: "How to learn Python?" },
         timestamps: { started_at: Date.now(), inserted_at: Date.now() },
         metrics: {},
-        search_embeddings: {},
-        metadata: {}
+        metadata: {},
       },
       {
         trace_id: "trace_2",
@@ -180,15 +183,14 @@ describe("Topic Clustering Integration Test", () => {
         input: { value: "Python learning resources" },
         timestamps: { started_at: Date.now(), inserted_at: Date.now() },
         metrics: {},
-        search_embeddings: {},
-        metadata: {}
+        metadata: {},
       },
       // Add more test traces as needed
     ];
 
     beforeAll(async () => {
       for (const trace of testTraceData) {
-        trace.input.openai_embeddings = await getOpenAIEmbeddings(
+        trace.input.embeddings = await getOpenAIEmbeddings(
           trace.input.value
         );
       }

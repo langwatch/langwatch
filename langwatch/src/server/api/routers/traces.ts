@@ -94,9 +94,13 @@ export const tracesRouter = createTRPCRouter({
         size: pageSize,
         _source: {
           excludes: [
-            "search_embeddings.openai_embeddings",
-            ...(input.groupBy !== "input" ? ["input.openai_embeddings"] : []),
-            ...(input.groupBy !== "output" ? ["output.openai_embeddings"] : []),
+            // TODO: do we really need to exclude both keys and nested keys for embeddings?
+            ...(input.groupBy !== "input"
+              ? ["input.embeddings", "input.embeddings.embeddings"]
+              : []),
+            ...(input.groupBy !== "output"
+              ? ["output.embeddings", "input.embeddings.embeddings"]
+              : []),
             ...(canSeeCosts ? [] : ["metrics.total_cost"]),
           ],
         },
@@ -141,7 +145,7 @@ export const tracesRouter = createTRPCRouter({
           ...(input.query
             ? {
                 knn: {
-                  field: "search_embeddings.openai_embeddings",
+                  field: "input.embeddings.embeddings",
                   query_vector: embeddings,
                   k: 10,
                   num_candidates: 100,
@@ -169,12 +173,12 @@ export const tracesRouter = createTRPCRouter({
       // Remove embeddings to reduce payload size
       for (const group of groups) {
         for (const trace of group) {
-          delete trace.input?.openai_embeddings;
-          delete trace.output?.openai_embeddings;
+          delete trace.input?.embeddings;
+          delete trace.output?.embeddings;
         }
       }
 
-      return {groups, tracesResult}
+      return { groups, tracesResult };
     }),
   getById: protectedProcedure
     .input(z.object({ projectId: z.string(), traceId: z.string() }))
@@ -191,10 +195,12 @@ export const tracesRouter = createTRPCRouter({
         index: TRACE_INDEX,
         size: 1,
         _source: {
+          // TODO: do we really need to exclude both keys and nested keys for embeddings?
           excludes: [
-            "search_embeddings.openai_embeddings",
-            "input.openai_embeddings",
-            "output.openai_embeddings",
+            "input.embeddings",
+            "input.embeddings.embeddings",
+            "output.embeddings",
+            "output.embeddings.embeddings",
             ...(canSeeCosts ? [] : ["metrics.total_cost"]),
           ],
         },
@@ -391,10 +397,10 @@ const groupTraces = (groupBy: string | undefined, traces: Trace[]) => {
 
   const groupingKeyPresent = (trace: Trace) => {
     if (groupBy === "input") {
-      return !!trace.input?.openai_embeddings;
+      return !!trace.input?.embeddings?.embeddings;
     }
     if (groupBy === "output") {
-      return !!trace.output?.openai_embeddings;
+      return !!trace.output?.embeddings?.embeddings;
     }
     if (groupBy === "user_id") {
       return !!trace.metadata.user_id;
@@ -411,8 +417,8 @@ const groupTraces = (groupBy: string | undefined, traces: Trace[]) => {
       const similarityThreshold = 0.85;
       return (
         (similarity(
-          trace.input.openai_embeddings!,
-          member.input.openai_embeddings!
+          trace.input.embeddings!.embeddings,
+          member.input.embeddings!.embeddings
         ) ?? 0) > similarityThreshold
       );
     }
@@ -420,8 +426,8 @@ const groupTraces = (groupBy: string | undefined, traces: Trace[]) => {
       const similarityThreshold = 0.9;
       return (
         (similarity(
-          trace.output!.openai_embeddings!,
-          member.output!.openai_embeddings!
+          trace.output!.embeddings!.embeddings,
+          member.output!.embeddings!.embeddings
         ) ?? 0) > similarityThreshold
       );
     }

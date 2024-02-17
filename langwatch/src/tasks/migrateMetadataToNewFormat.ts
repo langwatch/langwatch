@@ -14,7 +14,7 @@ const migrateTraces = async () => {
   const result = await esClient.search<Trace>({
     index: TRACE_INDEX,
     _source: {
-      excludes: ["input", "output", "search_embeddings"],
+      excludes: ["input", "output"],
     },
     body: {
       query: {

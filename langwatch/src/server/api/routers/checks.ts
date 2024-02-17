@@ -200,7 +200,8 @@ const computeEmbeddings = async (
 ): Promise<void> => {
   for (const rule of rules) {
     if (rule.rule === "is_similar_to") {
-      rule.openai_embeddings = await getOpenAIEmbeddings(rule.value);
+      // TODO: change this to the same format {model, embeddings} as the traces
+      rule.embeddings = await getOpenAIEmbeddings(rule.value);
     }
   }
 };
@@ -210,7 +211,7 @@ const deleteEmbeddings = async (
 ): Promise<void> => {
   for (const rule of rules) {
     if (rule.rule === "is_similar_to") {
-      delete rule.openai_embeddings;
+      delete rule.embeddings;
     }
   }
 };

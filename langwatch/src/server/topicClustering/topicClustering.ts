@@ -140,7 +140,10 @@ export const clusterTraces = async (projectId: string, traces: Trace[]) => {
       .map((trace) => ({
         _source: {
           id: trace.trace_id,
-          input: trace.input,
+          input: {
+            value: trace.input.value,
+            openai_embeddings: trace.input.embeddings?.embeddings,
+          }
         },
       }))
       .filter(

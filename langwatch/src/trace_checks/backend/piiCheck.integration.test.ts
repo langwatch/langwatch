@@ -12,7 +12,6 @@ describe("PIICheck", () => {
       input: { value: "hi there" },
       metrics: {},
       timestamps: { started_at: Date.now(), inserted_at: Date.now() },
-      search_embeddings: { openai_embeddings: [] },
     };
     let response = await piiCheck(sampleTrace, [], {
       infoTypes: { creditCardNumber: true } as any,
@@ -35,7 +34,6 @@ describe("PIICheck", () => {
       },
       metrics: {},
       timestamps: { started_at: Date.now(), inserted_at: Date.now() },
-      search_embeddings: { openai_embeddings: [] },
     };
     response = await piiCheck(samplePIITrace, [], {
       infoTypes: { creditCardNumber: true } as any,

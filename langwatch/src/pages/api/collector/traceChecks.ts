@@ -71,8 +71,8 @@ async function evaluatePreconditions(
         break;
       case "is_similar_to":
         const embeddingsMap = {
-          input: trace.input.openai_embeddings ?? [],
-          output: trace.output?.openai_embeddings ?? [],
+          input: trace.input.embeddings?.embeddings ?? [],
+          output: trace.output?.embeddings?.embeddings ?? [],
           "metadata.labels": null,
         };
         const embeddings = embeddingsMap[precondition.field];
@@ -83,7 +83,7 @@ async function evaluatePreconditions(
           return false;
         }
 
-        const preconditionEmbeddings = precondition.openai_embeddings;
+        const preconditionEmbeddings = precondition.embeddings?.embeddings;
         if (!preconditionEmbeddings || preconditionEmbeddings.length === 0) {
           console.error(
             `No embeddings provided for is_similar_to precondition on ${precondition.field} field.`

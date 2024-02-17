@@ -30,7 +30,6 @@ import {
   maybeAddIdsToContextList,
 } from "./collector/rag";
 import {
-  getSearchEmbeddings,
   getTraceInput,
   getTraceOutput,
 } from "./collector/trace";
@@ -210,11 +209,6 @@ export default async function handler(
     getTraceOutput(spans),
   ]);
   const error = getLastOutputError(spans);
-  const openAISearchEmbeddings = await getSearchEmbeddings(
-    input,
-    output,
-    error
-  );
 
   const nullToUndefined = <T>(value: T | null): T | undefined =>
     // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
@@ -239,9 +233,6 @@ export default async function handler(
     output,
     metrics: computeTraceMetrics(spans),
     error,
-    search_embeddings: {
-      openai_embeddings: openAISearchEmbeddings,
-    },
     indexing_md5s: [...(existingMD5s ?? []), paramsMD5],
   };
 

@@ -13,7 +13,6 @@ describe("RagasContextPrecision Integration", () => {
       output: { value: "The capital of France is Paris." },
       metrics: {},
       timestamps: { started_at: Date.now(), inserted_at: Date.now() },
-      search_embeddings: {},
     };
     const sampleSpans: ElasticSearchSpan[] = [
       {

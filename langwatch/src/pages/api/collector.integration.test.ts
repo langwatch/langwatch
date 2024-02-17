@@ -145,14 +145,11 @@ describe("Collector API Endpoint", () => {
       input: {
         value: "hello",
         satisfaction_score: expect.any(Number),
-        openai_embeddings: expect.any(Array),
+        embeddings: expect.any(Array),
       },
       output: {
         value: "world",
-        openai_embeddings: expect.any(Array),
-      },
-      search_embeddings: {
-        openai_embeddings: expect.any(Array),
+        embeddings: expect.any(Array),
       },
       metrics: {
         first_token_ms: null,
