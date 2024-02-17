@@ -2,8 +2,6 @@ import { TRACE_INDEX, esClient } from "../server/elasticsearch";
 import { getOpenAIEmbeddings } from "../server/embeddings";
 
 const migrateIndex = async (index: string) => {
-  let results: any[] = [];
-
   let searchAfter: any;
   let response;
   let bulkActions = [];
@@ -30,15 +28,14 @@ const migrateIndex = async (index: string) => {
             },
           },
         },
-        size: 2_000,
+        size: 500,
         sort: ["_doc"],
         ...(searchAfter ? { search_after: searchAfter } : {}),
       },
     });
-    const records = response.hits.hits;
-    results = results.concat(records);
-    searchAfter = records[records.length - 1]?.sort;
-    process.stdout.write(`\rFetched ${results.length} hits`);
+    const results = response.hits.hits;
+    searchAfter = results[results.length - 1]?.sort;
+    process.stdout.write(`\nFetched ${results.length} more hits from ${(response as any).hits.total.value} total\n`);
 
     let inputEmbeddings: (
       | { model: string; embeddings: number[] }
@@ -49,18 +46,20 @@ const migrateIndex = async (index: string) => {
       | undefined
     )[] = [];
 
-    for (let i = 0; i < results.length; i += 10) {
+    const embeddingsAtOnce = 50;
+    for (let i = 0; i < results.length; i += embeddingsAtOnce) {
       const inputs: (string | undefined)[] = results
-        .slice(i, i + 10)
+        .slice(i, i + embeddingsAtOnce)
         .map((hit: any) => hit._source.input?.value);
       const outputs: (string | undefined)[] = results
-        .slice(i, i + 10)
+        .slice(i, i + embeddingsAtOnce)
         .map((hit: any) => hit._source.output?.value);
 
       process.stdout.write(
-        `\rGetting embeddings for ${Math.min(i + 10, results.length)}/${
+        `\rGetting embeddings for ${Math.min(
+          i + embeddingsAtOnce,
           results.length
-        } records`
+        )}/${results.length} records`
       );
 
       const embeddings = await Promise.all(
@@ -79,6 +78,8 @@ const migrateIndex = async (index: string) => {
         embeddings.slice(inputs.length)
       );
     }
+
+    process.stdout.write("\n");
 
     for (let i = 0; i < results.length; i++) {
       const hit = results[i];
@@ -138,14 +139,12 @@ const migrateIndex = async (index: string) => {
       });
 
       process.stdout.write(
-        `\r${i + 1}/${results.length} records to be updated`
+        `\r${i + 1}/${results.length} being updated`
       );
 
       if (bulkActions.length >= 400) {
-        console.log(`\nUpdating ${bulkActions.length / 4} records`);
         try {
           await esClient.bulk({ body: bulkActions });
-          console.log("bulkActions", bulkActions);
           bulkActions = [];
         } catch (error) {
           console.error("Error in bulk update:", error);
@@ -154,7 +153,6 @@ const migrateIndex = async (index: string) => {
     }
 
     if (bulkActions.length > 0) {
-      console.log(`\nUpdating ${bulkActions.length / 4} records`);
       try {
         await esClient.bulk({ body: bulkActions });
       } catch (error) {

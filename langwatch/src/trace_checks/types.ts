@@ -329,10 +329,6 @@ export type CheckPrecondition =
        * @maxLength 500
        */
       value: string;
-      /**
-       * @minimum 0
-       * @maximum 1
-       */
       embeddings?: { model: string; embeddings: number[] };
       threshold: number;
     };
