@@ -69,7 +69,14 @@ export const tracesRouter = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       const embeddings = input.query
         ? await getOpenAIEmbeddings(input.query)
-        : [];
+        : undefined;
+
+      if (input.query && !embeddings) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Failed to get embeddings for query.",
+        });
+      }
 
       const queryConditions = [
         ...generateTraceQueryConditions(input),
@@ -146,7 +153,7 @@ export const tracesRouter = createTRPCRouter({
             ? {
                 knn: {
                   field: "input.embeddings.embeddings",
-                  query_vector: embeddings,
+                  query_vector: embeddings?.embeddings,
                   k: 10,
                   num_candidates: 100,
                 },
