@@ -2,6 +2,10 @@ import type { AggregationsAggregationContainer } from "@elastic/elasticsearch/li
 import { z } from "zod";
 
 export const filterFieldsEnum = z.enum([
+  "metadata.user_id",
+  "metadata.thread_id",
+  "metadata.customer_id",
+  "metadata.labels",
   "trace_checks.check_id",
   "events.event_type",
   "events.metrics.key",

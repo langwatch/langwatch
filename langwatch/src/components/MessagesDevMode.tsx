@@ -228,7 +228,7 @@ export function MessagesDevMode() {
   interface SearchTotalHits {
     value: number;
   }
-  // TODO: refactor
+
   useEffect(() => {
     if (traceGroups.isFetched) {
       const totalHits: number =
@@ -237,7 +237,7 @@ export function MessagesDevMode() {
 
       setTotalHits(totalHits);
     }
-  });
+  }, [traceGroups.data?.tracesResult?.hits?.total, traceGroups.isFetched]);
 
   const isFirstRender = useRef(true);
 

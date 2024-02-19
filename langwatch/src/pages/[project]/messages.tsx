@@ -29,6 +29,7 @@ import React, { createRef, useEffect, useRef, useState } from "react";
 import {
   ChevronDown,
   ChevronUp,
+  Filter,
   HelpCircle,
   Layers,
   Maximize2,
@@ -52,6 +53,7 @@ import { getSingleQueryParam } from "../../utils/getSingleQueryParam";
 import { MessagesDevMode } from "~/components/MessagesDevMode";
 import { useDevView } from "../../hooks/DevViewProvider";
 import { useFilterParams } from "../../hooks/useFilterParams";
+import { FieldsFilters } from "../../components/FieldsFilters";
 
 export default function MessagesOrIntegrationGuide() {
   const { project } = useOrganizationTeamProject();
@@ -78,6 +80,8 @@ function Messages() {
   >();
   const [groupBy] = useGroupBy();
   const [liveUpdate, setLiveUpdate] = useState(true);
+
+  const [showFilters, setShowFilters] = useState(true);
 
   const { filterParams, queryOpts } = useFilterParams();
 
@@ -149,9 +153,19 @@ function Messages() {
             <Search size={16} />
           </Box>
           <SearchInput />
-          <FilterSelector />
           <GroupingSelector />
           <PeriodSelector period={period} setPeriod={setPeriod} />
+          <Button
+            variant="outline"
+            onClick={() => setShowFilters(!showFilters)}
+            minWidth="fit-content"
+            isActive={showFilters}
+          >
+            <HStack spacing={2}>
+              <Filter size={16} />
+              <Text>Filters</Text>
+            </HStack>
+          </Button>
           <Tooltip
             label={
               liveUpdate
@@ -190,7 +204,7 @@ function Messages() {
         </HStack>
       </VStack>
       <Container maxWidth="1440" padding={6}>
-        <HStack align="start" spacing={10}>
+        <HStack align="start" spacing={8}>
           <VStack gap={6} width="full">
             {project &&
             traceGroups.data &&
@@ -218,10 +232,25 @@ function Messages() {
               </>
             )}
           </VStack>
-          <TopicsSelector />
+          {showFilters && <FilterSidebar />}
         </HStack>
       </Container>
     </DashboardLayout>
+  );
+}
+
+function FilterSidebar() {
+  return (
+    <VStack
+      align="start"
+      width="full"
+      maxWidth="380"
+      spacing={12}
+      paddingTop={2}
+    >
+      <TopicsSelector />
+      <FieldsFilters />
+    </VStack>
   );
 }
 
@@ -263,56 +292,55 @@ function TopicsSelector() {
   };
 
   return (
-    <Card width="full" maxWidth="400px">
-      <CardBody width="full" padding={8}>
-        <Heading as="h2" size="md">
-          Topics
-        </Heading>
-        <VStack width="full" spacing={4} paddingTop={6} align="start">
-          {topicCountsQuery.isLoading ? (
-            <>
-              <Skeleton width="full" height="20px" />
-              <Skeleton width="full" height="20px" />
-              <Skeleton width="full" height="20px" />
-            </>
-          ) : topicCountsQuery.data ? (
-            Object.keys(topicCountsQuery.data).length > 0 ? (
-              Object.entries(topicCountsQuery.data)
-                .sort((a, b) => (a[1] > b[1] ? -1 : 1))
-                .map(([topic, count]) => (
-                  <React.Fragment key={topic}>
-                    <HStack spacing={4} width="full">
-                      <Checkbox
-                        spacing={3}
-                        flexGrow={1}
-                        isChecked={selectedTopics.includes(topic)}
-                        onChange={(e) =>
-                          handleTopicChange(topic, e.target.checked)
-                        }
-                      >
-                        {topic}
-                      </Checkbox>
-                      <Text color="gray.500" fontSize={12}>
-                        {count}
-                      </Text>
-                    </HStack>
-                    <Divider _last={{ display: "none" }} />
-                  </React.Fragment>
-                ))
-            ) : (
-              <HStack>
-                <Text>No topics found</Text>
-                <Tooltip label="Topics are assigned automatically to a group of messages. If you already have enough messages, it may take a day topics to be generated">
-                  <HelpCircle width="14px" />
-                </Tooltip>
-              </HStack>
-            )
+    <VStack align="start" width="full" spacing={6}>
+      <Heading as="h2" size="md">
+        Topics
+      </Heading>
+      <VStack width="full" spacing={4} align="start">
+        {topicCountsQuery.isLoading ? (
+          <>
+            <Skeleton width="full" height="20px" />
+            <Skeleton width="full" height="20px" />
+            <Skeleton width="full" height="20px" />
+          </>
+        ) : topicCountsQuery.data ? (
+          Object.keys(topicCountsQuery.data).length > 0 ? (
+            Object.entries(topicCountsQuery.data)
+              .sort((a, b) => (a[1] > b[1] ? -1 : 1))
+              .map(([topic, count]) => (
+                <React.Fragment key={topic}>
+                  <HStack spacing={4} width="full" paddingX={2}>
+                    <Checkbox
+                      borderColor="gray.400"
+                      spacing={3}
+                      flexGrow={1}
+                      isChecked={selectedTopics.includes(topic)}
+                      onChange={(e) =>
+                        handleTopicChange(topic, e.target.checked)
+                      }
+                    >
+                      <Text noOfLines={1}>{topic}</Text>
+                    </Checkbox>
+                    <Text color="gray.500" fontSize={12} whiteSpace="nowrap">
+                      {count} messages
+                    </Text>
+                  </HStack>
+                  <Divider borderColor="gray.350" _last={{ display: "none" }} />
+                </React.Fragment>
+              ))
           ) : (
-            <Text>No topics found</Text>
-          )}
-        </VStack>
-      </CardBody>
-    </Card>
+            <HStack>
+              <Text>No topics found</Text>
+              <Tooltip label="Topics are assigned automatically to a group of messages. If you already have enough messages, it may take a day topics to be generated">
+                <HelpCircle width="14px" />
+              </Tooltip>
+            </HStack>
+          )
+        ) : (
+          <Text>No topics found</Text>
+        )}
+      </VStack>
+    </VStack>
   );
 }
 
@@ -394,6 +422,7 @@ function ExpandableMessages({
                 traceGroup.length > 2 ? -4 : traceGroup.length > 1 ? -2 : 0,
               cursor: "pointer",
               width: "full",
+              zIndex: 2,
               _hover: {
                 transform: "scale(1.04)",
               },
