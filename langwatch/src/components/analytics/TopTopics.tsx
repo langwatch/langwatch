@@ -13,13 +13,13 @@ import {
 import { useRouter } from "next/router";
 import React, { useEffect, useState } from "react";
 import { HelpCircle } from "react-feather";
-import { useAnalyticsParams } from "../../hooks/useAnalyticsParams";
+import { useFilterParams } from "../../hooks/useFilterParams";
 import { api } from "../../utils/api";
 
 export function TopTopics() {
-  const { analyticsParams, queryOpts } = useAnalyticsParams();
   const router = useRouter();
   const [selectedTopics, setSelectedTopics] = useState<string[]>([]);
+  const { filterParams, queryOpts } = useFilterParams();
 
   useEffect(() => {
     if (router.query.topics) {
@@ -27,7 +27,7 @@ export function TopTopics() {
     }
   }, [router.query.topics]);
 
-  const paramsWithoutTopics = { ...analyticsParams, topics: undefined };
+  const paramsWithoutTopics = { ...filterParams, topics: undefined };
 
   const topicCountsQuery = api.traces.getTopicCounts.useQuery(
     paramsWithoutTopics,

@@ -2,9 +2,7 @@ import type {
   AggregationsAggregationContainer,
   MappingRuntimeField,
   QueryDslBoolQuery,
-  QueryDslQueryContainer,
 } from "@elastic/elasticsearch/lib/api/types";
-import { type z } from "zod";
 import { getGroup, getMetric } from "~/server/analytics/registry";
 import {
   pipelineAggregationsToElasticSearch,
@@ -19,45 +17,7 @@ import { TeamRoleGroup, checkUserPermissionForProject } from "../../permission";
 import { protectedProcedure } from "../../trpc";
 import { currentVsPreviousDates, dateTicks } from "./common";
 import { TRPCError } from "@trpc/server";
-
-export const generateTracesPivotQueryConditions = ({
-  projectId,
-  startDate,
-  endDate,
-  filters,
-}: z.infer<typeof sharedFiltersInputSchema>): QueryDslQueryContainer[] => {
-  // If end date is very close to now, force it to be now, to allow frontend to keep refetching for new messages
-  const endDate_ =
-    new Date().getTime() - endDate < 1000 * 60 * 60
-      ? new Date().getTime()
-      : endDate;
-
-  const { metadata, topics: topicsGroup } = filters;
-  const { topics } = topicsGroup ?? {};
-  const { user_id, thread_id, customer_id, labels } = metadata ?? {};
-
-  return [
-    {
-      term: { "trace.project_id": projectId },
-    },
-    {
-      range: {
-        "trace.timestamps.started_at": {
-          gte: startDate,
-          lte: endDate_,
-          format: "epoch_millis",
-        },
-      },
-    },
-    ...(user_id ? [{ term: { "trace.metadata.user_id": user_id } }] : []),
-    ...(thread_id ? [{ term: { "trace.metadata.thread_id": thread_id } }] : []),
-    ...(customer_id
-      ? [{ terms: { "trace.metadata.customer_id": customer_id } }]
-      : []),
-    ...(labels ? [{ terms: { "trace.metadata.labels": labels } }] : []),
-    ...(topics ? [{ terms: { "trace.metadata.topics": topics } }] : []),
-  ];
-};
+import { generateTracesPivotQueryConditions } from "./common";
 
 export const getTimeseries = protectedProcedure
   .input(sharedFiltersInputSchema.extend(timeseriesInput.shape))

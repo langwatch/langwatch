@@ -51,6 +51,7 @@ import { FilterSelector } from "../../components/FilterSelector";
 import { getSingleQueryParam } from "../../utils/getSingleQueryParam";
 import { MessagesDevMode } from "~/components/MessagesDevMode";
 import { useDevView } from "../../hooks/DevViewProvider";
+import { useFilterParams } from "../../hooks/useFilterParams";
 
 export default function MessagesOrIntegrationGuide() {
   const { project } = useOrganizationTeamProject();
@@ -78,23 +79,15 @@ function Messages() {
   const [groupBy] = useGroupBy();
   const [liveUpdate, setLiveUpdate] = useState(true);
 
+  const { filterParams, queryOpts } = useFilterParams();
+
   const traceGroups = api.traces.getAllForProject.useQuery(
     {
-      projectId: project?.id ?? "",
-      startDate: period.startDate.getTime(),
-      endDate: period.endDate.getTime(),
+      ...filterParams,
       query: getSingleQueryParam(router.query.query),
-      topics: getSingleQueryParam(router.query.topics)?.split(","),
       groupBy,
-      user_id: getSingleQueryParam(router.query.user_id),
-      thread_id: getSingleQueryParam(router.query.thread_id),
-      customer_ids: getSingleQueryParam(router.query.customer_ids)?.split(","),
-      labels: getSingleQueryParam(router.query.labels)?.split(","),
     },
-    {
-      enabled: !!project,
-      refetchOnWindowFocus: false, // there is a manual refetch on the useEffect below
-    }
+    queryOpts
   );
   const traceIds =
     traceGroups.data?.groups.flatMap((group) =>
@@ -109,8 +102,6 @@ function Messages() {
     }
   );
 
-
-
   useEffect(() => {
     if (traceChecksQuery.data) {
       const pendingChecks = Object.values(traceChecksQuery.data)
@@ -119,7 +110,7 @@ function Messages() {
           (check) =>
             (check.status == "scheduled" || check.status == "in_progress") &&
             (check.timestamps.inserted_at ?? 0) >
-            new Date().getTime() - 1000 * 60 * 60 * 1
+              new Date().getTime() - 1000 * 60 * 60 * 1
         );
       if (pendingChecks.length > 0) {
         setTracesCheckInterval(5000);
@@ -201,7 +192,9 @@ function Messages() {
       <Container maxWidth="1440" padding={6}>
         <HStack align="start" spacing={10}>
           <VStack gap={6} width="full">
-            {project && traceGroups.data && traceGroups.data.groups.length > 0 ? (
+            {project &&
+            traceGroups.data &&
+            traceGroups.data.groups.length > 0 ? (
               <ExpandableMessages
                 project={project}
                 traceGroups={traceGroups.data.groups}
@@ -233,10 +226,9 @@ function Messages() {
 }
 
 function TopicsSelector() {
-  const { project } = useOrganizationTeamProject();
   const router = useRouter();
-  const { period } = usePeriodSelector(30);
   const [selectedTopics, setSelectedTopics] = useState<string[]>([]);
+  const { filterParams, queryOpts } = useFilterParams();
 
   useEffect(() => {
     if (router.query.topics) {
@@ -245,21 +237,8 @@ function TopicsSelector() {
   }, [router.query.topics]);
 
   const topicCountsQuery = api.traces.getTopicCounts.useQuery(
-    {
-      projectId: project?.id ?? "",
-      startDate: period.startDate.getTime(),
-      endDate: period.endDate.getTime(),
-      user_id: getSingleQueryParam(router.query.user_id),
-      thread_id: getSingleQueryParam(router.query.thread_id),
-      customer_ids: getSingleQueryParam(router.query.customer_ids)?.split(","),
-      labels: getSingleQueryParam(router.query.labels)?.split(","),
-    },
-    {
-      enabled: !!project,
-      refetchOnMount: false,
-      refetchOnReconnect: false,
-      refetchOnWindowFocus: false,
-    }
+    filterParams,
+    queryOpts
   );
 
   const handleTopicChange = (topic: string, isChecked: boolean) => {
@@ -357,7 +336,6 @@ function ExpandableMessages({
     }));
   };
 
-
   const [cardHeights, setCardHeights] = useState<Record<number, number>>({});
   const cardRefs = (traceGroups ?? []).map(() => createRef<Element>());
   const [groupBy] = useGroupBy();
@@ -400,26 +378,26 @@ function ExpandableMessages({
         }}
         {...(isExpanded
           ? {
-            className: "card-stack-content expanded",
-            background: "#ECEEF2",
-            borderRadius: "10px",
-            padding: "40px",
-            width: "calc(100% + 80px)",
-            cursor: "n-resize",
-          }
+              className: "card-stack-content expanded",
+              background: "#ECEEF2",
+              borderRadius: "10px",
+              padding: "40px",
+              width: "calc(100% + 80px)",
+              cursor: "n-resize",
+            }
           : {
-            background: "#ECEEF200",
-            className: "card-stack-content",
-            marginBottom:
-              traceGroup.length > 2 ? 4 : traceGroup.length > 1 ? 2 : 0,
-            marginLeft:
-              traceGroup.length > 2 ? -4 : traceGroup.length > 1 ? -2 : 0,
-            cursor: "pointer",
-            width: "full",
-            _hover: {
-              transform: "scale(1.04)",
-            },
-          })}
+              background: "#ECEEF200",
+              className: "card-stack-content",
+              marginBottom:
+                traceGroup.length > 2 ? 4 : traceGroup.length > 1 ? 2 : 0,
+              marginLeft:
+                traceGroup.length > 2 ? -4 : traceGroup.length > 1 ? -2 : 0,
+              cursor: "pointer",
+              width: "full",
+              _hover: {
+                transform: "scale(1.04)",
+              },
+            })}
       >
         {isExpanded && (
           <HStack
@@ -490,8 +468,8 @@ function ExpandableMessages({
                   _hover={
                     expanded
                       ? {
-                        transform: "scale(1.04)",
-                      }
+                          transform: "scale(1.04)",
+                        }
                       : {}
                   }
                 >

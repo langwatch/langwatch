@@ -5,6 +5,7 @@ import similarity from "compute-cosine-similarity";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import {
   SPAN_INDEX,
+  TRACES_PIVOT_INDEX,
   TRACE_CHECKS_INDEX,
   TRACE_INDEX,
   esClient,
@@ -16,16 +17,17 @@ import {
   checkUserPermissionForProject,
   backendHasTeamProjectPermission,
 } from "../permission";
-import { generateTraceQueryConditions } from "./analytics/common";
+import {
+  generateTraceQueryConditions,
+  generateTracesPivotQueryConditions,
+} from "./analytics/common";
+import {
+  type TracesPivot,
+  sharedFiltersInputSchema,
+} from "../../analytics/types";
+import type { QueryDslBoolQuery } from "@elastic/elasticsearch/lib/api/types";
 
-const sharedTraceFilterInput = z.object({
-  projectId: z.string(),
-  startDate: z.number(),
-  endDate: z.number(),
-  user_id: z.string().optional(),
-  thread_id: z.string().optional(),
-  customer_ids: z.array(z.string()).optional(),
-  labels: z.array(z.string()).optional(),
+const tracesFilterInput = sharedFiltersInputSchema.extend({
   pageOffset: z.number().optional(),
   pageSize: z.number().optional(),
 });
@@ -59,10 +61,9 @@ export const esGetSpansByTraceId = async ({
 export const tracesRouter = createTRPCRouter({
   getAllForProject: protectedProcedure
     .input(
-      sharedTraceFilterInput.extend({
+      tracesFilterInput.extend({
         query: z.string().optional(),
         groupBy: z.string().optional(),
-        topics: z.array(z.string()).optional(),
       })
     )
     .use(checkUserPermissionForProject(TeamRoleGroup.MESSAGES_VIEW))
@@ -78,11 +79,28 @@ export const tracesRouter = createTRPCRouter({
         });
       }
 
-      const queryConditions = [
-        ...generateTraceQueryConditions(input),
-        ...(input.topics
-          ? [{ terms: { "metadata.topics": input.topics } }]
-          : []),
+      const pivotIndexConditions = generateTracesPivotQueryConditions(input);
+      const pivotIndexResults = await esClient.search<TracesPivot>({
+        index: TRACES_PIVOT_INDEX,
+        body: {
+          size: 10_000,
+          query: {
+            bool: {
+              filter: pivotIndexConditions,
+            } as QueryDslBoolQuery,
+          },
+          _source: ["trace.trace_id"],
+        },
+      });
+
+      const traceIds = pivotIndexResults.hits.hits
+        .map((hit) => hit._source?.trace?.trace_id)
+        .filter((x) => x)
+        .map((x) => x!);
+
+      const tracesIndexConditions = [
+        { term: { project_id: input.projectId } },
+        { terms: { trace_id: traceIds } },
       ];
 
       const canSeeCosts = await backendHasTeamProjectPermission(
@@ -124,7 +142,7 @@ export const tracesRouter = createTRPCRouter({
           query: {
             bool: {
               must: [
-                ...queryConditions,
+                ...tracesIndexConditions,
                 ...(input.query
                   ? [
                       {
@@ -165,7 +183,7 @@ export const tracesRouter = createTRPCRouter({
           // Ensures proper filters are applied even with knn
           post_filter: {
             bool: {
-              must: queryConditions,
+              must: tracesIndexConditions,
             },
           },
         },
@@ -279,7 +297,7 @@ export const tracesRouter = createTRPCRouter({
       return checksPerTrace;
     }),
   getTopicCounts: protectedProcedure
-    .input(sharedTraceFilterInput)
+    .input(tracesFilterInput)
     .use(checkUserPermissionForProject(TeamRoleGroup.MESSAGES_VIEW))
     .query(async ({ input }) => {
       const queryConditions = generateTraceQueryConditions(input);
