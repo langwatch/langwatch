@@ -33,6 +33,11 @@ import {
   DrawerHeader,
   ChakraProvider,
   Select,
+  Tab,
+  TabList,
+  TabPanel,
+  TabPanels,
+  Tabs,
 } from "@chakra-ui/react";
 import { DashboardLayout } from "./DashboardLayout";
 import { FilterSelector } from "./FilterSelector";
@@ -45,12 +50,14 @@ import { api } from "~/utils/api";
 import { durationColor } from "~/utils/durationColor";
 import numeral from "numeral";
 import { getTraceCheckDefinitions } from "~/trace_checks/registry";
-import { ChevronDown, List, ChevronLeft, ChevronRight } from "react-feather";
+import { ChevronDown, List, ChevronLeft, ChevronRight, CheckCircle, Check } from "react-feather";
 import type { Trace } from "~/server/tracer/types";
 import { SpanTree } from "./traces/SpanTree";
 import { TraceSummary } from "./traces/Summary";
 import { useRef } from "react";
 import { Maximize2, Minimize2, type Icon } from "react-feather";
+import { trace } from "console";
+import { CheckPassingDrawer } from "./CheckPassingDrawer";
 
 
 export function MessagesDevMode() {
@@ -106,6 +113,7 @@ export function MessagesDevMode() {
       refetchOnWindowFocus: false,
     }
   );
+
 
   const checksAvailable = Object.fromEntries(
     Object.values(traceChecksQuery.data ?? {}).flatMap((checks) =>
@@ -252,7 +260,25 @@ export function MessagesDevMode() {
     }
   })
 
+  const Evaluations = (traceId) => {
+
+    return (
+      <>
+        <VStack align="start" spacing={2}>
+          {traceId.traceChecks[traceId.traceId].map((check) => (
+            <CheckPassingDrawer
+              key={check.trace_id + "/" + check.check_id}
+              check={check}
+            />
+          ))}
+        </VStack >
+      </>
+    )
+  }
+
   const isFirstRender = useRef(true);
+
+
 
   useEffect(() => {
     if (
@@ -385,9 +411,9 @@ export function MessagesDevMode() {
         <HStack padding={6}>
           <Text>Items per page </Text>
 
-          <Select placeholder='' maxW='70px' size='sm' onChange={(e) => changePageSize(parseInt(e.target.value))} borderColor={'black'} borderRadius={'lg'}>
+          <Select defaultValue={'25'} placeholder='' maxW='70px' size='sm' onChange={(e) => changePageSize(parseInt(e.target.value))} borderColor={'black'} borderRadius={'lg'}>
             <option value='10'>10</option>
-            <option value='25' selected={true}>25</option>
+            <option value='25'>25</option>
             <option value='50'>50</option>
             <option value='100'>100</option>
             <option value='250'>250</option>
@@ -415,13 +441,34 @@ export function MessagesDevMode() {
               ) : (
                 <Minimize2 onClick={toggleView} cursor={"pointer"} />
               )}
-              <Text>Trace Details</Text>
+
               <DrawerCloseButton />
+
+            </HStack>
+            <HStack>
+              <Text paddingTop={5} fontSize='2xl'>Trace Details</Text>
             </HStack>
           </DrawerHeader>
           <DrawerBody>
-            <TraceSummary traceId={traceId ?? ""} />
-            <SpanTree traceId={traceId ?? ""} />
+            <Tabs>
+              <TabList>
+                <Tab>Details</Tab>
+                <Tab>Evaluations</Tab>
+              </TabList>
+
+              <TabPanels>
+                <TabPanel>
+                  <TraceSummary traceId={traceId ?? ""} />
+                  <SpanTree traceId={traceId ?? ""} />
+
+                </TabPanel>
+                <TabPanel>
+                  <Evaluations traceId={traceId ?? ""} traceChecks={traceChecksQuery.data} />
+                </TabPanel>
+
+              </TabPanels>
+            </Tabs>
+
           </DrawerBody>
         </DrawerContent>
       </Drawer>

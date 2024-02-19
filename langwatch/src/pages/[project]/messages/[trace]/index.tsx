@@ -156,9 +156,10 @@ export default function TraceDetails() {
                   ) : (
                     <Minimize2 onClick={toggleView} cursor={"pointer"} />
                   )}
-                  <Text>Trace Details</Text>
+
                   <DrawerCloseButton />
                 </HStack>
+                <Text>Trace Details</Text>
               </DrawerHeader>
               <DrawerBody>
                 <TraceSummary />
@@ -369,8 +370,8 @@ function Message({
     ? timestampDate.getTime() < Date.now() - 1000 * 60 * 60 * 24
       ? format(timestampDate, "dd/MMM HH:mm")
       : formatDistanceToNow(timestampDate, {
-          addSuffix: true,
-        })
+        addSuffix: true,
+      })
     : undefined;
 
   if (!project) return null;
