@@ -27,6 +27,7 @@ import { CheckPassing } from "./CheckPassing";
 import type { Project } from "@prisma/client";
 import NextLink from "next/link";
 import { getColorForString } from "../utils/rotatingColors";
+import { api } from "../utils/api";
 
 export function MessageCard({
   linkActive,
@@ -50,10 +51,16 @@ export function MessageCard({
     (check) => check.status == "succeeded"
   ).length;
   const totalChecks = traceChecks.length;
-  const topics =
-    (typeof trace.metadata.topics == "string"
-      ? [trace.metadata.topics]
-      : trace.metadata.topics) ?? [];
+
+  const topics = api.topics.getAll.useQuery(
+    { projectId: project?.id ?? "" },
+    { enabled: !!project }
+  );
+  const topicsMap = Object.fromEntries(
+    topics.data?.map((topic) => [topic.id, topic]) ?? []
+  );
+  const traceTopic = topicsMap[trace.metadata.topic_id ?? ""];
+  const traceSubtopic = topicsMap[trace.metadata.subtopic_id ?? ""];
 
   return (
     <VStack alignItems="flex-start" spacing={4} width="fill">
@@ -117,20 +124,28 @@ export function MessageCard({
       <HStack width="full" alignItems="flex-end">
         <VStack gap={4} alignItems="flex-start">
           <HStack spacing={2}>
-            {/* TODO: loop over models used */}
-            {/* <Tag background="blue.50" color="blue.600">
-                    vendor/model
-                  </Tag> */}
-            {topics.map((topic) => (
+            {traceTopic && (
               <Tag
-                key={topic}
-                background={getColorForString("colors", topic).background}
-                color={getColorForString("colors", topic).color}
+                background={
+                  getColorForString("colors", traceTopic.id).background
+                }
+                color={getColorForString("colors", traceTopic.id).color}
                 fontSize={12}
               >
-                {topic}
+                {traceTopic.name}
               </Tag>
-            ))}
+            )}
+            {traceSubtopic && (
+              <Tag
+                background={
+                  getColorForString("colors", traceSubtopic.id).background
+                }
+                color={getColorForString("colors", traceSubtopic.id).color}
+                fontSize={12}
+              >
+                {traceSubtopic.name}
+              </Tag>
+            )}
             {(trace.metadata.labels ?? []).map((label) => (
               <Tag
                 key={label}

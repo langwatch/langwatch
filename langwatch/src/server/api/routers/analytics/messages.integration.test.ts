@@ -113,7 +113,7 @@ describe("Analytics Endpoint Integration Tests", () => {
       body: {
         query: {
           terms: {
-            labels: ["test-messages"],
+            "metadata.labels": ["test-messages"],
           },
         },
       },

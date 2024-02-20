@@ -9,6 +9,21 @@ import { prisma } from "../db";
 import { nanoid } from "nanoid";
 import { CostReferenceType, CostType } from "@prisma/client";
 import { scheduleTopicClusteringNextPage } from "../background/queues/topicClusteringQueue";
+import type {
+  QueryDslBoolQuery,
+  QueryDslQueryContainer,
+} from "@elastic/elasticsearch/lib/api/types";
+import type {
+  BatchClusteringParams,
+  IncrementalClusteringParams,
+  TopicClusteringResponse,
+  TopicClusteringSubtopic,
+  TopicClusteringTopic,
+  TopicClusteringTrace,
+  TopicClusteringTraceTopicMap,
+} from "./types";
+import { fetch as fetchHTTP2 } from "fetch-h2";
+import { DEFAULT_EMBEDDINGS_MODEL } from "../embeddings";
 
 const debug = getDebugger("langwatch:topicClustering");
 
@@ -17,73 +32,142 @@ export const clusterTopicsForProject = async (
   searchAfter?: [number, string],
   scheduleNextPage = true
 ): Promise<void> => {
-  const tracesCount = await esClient.count({
+  const assignedTracesCount = await esClient.count({
     index: TRACE_INDEX,
     body: {
       query: {
-        term: {
-          project_id: projectId,
-        },
+        bool: {
+          must: [
+            {
+              term: {
+                project_id: projectId,
+              },
+            },
+            {
+              exists: {
+                field: "metadata.topic_id",
+              },
+            },
+          ],
+        } as QueryDslBoolQuery,
       },
     },
   });
 
-  // We do not re-cluster the messages unless there is less than 1k because that would be very little to settle on clusters
-  let presenceCondition = {};
-  if (tracesCount.count > 1000) {
-    presenceCondition = {
-      must_not: {
-        exists: {
-          field: "metadata.topics",
+  const topicsCount = await prisma.topic.count({
+    where: { projectId },
+  });
+
+  // If we have topics and more than 2000 traces are already assigned, we are in incremental processing mode
+  // This checks helps us getting back into batch mode if we simply delete all the topics for a given project
+  const isIncrementalProcessing =
+    topicsCount > 0 && assignedTracesCount.count >= 2000;
+
+  let presenceCondition: QueryDslQueryContainer[] = [
+    {
+      range: {
+        "timestamps.inserted_at": {
+          gte: "now-12M", // Limit to last 12 months for full batch processing
+          lt: "now",
         },
       },
-    };
+    },
+  ];
+  if (isIncrementalProcessing) {
+    presenceCondition = [
+      {
+        range: {
+          "timestamps.inserted_at": {
+            gte: "now-12M", // grab only messages that were not classified in last 3 months for incremental processing
+            lt: "now",
+          },
+        },
+      },
+      {
+        bool: {
+          should: [
+            {
+              bool: {
+                must_not: {
+                  exists: {
+                    field: "trace.metadata.topic_id",
+                  },
+                },
+              } as QueryDslBoolQuery,
+            },
+            {
+              bool: {
+                must_not: {
+                  exists: {
+                    field: "trace.metadata.subtopic_id",
+                  },
+                },
+              } as QueryDslBoolQuery,
+            },
+          ],
+          minimum_should_match: 1,
+        },
+      },
+    ];
   }
 
-  // Fetch last 1000 traces that were not classified in last 3 months, sorted and paginated, with only id, input fields and their topics
+  // Fetch last 2000 traces that were not classified in sorted and paginated, with only id, input fields and their current topics
   const result = await esClient.search<Trace>({
     index: TRACE_INDEX,
     body: {
       query: {
-        //@ts-ignore
         bool: {
           must: [
             {
               term: { project_id: projectId },
             },
-            {
-              range: {
-                "timestamps.inserted_at": {
-                  gte: "now-3M",
-                  lt: "now",
-                },
-              },
-            },
+            ...presenceCondition,
           ],
-          ...presenceCondition,
-        },
+        } as QueryDslBoolQuery,
       },
-      _source: ["trace_id", "input"],
+      _source: [
+        "trace_id",
+        "input",
+        "metadata.topic_id",
+        "metadata.subtopic_id",
+      ],
       sort: [{ "timestamps.inserted_at": "asc" }, { trace_id: "asc" }],
       ...(searchAfter ? { search_after: searchAfter } : {}),
-      size: 1000,
+      size: 2000,
     },
   });
 
-  const traces = result.hits.hits
+  const traces: TopicClusteringTrace[] = result.hits.hits
     .map((hit) => hit._source!)
-    .filter((hit) => hit);
+    .filter(
+      (trace) =>
+        !!trace?.input.value &&
+        trace?.input.embeddings?.model === DEFAULT_EMBEDDINGS_MODEL
+    )
+    .map((trace) => ({
+      trace_id: trace.trace_id,
+      input: trace.input.value,
+      embeddings: trace.input.embeddings!.embeddings,
+      topic_id: trace.metadata?.topic_id ?? null,
+      subtopic_id: trace.metadata?.subtopic_id ?? null,
+    }));
 
-  if (traces.length === 0) {
+  const minimumTraces = isIncrementalProcessing ? 1 : 10;
+
+  if (traces.length < minimumTraces) {
     debug(
-      "No traces found for project",
+      `Less than ${minimumTraces} traces found for project`,
       projectId,
       "skipping topic clustering"
     );
     return;
   }
 
-  await clusterTraces(projectId, traces);
+  if (isIncrementalProcessing) {
+    await incrementalClustering(projectId, traces);
+  } else {
+    await batchClusterTraces(projectId, traces);
+  }
 
   // If results are not close to empty, schedule the seek for next page
   if (result.hits.hits.length > 10) {
@@ -100,7 +184,12 @@ export const clusterTopicsForProject = async (
       if (scheduleNextPage) {
         await scheduleTopicClusteringNextPage(projectId, lastTraceSort);
       } else {
-        debug("Skipping scheduling next page for project", projectId, "which would be", lastTraceSort);
+        debug(
+          "Skipping scheduling next page for project",
+          projectId,
+          "which would be",
+          lastTraceSort
+        );
       }
     }
   }
@@ -108,67 +197,146 @@ export const clusterTopicsForProject = async (
   debug("Done! Project", projectId);
 };
 
-export const clusterTraces = async (projectId: string, traces: Trace[]) => {
-  const topicsAgg = await esClient.search({
-    index: TRACE_INDEX,
-    body: {
-      size: 0, // We don't need the actual documents, just the aggregation
-      query: {
-        term: {
-          project_id: projectId,
-        },
-      },
-      aggs: {
-        unique_topics: {
-          terms: {
-            field: "metadata.topics",
-            size: 10000,
-          },
-        },
-      },
-    },
+export const batchClusterTraces = async (
+  projectId: string,
+  traces: TopicClusteringTrace[]
+) => {
+  debug(
+    "Batch clustering topics for",
+    traces.length,
+    "traces on project",
+    projectId
+  );
+
+  const clusteringResult = await fetchTopicsBatchClustering(projectId, {
+    traces,
   });
 
-  const existingTopics = (
-    topicsAgg.aggregations?.unique_topics as any
-  )?.buckets.map((bucket: any) => bucket.key);
+  await storeResults(projectId, clusteringResult, false);
+};
 
-  debug("Clustering topics for", traces.length, "traces on project", projectId);
-  const clusteringResult = await clusterTopicsForTraces(projectId, {
-    topics: existingTopics,
-    file: traces
-      .map((trace) => ({
-        _source: {
-          id: trace.trace_id,
-          input: {
-            value: trace.input.value,
-            openai_embeddings: trace.input.embeddings?.embeddings,
-          }
-        },
-      }))
-      .filter(
-        (trace) =>
-          !!trace._source.input.openai_embeddings && !!trace._source.input.value
-      ),
+export const incrementalClustering = async (
+  projectId: string,
+  traces: TopicClusteringTrace[]
+) => {
+  debug(
+    "Incremental topic clustering for",
+    traces.length,
+    "traces on project",
+    projectId
+  );
+
+  const topics: TopicClusteringTopic[] = (
+    await prisma.topic.findMany({
+      where: { projectId, parentId: null },
+      select: { id: true, name: true, centroid: true, p95Distance: true },
+    })
+  ).map((topic) => ({
+    id: topic.id,
+    name: topic.name,
+    centroid: topic.centroid as number[],
+    p95_distance: topic.p95Distance,
+  }));
+
+  const subtopics: TopicClusteringSubtopic[] = (
+    await prisma.topic.findMany({
+      where: { projectId, parentId: { not: null } },
+      select: {
+        id: true,
+        name: true,
+        centroid: true,
+        p95Distance: true,
+        parentId: true,
+      },
+    })
+  ).map((topic) => ({
+    id: topic.id,
+    name: topic.name,
+    centroid: topic.centroid as number[],
+    p95_distance: topic.p95Distance,
+    parent_id: topic.parentId as string,
+  }));
+
+  const clusteringResult = await fetchTopicsIncrementalClustering(projectId, {
+    traces,
+    topics,
+    subtopics,
   });
 
-  const topics = clusteringResult?.message_clusters ?? {};
-  const cost = clusteringResult?.costs;
+  await storeResults(projectId, clusteringResult, false);
+};
+
+export const storeResults = async (
+  projectId: string,
+  clusteringResult: TopicClusteringResponse | undefined,
+  isIncremental: boolean
+) => {
+  const {
+    topics,
+    subtopics,
+    traces: tracesToAssign,
+    cost,
+  } = clusteringResult ?? {
+    topics: [] as TopicClusteringTopic[],
+    subtopics: [] as TopicClusteringSubtopic[],
+    traces: [] as TopicClusteringTraceTopicMap[],
+    cost: undefined,
+  };
 
   debug(
-    "Found topics for",
-    Object.keys(topics).length,
-    "traces for project",
+    `Found ${topics.length} new topics, ${subtopics.length} new subtopics, and`,
+    Object.keys(tracesToAssign).length,
+    "traces to assign for project",
     projectId,
-    Object.keys(topics).length > 0
+    Object.keys(tracesToAssign).length > 0
       ? "- Updating ElasticSearch"
       : "- Skipping ElasticSearch update"
   );
-  const body = Object.entries(topics).flatMap(([traceId, topic]) => [
-    { update: { _id: traceIndexId({ traceId, projectId }) } },
+
+  if (!isIncremental) {
+    await prisma.topic.deleteMany({
+      where: { projectId, parentId: { not: null } },
+    });
+    await prisma.topic.deleteMany({
+      where: { projectId },
+    });
+  }
+
+  if (topics.length > 0) {
+    await prisma.topic.createMany({
+      data: topics.map((topic) => ({
+        id: topic.id,
+        projectId,
+        name: topic.name,
+        embeddings_model: DEFAULT_EMBEDDINGS_MODEL,
+        centroid: topic.centroid,
+        p95Distance: topic.p95_distance,
+        automaticallyGenerated: true,
+      })),
+      skipDuplicates: true,
+    });
+  }
+  if (subtopics.length > 0) {
+    await prisma.topic.createMany({
+      data: subtopics.map((subtopic) => ({
+        id: subtopic.id,
+        projectId,
+        name: subtopic.name,
+        embeddings_model: DEFAULT_EMBEDDINGS_MODEL,
+        centroid: subtopic.centroid,
+        p95Distance: subtopic.p95_distance,
+        parentId: subtopic.parent_id,
+        automaticallyGenerated: true,
+      })),
+      skipDuplicates: true,
+    });
+  }
+
+  const body = tracesToAssign.flatMap(({ trace_id, topic_id, subtopic_id }) => [
+    { update: { _id: traceIndexId({ traceId: trace_id, projectId }) } },
     {
       doc: {
-        metadata: { topics: [topic] },
+        metadata: { topic_id, subtopic_id },
         timestamps: { updated_at: Date.now() },
       } as Partial<ElasticSearchTrace>,
     },
@@ -194,28 +362,20 @@ export const clusterTraces = async (projectId: string, traces: Trace[]) => {
         amount: cost.amount,
         currency: cost.currency,
         extraInfo: {
-          traces_count: traces.length,
+          traces_count: tracesToAssign.length,
           topics_count: Object.keys(topics).length,
+          subtopics_count: Object.keys(subtopics).length,
+          is_incremental: isIncremental,
         },
       },
     });
   }
 };
 
-export type TopicClusteringParams = {
-  topics: string[];
-  file: { _source: { id: string; input: Trace["input"] } }[];
-};
-
-type ClusteringResult = {
-  message_clusters: Record<string, string>;
-  costs: Money;
-};
-
-export const clusterTopicsForTraces = async (
+export const fetchTopicsBatchClustering = async (
   projectId: string,
-  params: TopicClusteringParams
-): Promise<ClusteringResult | undefined> => {
+  params: BatchClusteringParams
+): Promise<TopicClusteringResponse | undefined> => {
   if (!env.LANGWATCH_GUARDRAILS_SERVICE) {
     console.warn(
       "Topic clustering service URL not set, skipping topic clustering"
@@ -223,74 +383,47 @@ export const clusterTopicsForTraces = async (
     return;
   }
 
-  const formData = new FormData();
-  formData.append("categories", params.topics.join(",") || " ");
-
-  const fileContent = params.file
-    .map((line) => JSON.stringify(line))
-    .join("\n");
   debug(
     "Uploading",
-    fileContent.length / 125000,
+    JSON.stringify(params).length / 125000,
     "mb of traces data for project",
     projectId
   );
 
-  const buffer = Buffer.from(fileContent);
-  formData.append("file", buffer, {
-    filename: "traces.jsonl",
-    contentType: "application/jsonl",
-  });
+  const response = await fetchHTTP2(
+    `${env.LANGWATCH_GUARDRAILS_SERVICE}/topics/batch_clustering`,
+    { method: "POST", json: params }
+  );
 
-  const headers = Object.assign({}, formData.getHeaders(), {
-    ":method": "POST",
-    ":path": "/topics",
-  });
+  const result = (await response.json()) as TopicClusteringResponse;
 
-  // HTTP/2 on Google Cloud Run has no payload limit, where HTTP/1.1 has a 32mb limit
-  // which we cannot increase, so here we have to force HTTP/2 to be used
-  // Create an HTTP/2 client
-  const client = http2.connect(env.LANGWATCH_GUARDRAILS_SERVICE);
+  return result;
+};
 
-  // Convert FormData to a readable stream
-  const formBuffer = formData.getBuffer();
-  const req = client.request(headers);
-  req.end(formBuffer);
+export const fetchTopicsIncrementalClustering = async (
+  projectId: string,
+  params: IncrementalClusteringParams
+): Promise<TopicClusteringResponse | undefined> => {
+  if (!env.LANGWATCH_GUARDRAILS_SERVICE) {
+    console.warn(
+      "Topic clustering service URL not set, skipping topic clustering"
+    );
+    return;
+  }
 
-  return await new Promise((resolve, reject) => {
-    let status: string | undefined;
-    req.on("response", (headers, _flags) => {
-      status = headers[":status"]?.toString();
-    });
+  debug(
+    "Uploading",
+    JSON.stringify(params).length / 125000,
+    "mb of traces data for project",
+    projectId
+  );
 
-    req.setEncoding("utf8");
-    let data = "";
-    req.on("data", (chunk) => {
-      data += chunk;
-    });
+  const response = await fetchHTTP2(
+    `${env.LANGWATCH_GUARDRAILS_SERVICE}/topics/incremental_clustering`,
+    { method: "POST", json: params }
+  );
 
-    req.on("error", (err) => {
-      reject(err);
-    });
+  const result = (await response.json()) as TopicClusteringResponse;
 
-    req.on("end", () => {
-      client.close();
-      if (
-        status &&
-        (parseInt(status, 10) < 200 || parseInt(status, 10) > 299)
-      ) {
-        reject(
-          new Error(`TopicClustering service returned error: ${status} ${data}`)
-        );
-        return;
-      }
-
-      try {
-        const result: ClusteringResult = JSON.parse(data);
-        resolve(result);
-      } catch (err) {
-        reject(err);
-      }
-    });
-  });
+  return result;
 };

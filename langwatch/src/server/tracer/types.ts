@@ -175,7 +175,8 @@ export type Trace = {
     user_id?: string;
     customer_id?: string;
     labels?: string[];
-    topics?: string[];
+    topic_id?: string;
+    subtopic_id?: string;
   };
   timestamps: { started_at: number; inserted_at: number };
   input: TraceInput;

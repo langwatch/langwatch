@@ -306,7 +306,7 @@ export const tracesRouter = createTRPCRouter({
   getTopicCounts: protectedProcedure
     .input(tracesFilterInput)
     .use(checkUserPermissionForProject(TeamRoleGroup.MESSAGES_VIEW))
-    .query(async ({ input }) => {
+    .query(async ({ input, ctx }) => {
       const queryConditions = generateTraceQueryConditions(input);
 
       const topicCountsResult = await esClient.search<Trace>({
@@ -323,7 +323,13 @@ export const tracesRouter = createTRPCRouter({
           aggs: {
             topicCounts: {
               terms: {
-                field: "metadata.topics",
+                field: "metadata.topic_id",
+                size: 10000,
+              },
+            },
+            subtopicCounts: {
+              terms: {
+                field: "metadata.subtopic_id",
                 size: 10000,
               },
             },
@@ -331,17 +337,45 @@ export const tracesRouter = createTRPCRouter({
         },
       });
 
-      const buckets: { key: string; doc_count: number }[] =
-        (topicCountsResult.aggregations?.topicCounts as any)?.buckets ?? [];
-      const topicCounts = buckets.reduce(
-        (acc, bucket) => {
-          acc[bucket.key] = bucket.doc_count;
-          return acc;
-        },
-        {} as Record<string, number>
+      const topicsMap = Object.fromEntries(
+        (
+          await ctx.prisma.topic.findMany({
+            where: {
+              projectId: input.projectId,
+            },
+          })
+        ).map((topic) => [topic.id, topic])
       );
 
-      return topicCounts;
+      const mapBuckets = (buckets: { key: string; doc_count: number }[]) => {
+        return buckets.reduce(
+          (acc, bucket) => {
+            const topic = topicsMap[bucket.key];
+
+            if (!topic) return [];
+
+            return [
+              ...acc,
+              {
+                id: bucket.key,
+                name: topic.name,
+                count: bucket.doc_count,
+              },
+            ];
+          },
+          [] as { id: string; name: string; count: number }[]
+        );
+      };
+
+      const topicBuckets: { key: string; doc_count: number }[] =
+        (topicCountsResult.aggregations?.topicCounts as any)?.buckets ?? [];
+      const topicCounts = mapBuckets(topicBuckets);
+
+      const subtopicBuckets: { key: string; doc_count: number }[] =
+        (topicCountsResult.aggregations?.subtopicCounts as any)?.buckets ?? [];
+      const subtopicCounts = mapBuckets(subtopicBuckets);
+
+      return { topicCounts, subtopicCounts };
     }),
   getCustomersAndLabels: protectedProcedure
     .input(

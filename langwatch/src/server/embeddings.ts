@@ -5,10 +5,12 @@ import {
 } from "@azure/openai";
 import { env } from "../env.mjs";
 
+export const DEFAULT_EMBEDDINGS_MODEL = "text-embedding-3-small";
+
 export const getOpenAIEmbeddings = async (text: string) => {
   // Temporary until text-embedding-3-small is also available on azure: https://learn.microsoft.com/en-us/answers/questions/1531681/openai-new-embeddings-model
   const useAzure = false;
-  const model = "text-embedding-3-small";
+  const model = DEFAULT_EMBEDDINGS_MODEL;
 
   if (useAzure && env.AZURE_OPENAI_ENDPOINT && env.AZURE_OPENAI_KEY) {
     const openai = new AzureOpenAIClient(

@@ -51,6 +51,7 @@
     "date-fns": "^2.30.0",
     "debug": "^4.3.4",
     "dotenv": "^16.3.1",
+    "fetch-h2": "^3.0.2",
     "framer-motion": "^10.16.4",
     "ioredis": "^5.3.2",
     "jsonwebtoken": "^9.0.2",

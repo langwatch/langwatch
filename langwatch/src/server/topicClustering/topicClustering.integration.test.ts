@@ -1,231 +1,177 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import {
   clusterTopicsForProject,
-  clusterTopicsForTraces,
-  type TopicClusteringParams,
+  fetchTopicsBatchClustering,
 } from "./topicClustering";
-import { getOpenAIEmbeddings } from "../embeddings";
-import { TRACE_INDEX, esClient } from "../elasticsearch";
+import { DEFAULT_EMBEDDINGS_MODEL, getOpenAIEmbeddings } from "../embeddings";
+import { TRACE_INDEX, esClient, traceIndexId } from "../elasticsearch";
 import type { Trace } from "../tracer/types";
 import { CostType } from "@prisma/client";
 import { prisma } from "../db";
+import type { TopicClusteringTrace } from "./types";
 
 describe("Topic Clustering Integration Test", () => {
-  it("cluster tracers into topics", async () => {
-    // Many examples because we skip adding a topic name to small clusters
-    const traces: TopicClusteringParams["file"] = [
-      {
-        _source: {
-          id: "trace_1",
-          input: { value: "hey there, how is it going?" },
-        },
-      },
-      {
-        _source: {
-          id: "trace_2",
-          input: { value: "hi, what is up?" },
-        },
-      },
-      {
-        _source: {
-          id: "trace_3",
-          input: { value: "please repeat" },
-        },
-      },
-      {
-        _source: {
-          id: "trace_4",
-          input: { value: "sorry, can you repeat?" },
-        },
-      },
-      {
-        _source: {
-          id: "trace_5",
-          input: { value: "hey there, how is it going??" },
-        },
-      },
-      {
-        _source: {
-          id: "trace_6",
-          input: { value: "hi, what is up??" },
-        },
-      },
-      {
-        _source: {
-          id: "trace_7",
-          input: { value: "please repeat!" },
-        },
-      },
-      {
-        _source: {
-          id: "trace_8",
-          input: { value: "sorry, can you repeat??" },
-        },
-      },
-      {
-        _source: {
-          id: "trace_9",
-          input: { value: "hey there, how is it going???" },
-        },
-      },
-      {
-        _source: {
-          id: "trace_10",
-          input: { value: "hi, what is up???" },
-        },
-      },
-      {
-        _source: {
-          id: "trace_11",
-          input: { value: "please repeat!!" },
-        },
-      },
-      {
-        _source: {
-          id: "trace_12",
-          input: { value: "sorry, can you repeat???" },
-        },
-      },
-      {
-        _source: {
-          id: "trace_13",
-          input: { value: "hey there, how is it going????" },
-        },
-      },
-      {
-        _source: {
-          id: "trace_14",
-          input: { value: "hi, what is up????" },
-        },
-      },
-      {
-        _source: {
-          id: "trace_15",
-          input: { value: "please repeat!!!" },
-        },
-      },
-      {
-        _source: {
-          id: "trace_16",
-          input: { value: "sorry, can you repeat????" },
-        },
-      },
-      {
-        _source: {
-          id: "trace_17",
-          input: { value: "hey there, how is it going?????" },
-        },
-      },
-      {
-        _source: {
-          id: "trace_18",
-          input: { value: "hi, what is up?????" },
-        },
-      },
-      {
-        _source: {
-          id: "trace_19",
-          input: { value: "please repeat!!!!" },
-        },
-      },
-      {
-        _source: {
-          id: "trace_20",
-          input: { value: "sorry, can you repeat?????" },
-        },
-      },
-    ];
+  const testProjectId = "test-project-id-clustering";
+  const traces: Partial<TopicClusteringTrace>[] = [
+    {
+      trace_id: "trace_1",
+      input: "hey there, how is it going?",
+    },
+    {
+      trace_id: "trace_2",
+      input: "hi, what is up?",
+    },
+    {
+      trace_id: "trace_3",
+      input: "please repeat",
+    },
+    {
+      trace_id: "trace_4",
+      input: "sorry, can you repeat?",
+    },
+    {
+      trace_id: "trace_5",
+      input: "hey there, how is it going??",
+    },
+    {
+      trace_id: "trace_6",
+      input: "hi, what is up??",
+    },
+    {
+      trace_id: "trace_7",
+      input: "please repeat!",
+    },
+    {
+      trace_id: "trace_8",
+      input: "sorry, can you repeat??",
+    },
+    {
+      trace_id: "trace_9",
+      input: "hey there, how is it going???",
+    },
+    {
+      trace_id: "trace_10",
+      input: "hi, what is up???",
+    },
+    {
+      trace_id: "trace_11",
+      input: "please repeat!!",
+    },
+    {
+      trace_id: "trace_12",
+      input: "sorry, can you repeat???",
+    },
+    {
+      trace_id: "trace_13",
+      input: "hey there, how is it going????",
+    },
+    {
+      trace_id: "trace_14",
+      input: "hi, what is up????",
+    },
+    {
+      trace_id: "trace_15",
+      input: "please repeat!!!",
+    },
+    {
+      trace_id: "trace_16",
+      input: "sorry, can you repeat????",
+    },
+    {
+      trace_id: "trace_17",
+      input: "hey there, how is it going?????",
+    },
+    {
+      trace_id: "trace_18",
+      input: "hi, what is up?????",
+    },
+    {
+      trace_id: "trace_19",
+      input: "please repeat!!!!",
+    },
+    {
+      trace_id: "trace_20",
+      input: "sorry, can you repeat?????",
+    },
+  ];
 
-    for (const trace of traces) {
-      trace._source.input.embeddings = await getOpenAIEmbeddings(
-        trace._source.input.value
-      );
-    }
-
-    const topics = await clusterTopicsForTraces("project_id", {
-      topics: [],
-      file: traces,
+  beforeAll(async () => {
+    const allEmbeddings = await Promise.all(
+      traces.map((trace) => getOpenAIEmbeddings(trace.input!))
+    );
+    traces.forEach((trace, i) => {
+      const embeddings = allEmbeddings[i];
+      if (embeddings) {
+        trace.embeddings = embeddings.embeddings;
+      }
+      trace.topic_id = null;
+      trace.subtopic_id = null;
     });
 
-    expect(topics?.costs).toEqual({
+    await esClient.bulk({
+      index: TRACE_INDEX,
+      body: traces.flatMap((trace) => [
+        {
+          index: {
+            _id: traceIndexId({
+              traceId: trace.trace_id!,
+              projectId: testProjectId,
+            }),
+          },
+        },
+        {
+          trace_id: trace.trace_id,
+          project_id: testProjectId,
+          input: {
+            value: trace.input,
+            embeddings: {
+              model: DEFAULT_EMBEDDINGS_MODEL,
+              embeddings: trace.embeddings,
+            },
+          },
+          timestamps: {
+            started_at: Date.now(),
+            inserted_at: Date.now(),
+          },
+          metrics: {},
+          metadata: {
+            labels: ["test-messages"],
+          },
+        } as Trace,
+      ]),
+    });
+  });
+
+  afterAll(async () => {
+    await esClient.deleteByQuery({
+      index: TRACE_INDEX,
+      body: {
+        query: {
+          terms: {
+            "metadata.labels": ["test-messages"],
+          },
+        },
+      },
+    });
+  });
+
+  it("cluster tracers into topics", async () => {
+    const result = await fetchTopicsBatchClustering("project_id", {
+      traces: traces as Required<TopicClusteringTrace>[],
+    });
+
+    expect(result?.cost).toEqual({
       amount: expect.any(Number),
       currency: "USD",
     });
 
-    try {
-      expect(topics?.message_clusters.trace_3).toEqual(
-        "Request for repetition"
-      );
-      expect(topics?.message_clusters.trace_4).toEqual(
-        "Request for repetition"
-      );
-    } catch {
-      expect(topics?.message_clusters.trace_3).toEqual("Asking for repetition");
-      expect(topics?.message_clusters.trace_4).toEqual("Asking for repetition");
-    }
+    expect(result?.topics.length).toBeGreaterThan(0);
+    expect(result?.topics[0]?.name).toContain("Repetition");
+    expect(result?.subtopics.length).toBeGreaterThan(0);
+    expect(result?.traces.length).toBe(traces.length);
   });
 
-  // Need to add way more examples
-  describe.skip("clustering project traces", () => {
-    const testProjectId = "test-project-clustering";
-    const testTraceData: Trace[] = [
-      {
-        trace_id: "trace_1",
-        project_id: testProjectId,
-        input: { value: "How to learn Python?" },
-        timestamps: { started_at: Date.now(), inserted_at: Date.now() },
-        metrics: {},
-        metadata: {},
-      },
-      {
-        trace_id: "trace_2",
-        project_id: testProjectId,
-        input: { value: "Python learning resources" },
-        timestamps: { started_at: Date.now(), inserted_at: Date.now() },
-        metrics: {},
-        metadata: {},
-      },
-      // Add more test traces as needed
-    ];
-
-    beforeAll(async () => {
-      for (const trace of testTraceData) {
-        trace.input.embeddings = await getOpenAIEmbeddings(
-          trace.input.value
-        );
-      }
-
-      // Create trace entries in Elasticsearch for the test project
-      await esClient.bulk({
-        index: TRACE_INDEX,
-        body: testTraceData.flatMap((trace) => [
-          { index: { _id: trace.trace_id } },
-          trace,
-        ]),
-        refresh: true,
-      });
-    });
-
-    afterAll(async () => {
-      // Clean up the test data from Elasticsearch
-      await esClient.deleteByQuery({
-        index: TRACE_INDEX,
-        body: {
-          query: {
-            term: { project_id: testProjectId },
-          },
-        },
-        refresh: true,
-      });
-      // Clean up the cost entry from the database
-      await prisma.cost.deleteMany({
-        where: {
-          projectId: testProjectId,
-          costType: CostType.CLUSTERING,
-        },
-      });
-    });
-
+  describe("clustering project traces", () => {
     it("assigns topics to traces for a project", async () => {
       // Run the clusterTopicsForProject function
       await clusterTopicsForProject(testProjectId);
@@ -236,16 +182,25 @@ describe("Topic Clustering Integration Test", () => {
         query: {
           term: { project_id: testProjectId },
         },
-        _source: ["trace_id", "metadata.topics"],
+        _source: ["trace_id", "metadata.topic_id", "metadata.subtopic_id", "metadata.labels"],
       });
 
       const traces = result.hits.hits.map((hit) => hit._source);
       expect(traces).not.toBeNull();
       expect(traces.length).toBeGreaterThan(0);
       traces.forEach((trace) => {
-        expect(trace).toHaveProperty("topics");
-        expect(trace?.metadata.topics).not.toHaveLength(0);
+        expect(trace?.metadata).toHaveProperty("topic_id");
+        expect(trace?.metadata).toHaveProperty("subtopic_id");
+        expect(trace?.metadata.topic_id).toBeDefined();
       });
+
+      // Verify that topics were added to the database
+      const topics = await prisma.topic.findMany({
+        where: {
+          projectId: testProjectId,
+        },
+      });
+      expect(topics.length).toBeGreaterThan(1);
 
       // Verify that a cost entry was inserted into the database
       const costEntries = await prisma.cost.findMany({
@@ -254,7 +209,7 @@ describe("Topic Clustering Integration Test", () => {
           costType: CostType.CLUSTERING,
         },
       });
-      expect(costEntries).toHaveLength(1);
+      expect(costEntries.length).toBeGreaterThan(1);
       const costEntry = costEntries[0];
       expect(costEntry).toHaveProperty("amount");
       expect(costEntry?.amount).toBeGreaterThan(0);

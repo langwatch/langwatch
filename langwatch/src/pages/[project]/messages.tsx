@@ -304,25 +304,25 @@ function TopicsSelector() {
             <Skeleton width="full" height="20px" />
           </>
         ) : topicCountsQuery.data ? (
-          Object.keys(topicCountsQuery.data).length > 0 ? (
-            Object.entries(topicCountsQuery.data)
-              .sort((a, b) => (a[1] > b[1] ? -1 : 1))
-              .map(([topic, count]) => (
-                <React.Fragment key={topic}>
+          topicCountsQuery.data.topicCounts.length > 0 ? (
+            topicCountsQuery.data.topicCounts
+              .sort((a, b) => (a.count > b.count ? -1 : 1))
+              .map((topic) => (
+                <React.Fragment key={topic.id}>
                   <HStack spacing={4} width="full" paddingX={2}>
                     <Checkbox
                       borderColor="gray.400"
                       spacing={3}
                       flexGrow={1}
-                      isChecked={selectedTopics.includes(topic)}
+                      isChecked={selectedTopics.includes(topic.id)}
                       onChange={(e) =>
-                        handleTopicChange(topic, e.target.checked)
+                        handleTopicChange(topic.id, e.target.checked)
                       }
                     >
-                      <Text noOfLines={1}>{topic}</Text>
+                      <Text noOfLines={1}>{topic.name}</Text>
                     </Checkbox>
                     <Text color="gray.500" fontSize={12} whiteSpace="nowrap">
-                      {count} messages
+                      {topic.count} messages
                     </Text>
                   </HStack>
                   <Divider borderColor="gray.350" _last={{ display: "none" }} />

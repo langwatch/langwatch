@@ -85,10 +85,10 @@ model TeamUser {
     userId    String
     teamId    String
     role      TeamUserRole
-    user      User     @relation(fields: [userId], references: [id])
-    team      Team     @relation(fields: [teamId], references: [id])
-    createdAt DateTime @default(now())
-    updatedAt DateTime @default(now()) @updatedAt
+    user      User         @relation(fields: [userId], references: [id])
+    team      Team         @relation(fields: [teamId], references: [id])
+    createdAt DateTime     @default(now())
+    updatedAt DateTime     @default(now()) @updatedAt
 
     @@id([userId, teamId])
     @@index([teamId])
@@ -99,10 +99,10 @@ model OrganizationUser {
     userId         String
     organizationId String
     role           OrganizationUserRole
-    user           User         @relation(fields: [userId], references: [id])
-    organization   Organization @relation(fields: [organizationId], references: [id])
-    createdAt      DateTime     @default(now())
-    updatedAt      DateTime     @default(now()) @updatedAt
+    user           User                 @relation(fields: [userId], references: [id])
+    organization   Organization         @relation(fields: [organizationId], references: [id])
+    createdAt      DateTime             @default(now())
+    updatedAt      DateTime             @default(now()) @updatedAt
 
     @@id([userId, organizationId])
     @@index([organizationId])
@@ -148,6 +148,7 @@ model Project {
     updatedAt    DateTime @default(now()) @updatedAt
     checks       Check[]
     costs        Cost[]
+    topics       Topic[]
 
     @@index([teamId])
 }
@@ -158,17 +159,17 @@ enum INVITE_STATUS {
 }
 
 model OrganizationInvite {
-    id             String        @id @default(nanoid())
+    id             String               @id @default(nanoid())
     email          String
-    inviteCode     String        @unique
+    inviteCode     String               @unique
     expiration     DateTime
-    status         INVITE_STATUS @default(PENDING)
+    status         INVITE_STATUS        @default(PENDING)
     organizationId String
-    organization   Organization  @relation(fields: [organizationId], references: [id])
+    organization   Organization         @relation(fields: [organizationId], references: [id])
     teamIds        String
     role           OrganizationUserRole
-    createdAt      DateTime      @default(now())
-    updatedAt      DateTime      @default(now()) @updatedAt
+    createdAt      DateTime             @default(now())
+    updatedAt      DateTime             @default(now()) @updatedAt
 
     @@index([organizationId])
 }
@@ -218,5 +219,26 @@ model Cost {
 
     @@index([referenceType, referenceId])
     @@index([costType])
+    @@index([projectId])
+}
+
+model Topic {
+    id        String  @id @default(nanoid())
+    projectId String
+    project   Project @relation(fields: [projectId], references: [id])
+    name      String
+    parentId  String?
+    parent    Topic?  @relation("Subtopics", fields: [parentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+    subtopics Topic[] @relation("Subtopics")
+
+    embeddings_model       String
+    centroid               Json
+    p95Distance            Float
+    automaticallyGenerated Boolean @default(true)
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @default(now()) @updatedAt
+
+    @@index([parentId])
     @@index([projectId])
 }

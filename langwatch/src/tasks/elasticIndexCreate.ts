@@ -50,7 +50,8 @@ const traceMapping: ElasticSearchMappingFrom<ElasticSearchTrace> = {
       user_id: { type: "keyword" },
       customer_id: { type: "keyword" },
       labels: { type: "keyword" },
-      topics: { type: "keyword" },
+      topic_id: { type: "keyword" },
+      subtopic_id: { type: "keyword" },
     },
   },
   timestamps: {

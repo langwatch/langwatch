@@ -56,12 +56,12 @@ export function TopTopics() {
   };
 
   const topTopics = topicCountsQuery.data
-    ? Object.entries(topicCountsQuery.data)
-        .sort((a, b) => (a[1] > b[1] ? -1 : 1))
+    ? topicCountsQuery.data.topicCounts
+        .sort((a, b) => (a.count > b.count ? -1 : 1))
         .slice(0, 6)
     : [];
 
-  const topTopicCount = topTopics[0] ? topTopics[0][1] : 1;
+  const topTopicCount = topTopics[0] ? topTopics[0].count : 1;
 
   return (
     <Card width="full" height="382px">
@@ -78,16 +78,16 @@ export function TopTopics() {
             </>
           ) : topicCountsQuery.data ? (
             topTopics.length > 0 ? (
-              topTopics.map(([topic, count]) => (
-                <React.Fragment key={topic}>
+              topTopics.map((topic) => (
+                <React.Fragment key={topic.id}>
                   <HStack align="start" spacing={4} width="100%">
                     <Checkbox
                       spacing={3}
                       flexGrow={1}
                       paddingTop={1}
-                      isChecked={selectedTopics.includes(topic)}
+                      isChecked={selectedTopics.includes(topic.id)}
                       onChange={(e) =>
-                        handleTopicChange(topic, e.target.checked)
+                        handleTopicChange(topic.id, e.target.checked)
                       }
                     />
                     <VStack
@@ -96,21 +96,21 @@ export function TopTopics() {
                       cursor="pointer"
                       onClick={() =>
                         handleTopicChange(
-                          topic,
-                          !selectedTopics.includes(topic)
+                          topic.id,
+                          !selectedTopics.includes(topic.id)
                         )
                       }
                     >
                       <HStack width="full">
                         <Text flexGrow={1} noOfLines={1}>
-                          {topic}
+                          {topic.name}
                         </Text>
                         <Text color="gray.500" fontSize={12}>
-                          {count}
+                          {topic.count}
                         </Text>
                       </HStack>
                       <Box
-                        width={`${(count / topTopicCount) * 100}%`}
+                        width={`${(topic.count / topTopicCount) * 100}%`}
                         height="3px"
                         backgroundColor="orange.400"
                       ></Box>

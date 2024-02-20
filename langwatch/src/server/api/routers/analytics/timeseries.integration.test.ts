@@ -21,7 +21,7 @@ describe("Timeseries Graph Integration Tests", () => {
           customer_id: "customer-id-1",
           labels: ["test-messages"],
           thread_id: "test-thread-id",
-          topics: ["greetings"],
+          topic_id: "greetings",
         },
         timestamps: {
           inserted_at: new Date().getTime(),
@@ -61,7 +61,7 @@ describe("Timeseries Graph Integration Tests", () => {
           customer_id: "customer-id-1",
           labels: ["test-messages"],
           thread_id: "test-thread-id-2",
-          topics: ["greetings"],
+          topic_id: "greetings",
         },
         timestamps: {
           inserted_at: new Date().getTime(),
@@ -101,7 +101,7 @@ describe("Timeseries Graph Integration Tests", () => {
           customer_id: "customer-id-1",
           labels: ["test-messages"],
           thread_id: "test-thread-id-3",
-          topics: ["poems"],
+          topic_id: "poems",
         },
         timestamps: {
           inserted_at: new Date().getTime(),
@@ -142,7 +142,7 @@ describe("Timeseries Graph Integration Tests", () => {
           customer_id: "customer-id-1",
           labels: ["test-messages"],
           thread_id: "test-thread-id",
-          topics: ["greetings"],
+          topic_id: "greetings",
         },
         timestamps: {
           inserted_at: new Date().getTime() - 24 * 60 * 60 * 1000 * 2,
