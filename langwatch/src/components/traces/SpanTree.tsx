@@ -77,21 +77,21 @@ const SpanNode: React.FC<SpanNodeProps> = ({ span, level, lastChild }) => {
         _before={
           level > 0
             ? {
-                content: "''",
-                width: "18px",
-                height: "12px",
-                borderColor: "gray.400",
-                borderStyle: "solid",
-                borderTopWidth: 0,
-                borderRightWidth: 0,
-                borderLeftWidth: "1px",
-                borderBottomWidth: "1px",
-                borderBottomLeftRadius: "6px",
-                position: "absolute",
-                top: "-19px",
-                left: "-7px",
-                transform: "translateX(-100%)",
-              }
+              content: "''",
+              width: "18px",
+              height: "12px",
+              borderColor: "gray.400",
+              borderStyle: "solid",
+              borderTopWidth: 0,
+              borderRightWidth: 0,
+              borderLeftWidth: "1px",
+              borderBottomWidth: "1px",
+              borderBottomLeftRadius: "6px",
+              position: "absolute",
+              top: "-19px",
+              left: "-7px",
+              transform: "translateX(-100%)",
+            }
             : undefined
         }
       />
@@ -131,15 +131,15 @@ const SpanNode: React.FC<SpanNodeProps> = ({ span, level, lastChild }) => {
               <SpanDuration span={span} />
               {(span.metrics?.prompt_tokens !== undefined ||
                 span.metrics?.completion_tokens !== undefined) && (
-                <>
-                  <Text>·</Text>
-                  <Text>
-                    {(span.metrics?.prompt_tokens ?? 0) +
-                      (span.metrics?.completion_tokens ?? 0)}{" "}
-                    tokens
-                  </Text>
-                </>
-              )}
+                  <>
+                    <Text>·</Text>
+                    <Text>
+                      {(span.metrics?.prompt_tokens ?? 0) +
+                        (span.metrics?.completion_tokens ?? 0)}{" "}
+                      tokens
+                    </Text>
+                  </>
+                )}
               {span.metrics?.cost !== undefined &&
                 span.metrics?.cost !== null && (
                   <>
@@ -194,13 +194,13 @@ const SpanTypeTag = ({ span }: { span: ElasticSearchSpan }) => {
         span.error
           ? "red"
           : {
-              llm: "green",
-              agent: "blue",
-              chain: "blue",
-              tool: "orange",
-              span: "gray",
-              rag: "red",
-            }[span.type]
+            llm: "green",
+            agent: "blue",
+            chain: "blue",
+            tool: "orange",
+            span: "gray",
+            rag: "red",
+          }[span.type]
       }
       fontSize={13}
     >
@@ -256,8 +256,8 @@ export function SpanTree(props?: SpanTreeProps) {
   const span = spanId
     ? spans.data?.find((span) => span.span_id === spanIdDev)
     : spanIdDev
-    ? spans.data?.[0]
-    : undefined;
+      ? spans.data?.[0]
+      : undefined;
 
   useEffect(() => {
     if (
@@ -279,7 +279,7 @@ export function SpanTree(props?: SpanTreeProps) {
   }
 
   return (
-    <VStack width="full" padding={4}>
+    <VStack width="full" >
       {spans.data ? (
         <HStack
           align="start"
@@ -311,14 +311,14 @@ export function SpanTree(props?: SpanTreeProps) {
                 </HStack>
                 {(span.metrics?.prompt_tokens !== undefined ||
                   span.metrics?.completion_tokens !== undefined) && (
-                  <Text>
-                    <b>Tokens:</b>{" "}
-                    {(span.metrics?.prompt_tokens ?? 0) +
-                      " prompt + " +
-                      (span.metrics?.completion_tokens ?? 0) +
-                      " completion"}
-                  </Text>
-                )}
+                    <Text>
+                      <b>Tokens:</b>{" "}
+                      {(span.metrics?.prompt_tokens ?? 0) +
+                        " prompt + " +
+                        (span.metrics?.completion_tokens ?? 0) +
+                        " completion"}
+                    </Text>
+                  )}
                 {(span.vendor !== undefined || span.model !== undefined) && (
                   <Text>
                     <b>Model:</b>{" "}

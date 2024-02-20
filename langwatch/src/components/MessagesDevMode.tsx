@@ -51,12 +51,11 @@ import { durationColor } from "~/utils/durationColor";
 import numeral from "numeral";
 import { getTraceCheckDefinitions } from "~/trace_checks/registry";
 import { ChevronDown, List, ChevronLeft, ChevronRight, CheckCircle, Check } from "react-feather";
-import type { Trace } from "~/server/tracer/types";
+import type { Trace, TraceCheck } from "~/server/tracer/types";
 import { SpanTree } from "./traces/SpanTree";
 import { TraceSummary } from "./traces/Summary";
 import { useRef } from "react";
 import { Maximize2, Minimize2, type Icon } from "react-feather";
-import { trace } from "console";
 import { CheckPassingDrawer } from "./CheckPassingDrawer";
 
 
@@ -69,6 +68,7 @@ export function MessagesDevMode() {
   const [totalHits, setTotalHits] = useState<number>(0);
   const [pageOffset, setPageOffset] = useState<number>(0);
   const [pageSize, setPageSize] = useState<number>(25);
+  const [totalErrors, setTotalErrors] = useState<number>(0);
 
   const toggleView = () => {
     setTraceView((prevView) => (prevView === "span" ? "full" : "span"));
@@ -113,7 +113,6 @@ export function MessagesDevMode() {
       refetchOnWindowFocus: false,
     }
   );
-
 
   const checksAvailable = Object.fromEntries(
     Object.values(traceChecksQuery.data ?? {}).flatMap((checks) =>
@@ -260,26 +259,42 @@ export function MessagesDevMode() {
     }
   })
 
-  const Evaluations = (traceId) => {
+  interface TraceEval {
+    traceId: string;
+    traceChecks?: { [key: string]: TraceCheck[] };
+  }
 
+  const Evaluations = (trace: TraceEval) => {
     return (
-      <>
-        <VStack align="start" spacing={2}>
-          {traceId.traceChecks[traceId.traceId].map((check) => (
-            <CheckPassingDrawer
-              key={check.trace_id + "/" + check.check_id}
-              check={check}
-            />
-          ))}
-        </VStack >
-      </>
+      <VStack align="start" spacing={2}>
+        {trace.traceChecks?.[trace.traceId]?.map((check) => (
+          <CheckPassingDrawer
+            key={check.trace_id + "/" + check.check_id}
+            check={check}
+          />
+        ))}
+      </VStack>
+    );
+  };
+
+
+  useEffect(() => {
+    const traceData = traceChecksQuery?.data?.[traceId ?? ""];
+    const totalErrors = traceData ? traceData.filter((check) => check.status === 'failed').length : 0;
+    setTotalErrors(totalErrors);
+  })
+
+  const errors = () => {
+    if (totalErrors == 0) return;
+
+    const errorText = totalErrors > 1 ? 'errors' : 'error';
+    return (
+      <Text marginLeft={3} borderRadius={'md'} paddingX={2} backgroundColor={'red.500'} color={'white'} fontSize={'sm'}>{totalErrors} {errorText}</Text>
     )
   }
 
+
   const isFirstRender = useRef(true);
-
-
-
   useEffect(() => {
     if (
       traceChecksQuery.isFetched &&
@@ -453,7 +468,7 @@ export function MessagesDevMode() {
             <Tabs>
               <TabList>
                 <Tab>Details</Tab>
-                <Tab>Evaluations</Tab>
+                <Tab>Evaluations {errors()}</Tab>
               </TabList>
 
               <TabPanels>

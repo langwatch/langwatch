@@ -1,11 +1,11 @@
-import { Box, HStack, Text, VStack, Flex, Spacer } from "@chakra-ui/react";
+import { Box, HStack, Text, VStack, Flex, Spacer, Tooltip } from "@chakra-ui/react";
 import type { TraceCheck } from "../server/tracer/types";
-import type { CheckTypes, TraceCheckDefinition } from "../trace_checks/types";
+import type { CheckTypes } from "../trace_checks/types";
 
 import { CheckCircle, Clock, XCircle } from "react-feather";
 import { getTraceCheckDefinitions } from "../trace_checks/registry";
 import numeral from "numeral";
-import { ca } from "date-fns/locale";
+import { format, formatDistanceToNow } from "date-fns";
 
 
 export function CheckPassingDrawer({ check }: { check: TraceCheck }) {
@@ -20,23 +20,14 @@ export function CheckPassingDrawer({ check }: { check: TraceCheck }) {
   const traceCheck = getTraceCheckDefinitions(checkType);
 
 
-  const timeResult = () => {
-
-    let finished_at = check.timestamps.finished_at ?? 0;
-    let current_time = new Date().getTime();
-    let time_difference = current_time - finished_at;
-    let minutes = Math.floor(time_difference / (1000 * 60)); // Convert milliseconds to minutes
-    let hours = Math.floor(minutes / 60); // Convert minutes to hours
-    let days = Math.floor(hours / 24); // Convert hours to days
-
-    // Remaining minutes and hours after converting to days
-    minutes = minutes % 60; // Remaining minutes after converting to hours
-    hours = hours % 24; // Remaining hours after converting to days
-
-    // Return the result
-    return `${days} days ${hours} hours ${minutes} minutes`;
-
-  }
+  const timestampDate = check.timestamps.finished_at ? new Date(check.timestamps.finished_at) : undefined;
+  const timeAgo = timestampDate
+    ? timestampDate.getTime() < Date.now() - 1000 * 60 * 60 * 24
+      ? format(timestampDate, "dd/MMM HH:mm")
+      : formatDistanceToNow(timestampDate, {
+        addSuffix: true,
+      })
+    : undefined;
 
   const color = check.status === 'succeeded' ? "green.500" : "red.500";
 
@@ -91,7 +82,21 @@ export function CheckPassingDrawer({ check }: { check: TraceCheck }) {
         </HStack>
         <Spacer />
         <Text fontSize={'sm'}>
-          {timeResult()} ago
+          {check.timestamps.finished_at && (
+            <Tooltip
+              label={new Date(check.timestamps.finished_at).toLocaleString()}
+            >
+              <Text
+                borderBottomWidth="1px"
+                borderBottomColor="gray.400"
+                borderBottomStyle="dashed"
+              >
+                {formatDistanceToNow(new Date(check.timestamps.finished_at), {
+                  addSuffix: true,
+                })}
+              </Text>
+            </Tooltip>
+          )}
         </Text>
       </Flex>
     </Box >
