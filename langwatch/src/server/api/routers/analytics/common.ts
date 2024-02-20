@@ -6,7 +6,10 @@ import {
   TRACE_INDEX,
   esClient,
 } from "../../../elasticsearch";
-import type { AggregationsAggregationContainer, QueryDslQueryContainer } from "@elastic/elasticsearch/lib/api/types";
+import type {
+  AggregationsAggregationContainer,
+  QueryDslQueryContainer,
+} from "@elastic/elasticsearch/lib/api/types";
 import type { Trace } from "../../../tracer/types";
 import { type sharedFiltersInputSchema } from "../../../analytics/types";
 
@@ -510,36 +513,52 @@ const groupedElasticSearchAggregation = async <T extends Record<string, any>>({
   return aggregations;
 };
 export const generateTracesPivotQueryConditions = ({
-  projectId, startDate, endDate, filters,
-}: z.infer<typeof sharedFiltersInputSchema>): QueryDslQueryContainer[] => {
+  projectId,
+  startDate,
+  endDate,
+  filters,
+}: z.infer<typeof sharedFiltersInputSchema>): {
+  pivotIndexConditions: QueryDslQueryContainer[];
+  isAnyFilterPresent: boolean;
+} => {
   // If end date is very close to now, force it to be now, to allow frontend to keep refetching for new messages
-  const endDate_ = new Date().getTime() - endDate < 1000 * 60 * 60
-    ? new Date().getTime()
-    : endDate;
+  const endDate_ =
+    new Date().getTime() - endDate < 1000 * 60 * 60
+      ? new Date().getTime()
+      : endDate;
 
   const { metadata, topics: topicsGroup } = filters;
   const { topics } = topicsGroup ?? {};
   const { user_id, thread_id, customer_id, labels } = metadata ?? {};
 
-  return [
-    {
-      term: { "trace.project_id": projectId },
-    },
-    {
-      range: {
-        "trace.timestamps.started_at": {
-          gte: startDate,
-          lte: endDate_,
-          format: "epoch_millis",
-        },
-      },
-    },
+  const filterConditions: QueryDslQueryContainer[] = [
     ...(user_id ? [{ terms: { "trace.metadata.user_id": user_id } }] : []),
-    ...(thread_id ? [{ terms: { "trace.metadata.thread_id": thread_id } }] : []),
+    ...(thread_id
+      ? [{ terms: { "trace.metadata.thread_id": thread_id } }]
+      : []),
     ...(customer_id
       ? [{ terms: { "trace.metadata.customer_id": customer_id } }]
       : []),
     ...(labels ? [{ terms: { "trace.metadata.labels": labels } }] : []),
     ...(topics ? [{ terms: { "trace.metadata.topics": topics } }] : []),
   ];
+
+  return {
+    pivotIndexConditions: [
+      {
+        term: { "trace.project_id": projectId },
+      },
+      {
+        range: {
+          "trace.timestamps.started_at": {
+            gte: startDate,
+            lte: endDate_,
+            format: "epoch_millis",
+          },
+        },
+      },
+      ...filterConditions,
+    ],
+    isAnyFilterPresent: filterConditions.length > 0,
+  };
 };

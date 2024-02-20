@@ -79,28 +79,35 @@ export const tracesRouter = createTRPCRouter({
         });
       }
 
-      const pivotIndexConditions = generateTracesPivotQueryConditions(input);
-      const pivotIndexResults = await esClient.search<TracesPivot>({
-        index: TRACES_PIVOT_INDEX,
-        body: {
-          size: 10_000,
-          query: {
-            bool: {
-              filter: pivotIndexConditions,
-            } as QueryDslBoolQuery,
+      const { pivotIndexConditions, isAnyFilterPresent } =
+        generateTracesPivotQueryConditions(input);
+
+      let traceIds: string[] = [];
+
+      if (isAnyFilterPresent) {
+        const pivotIndexResults = await esClient.search<TracesPivot>({
+          index: TRACES_PIVOT_INDEX,
+          body: {
+            size: 10_000,
+            query: {
+              bool: {
+                filter: pivotIndexConditions,
+              } as QueryDslBoolQuery,
+            },
+            _source: ["trace.trace_id"],
           },
-          _source: ["trace.trace_id"],
-        },
-      });
+        });
 
-      const traceIds = pivotIndexResults.hits.hits
-        .map((hit) => hit._source?.trace?.trace_id)
-        .filter((x) => x)
-        .map((x) => x!);
+        traceIds = pivotIndexResults.hits.hits
+          .map((hit) => hit._source?.trace?.trace_id)
+          .filter((x) => x)
+          .map((x) => x!);
+      }
 
+      const traceQueryConditions = generateTraceQueryConditions(input);
       const tracesIndexConditions = [
-        { term: { project_id: input.projectId } },
-        { terms: { trace_id: traceIds } },
+        ...traceQueryConditions,
+        ...(traceIds.length > 0 ? [{ terms: { trace_id: traceIds } }] : []),
       ];
 
       const canSeeCosts = await backendHasTeamProjectPermission(

@@ -96,16 +96,18 @@ export const getTimeseries = protectedProcedure
       aggs = group.aggregation(aggs);
     }
 
+    const { pivotIndexConditions } = generateTracesPivotQueryConditions({
+      ...input,
+      startDate: previousPeriodStartDate.getTime(),
+    });
+
     const result = await esClient.search({
       index: TRACES_PIVOT_INDEX,
       body: {
         size: 0,
         query: {
           bool: {
-            filter: generateTracesPivotQueryConditions({
-              ...input,
-              startDate: previousPeriodStartDate.getTime(),
-            }),
+            filter: pivotIndexConditions,
           } as QueryDslBoolQuery,
         },
         ...(Object.keys(runtimeMappings).length > 0
