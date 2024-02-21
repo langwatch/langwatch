@@ -58,6 +58,11 @@ export const projectRoutes = {
     path: "/settings",
     title: "Settings",
   },
+  datasets: {
+    path: "/[project]/datasets",
+    title: "Datasets",
+  },
+  
 };
 
 export type Route = {

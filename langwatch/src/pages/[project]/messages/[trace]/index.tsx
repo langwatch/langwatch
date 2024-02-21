@@ -76,7 +76,7 @@ export default function TraceDetails() {
 
   interface TraceEval {
     traceId: string;
-    traceChecks?: { [key: string]: TraceCheck[] };
+    traceChecks?: Record<string, TraceCheck[]>;
   }
 
   const Evaluations = (trace: TraceEval) => {
@@ -99,7 +99,7 @@ export default function TraceDetails() {
     const traceData = traceChecksQuery?.data?.[traceId ?? ""];
     const totalErrors = traceData ? traceData.filter((check) => check.status === 'failed').length : 0;
     setTotalErrors(totalErrors);
-  }
+  }, [traceChecksQuery.data, traceId]
   )
 
 

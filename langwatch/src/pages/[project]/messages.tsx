@@ -114,7 +114,7 @@ function Messages() {
           (check) =>
             (check.status == "scheduled" || check.status == "in_progress") &&
             (check.timestamps.inserted_at ?? 0) >
-              new Date().getTime() - 1000 * 60 * 60 * 1
+            new Date().getTime() - 1000 * 60 * 60 * 1
         );
       if (pendingChecks.length > 0) {
         setTracesCheckInterval(5000);
@@ -207,8 +207,8 @@ function Messages() {
         <HStack align="start" spacing={8}>
           <VStack gap={6} width="full">
             {project &&
-            traceGroups.data &&
-            traceGroups.data.groups.length > 0 ? (
+              traceGroups.data &&
+              traceGroups.data.groups.length > 0 ? (
               <ExpandableMessages
                 project={project}
                 traceGroups={traceGroups.data.groups}
@@ -499,27 +499,27 @@ function ExpandableMessages({
         }}
         {...(isExpanded
           ? {
-              className: "card-stack-content expanded",
-              background: "#ECEEF2",
-              borderRadius: "10px",
-              padding: "40px",
-              width: "calc(100% + 80px)",
-              cursor: "n-resize",
-            }
+            className: "card-stack-content expanded",
+            background: "#ECEEF2",
+            borderRadius: "10px",
+            padding: "40px",
+            width: "calc(100% + 80px)",
+            cursor: "n-resize",
+          }
           : {
-              background: "#ECEEF200",
-              className: "card-stack-content",
-              marginBottom:
-                traceGroup.length > 2 ? 4 : traceGroup.length > 1 ? 2 : 0,
-              marginLeft:
-                traceGroup.length > 2 ? -4 : traceGroup.length > 1 ? -2 : 0,
-              cursor: "pointer",
-              width: "full",
-              zIndex: 2,
-              _hover: {
-                transform: "scale(1.04)",
-              },
-            })}
+            background: "#ECEEF200",
+            className: "card-stack-content",
+            marginBottom:
+              traceGroup.length > 2 ? 4 : traceGroup.length > 1 ? 2 : 0,
+            marginLeft:
+              traceGroup.length > 2 ? -4 : traceGroup.length > 1 ? -2 : 0,
+            cursor: "pointer",
+            width: "full",
+            zIndex: 2,
+            _hover: {
+              transform: "scale(1.04)",
+            },
+          })}
       >
         {isExpanded && (
           <HStack
@@ -590,8 +590,8 @@ function ExpandableMessages({
                   _hover={
                     expanded
                       ? {
-                          transform: "scale(1.04)",
-                        }
+                        transform: "scale(1.04)",
+                      }
                       : {}
                   }
                 >
