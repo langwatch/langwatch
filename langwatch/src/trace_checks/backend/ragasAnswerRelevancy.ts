@@ -24,7 +24,7 @@ export const ragasAnswerRelevancy = async (
         answer: trace.output?.value ?? "",
         contexts: null,
         ground_truths: null,
-        model: "gpt-3.5-turbo-0613",
+        model: "gpt-3.5-turbo-1106",
       }),
     }
   );

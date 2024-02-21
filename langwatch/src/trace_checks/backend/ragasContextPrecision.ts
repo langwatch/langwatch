@@ -28,7 +28,7 @@ export const ragasContextPrecision = async (
         answer: output,
         contexts: contexts,
         ground_truths: null,
-        model: "gpt-3.5-turbo-0613",
+        model: "gpt-3.5-turbo-1106",
       }),
     }
   );
