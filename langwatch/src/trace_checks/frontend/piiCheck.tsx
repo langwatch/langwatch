@@ -1,12 +1,12 @@
-import { Text, VStack } from "@chakra-ui/react";
+import { HStack, Text, VStack } from "@chakra-ui/react";
 import type { TraceCheck } from "../../server/tracer/types";
 import type { google } from "@google-cloud/dlp/build/protos/protos";
 
 export function PIICheck({ check }: { check: TraceCheck }) {
   const findings = (
     check.raw_result as
-      | { findings: google.privacy.dlp.v2.IFinding[] }
-      | undefined
+    | { findings: google.privacy.dlp.v2.IFinding[] }
+    | undefined
   )?.findings;
 
   const findingsNames = Array.from(
@@ -20,7 +20,9 @@ export function PIICheck({ check }: { check: TraceCheck }) {
           <Text key={index}>Detected {name}</Text>
         ))
       ) : (
-        <Text>No PII leak detected</Text>
+        <HStack>
+          <Text>Result:</Text> <Text color={'green.600'}>Pass</Text>
+        </HStack>
       )}
     </VStack>
   );

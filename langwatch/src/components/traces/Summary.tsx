@@ -96,111 +96,79 @@ const TraceSummaryValues = React.forwardRef(function TraceSummaryValues(
   ref
 ) {
   return (
-    <HStack
-      borderBottomWidth={1}
-      borderColor="gray.300"
-      width="full"
-      align="stretch"
-      spacing={[0, 0, 0, 4]}
-      flexDirection={{ base: "column", lg: "row" }}
-      ref={ref as any}
-    >
-      {trace.metadata.customer_id && (
-        <SummaryItem label="Customer ID">
-          <Text
-            fontFamily={trace.metadata.customer_id ? "mono" : undefined}
-            maxWidth="200px"
-            wordBreak="break-all"
-          >
-            {trace.metadata.customer_id ?? "unknown"}
-          </Text>
-        </SummaryItem>
-      )}
-      <SummaryItem
-        label="User ID"
-        tooltip={
-          !trace.metadata.user_id
-            ? "Send the user_id to LangWatch to unlock various analysis per user, read more on our docs" /* TODO docs link */
-            : undefined
-        }
+    <>
+      <HStack
+        borderBottomWidth={1}
+        borderColor="gray.300"
+        width="full"
+        align="stretch"
+        spacing={[4, 4, 4, 4]}
+        flexDirection={{ base: "column", lg: "row" }}
+        ref={ref as any}
       >
-        <Text
-          fontFamily={trace.metadata.thread_id ? "mono" : undefined}
-          maxWidth="200px"
-          wordBreak="break-all"
-        >
-          {trace.metadata.user_id ?? "unknown"}
-        </Text>
-      </SummaryItem>
-      <SummaryItem
-        label="Thread ID"
-        tooltip={
-          !trace.metadata.thread_id
-            ? "Send the thread_id to LangWatch to group the messages as a part of a single context, read more on our docs" /* TODO docs link */
-            : undefined
-        }
-      >
-        <Text
-          fontFamily={trace.metadata.thread_id ? "mono" : undefined}
-          maxWidth="200px"
-          wordBreak="break-all"
-        >
-          {trace.metadata.thread_id ?? "unknown"}
-        </Text>
-      </SummaryItem>
-      {trace.metadata.labels && (
-        <SummaryItem label="Labels">
-          {trace.metadata.labels.map((label) => (
-            <Tag
-              key={label}
-              background={getColorForString("colors", label).background}
-              color={getColorForString("colors", label).color}
-              fontSize={12}
+        {trace.metadata.customer_id && (
+          <SummaryItem label="Customer ID">
+            <Text
+              fontFamily={trace.metadata.customer_id ? "mono" : undefined}
+              maxWidth="200px"
+              wordBreak="break-all"
             >
-              {label}
-            </Tag>
-          ))}
-        </SummaryItem>
-      )}
-      {(!!trace.metrics.completion_tokens || !!trace.metrics.prompt_tokens) && (
-        <SummaryItem
-          label="Total Tokens"
-          tooltip={
-            trace.metrics.tokens_estimated
-              ? "Token count is calculated by LangWatch when not available from the trace data"
-              : "How many tokens were processed combining both input and output"
-          }
-        >
-          {getTotalTokensDisplay(trace)}
-        </SummaryItem>
-      )}
-      {trace.metrics.total_cost !== null &&
-        trace.metrics.total_cost !== undefined && (
-          <SummaryItem
-            label="Total Cost"
-            tooltip={
-              "Based on the number of input and output tokens for each LLM call"
-            }
-          >
-            {numeral(trace.metrics.total_cost).format("$0.00000a")}
+              {trace.metadata.customer_id ?? "unknown"}
+            </Text>
           </SummaryItem>
         )}
-      {trace.metrics.first_token_ms && (
-        <SummaryItem
-          label="Time to First Token"
-          tooltip="How long did it took for the first token of the last span to arrive, that is, the smallest delay between request and the first output token to appear for the user"
-        >
-          {formatMilliseconds(trace.metrics.first_token_ms)}
-        </SummaryItem>
-      )}
-      {trace.metrics.total_time_ms && (
-        <SummaryItem
-          label="Total Completion Time"
-          tooltip="How long it took for completion output to be fully finished"
-        >
-          {formatMilliseconds(trace.metrics.total_time_ms)}
-        </SummaryItem>
-      )}
-    </HStack>
+
+
+
+        {(!!trace.metrics.completion_tokens || !!trace.metrics.prompt_tokens) && (
+          <SummaryItem
+            label="Total Tokens"
+            tooltip={
+              trace.metrics.tokens_estimated
+                ? "Token count is calculated by LangWatch when not available from the trace data"
+                : "How many tokens were processed combining both input and output"
+            }
+          >
+            {getTotalTokensDisplay(trace)}
+          </SummaryItem>
+        )}
+        {trace.metrics.total_cost !== null &&
+          trace.metrics.total_cost !== undefined && (
+            <SummaryItem
+              label="Total Cost"
+              tooltip={
+                "Based on the number of input and output tokens for each LLM call"
+              }
+            >
+              {numeral(trace.metrics.total_cost).format("$0.00000a")}
+            </SummaryItem>
+          )}
+        {trace.metrics.first_token_ms && (
+          <SummaryItem
+            label="Time to First Token"
+            tooltip="How long did it took for the first token of the last span to arrive, that is, the smallest delay between request and the first output token to appear for the user"
+          >
+            {formatMilliseconds(trace.metrics.first_token_ms)}
+          </SummaryItem>
+        )}
+        {trace.metrics.total_time_ms && (
+          <SummaryItem
+            label="Total Completion Time"
+            tooltip="How long it took for completion output to be fully finished"
+          >
+            {formatMilliseconds(trace.metrics.total_time_ms)}
+          </SummaryItem>
+        )}
+      </HStack>
+
+      <HStack gap={3} marginY={8} wrap={'wrap'}>
+        {Object.entries(trace.metadata).map(([key, value]) => (
+          <HStack gap={0} fontSize={'smaller'} margin={0}>
+            <Text borderWidth={1} borderColor={"gray.200"} paddingX={2} borderLeftRadius={'md'}>{key}:</Text>
+            <Text borderWidth={1} borderColor={"gray.200"} paddingX={2} borderLeft={'none'} backgroundColor={'gray.100'} borderRightRadius={'md'} fontFamily="mono">{value}</Text>
+          </HStack>
+        ))}
+      </HStack>
+    </>
   );
 });

@@ -31,24 +31,32 @@ import {
   Thead,
   Tr,
   VStack,
-  useDisclosure
+  useDisclosure,
+  ChakraProvider,
+  Tab,
+  TabList,
+  TabPanel,
+  TabPanels,
+  Tabs,
 } from "@chakra-ui/react";
 import { useRouter } from "next/router";
 import numeral from "numeral";
 import { useEffect, useRef, useState } from "react";
 import { ChevronDown, ChevronLeft, ChevronRight, List, Maximize2, Minimize2 } from "react-feather";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import type { Trace } from "~/server/tracer/types";
 import { getTraceCheckDefinitions } from "~/trace_checks/registry";
 import { api } from "~/utils/api";
 import { durationColor } from "~/utils/durationColor";
+import type { Trace, TraceCheck } from "~/server/tracer/types";
+import { SpanTree } from "./traces/SpanTree";
+import { TraceSummary } from "./traces/Summary";
+import { CheckPassingDrawer } from "./CheckPassingDrawer";
 import { getSingleQueryParam } from "~/utils/getSingleQueryParam";
 import { useFilterParams } from "../hooks/useFilterParams";
 import { DashboardLayout } from "./DashboardLayout";
 import { FilterSelector } from "./FilterSelector";
-import { PeriodSelector, usePeriodSelector } from "./PeriodSelector";
-import { SpanTree } from "./traces/SpanTree";
-import { TraceSummary } from "./traces/Summary";
+import { usePeriodSelector, PeriodSelector } from "./PeriodSelector";
+
 
 export function MessagesDevMode() {
   const router = useRouter();
@@ -59,6 +67,7 @@ export function MessagesDevMode() {
   const [totalHits, setTotalHits] = useState<number>(0);
   const [pageOffset, setPageOffset] = useState<number>(0);
   const [pageSize, setPageSize] = useState<number>(25);
+  const [totalErrors, setTotalErrors] = useState<number>(0);
   const { filterParams, queryOpts } = useFilterParams();
 
   const toggleView = () => {
@@ -237,10 +246,44 @@ export function MessagesDevMode() {
 
       setTotalHits(totalHits);
     }
-  }, [traceGroups.data?.tracesResult?.hits?.total, traceGroups.isFetched]);
+  })
+
+  interface TraceEval {
+    traceId: string;
+    traceChecks?: { [key: string]: TraceCheck[] };
+  }
+
+  const Evaluations = (trace: TraceEval) => {
+    return (
+      <VStack align="start" spacing={2}>
+        {trace.traceChecks?.[trace.traceId]?.map((check) => (
+          <CheckPassingDrawer
+            key={check.trace_id + "/" + check.check_id}
+            check={check}
+          />
+        ))}
+      </VStack>
+    );
+  };
+
+
+  useEffect(() => {
+    const traceData = traceChecksQuery?.data?.[traceId ?? ""];
+    const totalErrors = traceData ? traceData.filter((check) => check.status === 'failed').length : 0;
+    setTotalErrors(totalErrors);
+  })
+
+  const errors = () => {
+    if (totalErrors == 0) return;
+
+    const errorText = totalErrors > 1 ? 'errors' : 'error';
+    return (
+      <Text marginLeft={3} borderRadius={'md'} paddingX={2} backgroundColor={'red.500'} color={'white'} fontSize={'sm'}>{totalErrors} {errorText}</Text>
+    )
+  }
+
 
   const isFirstRender = useRef(true);
-
   useEffect(() => {
     if (
       traceChecksQuery.isFetched &&
@@ -370,30 +413,20 @@ export function MessagesDevMode() {
         <HStack padding={6}>
           <Text>Items per page </Text>
 
-          <Select
-            placeholder=""
-            maxW="70px"
-            size="sm"
-            onChange={(e) => changePageSize(parseInt(e.target.value))}
-            borderColor={"black"}
-            borderRadius={"lg"}
-          >
-            <option value="10">10</option>
-            <option value="25" selected={true}>
-              25
-            </option>
-            <option value="50">50</option>
-            <option value="100">100</option>
-            <option value="250">250</option>
+          <Select defaultValue={'25'} placeholder='' maxW='70px' size='sm' onChange={(e) => changePageSize(parseInt(e.target.value))} borderColor={'black'} borderRadius={'lg'}>
+            <option value='10'>10</option>
+            <option value='25'>25</option>
+            <option value='50'>50</option>
+            <option value='100'>100</option>
+            <option value='250'>250</option>
           </Select>
           <Text marginLeft={"20px"}>
             {" "}
             {`${pageOffset + 1}`} -{" "}
-            {`${
-              pageOffset + pageSize > totalHits
-                ? totalHits
-                : pageOffset + pageSize
-            }`}{" "}
+            {`${pageOffset + pageSize > totalHits
+              ? totalHits
+              : pageOffset + pageSize
+              }`}{" "}
             of {`${totalHits}`} items
           </Text>
           <Button
@@ -431,13 +464,34 @@ export function MessagesDevMode() {
               ) : (
                 <Minimize2 onClick={toggleView} cursor={"pointer"} />
               )}
-              <Text>Trace Details</Text>
+
               <DrawerCloseButton />
+
+            </HStack>
+            <HStack>
+              <Text paddingTop={5} fontSize='2xl'>Trace Details</Text>
             </HStack>
           </DrawerHeader>
           <DrawerBody>
-            <TraceSummary traceId={traceId ?? ""} />
-            <SpanTree traceId={traceId ?? ""} />
+            <Tabs>
+              <TabList>
+                <Tab>Details</Tab>
+                <Tab>Evaluations {errors()}</Tab>
+              </TabList>
+
+              <TabPanels>
+                <TabPanel>
+                  <TraceSummary traceId={traceId ?? ""} />
+                  <SpanTree traceId={traceId ?? ""} />
+
+                </TabPanel>
+                <TabPanel>
+                  <Evaluations traceId={traceId ?? ""} traceChecks={traceChecksQuery.data} />
+                </TabPanel>
+
+              </TabPanels>
+            </Tabs>
+
           </DrawerBody>
         </DrawerContent>
       </Drawer>

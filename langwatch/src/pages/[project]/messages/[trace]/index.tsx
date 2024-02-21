@@ -13,6 +13,11 @@ import {
   SkeletonCircle,
   Spacer,
   Spinner,
+  Tab,
+  TabList,
+  TabPanel,
+  TabPanels,
+  Tabs,
   Text,
   Tooltip,
   VStack,
@@ -32,13 +37,15 @@ import { SpanTree } from "../../../../components/traces/SpanTree";
 import { TraceSummary } from "../../../../components/traces/Summary";
 import { useOrganizationTeamProject } from "../../../../hooks/useOrganizationTeamProject";
 import { useTraceDetailsState } from "../../../../hooks/useTraceDetailsState";
-import type { Trace } from "../../../../server/tracer/types";
+import type { Trace, TraceCheck } from "../../../../server/tracer/types";
 import { api } from "../../../../utils/api";
 import { isNotFound } from "../../../../utils/trpcError";
 import { TeamRoleGroup } from "../../../../server/api/permission";
 import { MessagesDevMode } from "~/components/MessagesDevMode";
 import { useDevView } from "../../../../hooks/DevViewProvider";
-import { Maximize2, Minimize2 } from "react-feather";
+import { Maximize2, Minimize2, type Icon } from "react-feather";
+import { CheckPassingDrawer } from "~/components/CheckPassingDrawer";
+
 
 export default function TraceDetails() {
   const router = useRouter();
@@ -47,10 +54,54 @@ export default function TraceDetails() {
   const [threadId, setThreadId] = useState<string | undefined>(undefined);
   const { isDevViewEnabled } = useDevView();
   const [traceView, setTraceView] = useState<"span" | "full">("span");
+  const [totalErrors, setTotalErrors] = useState<number>(0);
 
   const toggleView = () => {
     setTraceView((prevView) => (prevView === "span" ? "full" : "span"));
   };
+
+
+
+  const traceIds = traceId ? [traceId] : [];
+  const traceChecksQuery = api.traces.getTraceChecks.useQuery(
+    { projectId: project?.id ?? "", traceIds },
+    {
+      enabled: traceIds.length > 0,
+      refetchInterval: undefined,
+      refetchOnWindowFocus: false,
+    }
+  );
+
+
+
+  interface TraceEval {
+    traceId: string;
+    traceChecks?: { [key: string]: TraceCheck[] };
+  }
+
+  const Evaluations = (trace: TraceEval) => {
+    return (
+      <VStack align="start" spacing={2}>
+        {trace.traceChecks?.[trace.traceId]?.map((check) => (
+          <CheckPassingDrawer
+            key={check.trace_id + "/" + check.check_id}
+            check={check}
+          />
+        ))}
+      </VStack>
+    );
+  };
+
+
+
+  useEffect(() => {
+
+    const traceData = traceChecksQuery?.data?.[traceId ?? ""];
+    const totalErrors = traceData ? traceData.filter((check) => check.status === 'failed').length : 0;
+    setTotalErrors(totalErrors);
+  }
+  )
+
 
   useEffect(() => {
     if (trace.data?.metadata.thread_id) {
@@ -81,6 +132,15 @@ export default function TraceDetails() {
 
   if (isDevViewEnabled) {
     return <MessagesDevMode />;
+  }
+
+  const errors = () => {
+    if (totalErrors == 0) return;
+
+    const errorText = totalErrors > 1 ? 'errors' : 'error';
+    return (
+      <Text marginLeft={3} borderRadius={'md'} paddingX={2} backgroundColor={'red.500'} color={'white'} fontSize={'sm'}>{totalErrors} {errorText}</Text>
+    )
   }
 
   return (
@@ -156,13 +216,32 @@ export default function TraceDetails() {
                   ) : (
                     <Minimize2 onClick={toggleView} cursor={"pointer"} />
                   )}
-                  <Text>Trace Details</Text>
+
                   <DrawerCloseButton />
                 </HStack>
+                <Text paddingTop={5} fontSize='2xl'>Trace Details</Text>
               </DrawerHeader>
               <DrawerBody>
-                <TraceSummary />
-                {openTab === "spans" && <SpanTree />}
+                <Tabs>
+                  <TabList>
+                    <Tab>Details</Tab>
+                    <Tab>Evaluations {errors()}</Tab>
+                  </TabList>
+
+                  <TabPanels>
+                    <TabPanel>
+                      <TraceSummary />
+                      {openTab === "spans" && <SpanTree />}
+
+                    </TabPanel>
+                    <TabPanel>
+                      {traceChecksQuery.data && (
+                        <Evaluations traceChecks={traceChecksQuery.data} traceId={traceId ?? ""} />
+                      )}
+                    </TabPanel>
+
+                  </TabPanels>
+                </Tabs>
               </DrawerBody>
             </DrawerContent>
           </Drawer>
@@ -369,8 +448,8 @@ function Message({
     ? timestampDate.getTime() < Date.now() - 1000 * 60 * 60 * 24
       ? format(timestampDate, "dd/MMM HH:mm")
       : formatDistanceToNow(timestampDate, {
-          addSuffix: true,
-        })
+        addSuffix: true,
+      })
     : undefined;
 
   if (!project) return null;
@@ -397,6 +476,7 @@ function Message({
         <HStack width="full">
           <Text fontWeight="bold">{author}</Text>
           <Spacer />
+          sss
           {timestampDate && timeAgo && (
             <Tooltip label={timestampDate.toLocaleString()}>
               <Text color="gray.400">{timeAgo}</Text>
