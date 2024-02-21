@@ -19,6 +19,7 @@
   },
   "dependencies": {
     "@azure/openai": "^1.0.0-beta.10",
+    "@chakra-ui/icons": "^2.1.1",
     "@chakra-ui/next-js": "^2.1.5",
     "@chakra-ui/react": "^2.8.2",
     "@elastic/elasticsearch": "^8.10.0",
