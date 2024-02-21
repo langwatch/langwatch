@@ -347,7 +347,10 @@ export const tracesRouter = createTRPCRouter({
         ).map((topic) => [topic.id, topic])
       );
 
-      const mapBuckets = (buckets: { key: string; doc_count: number }[]) => {
+      const mapBuckets = (
+        buckets: { key: string; doc_count: number }[],
+        includeParent = false
+      ) => {
         return buckets.reduce(
           (acc, bucket) => {
             const topic = topicsMap[bucket.key];
@@ -360,6 +363,7 @@ export const tracesRouter = createTRPCRouter({
                 id: bucket.key,
                 name: topic.name,
                 count: bucket.doc_count,
+                ...(includeParent && { parentId: topic.parentId }),
               },
             ];
           },
@@ -373,7 +377,12 @@ export const tracesRouter = createTRPCRouter({
 
       const subtopicBuckets: { key: string; doc_count: number }[] =
         (topicCountsResult.aggregations?.subtopicCounts as any)?.buckets ?? [];
-      const subtopicCounts = mapBuckets(subtopicBuckets);
+      const subtopicCounts = mapBuckets(subtopicBuckets, true) as {
+        id: string;
+        name: string;
+        count: number;
+        parentId: string;
+      }[];
 
       return { topicCounts, subtopicCounts };
     }),

@@ -257,38 +257,89 @@ function FilterSidebar() {
 function TopicsSelector() {
   const router = useRouter();
   const [selectedTopics, setSelectedTopics] = useState<string[]>([]);
+  const [selectedSubtopics, setSelectedSubtopics] = useState<string[]>([]);
   const { filterParams, queryOpts } = useFilterParams();
 
   useEffect(() => {
     if (router.query.topics) {
       setSelectedTopics((router.query.topics as string).split(","));
+    } else {
+      setSelectedTopics([]);
     }
   }, [router.query.topics]);
 
+  useEffect(() => {
+    if (router.query.subtopics) {
+      setSelectedSubtopics((router.query.subtopics as string).split(","));
+    } else {
+      setSelectedSubtopics([]);
+    }
+  }, [router.query.subtopics]);
+
   const topicCountsQuery = api.traces.getTopicCounts.useQuery(
-    filterParams,
+    {
+      ...filterParams,
+      filters: { ...filterParams.filters, topics: undefined },
+    },
     queryOpts
   );
 
-  const handleTopicChange = (topic: string, isChecked: boolean) => {
-    setSelectedTopics((prevTopics) => {
-      const newTopics = isChecked
-        ? [...prevTopics, topic]
-        : prevTopics.filter((t) => t !== topic);
-      const topicsQuery =
-        newTopics.length > 0 ? newTopics.join(",") : undefined;
+  const handleTopicChange = (topicId: string, isChecked: boolean) => {
+    const newTopics = isChecked
+      ? [...selectedTopics, topicId]
+      : selectedTopics.filter((t) => t !== topicId);
+
+    let newSubtopics = selectedSubtopics;
+    if (!isChecked) {
+      const subtopics = topicCountsQuery.data?.subtopicCounts.filter(
+        (subtopic) => subtopic.parentId === topicId
+      );
+      if (subtopics) {
+        newSubtopics = selectedSubtopics.filter(
+          (t) => !subtopics.map((s) => s.id).includes(t)
+        );
+      }
+    }
+
+    setSelectedTopics(newTopics);
+    setSelectedSubtopics(newSubtopics);
+
+    const topicsQuery = newTopics.length > 0 ? newTopics.join(",") : undefined;
+    const subtopicsQuery =
+      newSubtopics.length > 0 ? newSubtopics.join(",") : undefined;
+    void router.push(
+      {
+        query: {
+          ...router.query,
+          topics: topicsQuery,
+          subtopics: subtopicsQuery,
+        },
+      },
+      undefined,
+      { shallow: true }
+    );
+  };
+
+  const handleSubtopicChange = (subtopicId: string, isChecked: boolean) => {
+    const newSubtopics = isChecked
+      ? [...selectedSubtopics, subtopicId]
+      : selectedSubtopics.filter((t) => t !== subtopicId);
+    const subtopicsQuery =
+      newSubtopics.length > 0 ? newSubtopics.join(",") : undefined;
+    setTimeout(() => {
       void router.push(
         {
           query: {
             ...router.query,
-            topics: topicsQuery,
+            subtopics: subtopicsQuery,
           },
         },
         undefined,
         { shallow: true }
       );
-      return newTopics;
-    });
+    }, 0);
+
+    setSelectedSubtopics(newSubtopics);
   };
 
   return (
@@ -309,7 +360,14 @@ function TopicsSelector() {
               .sort((a, b) => (a.count > b.count ? -1 : 1))
               .map((topic) => (
                 <React.Fragment key={topic.id}>
-                  <HStack spacing={4} width="full" paddingX={2}>
+                  <HStack
+                    spacing={4}
+                    width="full"
+                    paddingX={2}
+                    fontWeight={
+                      selectedTopics.includes(topic.id) ? "500" : "normal"
+                    }
+                  >
                     <Checkbox
                       borderColor="gray.400"
                       spacing={3}
@@ -322,9 +380,44 @@ function TopicsSelector() {
                       <Text noOfLines={1}>{topic.name}</Text>
                     </Checkbox>
                     <Text color="gray.500" fontSize={12} whiteSpace="nowrap">
-                      {topic.count} messages
+                      {topic.count}
                     </Text>
                   </HStack>
+                  {selectedTopics.includes(topic.id) &&
+                    topicCountsQuery.data.subtopicCounts
+                      .filter((subtopic) => subtopic.parentId === topic.id)
+                      .map((subtopic) => (
+                        <HStack
+                          key={subtopic.id}
+                          spacing={4}
+                          width="full"
+                          paddingX={2}
+                          paddingLeft={8}
+                          fontWeight="normal"
+                        >
+                          <Checkbox
+                            borderColor="gray.400"
+                            spacing={3}
+                            flexGrow={1}
+                            isChecked={selectedSubtopics.includes(subtopic.id)}
+                            onChange={(e) =>
+                              handleSubtopicChange(
+                                subtopic.id,
+                                e.target.checked
+                              )
+                            }
+                          >
+                            <Text noOfLines={1}>{subtopic.name}</Text>
+                          </Checkbox>
+                          <Text
+                            color="gray.500"
+                            fontSize={12}
+                            whiteSpace="nowrap"
+                          >
+                            {subtopic.count}
+                          </Text>
+                        </HStack>
+                      ))}
                   <Divider borderColor="gray.350" _last={{ display: "none" }} />
                 </React.Fragment>
               ))
