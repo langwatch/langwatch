@@ -82,7 +82,7 @@ export function MessageCard({
                 if (!linkActive) e.preventDefault();
               }}
             >
-              {getSlicedInput(trace)}
+              <Text noOfLines={1} wordBreak="break-all">{getSlicedInput(trace)}</Text>
             </LinkOverlay>
           </Box>
         </VStack>
@@ -314,10 +314,7 @@ const getSlicedInput = (trace: Trace) => {
     // ignore
   }
 
-  return (
-    (value ? value.slice(0, 100) : "<empty>") +
-    (value.length >= 100 ? "..." : "")
-  );
+  return value ? value : "<empty>";
 };
 
 const getSlicedOutput = (trace: Trace) => {

@@ -125,8 +125,8 @@ export function MessagesDevMode() {
       </Td>
     ),
     Input: (trace, index) => (
-      <Td key={index}>
-        <Text noOfLines={1} maxWidth="300px">
+      <Td key={index} maxWidth="300px">
+        <Text noOfLines={1} wordBreak="break-all" display="block">
           {trace.input.value}
         </Text>
       </Td>
@@ -134,13 +134,13 @@ export function MessagesDevMode() {
     Output: (trace, index) =>
       trace.error ? (
         <Td key={index}>
-          <Text noOfLines={1} maxWidth="300px" color="red.400">
+          <Text noOfLines={1} maxWidth="300px" display="block" color="red.400">
             {trace.error.message}
           </Text>
         </Td>
       ) : (
         <Td key={index}>
-          <Text noOfLines={1} maxWidth="300px">
+          <Text noOfLines={1} display="block" maxWidth="300px">
             {trace.output?.value}
           </Text>
         </Td>
@@ -315,6 +315,9 @@ export function MessagesDevMode() {
   }, [traceChecksQuery, checksAvailable]);
 
   const { isOpen, onOpen, onClose } = useDisclosure();
+  const checkedHeaderColumnsEntries = Object.entries(
+    selectedHeaderColumns
+  ).filter(([_, checked]) => checked);
 
   return (
     <DashboardLayout>
@@ -375,11 +378,9 @@ export function MessagesDevMode() {
               <Table variant="simple">
                 <Thead>
                   <Tr>
-                    {Object.entries(selectedHeaderColumns)
-                      .filter(([_, checked]) => checked)
-                      .map(([column, _], index) => (
-                        <Th key={index}>{column}</Th>
-                      ))}
+                    {checkedHeaderColumnsEntries.map(([column, _], index) => (
+                      <Th key={index}>{column}</Th>
+                    ))}
                   </Tr>
                 </Thead>
                 <Tbody>
@@ -394,19 +395,19 @@ export function MessagesDevMode() {
                           setIsDrawerOpen(true);
                         }}
                       >
-                        {Object.entries(selectedHeaderColumns)
-                          .filter(([_, checked]) => checked)
-                          .map(
-                            ([column, _], index) =>
-                              headerColumns[column]?.(trace, index)
-                          )}
+                        {checkedHeaderColumnsEntries.map(
+                          ([column, _], index) =>
+                            headerColumns[column]?.(trace, index)
+                        )}
                       </Tr>
                     ))
                   )}
                   {traceGroups.isLoading &&
                     Array.from({ length: 3 }).map((_, i) => (
                       <Tr key={i}>
-                        {Array.from({ length: 8 }).map((_, i) => (
+                        {Array.from({
+                          length: checkedHeaderColumnsEntries.length,
+                        }).map((_, i) => (
                           <Td key={i}>
                             <Skeleton height="20px" />
                           </Td>

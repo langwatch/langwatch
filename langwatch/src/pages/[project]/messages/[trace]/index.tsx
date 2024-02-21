@@ -406,7 +406,7 @@ const TraceMessages = React.forwardRef(function TraceMessages(
             timestamp={trace.timestamps.started_at}
             paddingTop="20px"
           >
-            <Text paddingY="6px" marginBottom="38px">
+            <Text paddingY="6px" marginBottom="38px" whiteSpace="pre-wrap">
               {trace.input.value}
             </Text>
           </Message>
