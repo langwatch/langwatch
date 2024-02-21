@@ -220,6 +220,7 @@ export default function TraceDetails() {
                   <DrawerCloseButton />
                 </HStack>
                 <Text paddingTop={5} fontSize='2xl'>Trace Details</Text>
+
               </DrawerHeader>
               <DrawerBody>
                 <Tabs>

@@ -104,6 +104,7 @@ export function MessagesDevMode() {
     }
   );
 
+
   const checksAvailable = Object.fromEntries(
     Object.values(traceChecksQuery.data ?? {}).flatMap((checks) =>
       checks.map((check) => [check.check_id, check.check_name])
@@ -284,6 +285,7 @@ export function MessagesDevMode() {
 
 
   const isFirstRender = useRef(true);
+
   useEffect(() => {
     if (
       traceChecksQuery.isFetched &&
@@ -420,6 +422,7 @@ export function MessagesDevMode() {
             <option value='100'>100</option>
             <option value='250'>250</option>
           </Select>
+
           <Text marginLeft={"20px"}>
             {" "}
             {`${pageOffset + 1}`} -{" "}
@@ -447,6 +450,7 @@ export function MessagesDevMode() {
           </Button>
         </HStack>
       </Container>
+
       <Drawer
         isOpen={isDrawerOpen}
         placement="right"
@@ -477,7 +481,7 @@ export function MessagesDevMode() {
               <TabList>
                 <Tab>Details</Tab>
                 <Tab>Evaluations {errors()}</Tab>
-              </TabList>
+              </TabList >
 
               <TabPanels>
                 <TabPanel>
@@ -490,11 +494,11 @@ export function MessagesDevMode() {
                 </TabPanel>
 
               </TabPanels>
-            </Tabs>
+            </Tabs >
 
-          </DrawerBody>
-        </DrawerContent>
-      </Drawer>
-    </DashboardLayout>
+          </DrawerBody >
+        </DrawerContent >
+      </Drawer >
+    </DashboardLayout >
   );
 }
