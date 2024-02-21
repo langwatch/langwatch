@@ -356,6 +356,7 @@ function TopicsSelector() {
         ) : topicCountsQuery.data ? (
           topicCountsQuery.data.topicCounts.length > 0 ? (
             topicCountsQuery.data.topicCounts
+              .sort((a, b) => (a.name > b.name ? 1 : -1))
               .sort((a, b) => (a.count > b.count ? -1 : 1))
               .map((topic) => (
                 <React.Fragment key={topic.id}>
@@ -384,6 +385,8 @@ function TopicsSelector() {
                   </HStack>
                   {selectedTopics.includes(topic.id) &&
                     topicCountsQuery.data.subtopicCounts
+                      .sort((a, b) => (a.name > b.name ? 1 : -1))
+                      .sort((a, b) => (a.count > b.count ? -1 : 1))
                       .filter((subtopic) => subtopic.parentId === topic.id)
                       .map((subtopic) => (
                         <HStack

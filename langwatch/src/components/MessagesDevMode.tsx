@@ -277,7 +277,7 @@ export function MessagesDevMode() {
       ? traceData.filter((check) => check.status === "failed").length
       : 0;
     setTotalErrors(totalErrors);
-  }, [traceChecksQuery?.data, traceId]);
+  }, [traceChecksQuery.data, traceId]);
 
   const errors = () => {
     if (totalErrors == 0) return;
