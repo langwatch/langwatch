@@ -163,10 +163,12 @@ const TraceSummaryValues = React.forwardRef(function TraceSummaryValues(
 
       <HStack gap={3} marginY={8} wrap={'wrap'}>
         {Object.entries(trace.metadata).map(([key, value]) => (
-          <HStack gap={0} fontSize={'smaller'} margin={0}>
-            <Text borderWidth={1} borderColor={"gray.200"} paddingX={2} borderLeftRadius={'md'}>{key}:</Text>
-            <Text borderWidth={1} borderColor={"gray.200"} paddingX={2} borderLeft={'none'} backgroundColor={'gray.100'} borderRightRadius={'md'} fontFamily="mono">{value}</Text>
-          </HStack>
+          value && (
+            <HStack gap={0} fontSize={'smaller'} margin={0}>
+              <Text borderWidth={1} borderColor={"gray.200"} paddingX={2} borderLeftRadius={'md'}>{key}:</Text>
+              <Text borderWidth={1} borderColor={"gray.200"} paddingX={2} borderLeft={'none'} backgroundColor={'gray.100'} borderRightRadius={'md'} fontFamily="mono">{value}</Text>
+            </HStack>
+          )
         ))}
       </HStack>
     </>
