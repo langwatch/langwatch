@@ -55,10 +55,10 @@ export const clusterTopicsForProject = async (
     where: { projectId },
   });
 
-  // If we have topics and more than 2000 traces are already assigned, we are in incremental processing mode
+  // If we have topics and more than 1200 traces are already assigned, we are in incremental processing mode
   // This checks helps us getting back into batch mode if we simply delete all the topics for a given project
   const isIncrementalProcessing =
-    topicsCount > 0 && assignedTracesCount.count >= 2000;
+    topicsCount > 0 && assignedTracesCount.count >= 1200;
 
   let presenceCondition: QueryDslQueryContainer[] = [
     {
