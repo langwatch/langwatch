@@ -162,14 +162,26 @@ const TraceSummaryValues = React.forwardRef(function TraceSummaryValues(
       </HStack>
 
       <HStack gap={3} marginY={8} wrap={'wrap'}>
-        {Object.entries(trace.metadata).map(([key, value]) => (
-          value && (
-            <HStack gap={0} fontSize={'smaller'} margin={0}>
-              <Text borderWidth={1} borderColor={"gray.200"} paddingX={2} borderLeftRadius={'md'}>{key}:</Text>
-              <Text borderWidth={1} borderColor={"gray.200"} paddingX={2} borderLeft={'none'} backgroundColor={'gray.100'} borderRightRadius={'md'} fontFamily="mono">{value}</Text>
-            </HStack>
-          )
-        ))}
+        {
+          Object.entries(trace.metadata).map(([key, value], i) => {
+
+            let renderValue = value;
+
+            if (Array.isArray(value) && value.length === 0) {
+              renderValue = '';
+
+            } else if (Array.isArray(value) && value.length > 0) {
+              renderValue = value.join(', ')
+            }
+
+            return (renderValue && (
+              <HStack gap={0} fontSize={'smaller'} margin={0} key={i}>
+                <Text borderWidth={1} borderColor={"gray.200"} paddingX={2} borderLeftRadius={'md'}>{key}:</Text>
+                <Text borderWidth={1} borderColor={"gray.200"} paddingX={2} borderLeft={'none'} backgroundColor={'gray.100'} borderRightRadius={'md'} fontFamily="mono">{renderValue}</Text>
+              </HStack>
+            ))
+          })
+        }
       </HStack>
     </>
   );
