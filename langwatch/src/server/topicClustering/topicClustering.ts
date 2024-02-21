@@ -51,14 +51,21 @@ export const clusterTopicsForProject = async (
     },
   });
 
-  const topicsCount = await prisma.topic.count({
+  const topics = await prisma.topic.findMany({
     where: { projectId },
+    select: { id: true, parentId: true },
   });
+  const topicIds = topics
+    .filter((topic) => !topic.parentId)
+    .map((topic) => topic.id);
+  const subtopicIds = topics
+    .filter((topic) => topic.parentId)
+    .map((topic) => topic.id);
 
   // If we have topics and more than 1200 traces are already assigned, we are in incremental processing mode
   // This checks helps us getting back into batch mode if we simply delete all the topics for a given project
   const isIncrementalProcessing =
-    topicsCount > 0 && assignedTracesCount.count >= 1200;
+    topicIds.length > 0 && assignedTracesCount.count >= 1200;
 
   let presenceCondition: QueryDslQueryContainer[] = [
     {
@@ -81,24 +88,25 @@ export const clusterTopicsForProject = async (
         },
       },
       {
+        // Must either not have any of the available topics, or available subtopics
         bool: {
           should: [
             {
               bool: {
-                must_not: {
-                  exists: {
-                    field: "trace.metadata.topic_id",
+                must_not: topicIds.map((topicId) => ({
+                  term: {
+                    "metadata.topic_id": topicId,
                   },
-                },
+                })) as QueryDslQueryContainer[],
               } as QueryDslBoolQuery,
             },
             {
               bool: {
-                must_not: {
-                  exists: {
-                    field: "trace.metadata.subtopic_id",
+                must_not: subtopicIds.map((subtopicId) => ({
+                  term: {
+                    "metadata.subtopic_id": subtopicId,
                   },
-                },
+                })) as QueryDslQueryContainer[],
               } as QueryDslBoolQuery,
             },
           ],
@@ -145,8 +153,15 @@ export const clusterTopicsForProject = async (
       trace_id: trace.trace_id,
       input: trace.input.value,
       embeddings: trace.input.embeddings!.embeddings,
-      topic_id: trace.metadata?.topic_id ?? null,
-      subtopic_id: trace.metadata?.subtopic_id ?? null,
+      topic_id:
+        trace.metadata?.topic_id && topicIds.includes(trace.metadata.topic_id)
+          ? trace.metadata.topic_id
+          : null,
+      subtopic_id:
+        trace.metadata?.subtopic_id &&
+        subtopicIds.includes(trace.metadata.subtopic_id)
+          ? trace.metadata.subtopic_id
+          : null,
     }));
 
   const minimumTraces = isIncrementalProcessing ? 1 : 10;
@@ -260,7 +275,7 @@ export const incrementalClustering = async (
     subtopics,
   });
 
-  await storeResults(projectId, clusteringResult, false);
+  await storeResults(projectId, clusteringResult, true);
 };
 
 export const storeResults = async (
