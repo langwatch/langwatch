@@ -36,7 +36,8 @@ export function CheckPassingDrawer({ check }: { check: TraceCheck }) {
             ) : checkPasses ? (
               <CheckCircleIcon w={25} h={25} color={"green.600"} />
             ) : (
-              <CloseIcon w={15} h={15} color={"red.700"} />
+              <CloseIcon w={15} h={15} color={"red.500"} />
+
             )}
           </Box>
           <VStack alignItems="start" spacing={1} >
@@ -71,23 +72,26 @@ export function CheckPassingDrawer({ check }: { check: TraceCheck }) {
         </HStack>
         <Spacer />
         <Text fontSize={'sm'}>
-          {check.timestamps.finished_at && (
-            <Tooltip
-              label={new Date(check.timestamps.finished_at).toLocaleString()}
-            >
-              <Text
-                borderBottomWidth="1px"
-                borderBottomColor="gray.400"
-                borderBottomStyle="dashed"
+          {
+            check.timestamps.finished_at && (
+              <Tooltip
+                label={new Date(check.timestamps.finished_at).toLocaleString()}
               >
-                {formatDistanceToNow(new Date(check.timestamps.finished_at), {
-                  addSuffix: true,
-                })}
-              </Text>
-            </Tooltip>
-          )}
-        </Text>
-      </Flex>
+                <Text
+                  borderBottomWidth="1px"
+                  borderBottomColor="gray.400"
+                  borderBottomStyle="dashed"
+                >
+                  {formatDistanceToNow(new Date(check.timestamps.finished_at), {
+                    addSuffix: true,
+                  })}
+                </Text>
+              </Tooltip>
+            )
+          }
+
+        </Text >
+      </Flex >
     </Box >
   );
 }
