@@ -65,7 +65,7 @@ export const generateTraceQueryConditions = ({
       ? [{ terms: { "metadata.customer_id": customer_ids } }]
       : []),
     ...(labels ? [{ terms: { "metadata.labels": labels } }] : []),
-    ...(topics ? [{ terms: { "metadata.topics": topics } }] : []),
+    ...(topics ? [{ terms: { "metadata.topic_id": topics } }] : []),
   ];
 };
 

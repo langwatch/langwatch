@@ -361,7 +361,7 @@ function TopicsSelector() {
               .map((topic) => (
                 <React.Fragment key={topic.id}>
                   <HStack
-                    spacing={4}
+                    spacing={1}
                     width="full"
                     paddingX={2}
                     fontWeight={
@@ -377,7 +377,14 @@ function TopicsSelector() {
                         handleTopicChange(topic.id, e.target.checked)
                       }
                     >
-                      <Text noOfLines={1}>{topic.name}</Text>
+                      <Text
+                        noOfLines={1}
+                        wordBreak="break-all"
+                        title={topic.name}
+                        fontSize={15}
+                      >
+                        {topic.name}
+                      </Text>
                     </Checkbox>
                     <Text color="gray.500" fontSize={12} whiteSpace="nowrap">
                       {topic.count}
@@ -391,11 +398,12 @@ function TopicsSelector() {
                       .map((subtopic) => (
                         <HStack
                           key={subtopic.id}
-                          spacing={4}
+                          spacing={1}
                           width="full"
                           paddingX={2}
                           paddingLeft={8}
                           fontWeight="normal"
+                          fontSize={15}
                         >
                           <Checkbox
                             borderColor="gray.400"
@@ -409,7 +417,13 @@ function TopicsSelector() {
                               )
                             }
                           >
-                            <Text noOfLines={1}>{subtopic.name}</Text>
+                            <Text
+                              noOfLines={1}
+                              wordBreak="break-all"
+                              title={subtopic.name}
+                            >
+                              {subtopic.name}
+                            </Text>
                           </Checkbox>
                           <Text
                             color="gray.500"

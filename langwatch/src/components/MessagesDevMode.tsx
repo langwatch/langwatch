@@ -36,7 +36,7 @@ import {
   Thead,
   Tr,
   VStack,
-  useDisclosure
+  useDisclosure,
 } from "@chakra-ui/react";
 import { useRouter } from "next/router";
 import numeral from "numeral";
@@ -239,19 +239,13 @@ export function MessagesDevMode() {
     setPageOffset(0);
   };
 
-  interface SearchTotalHits {
-    value: number;
-  }
-
   useEffect(() => {
     if (traceGroups.isFetched) {
-      const totalHits: number =
-        (traceGroups.data?.tracesResult?.hits?.total as SearchTotalHits)
-          ?.value || 0;
+      const totalHits: number = traceGroups.data?.totalHits ?? 0;
 
       setTotalHits(totalHits);
     }
-  }, [traceGroups.data?.tracesResult?.hits?.total, traceGroups.isFetched]);
+  }, [traceGroups.data?.totalHits, traceGroups.isFetched]);
 
   interface TraceEval {
     traceId: string;
