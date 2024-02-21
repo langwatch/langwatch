@@ -8,6 +8,7 @@ import {
 } from "../../../elasticsearch";
 import type {
   AggregationsAggregationContainer,
+  QueryDslBoolQuery,
   QueryDslQueryContainer,
 } from "@elastic/elasticsearch/lib/api/types";
 import type { Trace } from "../../../tracer/types";
@@ -518,7 +519,7 @@ export const generateTracesPivotQueryConditions = ({
   endDate,
   filters,
 }: z.infer<typeof sharedFiltersInputSchema>): {
-  pivotIndexConditions: QueryDslQueryContainer[];
+  pivotIndexConditions: QueryDslQueryContainer;
   isAnyFilterPresent: boolean;
 } => {
   // If end date is very close to now, force it to be now, to allow frontend to keep refetching for new messages
@@ -528,7 +529,7 @@ export const generateTracesPivotQueryConditions = ({
       : endDate;
 
   const { metadata, topics: topicsGroup } = filters;
-  const { topics } = topicsGroup ?? {};
+  const { topics, subtopics } = topicsGroup ?? {};
   const { user_id, thread_id, customer_id, labels } = metadata ?? {};
 
   const filterConditions: QueryDslQueryContainer[] = [
@@ -540,25 +541,30 @@ export const generateTracesPivotQueryConditions = ({
       ? [{ terms: { "trace.metadata.customer_id": customer_id } }]
       : []),
     ...(labels ? [{ terms: { "trace.metadata.labels": labels } }] : []),
-    ...(topics ? [{ terms: { "trace.metadata.topics": topics } }] : []),
+    ...(topics ? [{ terms: { "trace.metadata.topic_id": topics } }] : []),
+    ...(subtopics ? [{ terms: { "trace.metadata.subtopic_id": subtopics } }] : []),
   ];
 
   return {
-    pivotIndexConditions: [
-      {
-        term: { "trace.project_id": projectId },
-      },
-      {
-        range: {
-          "trace.timestamps.started_at": {
-            gte: startDate,
-            lte: endDate_,
-            format: "epoch_millis",
+    pivotIndexConditions: {
+      bool: {
+        must: [
+          {
+            term: { "trace.project_id": projectId },
           },
-        },
-      },
-      ...filterConditions,
-    ],
+          {
+            range: {
+              "trace.timestamps.started_at": {
+                gte: startDate,
+                lte: endDate_,
+                format: "epoch_millis",
+              },
+            },
+          },
+          ...filterConditions,
+        ],
+      } as QueryDslBoolQuery,
+    },
     isAnyFilterPresent: filterConditions.length > 0,
   };
 };

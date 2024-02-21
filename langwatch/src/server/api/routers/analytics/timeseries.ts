@@ -105,11 +105,7 @@ export const getTimeseries = protectedProcedure
       index: TRACES_PIVOT_INDEX,
       body: {
         size: 0,
-        query: {
-          bool: {
-            filter: pivotIndexConditions,
-          } as QueryDslBoolQuery,
-        },
+        query: pivotIndexConditions,
         ...(Object.keys(runtimeMappings).length > 0
           ? { runtime_mappings: runtimeMappings }
           : {}),

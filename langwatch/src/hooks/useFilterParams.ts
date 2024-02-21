@@ -12,6 +12,7 @@ export const useFilterParams = () => {
   } = usePeriodSelector();
 
   const topics = getMultipleQueryParams(router.query.topics);
+  const subtopics = getMultipleQueryParams(router.query.subtopics);
   // TODO: add type signature same as the shared input schema for endpoints
   return {
     filterParams: {
@@ -19,7 +20,7 @@ export const useFilterParams = () => {
       startDate: startDate.getTime(),
       endDate: endDate.getTime(),
       filters: {
-        topics: topics ? { topics } : undefined,
+        topics: topics ? { topics, subtopics } : undefined,
         metadata: {
           user_id: getMultipleQueryParams(router.query.user_id),
           thread_id: getMultipleQueryParams(router.query.thread_id),

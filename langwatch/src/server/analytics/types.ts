@@ -83,6 +83,7 @@ export const sharedFiltersInputSchema = z.object({
     topics: z
       .object({
         topics: z.array(z.string()).optional(),
+        subtopics: z.array(z.string()).optional(),
       })
       .optional(),
     metadata: z

@@ -89,11 +89,7 @@ export const tracesRouter = createTRPCRouter({
           index: TRACES_PIVOT_INDEX,
           body: {
             size: 10_000,
-            query: {
-              bool: {
-                filter: pivotIndexConditions,
-              } as QueryDslBoolQuery,
-            },
+            query: pivotIndexConditions,
             _source: ["trace.trace_id"],
           },
         });
