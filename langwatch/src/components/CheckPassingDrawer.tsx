@@ -1,11 +1,11 @@
 import { Box, HStack, Text, VStack, Flex, Spacer, Tooltip } from "@chakra-ui/react";
 import type { TraceCheck } from "../server/tracer/types";
 import type { CheckTypes } from "../trace_checks/types";
-
-import { CheckCircle, Clock, XCircle } from "react-feather";
+import { CheckCircleIcon, CloseIcon } from '@chakra-ui/icons';
+import { Clock } from "react-feather";
 import { getTraceCheckDefinitions } from "../trace_checks/registry";
 import numeral from "numeral";
-import { format, formatDistanceToNow } from "date-fns";
+import { formatDistanceToNow } from "date-fns";
 
 
 export function CheckPassingDrawer({ check }: { check: TraceCheck }) {
@@ -19,18 +19,7 @@ export function CheckPassingDrawer({ check }: { check: TraceCheck }) {
   const checkPasses = check.status === "succeeded";
   const traceCheck = getTraceCheckDefinitions(checkType);
 
-
-  const timestampDate = check.timestamps.finished_at ? new Date(check.timestamps.finished_at) : undefined;
-  const timeAgo = timestampDate
-    ? timestampDate.getTime() < Date.now() - 1000 * 60 * 60 * 24
-      ? format(timestampDate, "dd/MMM HH:mm")
-      : formatDistanceToNow(timestampDate, {
-        addSuffix: true,
-      })
-    : undefined;
-
   const color = check.status === 'succeeded' ? "green.500" : "red.500";
-
 
   if (!traceCheck) return null;
 
@@ -45,9 +34,9 @@ export function CheckPassingDrawer({ check }: { check: TraceCheck }) {
             {!done /* TODO: differentiate in_progress and scheduled, also on the general one in Messages */ ? (
               <Clock />
             ) : checkPasses ? (
-              <CheckCircle />
+              <CheckCircleIcon w={25} h={25} color={"green.600"} />
             ) : (
-              <XCircle />
+              <CloseIcon w={15} h={15} color={"red.700"} />
             )}
           </Box>
           <VStack alignItems="start" spacing={1} >
