@@ -4,6 +4,10 @@ import { TRPCError } from "@trpc/server";
 import similarity from "compute-cosine-similarity";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import {
+  sharedFiltersInputSchema,
+  type TracesPivot,
+} from "../../analytics/types";
+import {
   SPAN_INDEX,
   TRACES_PIVOT_INDEX,
   TRACE_CHECKS_INDEX,
@@ -14,18 +18,13 @@ import { getOpenAIEmbeddings } from "../../embeddings";
 import type { ElasticSearchSpan, Trace, TraceCheck } from "../../tracer/types";
 import {
   TeamRoleGroup,
-  checkUserPermissionForProject,
   backendHasTeamProjectPermission,
+  checkUserPermissionForProject,
 } from "../permission";
 import {
   generateTraceQueryConditions,
   generateTracesPivotQueryConditions,
 } from "./analytics/common";
-import {
-  type TracesPivot,
-  sharedFiltersInputSchema,
-} from "../../analytics/types";
-import type { QueryDslBoolQuery } from "@elastic/elasticsearch/lib/api/types";
 
 const tracesFilterInput = sharedFiltersInputSchema.extend({
   pageOffset: z.number().optional(),

@@ -4,10 +4,9 @@ import {
   Box,
   HStack,
   Skeleton,
-  Tag,
   Text,
   Tooltip,
-  VStack,
+  VStack
 } from "@chakra-ui/react";
 import numeral from "numeral";
 import React, {
@@ -17,11 +16,10 @@ import React, {
   type PropsWithChildren,
 } from "react";
 import { HelpCircle } from "react-feather";
-import { useTraceDetailsState } from "../../hooks/useTraceDetailsState";
 import { getTotalTokensDisplay } from "~/utils/getTotalTokensDisplay";
+import { useTraceDetailsState } from "../../hooks/useTraceDetailsState";
 import type { Trace } from "../../server/tracer/types";
 import { formatMilliseconds } from "../../utils/formatMilliseconds";
-import { getColorForString } from "../../utils/rotatingColors";
 
 const SummaryItem = ({
   label,

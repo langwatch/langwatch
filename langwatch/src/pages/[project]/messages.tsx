@@ -48,7 +48,6 @@ import { ProjectIntegration } from "../../components/ProjectIntegration";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import type { Trace, TraceCheck } from "../../server/tracer/types";
 import { api } from "../../utils/api";
-import { FilterSelector } from "../../components/FilterSelector";
 import { getSingleQueryParam } from "../../utils/getSingleQueryParam";
 import { MessagesDevMode } from "~/components/MessagesDevMode";
 import { useDevView } from "../../hooks/DevViewProvider";

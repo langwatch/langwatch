@@ -1,18 +1,17 @@
-import { env } from "../../env.mjs";
-import type { ElasticSearchTrace, Trace } from "../tracer/types";
-import { TRACE_INDEX, esClient, traceIndexId } from "../elasticsearch";
-import { getDebugger } from "../../utils/logger";
-import type { Money } from "../../utils/types";
-import http2 from "http2";
-import FormData from "form-data";
-import { prisma } from "../db";
-import { nanoid } from "nanoid";
-import { CostReferenceType, CostType } from "@prisma/client";
-import { scheduleTopicClusteringNextPage } from "../background/queues/topicClusteringQueue";
 import type {
   QueryDslBoolQuery,
   QueryDslQueryContainer,
 } from "@elastic/elasticsearch/lib/api/types";
+import { CostReferenceType, CostType } from "@prisma/client";
+import { fetch as fetchHTTP2 } from "fetch-h2";
+import { nanoid } from "nanoid";
+import { env } from "../../env.mjs";
+import { getDebugger } from "../../utils/logger";
+import { scheduleTopicClusteringNextPage } from "../background/queues/topicClusteringQueue";
+import { prisma } from "../db";
+import { TRACE_INDEX, esClient, traceIndexId } from "../elasticsearch";
+import { DEFAULT_EMBEDDINGS_MODEL } from "../embeddings";
+import type { ElasticSearchTrace, Trace } from "../tracer/types";
 import type {
   BatchClusteringParams,
   IncrementalClusteringParams,
@@ -22,8 +21,6 @@ import type {
   TopicClusteringTrace,
   TopicClusteringTraceTopicMap,
 } from "./types";
-import { fetch as fetchHTTP2 } from "fetch-h2";
-import { DEFAULT_EMBEDDINGS_MODEL } from "../embeddings";
 
 const debug = getDebugger("langwatch:topicClustering");
 

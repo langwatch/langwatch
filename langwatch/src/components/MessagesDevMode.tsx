@@ -22,8 +22,13 @@ import {
   Select,
   Skeleton,
   Spacer,
+  Tab,
+  TabList,
+  TabPanel,
+  TabPanels,
   Table,
   TableContainer,
+  Tabs,
   Tbody,
   Td,
   Text,
@@ -31,32 +36,32 @@ import {
   Thead,
   Tr,
   VStack,
-  useDisclosure,
-  ChakraProvider,
-  Tab,
-  TabList,
-  TabPanel,
-  TabPanels,
-  Tabs,
+  useDisclosure
 } from "@chakra-ui/react";
 import { useRouter } from "next/router";
 import numeral from "numeral";
 import { useEffect, useRef, useState } from "react";
-import { ChevronDown, ChevronLeft, ChevronRight, List, Maximize2, Minimize2 } from "react-feather";
+import {
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  List,
+  Maximize2,
+  Minimize2,
+} from "react-feather";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import type { Trace, TraceCheck } from "~/server/tracer/types";
 import { getTraceCheckDefinitions } from "~/trace_checks/registry";
 import { api } from "~/utils/api";
 import { durationColor } from "~/utils/durationColor";
-import type { Trace, TraceCheck } from "~/server/tracer/types";
-import { SpanTree } from "./traces/SpanTree";
-import { TraceSummary } from "./traces/Summary";
-import { CheckPassingDrawer } from "./CheckPassingDrawer";
 import { getSingleQueryParam } from "~/utils/getSingleQueryParam";
 import { useFilterParams } from "../hooks/useFilterParams";
+import { CheckPassingDrawer } from "./CheckPassingDrawer";
 import { DashboardLayout } from "./DashboardLayout";
 import { FilterSelector } from "./FilterSelector";
-import { usePeriodSelector, PeriodSelector } from "./PeriodSelector";
-
+import { PeriodSelector, usePeriodSelector } from "./PeriodSelector";
+import { SpanTree } from "./traces/SpanTree";
+import { TraceSummary } from "./traces/Summary";
 
 export function MessagesDevMode() {
   const router = useRouter();
@@ -103,7 +108,6 @@ export function MessagesDevMode() {
       refetchOnWindowFocus: false,
     }
   );
-
 
   const checksAvailable = Object.fromEntries(
     Object.values(traceChecksQuery.data ?? {}).flatMap((checks) =>
@@ -247,11 +251,11 @@ export function MessagesDevMode() {
 
       setTotalHits(totalHits);
     }
-  })
+  }, [traceGroups.data?.tracesResult?.hits?.total, traceGroups.isFetched]);
 
   interface TraceEval {
     traceId: string;
-    traceChecks?: { [key: string]: TraceCheck[] };
+    traceChecks?: Record<string, TraceCheck[]>;
   }
 
   const Evaluations = (trace: TraceEval) => {
@@ -267,22 +271,31 @@ export function MessagesDevMode() {
     );
   };
 
-
   useEffect(() => {
     const traceData = traceChecksQuery?.data?.[traceId ?? ""];
-    const totalErrors = traceData ? traceData.filter((check) => check.status === 'failed').length : 0;
+    const totalErrors = traceData
+      ? traceData.filter((check) => check.status === "failed").length
+      : 0;
     setTotalErrors(totalErrors);
-  })
+  }, [traceChecksQuery?.data, traceId]);
 
   const errors = () => {
     if (totalErrors == 0) return;
 
-    const errorText = totalErrors > 1 ? 'errors' : 'error';
+    const errorText = totalErrors > 1 ? "errors" : "error";
     return (
-      <Text marginLeft={3} borderRadius={'md'} paddingX={2} backgroundColor={'red.500'} color={'white'} fontSize={'sm'}>{totalErrors} {errorText}</Text>
-    )
-  }
-
+      <Text
+        marginLeft={3}
+        borderRadius={"md"}
+        paddingX={2}
+        backgroundColor={"red.500"}
+        color={"white"}
+        fontSize={"sm"}
+      >
+        {totalErrors} {errorText}
+      </Text>
+    );
+  };
 
   const isFirstRender = useRef(true);
 
@@ -415,21 +428,30 @@ export function MessagesDevMode() {
         <HStack padding={6}>
           <Text>Items per page </Text>
 
-          <Select defaultValue={'25'} placeholder='' maxW='70px' size='sm' onChange={(e) => changePageSize(parseInt(e.target.value))} borderColor={'black'} borderRadius={'lg'}>
-            <option value='10'>10</option>
-            <option value='25'>25</option>
-            <option value='50'>50</option>
-            <option value='100'>100</option>
-            <option value='250'>250</option>
+          <Select
+            defaultValue={"25"}
+            placeholder=""
+            maxW="70px"
+            size="sm"
+            onChange={(e) => changePageSize(parseInt(e.target.value))}
+            borderColor={"black"}
+            borderRadius={"lg"}
+          >
+            <option value="10">10</option>
+            <option value="25">25</option>
+            <option value="50">50</option>
+            <option value="100">100</option>
+            <option value="250">250</option>
           </Select>
 
           <Text marginLeft={"20px"}>
             {" "}
             {`${pageOffset + 1}`} -{" "}
-            {`${pageOffset + pageSize > totalHits
-              ? totalHits
-              : pageOffset + pageSize
-              }`}{" "}
+            {`${
+              pageOffset + pageSize > totalHits
+                ? totalHits
+                : pageOffset + pageSize
+            }`}{" "}
             of {`${totalHits}`} items
           </Text>
           <Button
@@ -470,10 +492,11 @@ export function MessagesDevMode() {
               )}
 
               <DrawerCloseButton />
-
             </HStack>
             <HStack>
-              <Text paddingTop={5} fontSize='2xl'>Trace Details</Text>
+              <Text paddingTop={5} fontSize="2xl">
+                Trace Details
+              </Text>
             </HStack>
           </DrawerHeader>
           <DrawerBody>
@@ -481,24 +504,24 @@ export function MessagesDevMode() {
               <TabList>
                 <Tab>Details</Tab>
                 <Tab>Evaluations {errors()}</Tab>
-              </TabList >
+              </TabList>
 
               <TabPanels>
                 <TabPanel>
                   <TraceSummary traceId={traceId ?? ""} />
                   <SpanTree traceId={traceId ?? ""} />
-
                 </TabPanel>
                 <TabPanel>
-                  <Evaluations traceId={traceId ?? ""} traceChecks={traceChecksQuery.data} />
+                  <Evaluations
+                    traceId={traceId ?? ""}
+                    traceChecks={traceChecksQuery.data}
+                  />
                 </TabPanel>
-
               </TabPanels>
-            </Tabs >
-
-          </DrawerBody >
-        </DrawerContent >
-      </Drawer >
-    </DashboardLayout >
+            </Tabs>
+          </DrawerBody>
+        </DrawerContent>
+      </Drawer>
+    </DashboardLayout>
   );
 }
