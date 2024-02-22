@@ -36,7 +36,7 @@ export const TraceDeatilsDrawer = (props: TraceDetailsDrawerProps) => {
     const Evaluations = (trace: TraceEval) => {
 
         const totalChecks = trace.traceChecks?.[trace.traceId]?.length;
-        if (!totalChecks) return <Text>No checks found, why not setup some gaurdrails <Link href={`/${String(project)}/guardrails`}>here</Link></Text >;
+        if (!totalChecks) return <Text>No checks found, setup some gaurdrails <Link href={`/${String(project)}/guardrails`}>here.</Link></Text >;
         return (
             <VStack align="start" spacing={2}>
                 {trace.traceChecks?.[trace.traceId]?.map((check) => (
