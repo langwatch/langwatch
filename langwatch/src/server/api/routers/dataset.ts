@@ -17,6 +17,7 @@ export const datasetRouter = createTRPCRouter({
       const existingDataset = await ctx.prisma.dataset.findFirst({
         where: {
           slug: slug,
+          projectId: input.projectId,
         },
       });
 
@@ -24,7 +25,7 @@ export const datasetRouter = createTRPCRouter({
         throw new TRPCError({
           code: "CONFLICT",
           message:
-            "A project with this name already exists in the selected team.",
+            "A dataset with this name already exists.",
         });
       }
   

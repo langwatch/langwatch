@@ -29,27 +29,39 @@ import {
     Thead,
     Tr,
     VStack,
-    useDisclosure
+    useDisclosure,
+    useToast,
 } from "@chakra-ui/react";
 import { useState, useEffect } from "react";
 import slugify from "slugify";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { api } from "~/utils/api";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { al } from "vitest/dist/reporters-5f784f42";
+import { on } from "events";
+import vitestConfig from "vitest.config";
 
 
 export default function Datasets() {
 
     const { isOpen, onOpen, onClose } = useDisclosure();
     const { project } = useOrganizationTeamProject();
+    const toast = useToast();
 
     const [schemaValue, setSchemaValue] = useState<string>("full-trace");
     const [dataSetName, setDataSetName] = useState<string>("");
     const [slug, setSlug] = useState<string>("");
     const [hasError, setHasError] = useState<boolean>(false);
 
+
     const createDataset = api.dataset.create.useMutation();
-    const datasets = api.dataset.getAll.useQuery({ projectId: project?.id ?? "" });
+
+
+    const datasets = api.dataset.getAll.useQuery({ projectId: project?.id ?? "" },
+        {
+            enabled: !!project,
+
+        });
 
 
     const onSubmit = (e: any) => {
@@ -58,24 +70,42 @@ export default function Datasets() {
             projectId: project?.id ?? "",
             name: dataSetName,
             schema: schemaValue
-        })
+        },
+            {
+                onSuccess: () => {
+                    onClose();
+
+                    void datasets.refetch();
+
+                    toast({
+                        title: "Dataset Created",
+                        description: `You have successfully created the dataset ${dataSetName}`,
+
+                        status: "success",
+                        duration: 5000,
+                        isClosable: true,
+                        position: "top-right",
+                    });
+                }
+            })
     }
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        createDataset.reset()
         setHasError(false)
         setDataSetName(e.target.value)
         setSlug(slugify(e.target.value || "", { lower: true, strict: true, }))
     }
 
+
+
     useEffect(() => {
         if (createDataset.error) {
             setHasError(true)
+
         }
-        if (createDataset.isSuccess) {
-            onClose()
-            void datasets.refetch()
-        }
-    }, [createDataset.error, createDataset.isSuccess, onClose, datasets])
+
+    }, [createDataset.error])
 
     return (
         <DashboardLayout>
@@ -87,7 +117,12 @@ export default function Datasets() {
                     <Spacer />
                     <Button
                         colorScheme="blue"
-                        onClick={onOpen}
+                        onClick={() => {
+                            setHasError(false);
+                            setDataSetName("");
+                            setSlug("");
+                            onOpen();
+                        }}
                         minWidth="fit-content"
                     >
                         + Create New Dataset
