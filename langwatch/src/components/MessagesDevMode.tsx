@@ -58,9 +58,7 @@ export function MessagesDevMode() {
   const [totalHits, setTotalHits] = useState<number>(0);
   const [pageOffset, setPageOffset] = useState<number>(0);
   const [pageSize, setPageSize] = useState<number>(25);
-  const [totalErrors, setTotalErrors] = useState<number>(0);
   const { filterParams, queryOpts } = useFilterParams();
-
 
 
   const {
@@ -230,17 +228,6 @@ export function MessagesDevMode() {
       setTotalHits(totalHits);
     }
   }, [traceGroups.data?.totalHits, traceGroups.isFetched]);
-
-
-
-  useEffect(() => {
-    const traceData = traceChecksQuery?.data?.[traceId ?? ""];
-    const totalErrors = traceData
-      ? traceData.filter((check) => check.status === "failed").length
-      : 0;
-    setTotalErrors(totalErrors);
-  }, [traceChecksQuery.data, traceId]);
-
 
 
   const isFirstRender = useRef(true);
@@ -423,10 +410,8 @@ export function MessagesDevMode() {
           traceId={traceId}
           traceChecksQuery={traceChecksQuery}
           setIsDrawerOpen={setIsDrawerOpen}
-          totalErrors={totalErrors} />
+        />
       )}
-
-
     </DashboardLayout>
   );
 }

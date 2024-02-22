@@ -22,14 +22,13 @@ import React, {
   type PropsWithChildren,
 } from "react";
 import Markdown from "react-markdown";
-import { CheckPassingDrawer } from "~/components/CheckPassingDrawer";
 import { MessagesDevMode } from "~/components/MessagesDevMode";
 import { DashboardLayout } from "../../../../components/DashboardLayout";
 import { useDevView } from "../../../../hooks/DevViewProvider";
 import { useOrganizationTeamProject } from "../../../../hooks/useOrganizationTeamProject";
 import { useTraceDetailsState } from "../../../../hooks/useTraceDetailsState";
 import { TeamRoleGroup } from "../../../../server/api/permission";
-import type { Trace, TraceCheck } from "../../../../server/tracer/types";
+import type { Trace } from "../../../../server/tracer/types";
 import { api } from "../../../../utils/api";
 import { isNotFound } from "../../../../utils/trpcError";
 
@@ -42,8 +41,6 @@ export default function TraceDetails() {
   const { traceId, trace, openTab } = useTraceDetailsState();
   const [threadId, setThreadId] = useState<string | undefined>(undefined);
   const { isDevViewEnabled } = useDevView();
-  const [totalErrors, setTotalErrors] = useState<number>(0);
-
 
   const traceIds = traceId ? [traceId] : [];
   const traceChecksQuery = api.traces.getTraceChecks.useQuery(
@@ -55,13 +52,6 @@ export default function TraceDetails() {
     }
   );
 
-  useEffect(() => {
-    const traceData = traceChecksQuery?.data?.[traceId ?? ""];
-    const totalErrors = traceData
-      ? traceData.filter((check) => check.status === "failed").length
-      : 0;
-    setTotalErrors(totalErrors);
-  }, [traceChecksQuery?.data, traceId]);
 
   useEffect(() => {
     if (trace.data?.metadata.thread_id) {
@@ -164,7 +154,7 @@ export default function TraceDetails() {
               traceId={traceId}
               traceChecksQuery={traceChecksQuery}
               setIsDrawerOpen={onClose}
-              totalErrors={totalErrors} />
+            />
           )}
         </HStack>
       </Box>

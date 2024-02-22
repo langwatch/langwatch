@@ -5,14 +5,18 @@ import type { TraceCheck } from "~/server/tracer/types";
 import { CheckPassingDrawer } from "./CheckPassingDrawer";
 import { SpanTree } from "./traces/SpanTree";
 import { TraceSummary } from "./traces/Summary";
+import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
+import type { TRPCClientErrorLike } from "@trpc/react-query";
+import type { AppRouter } from "~/server/api/root";
+import { useRouter } from "next/router";
+import { Link } from "@chakra-ui/next-js";
 
 
 interface TraceDetailsDrawerProps {
     isDrawerOpen: boolean;
     setIsDrawerOpen: (isOpen: boolean) => void;
-    totalErrors: number;
     traceId?: string;
-    traceChecksQuery?: any
+    traceChecksQuery?: UseTRPCQueryResult<Record<string, TraceCheck[]>, TRPCClientErrorLike<AppRouter>>
 }
 
 interface TraceEval {
@@ -26,7 +30,13 @@ export const TraceDeatilsDrawer = (props: TraceDetailsDrawerProps) => {
         setTraceView((prevView) => (prevView === "span" ? "full" : "span"));
     };
 
+    const router = useRouter();
+    const { project } = router.query;
+
     const Evaluations = (trace: TraceEval) => {
+
+        const totalChecks = trace.traceChecks?.[trace.traceId]?.length;
+        if (!totalChecks) return <Text>No checks found, why not setup some gaurdrails <Link href={`/${String(project)}/guardrails`}>here</Link></Text >;
         return (
             <VStack align="start" spacing={2}>
                 {trace.traceChecks?.[trace.traceId]?.map((check) => (
@@ -39,10 +49,15 @@ export const TraceDeatilsDrawer = (props: TraceDetailsDrawerProps) => {
         );
     };
 
-    const errors = () => {
-        if (props.totalErrors == 0) return;
+    const Errors = (trace: TraceEval) => {
+        const totalErrors = trace
+            ? trace.traceChecks?.[trace.traceId]?.filter((check) => check.status === "failed").length
+            : 0;
 
-        const errorText = props.totalErrors > 1 ? "errors" : "error";
+        if (totalErrors === 0 || !totalErrors) return null;
+        const errorText = totalErrors ?? 0 > 1 ? "errors" : "error";
+
+
         return (
             <Text
                 marginLeft={3}
@@ -52,7 +67,7 @@ export const TraceDeatilsDrawer = (props: TraceDetailsDrawerProps) => {
                 color={"white"}
                 fontSize={"sm"}
             >
-                {props.totalErrors} {errorText}
+                {totalErrors} {errorText}
             </Text>
         );
     };
@@ -88,7 +103,7 @@ export const TraceDeatilsDrawer = (props: TraceDetailsDrawerProps) => {
                     <Tabs>
                         <TabList>
                             <Tab>Details</Tab>
-                            <Tab>Evaluations {errors()}</Tab>
+                            <Tab>Evaluations <Errors traceId={props.traceId ?? ""} traceChecks={props.traceChecksQuery?.data} /></Tab>
                         </TabList>
 
                         <TabPanels>
@@ -99,7 +114,7 @@ export const TraceDeatilsDrawer = (props: TraceDetailsDrawerProps) => {
                             <TabPanel>
                                 <Evaluations
                                     traceId={props.traceId ?? ""}
-                                    traceChecks={props.traceChecksQuery.data}
+                                    traceChecks={props.traceChecksQuery?.data}
                                 />
                             </TabPanel>
                         </TabPanels>
