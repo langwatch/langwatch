@@ -182,7 +182,12 @@ describe("Topic Clustering Integration Test", () => {
         query: {
           term: { project_id: testProjectId },
         },
-        _source: ["trace_id", "metadata.topic_id", "metadata.subtopic_id", "metadata.labels"],
+        _source: [
+          "trace_id",
+          "metadata.topic_id",
+          "metadata.subtopic_id",
+          "metadata.labels",
+        ],
       });
 
       const traces = result.hits.hits.map((hit) => hit._source);
@@ -215,5 +220,9 @@ describe("Topic Clustering Integration Test", () => {
       expect(costEntry?.amount).toBeGreaterThan(0);
       expect(costEntry).toHaveProperty("currency", "USD");
     });
+  });
+
+  it.todo("assign topics to new traces incrementally", async () => {
+    // TODO: write this test
   });
 });

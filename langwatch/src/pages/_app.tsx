@@ -144,7 +144,7 @@ const LangWatch: AppType<{
   return (
     <SessionProvider
       session={session}
-      refetchInterval={5 * 60}
+      refetchInterval={0}
       refetchOnWindowFocus={false}
     >
       <ChakraProvider

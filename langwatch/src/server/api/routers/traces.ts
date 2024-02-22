@@ -4,6 +4,10 @@ import { TRPCError } from "@trpc/server";
 import similarity from "compute-cosine-similarity";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import {
+  sharedFiltersInputSchema,
+  type TracesPivot,
+} from "../../analytics/types";
+import {
   SPAN_INDEX,
   TRACES_PIVOT_INDEX,
   TRACE_CHECKS_INDEX,
@@ -14,18 +18,14 @@ import { getOpenAIEmbeddings } from "../../embeddings";
 import type { ElasticSearchSpan, Trace, TraceCheck } from "../../tracer/types";
 import {
   TeamRoleGroup,
-  checkUserPermissionForProject,
   backendHasTeamProjectPermission,
+  checkUserPermissionForProject,
 } from "../permission";
 import {
   generateTraceQueryConditions,
   generateTracesPivotQueryConditions,
 } from "./analytics/common";
-import {
-  type TracesPivot,
-  sharedFiltersInputSchema,
-} from "../../analytics/types";
-import type { QueryDslBoolQuery } from "@elastic/elasticsearch/lib/api/types";
+import type { SearchTotalHits } from "@elastic/elasticsearch/lib/api/types";
 
 const tracesFilterInput = sharedFiltersInputSchema.extend({
   pageOffset: z.number().optional(),
@@ -89,11 +89,7 @@ export const tracesRouter = createTRPCRouter({
           index: TRACES_PIVOT_INDEX,
           body: {
             size: 10_000,
-            query: {
-              bool: {
-                filter: pivotIndexConditions,
-              } as QueryDslBoolQuery,
-            },
+            query: pivotIndexConditions,
             _source: ["trace.trace_id"],
           },
         });
@@ -102,6 +98,10 @@ export const tracesRouter = createTRPCRouter({
           .map((hit) => hit._source?.trace?.trace_id)
           .filter((x) => x)
           .map((x) => x!);
+
+        if (!traceIds.length) {
+          return { groups: [], totalHits: 0 };
+        }
       }
 
       const traceQueryConditions = generateTraceQueryConditions(input);
@@ -210,7 +210,9 @@ export const tracesRouter = createTRPCRouter({
         }
       }
 
-      return { groups, tracesResult };
+      const totalHits =
+        (tracesResult.hits?.total as SearchTotalHits)?.value || 0;
+      return { groups, totalHits };
     }),
   getById: protectedProcedure
     .input(z.object({ projectId: z.string(), traceId: z.string() }))
@@ -343,6 +345,7 @@ export const tracesRouter = createTRPCRouter({
             where: {
               projectId: input.projectId,
             },
+            select: { id: true, name: true, parentId: true },
           })
         ).map((topic) => [topic.id, topic])
       );
@@ -355,7 +358,7 @@ export const tracesRouter = createTRPCRouter({
           (acc, bucket) => {
             const topic = topicsMap[bucket.key];
 
-            if (!topic) return [];
+            if (!topic) return acc;
 
             return [
               ...acc,

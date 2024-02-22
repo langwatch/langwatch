@@ -395,6 +395,10 @@ export const tracesPivotFilterQueries: {
       name: "Topics",
       field: "trace.metadata.topics",
     },
+    subtopics: {
+      name: "Subtopics",
+      field: "trace.metadata.subtopics",
+    },
   },
   metadata: {
     user_id: {

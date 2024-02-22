@@ -54,7 +54,7 @@ export function MessageCard({
 
   const topics = api.topics.getAll.useQuery(
     { projectId: project?.id ?? "" },
-    { enabled: !!project }
+    { enabled: !!project, refetchOnMount: false, refetchOnWindowFocus: false }
   );
   const topicsMap = Object.fromEntries(
     topics.data?.map((topic) => [topic.id, topic]) ?? []
@@ -82,7 +82,9 @@ export function MessageCard({
                 if (!linkActive) e.preventDefault();
               }}
             >
-              {getSlicedInput(trace)}
+              <Text noOfLines={1} wordBreak="break-all">
+                {getSlicedInput(trace)}
+              </Text>
             </LinkOverlay>
           </Box>
         </VStack>
@@ -314,10 +316,7 @@ const getSlicedInput = (trace: Trace) => {
     // ignore
   }
 
-  return (
-    (value ? value.slice(0, 100) : "<empty>") +
-    (value.length >= 100 ? "..." : "")
-  );
+  return value ? value : "<empty>";
 };
 
 const getSlicedOutput = (trace: Trace) => {

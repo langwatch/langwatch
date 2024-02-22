@@ -50,6 +50,7 @@ import { findCurrentRoute, projectRoutes, type Route } from "../utils/routes";
 import { LoadingScreen } from "./LoadingScreen";
 import { ProjectTechStackIcon } from "./TechStack";
 import { LogoIcon } from "./icons/LogoIcon";
+import React from "react";
 
 const Breadcrumbs = ({ currentRoute }: { currentRoute: Route | undefined }) => {
   const { project } = useOrganizationTeamProject();
@@ -118,13 +119,13 @@ const SideMenuLink = ({
   );
 };
 
-const ProjectSelector = ({
+const ProjectSelector = React.memo(function ProjectSelector({
   organizations,
   project,
 }: {
   organizations: FullyLoadedOrganization[];
   project: Project;
-}) => {
+}) {
   const router = useRouter();
   const currentRoute = findCurrentRoute(router.pathname);
   const { data: session } = useRequiredSession();
@@ -133,8 +134,8 @@ const ProjectSelector = ({
     a.name.toLowerCase() < b.name.toLowerCase()
       ? -1
       : a.name.toLowerCase() > b.name.toLowerCase()
-        ? 1
-        : 0;
+      ? 1
+      : 0;
 
   const projectGroups = organizations.sort(sortByName).flatMap((organization) =>
     organization.teams.flatMap((team) => ({
@@ -191,9 +192,9 @@ const ProjectSelector = ({
                         href={
                           currentRoute?.path.includes("[project]")
                             ? currentRoute.path
-                              .replace("[project]", project.slug)
-                              .replace(/\[.*?\]/g, "")
-                              .replace(/\/\/+/g, "/")
+                                .replace("[project]", project.slug)
+                                .replace(/\[.*?\]/g, "")
+                                .replace(/\/\/+/g, "/")
                             : `/${project.slug}`
                         }
                         _hover={{
@@ -226,7 +227,7 @@ const ProjectSelector = ({
       </Portal>
     </Menu>
   );
-};
+});
 
 export const DashboardLayout = ({
   children,
@@ -341,13 +342,13 @@ export const DashboardLayout = ({
             {hasOrganizationPermission(
               OrganizationRoleGroup.ORGANIZATION_VIEW
             ) && (
-                <SideMenuLink
-                  path={projectRoutes.settings.path}
-                  icon={Settings}
-                  label={projectRoutes.settings.title}
-                  project={project}
-                />
-              )}
+              <SideMenuLink
+                path={projectRoutes.settings.path}
+                icon={Settings}
+                label={projectRoutes.settings.title}
+                project={project}
+              />
+            )}
           </VStack>
         </VStack>
       </Box>

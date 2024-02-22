@@ -1,23 +1,21 @@
 import type {
   AggregationsAggregationContainer,
-  MappingRuntimeField,
-  QueryDslBoolQuery,
+  MappingRuntimeField
 } from "@elastic/elasticsearch/lib/api/types";
+import { TRPCError } from "@trpc/server";
 import { getGroup, getMetric } from "~/server/analytics/registry";
 import {
-  pipelineAggregationsToElasticSearch,
   analyticsPipelines,
-  type FlattenAnalyticsGroupsEnum,
+  pipelineAggregationsToElasticSearch,
   timeseriesInput,
+  type FlattenAnalyticsGroupsEnum,
   type SeriesInputType,
 } from "../../../analytics/registry";
 import { sharedFiltersInputSchema } from "../../../analytics/types";
 import { TRACES_PIVOT_INDEX, esClient } from "../../../elasticsearch";
 import { TeamRoleGroup, checkUserPermissionForProject } from "../../permission";
 import { protectedProcedure } from "../../trpc";
-import { currentVsPreviousDates, dateTicks } from "./common";
-import { TRPCError } from "@trpc/server";
-import { generateTracesPivotQueryConditions } from "./common";
+import { currentVsPreviousDates, dateTicks, generateTracesPivotQueryConditions } from "./common";
 
 export const getTimeseries = protectedProcedure
   .input(sharedFiltersInputSchema.extend(timeseriesInput.shape))
@@ -105,11 +103,7 @@ export const getTimeseries = protectedProcedure
       index: TRACES_PIVOT_INDEX,
       body: {
         size: 0,
-        query: {
-          bool: {
-            filter: pivotIndexConditions,
-          } as QueryDslBoolQuery,
-        },
+        query: pivotIndexConditions,
         ...(Object.keys(runtimeMappings).length > 0
           ? { runtime_mappings: runtimeMappings }
           : {}),

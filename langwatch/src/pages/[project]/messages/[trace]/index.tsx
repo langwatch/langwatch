@@ -2,25 +2,15 @@ import {
   Avatar,
   Box,
   Container,
-  Drawer,
-  DrawerBody,
-  DrawerCloseButton,
-  DrawerContent,
-  DrawerHeader,
   HStack,
   Heading,
   Skeleton,
   SkeletonCircle,
   Spacer,
   Spinner,
-  Tab,
-  TabList,
-  TabPanel,
-  TabPanels,
-  Tabs,
   Text,
   Tooltip,
-  VStack,
+  VStack
 } from "@chakra-ui/react";
 import { format, formatDistanceToNow } from "date-fns";
 import ErrorPage from "next/error";
@@ -32,19 +22,17 @@ import React, {
   type PropsWithChildren,
 } from "react";
 import Markdown from "react-markdown";
+import { MessagesDevMode } from "~/components/MessagesDevMode";
 import { DashboardLayout } from "../../../../components/DashboardLayout";
-import { SpanTree } from "../../../../components/traces/SpanTree";
-import { TraceSummary } from "../../../../components/traces/Summary";
+import { useDevView } from "../../../../hooks/DevViewProvider";
 import { useOrganizationTeamProject } from "../../../../hooks/useOrganizationTeamProject";
 import { useTraceDetailsState } from "../../../../hooks/useTraceDetailsState";
-import type { Trace, TraceCheck } from "../../../../server/tracer/types";
+import { TeamRoleGroup } from "../../../../server/api/permission";
+import type { Trace } from "../../../../server/tracer/types";
 import { api } from "../../../../utils/api";
 import { isNotFound } from "../../../../utils/trpcError";
-import { TeamRoleGroup } from "../../../../server/api/permission";
-import { MessagesDevMode } from "~/components/MessagesDevMode";
-import { useDevView } from "../../../../hooks/DevViewProvider";
-import { Maximize2, Minimize2, type Icon } from "react-feather";
-import { CheckPassingDrawer } from "~/components/CheckPassingDrawer";
+
+import { TraceDeatilsDrawer } from "~/components/TraceDeatilsDrawer";
 
 
 export default function TraceDetails() {
@@ -53,14 +41,6 @@ export default function TraceDetails() {
   const { traceId, trace, openTab } = useTraceDetailsState();
   const [threadId, setThreadId] = useState<string | undefined>(undefined);
   const { isDevViewEnabled } = useDevView();
-  const [traceView, setTraceView] = useState<"span" | "full">("span");
-  const [totalErrors, setTotalErrors] = useState<number>(0);
-
-  const toggleView = () => {
-    setTraceView((prevView) => (prevView === "span" ? "full" : "span"));
-  };
-
-
 
   const traceIds = traceId ? [traceId] : [];
   const traceChecksQuery = api.traces.getTraceChecks.useQuery(
@@ -71,36 +51,6 @@ export default function TraceDetails() {
       refetchOnWindowFocus: false,
     }
   );
-
-
-
-  interface TraceEval {
-    traceId: string;
-    traceChecks?: Record<string, TraceCheck[]>;
-  }
-
-  const Evaluations = (trace: TraceEval) => {
-    return (
-      <VStack align="start" spacing={2}>
-        {trace.traceChecks?.[trace.traceId]?.map((check) => (
-          <CheckPassingDrawer
-            key={check.trace_id + "/" + check.check_id}
-            check={check}
-          />
-        ))}
-      </VStack>
-    );
-  };
-
-
-
-  useEffect(() => {
-
-    const traceData = traceChecksQuery?.data?.[traceId ?? ""];
-    const totalErrors = traceData ? traceData.filter((check) => check.status === 'failed').length : 0;
-    setTotalErrors(totalErrors);
-  }, [traceChecksQuery.data, traceId]
-  )
 
 
   useEffect(() => {
@@ -134,14 +84,13 @@ export default function TraceDetails() {
     return <MessagesDevMode />;
   }
 
-  const errors = () => {
-    if (totalErrors == 0) return;
 
-    const errorText = totalErrors > 1 ? 'errors' : 'error';
-    return (
-      <Text marginLeft={3} borderRadius={'md'} paddingX={2} backgroundColor={'red.500'} color={'white'} fontSize={'sm'}>{totalErrors} {errorText}</Text>
-    )
+
+  const onClose = () => {
+    setTabOpen(false);
+    void router.replace(`/${project?.slug}/messages/${traceId}`);
   }
+
 
   return (
     <DashboardLayout backgroundColor="white">
@@ -198,59 +147,21 @@ export default function TraceDetails() {
           >
             <Conversation threadId={threadId} />
           </Box>
-          <Drawer
-            isOpen={isTabOpen}
-            placement="right"
-            size={traceView}
-            onClose={() => {
-              setTabOpen(false);
-              setTraceView("span");
-              void router.replace(`/${project?.slug}/messages/${traceId}`);
-            }}
-          >
-            <DrawerContent>
-              <DrawerHeader>
-                <HStack>
-                  {traceView === "span" ? (
-                    <Maximize2 onClick={toggleView} cursor={"pointer"} />
-                  ) : (
-                    <Minimize2 onClick={toggleView} cursor={"pointer"} />
-                  )}
 
-                  <DrawerCloseButton />
-                </HStack>
-                <Text paddingTop={5} fontSize='2xl'>Trace Details</Text>
-
-              </DrawerHeader>
-              <DrawerBody>
-                <Tabs>
-                  <TabList>
-                    <Tab>Details</Tab>
-                    <Tab>Evaluations {errors()}</Tab>
-                  </TabList>
-
-                  <TabPanels>
-                    <TabPanel>
-                      <TraceSummary />
-                      {openTab === "spans" && <SpanTree />}
-
-                    </TabPanel>
-                    <TabPanel>
-                      {traceChecksQuery.data && (
-                        <Evaluations traceChecks={traceChecksQuery.data} traceId={traceId ?? ""} />
-                      )}
-                    </TabPanel>
-
-                  </TabPanels>
-                </Tabs>
-              </DrawerBody>
-            </DrawerContent>
-          </Drawer>
+          {traceId && (
+            <TraceDeatilsDrawer
+              isDrawerOpen={isTabOpen}
+              traceId={traceId}
+              traceChecksQuery={traceChecksQuery}
+              setIsDrawerOpen={onClose}
+            />
+          )}
         </HStack>
       </Box>
     </DashboardLayout>
   );
 }
+
 
 function Conversation({ threadId }: { threadId?: string }) {
   const { traceId, trace, openTab } = useTraceDetailsState();
@@ -403,7 +314,7 @@ const TraceMessages = React.forwardRef(function TraceMessages(
             timestamp={trace.timestamps.started_at}
             paddingTop="20px"
           >
-            <Text paddingY="6px" marginBottom="38px">
+            <Text paddingY="6px" marginBottom="38px" whiteSpace="pre-wrap">
               {trace.input.value}
             </Text>
           </Message>

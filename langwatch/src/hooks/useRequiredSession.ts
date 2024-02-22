@@ -1,8 +1,16 @@
 import { signIn, useSession } from "next-auth/react";
 
 export const useRequiredSession = () => {
-  return useSession({
+  const session = useSession({
     required: true,
-    onUnauthenticated: () => void signIn("auth0"),
+    onUnauthenticated: () => {
+      if (navigator.onLine) {
+        void signIn("auth0");
+      } else {
+        window.addEventListener("online", () => window.location.reload());
+      }
+    },
   });
+
+  return session;
 };

@@ -12,6 +12,12 @@ export const topicsRouter = createTRPCRouter({
 
       const topics = await prisma.topic.findMany({
         where: { projectId },
+        select: {
+          id: true,
+          name: true,
+          parentId: true,
+          automaticallyGenerated: true,
+        },
       });
 
       return topics;

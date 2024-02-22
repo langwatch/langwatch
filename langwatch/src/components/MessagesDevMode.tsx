@@ -5,11 +5,6 @@ import {
   CardBody,
   Checkbox,
   Container,
-  Drawer,
-  DrawerBody,
-  DrawerCloseButton,
-  DrawerContent,
-  DrawerHeader,
   HStack,
   Heading,
   Popover,
@@ -31,48 +26,40 @@ import {
   Thead,
   Tr,
   VStack,
-  useDisclosure,
-  ChakraProvider,
-  Tab,
-  TabList,
-  TabPanel,
-  TabPanels,
-  Tabs,
+  useDisclosure
 } from "@chakra-ui/react";
 import { useRouter } from "next/router";
 import numeral from "numeral";
 import { useEffect, useRef, useState } from "react";
-import { ChevronDown, ChevronLeft, ChevronRight, List, Maximize2, Minimize2 } from "react-feather";
+import {
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  List
+} from "react-feather";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import type { Trace } from "~/server/tracer/types";
 import { getTraceCheckDefinitions } from "~/trace_checks/registry";
 import { api } from "~/utils/api";
 import { durationColor } from "~/utils/durationColor";
-import type { Trace, TraceCheck } from "~/server/tracer/types";
-import { SpanTree } from "./traces/SpanTree";
-import { TraceSummary } from "./traces/Summary";
-import { CheckPassingDrawer } from "./CheckPassingDrawer";
 import { getSingleQueryParam } from "~/utils/getSingleQueryParam";
 import { useFilterParams } from "../hooks/useFilterParams";
 import { DashboardLayout } from "./DashboardLayout";
 import { FilterSelector } from "./FilterSelector";
-import { usePeriodSelector, PeriodSelector } from "./PeriodSelector";
+import { PeriodSelector, usePeriodSelector } from "./PeriodSelector";
 
+import { TraceDeatilsDrawer } from "~/components/TraceDeatilsDrawer";
 
 export function MessagesDevMode() {
   const router = useRouter();
   const { project } = useOrganizationTeamProject();
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [traceId, setTraceId] = useState<string | null>(null);
-  const [traceView, setTraceView] = useState<"span" | "full">("span");
   const [totalHits, setTotalHits] = useState<number>(0);
   const [pageOffset, setPageOffset] = useState<number>(0);
   const [pageSize, setPageSize] = useState<number>(25);
-  const [totalErrors, setTotalErrors] = useState<number>(0);
   const { filterParams, queryOpts } = useFilterParams();
 
-  const toggleView = () => {
-    setTraceView((prevView) => (prevView === "span" ? "full" : "span"));
-  };
 
   const {
     period: { startDate, endDate },
@@ -104,7 +91,6 @@ export function MessagesDevMode() {
     }
   );
 
-
   const checksAvailable = Object.fromEntries(
     Object.values(traceChecksQuery.data ?? {}).flatMap((checks) =>
       checks.map((check) => [check.check_id, check.check_name])
@@ -121,8 +107,8 @@ export function MessagesDevMode() {
       </Td>
     ),
     Input: (trace, index) => (
-      <Td key={index}>
-        <Text noOfLines={1} maxWidth="300px">
+      <Td key={index} maxWidth="300px">
+        <Text noOfLines={1} wordBreak="break-all" display="block">
           {trace.input.value}
         </Text>
       </Td>
@@ -130,13 +116,13 @@ export function MessagesDevMode() {
     Output: (trace, index) =>
       trace.error ? (
         <Td key={index}>
-          <Text noOfLines={1} maxWidth="300px" color="red.400">
+          <Text noOfLines={1} maxWidth="300px" display="block" color="red.400">
             {trace.error.message}
           </Text>
         </Td>
       ) : (
         <Td key={index}>
-          <Text noOfLines={1} maxWidth="300px">
+          <Text noOfLines={1} display="block" maxWidth="300px">
             {trace.output?.value}
           </Text>
         </Td>
@@ -235,53 +221,13 @@ export function MessagesDevMode() {
     setPageOffset(0);
   };
 
-  interface SearchTotalHits {
-    value: number;
-  }
-
   useEffect(() => {
     if (traceGroups.isFetched) {
-      const totalHits: number =
-        (traceGroups.data?.tracesResult?.hits?.total as SearchTotalHits)
-          ?.value || 0;
+      const totalHits: number = traceGroups.data?.totalHits ?? 0;
 
       setTotalHits(totalHits);
     }
-  })
-
-  interface TraceEval {
-    traceId: string;
-    traceChecks?: { [key: string]: TraceCheck[] };
-  }
-
-  const Evaluations = (trace: TraceEval) => {
-    return (
-      <VStack align="start" spacing={2}>
-        {trace.traceChecks?.[trace.traceId]?.map((check) => (
-          <CheckPassingDrawer
-            key={check.trace_id + "/" + check.check_id}
-            check={check}
-          />
-        ))}
-      </VStack>
-    );
-  };
-
-
-  useEffect(() => {
-    const traceData = traceChecksQuery?.data?.[traceId ?? ""];
-    const totalErrors = traceData ? traceData.filter((check) => check.status === 'failed').length : 0;
-    setTotalErrors(totalErrors);
-  })
-
-  const errors = () => {
-    if (totalErrors == 0) return;
-
-    const errorText = totalErrors > 1 ? 'errors' : 'error';
-    return (
-      <Text marginLeft={3} borderRadius={'md'} paddingX={2} backgroundColor={'red.500'} color={'white'} fontSize={'sm'}>{totalErrors} {errorText}</Text>
-    )
-  }
+  }, [traceGroups.data?.totalHits, traceGroups.isFetched]);
 
 
   const isFirstRender = useRef(true);
@@ -308,6 +254,9 @@ export function MessagesDevMode() {
   }, [traceChecksQuery, checksAvailable]);
 
   const { isOpen, onOpen, onClose } = useDisclosure();
+  const checkedHeaderColumnsEntries = Object.entries(
+    selectedHeaderColumns
+  ).filter(([_, checked]) => checked);
 
   return (
     <DashboardLayout>
@@ -368,11 +317,9 @@ export function MessagesDevMode() {
               <Table variant="simple">
                 <Thead>
                   <Tr>
-                    {Object.entries(selectedHeaderColumns)
-                      .filter(([_, checked]) => checked)
-                      .map(([column, _], index) => (
-                        <Th key={index}>{column}</Th>
-                      ))}
+                    {checkedHeaderColumnsEntries.map(([column, _], index) => (
+                      <Th key={index}>{column}</Th>
+                    ))}
                   </Tr>
                 </Thead>
                 <Tbody>
@@ -387,19 +334,19 @@ export function MessagesDevMode() {
                           setIsDrawerOpen(true);
                         }}
                       >
-                        {Object.entries(selectedHeaderColumns)
-                          .filter(([_, checked]) => checked)
-                          .map(
-                            ([column, _], index) =>
-                              headerColumns[column]?.(trace, index)
-                          )}
+                        {checkedHeaderColumnsEntries.map(
+                          ([column, _], index) =>
+                            headerColumns[column]?.(trace, index)
+                        )}
                       </Tr>
                     ))
                   )}
                   {traceGroups.isLoading &&
                     Array.from({ length: 3 }).map((_, i) => (
                       <Tr key={i}>
-                        {Array.from({ length: 8 }).map((_, i) => (
+                        {Array.from({
+                          length: checkedHeaderColumnsEntries.length,
+                        }).map((_, i) => (
                           <Td key={i}>
                             <Skeleton height="20px" />
                           </Td>
@@ -415,12 +362,20 @@ export function MessagesDevMode() {
         <HStack padding={6}>
           <Text>Items per page </Text>
 
-          <Select defaultValue={'25'} placeholder='' maxW='70px' size='sm' onChange={(e) => changePageSize(parseInt(e.target.value))} borderColor={'black'} borderRadius={'lg'}>
-            <option value='10'>10</option>
-            <option value='25'>25</option>
-            <option value='50'>50</option>
-            <option value='100'>100</option>
-            <option value='250'>250</option>
+          <Select
+            defaultValue={"25"}
+            placeholder=""
+            maxW="70px"
+            size="sm"
+            onChange={(e) => changePageSize(parseInt(e.target.value))}
+            borderColor={"black"}
+            borderRadius={"lg"}
+          >
+            <option value="10">10</option>
+            <option value="25">25</option>
+            <option value="50">50</option>
+            <option value="100">100</option>
+            <option value="250">250</option>
           </Select>
 
           <Text marginLeft={"20px"}>
@@ -450,55 +405,14 @@ export function MessagesDevMode() {
           </Button>
         </HStack>
       </Container>
-
-      <Drawer
-        isOpen={isDrawerOpen}
-        placement="right"
-        size={traceView}
-        onClose={() => {
-          setIsDrawerOpen(false);
-          setTraceView("span");
-        }}
-      >
-        <DrawerContent>
-          <DrawerHeader>
-            <HStack>
-              {traceView === "span" ? (
-                <Maximize2 onClick={toggleView} cursor={"pointer"} />
-              ) : (
-                <Minimize2 onClick={toggleView} cursor={"pointer"} />
-              )}
-
-              <DrawerCloseButton />
-
-            </HStack>
-            <HStack>
-              <Text paddingTop={5} fontSize='2xl'>Trace Details</Text>
-            </HStack>
-          </DrawerHeader>
-          <DrawerBody>
-            <Tabs>
-              <TabList>
-                <Tab>Details</Tab>
-                <Tab>Evaluations {errors()}</Tab>
-              </TabList >
-
-              <TabPanels>
-                <TabPanel>
-                  <TraceSummary traceId={traceId ?? ""} />
-                  <SpanTree traceId={traceId ?? ""} />
-
-                </TabPanel>
-                <TabPanel>
-                  <Evaluations traceId={traceId ?? ""} traceChecks={traceChecksQuery.data} />
-                </TabPanel>
-
-              </TabPanels>
-            </Tabs >
-
-          </DrawerBody >
-        </DrawerContent >
-      </Drawer >
-    </DashboardLayout >
+      {traceId && (
+        <TraceDeatilsDrawer
+          isDrawerOpen={isDrawerOpen}
+          traceId={traceId}
+          traceChecksQuery={traceChecksQuery}
+          setIsDrawerOpen={setIsDrawerOpen}
+        />
+      )}
+    </DashboardLayout>
   );
 }

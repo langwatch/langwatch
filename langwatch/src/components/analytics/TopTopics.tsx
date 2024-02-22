@@ -57,6 +57,7 @@ export function TopTopics() {
 
   const topTopics = topicCountsQuery.data
     ? topicCountsQuery.data.topicCounts
+        .sort((a, b) => (a.name > b.name ? 1 : -1))
         .sort((a, b) => (a.count > b.count ? -1 : 1))
         .slice(0, 6)
     : [];
