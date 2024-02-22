@@ -37,9 +37,8 @@ import slugify from "slugify";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { api } from "~/utils/api";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { al } from "vitest/dist/reporters-5f784f42";
-import { on } from "events";
-import vitestConfig from "vitest.config";
+
+import { DatabaseSchema } from "@prisma/client";
 
 
 export default function Datasets() {
@@ -48,7 +47,7 @@ export default function Datasets() {
     const { project } = useOrganizationTeamProject();
     const toast = useToast();
 
-    const [schemaValue, setSchemaValue] = useState<string>("full-trace");
+    const [schemaValue, setSchemaValue] = useState<string>(DatabaseSchema.FULL_TRACE);
     const [dataSetName, setDataSetName] = useState<string>("");
     const [slug, setSlug] = useState<string>("");
     const [hasError, setHasError] = useState<boolean>(false);
@@ -62,7 +61,6 @@ export default function Datasets() {
             enabled: !!project,
 
         });
-
 
     const onSubmit = (e: any) => {
         e.preventDefault()
@@ -130,7 +128,9 @@ export default function Datasets() {
                 </HStack>
                 <Card>
                     <CardBody>
-                        <TableContainer>
+
+
+                        {datasets.data && datasets.data.length == 0 ? <Text>No datasets found</Text> : <TableContainer>
                             <Table variant="simple">
                                 <Thead>
                                     <Tr>
@@ -164,7 +164,7 @@ export default function Datasets() {
                                     }
                                 </Tbody>
                             </Table>
-                        </TableContainer>
+                        </TableContainer>}
                     </CardBody>
                 </Card>
             </Container>
@@ -214,28 +214,28 @@ export default function Datasets() {
                                         <RadioGroup value={schemaValue} onChange={setSchemaValue}>
                                             <Stack spacing={4}>
                                                 <HStack align={'start'}>
-                                                    <Radio size="md" value="full-trace" colorScheme="blue" padding={1} />
+                                                    <Radio size="md" value={DatabaseSchema.FULL_TRACE} colorScheme="blue" padding={1} />
                                                     <Box>
                                                         <Text fontWeight="bold">Full Trace</Text>
                                                         <Text>Each entry will include all the spans of a complete trace call, that is, all the steps on your pipeline, and the expected output</Text>
                                                     </Box>
                                                 </HStack>
                                                 <HStack align={'start'}>
-                                                    <Radio size="md" value="llm-call" colorScheme="blue" padding={1} />
+                                                    <Radio size="md" value={DatabaseSchema.LLM_CHAT_CALL} colorScheme="blue" padding={1} />
                                                     <Box>
                                                         <Text fontWeight="bold">LLM Call</Text>
                                                         <Text>Each entry will be a single LLM Call with the expected output, this allows you to focus on improving on a single step of your pipeline with both the playground and manual runs</Text>
                                                     </Box>
                                                 </HStack>
                                                 <HStack align={'start'}>
-                                                    <Radio size="md" value="string-i-o" colorScheme="blue" padding={1} />
+                                                    <Radio size="md" value={DatabaseSchema.STRING_I_O} colorScheme="blue" padding={1} />
                                                     <Box>
                                                         <Text fontWeight="bold">String Input/Output</Text>
                                                         <Text>Each entry will be a simple input/output string pair, for running batch evaluations without the whole LLM structure</Text>
                                                     </Box>
                                                 </HStack>
                                                 <HStack align={'start'}>
-                                                    <Radio size="md" value="key-value" colorScheme="blue" padding={1} />
+                                                    <Radio size="md" value={DatabaseSchema.KEY_VALUE} colorScheme="blue" padding={1} />
                                                     <Box>
                                                         <Text fontWeight="bold">Key-Value</Text>
                                                         <Text>You can use the generic key-value schema for storing any dataset format, however requires manual implementation for batch evaluations</Text>

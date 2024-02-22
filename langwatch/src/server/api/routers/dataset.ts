@@ -1,6 +1,8 @@
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { TRPCError } from "@trpc/server";
+import { type DatabaseSchema } from "@prisma/client";
+
 
 import { TeamRoleGroup, checkUserPermissionForProject } from "../permission";
 import slugify from "slugify";
@@ -34,7 +36,7 @@ export const datasetRouter = createTRPCRouter({
             id: nanoid(),
             slug,
             name: input.name,
-            schema: input.schema,
+            schema: input.schema as keyof typeof DatabaseSchema,
             projectId: input.projectId,
           },
         });    

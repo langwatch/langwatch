@@ -244,7 +244,7 @@ model Topic {
     @@index([projectId])
 }
 
-enum DATASET_SCHEMA {
+enum DatabaseSchema {
     FULL_TRACE
     LLM_CHAT_CALL
     STRING_I_O
@@ -257,7 +257,7 @@ model Dataset {
     project   Project  @relation(fields: [projectId], references: [id])
     name      String
     slug      String
-    schema    DATASET_SCHEMA
+    schema    DatabaseSchema
     createdAt DateTime @default(now())
     updatedAt DateTime @default(now()) @updatedAt
     datasetRecords  DatasetRecord[]
