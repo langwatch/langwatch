@@ -5,11 +5,6 @@ import {
   CardBody,
   Checkbox,
   Container,
-  Drawer,
-  DrawerBody,
-  DrawerCloseButton,
-  DrawerContent,
-  DrawerHeader,
   HStack,
   Heading,
   Popover,
@@ -22,13 +17,8 @@ import {
   Select,
   Skeleton,
   Spacer,
-  Tab,
-  TabList,
-  TabPanel,
-  TabPanels,
   Table,
   TableContainer,
-  Tabs,
   Tbody,
   Td,
   Text,
@@ -36,7 +26,7 @@ import {
   Thead,
   Tr,
   VStack,
-  useDisclosure,
+  useDisclosure
 } from "@chakra-ui/react";
 import { useRouter } from "next/router";
 import numeral from "numeral";
@@ -45,39 +35,31 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
-  List,
-  Maximize2,
-  Minimize2,
+  List
 } from "react-feather";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import type { Trace, TraceCheck } from "~/server/tracer/types";
+import type { Trace } from "~/server/tracer/types";
 import { getTraceCheckDefinitions } from "~/trace_checks/registry";
 import { api } from "~/utils/api";
 import { durationColor } from "~/utils/durationColor";
 import { getSingleQueryParam } from "~/utils/getSingleQueryParam";
 import { useFilterParams } from "../hooks/useFilterParams";
-import { CheckPassingDrawer } from "./CheckPassingDrawer";
 import { DashboardLayout } from "./DashboardLayout";
 import { FilterSelector } from "./FilterSelector";
 import { PeriodSelector, usePeriodSelector } from "./PeriodSelector";
-import { SpanTree } from "./traces/SpanTree";
-import { TraceSummary } from "./traces/Summary";
+
+import { TraceDeatilsDrawer } from "~/components/TraceDeatilsDrawer";
 
 export function MessagesDevMode() {
   const router = useRouter();
   const { project } = useOrganizationTeamProject();
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [traceId, setTraceId] = useState<string | null>(null);
-  const [traceView, setTraceView] = useState<"span" | "full">("span");
   const [totalHits, setTotalHits] = useState<number>(0);
   const [pageOffset, setPageOffset] = useState<number>(0);
   const [pageSize, setPageSize] = useState<number>(25);
-  const [totalErrors, setTotalErrors] = useState<number>(0);
   const { filterParams, queryOpts } = useFilterParams();
 
-  const toggleView = () => {
-    setTraceView((prevView) => (prevView === "span" ? "full" : "span"));
-  };
 
   const {
     period: { startDate, endDate },
@@ -247,49 +229,6 @@ export function MessagesDevMode() {
     }
   }, [traceGroups.data?.totalHits, traceGroups.isFetched]);
 
-  interface TraceEval {
-    traceId: string;
-    traceChecks?: Record<string, TraceCheck[]>;
-  }
-
-  const Evaluations = (trace: TraceEval) => {
-    return (
-      <VStack align="start" spacing={2}>
-        {trace.traceChecks?.[trace.traceId]?.map((check) => (
-          <CheckPassingDrawer
-            key={check.trace_id + "/" + check.check_id}
-            check={check}
-          />
-        ))}
-      </VStack>
-    );
-  };
-
-  useEffect(() => {
-    const traceData = traceChecksQuery?.data?.[traceId ?? ""];
-    const totalErrors = traceData
-      ? traceData.filter((check) => check.status === "failed").length
-      : 0;
-    setTotalErrors(totalErrors);
-  }, [traceChecksQuery.data, traceId]);
-
-  const errors = () => {
-    if (totalErrors == 0) return;
-
-    const errorText = totalErrors > 1 ? "errors" : "error";
-    return (
-      <Text
-        marginLeft={3}
-        borderRadius={"md"}
-        paddingX={2}
-        backgroundColor={"red.500"}
-        color={"white"}
-        fontSize={"sm"}
-      >
-        {totalErrors} {errorText}
-      </Text>
-    );
-  };
 
   const isFirstRender = useRef(true);
 
@@ -442,11 +381,10 @@ export function MessagesDevMode() {
           <Text marginLeft={"20px"}>
             {" "}
             {`${pageOffset + 1}`} -{" "}
-            {`${
-              pageOffset + pageSize > totalHits
-                ? totalHits
-                : pageOffset + pageSize
-            }`}{" "}
+            {`${pageOffset + pageSize > totalHits
+              ? totalHits
+              : pageOffset + pageSize
+              }`}{" "}
             of {`${totalHits}`} items
           </Text>
           <Button
@@ -467,56 +405,14 @@ export function MessagesDevMode() {
           </Button>
         </HStack>
       </Container>
-
-      <Drawer
-        isOpen={isDrawerOpen}
-        placement="right"
-        size={traceView}
-        onClose={() => {
-          setIsDrawerOpen(false);
-          setTraceView("span");
-        }}
-      >
-        <DrawerContent>
-          <DrawerHeader>
-            <HStack>
-              {traceView === "span" ? (
-                <Maximize2 onClick={toggleView} cursor={"pointer"} />
-              ) : (
-                <Minimize2 onClick={toggleView} cursor={"pointer"} />
-              )}
-
-              <DrawerCloseButton />
-            </HStack>
-            <HStack>
-              <Text paddingTop={5} fontSize="2xl">
-                Trace Details
-              </Text>
-            </HStack>
-          </DrawerHeader>
-          <DrawerBody>
-            <Tabs>
-              <TabList>
-                <Tab>Details</Tab>
-                <Tab>Evaluations {errors()}</Tab>
-              </TabList>
-
-              <TabPanels>
-                <TabPanel>
-                  <TraceSummary traceId={traceId ?? ""} />
-                  <SpanTree traceId={traceId ?? ""} />
-                </TabPanel>
-                <TabPanel>
-                  <Evaluations
-                    traceId={traceId ?? ""}
-                    traceChecks={traceChecksQuery.data}
-                  />
-                </TabPanel>
-              </TabPanels>
-            </Tabs>
-          </DrawerBody>
-        </DrawerContent>
-      </Drawer>
+      {traceId && (
+        <TraceDeatilsDrawer
+          isDrawerOpen={isDrawerOpen}
+          traceId={traceId}
+          traceChecksQuery={traceChecksQuery}
+          setIsDrawerOpen={setIsDrawerOpen}
+        />
+      )}
     </DashboardLayout>
   );
 }
