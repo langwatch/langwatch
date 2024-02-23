@@ -1,13 +1,12 @@
-import { Button, Container, Drawer, DrawerBody, DrawerCloseButton, DrawerContent, DrawerHeader, FormControl, FormErrorMessage, FormHelperText, HStack, Select, Stack, Text, Textarea, VStack, useToast, useDisclosure } from "@chakra-ui/react";
+import { Button, Container, Drawer, Link, DrawerBody, DrawerCloseButton, DrawerContent, DrawerHeader, FormControl, FormErrorMessage, FormHelperText, HStack, Select, Stack, Text, Textarea, VStack, useToast, useDisclosure, Box } from "@chakra-ui/react";
 import { useState } from "react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useTraceDetailsState } from "~/hooks/useTraceDetailsState";
 import { api } from "~/utils/api";
-import numeral from "numeral";
 import { chatMessageSchema } from "~/server/tracer/types.generated";
 import { z } from "zod";
 import { AddDatasetDrawer } from "./AddDatasetDrawer";
-
+import { CheckCircleIcon } from "@chakra-ui/icons";
 
 
 function formatNumberWithSuffix(number: number) {
@@ -17,7 +16,6 @@ function formatNumberWithSuffix(number: number) {
 
     return `${number}${suffix}`;
 }
-
 
 interface AddDatasetDrawerProps {
     isOpen: boolean;
@@ -54,14 +52,11 @@ export function AddDatasetRecordDrawer(props: AddDatasetDrawerProps) {
         });
 
     const onCreateDatasetSuccess = () => {
-
         onClose();
         void datasets.refetch();
-
     }
 
     const handleOnClose = () => {
-
         props.onClose();
         setInputSpan("")
         setOutputSpan("")
@@ -69,9 +64,6 @@ export function AddDatasetRecordDrawer(props: AddDatasetDrawerProps) {
     }
 
     const onSubmit = (e: any) => {
-        console.log(inputSpan);
-        console.log(outputSpan);
-
         e.preventDefault()
         createDatasetRecord.mutate({
             projectId: project?.id ?? "",
@@ -84,12 +76,23 @@ export function AddDatasetRecordDrawer(props: AddDatasetDrawerProps) {
                 onSuccess: () => {
                     props.onClose();
                     toast({
-                        title: "Data Added",
-                        description: `You have successfully added data the dataset`,
-                        status: "success",
-                        duration: 5000,
-                        isClosable: true,
+                        duration: 6000,
                         position: "top-right",
+                        render: () => (
+                            <Box p={5} paddingRight={20} bg='green.200' borderTop={'green.600'} borderTopWidth={2}>
+                                <HStack>
+                                    <CheckCircleIcon w={18} h={18} color={"green.600"} />
+                                    <Box>
+                                        <Text color={'black'} fontWeight={'bold'}>Succesfully added to dataset</Text>
+                                        <Link color={'black'} textDecoration={"underline"} href={`/${project?.slug}/datasets/${datasetId}`}>
+                                            View the dataset
+                                        </Link>
+                                    </Box>
+                                </HStack>
+
+                            </Box>
+
+                        ),
                     });
                 },
                 onError: () => {
@@ -132,6 +135,8 @@ export function AddDatasetRecordDrawer(props: AddDatasetDrawerProps) {
             setInputError(false)
         }
     }
+
+
 
     const handleOutputChange = (e: any) => {
 
@@ -207,7 +212,7 @@ export function AddDatasetRecordDrawer(props: AddDatasetDrawerProps) {
 
                                                 spans.data ?
                                                     spans.data?.map((dataset, index) => (
-                                                        dataset.type === 'llm' && <option key={index} value={index}>{dataset.model + dataset.type} - {formatNumberWithSuffix(index + 1)}</option>
+                                                        dataset.type === 'llm' && <option key={index} value={index}>{dataset.model} - {formatNumberWithSuffix(index + 1)}</option>
                                                     )) : null
                                             }
                                         </Select>

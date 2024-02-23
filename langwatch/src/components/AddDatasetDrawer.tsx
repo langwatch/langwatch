@@ -14,7 +14,7 @@ interface AddDatasetDrawerProps {
 
 export function AddDatasetDrawer(props: AddDatasetDrawerProps) {
 
-    const [schemaValue, setSchemaValue] = useState<string>(DatabaseSchema.FULL_TRACE);
+    const [schemaValue, setSchemaValue] = useState<string>(DatabaseSchema.LLM_CHAT_CALL);
     const [dataSetName, setDataSetName] = useState<string>("");
     const [slug, setSlug] = useState<string>("");
     const [hasError, setHasError] = useState<boolean>(false);
@@ -112,7 +112,7 @@ export function AddDatasetDrawer(props: AddDatasetDrawerProps) {
                                     <RadioGroup value={schemaValue} onChange={setSchemaValue}>
                                         <Stack spacing={4}>
                                             <HStack align={'start'}>
-                                                <Radio size="md" value={DatabaseSchema.FULL_TRACE} colorScheme="blue" padding={1} />
+                                                <Radio size="md" value={DatabaseSchema.FULL_TRACE} colorScheme="blue" padding={1} disabled />
                                                 <Box>
                                                     <Text fontWeight="bold">Full Trace</Text>
                                                     <Text>Each entry will include all the spans of a complete trace call, that is, all the steps on your pipeline, and the expected output</Text>
@@ -126,14 +126,14 @@ export function AddDatasetDrawer(props: AddDatasetDrawerProps) {
                                                 </Box>
                                             </HStack>
                                             <HStack align={'start'}>
-                                                <Radio size="md" value={DatabaseSchema.STRING_I_O} colorScheme="blue" padding={1} />
+                                                <Radio size="md" value={DatabaseSchema.STRING_I_O} colorScheme="blue" padding={1} disabled />
                                                 <Box>
                                                     <Text fontWeight="bold">String Input/Output</Text>
                                                     <Text>Each entry will be a simple input/output string pair, for running batch evaluations without the whole LLM structure</Text>
                                                 </Box>
                                             </HStack>
                                             <HStack align={'start'}>
-                                                <Radio size="md" value={DatabaseSchema.KEY_VALUE} colorScheme="blue" padding={1} />
+                                                <Radio size="md" value={DatabaseSchema.KEY_VALUE} colorScheme="blue" padding={1} disabled />
                                                 <Box>
                                                     <Text fontWeight="bold">Key-Value</Text>
                                                     <Text>You can use the generic key-value schema for storing any dataset format, however requires manual implementation for batch evaluations</Text>

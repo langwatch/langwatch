@@ -17,7 +17,6 @@ import {
     Tr,
     useDisclosure
 } from "@chakra-ui/react";
-
 import { useRouter } from "next/router";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -25,29 +24,21 @@ import { api } from "~/utils/api";
 import { AddDatasetDrawer } from "~/components/AddDatasetDrawer";
 
 
-export default function Datasets() {
+export default function Dataset() {
+    const router = useRouter();
+    const { project } = useOrganizationTeamProject();
+    const dataSetId = router.query.id;
 
     const { isOpen, onOpen, onClose } = useDisclosure();
-    const { project } = useOrganizationTeamProject();
-    const router = useRouter();
-
-
-    const datasets = api.dataset.getAll.useQuery({ projectId: project?.id ?? "" },
+    const dataset = api.datasetRecord.getAll.useQuery({ projectId: project?.id ?? "", datasetId: dataSetId as string },
         {
             enabled: !!project,
 
         });
 
     const onSuccess = () => {
-        void datasets.refetch();
+        void dataset.refetch();
         onClose();
-    }
-
-    const goToDataset = (id: string) => {
-        void router.push({
-            pathname: `/${project?.slug}/datasets/${id}`,
-            query: { ...router.query }
-        });
     }
 
     return (
@@ -55,15 +46,12 @@ export default function Datasets() {
             <Container maxW={"calc(100vw - 200px)"} padding={6} marginTop={8}>
                 <HStack width="full" align="top">
                     <Heading as={"h1"} size="lg" paddingBottom={6} paddingTop={1}>
-                        Datasets
+                        Dataset {`- ${dataset.data?.name ?? ""}`}
                     </Heading>
                     <Spacer />
                     <Button
                         colorScheme="blue"
                         onClick={() => {
-                            // setHasError(false);
-                            // setDataSetName("");
-                            // setSlug("");
                             onOpen();
                         }}
                         minWidth="fit-content"
@@ -73,18 +61,18 @@ export default function Datasets() {
                 </HStack>
                 <Card>
                     <CardBody>
-                        {datasets.data && datasets.data.length == 0 ? <Text>No datasets found</Text> : <TableContainer>
+                        {dataset.data && dataset.data.datasetRecords.length == 0 ? <Text>No data found</Text> : <TableContainer>
                             <Table variant="simple">
                                 <Thead>
                                     <Tr>
-                                        <Th>Name</Th>
-                                        <Th>Schema</Th>
-                                        <Th>Entries</Th>
-                                        <Th>Last Update</Th>
+                                        <Th>Input</Th>
+                                        <Th>Expected Output</Th>
+                                        <Th>Created at</Th>
+                                        <Th>Updated at</Th>
                                     </Tr>
                                 </Thead>
                                 <Tbody>
-                                    {datasets.isLoading ? (
+                                    {dataset.isLoading ? (
                                         Array.from({ length: 3 }).map((_, i) => (
                                             <Tr key={i}>
                                                 {Array.from({ length: 4 }).map((_, i) => (
@@ -94,13 +82,13 @@ export default function Datasets() {
                                                 ))}
                                             </Tr>
                                         ))
-                                    ) : datasets.data ?
-                                        datasets.data?.map((dataset) => (
-                                            <Tr cursor="pointer" onClick={() => goToDataset(dataset.id)} key={dataset.id}>
-                                                <Td>{dataset.name}</Td>
-                                                <Td>{dataset.schema}</Td>
-                                                <Td>{dataset.datasetRecords.length ?? 0}</Td>
-                                                <Td>{new Date(dataset.datasetRecords[0]?.createdAt ?? dataset.createdAt).toLocaleString()}</Td>
+                                    ) : dataset.data ?
+                                        dataset.data.datasetRecords?.map((dataset) => (
+                                            <Tr key={dataset.id}>
+                                                <Td>{(dataset as any)?.entry?.input[0]?.content ?? ""}</Td>
+                                                <Td>{(dataset as any)?.entry?.output[0]?.content ?? ""}</Td>
+                                                <Td>{new Date(dataset.createdAt).toLocaleString()}</Td>
+                                                <Td>{new Date(dataset.updatedAt).toLocaleString()}</Td>
                                             </Tr>
                                         )
                                         ) : null

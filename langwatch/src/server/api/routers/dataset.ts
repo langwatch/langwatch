@@ -51,6 +51,11 @@ export const datasetRouter = createTRPCRouter({
       const datasets = await prisma.dataset.findMany({
         where: { projectId },
         orderBy: {  createdAt: 'desc' },
+        include: {
+          datasetRecords: {
+            orderBy: {  createdAt: 'desc' },
+          }
+        },
       });
 
       return datasets;

@@ -55,6 +55,7 @@ import React from "react";
 const Breadcrumbs = ({ currentRoute }: { currentRoute: Route | undefined }) => {
   const { project } = useOrganizationTeamProject();
 
+
   return (
     currentRoute && (
       <HStack gap={2} fontSize={13} color="gray.500">
@@ -134,8 +135,8 @@ const ProjectSelector = React.memo(function ProjectSelector({
     a.name.toLowerCase() < b.name.toLowerCase()
       ? -1
       : a.name.toLowerCase() > b.name.toLowerCase()
-      ? 1
-      : 0;
+        ? 1
+        : 0;
 
   const projectGroups = organizations.sort(sortByName).flatMap((organization) =>
     organization.teams.flatMap((team) => ({
@@ -192,9 +193,9 @@ const ProjectSelector = React.memo(function ProjectSelector({
                         href={
                           currentRoute?.path.includes("[project]")
                             ? currentRoute.path
-                                .replace("[project]", project.slug)
-                                .replace(/\[.*?\]/g, "")
-                                .replace(/\/\/+/g, "/")
+                              .replace("[project]", project.slug)
+                              .replace(/\[.*?\]/g, "")
+                              .replace(/\/\/+/g, "/")
                             : `/${project.slug}`
                         }
                         _hover={{
@@ -326,7 +327,7 @@ export const DashboardLayout = ({
               label={projectRoutes.checks.title}
               project={project}
             />
-            {isDevViewEnabled && (<SideMenuLink
+            {(process.env.NEXT_PUBLIC_FEATURE_DATASETS && isDevViewEnabled) && (<SideMenuLink
               path={projectRoutes.datasets.path}
               icon={Table}
               label={projectRoutes.datasets.title}
@@ -342,13 +343,13 @@ export const DashboardLayout = ({
             {hasOrganizationPermission(
               OrganizationRoleGroup.ORGANIZATION_VIEW
             ) && (
-              <SideMenuLink
-                path={projectRoutes.settings.path}
-                icon={Settings}
-                label={projectRoutes.settings.title}
-                project={project}
-              />
-            )}
+                <SideMenuLink
+                  path={projectRoutes.settings.path}
+                  icon={Settings}
+                  label={projectRoutes.settings.title}
+                  project={project}
+                />
+              )}
           </VStack>
         </VStack>
       </Box>
