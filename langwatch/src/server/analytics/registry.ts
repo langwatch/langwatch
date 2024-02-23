@@ -229,7 +229,7 @@ export const analyticsMetrics = {
       aggregation: (aggregation, key, subkey) => {
         if (!key || !subkey)
           throw new Error(
-            `Key and subkey are required for event_score ${aggregation} metric`
+            `Key and subkey are required for event_details ${aggregation} metric`
           );
 
         return {
@@ -333,14 +333,9 @@ export const analyticsMetrics = {
       requiresKey: {
         filter: "trace_checks.check_id",
       },
-      aggregation: (aggregation, key, subkey) => {
-        if (!key || !subkey)
-          throw new Error(
-            `Key and subkey are required for event_score ${aggregation} metric`
-          );
-
+      aggregation: (aggregation, key) => {
         return {
-          [`evaluation_score_${aggregation}_${key}_${subkey}`]: {
+          [`evaluation_score_${aggregation}_${key}`]: {
             nested: {
               path: "trace_checks",
             },
@@ -363,8 +358,8 @@ export const analyticsMetrics = {
           },
         };
       },
-      extractionPath: (aggregation: AggregationTypes, key, subkey) => {
-        return `evaluation_score_${aggregation}_${key}_${subkey}>child>child`;
+      extractionPath: (aggregation: AggregationTypes, key) => {
+        return `evaluation_score_${aggregation}_${key}>child>child`;
       },
     },
   },
