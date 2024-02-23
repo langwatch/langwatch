@@ -82,7 +82,7 @@ function Messages() {
     number | undefined
   >();
   const [liveUpdate, setLiveUpdate] = useState(true);
-  const [showFilters, setShowFilters] = useState(true);
+  const [showFilters, setShowFilters] = useState(window.innerWidth > 1024);
   const [groupBy] = useGroupBy();
   const { filterParams, queryOpts } = useFilterParams();
 

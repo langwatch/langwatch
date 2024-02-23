@@ -229,7 +229,7 @@ export const analyticsMetrics = {
       aggregation: (aggregation, key, subkey) => {
         if (!key || !subkey)
           throw new Error(
-            `Key and subkey are required for event_score ${aggregation} metric`
+            `Key and subkey are required for event_details ${aggregation} metric`
           );
 
         return {
@@ -333,14 +333,9 @@ export const analyticsMetrics = {
       requiresKey: {
         filter: "trace_checks.check_id",
       },
-      aggregation: (aggregation, key, subkey) => {
-        if (!key || !subkey)
-          throw new Error(
-            `Key and subkey are required for event_score ${aggregation} metric`
-          );
-
+      aggregation: (aggregation, key) => {
         return {
-          [`evaluation_score_${aggregation}_${key}_${subkey}`]: {
+          [`evaluation_score_${aggregation}_${key}`]: {
             nested: {
               path: "trace_checks",
             },
@@ -363,8 +358,8 @@ export const analyticsMetrics = {
           },
         };
       },
-      extractionPath: (aggregation: AggregationTypes, key, subkey) => {
-        return `evaluation_score_${aggregation}_${key}_${subkey}>child>child`;
+      extractionPath: (aggregation: AggregationTypes, key) => {
+        return `evaluation_score_${aggregation}_${key}>child>child`;
       },
     },
   },
@@ -473,7 +468,7 @@ const simpleFieldGroupping = (name: string, field: string): AnalyticsGroup => ({
     [`${field}_group`]: {
       terms: {
         field: field,
-        size: 100,
+        size: 50,
         missing: "unknown",
       },
       aggs: aggToGroup,
@@ -509,7 +504,7 @@ export const analyticsGroups = {
             child: {
               terms: {
                 field: "spans.model",
-                size: 100,
+                size: 50,
                 missing: "unknown",
               },
               aggs: {
@@ -652,7 +647,7 @@ export const analyticsGroups = {
             child: {
               terms: {
                 field: "events.event_type",
-                size: 100,
+                size: 50,
                 missing: "unknown",
               },
               aggs: {
@@ -680,7 +675,7 @@ export const analyticsGroups = {
             child: {
               terms: {
                 field: "trace_checks.status",
-                size: 100,
+                size: 50,
                 missing: "unknown",
               },
               aggs: {
