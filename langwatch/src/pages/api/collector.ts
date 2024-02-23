@@ -29,10 +29,7 @@ import {
   addInputAndOutputForRAGs,
   maybeAddIdsToContextList,
 } from "./collector/rag";
-import {
-  getTraceInput,
-  getTraceOutput,
-} from "./collector/trace";
+import { getTraceInput, getTraceOutput } from "./collector/trace";
 import { addLLMTokensCount, computeTraceMetrics } from "./collector/metrics";
 import { scheduleTraceChecks } from "./collector/traceChecks";
 import { cleanupPII } from "./collector/cleanupPII";
@@ -167,6 +164,12 @@ export default async function handler(
       (span.timestamps.first_token_at &&
         span.timestamps.first_token_at.toString().length === 10)
     ) {
+      debug(
+        "Timestamps not in milliseconds for",
+        traceId,
+        "on project",
+        project.id
+      );
       return res.status(400).json({
         error:
           "Timestamps should be in milliseconds not in seconds, please multiply it by 1000",

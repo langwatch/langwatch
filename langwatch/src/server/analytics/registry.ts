@@ -11,12 +11,15 @@ import {
   aggregationTypesEnum,
   pipelineAggregationTypesEnum,
   pipelineFieldsEnum,
+  numericAggregationTypes,
 } from "./types";
 import type { AggregationsAggregationContainer } from "@elastic/elasticsearch/lib/api/types";
+import { formatMilliseconds } from "../../utils/formatMilliseconds";
 
 const simpleFieldAnalytics = (
   field: string
 ): Omit<AnalyticsMetric, "label" | "colorSet" | "allowedAggregations"> => ({
+  format: "0a",
   aggregation: (aggregation: AggregationTypes) => ({
     [`${field.replaceAll(".", "_")}_${aggregation}`]: {
       [aggregation]: { field },
@@ -29,34 +32,36 @@ const simpleFieldAnalytics = (
 export const analyticsMetrics = {
   metadata: {
     trace_id: {
+      ...simpleFieldAnalytics("trace.trace_id"),
       label: "Messages",
       colorSet: "orangeTones",
       allowedAggregations: ["cardinality"],
-      ...simpleFieldAnalytics("trace.trace_id"),
     },
     user_id: {
+      ...simpleFieldAnalytics("trace.metadata.user_id"),
       label: "Users",
       colorSet: "blueTones",
       allowedAggregations: ["cardinality"],
-      ...simpleFieldAnalytics("trace.metadata.user_id"),
     },
     thread_id: {
+      ...simpleFieldAnalytics("trace.metadata.thread_id"),
       label: "Threads",
       colorSet: "greenTones",
       allowedAggregations: ["cardinality"],
-      ...simpleFieldAnalytics("trace.metadata.thread_id"),
     },
   },
   sentiment: {
     input_sentiment: {
+      ...simpleFieldAnalytics("trace.input.satisfaction_score"),
       label: "Input Sentiment Score",
       colorSet: "yellowTones",
-      allowedAggregations: allAggregationTypes,
-      ...simpleFieldAnalytics("trace.input.satisfaction_score"),
+      allowedAggregations: numericAggregationTypes,
+      format: "0.00%",
     },
     thumbs_up_down: {
       label: "Thumbs Up/Down Score",
       colorSet: "purpleTones",
+      format: "0.00a",
       allowedAggregations: allAggregationTypes,
       aggregation: (aggregation) => ({
         [`thumbs_up_down_${aggregation}`]: {
@@ -116,6 +121,15 @@ export const analyticsMetrics = {
       },
     },
   },
+  performance: {
+    completion_time: {
+      ...simpleFieldAnalytics("trace.metrics.total_time_ms"),
+      label: "Completion Time",
+      colorSet: "greenTones",
+      format: formatMilliseconds,
+      allowedAggregations: numericAggregationTypes,
+    },
+  },
   events: {
     event_type: {
       label: "Event Type",
@@ -157,6 +171,7 @@ export const analyticsMetrics = {
     event_score: {
       label: "Event Score",
       colorSet: "purpleTones",
+      format: "0.00a",
       allowedAggregations: allAggregationTypes.filter(
         (agg) => agg != "cardinality"
       ),
@@ -327,6 +342,7 @@ export const analyticsMetrics = {
     evaluation_score: {
       label: "Evaluation Score",
       colorSet: "tealTones",
+      format: "0.00a",
       allowedAggregations: allAggregationTypes.filter(
         (agg) => agg != "cardinality"
       ),

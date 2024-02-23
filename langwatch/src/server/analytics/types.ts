@@ -1,4 +1,7 @@
-import type { AggregationsAggregationContainer, MappingRuntimeField } from "@elastic/elasticsearch/lib/api/types";
+import type {
+  AggregationsAggregationContainer,
+  MappingRuntimeField,
+} from "@elastic/elasticsearch/lib/api/types";
 import { z } from "zod";
 import type {
   ElasticSearchSpan,
@@ -13,6 +16,7 @@ import type { FilterField } from "../filters/types";
 export type AnalyticsMetric = {
   label: string;
   colorSet: RotatingColorSet;
+  format?: string | ((value: number) => string);
   requiresKey?: {
     filter: FilterField;
     optional?: boolean;
@@ -44,13 +48,17 @@ export type AnalyticsGroup = {
 
 export const aggregationTypesEnum = z.enum([
   "cardinality",
-  "sum",
   "avg",
+  "sum",
   "min",
   "max",
 ]);
 
 export const allAggregationTypes = aggregationTypesEnum.options;
+
+export const numericAggregationTypes = allAggregationTypes.filter(
+  (agg) => agg !== "cardinality"
+);
 
 export type AggregationTypes = z.infer<typeof aggregationTypesEnum>;
 

@@ -24,6 +24,7 @@ import { useAnalyticsParams } from "../../hooks/useAnalyticsParams";
 import { useGetRotatingColorForCharts } from "../../hooks/useGetRotatingColorForCharts";
 import {
   getGroup,
+  getMetric,
   type timeseriesInput,
 } from "../../server/analytics/registry";
 import type { AppRouter } from "../../server/api/root";
@@ -31,6 +32,7 @@ import { api } from "../../utils/api";
 import { uppercaseFirstLetter } from "../../utils/stringCasing";
 import type { Unpacked } from "../../utils/types";
 import type { RotatingColorSet } from "../../utils/rotatingColors";
+import type { Payload } from "recharts/types/component/DefaultTooltipContent";
 
 export type CustomGraphInput = {
   graphId: string;
@@ -46,7 +48,6 @@ export type CustomGraphInput = {
 export function CustomGraph({ input }: { input: CustomGraphInput }) {
   const { analyticsParams, queryOpts } = useAnalyticsParams();
   const { projectId, startDate, endDate } = analyticsParams;
-  const valueFormat = "0a";
 
   const timeseries = api.analytics.getTimeseries.useQuery(
     {
@@ -83,7 +84,7 @@ export function CustomGraph({ input }: { input: CustomGraphInput }) {
     ])
   );
   const sortedKeys = expectedKeys
-    .filter((key) => keysToSum[key]! > 0)
+    .filter((key) => keysToSum[key]! !== 0)
     .sort((a, b) => {
       const totalA = keysToSum[a]!;
       const totalB = keysToSum[b]!;
@@ -157,15 +158,54 @@ export function CustomGraph({ input }: { input: CustomGraphInput }) {
     return getColor(colorSet, index);
   };
 
+  const formatWith = (
+    format: string | ((value: number) => string) | undefined,
+    value: number
+  ) => {
+    if (typeof format === "function") {
+      return format(value);
+    }
+    return numeral(value).format(format ?? "0a");
+  };
+
+  const valueFormats = Array.from(
+    new Set(
+      input.series.map((series) => {
+        const metric = getMetric(series.metric);
+        return metric?.format ?? "0a";
+      })
+    )
+  );
+  const yAxisValueFormat = valueFormats.length === 1 ? valueFormats[0] : "";
+  const keysToMax = Object.fromEntries(
+    expectedKeys.map((key) => [
+      key,
+      currentAndPreviousDataFilled?.reduce(
+        (acc, entry) => Math.max(acc, entry[key] ?? 0),
+        0
+      ) ?? 0,
+    ])
+  );
+  const maxValue = formatWith(
+    yAxisValueFormat,
+    Math.max(...Object.values(keysToMax))
+  );
+
   const getColor = useGetRotatingColorForCharts();
   const theme = useTheme();
   const gray400 = theme.colors.gray["400"];
 
   const formatDate = (date: string) => date && format(new Date(date), "MMM d");
-  const valueFormatter = (value: number) =>
-    Math.round(value) !== value
-      ? numeral(value).format("0.00a")
-      : numeral(value).format(valueFormat ?? "0a");
+  const tooltipValueFormatter = (
+    value: number,
+    _: string,
+    payload: Payload<any, any>
+  ) => {
+    const { series } = getSeries(payload.dataKey as string);
+    const metric = series?.metric && getMetric(series.metric);
+
+    return formatWith(metric?.format, value);
+  };
 
   const [GraphComponent, GraphElement] = input.graphType.includes("area")
     ? [AreaChart, Area]
@@ -203,7 +243,7 @@ export function CustomGraph({ input }: { input: CustomGraphInput }) {
       >
         <GraphComponent
           data={currentAndPreviousDataFilled}
-          margin={{ left: (valueFormat ?? "0a").length * 4 - 10 }}
+          margin={{ left: maxValue.length * 6 - 12 }}
         >
           <CartesianGrid vertical={false} strokeDasharray="5 7" />
           <XAxis
@@ -218,12 +258,18 @@ export function CustomGraph({ input }: { input: CustomGraphInput }) {
             tickLine={false}
             tickCount={4}
             tickMargin={20}
+            // tickSize={0}
             domain={[0, "dataMax"]}
             tick={{ fill: gray400 }}
-            tickFormatter={valueFormatter}
+            tickFormatter={(value) => {
+              if (typeof yAxisValueFormat === "function") {
+                return yAxisValueFormat(value);
+              }
+              return numeral(value).format(yAxisValueFormat);
+            }}
           />
           <Tooltip
-            formatter={valueFormatter}
+            formatter={tooltipValueFormatter}
             labelFormatter={(_label, payload) => {
               return (
                 formatDate(payload[0]?.payload.date) +
