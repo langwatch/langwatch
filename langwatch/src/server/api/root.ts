@@ -9,6 +9,8 @@ import { checksRouter } from "./routers/checks";
 import { costsRouter } from "./routers/costs";
 import { subscriptionRouter } from "./routers/subscription";
 import { topicsRouter } from "./routers/topics";
+import { datasetRouter } from "./routers/dataset";
+import { datasetRecordRouter } from "./routers/datasetRecord";
 
 /**
  * This is the primary router for your server.
@@ -26,6 +28,9 @@ export const appRouter = createTRPCRouter({
   costs: costsRouter,
   subscription: subscriptionRouter,
   topics: topicsRouter,
+  dataset: datasetRouter,
+  datasetRecord: datasetRecordRouter,
+  
 });
 
 // export type definition of API
