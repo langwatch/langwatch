@@ -16,18 +16,17 @@ import {
   Tooltip,
   VStack,
 } from "@chakra-ui/react";
-import { formatDistanceToNow } from "date-fns";
-import numeral from "numeral";
-import { CheckCircle, Clock, HelpCircle, XCircle } from "react-feather";
-import Markdown from "react-markdown";
-import { getTotalTokensDisplay } from "~/utils/getTotalTokensDisplay";
-import type { Trace, TraceCheck } from "../server/tracer/types";
-import { formatMilliseconds } from "../utils/formatMilliseconds";
-import { CheckPassing } from "./CheckPassing";
 import type { Project } from "@prisma/client";
+import { formatDistanceToNow } from "date-fns";
 import NextLink from "next/link";
-import { getColorForString } from "../utils/rotatingColors";
+import numeral from "numeral";
+import { CheckCircle, Clock, XCircle } from "react-feather";
+import Markdown from "react-markdown";
+import type { Trace, TraceCheck } from "../server/tracer/types";
 import { api } from "../utils/api";
+import { formatMilliseconds } from "../utils/formatMilliseconds";
+import { getColorForString } from "../utils/rotatingColors";
+import { CheckPassing } from "./CheckPassing";
 
 export function MessageCard({
   linkActive,
@@ -183,20 +182,6 @@ export function MessageCard({
                 })}
               </Text>
             </Tooltip>
-            {(!!trace.metrics.completion_tokens ||
-              !!trace.metrics.prompt_tokens) && (
-              <>
-                <Text>·</Text>
-                <HStack>
-                  <Box>{getTotalTokensDisplay(trace)}</Box>
-                  {trace.metrics.tokens_estimated && (
-                    <Tooltip label="token count is calculated by LangWatch when not available from the trace data">
-                      <HelpCircle width="14px" />
-                    </Tooltip>
-                  )}
-                </HStack>
-              </>
-            )}
             {!!trace.metrics.total_cost && (
               <>
                 <Text>·</Text>
