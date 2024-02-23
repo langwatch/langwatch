@@ -473,7 +473,7 @@ const simpleFieldGroupping = (name: string, field: string): AnalyticsGroup => ({
     [`${field}_group`]: {
       terms: {
         field: field,
-        size: 100,
+        size: 50,
         missing: "unknown",
       },
       aggs: aggToGroup,
@@ -509,7 +509,7 @@ export const analyticsGroups = {
             child: {
               terms: {
                 field: "spans.model",
-                size: 100,
+                size: 50,
                 missing: "unknown",
               },
               aggs: {
@@ -652,7 +652,7 @@ export const analyticsGroups = {
             child: {
               terms: {
                 field: "events.event_type",
-                size: 100,
+                size: 50,
                 missing: "unknown",
               },
               aggs: {
@@ -680,7 +680,7 @@ export const analyticsGroups = {
             child: {
               terms: {
                 field: "trace_checks.status",
-                size: 100,
+                size: 50,
                 missing: "unknown",
               },
               aggs: {
