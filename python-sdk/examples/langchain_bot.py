@@ -1,3 +1,7 @@
+from dotenv import load_dotenv
+
+load_dotenv()
+
 import chainlit as cl
 from langchain.chains import LLMMathChain
 from langchain.llms import OpenAI

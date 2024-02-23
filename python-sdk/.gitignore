@@ -7,3 +7,4 @@ examples/.chainlit
 examples/chainlit.md
 repl.ipynb
 chainlit.md
+.env
