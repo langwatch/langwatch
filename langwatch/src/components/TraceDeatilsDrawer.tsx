@@ -1,4 +1,4 @@
-import { Drawer, DrawerBody, DrawerCloseButton, DrawerContent, DrawerHeader, HStack, Tab, TabList, TabPanel, TabPanels, Tabs, Text, VStack } from "@chakra-ui/react";
+import { Drawer, DrawerBody, Flex, Spacer, Button, DrawerCloseButton, DrawerContent, DrawerHeader, HStack, Tab, TabList, TabPanel, TabPanels, Tabs, Text, VStack, useDisclosure } from "@chakra-ui/react";
 import { useState } from "react";
 import { Maximize2, Minimize2 } from "react-feather";
 import type { TraceCheck } from "~/server/tracer/types";
@@ -10,6 +10,7 @@ import type { TRPCClientErrorLike } from "@trpc/react-query";
 import type { AppRouter } from "~/server/api/root";
 import { useRouter } from "next/router";
 import { Link } from "@chakra-ui/next-js";
+import { AddDatasetRecordDrawer } from "./AddDatasetRecordDrawer";
 
 
 interface TraceDetailsDrawerProps {
@@ -25,6 +26,8 @@ interface TraceEval {
 }
 
 export const TraceDeatilsDrawer = (props: TraceDetailsDrawerProps) => {
+    const { isOpen, onOpen, onClose } = useDisclosure();
+
     const [traceView, setTraceView] = useState<"span" | "full">("span");
     const toggleView = () => {
         setTraceView((prevView) => (prevView === "span" ? "full" : "span"));
@@ -39,12 +42,14 @@ export const TraceDeatilsDrawer = (props: TraceDetailsDrawerProps) => {
         if (!totalChecks) return <Text>No evaluations ran for this message. Setup some gaurdrails <Link href={`/${String(project)}/guardrails`}>here.</Link></Text >;
         return (
             <VStack align="start" spacing={2}>
-                {trace.traceChecks?.[trace.traceId]?.map((check) => (
-                    <CheckPassingDrawer
-                        key={check.trace_id + "/" + check.check_id}
-                        check={check}
-                    />
-                ))}
+                <>
+                    {trace.traceChecks?.[trace.traceId]?.map((check) => (
+                        <CheckPassingDrawer
+                            key={check.trace_id + "/" + check.check_id}
+                            check={check}
+                        />
+                    ))}
+                </>
             </VStack>
         );
     };
@@ -93,11 +98,21 @@ export const TraceDeatilsDrawer = (props: TraceDetailsDrawerProps) => {
 
                         <DrawerCloseButton />
                     </HStack>
-                    <HStack>
+                    <Flex marginTop={4}>
                         <Text paddingTop={5} fontSize="2xl">
                             Trace Details
                         </Text>
-                    </HStack>
+                        <Spacer />
+                        <Button
+                            colorScheme="black"
+                            type="submit"
+                            variant='outline'
+                            minWidth="fit-content"
+                            onClick={onOpen}
+                        >
+                            Add to Dataset
+                        </Button>
+                    </Flex>
                 </DrawerHeader>
                 <DrawerBody>
                     <Tabs>
@@ -121,6 +136,7 @@ export const TraceDeatilsDrawer = (props: TraceDetailsDrawerProps) => {
                     </Tabs>
                 </DrawerBody>
             </DrawerContent>
+            <AddDatasetRecordDrawer isOpen={isOpen} onClose={onClose} traceId={props.traceId ?? ""} />
         </Drawer>
     )
 }

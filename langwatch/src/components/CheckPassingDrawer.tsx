@@ -49,14 +49,12 @@ export function CheckPassingDrawer({ check }: { check: TraceCheck }) {
             </Text>
             <Text fontSize={'sm'}>
               {check.status == "succeeded" || check.status == "failed" ? (
-                <>
-
+                <HStack>
                   {traceCheck.valueDisplayType === "boolean" ?
                     <HStack><Text>Result:</Text> <Text color={color}>{check.status == 'succeeded' ? 'Pass' : 'Fail'}</Text></HStack> :
                     <HStack><Text>Score:</Text> <Text color={color}>{numeral(check.value).format("0.00")}</Text></HStack>
                   }
-
-                </>
+                </HStack>
               ) : check.status == "error" ? (
                 <Text>Error</Text>
               ) : check.status == "in_progress" ? (

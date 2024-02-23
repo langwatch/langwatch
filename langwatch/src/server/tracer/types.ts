@@ -17,14 +17,14 @@ interface ToolCall {
   function: FunctionCall;
 }
 
-interface ChatMessage {
+export interface ChatMessage {
   role?: ChatRole;
   content?: string | null;
   function_call?: FunctionCall | null;
   tool_calls?: ToolCall[] | null;
 }
 
-interface TypedValueChatMessages {
+export interface TypedValueChatMessages {
   type: "chat_messages";
   value: ChatMessage[];
 }
