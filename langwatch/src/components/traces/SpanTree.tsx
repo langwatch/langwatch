@@ -77,21 +77,21 @@ const SpanNode: React.FC<SpanNodeProps> = ({ span, level, lastChild }) => {
         _before={
           level > 0
             ? {
-              content: "''",
-              width: "18px",
-              height: "12px",
-              borderColor: "gray.400",
-              borderStyle: "solid",
-              borderTopWidth: 0,
-              borderRightWidth: 0,
-              borderLeftWidth: "1px",
-              borderBottomWidth: "1px",
-              borderBottomLeftRadius: "6px",
-              position: "absolute",
-              top: "-19px",
-              left: "-7px",
-              transform: "translateX(-100%)",
-            }
+                content: "''",
+                width: "18px",
+                height: "12px",
+                borderColor: "gray.400",
+                borderStyle: "solid",
+                borderTopWidth: 0,
+                borderRightWidth: 0,
+                borderLeftWidth: "1px",
+                borderBottomWidth: "1px",
+                borderBottomLeftRadius: "6px",
+                position: "absolute",
+                top: "-19px",
+                left: "-7px",
+                transform: "translateX(-100%)",
+              }
             : undefined
         }
       />
@@ -126,20 +126,24 @@ const SpanNode: React.FC<SpanNodeProps> = ({ span, level, lastChild }) => {
             <SpanTypeTag span={span} />
           </HStack>
           <VStack align="start">
-            <Text>{span.name ?? span.model}</Text>
+            <Text>
+              {span.name ?? span.model ?? (
+                <Text color="gray.400">(unnamed)</Text>
+              )}
+            </Text>
             <HStack fontSize={13} color="gray.500">
               <SpanDuration span={span} />
               {(span.metrics?.prompt_tokens !== undefined ||
                 span.metrics?.completion_tokens !== undefined) && (
-                  <>
-                    <Text>·</Text>
-                    <Text>
-                      {(span.metrics?.prompt_tokens ?? 0) +
-                        (span.metrics?.completion_tokens ?? 0)}{" "}
-                      tokens
-                    </Text>
-                  </>
-                )}
+                <>
+                  <Text>·</Text>
+                  <Text>
+                    {(span.metrics?.prompt_tokens ?? 0) +
+                      (span.metrics?.completion_tokens ?? 0)}{" "}
+                    tokens
+                  </Text>
+                </>
+              )}
               {span.metrics?.cost !== undefined &&
                 span.metrics?.cost !== null && (
                   <>
@@ -194,13 +198,13 @@ const SpanTypeTag = ({ span }: { span: ElasticSearchSpan }) => {
         span.error
           ? "red"
           : {
-            llm: "green",
-            agent: "blue",
-            chain: "blue",
-            tool: "orange",
-            span: "gray",
-            rag: "red",
-          }[span.type]
+              llm: "green",
+              agent: "blue",
+              chain: "blue",
+              tool: "orange",
+              span: "gray",
+              rag: "red",
+            }[span.type]
       }
       fontSize={13}
     >
@@ -251,13 +255,9 @@ export function SpanTree(props?: SpanTreeProps) {
     { enabled: !!project && !!traceId, refetchOnWindowFocus: false }
   );
 
-  const spanIdDev = spans?.data ? spans.data[0]?.span_id : undefined;
-
   const span = spanId
-    ? spans.data?.find((span) => span.span_id === spanIdDev)
-    : spanIdDev
-      ? spans.data?.[0]
-      : undefined;
+    ? spans.data?.find((span) => span.span_id === spanId)
+    : spans.data?.[0];
 
   useEffect(() => {
     if (
@@ -279,7 +279,7 @@ export function SpanTree(props?: SpanTreeProps) {
   }
 
   return (
-    <VStack width="full" >
+    <VStack width="full">
       {spans.data ? (
         <HStack
           align="start"
@@ -299,6 +299,11 @@ export function SpanTree(props?: SpanTreeProps) {
               <VStack align="start" color="gray.500">
                 <HStack>
                   <Text>
+                    <b>Span ID:</b> <Text as="code">{span.span_id}</Text>
+                  </Text>
+                </HStack>
+                <HStack>
+                  <Text>
                     <b>Timestamp:</b>{" "}
                     {new Date(span.timestamps.started_at).toISOString()}
                   </Text>
@@ -311,14 +316,14 @@ export function SpanTree(props?: SpanTreeProps) {
                 </HStack>
                 {(span.metrics?.prompt_tokens !== undefined ||
                   span.metrics?.completion_tokens !== undefined) && (
-                    <Text>
-                      <b>Tokens:</b>{" "}
-                      {(span.metrics?.prompt_tokens ?? 0) +
-                        " prompt + " +
-                        (span.metrics?.completion_tokens ?? 0) +
-                        " completion"}
-                    </Text>
-                  )}
+                  <Text>
+                    <b>Tokens:</b>{" "}
+                    {(span.metrics?.prompt_tokens ?? 0) +
+                      " prompt + " +
+                      (span.metrics?.completion_tokens ?? 0) +
+                      " completion"}
+                  </Text>
+                )}
                 {(span.vendor !== undefined || span.model !== undefined) && (
                   <Text>
                     <b>Model:</b>{" "}
