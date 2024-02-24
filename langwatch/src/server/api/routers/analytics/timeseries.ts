@@ -22,9 +22,11 @@ import {
 } from "./common";
 import { prisma } from "../../../db";
 
-const labelsMapping: Record<
-  FlattenAnalyticsGroupsEnum,
-  (projectId: string) => Promise<Record<string, string>>
+const labelsMapping: Partial<
+  Record<
+    FlattenAnalyticsGroupsEnum,
+    (projectId: string) => Promise<Record<string, string>>
+  >
 > = {
   "topics.topics": async (projectId: string) => {
     const topics = await prisma.topic.findMany({
@@ -113,7 +115,7 @@ export const getTimeseries = protectedProcedure
       const group = getGroup(input.groupBy);
       aggs = group.aggregation(aggs);
       if (labelsMapping[input.groupBy]) {
-        groupLabelsMapping = await labelsMapping[input.groupBy](
+        groupLabelsMapping = await labelsMapping[input.groupBy]?.(
           input.projectId
         );
       }

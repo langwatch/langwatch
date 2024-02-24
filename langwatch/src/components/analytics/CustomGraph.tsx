@@ -11,9 +11,12 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
+  Cell,
   Legend,
   Line,
   LineChart,
+  Pie,
+  PieChart,
   ResponsiveContainer,
   Scatter,
   ScatterChart,
@@ -35,6 +38,15 @@ import { uppercaseFirstLetter } from "../../utils/stringCasing";
 import type { Unpacked } from "../../utils/types";
 import type { RotatingColorSet } from "../../utils/rotatingColors";
 import type { Payload } from "recharts/types/component/DefaultTooltipContent";
+import type {
+  AggregationTypes,
+  PipelineAggregationTypes,
+} from "../../server/analytics/types";
+
+type Series = Unpacked<z.infer<typeof timeseriesInput>["series"]> & {
+  name: string;
+  colorSet: RotatingColorSet;
+};
 
 export type CustomGraphInput = {
   graphId: string;
@@ -44,19 +56,18 @@ export type CustomGraphInput = {
     | "stacked_bar"
     | "area"
     | "stacked_area"
-    | "scatter";
-  series: (Unpacked<z.infer<typeof timeseriesInput>["series"]> & {
-    name: string;
-    colorSet: RotatingColorSet;
-  })[];
+    | "scatter"
+    | "pie"
+    | "donnut";
+  series: Series[];
   groupBy: z.infer<typeof timeseriesInput>["groupBy"];
   includePrevious: boolean;
   connected?: boolean;
 };
 
-const GraphComponentMap: {
+const GraphComponentMap: Partial<{
   [K in CustomGraphInput["graphType"]]: [React.Component, React.Component];
-} = {
+}> = {
   line: [LineChart as any, Line as any],
   bar: [BarChart as any, Bar as any],
   stacked_bar: [BarChart as any, Bar as any],
@@ -65,310 +76,405 @@ const GraphComponentMap: {
   scatter: [ScatterChart as any, Scatter as any],
 };
 
-export function CustomGraph({ input }: { input: CustomGraphInput }) {
-  const { analyticsParams, queryOpts } = useAnalyticsParams();
-  const { projectId, startDate, endDate } = analyticsParams;
+export const CustomGraph = React.memo(
+  function CustomGraph({ input }: { input: CustomGraphInput }) {
+    const { analyticsParams, queryOpts } = useAnalyticsParams();
+    const { projectId, startDate, endDate } = analyticsParams;
 
-  const timeseries = api.analytics.getTimeseries.useQuery(
-    {
-      projectId,
-      startDate,
-      endDate,
-      filters: {},
-      ...input,
-    },
-    queryOpts
-  );
+    const timeseries = api.analytics.getTimeseries.useQuery(
+      {
+        projectId,
+        startDate,
+        endDate,
+        filters: {},
+        ...input,
+      },
+      queryOpts
+    );
 
-  const currentAndPreviousData = shapeDataForGraph(input, timeseries);
-  const expectedKeys = Array.from(
-    new Set(
-      currentAndPreviousData?.flatMap((entry) =>
-        Object.keys(entry).filter(
-          (key) => key !== "date" && !key.startsWith("previous")
-        )
-      ) ?? []
-    )
-  );
-  const currentAndPreviousDataFilled =
-    input.graphType === "scatter"
-      ? currentAndPreviousData
-      : fillEmptyData(currentAndPreviousData, expectedKeys);
-  const keysToSum = Object.fromEntries(
-    expectedKeys.map((key) => [
-      key,
-      currentAndPreviousDataFilled?.reduce(
-        (acc, entry) => acc + (entry[key] ?? 0),
-        0
-      ),
-    ])
-  );
-  const sortedKeys = expectedKeys
-    .filter((key) => keysToSum[key]! !== 0)
-    .sort((a, b) => {
-      const totalA = keysToSum[a]!;
-      const totalB = keysToSum[b]!;
+    const currentAndPreviousData = shapeDataForGraph(input, timeseries);
+    const expectedKeys = Array.from(
+      new Set(
+        currentAndPreviousData?.flatMap((entry) =>
+          Object.keys(entry).filter(
+            (key) => key !== "date" && !key.startsWith("previous")
+          )
+        ) ?? []
+      )
+    );
+    const currentAndPreviousDataFilled =
+      input.graphType === "scatter"
+        ? currentAndPreviousData
+        : fillEmptyData(currentAndPreviousData, expectedKeys);
+    const keysToSum = Object.fromEntries(
+      expectedKeys.map((key) => [
+        key,
+        currentAndPreviousDataFilled?.reduce(
+          (acc, entry) => acc + (entry[key] ?? 0),
+          0
+        ),
+      ])
+    );
+    const sortedKeys = expectedKeys
+      .filter((key) => keysToSum[key]! !== 0)
+      .sort((a, b) => {
+        const totalA = keysToSum[a]!;
+        const totalB = keysToSum[b]!;
 
-      return totalB - totalA;
-    });
+        return totalB - totalA;
+      });
 
-  const seriesByKey = Object.fromEntries(
-    input.series.map((series) => {
-      const key = [
-        series.metric,
-        series.aggregation,
-        series.pipeline?.field,
-        series.pipeline?.aggregation,
-      ]
-        .filter((x) => x)
-        .join("/");
-
-      return [key, series];
-    })
-  );
-
-  const getSeries = (aggKey: string) => {
-    let groupKey: string | undefined;
-    let seriesKey = aggKey;
-
-    const parts = aggKey.split(">");
-    if (parts.length == 2) {
-      groupKey = parts[0];
-      seriesKey = parts[1]!;
-    }
-    const series = seriesByKey[seriesKey];
-
-    return { series, groupKey };
-  };
-
-  const nameForSeries = (aggKey: string) => {
-    const { series, groupKey } = getSeries(aggKey);
-
-    const group =
-      input.groupBy && groupKey ? getGroup(input.groupBy) : undefined;
-    const groupName = groupKey
-      ? `${group?.label.toLowerCase()} ${groupKey}`
-      : "";
-    return input.series.length > 1
-      ? (series?.name ?? aggKey) + (groupName ? ` (${groupName})` : "")
-      : groupName
-      ? uppercaseFirstLetter(groupName)
-      : series?.name ?? aggKey;
-  };
-
-  const colorForSeries = (aggKey: string, index: number): string => {
-    const { series, groupKey } = getSeries(aggKey);
-
-    const colorSet: RotatingColorSet = series?.colorSet ?? "grayTones";
-
-    if (colorSet === "positiveNegativeNeutral" && groupKey) {
-      const [positive, negative, neutral] = [0, 1, 2];
-      const colorMap: Record<string, number> = {
-        positive,
-        negative,
-        neutral,
-        error: negative,
-        failed: negative,
-        succeeded: positive,
-      };
-
-      return getColor(colorSet, colorMap[groupKey] ?? neutral);
-    }
-
-    return getColor(colorSet, index);
-  };
-
-  const formatWith = (
-    format: string | ((value: number) => string) | undefined,
-    value: number
-  ) => {
-    if (typeof format === "function") {
-      return format(value);
-    }
-    return numeral(value).format(format ?? "0a");
-  };
-
-  const valueFormats = Array.from(
-    new Set(
+    const seriesByKey = Object.fromEntries(
       input.series.map((series) => {
-        const metric = getMetric(series.metric);
-        return metric?.format ?? "0a";
+        const key = [
+          series.metric,
+          series.aggregation,
+          series.pipeline?.field,
+          series.pipeline?.aggregation,
+        ]
+          .filter((x) => x)
+          .join("/");
+
+        return [key, series];
       })
-    )
-  );
-  const yAxisValueFormat = valueFormats.length === 1 ? valueFormats[0] : "";
-  const keysToMax = Object.fromEntries(
-    expectedKeys.map((key) => [
-      key,
-      currentAndPreviousDataFilled?.reduce(
-        (acc, entry) => Math.max(acc, entry[key] ?? 0),
-        0
-      ) ?? 0,
-    ])
-  );
-  const maxValue = formatWith(
-    yAxisValueFormat,
-    Math.max(...Object.values(keysToMax))
-  );
+    );
 
-  const getColor = useGetRotatingColorForCharts();
-  const theme = useTheme();
-  const gray400 = theme.colors.gray["400"];
+    const nameForSeries = (aggKey: string) => {
+      const { series, groupKey } = getSeries(seriesByKey, aggKey);
 
-  const formatDate = (date: string) => date && format(new Date(date), "MMM d");
-  const tooltipValueFormatter = (
-    value: number | string,
-    _: string,
-    payload: Payload<any, any>
-  ) => {
-    if (payload.dataKey === "date") {
-      return formatDate(value as string);
-    }
-    const { series } = getSeries(payload.dataKey as string);
-    const metric = series?.metric && getMetric(series.metric);
+      const group =
+        input.groupBy && groupKey ? getGroup(input.groupBy) : undefined;
+      const groupName = groupKey
+        ? `${group?.label.toLowerCase()} ${groupKey}`
+        : "";
+      return input.series.length > 1
+        ? (series?.name ?? aggKey) + (groupName ? ` (${groupName})` : "")
+        : groupName
+        ? uppercaseFirstLetter(groupName)
+        : series?.name ?? aggKey;
+    };
 
-    return formatWith(metric?.format, value as number);
-  };
+    const colorForSeries = (aggKey: string, index: number): string => {
+      const { series, groupKey } = getSeries(seriesByKey, aggKey);
 
-  const [GraphComponent, GraphElement] = GraphComponentMap[input.graphType];
+      const colorSet: RotatingColorSet = series?.colorSet ?? "grayTones";
 
-  return (
-    <Box
-      width="full"
-      height="full"
-      position="relative"
-      paddingX={4}
-      paddingY={8}
-    >
-      {timeseries.isFetching && (
-        <Spinner position="absolute" right={4} top={4} />
-      )}
-      {timeseries.error && (
-        <Alert
-          status="error"
-          position="absolute"
-          variant="left-accent"
-          width="fit-content"
-          right={4}
-          top={4}
+      if (colorSet === "positiveNegativeNeutral" && groupKey) {
+        const [positive, negative, neutral] = [0, 1, 2];
+        const colorMap: Record<string, number> = {
+          positive,
+          negative,
+          neutral,
+          error: negative,
+          failed: negative,
+          succeeded: positive,
+        };
+
+        return getColor(colorSet, colorMap[groupKey] ?? neutral);
+      }
+
+      return getColor(colorSet, index);
+    };
+
+    const formatWith = (
+      format: string | ((value: number) => string) | undefined,
+      value: number
+    ) => {
+      if (typeof format === "function") {
+        return format(value);
+      }
+      return numeral(value).format(format ?? "0a");
+    };
+
+    const valueFormats = Array.from(
+      new Set(
+        input.series.map((series) => {
+          const metric = getMetric(series.metric);
+          return metric?.format ?? "0a";
+        })
+      )
+    );
+    const yAxisValueFormat = valueFormats.length === 1 ? valueFormats[0] : "";
+    const keysToMax = Object.fromEntries(
+      expectedKeys.map((key) => [
+        key,
+        currentAndPreviousDataFilled?.reduce(
+          (acc, entry) => Math.max(acc, entry[key] ?? 0),
+          0
+        ) ?? 0,
+      ])
+    );
+    const maxValue = formatWith(
+      yAxisValueFormat,
+      Math.max(...Object.values(keysToMax))
+    );
+
+    const getColor = useGetRotatingColorForCharts();
+    const theme = useTheme();
+    const gray400 = theme.colors.gray["400"];
+
+    const formatDate = (date: string) =>
+      date && format(new Date(date), "MMM d");
+    const tooltipValueFormatter = (
+      value: number | string,
+      _: string,
+      payload: Payload<any, any>
+    ) => {
+      if (payload.dataKey === "date") {
+        return formatDate(value as string);
+      }
+      const { series } = getSeries(
+        seriesByKey,
+        payload.payload?.key ?? (payload.dataKey as string)
+      );
+      const metric = series?.metric && getMetric(series.metric);
+
+      return formatWith(metric?.format, value as number);
+    };
+
+    const Container = ({ children }: React.PropsWithChildren) => {
+      return (
+        <Box
+          width="full"
+          height="full"
+          position="relative"
+          paddingX={4}
+          paddingY={8}
         >
-          <AlertIcon />
-          Error loading graph data
-        </Alert>
-      )}
-      <ResponsiveContainer
-        key={currentAndPreviousDataFilled ? input.graphId : "loading"}
-        height={500}
-      >
-        <GraphComponent
-          data={currentAndPreviousDataFilled}
-          margin={{ top: 10, left: maxValue.length * 6 - 5 }}
-        >
-          <CartesianGrid
-            vertical={input.graphType === "scatter"}
-            strokeDasharray="5 7"
-          />
-          <XAxis
-            dataKey="date"
-            name="Date"
-            tickFormatter={formatDate}
-            tickLine={false}
-            axisLine={false}
-            tick={{ fill: gray400 }}
-          />
-          <YAxis
-            axisLine={false}
-            tickLine={false}
-            tickCount={4}
-            tickMargin={20}
-            domain={[0, "dataMax"]}
-            tick={{ fill: gray400 }}
-            tickFormatter={(value) => {
-              if (typeof yAxisValueFormat === "function") {
-                return yAxisValueFormat(value);
-              }
-              return numeral(value).format(yAxisValueFormat);
-            }}
-          />
-          <Tooltip
-            formatter={tooltipValueFormatter}
-            labelFormatter={(_label, payload) => {
-              if (input.graphType === "scatter") return "";
-              return (
-                formatDate(payload[0]?.payload.date) +
-                (input.includePrevious && payload[1]?.payload["previous>date"]
-                  ? " vs " + formatDate(payload[1]?.payload["previous>date"])
-                  : "")
-              );
-            }}
-          />
-          <Legend
-            wrapperStyle={{
-              padding: "0 2rem",
-              maxHeight: "15%",
-              overflow: "auto",
-            }}
-          />
-          {(sortedKeys ?? []).map((aggKey, index) => (
-            <React.Fragment key={aggKey}>
-              {/* @ts-ignore */}
-              <GraphElement
-                key={aggKey}
-                type="linear"
-                dataKey={aggKey}
-                stroke={colorForSeries(aggKey, index)}
-                stackId={
-                  ["stacked_bar", "stacked_area"].includes(input.graphType)
-                    ? "same"
-                    : undefined
-                }
-                fill={colorForSeries(aggKey, index)}
-                strokeWidth={2.5}
-                dot={false}
-                activeDot={input.graphType !== "scatter" ? { r: 8 } : undefined}
-                name={nameForSeries(aggKey)}
-                line={
-                  input.graphType === "scatter" && input.connected
-                    ? true
-                    : undefined
-                }
+          {timeseries.isFetching && (
+            <Spinner position="absolute" right={4} top={4} />
+          )}
+          {timeseries.error && (
+            <Alert
+              status="error"
+              position="absolute"
+              variant="left-accent"
+              width="fit-content"
+              right={4}
+              top={4}
+            >
+              <AlertIcon />
+              Error loading graph data
+            </Alert>
+          )}
+          {children}
+        </Box>
+      );
+    };
+
+    if (input.graphType === "pie" || input.graphType === "donnut") {
+      const summaryData = shapeDataForSummary(input, seriesByKey, timeseries);
+      const pieData = summaryData.current.map((entry) => ({
+        ...entry,
+        name: nameForSeries(entry.key),
+      }));
+
+      return (
+        <Container>
+          <ResponsiveContainer
+            key={currentAndPreviousDataFilled ? input.graphId : "loading"}
+            height={500}
+          >
+            <PieChart>
+              <Pie
+                data={pieData}
+                nameKey="name"
+                dataKey="value"
+                labelLine={false}
+                label={pieChartPercentageLabel}
+                innerRadius={input.graphType === "donnut" ? "50%" : 0}
+              >
+                {pieData.map((entry, index) => (
+                  <Cell
+                    key={`cell-${index}`}
+                    fill={colorForSeries(entry.key, index)}
+                  />
+                ))}
+              </Pie>
+              <Tooltip formatter={tooltipValueFormatter} />
+              <Legend
+                wrapperStyle={{
+                  padding: "0 2rem",
+                  maxHeight: "15%",
+                  overflow: "auto",
+                }}
               />
-              {input.includePrevious && (
-                // @ts-ignore
+            </PieChart>
+          </ResponsiveContainer>
+        </Container>
+      );
+    }
+
+    const [GraphComponent, GraphElement] = GraphComponentMap[input.graphType]!;
+
+    return (
+      <Container>
+        <ResponsiveContainer
+          key={currentAndPreviousDataFilled ? input.graphId : "loading"}
+          height={500}
+        >
+          <GraphComponent
+            data={currentAndPreviousDataFilled}
+            margin={{ top: 10, left: maxValue.length * 6 - 5 }}
+          >
+            <CartesianGrid
+              vertical={input.graphType === "scatter"}
+              strokeDasharray="5 7"
+            />
+            <XAxis
+              dataKey="date"
+              name="Date"
+              tickFormatter={formatDate}
+              tickLine={false}
+              axisLine={false}
+              tick={{ fill: gray400 }}
+            />
+            <YAxis
+              axisLine={false}
+              tickLine={false}
+              tickCount={4}
+              tickMargin={20}
+              domain={[0, "dataMax"]}
+              tick={{ fill: gray400 }}
+              tickFormatter={(value) => {
+                if (typeof yAxisValueFormat === "function") {
+                  return yAxisValueFormat(value);
+                }
+                return numeral(value).format(yAxisValueFormat);
+              }}
+            />
+            <Tooltip
+              formatter={tooltipValueFormatter}
+              labelFormatter={(_label, payload) => {
+                if (input.graphType === "scatter") return "";
+                return (
+                  formatDate(payload[0]?.payload.date) +
+                  (input.includePrevious && payload[1]?.payload["previous>date"]
+                    ? " vs " + formatDate(payload[1]?.payload["previous>date"])
+                    : "")
+                );
+              }}
+            />
+            <Legend
+              wrapperStyle={{
+                padding: "0 2rem",
+                maxHeight: "15%",
+                overflow: "auto",
+              }}
+            />
+            {(sortedKeys ?? []).map((aggKey, index) => (
+              <React.Fragment key={aggKey}>
+                {/* @ts-ignore */}
                 <GraphElement
-                  key={"previous>" + aggKey}
+                  key={aggKey}
                   type="linear"
-                  dataKey={"previous>" + aggKey}
+                  dataKey={aggKey}
+                  stroke={colorForSeries(aggKey, index)}
                   stackId={
                     ["stacked_bar", "stacked_area"].includes(input.graphType)
                       ? "same"
                       : undefined
                   }
-                  stroke={colorForSeries(aggKey, index) + "99"}
-                  fill={colorForSeries(aggKey, index) + "99"}
+                  fill={colorForSeries(aggKey, index)}
                   strokeWidth={2.5}
-                  strokeDasharray={
-                    input.graphType !== "scatter" ? "5 5" : undefined
-                  }
                   dot={false}
                   activeDot={
                     input.graphType !== "scatter" ? { r: 8 } : undefined
                   }
-                  name={"Previous " + nameForSeries(aggKey)}
+                  name={nameForSeries(aggKey)}
                   line={
                     input.graphType === "scatter" && input.connected
                       ? true
                       : undefined
                   }
                 />
-              )}
-            </React.Fragment>
-          ))}
-        </GraphComponent>
-      </ResponsiveContainer>
-    </Box>
+                {input.includePrevious && (
+                  // @ts-ignore
+                  <GraphElement
+                    key={"previous>" + aggKey}
+                    type="linear"
+                    dataKey={"previous>" + aggKey}
+                    stackId={
+                      ["stacked_bar", "stacked_area"].includes(input.graphType)
+                        ? "same"
+                        : undefined
+                    }
+                    stroke={colorForSeries(aggKey, index) + "99"}
+                    fill={colorForSeries(aggKey, index) + "99"}
+                    strokeWidth={2.5}
+                    strokeDasharray={
+                      input.graphType !== "scatter" ? "5 5" : undefined
+                    }
+                    dot={false}
+                    activeDot={
+                      input.graphType !== "scatter" ? { r: 8 } : undefined
+                    }
+                    name={"Previous " + nameForSeries(aggKey)}
+                    line={
+                      input.graphType === "scatter" && input.connected
+                        ? true
+                        : undefined
+                    }
+                  />
+                )}
+              </React.Fragment>
+            ))}
+          </GraphComponent>
+        </ResponsiveContainer>
+      </Container>
+    );
+  }
+  // (prevProps, nextProps) => {
+  //   return JSON.stringify(prevProps.input) === JSON.stringify(nextProps.input);
+  // }
+);
+
+const RADIAN = Math.PI / 180;
+const pieChartPercentageLabel = ({
+  cx,
+  cy,
+  midAngle,
+  innerRadius,
+  outerRadius,
+  percent,
+}: {
+  cx: number;
+  cy: number;
+  midAngle: number;
+  innerRadius: number;
+  outerRadius: number;
+  percent: number;
+}) => {
+  const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
+  const x = cx + radius * Math.cos(-midAngle * RADIAN);
+  const y = cy + radius * Math.sin(-midAngle * RADIAN);
+
+  return (
+    <text
+      x={x}
+      y={y}
+      fill="white"
+      textAnchor="middle"
+      dominantBaseline="central"
+    >
+      {`${(percent * 100).toFixed(0)}%`}
+    </text>
   );
-}
+};
+
+const getSeries = (seriesByKey: Record<string, Series>, aggKey: string) => {
+  let groupKey: string | undefined;
+  let seriesKey = aggKey;
+
+  const parts = aggKey.split(">");
+  if (parts.length == 2) {
+    groupKey = parts[0];
+    seriesKey = parts[1]!;
+  }
+  const series = seriesByKey[seriesKey];
+
+  return { series, groupKey };
+};
 
 const shapeDataForGraph = (
   input: CustomGraphInput,
@@ -377,37 +483,10 @@ const shapeDataForGraph = (
     TRPCClientErrorLike<AppRouter>
   >
 ) => {
-  const flattenGroupData = (
-    data: NonNullable<(typeof timeseries)["data"]>["currentPeriod"]
-  ) => {
-    const groupBy = input.groupBy;
-    if (groupBy) {
-      return data.map((entry) => {
-        const buckets = entry[groupBy] as Record<
-          string,
-          Record<string, number>
-        >;
-        const aggregations = Object.fromEntries(
-          Object.entries(buckets).flatMap(([bucketKey, bucket]) => {
-            return Object.entries(bucket).map(([metricKey, metricValue]) => {
-              return [`${bucketKey}>${metricKey}`, metricValue ?? 0];
-            });
-          })
-        );
-
-        return {
-          date: entry.date,
-          ...aggregations,
-        };
-      });
-    }
-    return data;
-  };
-
   const flattenCurrentPeriod =
-    timeseries.data && flattenGroupData(timeseries.data.currentPeriod);
+    timeseries.data && flattenGroupData(input, timeseries.data.currentPeriod);
   const flattenPreviousPeriod =
-    timeseries.data && flattenGroupData(timeseries.data.previousPeriod);
+    timeseries.data && flattenGroupData(input, timeseries.data.previousPeriod);
 
   const currentAndPreviousData =
     flattenCurrentPeriod &&
@@ -426,6 +505,105 @@ const shapeDataForGraph = (
   return currentAndPreviousData as
     | ({ date: string } & Record<string, number>)[]
     | undefined;
+};
+
+const shapeDataForSummary = (
+  input: CustomGraphInput,
+  seriesByKey: Record<string, Series>,
+  timeseries: UseTRPCQueryResult<
+    inferRouterOutputs<AppRouter>["analytics"]["getTimeseries"],
+    TRPCClientErrorLike<AppRouter>
+  >
+) => {
+  const flattenCurrentPeriod =
+    timeseries.data && flattenGroupData(input, timeseries.data.currentPeriod);
+  const flattenPreviousPeriod =
+    timeseries.data && flattenGroupData(input, timeseries.data.previousPeriod);
+
+  const collectedCurrent = collectAllDays(flattenCurrentPeriod ?? []);
+  const collectedPrevious = collectAllDays(flattenPreviousPeriod ?? []);
+
+  const reduceOperations: Record<
+    AggregationTypes | PipelineAggregationTypes,
+    (values: number[]) => number
+  > = {
+    cardinality: (values: number[]) =>
+      values.reduce((acc, value) => acc + value, 0),
+    sum: (values: number[]) => values.reduce((acc, value) => acc + value, 0),
+    avg: (values: number[]) =>
+      values.reduce((acc, value) => acc + value, 0) / values.length,
+    min: (values: number[]) => Math.min(...values),
+    max: (values: number[]) => Math.max(...values),
+  };
+
+  const reduceToSummary = (data: Record<string, number[]>) => {
+    return Object.entries(data).map(([aggKey, values]) => {
+      const { series } = getSeries(seriesByKey, aggKey);
+
+      return {
+        key: aggKey,
+        value:
+          reduceOperations[
+            series?.pipeline?.aggregation ?? series?.aggregation ?? "sum"
+          ](values),
+      };
+    });
+  };
+
+  return {
+    current: reduceToSummary(collectedCurrent),
+    previous: reduceToSummary(collectedPrevious),
+  };
+};
+
+const collectAllDays = (
+  data: ({ date: string } & Record<string, number>)[]
+) => {
+  const result: Record<string, number[]> = {};
+
+  for (const entry of data) {
+    for (const key in entry) {
+      if (key === "date") continue;
+      if (!result[key]) {
+        result[key] = [];
+      }
+      result[key]!.push(entry[key]!);
+    }
+  }
+
+  return result;
+};
+
+const flattenGroupData = (
+  input: CustomGraphInput,
+  data: NonNullable<
+    UseTRPCQueryResult<
+      inferRouterOutputs<AppRouter>["analytics"]["getTimeseries"],
+      TRPCClientErrorLike<AppRouter>
+    >["data"]
+  >["currentPeriod"]
+): ({
+  date: string;
+} & Record<string, number>)[] => {
+  const groupBy = input.groupBy;
+  if (groupBy) {
+    return data.map((entry) => {
+      const buckets = entry[groupBy] as Record<string, Record<string, number>>;
+      const aggregations = Object.fromEntries(
+        Object.entries(buckets).flatMap(([bucketKey, bucket]) => {
+          return Object.entries(bucket).map(([metricKey, metricValue]) => {
+            return [`${bucketKey}>${metricKey}`, metricValue ?? 0];
+          });
+        })
+      );
+
+      return {
+        date: entry.date,
+        ...aggregations,
+      };
+    }) as any;
+  }
+  return data as any;
 };
 
 const fillEmptyData = (

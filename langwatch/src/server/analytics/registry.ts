@@ -15,12 +15,11 @@ import {
 } from "./types";
 import type { AggregationsAggregationContainer } from "@elastic/elasticsearch/lib/api/types";
 import { formatMilliseconds } from "../../utils/formatMilliseconds";
-import { prisma } from "../db";
 
 const simpleFieldAnalytics = (
   field: string
 ): Omit<AnalyticsMetric, "label" | "colorSet" | "allowedAggregations"> => ({
-  format: "0a",
+  format: "0.[00]a",
   aggregation: (aggregation: AggregationTypes) => ({
     [`${field.replaceAll(".", "_")}_${aggregation}`]: {
       [aggregation]: { field },
@@ -152,7 +151,7 @@ export const analyticsMetrics = {
     },
     completion_tokens: {
       ...simpleFieldAnalytics("trace.metrics.completion_tokens"),
-      label: "Prompt Tokens",
+      label: "Completion Tokens",
       colorSet: "blueTones",
       allowedAggregations: numericAggregationTypes,
     },
@@ -486,7 +485,6 @@ export const pipelineAggregationsToElasticSearch: {
   avg: "avg_bucket",
   min: "min_bucket",
   max: "max_bucket",
-  cumulative_sum: "cumulative_sum",
 };
 
 export const pipelineAggregations: Record<PipelineAggregationTypes, string> = {
@@ -494,7 +492,6 @@ export const pipelineAggregations: Record<PipelineAggregationTypes, string> = {
   sum: "sum",
   min: "minimum",
   max: "maximum",
-  cumulative_sum: "cumulative sum",
 };
 
 export const metricAggregations: Record<AggregationTypes, string> = {

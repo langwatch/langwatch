@@ -36,6 +36,7 @@ import { useEffect, useState, type Dispatch, type SetStateAction } from "react";
 import {
   BarChart2,
   GitBranch,
+  PieChart,
   Trash,
   TrendingUp,
   Triangle,
@@ -144,6 +145,16 @@ const chartOptions: CustomGraphFormData["graphType"][] = [
     value: "scatter",
     icon: <GitBranch />,
   },
+  {
+    label: "Pie Chart",
+    value: "pie",
+    icon: <PieChart />,
+  },
+  {
+    label: "Donnut Chart",
+    value: "donnut",
+    icon: <PieChart />,
+  },
 ];
 
 const defaultValues: CustomGraphFormData = {
@@ -178,20 +189,16 @@ export default function AnalyticsCustomGraph() {
   } = usePeriodSelector();
 
   const formData = JSON.stringify(form.watch() ?? {});
-  const [debouncedFormData, setDebouncedFormData] = useDebounceValue(
-    formData,
-    400
-  );
+  const [debouncedCustomGraphInput, setDebouncedCustomGraphInput] =
+    useDebounceValue<CustomGraphInput | undefined>(undefined, 400);
 
   useEffect(() => {
-    setDebouncedFormData(formData);
-  }, [formData, setDebouncedFormData]);
-
-  const customGraphInput =
-    debouncedFormData &&
-    customGraphFormToCustomGraphInput(
-      JSON.parse(debouncedFormData) as CustomGraphFormData
+    const customGraphInput = customGraphFormToCustomGraphInput(
+      JSON.parse(formData) as CustomGraphFormData
     );
+
+    setDebouncedCustomGraphInput(customGraphInput);
+  }, [formData, setDebouncedCustomGraphInput]);
 
   return (
     <DashboardLayout>
@@ -213,7 +220,9 @@ export default function AnalyticsCustomGraph() {
               <HStack width="full" align="start" minHeight="500px" spacing={8}>
                 <CustomGraphForm form={form} seriesFields={seriesFields} />
                 <Box border="1px solid" borderColor="gray.200" width="full">
-                  {customGraphInput && <CustomGraph input={customGraphInput} />}
+                  {debouncedCustomGraphInput && (
+                    <CustomGraph input={debouncedCustomGraphInput} />
+                  )}
                 </Box>
               </HStack>
             </CardBody>
@@ -349,7 +358,7 @@ function CustomGraphForm({
         <FormLabel>Group by</FormLabel>
         <Select
           {...groupByField}
-          onClick={(e) => {
+          onChange={(e) => {
             if (!form.getFieldState("includePrevious")?.isTouched) {
               form.setValue("includePrevious", false);
             }
@@ -435,7 +444,14 @@ function SeriesFieldItem({
       borderColor="gray.200"
       marginBottom={4}
     >
-      <AccordionButton background="gray.100" fontWeight="bold" paddingLeft={1}>
+      <AccordionButton
+        as={Box}
+        cursor="pointer"
+        role="button"
+        background="gray.100"
+        fontWeight="bold"
+        paddingLeft={1}
+      >
         <HStack width="full" spacing={4}>
           <HStack width="full" spacing={1}>
             <Menu>

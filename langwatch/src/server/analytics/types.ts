@@ -77,7 +77,6 @@ export const pipelineAggregationTypesEnum = z.enum([
   "avg",
   "min",
   "max",
-  "cumulative_sum",
 ]);
 
 export type PipelineAggregationTypes = z.infer<
