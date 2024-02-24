@@ -27,7 +27,7 @@ export function SummaryMetric({
 }) {
   return (
     <VStack
-      maxWidth="180"
+      maxWidth="192"
       spacing={4}
       align="start"
       justifyContent="space-between"
@@ -41,6 +41,9 @@ export function SummaryMetric({
         color="gray.500"
         fontWeight="normal"
         lineHeight="1.5em"
+        noOfLines={3}
+        wordBreak="break-word"
+        title={label}
       >
         {label}
         {tooltip && (

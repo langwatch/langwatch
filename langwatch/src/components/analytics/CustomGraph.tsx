@@ -31,6 +31,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import type { Payload } from "recharts/types/component/DefaultTooltipContent";
 import type { z } from "zod";
 import { useAnalyticsParams } from "../../hooks/useAnalyticsParams";
 import { useGetRotatingColorForCharts } from "../../hooks/useGetRotatingColorForCharts";
@@ -39,16 +40,15 @@ import {
   getMetric,
   type timeseriesInput,
 } from "../../server/analytics/registry";
-import type { AppRouter } from "../../server/api/root";
-import { api } from "../../utils/api";
-import { uppercaseFirstLetter } from "../../utils/stringCasing";
-import type { Unpacked } from "../../utils/types";
-import type { RotatingColorSet } from "../../utils/rotatingColors";
-import type { Payload } from "recharts/types/component/DefaultTooltipContent";
 import type {
   AggregationTypes,
   PipelineAggregationTypes,
 } from "../../server/analytics/types";
+import type { AppRouter } from "../../server/api/root";
+import { api } from "../../utils/api";
+import type { RotatingColorSet } from "../../utils/rotatingColors";
+import { uppercaseFirstLetter } from "../../utils/stringCasing";
+import type { Unpacked } from "../../utils/types";
 import { SummaryMetric } from "./SummaryMetric";
 
 type Series = Unpacked<z.infer<typeof timeseriesInput>["series"]> & {
@@ -75,14 +75,17 @@ export type CustomGraphInput = {
 };
 
 const GraphComponentMap: Partial<{
-  [K in CustomGraphInput["graphType"]]: [React.Component, React.Component];
+  [K in CustomGraphInput["graphType"]]: [
+    typeof LineChart | typeof BarChart | typeof AreaChart,
+    typeof Line | typeof Bar | typeof Area | typeof Scatter,
+  ];
 }> = {
-  line: [LineChart as any, Line as any],
-  bar: [BarChart as any, Bar as any],
-  stacked_bar: [BarChart as any, Bar as any],
-  area: [AreaChart as any, Area as any],
-  stacked_area: [AreaChart as any, Area as any],
-  scatter: [ScatterChart as any, Scatter as any],
+  line: [LineChart, Line],
+  bar: [BarChart, Bar],
+  stacked_bar: [BarChart, Bar],
+  area: [AreaChart, Area],
+  stacked_area: [AreaChart, Area],
+  scatter: [ScatterChart, Scatter],
 };
 
 export const CustomGraph = React.memo(
@@ -243,13 +246,7 @@ export const CustomGraph = React.memo(
 
     const Container = ({ children }: React.PropsWithChildren) => {
       return (
-        <Box
-          width="full"
-          height="full"
-          position="relative"
-          paddingX={4}
-          paddingY={8}
-        >
+        <Box width="full" height="full" position="relative">
           {timeseries.isFetching && (
             <Spinner position="absolute" right={4} top={4} />
           )}
@@ -281,8 +278,8 @@ export const CustomGraph = React.memo(
 
       return (
         <Container>
-          <HStack spacing={0}>
-            {summaryData.current.map((entry, index) => (
+          <HStack spacing={0} align="start">
+            {summaryData.current.slice(0, 10).map((entry, index) => (
               <SummaryMetric
                 key={entry.key}
                 label={entry.name}
@@ -351,7 +348,7 @@ export const CustomGraph = React.memo(
         >
           <GraphComponent
             data={currentAndPreviousDataFilled}
-            margin={{ top: 10, left: maxValue.length * 6 - 5 }}
+            margin={{ top: 10, left: maxValue.length * 6 - 5, right: 24 }}
           >
             <CartesianGrid
               vertical={input.graphType === "scatter"}

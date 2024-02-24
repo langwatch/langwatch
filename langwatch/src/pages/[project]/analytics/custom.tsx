@@ -8,6 +8,7 @@ import {
   Button,
   Card,
   CardBody,
+  CardHeader,
   Center,
   Container,
   FormControl,
@@ -68,6 +69,7 @@ import {
   analyticsGroups,
   analyticsMetrics,
   analyticsPipelines,
+  getGroup,
   getMetric,
   metricAggregations,
   pipelineAggregations,
@@ -93,6 +95,7 @@ import {
 } from "../../../utils/stringCasing";
 
 export interface CustomGraphFormData {
+  title: string;
   graphType: {
     label: string;
     value: CustomGraphInput["graphType"];
@@ -164,6 +167,7 @@ const chartOptions: CustomGraphFormData["graphType"][] = [
 ];
 
 const defaultValues: CustomGraphFormData = {
+  title: "Messages count",
   graphType: chartOptions[1]!,
   series: [
     {
@@ -221,18 +225,28 @@ export default function AnalyticsCustomGraph() {
               setPeriod={setPeriod}
             />
           </HStack>
-          <Card width="full">
-            <CardBody>
-              <HStack width="full" align="start" minHeight="500px" spacing={8}>
+          <HStack width="full" align="start" minHeight="500px" spacing={8}>
+            <Card minWidth="540px" minHeight="596px">
+              <CardBody>
                 <CustomGraphForm form={form} seriesFields={seriesFields} />
-                <Box border="1px solid" borderColor="gray.200" width="full">
-                  {debouncedCustomGraphInput && (
-                    <CustomGraph input={debouncedCustomGraphInput} />
-                  )}
-                </Box>
-              </HStack>
-            </CardBody>
-          </Card>
+              </CardBody>
+            </Card>
+            <Card width="full">
+              <CardHeader paddingTop={3} paddingBottom={1} paddingX={3}>
+                <Input
+                  {...form.control.register(`title`)}
+                  border="none"
+                  paddingX={2}
+                  fontWeight="bold"
+                />
+              </CardHeader>
+              <CardBody>
+                {debouncedCustomGraphInput && (
+                  <CustomGraph input={debouncedCustomGraphInput} />
+                )}
+              </CardBody>
+            </Card>
+          </HStack>
         </VStack>
       </Container>
     </DashboardLayout>
@@ -290,6 +304,24 @@ function CustomGraphForm({
   const [expandedSeries, setExpandedSeries] = useState<number | number[]>([0]);
   const groupByField = form.control.register("groupBy");
   const graphType = form.watch("graphType");
+  const groupBy = form.watch("groupBy");
+
+  const joinedSeriesNames = form
+    .watch()
+    .series.map((s) => s.name)
+    .join(", ");
+
+  useEffect(() => {
+    if (!form.getFieldState("title")?.isTouched) {
+      let suggestedTitle = joinedSeriesNames.replace(/,([^,]*)$/, " and$1");
+
+      if (groupBy) {
+        suggestedTitle += ` grouped by ${getGroup(groupBy).label}`;
+      }
+
+      form.setValue("title", uppercaseFirstLetterLowerCaseRest(suggestedTitle));
+    }
+  }, [form, groupBy, joinedSeriesNames]);
 
   return (
     <VStack width="full" align="start" spacing={4} maxWidth="500px">
@@ -390,18 +422,20 @@ function CustomGraphForm({
           ))}
         </Select>
       </FormControl>
-      <FormControl>
-        <Controller
-          control={form.control}
-          name="includePrevious"
-          defaultValue={false}
-          render={({ field: { onChange, value } }) => (
-            <Switch onChange={onChange} isChecked={value}>
-              Include previous period
-            </Switch>
-          )}
-        />
-      </FormControl>
+      {!["summary", "pie", "donnut"].includes(graphType.value) && (
+        <FormControl>
+          <Controller
+            control={form.control}
+            name="includePrevious"
+            defaultValue={false}
+            render={({ field: { onChange, value } }) => (
+              <Switch onChange={onChange} isChecked={value}>
+                Include previous period
+              </Switch>
+            )}
+          />
+        </FormControl>
+      )}
     </VStack>
   );
 }
