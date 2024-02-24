@@ -9,6 +9,7 @@ import {
 import { getTestUser } from "../../../../utils/testUtils";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
+import { prisma } from "../../../db";
 
 describe("Timeseries Graph Integration Tests", () => {
   const pivotEntries: TracesPivot[] = [
@@ -21,7 +22,7 @@ describe("Timeseries Graph Integration Tests", () => {
           customer_id: "customer-id-1",
           labels: ["test-messages"],
           thread_id: "test-thread-id",
-          topic_id: "greetings",
+          topic_id: "topic_id_greetings",
         },
         timestamps: {
           inserted_at: new Date().getTime(),
@@ -61,7 +62,7 @@ describe("Timeseries Graph Integration Tests", () => {
           customer_id: "customer-id-1",
           labels: ["test-messages"],
           thread_id: "test-thread-id-2",
-          topic_id: "greetings",
+          topic_id: "topic_id_greetings",
         },
         timestamps: {
           inserted_at: new Date().getTime(),
@@ -101,7 +102,7 @@ describe("Timeseries Graph Integration Tests", () => {
           customer_id: "customer-id-1",
           labels: ["test-messages"],
           thread_id: "test-thread-id-3",
-          topic_id: "poems",
+          topic_id: "topic_id_poems",
         },
         timestamps: {
           inserted_at: new Date().getTime(),
@@ -157,6 +158,28 @@ describe("Timeseries Graph Integration Tests", () => {
   ];
 
   beforeAll(async () => {
+    await prisma.topic.createMany({
+      data: [
+        {
+          id: "topic_id_greetings",
+          name: "greetings",
+          projectId: "test-project-id",
+          embeddings_model: "test-embeddings-model",
+          centroid: [],
+          p95Distance: 0,
+        },
+        {
+          id: "topic_id_poems",
+          name: "poems",
+          projectId: "test-project-id",
+          embeddings_model: "test-embeddings-model",
+          centroid: [],
+          p95Distance: 0,
+        },
+      ],
+      skipDuplicates: true,
+    });
+
     await esClient.bulk({
       index: TRACES_PIVOT_INDEX,
       body: pivotEntries.flatMap((pivot) => [
@@ -233,7 +256,9 @@ describe("Timeseries Graph Integration Tests", () => {
       "sentiment.thumbs_up_down/sum": 1,
       "sentiment.thumbs_up_down/min": -1,
     });
-    expect((response.previousPeriod[1] as any)["metadata.trace_id/cardinality"]).toBe(1);
+    expect(
+      (response.previousPeriod[1] as any)["metadata.trace_id/cardinality"]
+    ).toBe(1);
   });
 
   it("should return grouped metrics correctly", async () => {

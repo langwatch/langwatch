@@ -44,6 +44,7 @@ export type AnalyticsGroup = {
     aggToGroup: Record<string, AggregationsAggregationContainer>
   ) => Record<string, AggregationsAggregationContainer>;
   extractionPath: () => string;
+  labelsMapping?: (projectId: string) => Promise<Record<string, string>>;
 };
 
 export const aggregationTypesEnum = z.enum([

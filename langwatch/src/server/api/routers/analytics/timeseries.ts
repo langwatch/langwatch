@@ -1,6 +1,6 @@
 import type {
   AggregationsAggregationContainer,
-  MappingRuntimeField
+  MappingRuntimeField,
 } from "@elastic/elasticsearch/lib/api/types";
 import { TRPCError } from "@trpc/server";
 import { getGroup, getMetric } from "~/server/analytics/registry";
@@ -15,7 +15,26 @@ import { sharedFiltersInputSchema } from "../../../analytics/types";
 import { TRACES_PIVOT_INDEX, esClient } from "../../../elasticsearch";
 import { TeamRoleGroup, checkUserPermissionForProject } from "../../permission";
 import { protectedProcedure } from "../../trpc";
-import { currentVsPreviousDates, dateTicks, generateTracesPivotQueryConditions } from "./common";
+import {
+  currentVsPreviousDates,
+  dateTicks,
+  generateTracesPivotQueryConditions,
+} from "./common";
+import { prisma } from "../../../db";
+
+const labelsMapping: Record<
+  FlattenAnalyticsGroupsEnum,
+  (projectId: string) => Promise<Record<string, string>>
+> = {
+  "topics.topics": async (projectId: string) => {
+    const topics = await prisma.topic.findMany({
+      where: { projectId },
+      select: { id: true, name: true },
+    });
+
+    return Object.fromEntries(topics.map((topic) => [topic.id, topic.name]));
+  },
+};
 
 export const getTimeseries = protectedProcedure
   .input(sharedFiltersInputSchema.extend(timeseriesInput.shape))
@@ -89,9 +108,15 @@ export const getTimeseries = protectedProcedure
       })
     );
 
+    let groupLabelsMapping: Record<string, string> | undefined;
     if (input.groupBy) {
       const group = getGroup(input.groupBy);
       aggs = group.aggregation(aggs);
+      if (labelsMapping[input.groupBy]) {
+        groupLabelsMapping = await labelsMapping[input.groupBy](
+          input.projectId
+        );
+      }
     }
 
     const { pivotIndexConditions } = generateTracesPivotQueryConditions({
@@ -142,11 +167,14 @@ export const getTimeseries = protectedProcedure
           if (!buckets) {
             throw `Could not find buckets for ${input.groupBy} groupBy at ${extractionPath}`;
           }
+
           const groupResult = Object.fromEntries(
-            Array.isArray(buckets)
+            (Array.isArray(buckets)
               ? buckets.map((group_bucket: any) => {
                   return [
-                    group_bucket.key,
+                    groupLabelsMapping
+                      ? groupLabelsMapping[group_bucket.key]
+                      : group_bucket.key,
                     extractResultForBucket(
                       input.series,
                       pathsAfterBuckets,
@@ -157,7 +185,7 @@ export const getTimeseries = protectedProcedure
               : Object.entries(buckets).map(
                   ([key, group_bucket]: [string, any]) => {
                     return [
-                      key,
+                      groupLabelsMapping ? groupLabelsMapping[key] : key,
                       extractResultForBucket(
                         input.series,
                         pathsAfterBuckets,
@@ -166,7 +194,9 @@ export const getTimeseries = protectedProcedure
                     ];
                   }
                 )
+            ).filter(([key, _]) => key !== undefined)
           );
+
           aggregationResult = {
             ...aggregationResult,
             [input.groupBy]: groupResult,

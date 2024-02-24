@@ -15,6 +15,7 @@ import {
 } from "./types";
 import type { AggregationsAggregationContainer } from "@elastic/elasticsearch/lib/api/types";
 import { formatMilliseconds } from "../../utils/formatMilliseconds";
+import { prisma } from "../db";
 
 const simpleFieldAnalytics = (
   field: string
@@ -430,7 +431,7 @@ export const tracesPivotFilterQueries: {
   topics: {
     topics: {
       name: "Topics",
-      field: "trace.metadata.topics",
+      field: "trace.metadata.topic_id",
     },
     subtopics: {
       name: "Subtopics",
@@ -521,7 +522,7 @@ const simpleFieldGroupping = (name: string, field: string): AnalyticsGroup => ({
 
 export const analyticsGroups = {
   topics: {
-    topics: simpleFieldGroupping("Topic", "trace.metadata.topics"),
+    topics: simpleFieldGroupping("Topic", "trace.metadata.topic_id"),
   },
   metadata: {
     user_id: simpleFieldGroupping("User", "trace.metadata.user_id"),
