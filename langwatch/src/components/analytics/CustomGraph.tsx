@@ -278,7 +278,7 @@ export const CustomGraph = React.memo(
 
       return (
         <Container>
-          <HStack spacing={0} align="start">
+          <HStack spacing={0} align="start" minHeight="101px">
             {summaryData.current.slice(0, 10).map((entry, index) => (
               <SummaryMetric
                 key={entry.key}

@@ -305,6 +305,7 @@ function CustomGraphForm({
   const groupByField = form.control.register("groupBy");
   const graphType = form.watch("graphType");
   const groupBy = form.watch("groupBy");
+  const title = form.watch("title");
 
   const joinedSeriesNames = form
     .watch()
@@ -312,15 +313,18 @@ function CustomGraphForm({
     .join(", ");
 
   useEffect(() => {
-    if (!form.getFieldState("title")?.isTouched) {
+    if (!form.getFieldState("title")?.isTouched || !title) {
       let suggestedTitle = joinedSeriesNames.replace(/,([^,]*)$/, " and$1");
 
       if (groupBy) {
-        suggestedTitle += ` grouped by ${getGroup(groupBy).label}`;
+        suggestedTitle += ` per ${getGroup(groupBy).label}`;
       }
 
-      form.setValue("title", uppercaseFirstLetterLowerCaseRest(suggestedTitle));
+      form.resetField("title", {
+        defaultValue: uppercaseFirstLetterLowerCaseRest(suggestedTitle),
+      });
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form, groupBy, joinedSeriesNames]);
 
   return (
@@ -590,6 +594,7 @@ function SeriesField({
   form: ReturnType<typeof useForm<CustomGraphFormData>>;
   index: number;
 }) {
+  const name = form.watch(`series.${index}.name`);
   const metric = form.watch(`series.${index}.metric`);
   const aggregation = form.watch(`series.${index}.aggregation`);
   const key = form.watch(`series.${index}.key`);
@@ -613,18 +618,19 @@ function SeriesField({
         ? pipelineAggregations[pipelineAggregation] ?? pipelineAggregation
         : undefined;
 
-    const name = uppercaseFirstLetterLowerCaseRest(
+    const name_ = uppercaseFirstLetterLowerCaseRest(
       [pipelineAggregation_, metric_?.label, aggregation_, pipeline_]
         .filter((x) => x)
         .join(" ")
     );
 
-    if (!form.getFieldState(`series.${index}.name`)?.isTouched) {
-      form.setValue(`series.${index}.name`, name);
+    if (!form.getFieldState(`series.${index}.name`)?.isTouched || !name) {
+      form.resetField(`series.${index}.name`, { defaultValue: name_ });
     }
     if (!form.getFieldState(`series.${index}.colorSet`)?.isTouched && metric_) {
       form.setValue(`series.${index}.colorSet`, metric_.colorSet);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     aggregation,
     form,
