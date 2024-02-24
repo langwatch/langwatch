@@ -15,6 +15,8 @@ import {
   Line,
   LineChart,
   ResponsiveContainer,
+  Scatter,
+  ScatterChart,
   Tooltip,
   XAxis,
   YAxis,
@@ -36,13 +38,31 @@ import type { Payload } from "recharts/types/component/DefaultTooltipContent";
 
 export type CustomGraphInput = {
   graphId: string;
-  graphType: "line" | "bar" | "stacked_bar" | "area" | "stacked_area";
+  graphType:
+    | "line"
+    | "bar"
+    | "stacked_bar"
+    | "area"
+    | "stacked_area"
+    | "scatter";
   series: (Unpacked<z.infer<typeof timeseriesInput>["series"]> & {
     name: string;
     colorSet: RotatingColorSet;
   })[];
   groupBy: z.infer<typeof timeseriesInput>["groupBy"];
   includePrevious: boolean;
+  connected?: boolean;
+};
+
+const GraphComponentMap: {
+  [K in CustomGraphInput["graphType"]]: [React.Component, React.Component];
+} = {
+  line: [LineChart as any, Line as any],
+  bar: [BarChart as any, Bar as any],
+  stacked_bar: [BarChart as any, Bar as any],
+  area: [AreaChart as any, Area as any],
+  stacked_area: [AreaChart as any, Area as any],
+  scatter: [ScatterChart as any, Scatter as any],
 };
 
 export function CustomGraph({ input }: { input: CustomGraphInput }) {
@@ -70,10 +90,10 @@ export function CustomGraph({ input }: { input: CustomGraphInput }) {
       ) ?? []
     )
   );
-  const currentAndPreviousDataFilled = fillEmptyData(
-    currentAndPreviousData,
-    expectedKeys
-  );
+  const currentAndPreviousDataFilled =
+    input.graphType === "scatter"
+      ? currentAndPreviousData
+      : fillEmptyData(currentAndPreviousData, expectedKeys);
   const keysToSum = Object.fromEntries(
     expectedKeys.map((key) => [
       key,
@@ -197,21 +217,20 @@ export function CustomGraph({ input }: { input: CustomGraphInput }) {
 
   const formatDate = (date: string) => date && format(new Date(date), "MMM d");
   const tooltipValueFormatter = (
-    value: number,
+    value: number | string,
     _: string,
     payload: Payload<any, any>
   ) => {
+    if (payload.dataKey === "date") {
+      return formatDate(value as string);
+    }
     const { series } = getSeries(payload.dataKey as string);
     const metric = series?.metric && getMetric(series.metric);
 
-    return formatWith(metric?.format, value);
+    return formatWith(metric?.format, value as number);
   };
 
-  const [GraphComponent, GraphElement] = input.graphType.includes("area")
-    ? [AreaChart, Area]
-    : input.graphType.includes("bar")
-    ? [BarChart, Bar]
-    : [LineChart, Line];
+  const [GraphComponent, GraphElement] = GraphComponentMap[input.graphType];
 
   return (
     <Box
@@ -243,11 +262,15 @@ export function CustomGraph({ input }: { input: CustomGraphInput }) {
       >
         <GraphComponent
           data={currentAndPreviousDataFilled}
-          margin={{ left: maxValue.length * 6 - 12 }}
+          margin={{ top: 10, left: maxValue.length * 6 - 5 }}
         >
-          <CartesianGrid vertical={false} strokeDasharray="5 7" />
+          <CartesianGrid
+            vertical={input.graphType === "scatter"}
+            strokeDasharray="5 7"
+          />
           <XAxis
             dataKey="date"
+            name="Date"
             tickFormatter={formatDate}
             tickLine={false}
             axisLine={false}
@@ -258,7 +281,6 @@ export function CustomGraph({ input }: { input: CustomGraphInput }) {
             tickLine={false}
             tickCount={4}
             tickMargin={20}
-            // tickSize={0}
             domain={[0, "dataMax"]}
             tick={{ fill: gray400 }}
             tickFormatter={(value) => {
@@ -271,6 +293,7 @@ export function CustomGraph({ input }: { input: CustomGraphInput }) {
           <Tooltip
             formatter={tooltipValueFormatter}
             labelFormatter={(_label, payload) => {
+              if (input.graphType === "scatter") return "";
               return (
                 formatDate(payload[0]?.payload.date) +
                 (input.includePrevious && payload[1]?.payload["previous>date"]
@@ -302,8 +325,13 @@ export function CustomGraph({ input }: { input: CustomGraphInput }) {
                 fill={colorForSeries(aggKey, index)}
                 strokeWidth={2.5}
                 dot={false}
-                activeDot={{ r: 8 }}
+                activeDot={input.graphType !== "scatter" ? { r: 8 } : undefined}
                 name={nameForSeries(aggKey)}
+                line={
+                  input.graphType === "scatter" && input.connected
+                    ? true
+                    : undefined
+                }
               />
               {input.includePrevious && (
                 // @ts-ignore
@@ -319,10 +347,19 @@ export function CustomGraph({ input }: { input: CustomGraphInput }) {
                   stroke={colorForSeries(aggKey, index) + "99"}
                   fill={colorForSeries(aggKey, index) + "99"}
                   strokeWidth={2.5}
-                  strokeDasharray={"5 5"}
+                  strokeDasharray={
+                    input.graphType !== "scatter" ? "5 5" : undefined
+                  }
                   dot={false}
-                  activeDot={{ r: 8 }}
+                  activeDot={
+                    input.graphType !== "scatter" ? { r: 8 } : undefined
+                  }
                   name={"Previous " + nameForSeries(aggKey)}
+                  line={
+                    input.graphType === "scatter" && input.connected
+                      ? true
+                      : undefined
+                  }
                 />
               )}
             </React.Fragment>

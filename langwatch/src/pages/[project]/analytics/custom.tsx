@@ -33,7 +33,13 @@ import {
   type SingleValue,
 } from "chakra-react-select";
 import { useEffect, useState, type Dispatch, type SetStateAction } from "react";
-import { BarChart2, Trash, TrendingUp, Triangle } from "react-feather";
+import {
+  BarChart2,
+  GitBranch,
+  Trash,
+  TrendingUp,
+  Triangle,
+} from "react-feather";
 import {
   Controller,
   useFieldArray,
@@ -104,6 +110,7 @@ export interface CustomGraphFormData {
   }[];
   groupBy: FlattenAnalyticsGroupsEnum | "";
   includePrevious: boolean;
+  connected?: boolean;
 }
 
 const chartOptions: CustomGraphFormData["graphType"][] = [
@@ -131,6 +138,11 @@ const chartOptions: CustomGraphFormData["graphType"][] = [
     label: "Stacked Bar Chart",
     value: "stacked_bar",
     icon: <BarChart2 />,
+  },
+  {
+    label: "Scatter Chart",
+    value: "scatter",
+    icon: <GitBranch />,
   },
 ];
 
@@ -249,6 +261,7 @@ const customGraphFormToCustomGraphInput = (
     }),
     groupBy: formData.groupBy || undefined,
     includePrevious: formData.includePrevious,
+    connected: formData.connected,
   };
 };
 
@@ -261,6 +274,7 @@ function CustomGraphForm({
 }) {
   const [expandedSeries, setExpandedSeries] = useState<number | number[]>([0]);
   const groupByField = form.control.register("groupBy");
+  const graphType = form.watch("graphType");
 
   return (
     <VStack width="full" align="start" spacing={4} maxWidth="500px">
@@ -268,6 +282,20 @@ function CustomGraphForm({
         <FormLabel>Graph Type</FormLabel>
         <GraphTypeField form={form} />
       </FormControl>
+      {graphType.value === "scatter" && (
+        <FormControl>
+          <Controller
+            control={form.control}
+            name="connected"
+            defaultValue={false}
+            render={({ field: { onChange, value } }) => (
+              <Switch onChange={onChange} isChecked={value}>
+                Connect dots
+              </Switch>
+            )}
+          />
+        </FormControl>
+      )}
       <FormControl>
         <FormLabel fontSize={16}>Series</FormLabel>
         <Accordion

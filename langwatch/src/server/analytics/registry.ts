@@ -129,6 +129,32 @@ export const analyticsMetrics = {
       format: formatMilliseconds,
       allowedAggregations: numericAggregationTypes,
     },
+    first_token: {
+      ...simpleFieldAnalytics("trace.metrics.first_token_ms"),
+      label: "Time to First Token",
+      colorSet: "cyanTones",
+      format: formatMilliseconds,
+      allowedAggregations: numericAggregationTypes,
+    },
+    total_cost: {
+      ...simpleFieldAnalytics("trace.metrics.total_cost"),
+      label: "Total Cost",
+      colorSet: "greenTones",
+      format: "$0.00[00]",
+      allowedAggregations: numericAggregationTypes,
+    },
+    prompt_tokens: {
+      ...simpleFieldAnalytics("trace.metrics.prompt_tokens"),
+      label: "Prompt Tokens",
+      colorSet: "greenTones",
+      allowedAggregations: numericAggregationTypes,
+    },
+    completion_tokens: {
+      ...simpleFieldAnalytics("trace.metrics.completion_tokens"),
+      label: "Prompt Tokens",
+      colorSet: "blueTones",
+      allowedAggregations: numericAggregationTypes,
+    },
   },
   events: {
     event_type: {
