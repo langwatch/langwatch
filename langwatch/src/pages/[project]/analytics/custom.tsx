@@ -34,6 +34,7 @@ import {
 } from "chakra-react-select";
 import { useEffect, useState, type Dispatch, type SetStateAction } from "react";
 import {
+  AlignLeft,
   BarChart2,
   GitBranch,
   PieChart,
@@ -116,6 +117,11 @@ export interface CustomGraphFormData {
 
 const chartOptions: CustomGraphFormData["graphType"][] = [
   {
+    label: "Summary",
+    value: "summary",
+    icon: <AlignLeft />,
+  },
+  {
     label: "Line Chart",
     value: "line",
     icon: <TrendingUp />,
@@ -158,7 +164,7 @@ const chartOptions: CustomGraphFormData["graphType"][] = [
 ];
 
 const defaultValues: CustomGraphFormData = {
-  graphType: chartOptions[0]!,
+  graphType: chartOptions[1]!,
   series: [
     {
       name: "Messages count",

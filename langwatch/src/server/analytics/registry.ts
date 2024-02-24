@@ -20,6 +20,7 @@ const simpleFieldAnalytics = (
   field: string
 ): Omit<AnalyticsMetric, "label" | "colorSet" | "allowedAggregations"> => ({
   format: "0.[00]a",
+  increaseIs: "good",
   aggregation: (aggregation: AggregationTypes) => ({
     [`${field.replaceAll(".", "_")}_${aggregation}`]: {
       [aggregation]: { field },
@@ -62,6 +63,7 @@ export const analyticsMetrics = {
       label: "Thumbs Up/Down Score",
       colorSet: "purpleTones",
       format: "0.00a",
+      increaseIs: "good",
       allowedAggregations: allAggregationTypes,
       aggregation: (aggregation) => ({
         [`thumbs_up_down_${aggregation}`]: {
@@ -127,6 +129,7 @@ export const analyticsMetrics = {
       label: "Completion Time",
       colorSet: "greenTones",
       format: formatMilliseconds,
+      increaseIs: "bad",
       allowedAggregations: numericAggregationTypes,
     },
     first_token: {
@@ -134,6 +137,7 @@ export const analyticsMetrics = {
       label: "Time to First Token",
       colorSet: "cyanTones",
       format: formatMilliseconds,
+      increaseIs: "bad",
       allowedAggregations: numericAggregationTypes,
     },
     total_cost: {
@@ -141,18 +145,21 @@ export const analyticsMetrics = {
       label: "Total Cost",
       colorSet: "greenTones",
       format: "$0.00[00]",
+      increaseIs: "neutral",
       allowedAggregations: numericAggregationTypes,
     },
     prompt_tokens: {
       ...simpleFieldAnalytics("trace.metrics.prompt_tokens"),
       label: "Prompt Tokens",
       colorSet: "greenTones",
+      increaseIs: "neutral",
       allowedAggregations: numericAggregationTypes,
     },
     completion_tokens: {
       ...simpleFieldAnalytics("trace.metrics.completion_tokens"),
       label: "Completion Tokens",
       colorSet: "blueTones",
+      increaseIs: "neutral",
       allowedAggregations: numericAggregationTypes,
     },
   },
@@ -161,6 +168,8 @@ export const analyticsMetrics = {
       label: "Event Type",
       colorSet: "purpleTones",
       allowedAggregations: ["cardinality"],
+      format: "0.[00]a",
+      increaseIs: "neutral",
       requiresKey: {
         filter: "events.event_type",
         optional: true,
@@ -198,6 +207,7 @@ export const analyticsMetrics = {
       label: "Event Score",
       colorSet: "purpleTones",
       format: "0.00a",
+      increaseIs: "neutral",
       allowedAggregations: allAggregationTypes.filter(
         (agg) => agg != "cardinality"
       ),
@@ -260,6 +270,8 @@ export const analyticsMetrics = {
     event_details: {
       label: "Event Details",
       colorSet: "purpleTones",
+      format: "0.[00]a",
+      increaseIs: "neutral",
       allowedAggregations: ["cardinality"],
       requiresKey: {
         filter: "events.event_type",
@@ -324,6 +336,8 @@ export const analyticsMetrics = {
     checks: {
       label: "Checks",
       colorSet: "tealTones",
+      format: "0.[00]a",
+      increaseIs: "neutral",
       allowedAggregations: ["cardinality"],
       requiresKey: {
         filter: "trace_checks.check_id",
@@ -369,6 +383,7 @@ export const analyticsMetrics = {
       label: "Evaluation Score",
       colorSet: "tealTones",
       format: "0.00a",
+      increaseIs: "neutral",
       allowedAggregations: allAggregationTypes.filter(
         (agg) => agg != "cardinality"
       ),

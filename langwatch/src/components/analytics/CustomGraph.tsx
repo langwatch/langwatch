@@ -1,4 +1,11 @@
-import { Alert, AlertIcon, Box, Spinner, useTheme } from "@chakra-ui/react";
+import {
+  Alert,
+  AlertIcon,
+  Box,
+  HStack,
+  Spinner,
+  useTheme,
+} from "@chakra-ui/react";
 import type { TRPCClientErrorLike } from "@trpc/client";
 import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
 import type { inferRouterOutputs } from "@trpc/server";
@@ -42,6 +49,7 @@ import type {
   AggregationTypes,
   PipelineAggregationTypes,
 } from "../../server/analytics/types";
+import { SummaryMetric } from "./SummaryMetric";
 
 type Series = Unpacked<z.infer<typeof timeseriesInput>["series"]> & {
   name: string;
@@ -58,7 +66,8 @@ export type CustomGraphInput = {
     | "stacked_area"
     | "scatter"
     | "pie"
-    | "donnut";
+    | "donnut"
+    | "summary";
   series: Series[];
   groupBy: z.infer<typeof timeseriesInput>["groupBy"];
   includePrevious: boolean;
@@ -262,12 +271,39 @@ export const CustomGraph = React.memo(
       );
     };
 
+    if (input.graphType === "summary") {
+      const summaryData = shapeDataForSummary(
+        input,
+        seriesByKey,
+        timeseries,
+        nameForSeries
+      );
+
+      return (
+        <Container>
+          <HStack spacing={0}>
+            {summaryData.current.map((entry, index) => (
+              <SummaryMetric
+                key={entry.key}
+                label={entry.name}
+                current={entry.value}
+                previous={summaryData.previous[index]?.value}
+                format={entry.metric?.format}
+                increaseIs={entry.metric?.increaseIs}
+              />
+            ))}
+          </HStack>
+        </Container>
+      );
+    }
+
     if (input.graphType === "pie" || input.graphType === "donnut") {
-      const summaryData = shapeDataForSummary(input, seriesByKey, timeseries);
-      const pieData = summaryData.current.map((entry) => ({
-        ...entry,
-        name: nameForSeries(entry.key),
-      }));
+      const summaryData = shapeDataForSummary(
+        input,
+        seriesByKey,
+        timeseries,
+        nameForSeries
+      );
 
       return (
         <Container>
@@ -277,14 +313,14 @@ export const CustomGraph = React.memo(
           >
             <PieChart>
               <Pie
-                data={pieData}
+                data={summaryData.current}
                 nameKey="name"
                 dataKey="value"
                 labelLine={false}
                 label={pieChartPercentageLabel}
                 innerRadius={input.graphType === "donnut" ? "50%" : 0}
               >
-                {pieData.map((entry, index) => (
+                {summaryData.current.map((entry, index) => (
                   <Cell
                     key={`cell-${index}`}
                     fill={colorForSeries(entry.key, index)}
@@ -423,10 +459,10 @@ export const CustomGraph = React.memo(
         </ResponsiveContainer>
       </Container>
     );
+  },
+  (prevProps, nextProps) => {
+    return JSON.stringify(prevProps.input) === JSON.stringify(nextProps.input);
   }
-  // (prevProps, nextProps) => {
-  //   return JSON.stringify(prevProps.input) === JSON.stringify(nextProps.input);
-  // }
 );
 
 const RADIAN = Math.PI / 180;
@@ -513,7 +549,8 @@ const shapeDataForSummary = (
   timeseries: UseTRPCQueryResult<
     inferRouterOutputs<AppRouter>["analytics"]["getTimeseries"],
     TRPCClientErrorLike<AppRouter>
-  >
+  >,
+  nameForSeries: (aggKey: string) => string
 ) => {
   const flattenCurrentPeriod =
     timeseries.data && flattenGroupData(input, timeseries.data.currentPeriod);
@@ -539,9 +576,12 @@ const shapeDataForSummary = (
   const reduceToSummary = (data: Record<string, number[]>) => {
     return Object.entries(data).map(([aggKey, values]) => {
       const { series } = getSeries(seriesByKey, aggKey);
+      const metric = series?.metric && getMetric(series.metric);
 
       return {
         key: aggKey,
+        name: nameForSeries(aggKey),
+        metric,
         value:
           reduceOperations[
             series?.pipeline?.aggregation ?? series?.aggregation ?? "sum"

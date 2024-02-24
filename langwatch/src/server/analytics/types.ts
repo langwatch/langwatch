@@ -16,7 +16,8 @@ import type { FilterField } from "../filters/types";
 export type AnalyticsMetric = {
   label: string;
   colorSet: RotatingColorSet;
-  format?: string | ((value: number) => string);
+  format: string | ((value: number) => string);
+  increaseIs: "good" | "bad" | "neutral";
   requiresKey?: {
     filter: FilterField;
     optional?: boolean;
