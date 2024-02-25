@@ -61,6 +61,7 @@ export type CustomGraphInput = {
   graphType:
     | "line"
     | "bar"
+    | "horizontal_bar"
     | "stacked_bar"
     | "area"
     | "stacked_area"
@@ -75,15 +76,22 @@ export type CustomGraphInput = {
   connected?: boolean;
 };
 
+export const summaryGraphTypes: CustomGraphInput["graphType"][] = [
+  "summary",
+  "pie",
+  "donnut",
+];
+
 const GraphComponentMap: Partial<{
   [K in CustomGraphInput["graphType"]]: [
-    typeof LineChart | typeof BarChart | typeof AreaChart,
+    typeof LineChart | typeof BarChart | typeof AreaChart | typeof PieChart,
     typeof Line | typeof Bar | typeof Area | typeof Scatter,
   ];
 }> = {
   line: [LineChart, Line],
   bar: [BarChart, Bar],
   stacked_bar: [BarChart, Bar],
+  horizontal_bar: [BarChart, Bar],
   area: [AreaChart, Area],
   stacked_area: [AreaChart, Area],
   scatter: [ScatterChart, Scatter],
@@ -101,7 +109,7 @@ export const CustomGraph = React.memo(
         endDate,
         filters: {},
         ...input,
-        timeScale: ["summary", "bar", "donnut"].includes(input.graphType)
+        timeScale: summaryGraphTypes.includes(input.graphType)
           ? "full"
           : input.timeScale === "full"
           ? input.timeScale
@@ -346,6 +354,86 @@ export const CustomGraph = React.memo(
 
     const [GraphComponent, GraphElement] = GraphComponentMap[input.graphType]!;
 
+    const [XAxisComponent, YAxisComponent] =
+      input.graphType === "horizontal_bar" ? [YAxis, XAxis] : [XAxis, YAxis];
+
+    if (
+      ["bar", "horizontal_bar"].includes(input.graphType) &&
+      input.timeScale === "full"
+    ) {
+      const summaryData = shapeDataForSummary(
+        input,
+        seriesByKey,
+        timeseries,
+        nameForSeries
+      );
+      const sortedCurrentData = summaryData.current.sort(
+        (a, b) => b.value - a.value
+      );
+
+      const longestName = Math.max(
+        ...summaryData.current.map((entry) => entry.name.length)
+      );
+
+      const xAxisWidth = Math.min(longestName * 8, 300);
+
+      return (
+        <Container>
+          <ResponsiveContainer
+            key={currentAndPreviousDataFilled ? input.graphId : "loading"}
+            height={500}
+          >
+            <BarChart
+              data={sortedCurrentData}
+              barCategoryGap={10}
+              layout={
+                input.graphType === "horizontal_bar" ? "vertical" : undefined
+              }
+            >
+              <XAxisComponent
+                type="category"
+                dataKey="name"
+                width={
+                  input.graphType === "horizontal_bar" ? xAxisWidth : undefined
+                }
+                height={
+                  input.graphType === "horizontal_bar" ? undefined : xAxisWidth
+                }
+                tickLine={false}
+                axisLine={false}
+                tick={{ fill: gray400 }}
+                angle={input.graphType === "horizontal_bar" ? undefined : 45}
+                textAnchor={
+                  input.graphType === "horizontal_bar" ? "end" : "start"
+                }
+              />
+              <YAxisComponent
+                type="number"
+                dataKey="value"
+                domain={[0, "dataMax"]}
+                tick={{ fill: gray400 }}
+                tickFormatter={(value) => {
+                  if (typeof yAxisValueFormat === "function") {
+                    return yAxisValueFormat(value);
+                  }
+                  return numeral(value).format(yAxisValueFormat);
+                }}
+              />
+              <Tooltip formatter={tooltipValueFormatter} />
+              <Bar dataKey="value">
+                {summaryData.current.map((entry, index) => (
+                  <Cell
+                    key={`cell-${index}`}
+                    fill={colorForSeries(entry.key, index)}
+                  />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </Container>
+      );
+    }
+
     return (
       <Container>
         <ResponsiveContainer
@@ -355,12 +443,16 @@ export const CustomGraph = React.memo(
           <GraphComponent
             data={currentAndPreviousDataFilled}
             margin={{ top: 10, left: maxValue.length * 6 - 5, right: 24 }}
+            layout={
+              input.graphType === "horizontal_bar" ? "vertical" : undefined
+            }
           >
             <CartesianGrid
               vertical={input.graphType === "scatter"}
               strokeDasharray="5 7"
             />
-            <XAxis
+            <XAxisComponent
+              type="category"
               dataKey="date"
               name="Date"
               tickFormatter={formatDate}
@@ -368,7 +460,8 @@ export const CustomGraph = React.memo(
               axisLine={false}
               tick={{ fill: gray400 }}
             />
-            <YAxis
+            <YAxisComponent
+              type="number"
               axisLine={false}
               tickLine={false}
               tickCount={4}
@@ -403,7 +496,6 @@ export const CustomGraph = React.memo(
             />
             {(sortedKeys ?? []).map((aggKey, index) => (
               <React.Fragment key={aggKey}>
-                {/* @ts-ignore */}
                 <GraphElement
                   key={aggKey}
                   type="linear"

@@ -62,6 +62,7 @@ import {
 } from "../../../components/PeriodSelector";
 import {
   CustomGraph,
+  summaryGraphTypes,
   type CustomGraphInput,
 } from "../../../components/analytics/CustomGraph";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
@@ -149,6 +150,17 @@ const chartOptions: CustomGraphFormData["graphType"][] = [
     label: "Stacked Bar Chart",
     value: "stacked_bar",
     icon: <BarChart2 />,
+  },
+  {
+    label: "Horizontal Bar Chart",
+    value: "horizontal_bar",
+    icon: (
+      <BarChart2
+        style={{
+          transform: "rotate(90deg)",
+        }}
+      />
+    ),
   },
   {
     label: "Scatter Chart",
@@ -336,7 +348,7 @@ function CustomGraphForm({
         <FormLabel>Graph Type</FormLabel>
         <GraphTypeField form={form} />
       </FormControl>
-      {!["summary", "pie", "donnut"].includes(graphType.value) && (
+      {!summaryGraphTypes.includes(graphType.value) && (
         <FormControl>
           <FormLabel>Time Scale</FormLabel>
 
@@ -345,7 +357,7 @@ function CustomGraphForm({
             minWidth="fit-content"
           >
             <option value={"full"}>Full Period</option>
-            <option value={1}>1 day</option>
+            <option value={1}>Daily</option>
             <option value={7}>7 days</option>
             <option value={30}>30 days</option>
             <option value={30}>90 days</option>
@@ -446,7 +458,7 @@ function CustomGraphForm({
           ))}
         </Select>
       </FormControl>
-      {!["summary", "pie", "donnut"].includes(graphType.value) && (
+      {!summaryGraphTypes.includes(graphType.value) && (
         <FormControl>
           <Controller
             control={form.control}
