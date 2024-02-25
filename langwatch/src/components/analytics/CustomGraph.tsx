@@ -6,7 +6,7 @@ import {
   Spinner,
   useTheme,
   type ColorProps,
-  type TypographyProps
+  type TypographyProps,
 } from "@chakra-ui/react";
 import type { TRPCClientErrorLike } from "@trpc/client";
 import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
@@ -146,13 +146,19 @@ export const CustomGraph = React.memo(
       input.graphType === "scatter"
         ? currentAndPreviousData
         : fillEmptyData(currentAndPreviousData, expectedKeys);
-    const keysToSum = Object.fromEntries(
+    const keysToValues = Object.fromEntries(
       expectedKeys.map((key) => [
         key,
         currentAndPreviousDataFilled?.reduce(
-          (acc, entry) => acc + (entry[key] ?? 0),
-          0
-        ),
+          (acc, entry) => [...acc, entry[key]!],
+          [] as number[]
+        ) ?? [],
+      ])
+    );
+    const keysToSum = Object.fromEntries(
+      Object.entries(keysToValues).map(([key, values]) => [
+        key,
+        values.reduce((acc, value) => acc + value, 0),
       ])
     );
     const sortedKeys = expectedKeys
@@ -235,18 +241,8 @@ export const CustomGraph = React.memo(
       )
     );
     const yAxisValueFormat = valueFormats.length === 1 ? valueFormats[0] : "";
-    const keysToMax = Object.fromEntries(
-      expectedKeys.map((key) => [
-        key,
-        currentAndPreviousDataFilled?.reduce(
-          (acc, entry) => Math.max(acc, entry[key] ?? 0),
-          0
-        ) ?? 0,
-      ])
-    );
-    const maxValue = formatWith(
-      yAxisValueFormat,
-      Math.max(...Object.values(keysToMax))
+    const maxValue = Math.max(
+      ...Object.values(keysToValues).flatMap((values) => values)
     );
 
     const getColor = useGetRotatingColorForCharts();
@@ -273,6 +269,10 @@ export const CustomGraph = React.memo(
     };
 
     const Container = ({ children }: React.PropsWithChildren) => {
+      const allEmpty =
+        currentAndPreviousData &&
+        (maxValue == 0 || currentAndPreviousData?.length === 0);
+
       return (
         <Box width="full" height="full" position="relative">
           {input.graphType !== "summary" && timeseries.isFetching && (
@@ -290,6 +290,16 @@ export const CustomGraph = React.memo(
               <AlertIcon />
               Error loading graph data
             </Alert>
+          )}
+          {input.graphType !== "summary" && allEmpty && (
+            <Box
+              position="absolute"
+              top="50%"
+              left="50%"
+              transform="translate(-50%, -50%)"
+            >
+              No data
+            </Box>
           )}
           {children}
         </Box>
@@ -470,7 +480,11 @@ export const CustomGraph = React.memo(
         >
           <GraphComponent
             data={currentAndPreviousDataFilled}
-            margin={{ top: 10, left: maxValue.length * 6 - 5, right: 24 }}
+            margin={{
+              top: 10,
+              left: formatWith(yAxisValueFormat, maxValue).length * 6 - 5,
+              right: 24,
+            }}
             layout={
               input.graphType === "horizontal_bar" ? "vertical" : undefined
             }
