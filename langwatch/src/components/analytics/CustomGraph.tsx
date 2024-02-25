@@ -42,10 +42,6 @@ import {
   getMetric,
   type timeseriesInput,
 } from "../../server/analytics/registry";
-import type {
-  AggregationTypes,
-  PipelineAggregationTypes,
-} from "../../server/analytics/types";
 import type { AppRouter } from "../../server/api/root";
 import { api } from "../../utils/api";
 import type { RotatingColorSet } from "../../utils/rotatingColors";
@@ -702,19 +698,6 @@ const shapeDataForSummary = (
   const collectedCurrent = collectAllDays(flattenCurrentPeriod ?? []);
   const collectedPrevious = collectAllDays(flattenPreviousPeriod ?? []);
 
-  const reduceOperations: Record<
-    AggregationTypes | PipelineAggregationTypes,
-    (values: number[]) => number
-  > = {
-    cardinality: (values: number[]) =>
-      values.reduce((acc, value) => acc + value, 0),
-    sum: (values: number[]) => values.reduce((acc, value) => acc + value, 0),
-    avg: (values: number[]) =>
-      values.reduce((acc, value) => acc + value, 0) / values.length,
-    min: (values: number[]) => Math.min(...values),
-    max: (values: number[]) => Math.max(...values),
-  };
-
   const reduceToSummary = (data: Record<string, number[]>) => {
     return Object.entries(data).map(([aggKey, values]) => {
       const { series } = getSeries(seriesByKey, aggKey);
@@ -724,10 +707,7 @@ const shapeDataForSummary = (
         key: aggKey,
         name: nameForSeries(aggKey),
         metric,
-        value:
-          reduceOperations[
-            series?.pipeline?.aggregation ?? series?.aggregation ?? "sum"
-          ](values),
+        value: values[0] ?? 0,
       };
     });
   };
