@@ -19,7 +19,7 @@ import { formatMilliseconds } from "../../utils/formatMilliseconds";
 const simpleFieldAnalytics = (
   field: string
 ): Omit<AnalyticsMetric, "label" | "colorSet" | "allowedAggregations"> => ({
-  format: "0.[00]a",
+  format: "0.[0]a",
   increaseIs: "good",
   aggregation: (aggregation: AggregationTypes) => ({
     [`${field.replaceAll(".", "_")}_${aggregation}`]: {
@@ -151,14 +151,14 @@ export const analyticsMetrics = {
     prompt_tokens: {
       ...simpleFieldAnalytics("trace.metrics.prompt_tokens"),
       label: "Prompt Tokens",
-      colorSet: "greenTones",
+      colorSet: "blueTones",
       increaseIs: "neutral",
       allowedAggregations: numericAggregationTypes,
     },
     completion_tokens: {
       ...simpleFieldAnalytics("trace.metrics.completion_tokens"),
       label: "Completion Tokens",
-      colorSet: "blueTones",
+      colorSet: "orangeTones",
       increaseIs: "neutral",
       allowedAggregations: numericAggregationTypes,
     },

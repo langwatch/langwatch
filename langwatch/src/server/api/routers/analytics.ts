@@ -7,30 +7,11 @@ import {
   currentVsPreviousDates,
   generateTraceChecksQueryConditions,
 } from "./analytics/common";
-import {
-  messagesCountAggregated,
-  messagesCountVsPreviousPeriod,
-} from "./analytics/messages";
-import {
-  llmCostSumAggregated,
-  llmCostSumVsPreviousPeriod,
-} from "./analytics/llmCost";
-import {
-  tokensSumAggregated,
-  tokensSumVsPreviousPeriod,
-} from "./analytics/tokens";
+import { tokensSumVsPreviousPeriod } from "./analytics/tokens";
 import {
   llmCallsCountAggregated,
   llmCallsCountVsPreviousPeriod,
 } from "./analytics/llmCalls";
-import {
-  threadsCountAggregated,
-  threadsCountVsPreviousPeriod,
-} from "./analytics/threads";
-import {
-  usersCountAggregated,
-  usersCountVsPreviousPeriod,
-} from "./analytics/users";
 import { sessionsVsPreviousPeriod } from "./analytics/sessions";
 import { satisfactionVsPreviousPeriod } from "./analytics/satisfaction";
 import { topUsedDocuments } from "./analytics/documents";
@@ -42,21 +23,12 @@ import { dataForFilter } from "./analytics/dataForFilter";
 export const analyticsRouter = createTRPCRouter({
   getTimeseries,
   dataForFilter,
-  messagesCountVsPreviousPeriod,
-  messagesCountAggregated,
-  threadsCountVsPreviousPeriod,
-  threadsCountAggregated,
-  usersCountVsPreviousPeriod,
-  usersCountAggregated,
   sessionsVsPreviousPeriod,
   satisfactionVsPreviousPeriod,
   thumbsUpDownVsPreviousPeriod,
   llmCallsCountVsPreviousPeriod,
   llmCallsCountAggregated,
-  llmCostSumVsPreviousPeriod,
-  llmCostSumAggregated,
   tokensSumVsPreviousPeriod,
-  tokensSumAggregated,
   topUsedDocuments,
   getSummaryMetrics: protectedProcedure
     .input(sharedAnalyticsFilterInput)

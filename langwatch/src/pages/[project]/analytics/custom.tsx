@@ -306,6 +306,7 @@ const customGraphFormToCustomGraphInput = (
     includePrevious: formData.includePrevious,
     timeScale: formData.timeScale,
     connected: formData.connected,
+    height: 500,
   };
 };
 

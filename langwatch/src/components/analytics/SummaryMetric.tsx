@@ -6,6 +6,8 @@ import {
   VStack,
   Text,
   HStack,
+  type TypographyProps,
+  type ColorProps,
 } from "@chakra-ui/react";
 import numeral from "numeral";
 import { ArrowDown, ArrowUp, HelpCircle } from "react-feather";
@@ -17,6 +19,7 @@ export function SummaryMetric({
   format,
   tooltip,
   increaseIs,
+  titleProps,
 }: {
   label: string;
   current?: number | string;
@@ -24,10 +27,16 @@ export function SummaryMetric({
   format?: ((value: number) => string) | ((value: string) => string) | string;
   tooltip?: string;
   increaseIs?: "good" | "bad" | "neutral";
+  titleProps?: {
+    fontSize?: TypographyProps["fontSize"];
+    color?: ColorProps["color"];
+    fontWeight?: TypographyProps["fontWeight"];
+  };
 }) {
   return (
     <VStack
-      maxWidth="192"
+      minWidth="92px"
+      maxWidth="192px"
       spacing={4}
       align="start"
       justifyContent="space-between"
@@ -44,6 +53,7 @@ export function SummaryMetric({
         noOfLines={3}
         wordBreak="break-word"
         title={label}
+        {...(titleProps ?? {})}
       >
         {label}
         {tooltip && (
@@ -93,7 +103,7 @@ export function SummaryMetricValue({
           )
         ) : (
           <Box paddingY="0.25em">
-            <Skeleton height="1em" width="80px" />
+            <Skeleton height="1em" width="78px" />
           </Box>
         )}
       </Box>

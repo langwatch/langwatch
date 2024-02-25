@@ -24,6 +24,8 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import type { GetServerSidePropsContext } from "next";
+import { useRouter } from "next/router";
 import numeral from "numeral";
 import { CheckCircle, XCircle } from "react-feather";
 import { DashboardLayout } from "~/components/DashboardLayout";
@@ -33,45 +35,29 @@ import {
   usePeriodSelector,
 } from "../../components/PeriodSelector";
 import {
-  LLMCallsCountGraph,
-  LLMCallsCountSummary,
-} from "../../components/analytics/LLMCallsCountGraph";
-import {
-  LLMCostSumGraph,
-  LLMCostSumSummary,
-} from "../../components/analytics/LLMCostSumGraph";
-import {
-  MessagesCountGraph,
-  MessagesCountSummary,
-} from "../../components/analytics/MessagesCountGraph";
-import { SatisfactionPieChart } from "../../components/analytics/SatisfactionGraph";
-import { SessionsSummary } from "../../components/analytics/SessionsSummary";
-import {
-  ThreadsCountGraph,
-  ThreadsCountSummary,
-} from "../../components/analytics/ThreadsCountGraph";
-import {
-  TokensSumGraph,
-  TokensSumSummary,
-} from "../../components/analytics/TokensGraph";
-import { TopTopics } from "../../components/analytics/TopTopics";
-import {
-  UsersCountGraph,
-  UsersCountSummary,
-} from "../../components/analytics/UsersCountGraph";
-import { useAnalyticsParams } from "../../hooks/useAnalyticsParams";
-import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import { api } from "../../utils/api";
-import { LLMSummary } from "../../components/analytics/LLMSummary";
-import { useRouter } from "next/router";
-import { dependencies } from "../../injection/dependencies.client";
-import { dependencies as serverDependencies } from "../../injection/dependencies.server";
-import type { GetServerSidePropsContext } from "next";
-import { TeamRoleGroup } from "../../server/api/permission";
+  CustomGraph,
+  type CustomGraphInput,
+} from "../../components/analytics/CustomGraph";
 import {
   DocumentsCountsSummary,
   DocumentsCountsTable,
 } from "../../components/analytics/DocumentsCountsTable";
+import {
+  LLMCallsCountGraph,
+  LLMCallsCountSummary,
+} from "../../components/analytics/LLMCallsCountGraph";
+import { LLMSummary } from "../../components/analytics/LLMSummary";
+import { SatisfactionPieChart } from "../../components/analytics/SatisfactionGraph";
+import { SessionsSummary } from "../../components/analytics/SessionsSummary";
+import { TokensSumSummary } from "../../components/analytics/TokensSummary";
+import { TopTopics } from "../../components/analytics/TopTopics";
+import { useAnalyticsParams } from "../../hooks/useAnalyticsParams";
+import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
+import { dependencies } from "../../injection/dependencies.client";
+import { dependencies as serverDependencies } from "../../injection/dependencies.server";
+import { analyticsMetrics } from "../../server/analytics/registry";
+import { TeamRoleGroup } from "../../server/api/permission";
+import { api } from "../../utils/api";
 
 export default function ProjectRouter() {
   const router = useRouter();
@@ -148,6 +134,54 @@ function UserMetrics() {
     setPeriod,
   } = usePeriodSelector();
 
+  const messagesGraph: CustomGraphInput = {
+    graphId: "messagesCountGraph",
+    graphType: "line",
+    series: [
+      {
+        name: "Messages",
+        metric: "metadata.trace_id",
+        aggregation: "cardinality",
+        colorSet: analyticsMetrics.metadata.trace_id.colorSet,
+      },
+    ],
+    groupBy: undefined,
+    includePrevious: true,
+    timeScale: 1,
+  };
+
+  const threadsGraph: CustomGraphInput = {
+    graphId: "threadsCountGraph",
+    graphType: "line",
+    series: [
+      {
+        name: "Threads",
+        metric: "metadata.thread_id",
+        aggregation: "cardinality",
+        colorSet: analyticsMetrics.metadata.thread_id.colorSet,
+      },
+    ],
+    groupBy: undefined,
+    includePrevious: true,
+    timeScale: 1,
+  };
+
+  const usersGraph: CustomGraphInput = {
+    graphId: "usersCountGraph",
+    graphType: "line",
+    series: [
+      {
+        name: "Users",
+        metric: "metadata.user_id",
+        aggregation: "cardinality",
+        colorSet: analyticsMetrics.metadata.user_id.colorSet,
+      },
+    ],
+    groupBy: undefined,
+    includePrevious: true,
+    timeScale: 1,
+  };
+
   return (
     <>
       <HStack width="full" align="top">
@@ -167,30 +201,33 @@ function UserMetrics() {
           <Card>
             <CardBody>
               <Tabs variant="unstyled">
-                <TabList gap={12}>
+                <TabList gap={8}>
                   <Tab paddingX={0} paddingBottom={4}>
-                    <VStack align="start">
-                      <Text color="black">Messages</Text>
-                      <Box fontSize={24} color="black" fontWeight="bold">
-                        <MessagesCountSummary />
-                      </Box>
-                    </VStack>
+                    <CustomGraph
+                      input={{ ...messagesGraph, graphType: "summary" }}
+                      titleProps={{
+                        fontSize: 16,
+                        color: "black",
+                      }}
+                    />
                   </Tab>
                   <Tab paddingX={0} paddingBottom={4}>
-                    <VStack align="start">
-                      <Text color="black">Threads</Text>
-                      <Box fontSize={24} color="black" fontWeight="bold">
-                        <ThreadsCountSummary />
-                      </Box>
-                    </VStack>
+                    <CustomGraph
+                      input={{ ...threadsGraph, graphType: "summary" }}
+                      titleProps={{
+                        fontSize: 16,
+                        color: "black",
+                      }}
+                    />
                   </Tab>
                   <Tab paddingX={0} paddingBottom={4}>
-                    <VStack align="start">
-                      <Text color="black">Users</Text>
-                      <Box fontSize={24} color="black" fontWeight="bold">
-                        <UsersCountSummary />
-                      </Box>
-                    </VStack>
+                    <CustomGraph
+                      input={{ ...usersGraph, graphType: "summary" }}
+                      titleProps={{
+                        fontSize: 16,
+                        color: "black",
+                      }}
+                    />
                   </Tab>
                 </TabList>
                 <TabIndicator
@@ -201,13 +238,13 @@ function UserMetrics() {
                 />
                 <TabPanels>
                   <TabPanel>
-                    <MessagesCountGraph />
+                    <CustomGraph input={messagesGraph} />
                   </TabPanel>
                   <TabPanel>
-                    <ThreadsCountGraph />
+                    <CustomGraph input={threadsGraph} />
                   </TabPanel>
                   <TabPanel>
-                    <UsersCountGraph />
+                    <CustomGraph input={usersGraph} />
                   </TabPanel>
                 </TabPanels>
               </Tabs>
@@ -237,6 +274,44 @@ function LLMMetrics() {
     );
   const { hasTeamPermission } = useOrganizationTeamProject();
 
+  const totalCostGraph: CustomGraphInput = {
+    graphId: "totalCostGraph",
+    graphType: "line",
+    series: [
+      {
+        name: "Total Cost",
+        metric: "performance.total_cost",
+        aggregation: "cardinality",
+        colorSet: analyticsMetrics.performance.total_cost.colorSet,
+      },
+    ],
+    groupBy: undefined,
+    includePrevious: true,
+    timeScale: 1,
+  };
+
+  const tokensGraph: CustomGraphInput = {
+    graphId: "tokensGraph",
+    graphType: "stacked_bar",
+    series: [
+      {
+        name: analyticsMetrics.performance.prompt_tokens.label,
+        metric: "performance.prompt_tokens",
+        aggregation: "sum",
+        colorSet: analyticsMetrics.performance.prompt_tokens.colorSet,
+      },
+      {
+        name: analyticsMetrics.performance.completion_tokens.label,
+        metric: "performance.completion_tokens",
+        aggregation: "sum",
+        colorSet: analyticsMetrics.performance.completion_tokens.colorSet,
+      },
+    ],
+    groupBy: undefined,
+    includePrevious: false,
+    timeScale: 1,
+  };
+
   return (
     <>
       <Heading as={"h1"} size="lg" paddingBottom={6} paddingTop={10}>
@@ -258,12 +333,13 @@ function LLMMetrics() {
                   </Tab>
                   {hasTeamPermission(TeamRoleGroup.COST_VIEW) && (
                     <Tab paddingX={0} paddingBottom={4}>
-                      <VStack align="start">
-                        <Text color="black">Total Cost</Text>
-                        <Box fontSize={24} color="black" fontWeight="bold">
-                          <LLMCostSumSummary />
-                        </Box>
-                      </VStack>
+                      <CustomGraph
+                        input={{ ...totalCostGraph, graphType: "summary" }}
+                        titleProps={{
+                          fontSize: 16,
+                          color: "black",
+                        }}
+                      />
                     </Tab>
                   )}
                   <Tab paddingX={0} paddingBottom={4}>
@@ -287,11 +363,11 @@ function LLMMetrics() {
                   </TabPanel>
                   {hasTeamPermission(TeamRoleGroup.COST_VIEW) && (
                     <TabPanel>
-                      <LLMCostSumGraph />
+                      <CustomGraph input={totalCostGraph} />
                     </TabPanel>
                   )}
                   <TabPanel>
-                    <TokensSumGraph />
+                    <CustomGraph input={tokensGraph} />
                   </TabPanel>
                 </TabPanels>
               </Tabs>

@@ -5,6 +5,8 @@ import {
   HStack,
   Spinner,
   useTheme,
+  type ColorProps,
+  type TypographyProps
 } from "@chakra-ui/react";
 import type { TRPCClientErrorLike } from "@trpc/client";
 import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
@@ -74,6 +76,7 @@ export type CustomGraphInput = {
   includePrevious: boolean;
   timeScale: "full" | number;
   connected?: boolean;
+  height?: number;
 };
 
 export const summaryGraphTypes: CustomGraphInput["graphType"][] = [
@@ -98,7 +101,18 @@ const GraphComponentMap: Partial<{
 };
 
 export const CustomGraph = React.memo(
-  function CustomGraph({ input }: { input: CustomGraphInput }) {
+  function CustomGraph({
+    input,
+    titleProps,
+  }: {
+    input: CustomGraphInput;
+    titleProps?: {
+      fontSize?: TypographyProps["fontSize"];
+      color?: ColorProps["color"];
+      fontWeight?: TypographyProps["fontWeight"];
+    };
+  }) {
+    const height_ = input.height ?? 300;
     const { analyticsParams, queryOpts } = useAnalyticsParams();
     const { projectId, startDate, endDate } = analyticsParams;
 
@@ -261,7 +275,7 @@ export const CustomGraph = React.memo(
     const Container = ({ children }: React.PropsWithChildren) => {
       return (
         <Box width="full" height="full" position="relative">
-          {timeseries.isFetching && (
+          {input.graphType !== "summary" && timeseries.isFetching && (
             <Spinner position="absolute" right={4} top={4} />
           )}
           {timeseries.error && (
@@ -293,6 +307,19 @@ export const CustomGraph = React.memo(
       return (
         <Container>
           <HStack spacing={0} align="start" minHeight="101px">
+            {timeseries.isLoading &&
+              input.series.map((series) => (
+                <SummaryMetric
+                  key={
+                    series.metric +
+                    series.aggregation +
+                    series.pipeline?.field +
+                    series.pipeline?.aggregation
+                  }
+                  label={series.name}
+                  titleProps={titleProps}
+                />
+              ))}
             {summaryData.current.slice(0, 10).map((entry, index) => (
               <SummaryMetric
                 key={entry.key}
@@ -301,6 +328,7 @@ export const CustomGraph = React.memo(
                 previous={summaryData.previous[index]?.value}
                 format={entry.metric?.format}
                 increaseIs={entry.metric?.increaseIs}
+                titleProps={titleProps}
               />
             ))}
           </HStack>
@@ -320,7 +348,7 @@ export const CustomGraph = React.memo(
         <Container>
           <ResponsiveContainer
             key={currentAndPreviousDataFilled ? input.graphId : "loading"}
-            height={500}
+            height={height_}
           >
             <PieChart>
               <Pie
@@ -381,7 +409,7 @@ export const CustomGraph = React.memo(
         <Container>
           <ResponsiveContainer
             key={currentAndPreviousDataFilled ? input.graphId : "loading"}
-            height={500}
+            height={height_}
           >
             <BarChart
               data={sortedCurrentData}
@@ -438,7 +466,7 @@ export const CustomGraph = React.memo(
       <Container>
         <ResponsiveContainer
           key={currentAndPreviousDataFilled ? input.graphId : "loading"}
-          height={500}
+          height={height_}
         >
           <GraphComponent
             data={currentAndPreviousDataFilled}
@@ -496,6 +524,7 @@ export const CustomGraph = React.memo(
             />
             {(sortedKeys ?? []).map((aggKey, index) => (
               <React.Fragment key={aggKey}>
+                {/* @ts-ignore */}
                 <GraphElement
                   key={aggKey}
                   type="linear"
@@ -556,7 +585,11 @@ export const CustomGraph = React.memo(
     );
   },
   (prevProps, nextProps) => {
-    return JSON.stringify(prevProps.input) === JSON.stringify(nextProps.input);
+    return (
+      JSON.stringify(prevProps.input) === JSON.stringify(nextProps.input) &&
+      JSON.stringify(prevProps.titleProps) ===
+        JSON.stringify(nextProps.titleProps)
+    );
   }
 );
 
@@ -723,7 +756,10 @@ const flattenGroupData = (
   const groupBy = input.groupBy;
   if (groupBy) {
     return data.map((entry) => {
-      const buckets = entry[groupBy] as Record<string, Record<string, number>>;
+      const buckets = entry[groupBy] as unknown as Record<
+        string,
+        Record<string, number>
+      >;
       const aggregations = Object.fromEntries(
         Object.entries(buckets).flatMap(([bucketKey, bucket]) => {
           return Object.entries(bucket).map(([metricKey, metricValue]) => {
