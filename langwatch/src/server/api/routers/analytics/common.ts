@@ -176,10 +176,15 @@ export const spanQueryConditions = ({
   ];
 };
 
-export const dateTicks = (startDate: Date, endDate: Date, field: string) => {
+export const dateTicks = (
+  startDate: Date,
+  endDate: Date,
+  field: string,
+  period = "1d"
+) => {
   return {
     field: field,
-    calendar_interval: "day",
+    fixed_interval: period,
     min_doc_count: 0,
     extended_bounds: {
       min: startDate.getTime(),
@@ -288,17 +293,18 @@ export const currentVsPreviousEventsAggregation = async <
 };
 
 export const currentVsPreviousDates = (
-  input: z.infer<typeof sharedAnalyticsFilterInput>
+  input: z.infer<typeof sharedAnalyticsFilterInput>,
+  period?: number | string
 ) => {
   const startDate = new Date(input.startDate);
   const endDate = new Date(input.endDate);
-  const daysDifference = getDaysDifference(startDate, endDate);
-  const previousPeriodStartDate = addDays(
-    new Date(input.startDate),
-    -daysDifference
+  const daysDifference = Math.max(
+    typeof period === "number" ? period : 1,
+    getDaysDifference(startDate, endDate)
   );
+  const previousPeriodStartDate = addDays(startDate, -daysDifference);
 
-  return { previousPeriodStartDate, endDate, daysDifference };
+  return { previousPeriodStartDate, startDate, endDate, daysDifference };
 };
 
 const currentVsPreviousElasticSearchAggregation = async <
@@ -542,7 +548,9 @@ export const generateTracesPivotQueryConditions = ({
       : []),
     ...(labels ? [{ terms: { "trace.metadata.labels": labels } }] : []),
     ...(topics ? [{ terms: { "trace.metadata.topic_id": topics } }] : []),
-    ...(subtopics ? [{ terms: { "trace.metadata.subtopic_id": subtopics } }] : []),
+    ...(subtopics
+      ? [{ terms: { "trace.metadata.subtopic_id": subtopics } }]
+      : []),
   ];
 
   return {

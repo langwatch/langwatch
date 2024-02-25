@@ -115,6 +115,7 @@ export interface CustomGraphFormData {
   }[];
   groupBy: FlattenAnalyticsGroupsEnum | "";
   includePrevious: boolean;
+  timeScale: "full" | number;
   connected?: boolean;
 }
 
@@ -182,6 +183,7 @@ const defaultValues: CustomGraphFormData = {
     },
   ],
   groupBy: "",
+  timeScale: 1,
   includePrevious: true,
 };
 
@@ -290,6 +292,7 @@ const customGraphFormToCustomGraphInput = (
     }),
     groupBy: formData.groupBy || undefined,
     includePrevious: formData.includePrevious,
+    timeScale: formData.timeScale,
     connected: formData.connected,
   };
 };
@@ -333,6 +336,23 @@ function CustomGraphForm({
         <FormLabel>Graph Type</FormLabel>
         <GraphTypeField form={form} />
       </FormControl>
+      {!["summary", "pie", "donnut"].includes(graphType.value) && (
+        <FormControl>
+          <FormLabel>Time Scale</FormLabel>
+
+          <Select
+            {...form.control.register("timeScale")}
+            minWidth="fit-content"
+          >
+            <option value={"full"}>Full Period</option>
+            <option value={1}>1 day</option>
+            <option value={7}>7 days</option>
+            <option value={30}>30 days</option>
+            <option value={30}>90 days</option>
+            <option value={30}>365 days</option>
+          </Select>
+        </FormControl>
+      )}
       {graphType.value === "scatter" && (
         <FormControl>
           <Controller

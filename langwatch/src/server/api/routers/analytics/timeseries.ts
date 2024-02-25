@@ -17,10 +17,10 @@ import { TeamRoleGroup, checkUserPermissionForProject } from "../../permission";
 import { protectedProcedure } from "../../trpc";
 import {
   currentVsPreviousDates,
-  dateTicks,
   generateTracesPivotQueryConditions,
 } from "./common";
 import { prisma } from "../../../db";
+import type { SearchRequest } from "@elastic/elasticsearch/lib/api/typesWithBodyKey";
 
 const labelsMapping: Partial<
   Record<
@@ -42,14 +42,11 @@ export const getTimeseries = protectedProcedure
   .input(sharedFiltersInputSchema.extend(timeseriesInput.shape))
   .use(checkUserPermissionForProject(TeamRoleGroup.ANALYTICS_VIEW))
   .query(async ({ input }) => {
-    const { previousPeriodStartDate, endDate, daysDifference } =
-      currentVsPreviousDates(input);
-
-    const date_histogram = dateTicks(
-      previousPeriodStartDate,
-      endDate,
-      "trace.timestamps.started_at"
-    ) as any;
+    const { previousPeriodStartDate, startDate, endDate, daysDifference } =
+      currentVsPreviousDates(
+        input,
+        typeof input.timeScale === "number" ? input.timeScale : undefined
+      );
 
     let runtimeMappings: Record<string, MappingRuntimeField> = {};
     let aggs = Object.fromEntries(
@@ -126,33 +123,61 @@ export const getTimeseries = protectedProcedure
       startDate: previousPeriodStartDate.getTime(),
     });
 
-    const result = await esClient.search({
-      index: TRACES_PIVOT_INDEX,
-      body: {
-        size: 0,
-        query: pivotIndexConditions,
-        ...(Object.keys(runtimeMappings).length > 0
-          ? { runtime_mappings: runtimeMappings }
-          : {}),
-        aggs: {
-          traces_per_day: {
-            date_histogram,
-            aggs,
-          },
-        },
-      },
-    });
+    const queryBody: SearchRequest["body"] = {
+      size: 0,
+      query: pivotIndexConditions,
+      ...(Object.keys(runtimeMappings).length > 0
+        ? { runtime_mappings: runtimeMappings }
+        : {}),
+      aggs:
+        input.timeScale === "full"
+          ? {
+              previous_vs_current: {
+                range: {
+                  field: "trace.timestamps.started_at",
+                  ranges: [
+                    {
+                      key: "previous",
+                      from: previousPeriodStartDate.toISOString(),
+                      to: startDate.toISOString(),
+                    },
+                    {
+                      key: "current",
+                      from: startDate.toISOString(),
+                      to: endDate.toISOString(),
+                    },
+                  ],
+                },
+                aggs,
+              },
+            }
+          : ({
+              traces_per_day: {
+                date_histogram: {
+                  field: "trace.timestamps.started_at",
+                  fixed_interval: input.timeScale ? `${input.timeScale}d` : "1d",
+                  min_doc_count: 0,
+                  extended_bounds: {
+                    min: previousPeriodStartDate.getTime(),
+                    max: endDate.getTime(),
+                  },
+                },
+                aggs,
+              },
+            } as any),
+    };
 
-    const aggregations: ({ date: string } & (
-      | Record<string, number>
-      | Record<
-          FlattenAnalyticsGroupsEnum,
-          Record<string, Record<string, number>>
-        >
-    ))[] = (result.aggregations?.traces_per_day as any)?.buckets.map(
-      (day_bucket: any) => {
+    const result = (await esClient.search({
+      index: TRACES_PIVOT_INDEX,
+      body: queryBody,
+    })) as any;
+
+    const parseAggregations = (
+      buckets: any
+    ): ({ date: string } & Record<string, number>)[] => {
+      return buckets.map((day_bucket: any) => {
         let aggregationResult: Record<string, any> = {
-          date: day_bucket.key_as_string,
+          date: day_bucket.key_as_string ?? day_bucket.from_as_string,
         };
 
         if (input.groupBy) {
@@ -211,15 +236,32 @@ export const getTimeseries = protectedProcedure
         }
 
         return aggregationResult;
-      }
+      });
+    };
+
+    if (input.timeScale === "full") {
+      const [previous, current] =
+        result.aggregations?.previous_vs_current.buckets;
+
+      return {
+        previousPeriod: parseAggregations([previous]),
+        currentPeriod: parseAggregations([current]),
+      };
+    }
+
+    const aggregations = parseAggregations(
+      result.aggregations.traces_per_day.buckets
+    );
+    const toSlice = Math.ceil(daysDifference / (input.timeScale ?? 1));
+    let previousPeriod = aggregations.slice(0, toSlice);
+    const currentPeriod = aggregations.slice(toSlice);
+    previousPeriod = previousPeriod.slice(
+      Math.max(0, previousPeriod.length - currentPeriod.length)
     );
 
-    const previousPeriod = aggregations.slice(0, daysDifference);
-    const currentPeriod = aggregations.slice(daysDifference);
-
     return {
-      previousPeriod,
-      currentPeriod,
+      previousPeriod: previousPeriod,
+      currentPeriod: currentPeriod,
     };
   });
 

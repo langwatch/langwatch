@@ -321,4 +321,140 @@ describe("Timeseries Graph Integration Tests", () => {
       },
     });
   });
+
+  it("should return a single period for summary metrics", async () => {
+    const user = await getTestUser();
+
+    const ctx = createInnerTRPCContext({
+      session: {
+        user: { id: user.id },
+        expires: "1",
+      },
+    });
+    const caller = appRouter.createCaller(ctx);
+
+    const response = await caller.analytics.getTimeseries({
+      projectId: "test-project-id",
+      startDate: new Date().getTime() - 24 * 60 * 60 * 1000, // 1 day ago
+      endDate: new Date().getTime(),
+      filters: {
+        metadata: {
+          labels: ["test-messages"],
+        },
+      },
+      series: [
+        { metric: "metadata.trace_id", aggregation: "cardinality" },
+        {
+          metric: "metadata.trace_id",
+          aggregation: "cardinality",
+          pipeline: {
+            field: "user_id",
+            aggregation: "avg",
+          },
+        },
+        { metric: "metadata.thread_id", aggregation: "cardinality" },
+        { metric: "sentiment.thumbs_up_down", aggregation: "cardinality" },
+        { metric: "sentiment.thumbs_up_down", aggregation: "sum" },
+        { metric: "sentiment.thumbs_up_down", aggregation: "min" },
+      ],
+      groupBy: "topics.topics",
+      timeScale: "full",
+    });
+
+    expect(response.currentPeriod).toEqual([
+      {
+        date: expect.any(String),
+        "topics.topics": {
+          greetings: {
+            "metadata.trace_id/cardinality": 2,
+            "metadata.trace_id/cardinality/user_id/avg": 1,
+            "metadata.thread_id/cardinality": 2,
+            "sentiment.thumbs_up_down/cardinality": 2,
+            "sentiment.thumbs_up_down/sum": 0,
+            "sentiment.thumbs_up_down/min": -1,
+          },
+          poems: {
+            "metadata.trace_id/cardinality": 1,
+            "metadata.trace_id/cardinality/user_id/avg": 1,
+            "metadata.thread_id/cardinality": 1,
+            "sentiment.thumbs_up_down/cardinality": 1,
+            "sentiment.thumbs_up_down/sum": 1,
+            "sentiment.thumbs_up_down/min": 1,
+          },
+        },
+      },
+    ]);
+  });
+
+  it("should return a 7 days period if requested even though start date is shorter", async () => {
+    const user = await getTestUser();
+
+    const ctx = createInnerTRPCContext({
+      session: {
+        user: { id: user.id },
+        expires: "1",
+      },
+    });
+    const caller = appRouter.createCaller(ctx);
+
+    const response = await caller.analytics.getTimeseries({
+      projectId: "test-project-id",
+      startDate: new Date().getTime() - 24 * 60 * 60 * 1000 * 1, // 1 days ago
+      endDate: new Date().getTime(),
+      filters: {
+        metadata: {
+          labels: ["test-messages"],
+        },
+      },
+      series: [
+        { metric: "metadata.trace_id", aggregation: "cardinality" },
+        {
+          metric: "metadata.trace_id",
+          aggregation: "cardinality",
+          pipeline: {
+            field: "user_id",
+            aggregation: "avg",
+          },
+        },
+        { metric: "metadata.thread_id", aggregation: "cardinality" },
+        { metric: "sentiment.thumbs_up_down", aggregation: "cardinality" },
+        { metric: "sentiment.thumbs_up_down", aggregation: "sum" },
+        { metric: "sentiment.thumbs_up_down", aggregation: "min" },
+      ],
+      groupBy: "topics.topics",
+      timeScale: 7,
+    });
+
+    expect(response).toEqual({
+      previousPeriod: [
+        {
+          date: expect.any(String),
+          "topics.topics": {},
+        },
+      ],
+      currentPeriod: [
+        {
+          date: expect.any(String),
+          "topics.topics": {
+            greetings: {
+              "metadata.trace_id/cardinality": 2,
+              "metadata.trace_id/cardinality/user_id/avg": 1,
+              "metadata.thread_id/cardinality": 2,
+              "sentiment.thumbs_up_down/cardinality": 2,
+              "sentiment.thumbs_up_down/sum": 0,
+              "sentiment.thumbs_up_down/min": -1,
+            },
+            poems: {
+              "metadata.trace_id/cardinality": 1,
+              "metadata.trace_id/cardinality/user_id/avg": 1,
+              "metadata.thread_id/cardinality": 1,
+              "sentiment.thumbs_up_down/cardinality": 1,
+              "sentiment.thumbs_up_down/sum": 1,
+              "sentiment.thumbs_up_down/min": 1,
+            },
+          },
+        },
+      ],
+    });
+  });
 });

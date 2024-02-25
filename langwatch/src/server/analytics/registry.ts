@@ -800,4 +800,5 @@ export type SeriesInputType = z.infer<typeof seriesInput>;
 export const timeseriesInput = z.object({
   series: z.array(seriesInput),
   groupBy: z.optional(z.enum(flattenAnalyticsGroupsEnum)),
+  timeScale: z.optional(z.union([z.literal("full"), z.number().int()])),
 });

@@ -71,6 +71,7 @@ export type CustomGraphInput = {
   series: Series[];
   groupBy: z.infer<typeof timeseriesInput>["groupBy"];
   includePrevious: boolean;
+  timeScale: "full" | number;
   connected?: boolean;
 };
 
@@ -100,6 +101,11 @@ export const CustomGraph = React.memo(
         endDate,
         filters: {},
         ...input,
+        timeScale: ["summary", "bar", "donnut"].includes(input.graphType)
+          ? "full"
+          : input.timeScale === "full"
+          ? input.timeScale
+          : parseInt(input.timeScale.toString(), 10),
       },
       queryOpts
     );
