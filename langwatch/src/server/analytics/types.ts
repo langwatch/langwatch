@@ -9,7 +9,7 @@ import type {
   Event,
   TraceCheck,
 } from "../tracer/types";
-import type { DeepRequired } from "../../utils/types";
+import type { DeepRequired, Unpacked } from "../../utils/types";
 import type { RotatingColorSet } from "../../utils/rotatingColors";
 import type { FilterField } from "../filters/types";
 
@@ -54,13 +54,29 @@ export const aggregationTypesEnum = z.enum([
   "sum",
   "min",
   "max",
+  "median",
+  "p99",
+  "p95",
+  "p90",
 ]);
 
 export const allAggregationTypes = aggregationTypesEnum.options;
 
-export const numericAggregationTypes = allAggregationTypes.filter(
-  (agg) => agg !== "cardinality"
-);
+export const numericAggregationTypes: AggregationTypes[] = [
+  "avg",
+  "sum",
+  "min",
+  "max",
+];
+
+export const percentileAggregationTypes = ["median", "p99", "p95", "p90"] as (
+  | "median"
+  | "p99"
+  | "p95"
+  | "p90"
+)[] satisfies AggregationTypes[];
+
+export type PercentileAggregationTypes = Unpacked<typeof percentileAggregationTypes>;
 
 export type AggregationTypes = z.infer<typeof aggregationTypesEnum>;
 

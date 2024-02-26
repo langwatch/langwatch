@@ -1,5 +1,5 @@
 import { useRouter } from "next/router";
-import { useEffect, useMemo } from "react";
+import { useEffect } from "react";
 import { useLocalStorage } from "usehooks-ts";
 import { api } from "../utils/api";
 import { useRequiredSession } from "./useRequiredSession";
