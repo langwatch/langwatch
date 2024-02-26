@@ -281,7 +281,7 @@ function LLMMetrics() {
       {
         name: "Total Cost",
         metric: "performance.total_cost",
-        aggregation: "cardinality",
+        aggregation: "sum",
         colorSet: analyticsMetrics.performance.total_cost.colorSet,
       },
     ],
