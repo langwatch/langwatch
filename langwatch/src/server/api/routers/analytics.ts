@@ -8,10 +8,6 @@ import {
   generateTraceChecksQueryConditions,
 } from "./analytics/common";
 import { tokensSumVsPreviousPeriod } from "./analytics/tokens";
-import {
-  llmCallsCountAggregated,
-  llmCallsCountVsPreviousPeriod,
-} from "./analytics/llmCalls";
 import { sessionsVsPreviousPeriod } from "./analytics/sessions";
 import { satisfactionVsPreviousPeriod } from "./analytics/satisfaction";
 import { topUsedDocuments } from "./analytics/documents";
@@ -26,8 +22,6 @@ export const analyticsRouter = createTRPCRouter({
   sessionsVsPreviousPeriod,
   satisfactionVsPreviousPeriod,
   thumbsUpDownVsPreviousPeriod,
-  llmCallsCountVsPreviousPeriod,
-  llmCallsCountAggregated,
   tokensSumVsPreviousPeriod,
   topUsedDocuments,
   getSummaryMetrics: protectedProcedure

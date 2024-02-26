@@ -220,7 +220,7 @@ export const analyticsMetrics = {
       ...numericFieldAnalyticsWithPercentiles("trace.metrics.total_cost"),
       label: "Total Cost",
       colorSet: "greenTones",
-      format: "$0.00[00]",
+      format: "$0.00[0]",
       increaseIs: "neutral",
     },
     prompt_tokens: {
@@ -636,8 +636,42 @@ export const analyticsGroups = {
           },
           aggs: {
             child: {
+              filter: {
+                term: { "spans.type": "llm" },
+              },
+              aggs: {
+                child: {
+                  terms: {
+                    field: "spans.model",
+                    size: 50,
+                    missing: "unknown",
+                  },
+                  aggs: {
+                    back_to_root: {
+                      reverse_nested: {},
+                      aggs: aggToGroup,
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      }),
+      extractionPath: () => "model_group>child>child>buckets>back_to_root",
+    },
+
+    span_type: {
+      label: "Span Type",
+      aggregation: (aggToGroup) => ({
+        model_group: {
+          nested: {
+            path: "spans",
+          },
+          aggs: {
+            child: {
               terms: {
-                field: "spans.model",
+                field: "spans.type",
                 size: 50,
                 missing: "unknown",
               },
