@@ -15,7 +15,7 @@ export const titleCase = (input: string): string => {
       .replace(/^./, (str) => str.toUpperCase())
       .replace(/ (\w)/g, (_, char) => ` ${char.toUpperCase()}`)
       // Special cases (acronyms etc.)
-      .replace(/(\b(id|ip|iban|vat|pii)\b)/gi, (str) => str.toUpperCase())
+      .replace(/(\b(llm|id|ip|iban|vat|pii)\b)/gi, (str) => str.toUpperCase())
   );
 };
 
@@ -25,7 +25,7 @@ export const uppercaseFirstLetterLowerCaseRest = (input: string): string => {
       .toLowerCase()
       .replace(/^./, (str) => str.toUpperCase())
       // Special cases (acronyms etc.)
-      .replace(/(\b(id|ip|iban|vat|pii)\b)/gi, (str) => str.toUpperCase())
+      .replace(/(\b(llm|id|ip|iban|vat|pii)\b)/gi, (str) => str.toUpperCase())
   );
 };
 

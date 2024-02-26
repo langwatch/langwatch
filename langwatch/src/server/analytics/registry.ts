@@ -90,6 +90,43 @@ export const analyticsMetrics = {
       colorSet: "greenTones",
       allowedAggregations: ["cardinality"],
     },
+    span_type: {
+      label: "Span Type",
+      colorSet: "purpleTones",
+      allowedAggregations: ["cardinality"],
+      format: "0.[00]a",
+      increaseIs: "neutral",
+      requiresKey: {
+        filter: "spans.type",
+        optional: true,
+      },
+      aggregation: (aggregation, key) => ({
+        [`span_type_${aggregation}`]: {
+          nested: {
+            path: "spans",
+          },
+          aggs: {
+            child: {
+              filter: {
+                bool: {
+                  must: [
+                    key ? { term: { "spans.type": key } } : { match_all: {} },
+                  ],
+                } as any,
+              },
+              aggs: {
+                cardinality: {
+                  cardinality: { field: "spans.span_id" },
+                },
+              } as any,
+            },
+          },
+        },
+      }),
+      extractionPath: (aggregation) => {
+        return `span_type_${aggregation}>child>cardinality`;
+      },
+    },
   },
   sentiment: {
     input_sentiment: {

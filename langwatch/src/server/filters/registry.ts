@@ -16,7 +16,7 @@ export const filters: { [K in FilterField]: FilterDefinition } = {
               }
             : {
                 match_all: {},
-            },
+              },
           aggs: {
             child: {
               terms: {
@@ -24,8 +24,8 @@ export const filters: { [K in FilterField]: FilterDefinition } = {
                 size: 100,
                 order: { _key: "asc" },
               },
-            }
-          }
+            },
+          },
         },
       }),
       extract: (result: Record<string, any>) => {
@@ -54,7 +54,7 @@ export const filters: { [K in FilterField]: FilterDefinition } = {
               }
             : {
                 match_all: {},
-            },
+              },
           aggs: {
             child: {
               terms: {
@@ -62,8 +62,8 @@ export const filters: { [K in FilterField]: FilterDefinition } = {
                 size: 100,
                 order: { _key: "asc" },
               },
-            }
-          }
+            },
+          },
         },
       }),
       extract: (result: Record<string, any>) => {
@@ -92,7 +92,7 @@ export const filters: { [K in FilterField]: FilterDefinition } = {
               }
             : {
                 match_all: {},
-            },
+              },
           aggs: {
             child: {
               terms: {
@@ -100,8 +100,8 @@ export const filters: { [K in FilterField]: FilterDefinition } = {
                 size: 100,
                 order: { _key: "asc" },
               },
-            }
-          }
+            },
+          },
         },
       }),
       extract: (result: Record<string, any>) => {
@@ -130,7 +130,7 @@ export const filters: { [K in FilterField]: FilterDefinition } = {
               }
             : {
                 match_all: {},
-            },
+              },
           aggs: {
             child: {
               terms: {
@@ -138,13 +138,56 @@ export const filters: { [K in FilterField]: FilterDefinition } = {
                 size: 100,
                 order: { _key: "asc" },
               },
-            }
-          }
+            },
+          },
         },
       }),
       extract: (result: Record<string, any>) => {
         return (
           result.unique_values?.child?.buckets?.map((bucket: any) => ({
+            field: bucket.key,
+            label: bucket.key,
+            count: bucket.doc_count,
+          })) ?? []
+        );
+      },
+    },
+  },
+  "spans.type": {
+    listMatch: {
+      aggregation: (query) => ({
+        unique_values: {
+          nested: { path: "spans" },
+          aggs: {
+            child: {
+              filter: query
+                ? {
+                    prefix: {
+                      "spans.type": {
+                        value: query,
+                        case_insensitive: true,
+                      },
+                    },
+                  }
+                : {
+                    match_all: {},
+                  },
+              aggs: {
+                child: {
+                  terms: {
+                    field: "spans.type",
+                    size: 100,
+                    order: { _key: "asc" },
+                  },
+                },
+              },
+            },
+          },
+        },
+      }),
+      extract: (result: Record<string, any>) => {
+        return (
+          result.unique_values?.child?.child?.buckets?.map((bucket: any) => ({
             field: bucket.key,
             label: bucket.key,
             count: bucket.doc_count,
