@@ -105,6 +105,14 @@ export const useOrganizationTeamProject = (
       void router.push(`/onboarding/${firstTeamSlug}/project`);
       return;
     }
+
+    if (
+      project &&
+      typeof router.query.project == "string" &&
+      project.slug !== router.query.project
+    ) {
+      void router.push(`/${project.slug}`);
+    }
   }, [
     organization,
     organizations.data,
