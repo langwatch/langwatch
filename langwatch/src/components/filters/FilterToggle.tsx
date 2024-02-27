@@ -1,6 +1,7 @@
-import { Button, HStack, Text } from "@chakra-ui/react";
+import { Box, Button, HStack, Text } from "@chakra-ui/react";
 import { useRouter } from "next/router";
 import { Filter } from "react-feather";
+import { useFilterParams } from "../../hooks/useFilterParams";
 
 export const useFilterToggle = (
   { defaultShowFilters } = { defaultShowFilters: false }
@@ -44,6 +45,7 @@ export function FilterToggle({
   const { showFilters, setShowFilters } = useFilterToggle({
     defaultShowFilters,
   });
+  const { filterParams } = useFilterParams();
 
   return (
     <Button
@@ -53,6 +55,24 @@ export function FilterToggle({
       isActive={showFilters}
     >
       <HStack spacing={2}>
+        {filterParams.filters &&
+          Object.keys(filterParams.filters).length > 0 && (
+            <Box
+              width="12px"
+              height="12px"
+              borderRadius="12px"
+              background="red.500"
+              position="absolute"
+              marginTop="10px"
+              marginLeft="8px"
+              fontSize="8px"
+              color="white"
+              lineHeight="12px"
+              textAlign="center"
+            >
+              {Object.keys(filterParams.filters).length}
+            </Box>
+          )}
         <Filter size={16} />
         <Text>Filters</Text>
       </HStack>
