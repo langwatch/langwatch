@@ -72,7 +72,7 @@ AUTH0_CLIENT_SECRET=""
 AUTH0_ISSUER="https://dev-frj2zgeo5352i1kj.us.auth0.com"
 ```
 
-3. `docker compose up` should do the trick and get it working at http://localhost:3000 
+3. `docker compose up --build` should do the trick and get it working at http://localhost:3000
 
 ## Documentation
 

@@ -1,4 +1,5 @@
 import { RenderCode } from "./utils/RenderCode";
+import { langwatchEndpointEnv } from "./utils/langwatchEndpointEnv";
 
 export const LangChainPython = ({ apiKey }: { apiKey?: string }) => {
   return (
@@ -10,7 +11,7 @@ export const LangChainPython = ({ apiKey }: { apiKey?: string }) => {
         Ensure the <code>LANGWATCH_API_KEY</code> environment variable is set:
       </p>
       <RenderCode
-        code={`export LANGWATCH_API_KEY='${apiKey ?? "your_api_key_here"}'`}
+        code={`${langwatchEndpointEnv()}export LANGWATCH_API_KEY='${apiKey ?? "your_api_key_here"}'`}
         language="bash"
       />
       <h3>Usage:</h3>

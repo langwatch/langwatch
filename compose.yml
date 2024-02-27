@@ -5,6 +5,8 @@ services:
     container_name: langwatch-web
     environment:
       - SKIP_ENV_VALIDATION=true
+    env_file:
+      - langwatch/.env
     build:
       context: .
     ports:
