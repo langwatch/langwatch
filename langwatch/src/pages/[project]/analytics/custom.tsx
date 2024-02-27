@@ -37,6 +37,7 @@ import { useEffect, useState, type Dispatch, type SetStateAction } from "react";
 import {
   AlignLeft,
   BarChart2,
+  Check,
   GitBranch,
   PieChart,
   Trash,
@@ -55,7 +56,7 @@ import {
 } from "react-hook-form";
 import { useDebounceValue } from "usehooks-ts";
 import { DashboardLayout } from "../../../components/DashboardLayout";
-import { FilterSelector } from "../../../components/FilterSelector";
+import { FilterToggle } from "../../../components/filters/FilterToggle";
 import {
   PeriodSelector,
   usePeriodSelector,
@@ -233,7 +234,7 @@ export default function AnalyticsCustomGraph() {
               Custom Graph
             </Heading>
             <Spacer />
-            <FilterSelector />
+            <FilterToggle />
             <PeriodSelector
               period={{ startDate, endDate }}
               setPeriod={setPeriod}
@@ -847,6 +848,40 @@ function FilterSelectField<T extends FieldValues, U extends Path<T>>({
       options={options as any}
       value={current}
       isSearchable={true}
+      useBasicStyles
+      components={{
+        Option: ({ ...props }) => {
+          let label = props.data.label;
+          let details = "";
+          // if label is like "[details] label" then split it
+          const labelDetailsMatch = props.data.label.match(/^\[(.*)\] (.*)/);
+          if (labelDetailsMatch) {
+            label = labelDetailsMatch[2] ?? "";
+            details = labelDetailsMatch[1] ?? "";
+          }
+
+          return (
+            <chakraComponents.Option {...props}>
+              <HStack align="end">
+                <Box width="16px">
+                  {props.isSelected && <Check width="16px" />}
+                </Box>
+                <VStack align="start" spacing={"2px"}>
+                  {details && (
+                    <Text
+                      fontSize="sm"
+                      color={props.isSelected ? "white" : "gray.500"}
+                    >
+                      {details}
+                    </Text>
+                  )}
+                  <Text>{label}</Text>
+                </VStack>
+              </HStack>
+            </chakraComponents.Option>
+          );
+        },
+      }}
     />
   );
 }

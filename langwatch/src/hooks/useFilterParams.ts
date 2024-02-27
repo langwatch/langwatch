@@ -2,6 +2,8 @@ import { useOrganizationTeamProject } from "./useOrganizationTeamProject";
 import { getSingleQueryParam } from "../utils/getSingleQueryParam";
 import { usePeriodSelector } from "../components/PeriodSelector";
 import { useRouter } from "next/router";
+import { availableFilters } from "../server/filters/registry";
+import type { FilterField } from "../server/filters/types";
 
 export const useFilterParams = () => {
   const { project } = useOrganizationTeamProject();
@@ -11,23 +13,21 @@ export const useFilterParams = () => {
     period: { startDate, endDate },
   } = usePeriodSelector();
 
-  const topics = getMultipleQueryParams(router.query.topics);
-  const subtopics = getMultipleQueryParams(router.query.subtopics);
-  // TODO: add type signature same as the shared input schema for endpoints
+  const filters: Partial<Record<FilterField, string[]>> = {};
+
+  for (const [key, filter] of Object.entries(availableFilters)) {
+    const values = getMultipleQueryParams(router.query[filter.urlKey]);
+    if (values) {
+      filters[key as FilterField] = values;
+    }
+  }
+
   return {
     filterParams: {
       projectId: project?.id ?? "",
       startDate: startDate.getTime(),
       endDate: endDate.getTime(),
-      filters: {
-        topics: topics ? { topics, subtopics } : undefined,
-        metadata: {
-          user_id: getMultipleQueryParams(router.query.user_id),
-          thread_id: getMultipleQueryParams(router.query.thread_id),
-          customer_id: getMultipleQueryParams(router.query.customer_ids),
-          labels: getMultipleQueryParams(router.query.labels),
-        },
-      },
+      filters,
     },
     queryOpts: {
       enabled: !!project && !!startDate && !!endDate,

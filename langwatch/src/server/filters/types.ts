@@ -1,12 +1,18 @@
-import type { AggregationsAggregationContainer } from "@elastic/elasticsearch/lib/api/types";
+import type {
+  AggregationsAggregationContainer,
+  QueryDslQueryContainer,
+} from "@elastic/elasticsearch/lib/api/types";
 import { z } from "zod";
 
 export const filterFieldsEnum = z.enum([
+  "topics.topics",
+  "topics.subtopics",
   "metadata.user_id",
   "metadata.thread_id",
   "metadata.customer_id",
   "metadata.labels",
   "spans.type",
+  "spans.model",
   "trace_checks.check_id",
   "events.event_type",
   "events.metrics.key",
@@ -16,6 +22,9 @@ export const filterFieldsEnum = z.enum([
 export type FilterField = z.infer<typeof filterFieldsEnum>;
 
 export type FilterDefinition = {
+  name: string;
+  urlKey: string;
+  query: (values: string[]) => QueryDslQueryContainer;
   listMatch: {
     requiresKey?: boolean;
     aggregation: (

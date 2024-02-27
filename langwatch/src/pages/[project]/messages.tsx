@@ -5,11 +5,8 @@ import {
   Button,
   Card,
   CardBody,
-  Checkbox,
   Container,
-  Divider,
   HStack,
-  Heading,
   Input,
   LinkBox,
   Menu,
@@ -29,8 +26,6 @@ import React, { createRef, useEffect, useRef, useState } from "react";
 import {
   ChevronDown,
   ChevronUp,
-  Filter,
-  HelpCircle,
   Layers,
   Maximize2,
   Pause,
@@ -38,6 +33,7 @@ import {
   RefreshCw,
   Search,
 } from "react-feather";
+import { MessagesDevMode } from "~/components/MessagesDevMode";
 import { DashboardLayout } from "../../components/DashboardLayout";
 import { MessageCard } from "../../components/MessageCard";
 import {
@@ -45,14 +41,14 @@ import {
   usePeriodSelector,
 } from "../../components/PeriodSelector";
 import { ProjectIntegration } from "../../components/ProjectIntegration";
+import { FilterSidebar } from "../../components/filters/FilterSidebar";
+import { FilterToggle } from "../../components/filters/FilterToggle";
+import { useDevView } from "../../hooks/DevViewProvider";
+import { useFilterParams } from "../../hooks/useFilterParams";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import type { Trace, TraceCheck } from "../../server/tracer/types";
 import { api } from "../../utils/api";
 import { getSingleQueryParam } from "../../utils/getSingleQueryParam";
-import { MessagesDevMode } from "~/components/MessagesDevMode";
-import { useDevView } from "../../hooks/DevViewProvider";
-import { useFilterParams } from "../../hooks/useFilterParams";
-import { FieldsFilters } from "../../components/FieldsFilters";
 
 export default function MessagesOrIntegrationGuide() {
   const { project } = useOrganizationTeamProject();
@@ -82,7 +78,6 @@ function Messages() {
     number | undefined
   >();
   const [liveUpdate, setLiveUpdate] = useState(true);
-  const [showFilters, setShowFilters] = useState(window.innerWidth > 1024);
   const [groupBy] = useGroupBy();
   const { filterParams, queryOpts } = useFilterParams();
 
@@ -115,7 +110,7 @@ function Messages() {
           (check) =>
             (check.status == "scheduled" || check.status == "in_progress") &&
             (check.timestamps.inserted_at ?? 0) >
-            new Date().getTime() - 1000 * 60 * 60 * 1
+              new Date().getTime() - 1000 * 60 * 60 * 1
         );
       if (pendingChecks.length > 0) {
         setTracesCheckInterval(5000);
@@ -156,17 +151,7 @@ function Messages() {
           <SearchInput />
           <GroupingSelector />
           <PeriodSelector period={period} setPeriod={setPeriod} />
-          <Button
-            variant="outline"
-            onClick={() => setShowFilters(!showFilters)}
-            minWidth="fit-content"
-            isActive={showFilters}
-          >
-            <HStack spacing={2}>
-              <Filter size={16} />
-              <Text>Filters</Text>
-            </HStack>
-          </Button>
+          <FilterToggle defaultShowFilters={true} />
           <Tooltip
             label={
               liveUpdate
@@ -208,8 +193,8 @@ function Messages() {
         <HStack align="start" spacing={8}>
           <VStack gap={6} width="full">
             {project &&
-              traceGroups.data &&
-              traceGroups.data.groups.length > 0 ? (
+            traceGroups.data &&
+            traceGroups.data.groups.length > 0 ? (
               <ExpandableMessages
                 project={project}
                 traceGroups={traceGroups.data.groups}
@@ -233,226 +218,10 @@ function Messages() {
               </>
             )}
           </VStack>
-          {showFilters && <FilterSidebar />}
+          <FilterSidebar defaultShowFilters={true} />
         </HStack>
       </Container>
     </>
-  );
-}
-
-const FilterSidebar = React.memo(function FilterSidebar() {
-  return (
-    <VStack
-      align="start"
-      width="full"
-      maxWidth="380"
-      spacing={12}
-      paddingTop={2}
-      paddingBottom={"120px"}
-    >
-      <TopicsSelector />
-      <FieldsFilters />
-    </VStack>
-  );
-});
-
-function TopicsSelector() {
-  const router = useRouter();
-  const [selectedTopics, setSelectedTopics] = useState<string[]>([]);
-  const [selectedSubtopics, setSelectedSubtopics] = useState<string[]>([]);
-  const { filterParams, queryOpts } = useFilterParams();
-
-  useEffect(() => {
-    if (router.query.topics) {
-      setSelectedTopics((router.query.topics as string).split(","));
-    } else {
-      setSelectedTopics([]);
-    }
-  }, [router.query.topics]);
-
-  useEffect(() => {
-    if (router.query.subtopics) {
-      setSelectedSubtopics((router.query.subtopics as string).split(","));
-    } else {
-      setSelectedSubtopics([]);
-    }
-  }, [router.query.subtopics]);
-
-  const topicCountsQuery = api.traces.getTopicCounts.useQuery(
-    {
-      ...filterParams,
-      filters: { ...filterParams.filters, topics: undefined },
-    },
-    queryOpts
-  );
-
-  const handleTopicChange = (topicId: string, isChecked: boolean) => {
-    const newTopics = isChecked
-      ? [...selectedTopics, topicId]
-      : selectedTopics.filter((t) => t !== topicId);
-
-    let newSubtopics = selectedSubtopics;
-    if (!isChecked) {
-      const subtopics = topicCountsQuery.data?.subtopicCounts.filter(
-        (subtopic) => subtopic.parentId === topicId
-      );
-      if (subtopics) {
-        newSubtopics = selectedSubtopics.filter(
-          (t) => !subtopics.map((s) => s.id).includes(t)
-        );
-      }
-    }
-
-    setSelectedTopics(newTopics);
-    setSelectedSubtopics(newSubtopics);
-
-    const topicsQuery = newTopics.length > 0 ? newTopics.join(",") : undefined;
-    const subtopicsQuery =
-      newSubtopics.length > 0 ? newSubtopics.join(",") : undefined;
-    void router.push(
-      {
-        query: {
-          ...router.query,
-          topics: topicsQuery,
-          subtopics: subtopicsQuery,
-        },
-      },
-      undefined,
-      { shallow: true }
-    );
-  };
-
-  const handleSubtopicChange = (subtopicId: string, isChecked: boolean) => {
-    const newSubtopics = isChecked
-      ? [...selectedSubtopics, subtopicId]
-      : selectedSubtopics.filter((t) => t !== subtopicId);
-    const subtopicsQuery =
-      newSubtopics.length > 0 ? newSubtopics.join(",") : undefined;
-    setTimeout(() => {
-      void router.push(
-        {
-          query: {
-            ...router.query,
-            subtopics: subtopicsQuery,
-          },
-        },
-        undefined,
-        { shallow: true }
-      );
-    }, 0);
-
-    setSelectedSubtopics(newSubtopics);
-  };
-
-  return (
-    <VStack align="start" width="full" spacing={6}>
-      <Heading as="h2" size="md">
-        Topics
-      </Heading>
-      <VStack width="full" spacing={4} align="start">
-        {topicCountsQuery.isLoading ? (
-          <>
-            <Skeleton width="full" height="20px" />
-            <Skeleton width="full" height="20px" />
-            <Skeleton width="full" height="20px" />
-          </>
-        ) : topicCountsQuery.data ? (
-          topicCountsQuery.data.topicCounts.length > 0 ? (
-            topicCountsQuery.data.topicCounts
-              .sort((a, b) => (a.name > b.name ? 1 : -1))
-              .sort((a, b) => (a.count > b.count ? -1 : 1))
-              .map((topic) => (
-                <React.Fragment key={topic.id}>
-                  <HStack
-                    spacing={1}
-                    width="full"
-                    paddingX={2}
-                    fontWeight={
-                      selectedTopics.includes(topic.id) ? "500" : "normal"
-                    }
-                  >
-                    <Checkbox
-                      borderColor="gray.400"
-                      spacing={3}
-                      flexGrow={1}
-                      isChecked={selectedTopics.includes(topic.id)}
-                      onChange={(e) =>
-                        handleTopicChange(topic.id, e.target.checked)
-                      }
-                    >
-                      <Text
-                        noOfLines={1}
-                        wordBreak="break-all"
-                        title={topic.name}
-                        fontSize={15}
-                      >
-                        {topic.name}
-                      </Text>
-                    </Checkbox>
-                    <Text color="gray.500" fontSize={12} whiteSpace="nowrap">
-                      {topic.count}
-                    </Text>
-                  </HStack>
-                  {selectedTopics.includes(topic.id) &&
-                    topicCountsQuery.data.subtopicCounts
-                      .sort((a, b) => (a.name > b.name ? 1 : -1))
-                      .sort((a, b) => (a.count > b.count ? -1 : 1))
-                      .filter((subtopic) => subtopic.parentId === topic.id)
-                      .map((subtopic) => (
-                        <HStack
-                          key={subtopic.id}
-                          spacing={1}
-                          width="full"
-                          paddingX={2}
-                          paddingLeft={8}
-                          fontWeight="normal"
-                          fontSize={15}
-                        >
-                          <Checkbox
-                            borderColor="gray.400"
-                            spacing={3}
-                            flexGrow={1}
-                            isChecked={selectedSubtopics.includes(subtopic.id)}
-                            onChange={(e) =>
-                              handleSubtopicChange(
-                                subtopic.id,
-                                e.target.checked
-                              )
-                            }
-                          >
-                            <Text
-                              noOfLines={1}
-                              wordBreak="break-all"
-                              title={subtopic.name}
-                            >
-                              {subtopic.name}
-                            </Text>
-                          </Checkbox>
-                          <Text
-                            color="gray.500"
-                            fontSize={12}
-                            whiteSpace="nowrap"
-                          >
-                            {subtopic.count}
-                          </Text>
-                        </HStack>
-                      ))}
-                  <Divider borderColor="gray.350" _last={{ display: "none" }} />
-                </React.Fragment>
-              ))
-          ) : (
-            <HStack>
-              <Text>No topics found</Text>
-              <Tooltip label="Topics are assigned automatically to a group of messages. If you already have enough messages, it may take a day topics to be generated">
-                <HelpCircle width="14px" />
-              </Tooltip>
-            </HStack>
-          )
-        ) : (
-          <Text>No topics found</Text>
-        )}
-      </VStack>
-    </VStack>
   );
 }
 
@@ -519,27 +288,27 @@ const ExpandableMessages = React.memo(
           }}
           {...(isExpanded
             ? {
-              className: "card-stack-content expanded",
-              background: "#ECEEF2",
-              borderRadius: "10px",
-              padding: "40px",
-              width: "calc(100% + 80px)",
-              cursor: "n-resize",
-            }
+                className: "card-stack-content expanded",
+                background: "#ECEEF2",
+                borderRadius: "10px",
+                padding: "40px",
+                width: "calc(100% + 80px)",
+                cursor: "n-resize",
+              }
             : {
-              background: "#ECEEF200",
-              className: "card-stack-content",
-              marginBottom:
-                traceGroup.length > 2 ? 4 : traceGroup.length > 1 ? 2 : 0,
-              marginLeft:
-                traceGroup.length > 2 ? -4 : traceGroup.length > 1 ? -2 : 0,
-              cursor: "pointer",
-              width: "full",
-              zIndex: 2,
-              _hover: {
-                transform: "scale(1.04)",
-              },
-            })}
+                background: "#ECEEF200",
+                className: "card-stack-content",
+                marginBottom:
+                  traceGroup.length > 2 ? 4 : traceGroup.length > 1 ? 2 : 0,
+                marginLeft:
+                  traceGroup.length > 2 ? -4 : traceGroup.length > 1 ? -2 : 0,
+                cursor: "pointer",
+                width: "full",
+                zIndex: 2,
+                _hover: {
+                  transform: "scale(1.04)",
+                },
+              })}
         >
           {isExpanded && (
             <HStack
@@ -614,8 +383,8 @@ const ExpandableMessages = React.memo(
                     _hover={
                       expanded
                         ? {
-                          transform: "scale(1.04)",
-                        }
+                            transform: "scale(1.04)",
+                          }
                         : {}
                     }
                   >
@@ -648,11 +417,11 @@ const ExpandableMessages = React.memo(
       prevProps.traceGroups
         .flatMap((group) => group.map((trace) => trace.trace_id))
         .join() ===
-      nextProps.traceGroups
-        .flatMap((group) => group.map((trace) => trace.trace_id))
-        .join() &&
+        nextProps.traceGroups
+          .flatMap((group) => group.map((trace) => trace.trace_id))
+          .join() &&
       JSON.stringify(prevProps.checksMap) ===
-      JSON.stringify(nextProps.checksMap)
+        JSON.stringify(nextProps.checksMap)
     );
   }
 );

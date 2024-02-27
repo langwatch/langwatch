@@ -4,7 +4,7 @@ import { TRACES_PIVOT_INDEX, esClient } from "../../../elasticsearch";
 import { filterFieldsEnum } from "../../../filters/types";
 import { TeamRoleGroup, checkUserPermissionForProject } from "../../permission";
 import { protectedProcedure } from "../../trpc";
-import { filters } from "../../../filters/registry";
+import { availableFilters } from "../../../filters/registry";
 
 export const dataForFilter = protectedProcedure
   .input(
@@ -19,7 +19,7 @@ export const dataForFilter = protectedProcedure
   .query(async ({ input }) => {
     const { projectId, field, key } = input;
 
-    if (filters[field].listMatch.requiresKey && !key) {
+    if (availableFilters[field].listMatch.requiresKey && !key) {
       throw new TRPCError({
         code: "BAD_REQUEST",
         message: `Field ${field} requires a key to be defined`,
@@ -35,11 +35,11 @@ export const dataForFilter = protectedProcedure
             must: [{ term: { "trace.project_id": projectId } }],
           } as any,
         },
-        aggs: filters[field].listMatch.aggregation(input.query, key),
+        aggs: availableFilters[field].listMatch.aggregation(input.query, key),
       },
     });
 
-    const results = filters[field].listMatch.extract(
+    const results = availableFilters[field].listMatch.extract(
       (response.aggregations ?? {}) as any
     );
 
