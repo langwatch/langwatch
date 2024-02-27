@@ -1,5 +1,11 @@
 export const langwatchEndpointEnv = () => {
-  if (window.location.hostname !== "app.langwatch.ai" && window.location.hostname !== "docs.langwatch.ai") {
+  if (typeof window === "undefined") {
+    return "";
+  }
+  if (
+    window.location.hostname !== "app.langwatch.ai" &&
+    window.location.hostname !== "docs.langwatch.ai"
+  ) {
     return `export LANGWATCH_ENDPOINT='${window.location.protocol}//${
       window.location.hostname
     }${
