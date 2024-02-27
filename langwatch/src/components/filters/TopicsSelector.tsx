@@ -39,7 +39,11 @@ export function TopicsSelector() {
   const topicCountsQuery = api.traces.getTopicCounts.useQuery(
     {
       ...filterParams,
-      filters: { ...filterParams.filters, topics: undefined },
+      filters: {
+        ...filterParams.filters,
+        "topics.topics": [],
+        "topics.subtopics": [],
+      },
     },
     queryOpts
   );
