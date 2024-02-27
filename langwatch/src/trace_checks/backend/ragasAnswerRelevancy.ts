@@ -23,7 +23,7 @@ export const ragasAnswerRelevancy = async (
         question: trace.input.value,
         answer: trace.output?.value ?? "",
         contexts: null,
-        ground_truths: null,
+        ground_truth: null,
         model: "gpt-3.5-turbo-1106",
       }),
     }
