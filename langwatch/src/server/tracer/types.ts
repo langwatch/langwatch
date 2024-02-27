@@ -145,8 +145,8 @@ export type ElasticSearchInputOutput = {
 // Zod type will not be generated for this one, check ts-to-zod.config.js
 export type ElasticSearchSpan = Omit<
   BaseSpan &
-    Partial<Omit<RAGSpan, "type">> &
-    Partial<Omit<LLMSpan, "type" | "raw_response">>,
+  Partial<Omit<RAGSpan, "type">> &
+  Partial<Omit<LLMSpan, "type" | "raw_response">>,
   "input" | "outputs"
 > & {
   project_id: string;
@@ -276,3 +276,11 @@ export type TrackEventRESTParamsValidator = Omit<
   event_details?: Record<string, string>;
   timestamp?: number; // The timestamp when the event occurred
 };
+
+// Dataset Schemas
+
+export type DatasetSpan = (
+  Omit<BaseSpan, "project_id" | "trace_id" | "id" | "raw_response" | "timestamps" | "metrics"> |
+  Omit<LLMSpan, "project_id" | "trace_id" | "id" | "raw_response" | "timestamps" | "metrics"> |
+  Omit<RAGSpan, "project_id" | "trace_id" | "id" | "raw_response" | "timestamps" | "metrics">
+);

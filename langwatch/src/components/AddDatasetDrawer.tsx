@@ -112,7 +112,7 @@ export function AddDatasetDrawer(props: AddDatasetDrawerProps) {
                                     <RadioGroup value={schemaValue} onChange={setSchemaValue}>
                                         <Stack spacing={4}>
                                             <HStack align={'start'}>
-                                                <Radio size="md" value={DatabaseSchema.FULL_TRACE} colorScheme="blue" padding={1} disabled />
+                                                <Radio size="md" value={DatabaseSchema.FULL_TRACE} colorScheme="blue" padding={1} />
                                                 <Box>
                                                     <Text fontWeight="bold">Full Trace</Text>
                                                     <Text>Each entry will include all the spans of a complete trace call, that is, all the steps on your pipeline, and the expected output</Text>

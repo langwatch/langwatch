@@ -15,6 +15,7 @@ import {
     Th,
     Thead,
     Tr,
+    Box,
     useDisclosure
 } from "@chakra-ui/react";
 import { useRouter } from "next/router";
@@ -22,6 +23,10 @@ import { DashboardLayout } from "~/components/DashboardLayout";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { AddDatasetDrawer } from "~/components/AddDatasetDrawer";
+import { displayName } from "~/utils/datasets";
+import { DatabaseSchema } from "@prisma/client";
+
+
 
 
 export default function Dataset() {
@@ -44,10 +49,21 @@ export default function Dataset() {
     return (
         <DashboardLayout>
             <Container maxW={"calc(100vw - 200px)"} padding={6} marginTop={8}>
-                <HStack width="full" align="top">
-                    <Heading as={"h1"} size="lg" paddingBottom={6} paddingTop={1}>
+                <HStack width="full" verticalAlign={"middle"} paddingBottom={6} >
+                    <Heading as={"h1"} size="lg">
                         Dataset {`- ${dataset.data?.name ?? ""}`}
                     </Heading>
+                    <Text
+                        whiteSpace="nowrap"
+                        bg="gray.200"
+                        paddingX="2"
+                        paddingY="1"
+                        borderRadius="lg"
+                        fontSize={12}
+                        marginLeft={4}
+                    >
+                        {dataset.data ? displayName(dataset.data?.schema) : ""}
+                    </Text>
                     <Spacer />
                     <Button
                         colorScheme="blue"
@@ -85,8 +101,16 @@ export default function Dataset() {
                                     ) : dataset.data ?
                                         dataset.data.datasetRecords?.map((dataset) => (
                                             <Tr key={dataset.id}>
-                                                <Td>{(dataset as any)?.entry?.input[0]?.content ?? ""}</Td>
-                                                <Td>{(dataset as any)?.entry?.output[0]?.content ?? ""}</Td>
+                                                <Td >
+                                                    <Text noOfLines={1} maxWidth="300px" display="block">
+                                                        {(dataset as any)?.entry?.input[0]?.content ?? ""}
+                                                    </Text>
+                                                </Td>
+                                                <Td >
+                                                    <Text noOfLines={1} display="block" maxWidth="300px">
+                                                        {(dataset as any)?.entry?.output[0]?.content ?? ""}
+                                                    </Text>
+                                                </Td>
                                                 <Td>{new Date(dataset.createdAt).toLocaleString()}</Td>
                                                 <Td>{new Date(dataset.updatedAt).toLocaleString()}</Td>
                                             </Tr>

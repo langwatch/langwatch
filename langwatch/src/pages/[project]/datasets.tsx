@@ -23,7 +23,7 @@ import { DashboardLayout } from "~/components/DashboardLayout";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { AddDatasetDrawer } from "~/components/AddDatasetDrawer";
-
+import { displayName } from "~/utils/datasets";
 
 export default function Datasets() {
 
@@ -61,9 +61,6 @@ export default function Datasets() {
                     <Button
                         colorScheme="blue"
                         onClick={() => {
-                            // setHasError(false);
-                            // setDataSetName("");
-                            // setSlug("");
                             onOpen();
                         }}
                         minWidth="fit-content"
@@ -98,7 +95,7 @@ export default function Datasets() {
                                         datasets.data?.map((dataset) => (
                                             <Tr cursor="pointer" onClick={() => goToDataset(dataset.id)} key={dataset.id}>
                                                 <Td>{dataset.name}</Td>
-                                                <Td>{dataset.schema}</Td>
+                                                <Td>{displayName(dataset.schema)}</Td>
                                                 <Td>{dataset.datasetRecords.length ?? 0}</Td>
                                                 <Td>{new Date(dataset.datasetRecords[0]?.createdAt ?? dataset.createdAt).toLocaleString()}</Td>
                                             </Tr>

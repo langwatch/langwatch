@@ -80,6 +80,7 @@ export const TraceDeatilsDrawer = (props: TraceDetailsDrawerProps) => {
     return (
         <Drawer
             isOpen={props.isDrawerOpen}
+            blockScrollOnMount={false}
             placement="right"
             size={traceView}
             onClose={() => {
