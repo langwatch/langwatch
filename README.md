@@ -62,17 +62,27 @@ You need to have docker and docker compose installed in your local environment t
 
 1. Duplicate (or rename) [.env.example](./langwatch/.env.example) to .env or .env.local file
 
-2. Setup an [auth0](auth0.com) account (there should be a free plan and it should be more than enough).
+2. Add your Open AI key or Azure Open AI key for LLM guardrails capabilities and generating embeddings for the messages
+
+```
+# For embeddings and LLM guardrails, leave empty it if you don't want to use Azure
+AZURE_OPENAI_ENDPOINT=""
+AZURE_OPENAI_KEY=""
+# Set OPENAI_API_KEY if you want to use OpenAI directly instead of Azure
+OPENAI_API_KEY=""
+```
+
+3. Setup an [auth0](auth0.com) account (there should be a free plan and it should be more than enough).
     Create a simple app (for next.js) and take note of the credentials.
     You will use these credentials to update these env variables in .env file:
 
 ```
 AUTH0_CLIENT_ID=""
 AUTH0_CLIENT_SECRET=""
-AUTH0_ISSUER="https://dev-frj2zgeo5352i1kj.us.auth0.com"
+AUTH0_ISSUER="https://dev-yourapp.eu.auth0.com"
 ```
 
-3. `docker compose up --build` should do the trick and get it working at http://localhost:3000
+4. `docker compose up --build` should do the trick and get it working at http://localhost:3000
 
 ## Documentation
 
