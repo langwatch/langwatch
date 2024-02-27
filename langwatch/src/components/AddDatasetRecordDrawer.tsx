@@ -74,38 +74,38 @@ export function AddDatasetRecordDrawer(props: AddDatasetDrawerProps) {
         setDatabaseSchema("")
     }
 
-    const inputCheck = () => {
+    const inputCheck = (inputValue: any) => {
 
         if (databaseSchema === DatabaseSchema.LLM_CHAT_CALL) {
             try {
-                JSON.parse(inputSpan);
+                JSON.parse(inputValue);
                 const inputTypeCheck = z.array(chatMessageSchema)
-                const result = inputTypeCheck.safeParse(JSON.parse(inputSpan))
+                const result = inputTypeCheck.safeParse(JSON.parse(inputValue))
                 return result;
 
             } catch (e) { return false; }
         } else if (databaseSchema === DatabaseSchema.FULL_TRACE) {
 
             const inputTypeCheck = z.string();
-            const result = inputTypeCheck.safeParse(inputSpan)
+            const result = inputTypeCheck.safeParse(inputValue)
             return result;
         }
 
     }
 
-    const outputCheck = () => {
+    const outputCheck = (outputValue: any) => {
         if (databaseSchema === DatabaseSchema.LLM_CHAT_CALL) {
             try {
-                JSON.parse(outputSpan);
+                JSON.parse(outputValue);
                 const outputTypeCheck = z.array(chatMessageSchema)
-                const result = outputTypeCheck.safeParse(JSON.parse(outputSpan))
+                const result = outputTypeCheck.safeParse(JSON.parse(outputValue))
                 return result;
 
             } catch (e) { return false; }
 
         } else if (databaseSchema === DatabaseSchema.FULL_TRACE) {
             const outputTypeCheck = z.string();
-            const result = outputTypeCheck.safeParse(outputSpan)
+            const result = outputTypeCheck.safeParse(outputValue)
             return result;
         }
 
@@ -211,9 +211,11 @@ export function AddDatasetRecordDrawer(props: AddDatasetDrawerProps) {
 
     const handleInputChange = (e: any) => {
 
+
         const inputValue = e.target.value
         setInputSpan(inputValue)
-        const inputResult = inputCheck();
+        const inputResult = inputCheck(inputValue);
+
 
         if (inputResult && inputResult.success) {
             setInputError(false)
@@ -226,7 +228,7 @@ export function AddDatasetRecordDrawer(props: AddDatasetDrawerProps) {
 
         const outputValue = e.target.value
         setOutputSpan(outputValue)
-        const outputResult = outputCheck();
+        const outputResult = outputCheck(outputValue);
 
         if (outputResult && outputResult.success) {
             setOutputError(false)
