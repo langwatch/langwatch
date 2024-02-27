@@ -6,13 +6,15 @@ import {
 } from "../../../trace_checks/backend/piiCheck";
 import { updateCheckStatusInES } from "../../../server/background/queues/traceChecksQueue";
 import type { CheckTypes, Checks } from "../../../trace_checks/types";
+import { env } from "../../../env.mjs";
 
 // TODO: extract to separate file
 export const cleanupPII = async (
   trace: Trace,
   spans: ElasticSearchSpan[]
 ): Promise<undefined> => {
-  const results = await runPiiCheck(trace, spans);
+  const piiEnforced = env.NODE_ENV === "production";
+  const results = await runPiiCheck(trace, spans, piiEnforced);
   const { quotes } = results;
 
   const piiChecks = await prisma.check.findMany({

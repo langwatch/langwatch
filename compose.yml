@@ -1,0 +1,75 @@
+version: '3.8'
+
+services:
+  web:
+    container_name: langwatch-web
+    environment:
+      - SKIP_ENV_VALIDATION=true
+    env_file:
+      - langwatch/.env
+    build:
+      context: .
+    ports:
+      - "3000:3000"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+
+  mysql:
+    container_name: watch-db
+    image: mysql:8.3
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: mydb
+      MYSQL_USER: prisma
+      MYSQL_PASSWORD: prisma
+    ports:
+      - "3306:3306"
+    volumes:
+      - db-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    container_name: watch-redis
+    image: redis:alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  elasticsearch:
+    container_name: watch-search
+    image: elasticsearch:8.12.0
+    environment:
+      - discovery.type=single-node
+      - ELASTICSEARCH_PASSWORD="some-random-password-which-is-greater-than-16-chars-long"
+      - xpack.security.enabled=false
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    volumes:
+      - elasticsearch-data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl --silent --fail localhost:9200/_cluster/health || exit 1"]
+      interval: 20s
+      timeout: 10s
+      retries: 5
+
+volumes:
+  db-data:
+  redis-data:
+  elasticsearch-data:

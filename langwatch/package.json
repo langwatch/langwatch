@@ -4,18 +4,19 @@
   "private": true,
   "scripts": {
     "build": "next build --no-lint",
-    "dev": "NODE_ENV=development DEBUG=langwatch:* DEBUG_HIDE_DATE=true DEBUG_COLORS=true concurrently 'node src/server.js' 'npm run start:workers'",
-    "postinstall": "cp -R ../docs/docs/integration-guides src/components/ && npm run types:zod:generate",
     "lint": "next lint",
+    "dev": "npm run start:prepare && NODE_ENV=development DEBUG=langwatch:* DEBUG_HIDE_DATE=true DEBUG_COLORS=true concurrently 'node src/server.js' 'npm run start:workers'",
     "start": "next start",
+    "start:prepare": "npm run copy:integration && npm run types:zod:generate && npm run prisma:db:push && npm run elastic:index:create",
     "start:workers": "tsx --tsconfig tsconfig.workers.json src/workers.ts",
-    "prisma:db:push": "npx prisma db push",
     "test": "npm run test:unit -- --run --bail=1 && npm run test:integration -- --run --bail=1 --single-thread",
     "test:unit": "DEBUG=langwatch:* DEBUG_HIDE_DATE=true DEBUG_COLORS=true vitest",
     "test:integration": "DEBUG=langwatch:* DEBUG_HIDE_DATE=true DEBUG_COLORS=true vitest -c vitest.integration.config.ts",
-    "elastic:index:create": "npm run task -- elasticIndexCreate",
     "task": "DEBUG=langwatch:* tsx src/task.ts",
-    "types:zod:generate": "ts-to-zod src/server/tracer/types.ts src/server/tracer/types.generated.ts && ts-to-zod src/trace_checks/types.ts src/trace_checks/types.generated.ts"
+    "prisma:db:push": "npx prisma db push",
+    "elastic:index:create": "npm run task -- elasticIndexCreate",
+    "types:zod:generate": "ts-to-zod src/server/tracer/types.ts src/server/tracer/types.generated.ts && ts-to-zod src/trace_checks/types.ts src/trace_checks/types.generated.ts",
+    "copy:integration": "cp -R ../docs/docs/integration-guides src/components/"
   },
   "dependencies": {
     "@azure/openai": "^1.0.0-beta.10",

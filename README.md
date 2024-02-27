@@ -56,6 +56,24 @@ export LANGWATCH_API_KEY='your_api_key_here'
 
 For integration details of other LLMs and frameworks, refer our [documentation](https://docs.langwatch.ai/).
 
+## Local Development
+
+You need to have docker and docker compose installed in your local environment to be able to run LangWatch locally.
+
+1. Duplicate (or rename) [.env.example](./langwatch/.env.example) to .env or .env.local file
+
+2. Setup an [auth0](auth0.com) account (there should be a free plan and it should be more than enough).
+    Create a simple app (for next.js) and take note of the credentials.
+    You will use these credentials to update these env variables in .env file:
+
+```
+AUTH0_CLIENT_ID=""
+AUTH0_CLIENT_SECRET=""
+AUTH0_ISSUER="https://dev-frj2zgeo5352i1kj.us.auth0.com"
+```
+
+3. `docker compose up --build` should do the trick and get it working at http://localhost:3000
+
 ## Documentation
 
 Detailed documentation is available to help you get the most out of LangWatch:
