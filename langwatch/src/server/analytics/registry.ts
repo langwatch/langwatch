@@ -1,20 +1,22 @@
+import type { AggregationsAggregationContainer } from "@elastic/elasticsearch/lib/api/types";
 import { z } from "zod";
+import { formatMilliseconds } from "../../utils/formatMilliseconds";
 import {
-  allAggregationTypes,
-  type AggregationTypes,
-  type AnalyticsMetric,
-  type TracesPivotFilterQuery,
-  type TracesPivotFilters,
-  type PipelineFields,
-  type PipelineAggregationTypes,
-  type AnalyticsGroup,
   aggregationTypesEnum,
+  allAggregationTypes,
+  numericAggregationTypes,
+  percentileAggregationTypes,
   pipelineAggregationTypesEnum,
   pipelineFieldsEnum,
-  numericAggregationTypes,
+  type AggregationTypes,
+  type AnalyticsGroup,
+  type AnalyticsMetric,
+  type PercentileAggregationTypes,
+  type PipelineAggregationTypes,
+  type PipelineFields,
+  type TracesPivotFilterQuery,
+  type TracesPivotFilters,
 } from "./types";
-import type { AggregationsAggregationContainer } from "@elastic/elasticsearch/lib/api/types";
-import { formatMilliseconds } from "../../utils/formatMilliseconds";
 
 const simpleFieldAnalytics = (
   field: string
@@ -29,6 +31,44 @@ const simpleFieldAnalytics = (
   extractionPath: (aggregation: AggregationTypes) =>
     `${field.replaceAll(".", "_")}_${aggregation}`,
 });
+
+const numericFieldAnalyticsWithPercentiles = (
+  field: string
+): Omit<AnalyticsMetric, "label" | "colorSet" | "increaseIs"> => ({
+  format: "0.[0]a",
+  allowedAggregations: [
+    ...numericAggregationTypes,
+    ...percentileAggregationTypes,
+  ],
+  aggregation: (aggregation: AggregationTypes) => ({
+    [`${field.replaceAll(".", "_")}_${aggregation}`]:
+      percentileAggregationTypes.includes(aggregation as any)
+        ? {
+            percentiles: {
+              field,
+              percents: [
+                percentileToPercent[aggregation as PercentileAggregationTypes],
+              ],
+            },
+          }
+        : {
+            [aggregation]: { field },
+          },
+  }),
+  extractionPath: (aggregation: AggregationTypes) =>
+    percentileAggregationTypes.includes(aggregation as any)
+      ? `${field.replaceAll(".", "_")}_${aggregation}>values>${
+          percentileToPercent[aggregation as PercentileAggregationTypes]
+        }.0`
+      : `${field.replaceAll(".", "_")}_${aggregation}`,
+});
+
+const percentileToPercent: Record<PercentileAggregationTypes, number> = {
+  median: 50,
+  p99: 99,
+  p95: 95,
+  p90: 90,
+};
 
 export const analyticsMetrics = {
   metadata: {
@@ -50,14 +90,51 @@ export const analyticsMetrics = {
       colorSet: "greenTones",
       allowedAggregations: ["cardinality"],
     },
+    span_type: {
+      label: "Span Type",
+      colorSet: "purpleTones",
+      allowedAggregations: ["cardinality"],
+      format: "0.[00]a",
+      increaseIs: "neutral",
+      requiresKey: {
+        filter: "spans.type",
+        optional: true,
+      },
+      aggregation: (aggregation, key) => ({
+        [`span_type_${aggregation}`]: {
+          nested: {
+            path: "spans",
+          },
+          aggs: {
+            child: {
+              filter: {
+                bool: {
+                  must: [
+                    key ? { term: { "spans.type": key } } : { match_all: {} },
+                  ],
+                } as any,
+              },
+              aggs: {
+                cardinality: {
+                  cardinality: { field: "spans.span_id" },
+                },
+              } as any,
+            },
+          },
+        },
+      }),
+      extractionPath: (aggregation) => {
+        return `span_type_${aggregation}>child>cardinality`;
+      },
+    },
   },
   sentiment: {
     input_sentiment: {
-      ...simpleFieldAnalytics("trace.input.satisfaction_score"),
+      ...numericFieldAnalyticsWithPercentiles("trace.input.satisfaction_score"),
       label: "Input Sentiment Score",
       colorSet: "yellowTones",
-      allowedAggregations: numericAggregationTypes,
       format: "0.00%",
+      increaseIs: "good",
     },
     thumbs_up_down: {
       label: "Thumbs Up/Down Score",
@@ -125,12 +202,11 @@ export const analyticsMetrics = {
   },
   performance: {
     completion_time: {
-      ...simpleFieldAnalytics("trace.metrics.total_time_ms"),
+      ...numericFieldAnalyticsWithPercentiles("trace.metrics.total_time_ms"),
       label: "Completion Time",
       colorSet: "greenTones",
       format: formatMilliseconds,
       increaseIs: "bad",
-      allowedAggregations: numericAggregationTypes,
     },
     first_token: {
       ...simpleFieldAnalytics("trace.metrics.first_token_ms"),
@@ -141,26 +217,25 @@ export const analyticsMetrics = {
       allowedAggregations: numericAggregationTypes,
     },
     total_cost: {
-      ...simpleFieldAnalytics("trace.metrics.total_cost"),
+      ...numericFieldAnalyticsWithPercentiles("trace.metrics.total_cost"),
       label: "Total Cost",
       colorSet: "greenTones",
-      format: "$0.00[00]",
+      format: "$0.00[0]",
       increaseIs: "neutral",
-      allowedAggregations: numericAggregationTypes,
     },
     prompt_tokens: {
-      ...simpleFieldAnalytics("trace.metrics.prompt_tokens"),
+      ...numericFieldAnalyticsWithPercentiles("trace.metrics.prompt_tokens"),
       label: "Prompt Tokens",
       colorSet: "blueTones",
       increaseIs: "neutral",
-      allowedAggregations: numericAggregationTypes,
     },
     completion_tokens: {
-      ...simpleFieldAnalytics("trace.metrics.completion_tokens"),
+      ...numericFieldAnalyticsWithPercentiles(
+        "trace.metrics.completion_tokens"
+      ),
       label: "Completion Tokens",
       colorSet: "orangeTones",
       increaseIs: "neutral",
-      allowedAggregations: numericAggregationTypes,
     },
   },
   events: {
@@ -515,6 +590,10 @@ export const metricAggregations: Record<AggregationTypes, string> = {
   sum: "sum",
   min: "minimum",
   max: "maximum",
+  median: "median",
+  p99: "99th percentile",
+  p95: "95th percentile",
+  p90: "90th percentile",
 };
 
 const simpleFieldGroupping = (name: string, field: string): AnalyticsGroup => ({
@@ -557,8 +636,42 @@ export const analyticsGroups = {
           },
           aggs: {
             child: {
+              filter: {
+                term: { "spans.type": "llm" },
+              },
+              aggs: {
+                child: {
+                  terms: {
+                    field: "spans.model",
+                    size: 50,
+                    missing: "unknown",
+                  },
+                  aggs: {
+                    back_to_root: {
+                      reverse_nested: {},
+                      aggs: aggToGroup,
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      }),
+      extractionPath: () => "model_group>child>child>buckets>back_to_root",
+    },
+
+    span_type: {
+      label: "Span Type",
+      aggregation: (aggToGroup) => ({
+        model_group: {
+          nested: {
+            path: "spans",
+          },
+          aggs: {
+            child: {
               terms: {
-                field: "spans.model",
+                field: "spans.type",
                 size: 50,
                 missing: "unknown",
               },

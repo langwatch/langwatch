@@ -8,7 +8,9 @@ import type { google } from "@google-cloud/dlp/build/protos/protos";
 const debug = getDebugger("langwatch:trace_checks:piiCheck");
 
 // Instantiates a client using the environment variable
-const credentials = JSON.parse(env.GOOGLE_CREDENTIALS_JSON);
+const credentials = env.GOOGLE_CREDENTIALS_JSON
+  ? JSON.parse(env.GOOGLE_CREDENTIALS_JSON)
+  : undefined;
 const dlp = new DlpServiceClient({ credentials });
 
 const infoTypesMap: Record<
@@ -49,12 +51,29 @@ const dlpCheck = async (
 
 export const runPiiCheck = async (
   trace: Trace,
-  spans: ElasticSearchSpan[]
+  spans: ElasticSearchSpan[],
+  enforced = true
 ): Promise<{
   quotes: string[];
   traceFindings: google.privacy.dlp.v2.IFinding[];
   spansFindings: google.privacy.dlp.v2.IFinding[];
 }> => {
+  if (!credentials) {
+    if (enforced) {
+      throw new Error(
+        "GOOGLE_CREDENTIALS_JSON is not set, PII check cannot be performed"
+      );
+    }
+    console.warn(
+      "WARNING: GOOGLE_CREDENTIALS_JSON is not set, so PII check will not be performed, you are risking storing PII on the database, please set GOOGLE_CREDENTIALS_JSON if you wish to avoid that, this will fail in production by default"
+    );
+    return {
+      quotes: [],
+      traceFindings: [],
+      spansFindings: [],
+    };
+  }
+
   debug("Checking PII for trace", trace.trace_id);
 
   const traceText = [

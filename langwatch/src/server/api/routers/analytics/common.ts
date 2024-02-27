@@ -39,7 +39,7 @@ export const generateTraceQueryConditions = ({
   customer_ids,
   labels,
   topics,
-}: z.infer<typeof sharedAnalyticsFilterInput>) => {
+}: z.infer<typeof sharedAnalyticsFilterInput>): QueryDslQueryContainer[] => {
   // If end date is very close to now, force it to be now, to allow frontend to keep refetching for new messages
   const endDate_ =
     new Date().getTime() - endDate < 1000 * 60 * 60
@@ -77,7 +77,7 @@ export const generateTraceChecksQueryConditions = ({
   thread_id,
   customer_ids,
   labels,
-}: z.infer<typeof sharedAnalyticsFilterInput>) => {
+}: z.infer<typeof sharedAnalyticsFilterInput>) : QueryDslQueryContainer[] => {
   // If end date is very close to now, force it to be now, to allow frontend to keep refetching for new messages
   const endDate_ =
     new Date().getTime() - endDate < 1000 * 60 * 60
@@ -115,7 +115,7 @@ export const generateEventsQueryConditions = ({
   thread_id,
   customer_ids,
   labels,
-}: z.infer<typeof sharedAnalyticsFilterInput>) => {
+}: z.infer<typeof sharedAnalyticsFilterInput>) : QueryDslQueryContainer[] => {
   // If end date is very close to now, force it to be now, to allow frontend to keep refetching for new messages
   const endDate_ =
     new Date().getTime() - endDate < 1000 * 60 * 60
@@ -150,7 +150,7 @@ export const spanQueryConditions = ({
   projectId,
   startDate,
   endDate,
-}: z.infer<typeof sharedAnalyticsFilterInput> & { traceIds: string[] }) => {
+}: z.infer<typeof sharedAnalyticsFilterInput> & { traceIds: string[] }) : QueryDslQueryContainer[] => {
   // If end date is very close to now, force it to be now, to allow frontend to keep refetching for new messages
   const endDate_ =
     new Date().getTime() - endDate < 1000 * 60 * 60
@@ -238,12 +238,11 @@ export const currentVsPreviousSpansAggregation = async <
       size: 10000,
       query: {
         bool: {
-          //@ts-ignore
           filter: generateTraceQueryConditions({
             ...input,
             startDate: previousPeriodStartDate.getTime(),
           }),
-        },
+        } as QueryDslBoolQuery,
       },
     },
   });
@@ -411,12 +410,11 @@ export const groupedSpansAggregation = async <T extends Record<string, any>>({
       size: 10000,
       query: {
         bool: {
-          //@ts-ignore
           filter: generateTraceQueryConditions({
             ...input,
             startDate: previousPeriodStartDate.getTime(),
           }),
-        },
+        } as QueryDslBoolQuery,
       },
     },
   });

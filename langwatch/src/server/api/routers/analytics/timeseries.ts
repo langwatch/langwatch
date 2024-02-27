@@ -76,7 +76,10 @@ export const getTimeseries = protectedProcedure
           metricAggregations;
         if (pipeline) {
           const pipelineBucketsPath = `${metric}.${aggregation}.${pipeline.field}`;
-          const metricPath = metric_.extractionPath(aggregation, key, subkey);
+          const metricPath = metric_
+            .extractionPath(aggregation, key, subkey)
+            // Fix for working with percentiles too
+            .split(">values")[0];
           const pipelinePath_ = pipelinePath(metric, aggregation, pipeline);
 
           aggregationQuery = {
@@ -155,7 +158,9 @@ export const getTimeseries = protectedProcedure
               traces_per_day: {
                 date_histogram: {
                   field: "trace.timestamps.started_at",
-                  fixed_interval: input.timeScale ? `${input.timeScale}d` : "1d",
+                  fixed_interval: input.timeScale
+                    ? `${input.timeScale}d`
+                    : "1d",
                   min_doc_count: 0,
                   extended_bounds: {
                     min: previousPeriodStartDate.getTime(),

@@ -264,7 +264,7 @@ export const CustomGraph = React.memo(
       return formatWith(metric?.format, value as number);
     };
 
-    const Container = ({ children }: React.PropsWithChildren) => {
+    const container = (child: React.ReactNode) => {
       const allEmpty =
         currentAndPreviousData &&
         (maxValue == 0 || currentAndPreviousData?.length === 0);
@@ -297,7 +297,7 @@ export const CustomGraph = React.memo(
               No data
             </Box>
           )}
-          {children}
+          {child}
         </Box>
       );
     };
@@ -310,35 +310,33 @@ export const CustomGraph = React.memo(
         nameForSeries
       );
 
-      return (
-        <Container>
-          <HStack spacing={0} align="start" minHeight="101px">
-            {timeseries.isLoading &&
-              input.series.map((series) => (
-                <SummaryMetric
-                  key={
-                    series.metric +
-                    series.aggregation +
-                    series.pipeline?.field +
-                    series.pipeline?.aggregation
-                  }
-                  label={series.name}
-                  titleProps={titleProps}
-                />
-              ))}
-            {summaryData.current.slice(0, 10).map((entry, index) => (
+      return container(
+        <HStack spacing={0} align="start" minHeight="101px">
+          {timeseries.isLoading &&
+            input.series.map((series) => (
               <SummaryMetric
-                key={entry.key}
-                label={entry.name}
-                current={entry.value}
-                previous={summaryData.previous[index]?.value}
-                format={entry.metric?.format}
-                increaseIs={entry.metric?.increaseIs}
+                key={
+                  series.metric +
+                  series.aggregation +
+                  series.pipeline?.field +
+                  series.pipeline?.aggregation
+                }
+                label={series.name}
                 titleProps={titleProps}
               />
             ))}
-          </HStack>
-        </Container>
+          {summaryData.current.slice(0, 10).map((entry, index) => (
+            <SummaryMetric
+              key={entry.key}
+              label={entry.name}
+              current={entry.value}
+              previous={summaryData.previous[index]?.value}
+              format={entry.metric?.format}
+              increaseIs={entry.metric?.increaseIs}
+              titleProps={titleProps}
+            />
+          ))}
+        </HStack>
       );
     }
 
@@ -350,39 +348,37 @@ export const CustomGraph = React.memo(
         nameForSeries
       );
 
-      return (
-        <Container>
-          <ResponsiveContainer
-            key={currentAndPreviousDataFilled ? input.graphId : "loading"}
-            height={height_}
-          >
-            <PieChart>
-              <Pie
-                data={summaryData.current}
-                nameKey="name"
-                dataKey="value"
-                labelLine={false}
-                label={pieChartPercentageLabel}
-                innerRadius={input.graphType === "donnut" ? "50%" : 0}
-              >
-                {summaryData.current.map((entry, index) => (
-                  <Cell
-                    key={`cell-${index}`}
-                    fill={colorForSeries(entry.key, index)}
-                  />
-                ))}
-              </Pie>
-              <Tooltip formatter={tooltipValueFormatter} />
-              <Legend
-                wrapperStyle={{
-                  padding: "0 2rem",
-                  maxHeight: "15%",
-                  overflow: "auto",
-                }}
-              />
-            </PieChart>
-          </ResponsiveContainer>
-        </Container>
+      return container(
+        <ResponsiveContainer
+          key={currentAndPreviousDataFilled ? input.graphId : "loading"}
+          height={height_}
+        >
+          <PieChart>
+            <Pie
+              data={summaryData.current}
+              nameKey="name"
+              dataKey="value"
+              labelLine={false}
+              label={pieChartPercentageLabel}
+              innerRadius={input.graphType === "donnut" ? "50%" : 0}
+            >
+              {summaryData.current.map((entry, index) => (
+                <Cell
+                  key={`cell-${index}`}
+                  fill={colorForSeries(entry.key, index)}
+                />
+              ))}
+            </Pie>
+            <Tooltip formatter={tooltipValueFormatter} />
+            <Legend
+              wrapperStyle={{
+                padding: "0 2rem",
+                maxHeight: "15%",
+                overflow: "auto",
+              }}
+            />
+          </PieChart>
+        </ResponsiveContainer>
       );
     }
 
@@ -411,99 +407,38 @@ export const CustomGraph = React.memo(
 
       const xAxisWidth = Math.min(longestName * 8, 300);
 
-      return (
-        <Container>
-          <ResponsiveContainer
-            key={currentAndPreviousDataFilled ? input.graphId : "loading"}
-            height={height_}
-          >
-            <BarChart
-              data={sortedCurrentData}
-              barCategoryGap={10}
-              layout={
-                input.graphType === "horizontal_bar" ? "vertical" : undefined
-              }
-            >
-              <XAxisComponent
-                type="category"
-                dataKey="name"
-                width={
-                  input.graphType === "horizontal_bar" ? xAxisWidth : undefined
-                }
-                height={
-                  input.graphType === "horizontal_bar" ? undefined : xAxisWidth
-                }
-                tickLine={false}
-                axisLine={false}
-                tick={{ fill: gray400 }}
-                angle={input.graphType === "horizontal_bar" ? undefined : 45}
-                textAnchor={
-                  input.graphType === "horizontal_bar" ? "end" : "start"
-                }
-              />
-              <YAxisComponent
-                type="number"
-                dataKey="value"
-                domain={[0, "dataMax"]}
-                tick={{ fill: gray400 }}
-                tickFormatter={(value) => {
-                  if (typeof yAxisValueFormat === "function") {
-                    return yAxisValueFormat(value);
-                  }
-                  return numeral(value).format(yAxisValueFormat);
-                }}
-              />
-              <Tooltip formatter={tooltipValueFormatter} />
-              <Bar dataKey="value">
-                {summaryData.current.map((entry, index) => (
-                  <Cell
-                    key={`cell-${index}`}
-                    fill={colorForSeries(entry.key, index)}
-                  />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </Container>
-      );
-    }
-
-    return (
-      <Container>
+      return container(
         <ResponsiveContainer
           key={currentAndPreviousDataFilled ? input.graphId : "loading"}
           height={height_}
         >
-          <GraphComponent
-            data={currentAndPreviousDataFilled}
-            margin={{
-              top: 10,
-              left: formatWith(yAxisValueFormat, maxValue).length * 6 - 5,
-              right: 24,
-            }}
+          <BarChart
+            data={sortedCurrentData}
+            barCategoryGap={10}
             layout={
               input.graphType === "horizontal_bar" ? "vertical" : undefined
             }
           >
-            <CartesianGrid
-              vertical={input.graphType === "scatter"}
-              strokeDasharray="5 7"
-            />
             <XAxisComponent
               type="category"
-              dataKey="date"
-              name="Date"
-              tickFormatter={formatDate}
+              dataKey="name"
+              width={
+                input.graphType === "horizontal_bar" ? xAxisWidth : undefined
+              }
+              height={
+                input.graphType === "horizontal_bar" ? undefined : xAxisWidth
+              }
               tickLine={false}
               axisLine={false}
               tick={{ fill: gray400 }}
+              angle={input.graphType === "horizontal_bar" ? undefined : 45}
+              textAnchor={
+                input.graphType === "horizontal_bar" ? "end" : "start"
+              }
             />
             <YAxisComponent
               type="number"
-              axisLine={false}
-              tickLine={false}
-              tickCount={4}
-              tickMargin={20}
+              dataKey="value"
               domain={[0, "dataMax"]}
               tick={{ fill: gray400 }}
               tickFormatter={(value) => {
@@ -513,85 +448,138 @@ export const CustomGraph = React.memo(
                 return numeral(value).format(yAxisValueFormat);
               }}
             />
-            <Tooltip
-              formatter={tooltipValueFormatter}
-              labelFormatter={(_label, payload) => {
-                if (input.graphType === "scatter") return "";
-                return (
-                  formatDate(payload[0]?.payload.date) +
-                  (input.includePrevious && payload[1]?.payload["previous>date"]
-                    ? " vs " + formatDate(payload[1]?.payload["previous>date"])
-                    : "")
-                );
-              }}
-            />
-            <Legend
-              wrapperStyle={{
-                padding: "0 2rem",
-                maxHeight: "15%",
-                overflow: "auto",
-              }}
-            />
-            {(sortedKeys ?? []).map((aggKey, index) => (
-              <React.Fragment key={aggKey}>
-                {/* @ts-ignore */}
+            <Tooltip formatter={tooltipValueFormatter} />
+            <Bar dataKey="value">
+              {summaryData.current.map((entry, index) => (
+                <Cell
+                  key={`cell-${index}`}
+                  fill={colorForSeries(entry.key, index)}
+                />
+              ))}
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
+      );
+    }
+
+    return container(
+      <ResponsiveContainer
+        key={currentAndPreviousDataFilled ? input.graphId : "loading"}
+        height={height_}
+      >
+        <GraphComponent
+          data={currentAndPreviousDataFilled}
+          margin={{
+            top: 10,
+            left: formatWith(yAxisValueFormat, maxValue).length * 6 - 5,
+            right: 24,
+          }}
+          layout={input.graphType === "horizontal_bar" ? "vertical" : undefined}
+        >
+          <CartesianGrid
+            vertical={input.graphType === "scatter"}
+            strokeDasharray="5 7"
+          />
+          <XAxisComponent
+            type="category"
+            dataKey="date"
+            name="Date"
+            tickFormatter={formatDate}
+            tickLine={false}
+            axisLine={false}
+            tick={{ fill: gray400 }}
+          />
+          <YAxisComponent
+            type="number"
+            axisLine={false}
+            tickLine={false}
+            tickCount={4}
+            tickMargin={20}
+            domain={[0, "dataMax"]}
+            tick={{ fill: gray400 }}
+            tickFormatter={(value) => {
+              if (typeof yAxisValueFormat === "function") {
+                return yAxisValueFormat(value);
+              }
+              return numeral(value).format(yAxisValueFormat);
+            }}
+          />
+          <Tooltip
+            formatter={tooltipValueFormatter}
+            labelFormatter={(_label, payload) => {
+              if (input.graphType === "scatter") return "";
+              return (
+                formatDate(payload[0]?.payload.date) +
+                (input.includePrevious && payload[1]?.payload["previous>date"]
+                  ? " vs " + formatDate(payload[1]?.payload["previous>date"])
+                  : "")
+              );
+            }}
+          />
+          <Legend
+            wrapperStyle={{
+              padding: "0 2rem",
+              maxHeight: "15%",
+              overflow: "auto",
+            }}
+          />
+          {(sortedKeys ?? []).map((aggKey, index) => (
+            <React.Fragment key={aggKey}>
+              {/* @ts-ignore */}
+              <GraphElement
+                key={aggKey}
+                type="linear"
+                dataKey={aggKey}
+                stroke={colorForSeries(aggKey, index)}
+                stackId={
+                  ["stacked_bar", "stacked_area"].includes(input.graphType)
+                    ? "same"
+                    : undefined
+                }
+                fill={colorForSeries(aggKey, index)}
+                strokeWidth={2.5}
+                dot={false}
+                activeDot={input.graphType !== "scatter" ? { r: 8 } : undefined}
+                name={nameForSeries(aggKey)}
+                line={
+                  input.graphType === "scatter" && input.connected
+                    ? true
+                    : undefined
+                }
+              />
+              {input.includePrevious && (
+                // @ts-ignore
                 <GraphElement
-                  key={aggKey}
+                  key={"previous>" + aggKey}
                   type="linear"
-                  dataKey={aggKey}
-                  stroke={colorForSeries(aggKey, index)}
+                  dataKey={"previous>" + aggKey}
                   stackId={
                     ["stacked_bar", "stacked_area"].includes(input.graphType)
                       ? "same"
                       : undefined
                   }
-                  fill={colorForSeries(aggKey, index)}
+                  stroke={colorForSeries(aggKey, index) + "99"}
+                  fill={colorForSeries(aggKey, index) + "99"}
                   strokeWidth={2.5}
+                  strokeDasharray={
+                    input.graphType !== "scatter" ? "5 5" : undefined
+                  }
                   dot={false}
                   activeDot={
                     input.graphType !== "scatter" ? { r: 8 } : undefined
                   }
-                  name={nameForSeries(aggKey)}
+                  name={"Previous " + nameForSeries(aggKey)}
                   line={
                     input.graphType === "scatter" && input.connected
                       ? true
                       : undefined
                   }
                 />
-                {input.includePrevious && (
-                  // @ts-ignore
-                  <GraphElement
-                    key={"previous>" + aggKey}
-                    type="linear"
-                    dataKey={"previous>" + aggKey}
-                    stackId={
-                      ["stacked_bar", "stacked_area"].includes(input.graphType)
-                        ? "same"
-                        : undefined
-                    }
-                    stroke={colorForSeries(aggKey, index) + "99"}
-                    fill={colorForSeries(aggKey, index) + "99"}
-                    strokeWidth={2.5}
-                    strokeDasharray={
-                      input.graphType !== "scatter" ? "5 5" : undefined
-                    }
-                    dot={false}
-                    activeDot={
-                      input.graphType !== "scatter" ? { r: 8 } : undefined
-                    }
-                    name={"Previous " + nameForSeries(aggKey)}
-                    line={
-                      input.graphType === "scatter" && input.connected
-                        ? true
-                        : undefined
-                    }
-                  />
-                )}
-              </React.Fragment>
-            ))}
-          </GraphComponent>
-        </ResponsiveContainer>
-      </Container>
+              )}
+            </React.Fragment>
+          ))}
+        </GraphComponent>
+      </ResponsiveContainer>
     );
   },
   (prevProps, nextProps) => {

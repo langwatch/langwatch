@@ -1,6 +1,10 @@
 import similarity from "compute-cosine-similarity";
 import { prisma } from "../../../server/db";
-import { type Span, type Trace } from "../../../server/tracer/types";
+import {
+  type RAGSpan,
+  type Span,
+  type Trace,
+} from "../../../server/tracer/types";
 import { scheduleTraceCheck } from "../../../server/background/queues/traceChecksQueue";
 import { getTraceCheckDefinitions } from "../../../trace_checks/registry";
 import type {
@@ -8,6 +12,7 @@ import type {
   CheckTypes,
 } from "../../../trace_checks/types";
 import { debug } from "../collector";
+import { extractRAGTextualContext } from "./rag";
 
 async function evaluatePreconditions(
   checkType: string,
@@ -18,7 +23,14 @@ async function evaluatePreconditions(
   const checkDefinitions = getTraceCheckDefinitions(checkType);
 
   if (checkDefinitions?.requiresRag) {
-    if (!spans.some((span) => span.type === "rag")) {
+    // Check if any RAG span is available and has non-empty contexts
+    if (
+      !spans.some(
+        (span) =>
+          span.type === "rag" &&
+          extractRAGTextualContext((span as RAGSpan).contexts).length > 0
+      )
+    ) {
       return false;
     }
   }

@@ -57,9 +57,11 @@ export const addInputAndOutputForRAGs = (spans: Span[]): Span[] => {
 };
 
 export const extractRAGTextualContext = (contexts: RAGChunk[]) => {
-  return contexts.map((context) => {
-    return extractChunkTextualContent(context.content);
-  });
+  return contexts
+    .map((context) => {
+      return extractChunkTextualContent(context.content);
+    })
+    .filter((x) => x);
 };
 
 const extractChunkTextualContent = (object: any): string => {
@@ -68,20 +70,22 @@ const extractChunkTextualContent = (object: any): string => {
     try {
       content = JSON.parse(content);
     } catch {
-      return object;
+      return object.trim();
     }
   }
   if (Array.isArray(content)) {
     return content
       .map(extractChunkTextualContent)
       .filter((x) => x)
-      .join("\n");
+      .join("\n")
+      .trim();
   }
   if (typeof content === "object") {
     return Object.values(content)
       .map(extractChunkTextualContent)
       .filter((x) => x)
-      .join("\n");
+      .join("\n")
+      .trim();
   }
 
   return "";

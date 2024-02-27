@@ -56,6 +56,34 @@ export LANGWATCH_API_KEY='your_api_key_here'
 
 For integration details of other LLMs and frameworks, refer our [documentation](https://docs.langwatch.ai/).
 
+## Local Development
+
+You need to have docker and docker compose installed in your local environment to be able to run LangWatch locally.
+
+1. Duplicate (or rename) [.env.example](./langwatch/.env.example) to .env or .env.local file
+
+2. Add your Open AI key or Azure Open AI key for LLM guardrails capabilities and generating embeddings for the messages
+
+```
+# For embeddings and LLM guardrails, leave empty it if you don't want to use Azure
+AZURE_OPENAI_ENDPOINT=""
+AZURE_OPENAI_KEY=""
+# Set OPENAI_API_KEY if you want to use OpenAI directly instead of Azure
+OPENAI_API_KEY=""
+```
+
+3. Setup an [auth0](auth0.com) account (there should be a free plan and it should be more than enough).
+    Create a simple app (for next.js) and take note of the credentials.
+    You will use these credentials to update these env variables in .env file:
+
+```
+AUTH0_CLIENT_ID=""
+AUTH0_CLIENT_SECRET=""
+AUTH0_ISSUER="https://dev-yourapp.eu.auth0.com"
+```
+
+4. `docker compose up --build` should do the trick and get it working at http://localhost:3000
+
 ## Documentation
 
 Detailed documentation is available to help you get the most out of LangWatch:

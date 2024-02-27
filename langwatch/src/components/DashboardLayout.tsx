@@ -55,7 +55,6 @@ import React from "react";
 const Breadcrumbs = ({ currentRoute }: { currentRoute: Route | undefined }) => {
   const { project } = useOrganizationTeamProject();
 
-
   return (
     currentRoute && (
       <HStack gap={2} fontSize={13} color="gray.500">
@@ -112,7 +111,10 @@ const SideMenuLink = ({
     (path.includes("/settings") && router.pathname.includes("/settings"));
 
   return (
-    <Link href={path.replace("[project]", project.slug) + devModeQuery} aria-label={label}>
+    <Link
+      href={path.replace("[project]", project.slug) + devModeQuery}
+      aria-label={label}
+    >
       <VStack>
         <IconElem size={24} color={isActive ? activeColor : undefined} />
       </VStack>
@@ -135,8 +137,8 @@ const ProjectSelector = React.memo(function ProjectSelector({
     a.name.toLowerCase() < b.name.toLowerCase()
       ? -1
       : a.name.toLowerCase() > b.name.toLowerCase()
-        ? 1
-        : 0;
+      ? 1
+      : 0;
 
   const projectGroups = organizations.sort(sortByName).flatMap((organization) =>
     organization.teams.flatMap((team) => ({
@@ -193,9 +195,9 @@ const ProjectSelector = React.memo(function ProjectSelector({
                         href={
                           currentRoute?.path.includes("[project]")
                             ? currentRoute.path
-                              .replace("[project]", project.slug)
-                              .replace(/\[.*?\]/g, "")
-                              .replace(/\/\/+/g, "/")
+                                .replace("[project]", project.slug)
+                                .replace(/\[.*?\]/g, "")
+                                .replace(/\/\/+/g, "/")
                             : `/${project.slug}`
                         }
                         _hover={{
@@ -327,12 +329,14 @@ export const DashboardLayout = ({
               label={projectRoutes.checks.title}
               project={project}
             />
-            {(process.env.NEXT_PUBLIC_FEATURE_DATASETS && isDevViewEnabled) && (<SideMenuLink
-              path={projectRoutes.datasets.path}
-              icon={Table}
-              label={projectRoutes.datasets.title}
-              project={project}
-            />)}
+            {process.env.NEXT_PUBLIC_FEATURE_DATASETS && isDevViewEnabled && (
+              <SideMenuLink
+                path={projectRoutes.datasets.path}
+                icon={Table}
+                label={projectRoutes.datasets.title}
+                project={project}
+              />
+            )}
 
             {/*<SideMenuLink
               path={projectRoutes.prompts.path}
@@ -343,13 +347,13 @@ export const DashboardLayout = ({
             {hasOrganizationPermission(
               OrganizationRoleGroup.ORGANIZATION_VIEW
             ) && (
-                <SideMenuLink
-                  path={projectRoutes.settings.path}
-                  icon={Settings}
-                  label={projectRoutes.settings.title}
-                  project={project}
-                />
-              )}
+              <SideMenuLink
+                path={projectRoutes.settings.path}
+                icon={Settings}
+                label={projectRoutes.settings.title}
+                project={project}
+              />
+            )}
           </VStack>
         </VStack>
       </Box>
@@ -410,7 +414,8 @@ export const DashboardLayout = ({
           <Spacer />
           <Menu>
             <Stack align="center" direction="row">
-              {(router.pathname.includes("messages") || router.pathname.includes("datasets")) && (
+              {(router.pathname.includes("messages") ||
+                router.pathname.includes("datasets")) && (
                 <Switch
                   size="lg"
                   onChange={toggleDevView}

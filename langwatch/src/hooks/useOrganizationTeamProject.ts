@@ -26,15 +26,14 @@ export const useOrganizationTeamProject = (
     staleTime: keepFetching ? undefined : Infinity,
     refetchInterval: keepFetching ? 5_000 : undefined,
   });
-  const [organizationId, setOrganizationId] = useLocalStorage<string>(
-    "selectedOrganizationId",
+  const [localStorageOrganizationId, setLocalStorageOrganizationId] =
+    useLocalStorage<string>("selectedOrganizationId", "");
+  const [localStorageTeamId, setLocalStorageTeamId] = useLocalStorage<string>(
+    "selectedTeamId",
     ""
   );
-  const [teamId, setTeamId] = useLocalStorage<string>("selectedTeamId", "");
-  const [localStorageProjectSlug, setProjectSlug] = useLocalStorage<string>(
-    "selectedProjectSlug",
-    ""
-  );
+  const [localStorageProjectSlug, setLocalStorageProjectSlug] =
+    useLocalStorage<string>("selectedProjectSlug", "");
   const router = useRouter();
 
   const projectSlug =
@@ -42,51 +41,56 @@ export const useOrganizationTeamProject = (
       ? router.query.project
       : localStorageProjectSlug;
 
-  const projectsTeamsMatchingSlug = organizations.data?.flatMap((org) =>
-    org.teams.flatMap((team) =>
-      team.projects
-        .filter((project) => project.slug == projectSlug)
-        .map((project) => ({ project, team }))
-    )
+  const projectsTeamsOrganizationsMatchingSlug = organizations.data?.flatMap(
+    (organization) =>
+      organization.teams.flatMap((team) =>
+        team.projects
+          .filter((project) => project.slug == projectSlug)
+          .map((project) => ({ organization, project, team }))
+          .sort((a, b) => {
+            // slugs can be duplicate accross teams and project, so multiple could match
+            // prioritize those projects that match also org and team localstorage ids
+            if (a.organization.id == localStorageOrganizationId) return -1;
+            if (b.organization.id == localStorageOrganizationId) return 1;
+            if (a.team.id == localStorageTeamId) return -1;
+            if (b.team.id == localStorageTeamId) return 1;
+            return 0;
+          })
+      )
   );
 
-  const organization = organizations.data
-    ? organizations.data.find((org) => org.id == organizationId) ??
+  const organization = projectsTeamsOrganizationsMatchingSlug?.[0]
+    ? projectsTeamsOrganizationsMatchingSlug?.[0].organization
+    : organizations.data
+    ? organizations.data.find((org) => org.id == localStorageOrganizationId) ??
       organizations.data[0]
     : undefined;
-  const team = projectsTeamsMatchingSlug?.[0]
-    ? projectsTeamsMatchingSlug?.[0].team
+  const team = projectsTeamsOrganizationsMatchingSlug?.[0]
+    ? projectsTeamsOrganizationsMatchingSlug?.[0].team
     : organization
-    ? organization.teams.find((team) => team.id == teamId) ??
+    ? organization.teams.find((team) => team.id == localStorageTeamId) ??
       organization.teams.find((team) => team.projects.length > 0) ??
       organization.teams[0]
     : undefined;
   const project = team
-    ? projectsTeamsMatchingSlug?.[0]?.project ?? team.projects[0]
+    ? projectsTeamsOrganizationsMatchingSlug?.[0]?.project ?? team.projects[0]
     : undefined;
 
   useEffect(() => {
-    if (organization && organization.id !== organizationId) {
-      setOrganizationId(organization.id);
+    if (organization && organization.id !== localStorageOrganizationId) {
+      setLocalStorageOrganizationId(organization.id);
     }
-    if (team && team.id !== teamId) {
-      setTeamId(team.id);
+    if (team && team.id !== localStorageTeamId) {
+      setLocalStorageTeamId(team.id);
     }
     if (project && project.slug !== localStorageProjectSlug) {
-      setProjectSlug(project.slug);
+      setLocalStorageProjectSlug(project.slug);
     }
-  }, [
-    localStorageProjectSlug,
-    organization,
-    organizationId,
-    project,
-    projectSlug,
-    setOrganizationId,
-    setProjectSlug,
-    setTeamId,
-    team,
-    teamId,
-  ]);
+    // We want to update localstorage values only once, forward, doesn't matter if localstorage
+    // itself changes. This is because the user might have two tabs open in different projects,
+    // and we don't want them fighting each other on who keeps localstorage in sync.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [organization, project, team]);
 
   useEffect(() => {
     if (!organizations.data) return;
@@ -104,6 +108,14 @@ export const useOrganizationTeamProject = (
         ?.slug;
       void router.push(`/onboarding/${firstTeamSlug}/project`);
       return;
+    }
+
+    if (
+      project &&
+      typeof router.query.project == "string" &&
+      project.slug !== router.query.project
+    ) {
+      void router.push(`/${project.slug}`);
     }
   }, [
     organization,
