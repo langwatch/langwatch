@@ -15,6 +15,7 @@ import { thumbsUpDownVsPreviousPeriod } from "./analytics/thumbsUpDown";
 import type { TraceCheck } from "../../tracer/types";
 import { getTimeseries } from "./analytics/timeseries";
 import { dataForFilter } from "./analytics/dataForFilter";
+import type { QueryDslBoolQuery } from "@elastic/elasticsearch/lib/api/types";
 
 export const analyticsRouter = createTRPCRouter({
   getTimeseries,
@@ -37,13 +38,12 @@ export const analyticsRouter = createTRPCRouter({
             size: 0,
             query: {
               bool: {
-                //@ts-ignore
                 filter: generateTraceQueryConditions({
                   ...input,
                   startDate,
                   endDate,
                 }),
-              },
+              } as QueryDslBoolQuery,
             },
           },
           aggs: {
@@ -108,9 +108,8 @@ export const analyticsRouter = createTRPCRouter({
           size: 0,
           query: {
             bool: {
-              //@ts-ignore
               filter: generateTraceChecksQueryConditions(input),
-            },
+            } as QueryDslBoolQuery,
           },
           aggs: {
             status_counts: {

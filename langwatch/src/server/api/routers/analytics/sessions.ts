@@ -1,3 +1,4 @@
+import type { QueryDslBoolQuery } from "@elastic/elasticsearch/lib/api/types";
 import { TRACE_INDEX, esClient } from "../../../elasticsearch";
 import { TeamRoleGroup, checkUserPermissionForProject } from "../../permission";
 import { protectedProcedure } from "../../trpc";
@@ -133,13 +134,12 @@ export const sessionsVsPreviousPeriod = protectedProcedure
           },
           query: {
             bool: {
-              //@ts-ignore
               filter: generateTraceQueryConditions({
                 ...input,
                 startDate,
                 endDate,
               }),
-            },
+            } as QueryDslBoolQuery,
           },
           size: 0,
         },
