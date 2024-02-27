@@ -75,7 +75,6 @@ export default function Subscription() {
                       "90-day messages retention",
                       "Access to all guardrails",
                     ]}
-                    price={99}
                     betaOrDemo="beta"
                     selectedPlan={selectedPlan}
                     setSelectedPlan={setSelectedPlan}
