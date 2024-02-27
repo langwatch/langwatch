@@ -76,18 +76,40 @@ export function AddDatasetRecordDrawer(props: AddDatasetDrawerProps) {
 
     const inputCheck = () => {
 
-        const inputTypeCheck = z.array(chatMessageSchema)
-        const result = inputTypeCheck.safeParse(JSON.parse(inputSpan))
+        if (databaseSchema === DatabaseSchema.LLM_CHAT_CALL) {
+            try {
+                JSON.parse(inputSpan);
+                const inputTypeCheck = z.array(chatMessageSchema)
+                const result = inputTypeCheck.safeParse(JSON.parse(inputSpan))
+                return result;
 
-        return result;
+            } catch (e) { return false; }
+        } else if (databaseSchema === DatabaseSchema.FULL_TRACE) {
+
+            const inputTypeCheck = z.string();
+            const result = inputTypeCheck.safeParse(inputSpan)
+            return result;
+        }
 
     }
 
     const outputCheck = () => {
-        const outputTypeCheck = z.array(chatMessageSchema)
-        const result = outputTypeCheck.safeParse(JSON.parse(outputSpan))
+        if (databaseSchema === DatabaseSchema.LLM_CHAT_CALL) {
+            try {
+                JSON.parse(outputSpan);
+                const outputTypeCheck = z.array(chatMessageSchema)
+                const result = outputTypeCheck.safeParse(JSON.parse(outputSpan))
+                return result;
 
-        return result;
+            } catch (e) { return false; }
+
+        } else if (databaseSchema === DatabaseSchema.FULL_TRACE) {
+            const outputTypeCheck = z.string();
+            const result = outputTypeCheck.safeParse(outputSpan)
+            return result;
+        }
+
+
     }
 
     const onSubmit = (e: any) => {
@@ -97,13 +119,20 @@ export function AddDatasetRecordDrawer(props: AddDatasetDrawerProps) {
         let output;
 
         const inputResult = inputCheck();
-        inputResult.success ? setInputError(false) : setInputError(true)
+        if (inputResult && inputResult.success) {
+            setInputError(false);
+        } else {
+            setInputError(true);
+        }
 
         const outputResult = outputCheck();
-        outputResult.success ? setOutputError(false) : setOutputError(true)
+        if (outputResult && outputResult.success) {
+            setOutputError(false);
+        } else {
+            setOutputError(true);
+        }
 
-
-        if (!inputResult.success || !outputResult.success) {
+        if (!inputResult || !outputResult || !inputResult.success || !outputResult.success) {
             return;
         }
 
@@ -184,27 +213,25 @@ export function AddDatasetRecordDrawer(props: AddDatasetDrawerProps) {
 
         const inputValue = e.target.value
         setInputSpan(inputValue)
-        try {
-            JSON.parse(inputValue);
-            const inputResult = inputCheck();
-            inputResult.success ? setInputError(false) : setInputError(true)
-        } catch (e) {
-            setInputError(true)
-        }
+        const inputResult = inputCheck();
+
+        if (inputResult && inputResult.success) {
+            setInputError(false)
+        } else { setInputError(true) }
+
+
     }
 
     const handleOutputChange = (e: any) => {
 
         const outputValue = e.target.value
         setOutputSpan(outputValue)
-        try {
-            JSON.parse(outputValue);
-            const outputResult = outputCheck();
-            outputResult.success ? setOutputError(false) : setOutputError(true)
+        const outputResult = outputCheck();
 
-        } catch (e) {
-            setOutputError(true)
+        if (outputResult && outputResult.success) {
+            setOutputError(false)
         }
+        else { setOutputError(true) }
 
     }
 
@@ -244,7 +271,6 @@ export function AddDatasetRecordDrawer(props: AddDatasetDrawerProps) {
         setDatabaseSchema(datasetSchema ?? "")
         setDatabaseSchemaName(displayName(datasetSchema!))
         setDatasetId(e.target.value)
-        selectFullTraceDataset();
     }
 
     return (
