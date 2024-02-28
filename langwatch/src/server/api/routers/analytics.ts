@@ -7,7 +7,6 @@ import {
   currentVsPreviousDates,
   generateTraceChecksQueryConditions,
 } from "./analytics/common";
-import { tokensSumVsPreviousPeriod } from "./analytics/tokens";
 import { sessionsVsPreviousPeriod } from "./analytics/sessions";
 import { topUsedDocuments } from "./analytics/documents";
 import type { TraceCheck } from "../../tracer/types";
@@ -19,7 +18,6 @@ export const analyticsRouter = createTRPCRouter({
   getTimeseries,
   dataForFilter,
   sessionsVsPreviousPeriod,
-  tokensSumVsPreviousPeriod,
   topUsedDocuments,
   getSummaryMetrics: protectedProcedure
     .input(sharedAnalyticsFilterInput)

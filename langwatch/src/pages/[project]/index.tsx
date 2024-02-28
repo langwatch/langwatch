@@ -48,7 +48,6 @@ import {
 import { LLMSummary } from "../../components/analytics/LLMSummary";
 import { SatisfactionGraphs } from "../../components/analytics/SatisfactionGraph";
 import { SessionsSummary } from "../../components/analytics/SessionsSummary";
-import { TokensSumSummary } from "../../components/analytics/TokensSummary";
 import { TopTopics } from "../../components/analytics/TopTopics";
 import { useAnalyticsParams } from "../../hooks/useAnalyticsParams";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
@@ -380,10 +379,14 @@ function LLMMetrics() {
                   )}
                   <Tab paddingX={0} paddingBottom={4}>
                     <VStack align="start">
-                      <Text color="black">Tokens</Text>
-                      <Box fontSize={24} color="black" fontWeight="bold">
-                        <TokensSumSummary />
-                      </Box>
+                      <CustomGraph
+                        input={{ ...tokensGraph, graphType: "summary" }}
+                        titleProps={{
+                          fontSize: 16,
+                          color: "black",
+                        }}
+                        sumSummariesUnderTitle="Tokens"
+                      />
                     </VStack>
                   </Tab>
                 </TabList>
