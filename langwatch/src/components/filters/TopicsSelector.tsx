@@ -13,6 +13,7 @@ import React, { useEffect, useState } from "react";
 import { HelpCircle } from "react-feather";
 import { api } from "../../utils/api";
 import { useFilterParams } from "../../hooks/useFilterParams";
+import { OverflownTextWithTooltip } from "../OverflownText";
 
 export function TopicsSelector() {
   const router = useRouter();
@@ -142,14 +143,13 @@ export function TopicsSelector() {
                         handleTopicChange(topic.id, e.target.checked)
                       }
                     >
-                      <Text
+                      <OverflownTextWithTooltip
                         noOfLines={1}
                         wordBreak="break-all"
-                        title={topic.name}
                         fontSize={15}
                       >
                         {topic.name}
-                      </Text>
+                      </OverflownTextWithTooltip>
                     </Checkbox>
                     <Text color="gray.500" fontSize={12} whiteSpace="nowrap">
                       {topic.count}
@@ -182,13 +182,12 @@ export function TopicsSelector() {
                               )
                             }
                           >
-                            <Text
+                            <OverflownTextWithTooltip
                               noOfLines={1}
                               wordBreak="break-all"
-                              title={subtopic.name}
                             >
                               {subtopic.name}
-                            </Text>
+                            </OverflownTextWithTooltip>
                           </Checkbox>
                           <Text
                             color="gray.500"

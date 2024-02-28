@@ -15,6 +15,7 @@ import React, { useEffect, useState } from "react";
 import { HelpCircle } from "react-feather";
 import { useFilterParams } from "../../hooks/useFilterParams";
 import { api } from "../../utils/api";
+import { OverflownTextWithTooltip } from "../OverflownText";
 
 export function TopTopics() {
   const router = useRouter();
@@ -110,9 +111,9 @@ export function TopTopics() {
                       }
                     >
                       <HStack width="full">
-                        <Text flexGrow={1} noOfLines={1}>
+                        <OverflownTextWithTooltip flexGrow={1} noOfLines={1}>
                           {topic.name}
-                        </Text>
+                        </OverflownTextWithTooltip>
                         <Text color="gray.500" fontSize={12}>
                           {topic.count}
                         </Text>
