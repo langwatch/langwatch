@@ -46,7 +46,7 @@ import {
   DocumentsCountsTable,
 } from "../../components/analytics/DocumentsCountsTable";
 import { LLMSummary } from "../../components/analytics/LLMSummary";
-import { SatisfactionPieChart } from "../../components/analytics/SatisfactionGraph";
+import { SatisfactionGraphs } from "../../components/analytics/SatisfactionGraph";
 import { SessionsSummary } from "../../components/analytics/SessionsSummary";
 import { TokensSumSummary } from "../../components/analytics/TokensSummary";
 import { TopTopics } from "../../components/analytics/TopTopics";
@@ -269,7 +269,7 @@ function UserMetrics() {
       <GridItem rowSpan={2}>
         <VStack spacing={6}>
           <TopTopics />
-          <SatisfactionPieChart />
+          <SatisfactionGraphs />
         </VStack>
       </GridItem>
       <GridItem>

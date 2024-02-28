@@ -100,6 +100,7 @@ export const CustomGraph = React.memo(
   function CustomGraph({
     input,
     titleProps,
+    hideGroupLabel = false,
   }: {
     input: CustomGraphInput;
     titleProps?: {
@@ -107,6 +108,7 @@ export const CustomGraph = React.memo(
       color?: ColorProps["color"];
       fontWeight?: TypographyProps["fontWeight"];
     };
+    hideGroupLabel?: boolean;
   }) {
     const height_ = input.height ?? 300;
     const { filterParams, queryOpts } = useFilterParams();
@@ -183,7 +185,7 @@ export const CustomGraph = React.memo(
       const group =
         input.groupBy && groupKey ? getGroup(input.groupBy) : undefined;
       const groupName = groupKey
-        ? `${group?.label.toLowerCase()} ${groupKey}`
+        ? `${hideGroupLabel ? "" : group?.label.toLowerCase() + " "}${groupKey}`
         : "";
       return input.series.length > 1
         ? (series?.name ?? aggKey) + (groupName ? ` (${groupName})` : "")

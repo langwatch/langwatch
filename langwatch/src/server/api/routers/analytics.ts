@@ -9,9 +9,7 @@ import {
 } from "./analytics/common";
 import { tokensSumVsPreviousPeriod } from "./analytics/tokens";
 import { sessionsVsPreviousPeriod } from "./analytics/sessions";
-import { satisfactionVsPreviousPeriod } from "./analytics/satisfaction";
 import { topUsedDocuments } from "./analytics/documents";
-import { thumbsUpDownVsPreviousPeriod } from "./analytics/thumbsUpDown";
 import type { TraceCheck } from "../../tracer/types";
 import { getTimeseries } from "./analytics/timeseries";
 import { dataForFilter } from "./analytics/dataForFilter";
@@ -21,8 +19,6 @@ export const analyticsRouter = createTRPCRouter({
   getTimeseries,
   dataForFilter,
   sessionsVsPreviousPeriod,
-  satisfactionVsPreviousPeriod,
-  thumbsUpDownVsPreviousPeriod,
   tokensSumVsPreviousPeriod,
   topUsedDocuments,
   getSummaryMetrics: protectedProcedure

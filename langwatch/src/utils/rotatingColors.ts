@@ -71,7 +71,7 @@ export const rotatingColors = {
     },
     {
       background: "gray.100",
-      color: "gray.400",
+      color: "gray.375",
     },
   ],
   orangeTones: tones("orange"),
