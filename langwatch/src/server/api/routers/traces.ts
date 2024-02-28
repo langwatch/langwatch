@@ -21,11 +21,11 @@ import {
   backendHasTeamProjectPermission,
   checkUserPermissionForProject,
 } from "../permission";
-import {
-  generateTraceQueryConditions,
-  generateTracesPivotQueryConditions,
-} from "./analytics/common";
-import type { QueryDslBoolQuery, SearchTotalHits } from "@elastic/elasticsearch/lib/api/types";
+import { generateTracesPivotQueryConditions } from "./analytics/common";
+import type {
+  QueryDslBoolQuery,
+  SearchTotalHits,
+} from "@elastic/elasticsearch/lib/api/types";
 
 const tracesFilterInput = sharedFiltersInputSchema.extend({
   pageOffset: z.number().optional(),
@@ -79,7 +79,7 @@ export const tracesRouter = createTRPCRouter({
         });
       }
 
-      const { pivotIndexConditions, isAnyFilterPresent } =
+      const { pivotIndexConditions, isAnyFilterPresent, endDateUsedForQuery } =
         generateTracesPivotQueryConditions(input);
 
       let traceIds: string[] = [];
@@ -104,9 +104,19 @@ export const tracesRouter = createTRPCRouter({
         }
       }
 
-      const traceQueryConditions = generateTraceQueryConditions(input);
       const tracesIndexConditions = [
-        ...traceQueryConditions,
+        {
+          term: { project_id: input.projectId },
+        },
+        {
+          range: {
+            "timestamps.started_at": {
+              gte: input.startDate,
+              lte: endDateUsedForQuery,
+              format: "epoch_millis",
+            },
+          },
+        },
         ...(traceIds.length > 0 ? [{ terms: { trace_id: traceIds } }] : []),
       ];
 

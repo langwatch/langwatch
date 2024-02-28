@@ -116,7 +116,7 @@ export function SummaryMetricValue({
   );
 }
 
-export function MetricChange({
+function MetricChange({
   current,
   previous,
   increaseIs = "good",
