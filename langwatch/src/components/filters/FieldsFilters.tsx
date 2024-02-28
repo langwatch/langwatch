@@ -25,18 +25,19 @@ export function FieldsFilters() {
   const router = useRouter();
 
   const filterKeys: FilterField[] = [
+    "spans.model",
+    "metadata.labels",
+    "trace_checks.check_id",
+    "events.event_type",
     "metadata.user_id",
     "metadata.thread_id",
     "metadata.customer_id",
-    "metadata.labels",
-    "spans.model",
-    "trace_checks.check_id",
-    "events.event_type",
   ];
 
-  const filters = Object.entries(availableFilters).filter(([key]) =>
-    filterKeys.includes(key as FilterField)
-  ) as [FilterField, FilterDefinition][];
+  const filters: [FilterField, FilterDefinition][] = filterKeys.map((key) => [
+    key,
+    availableFilters[key],
+  ]);
 
   const addFilterToUrl = (field: string, value: string) => {
     void router.push(

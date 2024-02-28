@@ -444,7 +444,7 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
     },
   },
   "events.event_type": {
-    name: "Event Type",
+    name: "Event",
     urlKey: "event_type",
     query: (values) => ({
       nested: {
