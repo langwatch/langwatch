@@ -132,8 +132,8 @@ export function AddDatasetDrawer(props: AddDatasetDrawerProps) {
                                                     <Text>Each entry will be a simple input/output string pair, for running batch evaluations without the whole LLM structure</Text>
                                                 </Box>
                                             </HStack>
-                                            <HStack align={'start'}>
-                                                <Radio size="md" value={DatabaseSchema.KEY_VALUE} colorScheme="blue" padding={1} disabled />
+                                            <HStack align={'start'} display={'none'}>
+                                                <Radio size="md" value={DatabaseSchema.KEY_VALUE} colorScheme="blue" padding={1} />
                                                 <Box>
                                                     <Text fontWeight="bold">Key-Value</Text>
                                                     <Text>You can use the generic key-value schema for storing any dataset format, however requires manual implementation for batch evaluations</Text>
