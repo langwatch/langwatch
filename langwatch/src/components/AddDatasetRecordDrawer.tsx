@@ -118,14 +118,14 @@ export function AddDatasetRecordDrawer(props: AddDatasetDrawerProps) {
         let input;
         let output;
 
-        const inputResult = inputCheck();
+        const inputResult = inputCheck(inputSpan);
         if (inputResult && inputResult.success) {
             setInputError(false);
         } else {
             setInputError(true);
         }
 
-        const outputResult = outputCheck();
+        const outputResult = outputCheck(outputSpan);
         if (outputResult && outputResult.success) {
             setOutputError(false);
         } else {
@@ -158,7 +158,7 @@ export function AddDatasetRecordDrawer(props: AddDatasetDrawerProps) {
                 onSuccess: () => {
                     props.onClose();
                     toast({
-                        duration: 6000,
+                        duration: 3000,
                         position: "top-right",
                         render: () => (
                             <Box p={5} paddingRight={20} bg='green.200' borderTop={'green.600'} borderTopWidth={2}>
