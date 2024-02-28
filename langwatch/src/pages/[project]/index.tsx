@@ -58,6 +58,7 @@ import { analyticsMetrics } from "../../server/analytics/registry";
 import { TeamRoleGroup } from "../../server/api/permission";
 import { api } from "../../utils/api";
 import { FilterSidebar } from "../../components/filters/FilterSidebar";
+import { useFilterParams } from "../../hooks/useFilterParams";
 
 export default function ProjectRouter() {
   const router = useRouter();
@@ -456,9 +457,9 @@ function LLMMetrics() {
 }
 
 function DocumentsMetrics() {
-  const { analyticsParams, queryOpts } = useAnalyticsParams();
+  const { filterParams, queryOpts } = useFilterParams();
   const documents = api.analytics.topUsedDocuments.useQuery(
-    analyticsParams,
+    filterParams,
     queryOpts
   );
 

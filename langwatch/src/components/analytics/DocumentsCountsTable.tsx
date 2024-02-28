@@ -9,14 +9,14 @@ import {
   Tr,
   VStack,
 } from "@chakra-ui/react";
-import { useAnalyticsParams } from "../../hooks/useAnalyticsParams";
 import { api } from "../../utils/api";
 import { SummaryMetricValue } from "./SummaryMetric";
+import { useFilterParams } from "../../hooks/useFilterParams";
 
 export const DocumentsCountsTable = () => {
-  const { analyticsParams, queryOpts } = useAnalyticsParams();
+  const { filterParams, queryOpts } = useFilterParams();
   const documents = api.analytics.topUsedDocuments.useQuery(
-    analyticsParams,
+    filterParams,
     queryOpts
   );
 
@@ -46,8 +46,10 @@ export const DocumentsCountsTable = () => {
             <Tr key={doc.documentId}>
               <Td paddingLeft={0}>{doc.documentId}</Td>
               <Td>
-                {doc.content.substring(0, 255) +
-                  (doc.content.length > 255 ? "..." : "")}
+                {doc.content
+                  ? doc.content.substring(0, 255) +
+                    (doc.content.length > 255 ? "..." : "")
+                  : ""}
               </Td>
               <Td>{doc.count}</Td>
             </Tr>
@@ -59,9 +61,9 @@ export const DocumentsCountsTable = () => {
 };
 
 export const DocumentsCountsSummary = () => {
-  const { analyticsParams, queryOpts } = useAnalyticsParams();
+  const { filterParams, queryOpts } = useFilterParams();
   const documents = api.analytics.topUsedDocuments.useQuery(
-    analyticsParams,
+    filterParams,
     queryOpts
   );
 
