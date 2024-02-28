@@ -320,6 +320,22 @@ function LLMMetrics() {
     timeScale: 1,
   };
 
+  const totalTokensSummary: CustomGraphInput = {
+    graphId: "totalTokensSummary",
+    graphType: "summary",
+    series: [
+      {
+        name: "Tokens",
+        metric: "performance.total_tokens",
+        aggregation: "sum",
+        colorSet: analyticsMetrics.performance.total_tokens.colorSet,
+      },
+    ],
+    groupBy: undefined,
+    includePrevious: false,
+    timeScale: "full",
+  };
+
   const tokensGraph: CustomGraphInput = {
     graphId: "tokensGraph",
     graphType: "stacked_bar",
@@ -380,12 +396,11 @@ function LLMMetrics() {
                   <Tab paddingX={0} paddingBottom={4}>
                     <VStack align="start">
                       <CustomGraph
-                        input={{ ...tokensGraph, graphType: "summary" }}
+                        input={totalTokensSummary}
                         titleProps={{
                           fontSize: 16,
                           color: "black",
                         }}
-                        sumSummariesUnderTitle="Tokens"
                       />
                     </VStack>
                   </Tab>

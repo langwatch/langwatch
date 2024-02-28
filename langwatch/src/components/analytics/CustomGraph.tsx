@@ -101,7 +101,6 @@ export const CustomGraph = React.memo(
     input,
     titleProps,
     hideGroupLabel = false,
-    sumSummariesUnderTitle,
   }: {
     input: CustomGraphInput;
     titleProps?: {
@@ -110,7 +109,6 @@ export const CustomGraph = React.memo(
       fontWeight?: TypographyProps["fontWeight"];
     };
     hideGroupLabel?: boolean;
-    sumSummariesUnderTitle?: string;
   }) {
     const height_ = input.height ?? 300;
     const { filterParams, queryOpts } = useFilterParams();
@@ -310,60 +308,24 @@ export const CustomGraph = React.memo(
         nameForSeries
       );
 
-      // TODO: remove this hack later if no longer used
-      if (sumSummariesUnderTitle) {
-        const summedValues = summaryData.current.reduce(
-          (acc, entry) => acc + entry.value,
-          0
-        );
-        const summedPreviousValues = summaryData.previous.reduce(
-          (acc, entry) => acc + entry.value,
-          0
-        );
-
-        return container(
-          <HStack spacing={0} align="start" minHeight="101px">
-            {timeseries.isLoading &&
-              input.series
-                .slice(0, 1)
-                .map((series) => (
-                  <SummaryMetric
-                    key={
-                      series.metric +
-                      series.aggregation +
-                      series.pipeline?.field +
-                      series.pipeline?.aggregation
-                    }
-                    label={sumSummariesUnderTitle}
-                    titleProps={titleProps}
-                  />
-                ))}
-            {summaryData.current.slice(0, 1).map((entry) => (
-              <SummaryMetric
-                key={entry.key}
-                label={sumSummariesUnderTitle}
-                current={summedValues}
-                previous={summedPreviousValues}
-                format={entry.metric?.format}
-                increaseIs={entry.metric?.increaseIs}
-                titleProps={titleProps}
-              />
-            ))}
-          </HStack>
-        );
-      }
+      const seriesSet = Object.fromEntries(
+        input.series
+          .reverse()
+          .map((series) => [
+            series.metric +
+              series.aggregation +
+              series.pipeline?.field +
+              series.pipeline?.aggregation,
+            series,
+          ])
+      );
 
       return container(
         <HStack spacing={0} align="start" minHeight="101px">
           {timeseries.isLoading &&
-            input.series.map((series) => (
+            Object.entries(seriesSet).map(([key, series]) => (
               <SummaryMetric
-                key={
-                  series.metric +
-                  series.aggregation +
-                  series.pipeline?.field +
-                  series.pipeline?.aggregation
-                }
+                key={key}
                 label={series.name}
                 titleProps={titleProps}
               />

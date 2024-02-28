@@ -207,12 +207,11 @@ export const analyticsMetrics = {
       increaseIs: "bad",
     },
     first_token: {
-      ...simpleFieldAnalytics("trace.metrics.first_token_ms"),
+      ...numericFieldAnalyticsWithPercentiles("trace.metrics.first_token_ms"),
       label: "Time to First Token",
       colorSet: "cyanTones",
       format: formatMilliseconds,
       increaseIs: "bad",
-      allowedAggregations: numericAggregationTypes,
     },
     total_cost: {
       ...numericFieldAnalyticsWithPercentiles("trace.metrics.total_cost"),
@@ -234,6 +233,19 @@ export const analyticsMetrics = {
       label: "Completion Tokens",
       colorSet: "orangeTones",
       increaseIs: "neutral",
+    },
+    total_tokens: {
+      ...numericFieldAnalyticsWithPercentiles("total_tokens"),
+      label: "Total Tokens",
+      colorSet: "purpleTones",
+      increaseIs: "neutral",
+      runtimeMappings: {
+        total_tokens: {
+          type: "long",
+          script:
+            "emit(doc['trace.metrics.prompt_tokens'].value + doc['trace.metrics.completion_tokens'].value)",
+        },
+      },
     },
   },
   events: {
