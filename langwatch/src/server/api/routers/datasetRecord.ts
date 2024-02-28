@@ -18,6 +18,11 @@ const FullTraceSchema = z.object({
   spans: z.array(datasetSpanSchema),
 });
 
+const StringIOSchema = z.object({
+  input: z.string(),
+  output: z.string(),
+});
+
 
 
 export const datasetRecordRouter = createTRPCRouter({
@@ -26,17 +31,18 @@ export const datasetRecordRouter = createTRPCRouter({
     .use(checkUserPermissionForProject(TeamRoleGroup.ANALYTICS_VIEW))
     .mutation(async ({ ctx, input }) => {
 
-
       let validatedInput = null;
       let entry = {};
 
       if (input.datasetSchema === DatabaseSchema.LLM_CHAT_CALL) {
         validatedInput = LLMChatSchema.safeParse(input);
-        console.log(validatedInput);
         entry = validatedInput.success ? { input: validatedInput.data.input, output: validatedInput.data.output } : {};
       } else if (input.datasetSchema === DatabaseSchema.FULL_TRACE) {
         validatedInput = FullTraceSchema.safeParse(input);
         entry = validatedInput.success ? { input: input.input, output: input.output, spans: validatedInput.data } : {};
+      } else if (input.datasetSchema === DatabaseSchema.STRING_I_O) {
+        validatedInput = StringIOSchema.safeParse(input);
+        entry = validatedInput.success ? { input: input.input, output: input.output } : {};
       }
 
 

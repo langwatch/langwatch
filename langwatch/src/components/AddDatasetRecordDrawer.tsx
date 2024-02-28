@@ -76,6 +76,7 @@ export function AddDatasetRecordDrawer(props: AddDatasetDrawerProps) {
 
     const inputCheck = (inputValue: any) => {
 
+
         if (databaseSchema === DatabaseSchema.LLM_CHAT_CALL) {
             try {
                 JSON.parse(inputValue);
@@ -84,7 +85,7 @@ export function AddDatasetRecordDrawer(props: AddDatasetDrawerProps) {
                 return result;
 
             } catch (e) { return false; }
-        } else if (databaseSchema === DatabaseSchema.FULL_TRACE) {
+        } else if (databaseSchema === DatabaseSchema.FULL_TRACE || databaseSchema === DatabaseSchema.STRING_I_O) {
 
             const inputTypeCheck = z.string();
             const result = inputTypeCheck.safeParse(inputValue)
@@ -103,7 +104,7 @@ export function AddDatasetRecordDrawer(props: AddDatasetDrawerProps) {
 
             } catch (e) { return false; }
 
-        } else if (databaseSchema === DatabaseSchema.FULL_TRACE) {
+        } else if (databaseSchema === DatabaseSchema.FULL_TRACE || databaseSchema === DatabaseSchema.STRING_I_O) {
             const outputTypeCheck = z.string();
             const result = outputTypeCheck.safeParse(outputValue)
             return result;
@@ -140,7 +141,7 @@ export function AddDatasetRecordDrawer(props: AddDatasetDrawerProps) {
         if (databaseSchema === DatabaseSchema.LLM_CHAT_CALL) {
             input = JSON.parse(inputSpan);
             output = JSON.parse(outputSpan);
-        } else if (databaseSchema === DatabaseSchema.FULL_TRACE) {
+        } else if (databaseSchema === DatabaseSchema.FULL_TRACE || databaseSchema === DatabaseSchema.STRING_I_O) {
             input = inputSpan;
             output = outputSpan;
         }
@@ -196,7 +197,13 @@ export function AddDatasetRecordDrawer(props: AddDatasetDrawerProps) {
         const value = e.target.value;
         const callSelected = value !== "" ? parseInt(value) : "";
 
-        if (callSelected !== "") {
+        if (databaseSchema === DatabaseSchema.STRING_I_O && callSelected !== "") {
+
+            setInputSpan(JSON.parse(spans.data?.[callSelected]?.input?.value ?? "")[0].content)
+            setOutputSpan(JSON.parse(spans.data?.[callSelected]?.outputs?.[0]?.value ?? "")[0].content)
+
+        } else if (databaseSchema === DatabaseSchema.LLM_CHAT_CALL && callSelected !== "") {
+
             setInputSpan(JSON.stringify(JSON.parse(spans.data?.[callSelected]?.input?.value ?? ""), undefined, 2))
             setOutputSpan(JSON.stringify(JSON.parse(spans.data?.[callSelected]?.outputs?.[0]?.value ?? ""), undefined, 2))
         } else {
@@ -331,7 +338,7 @@ export function AddDatasetRecordDrawer(props: AddDatasetDrawerProps) {
                                 </Container>
                             </HStack>
 
-                            {databaseSchema === DatabaseSchema.LLM_CHAT_CALL ?
+                            {databaseSchema === DatabaseSchema.LLM_CHAT_CALL || databaseSchema === DatabaseSchema.STRING_I_O ?
                                 <HStack align={'start'} gap={8}>
                                     <Container padding={0}>
                                         <VStack align={'start'} padding={0}>

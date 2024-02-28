@@ -46,6 +46,27 @@ export default function Dataset() {
         onClose();
     }
 
+    const getInput = (datasetRecord: any, schema: DatabaseSchema) => {
+
+        if (schema === DatabaseSchema.LLM_CHAT_CALL) {
+            return datasetRecord.entry.input[0]?.content ?? "";
+        }
+        if (schema === DatabaseSchema.STRING_I_O || schema === DatabaseSchema.FULL_TRACE) {
+            return datasetRecord.entry.input;
+        }
+
+    }
+
+    const getOutput = (dataset: any, schema: DatabaseSchema) => {
+        if (schema === DatabaseSchema.LLM_CHAT_CALL) {
+            return dataset.entry.output[0]?.content ?? "";
+
+        }
+        if (schema === DatabaseSchema.STRING_I_O || schema === DatabaseSchema.FULL_TRACE) {
+            return dataset.entry.output;
+        }
+    }
+
     return (
         <DashboardLayout>
             <Container maxW={"calc(100vw - 200px)"} padding={6} marginTop={8}>
@@ -99,20 +120,20 @@ export default function Dataset() {
                                             </Tr>
                                         ))
                                     ) : dataset.data ?
-                                        dataset.data.datasetRecords?.map((dataset) => (
-                                            <Tr key={dataset.id}>
-                                                <Td >
+                                        dataset.data.datasetRecords?.map((datasetRecord) => (
+                                            <Tr key={datasetRecord.id}>
+                                                <Td>
                                                     <Text noOfLines={1} maxWidth="300px" display="block">
-                                                        {(dataset as any)?.entry?.input[0]?.content ?? ""}
+                                                        {getInput(datasetRecord, dataset.data!.schema)}
                                                     </Text>
                                                 </Td>
-                                                <Td >
+                                                <Td>
                                                     <Text noOfLines={1} display="block" maxWidth="300px">
-                                                        {(dataset as any)?.entry?.output[0]?.content ?? ""}
+                                                        {getOutput(datasetRecord, dataset.data!.schema)}
                                                     </Text>
                                                 </Td>
-                                                <Td>{new Date(dataset.createdAt).toLocaleString()}</Td>
-                                                <Td>{new Date(dataset.updatedAt).toLocaleString()}</Td>
+                                                <Td>{new Date(datasetRecord.createdAt).toLocaleString()}</Td>
+                                                <Td>{new Date(datasetRecord.updatedAt).toLocaleString()}</Td>
                                             </Tr>
                                         )
                                         ) : null

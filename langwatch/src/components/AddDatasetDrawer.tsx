@@ -126,7 +126,7 @@ export function AddDatasetDrawer(props: AddDatasetDrawerProps) {
                                                 </Box>
                                             </HStack>
                                             <HStack align={'start'}>
-                                                <Radio size="md" value={DatabaseSchema.STRING_I_O} colorScheme="blue" padding={1} disabled />
+                                                <Radio size="md" value={DatabaseSchema.STRING_I_O} colorScheme="blue" padding={1} />
                                                 <Box>
                                                     <Text fontWeight="bold">String Input/Output</Text>
                                                     <Text>Each entry will be a simple input/output string pair, for running batch evaluations without the whole LLM structure</Text>
