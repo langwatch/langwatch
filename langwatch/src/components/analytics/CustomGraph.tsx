@@ -35,7 +35,6 @@ import {
 } from "recharts";
 import type { Payload } from "recharts/types/component/DefaultTooltipContent";
 import type { z } from "zod";
-import { useAnalyticsParams } from "../../hooks/useAnalyticsParams";
 import { useGetRotatingColorForCharts } from "../../hooks/useGetRotatingColorForCharts";
 import {
   getGroup,
@@ -48,6 +47,7 @@ import type { RotatingColorSet } from "../../utils/rotatingColors";
 import { uppercaseFirstLetter } from "../../utils/stringCasing";
 import type { Unpacked } from "../../utils/types";
 import { SummaryMetric } from "./SummaryMetric";
+import { useFilterParams } from "../../hooks/useFilterParams";
 
 type Series = Unpacked<z.infer<typeof timeseriesInput>["series"]> & {
   name: string;
@@ -109,15 +109,11 @@ export const CustomGraph = React.memo(
     };
   }) {
     const height_ = input.height ?? 300;
-    const { analyticsParams, queryOpts } = useAnalyticsParams();
-    const { projectId, startDate, endDate } = analyticsParams;
+    const { filterParams, queryOpts } = useFilterParams();
 
     const timeseries = api.analytics.getTimeseries.useQuery(
       {
-        projectId,
-        startDate,
-        endDate,
-        filters: {},
+        ...filterParams,
         ...input,
         timeScale: summaryGraphTypes.includes(input.graphType)
           ? "full"

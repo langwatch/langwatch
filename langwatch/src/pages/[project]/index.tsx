@@ -29,7 +29,10 @@ import { useRouter } from "next/router";
 import numeral from "numeral";
 import { CheckCircle, XCircle } from "react-feather";
 import { DashboardLayout } from "~/components/DashboardLayout";
-import { FilterSelector } from "../../components/FilterSelector";
+import {
+  FilterToggle,
+  useFilterToggle,
+} from "../../components/filters/FilterToggle";
 import {
   PeriodSelector,
   usePeriodSelector,
@@ -54,6 +57,8 @@ import { dependencies as serverDependencies } from "../../injection/dependencies
 import { analyticsMetrics } from "../../server/analytics/registry";
 import { TeamRoleGroup } from "../../server/api/permission";
 import { api } from "../../utils/api";
+import { FilterSidebar } from "../../components/filters/FilterSidebar";
+import { useFilterParams } from "../../hooks/useFilterParams";
 
 export default function ProjectRouter() {
   const router = useRouter();
@@ -90,10 +95,15 @@ export const getServerSideProps = async (
 
 function Index() {
   const { project } = useOrganizationTeamProject();
+  const {
+    period: { startDate, endDate },
+    setPeriod,
+  } = usePeriodSelector();
+  const { showFilters } = useFilterToggle();
 
   return (
     <DashboardLayout>
-      <Container maxWidth="1200" padding={6}>
+      <Container maxWidth={showFilters ? "1612" : "1200"} padding={6}>
         {project && !project.firstMessage && (
           <Alert status="warning" variant="left-accent" marginBottom={6}>
             <AlertIcon alignSelf="start" />
@@ -116,20 +126,33 @@ function Index() {
             </VStack>
           </Alert>
         )}
-        <UserMetrics />
-        <LLMMetrics />
-        <DocumentsMetrics />
+        <Container maxWidth="1152" padding={0}>
+          <HStack width="full" align="top">
+            <Heading as={"h1"} size="lg" paddingBottom={6} paddingTop={1}>
+              User Metrics
+            </Heading>
+            <Spacer />
+            <FilterToggle />
+            <PeriodSelector
+              period={{ startDate, endDate }}
+              setPeriod={setPeriod}
+            />
+          </HStack>
+        </Container>
+        <HStack align="start" width="full" spacing={8}>
+          <VStack align="start" width="full">
+            <UserMetrics />
+            <LLMMetrics />
+            <DocumentsMetrics />
+          </VStack>
+          <FilterSidebar hideTopics={true} />
+        </HStack>
       </Container>
     </DashboardLayout>
   );
 }
 
 function UserMetrics() {
-  const {
-    period: { startDate, endDate },
-    setPeriod,
-  } = usePeriodSelector();
-
   const messagesGraph: CustomGraphInput = {
     graphId: "messagesCountGraph",
     graphType: "line",
@@ -179,85 +202,80 @@ function UserMetrics() {
   };
 
   return (
-    <>
-      <HStack width="full" align="top">
-        <Heading as={"h1"} size="lg" paddingBottom={6} paddingTop={1}>
-          User Metrics
-        </Heading>
-        <Spacer />
-        <FilterSelector />
-        <PeriodSelector period={{ startDate, endDate }} setPeriod={setPeriod} />
-      </HStack>
-      <Grid
-        width="100%"
-        templateColumns={["1fr", "1fr", "1fr", "1fr 0.5fr"]}
-        gap={6}
-      >
-        <GridItem>
-          <Card>
-            <CardBody>
-              <Tabs variant="unstyled">
-                <TabList gap={8}>
-                  <Tab paddingX={0} paddingBottom={4}>
-                    <CustomGraph
-                      input={{ ...messagesGraph, graphType: "summary" }}
-                      titleProps={{
-                        fontSize: 16,
-                        color: "black",
-                      }}
-                    />
-                  </Tab>
-                  <Tab paddingX={0} paddingBottom={4}>
-                    <CustomGraph
-                      input={{ ...threadsGraph, graphType: "summary" }}
-                      titleProps={{
-                        fontSize: 16,
-                        color: "black",
-                      }}
-                    />
-                  </Tab>
-                  <Tab paddingX={0} paddingBottom={4}>
-                    <CustomGraph
-                      input={{ ...usersGraph, graphType: "summary" }}
-                      titleProps={{
-                        fontSize: 16,
-                        color: "black",
-                      }}
-                    />
-                  </Tab>
-                </TabList>
-                <TabIndicator
-                  mt="-1.5px"
-                  height="4px"
-                  bg="orange.400"
-                  borderRadius="1px"
-                />
-                <TabPanels>
-                  <TabPanel>
-                    <CustomGraph input={messagesGraph} />
-                  </TabPanel>
-                  <TabPanel>
-                    <CustomGraph input={threadsGraph} />
-                  </TabPanel>
-                  <TabPanel>
-                    <CustomGraph input={usersGraph} />
-                  </TabPanel>
-                </TabPanels>
-              </Tabs>
-            </CardBody>
-          </Card>
-        </GridItem>
-        <GridItem rowSpan={2}>
-          <VStack spacing={6}>
-            <TopTopics />
-            <SatisfactionPieChart />
-          </VStack>
-        </GridItem>
-        <GridItem>
-          <SessionsSummary />
-        </GridItem>
-      </Grid>
-    </>
+    <Grid
+      width="full"
+      templateColumns={[
+        "minmax(350px, 1fr)",
+        "minmax(350px, 1fr)",
+        "minmax(350px, 1fr)",
+        "minmax(350px, 2fr) minmax(250px, 1fr)",
+      ]}
+      gap={6}
+    >
+      <GridItem>
+        <Card>
+          <CardBody>
+            <Tabs variant="unstyled">
+              <TabList gap={8}>
+                <Tab paddingX={0} paddingBottom={4}>
+                  <CustomGraph
+                    input={{ ...messagesGraph, graphType: "summary" }}
+                    titleProps={{
+                      fontSize: 16,
+                      color: "black",
+                    }}
+                  />
+                </Tab>
+                <Tab paddingX={0} paddingBottom={4}>
+                  <CustomGraph
+                    input={{ ...threadsGraph, graphType: "summary" }}
+                    titleProps={{
+                      fontSize: 16,
+                      color: "black",
+                    }}
+                  />
+                </Tab>
+                <Tab paddingX={0} paddingBottom={4}>
+                  <CustomGraph
+                    input={{ ...usersGraph, graphType: "summary" }}
+                    titleProps={{
+                      fontSize: 16,
+                      color: "black",
+                    }}
+                  />
+                </Tab>
+              </TabList>
+              <TabIndicator
+                mt="-1.5px"
+                height="4px"
+                bg="orange.400"
+                borderRadius="1px"
+              />
+              <TabPanels>
+                <TabPanel>
+                  <CustomGraph input={messagesGraph} />
+                </TabPanel>
+                <TabPanel>
+                  <CustomGraph input={threadsGraph} />
+                </TabPanel>
+                <TabPanel>
+                  <CustomGraph input={usersGraph} />
+                </TabPanel>
+              </TabPanels>
+            </Tabs>
+          </CardBody>
+        </Card>
+      </GridItem>
+      <GridItem rowSpan={2}>
+        <VStack spacing={6}>
+          <TopTopics />
+          <SatisfactionPieChart />
+        </VStack>
+      </GridItem>
+      <GridItem>
+        <SessionsSummary />
+      </GridItem>
+    </Grid>
   );
 }
 
@@ -439,9 +457,9 @@ function LLMMetrics() {
 }
 
 function DocumentsMetrics() {
-  const { analyticsParams, queryOpts } = useAnalyticsParams();
+  const { filterParams, queryOpts } = useFilterParams();
   const documents = api.analytics.topUsedDocuments.useQuery(
-    analyticsParams,
+    filterParams,
     queryOpts
   );
 

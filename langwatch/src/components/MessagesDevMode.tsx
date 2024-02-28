@@ -45,7 +45,7 @@ import { durationColor } from "~/utils/durationColor";
 import { getSingleQueryParam } from "~/utils/getSingleQueryParam";
 import { useFilterParams } from "../hooks/useFilterParams";
 import { DashboardLayout } from "./DashboardLayout";
-import { FilterSelector } from "./FilterSelector";
+import { FilterToggle } from "./filters/FilterToggle";
 import { PeriodSelector, usePeriodSelector } from "./PeriodSelector";
 
 import { TraceDeatilsDrawer } from "~/components/TraceDeatilsDrawer";
@@ -309,7 +309,7 @@ export function MessagesDevMode() {
             </PopoverContent>
           </Popover>
 
-          <FilterSelector />
+          <FilterToggle />
         </HStack>
         <Card>
           <CardBody>

@@ -13,6 +13,8 @@ import type {
 } from "@elastic/elasticsearch/lib/api/types";
 import type { Trace } from "../../../tracer/types";
 import { type sharedFiltersInputSchema } from "../../../analytics/types";
+import { availableFilters } from "../../../filters/registry";
+import type { FilterField } from "../../../filters/types";
 
 export const sharedAnalyticsFilterInput = z.object({
   projectId: z.string(),
@@ -77,7 +79,7 @@ export const generateTraceChecksQueryConditions = ({
   thread_id,
   customer_ids,
   labels,
-}: z.infer<typeof sharedAnalyticsFilterInput>) : QueryDslQueryContainer[] => {
+}: z.infer<typeof sharedAnalyticsFilterInput>): QueryDslQueryContainer[] => {
   // If end date is very close to now, force it to be now, to allow frontend to keep refetching for new messages
   const endDate_ =
     new Date().getTime() - endDate < 1000 * 60 * 60
@@ -115,7 +117,7 @@ export const generateEventsQueryConditions = ({
   thread_id,
   customer_ids,
   labels,
-}: z.infer<typeof sharedAnalyticsFilterInput>) : QueryDslQueryContainer[] => {
+}: z.infer<typeof sharedAnalyticsFilterInput>): QueryDslQueryContainer[] => {
   // If end date is very close to now, force it to be now, to allow frontend to keep refetching for new messages
   const endDate_ =
     new Date().getTime() - endDate < 1000 * 60 * 60
@@ -150,7 +152,9 @@ export const spanQueryConditions = ({
   projectId,
   startDate,
   endDate,
-}: z.infer<typeof sharedAnalyticsFilterInput> & { traceIds: string[] }) : QueryDslQueryContainer[] => {
+}: z.infer<typeof sharedAnalyticsFilterInput> & {
+  traceIds: string[];
+}): QueryDslQueryContainer[] => {
   // If end date is very close to now, force it to be now, to allow frontend to keep refetching for new messages
   const endDate_ =
     new Date().getTime() - endDate < 1000 * 60 * 60
@@ -517,6 +521,7 @@ const groupedElasticSearchAggregation = async <T extends Record<string, any>>({
 
   return aggregations;
 };
+
 export const generateTracesPivotQueryConditions = ({
   projectId,
   startDate,
@@ -532,24 +537,13 @@ export const generateTracesPivotQueryConditions = ({
       ? new Date().getTime()
       : endDate;
 
-  const { metadata, topics: topicsGroup } = filters;
-  const { topics, subtopics } = topicsGroup ?? {};
-  const { user_id, thread_id, customer_id, labels } = metadata ?? {};
-
-  const filterConditions: QueryDslQueryContainer[] = [
-    ...(user_id ? [{ terms: { "trace.metadata.user_id": user_id } }] : []),
-    ...(thread_id
-      ? [{ terms: { "trace.metadata.thread_id": thread_id } }]
-      : []),
-    ...(customer_id
-      ? [{ terms: { "trace.metadata.customer_id": customer_id } }]
-      : []),
-    ...(labels ? [{ terms: { "trace.metadata.labels": labels } }] : []),
-    ...(topics ? [{ terms: { "trace.metadata.topic_id": topics } }] : []),
-    ...(subtopics
-      ? [{ terms: { "trace.metadata.subtopic_id": subtopics } }]
-      : []),
-  ];
+  const filterConditions: QueryDslQueryContainer[] = [];
+  for (const [key, values] of Object.entries(filters)) {
+    if (values.length > 0) {
+      const filter = availableFilters[key as FilterField];
+      filterConditions.push(filter.query(values));
+    }
+  }
 
   return {
     pivotIndexConditions: {

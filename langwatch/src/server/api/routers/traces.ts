@@ -25,7 +25,7 @@ import {
   generateTraceQueryConditions,
   generateTracesPivotQueryConditions,
 } from "./analytics/common";
-import type { SearchTotalHits } from "@elastic/elasticsearch/lib/api/types";
+import type { QueryDslBoolQuery, SearchTotalHits } from "@elastic/elasticsearch/lib/api/types";
 
 const tracesFilterInput = sharedFiltersInputSchema.extend({
   pageOffset: z.number().optional(),
@@ -309,29 +309,28 @@ export const tracesRouter = createTRPCRouter({
     .input(tracesFilterInput)
     .use(checkUserPermissionForProject(TeamRoleGroup.MESSAGES_VIEW))
     .query(async ({ input, ctx }) => {
-      const queryConditions = generateTraceQueryConditions(input);
+      const { pivotIndexConditions } =
+        generateTracesPivotQueryConditions(input);
 
-      const topicCountsResult = await esClient.search<Trace>({
-        index: TRACE_INDEX,
+      const topicCountsResult = await esClient.search<TracesPivot>({
+        index: TRACES_PIVOT_INDEX,
         size: 0, // We do not need the actual documents, just the aggregations
         body: {
           query: {
-            //@ts-ignore
             bool: {
-              //@ts-ignore
-              must: queryConditions,
-            },
+              must: pivotIndexConditions,
+            } as QueryDslBoolQuery,
           },
           aggs: {
             topicCounts: {
               terms: {
-                field: "metadata.topic_id",
+                field: "trace.metadata.topic_id",
                 size: 10000,
               },
             },
             subtopicCounts: {
               terms: {
-                field: "metadata.subtopic_id",
+                field: "trace.metadata.subtopic_id",
                 size: 10000,
               },
             },

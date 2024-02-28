@@ -1,72 +1,58 @@
-import type { QueryDslBoolQuery } from "@elastic/elasticsearch/lib/api/types";
-import { SPAN_INDEX, TRACE_INDEX, esClient } from "../../../elasticsearch";
-import type { Trace } from "../../../tracer/types";
+import {
+  SPAN_INDEX,
+  TRACES_PIVOT_INDEX,
+  esClient,
+  traceIndexId,
+} from "../../../elasticsearch";
 import { TeamRoleGroup, checkUserPermissionForProject } from "../../permission";
 import { protectedProcedure } from "../../trpc";
-import {
-  currentVsPreviousDates,
-  generateTraceQueryConditions,
-  sharedAnalyticsFilterInput,
-  spanQueryConditions,
-} from "./common";
+import { generateTracesPivotQueryConditions } from "./common";
+import { sharedFiltersInputSchema } from "../../../analytics/types";
+import type {
+  QueryDslBoolQuery,
+  QueryDslQueryContainer,
+} from "@elastic/elasticsearch/lib/api/types";
 
 export const topUsedDocuments = protectedProcedure
-  .input(sharedAnalyticsFilterInput)
+  .input(sharedFiltersInputSchema)
   .use(checkUserPermissionForProject(TeamRoleGroup.COST_VIEW))
   .query(async ({ input }) => {
-    const { previousPeriodStartDate } = currentVsPreviousDates(input);
+    const { pivotIndexConditions } = generateTracesPivotQueryConditions(input);
 
-    const tracesResult = await esClient.search<Trace>({
-      index: TRACE_INDEX,
-      body: {
-        _source: ["trace_id"],
-        size: 10000,
-        query: {
-          bool: {
-            filter: generateTraceQueryConditions({
-              ...input,
-              startDate: previousPeriodStartDate.getTime(),
-            }),
-          } as QueryDslBoolQuery,
-        },
-      },
-    });
-
-    const traceIds = tracesResult.hits.hits.map((hit) => hit._source!.trace_id);
-
-    const result = await esClient.search({
-      index: SPAN_INDEX,
+    const result = (await esClient.search({
+      index: TRACES_PIVOT_INDEX,
       size: 0,
       body: {
-        query: {
-          //@ts-ignore
-          bool: {
-            filter: [
-              ...spanQueryConditions({
-                ...input,
-                startDate: previousPeriodStartDate.getTime(),
-                traceIds,
-              }),
-            ],
-          },
-        },
+        query: pivotIndexConditions,
         aggs: {
-          total_unique_documents: {
-            cardinality: {
-              field: "contexts.document_id",
-            },
-          },
-          top_documents: {
-            terms: {
-              field: "contexts.document_id",
-              size: 10,
+          nested: {
+            nested: {
+              path: "contexts",
             },
             aggs: {
-              top_content: {
-                top_hits: {
-                  size: 1,
-                  _source: {
-                    includes: ["contexts.content"],
+              total_unique_documents: {
+                cardinality: {
+                  field: "contexts.document_id",
+                },
+              },
+              top_documents: {
+                terms: {
+                  field: "contexts.document_id",
+                  size: 10,
+                },
+                aggs: {
+                  back_to_root: {
+                    reverse_nested: {},
+                    aggs: {
+                      top_content: {
+                        top_hits: {
+                          size: 1,
+                          _source: {
+                            includes: ["trace.trace_id"],
+                          },
+                        },
+                      },
+                    },
                   },
                 },
               },
@@ -74,22 +60,70 @@ export const topUsedDocuments = protectedProcedure
           },
         },
       },
-    });
+    })) as any;
 
-    const topDocuments = (
-      result.aggregations?.top_documents as any
-    )?.buckets.map((bucket: any) => ({
-      documentId: bucket.key,
-      count: bucket.doc_count,
-      content: bucket.top_content.hits.hits[0]._source.contexts[0].content,
-    })) as { documentId: string; count: number; content: string }[];
+    const topDocuments =
+      result.aggregations?.nested?.top_documents?.buckets.map(
+        (bucket: any) => ({
+          documentId: bucket.key,
+          count: bucket.doc_count,
+          traceId:
+            bucket.back_to_root.top_content.hits.hits[0]._source.trace.trace_id,
+        })
+      ) as { documentId: string; count: number; traceId: string }[];
 
-    const totalUniqueDocuments = (
-      result.aggregations?.total_unique_documents as any
-    )?.value as number;
+    const totalUniqueDocuments = result.aggregations?.nested
+      ?.total_unique_documents?.value as number;
+
+    // we now need to query spans to get the actual documents content
+    const documents = (await esClient.search({
+      index: SPAN_INDEX,
+      size: topDocuments.reduce((acc, d) => acc + d.count, 0),
+      body: {
+        query: {
+          bool: {
+            must: [
+              {
+                terms: {
+                  "contexts.document_id": topDocuments.map((d) => d.documentId),
+                },
+              },
+              {
+                terms: {
+                  trace_id: topDocuments.map((d) => d.traceId),
+                },
+              },
+              {
+                terms: {
+                  _routing: topDocuments.map((d) =>
+                    traceIndexId({
+                      traceId: d.traceId,
+                      projectId: input.projectId,
+                    })
+                  ),
+                },
+              },
+            ] as QueryDslQueryContainer[],
+          } as QueryDslBoolQuery,
+        },
+        _source: ["contexts.document_id", "contexts.content"],
+      },
+    })) as any;
+
+    const documentIdToContent: Record<string, string> = {};
+    for (const hit of documents.hits.hits) {
+      for (const context of hit._source.contexts) {
+        documentIdToContent[context.document_id] = context.content;
+      }
+    }
+
+    const topDocuments_ = topDocuments.map((d) => ({
+      ...d,
+      content: documentIdToContent[d.documentId],
+    }));
 
     return {
-      topDocuments,
+      topDocuments: topDocuments_,
       totalUniqueDocuments,
     };
   });

@@ -27,7 +27,14 @@ export function TopTopics() {
     }
   }, [router.query.topics]);
 
-  const paramsWithoutTopics = { ...filterParams, topics: undefined };
+  const paramsWithoutTopics = {
+    ...filterParams,
+    filters: {
+      ...filterParams.filters,
+      "topics.topics": [],
+      "topics.subtopics": [],
+    },
+  };
 
   const topicCountsQuery = api.traces.getTopicCounts.useQuery(
     paramsWithoutTopics,

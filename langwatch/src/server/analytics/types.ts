@@ -11,7 +11,7 @@ import type {
 } from "../tracer/types";
 import type { DeepRequired, Unpacked } from "../../utils/types";
 import type { RotatingColorSet } from "../../utils/rotatingColors";
-import type { FilterField } from "../filters/types";
+import { filterFieldsEnum, type FilterField } from "../filters/types";
 
 export type AnalyticsMetric = {
   label: string;
@@ -76,7 +76,9 @@ export const percentileAggregationTypes = ["median", "p99", "p95", "p90"] as (
   | "p90"
 )[] satisfies AggregationTypes[];
 
-export type PercentileAggregationTypes = Unpacked<typeof percentileAggregationTypes>;
+export type PercentileAggregationTypes = Unpacked<
+  typeof percentileAggregationTypes
+>;
 
 export type AggregationTypes = z.infer<typeof aggregationTypesEnum>;
 
@@ -104,22 +106,7 @@ export const sharedFiltersInputSchema = z.object({
   projectId: z.string(),
   startDate: z.number(),
   endDate: z.number(),
-  filters: z.object({
-    topics: z
-      .object({
-        topics: z.array(z.string()).optional(),
-        subtopics: z.array(z.string()).optional(),
-      })
-      .optional(),
-    metadata: z
-      .object({
-        user_id: z.array(z.string()).optional(),
-        thread_id: z.array(z.string()).optional(),
-        customer_id: z.array(z.string()).optional(),
-        labels: z.array(z.string()).optional(),
-      })
-      .optional(),
-  }),
+  filters: z.record(filterFieldsEnum, z.array(z.string())),
 });
 
 export type TracesPivotFilters = DeepRequired<

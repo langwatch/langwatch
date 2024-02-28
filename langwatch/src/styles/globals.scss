@@ -139,3 +139,17 @@ div input[type="number"] {
     display: block;
   }
 }
+
+.multicheck-option {
+  background: none!important;
+  color: #333!important;
+  border-bottom: 1px solid #f5f5f5!important;
+
+  &:last-child {
+    border-bottom: none!important;
+  }
+
+  &:hover {
+    background: #f5f5f5!important;
+  }
+}

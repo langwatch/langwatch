@@ -80,7 +80,7 @@ export const SatisfactionPieChart = () => {
               </HStack>
             </Tab>
           </TabList>
-          <TabIndicator height="4px" bg="orange.400" borderRadius="1px" />
+          <TabIndicator height="4px" bg="orange.400" borderRadius="1px" minWidth="50%" maxWidth="50%" />
           <TabPanels>
             <TabPanel padding={0}>
               <SatisfactionPieChartChart data={data} />

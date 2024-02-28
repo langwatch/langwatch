@@ -1,4 +1,12 @@
-import { FormControl, FormLabel, Heading, VStack } from "@chakra-ui/react";
+import {
+  Box,
+  FormControl,
+  FormLabel,
+  HStack,
+  Heading,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
 import {
   Select as MultiSelect,
   chakraComponents,
@@ -6,12 +14,30 @@ import {
 } from "chakra-react-select";
 import { useRouter } from "next/router";
 import { useMemo, useState } from "react";
-import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
-import type { FilterField } from "../server/filters/types";
-import { api } from "../utils/api";
+import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
+import type { FilterDefinition, FilterField } from "../../server/filters/types";
+import { api } from "../../utils/api";
+import { availableFilters } from "../../server/filters/registry";
+import React from "react";
+import { Check } from "react-feather";
 
 export function FieldsFilters() {
   const router = useRouter();
+
+  const filterKeys: FilterField[] = [
+    "spans.model",
+    "metadata.labels",
+    "trace_checks.check_id",
+    "events.event_type",
+    "metadata.user_id",
+    "metadata.thread_id",
+    "metadata.customer_id",
+  ];
+
+  const filters: [FilterField, FilterDefinition][] = filterKeys.map((key) => [
+    key,
+    availableFilters[key],
+  ]);
 
   const addFilterToUrl = (field: string, value: string) => {
     void router.push(
@@ -30,52 +56,26 @@ export function FieldsFilters() {
     <VStack align="start" width="full" spacing={6}>
       <Heading size="md">Filters</Heading>
       <VStack spacing={4} width="full">
-        <FormControl>
-          <FormLabel>User ID</FormLabel>
-          <FilterSelectField
-            current={(router.query.user_id as string)?.split(",") ?? []}
-            onChange={(user_ids) => {
-              addFilterToUrl("user_id", user_ids.join(","));
-            }}
-            filter="metadata.user_id"
-          />
-        </FormControl>
-        <FormControl>
-          <FormLabel>Thread ID</FormLabel>
-          <FilterSelectField
-            current={(router.query.thread_id as string)?.split(",") ?? []}
-            onChange={(thread_ids) => {
-              addFilterToUrl("thread_id", thread_ids.join(","));
-            }}
-            filter="metadata.thread_id"
-          />
-        </FormControl>
-        <FormControl>
-          <FormLabel>Customer ID</FormLabel>
-          <FilterSelectField
-            current={(router.query.customer_ids as string)?.split(",") ?? []}
-            onChange={(customer_ids) => {
-              addFilterToUrl("customer_ids", customer_ids.join(","));
-            }}
-            filter="metadata.customer_id"
-          />
-        </FormControl>
-        <FormControl>
-          <FormLabel>Label</FormLabel>
-          <FilterSelectField
-            current={(router.query.labels as string)?.split(",") ?? []}
-            onChange={(labels) => {
-              addFilterToUrl("labels", labels.join(","));
-            }}
-            filter="metadata.labels"
-          />
-        </FormControl>
+        {filters.map(([key, filter]) => (
+          <FormControl key={key}>
+            <FormLabel>{filter.name}</FormLabel>
+            <FilterSelectField
+              current={
+                (router.query[filter.urlKey] as string)?.split(",") ?? []
+              }
+              onChange={(value) => {
+                addFilterToUrl(filter.urlKey, value.join(","));
+              }}
+              filter={key}
+            />
+          </FormControl>
+        ))}
       </VStack>
     </VStack>
   );
 }
 
-function FilterSelectField({
+const FilterSelectField = React.memo(function FilterSelectField({
   onChange,
   key_,
   filter,
@@ -124,10 +124,15 @@ function FilterSelectField({
 
   return (
     <MultiSelect
+      key={filter}
+      hideSelectedOptions={false}
+      closeMenuOnSelect={false}
       onChange={(options: MultiValue<{ value: string; label: string }>) => {
         if (options) {
           onChange(options.map((o) => o.value));
         }
+
+        return true;
       }}
       isLoading={filterData.isLoading}
       onInputChange={(input) => {
@@ -139,6 +144,34 @@ function FilterSelectField({
       isMulti={true}
       useBasicStyles
       components={{
+        Option: ({ ...props }) => {
+          let label = props.data.label;
+          let details = "";
+          // if label is like "[details] label" then split it
+          const labelDetailsMatch = props.data.label.match(/^\[(.*)\] (.*)/);
+          if (labelDetailsMatch) {
+            label = labelDetailsMatch[2] ?? "";
+            details = labelDetailsMatch[1] ?? "";
+          }
+
+          return (
+            <chakraComponents.Option {...props} className="multicheck-option">
+              <HStack align="end">
+                <Box width="16px">
+                  {props.isSelected && <Check width="16px" />}
+                </Box>
+                <VStack align="start" spacing={"2px"}>
+                  {details && (
+                    <Text fontSize="sm" color="gray.500">
+                      {details}
+                    </Text>
+                  )}
+                  <Text>{label}</Text>
+                </VStack>
+              </HStack>
+            </chakraComponents.Option>
+          );
+        },
         SelectContainer: ({ children, ...props }) => (
           <chakraComponents.SelectContainer
             {...props}
@@ -153,4 +186,4 @@ function FilterSelectField({
       }}
     />
   );
-}
+});
