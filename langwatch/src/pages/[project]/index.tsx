@@ -49,7 +49,6 @@ import { LLMSummary } from "../../components/analytics/LLMSummary";
 import { SatisfactionGraphs } from "../../components/analytics/SatisfactionGraph";
 import { SessionsSummary } from "../../components/analytics/SessionsSummary";
 import { TopTopics } from "../../components/analytics/TopTopics";
-import { useAnalyticsParams } from "../../hooks/useAnalyticsParams";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { dependencies } from "../../injection/dependencies.client";
 import { dependencies as serverDependencies } from "../../injection/dependencies.server";
@@ -279,12 +278,9 @@ function UserMetrics() {
 }
 
 function LLMMetrics() {
-  const { analyticsParams, queryOpts } = useAnalyticsParams();
+  const { filterParams, queryOpts } = useFilterParams();
   const traceCheckStatusCounts =
-    api.analytics.getTraceCheckStatusCounts.useQuery(
-      analyticsParams,
-      queryOpts
-    );
+    api.analytics.getTraceCheckStatusCounts.useQuery(filterParams, queryOpts);
   const { hasTeamPermission } = useOrganizationTeamProject();
 
   const llmCallsGraph: CustomGraphInput = {

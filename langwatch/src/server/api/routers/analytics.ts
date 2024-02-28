@@ -1,16 +1,13 @@
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
-import { TRACE_CHECKS_INDEX, esClient } from "../../elasticsearch";
-import { TeamRoleGroup, checkUserPermissionForProject } from "../permission";
-import {
-  sharedAnalyticsFilterInput,
-  generateTraceChecksQueryConditions,
-} from "./analytics/common";
-import { sessionsVsPreviousPeriod } from "./analytics/sessions";
-import { topUsedDocuments } from "./analytics/documents";
+import { sharedFiltersInputSchema } from "../../analytics/types";
+import { TRACES_PIVOT_INDEX, esClient } from "../../elasticsearch";
 import type { TraceCheck } from "../../tracer/types";
-import { getTimeseries } from "./analytics/timeseries";
+import { TeamRoleGroup, checkUserPermissionForProject } from "../permission";
+import { generateTracesPivotQueryConditions } from "./analytics/common";
 import { dataForFilter } from "./analytics/dataForFilter";
-import type { QueryDslBoolQuery } from "@elastic/elasticsearch/lib/api/types";
+import { topUsedDocuments } from "./analytics/documents";
+import { sessionsVsPreviousPeriod } from "./analytics/sessions";
+import { getTimeseries } from "./analytics/timeseries";
 
 export const analyticsRouter = createTRPCRouter({
   getTimeseries,
@@ -18,31 +15,36 @@ export const analyticsRouter = createTRPCRouter({
   sessionsVsPreviousPeriod,
   topUsedDocuments,
   getTraceCheckStatusCounts: protectedProcedure
-    .input(sharedAnalyticsFilterInput)
+    .input(sharedFiltersInputSchema)
     .use(checkUserPermissionForProject(TeamRoleGroup.ANALYTICS_VIEW))
     .query(async ({ input }) => {
       const result = await esClient.search<TraceCheck>({
-        index: TRACE_CHECKS_INDEX,
+        index: TRACES_PIVOT_INDEX,
         body: {
           size: 0,
-          query: {
-            bool: {
-              filter: generateTraceChecksQueryConditions(input),
-            } as QueryDslBoolQuery,
-          },
+          query: generateTracesPivotQueryConditions(input).pivotIndexConditions,
           aggs: {
             status_counts: {
-              terms: {
-                field: "status",
+              nested: {
+                path: "trace_checks",
+              },
+              aggs: {
+                child: {
+                  terms: {
+                    field: "trace_checks.status",
+                  },
+                },
               },
             },
           },
         },
       });
 
+      console.log("result", JSON.stringify(result, undefined, 2));
+
       const buckets: any[] | undefined = (
         result.aggregations?.status_counts as any
-      )?.buckets;
+      )?.child.buckets;
 
       const statusCounts = buckets?.reduce((acc, bucket) => {
         acc[bucket.key] = bucket.doc_count;
