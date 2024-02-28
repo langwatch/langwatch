@@ -1,6 +1,5 @@
 import { AVAILABLE_TRACE_CHECKS } from "../../trace_checks/registry";
 import type { CheckTypes } from "../../trace_checks/types";
-import { camelCaseToTitleCase } from "../../utils/stringCasing";
 import type { FilterDefinition, FilterField } from "./types";
 
 export const availableFilters: { [K in FilterField]: FilterDefinition } = {

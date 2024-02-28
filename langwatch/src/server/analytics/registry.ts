@@ -14,8 +14,6 @@ import {
   type PercentileAggregationTypes,
   type PipelineAggregationTypes,
   type PipelineFields,
-  type TracesPivotFilterQuery,
-  type TracesPivotFilters,
 } from "./types";
 
 const simpleFieldAnalytics = (
@@ -511,41 +509,6 @@ export const flattenAnalyticsMetricsEnum = Object.keys(
     (subkey) => [key, subkey].join(".")
   )
 ) as [FlattenAnalyticsMetricsEnum, ...FlattenAnalyticsMetricsEnum[]];
-
-export const tracesPivotFilterQueries: {
-  [T in keyof TracesPivotFilters]: {
-    [K in keyof TracesPivotFilters[T]]: TracesPivotFilterQuery;
-  };
-} = {
-  topics: {
-    topics: {
-      name: "Topics",
-      field: "trace.metadata.topic_id",
-    },
-    subtopics: {
-      name: "Subtopics",
-      field: "trace.metadata.subtopics",
-    },
-  },
-  metadata: {
-    user_id: {
-      name: "Users",
-      field: "trace.metadata.user_id",
-    },
-    thread_id: {
-      name: "Threads",
-      field: "trace.metadata.thread_id",
-    },
-    customer_id: {
-      name: "Customer ID",
-      field: "trace.metadata.customer_id",
-    },
-    labels: {
-      name: "Labels",
-      field: "trace.metadata.labels",
-    },
-  },
-};
 
 export const analyticsPipelines: {
   [K in PipelineFields]: { label: string; field: string };
