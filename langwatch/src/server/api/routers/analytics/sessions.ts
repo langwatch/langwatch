@@ -1,53 +1,52 @@
-import type { QueryDslBoolQuery } from "@elastic/elasticsearch/lib/api/types";
-import { TRACE_INDEX, esClient } from "../../../elasticsearch";
+import { TRACES_PIVOT_INDEX, esClient } from "../../../elasticsearch";
 import { TeamRoleGroup, checkUserPermissionForProject } from "../../permission";
 import { protectedProcedure } from "../../trpc";
 import {
   currentVsPreviousDates,
-  generateTraceQueryConditions,
-  sharedAnalyticsFilterInput,
+  generateTracesPivotQueryConditions,
 } from "./common";
+import { sharedFiltersInputSchema } from "../../../analytics/types";
 
 export const sessionsVsPreviousPeriod = protectedProcedure
-  .input(sharedAnalyticsFilterInput)
+  .input(sharedFiltersInputSchema)
   .use(checkUserPermissionForProject(TeamRoleGroup.ANALYTICS_VIEW))
   .query(async ({ input }) => {
     const { previousPeriodStartDate } = currentVsPreviousDates(input);
 
     const sessionsQuery = (startDate: number, endDate: number) =>
       esClient.search({
-        index: TRACE_INDEX,
+        index: TRACES_PIVOT_INDEX,
         body: {
           aggs: {
             user_sessions: {
               terms: {
-                field: "metadata.user_id",
+                field: "trace.metadata.user_id",
                 size: 10000, // Adjust based on expected number of unique users
               },
               aggs: {
                 session_windows: {
                   date_histogram: {
-                    field: "timestamps.started_at",
+                    field: "trace.timestamps.started_at",
                     calendar_interval: "hour", // Group by hour
                   },
                   aggs: {
                     distinct_threads: {
                       cardinality: {
-                        field: "metadata.thread_id",
+                        field: "trace.metadata.thread_id",
                       },
                     },
                     session_duration: {
                       scripted_metric: {
                         init_script: "state.duration = 0",
                         map_script: `
-                          if (doc.containsKey('timestamps.started_at') && doc['timestamps.started_at'].size() > 0) {
-                            long startedAt = doc['timestamps.started_at'].value.toInstant().toEpochMilli();
+                          if (doc.containsKey('trace.timestamps.started_at') && doc['trace.timestamps.started_at'].size() > 0) {
+                            long startedAt = doc['trace.timestamps.started_at'].value.toInstant().toEpochMilli();
                             if (state.min_started_at == null || startedAt < state.min_started_at) {
                               state.min_started_at = startedAt;
                             }
                             if (state.max_started_at == null || startedAt > state.max_started_at) {
                               state.max_started_at = startedAt;
-                              state.total_time_ms = doc.containsKey('metrics.total_time_ms') && doc['metrics.total_time_ms'].size() > 0 ? doc['metrics.total_time_ms'].value : 0;
+                              state.total_time_ms = doc.containsKey('trace.metrics.total_time_ms') && doc['trace.metrics.total_time_ms'].size() > 0 ? doc['trace.metrics.total_time_ms'].value : 0;
                             }
                           }
                         `,
@@ -103,7 +102,7 @@ export const sessionsVsPreviousPeriod = protectedProcedure
             },
             total_users: {
               cardinality: {
-                field: "metadata.user_id",
+                field: "trace.metadata.user_id",
               },
             },
             total_sessions: {
@@ -132,15 +131,11 @@ export const sessionsVsPreviousPeriod = protectedProcedure
               },
             },
           },
-          query: {
-            bool: {
-              filter: generateTraceQueryConditions({
-                ...input,
-                startDate,
-                endDate,
-              }),
-            } as QueryDslBoolQuery,
-          },
+          query: generateTracesPivotQueryConditions({
+            ...input,
+            startDate,
+            endDate,
+          }).pivotIndexConditions,
           size: 0,
         },
         filter_path: [

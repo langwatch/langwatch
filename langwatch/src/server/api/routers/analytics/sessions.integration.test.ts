@@ -133,7 +133,9 @@ describe("Sessions Endpoint Integration Tests", () => {
       projectId: "test-project-id",
       startDate: new Date().getTime() - 24 * 60 * 60 * 1000, // 1 day ago
       endDate: new Date().getTime(),
-      labels: ["test-messages"],
+      filters: {
+        "metadata.labels": ["test-messages"],
+      },
     });
 
     expect(response).toEqual({

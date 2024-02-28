@@ -7,15 +7,15 @@ import {
   Tooltip,
 } from "@chakra-ui/react";
 import { HelpCircle } from "react-feather";
-import { useAnalyticsParams } from "../../hooks/useAnalyticsParams";
 import { api } from "../../utils/api";
 import { SummaryMetric } from "./SummaryMetric";
+import { useFilterParams } from "../../hooks/useFilterParams";
 
 export const SessionsSummary = () => {
-  const { analyticsParams, queryOpts } = useAnalyticsParams();
+  const { filterParams, queryOpts } = useFilterParams();
 
   const { data } = api.analytics.sessionsVsPreviousPeriod.useQuery(
-    analyticsParams,
+    filterParams,
     queryOpts
   );
 
