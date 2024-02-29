@@ -24,6 +24,7 @@ import {
   Text,
   Th,
   Thead,
+  Tooltip,
   Tr,
   VStack,
   useDisclosure
@@ -108,9 +109,11 @@ export function MessagesDevMode() {
     ),
     Input: (trace, index) => (
       <Td key={index} maxWidth="300px">
-        <Text noOfLines={1} wordBreak="break-all" display="block">
-          {trace.input.value}
-        </Text>
+        <Tooltip label={trace.input.value}>
+          <Text noOfLines={1} wordBreak="break-all" display="block">
+            {trace.input.value}
+          </Text>
+        </Tooltip>
       </Td>
     ),
     Output: (trace, index) =>
@@ -122,9 +125,11 @@ export function MessagesDevMode() {
         </Td>
       ) : (
         <Td key={index}>
-          <Text noOfLines={1} display="block" maxWidth="300px">
-            {trace.output?.value}
-          </Text>
+          <Tooltip label={trace.output?.value}>
+            <Text noOfLines={1} display="block" maxWidth="300px">
+              {trace.output?.value}
+            </Text>
+          </Tooltip>
         </Td>
       ),
     "First Token": (trace, index) => (
