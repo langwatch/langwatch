@@ -121,8 +121,6 @@ export function MessagesDevMode() {
     )
   );
 
-  console.log(traceCheckColumnsAvailable);
-
   const headerColumns: Record<
     string,
     {
