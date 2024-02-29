@@ -220,7 +220,7 @@ export function MessagesDevMode() {
           columnKey,
           {
             name: checkName,
-            sortable: false,
+            sortable: true,
             render: (trace, index) => {
               const checkId = columnKey.split(".")[1];
               const traceCheck = traceChecksQuery.data?.[trace.trace_id]?.find(

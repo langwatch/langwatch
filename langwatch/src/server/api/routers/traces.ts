@@ -102,13 +102,30 @@ export const tracesRouter = createTRPCRouter({
             from: input.query ? 0 : pageOffset,
             size: input.query ? 10_000 : pageSize,
             ...(input.sortBy
-              ? {
-                  sort: {
-                    [input.sortBy]: {
-                      order: input.orderBy ?? "desc",
-                    },
-                  } as Sort,
-                }
+              ? input.sortBy.startsWith("trace_checks.")
+                ? {
+                    sort: {
+                      "trace_checks.value": {
+                        order: input.orderBy ?? "desc",
+                        nested: {
+                          path: "trace_checks",
+                          filter: {
+                            term: {
+                              "trace_checks.check_id":
+                                input.sortBy.split(".")[1],
+                            },
+                          },
+                        },
+                      },
+                    } as Sort,
+                  }
+                : {
+                    sort: {
+                      [input.sortBy]: {
+                        order: input.orderBy ?? "desc",
+                      },
+                    } as Sort,
+                  }
               : {
                   sort: {
                     "timestamps.started_at": {
