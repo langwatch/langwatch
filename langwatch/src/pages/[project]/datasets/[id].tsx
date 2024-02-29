@@ -18,6 +18,7 @@ import {
     Box,
     useDisclosure
 } from "@chakra-ui/react";
+import { DownloadIcon } from "@chakra-ui/icons";
 import { useRouter } from "next/router";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -25,8 +26,6 @@ import { api } from "~/utils/api";
 import { AddDatasetDrawer } from "~/components/AddDatasetDrawer";
 import { displayName } from "~/utils/datasets";
 import { DatabaseSchema } from "@prisma/client";
-
-
 
 
 export default function Dataset() {
@@ -46,10 +45,54 @@ export default function Dataset() {
         onClose();
     }
 
+    const getHeaders = (schema: DatabaseSchema) => {
+
+
+        let headers: string[] = [];
+
+        if (schema === DatabaseSchema.STRING_I_O || schema === DatabaseSchema.LLM_CHAT_CALL) {
+            headers = ['Input', 'Output', 'Created at', 'Updated at']
+        } else if (schema === DatabaseSchema.FULL_TRACE) {
+            headers = ['Input', 'Output', 'Spans', 'Created at', 'Updated at']
+        }
+
+        return (
+            <Tr>
+                {headers.map((header, index) => (
+                    <Th key={index}>{header}</Th>
+                ))}
+            </Tr>
+        )
+    }
+
+    const getTableRows = (datasetRecord: any, schema: DatabaseSchema) => {
+
+        let tableRows: any[] = [];
+
+        if (schema === DatabaseSchema.STRING_I_O || schema === DatabaseSchema.LLM_CHAT_CALL) {
+            tableRows = [getInput(datasetRecord, schema), getOutput(datasetRecord, schema)]
+        }
+        if (schema === DatabaseSchema.FULL_TRACE) {
+            tableRows = [getInput(datasetRecord, schema), getOutput(datasetRecord, schema), getTrace(datasetRecord, schema)]
+        }
+
+        return (
+            <>
+                {tableRows.map((data, index) => (
+                    <Td key={index}> <Text noOfLines={1} display="block" maxWidth="300px">{data}</Text></Td>
+                ))}
+            </>
+
+        )
+
+
+
+    }
+
     const getInput = (datasetRecord: any, schema: DatabaseSchema) => {
 
         if (schema === DatabaseSchema.LLM_CHAT_CALL) {
-            return datasetRecord.entry.input[0]?.content ?? "";
+            return JSON.stringify(datasetRecord.entry.input[0]) ?? "";
         }
         if (schema === DatabaseSchema.STRING_I_O || schema === DatabaseSchema.FULL_TRACE) {
             return datasetRecord.entry.input;
@@ -57,14 +100,51 @@ export default function Dataset() {
 
     }
 
+    const getTrace = (dataset: any, schema: DatabaseSchema) => {
+
+        if (schema === DatabaseSchema.FULL_TRACE) {
+            return JSON.stringify(dataset.entry.spans) ?? "";
+        }
+    }
+
     const getOutput = (dataset: any, schema: DatabaseSchema) => {
         if (schema === DatabaseSchema.LLM_CHAT_CALL) {
-            return dataset.entry.output[0]?.content ?? "";
+            return JSON.stringify(dataset.entry.output[0]) ?? "";
 
         }
         if (schema === DatabaseSchema.STRING_I_O || schema === DatabaseSchema.FULL_TRACE) {
             return dataset.entry.output;
         }
+    }
+
+    const downloadCSV = () => {
+
+        const csvData = [];
+        csvData.push(["Input", "Output", "Created at", "Updated at"]);
+
+        dataset.data?.datasetRecords.forEach((record) => {
+            csvData.push([
+                getInput(record, dataset.data!.schema),
+                getOutput(record, dataset.data!.schema),
+                new Date(record.createdAt).toLocaleString(),
+                new Date(record.updatedAt).toLocaleString()
+            ]);
+        });
+
+        let csvContent = '';
+        csvData.forEach(row => {
+            csvContent += row.join(';') + '\n'
+        })
+
+        const url = window.URL.createObjectURL(new Blob([csvContent]))
+
+        const link = document.createElement('a')
+        link.href = url
+        const fileName = `downloaded Report.csv`;
+        link.setAttribute('download', fileName)
+        document.body.appendChild(link)
+        link.click()
+        link.remove()
     }
 
     return (
@@ -87,6 +167,14 @@ export default function Dataset() {
                     </Text>
                     <Spacer />
                     <Button
+                        colorScheme="black"
+                        minWidth="fit-content"
+                        variant='ghost'
+                        onClick={() => downloadCSV()}
+                    >
+                        Export <DownloadIcon marginLeft={2} />
+                    </Button>
+                    <Button
                         colorScheme="blue"
                         onClick={() => {
                             onOpen();
@@ -101,12 +189,7 @@ export default function Dataset() {
                         {dataset.data && dataset.data.datasetRecords.length == 0 ? <Text>No data found</Text> : <TableContainer>
                             <Table variant="simple">
                                 <Thead>
-                                    <Tr>
-                                        <Th>Input</Th>
-                                        <Th>Expected Output</Th>
-                                        <Th>Created at</Th>
-                                        <Th>Updated at</Th>
-                                    </Tr>
+                                    {dataset.data?.schema && getHeaders(dataset.data.schema)}
                                 </Thead>
                                 <Tbody>
                                     {dataset.isLoading ? (
@@ -122,16 +205,8 @@ export default function Dataset() {
                                     ) : dataset.data ?
                                         dataset.data.datasetRecords?.map((datasetRecord) => (
                                             <Tr key={datasetRecord.id}>
-                                                <Td>
-                                                    <Text noOfLines={1} maxWidth="300px" display="block">
-                                                        {getInput(datasetRecord, dataset.data!.schema)}
-                                                    </Text>
-                                                </Td>
-                                                <Td>
-                                                    <Text noOfLines={1} display="block" maxWidth="300px">
-                                                        {getOutput(datasetRecord, dataset.data!.schema)}
-                                                    </Text>
-                                                </Td>
+                                                {getTableRows(datasetRecord, dataset.data!.schema)}
+
                                                 <Td>{new Date(datasetRecord.createdAt).toLocaleString()}</Td>
                                                 <Td>{new Date(datasetRecord.updatedAt).toLocaleString()}</Td>
                                             </Tr>
