@@ -50,6 +50,7 @@ import { FilterToggle } from "./filters/FilterToggle";
 import { PeriodSelector, usePeriodSelector } from "./PeriodSelector";
 
 import { TraceDeatilsDrawer } from "~/components/TraceDeatilsDrawer";
+import { FilterSidebar } from "./filters/FilterSidebar";
 
 export function MessagesDevMode() {
   const router = useRouter();
@@ -438,63 +439,66 @@ export function MessagesDevMode() {
           </Popover>
           <FilterToggle />
         </HStack>
-        <Card>
-          <CardBody>
-            <TableContainer>
-              <Table variant="simple">
-                <Thead>
-                  <Tr>
-                    {checkedHeaderColumnsEntries
-                      .filter(([_, checked]) => checked)
-                      .map(([columnKey, _], index) => (
-                        <Th key={index}>
-                          <HStack spacing={1}>
-                            <Text width={headerColumns[columnKey]?.width}>
-                              {headerColumns[columnKey]?.name}
-                            </Text>
-                            {headerColumns[columnKey]?.sortable &&
-                              sortButton(columnKey)}
-                          </HStack>
-                        </Th>
-                      ))}
-                  </Tr>
-                </Thead>
-                <Tbody>
-                  {traceGroups.data?.groups.flatMap((traceGroup) =>
-                    traceGroup.map((trace) => (
-                      <Tr
-                        key={trace.trace_id}
-                        role="button"
-                        cursor="pointer"
-                        onClick={() => {
-                          setTraceId(trace.trace_id);
-                          setIsDrawerOpen(true);
-                        }}
-                      >
-                        {checkedHeaderColumnsEntries.map(
-                          ([column, _], index) =>
-                            headerColumns[column]?.render(trace, index)
-                        )}
-                      </Tr>
-                    ))
-                  )}
-                  {traceGroups.isLoading &&
-                    Array.from({ length: 3 }).map((_, i) => (
-                      <Tr key={i}>
-                        {Array.from({
-                          length: checkedHeaderColumnsEntries.length,
-                        }).map((_, i) => (
-                          <Td key={i}>
-                            <Skeleton height="20px" />
-                          </Td>
+        <HStack align={"top"} gap={8}>
+          <Card>
+            <CardBody>
+              <TableContainer>
+                <Table variant="simple">
+                  <Thead>
+                    <Tr>
+                      {checkedHeaderColumnsEntries
+                        .filter(([_, checked]) => checked)
+                        .map(([columnKey, _], index) => (
+                          <Th key={index}>
+                            <HStack spacing={1}>
+                              <Text width={headerColumns[columnKey]?.width}>
+                                {headerColumns[columnKey]?.name}
+                              </Text>
+                              {headerColumns[columnKey]?.sortable &&
+                                sortButton(columnKey)}
+                            </HStack>
+                          </Th>
                         ))}
-                      </Tr>
-                    ))}
-                </Tbody>
-              </Table>
-            </TableContainer>
-          </CardBody>
-        </Card>
+                    </Tr>
+                  </Thead>
+                  <Tbody>
+                    {traceGroups.data?.groups.flatMap((traceGroup) =>
+                      traceGroup.map((trace) => (
+                        <Tr
+                          key={trace.trace_id}
+                          role="button"
+                          cursor="pointer"
+                          onClick={() => {
+                            setTraceId(trace.trace_id);
+                            setIsDrawerOpen(true);
+                          }}
+                        >
+                          {checkedHeaderColumnsEntries.map(
+                            ([column, _], index) =>
+                              headerColumns[column]?.render(trace, index)
+                          )}
+                        </Tr>
+                      ))
+                    )}
+                    {traceGroups.isLoading &&
+                      Array.from({ length: 3 }).map((_, i) => (
+                        <Tr key={i}>
+                          {Array.from({
+                            length: checkedHeaderColumnsEntries.length,
+                          }).map((_, i) => (
+                            <Td key={i}>
+                              <Skeleton height="20px" />
+                            </Td>
+                          ))}
+                        </Tr>
+                      ))}
+                  </Tbody>
+                </Table>
+              </TableContainer>
+            </CardBody>
+          </Card>
+          <FilterSidebar />
+        </HStack>
 
         <HStack padding={6}>
           <Text>Items per page </Text>
