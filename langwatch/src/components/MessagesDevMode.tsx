@@ -29,7 +29,11 @@ import {
   VStack,
   useDisclosure,
 } from "@chakra-ui/react";
-import { ArrowUpDownIcon } from "@chakra-ui/icons";
+import {
+  ArrowUpDownIcon,
+  ChevronDownIcon,
+  ChevronUpIcon,
+} from "@chakra-ui/icons";
 import { useRouter } from "next/router";
 import numeral from "numeral";
 import { useEffect, useRef, useState } from "react";
@@ -75,6 +79,14 @@ export function MessagesDevMode() {
     queryOpts
   );
 
+  const [previousTraceGroups, setPreviousTraceGroups] =
+    useState<(typeof traceGroups)["data"]>(undefined);
+  useEffect(() => {
+    if (traceGroups.data) {
+      setPreviousTraceGroups(traceGroups.data);
+    }
+  }, [traceGroups.data]);
+
   const traceIds =
     traceGroups.data?.groups.flatMap((group) =>
       group.map((trace) => trace.trace_id)
@@ -89,12 +101,22 @@ export function MessagesDevMode() {
     }
   );
 
+  const [previousTraceChecks, setPreviousTraceChecks] = useState<
+    (typeof traceChecksQuery)["data"]
+  >(traceChecksQuery.data);
+  useEffect(() => {
+    if (traceChecksQuery.data) {
+      setPreviousTraceChecks(traceChecksQuery.data);
+    }
+  }, [traceChecksQuery.data]);
+
   const traceCheckColumnsAvailable = Object.fromEntries(
-    Object.values(traceChecksQuery.data ?? {}).flatMap((checks) =>
-      checks.map((check) => [
-        `trace_checks.${check.check_id}`,
-        check.check_name,
-      ])
+    Object.values(traceChecksQuery.data ?? previousTraceChecks ?? {}).flatMap(
+      (checks) =>
+        checks.map((check) => [
+          `trace_checks.${check.check_id}`,
+          check.check_name,
+        ])
     )
   );
 
@@ -105,6 +127,7 @@ export function MessagesDevMode() {
     {
       name: string;
       sortable: boolean;
+      width?: number;
       render: (trace: Trace, index: number) => React.ReactNode;
     }
   > = {
@@ -120,6 +143,7 @@ export function MessagesDevMode() {
     "trace.input.value": {
       name: "Input",
       sortable: false,
+      width: 300,
       render: (trace, index) => (
         <Td key={index} maxWidth="300px">
           <Tooltip label={trace.input.value}>
@@ -133,6 +157,7 @@ export function MessagesDevMode() {
     "trace.output.value": {
       name: "Output",
       sortable: false,
+      width: 300,
       render: (trace, index) =>
         trace.error ? (
           <Td key={index}>
@@ -305,6 +330,36 @@ export function MessagesDevMode() {
     });
   };
 
+  const sortButton = (columnKey: string) => {
+    if (getSingleQueryParam(router.query.sortBy) === columnKey) {
+      return getSingleQueryParam(router.query.orderBy) === "asc" ? (
+        <ChevronUpIcon
+          width={5}
+          height={5}
+          color={"blue.500"}
+          cursor={"pointer"}
+          onClick={() => sortBy(columnKey)}
+        />
+      ) : (
+        <ChevronDownIcon
+          width={5}
+          height={5}
+          color={"blue.500"}
+          cursor={"pointer"}
+          onClick={() => sortBy(columnKey)}
+        />
+      );
+    }
+    return (
+      <ArrowUpDownIcon
+        cursor={"pointer"}
+        marginLeft={1}
+        color={"gray.400"}
+        onClick={() => sortBy(columnKey)}
+      />
+    );
+  };
+
   useEffect(() => {
     if (
       traceChecksQuery.isFetched &&
@@ -381,7 +436,6 @@ export function MessagesDevMode() {
               </PopoverBody>
             </PopoverContent>
           </Popover>
-
           <FilterToggle />
         </HStack>
         <Card>
@@ -395,12 +449,11 @@ export function MessagesDevMode() {
                       .map(([columnKey, _], index) => (
                         <Th key={index}>
                           <HStack spacing={1}>
-                            <Text>{headerColumns[columnKey]?.name}</Text>
-                            {headerColumns[columnKey]?.sortable && (
-                              <ArrowUpDownIcon
-                                onClick={() => sortBy(columnKey)}
-                              />
-                            )}
+                            <Text width={headerColumns[columnKey]?.width}>
+                              {headerColumns[columnKey]?.name}
+                            </Text>
+                            {headerColumns[columnKey]?.sortable &&
+                              sortButton(columnKey)}
                           </HStack>
                         </Th>
                       ))}
