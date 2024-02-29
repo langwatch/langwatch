@@ -104,15 +104,17 @@ export const TraceDeatilsDrawer = (props: TraceDetailsDrawerProps) => {
                             Trace Details
                         </Text>
                         <Spacer />
-                        <Button
-                            colorScheme="black"
-                            type="submit"
-                            variant='outline'
-                            minWidth="fit-content"
-                            onClick={onOpen}
-                        >
-                            Add to Dataset
-                        </Button>
+                        {process.env.NEXT_PUBLIC_FEATURE_DATASETS &&
+                            <Button
+                                colorScheme="black"
+                                type="submit"
+                                variant='outline'
+                                minWidth="fit-content"
+                                onClick={onOpen}
+                            >
+                                Add to Dataset
+                            </Button>
+                        }
                     </Flex>
                 </DrawerHeader>
                 <DrawerBody>
