@@ -27,17 +27,13 @@ import {
   Tooltip,
   Tr,
   VStack,
-  useDisclosure
+  useDisclosure,
 } from "@chakra-ui/react";
+import { ArrowUpDownIcon } from "@chakra-ui/icons";
 import { useRouter } from "next/router";
 import numeral from "numeral";
 import { useEffect, useRef, useState } from "react";
-import {
-  ChevronDown,
-  ChevronLeft,
-  ChevronRight,
-  List
-} from "react-feather";
+import { ChevronDown, ChevronLeft, ChevronRight, List } from "react-feather";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { Trace } from "~/server/tracer/types";
 import { getTraceCheckDefinitions } from "~/trace_checks/registry";
@@ -61,7 +57,6 @@ export function MessagesDevMode() {
   const [pageSize, setPageSize] = useState<number>(25);
   const { filterParams, queryOpts } = useFilterParams();
 
-
   const {
     period: { startDate, endDate },
     setPeriod,
@@ -74,6 +69,8 @@ export function MessagesDevMode() {
       groupBy: "none",
       pageOffset: pageOffset,
       pageSize: pageSize,
+      sortBy: getSingleQueryParam(router.query.sortBy),
+      orderBy: getSingleQueryParam(router.query.orderBy),
     },
     queryOpts
   );
@@ -92,113 +89,170 @@ export function MessagesDevMode() {
     }
   );
 
-  const checksAvailable = Object.fromEntries(
+  const traceCheckColumnsAvailable = Object.fromEntries(
     Object.values(traceChecksQuery.data ?? {}).flatMap((checks) =>
-      checks.map((check) => [check.check_id, check.check_name])
+      checks.map((check) => [
+        `trace_checks.${check.check_id}`,
+        check.check_name,
+      ])
     )
   );
 
+  console.log(traceCheckColumnsAvailable);
+
   const headerColumns: Record<
     string,
-    (trace: Trace, index: number) => React.ReactNode
+    {
+      name: string;
+      sortable: boolean;
+      render: (trace: Trace, index: number) => React.ReactNode;
+    }
   > = {
-    Timestamp: (trace, index) => (
-      <Td key={index}>
-        {new Date(trace.timestamps.started_at).toLocaleString()}
-      </Td>
-    ),
-    Input: (trace, index) => (
-      <Td key={index} maxWidth="300px">
-        <Tooltip label={trace.input.value}>
-          <Text noOfLines={1} wordBreak="break-all" display="block">
-            {trace.input.value}
-          </Text>
-        </Tooltip>
-      </Td>
-    ),
-    Output: (trace, index) =>
-      trace.error ? (
+    "trace.timestamps.started_at": {
+      name: "Timestamp",
+      sortable: true,
+      render: (trace, index) => (
         <Td key={index}>
-          <Text noOfLines={1} maxWidth="300px" display="block" color="red.400">
-            {trace.error.message}
-          </Text>
+          {new Date(trace.timestamps.started_at).toLocaleString()}
         </Td>
-      ) : (
-        <Td key={index}>
-          <Tooltip label={trace.output?.value}>
-            <Text noOfLines={1} display="block" maxWidth="300px">
-              {trace.output?.value}
+      ),
+    },
+    "trace.input.value": {
+      name: "Input",
+      sortable: false,
+      render: (trace, index) => (
+        <Td key={index} maxWidth="300px">
+          <Tooltip label={trace.input.value}>
+            <Text noOfLines={1} wordBreak="break-all" display="block">
+              {trace.input.value}
             </Text>
           </Tooltip>
         </Td>
       ),
-    "First Token": (trace, index) => (
-      <Td key={index} isNumeric>
-        <Text
-          color={durationColor("first_token", trace.metrics.first_token_ms)}
-        >
-          {trace.metrics.first_token_ms
-            ? numeral(trace.metrics.first_token_ms / 1000).format("0.[0]") + "s"
-            : "-"}
-        </Text>
-      </Td>
-    ),
-    "Completion Time": (trace, index) => (
-      <Td key={index} isNumeric>
-        <Text color={durationColor("total_time", trace.metrics.total_time_ms)}>
-          {trace.metrics.total_time_ms
-            ? numeral(trace.metrics.total_time_ms / 1000).format("0.[0]") + "s"
-            : "-"}
-        </Text>
-      </Td>
-    ),
-    "Completion Token": (trace, index) => (
-      <Td key={index} isNumeric>
-        {trace.metrics.completion_tokens}
-      </Td>
-    ),
-    "Prompt Tokens": (trace, index) => (
-      <Td key={index} isNumeric>
-        {trace.metrics.prompt_tokens}
-      </Td>
-    ),
-    "Total Cost": (trace, index) => (
-      <Td key={index} isNumeric>
-        <Text>{numeral(trace.metrics.total_cost).format("$0.00[000]")}</Text>
-      </Td>
-    ),
+    },
+    "trace.output.value": {
+      name: "Output",
+      sortable: false,
+      render: (trace, index) =>
+        trace.error ? (
+          <Td key={index}>
+            <Text
+              noOfLines={1}
+              maxWidth="300px"
+              display="block"
+              color="red.400"
+            >
+              {trace.error.message}
+            </Text>
+          </Td>
+        ) : (
+          <Td key={index}>
+            <Tooltip label={trace.output?.value}>
+              <Text noOfLines={1} display="block" maxWidth="300px">
+                {trace.output?.value}
+              </Text>
+            </Tooltip>
+          </Td>
+        ),
+    },
+    "trace.metrics.first_token_ms": {
+      name: "First Token",
+      sortable: true,
+      render: (trace, index) => (
+        <Td key={index} isNumeric>
+          <Text
+            color={durationColor("first_token", trace.metrics.first_token_ms)}
+          >
+            {trace.metrics.first_token_ms
+              ? numeral(trace.metrics.first_token_ms / 1000).format("0.[0]") +
+                "s"
+              : "-"}
+          </Text>
+        </Td>
+      ),
+    },
+    "trace.metrics.total_time_ms": {
+      name: "Completion Time",
+      sortable: true,
+      render: (trace, index) => (
+        <Td key={index} isNumeric>
+          <Text
+            color={durationColor("total_time", trace.metrics.total_time_ms)}
+          >
+            {trace.metrics.total_time_ms
+              ? numeral(trace.metrics.total_time_ms / 1000).format("0.[0]") +
+                "s"
+              : "-"}
+          </Text>
+        </Td>
+      ),
+    },
+    "trace.metrics.completion_tokens": {
+      name: "Completion Token",
+      sortable: true,
+      render: (trace, index) => (
+        <Td key={index} isNumeric>
+          {trace.metrics.completion_tokens}
+        </Td>
+      ),
+    },
+    "trace.metrics.prompt_tokens": {
+      name: "Prompt Tokens",
+      sortable: true,
+      render: (trace, index) => (
+        <Td key={index} isNumeric>
+          {trace.metrics.prompt_tokens}
+        </Td>
+      ),
+    },
+    "trace.metrics.total_cost": {
+      name: "Total Cost",
+      sortable: true,
+      render: (trace, index) => (
+        <Td key={index} isNumeric>
+          <Text>{numeral(trace.metrics.total_cost).format("$0.00[000]")}</Text>
+        </Td>
+      ),
+    },
     ...Object.fromEntries(
-      Object.entries(checksAvailable).map(([checkId, checkName]) => [
-        checkName,
-        (trace, index) => {
-          const traceCheck = traceChecksQuery.data?.[trace.trace_id]?.find(
-            (traceCheck_) => traceCheck_.check_id === checkId
-          );
-          const checkDefinition = getTraceCheckDefinitions(
-            traceCheck?.check_type ?? ""
-          );
+      Object.entries(traceCheckColumnsAvailable).map(
+        ([columnKey, checkName]) => [
+          columnKey,
+          {
+            name: checkName,
+            sortable: false,
+            render: (trace, index) => {
+              const checkId = columnKey.split(".")[1];
+              const traceCheck = traceChecksQuery.data?.[trace.trace_id]?.find(
+                (traceCheck_) => traceCheck_.check_id === checkId
+              );
+              const checkDefinition = getTraceCheckDefinitions(
+                traceCheck?.check_type ?? ""
+              );
 
-          return (
-            <Td key={index}>
-              {traceCheck?.status === "failed" ? (
-                <Text color="red.400">
-                  {checkDefinition?.valueDisplayType == "boolean"
-                    ? "Fail"
-                    : numeral(traceCheck?.value).format("0.[00]") ?? 0}
-                </Text>
-              ) : traceCheck?.status === "succeeded" ? (
-                <Text color="green.400">
-                  {checkDefinition?.valueDisplayType == "boolean"
-                    ? "Pass"
-                    : numeral(traceCheck?.value).format("0.[00]") ?? 0}
-                </Text>
-              ) : (
-                <Text>{traceCheck?.status ?? "-"}</Text>
-              )}
-            </Td>
-          );
-        },
-      ])
+              return (
+                <Td key={index}>
+                  {traceCheck?.status === "failed" ? (
+                    <Text color="red.400">
+                      {checkDefinition?.valueDisplayType == "boolean"
+                        ? "Fail"
+                        : numeral(traceCheck?.value).format("0.[00]") ?? 0}
+                    </Text>
+                  ) : traceCheck?.status === "succeeded" ? (
+                    <Text color="green.400">
+                      {checkDefinition?.valueDisplayType == "boolean"
+                        ? "Pass"
+                        : numeral(traceCheck?.value).format("0.[00]") ?? 0}
+                    </Text>
+                  ) : (
+                    <Text>{traceCheck?.status ?? "-"}</Text>
+                  )}
+                </Td>
+              );
+            },
+          },
+        ]
+      )
     ),
   };
 
@@ -234,8 +288,22 @@ export function MessagesDevMode() {
     }
   }, [traceGroups.data?.totalHits, traceGroups.isFetched]);
 
-
   const isFirstRender = useRef(true);
+
+  const sortBy = (columnKey: string) => {
+    const sortBy = columnKey;
+    const orderBy =
+      getSingleQueryParam(router.query.orderBy) === "asc" ? "desc" : "asc";
+
+    void router.push({
+      pathname: router.pathname,
+      query: {
+        ...router.query,
+        sortBy,
+        orderBy,
+      },
+    });
+  };
 
   useEffect(() => {
     if (
@@ -248,7 +316,7 @@ export function MessagesDevMode() {
       setSelectedHeaderColumns((prevSelectedHeaderColumns) => ({
         ...prevSelectedHeaderColumns,
         ...Object.fromEntries(
-          Object.values(checksAvailable)
+          Object.keys(traceCheckColumnsAvailable)
             .filter(
               (key) => !Object.keys(prevSelectedHeaderColumns).includes(key)
             )
@@ -256,7 +324,7 @@ export function MessagesDevMode() {
         ),
       }));
     }
-  }, [traceChecksQuery, checksAvailable]);
+  }, [traceChecksQuery, traceCheckColumnsAvailable]);
 
   const { isOpen, onOpen, onClose } = useDisclosure();
   const checkedHeaderColumnsEntries = Object.entries(
@@ -295,18 +363,18 @@ export function MessagesDevMode() {
               </PopoverHeader>
               <PopoverBody padding={4}>
                 <VStack align="start" spacing={2}>
-                  {Object.keys(headerColumns).map((column, index) => (
+                  {Object.entries(headerColumns).map(([columnKey, column]) => (
                     <Checkbox
-                      key={index}
-                      isChecked={selectedHeaderColumns[column]}
+                      key={columnKey}
+                      isChecked={selectedHeaderColumns[columnKey]}
                       onChange={() => {
                         setSelectedHeaderColumns({
                           ...selectedHeaderColumns,
-                          [column]: !selectedHeaderColumns[column],
+                          [columnKey]: !selectedHeaderColumns[columnKey],
                         });
                       }}
                     >
-                      {column}
+                      {column.name}
                     </Checkbox>
                   ))}
                 </VStack>
@@ -322,9 +390,20 @@ export function MessagesDevMode() {
               <Table variant="simple">
                 <Thead>
                   <Tr>
-                    {checkedHeaderColumnsEntries.map(([column, _], index) => (
-                      <Th key={index}>{column}</Th>
-                    ))}
+                    {checkedHeaderColumnsEntries
+                      .filter(([_, checked]) => checked)
+                      .map(([columnKey, _], index) => (
+                        <Th key={index}>
+                          <HStack spacing={1}>
+                            <Text>{headerColumns[columnKey]?.name}</Text>
+                            {headerColumns[columnKey]?.sortable && (
+                              <ArrowUpDownIcon
+                                onClick={() => sortBy(columnKey)}
+                              />
+                            )}
+                          </HStack>
+                        </Th>
+                      ))}
                   </Tr>
                 </Thead>
                 <Tbody>
@@ -341,7 +420,7 @@ export function MessagesDevMode() {
                       >
                         {checkedHeaderColumnsEntries.map(
                           ([column, _], index) =>
-                            headerColumns[column]?.(trace, index)
+                            headerColumns[column]?.render(trace, index)
                         )}
                       </Tr>
                     ))
@@ -386,10 +465,11 @@ export function MessagesDevMode() {
           <Text marginLeft={"20px"}>
             {" "}
             {`${pageOffset + 1}`} -{" "}
-            {`${pageOffset + pageSize > totalHits
-              ? totalHits
-              : pageOffset + pageSize
-              }`}{" "}
+            {`${
+              pageOffset + pageSize > totalHits
+                ? totalHits
+                : pageOffset + pageSize
+            }`}{" "}
             of {`${totalHits}`} items
           </Text>
           <Button

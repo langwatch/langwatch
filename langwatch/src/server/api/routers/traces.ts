@@ -25,6 +25,7 @@ import { generateTracesPivotQueryConditions } from "./analytics/common";
 import type {
   QueryDslBoolQuery,
   SearchTotalHits,
+  Sort,
 } from "@elastic/elasticsearch/lib/api/types";
 
 const tracesFilterInput = sharedFiltersInputSchema.extend({
@@ -63,7 +64,9 @@ export const tracesRouter = createTRPCRouter({
     .input(
       tracesFilterInput.extend({
         query: z.string().optional(),
+        sortBy: z.string().optional(),
         groupBy: z.string().optional(),
+        orderBy: z.string().optional(),
       })
     )
     .use(checkUserPermissionForProject(TeamRoleGroup.MESSAGES_VIEW))
@@ -84,13 +87,35 @@ export const tracesRouter = createTRPCRouter({
 
       let traceIds: string[] = [];
 
-      if (isAnyFilterPresent) {
+      const pageSize = input.pageSize ? input.pageSize : 100;
+      const pageOffset = input.pageOffset ? input.pageOffset : 0;
+
+      let totalHits = 0;
+      let usePivotIndex = false;
+      if (isAnyFilterPresent || input.sortBy) {
+        usePivotIndex = true;
         const pivotIndexResults = await esClient.search<TracesPivot>({
           index: TRACES_PIVOT_INDEX,
           body: {
-            size: 10_000,
             query: pivotIndexConditions,
             _source: ["trace.trace_id"],
+            from: input.query ? 0 : pageOffset,
+            size: input.query ? 10_000 : pageSize,
+            ...(input.sortBy
+              ? {
+                  sort: {
+                    [input.sortBy]: {
+                      order: input.orderBy ?? "desc",
+                    },
+                  } as Sort,
+                }
+              : {
+                  sort: {
+                    "timestamps.started_at": {
+                      order: "desc",
+                    },
+                  } as Sort,
+                }),
           },
         });
 
@@ -98,6 +123,9 @@ export const tracesRouter = createTRPCRouter({
           .map((hit) => hit._source?.trace?.trace_id)
           .filter((x) => x)
           .map((x) => x!);
+
+        totalHits =
+          (pivotIndexResults.hits?.total as SearchTotalHits)?.value || 0;
 
         if (!traceIds.length) {
           return { groups: [], totalHits: 0 };
@@ -117,7 +145,7 @@ export const tracesRouter = createTRPCRouter({
             },
           },
         },
-        ...(traceIds.length > 0 ? [{ terms: { trace_id: traceIds } }] : []),
+        ...(usePivotIndex ? [{ terms: { trace_id: traceIds } }] : []),
       ];
 
       const canSeeCosts = await backendHasTeamProjectPermission(
@@ -126,14 +154,11 @@ export const tracesRouter = createTRPCRouter({
         TeamRoleGroup.COST_VIEW
       );
 
-      const pageSize = input.pageSize ? input.pageSize : 100;
-      const pageOffset = input.pageOffset ? input.pageOffset : 0;
-
       //@ts-ignore
       const tracesResult = await esClient.search<Trace>({
         index: TRACE_INDEX,
-        from: pageOffset,
-        size: pageSize,
+        from: !usePivotIndex || input.query ? pageOffset : 0,
+        size: !usePivotIndex || input.query ? pageSize : traceIds.length,
         _source: {
           excludes: [
             // TODO: do we really need to exclude both keys and nested keys for embeddings?
@@ -206,9 +231,16 @@ export const tracesRouter = createTRPCRouter({
         },
       });
 
-      const traces = tracesResult.hits.hits
-        .map((hit) => hit._source!)
-        .filter((x) => x);
+      const tracesById = Object.fromEntries(
+        tracesResult.hits.hits
+          .map((hit) => hit._source!)
+          .filter((x) => x)
+          .map((trace) => [trace.trace_id, trace])
+      );
+
+      const traces = usePivotIndex
+        ? traceIds.map((id) => tracesById[id]!).filter((x) => x)
+        : Object.values(tracesById);
 
       const groups = groupTraces(input.groupBy, traces);
 
@@ -220,8 +252,9 @@ export const tracesRouter = createTRPCRouter({
         }
       }
 
-      const totalHits =
-        (tracesResult.hits?.total as SearchTotalHits)?.value || 0;
+      if (!usePivotIndex) {
+        totalHits = (tracesResult.hits?.total as SearchTotalHits)?.value || 0;
+      }
       return { groups, totalHits };
     }),
   getById: protectedProcedure
