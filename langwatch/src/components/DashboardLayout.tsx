@@ -379,14 +379,19 @@ export const DashboardLayout = ({
             <Breadcrumbs currentRoute={currentRoute} />
           </Hide>
           <Spacer />
-          {currentRoute !== projectRoutes.messages && (
+          {(currentRoute !== projectRoutes.messages ||
+            router.query.mode === "dev") && (
             <form
-              action={`${project.slug}/messages`}
+              action={`${project.slug}/messages?mode=dev`}
               method="GET"
               style={{ width: "100%", maxWidth: "600px" }}
               onSubmit={(e) => {
                 e.preventDefault();
-                void router.push(`${project.slug}/messages?query=${query}`);
+                if (router.query.mode === "dev") {
+                  void router.replace({ query: { ...router.query, query } });
+                } else {
+                  void router.push(`${project.slug}/messages?query=${query}`);
+                }
               }}
             >
               <InputGroup borderColor="gray.300">
