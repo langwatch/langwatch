@@ -36,7 +36,7 @@ import {
 } from "@chakra-ui/icons";
 import { useRouter } from "next/router";
 import numeral from "numeral";
-import { useEffect, useRef, useState } from "react";
+import { use, useEffect, useRef, useState } from "react";
 import { ChevronDown, ChevronLeft, ChevronRight, List } from "react-feather";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { Trace } from "~/server/tracer/types";
@@ -51,6 +51,8 @@ import { PeriodSelector, usePeriodSelector } from "./PeriodSelector";
 
 import { TraceDeatilsDrawer } from "~/components/TraceDeatilsDrawer";
 import { FilterSidebar } from "./filters/FilterSidebar";
+import { useLocalStorage } from "usehooks-ts";
+import { useReadLocalStorage } from "usehooks-ts";
 
 export function MessagesDevMode() {
   const router = useRouter();
@@ -280,17 +282,38 @@ export function MessagesDevMode() {
     ),
   };
 
+  const initialTrueColumns = [
+    "trace.timestamps.started_at",
+    "trace.input.value",
+    "trace.metrics.completion_tokens",
+    "trace.metrics.first_token_ms",
+    "trace.metrics.prompt_tokens",
+    "trace.metrics.total_cost",
+    "trace.metrics.total_time_ms",
+    "trace.output.value",
+  ];
+
+  const [localStorageHeaderColumns, setLocalStorageHeaderColumns] =
+    useLocalStorage<Record<keyof typeof headerColumns, boolean> | undefined>(
+      `${project?.id ?? ""}_columns`,
+      undefined
+    );
+
   const [selectedHeaderColumns, setSelectedHeaderColumns] = useState<
     Record<keyof typeof headerColumns, boolean>
   >(
-    Object.fromEntries(
-      Object.keys(headerColumns).map((column) => [column, true])
-    )
+    localStorageHeaderColumns
+      ? localStorageHeaderColumns
+      : Object.fromEntries(
+          Object.keys(headerColumns).map((column) => [
+            column,
+            initialTrueColumns.includes(column),
+          ])
+        )
   );
 
   const nextPage = () => {
     setPageOffset(pageOffset + pageSize);
-    //setPageSize(pageSize);
   };
 
   const prevPage = () => {
@@ -367,18 +390,20 @@ export function MessagesDevMode() {
     ) {
       isFirstRender.current = false;
 
-      setSelectedHeaderColumns((prevSelectedHeaderColumns) => ({
-        ...prevSelectedHeaderColumns,
-        ...Object.fromEntries(
-          Object.keys(traceCheckColumnsAvailable)
-            .filter(
-              (key) => !Object.keys(prevSelectedHeaderColumns).includes(key)
-            )
-            .map((column) => [column, true])
-        ),
-      }));
+      if (!localStorageHeaderColumns) {
+        setSelectedHeaderColumns((prevSelectedHeaderColumns) => ({
+          ...prevSelectedHeaderColumns,
+          ...Object.fromEntries(
+            Object.keys(traceCheckColumnsAvailable)
+              .filter(
+                (key) => !Object.keys(prevSelectedHeaderColumns).includes(key)
+              )
+              .map((column) => [column, true])
+          ),
+        }));
+      }
     }
-  }, [traceChecksQuery, traceCheckColumnsAvailable]);
+  }, [traceChecksQuery, traceCheckColumnsAvailable, localStorageHeaderColumns]);
 
   const { isOpen, onOpen, onClose } = useDisclosure();
   const checkedHeaderColumnsEntries = Object.entries(
@@ -426,6 +451,11 @@ export function MessagesDevMode() {
                           ...selectedHeaderColumns,
                           [columnKey]: !selectedHeaderColumns[columnKey],
                         });
+
+                        setLocalStorageHeaderColumns({
+                          ...selectedHeaderColumns,
+                          [columnKey]: !selectedHeaderColumns[columnKey],
+                        });
                       }}
                     >
                       {column.name}
@@ -440,6 +470,9 @@ export function MessagesDevMode() {
         <HStack align={"top"} gap={8}>
           <Card>
             <CardBody>
+              {checkedHeaderColumnsEntries.length === 0 && (
+                <Text>No columns selected</Text>
+              )}
               <TableContainer>
                 <Table variant="simple">
                   <Thead>
