@@ -128,7 +128,7 @@ export const tracesRouter = createTRPCRouter({
                   }
               : {
                   sort: {
-                    "timestamps.started_at": {
+                    "trace.timestamps.started_at": {
                       order: "desc",
                     },
                   } as Sort,
