@@ -28,8 +28,6 @@ import { AddDatasetDrawer } from "~/components/AddDatasetDrawer";
 import { displayName } from "~/utils/datasets";
 import { DatabaseSchema } from "@prisma/client";
 import Parse from "papaparse";
-import { cs, da } from "date-fns/locale";
-import { c } from "vitest/dist/reporters-5f784f42";
 
 export default function Dataset() {
   const router = useRouter();
