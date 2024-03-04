@@ -170,8 +170,6 @@ export default function Dataset() {
       }
     });
 
-    console.log(csvData);
-
     const csv = Parse.unparse({
       data: csvData,
     });
@@ -210,7 +208,9 @@ export default function Dataset() {
             colorScheme="black"
             minWidth="fit-content"
             variant="ghost"
-            onClick={() => downloadCSV(dataset.data?.schema ?? null)}
+            onClick={() =>
+              dataset.data?.schema && downloadCSV(dataset.data.schema)
+            }
           >
             Export <DownloadIcon marginLeft={2} />
           </Button>
@@ -249,7 +249,6 @@ export default function Dataset() {
                       ? dataset.data.datasetRecords?.map((datasetRecord) => (
                           <Tr key={datasetRecord.id}>
                             {getTableRows(datasetRecord, dataset.data!.schema)}
-
                             <Td>
                               {new Date(
                                 datasetRecord.createdAt
