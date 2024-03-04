@@ -63,6 +63,7 @@ export function MessagesDevMode() {
   const [pageOffset, setPageOffset] = useState<number>(0);
   const [pageSize, setPageSize] = useState<number>(25);
   const { filterParams, queryOpts } = useFilterParams();
+  const [traceChecks, setTraceChecks] = useState<Record<string, any>>({});
 
   const {
     period: { startDate, endDate },
@@ -113,6 +114,11 @@ export function MessagesDevMode() {
     }
   }, [traceChecksQuery.data]);
 
+  const openTraceDrawer = (trace: Trace) => {
+    setTraceId(trace.trace_id);
+    setIsDrawerOpen(true);
+  };
+
   const traceCheckColumnsAvailable = Object.fromEntries(
     Object.values(traceChecksQuery.data ?? previousTraceChecks ?? {}).flatMap(
       (checks) =>
@@ -123,6 +129,13 @@ export function MessagesDevMode() {
     )
   );
 
+  const traceSelection = (trace: Trace) => {
+    setTraceChecks((prevTraceChecks) => ({
+      ...prevTraceChecks,
+      [trace.trace_id]: trace,
+    }));
+  };
+
   const headerColumns: Record<
     string,
     {
@@ -132,11 +145,20 @@ export function MessagesDevMode() {
       render: (trace: Trace, index: number) => React.ReactNode;
     }
   > = {
+    checked: {
+      name: "",
+      sortable: false,
+      render: (trace, index) => (
+        <Td key={index}>
+          <Checkbox colorScheme="blue" onClick={() => traceSelection(trace)} />
+        </Td>
+      ),
+    },
     "trace.timestamps.started_at": {
       name: "Timestamp",
       sortable: true,
       render: (trace, index) => (
-        <Td key={index}>
+        <Td key={index} onClick={() => openTraceDrawer(trace)}>
           {new Date(trace.timestamps.started_at).toLocaleString()}
         </Td>
       ),
@@ -146,7 +168,7 @@ export function MessagesDevMode() {
       sortable: false,
       width: 300,
       render: (trace, index) => (
-        <Td key={index} maxWidth="300px">
+        <Td key={index} maxWidth="300px" onClick={() => openTraceDrawer(trace)}>
           <Tooltip label={trace.input.value}>
             <Text noOfLines={1} wordBreak="break-all" display="block">
               {trace.input.value}
@@ -161,7 +183,7 @@ export function MessagesDevMode() {
       width: 300,
       render: (trace, index) =>
         trace.error ? (
-          <Td key={index}>
+          <Td key={index} onClick={() => openTraceDrawer(trace)}>
             <Text
               noOfLines={1}
               maxWidth="300px"
@@ -172,7 +194,7 @@ export function MessagesDevMode() {
             </Text>
           </Td>
         ) : (
-          <Td key={index}>
+          <Td key={index} onClick={() => openTraceDrawer(trace)}>
             <Tooltip label={trace.output?.value}>
               <Text noOfLines={1} display="block" maxWidth="300px">
                 {trace.output?.value}
@@ -185,7 +207,7 @@ export function MessagesDevMode() {
       name: "First Token",
       sortable: true,
       render: (trace, index) => (
-        <Td key={index} isNumeric>
+        <Td key={index} isNumeric onClick={() => openTraceDrawer(trace)}>
           <Text
             color={durationColor("first_token", trace.metrics.first_token_ms)}
           >
@@ -201,7 +223,7 @@ export function MessagesDevMode() {
       name: "Completion Time",
       sortable: true,
       render: (trace, index) => (
-        <Td key={index} isNumeric>
+        <Td key={index} isNumeric onClick={() => openTraceDrawer(trace)}>
           <Text
             color={durationColor("total_time", trace.metrics.total_time_ms)}
           >
@@ -217,7 +239,7 @@ export function MessagesDevMode() {
       name: "Completion Token",
       sortable: true,
       render: (trace, index) => (
-        <Td key={index} isNumeric>
+        <Td key={index} isNumeric onClick={() => openTraceDrawer(trace)}>
           {trace.metrics.completion_tokens}
         </Td>
       ),
@@ -226,7 +248,7 @@ export function MessagesDevMode() {
       name: "Prompt Tokens",
       sortable: true,
       render: (trace, index) => (
-        <Td key={index} isNumeric>
+        <Td key={index} isNumeric onClick={() => openTraceDrawer(trace)}>
           {trace.metrics.prompt_tokens}
         </Td>
       ),
@@ -235,7 +257,7 @@ export function MessagesDevMode() {
       name: "Total Cost",
       sortable: true,
       render: (trace, index) => (
-        <Td key={index} isNumeric>
+        <Td key={index} isNumeric onClick={() => openTraceDrawer(trace)}>
           <Text>{numeral(trace.metrics.total_cost).format("$0.00[000]")}</Text>
         </Td>
       ),
@@ -257,7 +279,7 @@ export function MessagesDevMode() {
               );
 
               return (
-                <Td key={index}>
+                <Td key={index} onClick={() => openTraceDrawer(trace)}>
                   {traceCheck?.status === "failed" ? (
                     <Text color="red.400">
                       {checkDefinition?.valueDisplayType == "boolean"
@@ -282,16 +304,17 @@ export function MessagesDevMode() {
     ),
   };
 
-  const initialTrueColumns = [
-    "trace.timestamps.started_at",
-    "trace.input.value",
-    "trace.metrics.completion_tokens",
-    "trace.metrics.first_token_ms",
-    "trace.metrics.prompt_tokens",
-    "trace.metrics.total_cost",
-    "trace.metrics.total_time_ms",
-    "trace.output.value",
-  ];
+  // const initialTrueColumns = [
+  //   "checked",
+  //   "trace.timestamps.started_at",
+  //   "trace.input.value",
+  //   "trace.metrics.completion_tokens",
+  //   "trace.metrics.first_token_ms",
+  //   "trace.metrics.prompt_tokens",
+  //   "trace.metrics.total_cost",
+  //   "trace.metrics.total_time_ms",
+  //   "trace.output.value",
+  // ];
 
   const [localStorageHeaderColumns, setLocalStorageHeaderColumns] =
     useLocalStorage<Record<keyof typeof headerColumns, boolean> | undefined>(
@@ -305,10 +328,7 @@ export function MessagesDevMode() {
     localStorageHeaderColumns
       ? localStorageHeaderColumns
       : Object.fromEntries(
-          Object.keys(headerColumns).map((column) => [
-            column,
-            initialTrueColumns.includes(column),
-          ])
+          Object.keys(headerColumns).map((column) => [column, true])
         )
   );
 
@@ -410,6 +430,8 @@ export function MessagesDevMode() {
     selectedHeaderColumns
   ).filter(([_, checked]) => checked);
 
+  console.log("selectedHeaderColumns", selectedHeaderColumns);
+
   return (
     <DashboardLayout>
       <Container maxW={"calc(100vw - 200px)"} padding={6}>
@@ -442,25 +464,30 @@ export function MessagesDevMode() {
               </PopoverHeader>
               <PopoverBody padding={4}>
                 <VStack align="start" spacing={2}>
-                  {Object.entries(headerColumns).map(([columnKey, column]) => (
-                    <Checkbox
-                      key={columnKey}
-                      isChecked={selectedHeaderColumns[columnKey]}
-                      onChange={() => {
-                        setSelectedHeaderColumns({
-                          ...selectedHeaderColumns,
-                          [columnKey]: !selectedHeaderColumns[columnKey],
-                        });
+                  {Object.entries(headerColumns).map(([columnKey, column]) => {
+                    if (columnKey === "checked") {
+                      return null;
+                    }
+                    return (
+                      <Checkbox
+                        key={columnKey}
+                        isChecked={selectedHeaderColumns[columnKey]}
+                        onChange={() => {
+                          setSelectedHeaderColumns({
+                            ...selectedHeaderColumns,
+                            [columnKey]: !selectedHeaderColumns[columnKey],
+                          });
 
-                        setLocalStorageHeaderColumns({
-                          ...selectedHeaderColumns,
-                          [columnKey]: !selectedHeaderColumns[columnKey],
-                        });
-                      }}
-                    >
-                      {column.name}
-                    </Checkbox>
-                  ))}
+                          setLocalStorageHeaderColumns({
+                            ...selectedHeaderColumns,
+                            [columnKey]: !selectedHeaderColumns[columnKey],
+                          });
+                        }}
+                      >
+                        {column.name}
+                      </Checkbox>
+                    );
+                  })}
                 </VStack>
               </PopoverBody>
             </PopoverContent>
@@ -495,15 +522,7 @@ export function MessagesDevMode() {
                   <Tbody>
                     {traceGroups.data?.groups.flatMap((traceGroup) =>
                       traceGroup.map((trace) => (
-                        <Tr
-                          key={trace.trace_id}
-                          role="button"
-                          cursor="pointer"
-                          onClick={() => {
-                            setTraceId(trace.trace_id);
-                            setIsDrawerOpen(true);
-                          }}
-                        >
+                        <Tr key={trace.trace_id} role="button" cursor="pointer">
                           {checkedHeaderColumnsEntries.map(
                             ([column, _], index) =>
                               headerColumns[column]?.render(trace, index)
