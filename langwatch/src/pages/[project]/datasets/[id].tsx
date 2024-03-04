@@ -1,3 +1,4 @@
+import { DownloadIcon } from "@chakra-ui/icons";
 import {
   Button,
   Card,
@@ -14,20 +15,18 @@ import {
   Text,
   Th,
   Thead,
-  Tr,
-  Box,
-  useDisclosure,
   Tooltip,
+  Tr,
+  useDisclosure,
 } from "@chakra-ui/react";
-import { DownloadIcon } from "@chakra-ui/icons";
+import { DatabaseSchema } from "@prisma/client";
 import { useRouter } from "next/router";
+import Parse from "papaparse";
+import { AddDatasetDrawer } from "~/components/AddDatasetDrawer";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
-import { AddDatasetDrawer } from "~/components/AddDatasetDrawer";
 import { displayName } from "~/utils/datasets";
-import { DatabaseSchema } from "@prisma/client";
-import Parse from "papaparse";
 
 export default function Dataset() {
   const router = useRouter();
@@ -115,13 +114,6 @@ export default function Dataset() {
     }
   };
 
-  const getTrace = (dataset: any, schema: DatabaseSchema) => {
-    console.log(dataset);
-    if (schema === DatabaseSchema.FULL_TRACE) {
-      return JSON.stringify(dataset.entry.spans) ?? "";
-    }
-  };
-
   const getOutput = (dataset: any, schema: DatabaseSchema) => {
     if (schema === DatabaseSchema.LLM_CHAT_CALL) {
       return JSON.stringify(dataset.entry.output[0]) ?? "";
@@ -134,30 +126,36 @@ export default function Dataset() {
     }
   };
 
+  const getTrace = (dataset: any, schema: DatabaseSchema) => {
+    if (schema === DatabaseSchema.FULL_TRACE) {
+      return JSON.stringify(dataset.entry.spans) ?? "";
+    }
+    return "";
+  };
+
   const downloadCSV = (schema: DatabaseSchema) => {
-    const csvData = [];
+    let fields: string[] = [];
 
     if (
       schema === DatabaseSchema.STRING_I_O ||
       schema === DatabaseSchema.LLM_CHAT_CALL
     ) {
-      csvData.push(["Input", "Output", "Created at", "Updated at"]);
+      fields = ["Input", "Output", "Created at", "Updated at"];
     } else if (schema === DatabaseSchema.FULL_TRACE) {
-      csvData.push(["Input", "Output", "Spans", "Created at", "Updated at"]);
+      fields = ["Input", "Output", "Spans", "Created at", "Updated at"];
     }
+
+    type CsvDataRow =
+      | [string, string, string, string]
+      | [string, string, string, string, string];
+
+    const csvData: CsvDataRow[] = [];
 
     dataset.data?.datasetRecords.forEach((record) => {
       if (
         schema === DatabaseSchema.STRING_I_O ||
         schema === DatabaseSchema.LLM_CHAT_CALL
       ) {
-        csvData.push([
-          getInput(record, dataset.data!.schema),
-          getOutput(record, dataset.data!.schema),
-          new Date(record.createdAt).toLocaleString(),
-          new Date(record.updatedAt).toLocaleString(),
-        ]);
-      } else if (schema === DatabaseSchema.FULL_TRACE) {
         csvData.push([
           getInput(record, dataset.data!.schema),
           getOutput(record, dataset.data!.schema),
@@ -169,6 +167,7 @@ export default function Dataset() {
     });
 
     const csv = Parse.unparse({
+      fields: fields,
       data: csvData,
     });
 
