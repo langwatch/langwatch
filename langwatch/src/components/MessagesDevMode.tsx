@@ -27,12 +27,14 @@ import {
   Tooltip,
   Tr,
   VStack,
+  filter,
   useDisclosure,
 } from "@chakra-ui/react";
 import {
   ArrowUpDownIcon,
   ChevronDownIcon,
   ChevronUpIcon,
+  DownloadIcon,
 } from "@chakra-ui/icons";
 import { useRouter } from "next/router";
 import numeral from "numeral";
@@ -52,7 +54,8 @@ import { PeriodSelector, usePeriodSelector } from "./PeriodSelector";
 import { TraceDeatilsDrawer } from "~/components/TraceDeatilsDrawer";
 import { FilterSidebar } from "./filters/FilterSidebar";
 import { useLocalStorage } from "usehooks-ts";
-import { useReadLocalStorage } from "usehooks-ts";
+import { AddDatasetRecordDrawer } from "./AddDatasetRecordDrawer";
+import Parse from "papaparse";
 
 export function MessagesDevMode() {
   const router = useRouter();
@@ -63,7 +66,9 @@ export function MessagesDevMode() {
   const [pageOffset, setPageOffset] = useState<number>(0);
   const [pageSize, setPageSize] = useState<number>(25);
   const { filterParams, queryOpts } = useFilterParams();
-  const [traceChecks, setTraceChecks] = useState<Record<string, any>>({});
+  const [traceDataset, setTraceDataset] = useState<Record<string, any>>([]);
+
+  const addDatasetModal = useDisclosure();
 
   const {
     period: { startDate, endDate },
@@ -129,11 +134,17 @@ export function MessagesDevMode() {
     )
   );
 
-  const traceSelection = (trace: Trace) => {
-    setTraceChecks((prevTraceChecks) => ({
-      ...prevTraceChecks,
-      [trace.trace_id]: trace,
-    }));
+  const traceSelection = (trace_id: string) => {
+    setTraceDataset((prevTraceChecks: string[]) => {
+      const index = prevTraceChecks.indexOf(trace_id);
+      if (index === -1) {
+        return [...prevTraceChecks, trace_id];
+      } else {
+        const updatedTraces = [...prevTraceChecks];
+        updatedTraces.splice(index, 1);
+        return updatedTraces;
+      }
+    });
   };
 
   const headerColumns: Record<
@@ -143,6 +154,7 @@ export function MessagesDevMode() {
       sortable: boolean;
       width?: number;
       render: (trace: Trace, index: number) => React.ReactNode;
+      value?: (trace: Trace) => string | number | Date;
     }
   > = {
     checked: {
@@ -150,18 +162,24 @@ export function MessagesDevMode() {
       sortable: false,
       render: (trace, index) => (
         <Td key={index}>
-          <Checkbox colorScheme="blue" onClick={() => traceSelection(trace)} />
+          <Checkbox
+            colorScheme="blue"
+            onChange={() => traceSelection(trace.trace_id)}
+          />
         </Td>
       ),
+      value: () => "",
     },
     "trace.timestamps.started_at": {
       name: "Timestamp",
       sortable: true,
-      render: (trace, index) => (
+      render: (trace: Trace, index: number) => (
         <Td key={index} onClick={() => openTraceDrawer(trace)}>
           {new Date(trace.timestamps.started_at).toLocaleString()}
         </Td>
       ),
+      value: (trace: Trace) =>
+        new Date(trace.timestamps.started_at).toLocaleString(),
     },
     "trace.input.value": {
       name: "Input",
@@ -176,6 +194,7 @@ export function MessagesDevMode() {
           </Tooltip>
         </Td>
       ),
+      value: (trace: Trace) => trace.input.value,
     },
     "trace.output.value": {
       name: "Output",
@@ -202,6 +221,7 @@ export function MessagesDevMode() {
             </Tooltip>
           </Td>
         ),
+      value: (trace: Trace) => trace.output?.value ?? "",
     },
     "trace.metrics.first_token_ms": {
       name: "First Token",
@@ -218,6 +238,11 @@ export function MessagesDevMode() {
           </Text>
         </Td>
       ),
+      value: (trace: Trace) => {
+        return trace.metrics.first_token_ms
+          ? numeral(trace.metrics.first_token_ms / 1000).format("0.[0]") + "s"
+          : "-";
+      },
     },
     "trace.metrics.total_time_ms": {
       name: "Completion Time",
@@ -234,6 +259,11 @@ export function MessagesDevMode() {
           </Text>
         </Td>
       ),
+      value: (trace: Trace) => {
+        return trace.metrics.total_time_ms
+          ? numeral(trace.metrics.total_time_ms / 1000).format("0.[0]") + "s"
+          : "-";
+      },
     },
     "trace.metrics.completion_tokens": {
       name: "Completion Token",
@@ -243,6 +273,7 @@ export function MessagesDevMode() {
           {trace.metrics.completion_tokens}
         </Td>
       ),
+      value: (trace: Trace) => trace.metrics.completion_tokens ?? 0,
     },
     "trace.metrics.prompt_tokens": {
       name: "Prompt Tokens",
@@ -252,6 +283,7 @@ export function MessagesDevMode() {
           {trace.metrics.prompt_tokens}
         </Td>
       ),
+      value: (trace: Trace) => trace.metrics.prompt_tokens ?? 0,
     },
     "trace.metrics.total_cost": {
       name: "Total Cost",
@@ -261,6 +293,8 @@ export function MessagesDevMode() {
           <Text>{numeral(trace.metrics.total_cost).format("$0.00[000]")}</Text>
         </Td>
       ),
+      value: (trace: Trace) =>
+        numeral(trace.metrics.total_cost).format("$0.00[000]"),
     },
     ...Object.fromEntries(
       Object.entries(traceCheckColumnsAvailable).map(
@@ -298,23 +332,34 @@ export function MessagesDevMode() {
                 </Td>
               );
             },
+            value: (trace: Trace) => {
+              const checkId = columnKey.split(".")[1];
+              const traceCheck = traceChecksQuery.data?.[trace.trace_id]?.find(
+                (traceCheck_) => traceCheck_.check_id === checkId
+              );
+              return traceCheck?.status === "failed"
+                ? "Fail"
+                : traceCheck?.status === "succeeded"
+                ? "Pass"
+                : traceCheck?.status ?? "-";
+            },
           },
         ]
       )
     ),
   };
 
-  // const initialTrueColumns = [
-  //   "checked",
-  //   "trace.timestamps.started_at",
-  //   "trace.input.value",
-  //   "trace.metrics.completion_tokens",
-  //   "trace.metrics.first_token_ms",
-  //   "trace.metrics.prompt_tokens",
-  //   "trace.metrics.total_cost",
-  //   "trace.metrics.total_time_ms",
-  //   "trace.output.value",
-  // ];
+  const initialTrueColumns = [
+    "checked",
+    "trace.timestamps.started_at",
+    "trace.input.value",
+    "trace.metrics.completion_tokens",
+    "trace.metrics.first_token_ms",
+    "trace.metrics.prompt_tokens",
+    "trace.metrics.total_cost",
+    "trace.metrics.total_time_ms",
+    "trace.output.value",
+  ];
 
   const [localStorageHeaderColumns, setLocalStorageHeaderColumns] =
     useLocalStorage<Record<keyof typeof headerColumns, boolean> | undefined>(
@@ -430,7 +475,54 @@ export function MessagesDevMode() {
     selectedHeaderColumns
   ).filter(([_, checked]) => checked);
 
-  console.log("selectedHeaderColumns", selectedHeaderColumns);
+  const downloadCSV = (selection = false) => {
+    let csv;
+
+    if (selection) {
+      csv = traceGroups.data?.groups
+        .flatMap((traceGroup) =>
+          traceGroup
+            .filter((trace) => traceDataset.includes(trace.trace_id))
+            .map((trace) =>
+              checkedHeaderColumnsEntries.map(
+                ([column, _]) => headerColumns[column]?.value?.(trace) ?? ""
+              )
+            )
+        )
+        .filter((row) => row.some((cell) => cell !== ""));
+    } else {
+      csv = traceGroups.data?.groups.flatMap((traceGroup) =>
+        traceGroup.map((trace) =>
+          checkedHeaderColumnsEntries.map(
+            ([column, _]) => headerColumns[column]?.value?.(trace) ?? ""
+          )
+        )
+      );
+    }
+
+    const fields = checkedHeaderColumnsEntries
+      .map(([columnKey, _]) => {
+        return headerColumns[columnKey]?.name;
+      })
+      .filter((field) => field !== undefined);
+
+    const csvBlob = Parse.unparse({
+      fields: fields as string[],
+      data: csv ?? [],
+    });
+
+    const url = window.URL.createObjectURL(new Blob([csvBlob]));
+
+    const link = document.createElement("a");
+    link.href = url;
+    const today = new Date();
+    const formattedDate = today.toISOString().split("T")[0];
+    const fileName = `Messages - ${formattedDate}.csv`;
+    link.setAttribute("download", fileName);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  };
 
   return (
     <DashboardLayout>
@@ -440,6 +532,14 @@ export function MessagesDevMode() {
             Messages
           </Heading>
           <Spacer />
+          <Button
+            colorScheme="black"
+            minWidth="fit-content"
+            variant="ghost"
+            onClick={() => downloadCSV()}
+          >
+            Export all <DownloadIcon marginLeft={2} />
+          </Button>
           <PeriodSelector
             period={{ startDate, endDate }}
             setPeriod={setPeriod}
@@ -604,6 +704,32 @@ export function MessagesDevMode() {
           traceChecksQuery={traceChecksQuery}
           setIsDrawerOpen={setIsDrawerOpen}
         />
+      )}
+      {traceDataset.length > 0 && (
+        <Box
+          position="fixed"
+          bottom={6}
+          left="50%"
+          transform="translateX(-50%)"
+          backgroundColor="#ffffff"
+          padding="8px"
+          paddingX="16px"
+          border="1px solid #ccc"
+          boxShadow="base"
+          borderRadius={"md"}
+        >
+          <HStack gap={3}>
+            <Text>{traceDataset.length} Traces selected</Text>
+            <Button
+              colorScheme="black"
+              minWidth="fit-content"
+              variant="outline"
+              onClick={() => downloadCSV(true)}
+            >
+              Export <DownloadIcon marginLeft={2} />
+            </Button>
+          </HStack>
+        </Box>
       )}
     </DashboardLayout>
   );
