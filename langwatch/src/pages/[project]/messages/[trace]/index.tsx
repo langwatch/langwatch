@@ -10,7 +10,7 @@ import {
   Spinner,
   Text,
   Tooltip,
-  VStack
+  VStack,
 } from "@chakra-ui/react";
 import { format, formatDistanceToNow } from "date-fns";
 import ErrorPage from "next/error";
@@ -34,7 +34,6 @@ import { isNotFound } from "../../../../utils/trpcError";
 
 import { TraceDeatilsDrawer } from "~/components/TraceDeatilsDrawer";
 
-
 export default function TraceDetails() {
   const router = useRouter();
   const { project, hasTeamPermission } = useOrganizationTeamProject();
@@ -51,7 +50,6 @@ export default function TraceDetails() {
       refetchOnWindowFocus: false,
     }
   );
-
 
   useEffect(() => {
     if (trace.data?.metadata.thread_id) {
@@ -84,13 +82,10 @@ export default function TraceDetails() {
     return <MessagesDevMode />;
   }
 
-
-
   const onClose = () => {
     setTabOpen(false);
     void router.replace(`/${project?.slug}/messages/${traceId}`);
-  }
-
+  };
 
   return (
     <DashboardLayout backgroundColor="white">
@@ -161,7 +156,6 @@ export default function TraceDetails() {
     </DashboardLayout>
   );
 }
-
 
 function Conversation({ threadId }: { threadId?: string }) {
   const { traceId, trace, openTab } = useTraceDetailsState();
@@ -324,7 +318,10 @@ const TraceMessages = React.forwardRef(function TraceMessages(
             avatar={
               <Avatar size="sm" name={project?.name} background="orange.400" />
             }
-            timestamp={trace.timestamps.inserted_at}
+            timestamp={
+              trace.timestamps.started_at +
+              (trace.metrics.first_token_ms ?? trace.metrics.total_time_ms ?? 0)
+            }
           >
             <Markdown className="markdown markdown-conversation-history">
               {trace.error ? trace.error.message : trace.output?.value}
@@ -360,8 +357,8 @@ function Message({
     ? timestampDate.getTime() < Date.now() - 1000 * 60 * 60 * 24
       ? format(timestampDate, "dd/MMM HH:mm")
       : formatDistanceToNow(timestampDate, {
-        addSuffix: true,
-      })
+          addSuffix: true,
+        })
     : undefined;
 
   if (!project) return null;
