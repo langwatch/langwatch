@@ -338,9 +338,9 @@ export function MessagesDevMode() {
                 (traceCheck_) => traceCheck_.check_id === checkId
               );
               return traceCheck?.status === "failed"
-                ? "Fail"
+                ? numeral(traceCheck?.value).format("0.[00]")
                 : traceCheck?.status === "succeeded"
-                ? "Pass"
+                ? numeral(traceCheck?.value).format("0.[00]")
                 : traceCheck?.status ?? "-";
             },
           },
