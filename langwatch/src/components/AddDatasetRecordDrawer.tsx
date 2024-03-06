@@ -1,460 +1,617 @@
 import { CheckCircleIcon } from "@chakra-ui/icons";
-import { Box, Button, Container, Drawer, DrawerBody, DrawerCloseButton, DrawerContent, DrawerHeader, FormControl, FormErrorMessage, HStack, Link, Select, Stack, Text, Textarea, Tooltip, VStack, useDisclosure, useToast } from "@chakra-ui/react";
+import {
+  Box,
+  Button,
+  Container,
+  Drawer,
+  DrawerBody,
+  DrawerCloseButton,
+  DrawerContent,
+  DrawerHeader,
+  Flex,
+  FormControl,
+  FormErrorMessage,
+  HStack,
+  Link,
+  Select,
+  Spacer,
+  Stack,
+  Text,
+  Textarea,
+  Tooltip,
+  VStack,
+  useDisclosure,
+  useToast,
+} from "@chakra-ui/react";
+import { ChevronLeftIcon, ChevronRightIcon } from "@chakra-ui/icons";
 import { DatabaseSchema } from "@prisma/client";
-import { useState } from "react";
+import { use, useState, useEffect } from "react";
 import { HelpCircle } from "react-feather";
 import { z } from "zod";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useTraceDetailsState } from "~/hooks/useTraceDetailsState";
-import { chatMessageSchema, } from "~/server/tracer/types.generated";
+import { chatMessageSchema } from "~/server/tracer/types.generated";
 import { api } from "~/utils/api";
 import { displayName } from "~/utils/datasets";
 import { AddDatasetDrawer } from "./AddDatasetDrawer";
-import { el } from "date-fns/locale";
-
-
 
 function formatNumberWithSuffix(number: number) {
-    const suffixes = ['th', 'st', 'nd', 'rd'];
-    const lastDigit = number % 10;
-    const suffix = suffixes[lastDigit <= 3 ? lastDigit : 0];
+  const suffixes = ["th", "st", "nd", "rd"];
+  const lastDigit = number % 10;
+  const suffix = suffixes[lastDigit <= 3 ? lastDigit : 0];
 
-    return `${number}${suffix}`;
+  return `${number}${suffix}`;
 }
 
 interface AddDatasetDrawerProps {
-    isOpen: boolean;
-    onClose: () => void;
-    onSuccess?: () => void;
-    traceId?: string;
+  isOpen: boolean;
+  onClose: () => void;
+  onSuccess?: () => void;
+  traceId?: string;
+  selectedTraceIds?: string[];
 }
 
 export function AddDatasetRecordDrawer(props: AddDatasetDrawerProps) {
+  const { project } = useOrganizationTeamProject();
+  const [datasetId, setDatasetId] = useState<string>("");
+  const [inputSpan, setInputSpan] = useState<any>("");
+  const [outputSpan, setOutputSpan] = useState<any>("");
+  const [spanTrace, setSpanTrace] = useState<any>("");
+  const [inputError, setInputError] = useState<boolean>(false);
+  const [outputError, setOutputError] = useState<boolean>(false);
+  const [databaseSchema, setDatabaseSchema] = useState<string>("");
+  const [databaseSchemaName, setDatabaseSchemaName] = useState<string>("");
+  const [selectedTraceIds, setSelectedTraceIds] = useState<string[]>(
+    props.selectedTraceIds ?? []
+  );
+  const [selectedTraceId, setSelectedTraceId] = useState<string>(
+    props.selectedTraceIds?.[0] ?? ""
+  );
 
-    const { project } = useOrganizationTeamProject();
-    const [datasetId, setDatasetId] = useState<string>("");
-    const [inputSpan, setInputSpan] = useState<any>("");
-    const [outputSpan, setOutputSpan] = useState<any>("");
-    const [spanTrace, setSpanTrace] = useState<any>("");
-    const [inputError, setInputError] = useState<boolean>(false);
-    const [outputError, setOutputError] = useState<boolean>(false);
-    const [databaseSchema, setDatabaseSchema] = useState<string>("");
-    const [databaseSchemaName, setDatabaseSchemaName] = useState<string>("");
+  useEffect(() => {
+    setSelectedTraceIds(props.selectedTraceIds ?? []);
+  }, [props.selectedTraceIds]);
 
-    const { onOpen, onClose, isOpen } = useDisclosure()
+  const [selectedIndex, setSelectedIndex] = useState<number>(0);
 
-    const { traceId, trace } = useTraceDetailsState(props?.traceId);
+  const selectIndexUp = () => {
+    setSelectedIndex(selectedIndex + 1);
+    setSelectedTraceId(props.selectedTraceIds?.[selectedIndex + 1] ?? "");
+  };
 
-    const spans = api.spans.getAllForTrace.useQuery(
-        { projectId: project?.id ?? "", traceId: traceId ?? "" },
-        { enabled: !!project && !!traceId, refetchOnWindowFocus: false }
-    );
+  const selectIndexDown = () => {
+    setSelectedIndex(selectedIndex - 1);
+    setSelectedTraceId(props.selectedTraceIds?.[selectedIndex - 1] ?? "");
+  };
 
-    const toast = useToast();
-    const createDatasetRecord = api.datasetRecord.create.useMutation();
+  console.log("selectedIndex", selectedIndex);
 
-    const datasets = api.dataset.getAll.useQuery({ projectId: project?.id ?? "" },
-        {
-            enabled: !!project,
+  console.log("props", selectedTraceId);
+  console.log("inputSpan", inputSpan);
 
-        });
+  const { onOpen, onClose, isOpen } = useDisclosure();
+  // const test = props.traceDataset?.[0];
 
-    const onCreateDatasetSuccess = () => {
-        onClose();
-        void datasets.refetch();
+  const { traceId, trace } = useTraceDetailsState(
+    selectedTraceId ?? props?.traceId
+  );
+
+  const spans = api.spans.getAllForTrace.useQuery(
+    { projectId: project?.id ?? "", traceId: traceId ?? "" },
+    { enabled: !!project && !!traceId, refetchOnWindowFocus: false }
+  );
+
+  console.log("spans", spans.data);
+
+  const toast = useToast();
+  const createDatasetRecord = api.datasetRecord.create.useMutation();
+
+  const datasets = api.dataset.getAll.useQuery(
+    { projectId: project?.id ?? "" },
+    {
+      enabled: !!project,
+    }
+  );
+
+  const onCreateDatasetSuccess = () => {
+    onClose();
+    void datasets.refetch();
+  };
+
+  const handleOnClose = () => {
+    props.onClose();
+    setInputSpan("");
+    setOutputSpan("");
+    setDatasetId("");
+    setSpanTrace("");
+    setOutputError(false);
+    setInputError(false);
+    setDatabaseSchema("");
+  };
+
+  const inputCheck = (inputValue: any) => {
+    if (databaseSchema === DatabaseSchema.LLM_CHAT_CALL) {
+      try {
+        JSON.parse(inputValue);
+        const inputTypeCheck = z.array(chatMessageSchema);
+        const result = inputTypeCheck.safeParse(JSON.parse(inputValue));
+        return result;
+      } catch (e) {
+        return false;
+      }
+    } else if (
+      databaseSchema === DatabaseSchema.FULL_TRACE ||
+      databaseSchema === DatabaseSchema.STRING_I_O
+    ) {
+      const inputTypeCheck = z.string();
+      const result = inputTypeCheck.safeParse(inputValue);
+      return result;
+    }
+  };
+
+  const outputCheck = (outputValue: any) => {
+    if (databaseSchema === DatabaseSchema.LLM_CHAT_CALL) {
+      try {
+        JSON.parse(outputValue);
+        const outputTypeCheck = z.array(chatMessageSchema);
+        const result = outputTypeCheck.safeParse(JSON.parse(outputValue));
+        return result;
+      } catch (e) {
+        return false;
+      }
+    } else if (
+      databaseSchema === DatabaseSchema.FULL_TRACE ||
+      databaseSchema === DatabaseSchema.STRING_I_O
+    ) {
+      const outputTypeCheck = z.string();
+      const result = outputTypeCheck.safeParse(outputValue);
+      return result;
+    }
+  };
+
+  const onSubmit = (e: any) => {
+    e.preventDefault();
+
+    let input;
+    let output;
+
+    const inputResult = inputCheck(inputSpan);
+    if (inputResult && inputResult.success) {
+      setInputError(false);
+    } else {
+      setInputError(true);
     }
 
-    const handleOnClose = () => {
-        props.onClose();
-        setInputSpan("")
-        setOutputSpan("")
-        setDatasetId("")
-        setSpanTrace("")
-        setOutputError(false)
-        setInputError(false)
-        setDatabaseSchema("")
+    const outputResult = outputCheck(outputSpan);
+    if (outputResult && outputResult.success) {
+      setOutputError(false);
+    } else {
+      setOutputError(true);
     }
 
-    const inputCheck = (inputValue: any) => {
-
-
-        if (databaseSchema === DatabaseSchema.LLM_CHAT_CALL) {
-            try {
-                JSON.parse(inputValue);
-                const inputTypeCheck = z.array(chatMessageSchema)
-                const result = inputTypeCheck.safeParse(JSON.parse(inputValue))
-                return result;
-
-            } catch (e) { return false; }
-        } else if (databaseSchema === DatabaseSchema.FULL_TRACE || databaseSchema === DatabaseSchema.STRING_I_O) {
-
-            const inputTypeCheck = z.string();
-            const result = inputTypeCheck.safeParse(inputValue)
-            return result;
-        }
-
+    if (
+      !inputResult ||
+      !outputResult ||
+      !inputResult.success ||
+      !outputResult.success
+    ) {
+      return;
     }
 
-    const outputCheck = (outputValue: any) => {
-        if (databaseSchema === DatabaseSchema.LLM_CHAT_CALL) {
-            try {
-                JSON.parse(outputValue);
-                const outputTypeCheck = z.array(chatMessageSchema)
-                const result = outputTypeCheck.safeParse(JSON.parse(outputValue))
-                return result;
-
-            } catch (e) { return false; }
-
-        } else if (databaseSchema === DatabaseSchema.FULL_TRACE || databaseSchema === DatabaseSchema.STRING_I_O) {
-            const outputTypeCheck = z.string();
-            const result = outputTypeCheck.safeParse(outputValue)
-            return result;
-        }
-
-
+    if (databaseSchema === DatabaseSchema.LLM_CHAT_CALL) {
+      input = JSON.parse(inputSpan);
+      output = JSON.parse(outputSpan);
+    } else if (
+      databaseSchema === DatabaseSchema.FULL_TRACE ||
+      databaseSchema === DatabaseSchema.STRING_I_O
+    ) {
+      input = inputSpan;
+      output = outputSpan;
     }
 
-    const onSubmit = (e: any) => {
-        e.preventDefault()
-
-        let input;
-        let output;
-
-        const inputResult = inputCheck(inputSpan);
-        if (inputResult && inputResult.success) {
-            setInputError(false);
-        } else {
-            setInputError(true);
-        }
-
-        const outputResult = outputCheck(outputSpan);
-        if (outputResult && outputResult.success) {
-            setOutputError(false);
-        } else {
-            setOutputError(true);
-        }
-
-        if (!inputResult || !outputResult || !inputResult.success || !outputResult.success) {
-            return;
-        }
-
-
-        if (databaseSchema === DatabaseSchema.LLM_CHAT_CALL) {
-            input = JSON.parse(inputSpan);
-            output = JSON.parse(outputSpan);
-        } else if (databaseSchema === DatabaseSchema.FULL_TRACE || databaseSchema === DatabaseSchema.STRING_I_O) {
-            input = inputSpan;
-            output = outputSpan;
-        }
-
-
-        createDatasetRecord.mutate({
-            projectId: project?.id ?? "",
-            input: input,
-            output: output,
-            datasetId: datasetId,
-            datasetSchema: databaseSchema,
-            spans: spanTrace ? JSON.parse(spanTrace) : []
+    createDatasetRecord.mutate(
+      {
+        projectId: project?.id ?? "",
+        input: input,
+        output: output,
+        datasetId: datasetId,
+        datasetSchema: databaseSchema,
+        spans: spanTrace ? JSON.parse(spanTrace) : [],
+      },
+      {
+        onSuccess: () => {
+          props.onClose();
+          toast({
+            duration: 3000,
+            position: "top-right",
+            render: () => (
+              <Box
+                p={5}
+                paddingRight={20}
+                bg="green.200"
+                borderTop={"green.600"}
+                borderTopWidth={2}
+              >
+                <HStack>
+                  <CheckCircleIcon w={18} h={18} color={"green.600"} />
+                  <Box>
+                    <Text color={"black"} fontWeight={"bold"}>
+                      Succesfully added to dataset
+                    </Text>
+                    <Link
+                      color={"black"}
+                      textDecoration={"underline"}
+                      href={`/${project?.slug}/datasets/${datasetId}`}
+                    >
+                      View the dataset
+                    </Link>
+                  </Box>
+                </HStack>
+              </Box>
+            ),
+          });
         },
-            {
-                onSuccess: () => {
-                    props.onClose();
-                    toast({
-                        duration: 3000,
-                        position: "top-right",
-                        render: () => (
-                            <Box p={5} paddingRight={20} bg='green.200' borderTop={'green.600'} borderTopWidth={2}>
-                                <HStack>
-                                    <CheckCircleIcon w={18} h={18} color={"green.600"} />
-                                    <Box>
-                                        <Text color={'black'} fontWeight={'bold'}>Succesfully added to dataset</Text>
-                                        <Link color={'black'} textDecoration={"underline"} href={`/${project?.slug}/datasets/${datasetId}`}>
-                                            View the dataset
-                                        </Link>
-                                    </Box>
-                                </HStack>
-                            </Box>
-                        ),
-                    });
-                },
-                onError: () => {
-                    toast({
-                        title: "Failed to upload dataset",
-                        description: "Please make sure you have edited the input and output fields correctly",
-                        status: "error",
-                        duration: 5000,
-                        isClosable: true,
-                        position: "top-right",
-                    });
-                }
-            },
+        onError: () => {
+          toast({
+            title: "Failed to upload dataset",
+            description:
+              "Please make sure you have edited the input and output fields correctly",
+            status: "error",
+            duration: 5000,
+            isClosable: true,
+            position: "top-right",
+          });
+        },
+      }
+    );
+  };
 
+  const selectLLMCall = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const value = e.target.value;
+    const callSelected = value !== "" ? parseInt(value) : "";
+
+    console.log("value", callSelected);
+
+    if (databaseSchema === DatabaseSchema.STRING_I_O && callSelected !== "") {
+      const existingInputSpan = { ...inputSpan };
+
+      // Check if the key exists in the object
+      if (!(selectedIndex in existingInputSpan)) {
+        // If it doesn't exist, set its value based on the conditions
+        existingInputSpan[selectedIndex] = JSON.parse(
+          spans.data?.[callSelected]?.input?.value ?? ""
+        )[0].content;
+
+        // Update the state with the new object
+        setInputSpan(existingInputSpan);
+      }
+      // setInputSpan({
+      //   [selectedIndex]: JSON.parse(
+      //     spans.data?.[callSelected]?.input?.value ?? ""
+      //   )[0].content,
+      // });
+
+      setOutputSpan(
+        JSON.parse(spans.data?.[callSelected]?.outputs?.[0]?.value ?? "")[0]
+          .content
+      );
+    } else if (
+      databaseSchema === DatabaseSchema.LLM_CHAT_CALL &&
+      callSelected !== ""
+    ) {
+      setInputSpan(
+        JSON.stringify(
+          JSON.parse(spans.data?.[callSelected]?.input?.value ?? ""),
+          undefined,
+          2
         )
+      );
+      setOutputSpan(
+        JSON.stringify(
+          JSON.parse(spans.data?.[callSelected]?.outputs?.[0]?.value ?? ""),
+          undefined,
+          2
+        )
+      );
+    } else {
+      setInputSpan("");
+      setOutputSpan("");
+    }
+  };
+
+  const handleSpansChange = (e: any) => {
+    setSpanTrace(e.target.value);
+  };
+
+  const handleInputChange = (e: any) => {
+    const inputValue = e.target.value;
+    setInputSpan(inputValue);
+    const inputResult = inputCheck(inputValue);
+
+    if (inputResult && inputResult.success) {
+      setInputError(false);
+    } else {
+      setInputError(true);
+    }
+  };
+
+  const handleOutputChange = (e: any) => {
+    const outputValue = e.target.value;
+    setOutputSpan(outputValue);
+    const outputResult = outputCheck(outputValue);
+
+    if (outputResult && outputResult.success) {
+      setOutputError(false);
+    } else {
+      setOutputError(true);
+    }
+  };
+
+  const createFullTraceDataset = (spans: any) => {
+    if (spans) {
+      const newArray = JSON.parse(JSON.stringify(spans));
+      for (let i = 0; i < spans.length; i++) {
+        const outputObj = JSON.parse(newArray[i].outputs[0].value);
+        const inputObj = JSON.parse(newArray[i].input.value);
+        newArray[i].outputs[0].value = outputObj;
+        newArray[i].input.value = inputObj;
+      }
+      return JSON.stringify(newArray, null, 3);
+    }
+    return;
+  };
+
+  const handleDatasetChange = (e: any) => {
+    const datasetSchema = datasets.data?.find(
+      (dataset) => dataset.id === e.target.value
+    )?.schema;
+    setInputSpan("");
+    setOutputSpan("");
+    setSpanTrace("");
+
+    if (datasetSchema === DatabaseSchema.FULL_TRACE) {
+      const input = trace.data ? trace.data?.input?.value : "";
+      const output = trace.data ? trace.data?.output?.value : "";
+      const allSpans = createFullTraceDataset(spans.data);
+
+      setInputSpan(input);
+      setOutputSpan(output);
+      setSpanTrace(allSpans);
     }
 
+    setDatabaseSchema(datasetSchema ?? "");
+    setDatabaseSchemaName(displayName(datasetSchema!));
+    setDatasetId(e.target.value);
+  };
 
-    const selectLLMCall = (e: React.ChangeEvent<HTMLSelectElement>) => {
-
-        const value = e.target.value;
-        const callSelected = value !== "" ? parseInt(value) : "";
-
-        if (databaseSchema === DatabaseSchema.STRING_I_O && callSelected !== "") {
-
-            setInputSpan(JSON.parse(spans.data?.[callSelected]?.input?.value ?? "")[0].content)
-            setOutputSpan(JSON.parse(spans.data?.[callSelected]?.outputs?.[0]?.value ?? "")[0].content)
-
-        } else if (databaseSchema === DatabaseSchema.LLM_CHAT_CALL && callSelected !== "") {
-
-            setInputSpan(JSON.stringify(JSON.parse(spans.data?.[callSelected]?.input?.value ?? ""), undefined, 2))
-            setOutputSpan(JSON.stringify(JSON.parse(spans.data?.[callSelected]?.outputs?.[0]?.value ?? ""), undefined, 2))
-        } else {
-            setInputSpan("")
-            setOutputSpan("")
-        }
+  const getInputErroMessage = () => {
+    if (databaseSchema === DatabaseSchema.LLM_CHAT_CALL) {
+      return "Invalid LLM Chat message format";
+    } else if (databaseSchema === DatabaseSchema.STRING_I_O) {
+      return "Invalid String Input/Output format";
+    } else if (databaseSchema === DatabaseSchema.FULL_TRACE) {
+      return "Invalid Full Trace format";
     }
+  };
 
-    const handleSpansChange = (e: any) => {
-        setSpanTrace(e.target.value)
+  const getOutputErroMessage = () => {
+    if (databaseSchema === DatabaseSchema.LLM_CHAT_CALL) {
+      return "Invalid LLM Chat message format";
+    } else if (databaseSchema === DatabaseSchema.STRING_I_O) {
+      return "Invalid String Input/Output format";
+    } else if (databaseSchema === DatabaseSchema.FULL_TRACE) {
+      return "Invalid Full Trace format";
     }
+  };
 
-    const handleInputChange = (e: any) => {
-
-
-        const inputValue = e.target.value
-        setInputSpan(inputValue)
-        const inputResult = inputCheck(inputValue);
-
-
-        if (inputResult && inputResult.success) {
-            setInputError(false)
-        } else { setInputError(true) }
-
-
-    }
-
-    const handleOutputChange = (e: any) => {
-
-        const outputValue = e.target.value
-        setOutputSpan(outputValue)
-        const outputResult = outputCheck(outputValue);
-
-        if (outputResult && outputResult.success) {
-            setOutputError(false)
-        }
-        else { setOutputError(true) }
-
-    }
-
-    const createFullTraceDataset = (spans: any) => {
-        if (spans) {
-            const newArray = JSON.parse(JSON.stringify(spans));
-            for (let i = 0; i < spans.length; i++) {
-                const outputObj = JSON.parse(newArray[i].outputs[0].value);
-                const inputObj = JSON.parse(newArray[i].input.value);
-                newArray[i].outputs[0].value = outputObj;
-                newArray[i].input.value = inputObj;
-            }
-            return JSON.stringify(newArray, null, 3);
-        }
-        return;
-    }
-
-
-    const handleDatasetChange = (e: any) => {
-
-        const datasetSchema = datasets.data?.find(dataset => dataset.id === e.target.value)?.schema;
-        setInputSpan("");
-        setOutputSpan("");
-        setSpanTrace("");
-
-        if (datasetSchema === DatabaseSchema.FULL_TRACE) {
-
-            const input = trace.data ? trace.data?.input?.value : "";
-            const output = trace.data ? trace.data?.output?.value : "";
-            const allSpans = createFullTraceDataset(spans.data)
-
-            setInputSpan(input)
-            setOutputSpan(output)
-            setSpanTrace(allSpans)
-        }
-
-        setDatabaseSchema(datasetSchema ?? "")
-        setDatabaseSchemaName(displayName(datasetSchema!))
-        setDatasetId(e.target.value)
-    }
-
-    const getInputErroMessage = () => {
-
-        if (databaseSchema === DatabaseSchema.LLM_CHAT_CALL) {
-            return "Invalid LLM Chat message format"
-        } else if (databaseSchema === DatabaseSchema.STRING_I_O) {
-            return "Invalid String Input/Output format"
-        } else if (databaseSchema === DatabaseSchema.FULL_TRACE) {
-            return "Invalid Full Trace format"
-        }
-
-    }
-
-    const getOutputErroMessage = () => {
-
-        if (databaseSchema === DatabaseSchema.LLM_CHAT_CALL) {
-            return "Invalid LLM Chat message format"
-        } else if (databaseSchema === DatabaseSchema.STRING_I_O) {
-            return "Invalid String Input/Output format"
-        } else if (databaseSchema === DatabaseSchema.FULL_TRACE) {
-            return "Invalid Full Trace format"
-        }
-
-    }
-
-    return (
-        <Drawer
-            isOpen={props.isOpen}
-            placement="right"
-            size={'xl'}
-            onClose={handleOnClose}
-            blockScrollOnMount={false}
-        >
-            <DrawerContent >
-                <DrawerHeader>
-                    <HStack>
-                        <DrawerCloseButton />
+  return (
+    <Drawer
+      isOpen={props.isOpen}
+      placement="right"
+      size={"xl"}
+      onClose={handleOnClose}
+      blockScrollOnMount={false}
+    >
+      <DrawerContent>
+        <DrawerHeader>
+          <HStack>
+            <DrawerCloseButton />
+          </HStack>
+          <HStack>
+            <Text paddingTop={5} fontSize="3xl">
+              Add to Dataset
+            </Text>
+          </HStack>
+        </DrawerHeader>
+        <DrawerBody overflow="scroll">
+          <form onSubmit={onSubmit}>
+            <Stack gap={8}>
+              <HStack align={"start"} gap={8}>
+                <Container padding={0}>
+                  <VStack align={"start"} padding={0}>
+                    <Text fontWeight={"bold"}> Dataset</Text>
+                    <Text fontSize={"sm"}>
+                      Add to an existing dataset or create a new one
+                    </Text>
+                  </VStack>
+                </Container>
+                <Container>
+                  <VStack align={"start"}>
+                    <FormControl>
+                      <Select required onChange={handleDatasetChange}>
+                        <option value={""}>Select Dataset</option>
+                        {datasets.data
+                          ? datasets.data?.map((dataset, index) => (
+                              <option key={index} value={dataset.id}>
+                                {dataset.name}
+                              </option>
+                            ))
+                          : null}
+                      </Select>
+                      <Button
+                        colorScheme="blue"
+                        onClick={() => {
+                          onOpen();
+                        }}
+                        minWidth="fit-content"
+                        variant="link"
+                        marginTop={2}
+                        fontWeight={"normal"}
+                      >
+                        + Create New
+                      </Button>
+                    </FormControl>
+                  </VStack>
+                </Container>
+              </HStack>
+              <HStack align={"start"} gap={8}>
+                <Container padding={0}>
+                  <Text fontWeight={"bold"}>Edit Entries</Text>
+                </Container>
+                <Container padding={0}>
+                  <Flex>
+                    <Spacer />
+                    <HStack gap={4}>
+                      {selectedIndex === 0 ? (
+                        <ChevronLeftIcon color={"gray.400"} />
+                      ) : (
+                        <ChevronLeftIcon
+                          onClick={selectIndexDown}
+                          cursor={"pointer"}
+                        />
+                      )}
+                      <Text fontWeight={"bold"}>{`${selectedIndex + 1}/${
+                        selectedTraceIds.length
+                      }`}</Text>
+                      {selectedIndex === selectedTraceIds.length - 1 ? (
+                        <ChevronRightIcon color={"gray.400"} />
+                      ) : (
+                        <ChevronRightIcon
+                          onClick={selectIndexUp}
+                          cursor={"pointer"}
+                        />
+                      )}
                     </HStack>
-                    <HStack>
-                        <Text paddingTop={5} fontSize='3xl'>Add to Dataset</Text>
+                  </Flex>
+                </Container>
+              </HStack>
+
+              {databaseSchema === DatabaseSchema.LLM_CHAT_CALL ||
+              databaseSchema === DatabaseSchema.STRING_I_O ? (
+                <HStack align={"start"} gap={8}>
+                  <Container padding={0}>
+                    <VStack align={"start"} padding={0}>
+                      <Text fontWeight={"bold"}>LLM Call</Text>
+                      <Text fontSize={"sm"}>
+                        Select which LLM call to add to the dataset
+                      </Text>
+                    </VStack>
+                  </Container>
+                  <Container>
+                    <VStack align={"start"}>
+                      <Select onChange={selectLLMCall} required>
+                        <option value={""}>Select LLM Call</option>
+                        {spans.data
+                          ? spans.data?.map(
+                              (dataset, index) =>
+                                dataset.type === "llm" && (
+                                  <option key={index} value={index}>
+                                    {dataset.model ?? "(noname)"} -{" "}
+                                    {formatNumberWithSuffix(index + 1)} LLM Call
+                                  </option>
+                                )
+                            )
+                          : null}
+                      </Select>
+                    </VStack>
+                  </Container>
+                </HStack>
+              ) : null}
+
+              <HStack align={"start"} gap={8}>
+                {databaseSchema ? (
+                  <Text
+                    whiteSpace="nowrap"
+                    bg="gray.200"
+                    paddingX="2"
+                    paddingY="1"
+                    borderRadius="lg"
+                    fontSize={12}
+                  >
+                    {databaseSchemaName}
+                  </Text>
+                ) : null}
+              </HStack>
+
+              {databaseSchema !== "" ? (
+                <>
+                  <FormControl isInvalid={inputError}>
+                    <HStack marginBottom={2}>
+                      <Text fontWeight={"bold"}> Input</Text>
+                      <Tooltip label="Input by user">
+                        <HelpCircle width="14px" />
+                      </Tooltip>
                     </HStack>
-                </DrawerHeader>
-                <DrawerBody overflow='scroll'>
-                    <form onSubmit={onSubmit}>
-                        <Stack gap={8}>
-                            <HStack align={'start'} gap={8}>
-                                <Container padding={0}>
-                                    <VStack align={'start'} padding={0}>
-                                        <Text fontWeight={'bold'}> Dataset</Text>
-                                        <Text fontSize={'sm'}>Add to an existing dataset or create a new one</Text>
-                                    </VStack>
-                                </Container>
-                                <Container>
-                                    <VStack align={'start'}>
-                                        <FormControl>
-                                            <Select required onChange={handleDatasetChange}>
-                                                <option value={""}>Select Dataset</option>
-                                                {
-                                                    datasets.data ?
-                                                        datasets.data?.map((dataset, index) => (
-                                                            <option key={index} value={dataset.id}>{dataset.name}</option>
-                                                        )) : null
-                                                }
-                                            </Select>
-                                            <Button
-                                                colorScheme="blue"
-                                                onClick={() => {
-                                                    onOpen();
-                                                }}
-                                                minWidth="fit-content"
-                                                variant='link'
-                                                marginTop={2}
-                                                fontWeight={'normal'}
-                                            >
-                                                + Create New
-                                            </Button>
-                                        </FormControl>
-                                    </VStack>
-                                </Container>
-                            </HStack>
+                    <Textarea
+                      onChange={handleInputChange}
+                      rows={5}
+                      value={inputSpan[selectedIndex]}
+                    />
+                    <FormErrorMessage>{getInputErroMessage()}</FormErrorMessage>
+                  </FormControl>
 
-                            {databaseSchema === DatabaseSchema.LLM_CHAT_CALL || databaseSchema === DatabaseSchema.STRING_I_O ?
-                                <HStack align={'start'} gap={8}>
-                                    <Container padding={0}>
-                                        <VStack align={'start'} padding={0}>
-                                            <Text fontWeight={'bold'}>LLM Call</Text>
-                                            <Text fontSize={'sm'}>Select which LLM call to add to the dataset</Text>
-                                        </VStack>
-                                    </Container>
-                                    <Container>
-                                        <VStack align={'start'}>
-                                            <Select onChange={selectLLMCall} required>
-                                                <option value={""}>Select LLM Call</option>
-                                                {
-                                                    spans.data ?
-                                                        spans.data?.map((dataset, index) => (
-                                                            dataset.type === 'llm' && <option key={index} value={index}>{dataset.model ?? "(noname)"} - {formatNumberWithSuffix(index + 1)} LLM Call</option>
-                                                        )) : null
-                                                }
-                                            </Select>
-                                        </VStack>
-                                    </Container>
-                                </HStack>
-                                : null}
+                  <FormControl isInvalid={outputError}>
+                    <HStack marginBottom={2}>
+                      <Text fontWeight={"bold"}> Output</Text>
+                      <Tooltip label="Output generated by chat model">
+                        <HelpCircle width="14px" />
+                      </Tooltip>
+                    </HStack>
+                    <Textarea
+                      onChange={handleOutputChange}
+                      rows={5}
+                      value={outputSpan}
+                    />
+                    <FormErrorMessage>
+                      {getOutputErroMessage()}
+                    </FormErrorMessage>
+                  </FormControl>
+                </>
+              ) : null}
 
-                            <HStack align={'start'} gap={8}>
-                                {databaseSchema ?
-                                    <Text
-                                        whiteSpace="nowrap"
-                                        bg="gray.200"
-                                        paddingX="2"
-                                        paddingY="1"
-                                        borderRadius="lg"
-                                        fontSize={12}
-                                    >
-                                        {databaseSchemaName}
-                                    </Text> : null}
-                            </HStack>
+              {databaseSchema === DatabaseSchema.FULL_TRACE ? (
+                <FormControl isInvalid={outputError}>
+                  <HStack marginBottom={2}>
+                    <Text fontWeight={"bold"}> Spans</Text>
+                    <Tooltip label="Full span trace of all messages">
+                      <HelpCircle width="14px" />
+                    </Tooltip>
+                  </HStack>
+                  <Textarea
+                    onChange={handleSpansChange}
+                    rows={10}
+                    value={spanTrace}
+                  />
+                  <FormErrorMessage>
+                    Invalid LLM Chat message format
+                  </FormErrorMessage>
+                </FormControl>
+              ) : null}
 
-                            {databaseSchema !== '' ?
-                                <>
-                                    <FormControl isInvalid={inputError}>
-                                        <HStack marginBottom={2}>
-                                            <Text fontWeight={'bold'}> Input</Text>
-                                            <Tooltip label="Input by user">
-                                                <HelpCircle width="14px" />
-                                            </Tooltip>
-                                        </HStack>
-                                        <Textarea onChange={handleInputChange} rows={5} value={inputSpan} />
-                                        <FormErrorMessage >{getInputErroMessage()}</FormErrorMessage>
-                                    </FormControl>
-
-                                    <FormControl isInvalid={outputError}>
-                                        <HStack marginBottom={2}>
-                                            <Text fontWeight={'bold'}> Output</Text>
-                                            <Tooltip label="Output generated by chat model">
-                                                <HelpCircle width="14px" />
-                                            </Tooltip>
-                                        </HStack>
-                                        <Textarea onChange={handleOutputChange} rows={5} value={outputSpan} />
-                                        <FormErrorMessage >{getOutputErroMessage()}</FormErrorMessage>
-                                    </FormControl>
-                                </> : null
-                            }
-
-                            {databaseSchema === DatabaseSchema.FULL_TRACE ?
-                                <FormControl isInvalid={outputError}>
-                                    <HStack marginBottom={2}>
-                                        <Text fontWeight={'bold'}> Spans</Text>
-                                        <Tooltip label="Full span trace of all messages">
-                                            <HelpCircle width="14px" />
-                                        </Tooltip>
-                                    </HStack>
-                                    <Textarea onChange={handleSpansChange} rows={10} value={spanTrace} />
-                                    <FormErrorMessage >Invalid LLM Chat message format</FormErrorMessage>
-                                </FormControl>
-                                : null
-                            }
-
-                            {databaseSchema !== '' ?
-                                <Button
-                                    colorScheme="blue"
-                                    type="submit"
-                                    width="fit-content"
-                                >
-                                    Add to dataset
-                                </Button>
-                                : null}
-                        </Stack>
-                    </form>
-                </DrawerBody >
-            </DrawerContent >
-            <AddDatasetDrawer isOpen={isOpen} onClose={onClose} onSuccess={onCreateDatasetSuccess} />
-        </Drawer >
-    )
+              {databaseSchema !== "" ? (
+                <Button colorScheme="blue" type="submit" width="fit-content">
+                  Add to dataset
+                </Button>
+              ) : null}
+            </Stack>
+          </form>
+        </DrawerBody>
+      </DrawerContent>
+      <AddDatasetDrawer
+        isOpen={isOpen}
+        onClose={onClose}
+        onSuccess={onCreateDatasetSuccess}
+      />
+    </Drawer>
+  );
 }

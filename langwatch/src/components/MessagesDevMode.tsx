@@ -66,7 +66,7 @@ export function MessagesDevMode() {
   const [pageOffset, setPageOffset] = useState<number>(0);
   const [pageSize, setPageSize] = useState<number>(25);
   const { filterParams, queryOpts } = useFilterParams();
-  const [traceDataset, setTraceDataset] = useState<Record<string, any>>([]);
+  const [selectedTraceIds, setSelectedTraceIds] = useState<string[]>([]);
 
   const addDatasetModal = useDisclosure();
 
@@ -134,8 +134,10 @@ export function MessagesDevMode() {
     )
   );
 
+  console.log(selectedTraceIds, "selectedTraceIds");
+
   const traceSelection = (trace_id: string) => {
-    setTraceDataset((prevTraceChecks: string[]) => {
+    setSelectedTraceIds((prevTraceChecks: string[]) => {
       const index = prevTraceChecks.indexOf(trace_id);
       if (index === -1) {
         return [...prevTraceChecks, trace_id];
@@ -482,7 +484,7 @@ export function MessagesDevMode() {
       csv = traceGroups.data?.groups
         .flatMap((traceGroup) =>
           traceGroup
-            .filter((trace) => traceDataset.includes(trace.trace_id))
+            .filter((trace) => selectedTraceIds.includes(trace.trace_id))
             .map((trace) =>
               checkedHeaderColumnsEntries.map(
                 ([column, _]) => headerColumns[column]?.value?.(trace) ?? ""
@@ -705,7 +707,7 @@ export function MessagesDevMode() {
           setIsDrawerOpen={setIsDrawerOpen}
         />
       )}
-      {traceDataset.length > 0 && (
+      {selectedTraceIds.length > 0 && (
         <Box
           position="fixed"
           bottom={6}
@@ -719,7 +721,7 @@ export function MessagesDevMode() {
           borderRadius={"md"}
         >
           <HStack gap={3}>
-            <Text>{traceDataset.length} Traces selected</Text>
+            <Text>{selectedTraceIds.length} Traces selected</Text>
             <Button
               colorScheme="black"
               minWidth="fit-content"
@@ -728,9 +730,25 @@ export function MessagesDevMode() {
             >
               Export <DownloadIcon marginLeft={2} />
             </Button>
+
+            <Text>or</Text>
+            <Button
+              colorScheme="black"
+              type="submit"
+              variant="outline"
+              minWidth="fit-content"
+              onClick={addDatasetModal.onOpen}
+            >
+              Add to Dataset
+            </Button>
           </HStack>
         </Box>
       )}
+      <AddDatasetRecordDrawer
+        isOpen={addDatasetModal.isOpen}
+        onClose={addDatasetModal.onClose}
+        selectedTraceIds={selectedTraceIds}
+      />
     </DashboardLayout>
   );
 }
