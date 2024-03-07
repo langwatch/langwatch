@@ -19,7 +19,7 @@ import {
 const simpleFieldAnalytics = (
   field: string
 ): Omit<AnalyticsMetric, "label" | "colorSet" | "allowedAggregations"> => ({
-  format: "0.[0]a",
+  format: "0.[0]",
   increaseIs: "good",
   aggregation: (aggregation: AggregationTypes) => ({
     [`${field.replaceAll(".", "_")}_${aggregation}`]: {
