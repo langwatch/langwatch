@@ -527,6 +527,56 @@ export const tracesRouter = createTRPCRouter({
 
       return traces;
     }),
+
+  getTracesWithSpans: protectedProcedure
+    .input(z.object({ projectId: z.string(), traceIds: z.array(z.string()) }))
+    .use(checkUserPermissionForProject(TeamRoleGroup.MESSAGES_VIEW))
+    .query(async ({ input }) => {
+      const { projectId, traceIds } = input;
+
+      const tracesResult = await esClient.search<Trace>({
+        index: TRACE_INDEX,
+        body: {
+          query: {
+            //@ts-ignore
+            bool: {
+              filter: [
+                { term: { project_id: projectId } },
+                { terms: { trace_id: traceIds } },
+              ],
+            },
+          },
+          sort: [
+            {
+              "timestamps.started_at": {
+                order: "asc",
+              },
+            },
+          ],
+          size: 1000,
+        },
+      });
+
+      const traces = tracesResult.hits.hits
+        .map((hit) => hit._source!)
+        .filter((x) => x);
+
+      const spansByTraceId = await Promise.all(
+        traceIds.map((traceId) => esGetSpansByTraceId({ traceId, projectId }))
+      );
+
+      const tracesWithSpans = traces.map((trace, i) => ({
+        ...trace,
+        spans: spansByTraceId[i],
+      }));
+
+      for (const tracesWithSpan of tracesWithSpans) {
+        delete tracesWithSpan.input?.embeddings;
+        delete tracesWithSpan.output?.embeddings;
+      }
+
+      return tracesWithSpans;
+    }),
 });
 
 const groupTraces = (groupBy: string | undefined, traces: Trace[]) => {
