@@ -134,8 +134,6 @@ export function MessagesDevMode() {
     )
   );
 
-  console.log(selectedTraceIds, "selectedTraceIds");
-
   const traceSelection = (trace_id: string) => {
     setSelectedTraceIds((prevTraceChecks: string[]) => {
       const index = prevTraceChecks.indexOf(trace_id);

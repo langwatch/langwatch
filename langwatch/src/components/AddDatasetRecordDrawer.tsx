@@ -1,4 +1,8 @@
-import { CheckCircleIcon } from "@chakra-ui/icons";
+import {
+  CheckCircleIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+} from "@chakra-ui/icons";
 import {
   Box,
   Button,
@@ -23,14 +27,15 @@ import {
   useDisclosure,
   useToast,
 } from "@chakra-ui/react";
-import { ChevronLeftIcon, ChevronRightIcon } from "@chakra-ui/icons";
 import { DatabaseSchema } from "@prisma/client";
-import { use, useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { HelpCircle } from "react-feather";
 import { z } from "zod";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { useTraceDetailsState } from "~/hooks/useTraceDetailsState";
-import { chatMessageSchema } from "~/server/tracer/types.generated";
+import {
+  chatMessageSchema,
+  datasetSpanSchema,
+} from "~/server/tracer/types.generated";
 import { api } from "~/utils/api";
 import { displayName } from "~/utils/datasets";
 import { AddDatasetDrawer } from "./AddDatasetDrawer";
@@ -54,18 +59,17 @@ interface AddDatasetDrawerProps {
 export function AddDatasetRecordDrawer(props: AddDatasetDrawerProps) {
   const { project } = useOrganizationTeamProject();
   const [datasetId, setDatasetId] = useState<string>("");
-  const [inputSpan, setInputSpan] = useState<any>("");
-  const [outputSpan, setOutputSpan] = useState<any>("");
+  const [inputSpan, setInputSpan] = useState<any>();
+  const [outputSpan, setOutputSpan] = useState<any>();
   const [spanTrace, setSpanTrace] = useState<any>("");
   const [inputError, setInputError] = useState<boolean>(false);
   const [outputError, setOutputError] = useState<boolean>(false);
+  const [spanError, setSpanError] = useState<boolean>(false);
   const [databaseSchema, setDatabaseSchema] = useState<string>("");
   const [databaseSchemaName, setDatabaseSchemaName] = useState<string>("");
+  const [selectedLLMCall, setSelectedLLMCall] = useState<any>();
   const [selectedTraceIds, setSelectedTraceIds] = useState<string[]>(
     props.selectedTraceIds ?? []
-  );
-  const [selectedTraceId, setSelectedTraceId] = useState<string>(
-    props.selectedTraceIds?.[0] ?? ""
   );
 
   useEffect(() => {
@@ -76,32 +80,18 @@ export function AddDatasetRecordDrawer(props: AddDatasetDrawerProps) {
 
   const selectIndexUp = () => {
     setSelectedIndex(selectedIndex + 1);
-    setSelectedTraceId(props.selectedTraceIds?.[selectedIndex + 1] ?? "");
   };
 
   const selectIndexDown = () => {
     setSelectedIndex(selectedIndex - 1);
-    setSelectedTraceId(props.selectedTraceIds?.[selectedIndex - 1] ?? "");
   };
 
-  console.log("selectedIndex", selectedIndex);
-
-  console.log("props", selectedTraceId);
-  console.log("inputSpan", inputSpan);
-
   const { onOpen, onClose, isOpen } = useDisclosure();
-  // const test = props.traceDataset?.[0];
 
-  const { traceId, trace } = useTraceDetailsState(
-    selectedTraceId ?? props?.traceId
-  );
-
-  const spans = api.spans.getAllForTrace.useQuery(
-    { projectId: project?.id ?? "", traceId: traceId ?? "" },
-    { enabled: !!project && !!traceId, refetchOnWindowFocus: false }
-  );
-
-  console.log("spans", spans.data);
+  const tracesWithSpans = api.traces.getTracesWithSpans.useQuery({
+    projectId: project?.id ?? "",
+    traceIds: props?.selectedTraceIds ?? [props?.traceId ?? ""],
+  });
 
   const toast = useToast();
   const createDatasetRecord = api.datasetRecord.create.useMutation();
@@ -169,54 +159,50 @@ export function AddDatasetRecordDrawer(props: AddDatasetDrawerProps) {
     }
   };
 
+  const spanCheck = (spanValue: any) => {
+    try {
+      const spanTypeCheck = z.array(datasetSpanSchema);
+      const result = spanTypeCheck.safeParse(JSON.parse(spanValue));
+      return result;
+    } catch (e) {
+      return false;
+    }
+  };
+
   const onSubmit = (e: any) => {
     e.preventDefault();
 
-    let input;
-    let output;
-
-    const inputResult = inputCheck(inputSpan);
-    if (inputResult && inputResult.success) {
-      setInputError(false);
-    } else {
-      setInputError(true);
-    }
-
-    const outputResult = outputCheck(outputSpan);
-    if (outputResult && outputResult.success) {
-      setOutputError(false);
-    } else {
-      setOutputError(true);
-    }
-
-    if (
-      !inputResult ||
-      !outputResult ||
-      !inputResult.success ||
-      !outputResult.success
-    ) {
+    if (inputError || outputError || spanError) {
       return;
     }
 
-    if (databaseSchema === DatabaseSchema.LLM_CHAT_CALL) {
-      input = JSON.parse(inputSpan);
-      output = JSON.parse(outputSpan);
-    } else if (
-      databaseSchema === DatabaseSchema.FULL_TRACE ||
-      databaseSchema === DatabaseSchema.STRING_I_O
-    ) {
-      input = inputSpan;
-      output = outputSpan;
-    }
+    const entries = Object.keys(inputSpan).map((key) => {
+      if (databaseSchema === DatabaseSchema.STRING_I_O) {
+        return {
+          input: inputSpan[key],
+          output: outputSpan[key],
+        };
+      } else if (databaseSchema === DatabaseSchema.FULL_TRACE) {
+        return {
+          input: inputSpan[key],
+          output: outputSpan[key],
+          spans: JSON.parse(spanTrace[key]),
+        };
+      } else if (databaseSchema === DatabaseSchema.LLM_CHAT_CALL) {
+        return {
+          input: JSON.parse(inputSpan[key]),
+          output: JSON.parse(outputSpan[key]),
+        };
+      }
+    });
 
     createDatasetRecord.mutate(
       {
         projectId: project?.id ?? "",
-        input: input,
-        output: output,
+
+        entries: entries,
         datasetId: datasetId,
         datasetSchema: databaseSchema,
-        spans: spanTrace ? JSON.parse(spanTrace) : [],
       },
       {
         onSuccess: () => {
@@ -269,63 +255,63 @@ export function AddDatasetRecordDrawer(props: AddDatasetDrawerProps) {
   const selectLLMCall = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const value = e.target.value;
     const callSelected = value !== "" ? parseInt(value) : "";
+    const existingLLMCall = { ...selectedLLMCall };
+    existingLLMCall[selectedIndex] = value;
+    setSelectedLLMCall(existingLLMCall);
 
-    console.log("value", callSelected);
-
-    if (databaseSchema === DatabaseSchema.STRING_I_O && callSelected !== "") {
-      const existingInputSpan = { ...inputSpan };
-
-      // Check if the key exists in the object
-      if (!(selectedIndex in existingInputSpan)) {
-        // If it doesn't exist, set its value based on the conditions
-        existingInputSpan[selectedIndex] = JSON.parse(
-          spans.data?.[callSelected]?.input?.value ?? ""
-        )[0].content;
-
-        // Update the state with the new object
-        setInputSpan(existingInputSpan);
-      }
-      // setInputSpan({
-      //   [selectedIndex]: JSON.parse(
-      //     spans.data?.[callSelected]?.input?.value ?? ""
-      //   )[0].content,
-      // });
-
-      setOutputSpan(
-        JSON.parse(spans.data?.[callSelected]?.outputs?.[0]?.value ?? "")[0]
-          .content
-      );
-    } else if (
+    if (
       databaseSchema === DatabaseSchema.LLM_CHAT_CALL &&
       callSelected !== ""
     ) {
-      setInputSpan(
-        JSON.stringify(
-          JSON.parse(spans.data?.[callSelected]?.input?.value ?? ""),
-          undefined,
-          2
-        )
+      const existingInputSpan = { ...inputSpan };
+      existingInputSpan[selectedIndex] = JSON.stringify(
+        JSON.parse(
+          tracesWithSpans.data?.[selectedIndex]?.spans?.[callSelected]?.input
+            ?.value ?? ""
+        ),
+        undefined,
+        2
       );
-      setOutputSpan(
-        JSON.stringify(
-          JSON.parse(spans.data?.[callSelected]?.outputs?.[0]?.value ?? ""),
-          undefined,
-          2
-        )
+      setInputSpan(existingInputSpan);
+
+      const existingOutputSpan = { ...outputSpan };
+      existingOutputSpan[selectedIndex] = JSON.stringify(
+        JSON.parse(
+          tracesWithSpans.data?.[selectedIndex]?.spans?.[callSelected]
+            ?.outputs?.[0]?.value ?? ""
+        ),
+        undefined,
+        2
       );
+      setOutputSpan(existingOutputSpan);
     } else {
-      setInputSpan("");
-      setOutputSpan("");
+      inputSpan[selectedIndex] = "";
+      outputSpan[selectedIndex] = "";
+      setInputSpan(inputSpan);
+      setOutputSpan(outputSpan);
     }
   };
 
   const handleSpansChange = (e: any) => {
-    setSpanTrace(e.target.value);
+    const spans = e.target.value;
+    const updatedSpanTrace = { ...spanTrace };
+    updatedSpanTrace[selectedIndex] = spans;
+    setSpanTrace(updatedSpanTrace);
+
+    const spanResult = spanCheck(spans);
+    if (spanResult && spanResult.success) {
+      setSpanError(false);
+    } else {
+      setSpanError(true);
+    }
   };
 
   const handleInputChange = (e: any) => {
     const inputValue = e.target.value;
-    setInputSpan(inputValue);
+
+    const updatedInputSpan = { ...inputSpan };
+    updatedInputSpan[selectedIndex] = inputValue;
+    setInputSpan(updatedInputSpan);
     const inputResult = inputCheck(inputValue);
 
     if (inputResult && inputResult.success) {
@@ -337,7 +323,11 @@ export function AddDatasetRecordDrawer(props: AddDatasetDrawerProps) {
 
   const handleOutputChange = (e: any) => {
     const outputValue = e.target.value;
-    setOutputSpan(outputValue);
+
+    const updatedOutputSpan = { ...outputSpan };
+    updatedOutputSpan[selectedIndex] = outputValue;
+
+    setOutputSpan(updatedOutputSpan);
     const outputResult = outputCheck(outputValue);
 
     if (outputResult && outputResult.success) {
@@ -365,19 +355,62 @@ export function AddDatasetRecordDrawer(props: AddDatasetDrawerProps) {
     const datasetSchema = datasets.data?.find(
       (dataset) => dataset.id === e.target.value
     )?.schema;
-    setInputSpan("");
-    setOutputSpan("");
-    setSpanTrace("");
+
+    const length = props.selectedTraceIds?.length ?? 0;
+    const generateInitialObject = (length: number) => {
+      return Object.fromEntries(Array.from({ length }, (_, i) => [i, ""]));
+    };
+
+    const initialInputSpans = generateInitialObject(length);
+    const initialOutputSpans = generateInitialObject(length);
+    const initialLLMCalls = generateInitialObject(length);
+    const initialSpans = generateInitialObject(length);
+
+    if (datasetSchema === DatabaseSchema.STRING_I_O) {
+      tracesWithSpans.data?.forEach((trace, index) => {
+        initialInputSpans[index] = trace.input.value ?? "";
+        initialOutputSpans[index] = trace.output?.value ?? "";
+
+        setInputSpan(initialInputSpans);
+        setOutputSpan(initialOutputSpans);
+      });
+    }
+
+    if (datasetSchema === DatabaseSchema.LLM_CHAT_CALL) {
+      tracesWithSpans.data?.forEach((trace, index) => {
+        initialInputSpans[index] = JSON.stringify(
+          JSON.parse(trace.spans?.[0]?.input?.value ?? ""),
+          undefined,
+          2
+        );
+
+        initialOutputSpans[index] = JSON.stringify(
+          JSON.parse(trace.spans?.[0]?.outputs?.[0]?.value ?? ""),
+          undefined,
+          2
+        );
+        initialLLMCalls[index] = "0";
+
+        setInputSpan(initialInputSpans);
+        setOutputSpan(initialOutputSpans);
+        setSelectedLLMCall(initialLLMCalls);
+      });
+    }
 
     if (datasetSchema === DatabaseSchema.FULL_TRACE) {
-      const input = trace.data ? trace.data?.input?.value : "";
-      const output = trace.data ? trace.data?.output?.value : "";
-      const allSpans = createFullTraceDataset(spans.data);
+      tracesWithSpans.data?.forEach((trace, index) => {
+        initialInputSpans[index] = trace.input.value ?? "";
+        initialOutputSpans[index] = trace.output?.value ?? "";
+        const allSpans = createFullTraceDataset(trace.spans ?? "");
+        initialSpans[index] = allSpans ?? "";
 
-      setInputSpan(input);
-      setOutputSpan(output);
-      setSpanTrace(allSpans);
+        setInputSpan(initialInputSpans);
+        setOutputSpan(initialOutputSpans);
+        setSpanTrace(initialSpans);
+      });
     }
+
+    setSelectedIndex(0);
 
     setDatabaseSchema(datasetSchema ?? "");
     setDatabaseSchemaName(displayName(datasetSchema!));
@@ -464,40 +497,41 @@ export function AddDatasetRecordDrawer(props: AddDatasetDrawerProps) {
                   </VStack>
                 </Container>
               </HStack>
-              <HStack align={"start"} gap={8}>
-                <Container padding={0}>
-                  <Text fontWeight={"bold"}>Edit Entries</Text>
-                </Container>
-                <Container padding={0}>
-                  <Flex>
-                    <Spacer />
-                    <HStack gap={4}>
-                      {selectedIndex === 0 ? (
-                        <ChevronLeftIcon color={"gray.400"} />
-                      ) : (
-                        <ChevronLeftIcon
-                          onClick={selectIndexDown}
-                          cursor={"pointer"}
-                        />
-                      )}
-                      <Text fontWeight={"bold"}>{`${selectedIndex + 1}/${
-                        selectedTraceIds.length
-                      }`}</Text>
-                      {selectedIndex === selectedTraceIds.length - 1 ? (
-                        <ChevronRightIcon color={"gray.400"} />
-                      ) : (
-                        <ChevronRightIcon
-                          onClick={selectIndexUp}
-                          cursor={"pointer"}
-                        />
-                      )}
-                    </HStack>
-                  </Flex>
-                </Container>
-              </HStack>
+              {selectedTraceIds.length > 1 ? (
+                <HStack align={"start"} gap={8}>
+                  <Container padding={0}>
+                    <Text fontWeight={"bold"}>Edit Entries</Text>
+                  </Container>
+                  <Container padding={0}>
+                    <Flex>
+                      <Spacer />
+                      <HStack gap={4}>
+                        {selectedIndex === 0 ? (
+                          <ChevronLeftIcon color={"gray.400"} />
+                        ) : (
+                          <ChevronLeftIcon
+                            onClick={selectIndexDown}
+                            cursor={"pointer"}
+                          />
+                        )}
+                        <Text fontWeight={"bold"}>{`${selectedIndex + 1}/${
+                          selectedTraceIds.length
+                        }`}</Text>
+                        {selectedIndex === selectedTraceIds.length - 1 ? (
+                          <ChevronRightIcon color={"gray.400"} />
+                        ) : (
+                          <ChevronRightIcon
+                            onClick={selectIndexUp}
+                            cursor={"pointer"}
+                          />
+                        )}
+                      </HStack>
+                    </Flex>
+                  </Container>
+                </HStack>
+              ) : null}
 
-              {databaseSchema === DatabaseSchema.LLM_CHAT_CALL ||
-              databaseSchema === DatabaseSchema.STRING_I_O ? (
+              {databaseSchema === DatabaseSchema.LLM_CHAT_CALL ? (
                 <HStack align={"start"} gap={8}>
                   <Container padding={0}>
                     <VStack align={"start"} padding={0}>
@@ -511,11 +545,18 @@ export function AddDatasetRecordDrawer(props: AddDatasetDrawerProps) {
                     <VStack align={"start"}>
                       <Select onChange={selectLLMCall} required>
                         <option value={""}>Select LLM Call</option>
-                        {spans.data
-                          ? spans.data?.map(
+                        {tracesWithSpans
+                          ? tracesWithSpans.data?.[selectedIndex]?.spans?.map(
                               (dataset, index) =>
                                 dataset.type === "llm" && (
-                                  <option key={index} value={index}>
+                                  <option
+                                    key={index}
+                                    value={index}
+                                    selected={
+                                      selectedLLMCall[selectedIndex] ===
+                                      index.toString()
+                                    }
+                                  >
                                     {dataset.model ?? "(noname)"} -{" "}
                                     {formatNumberWithSuffix(index + 1)} LLM Call
                                   </option>
@@ -570,7 +611,7 @@ export function AddDatasetRecordDrawer(props: AddDatasetDrawerProps) {
                     <Textarea
                       onChange={handleOutputChange}
                       rows={5}
-                      value={outputSpan}
+                      value={outputSpan[selectedIndex]}
                     />
                     <FormErrorMessage>
                       {getOutputErroMessage()}
@@ -580,7 +621,7 @@ export function AddDatasetRecordDrawer(props: AddDatasetDrawerProps) {
               ) : null}
 
               {databaseSchema === DatabaseSchema.FULL_TRACE ? (
-                <FormControl isInvalid={outputError}>
+                <FormControl isInvalid={spanError}>
                   <HStack marginBottom={2}>
                     <Text fontWeight={"bold"}> Spans</Text>
                     <Tooltip label="Full span trace of all messages">
@@ -590,19 +631,21 @@ export function AddDatasetRecordDrawer(props: AddDatasetDrawerProps) {
                   <Textarea
                     onChange={handleSpansChange}
                     rows={10}
-                    value={spanTrace}
+                    value={spanTrace[selectedIndex]}
                   />
-                  <FormErrorMessage>
-                    Invalid LLM Chat message format
-                  </FormErrorMessage>
+                  <FormErrorMessage>Invalid Span format</FormErrorMessage>
                 </FormControl>
               ) : null}
 
-              {databaseSchema !== "" ? (
+              {databaseSchema == "" ? null : createDatasetRecord.isLoading ? (
+                <Button colorScheme="blue" width="fit-content">
+                  Uploading...
+                </Button>
+              ) : (
                 <Button colorScheme="blue" type="submit" width="fit-content">
                   Add to dataset
                 </Button>
-              ) : null}
+              )}
             </Stack>
           </form>
         </DrawerBody>
