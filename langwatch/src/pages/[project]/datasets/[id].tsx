@@ -159,6 +159,13 @@ export default function Dataset() {
         csvData.push([
           getInput(record, dataset.data!.schema),
           getOutput(record, dataset.data!.schema),
+          new Date(record.createdAt).toLocaleString(),
+          new Date(record.updatedAt).toLocaleString(),
+        ]);
+      } else {
+        csvData.push([
+          getInput(record, dataset.data!.schema),
+          getOutput(record, dataset.data!.schema),
           getTrace(record, dataset.data!.schema),
           new Date(record.createdAt).toLocaleString(),
           new Date(record.updatedAt).toLocaleString(),
