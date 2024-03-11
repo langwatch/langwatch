@@ -420,7 +420,8 @@ export const DashboardLayout = ({
           <Menu>
             <Stack align="center" direction="row">
               {(router.pathname.includes("messages") ||
-                router.pathname.includes("datasets")) && (
+                router.pathname.includes("datasets") ||
+                router.pathname.includes("analytics")) && (
                 <Switch
                   size="lg"
                   onChange={toggleDevView}

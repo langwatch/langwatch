@@ -28,11 +28,6 @@ import type { GetServerSidePropsContext } from "next";
 import { useRouter } from "next/router";
 import numeral from "numeral";
 import { CheckCircle, XCircle } from "react-feather";
-import { DashboardLayout } from "~/components/DashboardLayout";
-import {
-  FilterToggle,
-  useFilterToggle,
-} from "../../components/filters/FilterToggle";
 import {
   PeriodSelector,
   usePeriodSelector,
@@ -49,14 +44,20 @@ import { LLMSummary } from "../../components/analytics/LLMSummary";
 import { SatisfactionGraphs } from "../../components/analytics/SatisfactionGraph";
 import { SessionsSummary } from "../../components/analytics/SessionsSummary";
 import { TopTopics } from "../../components/analytics/TopTopics";
+import { FilterSidebar } from "../../components/filters/FilterSidebar";
+import {
+  FilterToggle,
+  useFilterToggle,
+} from "../../components/filters/FilterToggle";
+import { useFilterParams } from "../../hooks/useFilterParams";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { dependencies } from "../../injection/dependencies.client";
 import { dependencies as serverDependencies } from "../../injection/dependencies.server";
 import { analyticsMetrics } from "../../server/analytics/registry";
 import { TeamRoleGroup } from "../../server/api/permission";
 import { api } from "../../utils/api";
-import { FilterSidebar } from "../../components/filters/FilterSidebar";
-import { useFilterParams } from "../../hooks/useFilterParams";
+
+import GraphsLayout from "~/components/GraphsLayout";
 
 export default function ProjectRouter() {
   const router = useRouter();
@@ -100,7 +101,7 @@ function Index() {
   const { showFilters } = useFilterToggle();
 
   return (
-    <DashboardLayout>
+    <GraphsLayout>
       <Container maxWidth={showFilters ? "1612" : "1200"} padding={6}>
         {project && !project.firstMessage && (
           <Alert status="warning" variant="left-accent" marginBottom={6}>
@@ -124,11 +125,8 @@ function Index() {
             </VStack>
           </Alert>
         )}
-        <Container maxWidth="1152" padding={0}>
+        <Container maxWidth="1152" padding={0} paddingBottom={3}>
           <HStack width="full" align="top">
-            <Heading as={"h1"} size="lg" paddingBottom={6} paddingTop={1}>
-              User Metrics
-            </Heading>
             <Spacer />
             <FilterToggle />
             <PeriodSelector
@@ -137,6 +135,7 @@ function Index() {
             />
           </HStack>
         </Container>
+
         <HStack align="start" width="full" spacing={8}>
           <VStack align="start" width="full">
             <UserMetrics />
@@ -146,7 +145,7 @@ function Index() {
           <FilterSidebar hideTopics={true} />
         </HStack>
       </Container>
-    </DashboardLayout>
+    </GraphsLayout>
   );
 }
 

@@ -11,6 +11,7 @@ import {
   CardHeader,
   Center,
   Container,
+  Flex,
   FormControl,
   FormLabel,
   Grid,
@@ -27,18 +28,38 @@ import {
   Text,
   VStack,
   useTheme,
+  useToast,
+  Link,
+  useDisclosure,
+  Modal,
+  ModalBody,
+  ModalCloseButton,
+  ModalContent,
+  ModalFooter,
+  ModalHeader,
+  ModalOverlay,
+  Textarea,
 } from "@chakra-ui/react";
+import { CheckCircleIcon } from "@chakra-ui/icons";
+
 import {
   Select as MultiSelect,
   chakraComponents,
   type SingleValue,
 } from "chakra-react-select";
-import { useEffect, useState, type Dispatch, type SetStateAction } from "react";
+import {
+  useEffect,
+  useState,
+  type Dispatch,
+  type SetStateAction,
+  use,
+} from "react";
 import {
   AlignLeft,
   BarChart2,
   Check,
   GitBranch,
+  MoreVertical,
   PieChart,
   Trash,
   TrendingUp,
@@ -95,6 +116,10 @@ import {
   camelCaseToTitleCase,
   uppercaseFirstLetterLowerCaseRest,
 } from "../../../utils/stringCasing";
+import { router } from "@trpc/server";
+import { useRouter } from "next/router";
+import { de } from "date-fns/locale";
+import { useDevView } from "~/hooks/DevViewProvider";
 
 export interface CustomGraphFormData {
   title: string;
@@ -201,6 +226,8 @@ const defaultValues: CustomGraphFormData = {
 };
 
 export default function AnalyticsCustomGraph() {
+  const { isOpen, onOpen, onClose } = useDisclosure();
+  const { isDevViewEnabled } = useDevView();
   const form = useForm<CustomGraphFormData>({
     defaultValues,
   });
@@ -241,19 +268,43 @@ export default function AnalyticsCustomGraph() {
             />
           </HStack>
           <HStack width="full" align="start" minHeight="500px" spacing={8}>
-            <Card minWidth="540px" minHeight="596px">
+            <Card minWidth="540px" minHeight="560px">
               <CardBody>
                 <CustomGraphForm form={form} seriesFields={seriesFields} />
               </CardBody>
             </Card>
             <Card width="full">
               <CardHeader paddingTop={3} paddingBottom={1} paddingX={3}>
-                <Input
-                  {...form.control.register(`title`)}
-                  border="none"
-                  paddingX={2}
-                  fontWeight="bold"
-                />
+                <Flex>
+                  <Input
+                    {...form.control.register(`title`)}
+                    border="none"
+                    paddingX={2}
+                    fontWeight="bold"
+                  />
+                  {isDevViewEnabled && (
+                    <Menu>
+                      <MenuButton
+                        as={Button}
+                        variant={"ghost"}
+                        // isLoading={
+                        //   deleteGraphs.isLoading &&
+                        //   deleteGraphs.variables?.id === graph.id
+                        // }
+                      >
+                        <MoreVertical />
+                      </MenuButton>
+                      <MenuList>
+                        <MenuItem
+                          onClick={onOpen}
+                          // icon={<DeleteIcon />}
+                        >
+                          Show JSON
+                        </MenuItem>
+                      </MenuList>
+                    </Menu>
+                  )}
+                </Flex>
               </CardHeader>
               <CardBody>
                 {debouncedCustomGraphInput && (
@@ -264,6 +315,22 @@ export default function AnalyticsCustomGraph() {
           </HStack>
         </VStack>
       </Container>
+      <Modal isOpen={isOpen} onClose={onClose}>
+        <ModalOverlay />
+        <ModalContent>
+          <ModalHeader>Graph JSON</ModalHeader>
+          <ModalCloseButton />
+          <ModalBody>
+            <Textarea rows={16}>
+              {JSON.stringify(debouncedCustomGraphInput, null, 2)}
+            </Textarea>
+
+            {/* <Lorem count={2} /> */}
+          </ModalBody>
+
+          <ModalFooter></ModalFooter>
+        </ModalContent>
+      </Modal>
     </DashboardLayout>
   );
 }
@@ -307,7 +374,7 @@ const customGraphFormToCustomGraphInput = (
     includePrevious: formData.includePrevious,
     timeScale: formData.timeScale,
     connected: formData.connected,
-    height: 500,
+    height: 550,
   };
 };
 
@@ -343,6 +410,31 @@ function CustomGraphForm({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form, groupBy, joinedSeriesNames]);
+
+  const addNewGraph = api.graphs.create.useMutation();
+  const { project } = useOrganizationTeamProject();
+  const router = useRouter();
+
+  const addGraph = () => {
+    const graphName = form.getValues("title");
+    const graphJson = customGraphFormToCustomGraphInput(form.getValues());
+    if (graphJson && graphJson.hasOwnProperty("height")) {
+      graphJson.height = 300;
+    }
+
+    addNewGraph.mutate(
+      {
+        projectId: project?.id ?? "",
+        name: graphName,
+        graph: JSON.stringify(graphJson),
+      },
+      {
+        onSuccess: () => {
+          void router.push(`/${project?.slug}/analytics/reports`);
+        },
+      }
+    );
+  };
 
   return (
     <VStack width="full" align="start" spacing={4} maxWidth="500px">
@@ -467,13 +559,31 @@ function CustomGraphForm({
             name="includePrevious"
             defaultValue={false}
             render={({ field: { onChange, value } }) => (
-              <Switch onChange={onChange} isChecked={value}>
+              <Switch
+                onChange={onChange}
+                isChecked={value}
+                colorScheme="orange"
+              >
                 Include previous period
               </Switch>
             )}
           />
         </FormControl>
       )}
+      <HStack width="full" spacing={2}>
+        <Spacer />
+        <Button
+          colorScheme="orange"
+          isLoading={addNewGraph.isLoading}
+          onClick={() => {
+            addGraph();
+          }}
+          marginX={2}
+          minWidth="fit-content"
+        >
+          Save
+        </Button>
+      </HStack>
     </VStack>
   );
 }

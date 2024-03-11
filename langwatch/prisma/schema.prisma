@@ -150,6 +150,7 @@ model Project {
     costs        Cost[]
     topics       Topic[]
     datasets     Dataset[]
+    customGraphs CustomGraph[]
 
     @@index([teamId])
 }
@@ -274,4 +275,16 @@ model DatasetRecord {
     updatedAt DateTime @default(now()) @updatedAt
    
     @@index([datasetId])
+}
+
+model CustomGraph {
+    id        String   @id @default(nanoid())
+    projectId String
+    project   Project  @relation(fields: [projectId], references: [id])
+    name      String
+    graph     Json
+    createdAt DateTime @default(now())
+    updatedAt DateTime @default(now()) @updatedAt
+
+    @@unique([id])
 }

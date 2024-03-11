@@ -11,6 +11,7 @@ import { subscriptionRouter } from "./routers/subscription";
 import { topicsRouter } from "./routers/topics";
 import { datasetRouter } from "./routers/dataset";
 import { datasetRecordRouter } from "./routers/datasetRecord";
+import { graphsRouter } from "./routers/graphs";
 
 /**
  * This is the primary router for your server.
@@ -30,7 +31,7 @@ export const appRouter = createTRPCRouter({
   topics: topicsRouter,
   dataset: datasetRouter,
   datasetRecord: datasetRecordRouter,
-  
+  graphs: graphsRouter,
 });
 
 // export type definition of API

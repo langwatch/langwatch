@@ -40,8 +40,6 @@ export const analyticsRouter = createTRPCRouter({
         },
       });
 
-      console.log("result", JSON.stringify(result, undefined, 2));
-
       const buckets: any[] | undefined = (
         result.aggregations?.status_counts as any
       )?.child.buckets;
