@@ -95,348 +95,411 @@ const GraphComponentMap: Partial<{
   stacked_area: [AreaChart, Area],
   scatter: [ScatterChart, Scatter],
 };
-export const CustomGraph = function CustomGraph({
-  input,
-  titleProps,
-  hideGroupLabel = false,
-}: {
-  input: CustomGraphInput;
-  titleProps?: {
-    fontSize?: TypographyProps["fontSize"];
-    color?: ColorProps["color"];
-    fontWeight?: TypographyProps["fontWeight"];
-  };
-  hideGroupLabel?: boolean;
-}) {
-  const height_ = input.height ?? 300;
-  const { filterParams, queryOpts } = useFilterParams();
 
-  const timeseries = api.analytics.getTimeseries.useQuery(
-    {
-      ...filterParams,
-      ...input,
-      timeScale: summaryGraphTypes.includes(input.graphType)
-        ? "full"
-        : input.timeScale === "full"
-        ? input.timeScale
-        : parseInt(input.timeScale.toString(), 10),
-    },
-    queryOpts
-  );
+export const CustomGraph = React.memo(
+  function CustomGraph({
+    input,
+    titleProps,
+    hideGroupLabel = false,
+  }: {
+    input: CustomGraphInput;
+    titleProps?: {
+      fontSize?: TypographyProps["fontSize"];
+      color?: ColorProps["color"];
+      fontWeight?: TypographyProps["fontWeight"];
+    };
+    hideGroupLabel?: boolean;
+  }) {
+    const height_ = input.height ?? 300;
+    const { filterParams, queryOpts } = useFilterParams();
 
-  const currentAndPreviousData = shapeDataForGraph(input, timeseries);
-  const expectedKeys = Array.from(
-    new Set(
-      currentAndPreviousData?.flatMap((entry) =>
-        Object.keys(entry).filter(
-          (key) => key !== "date" && !key.startsWith("previous")
-        )
-      ) ?? []
-    )
-  );
-  const currentAndPreviousDataFilled =
-    input.graphType === "scatter"
-      ? currentAndPreviousData
-      : fillEmptyData(currentAndPreviousData, expectedKeys);
-  const keysToValues = Object.fromEntries(
-    expectedKeys.map((key) => [
-      key,
-      currentAndPreviousDataFilled?.reduce(
-        (acc, entry) => [...acc, entry[key]!],
-        [] as number[]
-      ) ?? [],
-    ])
-  );
-  const keysToSum = Object.fromEntries(
-    Object.entries(keysToValues).map(([key, values]) => [
-      key,
-      values.reduce((acc, value) => acc + value, 0),
-    ])
-  );
-  const sortedKeys = expectedKeys
-    .filter((key) => keysToSum[key]! !== 0)
-    .sort((a, b) => {
-      const totalA = keysToSum[a]!;
-      const totalB = keysToSum[b]!;
+    const timeseries = api.analytics.getTimeseries.useQuery(
+      {
+        ...filterParams,
+        ...input,
+        timeScale: summaryGraphTypes.includes(input.graphType)
+          ? "full"
+          : input.timeScale === "full"
+          ? input.timeScale
+          : parseInt(input.timeScale.toString(), 10),
+      },
+      queryOpts
+    );
 
-      return totalB - totalA;
-    });
+    const currentAndPreviousData = shapeDataForGraph(input, timeseries);
+    const expectedKeys = Array.from(
+      new Set(
+        currentAndPreviousData?.flatMap((entry) =>
+          Object.keys(entry).filter(
+            (key) => key !== "date" && !key.startsWith("previous")
+          )
+        ) ?? []
+      )
+    );
+    const currentAndPreviousDataFilled =
+      input.graphType === "scatter"
+        ? currentAndPreviousData
+        : fillEmptyData(currentAndPreviousData, expectedKeys);
+    const keysToValues = Object.fromEntries(
+      expectedKeys.map((key) => [
+        key,
+        currentAndPreviousDataFilled?.reduce(
+          (acc, entry) => [...acc, entry[key]!],
+          [] as number[]
+        ) ?? [],
+      ])
+    );
+    const keysToSum = Object.fromEntries(
+      Object.entries(keysToValues).map(([key, values]) => [
+        key,
+        values.reduce((acc, value) => acc + value, 0),
+      ])
+    );
+    const sortedKeys = expectedKeys
+      .filter((key) => keysToSum[key]! !== 0)
+      .sort((a, b) => {
+        const totalA = keysToSum[a]!;
+        const totalB = keysToSum[b]!;
 
-  const seriesByKey = Object.fromEntries(
-    input.series.map((series) => {
-      const key = [
-        series.metric,
-        series.aggregation,
-        series.pipeline?.field,
-        series.pipeline?.aggregation,
-      ]
-        .filter((x) => x)
-        .join("/");
+        return totalB - totalA;
+      });
 
-      return [key, series];
-    })
-  );
-
-  const nameForSeries = (aggKey: string) => {
-    const { series, groupKey } = getSeries(seriesByKey, aggKey);
-
-    const group =
-      input.groupBy && groupKey ? getGroup(input.groupBy) : undefined;
-    const groupName = groupKey
-      ? `${hideGroupLabel ? "" : group?.label.toLowerCase() + " "}${groupKey}`
-      : "";
-    return input.series.length > 1
-      ? (series?.name ?? aggKey) + (groupName ? ` (${groupName})` : "")
-      : groupName
-      ? uppercaseFirstLetter(groupName)
-      : series?.name ?? aggKey;
-  };
-
-  const colorForSeries = (aggKey: string, index: number): string => {
-    const { series, groupKey } = getSeries(seriesByKey, aggKey);
-
-    const colorSet: RotatingColorSet = series?.colorSet ?? "grayTones";
-
-    if (colorSet === "positiveNegativeNeutral" && groupKey) {
-      const [positive, negative, neutral] = [0, 1, 2];
-      const colorMap: Record<string, number> = {
-        positive,
-        negative,
-        neutral,
-        error: negative,
-        failed: negative,
-        succeeded: positive,
-      };
-
-      return getColor(colorSet, colorMap[groupKey] ?? neutral);
-    }
-
-    return getColor(colorSet, index);
-  };
-
-  const formatWith = (
-    format: string | ((value: number) => string) | undefined,
-    value: number
-  ) => {
-    if (typeof format === "function") {
-      return format(value);
-    }
-    return numeral(value).format(format ?? "0a");
-  };
-
-  const valueFormats = Array.from(
-    new Set(
+    const seriesByKey = Object.fromEntries(
       input.series.map((series) => {
-        const metric = getMetric(series.metric);
-        return metric?.format ?? "0a";
+        const key = [
+          series.metric,
+          series.aggregation,
+          series.pipeline?.field,
+          series.pipeline?.aggregation,
+        ]
+          .filter((x) => x)
+          .join("/");
+
+        return [key, series];
       })
-    )
-  );
-  const yAxisValueFormat = valueFormats.length === 1 ? valueFormats[0] : "";
-  const maxValue = Math.max(
-    ...Object.values(keysToValues).flatMap((values) => values)
-  );
-
-  const getColor = useGetRotatingColorForCharts();
-  const theme = useTheme();
-  const gray400 = theme.colors.gray["400"];
-
-  const formatDate = (date: string) => date && format(new Date(date), "MMM d");
-  const tooltipValueFormatter = (
-    value: number | string,
-    _: string,
-    payload: Payload<any, any>
-  ) => {
-    if (payload.dataKey === "date") {
-      return formatDate(value as string);
-    }
-    const { series } = getSeries(
-      seriesByKey,
-      payload.payload?.key ?? (payload.dataKey as string)
-    );
-    const metric = series?.metric && getMetric(series.metric);
-
-    return formatWith(metric?.format, value as number);
-  };
-
-  const container = (child: React.ReactNode) => {
-    const allEmpty =
-      currentAndPreviousData &&
-      (maxValue == 0 || currentAndPreviousData?.length === 0);
-
-    return (
-      <Box width="full" height="full" position="relative">
-        {input.graphType !== "summary" && timeseries.isFetching && (
-          <Spinner position="absolute" right={4} top={4} />
-        )}
-        {timeseries.error && (
-          <Alert
-            status="error"
-            position="absolute"
-            variant="left-accent"
-            width="fit-content"
-            right={4}
-            top={4}
-          >
-            <AlertIcon />
-            Error loading graph data
-          </Alert>
-        )}
-        {input.graphType !== "summary" && allEmpty && (
-          <Box
-            position="absolute"
-            top="50%"
-            left="50%"
-            transform="translate(-50%, -50%)"
-          >
-            No data
-          </Box>
-        )}
-        {child}
-      </Box>
-    );
-  };
-
-  if (input.graphType === "summary") {
-    const summaryData = shapeDataForSummary(
-      input,
-      seriesByKey,
-      timeseries,
-      nameForSeries
     );
 
-    const seriesSet = Object.fromEntries(
-      input.series
-        .reverse()
-        .map((series) => [
-          series.metric +
-            series.aggregation +
-            series.pipeline?.field +
-            series.pipeline?.aggregation,
-          series,
-        ])
+    const nameForSeries = (aggKey: string) => {
+      const { series, groupKey } = getSeries(seriesByKey, aggKey);
+
+      const group =
+        input.groupBy && groupKey ? getGroup(input.groupBy) : undefined;
+      const groupName = groupKey
+        ? `${hideGroupLabel ? "" : group?.label.toLowerCase() + " "}${groupKey}`
+        : "";
+      return input.series.length > 1
+        ? (series?.name ?? aggKey) + (groupName ? ` (${groupName})` : "")
+        : groupName
+        ? uppercaseFirstLetter(groupName)
+        : series?.name ?? aggKey;
+    };
+
+    const colorForSeries = (aggKey: string, index: number): string => {
+      const { series, groupKey } = getSeries(seriesByKey, aggKey);
+
+      const colorSet: RotatingColorSet = series?.colorSet ?? "grayTones";
+
+      if (colorSet === "positiveNegativeNeutral" && groupKey) {
+        const [positive, negative, neutral] = [0, 1, 2];
+        const colorMap: Record<string, number> = {
+          positive,
+          negative,
+          neutral,
+          error: negative,
+          failed: negative,
+          succeeded: positive,
+        };
+
+        return getColor(colorSet, colorMap[groupKey] ?? neutral);
+      }
+
+      return getColor(colorSet, index);
+    };
+
+    const formatWith = (
+      format: string | ((value: number) => string) | undefined,
+      value: number
+    ) => {
+      if (typeof format === "function") {
+        return format(value);
+      }
+      return numeral(value).format(format ?? "0a");
+    };
+
+    const valueFormats = Array.from(
+      new Set(
+        input.series.map((series) => {
+          const metric = getMetric(series.metric);
+          return metric?.format ?? "0a";
+        })
+      )
+    );
+    const yAxisValueFormat = valueFormats.length === 1 ? valueFormats[0] : "";
+    const maxValue = Math.max(
+      ...Object.values(keysToValues).flatMap((values) => values)
     );
 
-    return container(
-      <HStack spacing={0} align="start" minHeight="101px">
-        {timeseries.isLoading &&
-          Object.entries(seriesSet).map(([key, series]) => (
+    const getColor = useGetRotatingColorForCharts();
+    const theme = useTheme();
+    const gray400 = theme.colors.gray["400"];
+
+    const formatDate = (date: string) =>
+      date && format(new Date(date), "MMM d");
+    const tooltipValueFormatter = (
+      value: number | string,
+      _: string,
+      payload: Payload<any, any>
+    ) => {
+      if (payload.dataKey === "date") {
+        return formatDate(value as string);
+      }
+      const { series } = getSeries(
+        seriesByKey,
+        payload.payload?.key ?? (payload.dataKey as string)
+      );
+      const metric = series?.metric && getMetric(series.metric);
+
+      return formatWith(metric?.format, value as number);
+    };
+
+    const container = (child: React.ReactNode) => {
+      const allEmpty =
+        currentAndPreviousData &&
+        (maxValue == 0 || currentAndPreviousData?.length === 0);
+
+      return (
+        <Box width="full" height="full" position="relative">
+          {input.graphType !== "summary" && timeseries.isFetching && (
+            <Spinner position="absolute" right={4} top={4} />
+          )}
+          {timeseries.error && (
+            <Alert
+              status="error"
+              position="absolute"
+              variant="left-accent"
+              width="fit-content"
+              right={4}
+              top={4}
+            >
+              <AlertIcon />
+              Error loading graph data
+            </Alert>
+          )}
+          {input.graphType !== "summary" && allEmpty && (
+            <Box
+              position="absolute"
+              top="50%"
+              left="50%"
+              transform="translate(-50%, -50%)"
+            >
+              No data
+            </Box>
+          )}
+          {child}
+        </Box>
+      );
+    };
+
+    if (input.graphType === "summary") {
+      const summaryData = shapeDataForSummary(
+        input,
+        seriesByKey,
+        timeseries,
+        nameForSeries
+      );
+
+      const seriesSet = Object.fromEntries(
+        input.series
+          .reverse()
+          .map((series) => [
+            series.metric +
+              series.aggregation +
+              series.pipeline?.field +
+              series.pipeline?.aggregation,
+            series,
+          ])
+      );
+
+      return container(
+        <HStack spacing={0} align="start" minHeight="101px">
+          {timeseries.isLoading &&
+            Object.entries(seriesSet).map(([key, series]) => (
+              <SummaryMetric
+                key={key}
+                label={series.name}
+                titleProps={titleProps}
+              />
+            ))}
+          {summaryData.current.slice(0, 10).map((entry, index) => (
             <SummaryMetric
-              key={key}
-              label={series.name}
+              key={entry.key}
+              label={entry.name}
+              current={entry.value}
+              previous={summaryData.previous[index]?.value}
+              format={entry.metric?.format}
+              increaseIs={entry.metric?.increaseIs}
               titleProps={titleProps}
             />
           ))}
-        {summaryData.current.slice(0, 10).map((entry, index) => (
-          <SummaryMetric
-            key={entry.key}
-            label={entry.name}
-            current={entry.value}
-            previous={summaryData.previous[index]?.value}
-            format={entry.metric?.format}
-            increaseIs={entry.metric?.increaseIs}
-            titleProps={titleProps}
-          />
-        ))}
-      </HStack>
-    );
-  }
+        </HStack>
+      );
+    }
 
-  if (input.graphType === "pie" || input.graphType === "donnut") {
-    const summaryData = shapeDataForSummary(
-      input,
-      seriesByKey,
-      timeseries,
-      nameForSeries
-    );
+    if (input.graphType === "pie" || input.graphType === "donnut") {
+      const summaryData = shapeDataForSummary(
+        input,
+        seriesByKey,
+        timeseries,
+        nameForSeries
+      );
 
-    return container(
-      <ResponsiveContainer
-        key={currentAndPreviousDataFilled ? input.graphId : "loading"}
-        height={height_}
-      >
-        <PieChart>
-          <Pie
-            data={summaryData.current}
-            nameKey="name"
-            dataKey="value"
-            labelLine={false}
-            label={pieChartPercentageLabel}
-            innerRadius={input.graphType === "donnut" ? "50%" : 0}
+      return container(
+        <ResponsiveContainer
+          key={currentAndPreviousDataFilled ? input.graphId : "loading"}
+          height={height_}
+        >
+          <PieChart>
+            <Pie
+              data={summaryData.current}
+              nameKey="name"
+              dataKey="value"
+              labelLine={false}
+              label={pieChartPercentageLabel}
+              innerRadius={input.graphType === "donnut" ? "50%" : 0}
+            >
+              {summaryData.current.map((entry, index) => (
+                <Cell
+                  key={`cell-${index}`}
+                  fill={colorForSeries(entry.key, index)}
+                />
+              ))}
+            </Pie>
+            <Tooltip formatter={tooltipValueFormatter} />
+            <Legend
+              wrapperStyle={{
+                padding: "0 2rem",
+                maxHeight: "15%",
+                overflow: "auto",
+              }}
+            />
+          </PieChart>
+        </ResponsiveContainer>
+      );
+    }
+
+    const [GraphComponent, GraphElement] = GraphComponentMap[input.graphType]!;
+
+    const [XAxisComponent, YAxisComponent] =
+      input.graphType === "horizontal_bar" ? [YAxis, XAxis] : [XAxis, YAxis];
+
+    if (
+      ["bar", "horizontal_bar"].includes(input.graphType) &&
+      input.timeScale === "full"
+    ) {
+      const summaryData = shapeDataForSummary(
+        input,
+        seriesByKey,
+        timeseries,
+        nameForSeries
+      );
+      const sortedCurrentData = summaryData.current.sort(
+        (a, b) => b.value - a.value
+      );
+
+      const longestName = Math.max(
+        ...summaryData.current.map((entry) => entry.name.length)
+      );
+
+      const xAxisWidth = Math.min(longestName * 8, 300);
+
+      return container(
+        <ResponsiveContainer
+          key={currentAndPreviousDataFilled ? input.graphId : "loading"}
+          height={height_}
+        >
+          <BarChart
+            data={sortedCurrentData}
+            barCategoryGap={10}
+            layout={
+              input.graphType === "horizontal_bar" ? "vertical" : undefined
+            }
           >
-            {summaryData.current.map((entry, index) => (
-              <Cell
-                key={`cell-${index}`}
-                fill={colorForSeries(entry.key, index)}
-              />
-            ))}
-          </Pie>
-          <Tooltip formatter={tooltipValueFormatter} />
-          <Legend
-            wrapperStyle={{
-              padding: "0 2rem",
-              maxHeight: "15%",
-              overflow: "auto",
-            }}
-          />
-        </PieChart>
-      </ResponsiveContainer>
-    );
-  }
-
-  const [GraphComponent, GraphElement] = GraphComponentMap[input.graphType]!;
-
-  const [XAxisComponent, YAxisComponent] =
-    input.graphType === "horizontal_bar" ? [YAxis, XAxis] : [XAxis, YAxis];
-
-  if (
-    ["bar", "horizontal_bar"].includes(input.graphType) &&
-    input.timeScale === "full"
-  ) {
-    const summaryData = shapeDataForSummary(
-      input,
-      seriesByKey,
-      timeseries,
-      nameForSeries
-    );
-    const sortedCurrentData = summaryData.current.sort(
-      (a, b) => b.value - a.value
-    );
-
-    const longestName = Math.max(
-      ...summaryData.current.map((entry) => entry.name.length)
-    );
-
-    const xAxisWidth = Math.min(longestName * 8, 300);
+            <XAxisComponent
+              type="category"
+              dataKey="name"
+              width={
+                input.graphType === "horizontal_bar" ? xAxisWidth : undefined
+              }
+              height={
+                input.graphType === "horizontal_bar" ? undefined : xAxisWidth
+              }
+              tickLine={false}
+              axisLine={false}
+              tick={{ fill: gray400 }}
+              angle={input.graphType === "horizontal_bar" ? undefined : 45}
+              textAnchor={
+                input.graphType === "horizontal_bar" ? "end" : "start"
+              }
+            />
+            <YAxisComponent
+              type="number"
+              dataKey="value"
+              domain={[0, "dataMax"]}
+              tick={{ fill: gray400 }}
+              tickFormatter={(value) => {
+                if (typeof yAxisValueFormat === "function") {
+                  return yAxisValueFormat(value);
+                }
+                return numeral(value).format(yAxisValueFormat);
+              }}
+            />
+            <Tooltip formatter={tooltipValueFormatter} />
+            <Bar dataKey="value">
+              {summaryData.current.map((entry, index) => (
+                <Cell
+                  key={`cell-${index}`}
+                  fill={colorForSeries(entry.key, index)}
+                />
+              ))}
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
+      );
+    }
 
     return container(
       <ResponsiveContainer
         key={currentAndPreviousDataFilled ? input.graphId : "loading"}
         height={height_}
       >
-        <BarChart
-          data={sortedCurrentData}
-          barCategoryGap={10}
+        <GraphComponent
+          data={currentAndPreviousDataFilled}
+          margin={{
+            top: 10,
+            left: formatWith(yAxisValueFormat, maxValue).length * 6 - 5,
+            right: 24,
+          }}
           layout={input.graphType === "horizontal_bar" ? "vertical" : undefined}
         >
+          <CartesianGrid
+            vertical={input.graphType === "scatter"}
+            strokeDasharray="5 7"
+          />
           <XAxisComponent
             type="category"
-            dataKey="name"
-            width={
-              input.graphType === "horizontal_bar" ? xAxisWidth : undefined
-            }
-            height={
-              input.graphType === "horizontal_bar" ? undefined : xAxisWidth
-            }
+            dataKey="date"
+            name="Date"
+            tickFormatter={formatDate}
             tickLine={false}
             axisLine={false}
             tick={{ fill: gray400 }}
-            angle={input.graphType === "horizontal_bar" ? undefined : 45}
-            textAnchor={input.graphType === "horizontal_bar" ? "end" : "start"}
           />
           <YAxisComponent
             type="number"
-            dataKey="value"
+            axisLine={false}
+            tickLine={false}
+            tickCount={4}
+            tickMargin={20}
             domain={[0, "dataMax"]}
             tick={{ fill: gray400 }}
             tickFormatter={(value) => {
@@ -446,163 +509,92 @@ export const CustomGraph = function CustomGraph({
               return numeral(value).format(yAxisValueFormat);
             }}
           />
-          <Tooltip formatter={tooltipValueFormatter} />
-          <Bar dataKey="value">
-            {summaryData.current.map((entry, index) => (
-              <Cell
-                key={`cell-${index}`}
-                fill={colorForSeries(entry.key, index)}
-              />
-            ))}
-          </Bar>
-        </BarChart>
-      </ResponsiveContainer>
-    );
-  }
-
-  return container(
-    <ResponsiveContainer
-      key={currentAndPreviousDataFilled ? input.graphId : "loading"}
-      height={height_}
-    >
-      <GraphComponent
-        data={currentAndPreviousDataFilled}
-        margin={{
-          top: 10,
-          left: formatWith(yAxisValueFormat, maxValue).length * 6 - 5,
-          right: 24,
-        }}
-        layout={input.graphType === "horizontal_bar" ? "vertical" : undefined}
-      >
-        <CartesianGrid
-          vertical={input.graphType === "scatter"}
-          strokeDasharray="5 7"
-        />
-        <XAxisComponent
-          type="category"
-          dataKey="date"
-          name="Date"
-          tickFormatter={formatDate}
-          tickLine={false}
-          axisLine={false}
-          tick={{ fill: gray400 }}
-        />
-        <YAxisComponent
-          type="number"
-          axisLine={false}
-          tickLine={false}
-          tickCount={4}
-          tickMargin={20}
-          domain={[0, "dataMax"]}
-          tick={{ fill: gray400 }}
-          tickFormatter={(value) => {
-            if (typeof yAxisValueFormat === "function") {
-              return yAxisValueFormat(value);
-            }
-            return numeral(value).format(yAxisValueFormat);
-          }}
-        />
-        <Tooltip
-          formatter={tooltipValueFormatter}
-          labelFormatter={(_label, payload) => {
-            if (input.graphType === "scatter") return "";
-            return (
-              formatDate(payload[0]?.payload.date) +
-              (input.includePrevious && payload[1]?.payload["previous>date"]
-                ? " vs " + formatDate(payload[1]?.payload["previous>date"])
-                : "")
-            );
-          }}
-        />
-        <Legend
-          wrapperStyle={{
-            padding: "0 2rem",
-            maxHeight: "15%",
-            overflow: "auto",
-          }}
-        />
-        {(sortedKeys ?? []).map((aggKey, index) => (
-          <React.Fragment key={aggKey}>
-            {/* @ts-ignore */}
-            <GraphElement
-              key={aggKey}
-              type="linear"
-              dataKey={aggKey}
-              stroke={colorForSeries(aggKey, index)}
-              stackId={
-                ["stacked_bar", "stacked_area"].includes(input.graphType)
-                  ? "same"
-                  : undefined
-              }
-              fill={colorForSeries(aggKey, index)}
-              strokeWidth={2.5}
-              dot={false}
-              activeDot={input.graphType !== "scatter" ? { r: 8 } : undefined}
-              name={nameForSeries(aggKey)}
-              line={
-                input.graphType === "scatter" && input.connected
-                  ? true
-                  : undefined
-              }
-            />
-            {input.includePrevious && (
-              // @ts-ignore
+          <Tooltip
+            formatter={tooltipValueFormatter}
+            labelFormatter={(_label, payload) => {
+              if (input.graphType === "scatter") return "";
+              return (
+                formatDate(payload[0]?.payload.date) +
+                (input.includePrevious && payload[1]?.payload["previous>date"]
+                  ? " vs " + formatDate(payload[1]?.payload["previous>date"])
+                  : "")
+              );
+            }}
+          />
+          <Legend
+            wrapperStyle={{
+              padding: "0 2rem",
+              maxHeight: "15%",
+              overflow: "auto",
+            }}
+          />
+          {(sortedKeys ?? []).map((aggKey, index) => (
+            <React.Fragment key={aggKey}>
+              {/* @ts-ignore */}
               <GraphElement
-                key={"previous>" + aggKey}
+                key={aggKey}
                 type="linear"
-                dataKey={"previous>" + aggKey}
+                dataKey={aggKey}
+                stroke={colorForSeries(aggKey, index)}
                 stackId={
                   ["stacked_bar", "stacked_area"].includes(input.graphType)
                     ? "same"
                     : undefined
                 }
-                stroke={colorForSeries(aggKey, index) + "99"}
-                fill={colorForSeries(aggKey, index) + "99"}
+                fill={colorForSeries(aggKey, index)}
                 strokeWidth={2.5}
-                strokeDasharray={
-                  input.graphType !== "scatter" ? "5 5" : undefined
-                }
                 dot={false}
                 activeDot={input.graphType !== "scatter" ? { r: 8 } : undefined}
-                name={"Previous " + nameForSeries(aggKey)}
+                name={nameForSeries(aggKey)}
                 line={
                   input.graphType === "scatter" && input.connected
                     ? true
                     : undefined
                 }
               />
-            )}
-          </React.Fragment>
-        ))}
-      </GraphComponent>
-    </ResponsiveContainer>
-  );
-};
-
-export const arePropsEqual = (
-  prevProps: {
-    input: CustomGraphInput;
-    titleProps?: {
-      fontSize?: TypographyProps["fontSize"];
-      color?: ColorProps["color"];
-      fontWeight?: TypographyProps["fontWeight"];
-    };
+              {input.includePrevious && (
+                // @ts-ignore
+                <GraphElement
+                  key={"previous>" + aggKey}
+                  type="linear"
+                  dataKey={"previous>" + aggKey}
+                  stackId={
+                    ["stacked_bar", "stacked_area"].includes(input.graphType)
+                      ? "same"
+                      : undefined
+                  }
+                  stroke={colorForSeries(aggKey, index) + "99"}
+                  fill={colorForSeries(aggKey, index) + "99"}
+                  strokeWidth={2.5}
+                  strokeDasharray={
+                    input.graphType !== "scatter" ? "5 5" : undefined
+                  }
+                  dot={false}
+                  activeDot={
+                    input.graphType !== "scatter" ? { r: 8 } : undefined
+                  }
+                  name={"Previous " + nameForSeries(aggKey)}
+                  line={
+                    input.graphType === "scatter" && input.connected
+                      ? true
+                      : undefined
+                  }
+                />
+              )}
+            </React.Fragment>
+          ))}
+        </GraphComponent>
+      </ResponsiveContainer>
+    );
   },
-  nextProps: {
-    input: CustomGraphInput;
-    titleProps?: {
-      fontSize?: TypographyProps["fontSize"];
-      color?: ColorProps["color"];
-      fontWeight?: TypographyProps["fontWeight"];
-    };
+  (prevProps, nextProps) => {
+    return (
+      JSON.stringify(prevProps.input) === JSON.stringify(nextProps.input) &&
+      JSON.stringify(prevProps.titleProps) ===
+        JSON.stringify(nextProps.titleProps)
+    );
   }
-) => {
-  return (
-    JSON.stringify(prevProps.input) === JSON.stringify(nextProps.input) &&
-    JSON.stringify(prevProps.titleProps) ===
-      JSON.stringify(nextProps.titleProps)
-  );
-};
+);
 
 const RADIAN = Math.PI / 180;
 const pieChartPercentageLabel = ({
