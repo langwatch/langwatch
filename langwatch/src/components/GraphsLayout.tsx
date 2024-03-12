@@ -22,7 +22,7 @@ export default function GraphsLayout({ children }: PropsWithChildren) {
           spacing={0}
         >
           <MenuLink href={`/${project?.slug}`}>Overview</MenuLink>
-          {process.env.NEXT_PUBLIC_REPORTS ?? (
+          {process.env.NEXT_PUBLIC_REPORTS && (
             <MenuLink href={`/${project?.slug}/analytics/reports`}>
               Reports
             </MenuLink>
