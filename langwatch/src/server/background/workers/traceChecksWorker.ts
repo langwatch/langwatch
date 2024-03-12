@@ -3,19 +3,23 @@ import * as Sentry from "@sentry/nextjs";
 import { Worker, type Job } from "bullmq";
 import { nanoid } from "nanoid";
 import { env } from "../../../env.mjs";
-import type {
-  CheckTypes,
-  TraceCheckResult
-} from "../../../trace_checks/types";
+import type { CheckTypes, TraceCheckResult } from "../../../trace_checks/types";
 import type { TraceCheckJob } from "~/server/background/types";
 import { prisma } from "../../db";
 import { connection } from "../../redis";
-import { TRACE_CHECKS_QUEUE_NAME, updateCheckStatusInES } from "../queues/traceChecksQueue";
+import {
+  TRACE_CHECKS_QUEUE_NAME,
+  updateCheckStatusInES,
+} from "../queues/traceChecksQueue";
 import { getDebugger } from "../../../utils/logger";
 
 const debug = getDebugger("langwatch:workers:traceChecksWorker");
 
-export const startTraceChecksWorker = (processFn: (job: Job<TraceCheckJob, any, CheckTypes>) => Promise<TraceCheckResult>) => {
+export const startTraceChecksWorker = (
+  processFn: (
+    job: Job<TraceCheckJob, any, CheckTypes>
+  ) => Promise<TraceCheckResult>
+) => {
   const traceChecksWorker = new Worker<TraceCheckJob, any, CheckTypes>(
     TRACE_CHECKS_QUEUE_NAME,
     async (job) => {
@@ -85,4 +89,4 @@ export const startTraceChecksWorker = (processFn: (job: Job<TraceCheckJob, any, 
 
   debug("Trace checks worker registered");
   return traceChecksWorker;
-}
+};

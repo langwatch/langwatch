@@ -181,8 +181,8 @@ export default async function handler(
     .createHash("md5")
     .update(JSON.stringify({ ...params, spans }))
     .digest("hex");
-  const existingMD5s = await fetchExistingMD5s(traceId, project.id);
-  if (existingMD5s?.includes(paramsMD5)) {
+  const existingTrace = await fetchExistingMD5s(traceId, project.id);
+  if (existingTrace?.indexing_md5s?.includes(paramsMD5)) {
     return res.status(200).json({ message: "No changes" });
   }
 
@@ -236,7 +236,7 @@ export default async function handler(
     output,
     metrics: computeTraceMetrics(spans),
     error,
-    indexing_md5s: [...(existingMD5s ?? []), paramsMD5],
+    indexing_md5s: [...(existingTrace?.indexing_md5s ?? []), paramsMD5],
   };
 
   await cleanupPII(trace, esSpans);
@@ -264,7 +264,10 @@ export default async function handler(
     body: trace,
   });
 
-  void scheduleTraceChecks(trace, spans);
+  // Does not re-schedule trace checks for too old traces being resynced
+  if (!existingTrace || existingTrace.inserted_at > Date.now() - 30 * 1000) {
+    void scheduleTraceChecks(trace, spans);
+  }
 
   await markProjectFirstMessage(project);
 
@@ -313,7 +316,9 @@ const markProjectFirstMessage = async (project: Project) => {
 const fetchExistingMD5s = async (
   traceId: string,
   projectId: string
-): Promise<Trace["indexing_md5s"] | undefined> => {
+): Promise<
+  { indexing_md5s: Trace["indexing_md5s"]; inserted_at: number } | undefined
+> => {
   const existingTraceResponse = await esClient.search<Trace>({
     index: TRACE_INDEX,
     body: {
@@ -327,10 +332,17 @@ const fetchExistingMD5s = async (
           ],
         },
       },
-      _source: ["indexing_md5s"],
+      _source: ["indexing_md5s", "timestamps.inserted_at"],
     },
   });
 
   const existingTrace = existingTraceResponse.hits.hits[0]?._source;
-  return existingTrace?.indexing_md5s;
+  if (!existingTrace) {
+    return undefined;
+  }
+
+  return {
+    indexing_md5s: existingTrace.indexing_md5s,
+    inserted_at: existingTrace.timestamps.inserted_at,
+  };
 };

@@ -19,6 +19,7 @@ import {
 import handler from "./collector";
 import type { Project } from "@prisma/client";
 import { nanoid } from "nanoid";
+import { DEFAULT_EMBEDDINGS_MODEL } from "../../server/embeddings";
 
 const sampleSpan: LLMSpan = {
   type: "llm",
@@ -141,15 +142,22 @@ describe("Collector API Endpoint", () => {
       timestamps: {
         started_at: expect.any(Number),
         inserted_at: expect.any(Number),
+        updated_at: expect.any(Number),
       },
       input: {
         value: "hello",
         satisfaction_score: expect.any(Number),
-        embeddings: expect.any(Array),
+        embeddings: {
+          embeddings: expect.any(Array),
+          model: DEFAULT_EMBEDDINGS_MODEL,
+        },
       },
       output: {
         value: "world",
-        embeddings: expect.any(Array),
+        embeddings: {
+          embeddings: expect.any(Array),
+          model: DEFAULT_EMBEDDINGS_MODEL,
+        },
       },
       metrics: {
         first_token_ms: null,
