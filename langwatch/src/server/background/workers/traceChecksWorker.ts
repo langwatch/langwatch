@@ -32,7 +32,13 @@ export const startTraceChecksWorker = (
 
       try {
         debug(`Processing job ${job.id} with data:`, job.data);
+
+        const timeout = setTimeout(() => {
+          throw new Error("Job timed out after 30s");
+        }, 30_000);
+
         const result = await processFn(job);
+        clearTimeout(timeout);
 
         for (const cost of result.costs) {
           await prisma.cost.create({
@@ -69,12 +75,21 @@ export const startTraceChecksWorker = (
         });
         debug("Failed to process job:", job.id, error);
 
-        throw error;
+        const nonRetriableChecks: CheckTypes[] = [
+          "ragas_answer_relevancy",
+          "ragas_context_precision",
+          "ragas_faithfulness",
+        ];
+
+        if (!nonRetriableChecks.includes(job.data.check.type)) {
+          throw error;
+        }
       }
     },
     {
       connection,
       concurrency: 3,
+      stalledInterval: 60_000, // 1 minute
     }
   );
 
