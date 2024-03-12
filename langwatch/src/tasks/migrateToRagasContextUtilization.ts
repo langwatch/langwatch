@@ -18,7 +18,7 @@ const migrateIndex = async (index: string) => {
           bool: {
             must: {
               term: {
-                check_type: "ragas_context_utilization",
+                check_type: "ragas_context_precision",
               },
             },
           },
