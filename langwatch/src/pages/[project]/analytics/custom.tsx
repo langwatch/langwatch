@@ -249,8 +249,6 @@ export default function AnalyticsCustomGraph() {
       JSON.parse(formData) as CustomGraphFormData
     );
 
-    console.log("customGraphInput", customGraphInput);
-
     setDebouncedCustomGraphInput(customGraphInput);
   }, [formData, setDebouncedCustomGraphInput, form]);
 
