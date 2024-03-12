@@ -249,8 +249,10 @@ export default function AnalyticsCustomGraph() {
       JSON.parse(formData) as CustomGraphFormData
     );
 
+    console.log("customGraphInput", customGraphInput);
+
     setDebouncedCustomGraphInput(customGraphInput);
-  }, [formData, setDebouncedCustomGraphInput]);
+  }, [formData, setDebouncedCustomGraphInput, form]);
 
   return (
     <DashboardLayout>
@@ -284,23 +286,11 @@ export default function AnalyticsCustomGraph() {
                   />
                   {isDevViewEnabled && (
                     <Menu>
-                      <MenuButton
-                        as={Button}
-                        variant={"ghost"}
-                        // isLoading={
-                        //   deleteGraphs.isLoading &&
-                        //   deleteGraphs.variables?.id === graph.id
-                        // }
-                      >
+                      <MenuButton as={Button} variant={"ghost"}>
                         <MoreVertical />
                       </MenuButton>
                       <MenuList>
-                        <MenuItem
-                          onClick={onOpen}
-                          // icon={<DeleteIcon />}
-                        >
-                          Show JSON
-                        </MenuItem>
+                        <MenuItem onClick={onOpen}>Show JSON</MenuItem>
                       </MenuList>
                     </Menu>
                   )}
