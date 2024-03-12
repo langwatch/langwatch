@@ -1,6 +1,4 @@
-import { Link } from "@chakra-ui/next-js";
 import { HStack, VStack } from "@chakra-ui/react";
-import { useRouter } from "next/router";
 import { type PropsWithChildren } from "react";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { MenuLink } from "~/components/MenuLink";
@@ -24,9 +22,11 @@ export default function GraphsLayout({ children }: PropsWithChildren) {
           spacing={0}
         >
           <MenuLink href={`/${project?.slug}`}>Overview</MenuLink>
-          <MenuLink href={`/${project?.slug}/analytics/reports`}>
-            Reports
-          </MenuLink>
+          {process.env.NEXT_PUBLIC_REPORTS ?? (
+            <MenuLink href={`/${project?.slug}/analytics/reports`}>
+              Reports
+            </MenuLink>
+          )}
         </VStack>
         {children}
       </HStack>

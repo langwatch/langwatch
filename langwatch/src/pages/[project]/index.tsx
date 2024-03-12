@@ -89,7 +89,7 @@ export const getServerSideProps = async (
 
   return {
     props: {},
-  };
+};
 };
 
 function Index() {
