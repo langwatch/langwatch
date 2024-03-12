@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { ragasContextPrecision } from "./ragasContextPrecision";
+import { ragasContextUtilization } from "./ragasContextUtilization";
 import type { ElasticSearchSpan, Trace } from "../../server/tracer/types";
 import type { RagasResult } from "../types";
 
-describe("RagasContextPrecision Integration", () => {
-  it("evaluates context precision with a real request", async () => {
+describe("RagasContextUtilization Integration", () => {
+  it("evaluates context utilization with a real request", async () => {
     const sampleTrace: Trace = {
       trace_id: "integration-test",
       project_id: "integration-test",
@@ -40,12 +40,12 @@ describe("RagasContextPrecision Integration", () => {
       },
     ];
 
-    const response = await ragasContextPrecision(sampleTrace, sampleSpans);
+    const response = await ragasContextUtilization(sampleTrace, sampleSpans);
 
-    const context_precision = (response.raw_result as RagasResult).scores
-      .context_precision;
-    expect(context_precision).toBeGreaterThan(0.01);
-    expect(response.value).toBe(context_precision);
+    const context_utilization = (response.raw_result as RagasResult).scores
+      .context_utilization;
+    expect(context_utilization).toBeGreaterThan(0.01);
+    expect(response.value).toBe(context_utilization);
     expect(response.costs[0]?.amount).toBeGreaterThan(0);
     expect(response.status).toBe("succeeded");
   });

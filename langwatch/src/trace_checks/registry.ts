@@ -93,8 +93,8 @@ export const AVAILABLE_TRACE_CHECKS: {
       parameters: {},
     },
   },
-  ragas_context_precision: {
-    name: "Ragas Context Precision",
+  ragas_context_utilization: {
+    name: "Ragas Context Utilization",
     requiresRag: true,
     description:
       "For RAG messages, evaluates the ratio of relevance from the RAG provided contexts to the input",

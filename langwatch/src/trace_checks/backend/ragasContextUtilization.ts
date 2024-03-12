@@ -5,7 +5,7 @@ import type { Money } from "../../utils/types";
 import type { RagasResult, TraceCheckResult } from "../types";
 import { getRAGInfo } from "../../server/tracer/utils";
 
-export const ragasContextPrecision = async (
+export const ragasContextUtilization = async (
   trace: Trace,
   spans: ElasticSearchSpan[]
 ): Promise<TraceCheckResult> => {
@@ -23,7 +23,7 @@ export const ragasContextPrecision = async (
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        metrics: ["context_precision"],
+        metrics: ["context_utilization"],
         question: input,
         answer: output,
         contexts: contexts,
@@ -36,17 +36,17 @@ export const ragasContextPrecision = async (
   if (!response.ok) {
     const error = await response.text();
     throw new Error(
-      `Ragas context precision check API returned an error: ${error} for trace ${trace.trace_id}`
+      `Ragas context utilization check API returned an error: ${error} for trace ${trace.trace_id}`
     );
   }
 
   const result = (await response.json()) as RagasResult;
-  const contextPrecisionScore = result.scores.context_precision;
+  const contextUtilizationScore = result.scores.context_utilization;
   const costs = result.costs;
 
-  if (typeof contextPrecisionScore === "undefined") {
+  if (typeof contextUtilizationScore === "undefined") {
     throw new Error(
-      `Ragas context precision check API did not return a score: ${JSON.stringify(
+      `Ragas context utilization check API did not return a score: ${JSON.stringify(
         result
       )}`
     );
@@ -54,8 +54,8 @@ export const ragasContextPrecision = async (
 
   return {
     raw_result: result,
-    value: contextPrecisionScore,
-    status: contextPrecisionScore > 0.3 ? "succeeded" : "failed",
+    value: contextUtilizationScore,
+    status: contextUtilizationScore > 0.3 ? "succeeded" : "failed",
     costs: [
       { amount: costs.amount, currency: costs.currency as Money["currency"] },
     ],

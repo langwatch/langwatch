@@ -6,7 +6,7 @@ import { jailbreakCheck } from "./jailbreakCheck";
 import { languageCheck } from "./languageCheck";
 import { piiCheck } from "./piiCheck";
 import { ragasAnswerRelevancy } from "./ragasAnswerRelevancy";
-import { ragasContextPrecision } from "./ragasContextPrecision";
+import { ragasContextUtilization } from "./ragasContextUtilization";
 import { ragasFaithfulness } from "./ragasFaithfulness";
 import { toxicityCheck } from "./toxicityCheck";
 
@@ -23,7 +23,7 @@ export const TRACE_CHECKS_EXECUTORS: {
   jailbreak_check: jailbreakCheck,
   ragas_answer_relevancy: ragasAnswerRelevancy,
   ragas_faithfulness: ragasFaithfulness,
-  ragas_context_precision: ragasContextPrecision,
+  ragas_context_utilization: ragasContextUtilization,
   inconsistency_check: inconsistencyCheck,
   language_check: languageCheck,
 };

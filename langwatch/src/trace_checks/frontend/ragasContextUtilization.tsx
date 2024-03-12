@@ -3,9 +3,9 @@ import type { TraceCheck } from "../../server/tracer/types";
 import type { RagasResult } from "../types";
 import numeral from "numeral";
 
-export function RagasContextPrecision({ check }: { check: TraceCheck }) {
+export function RagasContextUtilization({ check }: { check: TraceCheck }) {
   const result = check.raw_result as RagasResult | undefined;
-  const contextPrecisionScore = result?.scores?.context_precision;
+  const contextUtilizationScore = result?.scores?.context_utilization;
 
   const color = check.status === 'succeeded' ? "green.500" : "red.500";
 
@@ -14,10 +14,10 @@ export function RagasContextPrecision({ check }: { check: TraceCheck }) {
     <VStack align="start">
       <HStack>
         <Text>
-          Context Precision Score:
+          Context Utilization Score:
 
         </Text>
-        <Text color={color}> {numeral(contextPrecisionScore).format("0.00")}</Text>
+        <Text color={color}> {numeral(contextUtilizationScore).format("0.00")}</Text>
 
       </HStack>
     </VStack >

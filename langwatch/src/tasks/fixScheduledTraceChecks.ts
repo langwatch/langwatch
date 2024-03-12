@@ -45,7 +45,7 @@ export default async function execute() {
     if (checkType == "ragas_answer_relevancy") {
       return value > 0.5 ? "succeeded" : "failed";
     }
-    if (checkType == "ragas_context_precision") {
+    if (checkType == "ragas_context_utilization") {
       return value > 0.3 ? "succeeded" : "failed";
     }
     if (checkType == "ragas_faithfulness") {

@@ -36,7 +36,7 @@ export type Checks = {
   ragas_faithfulness: {
     parameters: Record<string, never>;
   };
-  ragas_context_precision: {
+  ragas_context_utilization: {
     parameters: Record<string, never>;
   };
   inconsistency_check: {
@@ -182,7 +182,7 @@ export type RagasResult = {
   scores: {
     answer_relevancy?: number;
     faithfulness?: number;
-    context_precision?: number;
+    context_utilization?: number;
     context_recall?: number;
   };
   costs: {

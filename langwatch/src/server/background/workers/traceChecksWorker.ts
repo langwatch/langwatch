@@ -77,7 +77,7 @@ export const startTraceChecksWorker = (
 
         const nonRetriableChecks: CheckTypes[] = [
           "ragas_answer_relevancy",
-          "ragas_context_precision",
+          "ragas_context_utilization",
           "ragas_faithfulness",
         ];
 
