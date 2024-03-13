@@ -23,7 +23,14 @@ from langwatch.utils import (
     safe_get,
 )
 
-from openai import AsyncStream, OpenAI, AsyncOpenAI, Stream
+from openai import (
+    AsyncStream,
+    OpenAI,
+    AsyncOpenAI,
+    Stream,
+    AzureOpenAI,
+    AsyncAzureOpenAI,
+)
 
 from openai.types import Completion
 from openai.types.chat import ChatCompletion, ChatCompletionChunk
@@ -63,10 +70,28 @@ class OpenAITracer(BaseContextTracer):
         self.chat_completion_tracer.__exit__(_type, _value, _traceback)
 
 
+class AzureOpenAITracer(OpenAITracer):
+    """
+    Tracing for both Completion and ChatCompletion endpoints
+    """
+
+    def __init__(
+        self,
+        instance: Union[AzureOpenAI, AsyncAzureOpenAI],
+        trace_id: Optional[str] = None,
+        metadata: Optional[TraceMetadata] = None,
+    ):
+        super().__init__(
+            instance=instance,
+            trace_id=trace_id,
+            metadata=metadata,
+        )
+
+
 class OpenAICompletionTracer(BaseContextTracer):
     def __init__(
         self,
-        instance: Union[OpenAI, AsyncOpenAI],
+        instance: Union[OpenAI, AsyncOpenAI, AzureOpenAI, AsyncAzureOpenAI],
         trace_id: Optional[str] = None,
         metadata: Optional[TraceMetadata] = None,
     ):
@@ -253,7 +278,7 @@ class OpenAICompletionTracer(BaseContextTracer):
 class OpenAIChatCompletionTracer(BaseContextTracer):
     def __init__(
         self,
-        instance: Union[OpenAI, AsyncOpenAI],
+        instance: Union[OpenAI, AsyncOpenAI, AzureOpenAI, AsyncAzureOpenAI],
         trace_id: Optional[str] = None,
         metadata: Optional[TraceMetadata] = None,
     ):
@@ -493,7 +518,12 @@ class OpenAIChatCompletionTracer(BaseContextTracer):
             span_id=f"span_{nanoid.generate()}",
             parent_id=self.get_parent_id(),
             trace_id=self.trace_id,
-            vendor="openai",
+            vendor=(
+                "azure"
+                if issubclass(type(self.instance), AzureOpenAI)
+                or issubclass(type(self.instance), AsyncAzureOpenAI)
+                else "openai"
+            ),
             model=kwargs.get("model", "unknown"),
             input=TypedValueChatMessages(
                 type="chat_messages", value=kwargs.get("messages", []).copy()
