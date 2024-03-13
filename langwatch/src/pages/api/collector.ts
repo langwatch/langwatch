@@ -63,7 +63,7 @@ export default async function handler(
   }
 
   // We migrated those keys to inside metadata, but we still want to support them for retrocompatibility for a while
-  if (!("metadata" in req.body)) {
+  if (!("metadata" in req.body) || !req.body.metadata) {
     req.body.metadata = {};
     if ("thread_id" in req.body) {
       req.body.metadata.thread_id = req.body.thread_id;
