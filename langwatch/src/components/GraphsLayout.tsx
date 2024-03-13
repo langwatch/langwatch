@@ -10,24 +10,25 @@ export default function GraphsLayout({ children }: PropsWithChildren) {
   return (
     <DashboardLayout>
       <HStack align="start" width="full" height="full">
-        <VStack
-          align="start"
-          background="white"
-          paddingY={4}
-          borderRightWidth="1px"
-          borderColor="gray.300"
-          fontSize="14px"
-          minWidth="150px"
-          height="full"
-          spacing={0}
-        >
-          <MenuLink href={`/${project?.slug}`}>Overview</MenuLink>
-          {process.env.NEXT_PUBLIC_REPORTS && (
+        {process.env.NEXT_PUBLIC_REPORTS && (
+          <VStack
+            align="start"
+            background="white"
+            paddingY={4}
+            borderRightWidth="1px"
+            borderColor="gray.300"
+            fontSize="14px"
+            minWidth="150px"
+            height="full"
+            spacing={0}
+          >
+            <MenuLink href={`/${project?.slug}`}>Overview</MenuLink>
+
             <MenuLink href={`/${project?.slug}/analytics/reports`}>
               Reports
             </MenuLink>
-          )}
-        </VStack>
+          </VStack>
+        )}
         {children}
       </HStack>
     </DashboardLayout>
