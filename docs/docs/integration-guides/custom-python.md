@@ -5,7 +5,7 @@ title: Custom Python Integration
 
 # Custom Python Integration
 
-Even if you have your own custom setup for calling LLMs and do not use any of the [other integrations](../integration-guides/) supported by LangWatch,
+Even if you have your own custom setup for calling LLMs and do not use any of the [other integrations](../category/integration-guides/) supported by LangWatch,
 you can still use our Python SDK to help integrate with LangWatch.
 
 ### Prerequisites:
