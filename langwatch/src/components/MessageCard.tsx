@@ -256,14 +256,14 @@ export function MessageCard({
                     <XCircle />
                   )}
                 </Box>
-                {checkPasses}/{totalChecks} checks
+                {checkPasses}/{totalChecks} evaluations
               </Tag>
             </PopoverTrigger>
             <Portal>
               <Box zIndex="popover">
                 <PopoverContent zIndex={2} width="fit-content">
                   <PopoverArrow />
-                  <PopoverHeader>Trace Checks</PopoverHeader>
+                  <PopoverHeader>Evaluations</PopoverHeader>
                   <PopoverBody>
                     <VStack align="start" spacing={2}>
                       {traceChecks.map((check) => (
