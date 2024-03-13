@@ -1,20 +1,19 @@
 ---
-sidebar_position: 3
-title: LangChain Python Integration
+sidebar_position: 2
+title: Azure OpenAI Python Integration
 ---
 
-# LangChain Python Integration
+# Azure OpenAI Python Integration
 
-To track the interactions with LangChain, use the `LangChainTracer`.
+To integrate LangWatch with Azure OpenAI's GPT models using Python, follow these steps:
 
 ### Prerequisites:
 
-- Install the `langwatch` library via pip.
 - Obtain your `LANGWATCH_API_KEY` from the LangWatch dashboard.
 
-import { LangChainPython } from "./LangChainPython"
+import { AzureOpenAIPython } from "./AzureOpenAIPython"
 
-<LangChainPython />
+<AzureOpenAIPython />
 
 After following the above guide, your interactions with LLMs should now
 be captured by LangWatch. Once integrated, you can visit your LangWatch

@@ -14,4 +14,6 @@ export const langwatchEndpointEnv = () => {
         : ""
     }'\n`;
   }
+
+  return "";
 };
