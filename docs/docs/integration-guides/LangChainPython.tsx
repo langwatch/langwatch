@@ -1,3 +1,4 @@
+import { MetadataFootnote } from "./utils/MetadataFootnote";
 import { RenderCode } from "./utils/RenderCode";
 import { langwatchEndpointEnv } from "./utils/langwatchEndpointEnv";
 
@@ -47,16 +48,7 @@ with langwatch.langchain.LangChainTracer(
         Each step in LangChain (<code>chain</code>) that invokes an LLM call
         will be traced as an individual span within a trace.
       </p>
-      <p>
-        It's optional but highly recommended to pass the <code>user_id</code> if
-        you want to leverage user-specific analytics and the{" "}
-        <code>thread_id</code> to group related traces together. Read more about
-        those and other concepts{" "}
-        <a href="https://docs.langwatch.ai/docs/concepts" target="_blank">
-          here
-        </a>
-        .
-      </p>
+      <MetadataFootnote />
     </div>
   );
 };

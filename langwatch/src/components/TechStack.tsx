@@ -11,13 +11,16 @@ import { type PropsWithChildren } from "react";
 import { Code } from "react-feather";
 import { type UseFormReturn } from "react-hook-form";
 import { RadioCard } from "~/pages/onboarding/[team]/project";
+import { Azure } from "./icons/Azure";
 import { JavaScript } from "./icons/JavaScript";
+import { LangChainParrot } from "./icons/LangChainParrot";
 import { OpenAI } from "./icons/OpenAI";
 import { Python } from "./icons/Python";
+import { AzureOpenAIPython } from "./integration-guides/AzureOpenAIPython";
+import { CustomPython } from "./integration-guides/CustomPython";
 import { CustomRest } from "./integration-guides/CustomRest";
 import { LangChainPython } from "./integration-guides/LangChainPython";
 import { OpenAIPython } from "./integration-guides/OpenAIPython";
-import { LangChainParrot } from "./icons/LangChainParrot";
 
 export type ProjectFormData = {
   name: string;
@@ -50,6 +53,14 @@ export const techStackFrameworkOptions = {
     icon: <OpenAI />,
     languages: { python: OpenAIPython, javascript: CustomRest } as LanguagesMap,
   },
+  azure_openai: {
+    label: "Azure OpenAI",
+    icon: <Azure />,
+    languages: {
+      python: AzureOpenAIPython,
+      javascript: CustomRest,
+    } as LanguagesMap,
+  },
   langchain: {
     label: "LangChain",
     icon: <LangChainParrot />,
@@ -62,7 +73,7 @@ export const techStackFrameworkOptions = {
     label: "Other",
     icon: <Code />,
     languages: {
-      python: CustomRest,
+      python: CustomPython,
       javascript: CustomRest,
       other: CustomRest,
     } as LanguagesMap,

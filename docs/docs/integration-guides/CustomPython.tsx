@@ -1,3 +1,4 @@
+import { MetadataFootnote } from "./utils/MetadataFootnote";
 import { RenderCode } from "./utils/RenderCode";
 import { langwatchEndpointEnv } from "./utils/langwatchEndpointEnv";
 
@@ -26,7 +27,10 @@ export const CustomPython = ({ apiKey }: { apiKey?: string }) => {
 from langwatch.types import LLMSpan
 
 with langwatch.tracer.BaseContextTracer(
-  trace_id=nanoid.generate(), metadata={}
+  trace_id=nanoid.generate(), metadata={
+    "user_id": "optional-user-123",
+    "thread_id": "optional-thread-456",
+  }
 ) as tracer:
   # Your LLM call here
 `}
@@ -41,7 +45,10 @@ with langwatch.tracer.BaseContextTracer(
 from langwatch.types import LLMSpan
 
 with langwatch.tracer.BaseContextTracer(
-  trace_id=nanoid.generate(), metadata={}
+  trace_id=nanoid.generate(), metadata={
+    "user_id": "optional-user-123",
+    "thread_id": "optional-thread-456",
+  }
 ) as tracer:
   started_at_ts = int(time.time() * 1000)  # time must be in milliseconds
 
@@ -80,16 +87,7 @@ with langwatch.tracer.BaseContextTracer(
 `}
         language="python"
       />
-      <p>
-        It's optional but highly recommended to pass the <code>user_id</code> if
-        you want to leverage user-specific analytics and the{" "}
-        <code>thread_id</code> to group related traces together. To connect it
-        to an event later on. Read more about those and other concepts{" "}
-        <a href="https://docs.langwatch.ai/docs/concepts" target="_blank">
-          here
-        </a>
-        .
-      </p>
+      <MetadataFootnote />
     </div>
   );
 };
