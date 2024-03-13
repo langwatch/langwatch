@@ -23,7 +23,7 @@ export const SessionsSummary = () => {
     <Card>
       <CardHeader>
         <HStack>
-          <Heading size="sm">Sessions</Heading>
+          <Heading size="sm">User Sessions</Heading>
           <Tooltip label="A session is a period of user activity without breaks longer than one hour">
             <HelpCircle width="14px" />
           </Tooltip>

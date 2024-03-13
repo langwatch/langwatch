@@ -68,7 +68,7 @@ export type CustomGraphInput = {
     | "donnut"
     | "summary";
   series: Series[];
-  groupBy: z.infer<typeof timeseriesInput>["groupBy"];
+  groupBy?: z.infer<typeof timeseriesInput>["groupBy"];
   includePrevious: boolean;
   timeScale: "full" | number;
   connected?: boolean;

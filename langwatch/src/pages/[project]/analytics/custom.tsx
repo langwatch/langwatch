@@ -324,8 +324,6 @@ export default function AnalyticsCustomGraph() {
             <Textarea rows={16}>
               {JSON.stringify(debouncedCustomGraphInput, null, 2)}
             </Textarea>
-
-            {/* <Lorem count={2} /> */}
           </ModalBody>
 
           <ModalFooter></ModalFooter>

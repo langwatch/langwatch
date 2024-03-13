@@ -6,6 +6,7 @@ import {
   Text,
   Th,
   Thead,
+  Tooltip,
   Tr,
   VStack,
 } from "@chakra-ui/react";
@@ -25,7 +26,7 @@ export const DocumentsCountsTable = () => {
 
   return (
     <VStack align="start" spacing={4}>
-      <Text fontSize="lg" paddingTop={4}>
+      <Text fontSize="lg" paddingTop={4} fontWeight={600}>
         Top 10 most used documents
       </Text>
       <Table variant="simple" padding={0} margin={0}>
@@ -42,14 +43,25 @@ export const DocumentsCountsTable = () => {
               <Td colSpan={2}>No documents found</Td>
             </Tr>
           )}
+
           {documents.data?.topDocuments.map((doc) => (
             <Tr key={doc.documentId}>
-              <Td paddingLeft={0}>{doc.documentId}</Td>
+              <Td paddingLeft={0}>
+                <Tooltip label={doc.documentId}>
+                  <Text noOfLines={1} wordBreak="break-all" display="block">
+                    {doc.documentId}
+                  </Text>
+                </Tooltip>
+              </Td>
               <Td>
-                {doc.content
-                  ? doc.content.substring(0, 255) +
-                    (doc.content.length > 255 ? "..." : "")
-                  : ""}
+                <Tooltip label={doc.content}>
+                  <Text noOfLines={1} wordBreak="break-all" display="block">
+                    {doc.content
+                      ? doc.content.substring(0, 255) +
+                        (doc.content.length > 255 ? "..." : "")
+                      : ""}
+                  </Text>
+                </Tooltip>
               </Td>
               <Td>{doc.count}</Td>
             </Tr>
