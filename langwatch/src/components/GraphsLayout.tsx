@@ -44,6 +44,9 @@ export default function GraphsLayout({ children }: PropsWithChildren) {
             <Text fontWeight={"bold"} padding={2}>
               Custom
             </Text>
+            <MenuLink href={`/${project?.slug}/analytics/reports`}>
+              Reports
+            </MenuLink>
           </VStack>
         )}
         {children}

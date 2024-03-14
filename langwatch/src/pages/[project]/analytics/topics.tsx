@@ -50,10 +50,14 @@ const inputSentimenPerTopic = {
   graphType: "horizontal_bar",
   series: [
     {
-      name: "Input sentiment score average",
-      colorSet: "colors",
+      name: "",
+      colorSet: "greenTones",
       metric: "sentiment.input_sentiment",
-      aggregation: "avg",
+      aggregation: "median",
+      pipeline: {
+        field: "trace_id",
+        aggregation: "avg",
+      },
     },
   ],
   groupBy: "topics.topics",
@@ -146,7 +150,7 @@ export default function Topics() {
                 <CardHeader>
                   <HStack>
                     <BarChart2 color="orange" />
-                    <Heading size="sm">Input Sentiment per Topic</Heading>
+                    <Heading size="sm">Input Sentiment Per Topic</Heading>
                   </HStack>
                 </CardHeader>
                 <CardBody>
