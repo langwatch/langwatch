@@ -388,7 +388,7 @@ export const fetchTopicsBatchClustering = async (
   projectId: string,
   params: BatchClusteringParams
 ): Promise<TopicClusteringResponse | undefined> => {
-  if (!env.LANGWATCH_GUARDRAILS_SERVICE) {
+  if (!env.LANGWATCH_NLP_SERVICE) {
     console.warn(
       "Topic clustering service URL not set, skipping topic clustering"
     );
@@ -403,7 +403,7 @@ export const fetchTopicsBatchClustering = async (
   );
 
   const response = await fetchHTTP2(
-    `${env.LANGWATCH_GUARDRAILS_SERVICE}/topics/batch_clustering`,
+    `${env.LANGWATCH_NLP_SERVICE}/topics/batch_clustering`,
     { method: "POST", json: params }
   );
 
@@ -416,7 +416,7 @@ export const fetchTopicsIncrementalClustering = async (
   projectId: string,
   params: IncrementalClusteringParams
 ): Promise<TopicClusteringResponse | undefined> => {
-  if (!env.LANGWATCH_GUARDRAILS_SERVICE) {
+  if (!env.LANGWATCH_NLP_SERVICE) {
     console.warn(
       "Topic clustering service URL not set, skipping topic clustering"
     );
@@ -431,7 +431,7 @@ export const fetchTopicsIncrementalClustering = async (
   );
 
   const response = await fetchHTTP2(
-    `${env.LANGWATCH_GUARDRAILS_SERVICE}/topics/incremental_clustering`,
+    `${env.LANGWATCH_NLP_SERVICE}/topics/incremental_clustering`,
     { method: "POST", json: params }
   );
 

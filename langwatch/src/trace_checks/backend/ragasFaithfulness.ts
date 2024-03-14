@@ -9,14 +9,14 @@ export const ragasFaithfulness = async (
   _trace: Trace,
   spans: ElasticSearchSpan[]
 ): Promise<TraceCheckResult> => {
-  if (!env.LANGWATCH_GUARDRAILS_SERVICE) {
-    throw new Error("LANGWATCH_GUARDRAILS_SERVICE not set");
+  if (!env.LANGWATCH_NLP_SERVICE) {
+    throw new Error("LANGWATCH_NLP_SERVICE not set");
   }
 
   const { input, output, contexts } = getRAGInfo(spans);
 
   const response = await fetch(
-    `${env.LANGWATCH_GUARDRAILS_SERVICE}/ragas_eval`,
+    `${env.LANGWATCH_NLP_SERVICE}/ragas_eval`,
     {
       method: "POST",
       headers: {

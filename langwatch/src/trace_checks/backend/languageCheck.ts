@@ -12,7 +12,7 @@ export const languageCheck = async (
   _spans: ElasticSearchSpan[],
   parameters: Checks["language_check"]["parameters"]
 ): Promise<TraceCheckResult> => {
-  const response = await fetch(`${env.LANGWATCH_GUARDRAILS_SERVICE}/language`, {
+  const response = await fetch(`${env.LANGWATCH_NLP_SERVICE}/language`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",

@@ -23,8 +23,8 @@ export const scoreSatisfactionFromInput = async ({
   projectId: string;
   input: Trace["input"];
 }): Promise<void> => {
-  if (!env.LANGWATCH_GUARDRAILS_SERVICE) {
-    throw new Error("LANGWATCH_GUARDRAILS_SERVICE not set");
+  if (!env.LANGWATCH_NLP_SERVICE) {
+    throw new Error("LANGWATCH_NLP_SERVICE not set");
   }
 
   if (!input.embeddings) {
@@ -35,7 +35,7 @@ export const scoreSatisfactionFromInput = async ({
   }
 
   const response = await fetch(
-    `${env.LANGWATCH_GUARDRAILS_SERVICE}/sentiment`,
+    `${env.LANGWATCH_NLP_SERVICE}/sentiment`,
     {
       method: "POST",
       headers: {
