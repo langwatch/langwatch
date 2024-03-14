@@ -3,16 +3,13 @@ import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { TeamRoleGroup, checkUserPermissionForProject } from "../permission";
 import slugify from "slugify";
 import { TRPCError } from "@trpc/server";
-import {
-  checkPreconditionsSchema,
-  checksSchema,
-} from "../../../trace_checks/types.generated";
-import type {
-  CheckPreconditions,
-  CustomCheckRules,
-} from "../../../trace_checks/types";
-import { getOpenAIEmbeddings } from "../../embeddings";
+import { checkPreconditionsSchema } from "../../../trace_checks/types.generated";
 import { nanoid } from "nanoid";
+import { evaluatorsSchema } from "../../../trace_checks/evaluators.zod.generated";
+import {
+  AVAILABLE_EVALUATORS,
+  type EvaluatorTypes,
+} from "../../../trace_checks/evaluators.generated";
 
 export const checksRouter = createTRPCRouter({
   getAllForProject: protectedProcedure
@@ -52,23 +49,24 @@ export const checksRouter = createTRPCRouter({
         name: z.string(),
         checkType: z.string(),
         preconditions: checkPreconditionsSchema,
-        parameters: z.object({}).passthrough(),
+        settings: z.object({}).passthrough(),
         sample: z.number().min(0).max(1),
       })
     )
     .use(checkUserPermissionForProject(TeamRoleGroup.GUARDRAILS_MANAGE))
     .mutation(async ({ input, ctx }) => {
-      const { projectId, name, checkType, preconditions, parameters, sample } =
-        input;
+      const {
+        projectId,
+        name,
+        checkType,
+        preconditions,
+        settings: parameters,
+        sample,
+      } = input;
       const prisma = ctx.prisma;
       const slug = slugify(name, { lower: true, strict: true });
 
-      validateCheckParameters(checkType, parameters);
-
-      await computeEmbeddings(preconditions as CheckPreconditions);
-      if (checkType === "custom") {
-        await computeEmbeddings(parameters.rules as CustomCheckRules);
-      }
+      validateCheckSettings(checkType, parameters);
 
       const newCheck = await prisma.check.create({
         data: {
@@ -94,7 +92,7 @@ export const checksRouter = createTRPCRouter({
         name: z.string(),
         checkType: z.string(),
         preconditions: checkPreconditionsSchema,
-        parameters: z.object({}).passthrough(),
+        settings: z.object({}).passthrough(),
         sample: z.number().min(0).max(1),
         enabled: z.boolean().optional(),
       })
@@ -107,19 +105,14 @@ export const checksRouter = createTRPCRouter({
         name,
         checkType,
         preconditions,
-        parameters,
+        settings: parameters,
         sample,
         enabled,
       } = input;
       const prisma = ctx.prisma;
       const slug = slugify(name, { lower: true, strict: true });
 
-      validateCheckParameters(checkType, parameters);
-
-      await computeEmbeddings(preconditions as CheckPreconditions);
-      if (checkType === "custom") {
-        await computeEmbeddings(parameters.rules as CustomCheckRules);
-      }
+      validateCheckSettings(checkType, parameters);
 
       const updatedCheck = await prisma.check.update({
         where: { id, projectId },
@@ -154,13 +147,6 @@ export const checksRouter = createTRPCRouter({
         });
       }
 
-      await deleteEmbeddings(check.preconditions as CheckPreconditions);
-      if (check.checkType === "custom") {
-        await deleteEmbeddings(
-          (check.parameters as any).rules as CustomCheckRules
-        );
-      }
-
       return check;
     }),
   delete: protectedProcedure
@@ -178,40 +164,26 @@ export const checksRouter = createTRPCRouter({
     }),
 });
 
-const validateCheckParameters = (checkType: string, parameters: any) => {
-  if (checkType === "custom") {
-    try {
-      checksSchema.shape[checkType].shape.parameters.parse(parameters);
-    } catch (error) {
-      if (error instanceof ZodError) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: `Invalid custom check parameters: ${error as any}`,
-        });
-      } else {
-        throw error;
-      }
-    }
+const validateCheckSettings = (checkType: string, parameters: any) => {
+  if (AVAILABLE_EVALUATORS[checkType as EvaluatorTypes] === undefined) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "Invalid checkType",
+    });
   }
-};
 
-const computeEmbeddings = async (
-  rules: CheckPreconditions | CustomCheckRules
-): Promise<void> => {
-  for (const rule of rules) {
-    if (rule.rule === "is_similar_to") {
-      // TODO: change this to the same format {model, embeddings} as the traces
-      rule.embeddings = await getOpenAIEmbeddings(rule.value);
-    }
-  }
-};
+  const checkType_ = checkType as EvaluatorTypes;
 
-const deleteEmbeddings = async (
-  rules: CheckPreconditions | CustomCheckRules
-): Promise<void> => {
-  for (const rule of rules) {
-    if (rule.rule === "is_similar_to") {
-      delete rule.embeddings;
+  try {
+    evaluatorsSchema.shape[checkType_].shape.settings.parse(parameters);
+  } catch (error) {
+    if (error instanceof ZodError) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: `Invalid settings: ${error as any}`,
+      });
+    } else {
+      throw error;
     }
   }
 };

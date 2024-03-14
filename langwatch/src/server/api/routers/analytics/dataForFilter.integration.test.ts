@@ -58,7 +58,7 @@ describe("Data For Filter Integration Tests", () => {
           check_id: `test-check-id-faithfulness`,
           check_type: "faithfulness",
           check_name: "Faithfulness",
-          status: "succeeded",
+          status: "processed",
           timestamps: {
             inserted_at: new Date().getTime(),
             started_at: new Date().getTime(),
@@ -113,7 +113,7 @@ describe("Data For Filter Integration Tests", () => {
           check_id: `test-check-id-faithfulness`,
           check_type: "faithfulness",
           check_name: "Faithfulness2",
-          status: "succeeded",
+          status: "processed",
           timestamps: {
             inserted_at: new Date().getTime(),
             started_at: new Date().getTime(),
@@ -126,7 +126,7 @@ describe("Data For Filter Integration Tests", () => {
           check_id: `test-check-id-consistency`,
           check_type: "consistency",
           check_name: "Consistency",
-          status: "succeeded",
+          status: "processed",
           timestamps: {
             inserted_at: new Date().getTime(),
             started_at: new Date().getTime(),

@@ -16,7 +16,7 @@ import type {
 import { HorizontalFormControl } from "../HorizontalFormControl";
 import { HelpCircle, X } from "react-feather";
 import { SmallLabel } from "../SmallLabel";
-import { getTraceCheckDefinitions } from "../../trace_checks/registry";
+import { getEvaluatorDefinitions } from "../../trace_checks/getEvaluator";
 import { useEffect } from "react";
 
 const ruleOptions: Record<CheckPrecondition["rule"], string> = {
@@ -47,7 +47,7 @@ export const PreconditionsField = ({
   const preconditions = watch("preconditions");
   const checkType = watch("checkType");
 
-  const check = getTraceCheckDefinitions(checkType);
+  const evaluator = getEvaluatorDefinitions(checkType);
 
   useEffect(() => {
     for (const precondition of preconditions) {
@@ -70,7 +70,7 @@ export const PreconditionsField = ({
       helper="Conditions that must be met for this check to run"
     >
       <VStack align="start" spacing={4}>
-        {check?.requiresRag && (
+        {evaluator?.requiredFields.includes("contexts") && (
           <Box borderLeft="4px solid" borderLeftColor="blue.400" width="full">
             <VStack
               borderLeftColor="reset"

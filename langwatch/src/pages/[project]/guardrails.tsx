@@ -21,10 +21,13 @@ import { ChevronRight } from "react-feather";
 import { DashboardLayout } from "../../components/DashboardLayout";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
-import type { CheckPreconditions, CheckTypes } from "../../trace_checks/types";
+import type { CheckPreconditions } from "../../trace_checks/types";
 import { camelCaseToLowerCase } from "../../utils/stringCasing";
 import { TeamRoleGroup } from "../../server/api/permission";
-import { AVAILABLE_TRACE_CHECKS } from "../../trace_checks/registry";
+import {
+  AVAILABLE_EVALUATORS,
+  type EvaluatorTypes,
+} from "../../trace_checks/evaluators.generated";
 
 export default function Checks() {
   const { project, hasTeamPermission } = useOrganizationTeamProject();
@@ -93,17 +96,16 @@ export default function Checks() {
       <Container maxWidth="1200" padding={6}>
         <VStack width="fill" spacing={4} align="stretch">
           <HStack paddingTop={4}>
-            <Heading as="h1">Guardrails and Measurements</Heading>
+            <Heading as="h1">Guardrails and Evaluations</Heading>
             <Spacer />
             {toggleConfig.isLoading && <Spinner size="lg" />}
           </HStack>
           <HStack align="end">
             <Text>
-              Automated checks are run on the messages that sent for your
-              project.
+              Setup automated evaluations to run on your project messages.
               <br />
-              You can use them to validate the output of your messages by using
-              the built-in checks or defining custom ones.
+              You can use them to validate security and quality by using the
+              built-in evaluations or defining custom ones.
             </Text>
             <Spacer />
             {hasTeamPermission(TeamRoleGroup.GUARDRAILS_MANAGE) && (
@@ -113,7 +115,7 @@ export default function Checks() {
                 href={`/${project.slug}/guardrails/new/choose`}
                 minWidth="fit-content"
               >
-                + Add Check
+                + Add Evaluation
               </Button>
             )}
           </HStack>
@@ -171,8 +173,8 @@ export default function Checks() {
                           ) && (
                             <Text>
                               {
-                                AVAILABLE_TRACE_CHECKS[
-                                  check.checkType as CheckTypes
+                                AVAILABLE_EVALUATORS[
+                                  check.checkType as EvaluatorTypes
                                 ].description
                               }
                             </Text>

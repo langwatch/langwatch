@@ -1,5 +1,7 @@
-import { AVAILABLE_TRACE_CHECKS } from "../../trace_checks/registry";
-import type { CheckTypes } from "../../trace_checks/types";
+import {
+  AVAILABLE_EVALUATORS,
+  type EvaluatorTypes,
+} from "../../trace_checks/evaluators.generated";
 import type { FilterDefinition, FilterField } from "./types";
 
 export const availableFilters: { [K in FilterField]: FilterDefinition } = {
@@ -430,7 +432,7 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
               const checkType: string = bucket.labels.type.buckets?.[0]?.key;
               const checkName: string = bucket.labels.name.buckets?.[0]?.key;
               const checkDefinition =
-                AVAILABLE_TRACE_CHECKS[checkType as CheckTypes];
+                AVAILABLE_EVALUATORS[checkType as EvaluatorTypes];
 
               return {
                 field: bucket.key,

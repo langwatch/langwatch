@@ -145,8 +145,8 @@ export type ElasticSearchInputOutput = {
 // Zod type will not be generated for this one, check ts-to-zod.config.js
 export type ElasticSearchSpan = Omit<
   BaseSpan &
-  Partial<Omit<RAGSpan, "type">> &
-  Partial<Omit<LLMSpan, "type" | "raw_response">>,
+    Partial<Omit<RAGSpan, "type">> &
+    Partial<Omit<LLMSpan, "type" | "raw_response">>,
   "input" | "outputs"
 > & {
   project_id: string;
@@ -205,9 +205,11 @@ export type TraceCheck = {
   project_id: string;
   check_type: string;
   check_name: string;
-  status: "scheduled" | "in_progress" | "error" | "failed" | "succeeded";
+  status: "scheduled" | "in_progress" | "error" | "skipped" | "processed";
+  passed?: boolean;
   raw_result?: object;
-  value?: number;
+  score?: number;
+  details?: string;
   error?: ErrorCapture | null;
   retries?: number;
   timestamps: {
@@ -279,8 +281,31 @@ export type TrackEventRESTParamsValidator = Omit<
 
 // Dataset Schemas
 
-export type DatasetSpan = (
-  Omit<BaseSpan, "project_id" | "trace_id" | "id" | "raw_response" | "timestamps" | "metrics"> |
-  Omit<LLMSpan, "project_id" | "trace_id" | "id" | "raw_response" | "timestamps" | "metrics"> |
-  Omit<RAGSpan, "project_id" | "trace_id" | "id" | "raw_response" | "timestamps" | "metrics">
-);
+export type DatasetSpan =
+  | Omit<
+      BaseSpan,
+      | "project_id"
+      | "trace_id"
+      | "id"
+      | "raw_response"
+      | "timestamps"
+      | "metrics"
+    >
+  | Omit<
+      LLMSpan,
+      | "project_id"
+      | "trace_id"
+      | "id"
+      | "raw_response"
+      | "timestamps"
+      | "metrics"
+    >
+  | Omit<
+      RAGSpan,
+      | "project_id"
+      | "trace_id"
+      | "id"
+      | "raw_response"
+      | "timestamps"
+      | "metrics"
+    >;

@@ -1,10 +1,10 @@
-import type { CheckTypes } from "../../trace_checks/types";
+import type { EvaluatorTypes } from "../../trace_checks/evaluators.generated";
 import type { TrackEventRESTParamsValidator } from "../tracer/types";
 
 export type TraceCheckJob = {
   check: {
     id: string;
-    type: CheckTypes;
+    type: EvaluatorTypes;
     name: string;
   };
   trace: {
@@ -25,5 +25,8 @@ export type TopicClusteringJob = {
 export type TrackEventJob = {
   project_id: string;
   postpone_count: number;
-  event: TrackEventRESTParamsValidator & { event_id: string; timestamp: number };
+  event: TrackEventRESTParamsValidator & {
+    event_id: string;
+    timestamp: number;
+  };
 };

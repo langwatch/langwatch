@@ -17,15 +17,7 @@ import {
   Spacer,
   Text,
 } from "@chakra-ui/react";
-import {
-  MoreVertical,
-  BarChart2,
-  GitBranch,
-  AlignLeft,
-  PieChart,
-  TrendingUp,
-  Triangle,
-} from "react-feather";
+import { MoreVertical, BarChart2 } from "react-feather";
 import { PeriodSelector, usePeriodSelector } from "~/components/PeriodSelector";
 import {
   CustomGraph,
@@ -40,21 +32,6 @@ import { api } from "~/utils/api";
 
 import GraphsLayout from "~/components/GraphsLayout";
 import { FilterSidebar } from "~/components/filters/FilterSidebar";
-
-const chartIcons = {
-  line: <TrendingUp color="orange" />,
-  area: <Triangle color="orange" />,
-  stacked_area: <Triangle color="orange" />,
-  bar: <BarChart2 color="orange" />,
-  stacked_bar: <BarChart2 color="orange" />,
-  horizontal_bar: (
-    <BarChart2 style={{ transform: "rotate(90deg)" }} color="orange" />
-  ),
-  scatter: <GitBranch color="orange" />,
-  pie: <PieChart color="orange" />,
-  donnut: <PieChart color="orange" />,
-  summary: <AlignLeft color="orange" />,
-};
 
 export default function Reports() {
   const { project } = useOrganizationTeamProject();
