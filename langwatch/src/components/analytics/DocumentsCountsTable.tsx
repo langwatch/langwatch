@@ -10,9 +10,9 @@ import {
   Tr,
   VStack,
 } from "@chakra-ui/react";
+import { useFilterParams } from "../../hooks/useFilterParams";
 import { api } from "../../utils/api";
 import { SummaryMetricValue } from "./SummaryMetric";
-import { useFilterParams } from "../../hooks/useFilterParams";
 
 export const DocumentsCountsTable = () => {
   const { filterParams, queryOpts } = useFilterParams();
@@ -26,7 +26,7 @@ export const DocumentsCountsTable = () => {
 
   return (
     <VStack align="start" spacing={4}>
-      <Text fontSize="lg" paddingTop={4} fontWeight={600}>
+      <Text fontSize="" paddingTop={4} fontWeight={600}>
         Top 10 most used documents
       </Text>
       <Table variant="simple" padding={0} margin={0}>

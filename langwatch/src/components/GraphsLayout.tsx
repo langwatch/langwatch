@@ -1,4 +1,4 @@
-import { HStack, VStack, Text } from "@chakra-ui/react";
+import { HStack, Text, VStack } from "@chakra-ui/react";
 import { type PropsWithChildren } from "react";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { MenuLink } from "~/components/MenuLink";
@@ -23,7 +23,7 @@ export default function GraphsLayout({ children }: PropsWithChildren) {
         >
           <MenuLink href={`/${project?.slug}`}>Overview</MenuLink>
           <Text fontWeight={"bold"} padding={2}>
-            Engagment
+            Engagement
           </Text>
           <MenuLink href={`/${project?.slug}/analytics/users`}>Users</MenuLink>
           <MenuLink href={`/${project?.slug}/analytics/topics`}>
@@ -32,8 +32,8 @@ export default function GraphsLayout({ children }: PropsWithChildren) {
           <Text fontWeight={"bold"} padding={2}>
             Observabilty
           </Text>
-          <MenuLink href={`/${project?.slug}/analytics/checks`}>
-            Checks
+          <MenuLink href={`/${project?.slug}/analytics/evaluations`}>
+            Evaluations
           </MenuLink>
           <MenuLink href={`/${project?.slug}/analytics/metrics`}>
             Metrics

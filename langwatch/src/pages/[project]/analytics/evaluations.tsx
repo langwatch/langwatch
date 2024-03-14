@@ -1,10 +1,11 @@
 import {
   Card,
   CardBody,
+  CardHeader,
   Container,
-  Grid,
   GridItem,
   HStack,
+  Heading,
   SimpleGrid,
   Spacer,
   Text,
@@ -15,7 +16,6 @@ import {
   CustomGraph,
   type CustomGraphInput,
 } from "~/components/analytics/CustomGraph";
-import { SessionsSummary } from "~/components/analytics/SessionsSummary";
 import {
   FilterToggle,
   useFilterToggle,
@@ -35,7 +35,7 @@ const creatChecks = (checks: any) => {
     if (traceCheck?.valueDisplayType === "boolean") {
       checksSummary = {
         graphId: "custom",
-        graphType: "pie",
+        graphType: "donnut",
         series: [
           {
             name: "Checks count",
@@ -87,7 +87,7 @@ const creatChecks = (checks: any) => {
         ],
         includePrevious: false,
         timeScale: 1,
-        height: 300,
+        height: 200,
       };
 
       checksAverage = {
@@ -95,7 +95,7 @@ const creatChecks = (checks: any) => {
         graphType: "line",
         series: [
           {
-            name: "",
+            name: "Average score",
             colorSet: "colors",
             metric: "evaluations.evaluation_score",
             aggregation: "avg",
@@ -104,7 +104,7 @@ const creatChecks = (checks: any) => {
         ],
         includePrevious: false,
         timeScale: 1,
-        height: 300,
+        height: 200,
       };
     }
 
@@ -112,23 +112,24 @@ const creatChecks = (checks: any) => {
       <>
         <GridItem colSpan={1} display={"inline-grid"}>
           <Card>
+            <CardHeader>
+              <Heading size="sm">{traceCheck?.name}</Heading>
+            </CardHeader>
             <CardBody>
-              <Text fontWeight={"500"} marginBottom={4}>
-                {traceCheck?.name}
-              </Text>
               <CustomGraph input={checksSummary as CustomGraphInput} />
             </CardBody>
           </Card>
         </GridItem>
         <GridItem colSpan={3} display={"inline-grid"}>
           <Card>
-            <CardBody>
-              <HStack alignItems={"top"}>
-                <Text fontWeight={"500"} marginBottom={4}>
-                  {traceCheck?.name}
-                </Text>
+            <CardHeader>
+              <HStack>
+                <Heading size="sm">{traceCheck?.name}</Heading>
+
                 <Text fontWeight={300}>- {check.name}</Text>
               </HStack>
+            </CardHeader>
+            <CardBody>
               <CustomGraph input={checksAverage as CustomGraphInput} />
             </CardBody>
           </Card>
@@ -138,7 +139,7 @@ const creatChecks = (checks: any) => {
   });
 };
 
-export default function Checks() {
+export default function Evaluations() {
   const { project } = useOrganizationTeamProject();
   const checks = api.checks.getAllForProject.useQuery(
     {

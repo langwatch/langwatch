@@ -15,8 +15,6 @@ import {
   CustomGraph,
   type CustomGraphInput,
 } from "~/components/analytics/CustomGraph";
-import { SatisfactionGraphs } from "~/components/analytics/SatisfactionGraph";
-import { SessionsSummary } from "~/components/analytics/SessionsSummary";
 import {
   FilterToggle,
   useFilterToggle,
@@ -38,47 +36,28 @@ const userCount = {
   height: 550,
 };
 
-const messagesCount = {
+const LLMMetrics = {
   graphId: "custom",
   graphType: "summary",
   series: [
     {
-      name: "Messages count",
-      colorSet: "orangeTones",
-      metric: "metadata.trace_id",
+      name: "LLM Calls",
+      metric: "metadata.span_type",
+      key: "llm",
       aggregation: "cardinality",
+      colorSet: "colors",
     },
     {
-      name: "Average msgs per user",
-      colorSet: "orangeTones",
-      metric: "metadata.trace_id",
-      aggregation: "cardinality",
-      pipeline: {
-        field: "user_id",
-        aggregation: "avg",
-      },
-    },
-    {
-      name: "Users count",
-      colorSet: "blueTones",
-      metric: "metadata.user_id",
-      aggregation: "cardinality",
-    },
-    {
-      name: "Threads count",
+      name: "Total cost",
       colorSet: "greenTones",
-      metric: "metadata.thread_id",
-      aggregation: "cardinality",
+      metric: "performance.total_cost",
+      aggregation: "sum",
     },
     {
-      name: "Average threads per user",
-      colorSet: "greenTones",
-      metric: "metadata.thread_id",
-      aggregation: "cardinality",
-      pipeline: {
-        field: "user_id",
-        aggregation: "avg",
-      },
+      name: "Total tokens",
+      colorSet: "purpleTones",
+      metric: "performance.total_tokens",
+      aggregation: "sum",
     },
   ],
   includePrevious: false,
@@ -86,147 +65,129 @@ const messagesCount = {
   height: 300,
 };
 
-const threadCount = {
+const LLMSummary = {
   graphId: "custom",
   graphType: "summary",
   series: [
     {
-      name: "",
+      name: "Average tokens per message",
+      colorSet: "colors",
+      metric: "performance.total_tokens",
+      aggregation: "avg",
+    },
+    {
+      name: "Average cost per message",
       colorSet: "greenTones",
-      metric: "metadata.thread_id",
-      aggregation: "cardinality",
+      metric: "performance.total_cost",
+      aggregation: "avg",
     },
-  ],
-  includePrevious: false,
-  timeScale: 1,
-  height: 550,
-};
-
-const averageCount = {
-  graphId: "custom",
-  graphType: "summary",
-  series: [
     {
-      name: "",
-      colorSet: "orangeTones",
-      metric: "metadata.trace_id",
-      aggregation: "cardinality",
-      pipeline: {
-        field: "user_id",
-        aggregation: "avg",
-      },
+      name: "90th Percentile time to first token",
+      colorSet: "cyanTones",
+      metric: "performance.first_token",
+      aggregation: "p90",
+    },
+    {
+      name: "90th Percentile completion time",
+      colorSet: "greenTones",
+      metric: "performance.completion_time",
+      aggregation: "p90",
     },
   ],
   includePrevious: false,
   timeScale: 1,
-  height: 550,
+  height: 300,
 };
 
-const userCountGrapgh = {
+const LLMs = {
   graphId: "custom",
   graphType: "area",
   series: [
     {
-      name: "Users count",
-      colorSet: "blueTones",
-      metric: "metadata.user_id",
-      aggregation: "cardinality",
-    },
-  ],
-  includePrevious: true,
-  timeScale: "1",
-  height: 300,
-};
-
-const dailyActiveThreads = {
-  graphId: "custom",
-  graphType: "area",
-  series: [
-    {
-      name: "Threads count",
-      colorSet: "greenTones",
-      metric: "metadata.thread_id",
-      aggregation: "cardinality",
-    },
-  ],
-  includePrevious: true,
-  timeScale: 1,
-  height: 300,
-};
-
-const dailyActiveThreadsPerUser = {
-  graphId: "custom",
-  graphType: "summary",
-  series: [
-    {
-      name: "",
-      colorSet: "greenTones",
-      metric: "metadata.thread_id",
-      aggregation: "cardinality",
-      pipeline: {
-        field: "user_id",
-        aggregation: "avg",
-      },
-    },
-  ],
-  includePrevious: false,
-  timeScale: 1,
-  height: 300,
-};
-
-const averageDailyThreadsPerUser = {
-  graphId: "custom",
-  graphType: "bar",
-  series: [
-    {
-      name: "Average threads count per user",
-      colorSet: "greenTones",
-      metric: "metadata.thread_id",
-      aggregation: "cardinality",
-      pipeline: {
-        field: "user_id",
-        aggregation: "avg",
-      },
-    },
-  ],
-  includePrevious: false,
-  timeScale: "1",
-  height: 300,
-};
-
-const messageSentiment = {
-  graphId: "custom",
-  graphType: "stacked_bar",
-  series: [
-    {
-      name: "Average messages count per user",
-      colorSet: "positiveNegativeNeutral",
-      metric: "metadata.trace_id",
-      aggregation: "cardinality",
-      pipeline: {
-        field: "user_id",
-        aggregation: "avg",
-      },
-    },
-  ],
-  groupBy: "sentiment.input_sentiment",
-  includePrevious: false,
-  timeScale: 1,
-  height: 300,
-};
-
-const powerUsers = {
-  graphId: "custom",
-  graphType: "horizontal_bar",
-  series: [
-    {
-      name: "Messages count",
+      name: "90th Percentile Completion Time",
       colorSet: "colors",
       metric: "metadata.trace_id",
       aggregation: "cardinality",
     },
   ],
-  groupBy: "metadata.user_id",
+  groupBy: "metadata.model",
+  includePrevious: false,
+  timeScale: 1,
+  height: 300,
+};
+
+const llmUsage = {
+  graphId: "custom",
+  graphType: "donnut",
+  series: [
+    {
+      name: "90th Percentile Completion Time",
+      colorSet: "colors",
+      metric: "metadata.span_type",
+      aggregation: "cardinality",
+      key: "llm",
+    },
+  ],
+  groupBy: "metadata.model",
+  includePrevious: false,
+  timeScale: 1,
+  height: 300,
+};
+
+const completionTime = {
+  graphId: "custom",
+  graphType: "horizontal_bar",
+  series: [
+    {
+      name: "Completion time average",
+      colorSet: "colors",
+      metric: "performance.completion_time",
+      aggregation: "avg",
+    },
+  ],
+  groupBy: "metadata.model",
+  includePrevious: false,
+  timeScale: "full",
+  height: 300,
+};
+
+const totalCostPerModel = {
+  graphId: "custom",
+  graphType: "horizontal_bar",
+  series: [
+    {
+      name: "Average total cost average per message",
+      colorSet: "colors",
+      metric: "performance.total_cost",
+      aggregation: "avg",
+      pipeline: {
+        field: "trace_id",
+        aggregation: "avg",
+      },
+    },
+  ],
+  groupBy: "metadata.model",
+  includePrevious: false,
+  timeScale: "full",
+  height: 300,
+};
+
+const averageTokensPerMessage = {
+  graphId: "custom",
+  graphType: "horizontal_bar",
+  series: [
+    {
+      name: "Average completion tokens average per message",
+      colorSet: "colors",
+      metric: "performance.completion_tokens",
+      aggregation: "avg",
+      pipeline: {
+        field: "trace_id",
+        aggregation: "avg",
+      },
+    },
+  ],
+  groupBy: "metadata.model",
   includePrevious: false,
   timeScale: "full",
   height: 300,
@@ -261,73 +222,75 @@ export default function Users() {
             <GridItem colSpan={2} display={"inline-grid"}>
               <Card>
                 <CardHeader>
-                  <Heading size="sm">User Messages</Heading>
+                  <Heading size="sm">LLM Metrics</Heading>
                 </CardHeader>
                 <CardBody>
-                  <CustomGraph input={messagesCount as CustomGraphInput} />
-                </CardBody>
-              </Card>
-            </GridItem>
-            <GridItem colSpan={2} display={"inline-grid"}>
-              <SessionsSummary />
-            </GridItem>
-
-            <GridItem colSpan={2} display={"inline-grid"}>
-              <Card>
-                <CardHeader>
-                  <Heading size="sm">Daily Users</Heading>
-                </CardHeader>
-
-                <CardBody>
-                  <CustomGraph input={userCountGrapgh as CustomGraphInput} />
+                  <CustomGraph input={LLMMetrics as CustomGraphInput} />
                 </CardBody>
               </Card>
             </GridItem>
             <GridItem colSpan={2} display={"inline-grid"}>
               <Card>
                 <CardHeader>
-                  <Heading size="sm">Daily Threads</Heading>
+                  <Heading size="sm">Summary</Heading>
                 </CardHeader>
                 <CardBody>
-                  <CustomGraph input={dailyActiveThreads as CustomGraphInput} />
+                  <CustomGraph input={LLMSummary as CustomGraphInput} />
                 </CardBody>
               </Card>
             </GridItem>
 
-            <GridItem colSpan={2} display={"inline-grid"}>
+            <GridItem colSpan={4} display={"inline-grid"}>
               <Card>
                 <CardHeader>
-                  <Heading size="sm">User Satisfaction</Heading>
+                  <Heading size="sm">LLM Usage</Heading>
                 </CardHeader>
                 <CardBody>
-                  <CustomGraph input={messageSentiment as CustomGraphInput} />
+                  <CustomGraph input={LLMs as CustomGraphInput} />
                 </CardBody>
               </Card>
             </GridItem>
             <GridItem colSpan={2} display={"inline-grid"}>
               <Card>
                 <CardHeader>
-                  <Heading size="sm">Average Daily Threads per User</Heading>
+                  <Heading size="sm">LLM Split</Heading>
+                </CardHeader>
+                <CardBody>
+                  <CustomGraph input={llmUsage as CustomGraphInput} />
+                </CardBody>
+              </Card>
+            </GridItem>
+            <GridItem colSpan={2} display={"inline-grid"}>
+              <Card>
+                <CardHeader>
+                  <Heading size="sm">Average Completion Time</Heading>
+                </CardHeader>
+                <CardBody>
+                  <CustomGraph input={completionTime as CustomGraphInput} />
+                </CardBody>
+              </Card>
+            </GridItem>
+            <GridItem colSpan={2} display={"inline-grid"}>
+              <Card>
+                <CardHeader>
+                  <Heading size="sm">Average Cost Per Message</Heading>
+                </CardHeader>
+                <CardBody>
+                  <CustomGraph input={totalCostPerModel as CustomGraphInput} />
+                </CardBody>
+              </Card>
+            </GridItem>
+            <GridItem colSpan={2} display={"inline-grid"}>
+              <Card>
+                <CardHeader>
+                  <Heading size="sm">Average Tokens Per Message</Heading>
                 </CardHeader>
                 <CardBody>
                   <CustomGraph
-                    input={averageDailyThreadsPerUser as CustomGraphInput}
+                    input={averageTokensPerMessage as CustomGraphInput}
                   />
                 </CardBody>
               </Card>
-            </GridItem>
-            <GridItem colSpan={2} display={"inline-grid"}>
-              <Card>
-                <CardHeader>
-                  <Heading size="sm">Power Users</Heading>
-                </CardHeader>
-                <CardBody>
-                  <CustomGraph input={powerUsers as CustomGraphInput} />
-                </CardBody>
-              </Card>
-            </GridItem>
-            <GridItem colSpan={2} display={"inline-grid"}>
-              <SatisfactionGraphs />
             </GridItem>
           </SimpleGrid>
         </HStack>

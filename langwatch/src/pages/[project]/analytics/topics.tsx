@@ -1,13 +1,13 @@
 import {
   Card,
   CardBody,
+  CardHeader,
   Container,
-  Grid,
   GridItem,
   HStack,
+  Heading,
   SimpleGrid,
   Spacer,
-  Text,
 } from "@chakra-ui/react";
 import GraphsLayout from "~/components/GraphsLayout";
 import { PeriodSelector, usePeriodSelector } from "~/components/PeriodSelector";
@@ -45,7 +45,7 @@ const inputSentimenPerTopic = {
   series: [
     {
       name: "Input sentiment score average",
-      colorSet: "positiveNegativeNeutral",
+      colorSet: "colors",
       metric: "sentiment.input_sentiment",
       aggregation: "avg",
     },
@@ -115,54 +115,52 @@ export default function Topics() {
         <hr />
         <HStack paddingY={2}>
           <SimpleGrid
-            templateColumns="repeat(3, 1fr)"
+            templateColumns="repeat(4, 1fr)"
             gap={5}
             marginTop={4}
             width={"100%"}
           >
-            <GridItem display={"inline-grid"}>
+            <GridItem colSpan={1}>
+              <TopTopics />
+            </GridItem>
+            <GridItem colSpan={3} display={"inline-grid"}>
               <Card>
+                <CardHeader>
+                  <Heading size="sm">Threads per Topic</Heading>
+                </CardHeader>
                 <CardBody>
-                  <Text fontWeight={"500"}>Threads per Topic</Text>
                   <CustomGraph input={threadsPerTopic as CustomGraphInput} />
                 </CardBody>
               </Card>
             </GridItem>
             <GridItem colSpan={2} display={"inline-grid"}>
               <Card>
+                <CardHeader>
+                  <Heading size="sm">Input Sentiment per Topic</Heading>
+                </CardHeader>
                 <CardBody>
-                  <Text fontWeight={"500"}>Input Sentiment per Topic</Text>
                   <CustomGraph
                     input={inputSentimenPerTopic as CustomGraphInput}
                   />
                 </CardBody>
               </Card>
             </GridItem>
-            <GridItem display={"inline-grid"}>
+            <GridItem colSpan={2} display={"inline-grid"}>
               <Card>
+                <CardHeader>
+                  <Heading size="sm">Most Discussed Topics</Heading>
+                </CardHeader>
                 <CardBody>
-                  <Text fontWeight={"500"}>Most Discussed Topics</Text>
                   <CustomGraph
                     input={mostDisucussedTopics as CustomGraphInput}
                   />
                 </CardBody>
               </Card>
             </GridItem>
-            <GridItem colSpan={2}>
+            <GridItem colSpan={4}>
               <Card>
                 <CardBody>
                   <DocumentsCountsTable />
-                </CardBody>
-              </Card>
-            </GridItem>
-            <GridItem>
-              <TopTopics />
-            </GridItem>
-            <GridItem display={"inline-grid"}>
-              <Card>
-                <CardBody>
-                  <Text fontWeight={"500"}>Overall Input Sentiment</Text>
-                  <CustomGraph input={inputSentiment as CustomGraphInput} />
                 </CardBody>
               </Card>
             </GridItem>

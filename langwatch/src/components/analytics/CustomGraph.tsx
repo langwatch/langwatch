@@ -205,7 +205,7 @@ export const CustomGraph = React.memo(
           positive,
           negative,
           neutral,
-          error: negative,
+          error: neutral,
           failed: negative,
           succeeded: positive,
         };

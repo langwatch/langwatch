@@ -41,9 +41,7 @@ import {
   DocumentsCountsTable,
 } from "../../components/analytics/DocumentsCountsTable";
 import { LLMSummary } from "../../components/analytics/LLMSummary";
-import { SatisfactionGraphs } from "../../components/analytics/SatisfactionGraph";
-import { SessionsSummary } from "../../components/analytics/SessionsSummary";
-import { TopTopics } from "../../components/analytics/TopTopics";
+import { UserMetrics } from "../../components/analytics/UserMetrics";
 import { FilterSidebar } from "../../components/filters/FilterSidebar";
 import {
   FilterToggle,
@@ -54,7 +52,6 @@ import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProje
 import { dependencies } from "../../injection/dependencies.client";
 import { dependencies as serverDependencies } from "../../injection/dependencies.server";
 import { analyticsMetrics } from "../../server/analytics/registry";
-import { UserMetrics } from "../../components/analytics/UserMetrics";
 import { TeamRoleGroup } from "../../server/api/permission";
 import { api } from "../../utils/api";
 

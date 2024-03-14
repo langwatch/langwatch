@@ -75,9 +75,7 @@ export function TopTopics() {
   return (
     <Card width="full" height="382px">
       <CardBody width="full" paddingTop={6}>
-        <Heading as="h2" size="md">
-          Top Topics
-        </Heading>
+        <Heading size="sm">Top Topics</Heading>
         <VStack width="full" spacing={4} paddingTop={6} align="start">
           {topicCountsQuery.isLoading ? (
             <>
