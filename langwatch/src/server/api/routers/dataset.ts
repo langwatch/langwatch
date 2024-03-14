@@ -1,20 +1,20 @@
+import { type DatabaseSchema } from "@prisma/client";
+import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
-import { TRPCError } from "@trpc/server";
-import { type DatabaseSchema } from "@prisma/client";
 
-
-import { TeamRoleGroup, checkUserPermissionForProject } from "../permission";
-import slugify from "slugify";
 import { nanoid } from "nanoid";
+import slugify from "slugify";
+import { TeamRoleGroup, checkUserPermissionForProject } from "../permission";
 
 export const datasetRouter = createTRPCRouter({
   create: protectedProcedure
-    .input(z.object({ projectId: z.string(), name: z.string(), schema: z.string() }))
+    .input(
+      z.object({ projectId: z.string(), name: z.string(), schema: z.string() })
+    )
     .use(checkUserPermissionForProject(TeamRoleGroup.ANALYTICS_VIEW))
     .mutation(async ({ ctx, input }) => {
-
-      const slug =  slugify(input.name, { lower: true })
+      const slug = slugify(input.name, { lower: true });
 
       const existingDataset = await ctx.prisma.dataset.findFirst({
         where: {
@@ -26,22 +26,21 @@ export const datasetRouter = createTRPCRouter({
       if (existingDataset) {
         throw new TRPCError({
           code: "CONFLICT",
-          message:
-            "A dataset with this name already exists.",
+          message: "A dataset with this name already exists.",
         });
       }
-  
-        return ctx.prisma.dataset.create({
-          data: {
-            id: nanoid(),
-            slug,
-            name: input.name,
-            schema: input.schema as keyof typeof DatabaseSchema,
-            projectId: input.projectId,
-          },
-        });    
+
+      return ctx.prisma.dataset.create({
+        data: {
+          id: nanoid(),
+          slug,
+          name: input.name,
+          schema: input.schema as keyof typeof DatabaseSchema,
+          projectId: input.projectId,
+        },
+      });
     }),
-    getAll: protectedProcedure
+  getAll: protectedProcedure
     .input(z.object({ projectId: z.string() }))
     .use(checkUserPermissionForProject(TeamRoleGroup.ANALYTICS_VIEW))
     .query(async ({ input, ctx }) => {
@@ -50,14 +49,14 @@ export const datasetRouter = createTRPCRouter({
 
       const datasets = await prisma.dataset.findMany({
         where: { projectId },
-        orderBy: {  createdAt: 'desc' },
+        orderBy: { createdAt: "desc" },
         include: {
           datasetRecords: {
-            orderBy: {  createdAt: 'desc' },
-          }
+            orderBy: { createdAt: "desc" },
+          },
         },
       });
 
       return datasets;
-    }),   
+    }),
 });

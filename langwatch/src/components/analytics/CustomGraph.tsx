@@ -68,7 +68,7 @@ export type CustomGraphInput = {
     | "donnut"
     | "summary";
   series: Series[];
-  groupBy: z.infer<typeof timeseriesInput>["groupBy"];
+  groupBy?: z.infer<typeof timeseriesInput>["groupBy"];
   includePrevious: boolean;
   timeScale: "full" | number;
   connected?: boolean;
@@ -205,7 +205,7 @@ export const CustomGraph = React.memo(
           positive,
           negative,
           neutral,
-          error: negative,
+          error: neutral,
           failed: negative,
           succeeded: positive,
         };

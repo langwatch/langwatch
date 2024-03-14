@@ -48,7 +48,7 @@ export const SatisfactionGraphs = () => {
   };
 
   return (
-    <Card width="full" height="335px">
+    <Card width="full" height="400px">
       <CardBody padding={0}>
         <Tabs variant="unstyled">
           <TabList gap={0}>
