@@ -1,4 +1,5 @@
 import {
+  Box,
   Card,
   CardBody,
   CardHeader,
@@ -9,6 +10,7 @@ import {
   SimpleGrid,
   Spacer,
 } from "@chakra-ui/react";
+import { BarChart2 } from "react-feather";
 import GraphsLayout from "~/components/GraphsLayout";
 import { PeriodSelector, usePeriodSelector } from "~/components/PeriodSelector";
 import {
@@ -17,26 +19,11 @@ import {
 } from "~/components/analytics/CustomGraph";
 import { SatisfactionGraphs } from "~/components/analytics/SatisfactionGraph";
 import { SessionsSummary } from "~/components/analytics/SessionsSummary";
+import { FilterSidebar } from "~/components/filters/FilterSidebar";
 import {
   FilterToggle,
   useFilterToggle,
 } from "~/components/filters/FilterToggle";
-
-const userCount = {
-  graphId: "custom",
-  graphType: "summary",
-  series: [
-    {
-      name: "",
-      colorSet: "blueTones",
-      metric: "metadata.user_id",
-      aggregation: "cardinality",
-    },
-  ],
-  includePrevious: true,
-  timeScale: 1,
-  height: 550,
-};
 
 const messagesCount = {
   graphId: "custom",
@@ -49,7 +36,7 @@ const messagesCount = {
       aggregation: "cardinality",
     },
     {
-      name: "Average msgs per user",
+      name: "Average messages per user",
       colorSet: "orangeTones",
       metric: "metadata.trace_id",
       aggregation: "cardinality",
@@ -86,42 +73,6 @@ const messagesCount = {
   height: 300,
 };
 
-const threadCount = {
-  graphId: "custom",
-  graphType: "summary",
-  series: [
-    {
-      name: "",
-      colorSet: "greenTones",
-      metric: "metadata.thread_id",
-      aggregation: "cardinality",
-    },
-  ],
-  includePrevious: false,
-  timeScale: 1,
-  height: 550,
-};
-
-const averageCount = {
-  graphId: "custom",
-  graphType: "summary",
-  series: [
-    {
-      name: "",
-      colorSet: "orangeTones",
-      metric: "metadata.trace_id",
-      aggregation: "cardinality",
-      pipeline: {
-        field: "user_id",
-        aggregation: "avg",
-      },
-    },
-  ],
-  includePrevious: false,
-  timeScale: 1,
-  height: 550,
-};
-
 const userCountGrapgh = {
   graphId: "custom",
   graphType: "area",
@@ -150,26 +101,6 @@ const dailyActiveThreads = {
     },
   ],
   includePrevious: true,
-  timeScale: 1,
-  height: 300,
-};
-
-const dailyActiveThreadsPerUser = {
-  graphId: "custom",
-  graphType: "summary",
-  series: [
-    {
-      name: "",
-      colorSet: "greenTones",
-      metric: "metadata.thread_id",
-      aggregation: "cardinality",
-      pipeline: {
-        field: "user_id",
-        aggregation: "avg",
-      },
-    },
-  ],
-  includePrevious: false,
   timeScale: 1,
   height: 300,
 };
@@ -232,16 +163,36 @@ const powerUsers = {
   height: 300,
 };
 
+const maxMessagePerThread = {
+  graphId: "custom",
+  graphType: "scatter",
+  series: [
+    {
+      name: "Maximum messages count per thread",
+      colorSet: "blueTones",
+      metric: "metadata.trace_id",
+      aggregation: "cardinality",
+      pipeline: {
+        field: "thread_id",
+        aggregation: "max",
+      },
+    },
+  ],
+  includePrevious: true,
+  timeScale: "1",
+  connected: false,
+  height: 300,
+};
+
 export default function Users() {
   const {
     period: { startDate, endDate },
     setPeriod,
   } = usePeriodSelector();
-  const { showFilters } = useFilterToggle();
 
   return (
     <GraphsLayout>
-      <Container maxWidth={showFilters ? "1300" : "1200"} padding={6}>
+      <Container maxWidth={"1300"} padding={6}>
         <HStack width="full" marginBottom={3}>
           <Spacer />
           <FilterToggle />
@@ -251,7 +202,7 @@ export default function Users() {
           />
         </HStack>
         <hr />
-        <HStack paddingY={2}>
+        <HStack paddingY={2} alignItems={"start"}>
           <SimpleGrid
             templateColumns="repeat(4, 1fr)"
             gap={5}
@@ -259,7 +210,7 @@ export default function Users() {
             width={"100%"}
           >
             <GridItem colSpan={2} display={"inline-grid"}>
-              <Card>
+              <Card overflow={"scroll"}>
                 <CardHeader>
                   <Heading size="sm">User Messages</Heading>
                 </CardHeader>
@@ -275,7 +226,10 @@ export default function Users() {
             <GridItem colSpan={2} display={"inline-grid"}>
               <Card>
                 <CardHeader>
-                  <Heading size="sm">Daily Users</Heading>
+                  <HStack>
+                    <BarChart2 color="orange" />
+                    <Heading size="sm">Daily Users</Heading>
+                  </HStack>
                 </CardHeader>
 
                 <CardBody>
@@ -286,7 +240,10 @@ export default function Users() {
             <GridItem colSpan={2} display={"inline-grid"}>
               <Card>
                 <CardHeader>
-                  <Heading size="sm">Daily Threads</Heading>
+                  <HStack>
+                    <BarChart2 color="orange" />
+                    <Heading size="sm">Daily Threads</Heading>
+                  </HStack>
                 </CardHeader>
                 <CardBody>
                   <CustomGraph input={dailyActiveThreads as CustomGraphInput} />
@@ -297,17 +254,39 @@ export default function Users() {
             <GridItem colSpan={2} display={"inline-grid"}>
               <Card>
                 <CardHeader>
-                  <Heading size="sm">User Satisfaction</Heading>
+                  <HStack>
+                    <BarChart2 color="orange" />
+                    <Heading size="sm">User Satisfaction</Heading>
+                  </HStack>
                 </CardHeader>
                 <CardBody>
                   <CustomGraph input={messageSentiment as CustomGraphInput} />
                 </CardBody>
               </Card>
             </GridItem>
+
             <GridItem colSpan={2} display={"inline-grid"}>
               <Card>
                 <CardHeader>
-                  <Heading size="sm">Average Daily Threads per User</Heading>
+                  <HStack>
+                    <BarChart2 color="orange" />
+                    <Heading size="sm">Max Messages Per Thread</Heading>
+                  </HStack>
+                </CardHeader>
+                <CardBody>
+                  <CustomGraph
+                    input={maxMessagePerThread as CustomGraphInput}
+                  />
+                </CardBody>
+              </Card>
+            </GridItem>
+            <GridItem colSpan={2} display={"inline-grid"}>
+              <Card>
+                <CardHeader>
+                  <HStack>
+                    <BarChart2 color="orange" />
+                    <Heading size="sm">Average Daily Threads per User</Heading>
+                  </HStack>
                 </CardHeader>
                 <CardBody>
                   <CustomGraph
@@ -319,7 +298,10 @@ export default function Users() {
             <GridItem colSpan={2} display={"inline-grid"}>
               <Card>
                 <CardHeader>
-                  <Heading size="sm">Power Users</Heading>
+                  <HStack>
+                    <BarChart2 color="orange" />
+                    <Heading size="sm">User Leaderboard</Heading>
+                  </HStack>
                 </CardHeader>
                 <CardBody>
                   <CustomGraph input={powerUsers as CustomGraphInput} />
@@ -330,6 +312,9 @@ export default function Users() {
               <SatisfactionGraphs />
             </GridItem>
           </SimpleGrid>
+          <Box padding={3}>
+            <FilterSidebar hideTopics={true} />
+          </Box>
         </HStack>
       </Container>
     </GraphsLayout>

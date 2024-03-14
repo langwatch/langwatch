@@ -20,7 +20,7 @@ export const SessionsSummary = () => {
   );
 
   return (
-    <Card>
+    <Card overflow={"scroll"}>
       <CardHeader>
         <HStack>
           <Heading size="sm">User Sessions</Heading>

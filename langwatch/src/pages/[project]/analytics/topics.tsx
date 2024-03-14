@@ -1,4 +1,5 @@
 import {
+  Box,
   Card,
   CardBody,
   CardHeader,
@@ -9,14 +10,19 @@ import {
   SimpleGrid,
   Spacer,
 } from "@chakra-ui/react";
+import { BarChart2 } from "react-feather";
 import GraphsLayout from "~/components/GraphsLayout";
 import { PeriodSelector, usePeriodSelector } from "~/components/PeriodSelector";
 import {
   CustomGraph,
   type CustomGraphInput,
 } from "~/components/analytics/CustomGraph";
-import { DocumentsCountsTable } from "~/components/analytics/DocumentsCountsTable";
+import {
+  DocumentsCountsSummary,
+  DocumentsCountsTable,
+} from "~/components/analytics/DocumentsCountsTable";
 import { TopTopics } from "~/components/analytics/TopTopics";
+import { FilterSidebar } from "~/components/filters/FilterSidebar";
 import {
   FilterToggle,
   useFilterToggle,
@@ -99,11 +105,10 @@ export default function Topics() {
     period: { startDate, endDate },
     setPeriod,
   } = usePeriodSelector();
-  const { showFilters } = useFilterToggle();
 
   return (
     <GraphsLayout>
-      <Container maxWidth={showFilters ? "1300" : "1200"} padding={6}>
+      <Container maxWidth={"1300"} padding={6}>
         <HStack width="full" marginBottom={3}>
           <Spacer />
           <FilterToggle />
@@ -113,7 +118,7 @@ export default function Topics() {
           />
         </HStack>
         <hr />
-        <HStack paddingY={2}>
+        <HStack paddingY={2} alignItems={"start"}>
           <SimpleGrid
             templateColumns="repeat(4, 1fr)"
             gap={5}
@@ -126,7 +131,10 @@ export default function Topics() {
             <GridItem colSpan={3} display={"inline-grid"}>
               <Card>
                 <CardHeader>
-                  <Heading size="sm">Threads per Topic</Heading>
+                  <HStack>
+                    <BarChart2 color="orange" />
+                    <Heading size="sm">Threads Per Topic</Heading>
+                  </HStack>
                 </CardHeader>
                 <CardBody>
                   <CustomGraph input={threadsPerTopic as CustomGraphInput} />
@@ -136,7 +144,10 @@ export default function Topics() {
             <GridItem colSpan={2} display={"inline-grid"}>
               <Card>
                 <CardHeader>
-                  <Heading size="sm">Input Sentiment per Topic</Heading>
+                  <HStack>
+                    <BarChart2 color="orange" />
+                    <Heading size="sm">Input Sentiment per Topic</Heading>
+                  </HStack>
                 </CardHeader>
                 <CardBody>
                   <CustomGraph
@@ -148,7 +159,10 @@ export default function Topics() {
             <GridItem colSpan={2} display={"inline-grid"}>
               <Card>
                 <CardHeader>
-                  <Heading size="sm">Most Discussed Topics</Heading>
+                  <HStack>
+                    <BarChart2 color="orange" />
+                    <Heading size="sm">Most Discussed Topics</Heading>
+                  </HStack>
                 </CardHeader>
                 <CardBody>
                   <CustomGraph
@@ -160,11 +174,19 @@ export default function Topics() {
             <GridItem colSpan={4}>
               <Card>
                 <CardBody>
+                  <HStack>
+                    <Heading size="sm"> Total documents</Heading>
+                  </HStack>
+
+                  <DocumentsCountsSummary />
                   <DocumentsCountsTable />
                 </CardBody>
               </Card>
             </GridItem>
           </SimpleGrid>
+          <Box padding={3}>
+            <FilterSidebar hideTopics={true} />
+          </Box>
         </HStack>
       </Container>
     </GraphsLayout>

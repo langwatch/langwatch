@@ -1,4 +1,5 @@
 import {
+  Box,
   Card,
   CardBody,
   CardHeader,
@@ -9,12 +10,14 @@ import {
   SimpleGrid,
   Spacer,
 } from "@chakra-ui/react";
+import { BarChart2 } from "react-feather";
 import GraphsLayout from "~/components/GraphsLayout";
 import { PeriodSelector, usePeriodSelector } from "~/components/PeriodSelector";
 import {
   CustomGraph,
   type CustomGraphInput,
 } from "~/components/analytics/CustomGraph";
+import { FilterSidebar } from "~/components/filters/FilterSidebar";
 import {
   FilterToggle,
   useFilterToggle,
@@ -198,11 +201,10 @@ export default function Users() {
     period: { startDate, endDate },
     setPeriod,
   } = usePeriodSelector();
-  const { showFilters } = useFilterToggle();
 
   return (
     <GraphsLayout>
-      <Container maxWidth={showFilters ? "1300" : "1200"} padding={6}>
+      <Container maxWidth={"1300"} padding={6}>
         <HStack width="full" marginBottom={3}>
           <Spacer />
           <FilterToggle />
@@ -212,7 +214,7 @@ export default function Users() {
           />
         </HStack>
         <hr />
-        <HStack paddingY={2}>
+        <HStack paddingY={2} alignItems={"start"}>
           <SimpleGrid
             templateColumns="repeat(4, 1fr)"
             gap={5}
@@ -220,9 +222,12 @@ export default function Users() {
             width={"100%"}
           >
             <GridItem colSpan={2} display={"inline-grid"}>
-              <Card>
+              <Card overflow={"scroll"}>
                 <CardHeader>
-                  <Heading size="sm">LLM Metrics</Heading>
+                  <HStack>
+                    <BarChart2 color="orange" />
+                    <Heading size="sm">LLM Metrics</Heading>
+                  </HStack>
                 </CardHeader>
                 <CardBody>
                   <CustomGraph input={LLMMetrics as CustomGraphInput} />
@@ -230,9 +235,12 @@ export default function Users() {
               </Card>
             </GridItem>
             <GridItem colSpan={2} display={"inline-grid"}>
-              <Card>
+              <Card overflow={"scroll"}>
                 <CardHeader>
-                  <Heading size="sm">Summary</Heading>
+                  <HStack>
+                    <BarChart2 color="orange" />
+                    <Heading size="sm">Summary</Heading>
+                  </HStack>
                 </CardHeader>
                 <CardBody>
                   <CustomGraph input={LLMSummary as CustomGraphInput} />
@@ -243,7 +251,10 @@ export default function Users() {
             <GridItem colSpan={4} display={"inline-grid"}>
               <Card>
                 <CardHeader>
-                  <Heading size="sm">LLM Usage</Heading>
+                  <HStack>
+                    <BarChart2 color="orange" />
+                    <Heading size="sm">LLM Usage</Heading>
+                  </HStack>
                 </CardHeader>
                 <CardBody>
                   <CustomGraph input={LLMs as CustomGraphInput} />
@@ -253,7 +264,10 @@ export default function Users() {
             <GridItem colSpan={2} display={"inline-grid"}>
               <Card>
                 <CardHeader>
-                  <Heading size="sm">LLM Split</Heading>
+                  <HStack>
+                    <BarChart2 color="orange" />
+                    <Heading size="sm">LLM Split</Heading>
+                  </HStack>
                 </CardHeader>
                 <CardBody>
                   <CustomGraph input={llmUsage as CustomGraphInput} />
@@ -263,7 +277,10 @@ export default function Users() {
             <GridItem colSpan={2} display={"inline-grid"}>
               <Card>
                 <CardHeader>
-                  <Heading size="sm">Average Completion Time</Heading>
+                  <HStack>
+                    <BarChart2 color="orange" />
+                    <Heading size="sm">Average Completion Time</Heading>
+                  </HStack>
                 </CardHeader>
                 <CardBody>
                   <CustomGraph input={completionTime as CustomGraphInput} />
@@ -273,7 +290,10 @@ export default function Users() {
             <GridItem colSpan={2} display={"inline-grid"}>
               <Card>
                 <CardHeader>
-                  <Heading size="sm">Average Cost Per Message</Heading>
+                  <HStack>
+                    <BarChart2 color="orange" />
+                    <Heading size="sm">Average Cost Per Message</Heading>
+                  </HStack>
                 </CardHeader>
                 <CardBody>
                   <CustomGraph input={totalCostPerModel as CustomGraphInput} />
@@ -283,7 +303,10 @@ export default function Users() {
             <GridItem colSpan={2} display={"inline-grid"}>
               <Card>
                 <CardHeader>
-                  <Heading size="sm">Average Tokens Per Message</Heading>
+                  <HStack>
+                    <BarChart2 color="orange" />
+                    <Heading size="sm">Average Tokens Per Message</Heading>
+                  </HStack>
                 </CardHeader>
                 <CardBody>
                   <CustomGraph
@@ -293,6 +316,9 @@ export default function Users() {
               </Card>
             </GridItem>
           </SimpleGrid>
+          <Box padding={3}>
+            <FilterSidebar hideTopics={true} />
+          </Box>
         </HStack>
       </Container>
     </GraphsLayout>

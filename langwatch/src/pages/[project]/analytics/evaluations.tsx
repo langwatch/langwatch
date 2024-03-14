@@ -1,4 +1,5 @@
 import {
+  Box,
   Card,
   CardBody,
   CardHeader,
@@ -10,12 +11,14 @@ import {
   Spacer,
   Text,
 } from "@chakra-ui/react";
+import { BarChart2 } from "react-feather";
 import GraphsLayout from "~/components/GraphsLayout";
 import { PeriodSelector, usePeriodSelector } from "~/components/PeriodSelector";
 import {
   CustomGraph,
   type CustomGraphInput,
 } from "~/components/analytics/CustomGraph";
+import { FilterSidebar } from "~/components/filters/FilterSidebar";
 import {
   FilterToggle,
   useFilterToggle,
@@ -113,7 +116,10 @@ const creatChecks = (checks: any) => {
         <GridItem colSpan={1} display={"inline-grid"}>
           <Card>
             <CardHeader>
-              <Heading size="sm">{traceCheck?.name}</Heading>
+              <HStack>
+                <BarChart2 color="orange" />
+                <Heading size="sm">{traceCheck?.name}</Heading>
+              </HStack>
             </CardHeader>
             <CardBody>
               <CustomGraph input={checksSummary as CustomGraphInput} />
@@ -124,6 +130,7 @@ const creatChecks = (checks: any) => {
           <Card>
             <CardHeader>
               <HStack>
+                <BarChart2 color="orange" />
                 <Heading size="sm">{traceCheck?.name}</Heading>
 
                 <Text fontWeight={300}>- {check.name}</Text>
@@ -148,17 +155,14 @@ export default function Evaluations() {
     { enabled: !!project }
   );
 
-  console.log(checks.data);
-
   const {
     period: { startDate, endDate },
     setPeriod,
   } = usePeriodSelector();
-  const { showFilters } = useFilterToggle();
 
   return (
     <GraphsLayout>
-      <Container maxWidth={showFilters ? "1300" : "1200"} padding={6}>
+      <Container maxWidth={"1300"} padding={6}>
         <HStack width="full" marginBottom={3}>
           <Spacer />
           <FilterToggle />
@@ -168,7 +172,7 @@ export default function Evaluations() {
           />
         </HStack>
         <hr />
-        <HStack paddingY={2}>
+        <HStack paddingY={2} alignItems={"start"}>
           <SimpleGrid
             templateColumns="repeat(4, 1fr)"
             gap={5}
@@ -177,6 +181,9 @@ export default function Evaluations() {
           >
             {checks.data ? creatChecks(checks.data) : null}
           </SimpleGrid>
+          <Box padding={3}>
+            <FilterSidebar hideTopics={true} />
+          </Box>
         </HStack>
       </Container>
     </GraphsLayout>
