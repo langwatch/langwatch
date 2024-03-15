@@ -7,7 +7,7 @@
     "lint": "next lint",
     "dev": "npm run start:prepare && NODE_ENV=development DEBUG=langwatch:* DEBUG_HIDE_DATE=true DEBUG_COLORS=true concurrently 'node src/server.js' 'npm run start:workers'",
     "start": "next start",
-    "start:prepare": "npm run copy:integration && npm run types:zod:generate && npm run prisma:db:push && npm run elastic:index:create && npm run copy:langevals-types",
+    "start:prepare": "npm run copy:integration && npm run copy:langevals-types && npm run types:zod:generate && npm run prisma:db:push && npm run elastic:index:create",
     "start:workers": "tsx --tsconfig tsconfig.workers.json src/workers.ts",
     "test": "npm run test:unit -- --run --bail=1 && npm run test:integration -- --run --bail=1 --single-thread",
     "test:unit": "DEBUG=langwatch:* DEBUG_HIDE_DATE=true DEBUG_COLORS=true vitest",
