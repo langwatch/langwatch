@@ -39,7 +39,6 @@ const creatChecks = (checks: any) => {
     let checksAverage = {};
     let checksSummary = {};
     const traceCheck = getTraceCheckDefinitions(check.checkType);
-    if (!check.enabled) return null;
 
     if (traceCheck?.valueDisplayType === "boolean") {
       checksSummary = {
@@ -126,6 +125,11 @@ const creatChecks = (checks: any) => {
                 <BarChart2 color="orange" />
                 <Heading size="sm">{traceCheck?.name}</Heading>
               </HStack>
+              {!check.enabled && (
+                <Text textColor={"gray"} fontSize={"sm"}>
+                  (disabled)
+                </Text>
+              )}
             </CardHeader>
             <CardBody>
               <CustomGraph input={checksSummary as CustomGraphInput} />
@@ -141,6 +145,11 @@ const creatChecks = (checks: any) => {
 
                 <Text fontWeight={300}>- {check.name}</Text>
               </HStack>
+              {!check.enabled && (
+                <Text textColor={"gray"} fontSize={"sm"}>
+                  (disabled)
+                </Text>
+              )}
             </CardHeader>
             <CardBody>
               <CustomGraph input={checksAverage as CustomGraphInput} />
