@@ -1,31 +1,78 @@
 locals {
   resource_name         = var.evaluator_package
   zipped_lambda_package = "${path.root}/../langevals/dist/lambdas/${var.evaluator_package}.zip"
+  tag                   = sha1(join("", [for f in fileset(path.root, "../langevals") : filesha1(f)]))
 }
 
 resource "aws_lambda_function" "this" {
+  package_type  = "Image"
   function_name = "${local.resource_name}-evaluator-lambda"
 
-  filename         = local.zipped_lambda_package
-  source_code_hash = filebase64sha256(local.zipped_lambda_package)
-
-  handler = "langevals.server.handler"
-  runtime = "python3.11"
+  image_uri = "${data.aws_ecr_repository.lambda_repository.repository_url}:${local.tag}"
 
   role = aws_iam_role.lambda.arn
 
   depends_on = [
-    aws_iam_role_policy_attachment.lambda
+    aws_iam_role_policy_attachment.lambda,
+    null_resource.docker_image
   ]
 }
 
-resource "aws_lambda_layer_version" "this" {
-  filename            = local.zipped_lambda_package
-  layer_name          = "${local.resource_name}--python3-layer"
-  source_code_hash    = filebase64sha256(local.zipped_lambda_package)
-  compatible_runtimes = ["python3.11"]
+data "aws_ecr_repository" "lambda_repository" {
+  name = aws_ecr_repository.lambda_repository.name
 }
 
+resource "aws_ecr_lifecycle_policy" "lambda_repository" {
+  repository = aws_ecr_repository.lambda_repository.name
+
+  policy = jsonencode({
+    rules = [
+      {
+        rulePriority = 1
+        description  = "Retain only 3 most recent images"
+        selection = {
+          tagStatus   = "any"
+          countType   = "imageCountMoreThan"
+          countNumber = 3
+        }
+        action = {
+          type = "expire"
+        }
+      }
+    ]
+  })
+}
+
+data "aws_caller_identity" "current" {}
+
+data "aws_region" "current" {}
+
+resource "null_resource" "docker_image" {
+  triggers = {
+    # image_hash = local.tag
+    always_run = "${timestamp()}"
+  }
+
+  provisioner "local-exec" {
+    command = <<EOT
+      set -eo pipefail
+
+      echo "Building ${local.resource_name}..."
+      aws ecr get-login-password --profile lw-prod --region ${data.aws_region.current.name} | docker login --username AWS --password-stdin ${data.aws_caller_identity.current.account_id}.dkr.ecr.${data.aws_region.current.name}.amazonaws.com || true
+      cd ${path.root}/../langevals
+      docker build . --build-arg EVALUATOR=${local.resource_name} --platform="linux/amd64" -t ${data.aws_ecr_repository.lambda_repository.repository_url}:${local.tag}
+      docker push ${data.aws_ecr_repository.lambda_repository.repository_url}:${local.tag}
+      cd -
+    EOT
+  }
+
+  depends_on = [aws_ecr_repository.lambda_repository]
+}
+
+resource "aws_ecr_repository" "lambda_repository" {
+  name                 = "${local.resource_name}-lambda"
+  image_tag_mutability = "MUTABLE"
+}
 
 # IAM role which dictates what other AWS services the Lambda function
 # may access.

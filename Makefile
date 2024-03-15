@@ -1,7 +1,6 @@
 infra-init:
 	@cd langevals && \
 	make install && \
-	make package-for-lambdas && \
 	poetry run python ../infrastructure/scripts/generate_lambdas.py
 	@terraform -chdir=infrastructure/ init
 

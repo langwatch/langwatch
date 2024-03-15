@@ -49,7 +49,7 @@ def main():
                 path_part   = "{evaluator_name}"
             }}
 
-            module "{package_name}_{evaluator_name}-api-gw" {{
+            module "{package_name}-{evaluator_name}-api-gw" {{
                 source                 = "./api-gw-resource"
                 apigw_id               = aws_api_gateway_rest_api.this.id
                 apigw_root_resource_id = aws_api_gateway_resource.{evaluator_name}.id
@@ -59,7 +59,7 @@ def main():
                 lambda_invoke_arn = module.{package_name}-evaluator.lambda_invoke_arn
             }}
             """
-            depends_on.append(f"module.{package_name}_{evaluator_name}-api-gw")
+            depends_on.append(f"module.{package_name}-{evaluator_name}-api-gw")
 
     lambdas_tf += f"""
             resource "aws_api_gateway_deployment" "this" {{
