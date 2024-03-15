@@ -1,4 +1,8 @@
 import {
+  Alert,
+  AlertDescription,
+  AlertIcon,
+  AlertTitle,
   Box,
   Card,
   CardBody,
@@ -10,6 +14,8 @@ import {
   SimpleGrid,
   Spacer,
   Text,
+  VStack,
+  Link,
 } from "@chakra-ui/react";
 import { BarChart2 } from "react-feather";
 import GraphsLayout from "~/components/GraphsLayout";
@@ -163,6 +169,28 @@ export default function Evaluations() {
   return (
     <GraphsLayout>
       <Container maxWidth={"1300"} padding={6}>
+        {checks && checks.data?.length === 0 && (
+          <Alert status="warning" variant="left-accent" marginBottom={6}>
+            <AlertIcon alignSelf="start" />
+            <VStack align="start">
+              <AlertTitle>No Evelautions yet</AlertTitle>
+              <AlertDescription>
+                <Text as="span">
+                  {
+                    "The evaluation results will be displayed here. Setup evaluations for your project to see the results. Click "
+                  }
+                </Text>
+                <Link
+                  textDecoration="underline"
+                  href={`/${project?.slug}/guardrails`}
+                >
+                  here
+                </Link>
+                <Text as="span"> to get started.</Text>
+              </AlertDescription>
+            </VStack>
+          </Alert>
+        )}
         <HStack width="full" marginBottom={3}>
           <Spacer />
           <FilterToggle />
