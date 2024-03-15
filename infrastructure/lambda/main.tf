@@ -1,17 +1,16 @@
 locals {
-  resource_name      = "${var.environment}-${var.function_name}"
-  source_code_output = "${path.root}/${var.source_code_dir}/dist/lambda.zip"
+  resource_name         = var.evaluator_package
+  zipped_lambda_package = "${path.root}/../langevals/dist/lambdas/${var.evaluator_package}.zip"
 }
 
 resource "aws_lambda_function" "this" {
-  function_name = "${local.resource_name}-lambda-function"
+  function_name = "${local.resource_name}-evaluator-lambda"
 
-  filename         = local.source_code_output
-  source_code_hash = filebase64sha256(local.source_code_output)
-  # layers = [ aws_lambda_layer_version.this.arn ]
+  filename         = local.zipped_lambda_package
+  source_code_hash = filebase64sha256(local.zipped_lambda_package)
 
-  handler = var.function_handler
-  runtime = "python3.12"
+  handler = "langevals.server.handler"
+  runtime = "python3.11"
 
   role = aws_iam_role.lambda.arn
 
@@ -21,9 +20,9 @@ resource "aws_lambda_function" "this" {
 }
 
 resource "aws_lambda_layer_version" "this" {
-  filename            = local.source_code_output
+  filename            = local.zipped_lambda_package
   layer_name          = "${local.resource_name}--python3-layer"
-  source_code_hash    = filebase64sha256(local.source_code_output)
+  source_code_hash    = filebase64sha256(local.zipped_lambda_package)
   compatible_runtimes = ["python3.11"]
 }
 
@@ -80,7 +79,7 @@ resource "aws_iam_role_policy_attachment" "lambda" {
 resource "aws_lambda_permission" "apigw" {
   statement_id  = "AllowAPIGatewayInvoke"
   action        = "lambda:InvokeFunction"
-  function_name = "${aws_lambda_function.this.function_name}"
+  function_name = aws_lambda_function.this.function_name
   principal     = "apigateway.amazonaws.com"
 
   # The /*/* portion grants access from any method on any resource
