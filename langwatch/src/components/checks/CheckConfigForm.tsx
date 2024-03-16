@@ -245,6 +245,7 @@ export default function CheckConfigForm({
                       schema={evaluatorsSchema.shape[checkType].shape.settings}
                       checkType={checkType}
                       prefix="settings"
+                      errors={errors.settings}
                     />
                   )}
                   <Accordion
@@ -274,7 +275,7 @@ export default function CheckConfigForm({
                         <HorizontalFormControl
                           label="Sampling"
                           helper="Run this check only on a sample of messages (min 0.01, max 1.0)"
-                          isInvalid={!!errors.name}
+                          isInvalid={!!errors.sample}
                           align="start"
                         >
                           <Controller

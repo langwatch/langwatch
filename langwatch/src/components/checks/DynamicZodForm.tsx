@@ -9,7 +9,12 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import React from "react";
-import { Controller, useFieldArray, useFormContext } from "react-hook-form";
+import {
+  Controller,
+  useFieldArray,
+  useFormContext,
+  type FieldErrors,
+} from "react-hook-form";
 import { z, type ZodType } from "zod";
 import type {
   EvaluatorDefinition,
@@ -19,15 +24,18 @@ import type {
 import { getEvaluatorDefinitions } from "../../trace_checks/getEvaluator";
 import { camelCaseToTitleCase } from "../../utils/stringCasing";
 import { HorizontalFormControl } from "../HorizontalFormControl";
+import type { CheckConfigFormData } from "./CheckConfigForm";
 
 const DynamicZodForm = ({
   schema,
   checkType,
   prefix,
+  errors,
 }: {
   schema: ZodType;
   checkType: EvaluatorTypes;
   prefix: string;
+  errors: FieldErrors<CheckConfigFormData>["settings"];
 }) => {
   const { control, register } = useFormContext();
 
@@ -87,7 +95,23 @@ const DynamicZodForm = ({
           name={fullPath}
           control={control}
           render={({ field }) => (
-            <Select {...field}>
+            <Select
+              {...field}
+              onChange={(e) => {
+                const literalValues = fieldSchema_.options.map(
+                  (option: any) => option.value
+                );
+
+                if (
+                  !isNaN(+e.target.value) &&
+                  literalValues.includes(+e.target.value)
+                ) {
+                  field.onChange(+e.target.value);
+                } else {
+                  field.onChange(e.target.value);
+                }
+              }}
+            >
               {fieldSchema instanceof z.ZodOptional && (
                 <option value={undefined}></option>
               )}
@@ -166,6 +190,7 @@ const DynamicZodForm = ({
                   key as keyof Evaluators[T]["settings"]
                 ].description ?? ""
               }
+              isInvalid={errors && key in errors && !!(errors as any)[key]}
             >
               {renderField(
                 field,
