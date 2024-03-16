@@ -1,62 +1,86 @@
-import { Box, HStack, Text, VStack, Flex, Spacer, Tooltip } from "@chakra-ui/react";
+import {
+  Box,
+  HStack,
+  Text,
+  VStack,
+  Flex,
+  Spacer,
+  Tooltip,
+} from "@chakra-ui/react";
 import type { TraceCheck } from "../server/tracer/types";
-import type { CheckTypes } from "../trace_checks/types";
-import { CheckCircleIcon, CloseIcon } from '@chakra-ui/icons';
-import { Clock } from "react-feather";
-import { getTraceCheckDefinitions } from "../trace_checks/registry";
+import { getEvaluatorDefinitions } from "../trace_checks/getEvaluator";
 import numeral from "numeral";
 import { formatDistanceToNow } from "date-fns";
-
+import type { EvaluatorTypes } from "../trace_checks/evaluators.generated";
+import {
+  CheckStatusIcon,
+  checkStatusColorMap,
+} from "./checks/EvaluationStatus";
 
 export function CheckPassingDrawer({ check }: { check: TraceCheck }) {
-  const checkType = check.check_type as CheckTypes;
+  const checkType = check.check_type as EvaluatorTypes;
 
+  const evaluator = getEvaluatorDefinitions(checkType);
+  if (!evaluator) return null;
 
-  const done =
-    check.status === "succeeded" ||
-    check.status === "failed" ||
-    check.status === "error";
-  const checkPasses = check.status === "succeeded";
-  const traceCheck = getTraceCheckDefinitions(checkType);
-
-  const color = check.status === 'succeeded' ? "green.500" : "red.500";
-
-  if (!traceCheck) return null;
+  const color = checkStatusColorMap(check);
 
   return (
-    <Box backgroundColor={'gray.100'} width={'full'} padding={6} borderRadius={'lg'}>
+    <Box
+      backgroundColor={"gray.100"}
+      width={"full"}
+      padding={6}
+      borderRadius={"lg"}
+    >
       <Flex>
         <HStack align="start" spacing={1}>
-          <Box
-            paddingRight={2}
-            color={!done ? "yellow.600" : checkPasses ? "green.600" : "red.600"}
-          >
-            {!done /* TODO: differentiate in_progress and scheduled, also on the general one in Messages */ ? (
-              <Clock />
-            ) : checkPasses ? (
-              <CheckCircleIcon w={25} h={25} color={"green.600"} />
-            ) : (
-              <CloseIcon w={15} h={15} color={"red.500"} />
-
-            )}
+          <Box paddingRight={2} color={color}>
+            <CheckStatusIcon check={check} />
           </Box>
-          <VStack alignItems="start" spacing={1} >
-            <Text >
-              <b>{check.check_name || traceCheck.name}</b>
+          <VStack alignItems="start" spacing={1}>
+            <Text>
+              <b>{check.check_name || evaluator.name}</b>
             </Text>
-            <Text fontSize={'sm'}>
-              {traceCheck.description}
-            </Text>
-            <Text fontSize={'sm'}>
-              {check.status == "succeeded" || check.status == "failed" ? (
+            <Text fontSize={"sm"}>{evaluator.description}</Text>
+            <Text fontSize={"sm"}>
+              {check.status == "processed" ? (
+                <VStack align="start" spacing={1}>
+                  {evaluator.isGuardrail ? (
+                    <HStack>
+                      <Text>Result:</Text>
+                      <Text color={color}>
+                        {check.passed ? "Pass" : "Fail"}
+                      </Text>
+                    </HStack>
+                  ) : (
+                    <HStack>
+                      <Text>Score:</Text>
+                      <Text color={color}>
+                        {check.score !== undefined
+                          ? numeral(check.score).format("0.00")
+                          : "N/A"}
+                      </Text>
+                    </HStack>
+                  )}
+                  {check.details && (
+                    <HStack align="start">
+                      <Text>Details:</Text>
+                      <Text color={color}>{check.details}</Text>
+                    </HStack>
+                  )}
+                </VStack>
+              ) : check.status == "skipped" ? (
                 <HStack>
-                  {traceCheck.valueDisplayType === "boolean" ?
-                    <HStack><Text>Result:</Text> <Text color={color}>{check.status == 'succeeded' ? 'Pass' : 'Fail'}</Text></HStack> :
-                    <HStack><Text>Score:</Text> <Text color={color}>{numeral(check.value).format("0.00")}</Text></HStack>
-                  }
+                  <Text>Skipped{check.details && ": "}</Text>
+                  {check.details && <Text color={color}>{check.details}</Text>}
                 </HStack>
               ) : check.status == "error" ? (
-                <Text>Error</Text>
+                <HStack>
+                  <Text>Error:</Text>
+                  <Text as="span" color={color}>
+                    {check.error?.message}
+                  </Text>
+                </HStack>
               ) : check.status == "in_progress" ? (
                 <Text>Processing</Text>
               ) : check.status === "scheduled" ? (
@@ -66,30 +90,26 @@ export function CheckPassingDrawer({ check }: { check: TraceCheck }) {
               )}
             </Text>
           </VStack>
-
         </HStack>
         <Spacer />
-        <Text fontSize={'sm'}>
-          {
-            check.timestamps.finished_at && (
-              <Tooltip
-                label={new Date(check.timestamps.finished_at).toLocaleString()}
+        <Text fontSize={"sm"}>
+          {check.timestamps.finished_at && (
+            <Tooltip
+              label={new Date(check.timestamps.finished_at).toLocaleString()}
+            >
+              <Text
+                borderBottomWidth="1px"
+                borderBottomColor="gray.400"
+                borderBottomStyle="dashed"
               >
-                <Text
-                  borderBottomWidth="1px"
-                  borderBottomColor="gray.400"
-                  borderBottomStyle="dashed"
-                >
-                  {formatDistanceToNow(new Date(check.timestamps.finished_at), {
-                    addSuffix: true,
-                  })}
-                </Text>
-              </Tooltip>
-            )
-          }
-
-        </Text >
-      </Flex >
-    </Box >
+                {formatDistanceToNow(new Date(check.timestamps.finished_at), {
+                  addSuffix: true,
+                })}
+              </Text>
+            </Tooltip>
+          )}
+        </Text>
+      </Flex>
+    </Box>
   );
 }

@@ -1,9 +1,9 @@
 import { DlpServiceClient } from "@google-cloud/dlp";
-import { env } from "../../env.mjs";
-import type { ElasticSearchSpan, Trace } from "../../server/tracer/types";
-import type { Checks, TraceCheckResult } from "../types";
-import { getDebugger } from "../../utils/logger";
+import { env } from "../../../env.mjs";
+import type { ElasticSearchSpan, Trace } from "../../../server/tracer/types";
+import { getDebugger } from "../../../utils/logger";
 import type { google } from "@google-cloud/dlp/build/protos/protos";
+import type { Evaluators } from "../../../trace_checks/evaluators.generated";
 
 const debug = getDebugger("langwatch:trace_checks:piiCheck");
 
@@ -14,17 +14,17 @@ const credentials = env.GOOGLE_CREDENTIALS_JSON
 const dlp = new DlpServiceClient({ credentials });
 
 const infoTypesMap: Record<
-  keyof Checks["pii_check"]["parameters"]["infoTypes"],
+  keyof Evaluators["google_cloud/dlp_pii_detection"]["settings"]["info_types"],
   string
 > = {
-  phoneNumber: "PHONE_NUMBER",
-  emailAddress: "EMAIL_ADDRESS",
-  creditCardNumber: "CREDIT_CARD_NUMBER",
-  ibanCode: "IBAN_CODE",
-  ipAddress: "IP_ADDRESS",
+  phone_number: "PHONE_NUMBER",
+  email_address: "EMAIL_ADDRESS",
+  credit_card_number: "CREDIT_CARD_NUMBER",
+  iban_code: "IBAN_CODE",
+  ip_address: "IP_ADDRESS",
   passport: "PASSPORT",
-  vatNumber: "VAT_NUMBER",
-  medicalRecordNumber: "MEDICAL_RECORD_NUMBER",
+  vat_number: "VAT_NUMBER",
+  medical_record_number: "MEDICAL_RECORD_NUMBER",
 };
 
 const dlpCheck = async (
@@ -104,68 +104,4 @@ export const runPiiCheck = async (
     traceFindings,
     spansFindings,
   };
-};
-
-export const convertToTraceCheckResult = (
-  {
-    traceFindings,
-    spansFindings,
-  }: {
-    traceFindings: google.privacy.dlp.v2.IFinding[];
-    spansFindings: google.privacy.dlp.v2.IFinding[];
-  },
-  parameters: Checks["pii_check"]["parameters"]
-): TraceCheckResult => {
-  const infoTypes = Object.entries(parameters.infoTypes ?? {})
-    .filter(([_key, value]) => value)
-    .map(([key]) => (infoTypesMap as any)[key]);
-  const likelihoodIncluded = (likelihood: string) => {
-    const likelihoods = [
-      "VERY_UNLIKELY",
-      "UNLIKELY",
-      "POSSIBLE",
-      "LIKELY",
-      "VERY_LIKELY",
-    ];
-    return (
-      likelihoods.indexOf(likelihood) >=
-      likelihoods.indexOf(parameters.minLikelihood ?? "POSSIBLE")
-    );
-  };
-  const filteredTraces = traceFindings.filter(
-    (finding) =>
-      finding.infoType?.name &&
-      infoTypes.includes(finding.infoType?.name) &&
-      likelihoodIncluded(finding.likelihood?.toString() ?? "POSSIBLE")
-  );
-  const filteredSpans = spansFindings.filter(
-    (finding) =>
-      finding.infoType?.name &&
-      infoTypes.includes(finding.infoType?.name) &&
-      likelihoodIncluded(finding.likelihood?.toString() ?? "POSSIBLE")
-  );
-
-  const allFindings = filteredTraces.concat(filteredSpans);
-  const reportedFindings = parameters?.checkPiiInSpans
-    ? allFindings
-    : filteredTraces;
-
-  return {
-    raw_result: {
-      findings: reportedFindings,
-    },
-    value: reportedFindings.length,
-    status: reportedFindings.length > 0 ? "failed" : "succeeded",
-    costs: [],
-  };
-};
-
-export const piiCheck = async (
-  trace: Trace,
-  spans: ElasticSearchSpan[],
-  parameters: Checks["pii_check"]["parameters"]
-): Promise<TraceCheckResult> => {
-  const results = await runPiiCheck(trace, spans);
-
-  return convertToTraceCheckResult(results, parameters);
 };

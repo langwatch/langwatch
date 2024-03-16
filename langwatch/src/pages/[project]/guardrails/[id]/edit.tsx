@@ -103,7 +103,7 @@ export default function EditTraceCheck() {
         checkType: check.data.checkType as CheckConfigFormData["checkType"],
         preconditions: check.data
           .preconditions as CheckConfigFormData["preconditions"],
-        parameters: check.data.parameters as CheckConfigFormData["parameters"],
+        parameters: check.data.parameters as CheckConfigFormData["settings"],
       }
     : undefined;
 

@@ -6,13 +6,11 @@ import {
   type Trace,
 } from "../../../server/tracer/types";
 import { scheduleTraceCheck } from "../../../server/background/queues/traceChecksQueue";
-import { getTraceCheckDefinitions } from "../../../trace_checks/registry";
-import type {
-  CheckPreconditions,
-  CheckTypes,
-} from "../../../trace_checks/types";
+import { getEvaluatorDefinitions } from "../../../trace_checks/getEvaluator";
+import type { CheckPreconditions } from "../../../trace_checks/types";
 import { debug } from "../collector";
 import { extractRAGTextualContext } from "./rag";
+import type { EvaluatorTypes } from "../../../trace_checks/evaluators.generated";
 
 async function evaluatePreconditions(
   checkType: string,
@@ -20,9 +18,9 @@ async function evaluatePreconditions(
   spans: Span[],
   preconditions: CheckPreconditions
 ): Promise<boolean> {
-  const checkDefinitions = getTraceCheckDefinitions(checkType);
+  const evaluator = getEvaluatorDefinitions(checkType);
 
-  if (checkDefinitions?.requiresRag) {
+  if (evaluator?.requiredFields.includes("contexts")) {
     // Check if any RAG span is available and has non-empty contexts
     if (
       !spans.some(
@@ -137,7 +135,7 @@ export const scheduleTraceChecks = async (trace: Trace, spans: Span[]) => {
         void scheduleTraceCheck({
           check: {
             ...check,
-            type: check.checkType as CheckTypes,
+            type: check.checkType as EvaluatorTypes,
           },
           trace: trace,
         });

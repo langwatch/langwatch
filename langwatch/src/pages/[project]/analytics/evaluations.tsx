@@ -30,17 +30,17 @@ import {
   useFilterToggle,
 } from "~/components/filters/FilterToggle";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { getTraceCheckDefinitions } from "~/trace_checks/registry";
 
 import { api } from "~/utils/api";
+import { getEvaluatorDefinitions } from "../../../trace_checks/getEvaluator";
 
 const creatChecks = (checks: any) => {
   return checks.map((check: any) => {
     let checksAverage = {};
     let checksSummary = {};
-    const traceCheck = getTraceCheckDefinitions(check.checkType);
+    const traceCheck = getEvaluatorDefinitions(check.checkType);
 
-    if (traceCheck?.valueDisplayType === "boolean") {
+    if (traceCheck?.isGuardrail) {
       checksSummary = {
         graphId: "custom",
         graphType: "donnut",

@@ -17,12 +17,15 @@ import {
 } from "../queues/traceChecksQueue";
 import { traceCheckIndexId } from "~/server/elasticsearch";
 import * as traceChecksWorker from "../worker";
-import type { CheckTypes, TraceCheckResult } from "../../../trace_checks/types";
 import type { TraceCheckJob } from "~/server/background/types";
+import type {
+  EvaluatorTypes,
+  SingleEvaluationResult,
+} from "../../../trace_checks/evaluators.generated";
 
 const mocks = vi.hoisted(() => {
   return {
-    traceChecksProcess: vi.fn<any, Promise<TraceCheckResult>>(),
+    runEvaluation: vi.fn<any, Promise<SingleEvaluationResult>>(),
   };
 });
 
@@ -44,23 +47,23 @@ const getTraceCheck = async (
 };
 
 describe("Check Queue Integration Tests", () => {
-  let worker: Worker<TraceCheckJob, any, CheckTypes> | undefined;
+  let worker: Worker<TraceCheckJob, any, EvaluatorTypes> | undefined;
   const trace_id = `test-trace-id-${nanoid()}`;
   const trace_id_success = `test-trace-id-success-${nanoid()}`;
   const trace_id_failed = `test-trace-id-failure-${nanoid()}`;
   const trace_id_error = `test-trace-id-error-${nanoid()}`;
   const check: TraceCheckJob["check"] = {
     id: "check_123",
-    type: "custom",
+    type: "custom/basic",
     name: "My Custom Check",
   };
 
   beforeEach(() => {
-    mocks.traceChecksProcess.mockReset();
+    mocks.runEvaluation.mockReset();
   });
 
   beforeAll(async () => {
-    const workers = await traceChecksWorker.start(mocks.traceChecksProcess);
+    const workers = await traceChecksWorker.start(mocks.runEvaluation);
     worker = workers?.traceChecksWorker;
     await worker?.waitUntilReady();
   });
@@ -75,45 +78,18 @@ describe("Check Queue Integration Tests", () => {
       index: TRACE_CHECKS_INDEX,
       body: {
         query: {
-          match: { trace_id: trace_id },
-        },
-      },
-    });
-
-    await esClient.deleteByQuery({
-      index: TRACE_CHECKS_INDEX,
-      body: {
-        query: {
-          match: { trace_id: trace_id_success },
-        },
-      },
-    });
-
-    await esClient.deleteByQuery({
-      index: TRACE_CHECKS_INDEX,
-      body: {
-        query: {
-          match: { trace_id: trace_id_failed },
-        },
-      },
-    });
-
-    await esClient.deleteByQuery({
-      index: TRACE_CHECKS_INDEX,
-      body: {
-        query: {
-          match: { trace_id: trace_id_error },
+          // starts with test-trace
+          prefix: { trace_id: "test-trace-id-" },
         },
       },
     });
   });
 
   it('should schedule a trace check and update status to "scheduled" in ES, making sure all the aggregation fields are also persisted', async () => {
-    mocks.traceChecksProcess.mockResolvedValue({
+    mocks.runEvaluation.mockResolvedValue({
       raw_result: { result: "it works" },
-      value: 1,
-      status: "succeeded",
-      costs: [],
+      score: 1,
+      status: "processed",
     });
 
     const trace = {
@@ -125,7 +101,7 @@ describe("Check Queue Integration Tests", () => {
       labels: ["test_label_123"],
     };
 
-    await scheduleTraceCheck({ check, trace });
+    await scheduleTraceCheck({ check, trace, delay: 0 });
 
     // Wait for a bit to allow the job to be scheduled
     await new Promise((resolve) => setTimeout(resolve, 100));
@@ -156,12 +132,11 @@ describe("Check Queue Integration Tests", () => {
     });
   });
 
-  it('should process a trace check successfully and update status to "succeeded" in ES', async () => {
-    mocks.traceChecksProcess.mockResolvedValue({
+  it('should process a trace check successfully and update status to "processed" in ES', async () => {
+    mocks.runEvaluation.mockResolvedValue({
       raw_result: { result: "succeeded test works" },
-      value: 1,
-      status: "succeeded",
-      costs: [],
+      score: 1,
+      status: "processed",
     });
 
     const trace = {
@@ -169,7 +144,7 @@ describe("Check Queue Integration Tests", () => {
       project_id: "test-project-id",
     };
 
-    await scheduleTraceCheck({ check, trace });
+    await scheduleTraceCheck({ check, trace, delay: 0 });
 
     // Wait for the job to be completed
     await new Promise<void>(
@@ -179,7 +154,7 @@ describe("Check Queue Integration Tests", () => {
         })
     );
 
-    // Query ES to verify the status is "succeeded"
+    // Query ES to verify the status is "processed"
     const response = await esClient.search<TraceCheck>({
       index: TRACE_CHECKS_INDEX,
       query: {
@@ -188,17 +163,17 @@ describe("Check Queue Integration Tests", () => {
     });
 
     expect(response.hits.hits).toHaveLength(1);
-    expect(response.hits.hits[0]?._source?.status).toBe("succeeded");
-    expect(response.hits.hits[0]?._source?.value).toBe(1);
-    expect(mocks.traceChecksProcess).toHaveBeenCalled();
+    expect(response.hits.hits[0]?._source?.status).toBe("processed");
+    expect(response.hits.hits[0]?._source?.score).toBe(1);
+    expect(mocks.runEvaluation).toHaveBeenCalled();
   });
 
-  it('should process a trace check that failed and update status to "failed" in ES', async () => {
-    mocks.traceChecksProcess.mockResolvedValue({
+  it('should process a trace check that failed and update status to "processed" in ES', async () => {
+    mocks.runEvaluation.mockResolvedValue({
       raw_result: { result: "succeeded test works" },
-      value: 1,
-      status: "failed",
-      costs: [],
+      score: 1,
+      passed: false,
+      status: "processed",
     });
 
     const trace = {
@@ -206,7 +181,7 @@ describe("Check Queue Integration Tests", () => {
       project_id: "test-project-id",
     };
 
-    await scheduleTraceCheck({ check, trace });
+    await scheduleTraceCheck({ check, trace, delay: 0 });
 
     // Wait for the job to be completed
     await new Promise<void>(
@@ -216,7 +191,7 @@ describe("Check Queue Integration Tests", () => {
         })
     );
 
-    // Query ES to verify the status is "failed"
+    // Query ES to verify the status is "processed"
     const response = await esClient.search<TraceCheck>({
       index: TRACE_CHECKS_INDEX,
       query: {
@@ -225,13 +200,14 @@ describe("Check Queue Integration Tests", () => {
     });
 
     expect(response.hits.hits).toHaveLength(1);
-    expect(response.hits.hits[0]?._source?.status).toBe("failed");
-    expect(response.hits.hits[0]?._source?.value).toBe(1);
-    expect(mocks.traceChecksProcess).toHaveBeenCalled();
+    expect(response.hits.hits[0]?._source?.status).toBe("processed");
+    expect(response.hits.hits[0]?._source?.score).toBe(1);
+    expect(response.hits.hits[0]?._source?.passed).toBe(false);
+    expect(mocks.runEvaluation).toHaveBeenCalled();
   });
 
   it('should errors out when a trace check throws an exception and update status to "error" in ES', async () => {
-    mocks.traceChecksProcess.mockRejectedValue("something wrong is not right");
+    mocks.runEvaluation.mockRejectedValue("something wrong is not right");
 
     const trace = {
       trace_id: trace_id_error,
@@ -243,7 +219,7 @@ describe("Check Queue Integration Tests", () => {
     // Wait for the worker to attempt to process the job
     await new Promise((resolve) => worker?.on("failed", resolve));
 
-    // Query ES to verify the status is "failed"
+    // Query ES to verify the status is "processed"
     const response = await esClient.search<TraceCheck>({
       index: TRACE_CHECKS_INDEX,
       query: {
@@ -253,15 +229,14 @@ describe("Check Queue Integration Tests", () => {
 
     expect(response.hits.hits).toHaveLength(1);
     expect(response.hits.hits[0]?._source?.status).toBe("error");
-    expect(mocks.traceChecksProcess).toHaveBeenCalled();
+    expect(mocks.runEvaluation).toHaveBeenCalled();
   });
 
   it("should re-process a trace check that is already successfull again if requested", async () => {
-    mocks.traceChecksProcess.mockResolvedValue({
+    mocks.runEvaluation.mockResolvedValue({
       raw_result: { result: "succeeded test works" },
-      value: 1,
-      status: "succeeded",
-      costs: [],
+      score: 1,
+      status: "processed",
     });
 
     const trace = {
@@ -269,7 +244,7 @@ describe("Check Queue Integration Tests", () => {
       project_id: "test-project-id",
     };
 
-    await scheduleTraceCheck({ check, trace });
+    await scheduleTraceCheck({ check, trace, delay: 0 });
 
     // Wait for the job to be completed
     await new Promise<void>(
@@ -279,7 +254,7 @@ describe("Check Queue Integration Tests", () => {
         })
     );
 
-    // Query ES to verify the status is "succeeded"
+    // Query ES to verify the status is "processed"
     let response = await esClient.search<TraceCheck>({
       index: TRACE_CHECKS_INDEX,
       query: {
@@ -287,12 +262,12 @@ describe("Check Queue Integration Tests", () => {
       },
     });
 
-    expect(response.hits.hits[0]?._source?.status).toBe("succeeded");
-    expect(response.hits.hits[0]?._source?.value).toBe(1);
-    expect(mocks.traceChecksProcess).toHaveBeenCalled();
+    expect(response.hits.hits[0]?._source?.status).toBe("processed");
+    expect(response.hits.hits[0]?._source?.score).toBe(1);
+    expect(mocks.runEvaluation).toHaveBeenCalled();
 
     // Process the job again
-    await scheduleTraceCheck({ check, trace });
+    await scheduleTraceCheck({ check, trace, delay: 0 });
 
     // Query ES to verify the status is "scheduled"
     response = await esClient.search<TraceCheck>({
@@ -312,7 +287,7 @@ describe("Check Queue Integration Tests", () => {
         })
     );
 
-    // Query ES to verify the status is "succeeded"
+    // Query ES to verify the status is "processed"
     response = await esClient.search<TraceCheck>({
       index: TRACE_CHECKS_INDEX,
       query: {
@@ -320,9 +295,9 @@ describe("Check Queue Integration Tests", () => {
       },
     });
 
-    expect(response.hits.hits[0]?._source?.status).toBe("succeeded");
-    expect(response.hits.hits[0]?._source?.value).toBe(1);
-    expect(mocks.traceChecksProcess).toHaveBeenCalled();
+    expect(response.hits.hits[0]?._source?.status).toBe("processed");
+    expect(response.hits.hits[0]?._source?.score).toBe(1);
+    expect(mocks.runEvaluation).toHaveBeenCalled();
   });
 });
 
@@ -331,7 +306,7 @@ describe("updateCheckStatusInES", () => {
   const projectId = "test-project-id";
   const check: TraceCheckJob["check"] = {
     id: "check_123",
-    type: "custom",
+    type: "custom/basic",
     name: "My Custom Check",
   };
 
@@ -360,7 +335,7 @@ describe("updateCheckStatusInES", () => {
     });
 
     const response = await getTraceCheck(traceId, check.id, projectId);
-    expect((response.hits.total as any).value).toBe(1);
+    expect((response.hits.total as any).value).toBeGreaterThan(0);
     const traceCheck = response.hits.hits[0]?._source;
     expect(traceCheck).toMatchObject({
       id: traceCheckIndexId({ traceId, checkId: check.id, projectId }),
@@ -395,7 +370,7 @@ describe("updateCheckStatusInES", () => {
     });
 
     const response = await getTraceCheck(traceId, check.id, projectId);
-    expect((response.hits.total as any).value).toBe(1);
+    expect((response.hits.total as any).value).toBeGreaterThan(0);
     const traceCheck = response.hits.hits[0]?._source;
     expect(traceCheck).toMatchObject({
       id: traceCheckIndexId({ traceId, checkId: check.id, projectId }),

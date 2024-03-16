@@ -3,7 +3,6 @@ import * as Sentry from "@sentry/nextjs";
 import { Worker, type Job } from "bullmq";
 import { nanoid } from "nanoid";
 import { env } from "../../../env.mjs";
-import type { CheckTypes, TraceCheckResult } from "../../../trace_checks/types";
 import type { TraceCheckJob } from "~/server/background/types";
 import { prisma } from "../../db";
 import { connection } from "../../redis";
@@ -12,15 +11,88 @@ import {
   updateCheckStatusInES,
 } from "../queues/traceChecksQueue";
 import { getDebugger } from "../../../utils/logger";
+import {
+  AVAILABLE_EVALUATORS,
+  type BatchEvaluationResult,
+  type EvaluatorTypes,
+  type SingleEvaluationResult,
+} from "../../../trace_checks/evaluators.generated";
+import { TRACE_INDEX, esClient, traceIndexId } from "../../elasticsearch";
+import type { Trace } from "../../tracer/types";
+import { esGetSpansByTraceId } from "../../api/routers/traces";
+import { getRAGInfo } from "../../tracer/utils";
 
 const debug = getDebugger("langwatch:workers:traceChecksWorker");
 
+export const runEvaluation = async (
+  job: Job<TraceCheckJob, any, EvaluatorTypes>
+): Promise<SingleEvaluationResult> => {
+  const evaluator = AVAILABLE_EVALUATORS[job.data.check.type];
+  const check = await prisma.check.findUnique({
+    where: { id: job.data.check.id },
+  });
+  if (!check) {
+    throw `check config ${job.data.check.id} not found`;
+  }
+
+  const trace = await esClient.getSource<Trace>({
+    index: TRACE_INDEX,
+    id: traceIndexId({
+      traceId: job.data.trace.trace_id,
+      projectId: job.data.trace.project_id,
+    }),
+  });
+  const spans = await esGetSpansByTraceId({
+    traceId: job.data.trace.trace_id,
+    projectId: job.data.trace.project_id,
+  });
+  if (!trace) {
+    throw "trace not found";
+  }
+
+  let input = trace.input.value;
+  let output = trace.output?.value;
+  let contexts = undefined;
+
+  if (evaluator.requiredFields.includes("contexts")) {
+    const ragInfo = getRAGInfo(spans);
+    input = ragInfo.input ?? input;
+    output = ragInfo.output ?? output;
+    contexts = ragInfo.contexts;
+  }
+
+  const response = await fetch(
+    `${env.LANGEVALS_ENDPOINT}/${job.data.check.type}/evaluate`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        data: [{ input, output, contexts }],
+        settings: check.parameters,
+      }),
+    }
+  );
+
+  if (!response.ok) {
+    throw `${response.status} ${response.statusText}`;
+  }
+
+  const result = ((await response.json()) as BatchEvaluationResult)[0];
+  if (!result) {
+    throw "Unexpected response: empty results";
+  }
+
+  return result;
+};
+
 export const startTraceChecksWorker = (
   processFn: (
-    job: Job<TraceCheckJob, any, CheckTypes>
-  ) => Promise<TraceCheckResult>
+    job: Job<TraceCheckJob, any, EvaluatorTypes>
+  ) => Promise<SingleEvaluationResult>
 ) => {
-  const traceChecksWorker = new Worker<TraceCheckJob, any, CheckTypes>(
+  const traceChecksWorker = new Worker<TraceCheckJob, any, EvaluatorTypes>(
     TRACE_CHECKS_QUEUE_NAME,
     async (job) => {
       if (
@@ -34,13 +106,13 @@ export const startTraceChecksWorker = (
         debug(`Processing job ${job.id} with data:`, job.data);
 
         const timeout = setTimeout(() => {
-          throw new Error("Job timed out after 30s");
-        }, 30_000);
+          throw new Error("Job timed out after 60s");
+        }, 60_000);
 
         const result = await processFn(job);
         clearTimeout(timeout);
 
-        for (const cost of result.costs) {
+        if ("cost" in result && result.cost) {
           await prisma.cost.create({
             data: {
               id: `cost_${nanoid()}`,
@@ -49,8 +121,8 @@ export const startTraceChecksWorker = (
               costName: job.data.check.name,
               referenceType: CostReferenceType.CHECK,
               referenceId: job.data.check.id,
-              amount: cost.amount,
-              currency: cost.currency,
+              amount: result.cost.amount,
+              currency: result.cost.currency,
               extraInfo: {
                 trace_check_id: job.id,
               },
@@ -62,8 +134,22 @@ export const startTraceChecksWorker = (
           check: job.data.check,
           trace: job.data.trace,
           status: result.status,
-          raw_result: result.raw_result,
-          value: result.value,
+          ...(result.status === "error"
+            ? {
+                error: {
+                  message: result.message,
+                  stack: result.traceback,
+                },
+              }
+            : {}),
+          ...(result.status === "processed"
+            ? {
+                raw_result: result.raw_result,
+                score: result.score,
+                passed: result.passed,
+              }
+            : {}),
+          details: "details" in result ? result.details : undefined,
         });
         debug("Successfully processed job:", job.id);
       } catch (error) {
@@ -75,13 +161,10 @@ export const startTraceChecksWorker = (
         });
         debug("Failed to process job:", job.id, error);
 
-        const nonRetriableChecks: CheckTypes[] = [
-          "ragas_answer_relevancy",
-          "ragas_context_utilization",
-          "ragas_faithfulness",
-        ];
+        // Ragas evaluations are expensive
+        const isEvaluationRetriable = !job.data.check.type.includes("ragas/");
 
-        if (!nonRetriableChecks.includes(job.data.check.type)) {
+        if (isEvaluationRetriable) {
           throw error;
         }
       }

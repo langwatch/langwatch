@@ -191,7 +191,9 @@ const traceChecksMapping: ElasticSearchMappingFrom<TraceCheck> = {
   check_name: { type: "keyword" },
   status: { type: "keyword" },
   raw_result: { type: "object", enabled: false } as any,
-  value: { type: "float" },
+  passed: { type: "boolean" },
+  score: { type: "float" },
+  details: { type: "text" },
   error: {
     properties: {
       message: { type: "text" },
@@ -265,13 +267,7 @@ const tracesPivotMapping: ElasticSearchMappingFrom<
   },
   trace: {
     properties: {
-      ...omit(
-        traceMapping,
-        "input",
-        "output",
-        "error",
-        "indexing_md5s"
-      ),
+      ...omit(traceMapping, "input", "output", "error", "indexing_md5s"),
       input: { properties: { satisfaction_score: { type: "float" } } },
       has_error: {
         type: "boolean",
