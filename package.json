@@ -6,11 +6,10 @@
   "scripts": {
     "dev": "NODE_ENV=development DEBUG=langwatch:* DEBUG_HIDE_DATE=true DEBUG_COLORS=true concurrently 'node server.js' 'npm run start:workers'",
     "build": "export DEPENDENCY_INJECTION_DIR=$(pwd)/src/injection/; export EXTRA_INCLUDE=$(pwd)/src; cp .env langwatch/langwatch/; cd langwatch/langwatch; npm run build",
-    "start": "next start",
+    "start": "NODE_ENV=production DEBUG=langwatch:* DEBUG_COLORS=true next start langwatch/langwatch/",
     "start:workers": "tsx src/workers.ts",
-    "preinstall": "git submodule update --init",
-    "postinstall": "cp .env langwatch/langwatch/; cd langwatch/langwatch; npm install && npm run copy:integration && npm run types:zod:generate; cd ../../; npm run prisma:db:push",
-    "prisma:db:push": "node prisma/generate-schema.js && npx prisma db push && cp -R node_modules/.prisma/* langwatch/langwatch/node_modules/.prisma/"
+    "start:prepare": "git submodule update --init; cp .env langwatch/langwatch/; cd langwatch/langwatch; npm install && npm run copy:integration && npm run types:zod:generate; cd ../../; npm run prisma:db:push",
+    "prisma:db:push": "node prisma/generate-schema.js && npx prisma generate && cp -R node_modules/.prisma/* langwatch/langwatch/node_modules/.prisma/"
   },
   "author": "",
   "license": "ISC",

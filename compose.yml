@@ -1,0 +1,11 @@
+version: '3.8'
+
+services:
+  web:
+    container_name: langwatch-sass-web
+    env_file:
+      - .env
+    build:
+      context: .
+    ports:
+      - "3000:3000"

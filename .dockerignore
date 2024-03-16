@@ -1,0 +1,12 @@
+.git
+node_modules
+*/**/node_modules
+*/**/.venv
+.github
+.next
+*/**/.next
+*/**/.next-sass
+langevals
+langwatch/python-sdk
+langwatch/docs/.docusaurus
+infrastructure

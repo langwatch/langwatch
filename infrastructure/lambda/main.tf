@@ -1,0 +1,145 @@
+locals {
+  evaluator_package     = var.evaluator_package
+  environment_variables = var.environment_variables
+  zipped_lambda_package = "${path.root}/../langevals/dist/lambdas/${var.evaluator_package}.zip"
+  tag                   = data.external.git_tag.result["tag"]
+}
+
+data "external" "git_tag" {
+  program = ["${path.root}/scripts/get_langevals_git_sha.sh"]
+}
+
+resource "aws_lambda_function" "this" {
+  package_type  = "Image"
+  function_name = "${local.evaluator_package}-evaluator-lambda"
+  image_uri     = "${data.aws_ecr_repository.lambda_repository.repository_url}:${local.tag}"
+  role          = aws_iam_role.lambda.arn
+  timeout       = 60
+
+  # use `/usr/bin/time -alh poetry run python langevals/server.py --only <evaluator>` to get the memory usage (maximum resident set size in bytes)
+  memory_size = local.evaluator_package == "lingua" ? 1896 : local.evaluator_package == "ragas" ? 512 : 256
+
+  environment {
+    variables = local.environment_variables
+  }
+
+  depends_on = [
+    aws_iam_role_policy_attachment.lambda,
+    null_resource.docker_image
+  ]
+}
+
+data "aws_ecr_repository" "lambda_repository" {
+  name = aws_ecr_repository.lambda_repository.name
+}
+
+resource "aws_ecr_lifecycle_policy" "lambda_repository" {
+  repository = aws_ecr_repository.lambda_repository.name
+
+  policy = jsonencode({
+    rules = [
+      {
+        rulePriority = 1
+        description  = "Retain only 3 most recent images"
+        selection = {
+          tagStatus   = "any"
+          countType   = "imageCountMoreThan"
+          countNumber = 3
+        }
+        action = {
+          type = "expire"
+        }
+      }
+    ]
+  })
+}
+
+data "aws_caller_identity" "current" {}
+
+data "aws_region" "current" {}
+
+resource "null_resource" "docker_image" {
+  triggers = {
+    image_hash = local.tag
+  }
+
+  provisioner "local-exec" {
+    command = <<EOT
+      set -eo pipefail
+
+      echo "Building ${local.evaluator_package}..."
+      aws ecr get-login-password --profile lw-prod --region ${data.aws_region.current.name} | docker login --username AWS --password-stdin ${data.aws_caller_identity.current.account_id}.dkr.ecr.${data.aws_region.current.name}.amazonaws.com || true
+      cd ${path.root}/../langevals
+      docker build . --build-arg EVALUATOR=${local.evaluator_package} --platform="linux/amd64" -t ${data.aws_ecr_repository.lambda_repository.repository_url}:${local.tag}
+      docker push ${data.aws_ecr_repository.lambda_repository.repository_url}:${local.tag}
+      cd -
+    EOT
+  }
+
+  depends_on = [aws_ecr_repository.lambda_repository]
+}
+
+resource "aws_ecr_repository" "lambda_repository" {
+  name                 = "${local.evaluator_package}-lambda"
+  image_tag_mutability = "IMMUTABLE"
+}
+
+# IAM role which dictates what other AWS services the Lambda function
+# may access.
+resource "aws_iam_role" "lambda" {
+  name = "${local.evaluator_package}-lambda-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRole"
+        Principal = {
+          Service = "lambda.amazonaws.com"
+        }
+        Effect = "Allow",
+        Sid    = ""
+      }
+    ]
+  })
+}
+
+resource "aws_iam_policy" "lambda" {
+  name        = "${local.evaluator_package}-lambda-policy"
+  path        = "/"
+  description = "AWS IAM Policy for managing aws lambda role"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = [
+          "logs:CreateLogGroup",
+          "logs:CreateLogStream",
+          "logs:PutLogEvents",
+        ]
+        Resource = [
+          "arn:aws:logs:*:*:*",
+          "arn:aws:secretsmanager:*:*:secret:*"
+        ]
+        Effect = "Allow"
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "lambda" {
+  role       = aws_iam_role.lambda.name
+  policy_arn = aws_iam_policy.lambda.arn
+}
+
+resource "aws_lambda_permission" "apigw" {
+  statement_id  = "AllowAPIGatewayInvoke"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.this.function_name
+  principal     = "apigateway.amazonaws.com"
+
+  # The /*/* portion grants access from any method on any resource
+  # within the API Gateway "REST API".
+  source_arn = "${var.apigw_execution_arn}/*/*"
+}
