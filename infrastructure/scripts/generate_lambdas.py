@@ -25,20 +25,10 @@ def main():
 
     for _, evaluator_module in evaluators.items():
         package_name = evaluator_module.__name__.split("langevals_")[1]
+        if package_name == "example":
+            continue
 
-        lambdas_tf += f"""
-            module "{package_name}-evaluator" {{
-                source              = "./lambda"
-                evaluator_package   = "{package_name}"
-                apigw_execution_arn = aws_api_gateway_rest_api.this.execution_arn
-            }}
-
-            resource "aws_api_gateway_resource" "{package_name}" {{
-                rest_api_id = aws_api_gateway_rest_api.this.id
-                parent_id   = aws_api_gateway_rest_api.this.root_resource_id
-                path_part   = "{package_name}"
-            }}
-            """
+        environment_variables = []
         for evaluator_cls in get_evaluator_classes(evaluator_module):
             definitions = get_evaluator_definitions(evaluator_cls)
             evaluator_name = definitions.evaluator_name
@@ -59,7 +49,33 @@ def main():
                 lambda_invoke_arn = module.{package_name}-evaluator.lambda_invoke_arn
             }}
             """
+            environment_variables += definitions.env_vars or []
             depends_on.append(f"module.{package_name}-{evaluator_name}-api-gw")
+
+        environment_variables_tf = "".join(
+            set(
+                [
+                    f"""
+                    {env_var} = jsondecode(data.aws_secretsmanager_secret_version.langevals.secret_string)["{env_var}"]
+                """
+                    for env_var in environment_variables
+                ]
+            )
+        )
+        lambdas_tf += f"""
+            module "{package_name}-evaluator" {{
+                source              = "./lambda"
+                evaluator_package   = "{package_name}"
+                apigw_execution_arn = aws_api_gateway_rest_api.this.execution_arn
+                environment_variables = {{{environment_variables_tf}}}
+            }}
+
+            resource "aws_api_gateway_resource" "{package_name}" {{
+                rest_api_id = aws_api_gateway_rest_api.this.id
+                parent_id   = aws_api_gateway_rest_api.this.root_resource_id
+                path_part   = "{package_name}"
+            }}
+            """
 
     lambdas_tf += f"""
             resource "aws_api_gateway_deployment" "this" {{
@@ -68,6 +84,7 @@ def main():
                 ]
 
                 rest_api_id = aws_api_gateway_rest_api.this.id
+                stage_name  = "v1"
             }}
             """
 

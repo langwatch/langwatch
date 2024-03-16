@@ -1,7 +1,12 @@
 locals {
   resource_name         = var.evaluator_package
+  environment_variables = var.environment_variables
   zipped_lambda_package = "${path.root}/../langevals/dist/lambdas/${var.evaluator_package}.zip"
-  tag                   = sha1(join("", [for f in fileset(path.root, "../langevals") : filesha1(f)]))
+  tag                   = data.external.git_tag.result["tag"]
+}
+
+data "external" "git_tag" {
+  program = ["${path.root}/scripts/get_langevals_git_sha.sh"]
 }
 
 resource "aws_lambda_function" "this" {
@@ -11,6 +16,10 @@ resource "aws_lambda_function" "this" {
   image_uri = "${data.aws_ecr_repository.lambda_repository.repository_url}:${local.tag}"
 
   role = aws_iam_role.lambda.arn
+
+  environment {
+    variables = local.environment_variables
+  }
 
   depends_on = [
     aws_iam_role_policy_attachment.lambda,
@@ -49,8 +58,7 @@ data "aws_region" "current" {}
 
 resource "null_resource" "docker_image" {
   triggers = {
-    # image_hash = local.tag
-    always_run = "${timestamp()}"
+    image_hash = local.tag
   }
 
   provisioner "local-exec" {
@@ -71,7 +79,7 @@ resource "null_resource" "docker_image" {
 
 resource "aws_ecr_repository" "lambda_repository" {
   name                 = "${local.resource_name}-lambda"
-  image_tag_mutability = "MUTABLE"
+  image_tag_mutability = "IMMUTABLE"
 }
 
 # IAM role which dictates what other AWS services the Lambda function
