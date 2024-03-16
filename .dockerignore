@@ -1,0 +1,7 @@
+*/**/node_modules
+*/**/.venv
+.github
+.next
+.next-sass
+langevals
+langwatch/python-sdk
