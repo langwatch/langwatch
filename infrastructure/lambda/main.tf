@@ -1,5 +1,5 @@
 locals {
-  resource_name         = var.evaluator_package
+  evaluator_package     = var.evaluator_package
   environment_variables = var.environment_variables
   zipped_lambda_package = "${path.root}/../langevals/dist/lambdas/${var.evaluator_package}.zip"
   tag                   = data.external.git_tag.result["tag"]
@@ -11,11 +11,13 @@ data "external" "git_tag" {
 
 resource "aws_lambda_function" "this" {
   package_type  = "Image"
-  function_name = "${local.resource_name}-evaluator-lambda"
+  function_name = "${local.evaluator_package}-evaluator-lambda"
+  image_uri     = "${data.aws_ecr_repository.lambda_repository.repository_url}:${local.tag}"
+  role          = aws_iam_role.lambda.arn
+  timeout       = 60
 
-  image_uri = "${data.aws_ecr_repository.lambda_repository.repository_url}:${local.tag}"
-
-  role = aws_iam_role.lambda.arn
+  # use `/usr/bin/time -alh poetry run python langevals/server.py --only <evaluator>` to get the memory usage (maximum resident set size in bytes)
+  memory_size = local.evaluator_package == "lingua" ? 1896 : local.evaluator_package == "ragas" ? 512 : 256
 
   environment {
     variables = local.environment_variables
@@ -65,10 +67,10 @@ resource "null_resource" "docker_image" {
     command = <<EOT
       set -eo pipefail
 
-      echo "Building ${local.resource_name}..."
+      echo "Building ${local.evaluator_package}..."
       aws ecr get-login-password --profile lw-prod --region ${data.aws_region.current.name} | docker login --username AWS --password-stdin ${data.aws_caller_identity.current.account_id}.dkr.ecr.${data.aws_region.current.name}.amazonaws.com || true
       cd ${path.root}/../langevals
-      docker build . --build-arg EVALUATOR=${local.resource_name} --platform="linux/amd64" -t ${data.aws_ecr_repository.lambda_repository.repository_url}:${local.tag}
+      docker build . --build-arg EVALUATOR=${local.evaluator_package} --platform="linux/amd64" -t ${data.aws_ecr_repository.lambda_repository.repository_url}:${local.tag}
       docker push ${data.aws_ecr_repository.lambda_repository.repository_url}:${local.tag}
       cd -
     EOT
@@ -78,14 +80,14 @@ resource "null_resource" "docker_image" {
 }
 
 resource "aws_ecr_repository" "lambda_repository" {
-  name                 = "${local.resource_name}-lambda"
+  name                 = "${local.evaluator_package}-lambda"
   image_tag_mutability = "IMMUTABLE"
 }
 
 # IAM role which dictates what other AWS services the Lambda function
 # may access.
 resource "aws_iam_role" "lambda" {
-  name = "${local.resource_name}-lambda-role"
+  name = "${local.evaluator_package}-lambda-role"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -103,7 +105,7 @@ resource "aws_iam_role" "lambda" {
 }
 
 resource "aws_iam_policy" "lambda" {
-  name        = "${local.resource_name}-lambda-policy"
+  name        = "${local.evaluator_package}-lambda-policy"
   path        = "/"
   description = "AWS IAM Policy for managing aws lambda role"
 
