@@ -8,8 +8,9 @@
     "build": "export DEPENDENCY_INJECTION_DIR=$(pwd)/src/injection/; export EXTRA_INCLUDE=$(pwd)/src; cp .env langwatch/langwatch/; cd langwatch/langwatch; npm run build",
     "start": "NODE_ENV=production DEBUG=langwatch:* DEBUG_COLORS=true next start langwatch/langwatch/",
     "start:workers": "tsx src/workers.ts",
-    "start:prepare": "git submodule update --init; cp .env langwatch/langwatch/; cd langwatch/langwatch; npm install && npm run copy:integration && npm run types:zod:generate; cd ../../; npm run prisma:db:push",
-    "prisma:db:push": "node prisma/generate-schema.js && npx prisma generate && cp -R node_modules/.prisma/* langwatch/langwatch/node_modules/.prisma/"
+    "start:prepare": "git submodule update --init; cp .env langwatch/langwatch/; cd langwatch/langwatch; npm install && npm run start:prepare:files && cd ../../ && npm run prisma:db:generate",
+    "prisma:db:generate": "node prisma/generate-schema.js && npx prisma generate && cp -R node_modules/.prisma/* langwatch/langwatch/node_modules/.prisma/",
+    "prisma:db:push": "npx prisma db push"
   },
   "author": "",
   "license": "ISC",
