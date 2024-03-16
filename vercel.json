@@ -12,6 +12,7 @@
     }
   ],
   "ignoreCommand": "git submodule update --init; exit 1",
+  "installCommand": "npm install && npm run start:prepare",
   "functions": {
     "src/pages/api/**/*.ts": {
       "memory": 512
