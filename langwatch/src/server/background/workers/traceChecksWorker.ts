@@ -106,8 +106,8 @@ export const startTraceChecksWorker = (
         debug(`Processing job ${job.id} with data:`, job.data);
 
         const timeout = setTimeout(() => {
-          throw new Error("Job timed out after 30s");
-        }, 30_000);
+          throw new Error("Job timed out after 60s");
+        }, 60_000);
 
         const result = await processFn(job);
         clearTimeout(timeout);
