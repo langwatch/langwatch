@@ -141,7 +141,7 @@ export type TracesPivot = {
   }[];
   trace_checks?: (Omit<
     TraceCheck,
-    "error" | "trace_metadata"
+    "error" | "trace_metadata" | "details"
   > & {
     has_error?: boolean;
   })[];

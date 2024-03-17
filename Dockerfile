@@ -1,4 +1,5 @@
 FROM node:20-alpine
+RUN apk --no-cache add curl
 WORKDIR /app
 ENV NODE_ENV=development
 RUN mkdir langwatch docs

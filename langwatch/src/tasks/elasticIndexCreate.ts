@@ -305,7 +305,7 @@ const tracesPivotMapping: ElasticSearchMappingFrom<
   trace_checks: {
     type: "nested",
     properties: {
-      ...omit(traceChecksMapping, "error", "trace_metadata"),
+      ...omit(traceChecksMapping, "error", "trace_metadata", "details"),
       has_error: {
         type: "boolean",
       },
