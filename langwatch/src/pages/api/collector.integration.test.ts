@@ -119,7 +119,6 @@ describe("Collector API Endpoint", () => {
         inserted_at: expect.any(Number),
       },
       project_id: project?.id,
-      raw_response: null,
     });
 
     const indexedTrace = await esClient.getSource<Trace>({

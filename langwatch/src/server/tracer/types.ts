@@ -107,7 +107,6 @@ export interface LLMSpan extends BaseSpan {
   type: "llm";
   vendor: string;
   model: string;
-  raw_response?: string | Record<string, any> | any[];
   params: SpanParams;
   metrics: SpanMetrics;
 }
@@ -146,13 +145,12 @@ export type ElasticSearchInputOutput = {
 export type ElasticSearchSpan = Omit<
   BaseSpan &
     Partial<Omit<RAGSpan, "type">> &
-    Partial<Omit<LLMSpan, "type" | "raw_response">>,
+    Partial<Omit<LLMSpan, "type">>,
   "input" | "outputs"
 > & {
   project_id: string;
   input?: ElasticSearchInputOutput | null;
   outputs: ElasticSearchInputOutput[];
-  raw_response?: string | null;
   timestamps: SpanTimestamps & { inserted_at: number; updated_at: number };
 };
 
@@ -207,7 +205,6 @@ export type TraceCheck = {
   check_name: string;
   status: "scheduled" | "in_progress" | "error" | "skipped" | "processed";
   passed?: boolean;
-  raw_result?: object;
   score?: number;
   details?: string;
   error?: ErrorCapture | null;
@@ -287,7 +284,6 @@ export type DatasetSpan =
       | "project_id"
       | "trace_id"
       | "id"
-      | "raw_response"
       | "timestamps"
       | "metrics"
     >
@@ -296,7 +292,6 @@ export type DatasetSpan =
       | "project_id"
       | "trace_id"
       | "id"
-      | "raw_response"
       | "timestamps"
       | "metrics"
     >
@@ -305,7 +300,6 @@ export type DatasetSpan =
       | "project_id"
       | "trace_id"
       | "id"
-      | "raw_response"
       | "timestamps"
       | "metrics"
     >;

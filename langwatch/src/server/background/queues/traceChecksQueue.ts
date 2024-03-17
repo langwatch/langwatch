@@ -80,7 +80,6 @@ export const updateCheckStatusInES = async ({
   check,
   trace,
   status,
-  raw_result,
   score,
   passed,
   error,
@@ -91,7 +90,6 @@ export const updateCheckStatusInES = async ({
   trace: TraceCheckJob["trace"];
   status: TraceCheck["status"];
   error?: any;
-  raw_result?: object;
   score?: number;
   passed?: boolean;
   details?: string;
@@ -113,7 +111,6 @@ export const updateCheckStatusInES = async ({
     check_type: check.type,
     status,
     ...(check.name && { check_name: check.name }),
-    ...(raw_result && { raw_result }),
     ...(score !== undefined && { score }),
     ...(passed !== undefined && { passed }),
     ...(error && { error: captureError(error) }),

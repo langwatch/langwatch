@@ -144,7 +144,6 @@ export const startTraceChecksWorker = (
             : {}),
           ...(result.status === "processed"
             ? {
-                raw_result: result.raw_result,
                 score: result.score,
                 passed: result.passed,
               }

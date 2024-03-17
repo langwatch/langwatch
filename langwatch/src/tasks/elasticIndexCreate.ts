@@ -156,7 +156,6 @@ const spanMapping: ElasticSearchMappingFrom<ElasticSearchSpan> = {
   },
   vendor: { type: "keyword" },
   model: { type: "keyword" },
-  raw_response: { type: "text" },
   params: {
     properties: {
       temperature: { type: "float" },
@@ -190,7 +189,6 @@ const traceChecksMapping: ElasticSearchMappingFrom<TraceCheck> = {
   check_type: { type: "keyword" },
   check_name: { type: "keyword" },
   status: { type: "keyword" },
-  raw_result: { type: "object", enabled: false } as any,
   passed: { type: "boolean" },
   score: { type: "float" },
   details: { type: "text" },
@@ -283,7 +281,6 @@ const tracesPivotMapping: ElasticSearchMappingFrom<
         "input",
         "outputs",
         "error",
-        "raw_response",
         "params",
         "contexts"
       ),
@@ -308,7 +305,7 @@ const tracesPivotMapping: ElasticSearchMappingFrom<
   trace_checks: {
     type: "nested",
     properties: {
-      ...omit(traceChecksMapping, "raw_result", "error", "trace_metadata"),
+      ...omit(traceChecksMapping, "error", "trace_metadata"),
       has_error: {
         type: "boolean",
       },

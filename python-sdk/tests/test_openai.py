@@ -70,7 +70,6 @@ class TestOpenAICompletionTracer:
                 "value": " there",
             }
         ]
-        assert first_span["raw_response"] == openai_mocks[0]
         assert first_span["params"] == {"temperature": 1, "stream": False}
         assert first_span["metrics"] == {
             "prompt_tokens": 5,
@@ -195,14 +194,6 @@ class TestOpenAICompletionTracer:
         assert first_span["timestamps"]["finished_at"] >= int(
             datetime(2022, 1, 1, 0, 0, 30).timestamp() * 1000
         )
-        assert first_span["raw_response"] == [
-            create_openai_completion_chunk(0, " there"),
-            create_openai_completion_chunk(0, " all"),
-            create_openai_completion_chunk(0, " good?"),
-            create_openai_completion_chunk(1, " how"),
-            create_openai_completion_chunk(1, " are"),
-            create_openai_completion_chunk(1, " you"),
-        ]
 
     @pytest.mark.asyncio
     async def test_trace_session_captures_openai_async_streams(
@@ -419,7 +410,6 @@ class TestOpenAIChatCompletionTracer:
                 ],
             }
         ]
-        assert first_span["raw_response"] == openai_mocks[0]
         assert first_span["params"] == {"temperature": 1, "stream": False}
         assert first_span["metrics"] == {
             "prompt_tokens": 5,
@@ -654,24 +644,6 @@ class TestOpenAIChatCompletionTracer:
         assert first_span["timestamps"]["finished_at"] >= int(
             datetime(2022, 1, 1, 0, 0, 30).timestamp() * 1000
         )
-        assert first_span["raw_response"] == [
-            create_openai_chat_completion_chunk(
-                0, {"role": "assistant", "content": ""}
-            ),
-            create_openai_chat_completion_chunk(
-                1, {"role": "assistant", "content": ""}
-            ),
-            create_openai_chat_completion_chunk(0, {"content": "Hi"}),
-            create_openai_chat_completion_chunk(0, {"content": " there"}),
-            create_openai_chat_completion_chunk(0, {"content": " all"}),
-            create_openai_chat_completion_chunk(0, {"content": " good?"}),
-            create_openai_chat_completion_chunk(1, {"content": "Hi"}),
-            create_openai_chat_completion_chunk(1, {"content": " how"}),
-            create_openai_chat_completion_chunk(1, {"content": " are"}),
-            create_openai_chat_completion_chunk(1, {"content": " you"}),
-            create_openai_chat_completion_chunk(0, {}),
-            create_openai_chat_completion_chunk(1, {}),
-        ]
 
     @freeze_time("2022-01-01", auto_tick_seconds=15)
     def test_trace_session_captures_openai_streams_with_functions(
