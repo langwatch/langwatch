@@ -1,3 +1,7 @@
+module "variables" {
+  source = "../variables"
+}
+
 locals {
   evaluator_package     = var.evaluator_package
   environment_variables = var.environment_variables
@@ -68,7 +72,7 @@ resource "null_resource" "docker_image" {
       set -eo pipefail
 
       echo "Building ${local.evaluator_package}..."
-      aws ecr get-login-password --profile lw-prod --region ${data.aws_region.current.name} | docker login --username AWS --password-stdin ${data.aws_caller_identity.current.account_id}.dkr.ecr.${data.aws_region.current.name}.amazonaws.com || true
+      aws ecr get-login-password --profile ${module.variables.profile} --region ${data.aws_region.current.name} | docker login --username AWS --password-stdin ${data.aws_caller_identity.current.account_id}.dkr.ecr.${data.aws_region.current.name}.amazonaws.com || true
       cd ${path.root}/../langevals
       docker build . --build-arg EVALUATOR=${local.evaluator_package} --platform="linux/amd64" -t ${data.aws_ecr_repository.lambda_repository.repository_url}:${local.tag}
       docker push ${data.aws_ecr_repository.lambda_repository.repository_url}:${local.tag}

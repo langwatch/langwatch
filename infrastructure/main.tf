@@ -1,6 +1,10 @@
+module "variables" {
+  source = "./variables"
+}
+
 provider "aws" {
   region  = "eu-central-1"
-  profile = "lw-prod"
+  profile = module.variables.profile
 }
 
 resource "aws_api_gateway_rest_api" "this" {

@@ -2,7 +2,7 @@
 
 set -e
 
-cd ../langevals
+cd ../langwatch
 
 if test -z "$(git status --porcelain)"; then
   echo "{\"tag\": \"$(git rev-parse --short HEAD)\"}"

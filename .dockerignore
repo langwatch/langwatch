@@ -4,7 +4,7 @@ node_modules
 */**/.venv
 .github
 .next
-*/**/.next
+!langwatch/langwatch/.next
 */**/.next-sass
 langevals
 langwatch/python-sdk
