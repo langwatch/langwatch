@@ -3,7 +3,12 @@ module "variables" {
 }
 
 provider "aws" {
-  region  = "eu-central-1"
+  region  = module.variables.region
+  profile = module.variables.profile
+}
+
+provider "awscc" {
+  region  = module.variables.region
   profile = module.variables.profile
 }
 
