@@ -9,6 +9,14 @@ terraform {
     region  = "eu-central-1"
   }
 
+  # backend "s3" {
+  #   bucket = "langwatch-terraform-dev"
+  #   key    = "langwatch-state"
+
+  #   profile = "lw-dev"
+  #   region  = "eu-central-1"
+  # }
+
   required_providers {
     aws = {
       source  = "hashicorp/aws"

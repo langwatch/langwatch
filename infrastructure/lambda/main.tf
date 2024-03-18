@@ -14,6 +14,7 @@ data "external" "git_tag" {
 }
 
 resource "aws_lambda_function" "this" {
+  count         = module.variables.profile == "lw-prod" ? 1 : 0
   package_type  = "Image"
   function_name = "${local.evaluator_package}-evaluator-lambda"
   image_uri     = "${data.aws_ecr_repository.lambda_repository.repository_url}:${local.tag}"
@@ -63,6 +64,7 @@ data "aws_caller_identity" "current" {}
 data "aws_region" "current" {}
 
 resource "null_resource" "docker_image" {
+  count = module.variables.profile == "lw-prod" ? 1 : 0
   triggers = {
     image_hash = local.tag
   }
@@ -138,9 +140,11 @@ resource "aws_iam_role_policy_attachment" "lambda" {
 }
 
 resource "aws_lambda_permission" "apigw" {
+  count = module.variables.profile == "lw-prod" ? 1 : 0
+
   statement_id  = "AllowAPIGatewayInvoke"
   action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.this.function_name
+  function_name = aws_lambda_function.this[0].function_name
   principal     = "apigateway.amazonaws.com"
 
   # The /*/* portion grants access from any method on any resource

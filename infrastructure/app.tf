@@ -38,10 +38,12 @@ resource "aws_ecr_lifecycle_policy" "langwatch" {
 }
 
 resource "aws_ecs_cluster" "langwatch" {
-  name = "langwatch-cluster"
+  count = module.variables.profile == "lw-prod" ? 1 : 0
+  name  = "langwatch-cluster"
 }
 
 resource "aws_ecs_task_definition" "langwatch" {
+  count                    = module.variables.profile == "lw-prod" ? 1 : 0
   family                   = "langwatch-task"
   network_mode             = "awsvpc"
   requires_compatibilities = ["FARGATE"]
@@ -85,9 +87,10 @@ resource "aws_ecs_task_definition" "langwatch" {
 }
 
 resource "aws_ecs_service" "langwatch_service" {
+  count           = module.variables.profile == "lw-prod" ? 1 : 0
   name            = "langwatch-service"
-  cluster         = aws_ecs_cluster.langwatch.id
-  task_definition = aws_ecs_task_definition.langwatch.arn
+  cluster         = aws_ecs_cluster.langwatch[0].id
+  task_definition = aws_ecs_task_definition.langwatch[0].arn
   desired_count   = 1
   launch_type     = "FARGATE"
 
@@ -97,12 +100,12 @@ resource "aws_ecs_service" "langwatch_service" {
 
   network_configuration {
     subnets          = [aws_subnet.public_subnet_1.id, aws_subnet.public_subnet_2.id]
-    security_groups  = [aws_security_group.alb_sg.id]
+    security_groups  = [aws_security_group.alb_sg[0].id]
     assign_public_ip = true
   }
 
   load_balancer {
-    target_group_arn = aws_alb_target_group.langwatch_blue_tg.arn
+    target_group_arn = aws_alb_target_group.langwatch_blue_tg[0].arn
     container_name   = "langwatch-container"
     container_port   = 3000
   }
@@ -116,7 +119,7 @@ resource "aws_ecs_service" "langwatch_service" {
   }
 
   depends_on = [
-    aws_alb_listener.https_listener
+    aws_alb_listener.https_listener[0]
   ]
 }
 
@@ -125,6 +128,8 @@ data "aws_caller_identity" "current" {}
 data "aws_region" "current" {}
 
 resource "null_resource" "docker_image" {
+  count = module.variables.profile == "lw-prod" ? 1 : 0
+
   triggers = {
     image_hash = local.tag
   }
@@ -155,24 +160,27 @@ resource "null_resource" "docker_image" {
 }
 
 resource "aws_codedeploy_app" "langwatch_app" {
+  count            = module.variables.profile == "lw-prod" ? 1 : 0
   name             = "langwatch-app"
   compute_platform = "ECS"
 }
 
 resource "aws_codestarnotifications_notification_rule" "langwatch-deploy" {
+  count          = module.variables.profile == "lw-prod" ? 1 : 0
   detail_type    = "FULL"
   event_type_ids = ["codedeploy-application-deployment-started", "codedeploy-application-deployment-failed", "codedeploy-application-deployment-succeeded"]
 
   name     = "langwatch-codedeploy-notifications"
-  resource = aws_codedeploy_app.langwatch_app.arn
+  resource = aws_codedeploy_app.langwatch_app[0].arn
 
   target {
     type    = "AWSChatbotSlack"
-    address = awscc_chatbot_slack_channel_configuration.langwatch.arn
+    address = awscc_chatbot_slack_channel_configuration.langwatch[0].arn
   }
 }
 
 resource "awscc_chatbot_slack_channel_configuration" "langwatch" {
+  count              = module.variables.profile == "lw-prod" ? 1 : 0
   configuration_name = "langwatch-chatbot"
   iam_role_arn       = awscc_iam_role.langwatch.arn
   slack_workspace_id = "T067B8XMC0M" # langwatch
@@ -180,7 +188,8 @@ resource "awscc_chatbot_slack_channel_configuration" "langwatch" {
 }
 
 resource "aws_codedeploy_deployment_group" "langwatch_dg" {
-  app_name               = aws_codedeploy_app.langwatch_app.name
+  count                  = module.variables.profile == "lw-prod" ? 1 : 0
+  app_name               = aws_codedeploy_app.langwatch_app[0].name
   deployment_group_name  = "langwatch-dg"
   service_role_arn       = aws_iam_role.codedeploy_role.arn
   deployment_config_name = "CodeDeployDefault.ECSAllAtOnce"
@@ -191,22 +200,22 @@ resource "aws_codedeploy_deployment_group" "langwatch_dg" {
   }
 
   ecs_service {
-    cluster_name = aws_ecs_cluster.langwatch.name
-    service_name = aws_ecs_service.langwatch_service.name
+    cluster_name = aws_ecs_cluster.langwatch[0].name
+    service_name = aws_ecs_service.langwatch_service[0].name
   }
 
   load_balancer_info {
     target_group_pair_info {
       prod_traffic_route {
-        listener_arns = [aws_alb_listener.https_listener.arn]
+        listener_arns = [aws_alb_listener.https_listener[0].arn]
       }
 
       target_group {
-        name = aws_alb_target_group.langwatch_blue_tg.name
+        name = aws_alb_target_group.langwatch_blue_tg[0].name
       }
 
       target_group {
-        name = aws_alb_target_group.langwatch_green_tg.name
+        name = aws_alb_target_group.langwatch_green_tg[0].name
       }
     }
   }
@@ -228,25 +237,27 @@ resource "aws_codedeploy_deployment_group" "langwatch_dg" {
 }
 
 resource "aws_alb" "langwatch_alb" {
+  count              = module.variables.profile == "lw-prod" ? 1 : 0
   name               = "langwatch-alb"
   internal           = false
   load_balancer_type = "application"
-  security_groups    = [aws_security_group.alb_sg.id]
+  security_groups    = [aws_security_group.alb_sg[0].id]
   subnets            = [aws_subnet.public_subnet_1.id, aws_subnet.public_subnet_2.id]
 
   enable_deletion_protection = true
 }
 
 resource "aws_alb_listener" "https_listener" {
-  load_balancer_arn = aws_alb.langwatch_alb.arn
+  count             = module.variables.profile == "lw-prod" ? 1 : 0
+  load_balancer_arn = aws_alb.langwatch_alb[0].arn
   port              = "443"
   protocol          = "HTTPS"
   ssl_policy        = "ELBSecurityPolicy-2016-08"
-  certificate_arn   = aws_acm_certificate.cert.arn
+  certificate_arn   = aws_acm_certificate.cert[0].arn
 
   default_action {
     type             = "forward"
-    target_group_arn = aws_alb_target_group.langwatch_blue_tg.arn
+    target_group_arn = aws_alb_target_group.langwatch_blue_tg[0].arn
   }
 
   lifecycle {
@@ -257,6 +268,7 @@ resource "aws_alb_listener" "https_listener" {
 }
 
 resource "aws_alb_target_group" "langwatch_blue_tg" {
+  count       = module.variables.profile == "lw-prod" ? 1 : 0
   name        = "langwatch-blue-tg"
   port        = 3000
   protocol    = "HTTP"
@@ -276,6 +288,7 @@ resource "aws_alb_target_group" "langwatch_blue_tg" {
 }
 
 resource "aws_alb_target_group" "langwatch_green_tg" {
+  count       = module.variables.profile == "lw-prod" ? 1 : 0
   name        = "langwatch-green-tg"
   port        = 3000
   protocol    = "HTTP"
@@ -295,6 +308,7 @@ resource "aws_alb_target_group" "langwatch_green_tg" {
 }
 
 resource "aws_security_group" "alb_sg" {
+  count       = module.variables.profile == "lw-prod" ? 1 : 0
   name        = "langwatch-alb-sg"
   description = "Allow web access to alb"
   vpc_id      = aws_vpc.main.id
@@ -329,6 +343,7 @@ resource "aws_security_group" "alb_sg" {
 }
 
 resource "aws_acm_certificate" "cert" {
+  count             = module.variables.profile == "lw-prod" ? 1 : 0
   domain_name       = "app.langwatch.ai"
   validation_method = "DNS"
 
