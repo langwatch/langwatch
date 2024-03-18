@@ -8,7 +8,7 @@ COPY langwatch/langwatch/package.json langwatch/langwatch/package-lock.json lang
 RUN cd langwatch/langwatch && npm ci && cd -
 COPY langwatch/ langwatch/
 COPY prisma/ prisma/
-# RUN npm run start:prepare
+RUN npm run start:prepare
 COPY . .
 # RUN npm run build
 ENV NODE_ENV=production

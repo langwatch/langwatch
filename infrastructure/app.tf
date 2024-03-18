@@ -1,5 +1,6 @@
 locals {
-  tag = data.external.git_tag.result["tag"]
+  tag         = data.external.git_tag.result["tag"]
+  secrets_map = jsondecode(data.aws_secretsmanager_secret_version.langwatch.secret_string)
 }
 
 data "external" "git_tag" {
@@ -67,7 +68,13 @@ resource "aws_ecs_task_definition" "langwatch" {
           awslogs-region        = "eu-central-1"
           awslogs-stream-prefix = "langwatch"
         }
-      }
+      },
+      environment = [
+        for key, value in local.secrets_map : {
+          name      = key
+          value = value
+        }
+      ],
     },
   ])
 
@@ -218,6 +225,12 @@ resource "aws_alb_listener" "https_listener" {
   default_action {
     type             = "forward"
     target_group_arn = aws_alb_target_group.langwatch_blue_tg.arn
+  }
+
+  lifecycle {
+    ignore_changes = [
+      default_action, # Updated by deployments
+    ]
   }
 }
 

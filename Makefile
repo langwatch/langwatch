@@ -9,9 +9,9 @@ infra-plan:
 
 # Required dependencies: terraform, aws, git, plus ~/.aws/credentials must be set up
 infra-apply:
-	@terraform -chdir=infrastructure/ apply
+	@terraform -chdir=infrastructure/ apply -auto-approve
 
-deploy: #infra-init infra-apply # TODO get the profile and region from variables file
+deploy: infra-apply # TODO get the profile and region from variables file
 	@profile=lw-prod && \
 	region=eu-central-1 && \
 	TASK_DEFINITION=$$(aws ecs describe-task-definition --profile $$profile --region $$region --task-definition=langwatch-task) && \

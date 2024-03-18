@@ -10,3 +10,5 @@ langevals
 langwatch/python-sdk
 langwatch/docs/.docusaurus
 infrastructure
+.env
+*/**/.env
