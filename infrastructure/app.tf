@@ -58,7 +58,6 @@ resource "aws_ecs_task_definition" "langwatch" {
       portMappings = [
         {
           containerPort = 3000
-          hostPort      = 3000
         },
       ],
       logConfiguration = {
@@ -78,35 +77,10 @@ resource "aws_ecs_task_definition" "langwatch" {
   ]
 }
 
-resource "aws_ecs_task_definition" "placeholder" {
-  family                   = "placeholder-task"
-  network_mode             = "awsvpc"
-  requires_compatibilities = ["FARGATE"]
-  cpu                      = "256" # Minimal valid CPU for FARGATE
-  memory                   = "512" # Minimal valid memory for FARGATE
-  execution_role_arn       = aws_iam_role.ecs_task_execution_role.arn
-
-  container_definitions = jsonencode([
-    {
-      name      = "langwatch-container"
-      image     = "amazon/amazon-ecs-sample"
-      cpu       = 256
-      memory    = 512
-      essential = true
-      portMappings = [
-        {
-          containerPort = 3000
-          hostPort      = 3000
-        },
-      ],
-    },
-  ])
-}
-
 resource "aws_ecs_service" "langwatch_service" {
   name            = "langwatch-service"
   cluster         = aws_ecs_cluster.langwatch.id
-  task_definition = aws_ecs_task_definition.placeholder.arn
+  task_definition = aws_ecs_task_definition.langwatch.arn
   desired_count   = 1
   launch_type     = "FARGATE"
 
@@ -124,6 +98,14 @@ resource "aws_ecs_service" "langwatch_service" {
     target_group_arn = aws_alb_target_group.langwatch_blue_tg.arn
     container_name   = "langwatch-container"
     container_port   = 3000
+  }
+
+  lifecycle {
+    ignore_changes = [
+      desired_count,   # Updated possibly by auto scaling
+      task_definition, # Updated by deployments
+      load_balancer,   # Updated by deployments
+    ]
   }
 
   depends_on = [
@@ -152,8 +134,11 @@ resource "null_resource" "docker_image" {
       npm run start:prepare
       npm run build
       aws ecr get-login-password --profile ${module.variables.profile} --region ${data.aws_region.current.name} | docker login --username AWS --password-stdin ${data.aws_caller_identity.current.account_id}.dkr.ecr.${data.aws_region.current.name}.amazonaws.com || true
+      docker pull ${data.aws_ecr_repository.langwatch.repository_url}:latest || true
       docker build . --platform="linux/amd64" -t ${data.aws_ecr_repository.langwatch.repository_url}:${local.tag}
+      docker tag ${data.aws_ecr_repository.langwatch.repository_url}:${local.tag} ${data.aws_ecr_repository.langwatch.repository_url}:latest
       docker push ${data.aws_ecr_repository.langwatch.repository_url}:${local.tag}
+      docker push ${data.aws_ecr_repository.langwatch.repository_url}:latest
       cd -
     EOT
   }
@@ -185,7 +170,7 @@ resource "aws_codedeploy_deployment_group" "langwatch_dg" {
   load_balancer_info {
     target_group_pair_info {
       prod_traffic_route {
-        listener_arns = [aws_alb_listener.https_listener.arn]
+        listener_arns = [aws_alb_listener.https_listener.arn, aws_alb_listener.http_listener.arn]
       }
 
       target_group {
@@ -204,8 +189,7 @@ resource "aws_codedeploy_deployment_group" "langwatch_dg" {
     }
 
     terminate_blue_instances_on_deployment_success {
-      action                           = "TERMINATE"
-      termination_wait_time_in_minutes = 5
+      action = "TERMINATE"
     }
   }
 
