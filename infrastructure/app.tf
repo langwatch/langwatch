@@ -159,19 +159,16 @@ resource "aws_codedeploy_app" "langwatch_app" {
   compute_platform = "ECS"
 }
 
-resource "aws_sns_topic" "codedeploy_notifications" {
-  name = "codedeploy-notifications-topic"
-}
-
-resource "aws_codestarnotifications_notification_rule" "commits" {
+resource "aws_codestarnotifications_notification_rule" "langwatch-deploy" {
   detail_type    = "FULL"
-  event_type_ids = ["codedeploy-application-deployment-failed", "codedeploy-application-deployment-succeeded"]
+  event_type_ids = ["codedeploy-application-deployment-started", "codedeploy-application-deployment-failed", "codedeploy-application-deployment-succeeded"]
 
   name     = "langwatch-codedeploy-notifications"
   resource = aws_codedeploy_app.langwatch_app.arn
 
   target {
-    address = aws_sns_topic.codedeploy_notifications.arn
+    type    = "AWSChatbotSlack"
+    address = awscc_chatbot_slack_channel_configuration.langwatch.arn
   }
 }
 
@@ -180,10 +177,6 @@ resource "awscc_chatbot_slack_channel_configuration" "langwatch" {
   iam_role_arn       = awscc_iam_role.langwatch.arn
   slack_workspace_id = "T067B8XMC0M" # langwatch
   slack_channel_id   = "C06JQLW1HE2" # #dev
-
-  sns_topic_arns = [
-    aws_sns_topic.codedeploy_notifications.arn,
-  ]
 }
 
 resource "aws_codedeploy_deployment_group" "langwatch_dg" {
@@ -220,7 +213,7 @@ resource "aws_codedeploy_deployment_group" "langwatch_dg" {
 
   blue_green_deployment_config {
     deployment_ready_option {
-      action_on_timeout    = "STOP_DEPLOYMENT"
+      action_on_timeout = "CONTINUE_DEPLOYMENT"
     }
 
     terminate_blue_instances_on_deployment_success {
