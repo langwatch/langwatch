@@ -44,13 +44,12 @@ export const esGetSpansByTraceId = async ({
     index: SPAN_INDEX,
     body: {
       query: {
-        //@ts-ignore
         bool: {
           must: [
             { term: { trace_id: traceId } },
             { term: { project_id: projectId } },
-          ],
-        },
+          ] as QueryDslBoolQuery["must"],
+        } as QueryDslBoolQuery,
       },
     },
     size: 10000,
