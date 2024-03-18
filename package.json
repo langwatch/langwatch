@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "NODE_ENV=development DEBUG=langwatch:* DEBUG_HIDE_DATE=true DEBUG_COLORS=true concurrently 'node server.js' 'npm run start:workers'",
     "build": "export DEPENDENCY_INJECTION_DIR=$(pwd)/src/injection/; export EXTRA_INCLUDE=$(pwd)/src; cp .env langwatch/langwatch/; cd langwatch/langwatch; npm run build",
-    "start": "NODE_ENV=production DEBUG=langwatch:* DEBUG_COLORS=true next start --hostname 0.0.0.0 langwatch/langwatch/",
+    "start": "NODE_ENV=production DEBUG=langwatch:* DEBUG_COLORS=true NEXTJS_DIST_DIR=.next node server.js",
     "start:workers": "tsx src/workers.ts",
     "start:prepare": "git submodule update --init; cp .env langwatch/langwatch/; cd langwatch/langwatch; npm install && npm run start:prepare:files && cd ../../ && npm run prisma:db:generate",
     "prisma:db:generate": "node prisma/generate-schema.js && npx prisma generate && cp -R node_modules/.prisma/* langwatch/langwatch/node_modules/.prisma/",

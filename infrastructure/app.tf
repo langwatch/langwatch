@@ -71,7 +71,7 @@ resource "aws_ecs_task_definition" "langwatch" {
       },
       environment = [
         for key, value in local.secrets_map : {
-          name      = key
+          name  = key
           value = value
         }
       ],
@@ -136,6 +136,8 @@ resource "null_resource" "docker_image" {
       echo "Building LangWatch..."
       cd ../
       git submodule update --init
+      secrets=$(aws secretsmanager --profile ${module.variables.profile} --region ${data.aws_region.current.name} get-secret-value --secret-id ${data.aws_secretsmanager_secret.langwatch.id} | jq -r '.SecretString')
+      $(echo "$${secrets}" | jq -r "to_entries|map(\"export \(.key)='\(.value)'\")|.[]|select(contains(\"NEXT_PUBLIC\"))")
       npm ci && cd langwatch/langwatch && npm ci && cd -
       npm run start:prepare
       npm run build
@@ -191,7 +193,8 @@ resource "aws_codedeploy_deployment_group" "langwatch_dg" {
 
   blue_green_deployment_config {
     deployment_ready_option {
-      action_on_timeout = "CONTINUE_DEPLOYMENT"
+      action_on_timeout    = "STOP_DEPLOYMENT"
+      wait_time_in_minutes = 5
     }
 
     terminate_blue_instances_on_deployment_success {
