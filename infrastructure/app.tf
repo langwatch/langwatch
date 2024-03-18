@@ -109,7 +109,6 @@ resource "aws_ecs_service" "langwatch_service" {
   }
 
   depends_on = [
-    aws_alb_listener.http_listener,
     aws_alb_listener.https_listener
   ]
 }
@@ -134,11 +133,11 @@ resource "null_resource" "docker_image" {
       npm run start:prepare
       npm run build
       aws ecr get-login-password --profile ${module.variables.profile} --region ${data.aws_region.current.name} | docker login --username AWS --password-stdin ${data.aws_caller_identity.current.account_id}.dkr.ecr.${data.aws_region.current.name}.amazonaws.com || true
-      docker pull ${data.aws_ecr_repository.langwatch.repository_url}:latest || true
-      docker build . --platform="linux/amd64" -t ${data.aws_ecr_repository.langwatch.repository_url}:${local.tag}
-      docker tag ${data.aws_ecr_repository.langwatch.repository_url}:${local.tag} ${data.aws_ecr_repository.langwatch.repository_url}:latest
+      last_tag=$(aws ecr --profile ${module.variables.profile} --region ${data.aws_region.current.name} describe-images --repository-name langwatch \
+        --query 'sort_by(imageDetails,& imagePushedAt)[*].imageTags[0]' --output yaml \
+        | tail -n 1 | awk -F'- ' '{print $2}')
+      docker build . --platform="linux/amd64" --cache-from ${data.aws_ecr_repository.langwatch.repository_url}:$last_tag -t ${data.aws_ecr_repository.langwatch.repository_url}:${local.tag}
       docker push ${data.aws_ecr_repository.langwatch.repository_url}:${local.tag}
-      docker push ${data.aws_ecr_repository.langwatch.repository_url}:latest
       cd -
     EOT
   }
@@ -170,7 +169,7 @@ resource "aws_codedeploy_deployment_group" "langwatch_dg" {
   load_balancer_info {
     target_group_pair_info {
       prod_traffic_route {
-        listener_arns = [aws_alb_listener.https_listener.arn, aws_alb_listener.http_listener.arn]
+        listener_arns = [aws_alb_listener.https_listener.arn]
       }
 
       target_group {
@@ -207,17 +206,6 @@ resource "aws_alb" "langwatch_alb" {
   subnets            = [aws_subnet.public_subnet_1.id, aws_subnet.public_subnet_2.id]
 
   enable_deletion_protection = true
-}
-
-resource "aws_alb_listener" "http_listener" {
-  load_balancer_arn = aws_alb.langwatch_alb.arn
-  port              = "80"
-  protocol          = "HTTP"
-
-  default_action {
-    type             = "forward"
-    target_group_arn = aws_alb_target_group.langwatch_blue_tg.arn
-  }
 }
 
 resource "aws_alb_listener" "https_listener" {
@@ -286,6 +274,13 @@ resource "aws_security_group" "alb_sg" {
   ingress {
     from_port   = 443
     to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    from_port   = 3000
+    to_port     = 3000
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
