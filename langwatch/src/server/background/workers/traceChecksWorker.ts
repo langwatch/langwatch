@@ -148,7 +148,7 @@ export const startTraceChecksWorker = (
                 passed: result.passed,
               }
             : {}),
-          details: "details" in result ? result.details : undefined,
+          details: "details" in result ? result.details ?? "" : "",
         });
         debug("Successfully processed job:", job.id);
       } catch (error) {
