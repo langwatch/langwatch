@@ -132,6 +132,23 @@ const DynamicZodForm = ({
         control,
         name: fullPath,
       });
+
+      const defaultValues =
+        fieldSchema_.element instanceof z.ZodObject
+          ? Object.fromEntries(
+              Object.entries(fieldSchema_.element.shape).flatMap(
+                ([key, value]) => {
+                  if (value instanceof z.ZodUnion) {
+                    const defaultValue = value.options[0].value;
+                    return [[key, defaultValue]];
+                  }
+
+                  return [];
+                }
+              )
+            )
+          : {};
+
       return (
         <VStack>
           {fields.map((field, index) => (
@@ -144,7 +161,7 @@ const DynamicZodForm = ({
               <Button onClick={() => remove(index)}>Remove</Button>
             </HStack>
           ))}
-          <Button onClick={() => append({})}>Add</Button>
+          <Button onClick={() => append(defaultValues)}>Add</Button>
         </VStack>
       );
     } else if (fieldSchema_ instanceof z.ZodObject) {
