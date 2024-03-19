@@ -55,7 +55,10 @@ type Series = Unpacked<z.infer<typeof timeseriesInput>["series"]> & {
 };
 
 export type CustomGraphInput = {
+  startDate?: number;
+  endDate?: number;
   graphId: string;
+  filters?: any;
   graphType:
     | "line"
     | "bar"
@@ -112,6 +115,8 @@ export const CustomGraph = React.memo(
   }) {
     const height_ = input.height ?? 300;
     const { filterParams, queryOpts } = useFilterParams();
+    console.log("filterParams", filterParams);
+    console.log("queryOpts", queryOpts);
 
     const timeseries = api.analytics.getTimeseries.useQuery(
       {
@@ -125,6 +130,8 @@ export const CustomGraph = React.memo(
       },
       queryOpts
     );
+
+    console.log("time", timeseries.data);
 
     const currentAndPreviousData = shapeDataForGraph(input, timeseries);
     const expectedKeys = Array.from(

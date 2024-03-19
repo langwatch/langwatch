@@ -18,6 +18,7 @@ export const analyticsRouter = createTRPCRouter({
     .input(sharedFiltersInputSchema)
     .use(checkUserPermissionForProject(TeamRoleGroup.ANALYTICS_VIEW))
     .query(async ({ input }) => {
+      console.log("input", input);
       const result = await esClient.search<TraceCheck>({
         index: TRACES_PIVOT_INDEX,
         body: {

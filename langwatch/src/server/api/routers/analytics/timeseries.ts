@@ -42,6 +42,7 @@ export const getTimeseries = protectedProcedure
   .input(sharedFiltersInputSchema.extend(timeseriesInput.shape))
   .use(checkUserPermissionForProject(TeamRoleGroup.ANALYTICS_VIEW))
   .query(async ({ input }) => {
+    console.log("input", input);
     const { previousPeriodStartDate, startDate, endDate, daysDifference } =
       currentVsPreviousDates(
         input,

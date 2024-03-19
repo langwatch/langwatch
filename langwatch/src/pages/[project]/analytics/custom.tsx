@@ -116,12 +116,40 @@ import {
   camelCaseToTitleCase,
   uppercaseFirstLetterLowerCaseRest,
 } from "../../../utils/stringCasing";
-import { router } from "@trpc/server";
 import { useRouter } from "next/router";
-import { de } from "date-fns/locale";
 import { useDevView } from "~/hooks/DevViewProvider";
+import { useFilterParams } from "~/hooks/useFilterParams";
 
 export interface CustomGraphFormData {
+  title?: string;
+  startDate?: Date;
+  endDate?: Date;
+  graphType?: {
+    label: string;
+    value: CustomGraphInput["graphType"];
+    icon: React.ReactNode;
+  };
+  series: {
+    name: string;
+    colorSet: RotatingColorSet;
+    metric: FlattenAnalyticsMetricsEnum;
+    key?: string;
+    subkey?: string;
+    aggregation: AggregationTypes;
+    pipeline: {
+      field: PipelineFields | "";
+      aggregation: PipelineAggregationTypes;
+    };
+  }[];
+  groupBy: FlattenAnalyticsGroupsEnum | "";
+  includePrevious: boolean;
+  timeScale: "full" | number;
+  connected?: boolean;
+}
+
+export interface CustomAPICAllData {
+  startDate: Date;
+  endDate: Date;
   title: string;
   graphType: {
     label: string;
@@ -130,7 +158,6 @@ export interface CustomGraphFormData {
   };
   series: {
     name: string;
-    colorSet: RotatingColorSet;
     metric: FlattenAnalyticsMetricsEnum;
     key?: string;
     subkey?: string;
@@ -228,6 +255,8 @@ const defaultValues: CustomGraphFormData = {
 export default function AnalyticsCustomGraph() {
   const { isOpen, onOpen, onClose } = useDisclosure();
   const { isDevViewEnabled } = useDevView();
+  const { filterParams, queryOpts } = useFilterParams();
+  console.log("filterParams", filterParams);
   const form = useForm<CustomGraphFormData>({
     defaultValues,
   });
@@ -248,6 +277,20 @@ export default function AnalyticsCustomGraph() {
     const customGraphInput = customGraphFormToCustomGraphInput(
       JSON.parse(formData) as CustomGraphFormData
     );
+
+    const apiJson = customAPIinput(
+      JSON.parse(formData) as CustomGraphFormData,
+      filterParams
+    );
+
+    console.log(apiJson);
+
+    // const apiJson = customGraphInput;
+
+    // apiJson.startDate = startDate;
+    // apiJson.endDate = endDate;
+
+    //console.log(apiJson);
 
     setDebouncedCustomGraphInput(customGraphInput);
   }, [formData, setDebouncedCustomGraphInput, form]);
@@ -311,6 +354,7 @@ export default function AnalyticsCustomGraph() {
           <ModalBody>
             <Textarea rows={16}>
               {JSON.stringify(debouncedCustomGraphInput, null, 2)}
+              {/* {JSON.stringify(formData, null, 2)} */}
             </Textarea>
           </ModalBody>
 
@@ -335,6 +379,53 @@ const customGraphFormToCustomGraphInput = (
   }
 
   return {
+    graphId: "custom",
+    graphType: formData.graphType.value,
+    series: formData.series.map((series) => {
+      if (series.pipeline.field) {
+        return {
+          ...series,
+          pipeline: {
+            ...series.pipeline,
+            field: series.pipeline.field,
+          },
+        };
+      }
+      return {
+        name: series.name,
+        colorSet: series.colorSet,
+        metric: series.metric,
+        aggregation: series.aggregation,
+        key: series.key,
+        subkey: series.subkey,
+      };
+    }),
+    groupBy: formData.groupBy || undefined,
+    includePrevious: formData.includePrevious,
+    timeScale: formData.timeScale,
+    connected: formData.connected,
+    height: 550,
+  };
+};
+
+const customAPIinput = (
+  formData: CustomGraphFormData,
+  filterParams: any
+): CustomGraphInput | undefined => {
+  for (const series of formData.series) {
+    const metric = getMetric(series.metric);
+    if (metric.requiresKey && !metric.requiresKey.optional && !series.key) {
+      return undefined;
+    }
+    if (metric.requiresSubkey && !series.subkey) {
+      return undefined;
+    }
+  }
+
+  return {
+    startDate: filterParams.startDate,
+    endDate: filterParams.endDate,
+    filters: filterParams.filters,
     graphId: "custom",
     graphType: formData.graphType.value,
     series: formData.series.map((series) => {
