@@ -1,150 +1,62 @@
-import type { Project } from "@prisma/client";
-import * as Sentry from "@sentry/nextjs";
-import { type NextApiRequest, type NextApiResponse } from "next";
-import { prisma } from "../../server/db"; // Adjust the import based on your setup
-import {
-  SPAN_INDEX,
-  TRACE_INDEX,
-  esClient,
-  spanIndexId,
-  traceIndexId,
-  TRACES_PIVOT_INDEX,
-} from "../../server/elasticsearch";
-
-import {
-  type CollectorRESTParamsValidator,
-  type ElasticSearchInputOutput,
-  type ElasticSearchSpan,
-  type ElasticSearchTrace,
-  type ErrorCapture,
-  type Span,
-  type SpanInput,
-  type SpanOutput,
-  type Trace,
-  type TraceCheck,
-} from "../../server/tracer/types";
-
-import {
-  collectorRESTParamsValidatorSchema,
-  spanValidatorSchema,
-} from "../../server/tracer/types.generated";
-import { getDebugger } from "../../utils/logger";
-import {
-  addInputAndOutputForRAGs,
-  maybeAddIdsToContextList,
-} from "./collector/rag";
-import { getTraceInput, getTraceOutput } from "./collector/trace";
-import { addLLMTokensCount, computeTraceMetrics } from "./collector/metrics";
-import { scheduleTraceChecks } from "./collector/traceChecks";
-import { cleanupPII } from "./collector/cleanupPII";
-import { scoreSatisfactionFromInput } from "./collector/satisfaction";
-import crypto from "crypto";
-import { api } from "../../utils/api";
-
+import type {
+  AggregationsAggregationContainer,
+  MappingRuntimeField,
+} from "@elastic/elasticsearch/lib/api/types";
+import { TRPCError } from "@trpc/server";
+import { getGroup, getMetric } from "~/server/analytics/registry";
 import {
   analyticsPipelines,
   pipelineAggregationsToElasticSearch,
   timeseriesInput,
   type FlattenAnalyticsGroupsEnum,
   type SeriesInputType,
-} from "../../server/analytics/registry";
-
+  type TimeseriesInput,
+} from "../../../analytics/registry";
+import {
+  sharedFiltersInputSchema,
+  type SharedFiltersInput,
+  type ApiConfig,
+} from "../../../analytics/types";
+import { TRACES_PIVOT_INDEX, esClient } from "../../../elasticsearch";
+import { TeamRoleGroup, checkUserPermissionForProject } from "../../permission";
+import { protectedProcedure } from "../../trpc";
 import {
   currentVsPreviousDates,
   generateTracesPivotQueryConditions,
-} from "../../server/api/routers/analytics/common";
-
+} from "./common";
+import { prisma } from "../../../db";
 import type { SearchRequest } from "@elastic/elasticsearch/lib/api/typesWithBodyKey";
-import type {
-  AggregationsAggregationContainer,
-  MappingRuntimeField,
-} from "@elastic/elasticsearch/lib/api/types";
 
-import { getGroup, getMetric } from "../../server/analytics/registry";
-import { timeseries } from "../../server/api/routers/analytics/test";
-import { ApiConfig } from "../../server/analytics/types";
+const labelsMapping: Partial<
+  Record<
+    FlattenAnalyticsGroupsEnum,
+    (projectId: string) => Promise<Record<string, string>>
+  >
+> = {
+  "topics.topics": async (projectId: string) => {
+    const topics = await prisma.topic.findMany({
+      where: { projectId },
+      select: { id: true, name: true },
+    });
 
-export const debug = getDebugger("langwatch:collector");
+    return Object.fromEntries(topics.map((topic) => [topic.id, topic.name]));
+  },
+};
 
-export default async function handler(
-  req: NextApiRequest,
-  res: NextApiResponse
-) {
-  if (req.method !== "POST") {
-    return res.status(405).end(); // Only accept POST requests
-  }
+sharedFiltersInputSchema.extend(timeseriesInput.shape);
 
-  const authToken = req.headers["x-auth-token"];
+//   type SeriesInputType<T extends SharedFiltersInput> = T;
 
-  if (!authToken) {
-    return res
-      .status(401)
-      .json({ message: "X-Auth-Token header is required." });
-  }
+export const timeseries = async (input: any, apiConfig: ApiConfig) => {
+  console.log("inputt", input);
+  console.log("ApiRoute", apiConfig);
 
-  const project = await prisma.project.findUnique({
-    where: { apiKey: authToken as string },
-  });
-
-  if (!project) {
-    return res.status(401).json({ message: "Invalid auth token." });
-  }
-
-  // let input = {
-  //   projectId: "KAXYxPR8MUgTcP8CF193y",
-  //   startDate: 1708250400000,
-  //   endDate: 1710756000000,
-  //   filters: {},
-  //   series: [
-  //     {
-  //       metric: "metadata.trace_id",
-  //       key: undefined,
-  //       subkey: undefined,
-  //       aggregation: "cardinality",
-  //     },
-  //   ],
-  //   groupBy: undefined,
-  //   timeScale: 1,
-  // };
-
-  // //TODO: add API CALL TYPE
-  // let params: CollectorRESTParamsValidator;
-  // try {
-  //   params = collectorRESTParamsValidatorSchema.parse(req.body);
-  // } catch (error) {
-  //   debug(
-  //     "Invalid trace received",
-  //     error,
-  //     JSON.stringify(req.body, null, "  ")
-  //   );
-  //   Sentry.captureException(error);
-  //   return res.status(400).json({ error: "Invalid trace format." });
-  // }
-
-  if (!req.body) {
-    return res.status(400).json({ message: "Bad request" });
-  }
-
-  if (!("startDate" in req.body) || !("endDate" in req.body)) {
-    return res
-      .status(400)
-      .json({ message: "Not startDate or endDate provided" });
-  }
-
-  const input = req.body;
-
-  input.projectId = project.id;
-  const apiConfig: ApiConfig = "REST";
-
-  const timeseriesResult = await timeseries(input, apiConfig);
-
-  if (timeseriesResult.code) {
-    return res.status(400).json(timeseriesResult);
-  }
-
-  return res.status(200).json(timeseriesResult);
-
-  return timeseries(input);
+  //   if (apiConfig === "REST") {
+  //     return {
+  //       code: "BAD_REQUEST",
+  //       message: `Metricrequires a key to be defined`,
+  //     };
+  //   }
 
   const { previousPeriodStartDate, startDate, endDate, daysDifference } =
     currentVsPreviousDates(
@@ -158,15 +70,30 @@ export default async function handler(
       const metric_ = getMetric(metric);
 
       if (metric_.requiresKey && !metric_.requiresKey.optional && !key) {
-        return res
-          .status(400)
-          .json({ message: `Metric ${metric} requires a key to be defined` });
+        if (apiConfig === "TRPC") {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: `Metric ${metric} requires a key to be defined`,
+          });
+        } else if (apiConfig === "REST") {
+          return {
+            code: "BAD_REQUEST",
+            message: `Metric ${metric} requires a key to be defined`,
+          };
+        }
       }
-
       if (metric_.requiresSubkey && !subkey) {
-        return res
-          .status(400)
-          .json({ message: `Metric ${metric} requires a key to be defined` });
+        if (apiConfig === "TRPC") {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: `Metric ${metric} requires a key to be defined`,
+          });
+        } else if (apiConfig === "REST") {
+          return {
+            code: "BAD_REQUEST",
+            message: `Metric ${metric} requires a key to be defined`,
+          };
+        }
       }
 
       const metricAggregations = metric_.aggregation(aggregation, key, subkey);
@@ -361,16 +288,11 @@ export default async function handler(
     Math.max(0, previousPeriod.length - currentPeriod.length)
   );
 
-  // return {
-  //   previousPeriod: previousPeriod,
-  //   currentPeriod: currentPeriod,
-  // };
-  return res
-    .status(200)
-    .json({ previousPeriod: previousPeriod, currentPeriod: currentPeriod });
-
-  //return res.status(200).json({ message: "No changes" });
-}
+  return {
+    previousPeriod: previousPeriod,
+    currentPeriod: currentPeriod,
+  };
+};
 
 const extractResultForBucket = (
   seriesList: SeriesInputType[],
@@ -419,19 +341,3 @@ const pipelinePath = (
   aggregation: SeriesInputType["aggregation"],
   pipeline: Required<SeriesInputType>["pipeline"]
 ) => `${metric}/${aggregation}/${pipeline.field}/${pipeline.aggregation}`;
-
-const labelsMapping: Partial<
-  Record<
-    FlattenAnalyticsGroupsEnum,
-    (projectId: string) => Promise<Record<string, string>>
-  >
-> = {
-  "topics.topics": async (projectId: string) => {
-    const topics = await prisma.topic.findMany({
-      where: { projectId },
-      select: { id: true, name: true },
-    });
-
-    return Object.fromEntries(topics.map((topic) => [topic.id, topic.name]));
-  },
-};

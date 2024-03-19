@@ -109,6 +109,8 @@ export const sharedFiltersInputSchema = z.object({
   filters: z.record(filterFieldsEnum, z.array(z.string())),
 });
 
+export type SharedFiltersInput = z.infer<typeof sharedFiltersInputSchema>;
+
 export type TracesPivotFilters = DeepRequired<
   z.infer<typeof sharedFiltersInputSchema>["filters"]
 >;
@@ -151,3 +153,7 @@ export type TracesPivot = {
     event_details: { key: string; value: string }[];
   })[];
 };
+
+export const apiType = z.enum(["TRPC", "REST"]);
+
+export type ApiConfig = z.infer<typeof apiType>;
