@@ -1,3 +1,7 @@
+module "variables" {
+  source = "../variables"
+}
+
 resource "aws_api_gateway_resource" "this" {
   rest_api_id = var.apigw_id
   parent_id   = var.apigw_root_resource_id
@@ -12,6 +16,8 @@ resource "aws_api_gateway_method" "this" {
 }
 
 resource "aws_api_gateway_integration" "this" {
+  count = module.variables.profile == "lw-prod" ? 1 : 0
+
   rest_api_id = var.apigw_id
   resource_id = aws_api_gateway_method.this.resource_id
   http_method = aws_api_gateway_method.this.http_method

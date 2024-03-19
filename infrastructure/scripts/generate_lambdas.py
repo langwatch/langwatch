@@ -79,6 +79,7 @@ def main():
 
     lambdas_tf += f"""
             resource "aws_api_gateway_deployment" "this" {{
+                count = module.variables.profile == "lw-prod" ? 1 : 0
                 depends_on = [
                     {", ".join(depends_on)}
                 ]
