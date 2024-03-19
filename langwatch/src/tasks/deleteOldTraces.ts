@@ -4,7 +4,7 @@ import type {
 } from "@elastic/elasticsearch/lib/api/types";
 import { TRACE_INDEX, esClient } from "../server/elasticsearch";
 
-const deleteOldTraces = async (projectId: string, lt: string) => {
+const deleteOldTraces = async (projectId: string, lt: number) => {
   let searchAfter: any;
   let response;
   let bulkActions = [];
@@ -83,5 +83,5 @@ const deleteOldTraces = async (projectId: string, lt: string) => {
 
 export default async function execute(projectId: string) {
   console.log("\nDeleting old Traces");
-  await deleteOldTraces(projectId, "now-1h");
+  await deleteOldTraces(projectId, new Date(2024, 2, 11).getTime());
 }
