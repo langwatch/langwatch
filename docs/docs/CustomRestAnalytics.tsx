@@ -1,4 +1,3 @@
-import { MetadataFootnote } from "./integration-guides/utils/MetadataFootnote";
 import { RenderCode } from "./integration-guides/utils/RenderCode";
 import { langwatchEndpointEnv } from "./integration-guides/utils/langwatchEndpointEnv";
 
