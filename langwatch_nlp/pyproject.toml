@@ -1,0 +1,29 @@
+[tool.poetry]
+name = "langwatch-nlp"
+version = "0.1.0"
+description = ""
+authors = ["Rogerio Chaves <rogerio@langwatch.ai>"]
+readme = "README.md"
+package-mode = false
+
+[tool.poetry.dependencies]
+python = "^3.11"
+fastapi = "^0.110.0"
+pydantic = "^2.6.4"
+numpy = "^1.26.4"
+openai = "^1.14.2"
+sentry-sdk = { extras = ["fastapi"], version = "^1.42.0" }
+scipy = "^1.12.0"
+tenacity = "^8.2.3"
+langchain-community = "^0.0.28"
+nanoid = "^2.0.0"
+python-dotenv = "^1.0.1"
+hypercorn = "^0.16.0"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.1.1"
+pandas = "^2.2.1"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

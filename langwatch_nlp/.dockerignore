@@ -1,0 +1,9 @@
+.venv
+notebooks
+.pytest_cache
+*__pycache__
+*.DS_Store
+*.csv
+__pycache__/
+*.py[cod]
+*$py.class
