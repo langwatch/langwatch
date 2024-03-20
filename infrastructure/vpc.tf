@@ -95,3 +95,62 @@ resource "aws_route_table_association" "private_subnet_2_association" {
   subnet_id      = aws_subnet.private_subnet_2.id
   route_table_id = aws_route_table.private_route_table.id
 }
+
+# For VPC Endpoints
+resource "aws_security_group" "vpc_tls" {
+  name_prefix = "main-vpc-tls-sg"
+  description = "Allow TLS inbound traffic"
+  vpc_id      = aws_vpc.main.id
+
+  ingress {
+    description = "TLS from VPC"
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = [aws_vpc.main.vpc_cidr_block]
+  }
+
+  tags = {
+    Name = "Main VPC Endpoints SG - TLS"
+  }
+}
+
+module "endpoints" {
+  count = module.variables.profile == "lw-prod" ? 1 : 0
+
+  source = "terraform-aws-modules/vpc/aws//modules/vpc-endpoints"
+
+  vpc_id             = aws_vpc.main.id
+  security_group_ids = [aws_security_group.langwatch.id]
+
+  endpoints = {
+    ssm = {
+      service             = "ssm"
+      private_dns_enabled = true
+      subnet_ids          = [aws_subnet.private_subnet_1.id, aws_subnet.private_subnet_2.id]
+      security_group_ids  = [aws_security_group.vpc_tls.id]
+    },
+    ssmmessages = {
+      service             = "ssmmessages"
+      private_dns_enabled = true
+      subnet_ids          = [aws_subnet.private_subnet_1.id, aws_subnet.private_subnet_2.id]
+      security_group_ids  = [aws_security_group.vpc_tls.id]
+    },
+    ec2messages = {
+      service             = "ec2messages"
+      private_dns_enabled = true
+      subnet_ids          = [aws_subnet.private_subnet_1.id, aws_subnet.private_subnet_2.id]
+      security_group_ids  = [aws_security_group.vpc_tls.id]
+    },
+    ec2 = {
+      service             = "ec2"
+      private_dns_enabled = true
+      subnet_ids          = [aws_subnet.private_subnet_1.id, aws_subnet.private_subnet_2.id]
+      security_group_ids  = [aws_security_group.vpc_tls.id]
+    },
+  }
+
+  tags = {
+    Name = "Main VPC Endpoints"
+  }
+}

@@ -106,7 +106,7 @@ resource "aws_ecs_service" "langwatch_service" {
 
   network_configuration {
     subnets          = [aws_subnet.public_subnet_1.id, aws_subnet.public_subnet_2.id]
-    security_groups  = [aws_security_group.alb_sg[0].id]
+    security_groups  = [aws_security_group.langwatch[0].id]
     assign_public_ip = true
   }
 
@@ -316,6 +316,33 @@ resource "aws_alb_target_group" "langwatch_green_tg" {
     protocol            = "HTTP"
     interval            = 30
     matcher             = "200"
+  }
+}
+
+resource "aws_security_group" "langwatch" {
+  count  = module.variables.profile == "lw-prod" ? 1 : 0
+  name   = "langwatch-app-sg"
+  vpc_id = aws_vpc.main.id
+
+  ingress {
+    description     = "HTTP from ALB"
+    from_port       = 3000
+    to_port         = 3000
+    protocol        = "tcp"
+    security_groups = [aws_security_group.alb_sg.id]
+  }
+
+  egress {
+    description      = "Allow Egress"
+    from_port        = 0
+    to_port          = 0
+    protocol         = -1
+    cidr_blocks      = ["0.0.0.0/0"]
+    ipv6_cidr_blocks = ["::/0"]
+  }
+
+  tags = {
+    Name = "Langwatch app sg"
   }
 }
 
