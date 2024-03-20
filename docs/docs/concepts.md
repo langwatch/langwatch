@@ -1,6 +1,6 @@
 ---
 title: Concepts
-sidebar_position: 5
+sidebar_position: 6
 ---
 
 Understanding LangWatch concepts can be made easier with two practical examples: an AI travel assistant and a tool for generating blog posts. Let's dive into how each core concept of LangWatch applies to these examples.

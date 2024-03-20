@@ -2,6 +2,7 @@ import type {
   AggregationsAggregationContainer,
   MappingRuntimeField,
 } from "@elastic/elasticsearch/lib/api/types";
+import type { SearchRequest } from "@elastic/elasticsearch/lib/api/typesWithBodyKey";
 import { TRPCError } from "@trpc/server";
 import { getGroup, getMetric } from "~/server/analytics/registry";
 import {
@@ -10,22 +11,17 @@ import {
   timeseriesInput,
   type FlattenAnalyticsGroupsEnum,
   type SeriesInputType,
-  type TimeseriesInput,
 } from "../../../analytics/registry";
 import {
   sharedFiltersInputSchema,
-  type SharedFiltersInput,
   type ApiConfig,
 } from "../../../analytics/types";
+import { prisma } from "../../../db";
 import { TRACES_PIVOT_INDEX, esClient } from "../../../elasticsearch";
-import { TeamRoleGroup, checkUserPermissionForProject } from "../../permission";
-import { protectedProcedure } from "../../trpc";
 import {
   currentVsPreviousDates,
   generateTracesPivotQueryConditions,
 } from "./common";
-import { prisma } from "../../../db";
-import type { SearchRequest } from "@elastic/elasticsearch/lib/api/typesWithBodyKey";
 
 const labelsMapping: Partial<
   Record<
@@ -43,21 +39,7 @@ const labelsMapping: Partial<
   },
 };
 
-sharedFiltersInputSchema.extend(timeseriesInput.shape);
-
-//   type SeriesInputType<T extends SharedFiltersInput> = T;
-
 export const timeseries = async (input: any, apiConfig: ApiConfig) => {
-  console.log("inputt", input);
-  console.log("ApiRoute", apiConfig);
-
-  //   if (apiConfig === "REST") {
-  //     return {
-  //       code: "BAD_REQUEST",
-  //       message: `Metricrequires a key to be defined`,
-  //     };
-  //   }
-
   const { previousPeriodStartDate, startDate, endDate, daysDifference } =
     currentVsPreviousDates(
       input,
@@ -66,84 +48,91 @@ export const timeseries = async (input: any, apiConfig: ApiConfig) => {
 
   let runtimeMappings: Record<string, MappingRuntimeField> = {};
   let aggs = Object.fromEntries(
-    input.series.flatMap(({ metric, aggregation, pipeline, key, subkey }) => {
-      const metric_ = getMetric(metric);
+    input.series.flatMap(
+      ({ metric, aggregation, pipeline, key, subkey }: SeriesInputType) => {
+        const metric_ = getMetric(metric);
 
-      if (metric_.requiresKey && !metric_.requiresKey.optional && !key) {
-        if (apiConfig === "TRPC") {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: `Metric ${metric} requires a key to be defined`,
-          });
-        } else if (apiConfig === "REST") {
-          return {
-            code: "BAD_REQUEST",
-            message: `Metric ${metric} requires a key to be defined`,
+        if (metric_.requiresKey && !metric_.requiresKey.optional && !key) {
+          if (apiConfig === "TRPC") {
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message: `Metric ${metric} requires a key to be defined`,
+            });
+          } else if (apiConfig === "REST") {
+            return {
+              code: "BAD_REQUEST",
+              message: `Metric ${metric} requires a key to be defined`,
+            };
+          }
+        }
+        if (metric_.requiresSubkey && !subkey) {
+          if (apiConfig === "TRPC") {
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message: `Metric ${metric} requires a key to be defined`,
+            });
+          } else if (apiConfig === "REST") {
+            return {
+              code: "BAD_REQUEST",
+              message: `Metric ${metric} requires a key to be defined`,
+            };
+          }
+        }
+
+        const metricAggregations = metric_.aggregation(
+          aggregation,
+          key,
+          subkey
+        );
+
+        let aggregationQuery: Record<string, AggregationsAggregationContainer> =
+          metricAggregations;
+        if (pipeline) {
+          const pipelineBucketsPath = `${metric}.${aggregation}.${pipeline.field}`;
+          const metricPath = metric_
+            .extractionPath(aggregation, key, subkey)
+            // Fix for working with percentiles too
+            .split(">values")[0];
+          const pipelinePath_ = pipelinePath(metric, aggregation, pipeline);
+
+          aggregationQuery = {
+            [pipelineBucketsPath]: {
+              terms: {
+                field: analyticsPipelines[pipeline.field].field,
+                size: 10000,
+              },
+              aggs: aggregationQuery,
+            },
+            [pipelinePath_]: {
+              [pipelineAggregationsToElasticSearch[pipeline.aggregation]]: {
+                buckets_path: `${pipelineBucketsPath}>${metricPath}`,
+                gap_policy: "insert_zeros",
+              },
+            },
           };
         }
-      }
-      if (metric_.requiresSubkey && !subkey) {
-        if (apiConfig === "TRPC") {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: `Metric ${metric} requires a key to be defined`,
-          });
-        } else if (apiConfig === "REST") {
-          return {
-            code: "BAD_REQUEST",
-            message: `Metric ${metric} requires a key to be defined`,
+
+        if (metric_.runtimeMappings) {
+          runtimeMappings = {
+            ...runtimeMappings,
+            ...metric_.runtimeMappings,
           };
         }
+
+        return Object.entries(aggregationQuery);
       }
-
-      const metricAggregations = metric_.aggregation(aggregation, key, subkey);
-
-      let aggregationQuery: Record<string, AggregationsAggregationContainer> =
-        metricAggregations;
-      if (pipeline) {
-        const pipelineBucketsPath = `${metric}.${aggregation}.${pipeline.field}`;
-        const metricPath = metric_
-          .extractionPath(aggregation, key, subkey)
-          // Fix for working with percentiles too
-          .split(">values")[0];
-        const pipelinePath_ = pipelinePath(metric, aggregation, pipeline);
-
-        aggregationQuery = {
-          [pipelineBucketsPath]: {
-            terms: {
-              field: analyticsPipelines[pipeline.field].field,
-              size: 10000,
-            },
-            aggs: aggregationQuery,
-          },
-          [pipelinePath_]: {
-            [pipelineAggregationsToElasticSearch[pipeline.aggregation]]: {
-              buckets_path: `${pipelineBucketsPath}>${metricPath}`,
-              gap_policy: "insert_zeros",
-            },
-          },
-        };
-      }
-
-      if (metric_.runtimeMappings) {
-        runtimeMappings = {
-          ...runtimeMappings,
-          ...metric_.runtimeMappings,
-        };
-      }
-
-      return Object.entries(aggregationQuery);
-    })
+    )
   );
 
   let groupLabelsMapping: Record<string, string> | undefined;
   if (input.groupBy) {
     const group = getGroup(input.groupBy);
     aggs = group.aggregation(aggs);
-    if (labelsMapping[input.groupBy]) {
-      groupLabelsMapping = await labelsMapping[input.groupBy]?.(
-        input.projectId
-      );
+    if (labelsMapping[input.groupBy as keyof typeof labelsMapping]) {
+      // Add type assertion here
+      groupLabelsMapping = await labelsMapping[
+        input.groupBy as keyof typeof labelsMapping
+      ]?.(input.projectId);
     }
   }
 

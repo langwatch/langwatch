@@ -119,6 +119,7 @@ import {
 import { useRouter } from "next/router";
 import { useDevView } from "~/hooks/DevViewProvider";
 import { useFilterParams } from "~/hooks/useFilterParams";
+import { set } from "nprogress";
 
 export interface CustomGraphFormData {
   title?: string;
@@ -150,12 +151,6 @@ export interface CustomGraphFormData {
 export interface CustomAPICAllData {
   startDate: Date;
   endDate: Date;
-  title: string;
-  graphType: {
-    label: string;
-    value: CustomGraphInput["graphType"];
-    icon: React.ReactNode;
-  };
   series: {
     name: string;
     metric: FlattenAnalyticsMetricsEnum;
@@ -168,9 +163,7 @@ export interface CustomAPICAllData {
     };
   }[];
   groupBy: FlattenAnalyticsGroupsEnum | "";
-  includePrevious: boolean;
   timeScale: "full" | number;
-  connected?: boolean;
 }
 
 const chartOptions: CustomGraphFormData["graphType"][] = [
@@ -253,10 +246,10 @@ const defaultValues: CustomGraphFormData = {
 };
 
 export default function AnalyticsCustomGraph() {
-  const { isOpen, onOpen, onClose } = useDisclosure();
+  const jsonModal = useDisclosure();
+  const apiModal = useDisclosure();
   const { isDevViewEnabled } = useDevView();
   const { filterParams, queryOpts } = useFilterParams();
-  console.log("filterParams", filterParams);
   const form = useForm<CustomGraphFormData>({
     defaultValues,
   });
@@ -272,6 +265,8 @@ export default function AnalyticsCustomGraph() {
   const formData = JSON.stringify(form.watch() ?? {});
   const [debouncedCustomGraphInput, setDebouncedCustomGraphInput] =
     useDebounceValue<CustomGraphInput | undefined>(undefined, 400);
+  const [debouncedCustomAPIInput, setDebouncedCustomAPIInput] =
+    useDebounceValue<CustomAPICAllData | undefined>(undefined, 400);
 
   useEffect(() => {
     const customGraphInput = customGraphFormToCustomGraphInput(
@@ -283,17 +278,16 @@ export default function AnalyticsCustomGraph() {
       filterParams
     );
 
-    console.log(apiJson);
-
-    // const apiJson = customGraphInput;
-
-    // apiJson.startDate = startDate;
-    // apiJson.endDate = endDate;
-
-    //console.log(apiJson);
+    setDebouncedCustomAPIInput(apiJson);
 
     setDebouncedCustomGraphInput(customGraphInput);
-  }, [formData, setDebouncedCustomGraphInput, form]);
+  }, [
+    formData,
+    setDebouncedCustomGraphInput,
+    form,
+    filterParams,
+    setDebouncedCustomAPIInput,
+  ]);
 
   return (
     <DashboardLayout>
@@ -331,7 +325,10 @@ export default function AnalyticsCustomGraph() {
                         <MoreVertical />
                       </MenuButton>
                       <MenuList>
-                        <MenuItem onClick={onOpen}>Show JSON</MenuItem>
+                        <MenuItem onClick={jsonModal.onOpen}>
+                          Show JSON
+                        </MenuItem>
+                        <MenuItem onClick={apiModal.onOpen}>Show API</MenuItem>
                       </MenuList>
                     </Menu>
                   )}
@@ -346,7 +343,7 @@ export default function AnalyticsCustomGraph() {
           </HStack>
         </VStack>
       </Container>
-      <Modal isOpen={isOpen} onClose={onClose}>
+      <Modal isOpen={jsonModal.isOpen} onClose={jsonModal.onClose}>
         <ModalOverlay />
         <ModalContent>
           <ModalHeader>Graph JSON</ModalHeader>
@@ -354,6 +351,26 @@ export default function AnalyticsCustomGraph() {
           <ModalBody>
             <Textarea rows={16}>
               {JSON.stringify(debouncedCustomGraphInput, null, 2)}
+              {/* {JSON.stringify(formData, null, 2)} */}
+            </Textarea>
+          </ModalBody>
+
+          <ModalFooter></ModalFooter>
+        </ModalContent>
+      </Modal>
+      <Modal isOpen={apiModal.isOpen} onClose={apiModal.onClose}>
+        <ModalOverlay />
+        <ModalContent>
+          <ModalHeader>JSON API</ModalHeader>
+          <ModalCloseButton />
+          <ModalBody>
+            <Text paddingBottom={8}>
+              Incorporate the following JSON payload within the body of your
+              HTTP POST request to access identical data tailored for the custom
+              graphs.
+            </Text>
+            <Textarea rows={16}>
+              {JSON.stringify(debouncedCustomAPIInput, null, 2)}
               {/* {JSON.stringify(formData, null, 2)} */}
             </Textarea>
           </ModalBody>
@@ -380,7 +397,7 @@ const customGraphFormToCustomGraphInput = (
 
   return {
     graphId: "custom",
-    graphType: formData.graphType.value,
+    graphType: formData.graphType!.value,
     series: formData.series.map((series) => {
       if (series.pipeline.field) {
         return {
@@ -411,7 +428,7 @@ const customGraphFormToCustomGraphInput = (
 const customAPIinput = (
   formData: CustomGraphFormData,
   filterParams: any
-): CustomGraphInput | undefined => {
+): CustomAPICAllData | undefined => {
   for (const series of formData.series) {
     const metric = getMetric(series.metric);
     if (metric.requiresKey && !metric.requiresKey.optional && !series.key) {
@@ -426,8 +443,6 @@ const customAPIinput = (
     startDate: filterParams.startDate,
     endDate: filterParams.endDate,
     filters: filterParams.filters,
-    graphId: "custom",
-    graphType: formData.graphType.value,
     series: formData.series.map((series) => {
       if (series.pipeline.field) {
         return {
@@ -439,8 +454,6 @@ const customAPIinput = (
         };
       }
       return {
-        name: series.name,
-        colorSet: series.colorSet,
         metric: series.metric,
         aggregation: series.aggregation,
         key: series.key,
@@ -448,10 +461,7 @@ const customAPIinput = (
       };
     }),
     groupBy: formData.groupBy || undefined,
-    includePrevious: formData.includePrevious,
     timeScale: formData.timeScale,
-    connected: formData.connected,
-    height: 550,
   };
 };
 
