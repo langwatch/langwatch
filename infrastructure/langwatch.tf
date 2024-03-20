@@ -320,7 +320,7 @@ resource "aws_alb_target_group" "langwatch_green_tg" {
 }
 
 resource "aws_security_group" "langwatch" {
-  count  = module.variables.profile == "lw-prod" ? 1 : 0
+  count  = module.variables.profile == "lw-prod" ? 1 : 1
   name   = "langwatch-app-sg"
   vpc_id = aws_vpc.main.id
 
@@ -329,7 +329,7 @@ resource "aws_security_group" "langwatch" {
     from_port       = 3000
     to_port         = 3000
     protocol        = "tcp"
-    security_groups = [aws_security_group.alb_sg.id]
+    security_groups = [aws_security_group.alb_sg[0].id]
   }
 
   egress {
@@ -347,7 +347,7 @@ resource "aws_security_group" "langwatch" {
 }
 
 resource "aws_security_group" "alb_sg" {
-  count       = module.variables.profile == "lw-prod" ? 1 : 0
+  count       = module.variables.profile == "lw-prod" ? 1 : 1
   name        = "langwatch-alb-sg"
   description = "Allow web access to alb"
   vpc_id      = aws_vpc.main.id

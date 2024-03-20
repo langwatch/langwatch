@@ -1,14 +1,15 @@
 locals {
-  aws_linux_ami = jsondecode(data.aws_ssm_parameter.linux_ami.value)["image_id"]
+  aws_linux_ami = data.aws_ssm_parameter.linux_ami.value
 }
 
 resource "aws_instance" "bastion" {
-  count = module.variables.profile == "lw-prod" ? 1 : 0
+  count = module.variables.profile == "lw-prod" ? 1 : 1
 
   ami                    = local.aws_linux_ami
   instance_type          = "t4g.nano"
   subnet_id              = aws_subnet.private_subnet_1.id
-  vpc_security_group_ids = [aws_security_group.bation-ec2, aws_security_group.vpc_tls.id]
+  iam_instance_profile   = aws_iam_instance_profile.bastion.name
+  vpc_security_group_ids = [aws_security_group.bation-ec2.id, aws_security_group.vpc_tls.id]
 
   tags = {
     Name = "Bastion EC2 Instance"
@@ -16,27 +17,18 @@ resource "aws_instance" "bastion" {
 
   lifecycle {
     ignore_changes = [
-      ami,
-      instance_type
+      ami
     ]
   }
 }
 
 data "aws_ssm_parameter" "linux_ami" {
-  name = "/aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2"
+  name = "/aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-arm64-gp2"
 }
 
 resource "aws_security_group" "bation-ec2" {
   name   = "bastion-instance-sg"
   vpc_id = aws_vpc.main.id
-
-  ingress {
-    description     = "HTTP from ALB"
-    from_port       = 32768
-    to_port         = 65535
-    protocol        = "tcp"
-    security_groups = [aws_security_group.vpc_tls.id]
-  }
 
   egress {
     description      = "Allow Egress"
@@ -48,7 +40,7 @@ resource "aws_security_group" "bation-ec2" {
   }
 
   tags = {
-    Name = "Bastiion EC2 Security Group"
+    Name = "Bastion EC2 Security Group"
   }
 }
 

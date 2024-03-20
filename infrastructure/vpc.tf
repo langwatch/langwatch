@@ -107,7 +107,7 @@ resource "aws_security_group" "vpc_tls" {
     from_port   = 443
     to_port     = 443
     protocol    = "tcp"
-    cidr_blocks = [aws_vpc.main.vpc_cidr_block]
+    cidr_blocks = [aws_vpc.main.cidr_block]
   }
 
   tags = {
@@ -116,12 +116,12 @@ resource "aws_security_group" "vpc_tls" {
 }
 
 module "endpoints" {
-  count = module.variables.profile == "lw-prod" ? 1 : 0
+  count = module.variables.profile == "lw-prod" ? 1 : 1
 
   source = "terraform-aws-modules/vpc/aws//modules/vpc-endpoints"
 
   vpc_id             = aws_vpc.main.id
-  security_group_ids = [aws_security_group.langwatch.id]
+  security_group_ids = [aws_security_group.bation-ec2.id]
 
   endpoints = {
     ssm = {
