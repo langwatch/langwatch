@@ -175,7 +175,6 @@ class LangChainTracer(BaseContextTracer, BaseCallbackHandler):
                         )
                     )
         span["outputs"] = outputs
-        span["raw_response"] = f"{type(response).__name__}({str(response)})"
         if response.llm_output and "token_usage" in response.llm_output:
             usage = response.llm_output["token_usage"]
             span["metrics"] = SpanMetrics(

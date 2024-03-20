@@ -10,8 +10,7 @@ module.exports = {
     ![
       "ElasticSearchSpan",
       "ElasticSearchInputOutput",
-      "TraceCheckResult",
-      "TraceCheckDefinition",
+      "EvaluatorDefinition",
       "TraceCheckJob",
       "AnalyticsMetric",
     ].includes(name),

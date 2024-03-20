@@ -1,43 +1,45 @@
 import { Box, HStack, Text } from "@chakra-ui/react";
 import type { TraceCheck } from "../server/tracer/types";
-import type { CheckTypes } from "../trace_checks/types";
-import { CheckCircle, Clock, XCircle } from "react-feather";
-import { getTraceCheckDefinitions } from "../trace_checks/registry";
-import { TraceCheckDetails } from "../trace_checks/frontend";
+import { getEvaluatorDefinitions } from "../trace_checks/getEvaluator";
+import type { EvaluatorTypes } from "../trace_checks/evaluators.generated";
+import {
+  CheckStatusIcon,
+  checkStatusColorMap,
+} from "./checks/EvaluationStatus";
+import numeral from "numeral";
 
 export function CheckPassing({ check }: { check: TraceCheck }) {
-  const checkType = check.check_type as CheckTypes;
+  const checkType = check.check_type as EvaluatorTypes;
 
-  const done =
-    check.status === "succeeded" ||
-    check.status === "failed" ||
-    check.status === "error";
-  const checkPasses = check.status === "succeeded";
-  const traceCheck = getTraceCheckDefinitions(checkType);
-
-  if (!traceCheck) return null;
+  const evaluator = getEvaluatorDefinitions(checkType);
+  if (!evaluator) return null;
 
   return (
     <HStack align="start" spacing={2}>
-      <Box
-        paddingRight={2}
-        color={!done ? "yellow.600" : checkPasses ? "green.600" : "red.600"}
-      >
-        {!done /* TODO: differentiate in_progress and scheduled, also on the general one in Messages */ ? (
-          <Clock />
-        ) : checkPasses ? (
-          <CheckCircle />
-        ) : (
-          <XCircle />
-        )}
+      <Box paddingRight={2} color={checkStatusColorMap(check)}>
+        <CheckStatusIcon check={check} />
       </Box>
       <Text whiteSpace="nowrap">
-        <b>{check.check_name || traceCheck.name}:</b>
+        <b>{check.check_name || evaluator.name}:</b>
       </Text>
-      {check.status == "succeeded" || check.status == "failed" ? (
-        <TraceCheckDetails check={check} />
+      {check.status == "processed" ? (
+        <Text noOfLines={1} maxWidth="400px">
+          {evaluator.isGuardrail
+            ? check.passed
+              ? "Passed"
+              : "Failed"
+            : "Score: " +
+              (check.score !== undefined ? numeral(check.score).format("0.[00]") : "N/A")}
+          {check.details ? `. Details: ${check.details}` : ""}
+        </Text>
+      ) : check.status == "skipped" ? (
+        <Text noOfLines={1} maxWidth="400px">
+          Skipped{check.details ? `: ${check.details}` : ""}
+        </Text>
       ) : check.status == "error" ? (
-        <Text>Error</Text>
+        <Text noOfLines={1} maxWidth="400px">
+          Error: {check.error?.message}
+        </Text>
       ) : check.status == "in_progress" ? (
         <Text>Processing</Text>
       ) : check.status === "scheduled" ? (

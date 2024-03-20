@@ -1,14 +1,10 @@
-import { prisma } from "../../../server/db";
-import { type ElasticSearchSpan, type Trace } from "../../../server/tracer/types";
 import {
-  convertToTraceCheckResult,
-  runPiiCheck
-} from "../../../trace_checks/backend/piiCheck";
-import { updateCheckStatusInES } from "../../../server/background/queues/traceChecksQueue";
-import type { CheckTypes, Checks } from "../../../trace_checks/types";
+  type ElasticSearchSpan,
+  type Trace,
+} from "../../../server/tracer/types";
+import { runPiiCheck } from "./piiCheck";
 import { env } from "../../../env.mjs";
 
-// TODO: extract to separate file
 export const cleanupPII = async (
   trace: Trace,
   spans: ElasticSearchSpan[]
@@ -16,36 +12,6 @@ export const cleanupPII = async (
   const piiEnforced = env.NODE_ENV === "production";
   const results = await runPiiCheck(trace, spans, piiEnforced);
   const { quotes } = results;
-
-  const piiChecks = await prisma.check.findMany({
-    where: {
-      projectId: trace.project_id,
-      enabled: true,
-      checkType: "pii_check",
-    },
-  });
-
-  // PII checks must run on every message anyway for GDPR compliance, however not always the user wants
-  // that to fail the trace. So we only update the status if the check is enabled, accordingly to the
-  // check configuration, and sampling condition.
-  for (const piiCheck of piiChecks) {
-    if (piiCheck.sample >= Math.random()) {
-      const traceCheckResult = convertToTraceCheckResult(
-        results,
-        piiCheck.parameters as Checks["pii_check"]["parameters"]
-      );
-      await updateCheckStatusInES({
-        check: {
-          ...piiCheck,
-          type: piiCheck.checkType as CheckTypes,
-        },
-        trace: trace,
-        status: traceCheckResult.status,
-        raw_result: traceCheckResult.raw_result,
-        value: traceCheckResult.value,
-      });
-    }
-  }
 
   for (const quote of quotes) {
     trace.input.value = trace.input.value.replace(quote, "[REDACTED]");

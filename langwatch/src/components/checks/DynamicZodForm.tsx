@@ -5,48 +5,69 @@ import {
   Input,
   Select,
   Switch,
+  Textarea,
   VStack,
 } from "@chakra-ui/react";
 import React from "react";
-import { Controller, useFieldArray, useFormContext } from "react-hook-form";
+import {
+  Controller,
+  useFieldArray,
+  useFormContext,
+  type FieldErrors,
+} from "react-hook-form";
 import { z, type ZodType } from "zod";
+import type {
+  EvaluatorDefinition,
+  EvaluatorTypes,
+  Evaluators,
+} from "../../trace_checks/evaluators.generated";
+import { getEvaluatorDefinitions } from "../../trace_checks/getEvaluator";
 import { camelCaseToTitleCase } from "../../utils/stringCasing";
 import { HorizontalFormControl } from "../HorizontalFormControl";
-import { getTraceCheckDefinitions } from "../../trace_checks/registry";
-import type {
-  CheckTypes,
-  Checks,
-  TraceCheckDefinition,
-} from "../../trace_checks/types";
+import type { CheckConfigFormData } from "./CheckConfigForm";
 
 const DynamicZodForm = ({
   schema,
   checkType,
   prefix,
+  errors,
 }: {
   schema: ZodType;
-  checkType: string;
+  checkType: EvaluatorTypes;
   prefix: string;
+  errors: FieldErrors<CheckConfigFormData>["settings"];
 }) => {
   const { control, register } = useFormContext();
 
-  const renderField = <T extends CheckTypes>(
+  const renderField = <T extends EvaluatorTypes>(
     fieldSchema: ZodType,
     fieldName: string,
-    checkDefinition: TraceCheckDefinition<T> | undefined
+    evaluator: EvaluatorDefinition<T> | undefined
   ): React.JSX.Element | null => {
     const fullPath = prefix ? `${prefix}.${fieldName}` : fieldName;
+    const defaultValue =
+      evaluator?.settings?.[fieldName as keyof Evaluators[T]["settings"]]
+        ?.default;
 
-    if (fieldSchema instanceof z.ZodString) {
-      return <Input {...register(fullPath)} />;
-    } else if (fieldSchema instanceof z.ZodNumber) {
+    const fieldSchema_ =
+      fieldSchema instanceof z.ZodOptional ? fieldSchema.unwrap() : fieldSchema;
+
+    if (fieldSchema_ instanceof z.ZodString) {
+      return <Textarea {...register(fullPath)} />;
+    } else if (fieldSchema_ instanceof z.ZodNumber) {
       return (
         <Input
           type="number"
+          step={
+            typeof defaultValue === "number" &&
+            Math.round(defaultValue) != defaultValue
+              ? "0.01"
+              : "1"
+          }
           {...register(fullPath, { setValueAs: (val) => +val })}
         />
       );
-    } else if (fieldSchema instanceof z.ZodBoolean) {
+    } else if (fieldSchema_ instanceof z.ZodBoolean) {
       return (
         <HStack width="full" spacing={2}>
           <Controller
@@ -68,21 +89,36 @@ const DynamicZodForm = ({
           </FormLabel>
         </HStack>
       );
-    } else if (fieldSchema instanceof z.ZodUnion) {
+    } else if (fieldSchema_ instanceof z.ZodUnion) {
       return (
         <Controller
           name={fullPath}
           control={control}
           render={({ field }) => (
-            <Select {...field}>
-              {fieldSchema.options.map(
+            <Select
+              {...field}
+              onChange={(e) => {
+                const literalValues = fieldSchema_.options.map(
+                  (option: any) => option.value
+                );
+
+                if (
+                  !isNaN(+e.target.value) &&
+                  literalValues.includes(+e.target.value)
+                ) {
+                  field.onChange(+e.target.value);
+                } else {
+                  field.onChange(e.target.value);
+                }
+              }}
+            >
+              {fieldSchema instanceof z.ZodOptional && (
+                <option value={undefined}></option>
+              )}
+              {fieldSchema_.options.map(
                 (option: { value: string }, index: number) => (
                   <option key={index} value={option.value}>
-                    {(
-                      checkDefinition?.parametersDescription[
-                        fieldName as keyof Checks[T]["parameters"]
-                      ]?.labels as any
-                    )?.[option.value] ?? option.value}
+                    {option.value}
                   </option>
                 )
               )}
@@ -90,36 +126,53 @@ const DynamicZodForm = ({
           )}
         />
       );
-    } else if (fieldSchema instanceof z.ZodArray) {
+    } else if (fieldSchema_ instanceof z.ZodArray) {
       // eslint-disable-next-line react-hooks/rules-of-hooks
       const { fields, append, remove } = useFieldArray({
         control,
         name: fullPath,
       });
+
+      const defaultValues =
+        fieldSchema_.element instanceof z.ZodObject
+          ? Object.fromEntries(
+              Object.entries(fieldSchema_.element.shape).flatMap(
+                ([key, value]) => {
+                  if (value instanceof z.ZodUnion) {
+                    const defaultValue = value.options[0].value;
+                    return [[key, defaultValue]];
+                  }
+
+                  return [];
+                }
+              )
+            )
+          : {};
+
       return (
         <VStack>
           {fields.map((field, index) => (
             <HStack key={field.id}>
               {renderField(
-                fieldSchema.element,
+                fieldSchema_.element,
                 `${fieldName}.${index}`,
-                checkDefinition
+                evaluator
               )}
               <Button onClick={() => remove(index)}>Remove</Button>
             </HStack>
           ))}
-          <Button onClick={() => append({})}>Add</Button>
+          <Button onClick={() => append(defaultValues)}>Add</Button>
         </VStack>
       );
-    } else if (fieldSchema instanceof z.ZodObject) {
+    } else if (fieldSchema_ instanceof z.ZodObject) {
       return (
         <VStack spacing={2}>
-          {Object.keys(fieldSchema.shape).map((key) => (
+          {Object.keys(fieldSchema_.shape).map((key) => (
             <React.Fragment key={key}>
               {renderField(
-                fieldSchema.shape[key],
+                fieldSchema_.shape[key],
                 `${fieldName}.${key}`,
-                checkDefinition
+                evaluator
               )}
             </React.Fragment>
           ))}
@@ -130,30 +183,41 @@ const DynamicZodForm = ({
     return null;
   };
 
-  const renderSchema = (schema: ZodType, basePath = "") => {
+  const renderSchema = <T extends EvaluatorTypes>(
+    schema: ZodType<Evaluators[T]["settings"]>,
+    basePath = ""
+  ) => {
     if (schema instanceof z.ZodObject) {
-      const checkDefinition = getTraceCheckDefinitions(checkType);
+      const checkDefinition = getEvaluatorDefinitions(
+        checkType
+      ) as EvaluatorDefinition<T>;
 
-      return Object.keys(schema.shape).map((key) => (
-        <React.Fragment key={key}>
-          <HorizontalFormControl
-            label={
-              (checkDefinition?.parametersDescription as any)?.[key]?.name ??
-              camelCaseToTitleCase(key)
-            }
-            helper={
-              (checkDefinition?.parametersDescription as any)?.[key]
-                ?.description ?? ""
-            }
-          >
-            {renderField(
-              schema.shape[key],
-              basePath ? `${basePath}.${key}` : key,
-              checkDefinition
-            )}
-          </HorizontalFormControl>
-        </React.Fragment>
-      ));
+      return Object.keys(schema.shape).map((key) => {
+        const field = schema.shape[key];
+        const isOptional = field instanceof z.ZodOptional;
+
+        return (
+          <React.Fragment key={key}>
+            <HorizontalFormControl
+              label={
+                camelCaseToTitleCase(key) + (isOptional ? " (Optional)" : "")
+              }
+              helper={
+                checkDefinition?.settings?.[
+                  key as keyof Evaluators[T]["settings"]
+                ].description ?? ""
+              }
+              isInvalid={errors && key in errors && !!(errors as any)[key]}
+            >
+              {renderField(
+                field,
+                basePath ? `${basePath}.${key}` : key,
+                checkDefinition
+              )}
+            </HorizontalFormControl>
+          </React.Fragment>
+        );
+      });
     }
     return null;
   };

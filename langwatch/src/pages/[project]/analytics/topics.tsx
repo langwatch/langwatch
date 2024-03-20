@@ -79,7 +79,7 @@ const mostDisucussedTopics = {
   ],
   groupBy: "topics.topics",
   includePrevious: false,
-  timeScale: "1",
+  timeScale: "full",
   height: 300,
 };
 

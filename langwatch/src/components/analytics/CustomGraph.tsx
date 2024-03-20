@@ -212,9 +212,12 @@ export const CustomGraph = React.memo(
           positive,
           negative,
           neutral,
-          error: neutral,
+          error: negative,
           failed: negative,
           succeeded: positive,
+          skipped: neutral,
+          processed: positive,
+          passed: positive,
         };
 
         return getColor(colorSet, colorMap[groupKey] ?? neutral);

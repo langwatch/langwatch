@@ -53,7 +53,7 @@ export const clusterTopicsForProject = async (
 
   const topics = await prisma.topic.findMany({
     where: { projectId },
-    select: { id: true, parentId: true },
+    select: { id: true, parentId: true, createdAt: true },
   });
   const topicIds = topics
     .filter((topic) => !topic.parentId)
@@ -67,10 +67,26 @@ export const clusterTopicsForProject = async (
   const isIncrementalProcessing =
     topicIds.length > 0 && assignedTracesCount.count >= 1200;
 
+  const lastTopicCreatedAt = topics.reduce((acc, topic) => {
+    return topic.createdAt > acc ? topic.createdAt : acc;
+  }, new Date(0));
+
+  if (
+    !isIncrementalProcessing &&
+    lastTopicCreatedAt > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+  ) {
+    debug(
+      "Skipping clustering for project",
+      projectId,
+      "as last topic from batch processing was created less than 7 days ago"
+    );
+    return;
+  }
+
   let presenceCondition: QueryDslQueryContainer[] = [
     {
       range: {
-        "timestamps.inserted_at": {
+        "timestamps.started_at": {
           gte: "now-12M", // Limit to last 12 months for full batch processing
           lt: "now",
         },
@@ -81,7 +97,7 @@ export const clusterTopicsForProject = async (
     presenceCondition = [
       {
         range: {
-          "timestamps.inserted_at": {
+          "timestamps.started_at": {
             gte: "now-12M", // grab only messages that were not classified in last 3 months for incremental processing
             lt: "now",
           },
@@ -136,7 +152,7 @@ export const clusterTopicsForProject = async (
         "metadata.topic_id",
         "metadata.subtopic_id",
       ],
-      sort: [{ "timestamps.inserted_at": "asc" }, { trace_id: "asc" }],
+      sort: [{ "timestamps.started_at": "desc" }, { trace_id: "asc" }],
       ...(searchAfter ? { search_after: searchAfter } : {}),
       size: 2000,
     },

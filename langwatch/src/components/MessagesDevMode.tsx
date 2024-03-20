@@ -1,4 +1,10 @@
 import {
+  ArrowUpDownIcon,
+  ChevronDownIcon,
+  ChevronUpIcon,
+  DownloadIcon,
+} from "@chakra-ui/icons";
+import {
   Box,
   Button,
   Card,
@@ -27,35 +33,29 @@ import {
   Tooltip,
   Tr,
   VStack,
-  filter,
   useDisclosure,
 } from "@chakra-ui/react";
-import {
-  ArrowUpDownIcon,
-  ChevronDownIcon,
-  ChevronUpIcon,
-  DownloadIcon,
-} from "@chakra-ui/icons";
 import { useRouter } from "next/router";
 import numeral from "numeral";
-import { use, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ChevronDown, ChevronLeft, ChevronRight, List } from "react-feather";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { Trace } from "~/server/tracer/types";
-import { getTraceCheckDefinitions } from "~/trace_checks/registry";
+import { getEvaluatorDefinitions } from "~/trace_checks/getEvaluator";
 import { api } from "~/utils/api";
 import { durationColor } from "~/utils/durationColor";
 import { getSingleQueryParam } from "~/utils/getSingleQueryParam";
 import { useFilterParams } from "../hooks/useFilterParams";
 import { DashboardLayout } from "./DashboardLayout";
-import { FilterToggle } from "./filters/FilterToggle";
 import { PeriodSelector, usePeriodSelector } from "./PeriodSelector";
+import { FilterToggle } from "./filters/FilterToggle";
 
-import { TraceDeatilsDrawer } from "~/components/TraceDeatilsDrawer";
-import { FilterSidebar } from "./filters/FilterSidebar";
-import { useLocalStorage } from "usehooks-ts";
-import { AddDatasetRecordDrawer } from "./AddDatasetRecordDrawer";
 import Parse from "papaparse";
+import { useLocalStorage } from "usehooks-ts";
+import { TraceDeatilsDrawer } from "~/components/TraceDeatilsDrawer";
+import { AddDatasetRecordDrawer } from "./AddDatasetRecordDrawer";
+import { checkStatusColorMap } from "./checks/EvaluationStatus";
+import { FilterSidebar } from "./filters/FilterSidebar";
 
 export function MessagesDevMode() {
   const router = useRouter();
@@ -87,14 +87,6 @@ export function MessagesDevMode() {
     },
     queryOpts
   );
-
-  const [previousTraceGroups, setPreviousTraceGroups] =
-    useState<(typeof traceGroups)["data"]>(undefined);
-  useEffect(() => {
-    if (traceGroups.data) {
-      setPreviousTraceGroups(traceGroups.data);
-    }
-  }, [traceGroups.data]);
 
   const traceIds =
     traceGroups.data?.groups.flatMap((group) =>
@@ -308,26 +300,28 @@ export function MessagesDevMode() {
               const traceCheck = traceChecksQuery.data?.[trace.trace_id]?.find(
                 (traceCheck_) => traceCheck_.check_id === checkId
               );
-              const checkDefinition = getTraceCheckDefinitions(
+              const evaluator = getEvaluatorDefinitions(
                 traceCheck?.check_type ?? ""
               );
 
               return (
                 <Td key={index} onClick={() => openTraceDrawer(trace)}>
-                  {traceCheck?.status === "failed" ? (
-                    <Text color="red.400">
-                      {checkDefinition?.valueDisplayType == "boolean"
-                        ? "Fail"
-                        : numeral(traceCheck?.value).format("0.[00]") ?? 0}
-                    </Text>
-                  ) : traceCheck?.status === "succeeded" ? (
-                    <Text color="green.400">
-                      {checkDefinition?.valueDisplayType == "boolean"
-                        ? "Pass"
-                        : numeral(traceCheck?.value).format("0.[00]") ?? 0}
+                  {traceCheck?.status === "processed" ? (
+                    <Text color={checkStatusColorMap(traceCheck)}>
+                      {evaluator?.isGuardrail
+                        ? traceCheck.passed
+                          ? "Passed"
+                          : "Failed"
+                        : traceCheck.score !== undefined
+                        ? numeral(traceCheck.score).format("0.[00]")
+                        : "N/A"}
                     </Text>
                   ) : (
-                    <Text>{traceCheck?.status ?? "-"}</Text>
+                    <Text
+                      color={traceCheck ? checkStatusColorMap(traceCheck) : ""}
+                    >
+                      {traceCheck?.status ?? "-"}
+                    </Text>
                   )}
                 </Td>
               );
@@ -337,10 +331,8 @@ export function MessagesDevMode() {
               const traceCheck = traceChecksQuery.data?.[trace.trace_id]?.find(
                 (traceCheck_) => traceCheck_.check_id === checkId
               );
-              return traceCheck?.status === "failed"
-                ? numeral(traceCheck?.value).format("0.[00]")
-                : traceCheck?.status === "succeeded"
-                ? numeral(traceCheck?.value).format("0.[00]")
+              return traceCheck?.status === "processed"
+                ? numeral(traceCheck?.score).format("0.[00]")
                 : traceCheck?.status ?? "-";
             },
           },
@@ -348,18 +340,6 @@ export function MessagesDevMode() {
       )
     ),
   };
-
-  const initialTrueColumns = [
-    "checked",
-    "trace.timestamps.started_at",
-    "trace.input.value",
-    "trace.metrics.completion_tokens",
-    "trace.metrics.first_token_ms",
-    "trace.metrics.prompt_tokens",
-    "trace.metrics.total_cost",
-    "trace.metrics.total_time_ms",
-    "trace.output.value",
-  ];
 
   const [localStorageHeaderColumns, setLocalStorageHeaderColumns] =
     useLocalStorage<Record<keyof typeof headerColumns, boolean> | undefined>(

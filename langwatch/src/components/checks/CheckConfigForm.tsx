@@ -29,32 +29,33 @@ import {
 } from "react-hook-form";
 import slugify from "slugify";
 import { z } from "zod";
-import type {
-  CheckPreconditions,
-  CheckTypes,
-  Checks,
-} from "../../trace_checks/types";
-import {
-  checkPreconditionsSchema,
-  checkTypesSchema,
-  checksSchema,
-} from "../../trace_checks/types.generated";
+import type { CheckPreconditions } from "../../trace_checks/types";
+import { checkPreconditionsSchema } from "../../trace_checks/types.generated";
 import { HorizontalFormControl } from "../HorizontalFormControl";
-import { CustomRuleField } from "./CustomRuleField";
 import DynamicZodForm from "./DynamicZodForm";
 import { PreconditionsField } from "./PreconditionsField";
 import {
-  AVAILABLE_TRACE_CHECKS,
-  getTraceCheckDefinitions,
-} from "../../trace_checks/registry";
+  getEvaluatorDefaultSettings,
+  getEvaluatorDefinitions,
+} from "../../trace_checks/getEvaluator";
 import { useRouter } from "next/router";
+import {
+  evaluatorTypesSchema,
+  evaluatorsSchema,
+} from "../../trace_checks/evaluators.zod.generated";
+import {
+  AVAILABLE_EVALUATORS,
+  type EvaluatorTypes,
+  type Evaluators,
+} from "../../trace_checks/evaluators.generated";
+import { EvaluatorSelection } from "./EvaluatorSelection";
 
 export interface CheckConfigFormData {
   name: string;
-  checkType: CheckTypes | undefined;
+  checkType: EvaluatorTypes | undefined;
   sample: number;
   preconditions: CheckPreconditions;
-  parameters: Checks[CheckTypes]["parameters"];
+  settings: Evaluators[EvaluatorTypes]["settings"];
 }
 
 interface CheckConfigFormProps {
@@ -74,13 +75,14 @@ export default function CheckConfigForm({
       return zodResolver(
         z.object({
           name: z.string().min(1).max(255),
-          checkType: checkTypesSchema,
+          checkType: evaluatorTypesSchema,
           sample: z.number().min(0.01).max(1),
           preconditions: checkPreconditionsSchema,
-          parameters:
-            checksSchema.shape[data.checkType ?? "custom"].shape.parameters,
+          settings:
+            evaluatorsSchema.shape[data.checkType ?? "custom/basic"].shape
+              .settings,
         })
-      )({ ...data, parameters: data.parameters || {} }, ...args);
+      )({ ...data, settings: data.settings || {} }, ...args);
     },
   });
 
@@ -104,7 +106,7 @@ export default function CheckConfigForm({
     control,
     name: "preconditions",
   });
-  const check = checkType && getTraceCheckDefinitions(checkType);
+  const check = checkType && getEvaluatorDefinitions(checkType);
 
   const router = useRouter();
   const isChoosing = router.pathname.endsWith("/choose");
@@ -119,19 +121,19 @@ export default function CheckConfigForm({
   }, [checkType, isChoosing, router]);
 
   useEffect(() => {
-    if (defaultValues?.parameters && defaultValues.checkType === checkType)
+    if (defaultValues?.settings && defaultValues.checkType === checkType)
       return;
 
     if (!checkType) return;
 
-    const defaultName = getTraceCheckDefinitions(checkType)?.name;
-    if (!nameValue && defaultName && checkType !== "custom") {
+    const defaultName = getEvaluatorDefinitions(checkType)?.name;
+    if (!nameValue && defaultName && checkType !== "custom/basic") {
       form.setValue("name", defaultName);
     }
 
-    const traceCheck = AVAILABLE_TRACE_CHECKS[checkType];
+    const evaluator = AVAILABLE_EVALUATORS[checkType];
 
-    const setDefaultParameters = (
+    const setDefaultSettings = (
       defaultValues: Record<string, any>,
       prefix: string
     ) => {
@@ -143,7 +145,7 @@ export default function CheckConfigForm({
           !Array.isArray(value) &&
           value !== null
         ) {
-          setDefaultParameters(value, `${prefix}.${key}`);
+          setDefaultSettings(value, `${prefix}.${key}`);
         } else {
           //@ts-ignore
           form.setValue(`${prefix}.${key}`, value);
@@ -151,22 +153,11 @@ export default function CheckConfigForm({
       });
     };
 
-    setDefaultParameters(traceCheck.default.parameters, "parameters");
-    // Workaround to get the preconditions to show up due to weird react-hook-form not rerendering bug
-    const timeout = setTimeout(() => {
-      (traceCheck.default.preconditions ?? []).forEach((precondition) => {
-        appendPrecondition(precondition);
-      });
-    }, 10);
-
-    return () => {
-      clearTimeout(timeout);
-    };
+    setDefaultSettings(getEvaluatorDefaultSettings(evaluator), "settings");
   }, [
-    appendPrecondition,
     checkType,
     defaultValues?.checkType,
-    defaultValues?.parameters,
+    defaultValues?.settings,
     form,
     nameValue,
   ]);
@@ -186,37 +177,7 @@ export default function CheckConfigForm({
       {/* eslint-disable-next-line @typescript-eslint/no-misused-promises */}
       <form onSubmit={handleSubmit(onSubmit)} style={{ width: "100%" }}>
         {!checkType || isChoosing ? (
-          <Grid templateColumns="repeat(3, 1fr)" gap={6}>
-            {Object.entries(AVAILABLE_TRACE_CHECKS).map(([key, check]) => (
-              <GridItem
-                key={key}
-                width="full"
-                background="white"
-                padding={6}
-                borderRadius={6}
-                boxShadow="0px 4px 10px 0px rgba(0, 0, 0, 0.06)"
-                cursor="pointer"
-                role="button"
-                _hover={{
-                  background: "gray.200",
-                }}
-                onClick={() => {
-                  form.setValue("checkType", key as CheckTypes);
-                  void router.push({
-                    pathname: router.pathname.replace("/choose", ""),
-                    query: router.query,
-                  });
-                }}
-              >
-                <VStack align="start" spacing={4}>
-                  <Heading as="h2" size="sm">
-                    {check.name}
-                  </Heading>
-                  <Text>{check.description}</Text>
-                </VStack>
-              </GridItem>
-            ))}
-          </Grid>
+          <EvaluatorSelection form={form} />
         ) : (
           <VStack spacing={6} align="start" width="full">
             <Card width="full">
@@ -227,7 +188,7 @@ export default function CheckConfigForm({
                     helper="Select the type of check"
                     isInvalid={!!errors.checkType}
                   >
-                    {AVAILABLE_TRACE_CHECKS[checkType].name}{" "}
+                    {AVAILABLE_EVALUATORS[checkType].name}{" "}
                     <Button
                       variant="link"
                       onClick={() => {
@@ -264,7 +225,8 @@ export default function CheckConfigForm({
                   </HorizontalFormControl>
                   <PreconditionsField
                     runOn={
-                      preconditions?.length === 0 && !check?.requiresRag ? (
+                      preconditions?.length === 0 &&
+                      !check?.requiredFields.includes("contexts") ? (
                         sample == 1 ? (
                           runOn
                         ) : (
@@ -278,16 +240,14 @@ export default function CheckConfigForm({
                     remove={removePrecondition}
                     fields={fieldsPrecondition}
                   />
-                  {checkType === "custom" && <CustomRuleField />}
-                  {checkType &&
-                    checkType !== "custom" &&
-                    checksSchema.shape[checkType] && (
-                      <DynamicZodForm
-                        schema={checksSchema.shape[checkType].shape.parameters}
-                        checkType={checkType}
-                        prefix="parameters"
-                      />
-                    )}
+                  {checkType && evaluatorsSchema.shape[checkType] && (
+                    <DynamicZodForm
+                      schema={evaluatorsSchema.shape[checkType].shape.settings}
+                      checkType={checkType}
+                      prefix="settings"
+                      errors={errors.settings}
+                    />
+                  )}
                   <Accordion
                     defaultIndex={
                       (defaultValues?.sample ?? 1) < 1 ? 0 : undefined
@@ -315,7 +275,7 @@ export default function CheckConfigForm({
                         <HorizontalFormControl
                           label="Sampling"
                           helper="Run this check only on a sample of messages (min 0.01, max 1.0)"
-                          isInvalid={!!errors.name}
+                          isInvalid={!!errors.sample}
                           align="start"
                         >
                           <Controller

@@ -36,6 +36,7 @@ export const env = createEnv({
     CONTENT_SAFETY_ENDPOINT: z.string().min(1).optional(),
     CONTENT_SAFETY_SUBSCRIPTION_KEY: z.string().min(1).optional(),
     LANGWATCH_NLP_SERVICE: z.string().min(1).optional(),
+    LANGEVALS_ENDPOINT: z.string().min(1).optional(),
   },
 
   /**
@@ -76,6 +77,7 @@ export const env = createEnv({
     CONTENT_SAFETY_SUBSCRIPTION_KEY:
       process.env.CONTENT_SAFETY_SUBSCRIPTION_KEY,
     LANGWATCH_NLP_SERVICE: process.env.LANGWATCH_NLP_SERVICE,
+    LANGEVALS_ENDPOINT: process.env.LANGEVALS_ENDPOINT,
   },
   /**
    * Run `build` or `dev` with `SKIP_ENV_VALIDATION` to skip env validation.

@@ -184,17 +184,14 @@ class OpenAICompletionTracer(BaseContextTracer):
         timestamps: SpanTimestamps,
         **kwargs,
     ):
-        raw_response = []
         text_outputs: Dict[int, str] = {}
         for delta in deltas:
-            raw_response.append(delta.model_dump())
             for choice in delta.choices:
                 index = choice.index or 0
                 text_outputs[index] = text_outputs.get(index, "") + (choice.text or "")
 
         self.append_span(
             self.build_trace(
-                raw_response=raw_response,
                 outputs=[
                     TypedValueText(type="text", value=output)
                     for output in text_outputs.values()
@@ -214,7 +211,6 @@ class OpenAICompletionTracer(BaseContextTracer):
     ):
         self.append_span(
             self.build_trace(
-                raw_response=response.model_dump(),
                 outputs=[
                     TypedValueText(type="text", value=output.text)
                     for output in response.choices
@@ -237,7 +233,6 @@ class OpenAICompletionTracer(BaseContextTracer):
     ):
         self.append_span(
             self.build_trace(
-                raw_response=None,
                 outputs=[],
                 metrics=SpanMetrics(),
                 timestamps=timestamps,
@@ -248,7 +243,6 @@ class OpenAICompletionTracer(BaseContextTracer):
 
     def build_trace(
         self,
-        raw_response: Optional[Union[dict, list]],
         outputs: List[SpanOutput],
         metrics: SpanMetrics,
         timestamps: SpanTimestamps,
@@ -264,7 +258,6 @@ class OpenAICompletionTracer(BaseContextTracer):
             model=kwargs.get("model", "unknown"),
             input=TypedValueText(type="text", value=kwargs.get("prompt", "")).copy(),
             outputs=outputs,
-            raw_response=raw_response,
             error=error,
             params=SpanParams(
                 temperature=kwargs.get("temperature", 1.0),
@@ -372,10 +365,8 @@ class OpenAIChatCompletionTracer(BaseContextTracer):
         **kwargs,
     ):
         # Accumulate deltas
-        raw_response = []
         chat_outputs: Dict[int, List[ChatMessage]] = {}
         for delta in deltas:
-            raw_response.append(delta.model_dump())
             for choice in delta.choices:
                 index = choice.index
                 delta = choice.delta
@@ -436,7 +427,6 @@ class OpenAIChatCompletionTracer(BaseContextTracer):
 
         self.append_span(
             self.build_trace(
-                raw_response=raw_response,
                 outputs=[
                     TypedValueChatMessages(type="chat_messages", value=output)
                     for output in chat_outputs.values()
@@ -456,7 +446,6 @@ class OpenAIChatCompletionTracer(BaseContextTracer):
     ):
         self.append_span(
             self.build_trace(
-                raw_response=response.model_dump(),
                 outputs=[
                     TypedValueChatMessages(
                         type="chat_messages",
@@ -482,7 +471,6 @@ class OpenAIChatCompletionTracer(BaseContextTracer):
     ):
         self.append_span(
             self.build_trace(
-                raw_response=None,
                 outputs=[],
                 metrics=SpanMetrics(),
                 timestamps=timestamps,
@@ -493,7 +481,6 @@ class OpenAIChatCompletionTracer(BaseContextTracer):
 
     def build_trace(
         self,
-        raw_response: Optional[Union[dict, list]],
         outputs: List[SpanOutput],
         metrics: SpanMetrics,
         timestamps: SpanTimestamps,
@@ -529,7 +516,6 @@ class OpenAIChatCompletionTracer(BaseContextTracer):
                 type="chat_messages", value=kwargs.get("messages", []).copy()
             ),
             outputs=outputs,
-            raw_response=raw_response,
             error=error,
             params=params,
             metrics=metrics,

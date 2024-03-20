@@ -42,13 +42,16 @@ export function MessageCard({
   const traceChecks = checksMap ? checksMap[trace.trace_id] ?? [] : [];
   const checksDone = traceChecks.every(
     (check) =>
-      check.status == "succeeded" ||
-      check.status == "failed" ||
+      check.status == "processed" ||
+      check.status == "skipped" ||
       check.status == "error"
   );
   const checkPasses = traceChecks.filter(
-    (check) => check.status == "succeeded"
+    (check) =>
+      check.passed !== false &&
+      (check.status === "processed" || check.status === "skipped")
   ).length;
+
   const totalChecks = traceChecks.length;
 
   const topics = api.topics.getAll.useQuery(

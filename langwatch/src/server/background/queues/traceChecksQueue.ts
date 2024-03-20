@@ -8,7 +8,7 @@ import { traceCheckIndexId } from "~/server/elasticsearch";
 
 export const TRACE_CHECKS_QUEUE_NAME = "trace_checks";
 
-const traceChecksQueue = new Queue<TraceCheckJob, any, string>(
+export const traceChecksQueue = new Queue<TraceCheckJob, any, string>(
   TRACE_CHECKS_QUEUE_NAME,
   {
     connection,
@@ -80,17 +80,19 @@ export const updateCheckStatusInES = async ({
   check,
   trace,
   status,
-  raw_result,
-  value,
+  score,
+  passed,
   error,
+  details,
   retries,
 }: {
   check: TraceCheckJob["check"];
   trace: TraceCheckJob["trace"];
   status: TraceCheck["status"];
   error?: any;
-  raw_result?: object;
-  value?: number;
+  score?: number;
+  passed?: boolean;
+  details?: string;
   retries?: number;
 }) => {
   const traceCheck: TraceCheck = {
@@ -109,13 +111,14 @@ export const updateCheckStatusInES = async ({
     check_type: check.type,
     status,
     ...(check.name && { check_name: check.name }),
-    ...(raw_result && { raw_result }),
-    ...(value !== undefined && { value }),
+    ...(score !== undefined && { score }),
+    ...(passed !== undefined && { passed }),
     ...(error && { error: captureError(error) }),
+    ...(details !== undefined && { details }),
     ...(retries && { retries }),
     timestamps: {
       ...(status == "in_progress" && { started_at: Date.now() }),
-      ...((status == "succeeded" || status == "failed") && {
+      ...((status == "skipped" || status == "processed") && {
         finished_at: Date.now(),
       }),
       updated_at: Date.now(),

@@ -100,7 +100,6 @@ class LLMSpan(TypedDict, total=False):
     model: str
     input: SpanInput
     outputs: List[SpanOutput]
-    raw_response: Optional[Union[str, dict, list]]
     error: Optional[ErrorCapture]
     params: SpanParams
     metrics: SpanMetrics

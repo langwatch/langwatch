@@ -107,7 +107,6 @@ export interface LLMSpan extends BaseSpan {
   type: "llm";
   vendor: string;
   model: string;
-  raw_response?: string | Record<string, any> | any[];
   params: SpanParams;
   metrics: SpanMetrics;
 }
@@ -145,14 +144,13 @@ export type ElasticSearchInputOutput = {
 // Zod type will not be generated for this one, check ts-to-zod.config.js
 export type ElasticSearchSpan = Omit<
   BaseSpan &
-  Partial<Omit<RAGSpan, "type">> &
-  Partial<Omit<LLMSpan, "type" | "raw_response">>,
+    Partial<Omit<RAGSpan, "type">> &
+    Partial<Omit<LLMSpan, "type">>,
   "input" | "outputs"
 > & {
   project_id: string;
   input?: ElasticSearchInputOutput | null;
   outputs: ElasticSearchInputOutput[];
-  raw_response?: string | null;
   timestamps: SpanTimestamps & { inserted_at: number; updated_at: number };
 };
 
@@ -205,9 +203,10 @@ export type TraceCheck = {
   project_id: string;
   check_type: string;
   check_name: string;
-  status: "scheduled" | "in_progress" | "error" | "failed" | "succeeded";
-  raw_result?: object;
-  value?: number;
+  status: "scheduled" | "in_progress" | "error" | "skipped" | "processed";
+  passed?: boolean;
+  score?: number;
+  details?: string;
   error?: ErrorCapture | null;
   retries?: number;
   timestamps: {
@@ -279,8 +278,28 @@ export type TrackEventRESTParamsValidator = Omit<
 
 // Dataset Schemas
 
-export type DatasetSpan = (
-  Omit<BaseSpan, "project_id" | "trace_id" | "id" | "raw_response" | "timestamps" | "metrics"> |
-  Omit<LLMSpan, "project_id" | "trace_id" | "id" | "raw_response" | "timestamps" | "metrics"> |
-  Omit<RAGSpan, "project_id" | "trace_id" | "id" | "raw_response" | "timestamps" | "metrics">
-);
+export type DatasetSpan =
+  | Omit<
+      BaseSpan,
+      | "project_id"
+      | "trace_id"
+      | "id"
+      | "timestamps"
+      | "metrics"
+    >
+  | Omit<
+      LLMSpan,
+      | "project_id"
+      | "trace_id"
+      | "id"
+      | "timestamps"
+      | "metrics"
+    >
+  | Omit<
+      RAGSpan,
+      | "project_id"
+      | "trace_id"
+      | "id"
+      | "timestamps"
+      | "metrics"
+    >;

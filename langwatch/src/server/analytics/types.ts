@@ -131,7 +131,6 @@ export type TracesPivot = {
     | "input"
     | "outputs"
     | "error"
-    | "raw_response"
     | "params"
     | "contexts"
   > & {
@@ -144,7 +143,7 @@ export type TracesPivot = {
   }[];
   trace_checks?: (Omit<
     TraceCheck,
-    "raw_result" | "error" | "trace_metadata"
+    "error" | "trace_metadata" | "details"
   > & {
     has_error?: boolean;
   })[];

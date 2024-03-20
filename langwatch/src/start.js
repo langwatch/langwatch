@@ -5,7 +5,7 @@ const path = require("path");
 
 module.exports.startApp = async (dir = path.dirname(__dirname)) => {
   const dev = process.env.NODE_ENV !== "production";
-  const hostname = "localhost";
+  const hostname = "0.0.0.0";
   const port = 3000;
   // when using middleware `hostname` and `port` must be provided below
   const app = next({ dev, hostname, port, dir });
@@ -32,6 +32,10 @@ module.exports.startApp = async (dir = path.dirname(__dirname)) => {
       process.exit(1);
     })
     .listen(port, () => {
-      console.log(`> Ready on http://${hostname}:${port}`);
+      console.log(
+        `> Ready on http://${
+          process.env.NODE_ENV === "production" ? hostname : "localhost"
+        }:${port}`
+      );
     });
 };

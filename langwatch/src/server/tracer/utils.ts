@@ -34,7 +34,7 @@ export const getRAGInfo = (
   }
   const firstOutput = lastRagSpan.outputs[0];
   if (typeof firstOutput == "undefined") {
-    throw new Error("RAG span does not have ");
+    throw new Error("RAG span does not have output");
   }
 
   let input = typedValueToText(lastRagSpan.input as SpanInput, true);

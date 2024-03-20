@@ -1,0 +1,64 @@
+import type {
+  QueryDslBoolQuery,
+  QueryDslQueryContainer,
+} from "@elastic/elasticsearch/lib/api/types";
+import {
+  TRACE_CHECKS_INDEX,
+  esClient,
+  traceCheckIndexId,
+} from "../server/elasticsearch";
+import { type TraceCheck } from "../server/tracer/types";
+import { traceChecksQueue } from "../server/background/queues/traceChecksQueue";
+
+export default async function execute(checkId: string) {
+  const traceChecks = await esClient.search<TraceCheck>({
+    index: TRACE_CHECKS_INDEX,
+    size: 100,
+    body: {
+      query: {
+        bool: {
+          must: [
+            {
+              term: {
+                passed: false,
+              },
+            },
+            {
+              term: {
+                check_id: checkId,
+              },
+            },
+            {
+              range: {
+                "timestamps.inserted_at": {
+                  gt: Date.now() - 1000 * 60 * 60 * 24 * 2,
+                },
+              },
+            },
+          ] as QueryDslQueryContainer[],
+        } as QueryDslBoolQuery,
+      },
+    },
+  });
+
+  const hits = traceChecks.hits.hits;
+
+  for (const hit of hits) {
+    const traceCheck = hit._source;
+    if (!traceCheck) continue;
+
+    const jobId = traceCheckIndexId({
+      traceId: traceCheck.trace_id,
+      checkId,
+      projectId: traceCheck.project_id,
+    });
+    const currentJob = await traceChecksQueue.getJob(jobId);
+    if (currentJob) {
+      const state = await currentJob.getState();
+      if (state == "completed" || state == "failed") {
+        console.log("Retrying job", jobId);
+        await currentJob.retry(state);
+      }
+    }
+  }
+}

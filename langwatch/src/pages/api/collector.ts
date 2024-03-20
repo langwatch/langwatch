@@ -22,6 +22,7 @@ import {
 } from "../../server/tracer/types";
 import {
   collectorRESTParamsValidatorSchema,
+  spanSchema,
   spanValidatorSchema,
 } from "../../server/tracer/types.generated";
 import { getDebugger } from "../../utils/logger";
@@ -35,6 +36,7 @@ import { scheduleTraceChecks } from "./collector/traceChecks";
 import { cleanupPII } from "./collector/cleanupPII";
 import { scoreSatisfactionFromInput } from "./collector/satisfaction";
 import crypto from "crypto";
+import type { ZodObject } from "zod";
 
 export const debug = getDebugger("langwatch:collector");
 
@@ -104,6 +106,9 @@ export default async function handler(
     return res.status(400).json({ message: "Bad request" });
   }
 
+  const spanFields = spanSchema.options.flatMap((option) =>
+    Object.keys(option.shape)
+  );
   let spans = (req.body as Record<string, any>).spans as Span[];
   spans.forEach((span) => {
     // We changed "id" to "span_id", but we still want to support "id" for retrocompatibility for a while
@@ -130,6 +135,12 @@ export default async function handler(
           ? { chunk_id: `${context.chunk_id as number}` }
           : {}),
       }));
+    }
+
+    for (const key of Object.keys(span)) {
+      if (!spanFields.includes(key)) {
+        delete (span as any)[key];
+      }
     }
   });
 
@@ -200,11 +211,6 @@ export default async function handler(
       inserted_at: Date.now(),
       updated_at: Date.now(),
     },
-    // TODO: test
-    raw_response:
-      "raw_response" in span && span.raw_response
-        ? JSON.stringify(span.raw_response)
-        : null,
   }));
 
   const [input, output] = await Promise.all([
