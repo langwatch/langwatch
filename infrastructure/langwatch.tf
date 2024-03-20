@@ -1,9 +1,9 @@
 locals {
-  tag         = data.external.git_tag.result["tag"]
+  tag         = data.external.langwatch_git_tag.result["tag"]
   secrets_map = jsondecode(data.aws_secretsmanager_secret_version.langwatch.secret_string)
 }
 
-data "external" "git_tag" {
+data "external" "langwatch_git_tag" {
   program = ["${path.root}/scripts/get_langwatch_sass_git_sha.sh"]
 }
 
@@ -71,18 +71,24 @@ resource "aws_ecs_task_definition" "langwatch" {
           awslogs-stream-prefix = "langwatch"
         }
       },
-      environment = [
+      environment = concat([
         for key, value in local.secrets_map : {
           name  = key
           value = value
         }
-      ],
+        ], [
+        {
+          name  = "LANGWATCH_NLP_SERVICE"
+          value = aws_lambda_function_url.langwatch_nlp[0].function_url
+        }
+      ]),
     },
   ])
 
   depends_on = [
-    null_resource.docker_image,
+    null_resource.langwatch_docker_image,
     aws_iam_role_policy_attachment.langwatch,
+    aws_lambda_function_url.langwatch_nlp,
   ]
 }
 
@@ -123,11 +129,7 @@ resource "aws_ecs_service" "langwatch_service" {
   ]
 }
 
-data "aws_caller_identity" "current" {}
-
-data "aws_region" "current" {}
-
-resource "null_resource" "docker_image" {
+resource "null_resource" "langwatch_docker_image" {
   count = module.variables.profile == "lw-prod" ? 1 : 0
 
   triggers = {
@@ -140,7 +142,9 @@ resource "null_resource" "docker_image" {
 
       echo "Building LangWatch..."
       cd ../
-      git submodule update --init
+      if [ ! -d "./langwatch" ] || [ ! "$(ls -A ./langwatch)" ]; then
+        git submodule update --init
+      fi
       secrets=$(aws secretsmanager --profile ${module.variables.profile} --region ${data.aws_region.current.name} get-secret-value --secret-id ${data.aws_secretsmanager_secret.langwatch.id} | jq -r '.SecretString')
       $(echo "$${secrets}" | jq -r "to_entries|map(\"export \(.key)='\(.value)'\")|.[]|select(contains(\"NEXT_PUBLIC\"))")
       npm ci && cd langwatch/langwatch && npm ci && cd -
@@ -365,7 +369,8 @@ resource "aws_acm_certificate" "cert" {
 }
 
 resource "aws_cloudwatch_log_group" "langwatch" {
-  name = "/ecs/langwatch"
+  name              = "/ecs/langwatch"
+  retention_in_days = 30
 }
 
 resource "aws_iam_role" "ecs_task_execution_role" {

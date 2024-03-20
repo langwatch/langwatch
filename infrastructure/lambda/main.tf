@@ -5,7 +5,6 @@ module "variables" {
 locals {
   evaluator_package     = var.evaluator_package
   environment_variables = var.environment_variables
-  zipped_lambda_package = "${path.root}/../langevals/dist/lambdas/${var.evaluator_package}.zip"
   tag                   = data.external.git_tag.result["tag"]
 }
 
@@ -30,8 +29,14 @@ resource "aws_lambda_function" "this" {
 
   depends_on = [
     aws_iam_role_policy_attachment.lambda,
-    null_resource.docker_image
+    null_resource.docker_image,
+    aws_cloudwatch_log_group.this
   ]
+}
+
+resource "aws_cloudwatch_log_group" "this" {
+  name              = "/aws/lambda/${local.evaluator_package}-evaluator-lambda"
+  retention_in_days = 30
 }
 
 data "aws_ecr_repository" "lambda_repository" {
