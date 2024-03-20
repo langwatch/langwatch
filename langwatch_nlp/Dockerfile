@@ -1,7 +1,6 @@
 FROM python:3.11-slim
 
-# Make directory for application
-WORKDIR /app
+WORKDIR /usr/src/app
 
 RUN pip install poetry
 
