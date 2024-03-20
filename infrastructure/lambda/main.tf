@@ -75,8 +75,19 @@ resource "null_resource" "docker_image" {
 
       echo "Building ${local.evaluator_package}..."
       aws ecr get-login-password --profile ${module.variables.profile} --region ${data.aws_region.current.name} | docker login --username AWS --password-stdin ${data.aws_caller_identity.current.account_id}.dkr.ecr.${data.aws_region.current.name}.amazonaws.com || true
+
+      set +e
+      last_tag=$(aws ecr --profile ${module.variables.profile} --region ${data.aws_region.current.name} describe-images --repository-name ${data.aws_ecr_repository.lambda_repository.name} \
+        --query 'sort_by(imageDetails,& imagePushedAt)[*].imageTags[0]' --output yaml \
+        | tail -n 1 | awk -F'- ' '{print $2}')
+      set -e
+      cache_from=""
+      if [ -n "$last_tag" ]; then
+        cache_from="--cache-from ${data.aws_ecr_repository.lambda_repository.name}:$last_tag"
+      fi
+
       cd ${path.root}/../langevals
-      docker build . --build-arg EVALUATOR=${local.evaluator_package} --platform="linux/amd64" -t ${data.aws_ecr_repository.lambda_repository.repository_url}:${local.tag}
+      docker build . --build-arg EVALUATOR=${local.evaluator_package} --platform="linux/amd64" $cache_from -t ${data.aws_ecr_repository.lambda_repository.repository_url}:${local.tag}
       docker push ${data.aws_ecr_repository.lambda_repository.repository_url}:${local.tag}
       cd -
     EOT

@@ -147,10 +147,18 @@ resource "null_resource" "docker_image" {
       npm run start:prepare
       npm run build
       aws ecr get-login-password --profile ${module.variables.profile} --region ${data.aws_region.current.name} | docker login --username AWS --password-stdin ${data.aws_caller_identity.current.account_id}.dkr.ecr.${data.aws_region.current.name}.amazonaws.com || true
-      last_tag=$(aws ecr --profile ${module.variables.profile} --region ${data.aws_region.current.name} describe-images --repository-name langwatch \
+
+      set +e
+      last_tag=$(aws ecr --profile ${module.variables.profile} --region ${data.aws_region.current.name} describe-images --repository-name ${aws_ecr_repository.langwatch.name} \
         --query 'sort_by(imageDetails,& imagePushedAt)[*].imageTags[0]' --output yaml \
         | tail -n 1 | awk -F'- ' '{print $2}')
-      docker build . --platform="linux/amd64" --cache-from ${data.aws_ecr_repository.langwatch.repository_url}:$last_tag -t ${data.aws_ecr_repository.langwatch.repository_url}:${local.tag}
+      set -e
+      cache_from=""
+      if [ -n "$last_tag" ]; then
+        cache_from="--cache-from ${aws_ecr_repository.langwatch.repository_url}:$last_tag"
+      fi
+
+      docker build . --platform="linux/amd64" $cache_from -t ${data.aws_ecr_repository.langwatch.repository_url}:${local.tag}
       docker push ${data.aws_ecr_repository.langwatch.repository_url}:${local.tag}
       cd -
     EOT
