@@ -1,15 +1,15 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
-from topic_clustering.build_response import build_response
-from topic_clustering.topic_naming import generate_topic_and_subtopic_names
-from topic_clustering.utils import calculate_centroid_and_distance
-from topic_clustering.constants import (
+from langwatch_nlp.topic_clustering.build_response import build_response
+from langwatch_nlp.topic_clustering.topic_naming import generate_topic_and_subtopic_names
+from langwatch_nlp.topic_clustering.utils import calculate_centroid_and_distance
+from langwatch_nlp.topic_clustering.constants import (
     COPHENETIC_DISTANCES_FOR_SUBTOPICS,
     COPHENETIC_DISTANCES_FOR_TOPICS,
     MINIMUM_SUBTOPICS_PER_TOPIC,
     MINIMUM_TRACES_PER_TOPIC,
 )
-from topic_clustering.types import TopicClusteringResponse, Trace
+from langwatch_nlp.topic_clustering.types import TopicClusteringResponse, Trace
 from scipy.cluster.hierarchy import linkage, fcluster
 
 

@@ -3,16 +3,16 @@ from fastapi import FastAPI
 
 import numpy as np
 from pydantic import BaseModel
-from topic_clustering.constants import (
+from langwatch_nlp.topic_clustering.constants import (
     COPHENETIC_DISTANCES_FOR_SUBTOPICS,
     COPHENETIC_DISTANCES_FOR_TOPICS,
     MINIMUM_UNASSIGNED_TRACES_TO_CREATE_NEW_SUBTOPIC,
     MINIMUM_UNASSIGNED_TRACES_TO_CREATE_NEW_TOPIC,
 )
-from topic_clustering.build_response import build_response
-from topic_clustering.topic_naming import generate_topic_and_subtopic_names
-from topic_clustering.batch_clustering import build_hierarchy
-from topic_clustering.types import (
+from langwatch_nlp.topic_clustering.build_response import build_response
+from langwatch_nlp.topic_clustering.topic_naming import generate_topic_and_subtopic_names
+from langwatch_nlp.topic_clustering.batch_clustering import build_hierarchy
+from langwatch_nlp.topic_clustering.types import (
     Money,
     Subtopic,
     Topic,

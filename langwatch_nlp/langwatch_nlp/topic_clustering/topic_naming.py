@@ -10,7 +10,7 @@ from typing import Iterable, TypeVar, Optional
 
 from tenacity import retry, stop_after_attempt, wait_exponential
 
-from topic_clustering.types import Money, Trace
+from langwatch_nlp.topic_clustering.types import Money, Trace
 from langchain_community.callbacks.openai_info import get_openai_token_cost_for_model
 
 T = TypeVar("T")

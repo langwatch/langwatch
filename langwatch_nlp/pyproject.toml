@@ -19,6 +19,7 @@ langchain-community = "^0.0.28"
 nanoid = "^2.0.0"
 python-dotenv = "^1.0.1"
 hypercorn = "^0.16.0"
+mangum = "^0.17.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.1.1"

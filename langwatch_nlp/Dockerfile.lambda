@@ -14,5 +14,5 @@ COPY . .
 
 EXPOSE 8080
 
-# Run the application
-CMD poetry run hypercorn langwatch_nlp.main:app --bind :8080
+ENTRYPOINT [ "/usr/local/bin/poetry", "run", "python", "-m", "awslambdaric" ]
+CMD [ "langwatch_nlp.main.handler" ]

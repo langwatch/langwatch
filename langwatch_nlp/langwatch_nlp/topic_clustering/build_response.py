@@ -1,10 +1,10 @@
 import nanoid
-from topic_clustering.constants import (
+from langwatch_nlp.topic_clustering.constants import (
     MINIMUM_SUBTOPICS_PER_TOPIC,
     MINIMUM_TRACES_PER_TOPIC,
 )
-from topic_clustering.utils import calculate_centroid_and_distance
-from topic_clustering.types import Subtopic, Topic, Trace, TraceTopicMap
+from langwatch_nlp.topic_clustering.utils import calculate_centroid_and_distance
+from langwatch_nlp.topic_clustering.types import Subtopic, Topic, Trace, TraceTopicMap
 
 
 def build_response(
