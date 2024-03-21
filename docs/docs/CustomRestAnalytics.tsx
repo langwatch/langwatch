@@ -4,23 +4,6 @@ import { langwatchEndpointEnv } from "./integration-guides/utils/langwatchEndpoi
 export const CustomRestAnalytics = ({ apiKey }: { apiKey?: string }) => {
   return (
     <div>
-      <h3>Prerequisites:</h3>
-      <ul>
-        <li>
-          Ensure you have <code>curl</code> installed on your system.
-        </li>
-      </ul>
-      <h3>Configuration:</h3>
-      <p>
-        Set the <code>LANGWATCH_API_KEY</code> environment variable in your
-        environment:
-      </p>
-      <RenderCode
-        code={`${langwatchEndpointEnv()}export LANGWATCH_API_KEY='${
-          apiKey ?? "your_api_key_here"
-        }'`}
-        language="bash"
-      />
       <h3>Usage:</h3>
       <p>
         You will need to obtain your JSON payload from the custom gragh section
@@ -44,7 +27,7 @@ export const CustomRestAnalytics = ({ apiKey }: { apiKey?: string }) => {
       <RenderCode
         code={`# Set your API key and endpoint URL
 API_KEY="${apiKey ?? "your_langwatch_api_key"}"
-ENDPOINT="https://app.langwatch.ai/api/collector"
+ENDPOINT="https://app.langwatch.ai/api/analytics"
 
 # Use curl to send the POST request, e.g.:
 curl -X POST "$ENDPOINT" \\
