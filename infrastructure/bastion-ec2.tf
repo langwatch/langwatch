@@ -13,11 +13,9 @@ resource "aws_instance" "bastion" {
 
     user_data = <<-EOF
               #!/bin/bash
-              yum update -y
-              yum install -y curl
-              echo "*/4 * * * * root curl -X GET https://app.langwatch.ai/api/start_workers" >> /etc/crontab
-              echo "0 0 * * * root curl -X GET https://app.langwatch.ai/api/schedule_topic_clustering" >> /etc/crontab
-              service crond restart
+              echo "*/4 * * * * root curl -X GET https://app.langwatch.ai/api/start_workers" | sudo tee -a /etc/crontab > /dev/null
+              echo "0 0 * * * root curl -X GET https://app.langwatch.ai/api/schedule_topic_clustering" | sudo tee -a /etc/crontab > /dev/null
+              sudo service crond restart
               EOF
 
   tags = {

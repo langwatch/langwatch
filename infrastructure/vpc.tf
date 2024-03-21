@@ -96,6 +96,27 @@ resource "aws_route_table_association" "private_subnet_2_association" {
   route_table_id = aws_route_table.private_route_table.id
 }
 
+# NatGW with EIP to Allow Egress from Private networks
+resource "aws_eip" "nat_eip" {
+  tags = {
+    Name = "nat-eip"
+  }
+}
+
+resource "aws_nat_gateway" "nat_gw" {
+  allocation_id = aws_eip.nat_eip.id
+  subnet_id     = aws_subnet.public_subnet_1.id
+  tags = {
+    Name = "main-nat-gw"
+  }
+}
+
+resource "aws_route" "private_route_to_nat" {
+  route_table_id         = aws_route_table.private_route_table.id
+  destination_cidr_block = "0.0.0.0/0"
+  nat_gateway_id         = aws_nat_gateway.nat_gw.id
+}
+
 # For VPC Endpoints
 resource "aws_security_group" "vpc_tls" {
   name_prefix = "main-vpc-tls-sg"
