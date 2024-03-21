@@ -21,3 +21,11 @@ data "aws_secretsmanager_secret" "langwatch_nlp" {
 data "aws_secretsmanager_secret_version" "langwatch_nlp" {
   secret_id = data.aws_secretsmanager_secret.langwatch_nlp.id
 }
+
+data "aws_secretsmanager_secret" "redis" {
+  name = "langwatch_redis"
+}
+
+data "aws_secretsmanager_secret_version" "redis" {
+  secret_id = data.aws_secretsmanager_secret.redis.id
+}

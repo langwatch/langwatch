@@ -80,6 +80,10 @@ resource "aws_ecs_task_definition" "langwatch" {
         {
           name  = "LANGWATCH_NLP_SERVICE"
           value = aws_lambda_function_url.langwatch_nlp[0].function_url
+        },
+        {
+          name = "REDIS_URL"
+          value = "redis://:${urlencode(jsondecode(data.aws_secretsmanager_secret_version.redis.secret_string)["password"])}@${aws_elasticache_replication_group.redis[0].primary_endpoint_address}:6379"
         }
       ]),
     },
@@ -106,7 +110,7 @@ resource "aws_ecs_service" "langwatch_service" {
 
   network_configuration {
     subnets          = [aws_subnet.public_subnet_1.id, aws_subnet.public_subnet_2.id]
-    security_groups  = [aws_security_group.alb_sg[0].id]
+    security_groups  = [aws_security_group.langwatch[0].id]
     assign_public_ip = true
   }
 
@@ -319,8 +323,35 @@ resource "aws_alb_target_group" "langwatch_green_tg" {
   }
 }
 
+resource "aws_security_group" "langwatch" {
+  count  = module.variables.profile == "lw-prod" ? 1 : 1
+  name   = "langwatch-app-sg"
+  vpc_id = aws_vpc.main.id
+
+  ingress {
+    description     = "HTTP from ALB and bastion ec2"
+    from_port       = 3000
+    to_port         = 3000
+    protocol        = "tcp"
+    security_groups = [aws_security_group.alb_sg[0].id, aws_security_group.bation-ec2.id]
+  }
+
+  egress {
+    description      = "Allow Egress"
+    from_port        = 0
+    to_port          = 0
+    protocol         = -1
+    cidr_blocks      = ["0.0.0.0/0"]
+    ipv6_cidr_blocks = ["::/0"]
+  }
+
+  tags = {
+    Name = "Langwatch app sg"
+  }
+}
+
 resource "aws_security_group" "alb_sg" {
-  count       = module.variables.profile == "lw-prod" ? 1 : 0
+  count       = module.variables.profile == "lw-prod" ? 1 : 1
   name        = "langwatch-alb-sg"
   description = "Allow web access to alb"
   vpc_id      = aws_vpc.main.id
