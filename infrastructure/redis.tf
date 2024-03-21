@@ -23,7 +23,7 @@ resource "aws_security_group" "redis" {
     from_port       = 6379
     to_port         = 6379
     protocol        = "tcp"
-    security_groups = [aws_security_group.langwatch[0].id]
+    security_groups = [aws_security_group.langwatch[0].id, aws_security_group.bation-ec2.id]
   }
 
   tags = {
@@ -53,18 +53,10 @@ resource "aws_elasticache_replication_group" "redis" {
   transit_encryption_enabled = true
   at_rest_encryption_enabled = true
 
-  auth_token                 = random_password.redis.result
-  auth_token_update_strategy = "SET"
-
+  auth_token                 = jsondecode(data.aws_secretsmanager_secret_version.redis.secret_string)["password"]
+  auth_token_update_strategy = "ROTATE"
 
   tags = {
     Name = "langwatch-redis-cluster"
   }
 }
-
-# random password
-resource "random_password" "redis" {
-  length  = 16
-  special = true
-}
-

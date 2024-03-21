@@ -1,6 +1,8 @@
 .git
+*/**/.git
 node_modules
 */**/node_modules
+.venv
 */**/.venv
 .github
 .next

@@ -7,7 +7,7 @@ resource "aws_db_instance" "langwatch" {
   instance_class              = "db.t4g.micro"
   parameter_group_name        = "default.mysql8.0"
   db_subnet_group_name        = aws_db_subnet_group.langwatch.name
-  vpc_security_group_ids      = [aws_security_group.langwatch_db_sg.id]
+  vpc_security_group_ids      = [aws_security_group.langwatch-mysql.id]
   final_snapshot_identifier   = "langwatch-mysql-db-final-snapshot"
   publicly_accessible         = false
   backup_retention_period     = 7

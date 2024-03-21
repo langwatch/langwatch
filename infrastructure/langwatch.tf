@@ -80,6 +80,10 @@ resource "aws_ecs_task_definition" "langwatch" {
         {
           name  = "LANGWATCH_NLP_SERVICE"
           value = aws_lambda_function_url.langwatch_nlp[0].function_url
+        },
+        {
+          name = "REDIS_URL"
+          value = "redis://:${urlencode(jsondecode(data.aws_secretsmanager_secret_version.redis.secret_string)["password"])}@${aws_elasticache_replication_group.redis[0].primary_endpoint_address}:6379"
         }
       ]),
     },

@@ -29,12 +29,12 @@ resource "aws_iam_access_key" "comprehend_user_key" {
   user = aws_iam_user.comprehend_user.name
 }
 
-output "aws_access_key_id" {
+output "aws_comprehend_access_key_id" {
   value     = aws_iam_access_key.comprehend_user_key.id
   sensitive = true
 }
 
-output "aws_secret_access_key" {
+output "aws_comprehend_secret_access_key" {
   value     = aws_iam_access_key.comprehend_user_key.secret
   sensitive = true
 }
