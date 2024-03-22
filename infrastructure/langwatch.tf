@@ -153,7 +153,7 @@ resource "null_resource" "langwatch_docker_image" {
       $(echo "$${secrets}" | jq -r "to_entries|map(\"export \(.key)='\(.value)'\")|.[]|select(contains(\"NEXT_PUBLIC\"))")
       npm ci && cd langwatch/langwatch && npm ci && cd -
       npm run start:prepare
-      npm run build
+      npm run build || exit 1
       aws ecr get-login-password --profile ${module.variables.profile} --region ${data.aws_region.current.name} | docker login --username AWS --password-stdin ${data.aws_caller_identity.current.account_id}.dkr.ecr.${data.aws_region.current.name}.amazonaws.com || true
 
       set +e
