@@ -96,6 +96,8 @@ resource "null_resource" "docker_image" {
       docker push ${data.aws_ecr_repository.lambda_repository.repository_url}:${local.tag}
       cd -
     EOT
+
+    on_failure = fail
   }
 
   depends_on = [aws_ecr_repository.lambda_repository]

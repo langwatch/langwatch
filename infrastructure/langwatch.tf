@@ -82,7 +82,7 @@ resource "aws_ecs_task_definition" "langwatch" {
           value = aws_lambda_function_url.langwatch_nlp[0].function_url
         },
         {
-          name = "REDIS_URL"
+          name  = "REDIS_URL"
           value = "redis://:${urlencode(jsondecode(data.aws_secretsmanager_secret_version.redis.secret_string)["password"])}@${aws_elasticache_replication_group.redis[0].primary_endpoint_address}:6379"
         }
       ]),
@@ -153,7 +153,7 @@ resource "null_resource" "langwatch_docker_image" {
       $(echo "$${secrets}" | jq -r "to_entries|map(\"export \(.key)='\(.value)'\")|.[]|select(contains(\"NEXT_PUBLIC\"))")
       npm ci && cd langwatch/langwatch && npm ci && cd -
       npm run start:prepare
-      npm run build || exit 1
+      npm run build
       aws ecr get-login-password --profile ${module.variables.profile} --region ${data.aws_region.current.name} | docker login --username AWS --password-stdin ${data.aws_caller_identity.current.account_id}.dkr.ecr.${data.aws_region.current.name}.amazonaws.com || true
 
       set +e
@@ -170,6 +170,8 @@ resource "null_resource" "langwatch_docker_image" {
       docker push ${data.aws_ecr_repository.langwatch.repository_url}:${local.tag}
       cd -
     EOT
+
+    on_failure = fail
   }
 
   depends_on = [aws_ecr_repository.langwatch]

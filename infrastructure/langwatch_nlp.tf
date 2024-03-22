@@ -83,6 +83,8 @@ resource "null_resource" "langwatch_nlp_docker_image" {
       docker push ${data.aws_ecr_repository.langwatch_nlp.repository_url}:${local.langwatch_nlp_tag}
       cd -
     EOT
+
+    on_failure = fail
   }
 
   depends_on = [aws_ecr_repository.langwatch_nlp]
