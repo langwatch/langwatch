@@ -282,7 +282,7 @@ export const incrementalClustering = async (
     name: topic.name,
     centroid: topic.centroid as number[],
     p95_distance: topic.p95Distance,
-    parent_id: topic.parentId as string,
+    parent_id: topic.parentId!,
   }));
 
   const clusteringResult = await fetchTopicsIncrementalClustering(projectId, {

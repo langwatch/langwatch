@@ -36,7 +36,6 @@ import { scheduleTraceChecks } from "./collector/traceChecks";
 import { cleanupPII } from "./collector/cleanupPII";
 import { scoreSatisfactionFromInput } from "./collector/satisfaction";
 import crypto from "crypto";
-import type { ZodObject } from "zod";
 
 export const debug = getDebugger("langwatch:collector");
 

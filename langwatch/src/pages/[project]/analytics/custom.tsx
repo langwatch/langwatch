@@ -28,8 +28,6 @@ import {
   Text,
   VStack,
   useTheme,
-  useToast,
-  Link,
   useDisclosure,
   Modal,
   ModalBody,
@@ -40,7 +38,6 @@ import {
   ModalOverlay,
   Textarea,
 } from "@chakra-ui/react";
-import { CheckCircleIcon } from "@chakra-ui/icons";
 
 import {
   Select as MultiSelect,
@@ -52,7 +49,6 @@ import {
   useState,
   type Dispatch,
   type SetStateAction,
-  use,
 } from "react";
 import {
   AlignLeft,
@@ -119,7 +115,6 @@ import {
 import { useRouter } from "next/router";
 import { useDevView } from "~/hooks/DevViewProvider";
 import { useFilterParams } from "~/hooks/useFilterParams";
-import { set } from "nprogress";
 
 export interface CustomGraphFormData {
   title?: string;
@@ -142,7 +137,7 @@ export interface CustomGraphFormData {
       aggregation: PipelineAggregationTypes;
     };
   }[];
-  groupBy: FlattenAnalyticsGroupsEnum | "";
+  groupBy?: FlattenAnalyticsGroupsEnum;
   includePrevious: boolean;
   timeScale: "full" | number;
   connected?: boolean;
@@ -162,11 +157,11 @@ export interface CustomAPICAllData {
       aggregation: PipelineAggregationTypes;
     };
   }[];
-  groupBy: FlattenAnalyticsGroupsEnum | "";
+  groupBy?: FlattenAnalyticsGroupsEnum;
   timeScale: "full" | number;
 }
 
-const chartOptions: CustomGraphFormData["graphType"][] = [
+const chartOptions: Required<CustomGraphFormData>["graphType"][] = [
   {
     label: "Summary",
     value: "summary",
@@ -240,7 +235,7 @@ const defaultValues: CustomGraphFormData = {
       },
     },
   ],
-  groupBy: "",
+  groupBy: undefined,
   timeScale: 1,
   includePrevious: true,
 };
@@ -249,7 +244,7 @@ export default function AnalyticsCustomGraph() {
   const jsonModal = useDisclosure();
   const apiModal = useDisclosure();
   const { isDevViewEnabled } = useDevView();
-  const { filterParams, queryOpts } = useFilterParams();
+  const { filterParams } = useFilterParams();
   const form = useForm<CustomGraphFormData>({
     defaultValues,
   });
@@ -417,7 +412,7 @@ const customGraphFormToCustomGraphInput = (
         subkey: series.subkey,
       };
     }),
-    groupBy: formData.groupBy || undefined,
+    groupBy: formData.groupBy ?? undefined,
     includePrevious: formData.includePrevious,
     timeScale: formData.timeScale,
     connected: formData.connected,
@@ -442,7 +437,7 @@ const customAPIinput = (
   return {
     startDate: filterParams.startDate,
     endDate: filterParams.endDate,
-    filters: filterParams.filters,
+    // filters: filterParams.filters,
     series: formData.series.map((series) => {
       if (series.pipeline.field) {
         return {
@@ -459,8 +454,8 @@ const customAPIinput = (
         key: series.key,
         subkey: series.subkey,
       };
-    }),
-    groupBy: formData.groupBy || undefined,
+    }) as CustomAPICAllData["series"],
+    groupBy: formData.groupBy ?? undefined,
     timeScale: formData.timeScale,
   };
 };
@@ -512,7 +507,7 @@ function CustomGraphForm({
     addNewGraph.mutate(
       {
         projectId: project?.id ?? "",
-        name: graphName,
+        name: graphName ?? "",
         graph: JSON.stringify(graphJson),
       },
       {
@@ -529,7 +524,7 @@ function CustomGraphForm({
         <FormLabel>Graph Type</FormLabel>
         <GraphTypeField form={form} />
       </FormControl>
-      {!summaryGraphTypes.includes(graphType.value) && (
+      {(!graphType || !summaryGraphTypes.includes(graphType.value)) && (
         <FormControl>
           <FormLabel>Time Scale</FormLabel>
 
@@ -546,7 +541,7 @@ function CustomGraphForm({
           </Select>
         </FormControl>
       )}
-      {graphType.value === "scatter" && (
+      {graphType?.value === "scatter" && (
         <FormControl>
           <Controller
             control={form.control}
@@ -639,7 +634,7 @@ function CustomGraphForm({
           ))}
         </Select>
       </FormControl>
-      {!summaryGraphTypes.includes(graphType.value) && (
+      {(!graphType || !summaryGraphTypes.includes(graphType.value)) && (
         <FormControl>
           <Controller
             control={form.control}

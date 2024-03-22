@@ -25,7 +25,6 @@ import { TopTopics } from "~/components/analytics/TopTopics";
 import { FilterSidebar } from "~/components/filters/FilterSidebar";
 import {
   FilterToggle,
-  useFilterToggle,
 } from "~/components/filters/FilterToggle";
 
 const threadsPerTopic = {
