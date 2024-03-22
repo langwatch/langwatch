@@ -9,7 +9,7 @@ resource "aws_db_instance" "langwatch" {
   db_subnet_group_name        = aws_db_subnet_group.langwatch.name
   vpc_security_group_ids      = [aws_security_group.langwatch-mysql.id]
   final_snapshot_identifier   = "langwatch-mysql-db-final-snapshot"
-  publicly_accessible         = false
+  publicly_accessible         = module.variables.profile == "lw-dev" ? true : false
   backup_retention_period     = 7
   backup_window               = "00:00-04:00"
   maintenance_window          = "Sun:04:00-Sun:06:00"
@@ -20,8 +20,11 @@ resource "aws_db_instance" "langwatch" {
 }
 
 resource "aws_db_subnet_group" "langwatch" {
-  name       = "langwatch-mysql-db-subnet-group"
-  subnet_ids = [aws_subnet.private_subnet_1.id, aws_subnet.private_subnet_2.id]
+  name = "langwatch-mysql-db-subnet-group"
+  subnet_ids = (module.variables.profile == "lw-dev" ?
+    [aws_subnet.public_subnet_1.id, aws_subnet.public_subnet_2.id] :
+    [aws_subnet.private_subnet_1.id, aws_subnet.private_subnet_2.id]
+  )
 }
 
 resource "aws_security_group" "langwatch-mysql" {
@@ -34,6 +37,7 @@ resource "aws_security_group" "langwatch-mysql" {
     to_port         = 3306
     protocol        = "tcp"
     security_groups = [aws_security_group.langwatch[0].id, aws_security_group.bation-ec2.id]
+    cidr_blocks     = module.variables.profile == "lw-dev" ? ["0.0.0.0/0"] : []
   }
 
   egress {

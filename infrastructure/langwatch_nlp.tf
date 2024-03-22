@@ -50,6 +50,7 @@ resource "aws_lambda_function_url" "langwatch_nlp" {
 }
 
 data "aws_lambda_function_url" "langwatch_nlp" {
+  count         = module.variables.profile == "lw-prod" ? 1 : 0
   function_name = aws_lambda_function_url.langwatch_nlp[0].function_name
 }
 

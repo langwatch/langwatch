@@ -137,7 +137,7 @@ resource "aws_security_group" "vpc_tls" {
 }
 
 module "endpoints" {
-  count = module.variables.profile == "lw-prod" ? 1 : 1
+  count = module.variables.profile == "lw-prod" ? 1 : 0
 
   source = "terraform-aws-modules/vpc/aws//modules/vpc-endpoints"
 

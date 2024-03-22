@@ -5,5 +5,5 @@ output "region" {
 
 output "profile" {
   description = "profile to be used for AWS"
-  value       = "lw-prod"
+  value       = "lw-dev"
 }

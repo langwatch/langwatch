@@ -1,21 +1,21 @@
 terraform {
   required_version = ">=1.7.4"
 
-  backend "s3" {
-    bucket = "langwatch-terraform"
-    key    = "langwatch-state"
-
-    profile = "lw-root-tf"
-    region  = "eu-central-1"
-  }
-
   # backend "s3" {
-  #   bucket = "langwatch-terraform-dev"
+  #   bucket = "langwatch-terraform"
   #   key    = "langwatch-state"
 
-  #   profile = "lw-dev"
+  #   profile = "lw-root-tf"
   #   region  = "eu-central-1"
   # }
+
+  backend "s3" {
+    bucket = "langwatch-terraform-dev"
+    key    = "langwatch-state"
+
+    profile = "lw-dev"
+    region  = "eu-central-1"
+  }
 
   required_providers {
     aws = {

@@ -10,20 +10,21 @@ resource "aws_security_group" "redis" {
   name   = "redis-sg"
   vpc_id = aws_vpc.main.id
 
-  # Ingress rule allowing all traffic from the ECS Security Group
-  egress {
-    from_port       = 0
-    to_port         = 0
-    protocol        = "-1" # This signifies all protocols
-    security_groups = [aws_security_group.langwatch[0].id]
-  }
-
   # Ingress rule allowing Redis port from the ECS Security Group
   ingress {
     from_port       = 6379
     to_port         = 6379
     protocol        = "tcp"
     security_groups = [aws_security_group.langwatch[0].id, aws_security_group.bation-ec2.id]
+    cidr_blocks     = module.variables.profile == "lw-dev" ? ["0.0.0.0/0"] : []
+  }
+
+  # Ingress rule allowing all traffic from the ECS Security Group
+  egress {
+    from_port       = 0
+    to_port         = 0
+    protocol        = "-1" # This signifies all protocols
+    security_groups = [aws_security_group.langwatch[0].id]
   }
 
   tags = {
@@ -34,7 +35,10 @@ resource "aws_security_group" "redis" {
 resource "aws_elasticache_subnet_group" "redis" {
   name        = "langwatch-redis-subnet-group"
   description = "Subnet group for ElastiCache Redis"
-  subnet_ids  = [aws_subnet.private_subnet_1.id, aws_subnet.private_subnet_2.id]
+  subnet_ids = (module.variables.profile == "lw-dev" ?
+    [aws_subnet.public_subnet_1.id, aws_subnet.public_subnet_2.id] :
+    [aws_subnet.private_subnet_1.id, aws_subnet.private_subnet_2.id]
+  )
 }
 
 resource "aws_elasticache_replication_group" "redis" {
