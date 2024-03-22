@@ -1,53 +1,12 @@
-import { DlpServiceClient } from "@google-cloud/dlp";
 import { env } from "../../../env.mjs";
 import type { ElasticSearchSpan, Trace } from "../../../server/tracer/types";
 import { getDebugger } from "../../../utils/logger";
-import type { google } from "@google-cloud/dlp/build/protos/protos";
-import type { Evaluators } from "../../../trace_checks/evaluators.generated";
+import {
+  ComprehendClient,
+  DetectPiiEntitiesCommand,
+} from "@aws-sdk/client-comprehend";
 
 const debug = getDebugger("langwatch:trace_checks:piiCheck");
-
-// Instantiates a client using the environment variable
-const credentials = env.GOOGLE_CREDENTIALS_JSON
-  ? JSON.parse(env.GOOGLE_CREDENTIALS_JSON)
-  : undefined;
-const dlp = new DlpServiceClient({ credentials });
-
-const infoTypesMap: Record<
-  keyof Evaluators["google_cloud/dlp_pii_detection"]["settings"]["info_types"],
-  string
-> = {
-  phone_number: "PHONE_NUMBER",
-  email_address: "EMAIL_ADDRESS",
-  credit_card_number: "CREDIT_CARD_NUMBER",
-  iban_code: "IBAN_CODE",
-  ip_address: "IP_ADDRESS",
-  passport: "PASSPORT",
-  vat_number: "VAT_NUMBER",
-  medical_record_number: "MEDICAL_RECORD_NUMBER",
-};
-
-const dlpCheck = async (
-  text: string
-): Promise<google.privacy.dlp.v2.IFinding[] | null | undefined> => {
-  const [response] = await dlp.inspectContent({
-    parent: `projects/${credentials.project_id}/locations/global`,
-    inspectConfig: {
-      infoTypes: Object.values(infoTypesMap).map((name) => ({ name })),
-      minLikelihood: "POSSIBLE",
-      limits: {
-        maxFindingsPerRequest: 0, // (0 = server maximum)
-      },
-      // Whether to include the matching string
-      includeQuote: true,
-    },
-    item: {
-      value: text,
-    },
-  });
-
-  return response.result?.findings;
-};
 
 export const runPiiCheck = async (
   trace: Trace,
@@ -55,26 +14,33 @@ export const runPiiCheck = async (
   enforced = true
 ): Promise<{
   quotes: string[];
-  traceFindings: google.privacy.dlp.v2.IFinding[];
-  spansFindings: google.privacy.dlp.v2.IFinding[];
 }> => {
-  if (!credentials) {
+  const accessKeyId = env.AWS_COMPREHEND_ACCESS_KEY_ID;
+  const secretKey = env.AWS_COMPREHEND_SECRET_ACCESS_KEY;
+
+  if (!accessKeyId || !secretKey) {
     if (enforced) {
       throw new Error(
-        "GOOGLE_CREDENTIALS_JSON is not set, PII check cannot be performed"
+        "AWS_COMPREHEND_ACCESS_KEY_ID and AWS_COMPREHEND_SECRET_ACCESS_KEY are not set, PII check cannot be performed"
       );
     }
     console.warn(
-      "WARNING: GOOGLE_CREDENTIALS_JSON is not set, so PII check will not be performed, you are risking storing PII on the database, please set GOOGLE_CREDENTIALS_JSON if you wish to avoid that, this will fail in production by default"
+      "WARNING: AWS_COMPREHEND_ACCESS_KEY_ID and AWS_COMPREHEND_SECRET_ACCESS_KEY are not set, so PII check will not be performed, you are risking storing PII on the database, please set them if you wish to avoid that, this will fail in production by default"
     );
     return {
       quotes: [],
-      traceFindings: [],
-      spansFindings: [],
     };
   }
 
   debug("Checking PII for trace", trace.trace_id);
+
+  const comprehend = new ComprehendClient({
+    region: "eu-central-1",
+    credentials: {
+      accessKeyId,
+      secretAccessKey: secretKey,
+    },
+  });
 
   const traceText = [
     trace.input.value,
@@ -86,22 +52,50 @@ export const runPiiCheck = async (
     .flatMap((span) =>
       [span.input?.value ?? "", span.error?.message ?? ""]
         .concat(span.outputs.map((x) => x.value))
+        .concat(
+          (span.contexts ?? []).flatMap((x) => {
+            if (Array.isArray(x)) {
+              return x;
+            }
+
+            if (typeof x.content === "object") {
+              return Object.entries(x.content);
+            }
+
+            return [x.content];
+          })
+        )
         .concat(span.error?.stacktrace ?? [])
     )
     .join("\n\n");
 
-  const traceFindings = (await dlpCheck(traceText)) ?? [];
-  const spansFindings = (spansText ? await dlpCheck(spansText) : []) ?? [];
-  const allFindings = traceFindings.concat(spansFindings);
+  const piiCheck = async (text: string) => {
+    const result = await comprehend.send(
+      new DetectPiiEntitiesCommand({
+        Text: text,
+        LanguageCode: "en",
+      })
+    );
 
-  const quotes = allFindings.map((finding) => finding.quote!).filter((x) => x);
-  for (const finding of allFindings) {
-    finding.quote = "REDACTED"; // prevent storing quote in ES
-  }
+    return result.Entities ?? [];
+  };
+
+  const traceOffsetFindings = (await piiCheck(traceText)) ?? [];
+  const spansOffsetFindings =
+    (spansText ? await piiCheck(spansText) : []) ?? [];
+
+  const traceQuotes = traceOffsetFindings.map((finding) => {
+    const start = finding.BeginOffset;
+    const end = finding.EndOffset;
+    return traceText.slice(start, end);
+  });
+  const spanQuotes = spansOffsetFindings.map((finding) => {
+    const start = finding.BeginOffset;
+    const end = finding.EndOffset;
+    return spansText.slice(start, end);
+  });
 
   return {
-    quotes,
-    traceFindings,
-    spansFindings,
+    quotes: traceQuotes.concat(spanQuotes),
   };
 };

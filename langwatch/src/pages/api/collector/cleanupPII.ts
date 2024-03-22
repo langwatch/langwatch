@@ -49,6 +49,27 @@ export const cleanupPII = async (
             ) ?? "";
         }
       }
+      if (span.contexts) {
+        for (const context of span.contexts) {
+          if (Array.isArray(context.content)) {
+            // eslint-disable-next-line @typescript-eslint/no-for-in-array
+            for (const contextIndex in context.content) {
+              context.content[contextIndex] = context.content[
+                contextIndex
+              ].replace(quote, "[REDACTED]");
+            }
+          } else if (typeof context.content === "object") {
+            for (const key in context.content) {
+              context.content[key] = context.content[key].replace(
+                quote,
+                "[REDACTED]"
+              );
+            }
+          } else {
+            context.content = context.content.replace(quote, "[REDACTED]");
+          }
+        }
+      }
     }
   }
 };

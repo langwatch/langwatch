@@ -15,8 +15,6 @@ describe("PIICheck", () => {
     const response = await runPiiCheck(sampleTrace, []);
     expect(response).toEqual({
       quotes: [],
-      traceFindings: [],
-      spansFindings: [],
     });
 
     const samplePIITrace: Trace = {
@@ -30,7 +28,7 @@ describe("PIICheck", () => {
       timestamps: { started_at: Date.now(), inserted_at: Date.now() },
     };
 
-    const findings = (await runPiiCheck(samplePIITrace, [])).traceFindings;
-    expect(findings[0]?.infoType?.name).toBe("CREDIT_CARD_NUMBER");
+    const quotes = (await runPiiCheck(samplePIITrace, [])).quotes;
+    expect(quotes).toEqual(["4012-8888-8888-1881"]);
   });
 });

@@ -284,19 +284,19 @@ describe("Collector API Endpoint", () => {
     expect(indexedRagSpan).toMatchObject({
       input: {
         type: "text",
-        value: '"What is the capital of France?"',
+        value: '"What is the capital of [REDACTED]?"',
       },
       outputs: [
         {
           type: "text",
-          value: '"The capital of France is Paris."',
+          value: '"The capital of [REDACTED] is [REDACTED]."',
         },
       ],
       contexts: [
-        { document_id: "context-1", content: "France is a country in Europe." },
+        { document_id: "context-1", content: "[REDACTED] is a country in Europe." },
         {
           document_id: "context-2",
-          content: "Paris is the capital of France.",
+          content: "[REDACTED] is the capital of [REDACTED].",
         },
       ],
       project_id: project?.id,
@@ -370,14 +370,97 @@ describe("Collector API Endpoint", () => {
     expect(indexedRagSpan.contexts).toMatchObject([
       {
         document_id: expect.any(String),
-        content: "France is a country in Europe.",
+        content: "[REDACTED] is a country in Europe.",
       },
       {
         document_id: expect.any(String),
-        content: "Paris is the capital of France.",
+        content: "[REDACTED] is the capital of [REDACTED].",
       },
     ]);
   });
 
-  // TODO: add a PII cleanup test
+  test("cleans up PII", async () => {
+    const traceData: CollectorRESTParams = {
+      trace_id: sampleSpan.trace_id,
+      spans: [
+        {
+          ...sampleSpan,
+          input: {
+            type: "chat_messages",
+            value: [
+              { role: "system", content: "you are a helpful assistant" },
+              {
+                role: "user",
+                content:
+                  "hey there, my email is foé at bar dot com, please check it for me",
+              },
+            ],
+          },
+        },
+      ],
+      metadata: {
+        thread_id: "thread_test-thread_1",
+        user_id: "user_test-user_1",
+        customer_id: "customer_test-customer_1",
+        labels: ["test-label-1.0.0"],
+      },
+    };
+
+    const { req, res }: { req: NextApiRequest; res: NextApiResponse } =
+      createMocks({
+        method: "POST",
+        headers: {
+          "X-Auth-Token": project?.apiKey,
+        },
+        body: traceData,
+      });
+
+    await handler(req, res);
+    expect(res.statusCode).toBe(200);
+
+    const indexedSpan = await esClient.getSource<ElasticSearchSpan>({
+      index: SPAN_INDEX,
+      id: spanIndexId({
+        spanId: sampleSpan.span_id,
+        projectId: project?.id ?? "",
+      }),
+      routing: traceIndexId({
+        traceId: sampleSpan.trace_id,
+        projectId: project?.id ?? "",
+      }),
+    });
+
+    expect(indexedSpan).toMatchObject({
+      input: {
+        type: "chat_messages",
+        value: JSON.stringify([
+          { role: "system", content: "you are a helpful assistant" },
+          {
+            role: "user",
+            content:
+              "hey there, my email is [REDACTED], please check it for me",
+          },
+        ]),
+      },
+    });
+
+    const indexedTrace = await esClient.getSource<Trace>({
+      index: TRACE_INDEX,
+      id: traceIndexId({
+        traceId: sampleSpan.trace_id,
+        projectId: project?.id ?? "",
+      }),
+    });
+
+    expect(indexedTrace).toMatchObject({
+      input: {
+        value: "hey there, my email is [REDACTED], please check it for me",
+        satisfaction_score: expect.any(Number),
+        embeddings: {
+          embeddings: expect.any(Array),
+          model: DEFAULT_EMBEDDINGS_MODEL,
+        },
+      },
+    });
+  });
 });
