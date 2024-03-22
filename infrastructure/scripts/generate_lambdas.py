@@ -80,6 +80,11 @@ def main():
     lambdas_tf += f"""
             resource "aws_api_gateway_deployment" "this" {{
                 count = module.variables.profile == "lw-prod" ? 1 : 0
+
+                triggers = {{
+                    redeployment = sha1(jsonencode(aws_api_gateway_rest_api.this.body))
+                }}
+
                 depends_on = [
                     {", ".join(depends_on)}
                 ]
