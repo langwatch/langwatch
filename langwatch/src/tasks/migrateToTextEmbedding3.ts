@@ -1,3 +1,7 @@
+import type {
+  QueryDslBoolQuery,
+  QueryDslQueryContainer,
+} from "@elastic/elasticsearch/lib/api/types";
 import { TRACE_INDEX, esClient } from "../server/elasticsearch";
 import { getOpenAIEmbeddings } from "../server/embeddings";
 
@@ -14,19 +18,18 @@ const migrateIndex = async (index: string) => {
       },
       body: {
         query: {
-          //@ts-ignore
           bool: {
             must: {
               exists: {
                 field: "input.value",
               },
-            },
+            } as QueryDslQueryContainer,
             must_not: {
               term: {
                 "input.embeddings.model": "text-embedding-3-small",
               },
-            },
-          },
+            } as QueryDslQueryContainer,
+          } as QueryDslBoolQuery,
         },
         size: 500,
         sort: ["_doc"],
@@ -35,7 +38,11 @@ const migrateIndex = async (index: string) => {
     });
     const results = response.hits.hits;
     searchAfter = results[results.length - 1]?.sort;
-    process.stdout.write(`\nFetched ${results.length} more hits from ${(response as any).hits.total.value} total\n`);
+    process.stdout.write(
+      `\nFetched ${results.length} more hits from ${
+        (response as any).hits.total.value
+      } total\n`
+    );
 
     let inputEmbeddings: (
       | { model: string; embeddings: number[] }
@@ -138,9 +145,7 @@ const migrateIndex = async (index: string) => {
         },
       });
 
-      process.stdout.write(
-        `\r${i + 1}/${results.length} being updated`
-      );
+      process.stdout.write(`\r${i + 1}/${results.length} being updated`);
 
       if (bulkActions.length >= 400) {
         try {

@@ -1,3 +1,4 @@
+import type { QueryDslBoolQuery, QueryDslQueryContainer } from "@elastic/elasticsearch/lib/api/types";
 import { prisma } from "../server/db";
 import { TRACE_CHECKS_INDEX, esClient } from "../server/elasticsearch";
 
@@ -14,14 +15,13 @@ const migrateIndex = async (index: string) => {
       },
       body: {
         query: {
-          //@ts-ignore
           bool: {
             must: {
               term: {
                 check_type: "ragas_context_precision",
               },
-            },
-          },
+            } as QueryDslQueryContainer,
+          } as QueryDslBoolQuery,
         },
         size: 500,
         sort: ["_doc"],

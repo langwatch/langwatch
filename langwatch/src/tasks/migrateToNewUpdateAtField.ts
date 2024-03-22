@@ -1,3 +1,7 @@
+import type {
+  QueryDslBoolQuery,
+  QueryDslQueryContainer,
+} from "@elastic/elasticsearch/lib/api/types";
 import {
   EVENTS_INDEX,
   SPAN_INDEX,
@@ -20,14 +24,13 @@ const migrateIndex = async (index: string) => {
       },
       body: {
         query: {
-          //@ts-ignore
           bool: {
             must_not: {
               exists: {
                 field: "timestamps.updated_at",
               },
-            },
-          },
+            } as QueryDslQueryContainer,
+          } as QueryDslBoolQuery,
         },
         size: 5_000,
         sort: ["_doc"],
