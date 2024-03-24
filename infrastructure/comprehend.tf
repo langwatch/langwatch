@@ -12,6 +12,7 @@ resource "aws_iam_policy" "comprehend_policy" {
       {
         "Effect" : "Allow",
         "Action" : [
+          "comprehend:ContainsPiiEntities",
           "comprehend:DetectPiiEntities"
         ],
         "Resource" : "*"

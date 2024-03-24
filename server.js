@@ -1,6 +1,6 @@
 require("dotenv").config();
 
-process.env.NEXTJS_DIST_DIR = process.env.NEXTJS_DIST_DIR || ".next-sass";
+process.env.NEXTJS_DIST_DIR = process.env.NEXTJS_DIST_DIR || ".next-saas";
 process.env.DEPENDENCY_INJECTION_DIR = `${__dirname}/src/injection/`;
 process.env.EXTRA_INCLUDE = `${__dirname}/src`;
 
