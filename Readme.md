@@ -2,15 +2,22 @@
 
 1. Find the .env file on 1password and copy it here
 
-2. Clone the git submodules `git submodule update --init`
+2. Install redis and start it up:
 
-3. Run `node -v` and make sure you have NodeJS v20 installed (use nvm to manage versions)
+    ```
+    brew install redis
+    brew services start redis
+    ```
 
-4. `npm install`
+3. Clone the git submodules `git submodule update --init`
 
-5. `npm run start:prepare`
+4. Run `node -v` and make sure you have NodeJS v20 installed (use nvm to manage versions)
 
-6. `npm run dev`
+5. `npm install`
+
+6. `npm run start:prepare`
+
+7. `npm run dev`
 
 # Connection to Production MySQL and Redis
 

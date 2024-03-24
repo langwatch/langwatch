@@ -42,7 +42,7 @@ resource "aws_elasticache_subnet_group" "redis" {
 }
 
 resource "aws_elasticache_replication_group" "redis" {
-  count = module.variables.profile == "lw-prod" ? 1 : 1
+  count = module.variables.profile == "lw-prod" ? 1 : 0
 
   replication_group_id = "langwatch-redis-replication-group"
   description          = "langwatch-redis-replication-group"
