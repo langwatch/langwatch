@@ -3,6 +3,7 @@ import type { ElasticSearchSpan, Trace } from "../../../server/tracer/types";
 import { getDebugger } from "../../../utils/logger";
 import {
   ComprehendClient,
+  ContainsPiiEntitiesCommand,
   DetectPiiEntitiesCommand,
 } from "@aws-sdk/client-comprehend";
 
@@ -70,6 +71,17 @@ export const runPiiCheck = async (
     .join("\n\n");
 
   const piiCheck = async (text: string) => {
+    const contains = await comprehend.send(
+      new ContainsPiiEntitiesCommand({
+        Text: text,
+        LanguageCode: "en",
+      })
+    );
+
+    if (contains.Labels?.length == 0) {
+      return [];
+    }
+
     const result = await comprehend.send(
       new DetectPiiEntitiesCommand({
         Text: text,
