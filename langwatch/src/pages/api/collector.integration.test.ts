@@ -392,7 +392,7 @@ describe("Collector API Endpoint", () => {
               {
                 role: "user",
                 content:
-                  "hey there, my email is foé at bar dot com, please check it for me",
+                  "hey there, my email is foo@bar.com, please check it for me",
               },
             ],
           },

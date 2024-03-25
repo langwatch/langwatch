@@ -1,13 +1,55 @@
 import { env } from "../../../env.mjs";
 import type { ElasticSearchSpan, Trace } from "../../../server/tracer/types";
 import { getDebugger } from "../../../utils/logger";
-import {
-  ComprehendClient,
-  ContainsPiiEntitiesCommand,
-  DetectPiiEntitiesCommand,
-} from "@aws-sdk/client-comprehend";
+import { DlpServiceClient } from "@google-cloud/dlp";
+import type { Evaluators } from "../../../trace_checks/evaluators.generated";
 
 const debug = getDebugger("langwatch:trace_checks:piiCheck");
+
+// Instantiates a client using the environment variable
+const credentials = env.GOOGLE_CREDENTIALS_JSON
+  ? JSON.parse(env.GOOGLE_CREDENTIALS_JSON)
+  : undefined;
+const dlp = new DlpServiceClient({ credentials });
+
+const infoTypesMap: Record<string, string> = {
+  first_name: "FIRST_NAME",
+  last_name: "LAST_NAME",
+  person_name: "PERSON_NAME",
+  dob: "DATE_OF_BIRTH",
+  location: "LOCATION",
+  street_address: "STREET_ADDRESS",
+  phone_number: "PHONE_NUMBER",
+  email_address: "EMAIL_ADDRESS",
+  credit_card_number: "CREDIT_CARD_NUMBER",
+  iban_code: "IBAN_CODE",
+  ip_address: "IP_ADDRESS",
+  passport: "PASSPORT",
+  vat_number: "VAT_NUMBER",
+  medical_record_number: "MEDICAL_RECORD_NUMBER",
+};
+
+const dlpCheck = async (text: string): Promise<string[]> => {
+  const [response] = await dlp.inspectContent({
+    parent: `projects/${credentials.project_id}/locations/global`,
+    inspectConfig: {
+      infoTypes: Object.values(infoTypesMap).map((name) => ({ name })),
+      minLikelihood: "POSSIBLE",
+      limits: {
+        maxFindingsPerRequest: 0, // (0 = server maximum)
+      },
+      // Whether to include the matching string
+      includeQuote: true,
+    },
+    item: {
+      value: text,
+    },
+  });
+
+  return (
+    response.result?.findings?.flatMap((x) => (x.quote ? [x.quote] : [])) ?? []
+  );
+};
 
 export const runPiiCheck = async (
   trace: Trace,
@@ -16,17 +58,14 @@ export const runPiiCheck = async (
 ): Promise<{
   quotes: string[];
 }> => {
-  const accessKeyId = env.AWS_COMPREHEND_ACCESS_KEY_ID;
-  const secretKey = env.AWS_COMPREHEND_SECRET_ACCESS_KEY;
-
-  if (!accessKeyId || !secretKey) {
+  if (!credentials) {
     if (enforced) {
       throw new Error(
-        "AWS_COMPREHEND_ACCESS_KEY_ID and AWS_COMPREHEND_SECRET_ACCESS_KEY are not set, PII check cannot be performed"
+        "GOOGLE_CREDENTIALS_JSON is not set, PII check cannot be performed"
       );
     }
     console.warn(
-      "WARNING: AWS_COMPREHEND_ACCESS_KEY_ID and AWS_COMPREHEND_SECRET_ACCESS_KEY are not set, so PII check will not be performed, you are risking storing PII on the database, please set them if you wish to avoid that, this will fail in production by default"
+      "WARNING: GOOGLE_CREDENTIALS_JSON is not set, so PII check will not be performed, you are risking storing PII on the database, please set them if you wish to avoid that, this will fail in production by default"
     );
     return {
       quotes: [],
@@ -34,14 +73,6 @@ export const runPiiCheck = async (
   }
 
   debug("Checking PII for trace", trace.trace_id);
-
-  const comprehend = new ComprehendClient({
-    region: "eu-central-1",
-    credentials: {
-      accessKeyId,
-      secretAccessKey: secretKey,
-    },
-  });
 
   const traceText = [
     trace.input.value,
@@ -70,44 +101,10 @@ export const runPiiCheck = async (
     )
     .join("\n\n");
 
-  const piiCheck = async (text: string) => {
-    const contains = await comprehend.send(
-      new ContainsPiiEntitiesCommand({
-        Text: text,
-        LanguageCode: "en",
-      })
-    );
-
-    if (contains.Labels?.length == 0) {
-      return [];
-    }
-
-    const result = await comprehend.send(
-      new DetectPiiEntitiesCommand({
-        Text: text,
-        LanguageCode: "en",
-      })
-    );
-
-    return result.Entities ?? [];
-  };
-
-  const traceOffsetFindings = (await piiCheck(traceText)) ?? [];
-  const spansOffsetFindings =
-    (spansText ? await piiCheck(spansText) : []) ?? [];
-
-  const traceQuotes = traceOffsetFindings.map((finding) => {
-    const start = finding.BeginOffset;
-    const end = finding.EndOffset;
-    return traceText.slice(start, end);
-  });
-  const spanQuotes = spansOffsetFindings.map((finding) => {
-    const start = finding.BeginOffset;
-    const end = finding.EndOffset;
-    return spansText.slice(start, end);
-  });
+  const traceQuotes = (await dlpCheck(traceText)) ?? [];
+  const spansQuotes = (spansText ? await dlpCheck(spansText) : []) ?? [];
 
   return {
-    quotes: traceQuotes.concat(spanQuotes),
+    quotes: traceQuotes.concat(spansQuotes),
   };
 };

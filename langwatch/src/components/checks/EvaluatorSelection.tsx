@@ -40,7 +40,8 @@ export function EvaluatorSelection({
   const availableEvaluators = Object.entries(AVAILABLE_EVALUATORS).filter(
     ([key, evaluator]) =>
       !evaluator.requiredFields.includes("expected_output") &&
-      !key.startsWith("example/")
+      !key.startsWith("example/") &&
+      key !== "aws/comprehend_pii_detection"
   );
 
   const categories: Category[] = ["safety", "quality", "custom"];
