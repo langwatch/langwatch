@@ -10,14 +10,14 @@ import {
   pipelineAggregationsToElasticSearch,
   type FlattenAnalyticsGroupsEnum,
   type SeriesInputType,
-} from "../../../analytics/registry";
-import { type ApiConfig } from "../../../analytics/types";
-import { prisma } from "../../../db";
-import { TRACES_PIVOT_INDEX, esClient } from "../../../elasticsearch";
+} from "./registry";
+import { type ApiConfig } from "./types";
+import { prisma } from "../db";
+import { TRACES_PIVOT_INDEX, esClient } from "../elasticsearch";
 import {
   currentVsPreviousDates,
   generateTracesPivotQueryConditions,
-} from "./common";
+} from "../api/routers/analytics/common";
 
 const labelsMapping: Partial<
   Record<

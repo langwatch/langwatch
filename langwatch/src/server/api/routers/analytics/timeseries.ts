@@ -5,7 +5,7 @@ import {
 } from "../../../analytics/types";
 import { TeamRoleGroup, checkUserPermissionForProject } from "../../permission";
 import { protectedProcedure } from "../../trpc";
-import { timeseries } from "./timeseriesHelpers";
+import { timeseries } from "../../../analytics/timeseries";
 
 export const getTimeseries = protectedProcedure
   .input(sharedFiltersInputSchema.extend(timeseriesInput.shape))

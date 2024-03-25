@@ -14,7 +14,7 @@ import {
   type ApiConfig,
   type SharedFiltersInput,
 } from "../../server/analytics/types";
-import { timeseries } from "../../server/api/routers/analytics/timeseriesHelpers";
+import { timeseries } from "../../server/analytics/timeseries";
 
 export const debug = getDebugger("langwatch:collector");
 
