@@ -1,16 +1,11 @@
 import { timeseriesInput } from "../../../analytics/registry";
-import {
-  sharedFiltersInputSchema,
-  type ApiConfig,
-} from "../../../analytics/types";
+import { timeseries } from "../../../analytics/timeseries";
 import { TeamRoleGroup, checkUserPermissionForProject } from "../../permission";
 import { protectedProcedure } from "../../trpc";
-import { timeseries } from "../../../analytics/timeseries";
 
 export const getTimeseries = protectedProcedure
-  .input(sharedFiltersInputSchema.extend(timeseriesInput.shape))
+  .input(timeseriesInput)
   .use(checkUserPermissionForProject(TeamRoleGroup.ANALYTICS_VIEW))
   .query(async ({ input }) => {
-    const apiConfig: ApiConfig = "TRPC";
-    return timeseries(input, apiConfig);
+    return timeseries(input);
   });

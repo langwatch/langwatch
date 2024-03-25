@@ -143,7 +143,3 @@ export type TracesPivot = {
     event_details: { key: string; value: string }[];
   })[];
 };
-
-export const apiType = z.enum(["TRPC", "REST"]);
-
-export type ApiConfig = z.infer<typeof apiType>;

@@ -5,16 +5,13 @@ import { prisma } from "../../server/db"; // Adjust the import based on your set
 import { getDebugger } from "../../utils/logger";
 
 import {
-  timeseriesInput,
-  type SeriesInputType,
+  timeseriesSeriesInput,
+  type TimeseriesInputType,
 } from "../../server/analytics/registry";
 
-import {
-  sharedFiltersInputSchema,
-  type ApiConfig,
-  type SharedFiltersInput,
-} from "../../server/analytics/types";
+import { sharedFiltersInputSchema } from "../../server/analytics/types";
 import { timeseries } from "../../server/analytics/timeseries";
+import { TRPCError } from "@trpc/server";
 
 export const debug = getDebugger("langwatch:collector");
 
@@ -49,24 +46,28 @@ export default async function handler(
   const input = req.body;
   input.projectId = project.id;
 
-  type ApiAnalyticsType = SeriesInputType | SharedFiltersInput;
-
-  let params: ApiAnalyticsType;
+  let params: TimeseriesInputType;
   try {
     params = sharedFiltersInputSchema
-      .extend(timeseriesInput.shape)
+      .extend(timeseriesSeriesInput.shape)
       .parse(input);
   } catch (error) {
     const validationError = fromZodError(error as ZodError);
-    return res.status(400).json({ error: validationError.toString() });
+    return res.status(400).json({ error: validationError.message });
   }
 
-  const apiConfig: ApiConfig = "REST";
-  const timeseriesResult = await timeseries(params, apiConfig);
+  try {
+    const timeseriesResult = await timeseries(params);
 
-  if ("code" in timeseriesResult && timeseriesResult.code) {
-    return res.status(400).json(timeseriesResult);
+    return res.status(200).json(timeseriesResult);
+  } catch (e) {
+    if (e instanceof TRPCError && e.code === "BAD_REQUEST") {
+      return res.status(400).json({
+        code: e.code,
+        message: e.message,
+      });
+    } else {
+      throw e;
+    }
   }
-
-  return res.status(200).json(timeseriesResult);
 }

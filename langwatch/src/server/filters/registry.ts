@@ -370,7 +370,7 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
     },
   },
   "trace_checks.check_id": {
-    name: "Guardrail",
+    name: "Contains Evaluation",
     urlKey: "check_id",
     query: (values) => ({
       nested: {

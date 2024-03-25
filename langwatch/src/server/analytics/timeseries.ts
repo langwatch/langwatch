@@ -4,14 +4,17 @@ import type {
 } from "@elastic/elasticsearch/lib/api/types";
 import type { SearchRequest } from "@elastic/elasticsearch/lib/api/typesWithBodyKey";
 import { TRPCError } from "@trpc/server";
-import { getGroup, getMetric } from "~/server/analytics/registry";
+import {
+  getGroup,
+  getMetric,
+  type TimeseriesInputType,
+} from "~/server/analytics/registry";
 import {
   analyticsPipelines,
   pipelineAggregationsToElasticSearch,
   type FlattenAnalyticsGroupsEnum,
   type SeriesInputType,
 } from "./registry";
-import { type ApiConfig } from "./types";
 import { prisma } from "../db";
 import { TRACES_PIVOT_INDEX, esClient } from "../elasticsearch";
 import {
@@ -42,7 +45,7 @@ const labelsMapping: Partial<
   },
 };
 
-export const timeseries = async (input: any, apiConfig: ApiConfig) => {
+export const timeseries = async (input: TimeseriesInputType) => {
   const { previousPeriodStartDate, startDate, endDate, daysDifference } =
     currentVsPreviousDates(
       input,
@@ -56,30 +59,16 @@ export const timeseries = async (input: any, apiConfig: ApiConfig) => {
         const metric_ = getMetric(metric);
 
         if (metric_.requiresKey && !metric_.requiresKey.optional && !key) {
-          if (apiConfig === "TRPC") {
-            throw new TRPCError({
-              code: "BAD_REQUEST",
-              message: `Metric ${metric} requires a key to be defined`,
-            });
-          } else if (apiConfig === "REST") {
-            return {
-              code: "BAD_REQUEST",
-              message: `Metric ${metric} requires a key to be defined`,
-            };
-          }
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: `Metric ${metric} requires a key to be defined`,
+          });
         }
         if (metric_.requiresSubkey && !subkey) {
-          if (apiConfig === "TRPC") {
-            throw new TRPCError({
-              code: "BAD_REQUEST",
-              message: `Metric ${metric} requires a key to be defined`,
-            });
-          } else if (apiConfig === "REST") {
-            return {
-              code: "BAD_REQUEST",
-              message: `Metric ${metric} requires a key to be defined`,
-            };
-          }
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: `Metric ${metric} requires a subkey to be defined`,
+          });
         }
 
         const metricAggregations = metric_.aggregation(
@@ -131,11 +120,10 @@ export const timeseries = async (input: any, apiConfig: ApiConfig) => {
   if (input.groupBy) {
     const group = getGroup(input.groupBy);
     aggs = group.aggregation(aggs);
-    if (labelsMapping[input.groupBy as keyof typeof labelsMapping]) {
-      // Add type assertion here
-      groupLabelsMapping = await labelsMapping[
-        input.groupBy as keyof typeof labelsMapping
-      ]?.(input.projectId);
+    if (labelsMapping[input.groupBy]) {
+      groupLabelsMapping = await labelsMapping[input.groupBy]?.(
+        input.projectId
+      );
     }
   }
 

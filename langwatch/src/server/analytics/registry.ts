@@ -14,6 +14,7 @@ import {
   type PercentileAggregationTypes,
   type PipelineAggregationTypes,
   type PipelineFields,
+  sharedFiltersInputSchema,
 } from "./types";
 
 const simpleFieldAnalytics = (
@@ -910,10 +911,16 @@ export const seriesInput = z.object({
 
 export type SeriesInputType = z.infer<typeof seriesInput>;
 
-export const timeseriesInput = z.object({
+export const timeseriesSeriesInput = z.object({
   series: z.array(seriesInput),
   groupBy: z.optional(z.enum(flattenAnalyticsGroupsEnum)),
   timeScale: z.optional(z.union([z.literal("full"), z.number().int()])),
 });
+
+export type TimeseriesSeriesInputType = z.infer<typeof timeseriesSeriesInput>;
+
+export const timeseriesInput = sharedFiltersInputSchema.extend(
+  timeseriesSeriesInput.shape
+);
 
 export type TimeseriesInputType = z.infer<typeof timeseriesInput>;

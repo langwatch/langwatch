@@ -68,7 +68,11 @@ import {
 } from "react-hook-form";
 import { useDebounceValue } from "usehooks-ts";
 import { DashboardLayout } from "../../../components/DashboardLayout";
-import { FilterToggle } from "../../../components/filters/FilterToggle";
+import {
+  FilterToggle,
+  useFilterToggle,
+} from "../../../components/filters/FilterToggle";
+import { FilterSidebar } from "../../../components/filters/FilterSidebar";
 import {
   PeriodSelector,
   usePeriodSelector,
@@ -96,6 +100,7 @@ import type {
   AnalyticsMetric,
   PipelineAggregationTypes,
   PipelineFields,
+  SharedFiltersInput,
 } from "../../../server/analytics/types";
 import type { FilterField } from "../../../server/filters/types";
 import { api } from "../../../utils/api";
@@ -138,9 +143,7 @@ export interface CustomGraphFormData {
   connected?: boolean;
 }
 
-export interface CustomAPICAllData {
-  startDate: Date;
-  endDate: Date;
+export type CustomAPICallData = Omit<SharedFiltersInput, "projectId"> & {
   series: {
     name: string;
     metric: FlattenAnalyticsMetricsEnum;
@@ -154,7 +157,7 @@ export interface CustomAPICAllData {
   }[];
   groupBy?: FlattenAnalyticsGroupsEnum;
   timeScale: "full" | number;
-}
+};
 
 const chartOptions: Required<CustomGraphFormData>["graphType"][] = [
   {
@@ -251,12 +254,13 @@ export default function AnalyticsCustomGraph() {
     period: { startDate, endDate },
     setPeriod,
   } = usePeriodSelector();
+  const { showFilters } = useFilterToggle();
 
   const formData = JSON.stringify(form.watch() ?? {});
   const [debouncedCustomGraphInput, setDebouncedCustomGraphInput] =
     useDebounceValue<CustomGraphInput | undefined>(undefined, 400);
   const [debouncedCustomAPIInput, setDebouncedCustomAPIInput] =
-    useDebounceValue<CustomAPICAllData | undefined>(undefined, 400);
+    useDebounceValue<CustomAPICallData | undefined>(undefined, 400);
 
   useEffect(() => {
     const customGraphInput = customGraphFormToCustomGraphInput(
@@ -295,7 +299,7 @@ export default function AnalyticsCustomGraph() {
             />
           </HStack>
           <HStack width="full" align="start" minHeight="500px" spacing={8}>
-            <Card minWidth="540px" minHeight="560px">
+            <Card minWidth="480px" minHeight="560px">
               <CardBody>
                 <CustomGraphForm form={form} seriesFields={seriesFields} />
               </CardBody>
@@ -330,6 +334,7 @@ export default function AnalyticsCustomGraph() {
                 )}
               </CardBody>
             </Card>
+            {showFilters && <FilterSidebar hideTopics={true} />}
           </HStack>
         </VStack>
       </Container>
@@ -417,8 +422,8 @@ const customGraphFormToCustomGraphInput = (
 
 const customAPIinput = (
   formData: CustomGraphFormData,
-  filterParams: any
-): CustomAPICAllData | undefined => {
+  filterParams: SharedFiltersInput
+): CustomAPICallData | undefined => {
   for (const series of formData.series) {
     const metric = getMetric(series.metric);
     if (metric.requiresKey && !metric.requiresKey.optional && !series.key) {
@@ -432,7 +437,7 @@ const customAPIinput = (
   return {
     startDate: filterParams.startDate,
     endDate: filterParams.endDate,
-    // filters: filterParams.filters,
+    filters: filterParams.filters,
     series: formData.series.map((series) => {
       if (series.pipeline.field) {
         return {
@@ -449,7 +454,7 @@ const customAPIinput = (
         key: series.key,
         subkey: series.subkey,
       };
-    }) as CustomAPICAllData["series"],
+    }) as CustomAPICallData["series"],
     groupBy: formData.groupBy === "" ? undefined : formData.groupBy,
     timeScale: formData.timeScale,
   };

@@ -36,6 +36,8 @@ import { scheduleTraceChecks } from "./collector/traceChecks";
 import { cleanupPII } from "./collector/cleanupPII";
 import { scoreSatisfactionFromInput } from "./collector/satisfaction";
 import crypto from "crypto";
+import type { ZodError } from "zod";
+import { fromZodError } from "zod-validation-error";
 
 export const debug = getDebugger("langwatch:collector");
 
@@ -90,7 +92,9 @@ export default async function handler(
       JSON.stringify(req.body, null, "  ")
     );
     Sentry.captureException(error);
-    return res.status(400).json({ error: "Invalid trace format." });
+
+    const validationError = fromZodError(error as ZodError);
+    return res.status(400).json({ error: validationError.message });
   }
 
   const { trace_id: nullableTraceId } = params;
@@ -102,7 +106,12 @@ export default async function handler(
   } = params.metadata ?? {};
 
   if (!req.body.spans) {
-    return res.status(400).json({ message: "Bad request" });
+    return res.status(400).json({ message: "Missing 'spans' field" });
+  }
+  if (!Array.isArray(req.body.spans)) {
+    return res
+      .status(400)
+      .json({ message: "Invalid 'spans' field, expecting array" });
   }
 
   const spanFields = spanSchema.options.flatMap((option) =>
@@ -163,7 +172,9 @@ export default async function handler(
     } catch (error) {
       debug("Invalid span received", error, JSON.stringify(span, null, "  "));
       Sentry.captureException(error);
-      return res.status(400).json({ error: "Invalid span format." });
+
+      const validationError = fromZodError(error as ZodError);
+      return res.status(400).json({ error: validationError.message });
     }
 
     if (

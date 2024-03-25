@@ -39,7 +39,7 @@ import { useGetRotatingColorForCharts } from "../../hooks/useGetRotatingColorFor
 import {
   getGroup,
   getMetric,
-  type timeseriesInput,
+  type timeseriesSeriesInput,
 } from "../../server/analytics/registry";
 import type { AppRouter } from "../../server/api/root";
 import { api } from "../../utils/api";
@@ -49,7 +49,7 @@ import type { Unpacked } from "../../utils/types";
 import { SummaryMetric } from "./SummaryMetric";
 import { useFilterParams } from "../../hooks/useFilterParams";
 
-type Series = Unpacked<z.infer<typeof timeseriesInput>["series"]> & {
+type Series = Unpacked<z.infer<typeof timeseriesSeriesInput>["series"]> & {
   name: string;
   colorSet: RotatingColorSet;
 };
@@ -71,7 +71,7 @@ export type CustomGraphInput = {
     | "donnut"
     | "summary";
   series: Series[];
-  groupBy?: z.infer<typeof timeseriesInput>["groupBy"];
+  groupBy?: z.infer<typeof timeseriesSeriesInput>["groupBy"];
   includePrevious: boolean;
   timeScale: "full" | number;
   connected?: boolean;
