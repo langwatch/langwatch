@@ -166,7 +166,7 @@ export default async function handler(
       .json({ message: "All spans must have the same trace id" });
   }
 
-  for (const span of spans) {
+  spans.forEach((span, index) => {
     try {
       spanValidatorSchema.parse(span);
     } catch (error) {
@@ -174,7 +174,9 @@ export default async function handler(
       Sentry.captureException(error);
 
       const validationError = fromZodError(error as ZodError);
-      return res.status(400).json({ error: validationError.message });
+      return res
+        .status(400)
+        .json({ error: validationError.message + ` at "spans[${index}]"` });
     }
 
     if (
@@ -196,7 +198,7 @@ export default async function handler(
           "Timestamps should be in milliseconds not in seconds, please multiply it by 1000",
       });
     }
-  }
+  });
 
   const paramsMD5 = crypto
     .createHash("md5")

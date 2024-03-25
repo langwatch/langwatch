@@ -1,12 +1,13 @@
 import * as Sentry from "@sentry/nextjs";
 import { nanoid } from "nanoid";
 import { type NextApiRequest, type NextApiResponse } from "next";
-import { z } from "zod";
+import { ZodError, z } from "zod";
 import { trackEventsQueue } from "../../server/background/queues/trackEventsQueue";
 import { prisma } from "../../server/db"; // Adjust the import based on your setup
 import { type TrackEventRESTParamsValidator } from "../../server/tracer/types";
 import { trackEventRESTParamsValidatorSchema } from "../../server/tracer/types.generated";
 import { getDebugger } from "../../utils/logger";
+import { fromZodError } from "zod-validation-error";
 
 const thumbsUpDownSchema = z.object({
   trace_id: z.string(),
@@ -87,7 +88,8 @@ export default async function handler(
       JSON.stringify(req.body, null, "  ")
     );
     Sentry.captureException(error);
-    return res.status(400).json({ error: "Invalid event format." });
+    const validationError = fromZodError(error as ZodError);
+    return res.status(400).json({ error: validationError.message });
   }
 
   if (predefinedEventTypes.includes(req.body.event_type)) {
@@ -100,7 +102,8 @@ export default async function handler(
         JSON.stringify(req.body, null, "  ")
       );
       Sentry.captureException(error);
-      return res.status(400).json({ error: "Invalid event format." });
+      const validationError = fromZodError(error as ZodError);
+      return res.status(400).json({ error: validationError.message });
     }
   }
 
@@ -111,7 +114,11 @@ export default async function handler(
     {
       project_id: project.id,
       postpone_count: 0,
-      event: { ...body, event_id: eventId, timestamp: body.timestamp ?? Date.now() },
+      event: {
+        ...body,
+        event_id: eventId,
+        timestamp: body.timestamp ?? Date.now(),
+      },
     },
     {
       jobId: `track_event_${eventId}`,
