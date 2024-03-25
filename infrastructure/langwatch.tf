@@ -403,7 +403,7 @@ resource "aws_acm_certificate" "cert" {
 
 resource "aws_cloudwatch_log_group" "langwatch" {
   name              = "/ecs/langwatch"
-  retention_in_days = 30
+  retention_in_days = 365
 }
 
 resource "aws_iam_role" "ecs_task_execution_role" {

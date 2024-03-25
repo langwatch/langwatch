@@ -36,7 +36,7 @@ resource "aws_lambda_function" "this" {
 
 resource "aws_cloudwatch_log_group" "this" {
   name              = "/aws/lambda/${local.evaluator_package}-evaluator-lambda"
-  retention_in_days = 30
+  retention_in_days = 365
 }
 
 data "aws_ecr_repository" "lambda_repository" {

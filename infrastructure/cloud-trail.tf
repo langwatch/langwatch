@@ -19,13 +19,17 @@ resource "aws_s3_bucket_lifecycle_configuration" "cloudtrail-logs" {
 
     status = "Enabled"
 
+    expiration {
+      days = 5 * 365
+    }
+
     transition {
-      days          = 90
+      days          = 365
       storage_class = "STANDARD_IA"
     }
 
     transition {
-      days          = 180
+      days          = 2 * 365
       storage_class = "GLACIER"
     }
   }
