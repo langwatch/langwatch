@@ -11,7 +11,7 @@ resource "aws_instance" "bastion" {
   iam_instance_profile   = aws_iam_instance_profile.bastion.name
   vpc_security_group_ids = [aws_security_group.bation-ec2.id, aws_security_group.vpc_tls.id]
 
-    user_data = <<-EOF
+  user_data = <<-EOF
               #!/bin/bash
               echo "*/4 * * * * root curl -X GET https://app.langwatch.ai/api/start_workers" | sudo tee -a /etc/crontab > /dev/null
               echo "0 0 * * * root curl -X GET https://app.langwatch.ai/api/schedule_topic_clustering" | sudo tee -a /etc/crontab > /dev/null

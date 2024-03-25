@@ -29,8 +29,8 @@
 aws ssm start-session --region eu-central-1 --target i-00a6de26faec3abcd --document-name AWS-StartPortForwardingSessionToRemoteHost --parameters host="langwatch-mysql.cfu2ksege2c2.eu-central-1.rds.amazonaws.com",portNumber="3306",localPortNumber="3306"  --profile lw-prod
 ```
 
-4. Run the following one for redis:
+4. Run the following one for redis (we use port 6378 localy to not conflict with the locally running redis):
 
 ```shell
-aws ssm start-session --region eu-central-1 --target i-00a6de26faec3abcd  --document-name AWS-StartPortForwardingSessionToRemoteHost --parameters host="master.langwatch-redis-replication-group.ulyeig.euc1.cache.amazonaws.com",portNumber="6379",localPortNumber="6379"  --profile lw-prod
+aws ssm start-session --region eu-central-1 --target i-00a6de26faec3abcd  --document-name AWS-StartPortForwardingSessionToRemoteHost --parameters host="master.langwatch-redis-replication-group.ulyeig.euc1.cache.amazonaws.com",portNumber="6379",localPortNumber="6378"  --profile lw-prod
 ```
