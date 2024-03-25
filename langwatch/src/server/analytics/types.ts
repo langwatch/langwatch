@@ -105,7 +105,13 @@ export const sharedFiltersInputSchema = z.object({
   projectId: z.string(),
   startDate: z.number(),
   endDate: z.number(),
-  filters: z.record(filterFieldsEnum, z.array(z.string())),
+  filters: z.record(
+    filterFieldsEnum,
+    z.object({
+      values: z.array(z.string()),
+      key: z.string().optional(),
+    })
+  ),
 });
 
 export type SharedFiltersInput = z.infer<typeof sharedFiltersInputSchema>;

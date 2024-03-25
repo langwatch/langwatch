@@ -19,7 +19,7 @@ export const dataForFilter = protectedProcedure
   .query(async ({ input }) => {
     const { projectId, field, key } = input;
 
-    if (availableFilters[field].listMatch.requiresKey && !key) {
+    if (availableFilters[field].requiresKey && !key) {
       throw new TRPCError({
         code: "BAD_REQUEST",
         message: `Field ${field} requires a key to be defined`,

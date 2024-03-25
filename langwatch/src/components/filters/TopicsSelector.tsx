@@ -42,11 +42,14 @@ export function TopicsSelector() {
       ...filterParams,
       filters: {
         ...filterParams.filters,
-        "topics.topics": [],
-        "topics.subtopics": [],
+        "topics.topics": { values: [] },
+        "topics.subtopics": { values: [] },
       },
     },
-    queryOpts
+    {
+      ...queryOpts,
+      keepPreviousData: true,
+    }
   );
 
   const handleTopicChange = (topicId: string, isChecked: boolean) => {

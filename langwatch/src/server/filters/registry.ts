@@ -1,3 +1,7 @@
+import type {
+  QueryDslBoolQuery,
+  QueryDslQueryContainer,
+} from "@elastic/elasticsearch/lib/api/types";
 import {
   AVAILABLE_EVALUATORS,
   type EvaluatorTypes,
@@ -445,6 +449,80 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
       },
     },
   },
+  "trace_checks.passed": {
+    name: "Evaluation Passed",
+    urlKey: "evaluation_passed",
+    single: true,
+    requiresKey: {
+      filter: "trace_checks.check_id",
+    },
+    query: (values, key) => ({
+      nested: {
+        path: "trace_checks",
+        query: {
+          bool: {
+            must: [
+              {
+                term: {
+                  "trace_checks.check_id": key,
+                },
+              },
+              {
+                terms: {
+                  "trace_checks.passed": values.map(
+                    (value) => value === "true" || value === "1"
+                  ),
+                },
+              },
+            ] as QueryDslQueryContainer[],
+          } as QueryDslBoolQuery,
+        },
+      },
+    }),
+    listMatch: {
+      aggregation: (query, key) => ({
+        unique_values: {
+          nested: { path: "trace_checks" },
+          aggs: {
+            child: {
+              filter: {
+                term: { "trace_checks.check_id": key },
+              },
+              aggs: {
+                child: {
+                  terms: {
+                    field: "trace_checks.passed",
+                  },
+                  aggs: {
+                    child: {
+                      filter: query
+                        ? {
+                            term: {
+                              "trace_checks.passed": query === "true",
+                            },
+                          }
+                        : {
+                            match_all: {},
+                          },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      }),
+      extract: (result: Record<string, any>) => {
+        return (
+          result.unique_values?.child?.child?.buckets?.map((bucket: any) => ({
+            field: bucket.key,
+            label: bucket.key ? "Passed" : "Failed",
+            count: bucket.doc_count,
+          })) ?? []
+        );
+      },
+    },
+  },
   "events.event_type": {
     name: "Event",
     urlKey: "event_type",
@@ -501,6 +579,9 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
   "events.metrics.key": {
     name: "Metric",
     urlKey: "event_metric",
+    requiresKey: {
+      filter: "events.event_type",
+    },
     query: (values) => ({
       nested: {
         path: "events.metrics",
@@ -515,7 +596,6 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
       },
     }),
     listMatch: {
-      requiresKey: true,
       aggregation: (query, key) => ({
         unique_values: {
           nested: { path: "events" },
@@ -576,6 +656,9 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
   "events.event_details.key": {
     name: "Event Detail",
     urlKey: "event_detail",
+    requiresKey: {
+      filter: "events.event_type",
+    },
     query: (values) => ({
       nested: {
         path: "events.event_details",
@@ -590,7 +673,6 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
       },
     }),
     listMatch: {
-      requiresKey: true,
       aggregation: (query, key) => ({
         unique_values: {
           nested: { path: "events" },

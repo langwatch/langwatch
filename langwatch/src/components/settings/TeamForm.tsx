@@ -40,6 +40,7 @@ import {
   type TeamUserRoleForm,
 } from "./TeamUserRoleField";
 import { TeamProjectsList } from "../../pages/settings/projects";
+import React from "react";
 
 export type TeamFormData = {
   name: string;
@@ -185,21 +186,13 @@ export const TeamForm = ({
                                   }
                                   hideSelectedOptions={false}
                                   useBasicStyles
-                                  components={{
-                                    SelectContainer: ({
-                                      children,
-                                      ...props
-                                    }) => (
-                                      <chakraComponents.SelectContainer
-                                        {...props}
-                                        innerProps={{
-                                          ...props.innerProps,
-                                          style: { width: "100%" },
-                                        }}
-                                      >
-                                        {children}
-                                      </chakraComponents.SelectContainer>
-                                    ),
+                                  chakraStyles={{
+                                    container: (base) => ({
+                                      ...base,
+                                      background: "white",
+                                      width: "100%",
+                                      borderRadius: "5px",
+                                    }),
                                   }}
                                 />
                               )}

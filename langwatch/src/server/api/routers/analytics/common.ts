@@ -7,6 +7,7 @@ import { type z } from "zod";
 import { type sharedFiltersInputSchema } from "../../../analytics/types";
 import { availableFilters } from "../../../filters/registry";
 import type { FilterField } from "../../../filters/types";
+import { TRPCError } from "@trpc/server";
 
 const getDaysDifference = (startDate: Date, endDate: Date) =>
   differenceInCalendarDays(endDate, startDate) + 1;
@@ -43,10 +44,18 @@ export const generateTracesPivotQueryConditions = ({
       : endDate;
 
   const filterConditions: QueryDslQueryContainer[] = [];
-  for (const [key, values] of Object.entries(filters)) {
+  for (const [field, { values, key }] of Object.entries(filters)) {
     if (values.length > 0) {
-      const filter = availableFilters[key as FilterField];
-      filterConditions.push(filter.query(values));
+      const filter = availableFilters[field as FilterField];
+
+      if (filter.requiresKey && !key) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: `Filter '${field}' requires a '${filter.requiresKey.filter}' key to be defined`,
+        });
+      }
+
+      filterConditions.push(filter.query(values, key));
     }
   }
 

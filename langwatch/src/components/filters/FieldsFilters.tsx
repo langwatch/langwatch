@@ -4,6 +4,7 @@ import {
   FormLabel,
   HStack,
   Heading,
+  Spacer,
   Text,
   VStack,
 } from "@chakra-ui/react";
@@ -11,6 +12,7 @@ import {
   Select as MultiSelect,
   chakraComponents,
   type MultiValue,
+  type SingleValue,
 } from "chakra-react-select";
 import { useRouter } from "next/router";
 import { useMemo, useState } from "react";
@@ -27,7 +29,7 @@ export function FieldsFilters() {
   const filterKeys: FilterField[] = [
     "spans.model",
     "metadata.labels",
-    "trace_checks.check_id",
+    "trace_checks.passed",
     "events.event_type",
     "metadata.user_id",
     "metadata.thread_id",
@@ -39,12 +41,14 @@ export function FieldsFilters() {
     availableFilters[key],
   ]);
 
-  const addFilterToUrl = (field: string, value: string) => {
+  const addFilterToUrl = (filters: { param: string; value: string }[]) => {
     void router.push(
       {
         query: {
           ...router.query,
-          [field]: value,
+          ...Object.fromEntries(
+            filters.map(({ param, value }) => [param, value])
+          ),
         },
       },
       undefined,
@@ -56,20 +60,69 @@ export function FieldsFilters() {
     <VStack align="start" width="full" spacing={6}>
       <Heading size="md">Filters</Heading>
       <VStack spacing={4} width="full">
-        {filters.map(([key, filter]) => (
-          <FormControl key={key}>
-            <FormLabel>{filter.name}</FormLabel>
-            <FilterSelectField
-              current={
-                (router.query[filter.urlKey] as string)?.split(",") ?? []
-              }
-              onChange={(value) => {
-                addFilterToUrl(filter.urlKey, value.join(","));
-              }}
-              filter={key}
-            />
-          </FormControl>
-        ))}
+        {filters.map(([key, filter]) => {
+          const requiredField = filter.requiresKey
+            ? availableFilters[filter.requiresKey.filter]
+            : undefined;
+
+          const requiredFieldKey = filter.requiresKey?.filter;
+
+          const requiredFieldUrlKey = requiredField
+            ? `${filter.urlKey}_key`
+            : undefined;
+
+          const currentRequiredKeyValue = requiredFieldUrlKey
+            ? (router.query[requiredFieldUrlKey] as string)?.split(",")?.[0]
+            : undefined;
+
+          return (
+            <FormControl key={key}>
+              <FormLabel>{filter.name}</FormLabel>
+              <HStack>
+                {requiredField && (
+                  <FilterSelectField
+                    single={true}
+                    current={
+                      currentRequiredKeyValue ? [currentRequiredKeyValue] : []
+                    }
+                    onChange={(value) => {
+                      addFilterToUrl([
+                        {
+                          param: requiredFieldUrlKey!,
+                          value: value.join(","),
+                        },
+                        ...(value.length === 0
+                          ? [
+                              {
+                                param: filter.urlKey,
+                                value: "",
+                              },
+                            ]
+                          : []),
+                      ]);
+                    }}
+                    filter={requiredFieldKey!}
+                  />
+                )}
+                <FilterSelectField
+                  current={
+                    (router.query[filter.urlKey] as string)?.split(",") ?? []
+                  }
+                  onChange={(value) => {
+                    addFilterToUrl([
+                      { param: filter.urlKey, value: value.join(",") },
+                    ]);
+                  }}
+                  filter={key}
+                  key_={requiredField ? currentRequiredKeyValue : undefined}
+                  isDisabled={!!requiredField && !currentRequiredKeyValue}
+                  single={!!filter.single}
+                  emptyOption={filter.single ? "Select..." : undefined}
+                />
+              </HStack>
+            </FormControl>
+          );
+        })}
       </VStack>
     </VStack>
   );
@@ -81,12 +134,16 @@ const FilterSelectField = React.memo(function FilterSelectField({
   filter,
   emptyOption,
   current,
+  isDisabled = false,
+  single = false,
 }: {
   onChange: (value: string[]) => void;
   key_?: string;
   filter: FilterField;
   emptyOption?: string;
   current?: string[];
+  isDisabled?: boolean;
+  single?: boolean;
 }) {
   const { project } = useOrganizationTeamProject();
   const [query, setQuery] = useState("");
@@ -98,7 +155,7 @@ const FilterSelectField = React.memo(function FilterSelectField({
       query: query,
     },
     {
-      enabled: !!project,
+      enabled: !!project && !isDisabled,
       refetchOnMount: false,
       refetchOnWindowFocus: false,
     }
@@ -107,12 +164,14 @@ const FilterSelectField = React.memo(function FilterSelectField({
   const [options, current_] = useMemo(() => {
     const emptyOption_ = emptyOption ? [{ value: "", label: emptyOption }] : [];
 
-    const options: { value: string; label: string }[] = emptyOption_.concat(
-      filterData.data?.options.map(({ field, label }) => ({
-        value: field,
-        label,
-      })) ?? []
-    );
+    const options: { value: string; label: string; count?: number }[] =
+      emptyOption_.concat(
+        filterData.data?.options.map(({ field, label, count }) => ({
+          value: field.toString(),
+          label,
+          count,
+        })) ?? []
+      );
 
     const current_ = options.filter(
       (option) => current?.includes(option.value)
@@ -126,63 +185,93 @@ const FilterSelectField = React.memo(function FilterSelectField({
     <MultiSelect
       key={filter}
       hideSelectedOptions={false}
-      closeMenuOnSelect={false}
-      onChange={(options: MultiValue<{ value: string; label: string }>) => {
-        if (options) {
+      closeMenuOnSelect={single}
+      isDisabled={isDisabled}
+      //@ts-ignore
+      onChange={(
+        options:
+          | MultiValue<{ value: string; label: string; count?: number }>
+          | SingleValue<{ value: string; label: string; count?: number }>
+      ) => {
+        if (Array.isArray(options)) {
           onChange(options.map((o) => o.value));
+        } else if (options) {
+          onChange([(options as any).value]);
         }
 
         return true;
       }}
-      isLoading={filterData.isLoading}
+      isLoading={!isDisabled && filterData.isLoading}
       onInputChange={(input) => {
         setQuery(input);
       }}
-      options={options as any}
+      options={options}
       value={current_}
       isSearchable={true}
-      isMulti={true}
+      isMulti={!single}
       useBasicStyles
+      placeholder="Select..."
+      chakraStyles={{
+        container: (base) => ({
+          ...base,
+          background: "white",
+          width: "100%",
+          minWidth: "50%",
+          borderRadius: "5px",
+        }),
+      }}
       components={{
-        Option: ({ ...props }) => {
-          let label = props.data.label;
-          let details = "";
-          // if label is like "[details] label" then split it
-          const labelDetailsMatch = props.data.label.match(/^\[(.*)\] (.*)/);
-          if (labelDetailsMatch) {
-            label = labelDetailsMatch[2] ?? "";
-            details = labelDetailsMatch[1] ?? "";
-          }
+        Option: 1
+          ? ({ ...props }) => {
+              const data = props.data as {
+                value: string;
+                label: string;
+                count?: number;
+              };
+              let label = data.label;
+              let details = "";
+              const count = (props.data as any).count;
+              // if label is like "[details] label" then split it
+              const labelDetailsMatch = data.label.match(/^\[(.*)\] (.*)/);
+              if (labelDetailsMatch) {
+                label = labelDetailsMatch[2] ?? "";
+                details = labelDetailsMatch[1] ?? "";
+              }
 
-          return (
-            <chakraComponents.Option {...props} className="multicheck-option">
-              <HStack align="end">
-                <Box width="16px">
-                  {props.isSelected && <Check width="16px" />}
-                </Box>
-                <VStack align="start" spacing={"2px"}>
-                  {details && (
-                    <Text fontSize="sm" color="gray.500">
-                      {details}
-                    </Text>
-                  )}
-                  <Text>{label}</Text>
-                </VStack>
-              </HStack>
-            </chakraComponents.Option>
-          );
-        },
-        SelectContainer: ({ children, ...props }) => (
-          <chakraComponents.SelectContainer
-            {...props}
-            innerProps={{
-              ...props.innerProps,
-              style: { width: "100%", background: "white" },
-            }}
-          >
-            {children}
-          </chakraComponents.SelectContainer>
-        ),
+              return (
+                <chakraComponents.Option
+                  {...props}
+                  className="multicheck-option"
+                >
+                  <HStack width="full" align="end">
+                    <Box width="16px">
+                      {props.isSelected && <Check width="16px" />}
+                    </Box>
+                    <VStack width="full" align="start" spacing={"2px"}>
+                      {details && (
+                        <Text fontSize="sm" color="gray.500">
+                          {details}
+                        </Text>
+                      )}
+                      <HStack width="full">
+                        <Text>{label}</Text>
+                        <Spacer />
+                        {typeof count !== "undefined" && (
+                          <Text fontSize={13} color="gray.400">
+                            {count}
+                          </Text>
+                        )}
+                      </HStack>
+                    </VStack>
+                  </HStack>
+                </chakraComponents.Option>
+              );
+            }
+          : ({ children, ...props }) => (
+              <chakraComponents.Option {...props}>
+                {children}
+              </chakraComponents.Option>
+            ),
       }}
     />
   );

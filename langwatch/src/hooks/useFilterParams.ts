@@ -13,12 +13,15 @@ export const useFilterParams = () => {
     period: { startDate, endDate },
   } = usePeriodSelector();
 
-  const filters: Partial<Record<FilterField, string[]>> = {};
+  const filters: Partial<
+    Record<FilterField, { values: string[]; key?: string }>
+  > = {};
 
-  for (const [key, filter] of Object.entries(availableFilters)) {
+  for (const [filterKey, filter] of Object.entries(availableFilters)) {
     const values = getMultipleQueryParams(router.query[filter.urlKey]);
     if (values) {
-      filters[key as FilterField] = values;
+      const key = getSingleQueryParam(router.query[`${filter.urlKey}_key`]);
+      filters[filterKey as FilterField] = { values, key };
     }
   }
 

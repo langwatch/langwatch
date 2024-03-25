@@ -14,6 +14,7 @@ export const filterFieldsEnum = z.enum([
   "spans.type",
   "spans.model",
   "trace_checks.check_id",
+  "trace_checks.passed",
   "events.event_type",
   "events.metrics.key",
   "events.event_details.key",
@@ -24,9 +25,12 @@ export type FilterField = z.infer<typeof filterFieldsEnum>;
 export type FilterDefinition = {
   name: string;
   urlKey: string;
-  query: (values: string[]) => QueryDslQueryContainer;
+  query: (values: string[], key: string | undefined) => QueryDslQueryContainer;
+  single?: boolean;
+  requiresKey?: {
+    filter: FilterField;
+  };
   listMatch: {
-    requiresKey?: boolean;
     aggregation: (
       query: string | undefined,
       key: string | undefined
