@@ -749,6 +749,7 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
   "events.event_type": {
     name: "Event",
     urlKey: "event_type",
+    single: true,
     query: (values) => ({
       nested: {
         path: "events",
@@ -802,19 +803,29 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
   "events.metrics.key": {
     name: "Metric",
     urlKey: "event_metric",
+    single: true,
     requiresKey: {
       filter: "events.event_type",
     },
-    query: (values) => ({
+    query: (values, key) => ({
       nested: {
-        path: "events.metrics",
+        path: "events",
         query: {
-          nested: {
-            path: "events",
-            query: {
-              terms: { "events.metrics.key": values },
-            },
-          },
+          bool: {
+            must: [
+              {
+                term: { "events.event_type": key ?? "" },
+              },
+              {
+                nested: {
+                  path: "events.metrics",
+                  query: {
+                    terms: { "events.metrics.key": values },
+                  },
+                },
+              },
+            ] as QueryDslQueryContainer[],
+          } as QueryDslBoolQuery,
         },
       },
     }),
@@ -873,6 +884,103 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
             })
           ) ?? []
         );
+      },
+    },
+  },
+  "events.metrics.value": {
+    name: "Event Metric",
+    urlKey: "event_metric_value",
+    single: true,
+    type: "numeric",
+    requiresKey: {
+      filter: "events.event_type",
+    },
+    requiresSubkey: {
+      filter: "events.metrics.key",
+    },
+    query: (values, key, subkey) => ({
+      nested: {
+        path: "events",
+        query: {
+          bool: {
+            must: [
+              {
+                term: { "events.event_type": key ?? "" },
+              },
+              {
+                nested: {
+                  path: "events.metrics",
+                  query: {
+                    bool: {
+                      must: [
+                        {
+                          term: { "events.metrics.key": subkey },
+                        },
+                        {
+                          range: {
+                            "events.metrics.value": {
+                              gte: values[0],
+                              lte: values[1],
+                            },
+                          },
+                        },
+                      ] as QueryDslQueryContainer[],
+                    } as QueryDslBoolQuery,
+                  },
+                },
+              },
+            ] as QueryDslQueryContainer[],
+          } as QueryDslBoolQuery,
+        },
+      },
+    }),
+    listMatch: {
+      aggregation: (query, key, subkey) => ({
+        unique_values: {
+          nested: { path: "events" },
+          aggs: {
+            child: {
+              filter: {
+                term: { "events.event_type": key },
+              },
+              aggs: {
+                child: {
+                  nested: {
+                    path: "events.metrics",
+                  },
+                  aggs: {
+                    child: {
+                      filter: {
+                        term: { "events.metrics.key": subkey },
+                      },
+                      aggs: {
+                        child: {
+                          stats: {
+                            field: "events.metrics.value",
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      }),
+      extract: (result: Record<string, any>) => {
+        return [
+          {
+            field: result.unique_values?.child?.child?.child?.child?.min,
+            label: "min",
+            count: 0,
+          },
+          {
+            field: result.unique_values?.child?.child?.child?.child?.max,
+            label: "max",
+            count: 0,
+          },
+        ];
       },
     },
   },

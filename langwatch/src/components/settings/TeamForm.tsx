@@ -22,7 +22,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { TeamUserRole } from "@prisma/client";
-import { Select as MultiSelect, chakraComponents } from "chakra-react-select";
+import { Select as MultiSelect } from "chakra-react-select";
 import NextLink from "next/link";
 import { ChevronRight, HelpCircle, Plus, Trash } from "react-feather";
 import {

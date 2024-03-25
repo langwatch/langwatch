@@ -12,17 +12,25 @@ export const dataForFilter = protectedProcedure
       projectId: z.string(),
       field: filterFieldsEnum,
       key: z.string().optional(),
+      subkey: z.string().optional(),
       query: z.string().optional(),
     })
   )
   .use(checkUserPermissionForProject(TeamRoleGroup.ANALYTICS_VIEW))
   .query(async ({ input }) => {
-    const { projectId, field, key } = input;
+    const { projectId, field, key, subkey } = input;
 
     if (availableFilters[field].requiresKey && !key) {
       throw new TRPCError({
         code: "BAD_REQUEST",
         message: `Field ${field} requires a key to be defined`,
+      });
+    }
+
+    if (availableFilters[field].requiresSubkey && !subkey) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: `Field ${field} requires a subkey to be defined`,
       });
     }
 
@@ -35,7 +43,11 @@ export const dataForFilter = protectedProcedure
             must: [{ term: { "trace.project_id": projectId } }],
           } as any,
         },
-        aggs: availableFilters[field].listMatch.aggregation(input.query, key),
+        aggs: availableFilters[field].listMatch.aggregation(
+          input.query,
+          key,
+          subkey
+        ),
       },
     });
 

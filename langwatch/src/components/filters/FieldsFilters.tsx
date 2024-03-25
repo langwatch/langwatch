@@ -37,7 +37,7 @@ export function FieldsFilters() {
     "trace_checks.passed",
     "trace_checks.score",
     "trace_checks.state",
-    "events.event_type",
+    "events.metrics.value",
     "metadata.user_id",
     "metadata.thread_id",
     "metadata.customer_id",
@@ -48,7 +48,87 @@ export function FieldsFilters() {
     availableFilters[key],
   ]);
 
-  const addFilterToUrl = (filters: { param: string; value: string }[]) => {
+  const addFilterToUrl = useAddFilterToUrl();
+
+  return (
+    <VStack align="start" width="full" spacing={6}>
+      <Heading size="md">Filters</Heading>
+      <VStack spacing={4} width="full">
+        {filters.map(([key, filter]) => {
+          const requiredKeyFilter = filter.requiresKey
+            ? availableFilters[filter.requiresKey.filter]
+            : undefined;
+          const requiredKeyUrl = requiredKeyFilter
+            ? `${filter.urlKey}_key`
+            : undefined;
+          const currentKeyValue = requiredKeyUrl
+            ? (router.query[requiredKeyUrl] as string)?.split(",")?.[0]
+            : undefined;
+
+          const requiredSubkeyFilter = filter.requiresSubkey
+            ? availableFilters[filter.requiresSubkey.filter]
+            : undefined;
+          const requiredSubkeyUrl = requiredSubkeyFilter
+            ? `${filter.urlKey}_subkey`
+            : undefined;
+          const currentSubkeyValue = requiredSubkeyUrl
+            ? (router.query[requiredSubkeyUrl] as string)?.split(",")?.[0]
+            : undefined;
+
+          return (
+            <FormControl key={key}>
+              <FormLabel>{filter.name}</FormLabel>
+              <HStack flexWrap={filter.type === "numeric" ? "wrap" : undefined}>
+                {requiredKeyFilter && (
+                  <NestedKeyField
+                    filter={filter}
+                    requiredKey={filter.requiresKey!.filter}
+                    requiredKeyUrl={requiredKeyUrl!}
+                    currentKeyValue={currentKeyValue!}
+                  />
+                )}
+                {requiredSubkeyFilter && (
+                  <NestedKeyField
+                    filter={filter}
+                    requiredKey={filter.requiresSubkey!.filter}
+                    requiredKeyUrl={requiredSubkeyUrl!}
+                    currentKeyValue={currentSubkeyValue!}
+                    key_={requiredKeyFilter ? currentKeyValue : undefined}
+                    isDisabled={!!requiredKeyFilter && !currentKeyValue}
+                  />
+                )}
+                <FilterSelectField
+                  current={
+                    (router.query[filter.urlKey] as string)?.split(",") ?? []
+                  }
+                  onChange={(value) => {
+                    addFilterToUrl([
+                      { param: filter.urlKey, value: value.join(",") },
+                    ]);
+                  }}
+                  filter={key}
+                  key_={requiredKeyFilter ? currentKeyValue : undefined}
+                  subkey={requiredSubkeyFilter ? currentSubkeyValue : undefined}
+                  isDisabled={
+                    (!!requiredKeyFilter && !currentKeyValue) ||
+                    (!!requiredSubkeyFilter && !currentSubkeyValue)
+                  }
+                  single={!!filter.single}
+                  emptyOption={filter.single ? "Select..." : undefined}
+                />
+              </HStack>
+            </FormControl>
+          );
+        })}
+      </VStack>
+    </VStack>
+  );
+}
+
+const useAddFilterToUrl = () => {
+  const router = useRouter();
+
+  return (filters: { param: string; value: string }[]) => {
     void router.push(
       {
         query: {
@@ -62,83 +142,57 @@ export function FieldsFilters() {
       { shallow: true, scroll: false }
     );
   };
+};
+
+function NestedKeyField({
+  filter,
+  requiredKey,
+  requiredKeyUrl,
+  currentKeyValue,
+  key_,
+  isDisabled = false,
+}: {
+  filter: FilterDefinition;
+  requiredKey: FilterField;
+  requiredKeyUrl: string;
+  currentKeyValue: string;
+  key_?: string;
+  isDisabled?: boolean;
+}) {
+  const addFilterToUrl = useAddFilterToUrl();
 
   return (
-    <VStack align="start" width="full" spacing={6}>
-      <Heading size="md">Filters</Heading>
-      <VStack spacing={4} width="full">
-        {filters.map(([key, filter]) => {
-          const requiredField = filter.requiresKey
-            ? availableFilters[filter.requiresKey.filter]
-            : undefined;
-
-          const requiredFieldKey = filter.requiresKey?.filter;
-
-          const requiredFieldUrlKey = requiredField
-            ? `${filter.urlKey}_key`
-            : undefined;
-
-          const currentRequiredKeyValue = requiredFieldUrlKey
-            ? (router.query[requiredFieldUrlKey] as string)?.split(",")?.[0]
-            : undefined;
-
-          return (
-            <FormControl key={key}>
-              <FormLabel>{filter.name}</FormLabel>
-              <HStack>
-                {requiredField && (
-                  <FilterSelectField
-                    single={true}
-                    current={
-                      currentRequiredKeyValue ? [currentRequiredKeyValue] : []
-                    }
-                    onChange={(value) => {
-                      addFilterToUrl([
-                        {
-                          param: requiredFieldUrlKey!,
-                          value: value.join(","),
-                        },
-                        ...(value.join(",").length === 0
-                          ? [
-                              {
-                                param: filter.urlKey,
-                                value: "",
-                              },
-                            ]
-                          : []),
-                      ]);
-                    }}
-                    filter={requiredFieldKey!}
-                    emptyOption={"Select..."}
-                  />
-                )}
-                <FilterSelectField
-                  current={
-                    (router.query[filter.urlKey] as string)?.split(",") ?? []
-                  }
-                  onChange={(value) => {
-                    addFilterToUrl([
-                      { param: filter.urlKey, value: value.join(",") },
-                    ]);
-                  }}
-                  filter={key}
-                  key_={requiredField ? currentRequiredKeyValue : undefined}
-                  isDisabled={!!requiredField && !currentRequiredKeyValue}
-                  single={!!filter.single}
-                  emptyOption={filter.single ? "Select..." : undefined}
-                />
-              </HStack>
-            </FormControl>
-          );
-        })}
-      </VStack>
-    </VStack>
+    <FilterSelectField
+      single={true}
+      current={currentKeyValue ? [currentKeyValue] : []}
+      onChange={(value) => {
+        addFilterToUrl([
+          {
+            param: requiredKeyUrl,
+            value: value.join(","),
+          },
+          ...(value.join(",").length === 0
+            ? [
+                {
+                  param: filter.urlKey,
+                  value: "",
+                },
+              ]
+            : []),
+        ]);
+      }}
+      filter={requiredKey}
+      emptyOption={"Select..."}
+      key_={key_}
+      isDisabled={isDisabled}
+    />
   );
 }
 
 const FilterSelectField = React.memo(function FilterSelectField({
   onChange,
   key_,
+  subkey,
   filter,
   emptyOption,
   current,
@@ -147,6 +201,7 @@ const FilterSelectField = React.memo(function FilterSelectField({
 }: {
   onChange: (value: string[]) => void;
   key_?: string;
+  subkey?: string;
   filter: FilterField;
   emptyOption?: string;
   current?: string[];
@@ -160,6 +215,7 @@ const FilterSelectField = React.memo(function FilterSelectField({
       projectId: project?.id ?? "",
       field: filter,
       key: key_,
+      subkey: subkey,
       query: query,
     },
     {
@@ -178,7 +234,7 @@ const FilterSelectField = React.memo(function FilterSelectField({
     const options: { value: string; label: string; count?: number }[] =
       emptyOption_.concat(
         filterData.data?.options.map(({ field, label, count }) => ({
-          value: field.toString(),
+          value: field?.toString() ?? "0",
           label,
           count,
         })) ?? []
@@ -203,10 +259,6 @@ const FilterSelectField = React.memo(function FilterSelectField({
 
   useEffect(() => {
     if (isNumeric && filterData.data) {
-      console.log("[min.toString(), max.toString()]", [
-        min.toString(),
-        max.toString(),
-      ]);
       onChange([min.toString(), max.toString()]);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -214,7 +266,7 @@ const FilterSelectField = React.memo(function FilterSelectField({
 
   if (isNumeric) {
     return (
-      <HStack minWidth="50%" paddingX={4}>
+      <HStack width="100%" paddingX={4}>
         <RangeSlider
           isDisabled={isDisabled}
           colorScheme="orange"
@@ -223,7 +275,11 @@ const FilterSelectField = React.memo(function FilterSelectField({
           min={min}
           max={max}
           step={0.1}
-          value={current?.map((v) => +v)}
+          value={
+            current && current.length == 2
+              ? current?.map((v) => +v)
+              : [min, max]
+          }
           onChange={(values) => {
             onChange(values.map((v) => v.toString()));
           }}

@@ -110,6 +110,7 @@ export const sharedFiltersInputSchema = z.object({
     z.object({
       values: z.array(z.string()),
       key: z.string().optional(),
+      subkey: z.string().optional(),
     })
   ),
 });

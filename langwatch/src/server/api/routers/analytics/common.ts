@@ -44,7 +44,7 @@ export const generateTracesPivotQueryConditions = ({
       : endDate;
 
   const filterConditions: QueryDslQueryContainer[] = [];
-  for (const [field, { values, key }] of Object.entries(filters)) {
+  for (const [field, { values, key, subkey }] of Object.entries(filters)) {
     if (values.length > 0) {
       const filter = availableFilters[field as FilterField];
 
@@ -55,7 +55,14 @@ export const generateTracesPivotQueryConditions = ({
         });
       }
 
-      filterConditions.push(filter.query(values, key));
+      if (filter.requiresSubkey && !subkey) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: `Filter '${field}' requires a '${filter.requiresSubkey.filter}' subkey to be defined`,
+        });
+      }
+
+      filterConditions.push(filter.query(values, key, subkey));
     }
   }
 
