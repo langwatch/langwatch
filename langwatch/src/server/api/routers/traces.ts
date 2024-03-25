@@ -86,7 +86,7 @@ export const tracesRouter = createTRPCRouter({
 
       let traceIds: string[] = [];
 
-      const pageSize = input.pageSize ? input.pageSize : 100;
+      const pageSize = input.pageSize ? input.pageSize : 25;
       const pageOffset = input.pageOffset ? input.pageOffset : 0;
 
       let totalHits = 0;

@@ -30,6 +30,7 @@ export function FieldsFilters() {
     "spans.model",
     "metadata.labels",
     "trace_checks.passed",
+    "trace_checks.state",
     "events.event_type",
     "metadata.user_id",
     "metadata.thread_id",
@@ -102,6 +103,7 @@ export function FieldsFilters() {
                       ]);
                     }}
                     filter={requiredFieldKey!}
+                    emptyOption={"Select..."}
                   />
                 )}
                 <FilterSelectField
@@ -162,7 +164,10 @@ const FilterSelectField = React.memo(function FilterSelectField({
   );
 
   const [options, current_] = useMemo(() => {
-    const emptyOption_ = emptyOption ? [{ value: "", label: emptyOption }] : [];
+    const emptyOption_ =
+      typeof emptyOption !== "undefined"
+        ? [{ value: "", label: emptyOption }]
+        : [];
 
     const options: { value: string; label: string; count?: number }[] =
       emptyOption_.concat(
@@ -221,57 +226,51 @@ const FilterSelectField = React.memo(function FilterSelectField({
         }),
       }}
       components={{
-        Option: 1
-          ? ({ ...props }) => {
-              const data = props.data as {
-                value: string;
-                label: string;
-                count?: number;
-              };
-              let label = data.label;
-              let details = "";
-              const count = (props.data as any).count;
-              // if label is like "[details] label" then split it
-              const labelDetailsMatch = data.label.match(/^\[(.*)\] (.*)/);
-              if (labelDetailsMatch) {
-                label = labelDetailsMatch[2] ?? "";
-                details = labelDetailsMatch[1] ?? "";
-              }
+        Option: ({ ...props }) => {
+          const data = props.data as {
+            value: string;
+            label: string;
+            count?: number;
+          };
+          let label = data.label;
+          let details = "";
+          const count = (props.data as any).count;
+          // if label is like "[details] label" then split it
+          const labelDetailsMatch = data.label.match(/^\[(.*)\] (.*)/);
+          if (labelDetailsMatch) {
+            label = labelDetailsMatch[2] ?? "";
+            details = labelDetailsMatch[1] ?? "";
+          }
 
-              return (
-                <chakraComponents.Option
-                  {...props}
-                  className="multicheck-option"
-                >
-                  <HStack width="full" align="end">
-                    <Box width="16px">
-                      {props.isSelected && <Check width="16px" />}
-                    </Box>
-                    <VStack width="full" align="start" spacing={"2px"}>
-                      {details && (
-                        <Text fontSize="sm" color="gray.500">
-                          {details}
-                        </Text>
-                      )}
-                      <HStack width="full">
-                        <Text>{label}</Text>
-                        <Spacer />
-                        {typeof count !== "undefined" && (
-                          <Text fontSize={13} color="gray.400">
-                            {count}
-                          </Text>
-                        )}
-                      </HStack>
-                    </VStack>
+          return (
+            <chakraComponents.Option {...props} className="multicheck-option">
+              <HStack width="full" align="end">
+                <Box width="16px">
+                  {props.isSelected && <Check width="16px" />}
+                </Box>
+                <VStack width="full" align="start" spacing={"2px"}>
+                  {details && (
+                    <Text fontSize="sm" color="gray.500">
+                      {details}
+                    </Text>
+                  )}
+                  <HStack width="full">
+                    <Text color={data.value === "" ? "gray.400" : undefined}>
+                      {label}
+                    </Text>
+                    <Spacer />
+                    {/* TODO: this is hidden for now because we need to send also the date range, and other filters, to apply the rules */}
+                    {/* {typeof count !== "undefined" && (
+                      <Text fontSize={13} color="gray.400">
+                        {count}
+                      </Text>
+                    )} */}
                   </HStack>
-                </chakraComponents.Option>
-              );
-            }
-          : ({ children, ...props }) => (
-              <chakraComponents.Option {...props}>
-                {children}
-              </chakraComponents.Option>
-            ),
+                </VStack>
+              </HStack>
+            </chakraComponents.Option>
+          );
+        },
       }}
     />
   );

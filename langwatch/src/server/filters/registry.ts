@@ -449,12 +449,92 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
       },
     },
   },
+  "trace_checks.check_id.guardrails_only": {
+    name: "Contains Evaluation (guardrails only)",
+    urlKey: "guardrail_check_id",
+    query: (values) => ({
+      nested: {
+        path: "trace_checks",
+        query: {
+          terms: { "trace_checks.check_id": values },
+        },
+      },
+    }),
+    listMatch: {
+      aggregation: (query) => ({
+        unique_check_ids: {
+          nested: { path: "trace_checks" },
+          aggs: {
+            child: {
+              terms: {
+                field: "trace_checks.check_id",
+                size: 100,
+                order: { _key: "asc" },
+              },
+              aggs: {
+                labels: {
+                  filter: query
+                    ? {
+                        prefix: {
+                          "trace_checks.check_name": {
+                            value: query,
+                            case_insensitive: true,
+                          },
+                        },
+                      }
+                    : {
+                        match_all: {},
+                      },
+                  aggs: {
+                    name: {
+                      terms: {
+                        field: "trace_checks.check_name",
+                        size: 1,
+                      },
+                    },
+                    type: {
+                      terms: {
+                        field: "trace_checks.check_type",
+                        size: 1,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      }),
+      extract: (result: Record<string, any>) => {
+        return (
+          result.unique_check_ids?.child?.buckets
+            ?.map((bucket: any) => {
+              const checkType: string = bucket.labels.type.buckets?.[0]?.key;
+              const checkName: string = bucket.labels.name.buckets?.[0]?.key;
+              const checkDefinition =
+                AVAILABLE_EVALUATORS[checkType as EvaluatorTypes];
+
+              if (!checkDefinition?.isGuardrail) {
+                return;
+              }
+
+              return {
+                field: bucket.key,
+                label: `[${checkDefinition?.name ?? checkType}] ${checkName}`,
+                count: bucket.doc_count,
+              };
+            })
+            .filter((option: any) => option?.label !== undefined) ?? []
+        );
+      },
+    },
+  },
   "trace_checks.passed": {
     name: "Evaluation Passed",
     urlKey: "evaluation_passed",
     single: true,
     requiresKey: {
-      filter: "trace_checks.check_id",
+      filter: "trace_checks.check_id.guardrails_only",
     },
     query: (values, key) => ({
       nested: {
@@ -519,6 +599,81 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
             label: bucket.key ? "Passed" : "Failed",
             count: bucket.doc_count,
           })) ?? []
+        );
+      },
+    },
+  },
+  "trace_checks.state": {
+    name: "Evaluation Execution State",
+    urlKey: "evaluation_state",
+    requiresKey: {
+      filter: "trace_checks.check_id",
+    },
+    query: (values, key) => ({
+      nested: {
+        path: "trace_checks",
+        query: {
+          bool: {
+            must: [
+              {
+                term: {
+                  "trace_checks.check_id": key,
+                },
+              },
+              {
+                terms: {
+                  "trace_checks.status": values,
+                },
+              },
+            ] as QueryDslQueryContainer[],
+          } as QueryDslBoolQuery,
+        },
+      },
+    }),
+    listMatch: {
+      aggregation: (query, key) => ({
+        unique_values: {
+          nested: { path: "trace_checks" },
+          aggs: {
+            child: {
+              filter: {
+                term: { "trace_checks.check_id": key },
+              },
+              aggs: {
+                child: {
+                  terms: {
+                    field: "trace_checks.status",
+                  },
+                  aggs: {
+                    child: {
+                      filter: query
+                        ? {
+                            term: {
+                              "trace_checks.status": query,
+                            },
+                          }
+                        : {
+                            match_all: {},
+                          },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      }),
+      extract: (result: Record<string, any>) => {
+        return (
+          result.unique_values?.child?.child?.buckets
+            ?.filter(
+              (bucket: any) => !["succeeded", "failed"].includes(bucket.key)
+            )
+            .map((bucket: any) => ({
+              field: bucket.key,
+              label: bucket.key,
+              count: bucket.doc_count,
+            })) ?? []
         );
       },
     },
