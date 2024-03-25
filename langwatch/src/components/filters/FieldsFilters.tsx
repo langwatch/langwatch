@@ -92,7 +92,7 @@ export function FieldsFilters() {
                           param: requiredFieldUrlKey!,
                           value: value.join(","),
                         },
-                        ...(value.length === 0
+                        ...(value.join(",").length === 0
                           ? [
                               {
                                 param: filter.urlKey,
