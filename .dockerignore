@@ -7,10 +7,13 @@ node_modules
 .github
 .next
 !langwatch/langwatch/.next
+*/**/.next/cache
+*/**/.next/trace
 */**/.next-saas
 langevals
 langwatch/python-sdk
 langwatch/docs/.docusaurus
+langwatch/langwatch_nlp/notebooks
 infrastructure
 .env
 */**/.env
