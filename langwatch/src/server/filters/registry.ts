@@ -603,6 +603,74 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
       },
     },
   },
+  "trace_checks.score": {
+    name: "Evaluation Score",
+    urlKey: "evaluation_passed",
+    type: "numeric",
+    single: true,
+    requiresKey: {
+      filter: "trace_checks.check_id",
+    },
+    query: (values, key) => ({
+      nested: {
+        path: "trace_checks",
+        query: {
+          bool: {
+            must: [
+              {
+                term: {
+                  "trace_checks.check_id": key,
+                },
+              },
+              {
+                range: {
+                  "trace_checks.score": {
+                    gte: values[0],
+                    lte: values[1],
+                  },
+                },
+              },
+            ] as QueryDslQueryContainer[],
+          } as QueryDslBoolQuery,
+        },
+      },
+    }),
+    listMatch: {
+      aggregation: (query, key) => ({
+        unique_values: {
+          nested: { path: "trace_checks" },
+          aggs: {
+            child: {
+              filter: {
+                term: { "trace_checks.check_id": key },
+              },
+              aggs: {
+                child: {
+                  stats: {
+                    field: "trace_checks.score",
+                  },
+                },
+              },
+            },
+          },
+        },
+      }),
+      extract: (result: Record<string, any>) => {
+        return [
+          {
+            field: result.unique_values?.child?.child?.min,
+            label: "min",
+            count: 0,
+          },
+          {
+            field: result.unique_values?.child?.child?.max,
+            label: "max",
+            count: 0,
+          },
+        ];
+      },
+    },
+  },
   "trace_checks.state": {
     name: "Evaluation Execution State",
     urlKey: "evaluation_state",

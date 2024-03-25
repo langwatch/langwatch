@@ -16,6 +16,7 @@ export const filterFieldsEnum = z.enum([
   "trace_checks.check_id",
   "trace_checks.check_id.guardrails_only",
   "trace_checks.passed",
+  "trace_checks.score",
   "trace_checks.state",
   "events.event_type",
   "events.metrics.key",
@@ -29,6 +30,7 @@ export type FilterDefinition = {
   urlKey: string;
   query: (values: string[], key: string | undefined) => QueryDslQueryContainer;
   single?: boolean;
+  type?: "numeric";
   requiresKey?: {
     filter: FilterField;
   };

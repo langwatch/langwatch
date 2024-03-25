@@ -4,6 +4,10 @@ import {
   FormLabel,
   HStack,
   Heading,
+  RangeSlider,
+  RangeSliderFilledTrack,
+  RangeSliderThumb,
+  RangeSliderTrack,
   Spacer,
   Text,
   VStack,
@@ -15,13 +19,14 @@ import {
   type SingleValue,
 } from "chakra-react-select";
 import { useRouter } from "next/router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import type { FilterDefinition, FilterField } from "../../server/filters/types";
 import { api } from "../../utils/api";
 import { availableFilters } from "../../server/filters/registry";
 import React from "react";
 import { Check } from "react-feather";
+import numeral from "numeral";
 
 export function FieldsFilters() {
   const router = useRouter();
@@ -30,6 +35,7 @@ export function FieldsFilters() {
     "spans.model",
     "metadata.labels",
     "trace_checks.passed",
+    "trace_checks.score",
     "trace_checks.state",
     "events.event_type",
     "metadata.user_id",
@@ -186,6 +192,56 @@ const FilterSelectField = React.memo(function FilterSelectField({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [JSON.stringify(current), emptyOption, filterData.data?.options]);
 
+  const isNumeric = availableFilters[filter].type === "numeric";
+
+  const min = +numeral(
+    +(filterData.data?.options.find((o) => o.label === "min")?.field ?? 0)
+  ).format("0.[0]");
+  const max = +numeral(
+    +(filterData.data?.options.find((o) => o.label === "max")?.field ?? 0)
+  ).format("0.[0]");
+
+  useEffect(() => {
+    if (isNumeric && filterData.data) {
+      console.log("[min.toString(), max.toString()]", [
+        min.toString(),
+        max.toString(),
+      ]);
+      onChange([min.toString(), max.toString()]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [min, max]);
+
+  if (isNumeric) {
+    return (
+      <HStack minWidth="50%" paddingX={4}>
+        <RangeSlider
+          isDisabled={isDisabled}
+          colorScheme="orange"
+          // eslint-disable-next-line jsx-a11y/aria-proptypes
+          aria-label={["min", "max"]}
+          min={min}
+          max={max}
+          step={0.1}
+          value={current?.map((v) => +v)}
+          onChange={(values) => {
+            onChange(values.map((v) => v.toString()));
+          }}
+        >
+          <RangeSliderTrack>
+            <RangeSliderFilledTrack />
+          </RangeSliderTrack>
+          <RangeSliderThumb index={0} padding={3}>
+            <Text fontSize={13}>{current?.[0]}</Text>
+          </RangeSliderThumb>
+          <RangeSliderThumb index={1} padding={3}>
+            <Text fontSize={13}>{current?.[1]}</Text>
+          </RangeSliderThumb>
+        </RangeSlider>
+      </HStack>
+    );
+  }
+
   return (
     <MultiSelect
       key={filter}
@@ -234,7 +290,7 @@ const FilterSelectField = React.memo(function FilterSelectField({
           };
           let label = data.label;
           let details = "";
-          const count = (props.data as any).count;
+          // const count = (props.data as any).count;
           // if label is like "[details] label" then split it
           const labelDetailsMatch = data.label.match(/^\[(.*)\] (.*)/);
           if (labelDetailsMatch) {
