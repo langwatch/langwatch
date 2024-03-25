@@ -45,7 +45,6 @@ export type AnalyticsGroup = {
     aggToGroup: Record<string, AggregationsAggregationContainer>
   ) => Record<string, AggregationsAggregationContainer>;
   extractionPath: () => string;
-  labelsMapping?: (projectId: string) => Promise<Record<string, string>>;
 };
 
 export const aggregationTypesEnum = z.enum([
@@ -127,12 +126,7 @@ export type TracesPivot = {
   > & { input: { satisfaction_score?: number }; has_error: boolean };
   spans?: (Omit<
     ElasticSearchSpan,
-    | "name"
-    | "input"
-    | "outputs"
-    | "error"
-    | "params"
-    | "contexts"
+    "name" | "input" | "outputs" | "error" | "params" | "contexts"
   > & {
     has_error?: boolean;
     params?: { temperature: number; stream: boolean };
@@ -141,10 +135,7 @@ export type TracesPivot = {
     document_id?: string;
     chunk_id?: string;
   }[];
-  trace_checks?: (Omit<
-    TraceCheck,
-    "error" | "trace_metadata" | "details"
-  > & {
+  trace_checks?: (Omit<TraceCheck, "error" | "trace_metadata" | "details"> & {
     has_error?: boolean;
   })[];
   events?: (Omit<Event, "trace_metadata" | "metrics" | "event_details"> & {

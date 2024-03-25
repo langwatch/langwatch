@@ -418,8 +418,48 @@ export const analyticsMetrics = {
     },
   },
   evaluations: {
-    checks: {
-      label: "Checks",
+    evaluation_score: {
+      label: "Evaluation Score",
+      colorSet: "tealTones",
+      format: "0.00a",
+      increaseIs: "neutral",
+      allowedAggregations: allAggregationTypes.filter(
+        (agg) => agg != "cardinality"
+      ),
+      requiresKey: {
+        filter: "trace_checks.check_id",
+      },
+      aggregation: (aggregation, key) => {
+        return {
+          [`evaluation_score_${aggregation}_${key}`]: {
+            nested: {
+              path: "trace_checks",
+            },
+            aggs: {
+              child: {
+                filter: {
+                  bool: {
+                    must: [{ term: { "trace_checks.check_id": key } }],
+                  } as any,
+                },
+                aggs: {
+                  child: {
+                    [aggregation]: {
+                      field: "trace_checks.score",
+                    },
+                  },
+                },
+              },
+            },
+          },
+        };
+      },
+      extractionPath: (aggregation: AggregationTypes, key) => {
+        return `evaluation_score_${aggregation}_${key}>child>child`;
+      },
+    },
+    evaluation_runs: {
+      label: "Evaluation Execution",
       colorSet: "tealTones",
       format: "0.[00]a",
       increaseIs: "neutral",
@@ -462,46 +502,6 @@ export const analyticsMetrics = {
       }),
       extractionPath: (aggregation: AggregationTypes) => {
         return `checks_${aggregation}>child>cardinality`;
-      },
-    },
-    evaluation_score: {
-      label: "Evaluation Score",
-      colorSet: "tealTones",
-      format: "0.00a",
-      increaseIs: "neutral",
-      allowedAggregations: allAggregationTypes.filter(
-        (agg) => agg != "cardinality"
-      ),
-      requiresKey: {
-        filter: "trace_checks.check_id",
-      },
-      aggregation: (aggregation, key) => {
-        return {
-          [`evaluation_score_${aggregation}_${key}`]: {
-            nested: {
-              path: "trace_checks",
-            },
-            aggs: {
-              child: {
-                filter: {
-                  bool: {
-                    must: [{ term: { "trace_checks.check_id": key } }],
-                  } as any,
-                },
-                aggs: {
-                  child: {
-                    [aggregation]: {
-                      field: "trace_checks.value",
-                    },
-                  },
-                },
-              },
-            },
-          },
-        };
-      },
-      extractionPath: (aggregation: AggregationTypes, key) => {
-        return `evaluation_score_${aggregation}_${key}>child>child`;
       },
     },
   },
@@ -807,8 +807,33 @@ export const analyticsGroups = {
     },
   },
   evaluations: {
-    check_state: {
-      label: "Check State",
+    evaluation_passed: {
+      label: "Evaluation Passed",
+      aggregation: (aggToGroup) => ({
+        check_state_group: {
+          nested: {
+            path: "trace_checks",
+          },
+          aggs: {
+            child: {
+              terms: {
+                field: "trace_checks.passed",
+                size: 50,
+              },
+              aggs: {
+                back_to_root: {
+                  reverse_nested: {},
+                  aggs: aggToGroup,
+                },
+              },
+            },
+          },
+        },
+      }),
+      extractionPath: () => "check_state_group>child>buckets>back_to_root",
+    },
+    evaluation_processing_state: {
+      label: "Evaluation Processing State",
       aggregation: (aggToGroup) => ({
         check_state_group: {
           nested: {

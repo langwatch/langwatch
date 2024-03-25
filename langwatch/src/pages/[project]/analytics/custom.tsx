@@ -44,12 +44,7 @@ import {
   chakraComponents,
   type SingleValue,
 } from "chakra-react-select";
-import {
-  useEffect,
-  useState,
-  type Dispatch,
-  type SetStateAction,
-} from "react";
+import { useEffect, useState, type Dispatch, type SetStateAction } from "react";
 import {
   AlignLeft,
   BarChart2,
@@ -137,7 +132,7 @@ export interface CustomGraphFormData {
       aggregation: PipelineAggregationTypes;
     };
   }[];
-  groupBy?: FlattenAnalyticsGroupsEnum;
+  groupBy?: FlattenAnalyticsGroupsEnum | "";
   includePrevious: boolean;
   timeScale: "full" | number;
   connected?: boolean;
@@ -412,7 +407,7 @@ const customGraphFormToCustomGraphInput = (
         subkey: series.subkey,
       };
     }),
-    groupBy: formData.groupBy ?? undefined,
+    groupBy: formData.groupBy === "" ? undefined : formData.groupBy,
     includePrevious: formData.includePrevious,
     timeScale: formData.timeScale,
     connected: formData.connected,
@@ -455,7 +450,7 @@ const customAPIinput = (
         subkey: series.subkey,
       };
     }) as CustomAPICAllData["series"],
-    groupBy: formData.groupBy ?? undefined,
+    groupBy: formData.groupBy === "" ? undefined : formData.groupBy,
     timeScale: formData.timeScale,
   };
 };

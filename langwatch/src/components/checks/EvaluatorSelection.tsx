@@ -24,7 +24,7 @@ import type { CheckConfigFormData } from "./CheckConfigForm";
 import type { UseFormReturn } from "react-hook-form";
 import { useRouter } from "next/router";
 import { titleCase } from "../../utils/stringCasing";
-import { Shield, Tool } from "react-feather";
+import { Shield } from "react-feather";
 
 type Category = EvaluatorDefinition<any>["category"];
 

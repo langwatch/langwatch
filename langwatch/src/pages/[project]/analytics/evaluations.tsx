@@ -25,10 +25,7 @@ import {
   type CustomGraphInput,
 } from "~/components/analytics/CustomGraph";
 import { FilterSidebar } from "~/components/filters/FilterSidebar";
-import {
-  FilterToggle,
-  useFilterToggle,
-} from "~/components/filters/FilterToggle";
+import { FilterToggle } from "~/components/filters/FilterToggle";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 
 import { api } from "~/utils/api";
@@ -48,12 +45,12 @@ const creatChecks = (checks: any) => {
           {
             name: "Checks count",
             colorSet: "positiveNegativeNeutral",
-            metric: "evaluations.checks",
+            metric: "evaluations.evaluation_runs",
             aggregation: "cardinality",
             key: check.id,
           },
         ],
-        groupBy: "evaluations.check_state",
+        groupBy: "evaluations.evaluation_passed",
         includePrevious: false,
         timeScale: 1,
         height: 300,
@@ -66,7 +63,7 @@ const creatChecks = (checks: any) => {
           {
             name: "",
             colorSet: "positiveNegativeNeutral",
-            metric: "evaluations.checks",
+            metric: "evaluations.evaluation_runs",
             aggregation: "cardinality",
             pipeline: {
               field: "trace_id",
@@ -75,7 +72,7 @@ const creatChecks = (checks: any) => {
             key: check.id,
           },
         ],
-        groupBy: "evaluations.check_state",
+        groupBy: "evaluations.evaluation_passed",
         includePrevious: false,
         timeScale: 1,
         height: 300,

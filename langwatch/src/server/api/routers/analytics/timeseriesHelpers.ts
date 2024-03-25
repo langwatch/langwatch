@@ -8,14 +8,10 @@ import { getGroup, getMetric } from "~/server/analytics/registry";
 import {
   analyticsPipelines,
   pipelineAggregationsToElasticSearch,
-  timeseriesInput,
   type FlattenAnalyticsGroupsEnum,
   type SeriesInputType,
 } from "../../../analytics/registry";
-import {
-  sharedFiltersInputSchema,
-  type ApiConfig,
-} from "../../../analytics/types";
+import { type ApiConfig } from "../../../analytics/types";
 import { prisma } from "../../../db";
 import { TRACES_PIVOT_INDEX, esClient } from "../../../elasticsearch";
 import {
@@ -36,6 +32,13 @@ const labelsMapping: Partial<
     });
 
     return Object.fromEntries(topics.map((topic) => [topic.id, topic.name]));
+  },
+
+  "evaluations.evaluation_passed": async () => {
+    return {
+      0: "failed",
+      1: "passed",
+    };
   },
 };
 
