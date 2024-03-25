@@ -114,7 +114,9 @@ def generate_topic_names_split(
     topic_examples: list[list[str]], existing: Optional[list[str]] = None
 ) -> tuple[list[str], Money]:
     total_samples = sum([len(examples) for examples in topic_examples])
-    split_point = min(math.ceil(total_samples / math.ceil(total_samples / 150)), 150)
+    split_point = min(
+        math.ceil(total_samples / max(1, math.ceil(total_samples / 150))), 150
+    )
 
     batch: list[list[str]] = []
 
