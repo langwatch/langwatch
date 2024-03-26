@@ -80,6 +80,8 @@ export function FilterToggle({
         {hasAnyFilters && (
           <Tooltip label="Clear all filters" gutter={0}>
             <Button
+              as={Box}
+              role="button"
               variant="unstyled"
               width="fit-content"
               minWidth={0}

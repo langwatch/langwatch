@@ -130,8 +130,13 @@ function FieldsFilter({
                       {currentStringList.length}
                     </Tag>
                   )}
-                  <Tooltip label={`Clear ${filter.name.toLowerCase()} filter`} gutter={0}>
+                  <Tooltip
+                    label={`Clear ${filter.name.toLowerCase()} filter`}
+                    gutter={0}
+                  >
                     <Button
+                      as={Box}
+                      role="button"
                       variant="unstyled"
                       width="fit-content"
                       display="flex"
@@ -181,7 +186,7 @@ function FieldsFilter({
                 />
               </InputGroup>
             </PopoverHeader>
-            <PopoverBody paddingY={1}>
+            <PopoverBody paddingY={1} paddingX={4}>
               {isOpen && (
                 <NestedListSelection
                   query={query}
@@ -245,18 +250,24 @@ function NestedListSelection({
           return;
         }
 
-        let current_ = Array.isArray(current) ? {} : cloneDeep(current);
+        const filterParam = Array.isArray(current) ? {} : cloneDeep(current);
+        let current_ = filterParam;
         keysBefore
           .slice(0, keysAhead.length + keysBefore.length - 2)
           .forEach((key) => {
             const next = current_[key];
             if (next) {
-              current_ = Array.isArray(next) ? {} : next;
+              if (Array.isArray(next)) {
+                current_[key] = {} as Record<string, string[]>;
+                current_ = current_[key] as any;
+              } else {
+                current_ = next;
+              }
             }
           });
 
+        const lastKey = keysBefore[keysBefore.length - 1]!;
         if (keysAhead.length === 1) {
-          const lastKey = keysBefore[keysBefore.length - 1]!;
           current_[lastKey] = values;
         } else {
           for (const key of Object.keys(current_)) {
@@ -269,9 +280,12 @@ function NestedListSelection({
               current_[key] = [];
             }
           }
+          if (lastKey && Object.keys(current_).length === 0) {
+            current_[lastKey] = [];
+          }
         }
 
-        setFilter(topLevelFilterId, current_);
+        setFilter(topLevelFilterId, filterParam);
       }}
       {...(keysAhead.length > 1
         ? {
@@ -340,7 +354,7 @@ function ListSelection({
       width="full"
       align="start"
       spacing={2}
-      padding={2}
+      paddingY={2}
       maxHeight="300px"
       overflowY="scroll"
       className="js-filter-popover"
@@ -363,7 +377,8 @@ function ListSelection({
                   paddingY={1}
                   spacing={3}
                   isChecked={currentValues.includes(field.toString())}
-                  onChange={(_e) => {
+                  onChange={(e) => {
+                    e.stopPropagation();
                     if (currentValues.includes(field.toString())) {
                       onChange(
                         currentValues.filter(
@@ -438,7 +453,9 @@ function RangeFilter({
 
   useEffect(() => {
     if (filterData.data) {
-      onChange([min.toString(), max.toString()]);
+      setTimeout(() => {
+        onChange([min.toString(), max.toString()]);
+      }, 100);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [min, max]);
