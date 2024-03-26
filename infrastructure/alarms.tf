@@ -83,7 +83,7 @@ resource "aws_cloudwatch_event_rule" "guardduty_findings" {
   #  High: >= 7.0
   event_pattern = jsonencode({
     source      = ["aws.guardduty"],
-    detail_type = ["GuardDuty Finding"],
+    detail-type = ["GuardDuty Finding"],
     detail = {
       severity = [
         4, 4.0, 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 4.7, 4.8, 4.9,
