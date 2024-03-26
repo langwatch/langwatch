@@ -12,3 +12,8 @@ variable "environment_variables" {
   description = "Environment variables for the lambda"
   type        = map(string)
 }
+
+variable "sns_alarms_topic_arn" {
+  description = "SNS topic ARN to send alarms to"
+  type        = string
+}
