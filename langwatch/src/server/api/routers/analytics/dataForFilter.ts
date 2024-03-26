@@ -19,7 +19,7 @@ export const dataForFilter = protectedProcedure
   )
   .use(checkUserPermissionForProject(TeamRoleGroup.ANALYTICS_VIEW))
   .query(async ({ input }) => {
-    const { projectId, field, key, subkey } = input;
+    const { field, key, subkey } = input;
 
     if (availableFilters[field].requiresKey && !key) {
       throw new TRPCError({

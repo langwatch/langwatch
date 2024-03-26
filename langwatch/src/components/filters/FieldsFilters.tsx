@@ -344,58 +344,11 @@ function ListSelection({
     keys?.[0] == "thumbs_up_down" &&
     keys?.[1] == "vote"
   ) {
-    // TODO: extract this to another function
-    const min = currentValues[0] ? +currentValues[0] : undefined;
-    const max = currentValues[1] ? +currentValues[1] : undefined;
-
     return (
-      <VStack
-        width="full"
-        align="start"
-        spacing={2}
-        paddingY={2}
-        maxHeight="300px"
-        overflowY="scroll"
-        className="js-filter-popover"
-      >
-        {[
-          { field: -1, label: "negative" },
-          { field: 1, label: "positive" },
-        ].map(({ field, label }) => (
-          <Checkbox
-            key={field}
-            width="full"
-            paddingY={1}
-            spacing={3}
-            isChecked={!!(min && max && min <= field && max >= field)}
-            onChange={(e) => {
-              e.stopPropagation();
-              if (e.target.checked) {
-                onChange([
-                  (min && min < field ? min : field).toString(),
-                  (max && max > field ? max : field).toString(),
-                ]);
-              } else {
-                const other = field === -1 ? 1 : -1;
-                onChange([
-                  ((min ?? 0) === field && (max ?? 0) === field
-                    ? undefined
-                    : other
-                  )?.toString() ?? "",
-                  ((min ?? 0) === field && (max ?? 0) === field
-                    ? undefined
-                    : other
-                  )?.toString() ?? "",
-                ]);
-              }
-            }}
-          >
-            <VStack width="full" align="start" spacing={"2px"}>
-              <Text>{label}</Text>
-            </VStack>
-          </Checkbox>
-        ))}
-      </VStack>
+      <ThumbsUpDownVoteFilter
+        currentValues={currentValues}
+        onChange={onChange}
+      />
     );
   }
 
@@ -561,5 +514,66 @@ function RangeFilter({
         }}
       />
     </HStack>
+  );
+}
+
+function ThumbsUpDownVoteFilter({
+  currentValues,
+  onChange,
+}: {
+  currentValues: string[];
+  onChange: (value: string[]) => void;
+}) {
+  const min = currentValues[0] ? +currentValues[0] : undefined;
+  const max = currentValues[1] ? +currentValues[1] : undefined;
+
+  return (
+    <VStack
+      width="full"
+      align="start"
+      spacing={2}
+      paddingY={2}
+      maxHeight="300px"
+      overflowY="scroll"
+      className="js-filter-popover"
+    >
+      {[
+        { field: -1, label: "negative" },
+        { field: 1, label: "positive" },
+      ].map(({ field, label }) => (
+        <Checkbox
+          key={field}
+          width="full"
+          paddingY={1}
+          spacing={3}
+          isChecked={!!(min && max && min <= field && max >= field)}
+          onChange={(e) => {
+            e.stopPropagation();
+            if (e.target.checked) {
+              onChange([
+                (min && min < field ? min : field).toString(),
+                (max && max > field ? max : field).toString(),
+              ]);
+            } else {
+              const other = field === -1 ? 1 : -1;
+              onChange([
+                ((min ?? 0) === field && (max ?? 0) === field
+                  ? undefined
+                  : other
+                )?.toString() ?? "",
+                ((min ?? 0) === field && (max ?? 0) === field
+                  ? undefined
+                  : other
+                )?.toString() ?? "",
+              ]);
+            }
+          }}
+        >
+          <VStack width="full" align="start" spacing={"2px"}>
+            <Text>{label}</Text>
+          </VStack>
+        </Checkbox>
+      ))}
+    </VStack>
   );
 }
