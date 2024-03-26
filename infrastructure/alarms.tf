@@ -217,3 +217,23 @@ resource "aws_cloudwatch_metric_alarm" "rds_free_storage_space" {
     DBInstanceIdentifier = aws_db_instance.langwatch.identifier
   }
 }
+
+# EC2 Bastion CloudWatch alarms
+resource "aws_cloudwatch_metric_alarm" "ec2_cpu_utilization_alarm" {
+  count               = module.variables.profile == "lw-prod" ? 1 : 0
+  alarm_name          = "ec2-cpu-high"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = "2"
+  metric_name         = "CPUUtilization"
+  namespace           = "AWS/EC2"
+  period              = "300" # 5 minutes
+  statistic           = "Average"
+  threshold           = 80.0 # Trigger at 80% CPU utilization
+  alarm_description   = "Alarm when EC2 CPU exceeds 80%"
+  actions_enabled     = true
+  alarm_actions       = [aws_sns_topic.alarms.arn]
+
+  dimensions = {
+    InstanceId = aws_instance.bastion[0].id
+  }
+}

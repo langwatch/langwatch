@@ -221,6 +221,7 @@ resource "aws_iam_role_policy_attachment" "flow_log_policy_attachment" {
 }
 
 resource "aws_flow_log" "vpc_flow_log" {
+  count           = module.variables.profile == "lw-prod" ? 1 : 0
   log_destination = aws_cloudwatch_log_group.vpc_flow_logs.arn
   iam_role_arn    = aws_iam_role.flow_log_role.arn
   traffic_type    = "ALL"
@@ -232,6 +233,7 @@ data "aws_vpc" "default" {
 }
 
 resource "aws_flow_log" "default_vpc_flow_log" {
+  count           = module.variables.profile == "lw-prod" ? 1 : 0
   log_destination = aws_cloudwatch_log_group.vpc_flow_logs.arn
   iam_role_arn    = aws_iam_role.flow_log_role.arn
   traffic_type    = "ALL"
