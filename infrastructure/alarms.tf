@@ -98,7 +98,7 @@ resource "aws_cloudwatch_event_rule" "guardduty_findings" {
 
 resource "aws_cloudwatch_event_target" "guardduty_to_sns" {
   count     = module.variables.profile == "lw-prod" ? 1 : 0
-  rule      = aws_cloudwatch_event_rule.guardduty_findings.name
+  rule      = aws_cloudwatch_event_rule.guardduty_findings[0].name
   target_id = "SendToSNS"
   arn       = aws_sns_topic.alarms.arn
 }

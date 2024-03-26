@@ -58,10 +58,6 @@ resource "aws_cloudtrail" "logs" {
     }
   }
 
-  insight_selector {
-    insight_type = "ALL"
-  }
-
   depends_on = [aws_s3_bucket_policy.cloudtrail]
 }
 
