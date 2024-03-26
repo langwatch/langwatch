@@ -107,11 +107,13 @@ export const sharedFiltersInputSchema = z.object({
   endDate: z.number(),
   filters: z.record(
     filterFieldsEnum,
-    z.object({
-      values: z.array(z.string()),
-      key: z.string().optional(),
-      subkey: z.string().optional(),
-    })
+    z.array(
+      z.object({
+        values: z.array(z.string()),
+        key: z.string().optional(),
+        subkey: z.string().optional(),
+      })
+    )
   ),
 });
 

@@ -1,16 +1,33 @@
 import {
   Box,
+  Button,
+  Checkbox,
+  FocusLock,
   FormControl,
   FormLabel,
   HStack,
   Heading,
+  Input,
+  InputGroup,
+  InputLeftElement,
+  Popover,
+  PopoverArrow,
+  PopoverBody,
+  PopoverCloseButton,
+  PopoverContent,
+  PopoverHeader,
+  PopoverTrigger,
   RangeSlider,
   RangeSliderFilledTrack,
   RangeSliderThumb,
   RangeSliderTrack,
+  Skeleton,
   Spacer,
+  Tag,
   Text,
   VStack,
+  useDisclosure,
+  useTheme,
 } from "@chakra-ui/react";
 import {
   Select as MultiSelect,
@@ -25,12 +42,12 @@ import type { FilterDefinition, FilterField } from "../../server/filters/types";
 import { api } from "../../utils/api";
 import { availableFilters } from "../../server/filters/registry";
 import React from "react";
-import { Check } from "react-feather";
+import { Check, ChevronDown, Search, X } from "react-feather";
 import numeral from "numeral";
+import { useDebounceValue } from "usehooks-ts";
+import { on } from "events";
 
 export function FieldsFilters() {
-  const router = useRouter();
-
   const filterKeys: FilterField[] = [
     "spans.model",
     "metadata.labels",
@@ -43,84 +60,301 @@ export function FieldsFilters() {
     "metadata.customer_id",
   ];
 
-  const filters: [FilterField, FilterDefinition][] = filterKeys.map((key) => [
-    key,
-    availableFilters[key],
+  const filters: [FilterField, FilterDefinition][] = filterKeys.map((id) => [
+    id,
+    availableFilters[id],
   ]);
-
-  const addFilterToUrl = useAddFilterToUrl();
 
   return (
     <VStack align="start" width="full" spacing={6}>
       <Heading size="md">Filters</Heading>
       <VStack spacing={4} width="full">
-        {filters.map(([key, filter]) => {
-          const requiredKeyFilter = filter.requiresKey
-            ? availableFilters[filter.requiresKey.filter]
-            : undefined;
-          const requiredKeyUrl = requiredKeyFilter
-            ? `${filter.urlKey}_key`
-            : undefined;
-          const currentKeyValue = requiredKeyUrl
-            ? (router.query[requiredKeyUrl] as string)?.split(",")?.[0]
-            : undefined;
+        {filters.map(([id, filter]) => (
+          <FieldsFilter key={id} filterId={id} filter={filter} />
+        ))}
+      </VStack>
+    </VStack>
+  );
+}
 
-          const requiredSubkeyFilter = filter.requiresSubkey
-            ? availableFilters[filter.requiresSubkey.filter]
-            : undefined;
-          const requiredSubkeyUrl = requiredSubkeyFilter
-            ? `${filter.urlKey}_subkey`
-            : undefined;
-          const currentSubkeyValue = requiredSubkeyUrl
-            ? (router.query[requiredSubkeyUrl] as string)?.split(",")?.[0]
-            : undefined;
+function FieldsFilter({
+  filterId,
+  filter,
+}: {
+  filterId: FilterField;
+  filter: FilterDefinition;
+}) {
+  const router = useRouter();
+  const theme = useTheme();
+  const gray400 = theme.colors.gray["400"];
 
-          return (
-            <FormControl key={key}>
-              <FormLabel>{filter.name}</FormLabel>
-              <HStack flexWrap={filter.type === "numeric" ? "wrap" : undefined}>
-                {requiredKeyFilter && (
-                  <NestedKeyField
-                    filter={filter}
-                    requiredKey={filter.requiresKey!.filter}
-                    requiredKeyUrl={requiredKeyUrl!}
-                    currentKeyValue={currentKeyValue!}
-                  />
-                )}
-                {requiredSubkeyFilter && (
-                  <NestedKeyField
-                    filter={filter}
-                    requiredKey={filter.requiresSubkey!.filter}
-                    requiredKeyUrl={requiredSubkeyUrl!}
-                    currentKeyValue={currentSubkeyValue!}
-                    key_={requiredKeyFilter ? currentKeyValue : undefined}
-                    isDisabled={!!requiredKeyFilter && !currentKeyValue}
-                  />
-                )}
-                <FilterSelectField
-                  current={
-                    (router.query[filter.urlKey] as string)?.split(",") ?? []
-                  }
-                  onChange={(value) => {
+  const requiredKeyFilter = filter.requiresKey
+    ? availableFilters[filter.requiresKey.filter]
+    : undefined;
+  const requiredKeyUrl = requiredKeyFilter ? `${filter.urlKey}_key` : undefined;
+  const currentKeyValue = requiredKeyUrl
+    ? (router.query[requiredKeyUrl] as string)?.split(",")?.[0]
+    : undefined;
+
+  const requiredSubkeyFilter = filter.requiresSubkey
+    ? availableFilters[filter.requiresSubkey.filter]
+    : undefined;
+  const requiredSubkeyUrl = requiredSubkeyFilter
+    ? `${filter.urlKey}_subkey`
+    : undefined;
+  const currentSubkeyValue = requiredSubkeyUrl
+    ? (router.query[requiredSubkeyUrl] as string)?.split(",")?.[0]
+    : undefined;
+
+  const addFilterToUrl = useAddFilterToUrl();
+
+  const searchRef = React.useRef<HTMLInputElement | null>(null);
+  const [query, setQuery] = useDebounceValue("", 300);
+  const { onOpen, onClose, isOpen } = useDisclosure();
+  const current =
+    (router.query[filter.urlKey] as string)?.split(",").filter((x) => x) ?? [];
+
+  return (
+    <FormControl>
+      <Popover
+        matchWidth={true}
+        initialFocusRef={searchRef}
+        isOpen={isOpen}
+        onOpen={onOpen}
+        onClose={onClose}
+      >
+        <PopoverTrigger>
+          <Button
+            variant="outline"
+            width="100%"
+            background="white"
+            fontWeight="normal"
+            _hover={{ background: "white" }}
+          >
+            <HStack width="full" spacing={0}>
+              <Text color="gray.500" fontWeight="500" paddingRight={4}>
+                {filter.name}
+              </Text>
+              {current.length > 0 ? (
+                <>
+                  <Text noOfLines={1} wordBreak="break-all" display="block">
+                    {current.join(", ")}
+                  </Text>
+                  <Spacer />
+                  {current.length > 1 && (
+                    <Tag
+                      width="fit-content"
+                      padding={0}
+                      justifyContent="center"
+                      display="flex"
+                    >
+                      {current.length}
+                    </Tag>
+                  )}
+                  <Button
+                    variant="unstyled"
+                    width="fit-content"
+                    display="flex"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      addFilterToUrl([{ param: filter.urlKey, value: "" }]);
+                    }}
+                  >
+                    <X width={12} />
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Text color="gray.400">Any</Text>
+                  <Spacer />
+                </>
+              )}
+              <ChevronDown width={12} style={{ minWidth: "12px" }} />
+            </HStack>
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent
+          marginTop="-8px"
+          width="100%"
+          motionProps={{
+            variants: {
+              enter: {},
+              exit: {},
+            },
+          }}
+        >
+          <FocusLock restoreFocus persistentFocus={false}>
+            <PopoverHeader paddingY={1} paddingX={1}>
+              <InputGroup>
+                <InputLeftElement>
+                  <Search width={16} color={gray400} />
+                </InputLeftElement>
+                <Input
+                  placeholder="Search..."
+                  border="none"
+                  ref={searchRef}
+                  _focusVisible={{ boxShadow: "none" }}
+                  onChange={(e) => {
+                    setQuery(e.target.value);
+                  }}
+                />
+              </InputGroup>
+            </PopoverHeader>
+            <PopoverBody paddingY={1}>
+              {isOpen && requiredKeyFilter && (
+                <ListSelection
+                  filterId={filter.requiresKey!.filter}
+                  filter={requiredKeyFilter}
+                  query={query}
+                  current={currentKeyValue ? [currentKeyValue] : []}
+                  onChange={(values) => {
                     addFilterToUrl([
-                      { param: filter.urlKey, value: value.join(",") },
+                      {
+                        param: requiredKeyUrl!,
+                        value: values.join(","),
+                      },
+                      ...(values.join(",").length === 0
+                        ? [
+                            {
+                              param: filter.urlKey,
+                              value: "",
+                            },
+                          ]
+                        : []),
                     ]);
                   }}
-                  filter={key}
+                />
+              )}
+              {isOpen && (!requiredKeyFilter || currentKeyValue) && (
+                <ListSelection
+                  filterId={filterId}
+                  filter={filter}
+                  query={query}
+                  current={current}
                   key_={requiredKeyFilter ? currentKeyValue : undefined}
                   subkey={requiredSubkeyFilter ? currentSubkeyValue : undefined}
-                  isDisabled={
-                    (!!requiredKeyFilter && !currentKeyValue) ||
-                    (!!requiredSubkeyFilter && !currentSubkeyValue)
-                  }
-                  single={!!filter.single}
-                  emptyOption={filter.single ? "Select..." : undefined}
+                  onChange={(values) => {
+                    addFilterToUrl([
+                      { param: filter.urlKey, value: values.join(",") },
+                    ]);
+                  }}
                 />
-              </HStack>
-            </FormControl>
-          );
-        })}
-      </VStack>
+              )}
+            </PopoverBody>
+          </FocusLock>
+        </PopoverContent>
+      </Popover>
+
+      {/* <FormLabel>{filter.name}</FormLabel>
+      <HStack flexWrap={filter.type === "numeric" ? "wrap" : undefined}>
+        {requiredKeyFilter && (
+          <NestedKeyField
+            filter={filter}
+            requiredKey={filter.requiresKey!.filter}
+            requiredKeyUrl={requiredKeyUrl!}
+            currentKeyValue={currentKeyValue!}
+          />
+        )}
+        {requiredSubkeyFilter && (
+          <NestedKeyField
+            filter={filter}
+            requiredKey={filter.requiresSubkey!.filter}
+            requiredKeyUrl={requiredSubkeyUrl!}
+            currentKeyValue={currentSubkeyValue!}
+            key_={requiredKeyFilter ? currentKeyValue : undefined}
+            isDisabled={!!requiredKeyFilter && !currentKeyValue}
+          />
+        )}
+        <FilterSelectField
+          current={(router.query[filter.urlKey] as string)?.split(",") ?? []}
+          onChange={(value) => {
+            addFilterToUrl([{ param: filter.urlKey, value: value.join(",") }]);
+          }}
+          filter={filterKey}
+          key_={requiredKeyFilter ? currentKeyValue : undefined}
+          subkey={requiredSubkeyFilter ? currentSubkeyValue : undefined}
+          isDisabled={
+            (!!requiredKeyFilter && !currentKeyValue) ||
+            (!!requiredSubkeyFilter && !currentSubkeyValue)
+          }
+          single={!!filter.single}
+          emptyOption={filter.single ? "Select..." : undefined}
+        />
+      </HStack> */}
+    </FormControl>
+  );
+}
+
+function ListSelection({
+  filterId,
+  filter,
+  query,
+  key_,
+  subkey,
+  current,
+  onChange,
+}: {
+  filterId: FilterField;
+  filter: FilterDefinition;
+  query: string;
+  key_?: string;
+  subkey?: string;
+  current: string[];
+  onChange: (value: string[]) => void;
+}) {
+  const { project } = useOrganizationTeamProject();
+
+  const filterData = api.analytics.dataForFilter.useQuery(
+    {
+      projectId: project?.id ?? "",
+      field: filterId,
+      query: query,
+      key: key_,
+      subkey: subkey,
+    },
+    {
+      refetchOnMount: false,
+      refetchOnWindowFocus: false,
+      keepPreviousData: true,
+      enabled: !!project,
+    }
+  );
+
+  return (
+    <VStack
+      width="full"
+      align="start"
+      spacing={2}
+      padding={2}
+      maxHeight="300px"
+      overflowY="scroll"
+    >
+      {filterData.data?.options.map(({ field, label }) => (
+        <Checkbox
+          key={field}
+          paddingY={1}
+          spacing={3}
+          isChecked={current.includes(field)}
+          onChange={(_e) => {
+            if (current.includes(field)) {
+              onChange(current.filter((v) => v !== field));
+            } else {
+              onChange([...current, field]);
+            }
+          }}
+        >
+          {label}
+        </Checkbox>
+      ))}
+      {filterData.data && filterData.data.options.length === 0 && (
+        <Text>No options found</Text>
+      )}
+      {filterData.isLoading &&
+        Array.from({ length: 5 }).map((_, i) => (
+          <Checkbox key={i} isChecked={false} paddingY={2} spacing={3}>
+            <Skeleton height="12px" width="120px" />
+          </Checkbox>
+        ))}
     </VStack>
   );
 }
