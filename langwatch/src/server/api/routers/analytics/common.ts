@@ -43,27 +43,15 @@ export const generateTracesPivotQueryConditions = ({
       ? new Date().getTime()
       : endDate;
 
-  const filterConditions: QueryDslQueryContainer[] = [];
-  for (const [field, { values, key, subkey }] of Object.entries(filters)) {
-    if (values.length > 0) {
-      const filter = availableFilters[field as FilterField];
+  let filterConditions: QueryDslQueryContainer[] = [];
 
-      if (filter.requiresKey && !key) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: `Filter '${field}' requires a '${filter.requiresKey.filter}' key to be defined`,
-        });
-      }
-
-      if (filter.requiresSubkey && !subkey) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: `Filter '${field}' requires a '${filter.requiresSubkey.filter}' subkey to be defined`,
-        });
-      }
-
-      filterConditions.push(filter.query(values, key, subkey));
+  for (const [field, params] of Object.entries(filters)) {
+    if (params.length == 0) {
+      continue;
     }
+
+    const col = collectConditions(field as FilterField, params);
+    filterConditions = filterConditions.concat(col);
   }
 
   return {
@@ -89,4 +77,53 @@ export const generateTracesPivotQueryConditions = ({
     isAnyFilterPresent: filterConditions.length > 0,
     endDateUsedForQuery: endDate_,
   };
+};
+
+const collectConditions = (
+  field: FilterField,
+  params:
+    | string[]
+    | Record<string, string[]>
+    | Record<string, Record<string, string[]>>,
+  keys: string[] = []
+): QueryDslQueryContainer[] => {
+  const key = keys[0];
+  const subkey = keys[1];
+
+  if (Array.isArray(params)) {
+    const conditions: QueryDslQueryContainer[] = [];
+    const filter = availableFilters[field];
+
+    if (filter.requiresKey && !key) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: `Filter '${field}' requires a '${filter.requiresKey.filter}' key to be defined`,
+      });
+    }
+
+    if (filter.requiresSubkey && !subkey) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: `Filter '${field}' requires a '${filter.requiresSubkey.filter}' subkey to be defined`,
+      });
+    }
+
+    conditions.push(filter.query(params, key, subkey));
+
+    return conditions;
+  } else if (typeof params === "object") {
+    const conditions: QueryDslQueryContainer[] = [
+      {
+        bool: {
+          should: Object.entries(params).flatMap(([key, values]) => {
+            return collectConditions(field, values, [...keys, key]);
+          }),
+        } as QueryDslBoolQuery,
+      },
+    ];
+
+    return conditions;
+  }
+
+  return [];
 };

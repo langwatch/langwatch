@@ -4,16 +4,13 @@ import {
   Checkbox,
   FocusLock,
   FormControl,
-  FormLabel,
   HStack,
   Heading,
   Input,
   InputGroup,
   InputLeftElement,
   Popover,
-  PopoverArrow,
   PopoverBody,
-  PopoverCloseButton,
   PopoverContent,
   PopoverHeader,
   PopoverTrigger,
@@ -27,25 +24,22 @@ import {
   Text,
   VStack,
   useDisclosure,
-  useTheme,
+  useTheme
 } from "@chakra-ui/react";
-import {
-  Select as MultiSelect,
-  chakraComponents,
-  type MultiValue,
-  type SingleValue,
-} from "chakra-react-select";
-import { useRouter } from "next/router";
-import { useEffect, useMemo, useState } from "react";
+import type { TRPCClientErrorLike } from "@trpc/client";
+import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
+import type { inferRouterOutputs } from "@trpc/server";
+import { cloneDeep } from "lodash";
+import numeral from "numeral";
+import React, { useEffect } from "react";
+import { ChevronDown, Search, X } from "react-feather";
+import { useDebounceValue } from "usehooks-ts";
+import { useFilterParams, type FilterParam } from "../../hooks/useFilterParams";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
+import type { AppRouter } from "../../server/api/root";
+import { availableFilters } from "../../server/filters/registry";
 import type { FilterDefinition, FilterField } from "../../server/filters/types";
 import { api } from "../../utils/api";
-import { availableFilters } from "../../server/filters/registry";
-import React from "react";
-import { Check, ChevronDown, Search, X } from "react-feather";
-import numeral from "numeral";
-import { useDebounceValue } from "usehooks-ts";
-import { on } from "events";
 
 export function FieldsFilters() {
   const filterKeys: FilterField[] = [
@@ -84,35 +78,19 @@ function FieldsFilter({
   filterId: FilterField;
   filter: FilterDefinition;
 }) {
-  const router = useRouter();
   const theme = useTheme();
   const gray400 = theme.colors.gray["400"];
 
-  const requiredKeyFilter = filter.requiresKey
-    ? availableFilters[filter.requiresKey.filter]
-    : undefined;
-  const requiredKeyUrl = requiredKeyFilter ? `${filter.urlKey}_key` : undefined;
-  const currentKeyValue = requiredKeyUrl
-    ? (router.query[requiredKeyUrl] as string)?.split(",")?.[0]
-    : undefined;
-
-  const requiredSubkeyFilter = filter.requiresSubkey
-    ? availableFilters[filter.requiresSubkey.filter]
-    : undefined;
-  const requiredSubkeyUrl = requiredSubkeyFilter
-    ? `${filter.urlKey}_subkey`
-    : undefined;
-  const currentSubkeyValue = requiredSubkeyUrl
-    ? (router.query[requiredSubkeyUrl] as string)?.split(",")?.[0]
-    : undefined;
-
-  const addFilterToUrl = useAddFilterToUrl();
+  const { setFilter, filters } = useFilterParams();
 
   const searchRef = React.useRef<HTMLInputElement | null>(null);
   const [query, setQuery] = useDebounceValue("", 300);
   const { onOpen, onClose, isOpen } = useDisclosure();
-  const current =
-    (router.query[filter.urlKey] as string)?.split(",").filter((x) => x) ?? [];
+  const current = filters[filterId] ?? [];
+
+  const currentStringList = Array.isArray(current)
+    ? current
+    : Object.keys(current);
 
   return (
     <FormControl>
@@ -135,20 +113,20 @@ function FieldsFilter({
               <Text color="gray.500" fontWeight="500" paddingRight={4}>
                 {filter.name}
               </Text>
-              {current.length > 0 ? (
+              {currentStringList.length > 0 ? (
                 <>
                   <Text noOfLines={1} wordBreak="break-all" display="block">
-                    {current.join(", ")}
+                    {currentStringList.join(", ")}
                   </Text>
                   <Spacer />
-                  {current.length > 1 && (
+                  {currentStringList.length > 1 && (
                     <Tag
                       width="fit-content"
                       padding={0}
                       justifyContent="center"
                       display="flex"
                     >
-                      {current.length}
+                      {currentStringList.length}
                     </Tag>
                   )}
                   <Button
@@ -157,7 +135,7 @@ function FieldsFilter({
                     display="flex"
                     onClick={(e) => {
                       e.stopPropagation();
-                      addFilterToUrl([{ param: filter.urlKey, value: "" }]);
+                      setFilter(filterId, []);
                     }}
                   >
                     <X width={12} />
@@ -201,116 +179,141 @@ function FieldsFilter({
               </InputGroup>
             </PopoverHeader>
             <PopoverBody paddingY={1}>
-              {isOpen && requiredKeyFilter && (
-                <ListSelection
-                  filterId={filter.requiresKey!.filter}
-                  filter={requiredKeyFilter}
-                  query={query}
-                  current={currentKeyValue ? [currentKeyValue] : []}
-                  onChange={(values) => {
-                    addFilterToUrl([
-                      {
-                        param: requiredKeyUrl!,
-                        value: values.join(","),
-                      },
-                      ...(values.join(",").length === 0
-                        ? [
-                            {
-                              param: filter.urlKey,
-                              value: "",
-                            },
-                          ]
-                        : []),
-                    ]);
-                  }}
-                />
-              )}
-              {isOpen && (!requiredKeyFilter || currentKeyValue) && (
-                <ListSelection
-                  filterId={filterId}
-                  filter={filter}
+              {isOpen && (
+                <NestedListSelection
                   query={query}
                   current={current}
-                  key_={requiredKeyFilter ? currentKeyValue : undefined}
-                  subkey={requiredSubkeyFilter ? currentSubkeyValue : undefined}
-                  onChange={(values) => {
-                    addFilterToUrl([
-                      { param: filter.urlKey, value: values.join(",") },
-                    ]);
-                  }}
+                  keysAhead={[
+                    ...(filter.requiresKey ? [filter.requiresKey.filter] : []),
+                    ...(filter.requiresSubkey
+                      ? [filter.requiresSubkey.filter]
+                      : []),
+                    filterId,
+                  ]}
                 />
               )}
             </PopoverBody>
           </FocusLock>
         </PopoverContent>
       </Popover>
-
-      {/* <FormLabel>{filter.name}</FormLabel>
-      <HStack flexWrap={filter.type === "numeric" ? "wrap" : undefined}>
-        {requiredKeyFilter && (
-          <NestedKeyField
-            filter={filter}
-            requiredKey={filter.requiresKey!.filter}
-            requiredKeyUrl={requiredKeyUrl!}
-            currentKeyValue={currentKeyValue!}
-          />
-        )}
-        {requiredSubkeyFilter && (
-          <NestedKeyField
-            filter={filter}
-            requiredKey={filter.requiresSubkey!.filter}
-            requiredKeyUrl={requiredSubkeyUrl!}
-            currentKeyValue={currentSubkeyValue!}
-            key_={requiredKeyFilter ? currentKeyValue : undefined}
-            isDisabled={!!requiredKeyFilter && !currentKeyValue}
-          />
-        )}
-        <FilterSelectField
-          current={(router.query[filter.urlKey] as string)?.split(",") ?? []}
-          onChange={(value) => {
-            addFilterToUrl([{ param: filter.urlKey, value: value.join(",") }]);
-          }}
-          filter={filterKey}
-          key_={requiredKeyFilter ? currentKeyValue : undefined}
-          subkey={requiredSubkeyFilter ? currentSubkeyValue : undefined}
-          isDisabled={
-            (!!requiredKeyFilter && !currentKeyValue) ||
-            (!!requiredSubkeyFilter && !currentSubkeyValue)
-          }
-          single={!!filter.single}
-          emptyOption={filter.single ? "Select..." : undefined}
-        />
-      </HStack> */}
     </FormControl>
+  );
+}
+
+function NestedListSelection({
+  query,
+  current,
+  keysAhead,
+  keysBefore = [],
+}: {
+  query: string;
+  current: FilterParam;
+  keysAhead: FilterField[];
+  keysBefore?: string[];
+}) {
+  const { setFilter } = useFilterParams();
+
+  const filterId = keysAhead[0];
+  if (!filterId) {
+    console.warn("NestedListSelection called with empty keysAhead");
+    return null;
+  }
+
+  let currentValues = current;
+  keysBefore.forEach((key) => {
+    if (!Array.isArray(currentValues)) {
+      currentValues = currentValues[key] ?? [];
+    }
+  });
+  if (!Array.isArray(currentValues)) {
+    currentValues = Object.keys(currentValues);
+  }
+
+  return (
+    <ListSelection
+      filterId={filterId}
+      query={query}
+      currentValues={currentValues}
+      keys={keysBefore}
+      onChange={(values) => {
+        const topLevelFilterId = keysAhead[keysAhead.length - 1]!;
+        if (keysAhead.length === 1 && keysBefore.length == 0) {
+          setFilter(topLevelFilterId, values);
+          return;
+        }
+
+        let current_ = Array.isArray(current) ? {} : cloneDeep(current);
+        keysBefore
+          .slice(0, keysAhead.length + keysBefore.length - 2)
+          .forEach((key) => {
+            const next = current_[key];
+            if (next) {
+              current_ = Array.isArray(next) ? {} : next;
+            }
+          });
+
+        if (keysAhead.length === 1) {
+          const lastKey = keysBefore[keysBefore.length - 1]!;
+          current_[lastKey] = values;
+        } else {
+          for (const key of Object.keys(current_)) {
+            if (!(key in values)) {
+              delete current_[key];
+            }
+          }
+          for (const key of values) {
+            if (!current_[key]) {
+              current_[key] = [];
+            }
+          }
+        }
+
+        setFilter(topLevelFilterId, current_);
+      }}
+      {...(keysAhead.length > 1
+        ? {
+            nested: (key) => {
+              return (
+                <NestedListSelection
+                  query={query}
+                  current={current}
+                  keysAhead={keysAhead.slice(1)}
+                  keysBefore={[...keysBefore, key]}
+                />
+              );
+            },
+          }
+        : {})}
+    />
   );
 }
 
 function ListSelection({
   filterId,
-  filter,
   query,
-  key_,
-  subkey,
-  current,
+  keys,
+  currentValues,
   onChange,
+  nested,
 }: {
   filterId: FilterField;
-  filter: FilterDefinition;
   query: string;
-  key_?: string;
-  subkey?: string;
-  current: string[];
+  keys?: string[];
+  currentValues: string[];
   onChange: (value: string[]) => void;
+  nested?: (key: string) => React.ReactNode;
 }) {
   const { project } = useOrganizationTeamProject();
+
+  const filter = availableFilters[filterId];
 
   const filterData = api.analytics.dataForFilter.useQuery(
     {
       projectId: project?.id ?? "",
       field: filterId,
       query: query,
-      key: key_,
-      subkey: subkey,
+      key: keys?.[0],
+      subkey: keys?.[1],
     },
     {
       refetchOnMount: false,
@@ -319,6 +322,16 @@ function ListSelection({
       enabled: !!project,
     }
   );
+
+  if (filter.type === "numeric") {
+    return (
+      <RangeFilter
+        filterData={filterData}
+        currentValues={currentValues}
+        onChange={onChange}
+      />
+    );
+  }
 
   return (
     <VStack
@@ -330,21 +343,27 @@ function ListSelection({
       overflowY="scroll"
     >
       {filterData.data?.options.map(({ field, label }) => (
-        <Checkbox
-          key={field}
-          paddingY={1}
-          spacing={3}
-          isChecked={current.includes(field)}
-          onChange={(_e) => {
-            if (current.includes(field)) {
-              onChange(current.filter((v) => v !== field));
-            } else {
-              onChange([...current, field]);
-            }
-          }}
-        >
-          {label}
-        </Checkbox>
+        <React.Fragment key={field}>
+          <Checkbox
+            paddingY={1}
+            spacing={3}
+            isChecked={currentValues.includes(field.toString())}
+            onChange={(_e) => {
+              if (currentValues.includes(field.toString())) {
+                onChange(
+                  currentValues.filter((v) => v.toString() !== field.toString())
+                );
+              } else {
+                onChange([...currentValues, field]);
+              }
+            }}
+          >
+            {label}
+          </Checkbox>
+          <Box width="full" paddingLeft={4}>
+            {nested && currentValues.includes(field) && nested(field)}
+          </Box>
+        </React.Fragment>
       ))}
       {filterData.data && filterData.data.options.length === 0 && (
         <Text>No options found</Text>
@@ -359,265 +378,81 @@ function ListSelection({
   );
 }
 
-const useAddFilterToUrl = () => {
-  const router = useRouter();
-
-  return (filters: { param: string; value: string }[]) => {
-    void router.push(
-      {
-        query: {
-          ...router.query,
-          ...Object.fromEntries(
-            filters.map(({ param, value }) => [param, value])
-          ),
-        },
-      },
-      undefined,
-      { shallow: true, scroll: false }
-    );
-  };
-};
-
-function NestedKeyField({
-  filter,
-  requiredKey,
-  requiredKeyUrl,
-  currentKeyValue,
-  key_,
-  isDisabled = false,
-}: {
-  filter: FilterDefinition;
-  requiredKey: FilterField;
-  requiredKeyUrl: string;
-  currentKeyValue: string;
-  key_?: string;
-  isDisabled?: boolean;
-}) {
-  const addFilterToUrl = useAddFilterToUrl();
-
-  return (
-    <FilterSelectField
-      single={true}
-      current={currentKeyValue ? [currentKeyValue] : []}
-      onChange={(value) => {
-        addFilterToUrl([
-          {
-            param: requiredKeyUrl,
-            value: value.join(","),
-          },
-          ...(value.join(",").length === 0
-            ? [
-                {
-                  param: filter.urlKey,
-                  value: "",
-                },
-              ]
-            : []),
-        ]);
-      }}
-      filter={requiredKey}
-      emptyOption={"Select..."}
-      key_={key_}
-      isDisabled={isDisabled}
-    />
-  );
-}
-
-const FilterSelectField = React.memo(function FilterSelectField({
+function RangeFilter({
+  filterData,
+  currentValues,
   onChange,
-  key_,
-  subkey,
-  filter,
-  emptyOption,
-  current,
-  isDisabled = false,
-  single = false,
 }: {
+  filterData: UseTRPCQueryResult<
+    inferRouterOutputs<AppRouter>["analytics"]["dataForFilter"],
+    TRPCClientErrorLike<AppRouter>
+  >;
+  currentValues: string[];
   onChange: (value: string[]) => void;
-  key_?: string;
-  subkey?: string;
-  filter: FilterField;
-  emptyOption?: string;
-  current?: string[];
-  isDisabled?: boolean;
-  single?: boolean;
 }) {
-  const { project } = useOrganizationTeamProject();
-  const [query, setQuery] = useState("");
-  const filterData = api.analytics.dataForFilter.useQuery(
-    {
-      projectId: project?.id ?? "",
-      field: filter,
-      key: key_,
-      subkey: subkey,
-      query: query,
-    },
-    {
-      enabled: !!project && !isDisabled,
-      refetchOnMount: false,
-      refetchOnWindowFocus: false,
-    }
-  );
-
-  const [options, current_] = useMemo(() => {
-    const emptyOption_ =
-      typeof emptyOption !== "undefined"
-        ? [{ value: "", label: emptyOption }]
-        : [];
-
-    const options: { value: string; label: string; count?: number }[] =
-      emptyOption_.concat(
-        filterData.data?.options.map(({ field, label, count }) => ({
-          value: field?.toString() ?? "0",
-          label,
-          count,
-        })) ?? []
-      );
-
-    const current_ = options.filter(
-      (option) => current?.includes(option.value)
-    );
-
-    return [options, current_];
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [JSON.stringify(current), emptyOption, filterData.data?.options]);
-
-  const isNumeric = availableFilters[filter].type === "numeric";
-
-  const min = +numeral(
+  let min = +numeral(
     +(filterData.data?.options.find((o) => o.label === "min")?.field ?? 0)
   ).format("0.[0]");
-  const max = +numeral(
+  let max = +numeral(
     +(filterData.data?.options.find((o) => o.label === "max")?.field ?? 0)
   ).format("0.[0]");
+  if (min === max && min === 0) {
+    min = 0;
+    max = 1;
+  }
+  if (min === max && min !== 0) {
+    min = 0;
+  }
 
   useEffect(() => {
-    if (isNumeric && filterData.data) {
+    if (filterData.data) {
       onChange([min.toString(), max.toString()]);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [min, max]);
 
-  if (isNumeric) {
-    return (
-      <HStack width="100%" paddingX={4}>
-        <RangeSlider
-          isDisabled={isDisabled}
-          colorScheme="orange"
-          // eslint-disable-next-line jsx-a11y/aria-proptypes
-          aria-label={["min", "max"]}
-          min={min}
-          max={max}
-          step={0.1}
-          value={
-            current && current.length == 2
-              ? current?.map((v) => +v)
-              : [min, max]
-          }
-          onChange={(values) => {
-            onChange(values.map((v) => v.toString()));
-          }}
-        >
-          <RangeSliderTrack>
-            <RangeSliderFilledTrack />
-          </RangeSliderTrack>
-          <RangeSliderThumb index={0} padding={3}>
-            <Text fontSize={13}>{current?.[0]}</Text>
-          </RangeSliderThumb>
-          <RangeSliderThumb index={1} padding={3}>
-            <Text fontSize={13}>{current?.[1]}</Text>
-          </RangeSliderThumb>
-        </RangeSlider>
-      </HStack>
-    );
-  }
-
   return (
-    <MultiSelect
-      key={filter}
-      hideSelectedOptions={false}
-      closeMenuOnSelect={single}
-      isDisabled={isDisabled}
-      //@ts-ignore
-      onChange={(
-        options:
-          | MultiValue<{ value: string; label: string; count?: number }>
-          | SingleValue<{ value: string; label: string; count?: number }>
-      ) => {
-        if (Array.isArray(options)) {
-          onChange(options.map((o) => o.value));
-        } else if (options) {
-          onChange([(options as any).value]);
+    <HStack width="full" spacing={4}>
+      <Input
+        width="72px"
+        paddingX={2}
+        textAlign="center"
+        value={currentValues[0]}
+        onChange={(e) => {
+          onChange([e.target.value, currentValues[1] ?? max.toString()]);
+        }}
+      />
+      <RangeSlider
+        colorScheme="orange"
+        // eslint-disable-next-line jsx-a11y/aria-proptypes
+        aria-label={["min", "max"]}
+        min={min}
+        max={max}
+        step={0.1}
+        value={
+          currentValues && currentValues.length == 2
+            ? currentValues?.map((v) => +v)
+            : [min, max]
         }
-
-        return true;
-      }}
-      isLoading={!isDisabled && filterData.isLoading}
-      onInputChange={(input) => {
-        setQuery(input);
-      }}
-      options={options}
-      value={current_}
-      isSearchable={true}
-      isMulti={!single}
-      useBasicStyles
-      placeholder="Select..."
-      chakraStyles={{
-        container: (base) => ({
-          ...base,
-          background: "white",
-          width: "100%",
-          minWidth: "50%",
-          borderRadius: "5px",
-        }),
-      }}
-      components={{
-        Option: ({ ...props }) => {
-          const data = props.data as {
-            value: string;
-            label: string;
-            count?: number;
-          };
-          let label = data.label;
-          let details = "";
-          // const count = (props.data as any).count;
-          // if label is like "[details] label" then split it
-          const labelDetailsMatch = data.label.match(/^\[(.*)\] (.*)/);
-          if (labelDetailsMatch) {
-            label = labelDetailsMatch[2] ?? "";
-            details = labelDetailsMatch[1] ?? "";
-          }
-
-          return (
-            <chakraComponents.Option {...props} className="multicheck-option">
-              <HStack width="full" align="end">
-                <Box width="16px">
-                  {props.isSelected && <Check width="16px" />}
-                </Box>
-                <VStack width="full" align="start" spacing={"2px"}>
-                  {details && (
-                    <Text fontSize="sm" color="gray.500">
-                      {details}
-                    </Text>
-                  )}
-                  <HStack width="full">
-                    <Text color={data.value === "" ? "gray.400" : undefined}>
-                      {label}
-                    </Text>
-                    <Spacer />
-                    {/* TODO: this is hidden for now because we need to send also the date range, and other filters, to apply the rules */}
-                    {/* {typeof count !== "undefined" && (
-                      <Text fontSize={13} color="gray.400">
-                        {count}
-                      </Text>
-                    )} */}
-                  </HStack>
-                </VStack>
-              </HStack>
-            </chakraComponents.Option>
-          );
-        },
-      }}
-    />
+        onChange={(values) => {
+          onChange(values.map((v) => v.toString()));
+        }}
+      >
+        <RangeSliderTrack>
+          <RangeSliderFilledTrack />
+        </RangeSliderTrack>
+        <RangeSliderThumb index={0} />
+        <RangeSliderThumb index={1} />
+      </RangeSlider>
+      <Input
+        width="72px"
+        paddingX={2}
+        textAlign="center"
+        value={currentValues[1]}
+        onChange={(e) => {
+          onChange([currentValues[0] ?? min.toString(), e.target.value]);
+        }}
+      />
+    </HStack>
   );
-});
+}

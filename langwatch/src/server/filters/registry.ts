@@ -605,7 +605,7 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
   },
   "trace_checks.score": {
     name: "Evaluation Score",
-    urlKey: "evaluation_passed",
+    urlKey: "evaluation_score",
     type: "numeric",
     single: true,
     requiresKey: {

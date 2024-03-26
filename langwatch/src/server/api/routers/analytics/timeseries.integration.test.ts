@@ -226,7 +226,7 @@ describe("Timeseries Graph Integration Tests", () => {
       startDate: new Date().getTime() - 24 * 60 * 60 * 1000, // 1 day ago
       endDate: new Date().getTime(),
       filters: {
-        "metadata.labels": { values: ["test-messages"] },
+        "metadata.labels": [],
       },
       series: [
         { metric: "metadata.trace_id", aggregation: "cardinality" },
@@ -275,7 +275,7 @@ describe("Timeseries Graph Integration Tests", () => {
       startDate: new Date().getTime() - 24 * 60 * 60 * 1000, // 1 day ago
       endDate: new Date().getTime(),
       filters: {
-        "metadata.labels": { values: ["test-messages"] },
+        "metadata.labels": [],
       },
       series: [
         { metric: "metadata.trace_id", aggregation: "cardinality" },
@@ -334,7 +334,7 @@ describe("Timeseries Graph Integration Tests", () => {
       startDate: new Date().getTime() - 24 * 60 * 60 * 1000, // 1 day ago
       endDate: new Date().getTime(),
       filters: {
-        "metadata.labels": { values: ["test-messages"] },
+        "metadata.labels": [],
       },
       series: [
         { metric: "metadata.trace_id", aggregation: "cardinality" },
@@ -396,7 +396,7 @@ describe("Timeseries Graph Integration Tests", () => {
       startDate: new Date().getTime() - 24 * 60 * 60 * 1000 * 1, // 1 days ago
       endDate: new Date().getTime(),
       filters: {
-        "metadata.labels": { values: ["test-messages"] },
+        "metadata.labels": [],
       },
       series: [
         { metric: "metadata.trace_id", aggregation: "cardinality" },

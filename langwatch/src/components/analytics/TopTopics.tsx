@@ -32,8 +32,8 @@ export function TopTopics() {
     ...filterParams,
     filters: {
       ...filterParams.filters,
-      "topics.topics": { values: [] },
-      "topics.subtopics": { values: [] },
+      "topics.topics": [],
+      "topics.subtopics": [],
     },
   };
 
