@@ -22,9 +22,10 @@ import {
   Spacer,
   Tag,
   Text,
+  Tooltip,
   VStack,
   useDisclosure,
-  useTheme
+  useTheme,
 } from "@chakra-ui/react";
 import type { TRPCClientErrorLike } from "@trpc/client";
 import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
@@ -35,7 +36,6 @@ import React, { useEffect } from "react";
 import { ChevronDown, Search, X } from "react-feather";
 import { useDebounceValue } from "usehooks-ts";
 import { useFilterParams, type FilterParam } from "../../hooks/useFilterParams";
-import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import type { AppRouter } from "../../server/api/root";
 import { availableFilters } from "../../server/filters/registry";
 import type { FilterDefinition, FilterField } from "../../server/filters/types";
@@ -47,7 +47,7 @@ export function FieldsFilters() {
     "metadata.labels",
     "trace_checks.passed",
     "trace_checks.score",
-    "trace_checks.state",
+    // "trace_checks.state",
     "events.metrics.value",
     "metadata.user_id",
     "metadata.thread_id",
@@ -100,6 +100,7 @@ function FieldsFilter({
         isOpen={isOpen}
         onOpen={onOpen}
         onClose={onClose}
+        placement="bottom"
       >
         <PopoverTrigger>
           <Button
@@ -129,17 +130,19 @@ function FieldsFilter({
                       {currentStringList.length}
                     </Tag>
                   )}
-                  <Button
-                    variant="unstyled"
-                    width="fit-content"
-                    display="flex"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setFilter(filterId, []);
-                    }}
-                  >
-                    <X width={12} />
-                  </Button>
+                  <Tooltip label={`Clear ${filter.name.toLowerCase()} filter`} gutter={0}>
+                    <Button
+                      variant="unstyled"
+                      width="fit-content"
+                      display="flex"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setFilter(filterId, []);
+                      }}
+                    >
+                      <X width={12} />
+                    </Button>
+                  </Tooltip>
                 </>
               ) : (
                 <>
@@ -303,13 +306,12 @@ function ListSelection({
   onChange: (value: string[]) => void;
   nested?: (key: string) => React.ReactNode;
 }) {
-  const { project } = useOrganizationTeamProject();
-
   const filter = availableFilters[filterId];
 
+  const { filterParams, queryOpts } = useFilterParams();
   const filterData = api.analytics.dataForFilter.useQuery(
     {
-      projectId: project?.id ?? "",
+      ...filterParams,
       field: filterId,
       query: query,
       key: keys?.[0],
@@ -319,7 +321,7 @@ function ListSelection({
       refetchOnMount: false,
       refetchOnWindowFocus: false,
       keepPreviousData: true,
-      enabled: !!project,
+      enabled: queryOpts.enabled,
     }
   );
 
@@ -341,35 +343,65 @@ function ListSelection({
       padding={2}
       maxHeight="300px"
       overflowY="scroll"
+      className="js-filter-popover"
     >
-      {filterData.data?.options.map(({ field, label }) => (
-        <React.Fragment key={field}>
-          <Checkbox
-            paddingY={1}
-            spacing={3}
-            isChecked={currentValues.includes(field.toString())}
-            onChange={(_e) => {
-              if (currentValues.includes(field.toString())) {
-                onChange(
-                  currentValues.filter((v) => v.toString() !== field.toString())
-                );
-              } else {
-                onChange([...currentValues, field]);
-              }
-            }}
-          >
-            {label}
-          </Checkbox>
-          <Box width="full" paddingLeft={4}>
-            {nested && currentValues.includes(field) && nested(field)}
-          </Box>
-        </React.Fragment>
-      ))}
+      {filterData.data?.options
+        .sort((a, b) => (a.count > b.count ? -1 : 1))
+        .map(({ field, label, count }) => {
+          let details = "";
+          const labelDetailsMatch = label.match(/^\[(.*)\] (.*)/);
+          if (labelDetailsMatch) {
+            label = labelDetailsMatch[2] ?? "";
+            details = labelDetailsMatch[1] ?? "";
+          }
+
+          return (
+            <React.Fragment key={field}>
+              <HStack width="full">
+                <Checkbox
+                  width="full"
+                  paddingY={1}
+                  spacing={3}
+                  isChecked={currentValues.includes(field.toString())}
+                  onChange={(_e) => {
+                    if (currentValues.includes(field.toString())) {
+                      onChange(
+                        currentValues.filter(
+                          (v) => v.toString() !== field.toString()
+                        )
+                      );
+                    } else {
+                      onChange([...currentValues, field]);
+                    }
+                  }}
+                >
+                  <VStack width="full" align="start" spacing={"2px"}>
+                    {details && (
+                      <Text fontSize="sm" color="gray.500">
+                        {details}
+                      </Text>
+                    )}
+                    <Text>{label}</Text>
+                  </VStack>
+                </Checkbox>
+                <Spacer />
+                {typeof count !== "undefined" && (
+                  <Text fontSize={13} color="gray.400">
+                    {count}
+                  </Text>
+                )}
+              </HStack>
+              <Box width="full" paddingLeft={4}>
+                {nested && currentValues.includes(field) && nested(field)}
+              </Box>
+            </React.Fragment>
+          );
+        })}
       {filterData.data && filterData.data.options.length === 0 && (
         <Text>No options found</Text>
       )}
       {filterData.isLoading &&
-        Array.from({ length: 5 }).map((_, i) => (
+        Array.from({ length: keys && keys.length > 0 ? 2 : 5 }).map((_, i) => (
           <Checkbox key={i} isChecked={false} paddingY={2} spacing={3}>
             <Skeleton height="12px" width="120px" />
           </Checkbox>

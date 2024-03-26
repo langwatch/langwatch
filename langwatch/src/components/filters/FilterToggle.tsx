@@ -1,6 +1,6 @@
-import { Box, Button, HStack, Text } from "@chakra-ui/react";
+import { Box, Button, HStack, Text, Tooltip } from "@chakra-ui/react";
 import { useRouter } from "next/router";
-import { Filter } from "react-feather";
+import { Filter, X } from "react-feather";
 import { useFilterParams } from "../../hooks/useFilterParams";
 
 export const useFilterToggle = (
@@ -45,7 +45,9 @@ export function FilterToggle({
   const { showFilters, setShowFilters } = useFilterToggle({
     defaultShowFilters,
   });
-  const { filterParams } = useFilterParams();
+  const { filterParams, clearFilters } = useFilterParams();
+
+  const hasAnyFilters = Object.keys(filterParams.filters).length > 0;
 
   return (
     <Button
@@ -53,28 +55,46 @@ export function FilterToggle({
       onClick={() => setShowFilters(!showFilters)}
       minWidth="fit-content"
       isActive={showFilters}
+      paddingRight={hasAnyFilters ? 1 : undefined}
     >
-      <HStack spacing={2}>
-        {filterParams.filters &&
-          Object.keys(filterParams.filters).length > 0 && (
-            <Box
-              width="12px"
-              height="12px"
-              borderRadius="12px"
-              background="red.500"
-              position="absolute"
-              marginTop="10px"
-              marginLeft="8px"
-              fontSize="8px"
-              color="white"
-              lineHeight="12px"
-              textAlign="center"
-            >
-              {Object.keys(filterParams.filters).length}
-            </Box>
-          )}
+      <HStack spacing={0}>
+        {filterParams.filters && hasAnyFilters && (
+          <Box
+            width="12px"
+            height="12px"
+            borderRadius="12px"
+            background="red.500"
+            position="absolute"
+            marginTop="10px"
+            marginLeft="8px"
+            fontSize="8px"
+            color="white"
+            lineHeight="12px"
+            textAlign="center"
+          >
+            {Object.keys(filterParams.filters).length}
+          </Box>
+        )}
         <Filter size={16} />
-        <Text>Filters</Text>
+        <Text paddingLeft={2}>Filters</Text>
+        {hasAnyFilters && (
+          <Tooltip label="Clear all filters" gutter={0}>
+            <Button
+              variant="unstyled"
+              width="fit-content"
+              minWidth={0}
+              display="flex"
+              onClick={(e) => {
+                e.stopPropagation();
+                clearFilters();
+              }}
+            >
+              <Box paddingX={2}>
+                <X width={12} style={{ minWidth: "12px" }} />
+              </Box>
+            </Button>
+          </Tooltip>
+        )}
       </HStack>
     </Button>
   );

@@ -226,6 +226,9 @@ describe("Data For Filter Integration Tests", () => {
     let response = await caller.analytics.dataForFilter({
       projectId: "test-project-id",
       field: "trace_checks.check_id",
+      startDate: new Date().getTime() - 1000 * 60 * 60 * 24 * 7,
+      endDate: new Date().getTime(),
+      filters: {},
     });
 
     expect(response).toEqual({
@@ -247,6 +250,9 @@ describe("Data For Filter Integration Tests", () => {
       projectId: "test-project-id",
       field: "trace_checks.check_id",
       query: "faith",
+      startDate: new Date().getTime() - 1000 * 60 * 60 * 24 * 7,
+      endDate: new Date().getTime(),
+      filters: {},
     });
 
     expect(response).toEqual({
@@ -274,6 +280,9 @@ describe("Data For Filter Integration Tests", () => {
     let response = await caller.analytics.dataForFilter({
       projectId: "test-project-id",
       field: "events.event_type",
+      startDate: new Date().getTime() - 1000 * 60 * 60 * 24 * 7,
+      endDate: new Date().getTime(),
+      filters: {},
     });
 
     expect(response).toEqual({
@@ -295,6 +304,9 @@ describe("Data For Filter Integration Tests", () => {
       projectId: "test-project-id",
       field: "events.event_type",
       query: "add_to",
+      startDate: new Date().getTime() - 1000 * 60 * 60 * 24 * 7,
+      endDate: new Date().getTime(),
+      filters: {},
     });
 
     expect(response).toEqual({
@@ -323,6 +335,9 @@ describe("Data For Filter Integration Tests", () => {
       projectId: "test-project-id",
       field: "events.metrics.key",
       key: "add_to_cart",
+      startDate: new Date().getTime() - 1000 * 60 * 60 * 24 * 7,
+      endDate: new Date().getTime(),
+      filters: {},
     });
 
     expect(response).toEqual({
@@ -344,7 +359,10 @@ describe("Data For Filter Integration Tests", () => {
       projectId: "test-project-id",
       field: "events.metrics.key",
       key: "add_to_cart",
-      query: "Pr"
+      query: "Pr",
+      startDate: new Date().getTime() - 1000 * 60 * 60 * 24 * 7,
+      endDate: new Date().getTime(),
+      filters: {},
     });
 
     expect(response).toEqual({

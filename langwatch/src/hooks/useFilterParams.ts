@@ -49,7 +49,6 @@ export const useFilterParams = () => {
                 const value_ = value.filter((x) => x !== "");
                 if (filter && value_.length === 0) {
                   return [];
-
                 }
                 return [[key, value_]];
               } else if (value && typeof value === "object") {
@@ -107,9 +106,27 @@ export const useFilterParams = () => {
     );
   };
 
+  const clearFilters = () => {
+    void router.push(
+      {
+        query: Object.fromEntries(
+          Object.entries(router.query).filter(
+            ([key]) =>
+              !Object.values(availableFilters).some((filter) =>
+                key.startsWith(filter.urlKey)
+              )
+          )
+        ),
+      },
+      undefined,
+      { shallow: true, scroll: false }
+    );
+  };
+
   return {
     filters,
     setFilter,
+    clearFilters,
     filterParams: {
       projectId: project?.id ?? "",
       startDate: startDate.getTime(),

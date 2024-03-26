@@ -5,11 +5,12 @@ import { filterFieldsEnum } from "../../../filters/types";
 import { TeamRoleGroup, checkUserPermissionForProject } from "../../permission";
 import { protectedProcedure } from "../../trpc";
 import { availableFilters } from "../../../filters/registry";
+import { sharedFiltersInputSchema } from "../../../analytics/types";
+import { generateTracesPivotQueryConditions } from "./common";
 
 export const dataForFilter = protectedProcedure
   .input(
-    z.object({
-      projectId: z.string(),
+    sharedFiltersInputSchema.extend({
       field: filterFieldsEnum,
       key: z.string().optional(),
       subkey: z.string().optional(),
@@ -34,15 +35,20 @@ export const dataForFilter = protectedProcedure
       });
     }
 
+    const { pivotIndexConditions } = generateTracesPivotQueryConditions({
+      ...input,
+      filters: {
+        ...(input.filters["topics.topics"]
+          ? { "topics.topics": input.filters["topics.topics"] }
+          : {}),
+      },
+    });
+
     const response = await esClient.search({
       index: TRACES_PIVOT_INDEX, // Adjust the index based on the field
       body: {
         size: 0,
-        query: {
-          bool: {
-            must: [{ term: { "trace.project_id": projectId } }],
-          } as any,
-        },
+        query: pivotIndexConditions,
         aggs: availableFilters[field].listMatch.aggregation(
           input.query,
           key,

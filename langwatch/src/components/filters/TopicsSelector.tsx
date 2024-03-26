@@ -9,7 +9,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { useRouter } from "next/router";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { HelpCircle } from "react-feather";
 import { api } from "../../utils/api";
 import { useFilterParams } from "../../hooks/useFilterParams";
@@ -110,8 +110,27 @@ export function TopicsSelector() {
     setSelectedSubtopics(newSubtopics);
   };
 
+  const topicSelectorRef = useRef<HTMLDivElement>(null);
+  const [minHeight, setMinHeight] = useState<number | undefined>(undefined);
+
+  useEffect(() => {
+    if (topicSelectorRef.current) {
+      const currentHeight = topicSelectorRef.current.clientHeight;
+
+      setMinHeight((minHeight) =>
+        currentHeight > (minHeight ?? 0) ? currentHeight : minHeight
+      );
+    }
+  }, [topicCountsQuery.data]);
+
   return (
-    <VStack align="start" width="full" spacing={6}>
+    <VStack
+      align="start"
+      width="full"
+      spacing={6}
+      ref={topicSelectorRef}
+      minHeight={minHeight}
+    >
       <Heading as="h2" size="md">
         Topics
       </Heading>

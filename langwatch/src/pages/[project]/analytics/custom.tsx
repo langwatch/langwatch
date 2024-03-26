@@ -990,17 +990,21 @@ function FilterSelectField<T extends FieldValues, U extends Path<T>>({
   filter: FilterField;
   emptyOption?: string;
 }) {
-  const { project } = useOrganizationTeamProject();
   const [query, setQuery] = useState("");
+
+  const { filterParams, queryOpts } = useFilterParams();
   const filterData = api.analytics.dataForFilter.useQuery(
     {
-      projectId: project?.id ?? "",
+      ...filterParams,
       field: filter,
       key: key_,
       query: query,
     },
     {
-      enabled: !!project,
+      refetchOnMount: false,
+      refetchOnWindowFocus: false,
+      keepPreviousData: true,
+      enabled: queryOpts.enabled,
     }
   );
 
