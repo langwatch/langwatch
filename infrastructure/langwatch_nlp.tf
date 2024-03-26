@@ -40,7 +40,7 @@ resource "aws_lambda_function" "langwatch_nlp" {
 
 resource "aws_cloudwatch_log_group" "langwatch_nlp" {
   name              = "/aws/lambda/langwatch-nlp-lambda"
-  retention_in_days = 30
+  retention_in_days = 365
 }
 
 resource "aws_lambda_function_url" "langwatch_nlp" {
