@@ -1,6 +1,6 @@
 locals {
   cloudtrail_name              = "account-activity-logs"
-  cloudtrail_bucket_key_prefix = "AWSLogs/${data.aws_caller_identity.current.account_id}"
+  cloudtrail_bucket_key_prefix = "cloudtrail-logs"
 }
 
 resource "aws_s3_bucket" "cloudtrail-logs" {
@@ -62,7 +62,7 @@ resource "aws_cloudtrail" "logs" {
 }
 
 resource "aws_s3_bucket_policy" "cloudtrail" {
-  bucket = aws_s3_bucket.cloudtrail-logs.id
+  bucket = aws_s3_bucket.cloudtrail-logs.bucket
   policy = data.aws_iam_policy_document.cloudtrail.json
 }
 
@@ -77,7 +77,7 @@ data "aws_iam_policy_document" "cloudtrail" {
     }
 
     actions   = ["s3:GetBucketAcl"]
-    resources = ["*"]
+    resources = [aws_s3_bucket.cloudtrail-logs.arn]
     condition {
       test     = "StringEquals"
       variable = "aws:SourceArn"
@@ -96,8 +96,8 @@ data "aws_iam_policy_document" "cloudtrail" {
 
     actions = ["s3:PutObject"]
     resources = [
-      "${aws_s3_bucket.cloudtrail-logs.arn}/${local.cloudtrail_bucket_key_prefix}",
-      "${aws_s3_bucket.cloudtrail-logs.arn}/${local.cloudtrail_bucket_key_prefix}/*"
+      "${aws_s3_bucket.cloudtrail-logs.arn}",
+      "${aws_s3_bucket.cloudtrail-logs.arn}/*"
     ]
 
     condition {
