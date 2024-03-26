@@ -344,6 +344,7 @@ function ListSelection({
     keys?.[0] == "thumbs_up_down" &&
     keys?.[1] == "vote"
   ) {
+    // TODO: extract this to another function
     const min = currentValues[0] ? +currentValues[0] : undefined;
     const max = currentValues[1] ? +currentValues[1] : undefined;
 
@@ -512,12 +513,10 @@ function RangeFilter({
 
   useEffect(() => {
     if (filterData.data) {
-      setTimeout(() => {
-        onChange([min.toString(), max.toString()]);
-      }, 100);
+      onChange([min.toString(), max.toString()]);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [min, max]);
+  }, [min, max, !!filterData.data]);
 
   return (
     <HStack width="full" spacing={4}>
