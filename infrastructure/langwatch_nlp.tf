@@ -38,6 +38,27 @@ resource "aws_lambda_function" "langwatch_nlp" {
   ]
 }
 
+resource "aws_cloudwatch_metric_alarm" "langwatch_nlp_function_errors" {
+  count               = module.variables.profile == "lw-prod" ? 1 : 0
+  alarm_name          = "langwatch-nlp-lambda-errors"
+  comparison_operator = "GreaterThanOrEqualToThreshold"
+  evaluation_periods  = "1"
+  metric_name         = "Errors"
+  namespace           = "AWS/Lambda"
+  period              = "60"
+  statistic           = "Sum"
+  threshold           = "1"
+  alarm_description   = "Alarm when langwatch-nlp lambda has errors"
+  actions_enabled     = true
+  alarm_actions       = [aws_sns_topic.alarms.arn]
+
+  dimensions = {
+    FunctionName = aws_lambda_function.langwatch_nlp[0].function_name
+  }
+
+  treat_missing_data = "notBreaching"
+}
+
 resource "aws_cloudwatch_log_group" "langwatch_nlp" {
   name              = "/aws/lambda/langwatch-nlp-lambda"
   retention_in_days = 365
