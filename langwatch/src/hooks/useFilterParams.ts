@@ -19,7 +19,6 @@ export const useFilterParams = () => {
   } = usePeriodSelector();
 
   const filters: Partial<Record<FilterField, FilterParam>> = {};
-  const filledFilters: Partial<Record<FilterField, FilterParam>> = {};
 
   const queryString = router.asPath.split("?")[1] ?? "";
   const queryParams = qs.parse(queryString.replaceAll("%2C", ","), {
@@ -64,14 +63,6 @@ export const useFilterParams = () => {
           )
         ) as FilterParam;
       };
-
-      const filterParamFilled = filterEmptyAndConverScalarToArray(
-        filterParam,
-        true
-      );
-      if (Object.keys(filterParamFilled).length > 0) {
-        filledFilters[filterKey as FilterField] = filterParamFilled;
-      }
 
       const filterParam_ = filterEmptyAndConverScalarToArray(
         filterParam,
@@ -131,7 +122,7 @@ export const useFilterParams = () => {
       projectId: project?.id ?? "",
       startDate: startDate.getTime(),
       endDate: endDate.getTime(),
-      filters: filledFilters,
+      filters: filters,
     },
     queryOpts: {
       enabled: !!project && !!startDate && !!endDate,

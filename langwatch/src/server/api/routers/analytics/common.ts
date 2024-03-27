@@ -94,21 +94,40 @@ const collectConditions = (
     const conditions: QueryDslQueryContainer[] = [];
     const filter = availableFilters[field];
 
-    if (filter.requiresKey && !key) {
-      throw new TRPCError({
-        code: "BAD_REQUEST",
-        message: `Filter '${field}' requires a '${filter.requiresKey.filter}' key to be defined`,
-      });
+    const andConditions: QueryDslQueryContainer[] = [];
+    if (filter.requiresKey && key) {
+      andConditions.push(
+        availableFilters[filter.requiresKey.filter].query(
+          [key],
+          undefined,
+          undefined
+        )
+      );
     }
 
-    if (filter.requiresSubkey && !subkey) {
-      throw new TRPCError({
-        code: "BAD_REQUEST",
-        message: `Filter '${field}' requires a '${filter.requiresSubkey.filter}' subkey to be defined`,
-      });
+    if (filter.requiresSubkey && subkey) {
+      andConditions.push(
+        availableFilters[filter.requiresSubkey.filter].query(
+          [subkey],
+          key,
+          undefined
+        )
+      );
     }
 
-    conditions.push(filter.query(params, key, subkey));
+    if ((!filter.requiresKey || key) && (!filter.requiresSubkey || subkey)) {
+      andConditions.push(filter.query(params, key, subkey));
+    }
+
+    if (andConditions.length > 1) {
+      conditions.push({
+        bool: {
+          must: andConditions,
+        } as QueryDslBoolQuery,
+      });
+    } else if (andConditions.length === 1) {
+      conditions.push(andConditions[0]!);
+    }
 
     return conditions;
   } else if (typeof params === "object") {
