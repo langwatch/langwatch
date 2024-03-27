@@ -66,6 +66,7 @@ def main():
             module "{package_name}-evaluator" {{
                 source              = "./lambda"
                 evaluator_package   = "{package_name}"
+                sns_alarms_topic_arn = aws_sns_topic.alarms.arn
                 apigw_execution_arn = aws_api_gateway_rest_api.this.execution_arn
                 environment_variables = {{{environment_variables_tf}}}
             }}

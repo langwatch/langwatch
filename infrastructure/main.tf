@@ -17,6 +17,10 @@ resource "aws_api_gateway_rest_api" "this" {
   description = "LangEvals API"
 }
 
+resource "aws_guardduty_detector" "this" {
+  enable = true
+}
+
 data "aws_caller_identity" "current" {}
 
 data "aws_region" "current" {}

@@ -5,18 +5,17 @@ locals {
 resource "aws_instance" "bastion" {
   count = module.variables.profile == "lw-prod" ? 1 : 1
 
-  ami                    = local.aws_linux_ami
-  instance_type          = "t4g.nano"
+  ami           = local.aws_linux_ami
+  instance_type = "t4g.nano"
+  metadata_options {
+    http_tokens   = "required"
+    http_endpoint = "enabled"
+  }
   subnet_id              = aws_subnet.private_subnet_1.id
   iam_instance_profile   = aws_iam_instance_profile.bastion.name
   vpc_security_group_ids = [aws_security_group.bation-ec2.id, aws_security_group.vpc_tls.id]
 
-  user_data = <<-EOF
-              #!/bin/bash
-              echo "*/4 * * * * root curl -X GET https://app.langwatch.ai/api/start_workers" | sudo tee -a /etc/crontab > /dev/null
-              echo "0 0 * * * root curl -X GET https://app.langwatch.ai/api/schedule_topic_clustering" | sudo tee -a /etc/crontab > /dev/null
-              sudo service crond restart
-              EOF
+  user_data = file("${path.module}/scripts/bastion-user-data.sh")
 
   tags = {
     Name = "Bastion EC2 Instance"

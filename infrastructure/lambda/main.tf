@@ -34,9 +34,30 @@ resource "aws_lambda_function" "this" {
   ]
 }
 
+resource "aws_cloudwatch_metric_alarm" "lambda_function_errors" {
+  count               = module.variables.profile == "lw-prod" ? 1 : 0
+  alarm_name          = "${local.evaluator_package}-lambda-errors"
+  comparison_operator = "GreaterThanOrEqualToThreshold"
+  evaluation_periods  = "1"
+  metric_name         = "Errors"
+  namespace           = "AWS/Lambda"
+  period              = "60"
+  statistic           = "Sum"
+  threshold           = "1"
+  alarm_description   = "Alarm when ${local.evaluator_package} lambda has errors"
+  actions_enabled     = true
+  alarm_actions       = [var.sns_alarms_topic_arn]
+
+  dimensions = {
+    FunctionName = aws_lambda_function.this[0].function_name
+  }
+
+  treat_missing_data = "notBreaching"
+}
+
 resource "aws_cloudwatch_log_group" "this" {
   name              = "/aws/lambda/${local.evaluator_package}-evaluator-lambda"
-  retention_in_days = 30
+  retention_in_days = 365
 }
 
 data "aws_ecr_repository" "lambda_repository" {
