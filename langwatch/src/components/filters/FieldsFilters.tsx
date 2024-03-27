@@ -456,6 +456,12 @@ function RangeFilter({
   let max = +numeral(
     +(filterData.data?.options.find((o) => o.label === "max")?.field ?? 0)
   ).format("0.[0]");
+  if (isNaN(min)) {
+    min = 0;
+  }
+  if (isNaN(max)) {
+    max = 1;
+  }
   if (min === max && min === 0) {
     min = 0;
     max = 1;

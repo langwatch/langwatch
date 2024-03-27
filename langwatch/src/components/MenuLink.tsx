@@ -1,20 +1,19 @@
 import type { PropsWithChildren } from "react";
 import { Link } from "@chakra-ui/next-js";
-import { useRouter } from "next/router";
 import { usePathname } from "next/navigation";
-import path from "path";
 
 export const MenuLink = ({
+  paddingX = 4,
   href,
   children,
-}: PropsWithChildren<{ href: string }>) => {
+}: PropsWithChildren<{ paddingX?: number; href: string }>) => {
   const pathname = usePathname();
   const selected = pathname === href;
 
   return (
     <Link
       href={href}
-      paddingX={4}
+      paddingX={paddingX}
       paddingY={2}
       width="full"
       position="relative"
