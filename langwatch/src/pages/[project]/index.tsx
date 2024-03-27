@@ -5,6 +5,7 @@ import {
   AlertIcon,
   AlertTitle,
   Box,
+  Button,
   Card,
   CardBody,
   CardHeader,
@@ -22,12 +23,13 @@ import {
   TabPanels,
   Tabs,
   Text,
+  Tooltip,
   VStack,
 } from "@chakra-ui/react";
 import type { GetServerSidePropsContext } from "next";
 import { useRouter } from "next/router";
 import numeral from "numeral";
-import { CheckCircle, XCircle } from "react-feather";
+import { CheckCircle, MessageSquare, XCircle } from "react-feather";
 import {
   PeriodSelector,
   usePeriodSelector,
@@ -97,6 +99,7 @@ function Index() {
     setPeriod,
   } = usePeriodSelector();
   const { showFilters } = useFilterToggle();
+  const router = useRouter();
 
   return (
     <GraphsLayout>
@@ -123,8 +126,36 @@ function Index() {
             </VStack>
           </Alert>
         )}
-        <Container maxWidth="1152" padding={0} paddingBottom={3}>
-          <HStack width="full" align="top">
+        <Container maxWidth="1152" padding={0}>
+          <HStack width="full" align="top" paddingBottom={6}>
+            <HStack align="center" spacing={6}>
+              <Heading as={"h1"} size="lg" paddingTop={1}>
+                Analytics
+              </Heading>
+              <Tooltip label="Show messages behind those metrics">
+                <Button
+                  variant="outline"
+                  minWidth={0}
+                  height="32px"
+                  padding={2}
+                  marginTop={2}
+                  onClick={() => {
+                    void router.push(
+                      {
+                        pathname: `/${project?.slug}/messages`,
+                        query: {
+                          ...router.query,
+                        },
+                      },
+                      undefined,
+                      { shallow: true }
+                    );
+                  }}
+                >
+                  <MessageSquare size="16" />
+                </Button>
+              </Tooltip>
+            </HStack>
             <Spacer />
             <FilterToggle />
             <PeriodSelector

@@ -47,8 +47,6 @@ import { durationColor } from "~/utils/durationColor";
 import { getSingleQueryParam } from "~/utils/getSingleQueryParam";
 import { useFilterParams } from "../hooks/useFilterParams";
 import { DashboardLayout } from "./DashboardLayout";
-import { PeriodSelector, usePeriodSelector } from "./PeriodSelector";
-import { FilterToggle } from "./filters/FilterToggle";
 
 import Parse from "papaparse";
 import { useLocalStorage } from "usehooks-ts";
@@ -56,6 +54,8 @@ import { TraceDeatilsDrawer } from "~/components/TraceDeatilsDrawer";
 import { AddDatasetRecordDrawer } from "./AddDatasetRecordDrawer";
 import { checkStatusColorMap } from "./checks/EvaluationStatus";
 import { FilterSidebar } from "./filters/FilterSidebar";
+import { usePeriodSelector, PeriodSelector } from "./PeriodSelector";
+import { FilterToggle } from "./filters/FilterToggle";
 
 export function MessagesDevMode() {
   const router = useRouter();
@@ -572,8 +572,9 @@ export function MessagesDevMode() {
               </PopoverBody>
             </PopoverContent>
           </Popover>
-          <FilterToggle />
+          <FilterToggle defaultShowFilters={true} />
         </HStack>
+
         <HStack align={"top"} gap={8}>
           <Card>
             <CardBody>

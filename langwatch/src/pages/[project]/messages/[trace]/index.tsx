@@ -22,7 +22,7 @@ import React, {
   type PropsWithChildren,
 } from "react";
 import Markdown from "react-markdown";
-import { MessagesDevMode } from "~/components/MessagesDevMode";
+import { MessagesDevMode } from "~/components/MessagesTable";
 import { DashboardLayout } from "../../../../components/DashboardLayout";
 import { useDevView } from "../../../../hooks/DevViewProvider";
 import { useOrganizationTeamProject } from "../../../../hooks/useOrganizationTeamProject";

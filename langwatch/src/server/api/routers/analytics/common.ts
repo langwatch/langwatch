@@ -7,7 +7,6 @@ import { type z } from "zod";
 import { type sharedFiltersInputSchema } from "../../../analytics/types";
 import { availableFilters } from "../../../filters/registry";
 import type { FilterField } from "../../../filters/types";
-import { TRPCError } from "@trpc/server";
 
 const getDaysDifference = (startDate: Date, endDate: Date) =>
   differenceInCalendarDays(endDate, startDate) + 1;
