@@ -80,7 +80,7 @@ export const useFilterParams = () => {
           {
             ...Object.fromEntries(
               Object.entries(router.query).filter(
-                ([key]) => !key.startsWith(filterUrl + ".")
+                ([key]) => !key.startsWith(filterUrl)
               )
             ),
             [filterUrl]: params,

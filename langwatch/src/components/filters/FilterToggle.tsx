@@ -47,7 +47,15 @@ export function FilterToggle({
   });
   const { filterParams, clearFilters } = useFilterParams();
 
-  const hasAnyFilters = Object.keys(filterParams.filters).length > 0;
+  const nonEmptyFilters = Object.values(filterParams.filters).filter((f) =>
+    typeof f === "string"
+      ? !!f
+      : Array.isArray(f)
+      ? f.length > 0
+      : Object.keys(f).length > 0
+  );
+
+  const hasAnyFilters = nonEmptyFilters.length > 0;
 
   return (
     <Button
@@ -72,7 +80,7 @@ export function FilterToggle({
             lineHeight="12px"
             textAlign="center"
           >
-            {Object.keys(filterParams.filters).length}
+            {nonEmptyFilters.length}
           </Box>
         )}
         <Filter size={16} />
