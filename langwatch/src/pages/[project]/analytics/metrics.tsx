@@ -3,25 +3,18 @@ import {
   Card,
   CardBody,
   CardHeader,
-  Container,
   GridItem,
   HStack,
   Heading,
-  SimpleGrid,
-  Spacer,
+  SimpleGrid
 } from "@chakra-ui/react";
 import { BarChart2 } from "react-feather";
 import GraphsLayout from "~/components/GraphsLayout";
-import { PeriodSelector, usePeriodSelector } from "~/components/PeriodSelector";
 import {
   CustomGraph,
   type CustomGraphInput,
 } from "~/components/analytics/CustomGraph";
 import { FilterSidebar } from "~/components/filters/FilterSidebar";
-import {
-  FilterToggle,
-  useFilterToggle,
-} from "~/components/filters/FilterToggle";
 import { AnalyticsHeader } from "../../../components/analytics/AnalyticsHeader";
 
 const userCount = {

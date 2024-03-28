@@ -8,7 +8,6 @@ import {
   Button,
   Card,
   CardBody,
-  Container,
   Flex,
   Grid,
   GridItem,
@@ -20,17 +19,15 @@ import {
   Skeleton,
   Spacer,
   Text,
-  VStack,
+  VStack
 } from "@chakra-ui/react";
-import { MoreVertical, BarChart2 } from "react-feather";
-import { PeriodSelector, usePeriodSelector } from "~/components/PeriodSelector";
+import { BarChart2, MoreVertical } from "react-feather";
 import {
   CustomGraph,
   type CustomGraphInput,
 } from "~/components/analytics/CustomGraph";
 import {
-  FilterToggle,
-  useFilterToggle,
+  useFilterToggle
 } from "~/components/filters/FilterToggle";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
@@ -41,10 +38,6 @@ import { AnalyticsHeader } from "../../../components/analytics/AnalyticsHeader";
 
 export default function Reports() {
   const { project } = useOrganizationTeamProject();
-  const {
-    period: { startDate, endDate },
-    setPeriod,
-  } = usePeriodSelector();
   const { showFilters } = useFilterToggle();
 
   const graphs = api.graphs.getAll.useQuery({ projectId: project?.id ?? "" });
