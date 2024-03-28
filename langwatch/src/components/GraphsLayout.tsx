@@ -1,11 +1,13 @@
-import { HStack, Text, VStack } from "@chakra-ui/react";
+import { Container, HStack, Text, VStack } from "@chakra-ui/react";
 import { type PropsWithChildren } from "react";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { MenuLink } from "~/components/MenuLink";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { useFilterToggle } from "./filters/FilterToggle";
 
 export default function GraphsLayout({ children }: PropsWithChildren) {
   const { project } = useOrganizationTeamProject();
+  const { showFilters } = useFilterToggle();
 
   return (
     <DashboardLayout>
@@ -42,16 +44,16 @@ export default function GraphsLayout({ children }: PropsWithChildren) {
                 Observabilty
               </Text>
               <MenuLink
+                href={`/${project?.slug}/analytics/metrics`}
+                paddingX={6}
+              >
+                LLM Metrics
+              </MenuLink>
+              <MenuLink
                 href={`/${project?.slug}/analytics/evaluations`}
                 paddingX={6}
               >
                 Evaluations
-              </MenuLink>
-              <MenuLink
-                href={`/${project?.slug}/analytics/metrics`}
-                paddingX={6}
-              >
-                Metrics
               </MenuLink>
             </VStack>
             <VStack align="start" width="full" spacing={0}>
@@ -67,7 +69,9 @@ export default function GraphsLayout({ children }: PropsWithChildren) {
             </VStack>
           </VStack>
         )}
-        {children}
+        <Container maxWidth={showFilters ? "1612" : "1200"} padding={6}>
+          {children}
+        </Container>
       </HStack>
     </DashboardLayout>
   );

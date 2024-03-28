@@ -30,6 +30,7 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 
 import { api } from "~/utils/api";
 import { getEvaluatorDefinitions } from "../../../trace_checks/getEvaluator";
+import { AnalyticsHeader } from "../../../components/analytics/AnalyticsHeader";
 
 const creatChecks = (checks: any) => {
   return checks.map((check: any) => {
@@ -167,59 +168,43 @@ export default function Evaluations() {
     { enabled: !!project }
   );
 
-  const {
-    period: { startDate, endDate },
-    setPeriod,
-  } = usePeriodSelector();
-
   return (
     <GraphsLayout>
-      <Container maxWidth={"1300"} padding={6}>
-        {checks && checks.data?.length === 0 && (
-          <Alert status="warning" variant="left-accent" marginBottom={6}>
-            <AlertIcon alignSelf="start" />
-            <VStack align="start">
-              <AlertTitle>No Evelautions yet</AlertTitle>
-              <AlertDescription>
-                <Text as="span">
-                  {
-                    "The evaluation results will be displayed here. Setup evaluations for your project to see the results. Click "
-                  }
-                </Text>
-                <Link
-                  textDecoration="underline"
-                  href={`/${project?.slug}/guardrails`}
-                >
-                  here
-                </Link>
-                <Text as="span"> to get started.</Text>
-              </AlertDescription>
-            </VStack>
-          </Alert>
-        )}
-        <HStack width="full" marginBottom={3}>
-          <Spacer />
-          <FilterToggle />
-          <PeriodSelector
-            period={{ startDate, endDate }}
-            setPeriod={setPeriod}
-          />
-        </HStack>
-        <hr />
-        <HStack paddingY={2} alignItems={"start"}>
-          <SimpleGrid
-            templateColumns="repeat(4, 1fr)"
-            gap={5}
-            marginTop={4}
-            width={"100%"}
-          >
-            {checks.data ? creatChecks(checks.data) : null}
-          </SimpleGrid>
-          <Box padding={3}>
-            <FilterSidebar hideTopics={true} />
-          </Box>
-        </HStack>
-      </Container>
+      <AnalyticsHeader title="Evaluations" />
+      {checks.data && checks.data?.length === 0 && (
+        <Alert status="warning" variant="left-accent" marginBottom={6}>
+          <AlertIcon alignSelf="start" />
+          <VStack align="start">
+            <AlertTitle>No Evaluations yet</AlertTitle>
+            <AlertDescription>
+              <Text as="span">
+                {
+                  "The evaluation results will be displayed here. Setup evaluations for your project to see the results. Click "
+                }
+              </Text>
+              <Link
+                textDecoration="underline"
+                href={`/${project?.slug}/guardrails`}
+              >
+                here
+              </Link>
+              <Text as="span"> to get started.</Text>
+            </AlertDescription>
+          </VStack>
+        </Alert>
+      )}
+      <HStack alignItems={"start"}>
+        <SimpleGrid
+          templateColumns="repeat(4, 1fr)"
+          gap={5}
+          width={"100%"}
+        >
+          {checks.data ? creatChecks(checks.data) : null}
+        </SimpleGrid>
+        <Box padding={3}>
+          <FilterSidebar hideTopics={true} />
+        </Box>
+      </HStack>
     </GraphsLayout>
   );
 }

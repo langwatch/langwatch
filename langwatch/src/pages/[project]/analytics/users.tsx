@@ -3,16 +3,13 @@ import {
   Card,
   CardBody,
   CardHeader,
-  Container,
   GridItem,
   HStack,
   Heading,
-  SimpleGrid,
-  Spacer,
+  SimpleGrid
 } from "@chakra-ui/react";
 import { BarChart2 } from "react-feather";
 import GraphsLayout from "~/components/GraphsLayout";
-import { PeriodSelector, usePeriodSelector } from "~/components/PeriodSelector";
 import {
   CustomGraph,
   type CustomGraphInput,
@@ -20,10 +17,7 @@ import {
 import { SatisfactionGraphs } from "~/components/analytics/SatisfactionGraph";
 import { SessionsSummary } from "~/components/analytics/SessionsSummary";
 import { FilterSidebar } from "~/components/filters/FilterSidebar";
-import {
-  FilterToggle,
-  useFilterToggle,
-} from "~/components/filters/FilterToggle";
+import { AnalyticsHeader } from "../../../components/analytics/AnalyticsHeader";
 
 const messagesCount = {
   graphId: "custom",
@@ -185,138 +179,116 @@ const maxMessagePerThread = {
 };
 
 export default function Users() {
-  const {
-    period: { startDate, endDate },
-    setPeriod,
-  } = usePeriodSelector();
-
   return (
     <GraphsLayout>
-      <Container maxWidth={"1300"} padding={6}>
-        <HStack width="full" marginBottom={3}>
-          <Spacer />
-          <FilterToggle />
-          <PeriodSelector
-            period={{ startDate, endDate }}
-            setPeriod={setPeriod}
-          />
-        </HStack>
-        <hr />
-        <HStack paddingY={2} alignItems={"start"}>
-          <SimpleGrid
-            templateColumns="repeat(4, 1fr)"
-            gap={5}
-            marginTop={4}
-            width={"100%"}
-          >
-            <GridItem colSpan={2} display={"inline-grid"}>
-              <Card overflow={"scroll"}>
-                <CardHeader>
-                  <Heading size="sm">User Messages</Heading>
-                </CardHeader>
-                <CardBody>
-                  <CustomGraph input={messagesCount as CustomGraphInput} />
-                </CardBody>
-              </Card>
-            </GridItem>
-            <GridItem colSpan={2} display={"inline-grid"}>
-              <SessionsSummary />
-            </GridItem>
+      <AnalyticsHeader title="Users" />
+      <HStack alignItems={"start"}>
+        <SimpleGrid templateColumns="repeat(4, 1fr)" gap={5} width={"100%"}>
+          <GridItem colSpan={2} display={"inline-grid"}>
+            <Card overflow={"scroll"}>
+              <CardHeader>
+                <Heading size="sm">User Messages</Heading>
+              </CardHeader>
+              <CardBody>
+                <CustomGraph input={messagesCount as CustomGraphInput} />
+              </CardBody>
+            </Card>
+          </GridItem>
+          <GridItem colSpan={2} display={"inline-grid"}>
+            <SessionsSummary />
+          </GridItem>
 
-            <GridItem colSpan={2} display={"inline-grid"}>
-              <Card>
-                <CardHeader>
-                  <HStack>
-                    <BarChart2 color="orange" />
-                    <Heading size="sm">Daily Users</Heading>
-                  </HStack>
-                </CardHeader>
+          <GridItem colSpan={2} display={"inline-grid"}>
+            <Card>
+              <CardHeader>
+                <HStack>
+                  <BarChart2 color="orange" />
+                  <Heading size="sm">Daily Users</Heading>
+                </HStack>
+              </CardHeader>
 
-                <CardBody>
-                  <CustomGraph input={userCountGrapgh as CustomGraphInput} />
-                </CardBody>
-              </Card>
-            </GridItem>
-            <GridItem colSpan={2} display={"inline-grid"}>
-              <Card>
-                <CardHeader>
-                  <HStack>
-                    <BarChart2 color="orange" />
-                    <Heading size="sm">Daily Threads</Heading>
-                  </HStack>
-                </CardHeader>
-                <CardBody>
-                  <CustomGraph input={dailyActiveThreads as CustomGraphInput} />
-                </CardBody>
-              </Card>
-            </GridItem>
+              <CardBody>
+                <CustomGraph input={userCountGrapgh as CustomGraphInput} />
+              </CardBody>
+            </Card>
+          </GridItem>
+          <GridItem colSpan={2} display={"inline-grid"}>
+            <Card>
+              <CardHeader>
+                <HStack>
+                  <BarChart2 color="orange" />
+                  <Heading size="sm">Daily Threads</Heading>
+                </HStack>
+              </CardHeader>
+              <CardBody>
+                <CustomGraph input={dailyActiveThreads as CustomGraphInput} />
+              </CardBody>
+            </Card>
+          </GridItem>
 
-            <GridItem colSpan={2} display={"inline-grid"}>
-              <Card>
-                <CardHeader>
-                  <HStack>
-                    <BarChart2 color="orange" />
-                    <Heading size="sm">User Satisfaction</Heading>
-                  </HStack>
-                </CardHeader>
-                <CardBody>
-                  <CustomGraph input={messageSentiment as CustomGraphInput} />
-                </CardBody>
-              </Card>
-            </GridItem>
+          <GridItem colSpan={2} display={"inline-grid"}>
+            <Card>
+              <CardHeader>
+                <HStack>
+                  <BarChart2 color="orange" />
+                  <Heading size="sm">User Satisfaction</Heading>
+                </HStack>
+              </CardHeader>
+              <CardBody>
+                <CustomGraph input={messageSentiment as CustomGraphInput} />
+              </CardBody>
+            </Card>
+          </GridItem>
 
-            <GridItem colSpan={2} display={"inline-grid"}>
-              <Card>
-                <CardHeader>
-                  <HStack>
-                    <BarChart2 color="orange" />
-                    <Heading size="sm">Max Messages Per Thread</Heading>
-                  </HStack>
-                </CardHeader>
-                <CardBody>
-                  <CustomGraph
-                    input={maxMessagePerThread as CustomGraphInput}
-                  />
-                </CardBody>
-              </Card>
-            </GridItem>
-            <GridItem colSpan={2} display={"inline-grid"}>
-              <Card>
-                <CardHeader>
-                  <HStack>
-                    <BarChart2 color="orange" />
-                    <Heading size="sm">Average Daily Threads per User</Heading>
-                  </HStack>
-                </CardHeader>
-                <CardBody>
-                  <CustomGraph
-                    input={averageDailyThreadsPerUser as CustomGraphInput}
-                  />
-                </CardBody>
-              </Card>
-            </GridItem>
-            <GridItem colSpan={2} display={"inline-grid"}>
-              <Card>
-                <CardHeader>
-                  <HStack>
-                    <BarChart2 color="orange" />
-                    <Heading size="sm">User Leaderboard</Heading>
-                  </HStack>
-                </CardHeader>
-                <CardBody>
-                  <CustomGraph input={powerUsers as CustomGraphInput} />
-                </CardBody>
-              </Card>
-            </GridItem>
-            <GridItem colSpan={2} display={"inline-grid"}>
-              <SatisfactionGraphs />
-            </GridItem>
-          </SimpleGrid>
-          <Box padding={3}>
-            <FilterSidebar hideTopics={true} />
-          </Box>
-        </HStack>
-      </Container>
+          <GridItem colSpan={2} display={"inline-grid"}>
+            <Card>
+              <CardHeader>
+                <HStack>
+                  <BarChart2 color="orange" />
+                  <Heading size="sm">Max Messages Per Thread</Heading>
+                </HStack>
+              </CardHeader>
+              <CardBody>
+                <CustomGraph input={maxMessagePerThread as CustomGraphInput} />
+              </CardBody>
+            </Card>
+          </GridItem>
+          <GridItem colSpan={2} display={"inline-grid"}>
+            <Card>
+              <CardHeader>
+                <HStack>
+                  <BarChart2 color="orange" />
+                  <Heading size="sm">Average Daily Threads per User</Heading>
+                </HStack>
+              </CardHeader>
+              <CardBody>
+                <CustomGraph
+                  input={averageDailyThreadsPerUser as CustomGraphInput}
+                />
+              </CardBody>
+            </Card>
+          </GridItem>
+          <GridItem colSpan={2} display={"inline-grid"}>
+            <Card>
+              <CardHeader>
+                <HStack>
+                  <BarChart2 color="orange" />
+                  <Heading size="sm">User Leaderboard</Heading>
+                </HStack>
+              </CardHeader>
+              <CardBody>
+                <CustomGraph input={powerUsers as CustomGraphInput} />
+              </CardBody>
+            </Card>
+          </GridItem>
+          <GridItem colSpan={2} display={"inline-grid"}>
+            <SatisfactionGraphs />
+          </GridItem>
+        </SimpleGrid>
+        <Box padding={3}>
+          <FilterSidebar hideTopics={true} />
+        </Box>
+      </HStack>
     </GraphsLayout>
   );
 }

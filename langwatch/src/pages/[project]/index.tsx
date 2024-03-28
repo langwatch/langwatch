@@ -5,17 +5,14 @@ import {
   AlertIcon,
   AlertTitle,
   Box,
-  Button,
   Card,
   CardBody,
   CardHeader,
-  Container,
   Grid,
   GridItem,
   HStack,
   Heading,
   Skeleton,
-  Spacer,
   Tab,
   TabIndicator,
   TabList,
@@ -23,17 +20,12 @@ import {
   TabPanels,
   Tabs,
   Text,
-  Tooltip,
-  VStack,
+  VStack
 } from "@chakra-ui/react";
 import type { GetServerSidePropsContext } from "next";
 import { useRouter } from "next/router";
 import numeral from "numeral";
-import { CheckCircle, MessageSquare, XCircle } from "react-feather";
-import {
-  PeriodSelector,
-  usePeriodSelector,
-} from "../../components/PeriodSelector";
+import { CheckCircle, XCircle } from "react-feather";
 import {
   CustomGraph,
   type CustomGraphInput,
@@ -45,10 +37,6 @@ import {
 import { LLMSummary } from "../../components/analytics/LLMSummary";
 import { UserMetrics } from "../../components/analytics/UserMetrics";
 import { FilterSidebar } from "../../components/filters/FilterSidebar";
-import {
-  FilterToggle,
-  useFilterToggle,
-} from "../../components/filters/FilterToggle";
 import { useFilterParams } from "../../hooks/useFilterParams";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { dependencies } from "../../injection/dependencies.client";
@@ -58,6 +46,7 @@ import { TeamRoleGroup } from "../../server/api/permission";
 import { api } from "../../utils/api";
 
 import GraphsLayout from "~/components/GraphsLayout";
+import { AnalyticsHeader } from "../../components/analytics/AnalyticsHeader";
 
 export default function ProjectRouter() {
   const router = useRouter();
@@ -94,84 +83,41 @@ export const getServerSideProps = async (
 
 function Index() {
   const { project } = useOrganizationTeamProject();
-  const {
-    period: { startDate, endDate },
-    setPeriod,
-  } = usePeriodSelector();
-  const { showFilters } = useFilterToggle();
-  const router = useRouter();
 
   return (
     <GraphsLayout>
-      <Container maxWidth={showFilters ? "1612" : "1200"} padding={6}>
-        {project && !project.firstMessage && (
-          <Alert status="warning" variant="left-accent" marginBottom={6}>
-            <AlertIcon alignSelf="start" />
-            <VStack align="start">
-              <AlertTitle>Setup pending</AlertTitle>
-              <AlertDescription>
-                <Text as="span">
-                  {
-                    "Your project is not set up yet so you won't be able to see any data on the dashboard, please go to the "
-                  }
-                </Text>
-                <Link
-                  textDecoration="underline"
-                  href={`/${project.slug}/messages`}
-                >
-                  setup
-                </Link>
-                <Text as="span"> page to get started.</Text>
-              </AlertDescription>
-            </VStack>
-          </Alert>
-        )}
-        <HStack width="full" align="top" paddingBottom={6}>
-          <HStack align="center" spacing={6}>
-            <Heading as={"h1"} size="lg" paddingTop={1}>
-              Analytics
-            </Heading>
-            <Tooltip label="Show messages behind those metrics">
-              <Button
-                variant="outline"
-                minWidth={0}
-                height="32px"
-                padding={2}
-                marginTop={2}
-                onClick={() => {
-                  void router.push(
-                    {
-                      pathname: `/${project?.slug}/messages`,
-                      query: {
-                        ...router.query,
-                      },
-                    },
-                    undefined,
-                    { shallow: true }
-                  );
-                }}
+      {project && !project.firstMessage && (
+        <Alert status="warning" variant="left-accent" marginBottom={6}>
+          <AlertIcon alignSelf="start" />
+          <VStack align="start">
+            <AlertTitle>Setup pending</AlertTitle>
+            <AlertDescription>
+              <Text as="span">
+                {
+                  "Your project is not set up yet so you won't be able to see any data on the dashboard, please go to the "
+                }
+              </Text>
+              <Link
+                textDecoration="underline"
+                href={`/${project.slug}/messages`}
               >
-                <MessageSquare size="16" />
-              </Button>
-            </Tooltip>
-          </HStack>
-          <Spacer />
-          <FilterToggle />
-          <PeriodSelector
-            period={{ startDate, endDate }}
-            setPeriod={setPeriod}
-          />
-        </HStack>
-
-        <HStack align="start" width="full" spacing={8}>
-          <VStack align="start" width="full">
-            <UserMetrics />
-            <LLMMetrics />
-            <DocumentsMetrics />
+                setup
+              </Link>
+              <Text as="span"> page to get started.</Text>
+            </AlertDescription>
           </VStack>
-          <FilterSidebar hideTopics={true} />
-        </HStack>
-      </Container>
+        </Alert>
+      )}
+      <AnalyticsHeader title="Analytics" />
+
+      <HStack align="start" width="full" spacing={8}>
+        <VStack align="start" width="full">
+          <UserMetrics />
+          <LLMMetrics />
+          <DocumentsMetrics />
+        </VStack>
+        <FilterSidebar hideTopics={true} />
+      </HStack>
     </GraphsLayout>
   );
 }

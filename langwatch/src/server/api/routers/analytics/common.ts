@@ -114,7 +114,11 @@ const collectConditions = (
       );
     }
 
-    if ((!filter.requiresKey || key) && (!filter.requiresSubkey || subkey)) {
+    if (
+      (!filter.requiresKey || key) &&
+      (!filter.requiresSubkey || subkey) &&
+      params.length > 0
+    ) {
       andConditions.push(filter.query(params, key, subkey));
     }
 

@@ -35,7 +35,6 @@ import {
   Settings,
   Shield,
   TrendingUp,
-  Table,
   type Icon,
   Database,
 } from "react-feather";
