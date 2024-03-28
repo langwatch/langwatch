@@ -15,8 +15,6 @@ import {
   MenuList,
   Portal,
   Spacer,
-  Stack,
-  Switch,
   Text,
   VStack,
   useTheme,
@@ -39,8 +37,8 @@ import {
   TrendingUp,
   Table,
   type Icon,
+  Database,
 } from "react-feather";
-import { useDevView } from "../hooks/DevViewProvider";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import { useRequiredSession } from "../hooks/useRequiredSession";
 import { dependencies } from "../injection/dependencies.client";
@@ -51,6 +49,7 @@ import { LoadingScreen } from "./LoadingScreen";
 import { ProjectTechStackIcon } from "./TechStack";
 import { LogoIcon } from "./icons/LogoIcon";
 import React from "react";
+import { useTableView } from "./messages/HeaderButtons";
 
 const Breadcrumbs = ({ currentRoute }: { currentRoute: Route | undefined }) => {
   const { project } = useOrganizationTeamProject();
@@ -92,14 +91,10 @@ const SideMenuLink = ({
 }) => {
   const router = useRouter();
   const currentRoute = findCurrentRoute(router.pathname);
-  const { isDevViewEnabled } = useDevView();
+  const { isTableView } = useTableView();
 
   const theme = useTheme();
   const orange400 = theme.colors.orange["400"];
-  const blue500 = theme.colors.blue["500"];
-
-  const activeColor = isDevViewEnabled ? blue500 : orange400;
-  const devModeQuery = isDevViewEnabled ? "?mode=dev" : "";
 
   const IconElem = icon;
 
@@ -110,13 +105,19 @@ const SideMenuLink = ({
     (path.includes("/datasets") && router.pathname.includes("/datasets")) ||
     (path.includes("/settings") && router.pathname.includes("/settings"));
 
+  const viewModeQuery = path.includes("/messages")
+    ? isTableView
+      ? "?view=table"
+      : "?view=list"
+    : "";
+
   return (
     <Link
-      href={path.replace("[project]", project.slug) + devModeQuery}
+      href={path.replace("[project]", project.slug) + viewModeQuery}
       aria-label={label}
     >
       <VStack>
-        <IconElem size={24} color={isActive ? activeColor : undefined} />
+        <IconElem size={24} color={isActive ? orange400 : undefined} />
       </VStack>
     </Link>
   );
@@ -239,7 +240,6 @@ export const DashboardLayout = ({
   const router = useRouter();
   const theme = useTheme();
   const gray400 = theme.colors.gray["400"];
-  const { isDevViewEnabled, toggleDevView } = useDevView();
 
   const { data: session } = useRequiredSession();
 
@@ -291,19 +291,6 @@ export const DashboardLayout = ({
           <Box fontSize={32} fontWeight="bold">
             <LogoIcon width={25} height={34} />
           </Box>
-          <Text
-            whiteSpace="nowrap"
-            bg="blue.500"
-            color="white"
-            paddingX="2"
-            paddingY="1"
-            borderRadius="lg"
-            fontSize={11}
-            fontWeight="bold"
-            hidden={!isDevViewEnabled}
-          >
-            Dev Mode
-          </Text>
           <VStack spacing={8}>
             <SideMenuLink
               path={projectRoutes.home.path}
@@ -329,14 +316,12 @@ export const DashboardLayout = ({
               label={projectRoutes.checks.title}
               project={project}
             />
-            {process.env.NEXT_PUBLIC_FEATURE_DATASETS && isDevViewEnabled && (
-              <SideMenuLink
-                path={projectRoutes.datasets.path}
-                icon={Table}
-                label={projectRoutes.datasets.title}
-                project={project}
-              />
-            )}
+            <SideMenuLink
+              path={projectRoutes.datasets.path}
+              icon={Database}
+              label={projectRoutes.datasets.title}
+              project={project}
+            />
 
             {/*<SideMenuLink
               path={projectRoutes.prompts.path}
@@ -418,21 +403,10 @@ export const DashboardLayout = ({
           )}
           <Spacer />
           <Menu>
-            <Stack align="center" direction="row">
-              {(router.pathname.includes("messages") ||
-                router.pathname.includes("datasets") ||
-                router.pathname.includes("analytics")) && (
-                <Switch
-                  size="lg"
-                  onChange={toggleDevView}
-                  isChecked={isDevViewEnabled}
-                />
-              )}
-            </Stack>
             <MenuButton as={Button} variant="unstyled">
               <Avatar
                 name={user.name ?? undefined}
-                backgroundColor={isDevViewEnabled ? "blue.500" : "orange.400"}
+                backgroundColor={"orange.400"}
                 color="white"
                 size="sm"
               />

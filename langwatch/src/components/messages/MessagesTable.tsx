@@ -45,19 +45,20 @@ import { getEvaluatorDefinitions } from "~/trace_checks/getEvaluator";
 import { api } from "~/utils/api";
 import { durationColor } from "~/utils/durationColor";
 import { getSingleQueryParam } from "~/utils/getSingleQueryParam";
-import { useFilterParams } from "../hooks/useFilterParams";
-import { DashboardLayout } from "./DashboardLayout";
+import { useFilterParams } from "../../hooks/useFilterParams";
+import { DashboardLayout } from "../DashboardLayout";
 
 import Parse from "papaparse";
 import { useLocalStorage } from "usehooks-ts";
 import { TraceDeatilsDrawer } from "~/components/TraceDeatilsDrawer";
-import { AddDatasetRecordDrawer } from "./AddDatasetRecordDrawer";
-import { checkStatusColorMap } from "./checks/EvaluationStatus";
-import { FilterSidebar } from "./filters/FilterSidebar";
-import { usePeriodSelector, PeriodSelector } from "./PeriodSelector";
-import { FilterToggle } from "./filters/FilterToggle";
+import { AddDatasetRecordDrawer } from "../AddDatasetRecordDrawer";
+import { checkStatusColorMap } from "../checks/EvaluationStatus";
+import { FilterSidebar } from "../filters/FilterSidebar";
+import { usePeriodSelector, PeriodSelector } from "../PeriodSelector";
+import { FilterToggle } from "../filters/FilterToggle";
+import { ToggleAnalytics, ToggleTableView } from "./HeaderButtons";
 
-export function MessagesDevMode() {
+export function MessagesTable() {
   const router = useRouter();
   const { project } = useOrganizationTeamProject();
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
@@ -507,10 +508,13 @@ export function MessagesDevMode() {
   return (
     <DashboardLayout>
       <Container maxW={"calc(100vw - 200px)"} padding={6}>
-        <HStack width="full" align="top">
-          <Heading as={"h1"} size="lg" paddingBottom={6} paddingTop={1}>
-            Messages
-          </Heading>
+        <HStack width="full" align="top" paddingBottom={6}>
+          <HStack align="center" spacing={6}>
+            <Heading as={"h1"} size="lg" paddingTop={1}>
+              Messages
+            </Heading>
+            <ToggleAnalytics />
+          </HStack>
           <Spacer />
           <Button
             colorScheme="black"
@@ -520,10 +524,8 @@ export function MessagesDevMode() {
           >
             Export all <DownloadIcon marginLeft={2} />
           </Button>
-          <PeriodSelector
-            period={{ startDate, endDate }}
-            setPeriod={setPeriod}
-          />
+          <ToggleTableView />
+
           <Popover isOpen={isOpen} onClose={onClose} placement="bottom-end">
             <PopoverTrigger>
               <Button variant="outline" onClick={onOpen} minWidth="fit-content">
@@ -572,7 +574,11 @@ export function MessagesDevMode() {
               </PopoverBody>
             </PopoverContent>
           </Popover>
-          <FilterToggle defaultShowFilters={true} />
+          <PeriodSelector
+            period={{ startDate, endDate }}
+            setPeriod={setPeriod}
+          />
+          <FilterToggle />
         </HStack>
 
         <HStack align={"top"} gap={8}>

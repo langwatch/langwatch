@@ -32,17 +32,17 @@ import {
   Pause,
   Play,
   RefreshCw,
-  TrendingUp,
 } from "react-feather";
-import { useFilterParams } from "../hooks/useFilterParams";
-import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
-import type { Trace, TraceCheck } from "../server/tracer/types";
-import { api } from "../utils/api";
-import { getSingleQueryParam } from "../utils/getSingleQueryParam";
+import { useFilterParams } from "../../hooks/useFilterParams";
+import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
+import type { Trace, TraceCheck } from "../../server/tracer/types";
+import { api } from "../../utils/api";
+import { getSingleQueryParam } from "../../utils/getSingleQueryParam";
 import { MessageCard } from "./MessageCard";
-import { FilterSidebar } from "./filters/FilterSidebar";
-import { FilterToggle } from "./filters/FilterToggle";
-import { PeriodSelector, usePeriodSelector } from "./PeriodSelector";
+import { FilterSidebar } from "../filters/FilterSidebar";
+import { FilterToggle } from "../filters/FilterToggle";
+import { PeriodSelector, usePeriodSelector } from "../PeriodSelector";
+import { ToggleAnalytics, ToggleTableView } from "./HeaderButtons";
 
 export function MessagesList() {
   const { project } = useOrganizationTeamProject();
@@ -114,29 +114,7 @@ export function MessagesList() {
           <Heading as={"h1"} size="lg" paddingTop={1}>
             Messages
           </Heading>
-          <Tooltip label="Show analytics for those messages">
-            <Button
-              variant="outline"
-              minWidth={0}
-              height="32px"
-              padding={2}
-              marginTop={2}
-              onClick={() => {
-                void router.push(
-                  {
-                    pathname: `/${project?.slug}`,
-                    query: {
-                      ...router.query,
-                    },
-                  },
-                  undefined,
-                  { shallow: true }
-                );
-              }}
-            >
-              <TrendingUp size="16" />
-            </Button>
-          </Tooltip>
+          <ToggleAnalytics />
           <Tooltip
             label={
               liveUpdate
@@ -179,6 +157,7 @@ export function MessagesList() {
           </Tooltip>
         </HStack>
         <Spacer />
+        <ToggleTableView />
         <GroupingSelector />
         <PeriodSelector period={{ startDate, endDate }} setPeriod={setPeriod} />
         <FilterToggle defaultShowFilters={true} />

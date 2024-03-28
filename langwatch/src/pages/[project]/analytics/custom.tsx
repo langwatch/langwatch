@@ -113,7 +113,6 @@ import {
   uppercaseFirstLetterLowerCaseRest,
 } from "../../../utils/stringCasing";
 import { useRouter } from "next/router";
-import { useDevView } from "~/hooks/DevViewProvider";
 import { useFilterParams } from "~/hooks/useFilterParams";
 
 export interface CustomGraphFormData {
@@ -241,7 +240,6 @@ const defaultValues: CustomGraphFormData = {
 export default function AnalyticsCustomGraph() {
   const jsonModal = useDisclosure();
   const apiModal = useDisclosure();
-  const { isDevViewEnabled } = useDevView();
   const { filterParams } = useFilterParams();
   const form = useForm<CustomGraphFormData>({
     defaultValues,
@@ -313,19 +311,15 @@ export default function AnalyticsCustomGraph() {
                     paddingX={2}
                     fontWeight="bold"
                   />
-                  {isDevViewEnabled && (
-                    <Menu>
-                      <MenuButton as={Button} variant={"ghost"}>
-                        <MoreVertical />
-                      </MenuButton>
-                      <MenuList>
-                        <MenuItem onClick={jsonModal.onOpen}>
-                          Show JSON
-                        </MenuItem>
-                        <MenuItem onClick={apiModal.onOpen}>Show API</MenuItem>
-                      </MenuList>
-                    </Menu>
-                  )}
+                  <Menu>
+                    <MenuButton as={Button} variant={"ghost"}>
+                      <MoreVertical />
+                    </MenuButton>
+                    <MenuList>
+                      <MenuItem onClick={jsonModal.onOpen}>Show JSON</MenuItem>
+                      <MenuItem onClick={apiModal.onOpen}>Show API</MenuItem>
+                    </MenuList>
+                  </Menu>
                 </Flex>
               </CardHeader>
               <CardBody>

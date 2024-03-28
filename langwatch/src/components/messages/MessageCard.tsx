@@ -22,11 +22,11 @@ import NextLink from "next/link";
 import numeral from "numeral";
 import { CheckCircle, Clock, XCircle } from "react-feather";
 import Markdown from "react-markdown";
-import type { Trace, TraceCheck } from "../server/tracer/types";
-import { api } from "../utils/api";
-import { formatMilliseconds } from "../utils/formatMilliseconds";
-import { getColorForString } from "../utils/rotatingColors";
-import { CheckPassing } from "./CheckPassing";
+import type { Trace, TraceCheck } from "../../server/tracer/types";
+import { api } from "../../utils/api";
+import { formatMilliseconds } from "../../utils/formatMilliseconds";
+import { getColorForString } from "../../utils/rotatingColors";
+import { CheckPassing } from "../CheckPassing";
 
 export function MessageCard({
   linkActive,

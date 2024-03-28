@@ -22,9 +22,7 @@ import React, {
   type PropsWithChildren,
 } from "react";
 import Markdown from "react-markdown";
-import { MessagesDevMode } from "~/components/MessagesTable";
 import { DashboardLayout } from "../../../../components/DashboardLayout";
-import { useDevView } from "../../../../hooks/DevViewProvider";
 import { useOrganizationTeamProject } from "../../../../hooks/useOrganizationTeamProject";
 import { useTraceDetailsState } from "../../../../hooks/useTraceDetailsState";
 import { TeamRoleGroup } from "../../../../server/api/permission";
@@ -39,7 +37,6 @@ export default function TraceDetails() {
   const { project, hasTeamPermission } = useOrganizationTeamProject();
   const { traceId, trace, openTab } = useTraceDetailsState();
   const [threadId, setThreadId] = useState<string | undefined>(undefined);
-  const { isDevViewEnabled } = useDevView();
 
   const traceIds = traceId ? [traceId] : [];
   const traceChecksQuery = api.traces.getTraceChecks.useQuery(
@@ -76,10 +73,6 @@ export default function TraceDetails() {
 
   if (isNotFound(trace.error)) {
     return <ErrorPage statusCode={404} />;
-  }
-
-  if (isDevViewEnabled) {
-    return <MessagesDevMode />;
   }
 
   const onClose = () => {

@@ -1,21 +1,21 @@
-import { MessagesDevMode } from "~/components/MessagesTable";
+import { MessagesTable } from "~/components/messages/MessagesTable";
 import { DashboardLayout } from "../../components/DashboardLayout";
 import { ProjectIntegration } from "../../components/ProjectIntegration";
-import { useDevView } from "../../hooks/DevViewProvider";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import { MessagesList } from "../../components/MessagesList";
+import { MessagesList } from "../../components/messages/MessagesList";
+import { useTableView } from "../../components/messages/HeaderButtons";
 
 export default function MessagesOrIntegrationGuide() {
   const { project } = useOrganizationTeamProject();
 
-  const { isDevViewEnabled } = useDevView();
+  const { isTableView } = useTableView();
 
   if (project && !project.firstMessage) {
     return <ProjectIntegration />;
   }
 
-  if (isDevViewEnabled) {
-    return <MessagesDevMode />;
+  if (isTableView) {
+    return <MessagesTable />;
   }
 
   return (

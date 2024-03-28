@@ -126,44 +126,42 @@ function Index() {
             </VStack>
           </Alert>
         )}
-        <Container maxWidth="1152" padding={0}>
-          <HStack width="full" align="top" paddingBottom={6}>
-            <HStack align="center" spacing={6}>
-              <Heading as={"h1"} size="lg" paddingTop={1}>
-                Analytics
-              </Heading>
-              <Tooltip label="Show messages behind those metrics">
-                <Button
-                  variant="outline"
-                  minWidth={0}
-                  height="32px"
-                  padding={2}
-                  marginTop={2}
-                  onClick={() => {
-                    void router.push(
-                      {
-                        pathname: `/${project?.slug}/messages`,
-                        query: {
-                          ...router.query,
-                        },
+        <HStack width="full" align="top" paddingBottom={6}>
+          <HStack align="center" spacing={6}>
+            <Heading as={"h1"} size="lg" paddingTop={1}>
+              Analytics
+            </Heading>
+            <Tooltip label="Show messages behind those metrics">
+              <Button
+                variant="outline"
+                minWidth={0}
+                height="32px"
+                padding={2}
+                marginTop={2}
+                onClick={() => {
+                  void router.push(
+                    {
+                      pathname: `/${project?.slug}/messages`,
+                      query: {
+                        ...router.query,
                       },
-                      undefined,
-                      { shallow: true }
-                    );
-                  }}
-                >
-                  <MessageSquare size="16" />
-                </Button>
-              </Tooltip>
-            </HStack>
-            <Spacer />
-            <FilterToggle />
-            <PeriodSelector
-              period={{ startDate, endDate }}
-              setPeriod={setPeriod}
-            />
+                    },
+                    undefined,
+                    { shallow: true }
+                  );
+                }}
+              >
+                <MessageSquare size="16" />
+              </Button>
+            </Tooltip>
           </HStack>
-        </Container>
+          <Spacer />
+          <FilterToggle />
+          <PeriodSelector
+            period={{ startDate, endDate }}
+            setPeriod={setPeriod}
+          />
+        </HStack>
 
         <HStack align="start" width="full" spacing={8}>
           <VStack align="start" width="full">
