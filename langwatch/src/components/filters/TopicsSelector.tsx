@@ -114,7 +114,7 @@ export function TopicsSelector() {
   const [minHeight, setMinHeight] = useState<number | undefined>(undefined);
 
   useEffect(() => {
-    if (topicSelectorRef.current) {
+    if (topicSelectorRef.current && topicCountsQuery.data) {
       const currentHeight = topicSelectorRef.current.clientHeight;
 
       setMinHeight((minHeight) =>
@@ -129,7 +129,7 @@ export function TopicsSelector() {
       width="full"
       spacing={6}
       ref={topicSelectorRef}
-      minHeight={minHeight}
+      minHeight={`${minHeight}px`}
     >
       <Heading as="h2" size="md">
         Topics
