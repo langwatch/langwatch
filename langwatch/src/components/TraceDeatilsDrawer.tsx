@@ -23,21 +23,15 @@ import type { TraceCheck } from "~/server/tracer/types";
 import { CheckPassingDrawer } from "./CheckPassingDrawer";
 import { SpanTree } from "./traces/SpanTree";
 import { TraceSummary } from "./traces/Summary";
-import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
-import type { TRPCClientErrorLike } from "@trpc/react-query";
-import type { AppRouter } from "~/server/api/root";
-import { useRouter } from "next/router";
 import { Link } from "@chakra-ui/next-js";
 import { AddDatasetRecordDrawer } from "./AddDatasetRecordDrawer";
+import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
+import { api } from "../utils/api";
 
 interface TraceDetailsDrawerProps {
   isDrawerOpen: boolean;
-  setIsDrawerOpen: (isOpen: boolean) => void;
-  traceId?: string;
-  traceChecksQuery?: UseTRPCQueryResult<
-    Record<string, TraceCheck[]>,
-    TRPCClientErrorLike<AppRouter>
-  >;
+  closeDrawer: () => void;
+  traceId: string;
 }
 
 interface TraceEval {
@@ -53,8 +47,16 @@ export const TraceDeatilsDrawer = (props: TraceDetailsDrawerProps) => {
     setTraceView((prevView) => (prevView === "span" ? "full" : "span"));
   };
 
-  const router = useRouter();
-  const { project } = router.query;
+  const { project } = useOrganizationTeamProject();
+
+  const traceChecksQuery = api.traces.getTraceChecks.useQuery(
+    { projectId: project?.id ?? "", traceIds: [props.traceId] },
+    {
+      enabled: !!project,
+      refetchInterval: undefined,
+      refetchOnWindowFocus: false,
+    }
+  );
 
   const Evaluations = (trace: TraceEval) => {
     const totalChecks = trace.traceChecks?.[trace.traceId]?.length;
@@ -110,7 +112,7 @@ export const TraceDeatilsDrawer = (props: TraceDetailsDrawerProps) => {
       placement="right"
       size={traceView}
       onClose={() => {
-        props.setIsDrawerOpen(false);
+        props.closeDrawer();
         setTraceView("span");
       }}
     >
@@ -151,7 +153,7 @@ export const TraceDeatilsDrawer = (props: TraceDetailsDrawerProps) => {
                 Evaluations{" "}
                 <Errors
                   traceId={props.traceId ?? ""}
-                  traceChecks={props.traceChecksQuery?.data}
+                  traceChecks={traceChecksQuery.data}
                 />
               </Tab>
             </TabList>
@@ -164,7 +166,7 @@ export const TraceDeatilsDrawer = (props: TraceDetailsDrawerProps) => {
               <TabPanel>
                 <Evaluations
                   traceId={props.traceId ?? ""}
-                  traceChecks={props.traceChecksQuery?.data}
+                  traceChecks={traceChecksQuery.data}
                 />
               </TabPanel>
             </TabPanels>

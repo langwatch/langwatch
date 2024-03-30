@@ -38,16 +38,6 @@ export default function TraceDetails() {
   const { traceId, trace, openTab } = useTraceDetailsState();
   const [threadId, setThreadId] = useState<string | undefined>(undefined);
 
-  const traceIds = traceId ? [traceId] : [];
-  const traceChecksQuery = api.traces.getTraceChecks.useQuery(
-    { projectId: project?.id ?? "", traceIds },
-    {
-      enabled: traceIds.length > 0,
-      refetchInterval: undefined,
-      refetchOnWindowFocus: false,
-    }
-  );
-
   useEffect(() => {
     if (trace.data?.metadata.thread_id) {
       setThreadId(trace.data.metadata.thread_id);
@@ -140,8 +130,7 @@ export default function TraceDetails() {
             <TraceDeatilsDrawer
               isDrawerOpen={isTabOpen}
               traceId={traceId}
-              traceChecksQuery={traceChecksQuery}
-              setIsDrawerOpen={onClose}
+              closeDrawer={onClose}
             />
           )}
         </HStack>

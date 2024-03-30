@@ -63,9 +63,9 @@ export const tracesRouter = createTRPCRouter({
     .input(
       tracesFilterInput.extend({
         query: z.string().optional(),
-        sortBy: z.string().optional(),
         groupBy: z.string().optional(),
-        orderBy: z.string().optional(),
+        sortBy: z.string().optional(),
+        sortDirection: z.string().optional(),
       })
     )
     .use(checkUserPermissionForProject(TeamRoleGroup.MESSAGES_VIEW))
@@ -101,11 +101,23 @@ export const tracesRouter = createTRPCRouter({
             from: input.query ? 0 : pageOffset,
             size: input.query ? 10_000 : pageSize,
             ...(input.sortBy
-              ? input.sortBy.startsWith("trace_checks.")
+              ? input.sortBy.startsWith("random.")
+                ? {
+                    sort: {
+                      _script: {
+                        type: "number",
+                        script: {
+                          source: "Math.random()",
+                        },
+                        order: input.sortDirection ?? "desc",
+                      },
+                    } as Sort,
+                  }
+                : input.sortBy.startsWith("trace_checks.")
                 ? {
                     sort: {
                       "trace_checks.value": {
-                        order: input.orderBy ?? "desc",
+                        order: input.sortDirection ?? "desc",
                         nested: {
                           path: "trace_checks",
                           filter: {
@@ -121,7 +133,7 @@ export const tracesRouter = createTRPCRouter({
                 : {
                     sort: {
                       [input.sortBy]: {
-                        order: input.orderBy ?? "desc",
+                        order: input.sortDirection ?? "desc",
                       },
                     } as Sort,
                   }

@@ -61,8 +61,7 @@ import { ToggleAnalytics, ToggleTableView } from "./HeaderButtons";
 export function MessagesTable() {
   const router = useRouter();
   const { project } = useOrganizationTeamProject();
-  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-  const [traceId, setTraceId] = useState<string | null>(null);
+  const [openTraceDrawer, setOpenTraceDrawer] = useState<string | undefined>();
   const [totalHits, setTotalHits] = useState<number>(0);
   const [pageOffset, setPageOffset] = useState<number>(0);
   const [pageSize, setPageSize] = useState<number>(25);
@@ -84,7 +83,7 @@ export function MessagesTable() {
       pageOffset: pageOffset,
       pageSize: pageSize,
       sortBy: getSingleQueryParam(router.query.sortBy),
-      orderBy: getSingleQueryParam(router.query.orderBy),
+      sortDirection: getSingleQueryParam(router.query.orderBy),
     },
     queryOpts
   );
@@ -111,11 +110,6 @@ export function MessagesTable() {
       setPreviousTraceChecks(traceChecksQuery.data);
     }
   }, [traceChecksQuery.data]);
-
-  const openTraceDrawer = (trace: Trace) => {
-    setTraceId(trace.trace_id);
-    setIsDrawerOpen(true);
-  };
 
   const traceCheckColumnsAvailable = Object.fromEntries(
     Object.values(traceChecksQuery.data ?? previousTraceChecks ?? {}).flatMap(
@@ -167,7 +161,7 @@ export function MessagesTable() {
       name: "Timestamp",
       sortable: true,
       render: (trace: Trace, index: number) => (
-        <Td key={index} onClick={() => openTraceDrawer(trace)}>
+        <Td key={index} onClick={() => setOpenTraceDrawer(trace.trace_id)}>
           {new Date(trace.timestamps.started_at).toLocaleString()}
         </Td>
       ),
@@ -179,7 +173,11 @@ export function MessagesTable() {
       sortable: false,
       width: 300,
       render: (trace, index) => (
-        <Td key={index} maxWidth="300px" onClick={() => openTraceDrawer(trace)}>
+        <Td
+          key={index}
+          maxWidth="300px"
+          onClick={() => setOpenTraceDrawer(trace.trace_id)}
+        >
           <Tooltip label={trace.input.value}>
             <Text noOfLines={1} wordBreak="break-all" display="block">
               {trace.input.value}
@@ -195,7 +193,7 @@ export function MessagesTable() {
       width: 300,
       render: (trace, index) =>
         trace.error ? (
-          <Td key={index} onClick={() => openTraceDrawer(trace)}>
+          <Td key={index} onClick={() => setOpenTraceDrawer(trace.trace_id)}>
             <Text
               noOfLines={1}
               maxWidth="300px"
@@ -206,7 +204,7 @@ export function MessagesTable() {
             </Text>
           </Td>
         ) : (
-          <Td key={index} onClick={() => openTraceDrawer(trace)}>
+          <Td key={index} onClick={() => setOpenTraceDrawer(trace.trace_id)}>
             <Tooltip label={trace.output?.value}>
               <Text noOfLines={1} display="block" maxWidth="300px">
                 {trace.output?.value}
@@ -220,7 +218,11 @@ export function MessagesTable() {
       name: "First Token",
       sortable: true,
       render: (trace, index) => (
-        <Td key={index} isNumeric onClick={() => openTraceDrawer(trace)}>
+        <Td
+          key={index}
+          isNumeric
+          onClick={() => setOpenTraceDrawer(trace.trace_id)}
+        >
           <Text
             color={durationColor("first_token", trace.metrics.first_token_ms)}
           >
@@ -241,7 +243,11 @@ export function MessagesTable() {
       name: "Completion Time",
       sortable: true,
       render: (trace, index) => (
-        <Td key={index} isNumeric onClick={() => openTraceDrawer(trace)}>
+        <Td
+          key={index}
+          isNumeric
+          onClick={() => setOpenTraceDrawer(trace.trace_id)}
+        >
           <Text
             color={durationColor("total_time", trace.metrics.total_time_ms)}
           >
@@ -262,7 +268,11 @@ export function MessagesTable() {
       name: "Completion Token",
       sortable: true,
       render: (trace, index) => (
-        <Td key={index} isNumeric onClick={() => openTraceDrawer(trace)}>
+        <Td
+          key={index}
+          isNumeric
+          onClick={() => setOpenTraceDrawer(trace.trace_id)}
+        >
           {trace.metrics.completion_tokens}
         </Td>
       ),
@@ -272,7 +282,11 @@ export function MessagesTable() {
       name: "Prompt Tokens",
       sortable: true,
       render: (trace, index) => (
-        <Td key={index} isNumeric onClick={() => openTraceDrawer(trace)}>
+        <Td
+          key={index}
+          isNumeric
+          onClick={() => setOpenTraceDrawer(trace.trace_id)}
+        >
           {trace.metrics.prompt_tokens}
         </Td>
       ),
@@ -282,7 +296,11 @@ export function MessagesTable() {
       name: "Total Cost",
       sortable: true,
       render: (trace, index) => (
-        <Td key={index} isNumeric onClick={() => openTraceDrawer(trace)}>
+        <Td
+          key={index}
+          isNumeric
+          onClick={() => setOpenTraceDrawer(trace.trace_id)}
+        >
           <Text>{numeral(trace.metrics.total_cost).format("$0.00[000]")}</Text>
         </Td>
       ),
@@ -306,7 +324,10 @@ export function MessagesTable() {
               );
 
               return (
-                <Td key={index} onClick={() => openTraceDrawer(trace)}>
+                <Td
+                  key={index}
+                  onClick={() => setOpenTraceDrawer(trace.trace_id)}
+                >
                   {traceCheck?.status === "processed" ? (
                     <Text color={checkStatusColorMap(traceCheck)}>
                       {evaluator?.isGuardrail
@@ -629,6 +650,16 @@ export function MessagesTable() {
                           ))}
                         </Tr>
                       ))}
+                    {traceGroups.isFetched &&
+                      traceGroups.data?.groups.length === 0 && (
+                        <Tr>
+                          <Td />
+                          <Td colSpan={checkedHeaderColumnsEntries.length}>
+                            No messages found, try selecting different filters
+                            and dates
+                          </Td>
+                        </Tr>
+                      )}
                   </Tbody>
                 </Table>
               </TableContainer>
@@ -684,12 +715,11 @@ export function MessagesTable() {
           </Button>
         </HStack>
       </Container>
-      {traceId && (
+      {openTraceDrawer && (
         <TraceDeatilsDrawer
-          isDrawerOpen={isDrawerOpen}
-          traceId={traceId}
-          traceChecksQuery={traceChecksQuery}
-          setIsDrawerOpen={setIsDrawerOpen}
+          isDrawerOpen={true}
+          traceId={openTraceDrawer}
+          closeDrawer={() => setOpenTraceDrawer(undefined)}
         />
       )}
       {selectedTraceIds.length > 0 && (

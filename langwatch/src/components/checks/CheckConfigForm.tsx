@@ -8,21 +8,32 @@ import {
   Button,
   Card,
   CardBody,
+  CardHeader,
   HStack,
+  Heading,
   Input,
+  Skeleton,
   Spacer,
+  Table,
+  TableContainer,
+  Tbody,
+  Td,
   Text,
+  Th,
+  Thead,
   Tooltip,
+  Tr,
   VStack,
 } from "@chakra-ui/react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useEffect } from "react";
-import { HelpCircle } from "react-feather";
+import { useEffect, useState } from "react";
+import { HelpCircle, Play, RefreshCw } from "react-feather";
 import {
   Controller,
   FormProvider,
   useFieldArray,
   useForm,
+  type UseFormReturn,
 } from "react-hook-form";
 import slugify from "slugify";
 import { z } from "zod";
@@ -46,6 +57,12 @@ import {
   type Evaluators,
 } from "../../trace_checks/evaluators.generated";
 import { EvaluatorSelection } from "./EvaluatorSelection";
+import { usePeriodSelector, PeriodSelector } from "../PeriodSelector";
+import { FilterToggle } from "../filters/FilterToggle";
+import { FilterSidebar } from "../filters/FilterSidebar";
+import { api } from "../../utils/api";
+import { useFilterParams } from "../../hooks/useFilterParams";
+import { TraceDeatilsDrawer } from "../TraceDeatilsDrawer";
 
 export interface CheckConfigFormData {
   name: string;
@@ -319,9 +336,202 @@ export default function CheckConfigForm({
                 Save
               </Button>
             </HStack>
+            <TryItOut form={form} />
           </VStack>
         )}
       </form>
     </FormProvider>
+  );
+}
+
+function TryItOut({
+  form,
+}: {
+  form: UseFormReturn<CheckConfigFormData, any, undefined>;
+}) {
+  const { watch } = form;
+
+  const checkType = watch("checkType");
+  const evaluation = checkType && getEvaluatorDefinitions(checkType);
+
+  const {
+    period: { startDate, endDate },
+    setPeriod,
+  } = usePeriodSelector();
+
+  const { filterParams, queryOpts } = useFilterParams();
+  const [openTraceDrawer, setOpenTraceDrawer] = useState<string | undefined>();
+  const [randomSeed, setRandomSeed] = useState<number>(Math.random() * 1000);
+
+  const traceGroups = api.traces.getAllForProject.useQuery(
+    {
+      ...filterParams,
+      // query: getSingleQueryParam(router.query.query),
+      groupBy: "none",
+      pageSize: 10,
+      sortBy: `random.${randomSeed}`,
+    },
+    queryOpts
+  );
+
+  return (
+    <VStack width="full" spacing={6} marginTop={6}>
+      <HStack width="full" align="end">
+        <Heading as="h2" size="lg" textAlign="center" paddingTop={4}>
+          Try it out
+        </Heading>
+        <Spacer />
+        <PeriodSelector period={{ startDate, endDate }} setPeriod={setPeriod} />
+        <FilterToggle />
+      </HStack>
+      <HStack width="full" align="start" spacing={6} paddingBottom={6}>
+        <Card width="full" minHeight="400px">
+          <CardHeader>
+            <HStack spacing={4}>
+              <Text fontWeight="500">
+                {traceGroups.isLoading
+                  ? "Fetching samples..."
+                  : `Fetched ${
+                      (traceGroups.data?.groups ?? []).length
+                    } random sample messages`}
+              </Text>
+              <Spacer />
+              <Button
+                onClick={() => setRandomSeed(Math.random() * 1000)}
+                leftIcon={
+                  <RefreshCw
+                    size={16}
+                    className={
+                      traceGroups.isLoading
+                        ? "refresh-icon animation-spinning"
+                        : "refresh-icon"
+                    }
+                  />
+                }
+                disabled={traceGroups.isLoading}
+                size="sm"
+              >
+                Shuffle
+              </Button>
+              <Button
+                leftIcon={<Play size={16} />}
+                colorScheme="orange"
+                size="sm"
+              >
+                Run on samples
+              </Button>
+            </HStack>
+          </CardHeader>
+          <CardBody paddingX={2} paddingTop={0}>
+            <VStack width="full" align="start" spacing={6}>
+              <TableContainer>
+                <Table variant="simple">
+                  <Thead>
+                    <Tr>
+                      <Th width="240px">Timestamp</Th>
+                      <Th width="300px">Input</Th>
+                      <Th width="300px">Output</Th>
+                      {evaluation?.isGuardrail ? (
+                        <Th>Passed</Th>
+                      ) : (
+                        <Th>Score</Th>
+                      )}
+                      <Th width="200px">Details</Th>
+                    </Tr>
+                  </Thead>
+                  <Tbody>
+                    {traceGroups.data?.groups.flatMap((traceGroup) =>
+                      traceGroup.map((trace) => (
+                        <Tr key={trace.trace_id} role="button" cursor="pointer">
+                          <Td
+                            maxWidth="240px"
+                            onClick={() => setOpenTraceDrawer(trace.trace_id)}
+                          >
+                            {new Date(
+                              trace.timestamps.started_at
+                            ).toLocaleString()}
+                          </Td>
+                          <Td
+                            maxWidth="300px"
+                            onClick={() => setOpenTraceDrawer(trace.trace_id)}
+                          >
+                            <Tooltip label={trace.input.value}>
+                              <Text
+                                noOfLines={1}
+                                wordBreak="break-all"
+                                display="block"
+                              >
+                                {trace.input.value}
+                              </Text>
+                            </Tooltip>
+                          </Td>
+                          {trace.error ? (
+                            <Td
+                              onClick={() => setOpenTraceDrawer(trace.trace_id)}
+                            >
+                              <Text
+                                noOfLines={1}
+                                maxWidth="300px"
+                                display="block"
+                                color="red.400"
+                              >
+                                {trace.error.message}
+                              </Text>
+                            </Td>
+                          ) : (
+                            <Td
+                              onClick={() => setOpenTraceDrawer(trace.trace_id)}
+                            >
+                              <Tooltip label={trace.output?.value}>
+                                <Text
+                                  noOfLines={1}
+                                  display="block"
+                                  maxWidth="250px"
+                                >
+                                  {trace.output?.value}
+                                </Text>
+                              </Tooltip>
+                            </Td>
+                          )}
+                          {evaluation?.isGuardrail ? <Td></Td> : <Td></Td>}
+                          <Td></Td>
+                        </Tr>
+                      ))
+                    )}
+                    {traceGroups.isLoading &&
+                      Array.from({ length: 3 }).map((_, i) => (
+                        <Tr key={i}>
+                          {Array.from({ length: 3 }).map((_, i) => (
+                            <Td key={i}>
+                              <Skeleton height="20px" />
+                            </Td>
+                          ))}
+                        </Tr>
+                      ))}
+                    {traceGroups.isFetched &&
+                      traceGroups.data?.groups.length === 0 && (
+                        <Tr>
+                          <Td colSpan={5}>
+                            No messages found, try selecting different filters
+                            and dates
+                          </Td>
+                        </Tr>
+                      )}
+                  </Tbody>
+                </Table>
+              </TableContainer>
+            </VStack>
+          </CardBody>
+        </Card>
+        <FilterSidebar />
+        {openTraceDrawer && (
+          <TraceDeatilsDrawer
+            isDrawerOpen={true}
+            traceId={openTraceDrawer}
+            closeDrawer={() => setOpenTraceDrawer(undefined)}
+          />
+        )}
+      </HStack>
+    </VStack>
   );
 }
