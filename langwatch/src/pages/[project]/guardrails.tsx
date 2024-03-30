@@ -115,7 +115,7 @@ export default function Checks() {
                 href={`/${project.slug}/guardrails/new/choose`}
                 minWidth="fit-content"
               >
-                + Add Evaluation
+                + Add
               </Button>
             )}
           </HStack>

@@ -181,8 +181,8 @@ export default function CheckConfigForm({
               <CardBody>
                 <VStack spacing={4}>
                   <HorizontalFormControl
-                    label="Check Type"
-                    helper="Select the type of check"
+                    label="Evaluation Type"
+                    helper="Select the evaluation to run"
                     isInvalid={!!errors.checkType}
                   >
                     {AVAILABLE_EVALUATORS[checkType].name}{" "}
