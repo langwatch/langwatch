@@ -49,6 +49,7 @@ import { ProjectTechStackIcon } from "./TechStack";
 import { LogoIcon } from "./icons/LogoIcon";
 import React from "react";
 import { useTableView } from "./messages/HeaderButtons";
+import { CurrentDrawer } from "./CurrentDrawer";
 
 const Breadcrumbs = ({ currentRoute }: { currentRoute: Route | undefined }) => {
   const { project } = useOrganizationTeamProject();
@@ -428,6 +429,7 @@ export const DashboardLayout = ({
             </Portal>
           </Menu>
         </HStack>
+        <CurrentDrawer />
         {children}
       </VStack>
     </HStack>

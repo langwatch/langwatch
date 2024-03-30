@@ -62,7 +62,8 @@ import { FilterToggle } from "../filters/FilterToggle";
 import { FilterSidebar } from "../filters/FilterSidebar";
 import { api } from "../../utils/api";
 import { useFilterParams } from "../../hooks/useFilterParams";
-import { TraceDeatilsDrawer } from "../TraceDeatilsDrawer";
+import { TraceDetailsDrawer } from "../TraceDetailsDrawer";
+import { useDrawer } from "../CurrentDrawer";
 
 export interface CheckConfigFormData {
   name: string;
@@ -360,7 +361,7 @@ function TryItOut({
   } = usePeriodSelector();
 
   const { filterParams, queryOpts } = useFilterParams();
-  const [openTraceDrawer, setOpenTraceDrawer] = useState<string | undefined>();
+  const { openDrawer } = useDrawer();
   const [randomSeed, setRandomSeed] = useState<number>(Math.random() * 1000);
 
   const traceGroups = api.traces.getAllForProject.useQuery(
@@ -445,7 +446,11 @@ function TryItOut({
                         <Tr key={trace.trace_id} role="button" cursor="pointer">
                           <Td
                             maxWidth="240px"
-                            onClick={() => setOpenTraceDrawer(trace.trace_id)}
+                            onClick={() =>
+                              openDrawer("traceDetails", {
+                                traceId: trace.trace_id,
+                              })
+                            }
                           >
                             {new Date(
                               trace.timestamps.started_at
@@ -453,7 +458,11 @@ function TryItOut({
                           </Td>
                           <Td
                             maxWidth="300px"
-                            onClick={() => setOpenTraceDrawer(trace.trace_id)}
+                            onClick={() =>
+                              openDrawer("traceDetails", {
+                                traceId: trace.trace_id,
+                              })
+                            }
                           >
                             <Tooltip label={trace.input.value}>
                               <Text
@@ -467,7 +476,11 @@ function TryItOut({
                           </Td>
                           {trace.error ? (
                             <Td
-                              onClick={() => setOpenTraceDrawer(trace.trace_id)}
+                              onClick={() =>
+                                openDrawer("traceDetails", {
+                                  traceId: trace.trace_id,
+                                })
+                              }
                             >
                               <Text
                                 noOfLines={1}
@@ -480,7 +493,11 @@ function TryItOut({
                             </Td>
                           ) : (
                             <Td
-                              onClick={() => setOpenTraceDrawer(trace.trace_id)}
+                              onClick={() =>
+                                openDrawer("traceDetails", {
+                                  traceId: trace.trace_id,
+                                })
+                              }
                             >
                               <Tooltip label={trace.output?.value}>
                                 <Text
@@ -524,13 +541,6 @@ function TryItOut({
           </CardBody>
         </Card>
         <FilterSidebar />
-        {openTraceDrawer && (
-          <TraceDeatilsDrawer
-            isDrawerOpen={true}
-            traceId={openTraceDrawer}
-            closeDrawer={() => setOpenTraceDrawer(undefined)}
-          />
-        )}
       </HStack>
     </VStack>
   );

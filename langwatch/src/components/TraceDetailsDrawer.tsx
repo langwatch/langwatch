@@ -27,10 +27,9 @@ import { Link } from "@chakra-ui/next-js";
 import { AddDatasetRecordDrawer } from "./AddDatasetRecordDrawer";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import { api } from "../utils/api";
+import { useDrawer } from "./CurrentDrawer";
 
 interface TraceDetailsDrawerProps {
-  isDrawerOpen: boolean;
-  closeDrawer: () => void;
   traceId: string;
 }
 
@@ -39,7 +38,8 @@ interface TraceEval {
   traceChecks?: Record<string, TraceCheck[]>;
 }
 
-export const TraceDeatilsDrawer = (props: TraceDetailsDrawerProps) => {
+export const TraceDetailsDrawer = (props: TraceDetailsDrawerProps) => {
+  const { closeDrawer } = useDrawer();
   const { isOpen, onOpen, onClose } = useDisclosure();
 
   const [traceView, setTraceView] = useState<"span" | "full">("span");
@@ -107,13 +107,12 @@ export const TraceDeatilsDrawer = (props: TraceDetailsDrawerProps) => {
 
   return (
     <Drawer
-      isOpen={props.isDrawerOpen}
+      isOpen={true}
       blockScrollOnMount={false}
       placement="right"
       size={traceView}
       onClose={() => {
-        props.closeDrawer();
-        setTraceView("span");
+        closeDrawer();
       }}
     >
       <DrawerContent>

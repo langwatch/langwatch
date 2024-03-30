@@ -30,13 +30,13 @@ import type { Trace } from "../../../../server/tracer/types";
 import { api } from "../../../../utils/api";
 import { isNotFound } from "../../../../utils/trpcError";
 
-import { TraceDeatilsDrawer } from "~/components/TraceDeatilsDrawer";
+import { useDrawer } from "../../../../components/CurrentDrawer";
 
 export default function TraceDetails() {
-  const router = useRouter();
-  const { project, hasTeamPermission } = useOrganizationTeamProject();
+  const { hasTeamPermission } = useOrganizationTeamProject();
   const { traceId, trace, openTab } = useTraceDetailsState();
   const [threadId, setThreadId] = useState<string | undefined>(undefined);
+  const { openDrawer } = useDrawer();
 
   useEffect(() => {
     if (trace.data?.metadata.thread_id) {
@@ -45,14 +45,15 @@ export default function TraceDetails() {
   }, [trace.data?.metadata.thread_id]);
 
   const [initialDelay, setInitialDelay] = useState<boolean>(false);
-  const [isTabOpen, setTabOpen] = useState<boolean>(false);
 
   useEffect(() => {
-    if (!hasTeamPermission(TeamRoleGroup.SPANS_DEBUG)) return;
+    if (!hasTeamPermission(TeamRoleGroup.SPANS_DEBUG) || !traceId) return;
     setTimeout(
       () => {
         const isOpen = (!!threadId || !!trace.data) && !!openTab;
-        setTabOpen(isOpen);
+        openDrawer("traceDetails", {
+          traceId: traceId,
+        });
 
         if (isOpen) setInitialDelay(true);
       },
@@ -64,11 +65,6 @@ export default function TraceDetails() {
   if (isNotFound(trace.error)) {
     return <ErrorPage statusCode={404} />;
   }
-
-  const onClose = () => {
-    setTabOpen(false);
-    void router.replace(`/${project?.slug}/messages/${traceId}`);
-  };
 
   return (
     <DashboardLayout backgroundColor="white">
@@ -99,7 +95,7 @@ export default function TraceDetails() {
         alignItems="flex-start"
         paddingX={12}
         width="100%"
-        maxWidth={isTabOpen ? "2300" : "1600"}
+        maxWidth="1600"
       >
         <HStack
           align="start"
@@ -125,14 +121,6 @@ export default function TraceDetails() {
           >
             <Conversation threadId={threadId} />
           </Box>
-
-          {traceId && (
-            <TraceDeatilsDrawer
-              isDrawerOpen={isTabOpen}
-              traceId={traceId}
-              closeDrawer={onClose}
-            />
-          )}
         </HStack>
       </Box>
     </DashboardLayout>
@@ -140,7 +128,8 @@ export default function TraceDetails() {
 }
 
 function Conversation({ threadId }: { threadId?: string }) {
-  const { traceId, trace, openTab } = useTraceDetailsState();
+  const router = useRouter();
+  const { traceId, trace } = useTraceDetailsState();
   const { project } = useOrganizationTeamProject();
 
   const currentTraceRef = useRef<HTMLDivElement>(null);
@@ -153,6 +142,8 @@ function Conversation({ threadId }: { threadId?: string }) {
       enabled: !!project && !!threadId,
     }
   );
+
+  const modalTraceId = router.query["drawer.traceId"];
 
   useEffect(() => {
     if (threadTraces.data && threadTraces.data?.length > 0) {
@@ -183,7 +174,7 @@ function Conversation({ threadId }: { threadId?: string }) {
                   key={trace.trace_id}
                   trace={trace}
                   ref={trace.trace_id == traceId ? currentTraceRef : undefined}
-                  highlighted={trace.trace_id == traceId && !!openTab}
+                  highlighted={trace.trace_id == modalTraceId}
                 />
               ))
             ) : threadTraces.error ? (
@@ -208,7 +199,7 @@ function Conversation({ threadId }: { threadId?: string }) {
           ) : null}
           {!threadId && <Box height="56px" />}
           {trace.data && !threadTraces.data && (
-            <TraceMessages trace={trace.data} highlighted={!!openTab} />
+            <TraceMessages trace={trace.data} highlighted={!!modalTraceId} />
           )}
           {trace.data && !trace.data.metadata.thread_id && (
             <Container maxWidth="800px" padding={8}>
@@ -329,9 +320,8 @@ function Message({
   timestamp?: number;
   paddingTop?: string;
 }>) {
-  const router = useRouter();
   const { project } = useOrganizationTeamProject();
-  const { traceId, openTab } = useTraceDetailsState();
+  const { openDrawer } = useDrawer();
 
   // show time ago if less than a day old
   const timestampDate = timestamp ? new Date(timestamp) : undefined;
@@ -355,11 +345,9 @@ function Message({
       role="button"
       onClick={() => {
         if (!trace) return;
-        if (openTab && traceId === trace.trace_id) {
-          void router.replace(`/${project.slug}/messages/${trace.trace_id}`);
-        } else {
-          void router.push(`/${project.slug}/messages/${trace.trace_id}/spans`);
-        }
+        openDrawer("traceDetails", {
+          traceId: trace.trace_id,
+        });
       }}
     >
       {avatar}
@@ -367,7 +355,6 @@ function Message({
         <HStack width="full">
           <Text fontWeight="bold">{author}</Text>
           <Spacer />
-          sss
           {timestampDate && timeAgo && (
             <Tooltip label={timestampDate.toLocaleString()}>
               <Text color="gray.400">{timeAgo}</Text>

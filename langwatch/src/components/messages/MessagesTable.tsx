@@ -50,18 +50,18 @@ import { DashboardLayout } from "../DashboardLayout";
 
 import Parse from "papaparse";
 import { useLocalStorage } from "usehooks-ts";
-import { TraceDeatilsDrawer } from "~/components/TraceDeatilsDrawer";
 import { AddDatasetRecordDrawer } from "../AddDatasetRecordDrawer";
 import { checkStatusColorMap } from "../checks/EvaluationStatus";
 import { FilterSidebar } from "../filters/FilterSidebar";
 import { usePeriodSelector, PeriodSelector } from "../PeriodSelector";
 import { FilterToggle } from "../filters/FilterToggle";
 import { ToggleAnalytics, ToggleTableView } from "./HeaderButtons";
+import { useDrawer } from "../CurrentDrawer";
 
 export function MessagesTable() {
   const router = useRouter();
   const { project } = useOrganizationTeamProject();
-  const [openTraceDrawer, setOpenTraceDrawer] = useState<string | undefined>();
+  const { openDrawer } = useDrawer();
   const [totalHits, setTotalHits] = useState<number>(0);
   const [pageOffset, setPageOffset] = useState<number>(0);
   const [pageSize, setPageSize] = useState<number>(25);
@@ -161,7 +161,14 @@ export function MessagesTable() {
       name: "Timestamp",
       sortable: true,
       render: (trace: Trace, index: number) => (
-        <Td key={index} onClick={() => setOpenTraceDrawer(trace.trace_id)}>
+        <Td
+          key={index}
+          onClick={() =>
+            openDrawer("traceDetails", {
+              traceId: trace.trace_id,
+            })
+          }
+        >
           {new Date(trace.timestamps.started_at).toLocaleString()}
         </Td>
       ),
@@ -176,7 +183,11 @@ export function MessagesTable() {
         <Td
           key={index}
           maxWidth="300px"
-          onClick={() => setOpenTraceDrawer(trace.trace_id)}
+          onClick={() =>
+            openDrawer("traceDetails", {
+              traceId: trace.trace_id,
+            })
+          }
         >
           <Tooltip label={trace.input.value}>
             <Text noOfLines={1} wordBreak="break-all" display="block">
@@ -193,7 +204,14 @@ export function MessagesTable() {
       width: 300,
       render: (trace, index) =>
         trace.error ? (
-          <Td key={index} onClick={() => setOpenTraceDrawer(trace.trace_id)}>
+          <Td
+            key={index}
+            onClick={() =>
+              openDrawer("traceDetails", {
+                traceId: trace.trace_id,
+              })
+            }
+          >
             <Text
               noOfLines={1}
               maxWidth="300px"
@@ -204,7 +222,14 @@ export function MessagesTable() {
             </Text>
           </Td>
         ) : (
-          <Td key={index} onClick={() => setOpenTraceDrawer(trace.trace_id)}>
+          <Td
+            key={index}
+            onClick={() =>
+              openDrawer("traceDetails", {
+                traceId: trace.trace_id,
+              })
+            }
+          >
             <Tooltip label={trace.output?.value}>
               <Text noOfLines={1} display="block" maxWidth="300px">
                 {trace.output?.value}
@@ -221,7 +246,11 @@ export function MessagesTable() {
         <Td
           key={index}
           isNumeric
-          onClick={() => setOpenTraceDrawer(trace.trace_id)}
+          onClick={() =>
+            openDrawer("traceDetails", {
+              traceId: trace.trace_id,
+            })
+          }
         >
           <Text
             color={durationColor("first_token", trace.metrics.first_token_ms)}
@@ -246,7 +275,11 @@ export function MessagesTable() {
         <Td
           key={index}
           isNumeric
-          onClick={() => setOpenTraceDrawer(trace.trace_id)}
+          onClick={() =>
+            openDrawer("traceDetails", {
+              traceId: trace.trace_id,
+            })
+          }
         >
           <Text
             color={durationColor("total_time", trace.metrics.total_time_ms)}
@@ -271,7 +304,11 @@ export function MessagesTable() {
         <Td
           key={index}
           isNumeric
-          onClick={() => setOpenTraceDrawer(trace.trace_id)}
+          onClick={() =>
+            openDrawer("traceDetails", {
+              traceId: trace.trace_id,
+            })
+          }
         >
           {trace.metrics.completion_tokens}
         </Td>
@@ -285,7 +322,11 @@ export function MessagesTable() {
         <Td
           key={index}
           isNumeric
-          onClick={() => setOpenTraceDrawer(trace.trace_id)}
+          onClick={() =>
+            openDrawer("traceDetails", {
+              traceId: trace.trace_id,
+            })
+          }
         >
           {trace.metrics.prompt_tokens}
         </Td>
@@ -299,7 +340,11 @@ export function MessagesTable() {
         <Td
           key={index}
           isNumeric
-          onClick={() => setOpenTraceDrawer(trace.trace_id)}
+          onClick={() =>
+            openDrawer("traceDetails", {
+              traceId: trace.trace_id,
+            })
+          }
         >
           <Text>{numeral(trace.metrics.total_cost).format("$0.00[000]")}</Text>
         </Td>
@@ -326,7 +371,11 @@ export function MessagesTable() {
               return (
                 <Td
                   key={index}
-                  onClick={() => setOpenTraceDrawer(trace.trace_id)}
+                  onClick={() =>
+                    openDrawer("traceDetails", {
+                      traceId: trace.trace_id,
+                    })
+                  }
                 >
                   {traceCheck?.status === "processed" ? (
                     <Text color={checkStatusColorMap(traceCheck)}>
@@ -715,13 +764,6 @@ export function MessagesTable() {
           </Button>
         </HStack>
       </Container>
-      {openTraceDrawer && (
-        <TraceDeatilsDrawer
-          isDrawerOpen={true}
-          traceId={openTraceDrawer}
-          closeDrawer={() => setOpenTraceDrawer(undefined)}
-        />
-      )}
       {selectedTraceIds.length > 0 && (
         <Box
           position="fixed"

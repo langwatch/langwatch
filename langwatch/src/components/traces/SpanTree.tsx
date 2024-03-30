@@ -96,67 +96,73 @@ const SpanNode: React.FC<SpanNodeProps> = ({ span, level, lastChild }) => {
         }
       />
 
-      <Link
-        href={`/${project.slug}/messages/${span.trace_id}/spans/${span.span_id}`}
-        replace={true}
-        _hover={{ textDecoration: "none" }}
+      <HStack
+        align="start"
+        paddingY={2}
+        paddingX={level > 0 ? 8 : 4}
+        paddingRight={14}
+        borderRadius={6}
+        background={span.span_id === currentSpanId ? "gray.100" : undefined}
+        _hover={{
+          background: "gray.100",
+        }}
+        cursor="pointer"
+        role="button"
+        onClick={() => {
+          void router.replace(
+            {
+              query: {
+                ...router.query,
+                span: span.span_id,
+              },
+            },
+            undefined,
+            { shallow: true }
+          );
+        }}
       >
-        <HStack
-          align="start"
-          paddingY={2}
-          paddingX={level > 0 ? 8 : 4}
-          paddingRight={14}
-          borderRadius={6}
-          background={span.span_id === currentSpanId ? "gray.100" : undefined}
-          _hover={{
-            background: "gray.100",
-          }}
-        >
-          <HStack spacing={4}>
-            <Box
-              background="white"
-              borderColor={span.error ? "red.400" : "gray.400"}
-              borderWidth="3px"
-              borderRadius="100%"
-              width="12px"
-              height="12px"
-              position="relative"
-              zIndex={1}
-            ></Box>
-            <SpanTypeTag span={span} />
-          </HStack>
-          <VStack align="start">
-            <Text>
-              {span.name ?? span.model ?? (
-                <Text color="gray.400">(unnamed)</Text>
-              )}
-            </Text>
-            <HStack fontSize={13} color="gray.500">
-              <SpanDuration span={span} />
-              {(span.metrics?.prompt_tokens !== undefined ||
-                span.metrics?.completion_tokens !== undefined) && (
+        <HStack spacing={4}>
+          <Box
+            background="white"
+            borderColor={span.error ? "red.400" : "gray.400"}
+            borderWidth="3px"
+            borderRadius="100%"
+            width="12px"
+            height="12px"
+            position="relative"
+            zIndex={1}
+          ></Box>
+          <SpanTypeTag span={span} />
+        </HStack>
+        <VStack align="start">
+          <Text>
+            {span.name ?? span.model ?? <Text color="gray.400">(unnamed)</Text>}
+          </Text>
+          <HStack fontSize={13} color="gray.500">
+            <SpanDuration span={span} />
+            {(span.metrics?.prompt_tokens !== undefined ||
+              span.metrics?.completion_tokens !== undefined) && (
+              <>
+                <Text>·</Text>
+                <Text>
+                  {(span.metrics?.prompt_tokens ?? 0) +
+                    (span.metrics?.completion_tokens ?? 0)}{" "}
+                  tokens
+                </Text>
+              </>
+            )}
+            {span.metrics?.cost !== undefined &&
+              span.metrics?.cost !== null && (
                 <>
                   <Text>·</Text>
-                  <Text>
-                    {(span.metrics?.prompt_tokens ?? 0) +
-                      (span.metrics?.completion_tokens ?? 0)}{" "}
-                    tokens
+                  <Text fontSize={13} color="gray.500">
+                    <SpanCost span={span} />
                   </Text>
                 </>
               )}
-              {span.metrics?.cost !== undefined &&
-                span.metrics?.cost !== null && (
-                  <>
-                    <Text>·</Text>
-                    <Text fontSize={13} color="gray.500">
-                      <SpanCost span={span} />
-                    </Text>
-                  </>
-                )}
-            </HStack>
-          </VStack>
-        </HStack>
-      </Link>
+          </HStack>
+        </VStack>
+      </HStack>
       {span.children.map((childSpan, index) => (
         <SpanNode
           key={childSpan.span_id}
@@ -246,6 +252,7 @@ const SpanCost = ({ span }: { span: ElasticSearchSpan }) => {
 type SpanTreeProps = {
   traceId?: string;
 };
+
 export function SpanTree(props?: SpanTreeProps) {
   const { traceId, spanId, trace } = useTraceDetailsState(props?.traceId);
   const router = useRouter();
@@ -261,18 +268,24 @@ export function SpanTree(props?: SpanTreeProps) {
 
   useEffect(() => {
     if (
-      !spanId &&
+      (!spanId || spanId !== span?.span_id) &&
       project &&
       traceId &&
       spans.data &&
-      spans.data[0] &&
-      router.query.mode !== "dev"
+      spans.data[0]
     ) {
       void router.replace(
-        `/${project.slug}/messages/${traceId}/spans/${spans.data[0].span_id}`
+        {
+          query: {
+            ...router.query,
+            span: spans.data[0].span_id,
+          },
+        },
+        undefined,
+        { shallow: true }
       );
     }
-  }, [project, router, spanId, spans.data, traceId]);
+  }, [project, router, span?.span_id, spanId, spans.data, traceId]);
 
   if (isNotFound(trace.error)) {
     return <Alert status="error">Trace not found</Alert>;
