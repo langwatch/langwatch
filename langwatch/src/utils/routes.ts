@@ -11,29 +11,29 @@ export const projectRoutes = {
     path: "/[project]/analytics",
     title: "Analytics",
   },
-  checks: {
-    path: "/[project]/guardrails",
-    title: "Checks",
+  evaluations: {
+    path: "/[project]/evaluations",
+    title: "Evaluations",
   },
-  checks_new_choose: {
-    path: "/[project]/guardrails/new/choose",
-    title: "New Check",
-    parent: "checks",
+  evaluations_new_choose: {
+    path: "/[project]/evaluations/new/choose",
+    title: "New Evaluation",
+    parent: "evaluations",
   },
-  checks_new: {
-    path: "/[project]/guardrails/new",
-    title: "New Check",
-    parent: "checks",
+  evaluations_new: {
+    path: "/[project]/evaluations/new",
+    title: "New Evaluation",
+    parent: "evaluations",
   },
-  checks_edit_choose: {
-    path: "/[project]/guardrails/[id]/edit/choose",
-    title: "Editing Check",
-    parent: "checks",
+  evaluations_edit_choose: {
+    path: "/[project]/evaluations/[id]/edit/choose",
+    title: "Editing Evaluation",
+    parent: "evaluations",
   },
-  checks_edit: {
-    path: "/[project]/guardrails/[id]/edit",
-    title: "Editing Check",
-    parent: "checks",
+  evaluations_edit: {
+    path: "/[project]/evaluations/[id]/edit",
+    title: "Editing Evaluation",
+    parent: "evaluations",
   },
   prompts: {
     path: "/[project]/prompts",
@@ -62,7 +62,7 @@ export const projectRoutes = {
     path: "/[project]/datasets",
     title: "Datasets",
   },
-  
+
 };
 
 export type Route = {

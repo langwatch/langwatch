@@ -180,7 +180,7 @@ export default function Evaluations() {
               </Text>
               <Link
                 textDecoration="underline"
-                href={`/${project?.slug}/guardrails`}
+                href={`/${project?.slug}/evaluations`}
               >
                 here
               </Link>

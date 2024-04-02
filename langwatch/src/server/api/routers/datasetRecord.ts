@@ -35,7 +35,7 @@ export const datasetRecordRouter = createTRPCRouter({
         entries: z.array(z.unknown()), // Fix: Provide the missing argument for z.array()
       })
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.ANALYTICS_VIEW))
+    .use(checkUserPermissionForProject(TeamRoleGroup.DATASETS_MANAGE))
     .mutation(async ({ ctx, input }) => {
       const recordData = [];
 
@@ -89,7 +89,7 @@ export const datasetRecordRouter = createTRPCRouter({
     }),
   getAll: protectedProcedure
     .input(z.object({ projectId: z.string(), datasetId: z.string() }))
-    .use(checkUserPermissionForProject(TeamRoleGroup.ANALYTICS_VIEW))
+    .use(checkUserPermissionForProject(TeamRoleGroup.DATASETS_VIEW))
     .query(async ({ input, ctx }) => {
       const prisma = ctx.prisma;
 

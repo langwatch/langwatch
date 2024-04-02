@@ -101,7 +101,8 @@ const SideMenuLink = ({
   const isActive =
     currentRoute?.path === path ||
     (path.includes("/messages") && router.pathname.includes("/messages")) ||
-    (path.includes("/guardrails") && router.pathname.includes("/guardrails")) ||
+    (path.includes("/evaluations") &&
+      router.pathname.includes("/evaluations")) ||
     (path.includes("/datasets") && router.pathname.includes("/datasets")) ||
     (path.includes("/settings") && router.pathname.includes("/settings"));
 
@@ -311,9 +312,9 @@ export const DashboardLayout = ({
               project={project}
             />*/}
             <SideMenuLink
-              path={projectRoutes.checks.path}
+              path={projectRoutes.evaluations.path}
               icon={Shield}
-              label={projectRoutes.checks.title}
+              label={projectRoutes.evaluations.title}
               project={project}
             />
             <SideMenuLink
@@ -364,43 +365,41 @@ export const DashboardLayout = ({
             <Breadcrumbs currentRoute={currentRoute} />
           </Hide>
           <Spacer />
-          {(currentRoute !== projectRoutes.messages ||
-            router.query.mode === "dev") && (
-            <form
-              action={`${project.slug}/messages?mode=dev`}
-              method="GET"
-              style={{ width: "100%", maxWidth: "600px" }}
-              onSubmit={(e) => {
-                e.preventDefault();
-                if (router.query.mode === "dev") {
-                  void router.replace({ query: { ...router.query, query } });
-                } else {
-                  void router.push(`${project.slug}/messages?query=${query}`);
-                }
-              }}
-            >
-              <InputGroup borderColor="gray.300">
-                <InputLeftElement
-                  paddingY={1.5}
-                  height="auto"
-                  pointerEvents="none"
-                >
-                  <Search color={gray400} width={16} />
-                </InputLeftElement>
-                <Input
-                  name="query"
-                  type="search"
-                  placeholder="Search"
-                  _placeholder={{ color: "gray.800" }}
-                  fontSize={14}
-                  paddingY={1.5}
-                  height="auto"
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                />
-              </InputGroup>
-            </form>
-          )}
+
+          <form
+            action={`${project.slug}/messages?mode=dev`}
+            method="GET"
+            style={{ width: "100%", maxWidth: "600px" }}
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (router.query.mode === "dev") {
+                void router.replace({ query: { ...router.query, query } });
+              } else {
+                void router.push(`${project.slug}/messages?query=${query}`);
+              }
+            }}
+          >
+            <InputGroup borderColor="gray.300">
+              <InputLeftElement
+                paddingY={1.5}
+                height="auto"
+                pointerEvents="none"
+              >
+                <Search color={gray400} width={16} />
+              </InputLeftElement>
+              <Input
+                name="query"
+                type="search"
+                placeholder="Search"
+                _placeholder={{ color: "gray.800" }}
+                fontSize={14}
+                paddingY={1.5}
+                height="auto"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+              />
+            </InputGroup>
+          </form>
           <Spacer />
           <Menu>
             <MenuButton as={Button} variant="unstyled">

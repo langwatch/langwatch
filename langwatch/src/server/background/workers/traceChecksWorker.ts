@@ -27,7 +27,6 @@ const debug = getDebugger("langwatch:workers:traceChecksWorker");
 export const runEvaluation = async (
   job: Job<TraceCheckJob, any, EvaluatorTypes>
 ): Promise<SingleEvaluationResult> => {
-  const evaluator = AVAILABLE_EVALUATORS[job.data.check.type];
   const check = await prisma.check.findUnique({
     where: { id: job.data.check.id },
   });
@@ -35,19 +34,47 @@ export const runEvaluation = async (
     throw `check config ${job.data.check.id} not found`;
   }
 
+  return await runEvaluationForTrace({
+    projectId: job.data.trace.project_id,
+    traceId: job.data.trace.trace_id,
+    evaluatorType: job.data.check.type,
+    settings: check.parameters,
+  });
+};
+
+export const runEvaluationForTrace = async ({
+  projectId,
+  traceId,
+  evaluatorType,
+  settings,
+}: {
+  projectId: string;
+  traceId: string;
+  evaluatorType: EvaluatorTypes;
+  settings: Record<string, any> | string | number | boolean | null;
+}): Promise<SingleEvaluationResult> => {
+  const evaluator = AVAILABLE_EVALUATORS[evaluatorType];
+
   const trace = await esClient.getSource<Trace>({
     index: TRACE_INDEX,
     id: traceIndexId({
-      traceId: job.data.trace.trace_id,
-      projectId: job.data.trace.project_id,
+      traceId: traceId,
+      projectId: projectId,
     }),
   });
   const spans = await esGetSpansByTraceId({
-    traceId: job.data.trace.trace_id,
-    projectId: job.data.trace.project_id,
+    traceId: traceId,
+    projectId: projectId,
   });
   if (!trace) {
     throw "trace not found";
+  }
+
+  if (trace.error) {
+    return {
+      status: "skipped",
+      details: "Cannot evaluate trace with errors",
+    };
   }
 
   let input = trace.input.value;
@@ -62,7 +89,7 @@ export const runEvaluation = async (
   }
 
   const response = await fetch(
-    `${env.LANGEVALS_ENDPOINT}/${job.data.check.type}/evaluate`,
+    `${env.LANGEVALS_ENDPOINT}/${evaluatorType}/evaluate`,
     {
       method: "POST",
       headers: {
@@ -70,7 +97,7 @@ export const runEvaluation = async (
       },
       body: JSON.stringify({
         data: [{ input, output, contexts }],
-        settings: check.parameters,
+        settings: settings && typeof settings === "object" ? settings : {},
       }),
     }
   );

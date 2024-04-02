@@ -64,7 +64,7 @@ export const TraceDetailsDrawer = (props: TraceDetailsDrawerProps) => {
       return (
         <Text>
           No evaluations ran for this message. Setup some gaurdrails{" "}
-          <Link href={`/${String(project)}/guardrails`}>here.</Link>
+          <Link href={`/${String(project)}/evaluations`}>here.</Link>
         </Text>
       );
     return (

@@ -12,7 +12,7 @@ export const datasetRouter = createTRPCRouter({
     .input(
       z.object({ projectId: z.string(), name: z.string(), schema: z.string() })
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.ANALYTICS_VIEW))
+    .use(checkUserPermissionForProject(TeamRoleGroup.DATASETS_MANAGE))
     .mutation(async ({ ctx, input }) => {
       const slug = slugify(input.name, { lower: true });
 
@@ -42,7 +42,7 @@ export const datasetRouter = createTRPCRouter({
     }),
   getAll: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .use(checkUserPermissionForProject(TeamRoleGroup.ANALYTICS_VIEW))
+    .use(checkUserPermissionForProject(TeamRoleGroup.DATASETS_VIEW))
     .query(async ({ input, ctx }) => {
       const { projectId } = input;
       const prisma = ctx.prisma;

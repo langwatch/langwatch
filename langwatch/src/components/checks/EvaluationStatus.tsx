@@ -15,7 +15,10 @@ export function CheckStatusIcon({ check }: { check: TraceCheck }) {
   return <Icon />;
 }
 
-export const checkStatusColorMap = (check: TraceCheck) => {
+export const checkStatusColorMap = (check: {
+  status: TraceCheck["status"];
+  passed?: boolean;
+}) => {
   const colorMap: Record<TraceCheck["status"], string> = {
     scheduled: "yellow.600",
     in_progress: "yellow.600",

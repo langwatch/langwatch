@@ -8,63 +8,45 @@ import {
   Button,
   Card,
   CardBody,
-  CardHeader,
   HStack,
-  Heading,
   Input,
-  Skeleton,
   Spacer,
-  Table,
-  TableContainer,
-  Tbody,
-  Td,
   Text,
-  Th,
-  Thead,
   Tooltip,
-  Tr,
   VStack,
 } from "@chakra-ui/react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useEffect, useMemo, useState } from "react";
-import { HelpCircle, Play, RefreshCw } from "react-feather";
+import { useRouter } from "next/router";
+import { useEffect } from "react";
+import { HelpCircle } from "react-feather";
 import {
   Controller,
   FormProvider,
   useFieldArray,
   useForm,
-  type UseFormReturn,
 } from "react-hook-form";
 import slugify from "slugify";
 import { z } from "zod";
-import type { CheckPreconditions } from "../../trace_checks/types";
-import { checkPreconditionsSchema } from "../../trace_checks/types.generated";
-import { HorizontalFormControl } from "../HorizontalFormControl";
-import DynamicZodForm from "./DynamicZodForm";
-import { PreconditionsField } from "./PreconditionsField";
-import {
-  getEvaluatorDefaultSettings,
-  getEvaluatorDefinitions,
-} from "../../trace_checks/getEvaluator";
-import { useRouter } from "next/router";
-import {
-  evaluatorTypesSchema,
-  evaluatorsSchema,
-} from "../../trace_checks/evaluators.zod.generated";
 import {
   AVAILABLE_EVALUATORS,
   type EvaluatorTypes,
   type Evaluators,
 } from "../../trace_checks/evaluators.generated";
+import {
+  evaluatorTypesSchema,
+  evaluatorsSchema,
+} from "../../trace_checks/evaluators.zod.generated";
+import {
+  getEvaluatorDefaultSettings,
+  getEvaluatorDefinitions,
+} from "../../trace_checks/getEvaluator";
+import type { CheckPreconditions } from "../../trace_checks/types";
+import { checkPreconditionsSchema } from "../../trace_checks/types.generated";
+import { HorizontalFormControl } from "../HorizontalFormControl";
+import DynamicZodForm from "./DynamicZodForm";
 import { EvaluatorSelection } from "./EvaluatorSelection";
-import { usePeriodSelector, PeriodSelector } from "../PeriodSelector";
-import { FilterToggle } from "../filters/FilterToggle";
-import { FilterSidebar } from "../filters/FilterSidebar";
-import { api } from "../../utils/api";
-import { useFilterParams } from "../../hooks/useFilterParams";
-import { useDrawer } from "../CurrentDrawer";
-import { elasticSearchSpanToSpan } from "../../server/tracer/types";
-import { evaluatePreconditions } from "../../trace_checks/preconditions";
+import { PreconditionsField } from "./PreconditionsField";
+import { TryItOut } from "./TryItOut";
 
 export interface CheckConfigFormData {
   name: string;
@@ -343,264 +325,5 @@ export default function CheckConfigForm({
         )}
       </form>
     </FormProvider>
-  );
-}
-
-function TryItOut({
-  form,
-}: {
-  form: UseFormReturn<CheckConfigFormData, any, undefined>;
-}) {
-  const { watch } = form;
-
-  const evaluatorType = watch("checkType");
-  const preconditions = watch("preconditions");
-  const evaluation = evaluatorType && getEvaluatorDefinitions(evaluatorType);
-
-  const {
-    period: { startDate, endDate },
-    setPeriod,
-  } = usePeriodSelector();
-
-  const { filterParams, queryOpts } = useFilterParams();
-  const { openDrawer } = useDrawer();
-  const [randomSeed, setRandomSeed] = useState<number>(Math.random() * 1000);
-
-  const traceGroups = api.traces.getAllForProject.useQuery(
-    {
-      ...filterParams,
-      // query: getSingleQueryParam(router.query.query),
-      groupBy: "none",
-      pageSize: 100,
-      sortBy: `random.${randomSeed}`,
-    },
-    queryOpts
-  );
-
-  const traceWithSpans = api.traces.getTracesWithSpans.useQuery(
-    {
-      projectId: filterParams.projectId,
-      traceIds:
-        traceGroups.data?.groups.flatMap((group) =>
-          group.map((trace) => trace.trace_id)
-        ) ?? [],
-    },
-    {
-      enabled:
-        !!filterParams.projectId && (traceGroups.data?.groups ?? []).length > 0,
-    }
-  );
-
-  const tracesPassingPreconditionsOnLoad = useMemo(() => {
-    return traceWithSpans.data
-      ?.filter(
-        (trace) =>
-          evaluatorType &&
-          evaluatePreconditions(
-            evaluatorType,
-            trace,
-            trace.spans?.map(elasticSearchSpanToSpan) ?? [],
-            preconditions
-          )
-      )
-      .slice(0, 10);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [traceWithSpans.data]);
-
-  return (
-    <VStack width="full" spacing={6} marginTop={6}>
-      <HStack width="full" align="end">
-        <Heading as="h2" size="lg" textAlign="center" paddingTop={4}>
-          Try it out
-        </Heading>
-        <Spacer />
-        <PeriodSelector period={{ startDate, endDate }} setPeriod={setPeriod} />
-        <FilterToggle />
-      </HStack>
-      <HStack width="full" align="start" spacing={6} paddingBottom={6}>
-        <Card width="full" minHeight="400px">
-          <CardHeader>
-            <HStack spacing={4}>
-              <Text fontWeight="500">
-                {traceGroups.isLoading || traceWithSpans.isLoading
-                  ? "Fetching samples..."
-                  : `Fetched ${
-                      (tracesPassingPreconditionsOnLoad ?? []).length
-                    } random sample messages${
-                      preconditions.length > 0 ? " passing preconditions" : ""
-                    }`}
-              </Text>
-              <Spacer />
-              <Button
-                onClick={() => setRandomSeed(Math.random() * 1000)}
-                leftIcon={
-                  <RefreshCw
-                    size={16}
-                    className={
-                      traceGroups.isLoading
-                        ? "refresh-icon animation-spinning"
-                        : "refresh-icon"
-                    }
-                  />
-                }
-                disabled={traceGroups.isLoading}
-                size="sm"
-              >
-                Shuffle
-              </Button>
-              <Button
-                leftIcon={<Play size={16} />}
-                colorScheme="orange"
-                size="sm"
-              >
-                Run on samples
-              </Button>
-            </HStack>
-          </CardHeader>
-          <CardBody paddingX={2} paddingTop={0}>
-            <VStack width="full" align="start" spacing={6}>
-              <TableContainer>
-                <Table variant="simple">
-                  <Thead>
-                    <Tr>
-                      <Th width="240px">Timestamp</Th>
-                      <Th width="300px">Input</Th>
-                      <Th width="300px">Output</Th>
-                      {evaluation?.isGuardrail ? (
-                        <Th>Passed</Th>
-                      ) : (
-                        <Th>Score</Th>
-                      )}
-                      <Th width="200px">Details</Th>
-                    </Tr>
-                  </Thead>
-                  <Tbody>
-                    {tracesPassingPreconditionsOnLoad?.map((trace, i) => {
-                      const livePassesPreconditions =
-                        evaluatorType &&
-                        evaluatePreconditions(
-                          evaluatorType,
-                          trace,
-                          trace.spans?.map(elasticSearchSpanToSpan) ?? [],
-                          preconditions
-                        );
-
-                      return (
-                        <Tr
-                          key={trace.trace_id}
-                          role="button"
-                          cursor="pointer"
-                          background={
-                            livePassesPreconditions ? undefined : "gray.100"
-                          }
-                          color={
-                            livePassesPreconditions ? undefined : "gray.400"
-                          }
-                        >
-                          <Td
-                            maxWidth="240px"
-                            onClick={() =>
-                              openDrawer("traceDetails", {
-                                traceId: trace.trace_id,
-                              })
-                            }
-                          >
-                            {new Date(
-                              trace.timestamps.started_at
-                            ).toLocaleString()}
-                          </Td>
-                          <Td
-                            maxWidth="300px"
-                            onClick={() =>
-                              openDrawer("traceDetails", {
-                                traceId: trace.trace_id,
-                              })
-                            }
-                          >
-                            <Tooltip label={trace.input.value}>
-                              <Text
-                                noOfLines={1}
-                                wordBreak="break-all"
-                                display="block"
-                              >
-                                {trace.input.value}
-                              </Text>
-                            </Tooltip>
-                          </Td>
-                          {trace.error ? (
-                            <Td
-                              onClick={() =>
-                                openDrawer("traceDetails", {
-                                  traceId: trace.trace_id,
-                                })
-                              }
-                            >
-                              <Text
-                                noOfLines={1}
-                                maxWidth="300px"
-                                display="block"
-                                color="red.400"
-                              >
-                                {trace.error.message}
-                              </Text>
-                            </Td>
-                          ) : (
-                            <Td
-                              onClick={() =>
-                                openDrawer("traceDetails", {
-                                  traceId: trace.trace_id,
-                                })
-                              }
-                            >
-                              <Tooltip label={trace.output?.value}>
-                                <Text
-                                  noOfLines={1}
-                                  display="block"
-                                  maxWidth="250px"
-                                >
-                                  {trace.output?.value}
-                                </Text>
-                              </Tooltip>
-                            </Td>
-                          )}
-                          {i == 0 ? (
-                            <Td>Waiting to start</Td>
-                          ) : evaluation?.isGuardrail ? (
-                            <Td></Td>
-                          ) : (
-                            <Td></Td>
-                          )}
-                          <Td></Td>
-                        </Tr>
-                      );
-                    })}
-                    {(traceGroups.isLoading || traceWithSpans.isLoading) &&
-                      Array.from({ length: 3 }).map((_, i) => (
-                        <Tr key={i}>
-                          {Array.from({ length: 3 }).map((_, i) => (
-                            <Td key={i}>
-                              <Skeleton height="20px" />
-                            </Td>
-                          ))}
-                        </Tr>
-                      ))}
-                    {traceGroups.isFetched &&
-                      traceGroups.data?.groups.length === 0 && (
-                        <Tr>
-                          <Td colSpan={5}>
-                            No messages found, try selecting different filters
-                            and dates
-                          </Td>
-                        </Tr>
-                      )}
-                  </Tbody>
-                </Table>
-              </TableContainer>
-            </VStack>
-          </CardBody>
-        </Card>
-        <FilterSidebar />
-      </HStack>
-    </VStack>
   );
 }

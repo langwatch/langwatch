@@ -13,6 +13,7 @@ import {
   TRACE_CHECKS_INDEX,
   TRACE_INDEX,
   esClient,
+  traceIndexId,
 } from "../../elasticsearch";
 import { getOpenAIEmbeddings } from "../../embeddings";
 import type { ElasticSearchSpan, Trace, TraceCheck } from "../../tracer/types";
@@ -53,6 +54,10 @@ export const esGetSpansByTraceId = async ({
       },
     },
     size: 10000,
+    routing: traceIndexId({
+      traceId,
+      projectId,
+    }),
   });
 
   return result.hits.hits.map((hit) => hit._source!).filter((hit) => hit);
@@ -229,6 +234,7 @@ export const tracesRouter = createTRPCRouter({
                               },
                             },
                           ],
+                          boost: 100.0,
                           minimum_should_match: 1,
                         },
                       },
@@ -572,9 +578,10 @@ export const tracesRouter = createTRPCRouter({
         .map((hit) => hit._source!)
         .filter((x) => x);
 
-      // TODO: optimize this to be a single query?
       const spansByTraceId = await Promise.all(
-        traceIds.map((traceId) => esGetSpansByTraceId({ traceId, projectId }))
+        traces.map((trace) =>
+          esGetSpansByTraceId({ traceId: trace.trace_id, projectId })
+        )
       );
 
       const tracesWithSpans = traces.map((trace, i) => ({

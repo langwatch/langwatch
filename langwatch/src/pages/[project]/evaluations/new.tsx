@@ -28,7 +28,7 @@ export default function NewTraceCheckConfig() {
         duration: 5000,
         isClosable: true,
       });
-      await router.push(`/${project.slug}/guardrails`);
+      await router.push(`/${project.slug}/evaluations`);
     } catch (error) {
       toast({
         title: "Failed to create check",

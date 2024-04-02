@@ -112,7 +112,7 @@ export default function Checks() {
               <Button
                 colorScheme="orange"
                 as={NextLink}
-                href={`/${project.slug}/guardrails/new/choose`}
+                href={`/${project.slug}/evaluations/new/choose`}
                 minWidth="fit-content"
               >
                 + Add
@@ -197,7 +197,7 @@ export default function Checks() {
                         {hasTeamPermission(TeamRoleGroup.GUARDRAILS_MANAGE) && (
                           <LinkOverlay
                             as={NextLink}
-                            href={`/${project.slug}/guardrails/${check.id}/edit`}
+                            href={`/${project.slug}/evaluations/${check.id}/edit`}
                           >
                             <ChevronRight />
                           </LinkOverlay>

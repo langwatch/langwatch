@@ -1,4 +1,3 @@
-import { Link } from "@chakra-ui/next-js";
 import {
   Alert,
   AlertIcon,

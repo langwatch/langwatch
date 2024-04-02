@@ -54,7 +54,7 @@ export default function EditTraceCheck() {
         duration: 5000,
         isClosable: true,
       });
-      void router.push(`/${project.slug}/guardrails`);
+      void router.push(`/${project.slug}/evaluations`);
       check.remove();
     } catch (error) {
       toast({
@@ -81,7 +81,7 @@ export default function EditTraceCheck() {
               duration: 5000,
               isClosable: true,
             });
-            void router.push(`/${project.slug}/guardrails`);
+            void router.push(`/${project.slug}/evaluations`);
           },
           onError: () => {
             toast({
@@ -113,7 +113,7 @@ export default function EditTraceCheck() {
         <VStack align="start" spacing={4}>
           <HStack align="end" width="full">
             <Heading as="h1" size="xl" textAlign="center" paddingTop={4}>
-              Editing Check
+              Editing Evaluation
             </Heading>
             <Spacer />
             <Menu>
