@@ -20,6 +20,7 @@ import {
   checkUserPermissionForOrganization,
   checkUserPermissionForTeam,
 } from "../permission";
+import { dependencies } from "../../../injection/dependencies.server";
 
 export type TeamWithProjects = Team & {
   projects: Project[];
@@ -285,25 +286,36 @@ export const organizationRouter = createTRPCRouter({
     )
     .mutation(async ({ input, ctx }) => {
       const prisma = ctx.prisma;
-      const userId = ctx.session.user.id;
 
-      // Check if the user is an admin of the organization
       const organization = await prisma.organization.findFirst({
         where: {
           id: input.organizationId,
-          members: {
-            some: {
-              userId: userId,
-              role: "ADMIN",
-            },
-          },
+        },
+        include: {
+          members: true,
         },
       });
 
       if (!organization) {
         throw new TRPCError({
           code: "FORBIDDEN",
-          message: "You must be an admin to send invites.",
+          message: "Organization not found",
+        });
+      }
+
+      const subscriptionLimits =
+        await dependencies.subscriptionHandler.getActivePlan(
+          ctx.session.user,
+          input.organizationId
+        );
+
+      if (
+        !subscriptionLimits.canAlwaysAddNewMembers &&
+        organization.members.length >= subscriptionLimits.maxMembers
+      ) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Over the limit of invites allowed",
         });
       }
 

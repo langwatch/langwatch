@@ -18,8 +18,9 @@ export const subscriptionRouter = createTRPCRouter({
         OrganizationRoleGroup.ORGANIZATION_VIEW
       )
     )
-    .query(async ({ input }) => {
+    .query(async ({ input, ctx }) => {
       return await dependencies.subscriptionHandler.getActivePlan(
+        ctx.session.user,
         input.organizationId
       );
     }),

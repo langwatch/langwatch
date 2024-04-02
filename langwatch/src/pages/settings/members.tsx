@@ -192,7 +192,8 @@ function MembersList({
             Organization Members
           </Heading>
           <Spacer />
-          {organization.members.length >= subscriptionLimits.maxMembers ? (
+          {!subscriptionLimits.canAlwaysAddNewMembers &&
+          organization.members.length >= subscriptionLimits.maxMembers ? (
             <Tooltip label="Upgrade your plan to add more members">
               <Button size="sm" colorScheme="orange" isDisabled={true}>
                 <HStack spacing={2}>
@@ -360,7 +361,10 @@ function MembersList({
                                 Menu: ({ children, ...props }) => (
                                   <chakraComponents.Menu
                                     {...props}
-                                    innerProps={{ ...props.innerProps, style: { width: "300px" } }}
+                                    innerProps={{
+                                      ...props.innerProps,
+                                      style: { width: "300px" },
+                                    }}
                                   >
                                     {children}
                                   </chakraComponents.Menu>
