@@ -11,7 +11,7 @@ export const evaluationsRouter = createTRPCRouter({
         projectId: z.string(),
         evaluatorType: evaluatorsSchema.keyof(),
         traceId: z.string(),
-        settings: z.object({}),
+        settings: z.object({}).passthrough(),
       })
     )
     .use(checkUserPermissionForProject(TeamRoleGroup.GUARDRAILS_MANAGE))

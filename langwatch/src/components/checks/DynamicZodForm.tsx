@@ -102,7 +102,9 @@ const DynamicZodForm = ({
                   (option: any) => option.value
                 );
 
-                if (
+                if (e.target.value === "") {
+                  field.onChange(undefined);
+                } else if (
                   !isNaN(+e.target.value) &&
                   literalValues.includes(+e.target.value)
                 ) {
@@ -113,7 +115,7 @@ const DynamicZodForm = ({
               }}
             >
               {fieldSchema instanceof z.ZodOptional && (
-                <option value={undefined}></option>
+                <option value=""></option>
               )}
               {fieldSchema_.options.map(
                 (option: { value: string }, index: number) => (
