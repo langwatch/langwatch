@@ -7,11 +7,7 @@ export const CustomRestAnalytics = ({ apiKey }: { apiKey?: string }) => {
       <h3>Usage:</h3>
       <p>
         You will need to obtain your JSON payload from the custom gragh section
-        in our application. You can find this{" "}
-        <a href={`${window.location.protocol}/inbox-narrator/analytics/custom`}>
-          here
-        </a>
-        .
+        in our application. You can find this on the Analytics page &gt; Custom Reports &gt; Add chart.
       </p>
       <ol>
         <li>Pick the custom graph you want to get the analytics for.</li>
