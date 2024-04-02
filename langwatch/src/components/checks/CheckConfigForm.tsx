@@ -26,7 +26,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { HelpCircle, Play, RefreshCw } from "react-feather";
 import {
   Controller,
@@ -62,8 +62,9 @@ import { FilterToggle } from "../filters/FilterToggle";
 import { FilterSidebar } from "../filters/FilterSidebar";
 import { api } from "../../utils/api";
 import { useFilterParams } from "../../hooks/useFilterParams";
-import { TraceDetailsDrawer } from "../TraceDetailsDrawer";
 import { useDrawer } from "../CurrentDrawer";
+import { elasticSearchSpanToSpan } from "../../server/tracer/types";
+import { evaluatePreconditions } from "../../trace_checks/preconditions";
 
 export interface CheckConfigFormData {
   name: string;
@@ -352,8 +353,9 @@ function TryItOut({
 }) {
   const { watch } = form;
 
-  const checkType = watch("checkType");
-  const evaluation = checkType && getEvaluatorDefinitions(checkType);
+  const evaluatorType = watch("checkType");
+  const preconditions = watch("preconditions");
+  const evaluation = evaluatorType && getEvaluatorDefinitions(evaluatorType);
 
   const {
     period: { startDate, endDate },
@@ -369,11 +371,41 @@ function TryItOut({
       ...filterParams,
       // query: getSingleQueryParam(router.query.query),
       groupBy: "none",
-      pageSize: 10,
+      pageSize: 100,
       sortBy: `random.${randomSeed}`,
     },
     queryOpts
   );
+
+  const traceWithSpans = api.traces.getTracesWithSpans.useQuery(
+    {
+      projectId: filterParams.projectId,
+      traceIds:
+        traceGroups.data?.groups.flatMap((group) =>
+          group.map((trace) => trace.trace_id)
+        ) ?? [],
+    },
+    {
+      enabled:
+        !!filterParams.projectId && (traceGroups.data?.groups ?? []).length > 0,
+    }
+  );
+
+  const tracesPassingPreconditionsOnLoad = useMemo(() => {
+    return traceWithSpans.data
+      ?.filter(
+        (trace) =>
+          evaluatorType &&
+          evaluatePreconditions(
+            evaluatorType,
+            trace,
+            trace.spans?.map(elasticSearchSpanToSpan) ?? [],
+            preconditions
+          )
+      )
+      .slice(0, 10);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [traceWithSpans.data]);
 
   return (
     <VStack width="full" spacing={6} marginTop={6}>
@@ -390,11 +422,13 @@ function TryItOut({
           <CardHeader>
             <HStack spacing={4}>
               <Text fontWeight="500">
-                {traceGroups.isLoading
+                {traceGroups.isLoading || traceWithSpans.isLoading
                   ? "Fetching samples..."
                   : `Fetched ${
-                      (traceGroups.data?.groups ?? []).length
-                    } random sample messages`}
+                      (tracesPassingPreconditionsOnLoad ?? []).length
+                    } random sample messages${
+                      preconditions.length > 0 ? " passing preconditions" : ""
+                    }`}
               </Text>
               <Spacer />
               <Button
@@ -441,9 +475,28 @@ function TryItOut({
                     </Tr>
                   </Thead>
                   <Tbody>
-                    {traceGroups.data?.groups.flatMap((traceGroup) =>
-                      traceGroup.map((trace) => (
-                        <Tr key={trace.trace_id} role="button" cursor="pointer">
+                    {tracesPassingPreconditionsOnLoad?.map((trace, i) => {
+                      const livePassesPreconditions =
+                        evaluatorType &&
+                        evaluatePreconditions(
+                          evaluatorType,
+                          trace,
+                          trace.spans?.map(elasticSearchSpanToSpan) ?? [],
+                          preconditions
+                        );
+
+                      return (
+                        <Tr
+                          key={trace.trace_id}
+                          role="button"
+                          cursor="pointer"
+                          background={
+                            livePassesPreconditions ? undefined : "gray.100"
+                          }
+                          color={
+                            livePassesPreconditions ? undefined : "gray.400"
+                          }
+                        >
                           <Td
                             maxWidth="240px"
                             onClick={() =>
@@ -510,12 +563,18 @@ function TryItOut({
                               </Tooltip>
                             </Td>
                           )}
-                          {evaluation?.isGuardrail ? <Td></Td> : <Td></Td>}
+                          {i == 0 ? (
+                            <Td>Waiting to start</Td>
+                          ) : evaluation?.isGuardrail ? (
+                            <Td></Td>
+                          ) : (
+                            <Td></Td>
+                          )}
                           <Td></Td>
                         </Tr>
-                      ))
-                    )}
-                    {traceGroups.isLoading &&
+                      );
+                    })}
+                    {(traceGroups.isLoading || traceWithSpans.isLoading) &&
                       Array.from({ length: 3 }).map((_, i) => (
                         <Tr key={i}>
                           {Array.from({ length: 3 }).map((_, i) => (

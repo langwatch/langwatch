@@ -572,6 +572,7 @@ export const tracesRouter = createTRPCRouter({
         .map((hit) => hit._source!)
         .filter((x) => x);
 
+      // TODO: optimize this to be a single query?
       const spansByTraceId = await Promise.all(
         traceIds.map((traceId) => esGetSpansByTraceId({ traceId, projectId }))
       );

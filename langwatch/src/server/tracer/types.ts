@@ -143,15 +143,39 @@ export type ElasticSearchInputOutput = {
 
 // Zod type will not be generated for this one, check ts-to-zod.config.js
 export type ElasticSearchSpan = Omit<
-  BaseSpan &
-    Partial<Omit<RAGSpan, "type">> &
-    Partial<Omit<LLMSpan, "type">>,
+  BaseSpan & Partial<Omit<RAGSpan, "type">> & Partial<Omit<LLMSpan, "type">>,
   "input" | "outputs"
 > & {
   project_id: string;
   input?: ElasticSearchInputOutput | null;
   outputs: ElasticSearchInputOutput[];
   timestamps: SpanTimestamps & { inserted_at: number; updated_at: number };
+};
+
+export const elasticSearchSpanToSpan = (esSpan: ElasticSearchSpan): Span => {
+  const { input, outputs, ...rest } = esSpan;
+  const spanInput: SpanInput | null = input
+    ? elasticSearchToTypedValue(input)
+    : null;
+  const spanOutputs: SpanOutput[] = outputs.map(elasticSearchToTypedValue);
+
+  return { ...rest, input: spanInput, outputs: spanOutputs };
+};
+
+const elasticSearchToTypedValue = (
+  typed: ElasticSearchInputOutput
+): SpanInput | SpanOutput => {
+  try {
+    return {
+      type: typed.type,
+      value: JSON.parse(typed.value),
+    };
+  } catch (e) {
+    return {
+      type: "raw",
+      value: typed.value,
+    };
+  }
 };
 
 export type TraceInput = {
@@ -279,27 +303,6 @@ export type TrackEventRESTParamsValidator = Omit<
 // Dataset Schemas
 
 export type DatasetSpan =
-  | Omit<
-      BaseSpan,
-      | "project_id"
-      | "trace_id"
-      | "id"
-      | "timestamps"
-      | "metrics"
-    >
-  | Omit<
-      LLMSpan,
-      | "project_id"
-      | "trace_id"
-      | "id"
-      | "timestamps"
-      | "metrics"
-    >
-  | Omit<
-      RAGSpan,
-      | "project_id"
-      | "trace_id"
-      | "id"
-      | "timestamps"
-      | "metrics"
-    >;
+  | Omit<BaseSpan, "project_id" | "trace_id" | "id" | "timestamps" | "metrics">
+  | Omit<LLMSpan, "project_id" | "trace_id" | "id" | "timestamps" | "metrics">
+  | Omit<RAGSpan, "project_id" | "trace_id" | "id" | "timestamps" | "metrics">;
