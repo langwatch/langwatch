@@ -5,6 +5,7 @@ import {
   type PlanInfo,
 } from "../langwatch/langwatch/src/server/subscriptionHandler";
 import { prisma } from "../langwatch/langwatch/src/server/db";
+import { isAdmin } from "./utils/auth";
 
 const PLAN_LIMITS: Record<PlanTypes, PlanInfo> = {
   [PlanTypes.FREE]: {
@@ -30,7 +31,17 @@ const PLAN_LIMITS: Record<PlanTypes, PlanInfo> = {
 };
 
 export class SubscriptionHandlerSass extends SubscriptionHandler {
-  static async getActivePlan(organizationId: string): Promise<PlanInfo> {
+  static async getActivePlan(
+    user: any & {
+      impersonator?: {
+        email: string;
+      };
+    },
+    organizationId: string
+  ): Promise<PlanInfo> {
+    const canAlwaysAddNewMembers =
+      user.impersonator && isAdmin(user.impersonator);
+
     if (
       organizationId === "organization_erk6Bmlfzxw2YMyzWdo8O" ||
       organizationId === "HXECRq2mRfSQpxTiSCcsS" ||
@@ -39,7 +50,7 @@ export class SubscriptionHandlerSass extends SubscriptionHandler {
       organizationId === "organization_NW_jBe8d0CCKSnK8FW8UD" ||
       organizationId === "organization_z0JEOAFun8ldnzTQgFxVA"
     ) {
-      return PLAN_LIMITS[PlanTypes.BUSINESS];
+      return { ...PLAN_LIMITS[PlanTypes.BUSINESS], canAlwaysAddNewMembers };
     }
 
     const activeSubscription = await prisma.subscription.findFirst({
@@ -51,8 +62,9 @@ export class SubscriptionHandlerSass extends SubscriptionHandler {
       },
     });
 
-    if (!activeSubscription) return PLAN_LIMITS[PlanTypes.FREE];
+    if (!activeSubscription)
+      return { ...PLAN_LIMITS[PlanTypes.FREE], canAlwaysAddNewMembers };
 
-    return PLAN_LIMITS[activeSubscription.plan];
+    return { ...PLAN_LIMITS[activeSubscription.plan], canAlwaysAddNewMembers };
   }
 }
