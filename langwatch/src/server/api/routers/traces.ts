@@ -116,7 +116,7 @@ export const tracesRouter = createTRPCRouter({
                 : input.sortBy.startsWith("trace_checks.")
                 ? {
                     sort: {
-                      "trace_checks.value": {
+                      "trace_checks.score": {
                         order: input.sortDirection ?? "desc",
                         nested: {
                           path: "trace_checks",
