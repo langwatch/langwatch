@@ -17,7 +17,7 @@ import {
 } from "@chakra-ui/react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/router";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { HelpCircle } from "react-feather";
 import {
   Controller,
@@ -47,6 +47,8 @@ import DynamicZodForm from "./DynamicZodForm";
 import { EvaluatorSelection } from "./EvaluatorSelection";
 import { PreconditionsField } from "./PreconditionsField";
 import { TryItOut } from "./TryItOut";
+import { api } from "../../utils/api";
+import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 
 export interface CheckConfigFormData {
   name: string;
@@ -57,22 +59,40 @@ export interface CheckConfigFormData {
 }
 
 interface CheckConfigFormProps {
+  checkId?: string;
   defaultValues?: Partial<CheckConfigFormData>;
   onSubmit: (data: CheckConfigFormData) => Promise<void>;
   isLoading: boolean;
 }
 
 export default function CheckConfigForm({
+  checkId,
   defaultValues,
   onSubmit,
   isLoading,
 }: CheckConfigFormProps) {
+  const { project } = useOrganizationTeamProject();
+  const isNameAvailable = api.checks.isNameAvailable.useMutation();
+  const [isNameAlreadyInUse, setIsNameAlreadyInUse] = useState(false);
+
+  const validateNameUniqueness = async (name: string) => {
+    const result = await isNameAvailable.mutateAsync({
+      projectId: project?.id ?? "",
+      name,
+      checkId,
+    });
+
+    setIsNameAlreadyInUse(!result.available);
+
+    return result.available;
+  };
+
   const form = useForm<CheckConfigFormData>({
     defaultValues,
     resolver: (data, ...args) => {
       return zodResolver(
         z.object({
-          name: z.string().min(1).max(255),
+          name: z.string().min(1).max(255).refine(validateNameUniqueness),
           checkType: evaluatorTypesSchema,
           sample: z.number().min(0.01).max(1),
           preconditions: checkPreconditionsSchema,
@@ -125,8 +145,14 @@ export default function CheckConfigForm({
     if (!checkType) return;
 
     const defaultName = getEvaluatorDefinitions(checkType)?.name;
-    if (!nameValue && defaultName && checkType !== "custom/basic") {
-      form.setValue("name", defaultName);
+    const allDefaultNames = Object.values(AVAILABLE_EVALUATORS).map(
+      (evaluator) => evaluator.name
+    );
+    if (!nameValue || allDefaultNames.includes(nameValue)) {
+      form.setValue(
+        "name",
+        checkType.includes("custom") ? "" : defaultName ?? ""
+      );
     }
 
     const evaluator = AVAILABLE_EVALUATORS[checkType];
@@ -152,13 +178,8 @@ export default function CheckConfigForm({
     };
 
     setDefaultSettings(getEvaluatorDefaultSettings(evaluator), "settings");
-  }, [
-    checkType,
-    defaultValues?.checkType,
-    defaultValues?.settings,
-    form,
-    nameValue,
-  ]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [checkType, defaultValues?.checkType, defaultValues?.settings]);
 
   const runOn = (
     <Text color="gray.500" fontStyle="italic">
@@ -210,8 +231,17 @@ export default function CheckConfigForm({
                     <VStack spacing={2} align="start">
                       <Input
                         id="name"
-                        {...register("name", { required: true })}
+                        {...register("name", {
+                          required: true,
+                        })}
                       />
+                      {isNameAlreadyInUse && (
+                        <Text color="red.500" fontSize={13}>
+                          An evaluation with the same name already exists,
+                          please choose a different name to have a different
+                          slug identifier as well
+                        </Text>
+                      )}
                       <Text fontSize={12} paddingLeft={4}>
                         {nameValue && "slug: "}
                         {slugify(nameValue || "", {

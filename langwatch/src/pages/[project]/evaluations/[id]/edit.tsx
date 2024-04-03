@@ -145,6 +145,7 @@ export default function EditTraceCheck() {
             </Alert>
           ) : (
             <CheckConfigForm
+              checkId={checkId}
               defaultValues={defaultValues}
               onSubmit={onSubmit}
               isLoading={updateCheck.isLoading}

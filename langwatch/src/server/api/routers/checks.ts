@@ -162,6 +162,25 @@ export const checksRouter = createTRPCRouter({
 
       return { success: true };
     }),
+  isNameAvailable: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        checkId: z.string().optional(),
+        name: z.string(),
+      })
+    )
+    .use(checkUserPermissionForProject(TeamRoleGroup.GUARDRAILS_MANAGE))
+    .mutation(async ({ input, ctx }) => {
+      const { projectId, name } = input;
+      const prisma = ctx.prisma;
+
+      const check = await prisma.check.findFirst({
+        where: { projectId, name },
+      });
+
+      return { available: check === null || check.id === input.checkId };
+    }),
 });
 
 const validateCheckSettings = (checkType: string, parameters: any) => {
