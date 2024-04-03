@@ -64,6 +64,7 @@
     "lodash.debounce": "^4.0.8",
     "lodash.isequal": "^4.5.0",
     "lodash.omit": "^4.5.0",
+    "lodash.shuffle": "^4.2.0",
     "nanoid": "^5.0.3",
     "next": "^13.4.13",
     "next-auth": "^4.22.4",
