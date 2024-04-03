@@ -48,6 +48,7 @@ import { useDebounceValue } from "usehooks-ts";
 import type { CheckPreconditions } from "../../trace_checks/types";
 import { formatMoney } from "../../utils/formatMoney";
 import type { Money } from "../../utils/types";
+import numeral from "numeral";
 
 export function TryItOut({
   form,
@@ -499,7 +500,7 @@ export function TryItOut({
                                 </Td>
                               ) : (
                                 <Td maxWidth="120" color={color}>
-                                  {runningResult.score}
+                                  {numeral(runningResult.score).format("0.[00]")}
                                 </Td>
                               )
                             ) : i == firstPassingPrecondition ? (
