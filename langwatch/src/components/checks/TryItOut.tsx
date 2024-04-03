@@ -31,7 +31,10 @@ import { type UseFormReturn } from "react-hook-form";
 import { useFilterParams } from "../../hooks/useFilterParams";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { elasticSearchSpanToSpan } from "../../server/tracer/types";
-import { type SingleEvaluationResult } from "../../trace_checks/evaluators.generated";
+import {
+  type Evaluators,
+  type SingleEvaluationResult,
+} from "../../trace_checks/evaluators.generated";
 import { getEvaluatorDefinitions } from "../../trace_checks/getEvaluator";
 import { evaluatePreconditions } from "../../trace_checks/preconditions";
 import { api } from "../../utils/api";
@@ -43,6 +46,8 @@ import type { CheckConfigFormData } from "./CheckConfigForm";
 import { checkStatusColorMap } from "./EvaluationStatus";
 import { useDebounceValue } from "usehooks-ts";
 import type { CheckPreconditions } from "../../trace_checks/types";
+import { formatMoney } from "../../utils/formatMoney";
+import type { Money } from "../../utils/types";
 
 export function TryItOut({
   form,
@@ -68,24 +73,30 @@ export function TryItOut({
   const { filterParams } = useFilterParams();
   const { openDrawer } = useDrawer();
   const [randomSeed, setRandomSeed] = useState<number>(Math.random() * 1000);
-  const [fetchingPreconditions, setFetchingPreconditions] =
-    useState<CheckPreconditions>([]);
+  const [fetchingParams, setFetchingParams] = useState<
+    | { preconditions: CheckPreconditions; evaluatorType: keyof Evaluators }
+    | undefined
+  >(undefined);
 
   const tracesPassingPreconditionsOnLoad = api.traces.getSampleTraces.useQuery(
     {
       ...filterParams,
+      ...fetchingParams!,
       query: query,
-      evaluatorType: evaluatorType!,
-      preconditions: fetchingPreconditions,
       expectedResults: 10,
       sortBy: `random.${randomSeed}`,
     },
     {
-      enabled: !!filterParams.projectId && !!evaluatorType,
+      enabled: !!filterParams.projectId && !!fetchingParams,
       refetchOnMount: false,
       refetchOnWindowFocus: false,
     }
   );
+
+  useEffect(() => {
+    setFetchingParams({ preconditions, evaluatorType: evaluatorType! });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const allPassing =
     tracesPassingPreconditionsOnLoad.data?.every(
@@ -190,6 +201,13 @@ export function TryItOut({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [runningState.state, (runningState as any).nextTraceId]);
 
+  const totalCost = Object.values(runningResults).reduce(
+    (acc, result) =>
+      acc +
+      (result.status === "processed" ? (result.cost as Money)?.amount ?? 0 : 0),
+    0
+  );
+
   return (
     <VStack width="full" spacing={6} marginTop={6}>
       <HStack width="full" align="end">
@@ -219,9 +237,8 @@ export function TryItOut({
         <Alert status="info">
           <AlertIcon />
           <Text>
-            Heads up! Since LangWatch already redacts PII, all message samples
-            should pass here on the {'"'}Try it out{'"'}. You can still try it
-            out to see the results if you want though.
+            Heads up! Since LangWatch already redacts PII, you won{"'"}t see any
+            bad examples here. You can still try it though.
           </Text>
         </Alert>
       )}
@@ -243,8 +260,10 @@ export function TryItOut({
               <Spacer />
               <Button
                 onClick={() => {
-                  console.log("preconditions", preconditions);
-                  setFetchingPreconditions(preconditions);
+                  setFetchingParams({
+                    preconditions,
+                    evaluatorType: evaluatorType!,
+                  });
                   setRandomSeed(Math.random() * 1000);
                 }}
                 leftIcon={
@@ -315,15 +334,16 @@ export function TryItOut({
                 <Table variant="simple">
                   <Thead>
                     <Tr>
-                      <Th width="150px">Timestamp</Th>
-                      <Th width="250px">Input</Th>
-                      <Th width="250px">Output</Th>
+                      <Th width="180px">Timestamp</Th>
+                      <Th width="225px">Input</Th>
+                      <Th width="225px">Output</Th>
                       {evaluatorDefinition?.isGuardrail ? (
-                        <Th>Passed</Th>
+                        <Th width="120px">Passed</Th>
                       ) : (
-                        <Th>Score</Th>
+                        <Th width="120px">Score</Th>
                       )}
-                      <Th width="350px">Details</Th>
+                      <Th width="250px">Details</Th>
+                      <Th width="120px">Cost</Th>
                     </Tr>
                   </Thead>
                   <Tbody>
@@ -365,7 +385,7 @@ export function TryItOut({
                             }
                           >
                             <Td
-                              maxWidth="150px"
+                              maxWidth="180px"
                               onClick={() =>
                                 openDrawer("traceDetails", {
                                   traceId: trace.trace_id,
@@ -387,7 +407,7 @@ export function TryItOut({
                                 })}
                             </Td>
                             <Td
-                              maxWidth="250px"
+                              maxWidth="225px"
                               onClick={() =>
                                 openDrawer("traceDetails", {
                                   traceId: trace.trace_id,
@@ -414,6 +434,7 @@ export function TryItOut({
                             </Td>
                             {trace.error ? (
                               <Td
+                                maxWidth="225px"
                                 onClick={() =>
                                   openDrawer("traceDetails", {
                                     traceId: trace.trace_id,
@@ -433,6 +454,7 @@ export function TryItOut({
                               </Td>
                             ) : (
                               <Td
+                                maxWidth="225px"
                                 onClick={() =>
                                   openDrawer("traceDetails", {
                                     traceId: trace.trace_id,
@@ -460,26 +482,32 @@ export function TryItOut({
                             )}
                             {runningResult ? (
                               runningResult.status === "loading" ? (
-                                <Td>
+                                <Td maxWidth="120">
                                   <Spinner size="sm" />
                                 </Td>
                               ) : runningResult.status === "skipped" ? (
-                                <Td color={color}>Skipped</Td>
+                                <Td maxWidth="120" color={color}>
+                                  Skipped
+                                </Td>
                               ) : runningResult.status === "error" ? (
-                                <Td color={color}>Error</Td>
+                                <Td maxWidth="120" color={color}>
+                                  Error
+                                </Td>
                               ) : evaluatorDefinition?.isGuardrail ? (
-                                <Td color={color}>
+                                <Td maxWidth="120" color={color}>
                                   {runningResult.passed ? "Pass" : "Fail"}
                                 </Td>
                               ) : (
-                                <Td color={color}>{runningResult.score}</Td>
+                                <Td maxWidth="120" color={color}>
+                                  {runningResult.score}
+                                </Td>
                               )
                             ) : i == firstPassingPrecondition ? (
-                              <Td>Waiting to run</Td>
+                              <Td maxWidth="120">Waiting to run</Td>
                             ) : (
-                              <Td></Td>
+                              <Td maxWidth="120"></Td>
                             )}
-                            <Td color={color} maxWidth="300px">
+                            <Td color={color} maxWidth="250px">
                               {runningResult &&
                                 (resultDetails ? (
                                   <Tooltip label={resultDetails}>
@@ -491,18 +519,34 @@ export function TryItOut({
                                       {resultDetails}
                                     </Text>
                                   </Tooltip>
+                                ) : runningResult.status === "loading" ? (
+                                  ""
                                 ) : (
                                   "-"
                                 ))}
+                            </Td>
+                            <Td maxWidth="120px">
+                              {runningResult &&
+                                (runningResult.status === "processed"
+                                  ? formatMoney(
+                                      (runningResult.cost as Money) ?? {
+                                        amount: 0,
+                                        currency: "USD",
+                                      }
+                                    )
+                                  : runningResult.status === "loading"
+                                  ? ""
+                                  : "-")}
                             </Td>
                           </Tr>
                         </Tooltip>
                       );
                     })}
+
                     {tracesPassingPreconditionsOnLoad.isLoading &&
                       Array.from({ length: 10 }).map((_, i) => (
                         <Tr key={i}>
-                          {Array.from({ length: 5 }).map((_, i) => (
+                          {Array.from({ length: 6 }).map((_, i) => (
                             <Td key={i}>
                               <Skeleton height="20px" />
                             </Td>
@@ -518,6 +562,28 @@ export function TryItOut({
                           </Td>
                         </Tr>
                       )}
+                    <Tr>
+                      <Td colSpan={5} textAlign="right" fontWeight={500}>
+                        Total Cost:
+                      </Td>
+                      <Td>
+                        {Object.values(runningResults).filter(
+                          (result) => result.status !== "loading"
+                        ).length > 0
+                          ? formatMoney({
+                              amount: totalCost,
+                              currency:
+                                (
+                                  Object.values(runningResults).filter(
+                                    (result) =>
+                                      result.status === "processed" &&
+                                      result.cost
+                                  )[0] as any
+                                )?.cost.currency ?? "USD",
+                            })
+                          : "-"}
+                      </Td>
+                    </Tr>
                   </Tbody>
                 </Table>
               </TableContainer>
