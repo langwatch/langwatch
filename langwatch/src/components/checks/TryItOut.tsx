@@ -25,8 +25,7 @@ import {
   VStack,
   useTheme,
 } from "@chakra-ui/react";
-import shuffle from "lodash/shuffle";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Pause, Play, RefreshCw, Search } from "react-feather";
 import { type UseFormReturn } from "react-hook-form";
 import { useFilterParams } from "../../hooks/useFilterParams";
@@ -43,6 +42,7 @@ import { FilterToggle } from "../filters/FilterToggle";
 import type { CheckConfigFormData } from "./CheckConfigForm";
 import { checkStatusColorMap } from "./EvaluationStatus";
 import { useDebounceValue } from "usehooks-ts";
+import type { CheckPreconditions } from "../../trace_checks/types";
 
 export function TryItOut({
   form,
@@ -65,37 +65,35 @@ export function TryItOut({
     period: { startDate, endDate },
     setPeriod,
   } = usePeriodSelector();
-  const { filterParams, queryOpts } = useFilterParams();
+  const { filterParams } = useFilterParams();
   const { openDrawer } = useDrawer();
   const [randomSeed, setRandomSeed] = useState<number>(Math.random() * 1000);
+  const [fetchingPreconditions, setFetchingPreconditions] =
+    useState<CheckPreconditions>([]);
 
-  const traceGroups = api.traces.getAllForProject.useQuery(
+  const tracesPassingPreconditionsOnLoad = api.traces.getSampleTraces.useQuery(
     {
       ...filterParams,
       query: query,
-      groupBy: "none",
-      pageSize: 100,
+      evaluatorType: evaluatorType!,
+      preconditions: fetchingPreconditions,
+      expectedResults: 10,
       sortBy: `random.${randomSeed}`,
     },
-    queryOpts
-  );
-
-  const traceWithSpans = api.traces.getTracesWithSpans.useQuery(
     {
-      projectId: filterParams.projectId,
-      traceIds:
-        traceGroups.data?.groups.flatMap((group) =>
-          group.map((trace) => trace.trace_id)
-        ) ?? [],
-    },
-    {
-      enabled:
-        !!filterParams.projectId && (traceGroups.data?.groups ?? []).length > 0,
+      enabled: !!filterParams.projectId && !!evaluatorType,
+      refetchOnMount: false,
+      refetchOnWindowFocus: false,
     }
   );
 
-  const [allPassing, tracesPassingPreconditionsOnLoad] = useMemo(() => {
-    const passedPreconditions = traceWithSpans.data?.filter(
+  const allPassing =
+    tracesPassingPreconditionsOnLoad.data?.every(
+      (trace) => trace.passesPreconditions
+    ) ?? false;
+
+  const tracesLivePassesPreconditions =
+    tracesPassingPreconditionsOnLoad.data?.map(
       (trace) =>
         evaluatorType &&
         evaluatePreconditions(
@@ -104,38 +102,7 @@ export function TryItOut({
           trace.spans?.map(elasticSearchSpanToSpan) ?? [],
           preconditions
         )
-    );
-    const passedPreconditionsTraceIds = passedPreconditions?.map(
-      (trace) => trace.trace_id
-    );
-
-    let samples = shuffle(passedPreconditions).slice(0, 10);
-    let allPassing = true;
-    if (samples.length < 10) {
-      allPassing = false;
-      samples = samples.concat(
-        shuffle(
-          traceWithSpans.data?.filter(
-            (trace) => !passedPreconditionsTraceIds?.includes(trace.trace_id)
-          )
-        ).slice(0, 10 - samples.length)
-      );
-    }
-
-    return [allPassing, samples];
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [traceWithSpans.data]);
-
-  const tracesLivePassesPreconditions = tracesPassingPreconditionsOnLoad.map(
-    (trace) =>
-      evaluatorType &&
-      evaluatePreconditions(
-        evaluatorType,
-        trace,
-        trace.spans?.map(elasticSearchSpanToSpan) ?? [],
-        preconditions
-      )
-  );
+    ) ?? [];
   const firstPassingPrecondition = tracesLivePassesPreconditions.findIndex(
     (pass) => pass
   );
@@ -152,7 +119,7 @@ export function TryItOut({
   useEffect(() => {
     setRunningResults({});
     setRunningState({ state: "idle" });
-  }, [traceWithSpans.data]);
+  }, [tracesPassingPreconditionsOnLoad.data]);
 
   useEffect(() => {
     if (!project || !evaluatorType || runningState.state !== "running") return;
@@ -171,11 +138,12 @@ export function TryItOut({
         (passes, index) =>
           passes &&
           !processedTraceIds.includes(
-            tracesPassingPreconditionsOnLoad[index]?.trace_id ?? ""
+            tracesPassingPreconditionsOnLoad.data?.[index]?.trace_id ?? ""
           )
       );
 
-      const nextTraceId = tracesPassingPreconditionsOnLoad[nextIndex]?.trace_id;
+      const nextTraceId =
+        tracesPassingPreconditionsOnLoad.data?.[nextIndex]?.trace_id;
 
       if (!nextTraceId) {
         setRunningState({ state: "idle" });
@@ -262,10 +230,10 @@ export function TryItOut({
           <CardHeader>
             <HStack spacing={4}>
               <Text fontWeight="500">
-                {traceGroups.isLoading || traceWithSpans.isLoading
+                {tracesPassingPreconditionsOnLoad.isLoading
                   ? "Fetching samples..."
                   : `Fetched ${
-                      (tracesPassingPreconditionsOnLoad ?? []).length
+                      (tracesPassingPreconditionsOnLoad.data ?? []).length
                     } random sample messages${
                       preconditions.length > 0 && allPassing
                         ? " passing preconditions"
@@ -274,18 +242,22 @@ export function TryItOut({
               </Text>
               <Spacer />
               <Button
-                onClick={() => setRandomSeed(Math.random() * 1000)}
+                onClick={() => {
+                  console.log("preconditions", preconditions);
+                  setFetchingPreconditions(preconditions);
+                  setRandomSeed(Math.random() * 1000);
+                }}
                 leftIcon={
                   <RefreshCw
                     size={16}
                     className={
-                      traceGroups.isLoading || traceWithSpans.isLoading
+                      tracesPassingPreconditionsOnLoad.isLoading
                         ? "refresh-icon animation-spinning"
                         : "refresh-icon"
                     }
                   />
                 }
-                isDisabled={traceGroups.isLoading || traceWithSpans.isLoading}
+                isDisabled={tracesPassingPreconditionsOnLoad.isLoading}
                 size="sm"
               >
                 Shuffle
@@ -306,8 +278,9 @@ export function TryItOut({
                 onClick={() => {
                   if (runningState.state === "idle") {
                     const firstTraceId =
-                      tracesPassingPreconditionsOnLoad[firstPassingPrecondition]
-                        ?.trace_id;
+                      tracesPassingPreconditionsOnLoad.data?.[
+                        firstPassingPrecondition
+                      ]?.trace_id;
 
                     if (!firstTraceId) {
                       return;
@@ -354,7 +327,7 @@ export function TryItOut({
                     </Tr>
                   </Thead>
                   <Tbody>
-                    {tracesPassingPreconditionsOnLoad?.map((trace, i) => {
+                    {tracesPassingPreconditionsOnLoad.data?.map((trace, i) => {
                       const livePassesPreconditions =
                         tracesLivePassesPreconditions[i];
                       const runningResult = runningResults[trace.trace_id];
@@ -526,7 +499,7 @@ export function TryItOut({
                         </Tooltip>
                       );
                     })}
-                    {(traceGroups.isLoading || traceWithSpans.isLoading) &&
+                    {tracesPassingPreconditionsOnLoad.isLoading &&
                       Array.from({ length: 10 }).map((_, i) => (
                         <Tr key={i}>
                           {Array.from({ length: 5 }).map((_, i) => (
@@ -536,8 +509,8 @@ export function TryItOut({
                           ))}
                         </Tr>
                       ))}
-                    {traceWithSpans.isFetched &&
-                      tracesPassingPreconditionsOnLoad.length === 0 && (
+                    {tracesPassingPreconditionsOnLoad.isFetched &&
+                      tracesPassingPreconditionsOnLoad.data?.length === 0 && (
                         <Tr>
                           <Td colSpan={5}>
                             No messages found, try selecting different filters

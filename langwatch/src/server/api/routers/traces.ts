@@ -16,7 +16,12 @@ import {
   traceIndexId,
 } from "../../elasticsearch";
 import { getOpenAIEmbeddings } from "../../embeddings";
-import type { ElasticSearchSpan, Trace, TraceCheck } from "../../tracer/types";
+import {
+  elasticSearchSpanToSpan,
+  type ElasticSearchSpan,
+  type Trace,
+  type TraceCheck,
+} from "../../tracer/types";
 import {
   TeamRoleGroup,
   backendHasTeamProjectPermission,
@@ -28,10 +33,23 @@ import type {
   SearchTotalHits,
   Sort,
 } from "@elastic/elasticsearch/lib/api/types";
+import { checkPreconditionSchema } from "../../../trace_checks/types.generated";
+import { evaluatePreconditions } from "../../../trace_checks/preconditions";
+import { evaluatorsSchema } from "../../../trace_checks/evaluators.zod.generated";
+import shuffle from "lodash/shuffle";
+import type { PrismaClient } from "@prisma/client";
+import type { Session } from "next-auth";
 
 const tracesFilterInput = sharedFiltersInputSchema.extend({
   pageOffset: z.number().optional(),
   pageSize: z.number().optional(),
+});
+
+const getAllForProjectInput = tracesFilterInput.extend({
+  query: z.string().optional(),
+  groupBy: z.string().optional(),
+  sortBy: z.string().optional(),
+  sortDirection: z.string().optional(),
 });
 
 export const esGetSpansByTraceId = async ({
@@ -65,231 +83,10 @@ export const esGetSpansByTraceId = async ({
 
 export const tracesRouter = createTRPCRouter({
   getAllForProject: protectedProcedure
-    .input(
-      tracesFilterInput.extend({
-        query: z.string().optional(),
-        groupBy: z.string().optional(),
-        sortBy: z.string().optional(),
-        sortDirection: z.string().optional(),
-      })
-    )
+    .input(getAllForProjectInput)
     .use(checkUserPermissionForProject(TeamRoleGroup.MESSAGES_VIEW))
     .query(async ({ ctx, input }) => {
-      const embeddings = input.query
-        ? await getOpenAIEmbeddings(input.query)
-        : undefined;
-
-      if (input.query && !embeddings) {
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: "Failed to get embeddings for query.",
-        });
-      }
-
-      const { pivotIndexConditions, isAnyFilterPresent, endDateUsedForQuery } =
-        generateTracesPivotQueryConditions(input);
-
-      let traceIds: string[] = [];
-
-      const pageSize = input.pageSize ? input.pageSize : 25;
-      const pageOffset = input.pageOffset ? input.pageOffset : 0;
-
-      let totalHits = 0;
-      let usePivotIndex = false;
-      if (isAnyFilterPresent || input.sortBy) {
-        usePivotIndex = true;
-        const pivotIndexResults = await esClient.search<TracesPivot>({
-          index: TRACES_PIVOT_INDEX,
-          body: {
-            query: pivotIndexConditions,
-            _source: ["trace.trace_id"],
-            from: input.query ? 0 : pageOffset,
-            size: input.query ? 10_000 : pageSize,
-            ...(input.sortBy
-              ? input.sortBy.startsWith("random.")
-                ? {
-                    sort: {
-                      _script: {
-                        type: "number",
-                        script: {
-                          source: "Math.random()",
-                        },
-                        order: input.sortDirection ?? "desc",
-                      },
-                    } as Sort,
-                  }
-                : input.sortBy.startsWith("trace_checks.")
-                ? {
-                    sort: {
-                      "trace_checks.score": {
-                        order: input.sortDirection ?? "desc",
-                        nested: {
-                          path: "trace_checks",
-                          filter: {
-                            term: {
-                              "trace_checks.check_id":
-                                input.sortBy.split(".")[1],
-                            },
-                          },
-                        },
-                      },
-                    } as Sort,
-                  }
-                : {
-                    sort: {
-                      [input.sortBy]: {
-                        order: input.sortDirection ?? "desc",
-                      },
-                    } as Sort,
-                  }
-              : {
-                  sort: {
-                    "trace.timestamps.started_at": {
-                      order: "desc",
-                    },
-                  } as Sort,
-                }),
-          },
-        });
-
-        traceIds = pivotIndexResults.hits.hits
-          .map((hit) => hit._source?.trace?.trace_id)
-          .filter((x) => x)
-          .map((x) => x!);
-
-        totalHits =
-          (pivotIndexResults.hits?.total as SearchTotalHits)?.value || 0;
-
-        if (!traceIds.length) {
-          return { groups: [], totalHits: 0 };
-        }
-      }
-
-      const tracesIndexConditions = [
-        {
-          term: { project_id: input.projectId },
-        },
-        {
-          range: {
-            "timestamps.started_at": {
-              gte: input.startDate,
-              lte: endDateUsedForQuery,
-              format: "epoch_millis",
-            },
-          },
-        },
-        ...(usePivotIndex ? [{ terms: { trace_id: traceIds } }] : []),
-      ];
-
-      const canSeeCosts = await backendHasTeamProjectPermission(
-        ctx,
-        input,
-        TeamRoleGroup.COST_VIEW
-      );
-
-      //@ts-ignore
-      const tracesResult = await esClient.search<Trace>({
-        index: TRACE_INDEX,
-        from: !usePivotIndex || input.query ? pageOffset : 0,
-        size: !usePivotIndex || input.query ? pageSize : traceIds.length,
-        _source: {
-          excludes: [
-            // TODO: do we really need to exclude both keys and nested keys for embeddings?
-            ...(input.groupBy !== "input"
-              ? ["input.embeddings", "input.embeddings.embeddings"]
-              : []),
-            ...(input.groupBy !== "output"
-              ? ["output.embeddings", "input.embeddings.embeddings"]
-              : []),
-            ...(canSeeCosts ? [] : ["metrics.total_cost"]),
-          ],
-        },
-        ...(!input.query
-          ? {
-              sort: {
-                "timestamps.started_at": {
-                  order: "desc",
-                },
-              },
-            }
-          : {}),
-        body: {
-          query: {
-            bool: {
-              must: [
-                ...tracesIndexConditions,
-                ...(input.query
-                  ? [
-                      {
-                        bool: {
-                          should: [
-                            {
-                              match: {
-                                "input.value": input.query,
-                              },
-                            },
-                            {
-                              match: {
-                                "output.value": input.query,
-                              },
-                            },
-                          ],
-                          boost: 100.0,
-                          minimum_should_match: 1,
-                        },
-                      },
-                    ]
-                  : []),
-              ],
-            },
-          },
-          ...(input.query
-            ? {
-                knn: {
-                  field: "input.embeddings.embeddings",
-                  query_vector: embeddings?.embeddings,
-                  k: 10,
-                  num_candidates: 100,
-                },
-                rank: {
-                  rrf: { window_size: 100 },
-                },
-              }
-            : {}),
-          // Ensures proper filters are applied even with knn
-          post_filter: {
-            bool: {
-              must: tracesIndexConditions,
-            },
-          },
-        },
-      });
-
-      const tracesById = Object.fromEntries(
-        tracesResult.hits.hits
-          .map((hit) => hit._source!)
-          .filter((x) => x)
-          .map((trace) => [trace.trace_id, trace])
-      );
-
-      const traces = usePivotIndex
-        ? traceIds.map((id) => tracesById[id]!).filter((x) => x)
-        : Object.values(tracesById);
-
-      const groups = groupTraces(input.groupBy, traces);
-
-      // Remove embeddings to reduce payload size
-      for (const group of groups) {
-        for (const trace of group) {
-          delete trace.input?.embeddings;
-          delete trace.output?.embeddings;
-        }
-      }
-
-      if (!usePivotIndex) {
-        totalHits = (tracesResult.hits?.total as SearchTotalHits)?.value || 0;
-      }
-      return { groups, totalHits };
+      return await getAllForProject(ctx, input);
     }),
   getById: protectedProcedure
     .input(z.object({ projectId: z.string(), traceId: z.string() }))
@@ -551,52 +348,337 @@ export const tracesRouter = createTRPCRouter({
     .query(async ({ input }) => {
       const { projectId, traceIds } = input;
 
-      const tracesResult = await esClient.search<Trace>({
-        index: TRACE_INDEX,
-        body: {
-          query: {
-            //@ts-ignore
-            bool: {
-              filter: [
-                { term: { project_id: projectId } },
-                { terms: { trace_id: traceIds } },
-              ],
-            },
-          },
-          sort: [
-            {
-              "timestamps.started_at": {
-                order: "asc",
-              },
-            },
-          ],
-          size: 1000,
-        },
+      return getTracesWithSpans(projectId, traceIds);
+    }),
+
+  getSampleTraces: protectedProcedure
+    .input(
+      tracesFilterInput.extend({
+        query: z.string().optional(),
+        sortBy: z.string().optional(),
+        evaluatorType: evaluatorsSchema.keyof(),
+        preconditions: z.array(checkPreconditionSchema),
+        expectedResults: z.number(),
+      })
+    )
+    .use(checkUserPermissionForProject(TeamRoleGroup.MESSAGES_VIEW))
+    .query(async ({ ctx, input }) => {
+      const { groups } = await getAllForProject(ctx, {
+        ...input,
+        groupBy: "none",
+        pageSize: 100,
       });
-
-      const traces = tracesResult.hits.hits
-        .map((hit) => hit._source!)
-        .filter((x) => x);
-
-      const spansByTraceId = await Promise.all(
-        traces.map((trace) =>
-          esGetSpansByTraceId({ traceId: trace.trace_id, projectId })
-        )
+      const traceIds = groups.flatMap((group) =>
+        group.map((trace) => trace.trace_id)
       );
 
-      const tracesWithSpans = traces.map((trace, i) => ({
-        ...trace,
-        spans: spansByTraceId[i],
-      }));
-
-      for (const tracesWithSpan of tracesWithSpans) {
-        delete tracesWithSpan.input?.embeddings;
-        delete tracesWithSpan.output?.embeddings;
+      if (traceIds.length === 0) {
+        return [];
       }
 
-      return tracesWithSpans;
+      const { projectId, evaluatorType, preconditions, expectedResults } =
+        input;
+
+      const traceWithSpans = await getTracesWithSpans(projectId, traceIds);
+
+      const passedPreconditions = traceWithSpans.filter(
+        (trace) =>
+          evaluatorType &&
+          evaluatePreconditions(
+            evaluatorType,
+            trace,
+            trace.spans?.map(elasticSearchSpanToSpan) ?? [],
+            preconditions
+          )
+      );
+      const passedPreconditionsTraceIds = passedPreconditions?.map(
+        (trace) => trace.trace_id
+      );
+
+      let samples = shuffle(passedPreconditions)
+        .slice(0, expectedResults)
+        .map((sample) => ({ ...sample, passesPreconditions: true }));
+      if (samples.length < 10) {
+        samples = samples.concat(
+          shuffle(
+            traceWithSpans.filter(
+              (trace) => !passedPreconditionsTraceIds?.includes(trace.trace_id)
+            )
+          )
+            .slice(0, expectedResults - samples.length)
+            .map((sample) => ({ ...sample, passesPreconditions: false }))
+        );
+      }
+
+      return samples;
     }),
 });
+
+const getAllForProject = async (
+  ctx: { prisma: PrismaClient; session: Session },
+  input: z.infer<typeof getAllForProjectInput>
+) => {
+  const embeddings = input.query
+    ? await getOpenAIEmbeddings(input.query)
+    : undefined;
+
+  if (input.query && !embeddings) {
+    throw new TRPCError({
+      code: "INTERNAL_SERVER_ERROR",
+      message: "Failed to get embeddings for query.",
+    });
+  }
+
+  const { pivotIndexConditions, isAnyFilterPresent, endDateUsedForQuery } =
+    generateTracesPivotQueryConditions(input);
+
+  let traceIds: string[] = [];
+
+  const pageSize = input.pageSize ? input.pageSize : 25;
+  const pageOffset = input.pageOffset ? input.pageOffset : 0;
+
+  let totalHits = 0;
+  let usePivotIndex = false;
+  if (isAnyFilterPresent || input.sortBy) {
+    usePivotIndex = true;
+    const pivotIndexResults = await esClient.search<TracesPivot>({
+      index: TRACES_PIVOT_INDEX,
+      body: {
+        query: pivotIndexConditions,
+        _source: ["trace.trace_id"],
+        from: input.query ? 0 : pageOffset,
+        size: input.query ? 10_000 : pageSize,
+        ...(input.sortBy
+          ? input.sortBy.startsWith("random.")
+            ? {
+                sort: {
+                  _script: {
+                    type: "number",
+                    script: {
+                      source: "Math.random()",
+                    },
+                    order: input.sortDirection ?? "desc",
+                  },
+                } as Sort,
+              }
+            : input.sortBy.startsWith("trace_checks.")
+            ? {
+                sort: {
+                  "trace_checks.score": {
+                    order: input.sortDirection ?? "desc",
+                    nested: {
+                      path: "trace_checks",
+                      filter: {
+                        term: {
+                          "trace_checks.check_id": input.sortBy.split(".")[1],
+                        },
+                      },
+                    },
+                  },
+                } as Sort,
+              }
+            : {
+                sort: {
+                  [input.sortBy]: {
+                    order: input.sortDirection ?? "desc",
+                  },
+                } as Sort,
+              }
+          : {
+              sort: {
+                "trace.timestamps.started_at": {
+                  order: "desc",
+                },
+              } as Sort,
+            }),
+      },
+    });
+
+    traceIds = pivotIndexResults.hits.hits
+      .map((hit) => hit._source?.trace?.trace_id)
+      .filter((x) => x)
+      .map((x) => x!);
+
+    totalHits = (pivotIndexResults.hits?.total as SearchTotalHits)?.value || 0;
+
+    if (!traceIds.length) {
+      return { groups: [], totalHits: 0 };
+    }
+  }
+
+  const tracesIndexConditions = [
+    {
+      term: { project_id: input.projectId },
+    },
+    {
+      range: {
+        "timestamps.started_at": {
+          gte: input.startDate,
+          lte: endDateUsedForQuery,
+          format: "epoch_millis",
+        },
+      },
+    },
+    ...(usePivotIndex ? [{ terms: { trace_id: traceIds } }] : []),
+  ];
+
+  const canSeeCosts = await backendHasTeamProjectPermission(
+    ctx,
+    input,
+    TeamRoleGroup.COST_VIEW
+  );
+
+  //@ts-ignore
+  const tracesResult = await esClient.search<Trace>({
+    index: TRACE_INDEX,
+    from: !usePivotIndex || input.query ? pageOffset : 0,
+    size: !usePivotIndex || input.query ? pageSize : traceIds.length,
+    _source: {
+      excludes: [
+        // TODO: do we really need to exclude both keys and nested keys for embeddings?
+        ...(input.groupBy !== "input"
+          ? ["input.embeddings", "input.embeddings.embeddings"]
+          : []),
+        ...(input.groupBy !== "output"
+          ? ["output.embeddings", "input.embeddings.embeddings"]
+          : []),
+        ...(canSeeCosts ? [] : ["metrics.total_cost"]),
+      ],
+    },
+    ...(!input.query
+      ? {
+          sort: {
+            "timestamps.started_at": {
+              order: "desc",
+            },
+          },
+        }
+      : {}),
+    body: {
+      query: {
+        bool: {
+          must: [
+            ...tracesIndexConditions,
+            ...(input.query
+              ? [
+                  {
+                    bool: {
+                      should: [
+                        {
+                          match: {
+                            "input.value": input.query,
+                          },
+                        },
+                        {
+                          match: {
+                            "output.value": input.query,
+                          },
+                        },
+                      ],
+                      boost: 100.0,
+                      minimum_should_match: 1,
+                    },
+                  },
+                ]
+              : []),
+          ],
+        },
+      },
+      ...(input.query
+        ? {
+            knn: {
+              field: "input.embeddings.embeddings",
+              query_vector: embeddings?.embeddings,
+              k: 10,
+              num_candidates: 100,
+            },
+            rank: {
+              rrf: { window_size: 100 },
+            },
+          }
+        : {}),
+      // Ensures proper filters are applied even with knn
+      post_filter: {
+        bool: {
+          must: tracesIndexConditions,
+        },
+      },
+    },
+  });
+
+  const tracesById = Object.fromEntries(
+    tracesResult.hits.hits
+      .map((hit) => hit._source!)
+      .filter((x) => x)
+      .map((trace) => [trace.trace_id, trace])
+  );
+
+  const traces = usePivotIndex
+    ? traceIds.map((id) => tracesById[id]!).filter((x) => x)
+    : Object.values(tracesById);
+
+  const groups = groupTraces(input.groupBy, traces);
+
+  // Remove embeddings to reduce payload size
+  for (const group of groups) {
+    for (const trace of group) {
+      delete trace.input?.embeddings;
+      delete trace.output?.embeddings;
+    }
+  }
+
+  if (!usePivotIndex) {
+    totalHits = (tracesResult.hits?.total as SearchTotalHits)?.value || 0;
+  }
+  return { groups, totalHits };
+};
+
+const getTracesWithSpans = async (projectId: string, traceIds: string[]) => {
+  const tracesResult = await esClient.search<Trace>({
+    index: TRACE_INDEX,
+    body: {
+      query: {
+        //@ts-ignore
+        bool: {
+          filter: [
+            { term: { project_id: projectId } },
+            { terms: { trace_id: traceIds } },
+          ],
+        },
+      },
+      sort: [
+        {
+          "timestamps.started_at": {
+            order: "asc",
+          },
+        },
+      ],
+      size: 1000,
+    },
+  });
+
+  const traces = tracesResult.hits.hits
+    .map((hit) => hit._source!)
+    .filter((x) => x);
+
+  const spansByTraceId = await Promise.all(
+    traces.map((trace) =>
+      esGetSpansByTraceId({ traceId: trace.trace_id, projectId })
+    )
+  );
+
+  const tracesWithSpans = traces.map((trace, i) => ({
+    ...trace,
+    spans: spansByTraceId[i],
+  }));
+
+  for (const tracesWithSpan of tracesWithSpans) {
+    delete tracesWithSpan.input?.embeddings;
+    delete tracesWithSpan.output?.embeddings;
+  }
+
+  return tracesWithSpans;
+};
 
 const groupTraces = (groupBy: string | undefined, traces: Trace[]) => {
   const groups: Trace[][] = [];
