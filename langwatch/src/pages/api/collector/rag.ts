@@ -64,7 +64,7 @@ export const extractRAGTextualContext = (contexts: RAGChunk[]) => {
     .filter((x) => x);
 };
 
-const extractChunkTextualContent = (object: any): string => {
+export const extractChunkTextualContent = (object: any): string => {
   let content = object;
   if (typeof content === "string") {
     try {
