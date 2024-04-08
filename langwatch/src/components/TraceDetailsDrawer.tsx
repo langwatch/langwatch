@@ -58,19 +58,52 @@ export const TraceDetailsDrawer = (props: TraceDetailsDrawerProps) => {
     }
   );
 
+  const anyGuardrails = traceChecksQuery.data?.[props.traceId]?.some(
+    (x) => x.is_guardrail
+  );
+
   const Evaluations = (trace: TraceEval) => {
-    const totalChecks = trace.traceChecks?.[trace.traceId]?.length;
+    const evaluations = trace.traceChecks?.[trace.traceId]?.filter(
+      (x) => !x.is_guardrail
+    );
+    const totalChecks = evaluations?.length;
     if (!totalChecks)
       return (
         <Text>
-          No evaluations ran for this message. Setup some gaurdrails{" "}
-          <Link href={`/${String(project)}/evaluations`}>here.</Link>
+          No evaluations ran for this message. Setup evaluations{" "}
+          <Link href={`/${project?.slug}/evaluations`}>here.</Link>
         </Text>
       );
     return (
       <VStack align="start" spacing={2}>
         <>
-          {trace.traceChecks?.[trace.traceId]?.map((check) => (
+          {evaluations?.map((check) => (
+            <CheckPassingDrawer
+              key={check.trace_id + "/" + check.check_id}
+              check={check}
+            />
+          ))}
+        </>
+      </VStack>
+    );
+  };
+
+  const Guardrails = (trace: TraceEval) => {
+    const guardrails = trace.traceChecks?.[trace.traceId]?.filter(
+      (x) => x.is_guardrail
+    );
+    const totalChecks = guardrails?.length;
+    if (!totalChecks)
+      return (
+        <Text>
+          No evaluations ran for this message. Setup evaluations{" "}
+          <Link href={`/${project?.slug}/evaluations`}>here.</Link>
+        </Text>
+      );
+    return (
+      <VStack align="start" spacing={2}>
+        <>
+          {guardrails?.map((check) => (
             <CheckPassingDrawer
               key={check.trace_id + "/" + check.check_id}
               check={check}
@@ -84,12 +117,13 @@ export const TraceDetailsDrawer = (props: TraceDetailsDrawerProps) => {
   const Errors = (trace: TraceEval) => {
     const totalErrors = trace
       ? trace.traceChecks?.[trace.traceId]?.filter(
-          (check) => check.status === "error" || check.passed === false
+          (check) =>
+            !check.is_guardrail &&
+            (check.status === "error" || check.passed === false)
         ).length
       : 0;
 
     if (totalErrors === 0 || !totalErrors) return null;
-    const errorText = totalErrors ?? 0 > 1 ? "errors" : "error";
 
     return (
       <Text
@@ -100,7 +134,29 @@ export const TraceDetailsDrawer = (props: TraceDetailsDrawerProps) => {
         color={"white"}
         fontSize={"sm"}
       >
-        {totalErrors} {errorText}
+        {totalErrors} failed
+      </Text>
+    );
+  };
+
+  const Blocked = (trace: TraceEval) => {
+    const totalBlocked = trace
+      ? trace.traceChecks?.[trace.traceId]?.filter(
+          (check) => check.is_guardrail && check.passed === false
+        ).length
+      : 0;
+
+    if (totalBlocked === 0 || !totalBlocked) return null;
+
+    return (
+      <Text
+        marginLeft={3}
+        borderRadius={"md"}
+        paddingX={2}
+        backgroundColor={"blue.100"}
+        fontSize={"sm"}
+      >
+        {totalBlocked} blocked
       </Text>
     );
   };
@@ -148,6 +204,15 @@ export const TraceDetailsDrawer = (props: TraceDetailsDrawerProps) => {
           <Tabs>
             <TabList>
               <Tab>Details</Tab>
+              {anyGuardrails && (
+                <Tab>
+                  Guardrails{" "}
+                  <Blocked
+                    traceId={props.traceId ?? ""}
+                    traceChecks={traceChecksQuery.data}
+                  />
+                </Tab>
+              )}
               <Tab>
                 Evaluations{" "}
                 <Errors
@@ -162,6 +227,14 @@ export const TraceDetailsDrawer = (props: TraceDetailsDrawerProps) => {
                 <TraceSummary traceId={props.traceId ?? ""} />
                 <SpanTree traceId={props.traceId ?? ""} />
               </TabPanel>
+              {anyGuardrails && (
+                <TabPanel>
+                  <Guardrails
+                    traceId={props.traceId ?? ""}
+                    traceChecks={traceChecksQuery.data}
+                  />
+                </TabPanel>
+              )}
               <TabPanel>
                 <Evaluations
                   traceId={props.traceId ?? ""}
