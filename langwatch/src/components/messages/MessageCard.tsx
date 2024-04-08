@@ -14,7 +14,7 @@ import {
   Tag,
   Text,
   Tooltip,
-  VStack
+  VStack,
 } from "@chakra-ui/react";
 import type { Project } from "@prisma/client";
 import { formatDistanceToNow } from "date-fns";
@@ -31,6 +31,7 @@ import { api } from "../../utils/api";
 import { formatMilliseconds } from "../../utils/formatMilliseconds";
 import { getColorForString } from "../../utils/rotatingColors";
 import { CheckPassing } from "../CheckPassing";
+import { pluralize } from "../../utils/pluralize";
 
 export type TraceWithGuardrail = Trace & {
   lastGuardrail: (GuardrailResult & { name?: string }) | undefined;
@@ -47,20 +48,29 @@ export function MessageCard({
   trace: TraceWithGuardrail;
   checksMap: Record<string, TraceCheck[]> | undefined;
 }) {
-  const traceChecks = checksMap ? checksMap[trace.trace_id] ?? [] : [];
-  const checksDone = traceChecks.every(
+  const evaluations = checksMap
+    ? checksMap[trace.trace_id]?.filter((x) => !x.is_guardrail) ?? []
+    : [];
+  const guardrails = checksMap
+    ? checksMap[trace.trace_id]?.filter((x) => x.is_guardrail) ?? []
+    : [];
+  const evaluationsDone = evaluations.every(
     (check) =>
       check.status == "processed" ||
       check.status == "skipped" ||
       check.status == "error"
   );
-  const checkPasses = traceChecks.filter(
+  const evaluationsPasses = evaluations.filter(
     (check) =>
       check.passed !== false &&
       (check.status === "processed" || check.status === "skipped")
   ).length;
+  const guardrailsPasses = guardrails.filter(
+    (check) => check.passed !== false
+  ).length;
 
-  const totalChecks = traceChecks.length;
+  const totalEvaluations = evaluations.length;
+  const totalGuardrails = guardrails.length;
 
   const topics = api.topics.getAll.useQuery(
     { projectId: project?.id ?? "" },
@@ -136,8 +146,8 @@ export function MessageCard({
                 >
                   <HStack>
                     <Box
-                      color="green.700"
-                      background="green.100"
+                      color="blue.700"
+                      background="blue.100"
                       borderRadius="100%"
                       padding="6px"
                     >
@@ -268,16 +278,72 @@ export function MessageCard({
         </VStack>
         <Spacer />
         {!checksMap && <Skeleton width={100} height="1em" />}
-        {checksMap && totalChecks > 0 && (
+        {checksMap && totalGuardrails > 0 && (
           <Popover trigger="hover">
             <PopoverTrigger>
               <Tag
                 variant="outline"
                 boxShadow="#DEDEDE 0px 0px 0px 1px inset"
                 color={
-                  !checksDone
+                  guardrailsPasses == totalGuardrails ? "green.600" : "blue.600"
+                }
+                paddingY={1}
+                paddingX={2}
+                position="relative"
+                zIndex="popover"
+              >
+                {guardrailsPasses == totalGuardrails ? (
+                  <>
+                    <Box paddingRight={2}>
+                      <CheckCircle />
+                    </Box>
+                    {guardrailsPasses}/{totalGuardrails} guardrails
+                  </>
+                ) : (
+                  <>
+                    <Box paddingRight={2}>
+                      <Shield />
+                    </Box>
+                    {totalGuardrails - guardrailsPasses}{" "}
+                    {pluralize(
+                      totalGuardrails - guardrailsPasses,
+                      "guardrail block",
+                      "guardrail blocks"
+                    )}
+                  </>
+                )}
+              </Tag>
+            </PopoverTrigger>
+            <Portal>
+              <Box zIndex="popover">
+                <PopoverContent zIndex={2} width="fit-content">
+                  <PopoverArrow />
+                  <PopoverHeader>Guardrails</PopoverHeader>
+                  <PopoverBody>
+                    <VStack align="start" spacing={2}>
+                      {guardrails.map((check) => (
+                        <CheckPassing
+                          key={check.trace_id + "/" + check.check_id}
+                          check={check}
+                        />
+                      ))}
+                    </VStack>
+                  </PopoverBody>
+                </PopoverContent>
+              </Box>
+            </Portal>
+          </Popover>
+        )}
+        {checksMap && totalEvaluations > 0 && (
+          <Popover trigger="hover">
+            <PopoverTrigger>
+              <Tag
+                variant="outline"
+                boxShadow="#DEDEDE 0px 0px 0px 1px inset"
+                color={
+                  !evaluationsDone
                     ? "yellow.600"
-                    : checkPasses == totalChecks
+                    : evaluationsPasses == totalEvaluations
                     ? "green.600"
                     : "red.600"
                 }
@@ -287,15 +353,15 @@ export function MessageCard({
                 zIndex="popover"
               >
                 <Box paddingRight={2}>
-                  {!checksDone ? (
+                  {!evaluationsDone ? (
                     <Clock />
-                  ) : checkPasses == totalChecks ? (
+                  ) : evaluationsPasses == totalEvaluations ? (
                     <CheckCircle />
                   ) : (
                     <XCircle />
                   )}
                 </Box>
-                {checkPasses}/{totalChecks} evaluations
+                {evaluationsPasses}/{totalEvaluations} evaluations
               </Tag>
             </PopoverTrigger>
             <Portal>
@@ -305,7 +371,7 @@ export function MessageCard({
                   <PopoverHeader>Evaluations</PopoverHeader>
                   <PopoverBody>
                     <VStack align="start" spacing={2}>
-                      {traceChecks.map((check) => (
+                      {evaluations.map((check) => (
                         <CheckPassing
                           key={check.trace_id + "/" + check.check_id}
                           check={check}

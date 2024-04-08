@@ -257,7 +257,7 @@ export function MessagesTable() {
                   {trace.output?.value}
                 </Text>
               ) : trace.lastGuardrail ? (
-                <Tag colorScheme="green" paddingLeft={2}>
+                <Tag colorScheme="blue" paddingLeft={2}>
                   <TagLeftIcon boxSize="16px" as={Shield} />
                   <TagLabel>Blocked by Guardrail</TagLabel>
                 </Tag>

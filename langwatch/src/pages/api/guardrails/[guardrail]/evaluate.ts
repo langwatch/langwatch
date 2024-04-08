@@ -217,6 +217,7 @@ export default async function handler(
         project_id: project.id,
       },
       status: result.status,
+      is_guardrail: true,
       ...(result.status === "error"
         ? {
             error: {

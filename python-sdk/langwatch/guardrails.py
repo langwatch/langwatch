@@ -1,4 +1,4 @@
-from typing import List, Literal, Optional, Union
+from typing import List, Literal, Optional, Union, cast
 from warnings import warn
 
 from pydantic import BaseModel
@@ -52,12 +52,10 @@ def evaluate(
         )
         response.raise_for_status()
 
-        response_json: GuardrailResult = response.json()
-        result = GuardrailResultModel.model_validate(response_json)
-
+        result = GuardrailResultModel.model_validate(response.json())
         if result.status == "error":
             result.details = response.json()["message"]
         span.output = TypedValueGuardrailResult(
-            type="guardrail_result", value=response_json
+            type="guardrail_result", value=cast(GuardrailResult, result.model_dump())
         )
         return result

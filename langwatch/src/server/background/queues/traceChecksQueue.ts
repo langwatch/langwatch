@@ -85,6 +85,7 @@ export const updateCheckStatusInES = async ({
   error,
   details,
   retries,
+  is_guardrail,
 }: {
   check: TraceCheckJob["check"];
   trace: TraceCheckJob["trace"];
@@ -94,6 +95,7 @@ export const updateCheckStatusInES = async ({
   passed?: boolean;
   details?: string;
   retries?: number;
+  is_guardrail?: boolean;
 }) => {
   const traceCheck: TraceCheck = {
     id: traceCheckIndexId({
@@ -111,6 +113,7 @@ export const updateCheckStatusInES = async ({
     check_type: check.type,
     status,
     ...(check.name && { check_name: check.name }),
+    ...(is_guardrail !== undefined && { is_guardrail }),
     ...(score !== undefined && { score }),
     ...(passed !== undefined && { passed }),
     ...(error && { error: captureError(error) }),

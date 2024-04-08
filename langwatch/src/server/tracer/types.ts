@@ -242,6 +242,7 @@ export type TraceCheck = {
   project_id: string;
   check_type: string;
   check_name: string;
+  is_guardrail: boolean;
   status: "scheduled" | "in_progress" | "error" | "skipped" | "processed";
   passed?: boolean;
   score?: number;

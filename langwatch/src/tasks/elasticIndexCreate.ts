@@ -188,6 +188,7 @@ const traceChecksMapping: ElasticSearchMappingFrom<TraceCheck> = {
   project_id: { type: "keyword" },
   check_type: { type: "keyword" },
   check_name: { type: "keyword" },
+  is_guardrail: { type: "boolean" },
   status: { type: "keyword" },
   passed: { type: "boolean" },
   score: { type: "float" },

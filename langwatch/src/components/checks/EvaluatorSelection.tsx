@@ -108,7 +108,7 @@ export function EvaluatorSelection({
                             position="absolute"
                             right="-12px"
                             top="-12px"
-                            background="green.100"
+                            background="blue.100"
                             borderRadius="100%"
                             padding="4px"
                           >

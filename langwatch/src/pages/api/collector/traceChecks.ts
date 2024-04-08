@@ -7,6 +7,16 @@ import type { CheckPreconditions } from "../../../trace_checks/types";
 import { debug } from "../collector";
 
 export const scheduleTraceChecks = async (trace: Trace, spans: Span[]) => {
+  const isOutputEmpty = !trace.output?.value;
+  const lastOutput = spans.reverse()[0]?.outputs[0];
+  const blockedByGuardrail =
+    isOutputEmpty &&
+    lastOutput?.type === "guardrail_result" &&
+    lastOutput?.value?.passed === false;
+  if (blockedByGuardrail) {
+    return;
+  }
+
   const checks = await prisma.check.findMany({
     where: {
       projectId: trace.project_id,
