@@ -157,7 +157,10 @@ export default async function handler(
       output: output ? output : undefined,
       contexts: contextList,
       expected_output: expected_output ? expected_output : undefined,
-      settings,
+      settings: {
+        ...((guardrail.parameters as object) ?? {}),
+        ...(settings ?? {}),
+      },
     });
   } catch (error) {
     result = {

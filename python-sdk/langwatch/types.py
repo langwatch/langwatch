@@ -104,6 +104,7 @@ class BaseSpan(TypedDict):
     input: Optional[SpanInputOutput]
     outputs: List[SpanInputOutput]
     error: Optional[ErrorCapture]
+    metrics: Optional[SpanMetrics]
     timestamps: SpanTimestamps
 
 
@@ -118,7 +119,7 @@ class LLMSpan(TypedDict, total=False):
     outputs: List[SpanInputOutput]
     error: Optional[ErrorCapture]
     params: SpanParams
-    metrics: SpanMetrics
+    metrics: Optional[SpanMetrics]
     timestamps: SpanTimestamps
 
 
@@ -137,6 +138,7 @@ class RAGSpan(TypedDict, total=False):
     input: Optional[SpanInputOutput]
     outputs: List[SpanInputOutput]
     error: Optional[ErrorCapture]
+    metrics: Optional[SpanMetrics]
     timestamps: SpanTimestamps
     contexts: List[RAGChunk]
 

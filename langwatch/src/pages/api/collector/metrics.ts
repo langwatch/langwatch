@@ -40,7 +40,7 @@ export const computeTraceMetrics = (spans: Span[]): Trace["metrics"] => {
       latestFinishedAt = span.timestamps.finished_at;
     }
 
-    if ("metrics" in span) {
+    if ("metrics" in span && span.metrics) {
       if (
         span.metrics.prompt_tokens !== undefined &&
         span.metrics.prompt_tokens !== null
@@ -123,6 +123,25 @@ export const addLLMTokensCount = async (spans: Span[]) => {
         inputTokens: llmSpan.metrics.prompt_tokens ?? 0,
         outputTokens: llmSpan.metrics.completion_tokens ?? 0,
       });
+    }
+  }
+  return spans;
+};
+
+export const addGuardrailCosts = (spans: Span[]) => {
+  for (const span of spans) {
+    for (const output of span.outputs) {
+      if (output.type === "guardrail_result" && output.value.cost) {
+        if (output.value.cost.currency !== "USD") {
+          console.warn(
+            `Guardrail cost is in ${output.value.cost.currency}, not USD, which is not supported yet`
+          );
+        }
+        if (!span.metrics) {
+          span.metrics = {};
+        }
+        span.metrics.cost = output.value.cost.amount;
+      }
     }
   }
   return spans;

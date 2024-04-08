@@ -21,7 +21,7 @@ async def main(message: cl.Message):
     )
 
     with langwatch.openai.OpenAITracer(client):
-        jailbreak_guardrail = await langwatch.guardrails.async_evaluate(
+        jailbreak_guardrail = langwatch.guardrails.evaluate(
             "azure-jailbreak-detection", input=message.content
         )
         if not jailbreak_guardrail.passed:

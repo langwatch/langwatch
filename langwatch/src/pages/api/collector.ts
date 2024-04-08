@@ -30,7 +30,7 @@ import {
   maybeAddIdsToContextList,
 } from "./collector/rag";
 import { getTraceInput, getTraceOutput } from "./collector/trace";
-import { addLLMTokensCount, computeTraceMetrics } from "./collector/metrics";
+import { addGuardrailCosts, addLLMTokensCount, computeTraceMetrics } from "./collector/metrics";
 import { scheduleTraceChecks } from "./collector/traceChecks";
 import { cleanupPII } from "./collector/cleanupPII";
 import { scoreSatisfactionFromInput } from "./collector/satisfaction";
@@ -213,7 +213,7 @@ export default async function handler(
 
   debug(`collecting traceId ${traceId}`);
 
-  spans = addInputAndOutputForRAGs(await addLLMTokensCount(spans));
+  spans = addInputAndOutputForRAGs(await addLLMTokensCount(addGuardrailCosts(spans)));
 
   const esSpans: ElasticSearchSpan[] = spans.map((span) => ({
     ...span,

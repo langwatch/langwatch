@@ -52,11 +52,17 @@ interface TypedValueJson {
   value: JSONSerializable;
 }
 
+type Money = {
+  currency: string;
+  amount: number;
+};
+
 export interface GuardrailResult {
   status: "processed" | "skipped" | "error";
   passed: boolean;
   score?: number | null;
   details?: string | null;
+  cost?: Money;
 }
 
 interface TypedValueGuardrailResult {
@@ -117,6 +123,7 @@ export interface BaseSpan {
   outputs: SpanInputOutput[];
   error?: ErrorCapture | null;
   timestamps: SpanTimestamps;
+  metrics?: SpanMetrics | null;
 }
 
 export interface LLMSpan extends BaseSpan {
@@ -124,7 +131,6 @@ export interface LLMSpan extends BaseSpan {
   vendor: string;
   model: string;
   params: SpanParams;
-  metrics: SpanMetrics;
 }
 
 export interface RAGChunk {

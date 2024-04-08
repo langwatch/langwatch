@@ -29,9 +29,7 @@ import {
   ChevronUp,
   Layers,
   Maximize2,
-  Pause,
-  Play,
-  RefreshCw,
+  RefreshCw
 } from "react-feather";
 import { useFilterParams } from "../../hooks/useFilterParams";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";

@@ -10,11 +10,17 @@ from langwatch.tracer import ContextSpan, get_current_tracer
 from langwatch.types import GuardrailResult, RAGChunk, TypedValueGuardrailResult
 
 
+class Money(BaseModel):
+    currency: str
+    amount: float
+
+
 class GuardrailResultModel(BaseModel):
     status: Literal["processed", "skipped", "error"]
     passed: bool = True
     score: Optional[float] = None
     details: Optional[str] = None
+    cost: Optional[Money] = None
 
 
 def evaluate(

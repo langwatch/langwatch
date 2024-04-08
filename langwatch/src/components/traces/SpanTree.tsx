@@ -344,6 +344,12 @@ export function SpanTree(props?: SpanTreeProps) {
                     {[span.vendor, span.model].filter((x) => x).join("/")}
                   </Text>
                 )}
+                {span.metrics?.cost !== undefined && (
+                  <Text>
+                    <b>Cost:</b>{" "}
+                    {numeral(span.metrics.cost).format("$0.00000a")}
+                  </Text>
+                )}
               </VStack>
               <VStack
                 alignItems="flex-start"
