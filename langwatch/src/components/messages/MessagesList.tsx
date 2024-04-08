@@ -50,7 +50,6 @@ export function MessagesList() {
   const [tracesCheckInterval, setTracesCheckInterval] = useState<
     number | undefined
   >();
-  const [liveUpdate, setLiveUpdate] = useState(true);
   const [groupBy] = useGroupBy();
   const { filterParams, queryOpts } = useFilterParams();
 
@@ -99,13 +98,14 @@ export function MessagesList() {
   }, [traceChecksQuery.data]);
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      if (liveUpdate && document.hasFocus()) {
+    const onFocus = () => {
+      setTimeout(() => {
         void traceGroups.refetch();
-      }
-    }, 5000);
-    return () => clearInterval(interval);
-  }, [liveUpdate, traceGroups]);
+      }, 500);
+    };
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [traceGroups]);
 
   return (
     <Container maxW={"calc(min(1440px, 100vw - 200px))"} padding={6}>
@@ -115,13 +115,7 @@ export function MessagesList() {
             Messages
           </Heading>
           <ToggleAnalytics />
-          <Tooltip
-            label={
-              liveUpdate
-                ? "Pause real-time updates"
-                : "Enable real-time updates"
-            }
-          >
+          <Tooltip label="Refresh">
             <Button
               variant="outline"
               minWidth={0}
@@ -129,30 +123,18 @@ export function MessagesList() {
               padding={2}
               marginTop={2}
               onClick={() => {
-                if (liveUpdate) {
-                  setLiveUpdate(false);
-                } else {
-                  setLiveUpdate(true);
-                  void traceGroups.refetch();
-                  void traceChecksQuery.refetch();
-                }
+                void traceGroups.refetch();
+                void traceChecksQuery.refetch();
               }}
-              className="hide-refresh-on-hover"
             >
-              {!liveUpdate && <Play size="16" />}
-              {liveUpdate && (
-                <>
-                  <RefreshCw
-                    size="16"
-                    className={
-                      traceGroups.isLoading || traceGroups.isRefetching
-                        ? "refresh-icon animation-spinning"
-                        : "refresh-icon"
-                    }
-                  />
-                  <Pause size="16" className="show-on-hover" />
-                </>
-              )}
+              <RefreshCw
+                size="16"
+                className={
+                  traceGroups.isLoading || traceGroups.isRefetching
+                    ? "refresh-icon animation-spinning"
+                    : "refresh-icon"
+                }
+              />
             </Button>
           </Tooltip>
         </HStack>

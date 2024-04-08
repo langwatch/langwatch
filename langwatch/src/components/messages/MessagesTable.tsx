@@ -46,6 +46,7 @@ import {
   ChevronLeft,
   ChevronRight,
   List,
+  RefreshCw,
   Shield,
 } from "react-feather";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -618,6 +619,28 @@ export function MessagesTable() {
               Messages
             </Heading>
             <ToggleAnalytics />
+            <Tooltip label="Refresh">
+              <Button
+                variant="outline"
+                minWidth={0}
+                height="32px"
+                padding={2}
+                marginTop={2}
+                onClick={() => {
+                  void traceGroups.refetch();
+                  void traceChecksQuery.refetch();
+                }}
+              >
+                <RefreshCw
+                  size="16"
+                  className={
+                    traceGroups.isLoading || traceGroups.isRefetching
+                      ? "refresh-icon animation-spinning"
+                      : "refresh-icon"
+                  }
+                />
+              </Button>
+            </Tooltip>
           </HStack>
           <Spacer />
           <Button
