@@ -135,17 +135,17 @@ model Organization {
 }
 
 model Project {
-    id           String   @id @default(nanoid())
+    id           String        @id @default(nanoid())
     name         String
-    slug         String   @unique
-    apiKey       String   @unique
+    slug         String        @unique
+    apiKey       String        @unique
     teamId       String
-    team         Team     @relation(fields: [teamId], references: [id])
+    team         Team          @relation(fields: [teamId], references: [id])
     language     String
     framework    String
-    firstMessage Boolean  @default(false)
-    createdAt    DateTime @default(now())
-    updatedAt    DateTime @default(now()) @updatedAt
+    firstMessage Boolean       @default(false)
+    createdAt    DateTime      @default(now())
+    updatedAt    DateTime      @default(now()) @updatedAt
     checks       Check[]
     costs        Cost[]
     topics       Topic[]
@@ -184,6 +184,7 @@ model Check {
     name          String
     slug          String
     enabled       Boolean  @default(true)
+    isGuardrail   Boolean  @default(false)
     preconditions Json
     parameters    Json
     sample        Float    @default(1.0)
@@ -254,15 +255,15 @@ enum DatabaseSchema {
 }
 
 model Dataset {
-    id        String   @id @default(nanoid())
-    projectId String
-    project   Project  @relation(fields: [projectId], references: [id])
-    name      String
-    slug      String
-    schema    DatabaseSchema
-    createdAt DateTime @default(now())
-    updatedAt DateTime @default(now()) @updatedAt
-    datasetRecords  DatasetRecord[]
+    id             String          @id @default(nanoid())
+    projectId      String
+    project        Project         @relation(fields: [projectId], references: [id])
+    name           String
+    slug           String
+    schema         DatabaseSchema
+    createdAt      DateTime        @default(now())
+    updatedAt      DateTime        @default(now()) @updatedAt
+    datasetRecords DatasetRecord[]
 
     @@unique([projectId, slug])
 }

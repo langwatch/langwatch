@@ -1,16 +1,18 @@
 import {
-  Accordion,
-  AccordionButton,
-  AccordionIcon,
-  AccordionItem,
-  AccordionPanel,
   Box,
   Button,
   Card,
   CardBody,
+  Heading,
   HStack,
   Input,
   Spacer,
+  Switch,
+  Tab,
+  TabList,
+  TabPanel,
+  TabPanels,
+  Tabs,
   Text,
   Tooltip,
   VStack,
@@ -27,6 +29,7 @@ import {
 } from "react-hook-form";
 import slugify from "slugify";
 import { z } from "zod";
+import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import {
   AVAILABLE_EVALUATORS,
   type EvaluatorTypes,
@@ -42,13 +45,13 @@ import {
 } from "../../trace_checks/getEvaluator";
 import type { CheckPreconditions } from "../../trace_checks/types";
 import { checkPreconditionsSchema } from "../../trace_checks/types.generated";
+import { api } from "../../utils/api";
 import { HorizontalFormControl } from "../HorizontalFormControl";
+import { RenderCode } from "../integration-guides/utils/RenderCode";
 import DynamicZodForm from "./DynamicZodForm";
 import { EvaluatorSelection } from "./EvaluatorSelection";
 import { PreconditionsField } from "./PreconditionsField";
 import { TryItOut } from "./TryItOut";
-import { api } from "../../utils/api";
-import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 
 export interface CheckConfigFormData {
   name: string;
@@ -56,6 +59,7 @@ export interface CheckConfigFormData {
   sample: number;
   preconditions: CheckPreconditions;
   settings: Evaluators[EvaluatorTypes]["settings"];
+  isGuardrail: boolean;
 }
 
 interface CheckConfigFormProps {
@@ -99,6 +103,7 @@ export default function CheckConfigForm({
           settings:
             evaluatorsSchema.shape[data.checkType ?? "custom/basic"].shape
               .settings,
+          isGuardrail: z.boolean(),
         })
       )({ ...data, settings: data.settings || {} }, ...args);
     },
@@ -116,6 +121,7 @@ export default function CheckConfigForm({
   const preconditions = watch("preconditions");
   const nameValue = watch("name");
   const sample = watch("sample");
+  const isGuardrail = watch("isGuardrail");
   const {
     fields: fieldsPrecondition,
     append: appendPrecondition,
@@ -124,7 +130,11 @@ export default function CheckConfigForm({
     control,
     name: "preconditions",
   });
-  const check = checkType && getEvaluatorDefinitions(checkType);
+  const evaluatorDefinition = checkType && getEvaluatorDefinitions(checkType);
+  const slug = slugify(nameValue || "", {
+    lower: true,
+    strict: true,
+  });
 
   const router = useRouter();
   const isChoosing = router.pathname.endsWith("/choose");
@@ -244,17 +254,24 @@ export default function CheckConfigForm({
                       )}
                       <Text fontSize={12} paddingLeft={4}>
                         {nameValue && "slug: "}
-                        {slugify(nameValue || "", {
-                          lower: true,
-                          strict: true,
-                        })}
+                        {slug}
                       </Text>
                     </VStack>
                   </HorizontalFormControl>
+                  {checkType && evaluatorsSchema.shape[checkType] && (
+                    <DynamicZodForm
+                      schema={evaluatorsSchema.shape[checkType].shape.settings}
+                      checkType={checkType}
+                      prefix="settings"
+                      errors={errors.settings}
+                    />
+                  )}
                   <PreconditionsField
                     runOn={
                       preconditions?.length === 0 &&
-                      !check?.requiredFields.includes("contexts") ? (
+                      !evaluatorDefinition?.requiredFields.includes(
+                        "contexts"
+                      ) ? (
                         sample == 1 ? (
                           runOn
                         ) : (
@@ -268,74 +285,142 @@ export default function CheckConfigForm({
                     remove={removePrecondition}
                     fields={fieldsPrecondition}
                   />
-                  {checkType && evaluatorsSchema.shape[checkType] && (
-                    <DynamicZodForm
-                      schema={evaluatorsSchema.shape[checkType].shape.settings}
-                      checkType={checkType}
-                      prefix="settings"
-                      errors={errors.settings}
-                    />
-                  )}
-                  <Accordion
-                    defaultIndex={
-                      (defaultValues?.sample ?? 1) < 1 ? 0 : undefined
-                    }
-                    allowToggle={true}
-                    width="full"
-                    boxShadow="none"
-                    border="none"
+                  <HorizontalFormControl
+                    label="Sampling"
+                    helper="Run this check only on a sample of messages (min 0.01, max 1.0)"
+                    isInvalid={!!errors.sample}
+                    align="start"
                   >
-                    <AccordionItem width="full" border="none" padding={0}>
-                      <AccordionButton
-                        border="none"
-                        paddingX={5}
-                        paddingY={5}
-                        marginX={-5}
-                        marginY={-5}
-                        width="calc(100% + 40px)"
+                    <Controller
+                      control={control}
+                      name="sample"
+                      render={({ field }) => (
+                        <VStack align="start">
+                          <HStack>
+                            <Input
+                              width="110px"
+                              type="number"
+                              min="0"
+                              max="1"
+                              step="0.1"
+                              placeholder="0.0"
+                              {...field}
+                              onChange={(e) => field.onChange(+e.target.value)}
+                            />
+                            <Tooltip label="You can use this to save costs on expensive checks if you have too many messages incomming. From 0.01 to run on 1% of the messages to 1.0 to run on 100% of the messages">
+                              <HelpCircle width="14px" />
+                            </Tooltip>
+                          </HStack>
+                          {runOn}
+                        </VStack>
+                      )}
+                    />
+                  </HorizontalFormControl>
+
+                  {evaluatorDefinition?.isGuardrail && (
+                    <HorizontalFormControl
+                      label="Use it as Guardrail"
+                      helper="Block messages that don't pass this evaluation of going through"
+                      isInvalid={!!errors.isGuardrail}
+                      align="start"
+                    >
+                      <VStack spacing={2} align="start">
+                        <Switch
+                          id="isGuardrail"
+                          size="lg"
+                          {...register("isGuardrail", {
+                            required: true,
+                          })}
+                        />
+                      </VStack>
+                    </HorizontalFormControl>
+                  )}
+
+                  {isGuardrail && (
+                    <VStack spacing={4} align="start" width="full">
+                      <Heading
+                        as="h4"
+                        fontSize={16}
+                        fontWeight={500}
+                        paddingTop={4}
                       >
-                        <Box flex="1" textAlign="left" fontWeight={500}>
-                          Advanced
-                        </Box>
-                        <AccordionIcon color="gray.400" />
-                      </AccordionButton>
-                      <AccordionPanel width="full" paddingX={0} marginTop={6}>
-                        <HorizontalFormControl
-                          label="Sampling"
-                          helper="Run this check only on a sample of messages (min 0.01, max 1.0)"
-                          isInvalid={!!errors.sample}
-                          align="start"
-                        >
-                          <Controller
-                            control={control}
-                            name="sample"
-                            render={({ field }) => (
-                              <VStack align="start">
-                                <HStack>
-                                  <Input
-                                    width="110px"
-                                    type="number"
-                                    min="0"
-                                    max="1"
-                                    step="0.1"
-                                    placeholder="0.0"
-                                    {...field}
-                                    onChange={(e) =>
-                                      field.onChange(+e.target.value)
-                                    }
-                                  />
-                                  <Tooltip label="You can use this to save costs on expensive checks if you have too many messages incomming. From 0.01 to run on 1% of the messages to 1.0 to run on 100% of the messages">
-                                    <HelpCircle width="14px" />
-                                  </Tooltip>
-                                </HStack>
-                                {runOn}
-                              </VStack>
-                            )}
-                          />
-                        </HorizontalFormControl>
-                      </AccordionPanel>
-                    </AccordionItem>
-                  </Accordion>
+                        Guardrail Integration
+                      </Heading>
+                      <Text>
+                        Follow the code example below to integrate this
+                        guardrail in your LLM pipeline, save changes first for
+                        the guardrail to work.
+                      </Text>
+                      <Tabs width="full">
+                        <TabList marginBottom={4}>
+                          <Tab>Python</Tab>
+                          <Tab>Python (Async)</Tab>
+                          {/* <Tab>REST API</Tab> */}
+                        </TabList>
+
+                        <TabPanels>
+                          <TabPanel padding={0}>
+                            <VStack align="start" width="full" spacing={3}>
+                              <Text fontSize={14}>
+                                Add this import at the top of the file where the
+                                LLM call happens:
+                              </Text>
+                              <Box className="markdown" width="full">
+                                <RenderCode
+                                  code={`import langwatch.guardrails `}
+                                  language="python"
+                                />
+                              </Box>
+                              <Text fontSize={14}>
+                                Then, right before calling your LLM, check for
+                                the guardrail:
+                              </Text>
+                              <Box className="markdown" width="full">
+                                <RenderCode
+                                  code={`guardrail = langwatch.guardrails.evaluate(
+  "${slug}", input=user_input
+)
+if not guardrail.passed:
+  # handle the guardrail here
+  return "I'm sorry, I can't do that."`}
+                                  language="python"
+                                />
+                              </Box>
+                            </VStack>
+                          </TabPanel>
+                          <TabPanel padding={0}>
+                            <VStack align="start" width="full" spacing={3}>
+                              <Text fontSize={14}>
+                                Add this import at the top of the file where the
+                                LLM call happens:
+                              </Text>
+                              <Box className="markdown" width="full">
+                                <RenderCode
+                                  code={`import langwatch.guardrails `}
+                                  language="python"
+                                />
+                              </Box>
+                              <Text fontSize={14}>
+                                Then, right before calling your LLM, check for
+                                the guardrail:
+                              </Text>
+                              <Box className="markdown" width="full">
+                                <RenderCode
+                                  code={`guardrail = await langwatch.guardrails.async_evaluate(
+  "${slug}", input=user_input
+)
+if not guardrail.passed:
+  # handle the guardrail here
+  return "I'm sorry, I can't do that."`}
+                                  language="python"
+                                />
+                              </Box>
+                            </VStack>
+                          </TabPanel>
+                        </TabPanels>
+                      </Tabs>
+                    </VStack>
+                  )}
                 </VStack>
               </CardBody>
             </Card>

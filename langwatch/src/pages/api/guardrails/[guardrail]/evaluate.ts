@@ -92,6 +92,14 @@ export default async function handler(
     return res.status(404).json({ message: "Guardrail not found" });
   }
 
+  if (!guardrail.enabled || !guardrail.isGuardrail) {
+    return res.status(200).json({
+      status: "skipped",
+      passed: true,
+      details: "Guardrail is not enabled",
+    });
+  }
+
   let params: GuardrailRESTParams;
   try {
     params = guardrailInputSchema.parse(req.body);

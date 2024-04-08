@@ -51,6 +51,7 @@ export const checksRouter = createTRPCRouter({
         preconditions: checkPreconditionsSchema,
         settings: z.object({}).passthrough(),
         sample: z.number().min(0).max(1),
+        isGuardrail: z.boolean().optional(),
       })
     )
     .use(checkUserPermissionForProject(TeamRoleGroup.GUARDRAILS_MANAGE))
@@ -62,6 +63,7 @@ export const checksRouter = createTRPCRouter({
         preconditions,
         settings: parameters,
         sample,
+        isGuardrail,
       } = input;
       const prisma = ctx.prisma;
       const slug = slugify(name, { lower: true, strict: true });
@@ -79,6 +81,7 @@ export const checksRouter = createTRPCRouter({
           parameters,
           sample,
           enabled: true,
+          isGuardrail,
         },
       });
 
@@ -95,6 +98,7 @@ export const checksRouter = createTRPCRouter({
         settings: z.object({}).passthrough(),
         sample: z.number().min(0).max(1),
         enabled: z.boolean().optional(),
+        isGuardrail: z.boolean().optional(),
       })
     )
     .use(checkUserPermissionForProject(TeamRoleGroup.GUARDRAILS_MANAGE))
@@ -108,6 +112,7 @@ export const checksRouter = createTRPCRouter({
         settings: parameters,
         sample,
         enabled,
+        isGuardrail,
       } = input;
       const prisma = ctx.prisma;
       const slug = slugify(name, { lower: true, strict: true });
@@ -124,6 +129,7 @@ export const checksRouter = createTRPCRouter({
           parameters,
           sample,
           ...(enabled !== undefined && { enabled }),
+          isGuardrail,
         },
       });
 
