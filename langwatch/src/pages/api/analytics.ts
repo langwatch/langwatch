@@ -13,7 +13,7 @@ import { sharedFiltersInputSchema } from "../../server/analytics/types";
 import { timeseries } from "../../server/analytics/timeseries";
 import { TRPCError } from "@trpc/server";
 
-export const debug = getDebugger("langwatch:collector");
+export const debug = getDebugger("langwatch:analytics");
 
 export default async function handler(
   req: NextApiRequest,

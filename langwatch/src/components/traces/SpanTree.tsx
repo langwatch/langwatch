@@ -209,6 +209,8 @@ const SpanTypeTag = ({ span }: { span: ElasticSearchSpan }) => {
               tool: "orange",
               span: "gray",
               rag: "red",
+              guardrail: "blue",
+              unknown: "gray",
             }[span.type]
       }
       fontSize={13}

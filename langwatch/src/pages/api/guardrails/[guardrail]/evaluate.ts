@@ -1,15 +1,15 @@
 import { type NextApiRequest, type NextApiResponse } from "next";
 import { fromZodError, type ZodError } from "zod-validation-error";
-import { prisma } from "../../../server/db"; // Adjust the import based on your setup
+import { prisma } from "../../../../server/db"; // Adjust the import based on your setup
 
-import { getDebugger } from "../../../utils/logger";
+import { getDebugger } from "../../../../utils/logger";
 
 import { CostReferenceType, CostType, type Check } from "@prisma/client";
 import { nanoid } from "nanoid";
 import { z } from "zod";
-import { env } from "../../../env.mjs";
-import { updateCheckStatusInES } from "../../../server/background/queues/traceChecksQueue";
-import { rAGChunkSchema } from "../../../server/tracer/types.generated";
+import { env } from "../../../../env.mjs";
+import { updateCheckStatusInES } from "../../../../server/background/queues/traceChecksQueue";
+import { rAGChunkSchema } from "../../../../server/tracer/types.generated";
 import type {
   BatchEvaluationResult,
   EvaluationResult,
@@ -17,24 +17,26 @@ import type {
   EvaluationResultSkipped,
   EvaluatorTypes,
   SingleEvaluationResult,
-} from "../../../trace_checks/evaluators.generated";
-import { evaluatorsSchema } from "../../../trace_checks/evaluators.zod.generated";
-import { getEvaluatorDefinitions } from "../../../trace_checks/getEvaluator";
-import { extractChunkTextualContent } from "../collector/rag";
+} from "../../../../trace_checks/evaluators.generated";
+import { evaluatorsSchema } from "../../../../trace_checks/evaluators.zod.generated";
+import { getEvaluatorDefinitions } from "../../../../trace_checks/getEvaluator";
+import { extractChunkTextualContent } from "../../collector/rag";
+import * as Sentry from "@sentry/nextjs";
 
-export const debug = getDebugger("langwatch:collector");
+export const debug = getDebugger("langwatch:guardrail:evaluate");
 
 export const guardrailInputSchema = z.object({
   trace_id: z.string().optional(),
   data: z.object({
-    input: z.string().optional(),
-    output: z.string().optional(),
+    input: z.string().optional().nullable(),
+    output: z.string().optional().nullable(),
     contexts: z
       .union([z.array(rAGChunkSchema), z.array(z.string())])
-      .optional(),
-    expected_output: z.string().optional(),
+      .optional()
+      .nullable(),
+    expected_output: z.string().optional().nullable(),
   }),
-  settings: z.object({}).passthrough().optional(),
+  settings: z.object({}).passthrough().optional().nullable(),
 });
 
 export type GuardrailRESTParams = z.infer<typeof guardrailInputSchema>;
@@ -94,6 +96,14 @@ export default async function handler(
   try {
     params = guardrailInputSchema.parse(req.body);
   } catch (error) {
+    debug(
+      "Invalid guardrail received",
+      error,
+      JSON.stringify(req.body, null, "  "),
+      { projectId: project.id }
+    );
+    Sentry.captureException(error, { extra: { projectId: project.id } });
+
     const validationError = fromZodError(error as ZodError);
     return res.status(400).json({ error: validationError.message });
   }
@@ -107,6 +117,14 @@ export default async function handler(
       settings = evaluatorSettingSchema.parse(params.settings);
     }
   } catch (error) {
+    debug(
+      "Invalid guardrail settings received",
+      error,
+      JSON.stringify(req.body, null, "  "),
+      { projectId: project.id }
+    );
+    Sentry.captureException(error, { extra: { projectId: project.id } });
+
     const validationError = fromZodError(error as ZodError);
     return res.status(400).json({ error: validationError.message });
   }
@@ -135,10 +153,10 @@ export default async function handler(
   try {
     result = await runEvaluation({
       guardrail,
-      input,
-      output,
+      input: input ? input : undefined,
+      output: output ? output : undefined,
       contexts: contextList,
-      expected_output,
+      expected_output: expected_output ? expected_output : undefined,
       settings,
     });
   } catch (error) {

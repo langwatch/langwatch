@@ -31,6 +31,7 @@ import { api } from "../../../../utils/api";
 import { isNotFound } from "../../../../utils/trpcError";
 
 import { useDrawer } from "../../../../components/CurrentDrawer";
+import { getExtractedInput } from "../../../../components/messages/MessageCard";
 
 export default function TraceDetails() {
   const { hasTeamPermission } = useOrganizationTeamProject();
@@ -282,7 +283,7 @@ const TraceMessages = React.forwardRef(function TraceMessages(
             paddingTop="20px"
           >
             <Text paddingY="6px" marginBottom="38px" whiteSpace="pre-wrap">
-              {trace.input.value}
+              {getExtractedInput(trace)}
             </Text>
           </Message>
           <Message
@@ -296,9 +297,25 @@ const TraceMessages = React.forwardRef(function TraceMessages(
               (trace.metrics.first_token_ms ?? trace.metrics.total_time_ms ?? 0)
             }
           >
-            <Markdown className="markdown markdown-conversation-history">
-              {trace.error ? trace.error.message : trace.output?.value}
-            </Markdown>
+            {trace.error && !trace.output?.value ? (
+              <VStack alignItems="flex-start" spacing={2} paddingY={2}>
+                <Box
+                  fontSize={11}
+                  color="red.400"
+                  textTransform="uppercase"
+                  fontWeight="bold"
+                >
+                  Exception
+                </Box>
+                <Text color="red.900">{trace.error.message}</Text>
+              </VStack>
+            ) : trace.output?.value ? (
+              <Markdown className="markdown markdown-conversation-history">
+                {trace.output.value}
+              </Markdown>
+            ) : (
+              <Text paddingY={2}>{"<empty>"}</Text>
+            )}
           </Message>
         </Container>
       </Box>

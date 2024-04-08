@@ -12,13 +12,14 @@ from typing import (
     Tuple,
     TypeVar,
     Union,
+    cast,
 )
 
 from pydantic import BaseModel
 
 from langwatch.types import (
     ErrorCapture,
-    SpanOutput,
+    SpanInputOutput,
     TypedValueJson,
     TypedValueRaw,
     TypedValueText,
@@ -91,7 +92,9 @@ def list_get(l, i, default=None):
         return default
 
 
-def autoconvert_typed_values(value: Any) -> SpanOutput:
+def autoconvert_typed_values(value: Any) -> SpanInputOutput:
+    if type(value) == dict and "type" in value:
+        return cast(SpanInputOutput, value)
     if type(value) == str:
         return TypedValueText(type="text", value=value)
     else:

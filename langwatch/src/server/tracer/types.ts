@@ -52,14 +52,22 @@ interface TypedValueJson {
   value: JSONSerializable;
 }
 
-export type SpanInput =
+export interface GuardrailResult {
+  status: "processed" | "skipped" | "error";
+  passed: boolean;
+  score?: number | null;
+  details?: string | null;
+}
+
+interface TypedValueGuardrailResult {
+  type: "guardrail_result";
+  value: GuardrailResult;
+}
+
+export type SpanInputOutput =
   | TypedValueText
   | TypedValueChatMessages
-  | TypedValueJson
-  | TypedValueRaw;
-export type SpanOutput =
-  | TypedValueText
-  | TypedValueChatMessages
+  | TypedValueGuardrailResult
   | TypedValueJson
   | TypedValueRaw;
 
@@ -89,7 +97,15 @@ interface SpanTimestamps {
   finished_at: number;
 }
 
-type SpanTypes = "span" | "llm" | "chain" | "tool" | "agent" | "rag";
+type SpanTypes =
+  | "span"
+  | "llm"
+  | "chain"
+  | "tool"
+  | "agent"
+  | "rag"
+  | "guardrail"
+  | "unknown";
 
 export interface BaseSpan {
   span_id: string;
@@ -97,8 +113,8 @@ export interface BaseSpan {
   trace_id: string;
   type: SpanTypes;
   name?: string | null;
-  input?: SpanInput | null;
-  outputs: SpanOutput[];
+  input?: SpanInputOutput | null;
+  outputs: SpanInputOutput[];
   error?: ErrorCapture | null;
   timestamps: SpanTimestamps;
 }
@@ -124,20 +140,19 @@ export interface RAGSpan extends BaseSpan {
 
 export type Span = LLMSpan | RAGSpan | BaseSpan;
 
-type SpanInputValidator = SpanInput & { value: any };
-type SpanOutputValidator = SpanInput & { value: any };
+type SpanInputOutputValidator = SpanInputOutput & { value: any };
 
 export type SpanValidator = (
   | Omit<LLMSpan, "input" | "outputs">
   | Omit<RAGSpan, "input" | "outputs">
   | Omit<BaseSpan, "input" | "outputs">
 ) & {
-  input?: SpanInputValidator | null;
-  outputs: SpanOutputValidator[];
+  input?: SpanInputOutputValidator | null;
+  outputs: SpanInputOutputValidator[];
 };
 
 export type ElasticSearchInputOutput = {
-  type: SpanInput["type"];
+  type: SpanInputOutput["type"];
   value: string;
 };
 
@@ -154,22 +169,22 @@ export type ElasticSearchSpan = Omit<
 
 export const elasticSearchSpanToSpan = (esSpan: ElasticSearchSpan): Span => {
   const { input, outputs, ...rest } = esSpan;
-  const spanInput: SpanInput | null = input
+  const spanInput: SpanInputOutput | null = input
     ? elasticSearchToTypedValue(input)
     : null;
-  const spanOutputs: SpanOutput[] = outputs.map(elasticSearchToTypedValue);
+  const spanOutputs: SpanInputOutput[] = outputs.map(elasticSearchToTypedValue);
 
   return { ...rest, input: spanInput, outputs: spanOutputs };
 };
 
-const elasticSearchToTypedValue = (
+export const elasticSearchToTypedValue = (
   typed: ElasticSearchInputOutput
-): SpanInput | SpanOutput => {
+): SpanInputOutput => {
   try {
     return {
       type: typed.type,
       value: JSON.parse(typed.value),
-    };
+    } as any;
   } catch (e) {
     return {
       type: "raw",

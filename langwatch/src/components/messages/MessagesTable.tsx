@@ -25,6 +25,9 @@ import {
   Spacer,
   Table,
   TableContainer,
+  Tag,
+  TagLabel,
+  TagLeftIcon,
   Tbody,
   Td,
   Text,
@@ -38,7 +41,13 @@ import {
 import { useRouter } from "next/router";
 import numeral from "numeral";
 import { useEffect, useRef, useState } from "react";
-import { ChevronDown, ChevronLeft, ChevronRight, List } from "react-feather";
+import {
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  List,
+  Shield,
+} from "react-feather";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { Trace } from "~/server/tracer/types";
 import { getEvaluatorDefinitions } from "~/trace_checks/getEvaluator";
@@ -57,6 +66,7 @@ import { usePeriodSelector, PeriodSelector } from "../PeriodSelector";
 import { FilterToggle } from "../filters/FilterToggle";
 import { ToggleAnalytics, ToggleTableView } from "./HeaderButtons";
 import { useDrawer } from "../CurrentDrawer";
+import type { TraceWithGuardrail } from "./MessageCard";
 
 export function MessagesTable() {
   const router = useRouter();
@@ -140,8 +150,8 @@ export function MessagesTable() {
       name: string;
       sortable: boolean;
       width?: number;
-      render: (trace: Trace, index: number) => React.ReactNode;
-      value?: (trace: Trace) => string | number | Date;
+      render: (trace: TraceWithGuardrail, index: number) => React.ReactNode;
+      value?: (trace: TraceWithGuardrail) => string | number | Date;
     }
   > = {
     checked: {
@@ -230,10 +240,29 @@ export function MessagesTable() {
               })
             }
           >
-            <Tooltip label={trace.output?.value}>
-              <Text noOfLines={1} display="block" maxWidth="300px">
-                {trace.output?.value}
-              </Text>
+            <Tooltip
+              label={
+                trace.output?.value
+                  ? trace.output?.value
+                  : trace.lastGuardrail
+                  ? [trace.lastGuardrail.name, trace.lastGuardrail.details]
+                      .filter((x) => x)
+                      .join(": ")
+                  : undefined
+              }
+            >
+              {trace.output?.value ? (
+                <Text noOfLines={1} display="block" maxWidth="300px">
+                  {trace.output?.value}
+                </Text>
+              ) : trace.lastGuardrail ? (
+                <Tag colorScheme="green" paddingLeft={2}>
+                  <TagLeftIcon boxSize="16px" as={Shield} />
+                  <TagLabel>Blocked by Guardrail</TagLabel>
+                </Tag>
+              ) : (
+                <Text>{"<empty>"}</Text>
+              )}
             </Tooltip>
           </Td>
         ),

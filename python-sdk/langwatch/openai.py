@@ -6,8 +6,8 @@ from langwatch.tracer import BaseContextTracer
 from langwatch.types import (
     ChatMessage,
     ErrorCapture,
+    SpanInputOutput,
     SpanMetrics,
-    SpanOutput,
     TraceMetadata,
     TypedValueChatMessages,
     TypedValueText,
@@ -243,7 +243,7 @@ class OpenAICompletionTracer(BaseContextTracer):
 
     def build_trace(
         self,
-        outputs: List[SpanOutput],
+        outputs: List[SpanInputOutput],
         metrics: SpanMetrics,
         timestamps: SpanTimestamps,
         error: Optional[ErrorCapture],
@@ -481,7 +481,7 @@ class OpenAIChatCompletionTracer(BaseContextTracer):
 
     def build_trace(
         self,
-        outputs: List[SpanOutput],
+        outputs: List[SpanInputOutput],
         metrics: SpanMetrics,
         timestamps: SpanTimestamps,
         error: Optional[ErrorCapture],

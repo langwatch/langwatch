@@ -1,8 +1,19 @@
 import { z } from "zod";
 
+import type {
+  QueryDslBoolQuery,
+  SearchTotalHits,
+  Sort,
+} from "@elastic/elasticsearch/lib/api/types";
+import type { PrismaClient } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import similarity from "compute-cosine-similarity";
+import shuffle from "lodash/shuffle";
+import type { Session } from "next-auth";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
+import { evaluatorsSchema } from "../../../trace_checks/evaluators.zod.generated";
+import { evaluatePreconditions } from "../../../trace_checks/preconditions";
+import { checkPreconditionSchema } from "../../../trace_checks/types.generated";
 import {
   sharedFiltersInputSchema,
   type TracesPivot,
@@ -21,6 +32,8 @@ import {
   type ElasticSearchSpan,
   type Trace,
   type TraceCheck,
+  elasticSearchToTypedValue,
+  type GuardrailResult,
 } from "../../tracer/types";
 import {
   TeamRoleGroup,
@@ -28,17 +41,6 @@ import {
   checkUserPermissionForProject,
 } from "../permission";
 import { generateTracesPivotQueryConditions } from "./analytics/common";
-import type {
-  QueryDslBoolQuery,
-  SearchTotalHits,
-  Sort,
-} from "@elastic/elasticsearch/lib/api/types";
-import { checkPreconditionSchema } from "../../../trace_checks/types.generated";
-import { evaluatePreconditions } from "../../../trace_checks/preconditions";
-import { evaluatorsSchema } from "../../../trace_checks/evaluators.zod.generated";
-import shuffle from "lodash/shuffle";
-import type { PrismaClient } from "@prisma/client";
-import type { Session } from "next-auth";
 
 const tracesFilterInput = sharedFiltersInputSchema.extend({
   pageOffset: z.number().optional(),
@@ -606,11 +608,47 @@ const getAllForProject = async (
     },
   });
 
+  // Get the spans only for the empty output traces to check if they were stopped by a guardrail
+  const emptyOutputTraceIds = tracesResult.hits.hits
+    .map((hit) => hit._source!)
+    .filter((trace) => !trace.output?.value)
+    .map((trace) => trace.trace_id);
+  const spansByTraceId = await getSpansForTraceIds(
+    input.projectId,
+    emptyOutputTraceIds
+  );
+  const guardrailsSlugToName = Object.fromEntries(
+    (
+      await ctx.prisma.check.findMany({
+        where: {
+          projectId: input.projectId,
+        },
+        select: {
+          slug: true,
+          name: true,
+        },
+      })
+    ).map((guardrail) => [guardrail.slug, guardrail.name])
+  );
+
   const tracesById = Object.fromEntries(
     tracesResult.hits.hits
       .map((hit) => hit._source!)
       .filter((x) => x)
-      .map((trace) => [trace.trace_id, trace])
+      .map((trace) => {
+        const lastSpan = spansByTraceId[trace.trace_id]?.reverse()[0];
+        const lastGuardrail: (GuardrailResult & { name?: string }) | undefined =
+          lastSpan?.outputs
+            .filter((output) => output.type === "guardrail_result")
+            .map(elasticSearchToTypedValue)
+            .map((output) => ({
+              ...((output.value as GuardrailResult) || {}),
+              name: guardrailsSlugToName[lastSpan.name ?? ""],
+            }))
+            .filter((output) => !(output as GuardrailResult)?.passed)[0];
+        const trace_ = { ...trace, lastGuardrail };
+        return [trace.trace_id, trace_];
+      })
   );
 
   const traces = usePivotIndex
@@ -631,6 +669,39 @@ const getAllForProject = async (
     totalHits = (tracesResult.hits?.total as SearchTotalHits)?.value || 0;
   }
   return { groups, totalHits };
+};
+
+const getSpansForTraceIds = async (projectId: string, traceIds: string[]) => {
+  const spansForEmptyOutputTraces = await esClient.search<ElasticSearchSpan>({
+    index: SPAN_INDEX,
+    body: {
+      size: 10_000,
+      query: {
+        bool: {
+          filter: [
+            { term: { project_id: projectId } },
+            { terms: { trace_id: traceIds } },
+          ] as QueryDslBoolQuery["filter"],
+        } as QueryDslBoolQuery,
+      },
+    },
+    routing: traceIds
+      .map((traceId) => traceIndexId({ traceId, projectId: projectId }))
+      .join(","),
+  });
+  return spansForEmptyOutputTraces.hits.hits
+    .map((hit) => hit._source!)
+    .filter((x) => x)
+    .reduce(
+      (acc, span) => {
+        if (!acc[span.trace_id]) {
+          acc[span.trace_id] = [];
+        }
+        acc[span.trace_id]!.push(span);
+        return acc;
+      },
+      {} as Record<string, ElasticSearchSpan[]>
+    );
 };
 
 const getTracesWithSpans = async (projectId: string, traceIds: string[]) => {
@@ -680,10 +751,13 @@ const getTracesWithSpans = async (projectId: string, traceIds: string[]) => {
   return tracesWithSpans;
 };
 
-const groupTraces = (groupBy: string | undefined, traces: Trace[]) => {
-  const groups: Trace[][] = [];
+const groupTraces = <T extends Trace>(
+  groupBy: string | undefined,
+  traces: T[]
+) => {
+  const groups: T[][] = [];
 
-  const groupingKeyPresent = (trace: Trace) => {
+  const groupingKeyPresent = (trace: T) => {
     if (groupBy === "input") {
       return !!trace.input?.embeddings?.embeddings;
     }
@@ -700,7 +774,7 @@ const groupTraces = (groupBy: string | undefined, traces: Trace[]) => {
     return false;
   };
 
-  const matchesGroup = (trace: Trace, member: Trace) => {
+  const matchesGroup = (trace: T, member: T) => {
     if (groupBy === "input") {
       const similarityThreshold = 0.85;
       return (

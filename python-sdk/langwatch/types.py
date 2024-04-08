@@ -1,7 +1,9 @@
 from typing import Any, Dict, List, Literal, Optional, TypedDict, Union
 
 
-ChatRole = Literal["system", "user", "assistant", "function", "tool", "unknown"]
+ChatRole = Literal[
+    "system", "user", "assistant", "function", "tool", "guardrail", "unknown"
+]
 
 
 class FunctionCall(TypedDict, total=False):
@@ -32,6 +34,18 @@ class TypedValueText(TypedDict):
     value: str
 
 
+class GuardrailResult(TypedDict, total=False):
+    status: Literal["processed", "skipped", "error"]
+    passed: bool
+    score: Optional[float]
+    details: Optional[str]
+
+
+class TypedValueGuardrailResult(TypedDict):
+    type: Literal["guardrail_result"]
+    value: GuardrailResult
+
+
 class TypedValueRaw(TypedDict):
     type: Literal["raw"]
     value: str
@@ -50,10 +64,12 @@ class ErrorCapture(TypedDict):
     stacktrace: List[str]
 
 
-SpanInput = Union[TypedValueText, TypedValueChatMessages, TypedValueJson, TypedValueRaw]
-
-SpanOutput = Union[
-    TypedValueText, TypedValueChatMessages, TypedValueJson, TypedValueRaw
+SpanInputOutput = Union[
+    TypedValueText,
+    TypedValueChatMessages,
+    TypedValueJson,
+    TypedValueGuardrailResult,
+    TypedValueRaw,
 ]
 
 
@@ -76,7 +92,7 @@ class SpanTimestamps(TypedDict, total=False):
     finished_at: int
 
 
-SpanTypes = Literal["span", "llm", "chain", "tool", "agent", "rag"]
+SpanTypes = Literal["span", "llm", "chain", "tool", "agent", "guardrail", "rag"]
 
 
 class BaseSpan(TypedDict):
@@ -85,8 +101,8 @@ class BaseSpan(TypedDict):
     span_id: str
     parent_id: Optional[str]
     trace_id: str
-    input: Optional[SpanInput]
-    outputs: List[SpanOutput]
+    input: Optional[SpanInputOutput]
+    outputs: List[SpanInputOutput]
     error: Optional[ErrorCapture]
     timestamps: SpanTimestamps
 
@@ -98,8 +114,8 @@ class LLMSpan(TypedDict, total=False):
     trace_id: str
     vendor: str
     model: str
-    input: SpanInput
-    outputs: List[SpanOutput]
+    input: SpanInputOutput
+    outputs: List[SpanInputOutput]
     error: Optional[ErrorCapture]
     params: SpanParams
     metrics: SpanMetrics
@@ -118,8 +134,8 @@ class RAGSpan(TypedDict, total=False):
     span_id: str
     parent_id: Optional[str]
     trace_id: str
-    input: Optional[SpanInput]
-    outputs: List[SpanOutput]
+    input: Optional[SpanInputOutput]
+    outputs: List[SpanInputOutput]
     error: Optional[ErrorCapture]
     timestamps: SpanTimestamps
     contexts: List[RAGChunk]

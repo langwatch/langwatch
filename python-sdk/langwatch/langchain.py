@@ -17,9 +17,8 @@ from langwatch.types import (
     BaseSpan,
     ChatMessage,
     ChatRole,
-    SpanInput,
+    SpanInputOutput,
     SpanMetrics,
-    SpanOutput,
     SpanParams,
     SpanTimestamps,
     LLMSpan,
@@ -122,7 +121,7 @@ class LangChainTracer(BaseContextTracer, BaseCallbackHandler):
         serialized: Dict[str, Any],
         run_id: UUID,
         parent_run_id: Optional[UUID],
-        input: SpanInput,
+        input: SpanInputOutput,
         **kwargs: Any,
     ):
         params = SpanParams(
@@ -155,7 +154,7 @@ class LangChainTracer(BaseContextTracer, BaseCallbackHandler):
         if "timestamps" in span and span["timestamps"]:
             span["timestamps"]["finished_at"] = milliseconds_timestamp()
 
-        outputs: List[SpanOutput] = []
+        outputs: List[SpanInputOutput] = []
         for generations in response.generations:
             # TODO: why the twice loop? Can OpenAI generate multiple chat outputs?
             for g in generations:
@@ -243,7 +242,7 @@ class LangChainTracer(BaseContextTracer, BaseCallbackHandler):
         run_id: UUID,
         parent_run_id: Optional[UUID],
         name: Optional[str],
-        input: Optional[SpanInput],
+        input: Optional[SpanInputOutput],
     ) -> BaseSpan:
         return BaseSpan(
             type=type,
@@ -257,7 +256,7 @@ class LangChainTracer(BaseContextTracer, BaseCallbackHandler):
             timestamps=SpanTimestamps(started_at=milliseconds_timestamp()),
         )
 
-    def _end_base_span(self, run_id: UUID, outputs: List[SpanOutput]):
+    def _end_base_span(self, run_id: UUID, outputs: List[SpanInputOutput]):
         span = self.spans.get(str(run_id))
         if span == None:
             return
@@ -314,7 +313,7 @@ class LangChainTracer(BaseContextTracer, BaseCallbackHandler):
             run_id, outputs=[self._autoconvert_typed_values(finish.return_values)]
         )
 
-    def _autoconvert_typed_values(self, output: Any) -> SpanOutput:
+    def _autoconvert_typed_values(self, output: Any) -> SpanInputOutput:
         if isinstance(output, BaseMessage):
             return TypedValueChatMessages(
                 type="chat_messages", value=[langchain_message_to_chat_message(output)]

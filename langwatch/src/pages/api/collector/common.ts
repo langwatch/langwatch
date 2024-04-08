@@ -3,8 +3,7 @@ import type {
   LLMSpan,
   RAGSpan,
   Span,
-  SpanInput,
-  SpanOutput,
+  SpanInputOutput,
 } from "../../../server/tracer/types";
 
 export const getFirstInputAsText = (spans: Span[]): string => {
@@ -42,7 +41,7 @@ export const getLastOutputAsText = (spans: Span[]): string => {
 
 // TODO: test
 export const typedValueToText = (
-  typed: SpanInput | SpanOutput,
+  typed: SpanInputOutput,
   last = false
 ): string => {
   if (typed.type == "text") {

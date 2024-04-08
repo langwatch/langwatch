@@ -4,6 +4,7 @@ import threading
 from concurrent.futures import Future, ThreadPoolExecutor
 import time
 from typing import Any, Dict, List, Optional, TypeVar
+from warnings import warn
 
 import nanoid
 import requests
@@ -96,9 +97,9 @@ class ContextSpan:
             parent_id=self.parent.span_id if self.parent else None,  # TODO: test
             trace_id=context_tracer.trace_id,  # TODO: test
             input=autoconvert_typed_values(self.input) if self.input else None,
-            outputs=[autoconvert_typed_values(self.output)]
-            if self.output
-            else [],  # TODO test?
+            outputs=(
+                [autoconvert_typed_values(self.output)] if self.output else []
+            ),  # TODO test?
             error=error,  # TODO: test
             timestamps=SpanTimestamps(
                 started_at=self.started_at, finished_at=finished_at
@@ -170,6 +171,10 @@ def span(name: Optional[str] = None, type: SpanTypes = "span"):
         return wrapper
 
     return _span
+
+
+def get_current_tracer():
+    return getattr(_local_context, "current_tracer", None)
 
 
 executor = ThreadPoolExecutor(max_workers=10)
@@ -252,6 +257,7 @@ def send_spans(data: CollectorRESTParams):
     if len(data["spans"]) == 0:
         return
     if not langwatch.api_key:
+        warn("LANGWATCH_API_KEY is not set, LLMs traces will not be sent, go to https://langwatch.ai to set it up")
         return
     response = requests.post(
         langwatch.endpoint + "/api/collector",

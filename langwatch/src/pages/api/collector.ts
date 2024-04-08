@@ -16,8 +16,7 @@ import {
   type ElasticSearchTrace,
   type ErrorCapture,
   type Span,
-  type SpanInput,
-  type SpanOutput,
+  type SpanInputOutput,
   type Trace,
 } from "../../server/tracer/types";
 import {
@@ -89,9 +88,10 @@ export default async function handler(
     debug(
       "Invalid trace received",
       error,
-      JSON.stringify(req.body, null, "  ")
+      JSON.stringify(req.body, null, "  "),
+      { projectId: project.id }
     );
-    Sentry.captureException(error);
+    Sentry.captureException(error, { extra: { projectId: project.id } });
 
     const validationError = fromZodError(error as ZodError);
     return res.status(400).json({ error: validationError.message });
@@ -170,8 +170,10 @@ export default async function handler(
     try {
       spanValidatorSchema.parse(span);
     } catch (error) {
-      debug("Invalid span received", error, JSON.stringify(span, null, "  "));
-      Sentry.captureException(error);
+      debug("Invalid span received", error, JSON.stringify(span, null, "  "), {
+        projectId: project.id,
+      });
+      Sentry.captureException(error, { extra: { projectId: project.id } });
 
       const validationError = fromZodError(error as ZodError);
       return res
@@ -303,7 +305,7 @@ export default async function handler(
 }
 
 const typedValueToElasticSearch = (
-  typed: SpanInput | SpanOutput
+  typed: SpanInputOutput
 ): ElasticSearchInputOutput => {
   return {
     type: typed.type,

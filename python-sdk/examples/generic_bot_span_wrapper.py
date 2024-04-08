@@ -1,8 +1,6 @@
 import time
 from dotenv import load_dotenv
 
-from langwatch.types import LLMSpan, SpanInput
-
 load_dotenv()
 
 import chainlit as cl

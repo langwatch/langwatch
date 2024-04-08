@@ -35,14 +35,14 @@ import {
 } from "react-feather";
 import { useFilterParams } from "../../hooks/useFilterParams";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import type { Trace, TraceCheck } from "../../server/tracer/types";
+import type { TraceCheck } from "../../server/tracer/types";
 import { api } from "../../utils/api";
 import { getSingleQueryParam } from "../../utils/getSingleQueryParam";
-import { MessageCard } from "./MessageCard";
+import { PeriodSelector, usePeriodSelector } from "../PeriodSelector";
 import { FilterSidebar } from "../filters/FilterSidebar";
 import { FilterToggle } from "../filters/FilterToggle";
-import { PeriodSelector, usePeriodSelector } from "../PeriodSelector";
 import { ToggleAnalytics, ToggleTableView } from "./HeaderButtons";
+import { MessageCard, type TraceWithGuardrail } from "./MessageCard";
 
 export function MessagesList() {
   const { project } = useOrganizationTeamProject();
@@ -201,7 +201,7 @@ const ExpandableMessages = React.memo(
     checksMap,
   }: {
     project: Project;
-    traceGroups: Trace[][];
+    traceGroups: TraceWithGuardrail[][];
     checksMap: Record<string, TraceCheck[]> | undefined;
   }) {
     const [expandedGroups, setExpandedGroups] = useState<

@@ -14,19 +14,27 @@ import {
   Tag,
   Text,
   Tooltip,
-  VStack,
+  VStack
 } from "@chakra-ui/react";
 import type { Project } from "@prisma/client";
 import { formatDistanceToNow } from "date-fns";
 import NextLink from "next/link";
 import numeral from "numeral";
-import { CheckCircle, Clock, XCircle } from "react-feather";
+import { CheckCircle, Clock, Shield, XCircle } from "react-feather";
 import Markdown from "react-markdown";
-import type { Trace, TraceCheck } from "../../server/tracer/types";
+import type {
+  GuardrailResult,
+  Trace,
+  TraceCheck,
+} from "../../server/tracer/types";
 import { api } from "../../utils/api";
 import { formatMilliseconds } from "../../utils/formatMilliseconds";
 import { getColorForString } from "../../utils/rotatingColors";
 import { CheckPassing } from "../CheckPassing";
+
+export type TraceWithGuardrail = Trace & {
+  lastGuardrail: (GuardrailResult & { name?: string }) | undefined;
+};
 
 export function MessageCard({
   linkActive,
@@ -36,7 +44,7 @@ export function MessageCard({
 }: {
   linkActive: boolean;
   project: Project;
-  trace: Trace;
+  trace: TraceWithGuardrail;
   checksMap: Record<string, TraceCheck[]> | undefined;
 }) {
   const traceChecks = checksMap ? checksMap[trace.trace_id] ?? [] : [];
@@ -85,7 +93,7 @@ export function MessageCard({
               }}
             >
               <Text noOfLines={1} wordBreak="break-all">
-                {getSlicedInput(trace)}
+                {getExtractedInput(trace)}
               </Text>
             </LinkOverlay>
           </Box>
@@ -117,6 +125,34 @@ export function MessageCard({
                 <Markdown className="markdown">
                   {getSlicedOutput(trace)}
                 </Markdown>
+              ) : trace.lastGuardrail ? (
+                <HStack
+                  align="start"
+                  border="1px solid"
+                  borderColor="gray.300"
+                  borderRadius={6}
+                  padding={4}
+                  spacing={4}
+                >
+                  <HStack>
+                    <Box
+                      color="green.700"
+                      background="green.100"
+                      borderRadius="100%"
+                      padding="6px"
+                    >
+                      <Shield size="26px" />
+                    </Box>
+                  </HStack>
+                  <VStack align="start">
+                    <Text>Blocked by Guardrail</Text>
+                    <Text fontSize={13}>
+                      {trace.lastGuardrail.details
+                        ? trace.lastGuardrail.details
+                        : trace.lastGuardrail.name}
+                    </Text>
+                  </VStack>
+                </HStack>
               ) : (
                 <Text>{"<empty>"}</Text>
               )}
@@ -287,7 +323,7 @@ export function MessageCard({
   );
 }
 
-const getSlicedInput = (trace: Trace) => {
+export const getExtractedInput = (trace: Trace) => {
   const input = trace.input;
 
   let value = input.value;
