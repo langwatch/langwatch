@@ -61,8 +61,13 @@ export const typedValueToText = (
     try {
       const json = typed.value as any;
       if (json.text) {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-return
         return json.text;
+      }
+      if (json.input) {
+        return json.input;
+      }
+      if (json.question) {
+        return json.question;
       }
       return JSON.stringify(typed.value);
     } catch (_e) {

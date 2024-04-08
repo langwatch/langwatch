@@ -67,6 +67,7 @@ import { FilterToggle } from "../filters/FilterToggle";
 import { ToggleAnalytics, ToggleTableView } from "./HeaderButtons";
 import { useDrawer } from "../CurrentDrawer";
 import type { TraceWithGuardrail } from "./MessageCard";
+import { titleCase } from "../../utils/stringCasing";
 
 export function MessagesTable() {
   const router = useRouter();
@@ -406,23 +407,27 @@ export function MessagesTable() {
                     })
                   }
                 >
-                  {traceCheck?.status === "processed" ? (
-                    <Text color={checkStatusColorMap(traceCheck)}>
-                      {evaluator?.isGuardrail
-                        ? traceCheck.passed
-                          ? "Passed"
-                          : "Failed"
-                        : traceCheck.score !== undefined
-                        ? numeral(traceCheck.score).format("0.[00]")
-                        : "N/A"}
-                    </Text>
-                  ) : (
-                    <Text
-                      color={traceCheck ? checkStatusColorMap(traceCheck) : ""}
-                    >
-                      {traceCheck?.status ?? "-"}
-                    </Text>
-                  )}
+                  <Tooltip label={traceCheck?.details}>
+                    {traceCheck?.status === "processed" ? (
+                      <Text color={checkStatusColorMap(traceCheck)}>
+                        {evaluator?.isGuardrail
+                          ? traceCheck.passed
+                            ? "Passed"
+                            : "Failed"
+                          : traceCheck.score !== undefined
+                          ? numeral(traceCheck.score).format("0.[00]")
+                          : "N/A"}
+                      </Text>
+                    ) : (
+                      <Text
+                        color={
+                          traceCheck ? checkStatusColorMap(traceCheck) : ""
+                        }
+                      >
+                        {titleCase(traceCheck?.status ?? "-")}
+                      </Text>
+                    )}
+                  </Tooltip>
                 </Td>
               );
             },
