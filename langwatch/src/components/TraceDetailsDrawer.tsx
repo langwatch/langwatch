@@ -70,8 +70,21 @@ export const TraceDetailsDrawer = (props: TraceDetailsDrawerProps) => {
     if (!totalChecks)
       return (
         <Text>
-          No evaluations ran for this message. Setup evaluations{" "}
-          <Link href={`/${project?.slug}/evaluations`}>here.</Link>
+          No evaluations ran for this message.
+          {anyGuardrails ? (
+            " Evaluations are skipped if guardrails completely blocked the message."
+          ) : (
+            <>
+              Setup evaluations{" "}
+              <Link
+                href={`/${project?.slug}/evaluations`}
+                textDecoration="underline"
+              >
+                here
+              </Link>
+              .
+            </>
+          )}
         </Text>
       );
     return (
@@ -96,8 +109,14 @@ export const TraceDetailsDrawer = (props: TraceDetailsDrawerProps) => {
     if (!totalChecks)
       return (
         <Text>
-          No evaluations ran for this message. Setup evaluations{" "}
-          <Link href={`/${project?.slug}/evaluations`}>here.</Link>
+          No guardrails ran for this message. Setup guardrails{" "}
+          <Link
+            href={`/${project?.slug}/evaluations`}
+            textDecoration="underline"
+          >
+            here
+          </Link>
+          .
         </Text>
       );
     return (
