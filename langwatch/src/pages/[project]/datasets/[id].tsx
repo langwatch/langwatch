@@ -23,10 +23,12 @@ import { DatabaseSchema } from "@prisma/client";
 import { useRouter } from "next/router";
 import Parse from "papaparse";
 import { AddDatasetDrawer } from "~/components/AddDatasetDrawer";
+import { BatchEvaluationDrawer } from "~/components/BatchEvaluationDrawer";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { displayName } from "~/utils/datasets";
+import { Play } from "react-feather";
 
 export default function Dataset() {
   const router = useRouter();
@@ -224,8 +226,9 @@ export default function Dataset() {
               onOpen();
             }}
             minWidth="fit-content"
+            leftIcon={<Play height={16} />}
           >
-            + Create New Dataset
+            Batch Evaluation
           </Button>
         </HStack>
         <Card>
@@ -273,7 +276,7 @@ export default function Dataset() {
           </CardBody>
         </Card>
       </Container>
-      <AddDatasetDrawer
+      <BatchEvaluationDrawer
         isOpen={isOpen}
         onClose={onClose}
         onSuccess={onSuccess}
