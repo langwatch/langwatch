@@ -53,9 +53,15 @@ export default function Dataset() {
       schema === DatabaseSchema.STRING_I_O ||
       schema === DatabaseSchema.LLM_CHAT_CALL
     ) {
-      headers = ["Input", "Output", "Created at", "Updated at"];
+      headers = ["Input", "Expected Output", "Created at", "Updated at"];
     } else if (schema === DatabaseSchema.FULL_TRACE) {
-      headers = ["Input", "Output", "Spans", "Created at", "Updated at"];
+      headers = [
+        "Input",
+        "Expected Output",
+        "Spans",
+        "Created at",
+        "Updated at",
+      ];
     }
 
     return (
@@ -140,9 +146,15 @@ export default function Dataset() {
       schema === DatabaseSchema.STRING_I_O ||
       schema === DatabaseSchema.LLM_CHAT_CALL
     ) {
-      fields = ["Input", "Output", "Created at", "Updated at"];
+      fields = ["Input", "Expected Output", "Created at", "Updated at"];
     } else if (schema === DatabaseSchema.FULL_TRACE) {
-      fields = ["Input", "Output", "Spans", "Created at", "Updated at"];
+      fields = [
+        "Input",
+        "Expected Output",
+        "Spans",
+        "Created at",
+        "Updated at",
+      ];
     }
 
     type CsvDataRow =
