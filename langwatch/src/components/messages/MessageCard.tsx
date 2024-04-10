@@ -361,7 +361,13 @@ export function MessageCard({
                     <XCircle />
                   )}
                 </Box>
-                {evaluationsPasses}/{totalEvaluations} evaluations
+                {evaluationsDone && evaluationsPasses != totalEvaluations
+                  ? `${totalEvaluations - evaluationsPasses} ${
+                      totalEvaluations - evaluationsPasses == 1
+                        ? "evaluation failed"
+                        : "evaluations failed"
+                    }`
+                  : `${evaluationsPasses}/${totalEvaluations} evaluations`}
               </Tag>
             </PopoverTrigger>
             <Portal>

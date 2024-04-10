@@ -184,6 +184,7 @@ model Check {
     name          String
     slug          String
     enabled       Boolean  @default(true)
+    isGuardrail   Boolean  @default(false)
     preconditions Json
     parameters    Json
     sample        Float    @default(1.0)

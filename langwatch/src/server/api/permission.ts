@@ -7,6 +7,7 @@ import { TRPCError } from "@trpc/server";
 import type { Session } from "next-auth";
 
 export const teamRolePermissionMapping = {
+  SETUP_PROJECT: [TeamUserRole.ADMIN, TeamUserRole.MEMBER],
   ANALYTICS_VIEW: [
     TeamUserRole.ADMIN,
     TeamUserRole.MEMBER,

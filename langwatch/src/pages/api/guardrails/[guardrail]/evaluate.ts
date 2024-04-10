@@ -92,6 +92,14 @@ export default async function handler(
     return res.status(404).json({ message: "Guardrail not found" });
   }
 
+  if (!guardrail.enabled || !guardrail.isGuardrail) {
+    return res.status(200).json({
+      status: "skipped",
+      passed: true,
+      details: "Guardrail is not enabled",
+    });
+  }
+
   let params: GuardrailRESTParams;
   try {
     params = guardrailInputSchema.parse(req.body);
@@ -157,7 +165,10 @@ export default async function handler(
       output: output ? output : undefined,
       contexts: contextList,
       expected_output: expected_output ? expected_output : undefined,
-      settings,
+      settings: {
+        ...((guardrail.parameters as object) ?? {}),
+        ...(settings ?? {}),
+      },
     });
   } catch (error) {
     result = {
