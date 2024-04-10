@@ -52,6 +52,7 @@ import DynamicZodForm from "./DynamicZodForm";
 import { EvaluatorSelection } from "./EvaluatorSelection";
 import { PreconditionsField } from "./PreconditionsField";
 import { TryItOut } from "./TryItOut";
+import { GuardrailIntegration } from "./GuardrailIntegration";
 
 export interface CheckConfigFormData {
   name: string;
@@ -337,89 +338,10 @@ export default function CheckConfigForm({
                   )}
 
                   {isGuardrail && (
-                    <VStack spacing={4} align="start" width="full">
-                      <Heading
-                        as="h4"
-                        fontSize={16}
-                        fontWeight={500}
-                        paddingTop={4}
-                      >
-                        Guardrail Integration
-                      </Heading>
-                      <Text>
-                        Follow the code example below to integrate this
-                        guardrail in your LLM pipeline, save changes first for
-                        the guardrail to work.
-                      </Text>
-                      <Tabs width="full">
-                        <TabList marginBottom={4}>
-                          <Tab>Python</Tab>
-                          <Tab>Python (Async)</Tab>
-                          {/* <Tab>REST API</Tab> */}
-                        </TabList>
-
-                        <TabPanels>
-                          <TabPanel padding={0}>
-                            <VStack align="start" width="full" spacing={3}>
-                              <Text fontSize={14}>
-                                Add this import at the top of the file where the
-                                LLM call happens:
-                              </Text>
-                              <Box className="markdown" width="full">
-                                <RenderCode
-                                  code={`import langwatch.guardrails `}
-                                  language="python"
-                                />
-                              </Box>
-                              <Text fontSize={14}>
-                                Then, right before calling your LLM, check for
-                                the guardrail:
-                              </Text>
-                              <Box className="markdown" width="full">
-                                <RenderCode
-                                  code={`guardrail = langwatch.guardrails.evaluate(
-  "${slug}", input=user_input
-)
-if not guardrail.passed:
-  # handle the guardrail here
-  return "I'm sorry, I can't do that."`}
-                                  language="python"
-                                />
-                              </Box>
-                            </VStack>
-                          </TabPanel>
-                          <TabPanel padding={0}>
-                            <VStack align="start" width="full" spacing={3}>
-                              <Text fontSize={14}>
-                                Add this import at the top of the file where the
-                                LLM call happens:
-                              </Text>
-                              <Box className="markdown" width="full">
-                                <RenderCode
-                                  code={`import langwatch.guardrails `}
-                                  language="python"
-                                />
-                              </Box>
-                              <Text fontSize={14}>
-                                Then, right before calling your LLM, check for
-                                the guardrail:
-                              </Text>
-                              <Box className="markdown" width="full">
-                                <RenderCode
-                                  code={`guardrail = await langwatch.guardrails.async_evaluate(
-  "${slug}", input=user_input
-)
-if not guardrail.passed:
-  # handle the guardrail here
-  return "I'm sorry, I can't do that."`}
-                                  language="python"
-                                />
-                              </Box>
-                            </VStack>
-                          </TabPanel>
-                        </TabPanels>
-                      </Tabs>
-                    </VStack>
+                    <GuardrailIntegration
+                      slug={slug}
+                      evaluatorDefinition={evaluatorDefinition!}
+                    />
                   )}
                 </VStack>
               </CardBody>
