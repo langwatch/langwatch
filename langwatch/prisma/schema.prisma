@@ -135,17 +135,17 @@ model Organization {
 }
 
 model Project {
-    id           String   @id @default(nanoid())
+    id           String        @id @default(nanoid())
     name         String
-    slug         String   @unique
-    apiKey       String   @unique
+    slug         String        @unique
+    apiKey       String        @unique
     teamId       String
-    team         Team     @relation(fields: [teamId], references: [id])
+    team         Team          @relation(fields: [teamId], references: [id])
     language     String
     framework    String
-    firstMessage Boolean  @default(false)
-    createdAt    DateTime @default(now())
-    updatedAt    DateTime @default(now()) @updatedAt
+    firstMessage Boolean       @default(false)
+    createdAt    DateTime      @default(now())
+    updatedAt    DateTime      @default(now()) @updatedAt
     checks       Check[]
     costs        Cost[]
     topics       Topic[]
@@ -198,12 +198,14 @@ enum CostType {
     TRACE_CHECK
     GUARDRAIL
     CLUSTERING
+    BATCH_PROCESSING
 }
 
 enum CostReferenceType {
     CHECK
     TRACE
     PROJECT
+    BATCH
 }
 
 model Cost {
@@ -254,15 +256,15 @@ enum DatabaseSchema {
 }
 
 model Dataset {
-    id        String   @id @default(nanoid())
-    projectId String
-    project   Project  @relation(fields: [projectId], references: [id])
-    name      String
-    slug      String
-    schema    DatabaseSchema
-    createdAt DateTime @default(now())
-    updatedAt DateTime @default(now()) @updatedAt
-    datasetRecords  DatasetRecord[]
+    id             String          @id @default(nanoid())
+    projectId      String
+    project        Project         @relation(fields: [projectId], references: [id])
+    name           String
+    slug           String
+    schema         DatabaseSchema
+    createdAt      DateTime        @default(now())
+    updatedAt      DateTime        @default(now()) @updatedAt
+    datasetRecords DatasetRecord[]
 
     @@unique([projectId, slug])
 }
@@ -284,6 +286,23 @@ model CustomGraph {
     project   Project  @relation(fields: [projectId], references: [id])
     name      String
     graph     Json
+    createdAt DateTime @default(now())
+    updatedAt DateTime @default(now()) @updatedAt
+
+    @@unique([id])
+}
+
+model BatchProcessing {
+    id        String   @id @default(nanoid())
+    batchId   String
+    projectId String
+    status    String
+    score     Float
+    passed    Boolean
+    details   String
+    cost      Float
+    name      String
+    slug      String
     createdAt DateTime @default(now())
     updatedAt DateTime @default(now()) @updatedAt
 
