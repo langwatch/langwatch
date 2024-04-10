@@ -9,6 +9,7 @@ import {
   OrganizationRoleGroup,
   TeamRoleGroup,
   checkUserPermissionForOrganization,
+  checkUserPermissionForProject,
   checkUserPermissionForTeam,
 } from "../permission";
 
@@ -122,6 +123,26 @@ export const projectRouter = createTRPCRouter({
       });
 
       return { success: true, projectSlug: project.slug };
+    }),
+  getProjectAPIKey: protectedProcedure
+    .input(z.object({ projectId: z.string() }))
+    .use(checkUserPermissionForProject(TeamRoleGroup.SETUP_PROJECT))
+    .query(async ({ input, ctx }) => {
+      const prisma = ctx.prisma;
+
+      const project = await prisma.project.findUnique({
+        where: { id: input.projectId },
+        select: { apiKey: true },
+      });
+
+      if (!project) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Project not found",
+        });
+      }
+
+      return project;
     }),
 });
 

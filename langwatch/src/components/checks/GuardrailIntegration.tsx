@@ -1,22 +1,21 @@
 import {
   Box,
-  Heading,
-  VStack,
-  Tab,
-  Tabs,
-  TabList,
-  TabPanels,
-  Text,
-  TabPanel,
-  Tag,
   HStack,
+  Heading,
+  Tab,
+  TabList,
+  TabPanel,
+  TabPanels,
+  Tabs,
+  Tag,
+  Text,
+  VStack,
 } from "@chakra-ui/react";
+import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
+import type { AVAILABLE_EVALUATORS } from "../../trace_checks/evaluators.generated";
+import { api } from "../../utils/api";
 import { RenderCode } from "../integration-guides/utils/RenderCode";
-import type {
-  AVAILABLE_EVALUATORS,
-  EvaluatorTypes,
-  Evaluators,
-} from "../../trace_checks/evaluators.generated";
+import { langwatchEndpoint } from "../integration-guides/utils/langwatchEndpointEnv";
 
 export function GuardrailIntegration({
   slug,
@@ -25,43 +24,89 @@ export function GuardrailIntegration({
   slug: string;
   evaluatorDefinition: (typeof AVAILABLE_EVALUATORS)[keyof typeof AVAILABLE_EVALUATORS];
 }) {
-  const contextsParams = evaluatorDefinition.requiredFields.includes("contexts")
-    ? `\n    contexts=["retrieved snippet 1", "retrieved snippet 2"],`
-    : evaluatorDefinition.optionalFields.includes("contexts")
-    ? `\n    contexts=["retrieved snippet 1", "retrieved snippet 2"], # optional`
-    : "";
-  const inputParams = evaluatorDefinition.requiredFields.includes("input")
-    ? `\n    input=user_input,`
-    : evaluatorDefinition.optionalFields.includes("input")
-    ? `\n    input=user_input, # optional`
-    : "";
+  const { project } = useOrganizationTeamProject();
   const isOutputMandatory =
     evaluatorDefinition.requiredFields.includes("output");
   const isOutputOptional =
     evaluatorDefinition.optionalFields.includes("output");
+  const projectAPIKey = api.project.getProjectAPIKey.useQuery(
+    {
+      projectId: project?.id ?? "",
+    },
+    {
+      enabled: !!project,
+    }
+  );
 
-  const PythonInstructions = ({ async }: { async: boolean }) => (
-    <VStack align="start" width="full" spacing={3}>
-      <Text fontSize={14}>
-        Add this import at the top of the file where the LLM call happens:
-      </Text>
-      <Box className="markdown" width="full">
-        <RenderCode code={`import langwatch.guardrails `} language="python" />
-      </Box>
-      {!isOutputMandatory && (
-        <>
+  const PythonInstructions = ({ async }: { async: boolean }) => {
+    const contextsParams = evaluatorDefinition.requiredFields.includes(
+      "contexts"
+    )
+      ? `\n    contexts=["retrieved snippet 1", "retrieved snippet 2"],`
+      : evaluatorDefinition.optionalFields.includes("contexts")
+      ? `\n    contexts=["retrieved snippet 1", "retrieved snippet 2"], # optional`
+      : "";
+    const inputParams = evaluatorDefinition.requiredFields.includes("input")
+      ? `\n    input=user_input,`
+      : evaluatorDefinition.optionalFields.includes("input")
+      ? `\n    input=user_input, # optional`
+      : "";
+
+    return (
+      <VStack align="start" width="full" spacing={3}>
+        <Text fontSize={14}>
+          Add this import at the top of the file where the LLM call happens:
+        </Text>
+        <Box className="markdown" width="full">
+          <RenderCode code={`import langwatch.guardrails `} language="python" />
+        </Box>
+        {!isOutputMandatory && (
+          <>
+            <Text fontSize={14}>
+              Then, right before calling your LLM, check for the guardrail:
+            </Text>
+            <Box className="markdown" width="full">
+              <RenderCode
+                code={`guardrail = ${
+                  async
+                    ? "await langwatch.guardrails.async_evaluate"
+                    : "langwatch.guardrails.evaluate"
+                }(
+    "${slug}",
+    input=user_input,${contextsParams}
+)
+if not guardrail.passed:
+    # handle the guardrail here
+    return "I'm sorry, I can't do that."`}
+                language="python"
+              />
+            </Box>
+          </>
+        )}
+        {isOutputMandatory && (
           <Text fontSize={14}>
-            Then, right before calling your LLM, check for the guardrail:
+            Then, after generating the response from the LLM, check for the
+            guardrail:
           </Text>
+        )}
+        {isOutputOptional && (
+          <Text fontSize={14}>
+            (Optional) You can instead check for the guardrail <i>after</i>{" "}
+            generating the response from the LLM, to validate the output:
+          </Text>
+        )}
+        {(isOutputMandatory || isOutputOptional) && (
           <Box className="markdown" width="full">
             <RenderCode
-              code={`guardrail = ${
+              code={`result = completion.choices[0].message
+
+guardrail = ${
                 async
                   ? "await langwatch.guardrails.async_evaluate"
                   : "langwatch.guardrails.evaluate"
               }(
-    "${slug}",
-    input=user_input,${contextsParams}
+    "${slug}",${inputParams}
+    output=result,${contextsParams}
 )
 if not guardrail.passed:
     # handle the guardrail here
@@ -69,42 +114,10 @@ if not guardrail.passed:
               language="python"
             />
           </Box>
-        </>
-      )}
-      {isOutputMandatory && (
-        <Text fontSize={14}>
-          Then, after generating the response from the LLM, check for the
-          guardrail:
-        </Text>
-      )}
-      {isOutputOptional && (
-        <Text fontSize={14}>
-          (Optional) You can check for the guardrail after generating the
-          response from the LLM instead, to validate the output:
-        </Text>
-      )}
-      {(isOutputMandatory || isOutputOptional) && (
-        <Box className="markdown" width="full">
-          <RenderCode
-            code={`result = completion.choices[0].message
-
-guardrail = ${
-              async
-                ? "await langwatch.guardrails.async_evaluate"
-                : "langwatch.guardrails.evaluate"
-            }(
-    "${slug}",${inputParams}
-    output=result,${contextsParams}
-)
-if not guardrail.passed:
-    # handle the guardrail here
-    return "I'm sorry, I can't do that."`}
-            language="python"
-          />
-        </Box>
-      )}
-    </VStack>
-  );
+        )}
+      </VStack>
+    );
+  };
 
   return (
     <VStack spacing={4} align="start" width="full">
@@ -133,7 +146,7 @@ if not guardrail.passed:
         <TabList marginBottom={4}>
           <Tab>Python</Tab>
           <Tab>Python (Async)</Tab>
-          {/* <Tab>REST API</Tab> */}
+          <Tab>Curl</Tab>
         </TabList>
 
         <TabPanels>
@@ -142,6 +155,53 @@ if not guardrail.passed:
           </TabPanel>
           <TabPanel padding={0}>
             <PythonInstructions async={true} />
+          </TabPanel>
+          <TabPanel padding={0}>
+            <VStack align="start" width="full" spacing={3}>
+              <Box className="markdown" width="full">
+                <RenderCode
+                  code={`# Set your API key and endpoint URL
+API_KEY="${projectAPIKey.data?.apiKey ?? "your_langwatch_api_key"}"
+
+# Use curl to send the POST request, e.g.:
+curl -X POST "${langwatchEndpoint()}/api/guardrails/${slug}/evaluate" \\
+     -H "X-Auth-Token: $API_KEY" \\
+     -H "Content-Type: application/json" \\
+     -d @- <<EOF
+{
+  "trace_id": "trace-123",
+  "data": {
+    ${evaluatorDefinition.requiredFields
+      .map((field) => `"${field}": "${field} content"`)
+      .concat(
+        evaluatorDefinition.optionalFields.map(
+          (field) => `"${field}": "${field} content (optional)"`
+        )
+      )
+      .join(",\n    ")}
+  }
+}
+EOF`}
+                  language="bash"
+                />
+              </Box>
+              <Text>Response:</Text>
+              <Box className="markdown" width="full">
+                <RenderCode
+                  code={JSON.stringify(
+                    {
+                      status: "processed",
+                      passed: true,
+                      score: 1,
+                      details: "possible explanation",
+                    },
+                    null,
+                    2
+                  )}
+                  language="json"
+                />
+              </Box>
+            </VStack>
           </TabPanel>
         </TabPanels>
       </Tabs>
