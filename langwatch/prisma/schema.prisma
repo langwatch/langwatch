@@ -135,22 +135,23 @@ model Organization {
 }
 
 model Project {
-    id           String        @id @default(nanoid())
-    name         String
-    slug         String        @unique
-    apiKey       String        @unique
-    teamId       String
-    team         Team          @relation(fields: [teamId], references: [id])
-    language     String
-    framework    String
-    firstMessage Boolean       @default(false)
-    createdAt    DateTime      @default(now())
-    updatedAt    DateTime      @default(now()) @updatedAt
-    checks       Check[]
-    costs        Cost[]
-    topics       Topic[]
-    datasets     Dataset[]
-    customGraphs CustomGraph[]
+    id               String            @id @default(nanoid())
+    name             String
+    slug             String            @unique
+    apiKey           String            @unique
+    teamId           String
+    team             Team              @relation(fields: [teamId], references: [id])
+    language         String
+    framework        String
+    firstMessage     Boolean           @default(false)
+    createdAt        DateTime          @default(now())
+    updatedAt        DateTime          @default(now()) @updatedAt
+    checks           Check[]
+    costs            Cost[]
+    topics           Topic[]
+    datasets         Dataset[]
+    customGraphs     CustomGraph[]
+    batchProcessings BatchProcessing[]
 
     @@index([teamId])
 }
@@ -183,8 +184,8 @@ model Check {
     checkType     String
     name          String
     slug          String
-    enabled       Boolean  @default(true)
     isGuardrail   Boolean  @default(false)
+    enabled       Boolean  @default(true)
     preconditions Json
     parameters    Json
     sample        Float    @default(1.0)
@@ -294,18 +295,19 @@ model CustomGraph {
 }
 
 model BatchProcessing {
-    id        String   @id @default(nanoid())
-    batchId   String
-    projectId String
-    status    String
-    score     Float
-    passed    Boolean
-    details   String
-    cost      Float
-    name      String
-    slug      String
-    createdAt DateTime @default(now())
-    updatedAt DateTime @default(now()) @updatedAt
+    id          String   @id @default(nanoid())
+    batchId     String
+    projectId   String
+    project     Project  @relation(fields: [projectId], references: [id])
+    status      String
+    score       Float
+    passed      Boolean
+    details     String
+    cost        Float
+    datasetSlug String
+    evaluation  String
+    createdAt   DateTime @default(now())
+    updatedAt   DateTime @default(now()) @updatedAt
 
     @@unique([id])
 }

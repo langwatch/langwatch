@@ -4,29 +4,27 @@ import { prisma } from "../../../server/db"; // Adjust the import based on your 
 
 import { getDebugger } from "../../../utils/logger";
 
-import { CostReferenceType, CostType, type Check } from "@prisma/client";
+import { CostReferenceType, CostType } from "@prisma/client";
+import * as Sentry from "@sentry/nextjs";
 import { nanoid } from "nanoid";
 import { z } from "zod";
 import { env } from "../../../env.mjs";
-import { updateCheckStatusInES } from "../../../server/background/queues/traceChecksQueue";
 import { rAGChunkSchema } from "../../../server/tracer/types.generated";
 import type {
   BatchEvaluationResult,
   EvaluationResult,
   EvaluationResultError,
   EvaluationResultSkipped,
-  EvaluatorTypes,
   SingleEvaluationResult,
 } from "../../../trace_checks/evaluators.generated";
-import { evaluatorsSchema } from "../../../trace_checks/evaluators.zod.generated";
-import { getEvaluatorDefinitions } from "../../../trace_checks/getEvaluator";
 import { extractChunkTextualContent } from "../collector/rag";
-import * as Sentry from "@sentry/nextjs";
 
 export const debug = getDebugger("langwatch:guardrail:evaluate");
 
-export const evaluatoinInputSchema = z.object({
-  evaluation_slug: z.string(),
+export const evaluationInputSchema = z.object({
+  evaluation: z.string(),
+  batchId: z.string(),
+  datasetSlug: z.string(),
   data: z.object({
     input: z.string().optional().nullable(),
     output: z.string().optional().nullable(),
@@ -39,7 +37,7 @@ export const evaluatoinInputSchema = z.object({
   settings: z.object({}).passthrough().optional().nullable(),
 });
 
-export type EvaluationRESTParams = z.infer<typeof evaluatoinInputSchema>;
+export type EvaluationRESTParams = z.infer<typeof evaluationInputSchema>;
 
 type EvalResult = (
   | EvaluationResult
@@ -79,7 +77,7 @@ export default async function handler(
 
   let params: EvaluationRESTParams;
   try {
-    params = evaluatoinInputSchema.parse(req.body);
+    params = evaluationInputSchema.parse(req.body);
   } catch (error) {
     debug(
       "Invalid evalution data received",
@@ -94,7 +92,7 @@ export default async function handler(
   }
 
   const { input, output, contexts, expected_output } = params.data;
-  const evaluation_slug = params.evaluation_slug;
+  const { evaluation, batchId, datasetSlug } = params;
 
   const contextList = contexts
     ?.map((context) => {
@@ -113,7 +111,7 @@ export default async function handler(
       output: output ? output : undefined,
       contexts: contextList,
       expected_output: expected_output ? expected_output : undefined,
-      evalution_slug: evaluation_slug,
+      evalution: evaluation,
     });
   } catch (error) {
     result = {
@@ -124,21 +122,36 @@ export default async function handler(
     };
   }
 
-  //TODO: "TABLE ID";
   if ("cost" in result && result.cost) {
     await prisma.cost.create({
       data: {
         id: `cost_${nanoid()}`,
         projectId: project.id,
         costType: CostType.BATCH_PROCESSING,
-        costName: evaluation_slug,
+        costName: evaluation,
         referenceType: CostReferenceType.BATCH,
-        referenceId: guardrail.id,
+        referenceId: params.batchId,
         amount: result.cost.amount,
         currency: result.cost.currency,
       },
     });
   }
+
+  const { score, passed, details, cost, status } = result as EvaluationResult;
+  await prisma.batchProcessing.create({
+    data: {
+      id: nanoid(),
+      batchId: batchId,
+      projectId: project.id,
+      status: status,
+      score: score,
+      passed: passed ?? false,
+      details: details ?? "",
+      cost: cost?.amount ?? 0,
+      evaluation: evaluation,
+      datasetSlug: datasetSlug,
+    },
+  });
 
   const evalutionResult: EvalResult =
     result.status === "error"
@@ -167,16 +180,16 @@ const runEvaluation = async ({
   output,
   contexts,
   expected_output,
-  evalution_slug,
+  evalution,
 }: {
   input?: string;
   output?: string;
   contexts?: string[];
   expected_output?: string;
-  evalution_slug: string;
+  evalution: string;
 }) => {
   const response = await fetch(
-    `${env.LANGEVALS_ENDPOINT}/${evalution_slug}/evaluate`,
+    `${env.LANGEVALS_ENDPOINT}/${evalution}/evaluate`,
     {
       method: "POST",
       headers: {
