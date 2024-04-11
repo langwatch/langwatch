@@ -1,4 +1,5 @@
 import {
+  Box,
   Button,
   FormLabel,
   HStack,
@@ -22,9 +23,11 @@ import type {
   Evaluators,
 } from "../../trace_checks/evaluators.generated";
 import { getEvaluatorDefinitions } from "../../trace_checks/getEvaluator";
-import { camelCaseToTitleCase } from "../../utils/stringCasing";
+import { camelCaseToTitleCase, titleCase } from "../../utils/stringCasing";
 import { HorizontalFormControl } from "../HorizontalFormControl";
 import type { CheckConfigFormData } from "./CheckConfigForm";
+import { X } from "react-feather";
+import { SmallLabel } from "../SmallLabel";
 
 const DynamicZodForm = ({
   schema,
@@ -52,7 +55,12 @@ const DynamicZodForm = ({
     const fieldSchema_ =
       fieldSchema instanceof z.ZodOptional ? fieldSchema.unwrap() : fieldSchema;
 
+    const fieldKey = fieldName.split(".").reverse()[0] ?? "";
+
     if (fieldSchema_ instanceof z.ZodString) {
+      if (["topic"].includes(fieldKey) || !isNaN(+fieldKey)) {
+        return <Input {...register(fullPath)} />;
+      }
       return <Textarea {...register(fullPath)} />;
     } else if (fieldSchema_ instanceof z.ZodNumber) {
       return (
@@ -152,31 +160,63 @@ const DynamicZodForm = ({
           : {};
 
       return (
-        <VStack>
+        <VStack align="start" width="full">
           {fields.map((field, index) => (
-            <HStack key={field.id}>
-              {renderField(
-                fieldSchema_.element,
-                `${fieldName}.${index}`,
-                evaluator
-              )}
-              <Button onClick={() => remove(index)}>Remove</Button>
-            </HStack>
+            <Box
+              key={field.id}
+              borderLeft={
+                fieldSchema_.element instanceof z.ZodObject
+                  ? "4px solid"
+                  : undefined
+              }
+              borderLeftColor="orange.400"
+              width="full"
+            >
+              <HStack
+                borderLeftColor="reset"
+                padding={fieldSchema_.element instanceof z.ZodObject ? 3 : 0}
+                paddingRight={3}
+                width="full"
+                align="start"
+                position="relative"
+              >
+                <Button
+                  position="absolute"
+                  right={0}
+                  top={0}
+                  padding={0}
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => remove(index)}
+                  color="gray.400"
+                >
+                  <X />
+                </Button>
+                <Box width="95%">
+                  {renderField(
+                    fieldSchema_.element,
+                    `${fieldName}.${index}`,
+                    evaluator
+                  )}
+                </Box>
+              </HStack>
+            </Box>
           ))}
           <Button onClick={() => append(defaultValues)}>Add</Button>
         </VStack>
       );
     } else if (fieldSchema_ instanceof z.ZodObject) {
       return (
-        <VStack spacing={2}>
+        <VStack width="full" spacing={2}>
           {Object.keys(fieldSchema_.shape).map((key) => (
-            <React.Fragment key={key}>
+            <VStack key={key} align="start" width="full">
+              <SmallLabel>{titleCase(key)}</SmallLabel>
               {renderField(
                 fieldSchema_.shape[key],
                 `${fieldName}.${key}`,
                 evaluator
               )}
-            </React.Fragment>
+            </VStack>
           ))}
         </VStack>
       );
