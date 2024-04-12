@@ -11,18 +11,18 @@ import { TRPCError } from "@trpc/server";
 
 const LLMChatSchema = z.object({
   input: z.array(chatMessageSchema),
-  output: z.array(chatMessageSchema),
+  expectedOutput: z.array(chatMessageSchema),
 });
 
 const FullTraceSchema = z.object({
   input: z.string(),
-  output: z.string(),
+  expectedOutput: z.string(),
   spans: z.array(datasetSpanSchema),
 });
 
 const StringIOSchema = z.object({
   input: z.string(),
-  output: z.string(),
+  expectedOutput: z.string(),
 });
 
 export const datasetRecordRouter = createTRPCRouter({
@@ -47,7 +47,7 @@ export const datasetRecordRouter = createTRPCRouter({
           entryInput = validatedInput.success
             ? {
                 input: validatedInput.data.input,
-                output: validatedInput.data.output,
+                expectedOutput: validatedInput.data.expectedOutput,
               }
             : {};
         } else if (input.datasetSchema === DatabaseSchema.FULL_TRACE) {
@@ -55,7 +55,7 @@ export const datasetRecordRouter = createTRPCRouter({
           entryInput = validatedInput.success
             ? {
                 input: validatedInput.data.input,
-                output: validatedInput.data.output,
+                expectedOutput: validatedInput.data.expectedOutput,
                 spans: validatedInput.data.spans,
               }
             : {};
@@ -64,7 +64,7 @@ export const datasetRecordRouter = createTRPCRouter({
           entryInput = validatedInput.success
             ? {
                 input: validatedInput.data.input,
-                output: validatedInput.data.output,
+                expectedOutput: validatedInput.data.expectedOutput,
               }
             : {};
         }
