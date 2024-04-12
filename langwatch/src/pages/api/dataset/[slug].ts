@@ -1,5 +1,5 @@
 import { type NextApiRequest, type NextApiResponse } from "next";
-import { prisma } from "../../../server/db"; // Adjust the import based on your setup
+import { prisma } from "../../../server/db";
 
 import { getDebugger } from "../../../utils/logger";
 
@@ -35,15 +35,20 @@ export default async function handler(
     });
 
     if (!dataset) {
-      return res.status(404).json({ message: "Dataset not found." });
+      return res
+        .status(200)
+        .json({ status: "error", message: "Dataset not found." });
     }
 
     const datasetRecords = await prisma.datasetRecord.findMany({
       where: { datasetId: dataset.id },
     });
 
-    return res.status(200).json({ datasetRecords });
-  } catch (e) {}
-
-  return res.status(200).json({ message: req.query.slug });
+    return res.status(200).json({ data: datasetRecords });
+  } catch (e) {
+    debug(e);
+    return res
+      .status(500)
+      .json({ status: "error", message: "Internal server error." });
+  }
 }
