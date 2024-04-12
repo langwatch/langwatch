@@ -62,7 +62,7 @@ export interface GuardrailResult {
   passed: boolean;
   score?: number | null;
   details?: string | null;
-  cost?: Money;
+  cost?: Money | null;
 }
 
 interface TypedValueGuardrailResult {

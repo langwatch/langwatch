@@ -44,7 +44,7 @@ export function EvaluatorSelection({
       key !== "aws/comprehend_pii_detection"
   );
 
-  const categories: Category[] = ["safety", "quality", "custom"];
+  const categories: Category[] = ["safety", "policy", "quality", "custom"];
 
   const availableEvaluatorsPerCategory: Record<
     string,
