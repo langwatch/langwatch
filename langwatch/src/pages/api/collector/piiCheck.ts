@@ -76,22 +76,18 @@ const clearPII = async (
   for (const finding of findings) {
     const start = finding.location?.codepointRange?.start;
     const end = finding.location?.codepointRange?.end;
-    if (start && end && +end > +start) {
+    if (start && end) {
       currentObject[lastKey] =
         currentObject[lastKey].substring(0, +start) +
-        "*".repeat(+end - +start) +
+        "✳".repeat(+end - +start) +
         currentObject[lastKey].substring(+end);
     }
   }
-  for (const finding of findings) {
-    const start = finding.location?.codepointRange?.start;
-    const end = finding.location?.codepointRange?.end;
-    if (start && end && +end > +start) {
-      currentObject[lastKey] = currentObject[lastKey].replace(
-        new RegExp(`\\*{${+end - +start}}`),
-        "[REDACTED]"
-      );
-    }
+  if (findings.length > 0) {
+    currentObject[lastKey] = currentObject[lastKey].replace(
+      /\✳{1,}/g,
+      "[REDACTED]"
+    );
   }
 };
 
