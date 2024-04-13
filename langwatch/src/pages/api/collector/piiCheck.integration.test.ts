@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Trace } from "../../../server/tracer/types";
-import { runPiiCheck } from "./piiCheck";
+import { cleanupPIIs } from "./piiCheck";
 
 describe("PIICheck", () => {
   it("detects PII on traces", async () => {
@@ -12,10 +12,8 @@ describe("PIICheck", () => {
       metrics: {},
       timestamps: { started_at: Date.now(), inserted_at: Date.now() },
     };
-    const response = await runPiiCheck(sampleTrace, []);
-    expect(response).toEqual({
-      quotes: [],
-    });
+    await cleanupPIIs(sampleTrace, []);
+    expect(sampleTrace.input.value).toEqual("hi there");
 
     const samplePIITrace: Trace = {
       trace_id: "foo",
@@ -28,7 +26,9 @@ describe("PIICheck", () => {
       timestamps: { started_at: Date.now(), inserted_at: Date.now() },
     };
 
-    const quotes = (await runPiiCheck(samplePIITrace, [])).quotes;
-    expect(quotes).toEqual(["4012-8888-8888-1881"]);
+    await cleanupPIIs(samplePIITrace, []);
+    expect(samplePIITrace.input.value).toEqual(
+      "hi there, my credit card number is [REDACTED]"
+    );
   });
 });
