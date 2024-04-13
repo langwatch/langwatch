@@ -21,7 +21,7 @@ export const scheduleTraceChecks = async (trace: Trace, spans: Span[]) => {
     where: {
       projectId: trace.project_id,
       enabled: true,
-      checkType: { not: "pii_check" },
+      isGuardrail: false,
     },
   });
 
