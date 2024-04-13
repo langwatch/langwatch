@@ -6,7 +6,7 @@ import {
   Skeleton,
   Text,
   Tooltip,
-  VStack
+  VStack,
 } from "@chakra-ui/react";
 import numeral from "numeral";
 import React, {
@@ -51,10 +51,10 @@ const SummaryItem = ({
 };
 
 type TraceSummaryProps = {
-  traceId?: string;
+  traceId: string;
 };
-export function TraceSummary(props?: TraceSummaryProps) {
-  const { trace } = useTraceDetailsState(props?.traceId);
+export function TraceSummary(props: TraceSummaryProps) {
+  const { trace } = useTraceDetailsState(props.traceId);
 
   const [height, setHeight] = useState<number | undefined>(undefined);
   const summaryRef = useRef<HTMLDivElement>();
@@ -104,21 +104,8 @@ const TraceSummaryValues = React.forwardRef(function TraceSummaryValues(
         flexDirection={{ base: "column", lg: "row" }}
         ref={ref as any}
       >
-        {trace.metadata.customer_id && (
-          <SummaryItem label="Customer ID">
-            <Text
-              fontFamily={trace.metadata.customer_id ? "mono" : undefined}
-              maxWidth="200px"
-              wordBreak="break-all"
-            >
-              {trace.metadata.customer_id ?? "unknown"}
-            </Text>
-          </SummaryItem>
-        )}
-
-
-
-        {(!!trace.metrics.completion_tokens || !!trace.metrics.prompt_tokens) && (
+        {(!!trace.metrics.completion_tokens ||
+          !!trace.metrics.prompt_tokens) && (
           <SummaryItem
             label="Total Tokens"
             tooltip={
@@ -159,27 +146,44 @@ const TraceSummaryValues = React.forwardRef(function TraceSummaryValues(
         )}
       </HStack>
 
-      <HStack gap={3} marginY={8} wrap={'wrap'}>
-        {
-          Object.entries(trace.metadata).map(([key, value], i) => {
-
+      <HStack gap={3} marginY={8} wrap={"wrap"}>
+        {Object.entries({ trace_id: trace.trace_id, ...trace.metadata }).map(
+          ([key, value], i) => {
             let renderValue = value;
 
             if (Array.isArray(value) && value.length === 0) {
-              renderValue = '';
-
+              renderValue = "";
             } else if (Array.isArray(value) && value.length > 0) {
-              renderValue = value.join(', ')
+              renderValue = value.join(", ");
             }
 
-            return (renderValue && (
-              <HStack gap={0} fontSize={'smaller'} margin={0} key={i}>
-                <Text borderWidth={1} borderColor={"gray.200"} paddingX={2} borderLeftRadius={'md'}>{key}:</Text>
-                <Text borderWidth={1} borderColor={"gray.200"} paddingX={2} borderLeft={'none'} backgroundColor={'gray.100'} borderRightRadius={'md'} fontFamily="mono">{renderValue}</Text>
-              </HStack>
-            ))
-          })
-        }
+            return (
+              renderValue && (
+                <HStack gap={0} fontSize={"smaller"} margin={0} key={i}>
+                  <Text
+                    borderWidth={1}
+                    borderColor={"gray.200"}
+                    paddingX={2}
+                    borderLeftRadius={"md"}
+                  >
+                    {key}:
+                  </Text>
+                  <Text
+                    borderWidth={1}
+                    borderColor={"gray.200"}
+                    paddingX={2}
+                    borderLeft={"none"}
+                    backgroundColor={"gray.100"}
+                    borderRightRadius={"md"}
+                    fontFamily="mono"
+                  >
+                    {renderValue}
+                  </Text>
+                </HStack>
+              )
+            );
+          }
+        )}
       </HStack>
     </>
   );

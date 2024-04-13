@@ -227,7 +227,7 @@ export const TraceDetailsDrawer = (props: TraceDetailsDrawerProps) => {
                 <Tab>
                   Guardrails{" "}
                   <Blocked
-                    traceId={props.traceId ?? ""}
+                    traceId={props.traceId}
                     traceChecks={traceChecksQuery.data}
                   />
                 </Tab>
@@ -235,7 +235,7 @@ export const TraceDetailsDrawer = (props: TraceDetailsDrawerProps) => {
               <Tab>
                 Evaluations{" "}
                 <Errors
-                  traceId={props.traceId ?? ""}
+                  traceId={props.traceId}
                   traceChecks={traceChecksQuery.data}
                 />
               </Tab>
@@ -243,8 +243,8 @@ export const TraceDetailsDrawer = (props: TraceDetailsDrawerProps) => {
 
             <TabPanels>
               <TabPanel>
-                <TraceSummary traceId={props.traceId ?? ""} />
-                <SpanTree traceId={props.traceId ?? ""} />
+                <TraceSummary traceId={props.traceId} />
+                <SpanTree traceId={props.traceId} />
               </TabPanel>
               {anyGuardrails && (
                 <TabPanel>

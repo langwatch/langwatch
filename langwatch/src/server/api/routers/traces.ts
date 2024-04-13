@@ -636,17 +636,29 @@ const getAllForProject = async (
       .map((hit) => hit._source!)
       .filter((x) => x)
       .map((trace) => {
-        const lastSpan = spansByTraceId[trace.trace_id]?.reverse()[0];
-        const lastGuardrail: (GuardrailResult & { name?: string }) | undefined =
-          lastSpan?.outputs
-            .filter((output) => output.type === "guardrail_result")
-            .map(elasticSearchToTypedValue)
-            .map((output) => ({
-              ...((output.value as GuardrailResult) || {}),
-              name: guardrailsSlugToName[lastSpan.name ?? ""],
-            }))
-            .filter((output) => !(output as GuardrailResult)?.passed)[0];
-        const trace_ = { ...trace, lastGuardrail };
+        const lastSpans = spansByTraceId[trace.trace_id]?.reverse();
+        const lastNonGuardrailSpanIndex =
+          lastSpans?.findIndex((span) => span.type !== "guardrail") ?? -1;
+        const lastGuardrailSpans =
+          lastNonGuardrailSpanIndex > -1
+            ? lastSpans?.slice(0, lastNonGuardrailSpanIndex)
+            : lastSpans;
+
+        console.log('lastGuardrailSpans', JSON.stringify(lastGuardrailSpans, undefined, 2));
+        const lastFailedGuardrailResult:
+          | (GuardrailResult & { name?: string })
+          | undefined = lastGuardrailSpans?.flatMap(
+          (span) =>
+            span?.outputs
+              .filter((output) => output.type === "guardrail_result")
+              .map(elasticSearchToTypedValue)
+              .map((output) => ({
+                ...((output.value as GuardrailResult) || {}),
+                name: guardrailsSlugToName[span.name ?? ""],
+              }))
+              .filter((output) => !(output as GuardrailResult)?.passed)
+        )[0];
+        const trace_ = { ...trace, lastGuardrail: lastFailedGuardrailResult };
         return [trace.trace_id, trace_];
       })
   );

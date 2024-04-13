@@ -251,11 +251,11 @@ const SpanCost = ({ span }: { span: ElasticSearchSpan }) => {
 };
 
 type SpanTreeProps = {
-  traceId?: string;
+  traceId: string;
 };
 
-export function SpanTree(props?: SpanTreeProps) {
-  const { traceId, spanId, trace } = useTraceDetailsState(props?.traceId);
+export function SpanTree(props: SpanTreeProps) {
+  const { traceId, spanId, trace } = useTraceDetailsState(props.traceId);
   const router = useRouter();
   const { project } = useOrganizationTeamProject();
   const spans = api.spans.getAllForTrace.useQuery(
