@@ -83,7 +83,7 @@ def main():
                 count = module.variables.profile == "lw-prod" ? 1 : 0
 
                 triggers = {{
-                    redeployment = sha1(jsonencode(aws_api_gateway_rest_api.this.body))
+                    redeployment = sha1(jsonencode([{", ".join(depends_on)}]))
                 }}
 
                 depends_on = [
