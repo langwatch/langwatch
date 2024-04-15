@@ -118,7 +118,8 @@ resource "null_resource" "docker_image" {
       cd -
     EOT
 
-    on_failure = fail
+    interpreter = ["/bin/bash", "-c"]
+    on_failure  = fail
   }
 
   depends_on = [aws_ecr_repository.lambda_repository]

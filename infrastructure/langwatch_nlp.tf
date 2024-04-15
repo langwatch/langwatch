@@ -105,7 +105,8 @@ resource "null_resource" "langwatch_nlp_docker_image" {
       cd -
     EOT
 
-    on_failure = fail
+    interpreter = ["/bin/bash", "-c"]
+    on_failure  = fail
   }
 
   depends_on = [aws_ecr_repository.langwatch_nlp]

@@ -73,6 +73,7 @@ jobs:
           sed --version | head -n 1
           jq --version
           cat --version | head -n 1
+          /bin/bash --version
       
       - name: Free up Disk Space
         run: |
