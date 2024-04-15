@@ -44,12 +44,12 @@ const PLAN_LIMITS: Record<PlanTypes, PlanInfo> = {
 
 export class SubscriptionHandlerSass extends SubscriptionHandler {
   static async getActivePlan(
-    user: any & {
+    organizationId: string,
+    user?: any & {
       impersonator?: {
         email: string;
       };
-    },
-    organizationId: string
+    }
   ): Promise<PlanInfo> {
     const canAlwaysAddNewMembers =
       user.impersonator && isAdmin(user.impersonator);
