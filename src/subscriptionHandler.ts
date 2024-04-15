@@ -12,21 +12,33 @@ const PLAN_LIMITS: Record<PlanTypes, PlanInfo> = {
     name: "Free",
     free: true,
     maxMembers: 1,
+    maxProjects: 1,
+    maxMessagesPerMonth: 1000,
+    evaluationsCredit: 2,
   },
   [PlanTypes.TEAM]: {
     name: "Team",
     free: false,
     maxMembers: 5,
+    maxProjects: 2,
+    maxMessagesPerMonth: 10_000,
+    evaluationsCredit: 10,
   },
   [PlanTypes.BUSINESS]: {
     name: "Business",
     free: false,
     maxMembers: 100,
+    maxProjects: 5,
+    maxMessagesPerMonth: 100_000,
+    evaluationsCredit: 50,
   },
   [PlanTypes.ENTERPRISE]: {
     name: "Enterprise",
     free: false,
     maxMembers: 1000,
+    maxProjects: 100,
+    maxMessagesPerMonth: 1_000_000,
+    evaluationsCredit: 500,
   },
 };
 
