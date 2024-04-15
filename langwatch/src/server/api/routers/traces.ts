@@ -644,7 +644,6 @@ const getAllForProject = async (
             ? lastSpans?.slice(0, lastNonGuardrailSpanIndex)
             : lastSpans;
 
-        console.log('lastGuardrailSpans', JSON.stringify(lastGuardrailSpans, undefined, 2));
         const lastFailedGuardrailResult:
           | (GuardrailResult & { name?: string })
           | undefined = lastGuardrailSpans?.flatMap(

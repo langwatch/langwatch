@@ -30,7 +30,11 @@ import {
   maybeAddIdsToContextList,
 } from "./collector/rag";
 import { getTraceInput, getTraceOutput } from "./collector/trace";
-import { addGuardrailCosts, addLLMTokensCount, computeTraceMetrics } from "./collector/metrics";
+import {
+  addGuardrailCosts,
+  addLLMTokensCount,
+  computeTraceMetrics,
+} from "./collector/metrics";
 import { scheduleTraceChecks } from "./collector/traceChecks";
 import { scoreSatisfactionFromInput } from "./collector/satisfaction";
 import crypto from "crypto";
@@ -38,6 +42,8 @@ import type { ZodError } from "zod";
 import { fromZodError } from "zod-validation-error";
 import { env } from "../../env.mjs";
 import { cleanupPIIs } from "./collector/piiCheck";
+import { getCurrentMonthMessagesCount } from "../../server/api/routers/limits";
+import { dependencies } from "../../injection/dependencies.server";
 
 export const debug = getDebugger("langwatch:collector");
 
@@ -59,10 +65,25 @@ export default async function handler(
 
   const project = await prisma.project.findUnique({
     where: { apiKey: authToken as string },
+    include: {
+      team: true,
+    },
   });
 
   if (!project) {
     return res.status(401).json({ message: "Invalid auth token." });
+  }
+
+  const currentMonthMessagesCount = await getCurrentMonthMessagesCount([
+    project.id,
+  ]);
+  const activePlan = await dependencies.subscriptionHandler.getActivePlan(
+    project.team.organizationId
+  );
+  if (currentMonthMessagesCount >= activePlan.maxMessagesPerMonth) {
+    return res.status(429).json({
+      message: `You have reached the monthly limit of ${activePlan.maxMessagesPerMonth} messages, please go to LangWatch dashboard to verify your plan.`,
+    });
   }
 
   // We migrated those keys to inside metadata, but we still want to support them for retrocompatibility for a while
@@ -214,7 +235,9 @@ export default async function handler(
 
   debug(`collecting traceId ${traceId}`);
 
-  spans = addInputAndOutputForRAGs(await addLLMTokensCount(addGuardrailCosts(spans)));
+  spans = addInputAndOutputForRAGs(
+    await addLLMTokensCount(addGuardrailCosts(spans))
+  );
 
   const esSpans: ElasticSearchSpan[] = spans.map((span) => ({
     ...span,

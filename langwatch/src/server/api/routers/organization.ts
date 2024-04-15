@@ -305,8 +305,8 @@ export const organizationRouter = createTRPCRouter({
 
       const subscriptionLimits =
         await dependencies.subscriptionHandler.getActivePlan(
-          ctx.session.user,
-          input.organizationId
+          input.organizationId,
+          ctx.session.user
         );
 
       if (

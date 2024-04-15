@@ -20,8 +20,8 @@ export const subscriptionRouter = createTRPCRouter({
     )
     .query(async ({ input, ctx }) => {
       return await dependencies.subscriptionHandler.getActivePlan(
+        input.organizationId,
         ctx.session.user,
-        input.organizationId
       );
     }),
 });

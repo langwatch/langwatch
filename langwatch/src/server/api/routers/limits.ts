@@ -1,26 +1,48 @@
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
-import { TeamRoleGroup, checkUserPermissionForProject } from "../permission";
+import {
+  OrganizationRoleGroup,
+  checkUserPermissionForOrganization,
+} from "../permission";
 import { TRACE_INDEX, esClient } from "../../elasticsearch";
 import type { QueryDslBoolQuery } from "@elastic/elasticsearch/lib/api/types";
 import { prisma } from "../../db";
+import { dependencies } from "../../../injection/dependencies.server";
 
 export const limitsRouter = createTRPCRouter({
-  getAll: protectedProcedure
-    .input(z.object({ projectId: z.string() }))
-    .use(checkUserPermissionForProject(TeamRoleGroup.ANALYTICS_VIEW))
-    .query(async ({ input }) => {
-      const { projectId } = input;
+  getUsage: protectedProcedure
+    .input(z.object({ organizationId: z.string() }))
+    .use(
+      checkUserPermissionForOrganization(
+        OrganizationRoleGroup.ORGANIZATION_USAGE
+      )
+    )
+    .query(async ({ input, ctx }) => {
+      const { organizationId } = input;
 
-      const projectsCount = await getProjectLimits(projectId);
+      const projectIds = (
+        await prisma.project.findMany({
+          where: {
+            team: { organizationId },
+          },
+          select: { id: true },
+        })
+      ).map((project) => project.id);
+
+      const projectsCount = await getProjectLimits(projectIds);
       const currentMonthMessagesCount =
-        await getCurrentMonthMessagesCount(projectId);
-      const currentMonthCost = await getCurrentMonthCost(projectId);
+        await getCurrentMonthMessagesCount(projectIds);
+      const currentMonthCost = await getCurrentMonthCost(projectIds);
+      const activePlan = await dependencies.subscriptionHandler.getActivePlan(
+        organizationId,
+        ctx.session.user
+      );
 
       return {
         projectsCount,
         currentMonthMessagesCount,
         currentMonthCost,
+        activePlan,
       };
     }),
 });
@@ -29,13 +51,17 @@ const getCurrentMonth = () => {
   return new Date(new Date().getFullYear(), new Date().getMonth(), 1);
 };
 
-export const getProjectLimits = async (projectId: string) => {
+export const getProjectLimits = async (projectIds: string[]) => {
   return await prisma.project.count({
-    where: { id: projectId },
+    where: {
+      id: {
+        in: projectIds,
+      },
+    },
   });
 };
 
-export const getCurrentMonthMessagesCount = async (projectId: string) => {
+export const getCurrentMonthMessagesCount = async (projectIds: string[]) => {
   const messagesCount = await esClient.count({
     index: TRACE_INDEX,
     body: {
@@ -43,8 +69,8 @@ export const getCurrentMonthMessagesCount = async (projectId: string) => {
         bool: {
           must: [
             {
-              term: {
-                project_id: projectId,
+              terms: {
+                project_id: projectIds,
               },
             },
             {
@@ -63,12 +89,14 @@ export const getCurrentMonthMessagesCount = async (projectId: string) => {
   return messagesCount.count;
 };
 
-export const getCurrentMonthCost = async (projectId: string) => {
+export const getCurrentMonthCost = async (projectIds: string[]) => {
   return (
     (
       await prisma.cost.aggregate({
         where: {
-          projectId,
+          projectId: {
+            in: projectIds,
+          },
           createdAt: {
             gte: getCurrentMonth(),
           },

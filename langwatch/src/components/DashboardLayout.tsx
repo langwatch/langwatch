@@ -19,6 +19,7 @@ import {
   VStack,
   useTheme,
   type BackgroundProps,
+  Tooltip,
 } from "@chakra-ui/react";
 import { type Project } from "@prisma/client";
 import { signOut } from "next-auth/react";
@@ -37,6 +38,7 @@ import {
   TrendingUp,
   type Icon,
   Database,
+  Lock,
 } from "react-feather";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import { useRequiredSession } from "../hooks/useRequiredSession";
@@ -50,6 +52,7 @@ import { LogoIcon } from "./icons/LogoIcon";
 import React from "react";
 import { useTableView } from "./messages/HeaderButtons";
 import { CurrentDrawer } from "./CurrentDrawer";
+import { api } from "../utils/api";
 
 const Breadcrumbs = ({ currentRoute }: { currentRoute: Route | undefined }) => {
   const { project } = useOrganizationTeamProject();
@@ -214,16 +217,10 @@ const ProjectSelector = React.memo(function ProjectSelector({
                         </MenuItem>
                       </Link>
                     ))}
-                    <Link
-                      href={`/onboarding/${projectGroup.team.slug}/project`}
-                      _hover={{
-                        textDecoration: "none",
-                      }}
-                    >
-                      <MenuItem icon={<Plus />} fontSize="14px">
-                        New Project
-                      </MenuItem>
-                    </Link>
+                    <AddProjectButton
+                      team={projectGroup.team}
+                      organization={projectGroup.organization}
+                    />
                   </MenuGroup>
                 ))}
             </>
@@ -233,6 +230,55 @@ const ProjectSelector = React.memo(function ProjectSelector({
     </Menu>
   );
 });
+
+export const AddProjectButton = ({
+  team,
+  organization,
+}: {
+  team: Team;
+  organization: Organization;
+}) => {
+  const router = useRouter();
+
+  const usage = api.limits.getUsage.useQuery(
+    { organizationId: organization.id },
+    { enabled: !!organization }
+  );
+
+  return !usage.data ||
+    usage.data.projectsCount < usage.data.activePlan.maxProjects ? (
+    <Link
+      href={`/onboarding/${team.slug}/project`}
+      _hover={{
+        textDecoration: "none",
+      }}
+    >
+      <MenuItem icon={<Plus />} fontSize="14px">
+        New Project
+      </MenuItem>
+    </Link>
+  ) : (
+    <Tooltip label="You reached the limit of max new projects, click to upgrade your plan to add more projects">
+      <Link
+        href={`/settings/subscription`}
+        _hover={{
+          textDecoration: "none",
+        }}
+      >
+        <MenuItem
+          icon={<Lock />}
+          fontSize="14px"
+          color="gray.400"
+          _hover={{
+            backgroundColor: "transparent",
+          }}
+        >
+          New Project
+        </MenuItem>
+      </Link>
+    </Tooltip>
+  );
+};
 
 export const DashboardLayout = ({
   children,
@@ -252,6 +298,10 @@ export const DashboardLayout = ({
     project,
     hasOrganizationPermission,
   } = useOrganizationTeamProject();
+  const usage = api.limits.getUsage.useQuery(
+    { organizationId: organization?.id ?? "" },
+    { enabled: !!organization }
+  );
 
   const [query, setQuery] = useState("");
 
