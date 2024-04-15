@@ -1,0 +1,102 @@
+name: 'Deploy Infrastructure'
+
+on:
+  push:
+    branches:
+      - main
+
+# Concurrency group
+concurrency: 
+  group: deploy-group
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: 'recursive' # Fetches submodules recursively
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install curl
+        run: sudo apt-get install curl -y
+
+      - name: Install Docker
+        uses: docker/setup-buildx-action@v3
+
+      - name: Install poetry
+        run: pip install poetry
+
+      - name: Install AWS CLI
+        run: |
+          if [ -d "/usr/local/aws-cli/v2/current" ]; then
+            echo "Updating existing AWS CLI installation."
+            curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+            unzip -o awscliv2.zip
+            sudo ./aws/install --update
+          else
+            echo "Installing AWS CLI."
+            curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+            unzip awscliv2.zip
+            sudo ./aws/install
+          fi
+
+      - name: Install jq
+        run: sudo apt-get install jq
+
+      - name: Configure AWS Root Profile
+        run: |
+          aws configure --profile lw-root-tf set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws configure --profile lw-root-tf set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws configure --profile lw-root-tf set region us-east-1
+
+      - name: Configure AWS Prod Profile for Role Assumption
+        run: |
+          aws configure --profile lw-prod set role_arn ${{ secrets.LW_PROD_ROLE_ARN }}
+          aws configure --profile lw-prod set source_profile lw-root-tf
+          aws configure --profile lw-prod set region us-east-1
+
+      - name: Free up Disk Space
+        run: |
+          sudo apt-get clean || true
+          sudo rm -rf /usr/share/dotnet || true
+          sudo rm -rf /opt/ghc || true
+          sudo rm -rf /usr/local/.ghcup || true
+          sudo rm -rf /usr/local/lib/android || true
+          sudo rm -rf /opt/android || true
+          sudo rm -rf /usr/local/share/android-sdk || true
+          sudo apt-get remove -y '^aspnetcore-.*' || true
+          sudo apt-get remove -y '^dotnet-.*' --fix-missing || true
+          sudo apt-get remove -y '^llvm-.*' --fix-missing || true
+          sudo apt-get remove -y 'php.*' --fix-missing || true
+          sudo apt-get remove -y '^mongodb-.*' --fix-missing || true
+          sudo apt-get remove -y '^mysql-.*' --fix-missing || true
+          sudo apt-get remove -y azure-cli google-chrome-stable firefox powershell mono-devel libgl1-mesa-dri --fix-missing || true
+          sudo apt-get remove -y google-cloud-sdk --fix-missing || true
+          sudo apt-get remove -y google-cloud-cli --fix-missing || true
+          sudo apt-get autoremove -y || true
+          sudo apt-get clean || true
+          sudo swapoff -a || true
+          sudo rm -f /mnt/swapfile || true
+          free -h || true
+
+      - name: Deploy Infrastructure
+        run: |
+          make infra-init
+          make deploy
+        env:
+          AWS_PROFILE: lw-prod
+          AWS_DEFAULT_PROFILE: lw-prod
