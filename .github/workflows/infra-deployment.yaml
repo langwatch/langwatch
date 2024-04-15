@@ -31,6 +31,9 @@ jobs:
         with:
           node-version: '18'
 
+      - name: Install prettier
+        run: sudo npm install -g prettier
+
       - name: Install curl
         run: sudo apt-get install curl -y
 
