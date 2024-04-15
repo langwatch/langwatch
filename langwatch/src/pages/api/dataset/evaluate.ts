@@ -170,26 +170,8 @@ export default async function handler(
       },
     });
   }
-  const evalutionResult: EvalResult =
-    result.status === "error"
-      ? {
-          status: "error",
-          error_type: "EVALUATOR_ERROR",
-          message: result.message,
-          passed: false,
-        }
-      : result.status === "skipped"
-      ? {
-          status: "skipped",
-          details: result.details,
-          passed: false,
-        }
-      : {
-          ...result,
-          passed: result.passed ?? true,
-        };
 
-  return res.status(200).json(evalutionResult);
+  return res.status(200).json(result);
 }
 
 const runEvaluation = async ({

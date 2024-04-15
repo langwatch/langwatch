@@ -110,8 +110,6 @@ export function BatchEvaluationDrawer(props: BatchEvaluatioProps) {
     });
   };
 
-  console.log(AVAILABLE_EVALUATORS);
-  //const checks = AVAILABLE_EVALUATORS
   return (
     <Drawer
       isOpen={props.isOpen}

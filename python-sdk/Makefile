@@ -12,7 +12,7 @@ install:
 example:
 	poetry run chainlit run -w $(filter-out $@,$(MAKECMDGOALS))
 
-example2:
+batch-evaluation-example:
 	poetry run python $(filter-out $@,$(MAKECMDGOALS))
 
 %:

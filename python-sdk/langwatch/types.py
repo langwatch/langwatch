@@ -1,5 +1,7 @@
 from typing import Any, Dict, List, Literal, Optional, TypedDict, Union
 
+from pydantic import BaseModel, Field
+
 
 ChatRole = Literal[
     "system", "user", "assistant", "function", "tool", "guardrail", "unknown"
