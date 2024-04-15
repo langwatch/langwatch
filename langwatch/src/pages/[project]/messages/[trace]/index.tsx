@@ -35,7 +35,10 @@ import { getExtractedInput } from "../../../../components/messages/MessageCard";
 
 export default function TraceDetails() {
   const { hasTeamPermission } = useOrganizationTeamProject();
-  const { traceId, trace, openTab } = useTraceDetailsState();
+  const router = useRouter();
+  const { traceId, trace, openTab } = useTraceDetailsState(
+    (router.query.trace as string) ?? ""
+  );
   const [threadId, setThreadId] = useState<string | undefined>(undefined);
   const { openDrawer } = useDrawer();
 
@@ -130,7 +133,9 @@ export default function TraceDetails() {
 
 function Conversation({ threadId }: { threadId?: string }) {
   const router = useRouter();
-  const { traceId, trace } = useTraceDetailsState();
+  const { traceId, trace } = useTraceDetailsState(
+    (router.query.trace as string) ?? ""
+  );
   const { project } = useOrganizationTeamProject();
 
   const currentTraceRef = useRef<HTMLDivElement>(null);

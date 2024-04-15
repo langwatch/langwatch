@@ -32,11 +32,12 @@ import {
 import { getTraceInput, getTraceOutput } from "./collector/trace";
 import { addGuardrailCosts, addLLMTokensCount, computeTraceMetrics } from "./collector/metrics";
 import { scheduleTraceChecks } from "./collector/traceChecks";
-import { cleanupPII } from "./collector/cleanupPII";
 import { scoreSatisfactionFromInput } from "./collector/satisfaction";
 import crypto from "crypto";
 import type { ZodError } from "zod";
 import { fromZodError } from "zod-validation-error";
+import { env } from "../../env.mjs";
+import { cleanupPIIs } from "./collector/piiCheck";
 
 export const debug = getDebugger("langwatch:collector");
 
@@ -259,7 +260,8 @@ export default async function handler(
     indexing_md5s: [...(existingTrace?.indexing_md5s ?? []), paramsMD5],
   };
 
-  await cleanupPII(trace, esSpans);
+  const piiEnforced = env.NODE_ENV === "production";
+  await cleanupPIIs(trace, esSpans, piiEnforced);
 
   const result = await esClient.helpers.bulk({
     datasource: esSpans,

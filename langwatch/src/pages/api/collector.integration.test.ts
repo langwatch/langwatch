@@ -52,12 +52,12 @@ describe("Collector API Endpoint", () => {
 
   beforeAll(async () => {
     await prisma.project.deleteMany({
-      where: { slug: "--test-project" },
+      where: { slug: "--test-project-collect" },
     });
     project = await prisma.project.create({
       data: {
         name: "Test Project",
-        slug: "--test-project",
+        slug: "--test-project-collect",
         language: "python",
         framework: "openai",
         apiKey: `test-auth-token-${nanoid()}`,

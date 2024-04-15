@@ -6,7 +6,7 @@ from pydantic import BaseModel
 
 import langwatch
 import langwatch.tracer
-from langwatch.tracer import ContextSpan, get_current_tracer
+from langwatch.tracer import ContextSpan, get_current_tracer, _local_context
 from langwatch.types import GuardrailResult, RAGChunk, TypedValueGuardrailResult
 
 
@@ -44,7 +44,11 @@ async def async_evaluate(
     output: Optional[str] = None,
     contexts: List[RAGChunk] = [],
 ):
+    current_span = getattr(_local_context, "current_span", None)
     with langwatch.tracer.create_span(name=slug, type="guardrail") as span:
+        # hack: avoid nesting async evaluate spans when they are called in parallel
+        _local_context.current_span = current_span
+
         request_params = prepare_data(slug, input, output, contexts, span=span)
         async with httpx.AsyncClient() as client:
             response = await client.post(**request_params)
