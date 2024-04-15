@@ -1,8 +1,11 @@
 export type PlanInfo = {
   name: string;
   free: boolean;
-  maxMembers: number;
   canAlwaysAddNewMembers?: boolean;
+  maxMembers: number;
+  maxProjects: number;
+  maxMessagesPerMonth: number;
+  evaluationsCredit: number;
 };
 
 export abstract class SubscriptionHandler {
@@ -17,8 +20,11 @@ export abstract class SubscriptionHandler {
     return {
       name: "Open Source",
       free: true,
-      maxMembers: 99999,
       canAlwaysAddNewMembers: true,
+      maxMembers: 99_999,
+      maxProjects: 9_999,
+      maxMessagesPerMonth: 999_999,
+      evaluationsCredit: 999,
     };
   }
 }
