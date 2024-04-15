@@ -38,6 +38,7 @@ import {
   Tr,
   Tooltip,
   Spacer,
+  useDisclosure,
 } from "@chakra-ui/react";
 import { DatabaseSchema } from "@prisma/client";
 import { useState, useEffect } from "react";
@@ -55,22 +56,28 @@ import type { CheckPreconditions } from "~/trace_checks/types";
 import { camelCaseToLowerCase } from "~/utils/stringCasing";
 import { RenderCode } from "../../../docs/docs/integration-guides/utils/RenderCode";
 import { BatchDatasetProcessing } from "./integration-guides/BatchDatasetProcessing";
+import { useDrawer } from "~/components/CurrentDrawer";
 import { object } from "zod";
 
 interface BatchEvaluatioProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onSuccess: () => void;
+  datasetSlug: string | undefined;
+  // isOpen: boolean;
+  // onClose: () => void;
+  // onSuccess: () => void;
 }
 
 export function BatchEvaluationDrawer(props: BatchEvaluatioProps) {
   const [selectedChecks, setSelectedChecks] = useState<string[]>([]);
   const { project } = useOrganizationTeamProject();
   const [step, setStep] = useState<number>(1);
-  const [selectedDataset, setSelectedDataset] = useState<string>("");
+  const [selectedDataset, setSelectedDataset] = useState<string>(
+    props.datasetSlug ?? ""
+  );
   const [selectedGenerations, setSelectedGenerations] =
     useState<string>("one-shot");
   const router = useRouter();
+  const { closeDrawer } = useDrawer();
+  const { isOpen, onOpen, onClose } = useDisclosure();
 
   const checkError = selectedChecks.length === 0;
 
@@ -112,10 +119,12 @@ export function BatchEvaluationDrawer(props: BatchEvaluatioProps) {
 
   return (
     <Drawer
-      isOpen={props.isOpen}
+      isOpen={true}
       placement="right"
       size={"xl"}
-      onClose={props.onClose}
+      onClose={() => {
+        closeDrawer();
+      }}
     >
       <DrawerContent>
         <DrawerHeader>

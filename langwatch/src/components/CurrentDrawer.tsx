@@ -1,6 +1,7 @@
 import { useRouter } from "next/router";
 import qs from "qs";
 import { TraceDetailsDrawer } from "./TraceDetailsDrawer";
+import { BatchEvaluationDrawer } from "./BatchEvaluationDrawer";
 
 type DrawerProps = {
   open: string;
@@ -8,6 +9,7 @@ type DrawerProps = {
 
 const drawers = {
   traceDetails: TraceDetailsDrawer,
+  batchEvaluation: BatchEvaluationDrawer,
 } satisfies Record<string, React.FC<any>>;
 
 export function CurrentDrawer() {

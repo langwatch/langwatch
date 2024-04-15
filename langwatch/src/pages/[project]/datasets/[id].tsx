@@ -29,11 +29,13 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { displayName } from "~/utils/datasets";
 import { Play } from "react-feather";
+import { useDrawer } from "~/components/CurrentDrawer";
 
 export default function Dataset() {
   const router = useRouter();
   const { project } = useOrganizationTeamProject();
   const dataSetId = router.query.id;
+  const { openDrawer } = useDrawer();
 
   const { isOpen, onOpen, onClose } = useDisclosure();
   const dataset = api.datasetRecord.getAll.useQuery(
@@ -235,7 +237,10 @@ export default function Dataset() {
           <Button
             colorScheme="blue"
             onClick={() => {
-              onOpen();
+              openDrawer("batchEvaluation", {
+                datasetSlug: dataset.data?.slug,
+              });
+              //onOpen();
             }}
             minWidth="fit-content"
             leftIcon={<Play height={16} />}
@@ -288,11 +293,11 @@ export default function Dataset() {
           </CardBody>
         </Card>
       </Container>
-      <BatchEvaluationDrawer
+      {/* <BatchEvaluationDrawer
         isOpen={isOpen}
         onClose={onClose}
         onSuccess={onSuccess}
-      />
+      /> */}
     </DashboardLayout>
   );
 }
