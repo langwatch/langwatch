@@ -110,6 +110,7 @@ resource "null_resource" "docker_image" {
       cache_from=""
       if [ -n "$last_tag" ]; then
         cache_from="--cache-from ${data.aws_ecr_repository.lambda_repository.name}:$last_tag"
+        docker pull ${data.aws_ecr_repository.lambda_repository.repository_url}:$last_tag
       fi
 
       cd ${path.root}/../langevals

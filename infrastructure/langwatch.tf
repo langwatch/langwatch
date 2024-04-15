@@ -164,6 +164,7 @@ resource "null_resource" "langwatch_docker_image" {
       cache_from=""
       if [ -n "$last_tag" ]; then
         cache_from="--cache-from ${aws_ecr_repository.langwatch.repository_url}:$last_tag"
+        docker pull ${aws_ecr_repository.langwatch.repository_url}:$last_tag
       fi
 
       docker build . --platform="linux/amd64" $cache_from -t ${data.aws_ecr_repository.langwatch.repository_url}:${local.tag}
