@@ -20,23 +20,30 @@ class BatchEvaluation:
             print(f"Dataset {self.dataset} not found.")
             return
 
-        # Execute evaluations for each dataset
-        for evaluation in self.evaluations:
-            print(f"Evaluating {evaluation} on dataset {self.dataset}...")
+        if isinstance(dataset, list) and len(dataset) > 0:
+            # loop through the dataset
+            for data in dataset:
+                entry_data = data.get("entry")
+                if isinstance(entry_data, dict):  # Check if entry_data is a dictionary
 
-            # if is array and has data
-            if isinstance(dataset, list) and len(dataset) > 0:
-                # loop through the dataset
-                for data in dataset:
-                    entry_data = data.get("entry")
-                    if isinstance(
-                        entry_data, dict
-                    ):  # Check if entry_data is a dictionary
-                        print("ed", entry_data)
-                        if self.callback:
-                            self.callback(entry_data)
+                    if self.callback:
+                        callbackResponce = self.callback(entry_data)
 
-            # Perform evaluation steps here...
+                        print(callbackResponce)
+
+                # Execute evaluations for each dataset
+                for evaluation in self.evaluations:
+                    print(
+                        f"Evaluating {evaluation} on dataset {self.dataset}...{entry_data}"
+                    )
+
+                    evaluation_result = run_evaluation(
+                        entry_data, evaluation, batchId, self.dataset
+                    )
+
+                    print(evaluation_result)
+
+        # Perform evaluation steps here...
 
         # Finish the evaluation process
         print("Batch evaluation completed.")
@@ -52,33 +59,34 @@ def generate_id():
     return id_prefix + id_suffix
 
 
-def run_evaluation(data: dict, evaluation: str, batch_id: str, datasetSlug: str):
-
-    input_data = data.get("input", "")
-    output_data = data.get("output", "")
-    contexts_data = data.get("contexts", [])
-    expected_output_data = data.get("expected_output", "")
-
-    request_params = {
-        "url": langwatch.endpoint + f"/api/dataset/evaluate",
-        "headers": {"X-Auth-Token": str(langwatch.api_key)},
-        "json": {
-            "data": {
-                "input": input_data,
-                "output": output_data,
-                "contexts": contexts_data,
-                "expected_output": expected_output_data,
-            },
+def run_evaluation(data: dict, evaluation: str, batchId: str, datasetSlug: str):
+    try:
+        json_data = {
+            "data": data,
             "evaluation": evaluation,
-            "batch_id": batch_id,
+            "batchId": batchId,
             "datasetSlug": datasetSlug,
-        },
-    }
-    with httpx.Client() as client:
-        response = client.post(**request_params)
-        response.raise_for_status()
+        }
 
-    return handle_response(response)
+        request_params = {
+            "url": langwatch.endpoint + f"/api/dataset/evaluate",
+            "headers": {"X-Auth-Token": str(langwatch.api_key)},
+            "json": json_data,
+        }
+
+        with httpx.Client() as client:
+            response = client.post(**request_params)
+            response.raise_for_status()  # Raise an exception for HTTP errors
+
+        return handle_response(response)  # Handle response based on application logic
+
+    except httpx.HTTPStatusError as e:
+        print(f"HTTP error {e.response.status_code}: {e.response.text}")
+        # Print HTTP status code and error message from the server
+
+    except Exception as e:
+        print("Unexpected error:", e)
+        # Handle any other unexpected errors gracefully
 
 
 def get_dataset(

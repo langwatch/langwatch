@@ -10,12 +10,13 @@ import { nanoid } from "nanoid";
 import { z } from "zod";
 import { env } from "../../../env.mjs";
 import { rAGChunkSchema } from "../../../server/tracer/types.generated";
-import type {
-  BatchEvaluationResult,
-  EvaluationResult,
-  EvaluationResultError,
-  EvaluationResultSkipped,
-  SingleEvaluationResult,
+import {
+  type BatchEvaluationResult,
+  type EvaluationResult,
+  type EvaluationResultError,
+  type EvaluationResultSkipped,
+  type SingleEvaluationResult,
+  AVAILABLE_EVALUATORS,
 } from "../../../trace_checks/evaluators.generated";
 import { extractChunkTextualContent } from "../collector/rag";
 
@@ -91,6 +92,21 @@ export default async function handler(
     return res.status(400).json({ error: validationError.message });
   }
 
+  const evaluationRequiredFields =
+    AVAILABLE_EVALUATORS[params.evaluation as keyof typeof AVAILABLE_EVALUATORS]
+      .requiredFields;
+
+  if (
+    !evaluationRequiredFields.every((field: string) => {
+      return field in params.data;
+    })
+  ) {
+    return res.status(400).json({
+      error: `Missing required field for ${params.evaluation}`,
+      requiredFields: evaluationRequiredFields,
+    });
+  }
+
   const { input, output, contexts, expected_output } = params.data;
   const { evaluation, batchId, datasetSlug } = params;
 
@@ -137,22 +153,23 @@ export default async function handler(
     });
   }
 
-  const { score, passed, details, cost, status } = result as EvaluationResult;
-  await prisma.batchProcessing.create({
-    data: {
-      id: nanoid(),
-      batchId: batchId,
-      projectId: project.id,
-      status: status,
-      score: score,
-      passed: passed ?? false,
-      details: details ?? "",
-      cost: cost?.amount ?? 0,
-      evaluation: evaluation,
-      datasetSlug: datasetSlug,
-    },
-  });
-
+  if (result.status != "error") {
+    const { score, passed, details, cost, status } = result as EvaluationResult;
+    await prisma.batchProcessing.create({
+      data: {
+        id: nanoid(),
+        batchId: batchId,
+        projectId: project.id,
+        status: status,
+        score: score ?? 0,
+        passed: passed ?? false,
+        details: details ?? "",
+        cost: cost?.amount ?? 0,
+        evaluation: evaluation,
+        datasetSlug: datasetSlug,
+      },
+    });
+  }
   const evalutionResult: EvalResult =
     result.status === "error"
       ? {
