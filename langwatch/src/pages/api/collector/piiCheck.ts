@@ -29,13 +29,44 @@ const infoTypesMap: Record<string, string> = {
   medical_record_number: "MEDICAL_RECORD_NUMBER",
 };
 
+const allInfoTypes = [
+  "FIRST_NAME",
+  "LAST_NAME",
+  "PERSON_NAME",
+  "DATE_OF_BIRTH",
+  "LOCATION",
+  "STREET_ADDRESS",
+  "PHONE_NUMBER",
+  "EMAIL_ADDRESS",
+  "CREDIT_CARD_NUMBER",
+  "IBAN_CODE",
+  "IP_ADDRESS",
+  "PASSPORT",
+  "VAT_NUMBER",
+  "MEDICAL_RECORD_NUMBER",
+];
+
+const essentialInfoTypes = [
+  "PHONE_NUMBER",
+  "EMAIL_ADDRESS",
+  "CREDIT_CARD_NUMBER",
+  "IBAN_CODE",
+  "IP_ADDRESS",
+  "PASSPORT",
+  "VAT_NUMBER",
+  "MEDICAL_RECORD_NUMBER",
+];
+
 const dlpCheck = async (
-  text: string
+  text: string,
+  essentialOnly: boolean
 ): Promise<google.privacy.dlp.v2.IFinding[]> => {
   const [response] = await dlp.inspectContent({
     parent: `projects/${credentials.project_id}/locations/global`,
     inspectConfig: {
-      infoTypes: Object.values(infoTypesMap).map((name) => ({ name })),
+      infoTypes: (essentialOnly ? essentialInfoTypes : allInfoTypes).map(
+        (name) => ({ name })
+      ),
       minLikelihood: "POSSIBLE",
       limits: {
         maxFindingsPerRequest: 0, // (0 = server maximum)
@@ -53,7 +84,8 @@ const dlpCheck = async (
 
 const clearPII = async (
   object: Record<string | number, any>,
-  keysPath: (string | number)[]
+  keysPath: (string | number)[],
+  essentialOnly: boolean
 ) => {
   const lastKey = keysPath[keysPath.length - 1];
   if (!lastKey) {
@@ -72,7 +104,7 @@ const clearPII = async (
     return;
   }
 
-  const findings = await dlpCheck(currentObject[lastKey]);
+  const findings = await dlpCheck(currentObject[lastKey], essentialOnly);
   for (const finding of findings) {
     const start = finding.location?.codepointRange?.start;
     const end = finding.location?.codepointRange?.end;
@@ -94,6 +126,7 @@ const clearPII = async (
 export const cleanupPIIs = async (
   trace: Trace,
   spans: ElasticSearchSpan[],
+  essentialOnly: boolean,
   enforced = true
 ): Promise<void> => {
   if (!credentials) {
@@ -111,36 +144,40 @@ export const cleanupPIIs = async (
   debug("Checking PII for trace", trace.trace_id);
 
   const clearPIIPromises = [
-    clearPII(trace, ["input", "value"]),
-    clearPII(trace, ["output", "value"]),
-    clearPII(trace, ["error", "message"]),
-    clearPII(trace, ["error", "stacktrace"]),
+    clearPII(trace, ["input", "value"], essentialOnly),
+    clearPII(trace, ["output", "value"], essentialOnly),
+    clearPII(trace, ["error", "message"], essentialOnly),
+    clearPII(trace, ["error", "stacktrace"], essentialOnly),
   ];
 
   for (const span of spans) {
-    clearPIIPromises.push(clearPII(span, ["input", "value"]));
-    clearPIIPromises.push(clearPII(span, ["error", "message"]));
+    clearPIIPromises.push(clearPII(span, ["input", "value"], essentialOnly));
+    clearPIIPromises.push(clearPII(span, ["error", "message"], essentialOnly));
 
     for (const output of span.outputs) {
-      clearPIIPromises.push(clearPII(output, ["value"]));
+      clearPIIPromises.push(clearPII(output, ["value"], essentialOnly));
     }
 
     for (const context of span.contexts ?? []) {
       if (Array.isArray(context.content)) {
         for (let i = 0; i < context.content.length; i++) {
-          clearPIIPromises.push(clearPII(context.content, [i]));
+          clearPIIPromises.push(clearPII(context.content, [i], essentialOnly));
         }
       } else if (typeof context.content === "object") {
         for (const key in context.content) {
-          clearPIIPromises.push(clearPII(context.content, [key]));
+          clearPIIPromises.push(
+            clearPII(context.content, [key], essentialOnly)
+          );
         }
       } else {
-        clearPIIPromises.push(clearPII(context, ["content"]));
+        clearPIIPromises.push(clearPII(context, ["content"], essentialOnly));
       }
     }
 
     for (let i = 0; i < (span.error?.stacktrace ?? []).length; i++) {
-      clearPIIPromises.push(clearPII(span.error?.stacktrace ?? [], [i]));
+      clearPIIPromises.push(
+        clearPII(span.error?.stacktrace ?? [], [i], essentialOnly)
+      );
     }
   }
 

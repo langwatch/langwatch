@@ -283,10 +283,9 @@ export default async function handler(
     indexing_md5s: [...(existingTrace?.indexing_md5s ?? []), paramsMD5],
   };
 
-  if (!project.skipPIIRedacting) {
-    const piiEnforced = env.NODE_ENV === "production";
-    await cleanupPIIs(trace, esSpans, piiEnforced);
-  }
+  const piiEnforced = env.NODE_ENV === "production";
+  const essentialOnly = project.skipPIIRedacting
+  await cleanupPIIs(trace, esSpans, essentialOnly, piiEnforced);
 
   const result = await esClient.helpers.bulk({
     datasource: esSpans,
