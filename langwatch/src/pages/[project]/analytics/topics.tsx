@@ -21,6 +21,7 @@ import {
 import { TopTopics } from "~/components/analytics/TopTopics";
 import { FilterSidebar } from "~/components/filters/FilterSidebar";
 import { AnalyticsHeader } from "../../../components/analytics/AnalyticsHeader";
+import { TopicsSelector } from "../../../components/filters/TopicsSelector";
 
 const threadsPerTopic = {
   graphId: "custom",
@@ -103,13 +104,16 @@ export default function Topics() {
     <GraphsLayout>
       <AnalyticsHeader title="Topics" />
       <HStack alignItems={"start"}>
-        <SimpleGrid
-          templateColumns="repeat(4, 1fr)"
-          gap={5}
-          width={"100%"}
-        >
+        <SimpleGrid templateColumns="repeat(4, 1fr)" gap={5} width={"100%"}>
           <GridItem colSpan={1}>
-            <TopTopics />
+            <Card height="100%">
+              <CardHeader>
+                <Heading size="sm">Top Topics</Heading>
+              </CardHeader>
+              <CardBody>
+                <TopicsSelector showTitle={false} />
+              </CardBody>
+            </Card>
           </GridItem>
           <GridItem colSpan={3} display={"inline-grid"}>
             <Card>
