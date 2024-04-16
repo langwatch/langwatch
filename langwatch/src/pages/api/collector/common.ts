@@ -69,6 +69,9 @@ export const typedValueToText = (
       if (json.question) {
         return json.question;
       }
+      if (json.user_query) {
+        return json.user_query;
+      }
       return JSON.stringify(typed.value);
     } catch (_e) {
       return typed.value?.toString() ?? "";
