@@ -124,34 +124,35 @@ model Team {
 }
 
 model Organization {
-    id                          String               @id @default(nanoid())
-    name                        String
-    slug                        String               @unique
-    members                     OrganizationUser[]
-    teams                       Team[]
-    createdAt                   DateTime             @default(now())
-    updatedAt                   DateTime             @default(now()) @updatedAt
-    OrganizationInvite          OrganizationInvite[]
+    id                    String               @id @default(nanoid())
+    name                  String
+    slug                  String               @unique
+    members               OrganizationUser[]
+    teams                 Team[]
+    createdAt             DateTime             @default(now())
+    updatedAt             DateTime             @default(now()) @updatedAt
+    OrganizationInvite    OrganizationInvite[]
     usageSpendingMaxLimit Int?
 }
 
 model Project {
-    id           String        @id @default(nanoid())
-    name         String
-    slug         String        @unique
-    apiKey       String        @unique
-    teamId       String
-    team         Team          @relation(fields: [teamId], references: [id])
-    language     String
-    framework    String
-    firstMessage Boolean       @default(false)
-    createdAt    DateTime      @default(now())
-    updatedAt    DateTime      @default(now()) @updatedAt
-    checks       Check[]
-    costs        Cost[]
-    topics       Topic[]
-    datasets     Dataset[]
-    customGraphs CustomGraph[]
+    id               String        @id @default(nanoid())
+    name             String
+    slug             String        @unique
+    apiKey           String        @unique
+    teamId           String
+    team             Team          @relation(fields: [teamId], references: [id])
+    language         String
+    framework        String
+    firstMessage     Boolean       @default(false)
+    createdAt        DateTime      @default(now())
+    updatedAt        DateTime      @default(now()) @updatedAt
+    checks           Check[]
+    costs            Cost[]
+    topics           Topic[]
+    datasets         Dataset[]
+    customGraphs     CustomGraph[]
+    skipPIIRedacting Boolean       @default(false)
 
     @@index([teamId])
 }
