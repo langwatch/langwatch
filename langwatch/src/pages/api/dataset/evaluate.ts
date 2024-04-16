@@ -105,6 +105,8 @@ export default async function handler(
     },
   });
 
+  console.log(check);
+
   if (check != null) {
     evaluation = check.checkType;
     settings = check.parameters;
@@ -152,6 +154,7 @@ export default async function handler(
       settings: (settings as Record<string, unknown>) ?? {},
     });
   } catch (error) {
+    console.error(error);
     result = {
       status: "error",
       error_type: "INTERNAL_ERROR",

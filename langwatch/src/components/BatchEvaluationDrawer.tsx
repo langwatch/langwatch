@@ -10,6 +10,7 @@ import {
   DrawerHeader,
   FormControl,
   HStack,
+  Link,
   Select,
   Skeleton,
   Spacer,
@@ -38,6 +39,7 @@ import { AVAILABLE_EVALUATORS } from "~/trace_checks/evaluators.generated";
 import { api } from "~/utils/api";
 import { BatchDatasetProcessing } from "./integration-guides/BatchDatasetProcessing";
 import { type Check } from "@prisma/client";
+import type { JsonObject } from "@prisma/client/runtime/library";
 
 interface BatchEvaluatioProps {
   datasetSlug?: string | undefined;
@@ -84,10 +86,10 @@ export function BatchEvaluationDrawer(props: BatchEvaluatioProps) {
         (evaluation) => evaluation[0] === checkType
       );
       if (evaluation) {
-        //ignore ts error
         // @ts-ignore: Unreachable code error
-        checksData[index].description! = evaluation[1]?.description ?? "";
-        checksData[index].requiredFields! = evaluation[1]?.requiredFields;
+        checksData[index].description = evaluation[1]?.description ?? "";
+        // @ts-ignore: Unreachable code error
+        checksData[index].requiredFields = evaluation[1]?.requiredFields ?? [];
       }
     });
   }
@@ -119,6 +121,19 @@ export function BatchEvaluationDrawer(props: BatchEvaluatioProps) {
       return;
     }
     setStep(2);
+  };
+
+  const NotFound = () => {
+    return (
+      <Alert status="info">
+        <AlertIcon />
+        No checks configured, you can add them in the Guardrails and Evaluations
+        page&nbsp;
+        <Link href={`/${project?.slug}/evaluations`} textDecoration="underline">
+          here
+        </Link>
+      </Alert>
+    );
   };
 
   const handleSwitchChange = (checkType: string) => {
@@ -201,108 +216,14 @@ export function BatchEvaluationDrawer(props: BatchEvaluatioProps) {
               <HStack align={"start"} gap={12}>
                 <Tabs>
                   <TabList>
-                    <Tab>My Evaluations</Tab>
-                    <Tab>Two</Tab>
-                    <Tab>Three</Tab>
+                    <Tab>Output Comparison</Tab>
+                    <Tab>Evaluations</Tab>
+                    <Tab>Guardrails</Tab>
                   </TabList>
 
                   <TabPanels>
                     <TabPanel padding={0}>
-                      <TableContainer>
-                        <Table
-                          variant="simple"
-                          borderWidth={1}
-                          borderColor={"gray.200"}
-                        >
-                          <Thead backgroundColor={"gray.200"}>
-                            <Tr>
-                              <Th></Th>
-                              <Th>NAME</Th>
-                              <Th>DESCRIPTION</Th>
-                              <Th>REQUIRED</Th>
-                              <Th></Th>
-                            </Tr>
-                          </Thead>
-                          <Tbody>
-                            {checks.isLoading ? (
-                              <Tr>
-                                <Td>
-                                  <Skeleton width="full" height="20px" />
-                                </Td>
-                                <Td>
-                                  <Skeleton width="full" height="20px" />
-                                </Td>
-                                <Td>
-                                  <Skeleton width="full" height="20px" />
-                                </Td>
-                                <Td>
-                                  <Skeleton width="full" height="20px" />
-                                </Td>
-                              </Tr>
-                            ) : checks.isError ? (
-                              <Alert status="error">
-                                <AlertIcon />
-                                An error has occurred trying to load the check
-                                configs
-                              </Alert>
-                            ) : checksData.length ? (
-                              checksData.map((check, index) => {
-                                return (
-                                  <Tr key={index}>
-                                    <Td>
-                                      {" "}
-                                      <Switch
-                                        size="lg"
-                                        isChecked={selectedChecks.includes(
-                                          check.slug
-                                        )}
-                                        position="relative"
-                                        zIndex={1}
-                                        onChange={() =>
-                                          handleSwitchChange(check.slug)
-                                        }
-                                        variant="darkerTrack"
-                                      />
-                                    </Td>
-                                    <Td> {check.name}</Td>
-                                    <Td>
-                                      <Tooltip
-                                        label={
-                                          check.parameters?.prompt ??
-                                          check.description
-                                        }
-                                      >
-                                        <Text
-                                          noOfLines={2}
-                                          display="block"
-                                          maxWidth={230}
-                                        >
-                                          {check.parameters?.prompt ??
-                                            check.description}
-                                        </Text>
-                                      </Tooltip>
-                                    </Td>
-                                    <Td>
-                                      {check.requiredFields
-                                        ? check.requiredFields.join(", ")
-                                        : ""}
-                                    </Td>
-                                    <Td></Td>
-                                  </Tr>
-                                );
-                              })
-                            ) : (
-                              <Alert status="info">
-                                <AlertIcon />
-                                No checks configured
-                              </Alert>
-                            )}
-                          </Tbody>
-                        </Table>
-                      </TableContainer>
-                    </TabPanel>
-                    <TabPanel padding={0}>
-                      {/* <HStack>
+                      <HStack>
                         <TableContainer>
                           <Table
                             variant="simple"
@@ -348,6 +269,10 @@ export function BatchEvaluationDrawer(props: BatchEvaluatioProps) {
 
                                     console.log(check);
 
+                                    if (check[1].category != "similarity") {
+                                      return null;
+                                    }
+
                                     return (
                                       <Tr key={index}>
                                         <Td>
@@ -388,18 +313,212 @@ export function BatchEvaluationDrawer(props: BatchEvaluatioProps) {
                                   }
                                 )
                               ) : (
-                                <Alert status="info">
-                                  <AlertIcon />
-                                  No checks configured
-                                </Alert>
+                                <Tr>
+                                  <Td colSpan={4}>
+                                    <NotFound />
+                                  </Td>
+                                </Tr>
                               )}
                             </Tbody>
                           </Table>
                         </TableContainer>
-                      </HStack> */}
+                      </HStack>
                     </TabPanel>
-                    <TabPanel>
-                      <p>three!</p>
+                    <TabPanel padding={0}>
+                      <TableContainer>
+                        <Table
+                          variant="simple"
+                          borderWidth={1}
+                          borderColor={"gray.200"}
+                        >
+                          <Thead backgroundColor={"gray.200"}>
+                            <Tr>
+                              <Th></Th>
+                              <Th>NAME</Th>
+                              <Th>DESCRIPTION</Th>
+                              <Th>REQUIRED</Th>
+                              <Th></Th>
+                            </Tr>
+                          </Thead>
+                          <Tbody>
+                            {checks.isLoading ? (
+                              <Tr>
+                                <Td>
+                                  <Skeleton width="full" height="20px" />
+                                </Td>
+                                <Td>
+                                  <Skeleton width="full" height="20px" />
+                                </Td>
+                                <Td>
+                                  <Skeleton width="full" height="20px" />
+                                </Td>
+                                <Td>
+                                  <Skeleton width="full" height="20px" />
+                                </Td>
+                              </Tr>
+                            ) : checks.isError ? (
+                              <Alert status="error">
+                                <AlertIcon />
+                                An error has occurred trying to load the check
+                                configs
+                              </Alert>
+                            ) : checksData.length ? (
+                              checksData.map((check, index) => {
+                                if (check.isGuardrail) {
+                                  return null;
+                                }
+                                return (
+                                  <Tr key={index}>
+                                    <Td>
+                                      {" "}
+                                      <Switch
+                                        size="lg"
+                                        isChecked={selectedChecks.includes(
+                                          check.slug
+                                        )}
+                                        position="relative"
+                                        zIndex={1}
+                                        onChange={() =>
+                                          handleSwitchChange(check.slug)
+                                        }
+                                        variant="darkerTrack"
+                                      />
+                                    </Td>
+                                    <Td> {check.name}</Td>
+                                    <Td>
+                                      <Tooltip
+                                        label={
+                                          (check.parameters as JsonObject)
+                                            ?.prompt ?? check.description
+                                        }
+                                      >
+                                        <Text
+                                          noOfLines={2}
+                                          display="block"
+                                          maxWidth={230}
+                                        >
+                                          {(check.parameters as JsonObject)
+                                            ?.prompt ?? check.description}
+                                        </Text>
+                                      </Tooltip>
+                                    </Td>
+                                    <Td>
+                                      {check.requiredFields
+                                        ? check.requiredFields.join(", ")
+                                        : ""}
+                                    </Td>
+                                    <Td></Td>
+                                  </Tr>
+                                );
+                              })
+                            ) : (
+                              <Tr>
+                                <Td colSpan={4}>
+                                  <NotFound />
+                                </Td>
+                              </Tr>
+                            )}
+                          </Tbody>
+                        </Table>
+                      </TableContainer>
+                    </TabPanel>
+                    <TabPanel padding={0}>
+                      <TableContainer>
+                        <Table
+                          variant="simple"
+                          borderWidth={1}
+                          borderColor={"gray.200"}
+                        >
+                          <Thead backgroundColor={"gray.200"}>
+                            <Tr>
+                              <Th></Th>
+                              <Th>NAME</Th>
+                              <Th>DESCRIPTION</Th>
+                              <Th>REQUIRED</Th>
+                              <Th></Th>
+                            </Tr>
+                          </Thead>
+                          <Tbody>
+                            {checks.isLoading ? (
+                              <Tr>
+                                <Td>
+                                  <Skeleton width="full" height="20px" />
+                                </Td>
+                                <Td>
+                                  <Skeleton width="full" height="20px" />
+                                </Td>
+                                <Td>
+                                  <Skeleton width="full" height="20px" />
+                                </Td>
+                                <Td>
+                                  <Skeleton width="full" height="20px" />
+                                </Td>
+                              </Tr>
+                            ) : checks.isError ? (
+                              <Alert status="error">
+                                <AlertIcon />
+                                An error has occurred trying to load the check
+                                configs
+                              </Alert>
+                            ) : checksData.length ? (
+                              checksData.map((check, index) => {
+                                if (!check.isGuardrail) {
+                                  return null;
+                                }
+                                return (
+                                  <Tr key={index}>
+                                    <Td>
+                                      {" "}
+                                      <Switch
+                                        size="lg"
+                                        isChecked={selectedChecks.includes(
+                                          check.slug
+                                        )}
+                                        position="relative"
+                                        zIndex={1}
+                                        onChange={() =>
+                                          handleSwitchChange(check.slug)
+                                        }
+                                        variant="darkerTrack"
+                                      />
+                                    </Td>
+                                    <Td> {check.name}</Td>
+                                    <Td>
+                                      <Tooltip
+                                        label={
+                                          (check.parameters as JsonObject)
+                                            ?.prompt ?? check.description
+                                        }
+                                      >
+                                        <Text
+                                          noOfLines={2}
+                                          display="block"
+                                          maxWidth={230}
+                                        >
+                                          {(check.parameters as JsonObject)
+                                            ?.prompt ?? check.description}
+                                        </Text>
+                                      </Tooltip>
+                                    </Td>
+                                    <Td>
+                                      {check.requiredFields
+                                        ? check.requiredFields.join(", ")
+                                        : ""}
+                                    </Td>
+                                    <Td></Td>
+                                  </Tr>
+                                );
+                              })
+                            ) : (
+                              <Tr>
+                                <Td colSpan={4}>
+                                  <NotFound />
+                                </Td>
+                              </Tr>
+                            )}
+                          </Tbody>
+                        </Table>
+                      </TableContainer>
                     </TabPanel>
                   </TabPanels>
                 </Tabs>
