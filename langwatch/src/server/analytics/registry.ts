@@ -243,8 +243,24 @@ export const analyticsMetrics = {
       runtimeMappings: {
         total_tokens: {
           type: "long",
-          script:
-            "emit(doc['trace.metrics.prompt_tokens'].value + doc['trace.metrics.completion_tokens'].value)",
+          script: `
+            long promptTokens = 0;
+            long completionTokens = 0;
+
+            try {
+              promptTokens = doc['trace.metrics.prompt_tokens'].size() > 0 ? doc['trace.metrics.prompt_tokens'].value : 0;
+            } catch (Exception e) {
+              // ignore
+            }
+
+            try {
+              completionTokens = doc['trace.metrics.completion_tokens'].size() > 0 ? doc['trace.metrics.completion_tokens'].value : 0;
+            } catch (Exception e) {
+              // ignore
+            }
+
+            emit(promptTokens + completionTokens);
+          `,
         },
       },
     },
