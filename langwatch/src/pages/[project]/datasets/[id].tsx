@@ -17,19 +17,16 @@ import {
   Thead,
   Tooltip,
   Tr,
-  useDisclosure,
 } from "@chakra-ui/react";
 import { DatabaseSchema } from "@prisma/client";
 import { useRouter } from "next/router";
 import Parse from "papaparse";
-import { AddDatasetDrawer } from "~/components/AddDatasetDrawer";
-import { BatchEvaluationDrawer } from "~/components/BatchEvaluationDrawer";
+import { Play } from "react-feather";
+import { useDrawer } from "~/components/CurrentDrawer";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { displayName } from "~/utils/datasets";
-import { Play } from "react-feather";
-import { useDrawer } from "~/components/CurrentDrawer";
 
 export default function Dataset() {
   const router = useRouter();
@@ -37,18 +34,12 @@ export default function Dataset() {
   const dataSetId = router.query.id;
   const { openDrawer } = useDrawer();
 
-  const { isOpen, onOpen, onClose } = useDisclosure();
   const dataset = api.datasetRecord.getAll.useQuery(
     { projectId: project?.id ?? "", datasetId: dataSetId as string },
     {
       enabled: !!project,
     }
   );
-
-  const onSuccess = () => {
-    void dataset.refetch();
-    onClose();
-  };
 
   const getHeaders = (schema: DatabaseSchema) => {
     let headers: string[] = [];
@@ -240,7 +231,6 @@ export default function Dataset() {
               openDrawer("batchEvaluation", {
                 datasetSlug: dataset.data?.slug,
               });
-              //onOpen();
             }}
             minWidth="fit-content"
             leftIcon={<Play height={16} />}
@@ -293,11 +283,6 @@ export default function Dataset() {
           </CardBody>
         </Card>
       </Container>
-      {/* <BatchEvaluationDrawer
-        isOpen={isOpen}
-        onClose={onClose}
-        onSuccess={onSuccess}
-      /> */}
     </DashboardLayout>
   );
 }

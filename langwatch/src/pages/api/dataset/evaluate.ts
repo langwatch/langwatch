@@ -92,8 +92,32 @@ export default async function handler(
     return res.status(400).json({ error: validationError.message });
   }
 
+  const { input, output, contexts, expected_output } = params.data;
+  const { batchId, datasetSlug } = params;
+  let evaluation = params.evaluation;
+  let settings = null;
+
+  console.log("params", evaluation, project.id);
+  const check = await prisma.check.findFirst({
+    where: {
+      projectId: project.id,
+      slug: evaluation,
+    },
+  });
+
+  if (check != null) {
+    evaluation = check.checkType;
+    settings = check.parameters;
+  }
+
+  if (!AVAILABLE_EVALUATORS[evaluation as keyof typeof AVAILABLE_EVALUATORS]) {
+    return res.status(400).json({
+      error: `Invalid evaluation type: ${evaluation}`,
+    });
+  }
+
   const evaluationRequiredFields =
-    AVAILABLE_EVALUATORS[params.evaluation as keyof typeof AVAILABLE_EVALUATORS]
+    AVAILABLE_EVALUATORS[evaluation as keyof typeof AVAILABLE_EVALUATORS]
       .requiredFields;
 
   if (
@@ -102,13 +126,10 @@ export default async function handler(
     })
   ) {
     return res.status(400).json({
-      error: `Missing required field for ${params.evaluation}`,
+      error: `Missing required field for ${evaluation}`,
       requiredFields: evaluationRequiredFields,
     });
   }
-
-  const { input, output, contexts, expected_output } = params.data;
-  const { evaluation, batchId, datasetSlug } = params;
 
   const contextList = contexts
     ?.map((context) => {
@@ -128,6 +149,7 @@ export default async function handler(
       contexts: contextList,
       expected_output: expected_output ? expected_output : undefined,
       evalution: evaluation,
+      settings: (settings as Record<string, unknown>) ?? {},
     });
   } catch (error) {
     result = {
@@ -180,12 +202,14 @@ const runEvaluation = async ({
   contexts,
   expected_output,
   evalution,
+  settings,
 }: {
   input?: string;
   output?: string;
   contexts?: string[];
   expected_output?: string;
   evalution: string;
+  settings?: Record<string, unknown>;
 }) => {
   const response = await fetch(
     `${env.LANGEVALS_ENDPOINT}/${evalution}/evaluate`,
@@ -203,6 +227,8 @@ const runEvaluation = async ({
             expected_output,
           },
         ],
+
+        settings: settings && typeof settings === "object" ? settings : {},
       }),
     }
   );

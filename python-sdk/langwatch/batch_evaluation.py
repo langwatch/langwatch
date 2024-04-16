@@ -123,6 +123,7 @@ class BatchEvaluation:
             result_dict: dict[str, Any] = {
                 "input": result.entry.input,
                 "expectedOutput": result.entry.expectedOutput,
+                "output": result.entry.output,
             }
             for evaluation_name, evaluation_result in result.results:
                 if evaluation_result.status == "processed":

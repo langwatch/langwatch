@@ -1,5 +1,6 @@
 import {
-  Box,
+  Alert,
+  AlertIcon,
   Button,
   Container,
   Drawer,
@@ -8,62 +9,39 @@ import {
   DrawerContent,
   DrawerHeader,
   FormControl,
-  FormErrorMessage,
-  FormHelperText,
   HStack,
-  Input,
-  Radio,
-  RadioGroup,
-  Stack,
-  VStack,
-  useToast,
-  Text,
   Select,
   Skeleton,
-  Alert,
-  AlertIcon,
-  Card,
-  CardBody,
-  Heading,
-  LinkOverlay,
+  Spacer,
   Switch,
-  TableCaption,
+  Tab,
+  TabList,
+  TabPanel,
+  TabPanels,
+  Table,
   TableContainer,
+  Tabs,
   Tbody,
   Td,
-  Tfoot,
+  Text,
   Th,
   Thead,
-  Table,
-  Tr,
   Tooltip,
-  Spacer,
-  useDisclosure,
+  Tr,
+  VStack,
 } from "@chakra-ui/react";
-import { DatabaseSchema } from "@prisma/client";
-import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
-import { api } from "~/utils/api";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import slugify from "slugify";
-import { ChevronRight } from "react-feather";
-import { TeamRoleGroup } from "~/server/api/permission";
-import {
-  AVAILABLE_EVALUATORS,
-  type EvaluatorTypes,
-} from "~/trace_checks/evaluators.generated";
-import type { CheckPreconditions } from "~/trace_checks/types";
-import { camelCaseToLowerCase } from "~/utils/stringCasing";
-import { RenderCode } from "../../../docs/docs/integration-guides/utils/RenderCode";
-import { BatchDatasetProcessing } from "./integration-guides/BatchDatasetProcessing";
+import { useState } from "react";
 import { useDrawer } from "~/components/CurrentDrawer";
-import { object } from "zod";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { AVAILABLE_EVALUATORS } from "~/trace_checks/evaluators.generated";
+import { api } from "~/utils/api";
+import { BatchDatasetProcessing } from "./integration-guides/BatchDatasetProcessing";
+import { type Check } from "@prisma/client";
 
 interface BatchEvaluatioProps {
-  datasetSlug: string | undefined;
-  // isOpen: boolean;
-  // onClose: () => void;
-  // onSuccess: () => void;
+  datasetSlug?: string | undefined;
+  selectDataset?: boolean;
 }
 
 export function BatchEvaluationDrawer(props: BatchEvaluatioProps) {
@@ -77,7 +55,6 @@ export function BatchEvaluationDrawer(props: BatchEvaluatioProps) {
     useState<string>("one-shot");
   const router = useRouter();
   const { closeDrawer } = useDrawer();
-  const { isOpen, onOpen, onClose } = useDisclosure();
 
   const checkError = selectedChecks.length === 0;
 
@@ -96,6 +73,42 @@ export function BatchEvaluationDrawer(props: BatchEvaluatioProps) {
       enabled: !!project,
     }
   );
+
+  const evaluations = Object.entries(AVAILABLE_EVALUATORS);
+  const checksData = [...(checks.data ?? [])];
+
+  if (checksData) {
+    checksData.forEach((check, index: number) => {
+      const checkType = check.checkType;
+      const evaluation = evaluations.find(
+        (evaluation) => evaluation[0] === checkType
+      );
+      if (evaluation) {
+        //ignore ts error
+        // @ts-ignore: Unreachable code error
+        checksData[index].description! = evaluation[1]?.description ?? "";
+        checksData[index].requiredFields! = evaluation[1]?.requiredFields;
+      }
+    });
+  }
+
+  //left join on checks.data and evaluations
+  // if (checks.data) {
+  //   checks.data.forEach((check) => {
+  //     const checkType = check.checkType;
+  //     const evaluation = evaluations.find(
+  //       (evaluation) => evaluation[0] === checkType
+  //     );
+  //     if (evaluation) {
+  //       evaluation[1] = { ...evaluation[1], ...check };
+  //     }
+  //   });
+  //   console.log(checks);
+  // }
+  // evaluations = evaluations.map(([key, value]) => {
+  //   const check = checks.data?.find((check) => check.checkType === key);
+  //   return [key, { ...value, ...check }];
+  // });
 
   const onSubmit = (e: any) => {
     e.preventDefault();
@@ -123,6 +136,7 @@ export function BatchEvaluationDrawer(props: BatchEvaluatioProps) {
       placement="right"
       size={"xl"}
       onClose={() => {
+        setStep(1);
         closeDrawer();
       }}
     >
@@ -140,58 +154,40 @@ export function BatchEvaluationDrawer(props: BatchEvaluatioProps) {
         <DrawerBody>
           {step === 1 ? (
             <form onSubmit={onSubmit}>
-              <HStack align={"start"} gap={12} paddingBottom={4}>
-                <Container padding={0}>
-                  <VStack align={"start"} padding={0}>
-                    <Text fontWeight={"bold"}>Dataset</Text>
-                    <Text fontSize={"sm"}>
-                      Select the dataset to run the batch evaluation on
-                    </Text>
-                  </VStack>
-                </Container>
-                <Container>
-                  <VStack align={"start"}>
-                    <FormControl>
-                      <Select
-                        onChange={(e) => setSelectedDataset(e.target.value)}
-                      >
-                        {datasets.data
-                          ? datasets.data?.map((dataset, index) => (
-                              <option
-                                key={index}
-                                value={dataset.slug}
-                                selected={datasetId === dataset.id}
-                              >
-                                {dataset.name}
-                              </option>
-                            ))
-                          : null}
-                      </Select>
-                    </FormControl>
-                  </VStack>
-                </Container>
-              </HStack>
-              <HStack align={"start"} gap={12} paddingY={4}>
-                <Container padding={0}>
-                  <VStack align={"start"} padding={0}>
-                    <Text fontWeight={"bold"}>Generations per entry</Text>
-                    <Text fontSize={"sm"}>
-                      More attempts may reduce variance
-                    </Text>
-                  </VStack>
-                </Container>
-                <Container>
-                  <VStack align={"start"}>
-                    <FormControl>
-                      <Select
-                        onChange={(e) => setSelectedGenerations(e.target.value)}
-                      >
-                        <option value={"one-shot"}>One-shot</option>
-                      </Select>
-                    </FormControl>
-                  </VStack>
-                </Container>
-              </HStack>
+              {props.selectDataset ? (
+                <HStack align={"start"} gap={12} paddingBottom={4}>
+                  <Container padding={0}>
+                    <VStack align={"start"} padding={0}>
+                      <Text fontWeight={"bold"}>Dataset</Text>
+                      <Text fontSize={"sm"}>
+                        Select the dataset to run the batch evaluation on
+                      </Text>
+                    </VStack>
+                  </Container>
+                  <Container>
+                    <VStack align={"start"}>
+                      <FormControl>
+                        <Select
+                          onChange={(e) => setSelectedDataset(e.target.value)}
+                        >
+                          <option value={""}>Select a dataset</option>
+                          {datasets.data
+                            ? datasets.data?.map((dataset, index) => (
+                                <option
+                                  key={index}
+                                  value={dataset.slug}
+                                  selected={datasetId === dataset.id}
+                                >
+                                  {dataset.name}
+                                </option>
+                              ))
+                            : null}
+                        </Select>
+                      </FormControl>
+                    </VStack>
+                  </Container>
+                </HStack>
+              ) : null}
 
               <HStack align={"start"} gap={12} paddingY={4}>
                 <VStack align={"start"} padding={0}>
@@ -202,99 +198,214 @@ export function BatchEvaluationDrawer(props: BatchEvaluatioProps) {
                 </VStack>
               </HStack>
 
-              <VStack width="full" paddingTop={6} spacing={4}>
-                <TableContainer>
-                  <Table
-                    variant="simple"
-                    borderWidth={1}
-                    borderColor={"gray.200"}
-                  >
-                    <Thead backgroundColor={"gray.200"}>
-                      <Tr>
-                        <Th></Th>
-                        <Th>NAME</Th>
-                        <Th>DESCRIPTION</Th>
-                        <Th>REQUIRED</Th>
-                        <Th></Th>
-                      </Tr>
-                    </Thead>
-                    <Tbody>
-                      {checks.isLoading ? (
-                        <Tr>
-                          <Td>
-                            <Skeleton width="full" height="20px" />
-                          </Td>
-                          <Td>
-                            <Skeleton width="full" height="20px" />
-                          </Td>
-                          <Td>
-                            <Skeleton width="full" height="20px" />
-                          </Td>
-                          <Td>
-                            <Skeleton width="full" height="20px" />
-                          </Td>
-                        </Tr>
-                      ) : checks.isError ? (
-                        <Alert status="error">
-                          <AlertIcon />
-                          An error has occurred trying to load the check configs
-                        </Alert>
-                      ) : Object.entries(AVAILABLE_EVALUATORS).length ? (
-                        Object.entries(AVAILABLE_EVALUATORS).map(
-                          (check, index) => {
-                            const description = check[1].description;
+              <HStack align={"start"} gap={12}>
+                <Tabs>
+                  <TabList>
+                    <Tab>My Evaluations</Tab>
+                    <Tab>Two</Tab>
+                    <Tab>Three</Tab>
+                  </TabList>
 
-                            console.log(check);
-
-                            return (
-                              <Tr key={index}>
+                  <TabPanels>
+                    <TabPanel padding={0}>
+                      <TableContainer>
+                        <Table
+                          variant="simple"
+                          borderWidth={1}
+                          borderColor={"gray.200"}
+                        >
+                          <Thead backgroundColor={"gray.200"}>
+                            <Tr>
+                              <Th></Th>
+                              <Th>NAME</Th>
+                              <Th>DESCRIPTION</Th>
+                              <Th>REQUIRED</Th>
+                              <Th></Th>
+                            </Tr>
+                          </Thead>
+                          <Tbody>
+                            {checks.isLoading ? (
+                              <Tr>
                                 <Td>
-                                  {" "}
-                                  <Switch
-                                    size="lg"
-                                    isChecked={selectedChecks.includes(
-                                      check[0]
-                                    )}
-                                    position="relative"
-                                    zIndex={1}
-                                    onChange={() =>
-                                      handleSwitchChange(check[0])
-                                    }
-                                    variant="darkerTrack"
-                                  />
-                                </Td>
-                                <Td> {check[1].name}</Td>
-                                <Td>
-                                  <Tooltip label={description}>
-                                    <Text
-                                      noOfLines={2}
-                                      display="block"
-                                      maxWidth={230}
-                                    >
-                                      {description}
-                                    </Text>
-                                  </Tooltip>
+                                  <Skeleton width="full" height="20px" />
                                 </Td>
                                 <Td>
-                                  {check[1].requiredFields
-                                    ? check[1].requiredFields.join(", ")
-                                    : ""}
+                                  <Skeleton width="full" height="20px" />
                                 </Td>
-                                <Td></Td>
+                                <Td>
+                                  <Skeleton width="full" height="20px" />
+                                </Td>
+                                <Td>
+                                  <Skeleton width="full" height="20px" />
+                                </Td>
                               </Tr>
-                            );
-                          }
-                        )
-                      ) : (
-                        <Alert status="info">
-                          <AlertIcon />
-                          No checks configured
-                        </Alert>
-                      )}
-                    </Tbody>
-                  </Table>
-                </TableContainer>
-              </VStack>
+                            ) : checks.isError ? (
+                              <Alert status="error">
+                                <AlertIcon />
+                                An error has occurred trying to load the check
+                                configs
+                              </Alert>
+                            ) : checksData.length ? (
+                              checksData.map((check, index) => {
+                                return (
+                                  <Tr key={index}>
+                                    <Td>
+                                      {" "}
+                                      <Switch
+                                        size="lg"
+                                        isChecked={selectedChecks.includes(
+                                          check.slug
+                                        )}
+                                        position="relative"
+                                        zIndex={1}
+                                        onChange={() =>
+                                          handleSwitchChange(check.slug)
+                                        }
+                                        variant="darkerTrack"
+                                      />
+                                    </Td>
+                                    <Td> {check.name}</Td>
+                                    <Td>
+                                      <Tooltip
+                                        label={
+                                          check.parameters?.prompt ??
+                                          check.description
+                                        }
+                                      >
+                                        <Text
+                                          noOfLines={2}
+                                          display="block"
+                                          maxWidth={230}
+                                        >
+                                          {check.parameters?.prompt ??
+                                            check.description}
+                                        </Text>
+                                      </Tooltip>
+                                    </Td>
+                                    <Td>
+                                      {check.requiredFields
+                                        ? check.requiredFields.join(", ")
+                                        : ""}
+                                    </Td>
+                                    <Td></Td>
+                                  </Tr>
+                                );
+                              })
+                            ) : (
+                              <Alert status="info">
+                                <AlertIcon />
+                                No checks configured
+                              </Alert>
+                            )}
+                          </Tbody>
+                        </Table>
+                      </TableContainer>
+                    </TabPanel>
+                    <TabPanel padding={0}>
+                      {/* <HStack>
+                        <TableContainer>
+                          <Table
+                            variant="simple"
+                            borderWidth={1}
+                            borderColor={"gray.200"}
+                          >
+                            <Thead backgroundColor={"gray.200"}>
+                              <Tr>
+                                <Th></Th>
+                                <Th>NAME</Th>
+                                <Th>DESCRIPTION</Th>
+                                <Th>REQUIRED</Th>
+                                <Th></Th>
+                              </Tr>
+                            </Thead>
+                            <Tbody>
+                              {checks.isLoading ? (
+                                <Tr>
+                                  <Td>
+                                    <Skeleton width="full" height="20px" />
+                                  </Td>
+                                  <Td>
+                                    <Skeleton width="full" height="20px" />
+                                  </Td>
+                                  <Td>
+                                    <Skeleton width="full" height="20px" />
+                                  </Td>
+                                  <Td>
+                                    <Skeleton width="full" height="20px" />
+                                  </Td>
+                                </Tr>
+                              ) : checks.isError ? (
+                                <Alert status="error">
+                                  <AlertIcon />
+                                  An error has occurred trying to load the check
+                                  configs
+                                </Alert>
+                              ) : Object.entries(AVAILABLE_EVALUATORS)
+                                  .length ? (
+                                Object.entries(AVAILABLE_EVALUATORS).map(
+                                  (check, index) => {
+                                    const description = check[1].description;
+
+                                    console.log(check);
+
+                                    return (
+                                      <Tr key={index}>
+                                        <Td>
+                                          {" "}
+                                          <Switch
+                                            size="lg"
+                                            isChecked={selectedChecks.includes(
+                                              check[0]
+                                            )}
+                                            position="relative"
+                                            zIndex={1}
+                                            onChange={() =>
+                                              handleSwitchChange(check[0])
+                                            }
+                                            variant="darkerTrack"
+                                          />
+                                        </Td>
+                                        <Td> {check[1].name}</Td>
+                                        <Td>
+                                          <Tooltip label={description}>
+                                            <Text
+                                              noOfLines={2}
+                                              display="block"
+                                              maxWidth={230}
+                                            >
+                                              {description}
+                                            </Text>
+                                          </Tooltip>
+                                        </Td>
+                                        <Td>
+                                          {check[1].requiredFields
+                                            ? check[1].requiredFields.join(", ")
+                                            : ""}
+                                        </Td>
+                                        <Td></Td>
+                                      </Tr>
+                                    );
+                                  }
+                                )
+                              ) : (
+                                <Alert status="info">
+                                  <AlertIcon />
+                                  No checks configured
+                                </Alert>
+                              )}
+                            </Tbody>
+                          </Table>
+                        </TableContainer>
+                      </HStack> */}
+                    </TabPanel>
+                    <TabPanel>
+                      <p>three!</p>
+                    </TabPanel>
+                  </TabPanels>
+                </Tabs>
+              </HStack>
+
+              <VStack width="full" paddingTop={6} spacing={4}></VStack>
               <HStack gap={12} paddingY={8}>
                 <Spacer />
                 {checkError ? (
