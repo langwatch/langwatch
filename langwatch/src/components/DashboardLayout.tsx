@@ -238,8 +238,6 @@ export const AddProjectButton = ({
   team: Team;
   organization: Organization;
 }) => {
-  const router = useRouter();
-
   const usage = api.limits.getUsage.useQuery(
     { organizationId: organization.id },
     { enabled: !!organization }

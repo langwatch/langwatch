@@ -4,6 +4,7 @@ import {
   CardBody,
   HStack,
   Heading,
+  Link,
   LinkBox,
   LinkOverlay,
   Table,
@@ -12,6 +13,7 @@ import {
   Text,
   Th,
   Thead,
+  Tooltip,
   Tr,
   VStack,
 } from "@chakra-ui/react";
@@ -26,6 +28,7 @@ import type {
   TeamWithProjects,
 } from "../../server/api/routers/organization";
 import { TeamRoleGroup } from "../../server/api/permission";
+import { api } from "../../utils/api";
 
 export default function Projects() {
   const { organization } = useOrganizationTeamProject();
@@ -41,6 +44,11 @@ function ProjectsList({
   organization: FullyLoadedOrganization;
 }) {
   const { hasTeamPermission } = useOrganizationTeamProject();
+
+  const usage = api.limits.getUsage.useQuery(
+    { organizationId: organization.id },
+    { enabled: !!organization }
+  );
 
   return (
     <SettingsLayout>
@@ -69,19 +77,42 @@ function ProjectsList({
                         {hasTeamPermission(
                           TeamRoleGroup.TEAM_CREATE_NEW_PROJECTS,
                           team
-                        ) && (
-                          <Button
-                            as={NextLink}
-                            href={`/onboarding/${team.slug}/project`}
-                            size="sm"
-                            colorScheme="orange"
-                          >
-                            <HStack spacing={2}>
-                              <Plus size={20} />
-                              <Text>Add new project</Text>
-                            </HStack>
-                          </Button>
-                        )}
+                        ) &&
+                          (!usage.data ||
+                          usage.data.projectsCount <
+                            usage.data.activePlan.maxProjects ? (
+                            <Button
+                              as={NextLink}
+                              href={`/onboarding/${team.slug}/project`}
+                              size="sm"
+                              colorScheme="orange"
+                            >
+                              <HStack spacing={2}>
+                                <Plus size={20} />
+                                <Text>Add new project</Text>
+                              </HStack>
+                            </Button>
+                          ) : (
+                            <Tooltip label="You reached the limit of max new projects, click to upgrade your plan to add more projects">
+                              <Link
+                                href={`/settings/subscription`}
+                                _hover={{
+                                  textDecoration: "none",
+                                }}
+                              >
+                                <Button
+                                  background="gray.50"
+                                  _hover={{ background: "gray.50" }}
+                                  color="gray.400"
+                                >
+                                  <HStack spacing={2}>
+                                    <Plus size={20} />
+                                    <Text>Add new project</Text>
+                                  </HStack>
+                                </Button>
+                              </Link>
+                            </Tooltip>
+                          ))}
                       </Td>
                     </Tr>
                   </Thead>

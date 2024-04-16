@@ -29,7 +29,7 @@ export const limitsRouter = createTRPCRouter({
         })
       ).map((project) => project.id);
 
-      const projectsCount = await getProjectLimits(projectIds);
+      const projectsCount = projectIds.length;
       const currentMonthMessagesCount =
         await getCurrentMonthMessagesCount(projectIds);
       const currentMonthCost = await getCurrentMonthCost(projectIds);
@@ -51,12 +51,10 @@ const getCurrentMonth = () => {
   return new Date(new Date().getFullYear(), new Date().getMonth(), 1);
 };
 
-export const getProjectLimits = async (projectIds: string[]) => {
+export const getOrganizationProjectsCount = async (organizationId: string) => {
   return await prisma.project.count({
     where: {
-      id: {
-        in: projectIds,
-      },
+      team: { organizationId },
     },
   });
 };

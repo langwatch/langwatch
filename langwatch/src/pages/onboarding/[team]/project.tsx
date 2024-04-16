@@ -11,6 +11,10 @@ import {
   useRadio,
   type UseRadioProps,
   Select,
+  Alert,
+  AlertIcon,
+  Tooltip,
+  Link,
 } from "@chakra-ui/react";
 import ErrorPage from "next/error";
 import { useRouter } from "next/router";
@@ -86,6 +90,10 @@ export default function ProjectOnboarding() {
     { organizationId: organization?.id ?? "" },
     { enabled: !!organization }
   );
+  const usage = api.limits.getUsage.useQuery(
+    { organizationId: organization?.id ?? "" },
+    { enabled: !!organization }
+  );
 
   useEffect(() => {
     if (team.data) {
@@ -139,6 +147,26 @@ export default function ProjectOnboarding() {
           <Heading as="h1" fontSize="x-large">
             Create New Project
           </Heading>
+          {usage.data &&
+            usage.data.projectsCount >= usage.data.activePlan.maxProjects && (
+              <Alert status="warning">
+                <AlertIcon />
+                <Text>
+                  You have reached the maximum number of projects allowed by
+                  your plan. Please{" "}
+                  <Link
+                    href={`/settings/subscription`}
+                    textDecoration="underline"
+                    _hover={{
+                      textDecoration: "none",
+                    }}
+                  >
+                    upgrade your plan
+                  </Link>{" "}
+                  to create more projects.
+                </Text>
+              </Alert>
+            )}
           <Text paddingBottom={4} fontSize="14px">
             You can set up separate projects for each service or LLM feature of
             your application (for example, one for your ChatBot, another for
@@ -176,15 +204,29 @@ export default function ProjectOnboarding() {
           <TechStackSelector form={form} />
           {createProject.error && <p>Something went wrong!</p>}
           <HStack width="full">
-            <Button
-              colorScheme="orange"
-              type="submit"
-              disabled={createProject.isLoading}
+            <Tooltip
+              label={
+                usage.data &&
+                usage.data.projectsCount >= usage.data.activePlan.maxProjects
+                  ? "You reached the limit of max new projects, upgrade your plan to add more projects"
+                  : ""
+              }
             >
-              {createProject.isLoading || createProject.isSuccess
-                ? "Loading..."
-                : "Next"}
-            </Button>
+              <Button
+                colorScheme="orange"
+                type="submit"
+                isDisabled={
+                  createProject.isLoading ||
+                  (usage.data &&
+                    usage.data.projectsCount >=
+                      usage.data.activePlan.maxProjects)
+                }
+              >
+                {createProject.isLoading || createProject.isSuccess
+                  ? "Loading..."
+                  : "Next"}
+              </Button>
+            </Tooltip>
           </HStack>
         </VStack>
       </form>
