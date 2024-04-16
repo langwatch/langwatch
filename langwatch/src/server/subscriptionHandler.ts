@@ -6,6 +6,10 @@ export type PlanInfo = {
   maxProjects: number;
   maxMessagesPerMonth: number;
   evaluationsCredit: number;
+  prices: {
+    USD: number;
+    EUR: number;
+  };
 };
 
 export abstract class SubscriptionHandler {
@@ -25,6 +29,10 @@ export abstract class SubscriptionHandler {
       maxProjects: 9_999,
       maxMessagesPerMonth: 999_999,
       evaluationsCredit: 999,
+      prices: {
+        USD: 0,
+        EUR: 0,
+      },
     };
   }
 }

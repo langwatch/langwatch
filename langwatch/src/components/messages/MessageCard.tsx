@@ -20,7 +20,13 @@ import type { Project } from "@prisma/client";
 import { formatDistanceToNow } from "date-fns";
 import NextLink from "next/link";
 import numeral from "numeral";
-import { CheckCircle, Clock, Shield, XCircle } from "react-feather";
+import {
+  CheckCircle,
+  Clock,
+  MinusCircle,
+  Shield,
+  XCircle,
+} from "react-feather";
 import Markdown from "react-markdown";
 import type {
   GuardrailResult,
@@ -68,6 +74,13 @@ export function MessageCard({
   const guardrailsPasses = guardrails.filter(
     (check) => check.passed !== false
   ).length;
+
+  const allEvaluationsSkipped = evaluations.every(
+    (check) => check.status === "skipped"
+  );
+  const allGuardrailsSkipped = guardrails.every(
+    (check) => check.status === "skipped"
+  );
 
   const totalEvaluations = evaluations.length;
   const totalGuardrails = guardrails.length;
@@ -285,14 +298,25 @@ export function MessageCard({
                 variant="outline"
                 boxShadow="#DEDEDE 0px 0px 0px 1px inset"
                 color={
-                  guardrailsPasses == totalGuardrails ? "green.600" : "blue.600"
+                  allGuardrailsSkipped
+                    ? "yellow.600"
+                    : guardrailsPasses == totalGuardrails
+                    ? "green.600"
+                    : "blue.600"
                 }
                 paddingY={1}
                 paddingX={2}
                 position="relative"
                 zIndex="popover"
               >
-                {guardrailsPasses == totalGuardrails ? (
+                {allGuardrailsSkipped ? (
+                  <>
+                    <Box paddingRight={2}>
+                      <MinusCircle />
+                    </Box>
+                    Guardrails skipped
+                  </>
+                ) : guardrailsPasses == totalGuardrails ? (
                   <>
                     <Box paddingRight={2}>
                       <CheckCircle />
@@ -341,7 +365,7 @@ export function MessageCard({
                 variant="outline"
                 boxShadow="#DEDEDE 0px 0px 0px 1px inset"
                 color={
-                  !evaluationsDone
+                  !evaluationsDone || allEvaluationsSkipped
                     ? "yellow.600"
                     : evaluationsPasses == totalEvaluations
                     ? "green.600"
@@ -355,13 +379,17 @@ export function MessageCard({
                 <Box paddingRight={2}>
                   {!evaluationsDone ? (
                     <Clock />
+                  ) : allEvaluationsSkipped ? (
+                    <MinusCircle />
                   ) : evaluationsPasses == totalEvaluations ? (
                     <CheckCircle />
                   ) : (
                     <XCircle />
                   )}
                 </Box>
-                {evaluationsDone && evaluationsPasses != totalEvaluations
+                {allEvaluationsSkipped
+                  ? "Evaluations skipped"
+                  : evaluationsDone && evaluationsPasses != totalEvaluations
                   ? `${totalEvaluations - evaluationsPasses} ${
                       totalEvaluations - evaluationsPasses == 1
                         ? "evaluation failed"

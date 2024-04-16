@@ -32,17 +32,19 @@ export const limitsRouter = createTRPCRouter({
       const projectsCount = projectIds.length;
       const currentMonthMessagesCount =
         await getCurrentMonthMessagesCount(projectIds);
-      const currentMonthCost = await getCurrentMonthCost(projectIds);
+      const currentMonthCost = await getCurrentMonthCostForProjects(projectIds);
       const activePlan = await dependencies.subscriptionHandler.getActivePlan(
         organizationId,
         ctx.session.user
       );
+      const maxMonthlyUsageLimit_ = await maxMonthlyUsageLimit(organizationId);
 
       return {
         projectsCount,
         currentMonthMessagesCount,
         currentMonthCost,
         activePlan,
+        maxMonthlyUsageLimit: maxMonthlyUsageLimit_,
       };
     }),
 });
@@ -87,7 +89,20 @@ export const getCurrentMonthMessagesCount = async (projectIds: string[]) => {
   return messagesCount.count;
 };
 
-export const getCurrentMonthCost = async (projectIds: string[]) => {
+export const getCurrentMonthCost = async (organizationId: string) => {
+  const projectIds = (
+    await prisma.project.findMany({
+      where: {
+        team: { organizationId },
+      },
+      select: { id: true },
+    })
+  ).map((project) => project.id);
+
+  return getCurrentMonthCostForProjects(projectIds);
+};
+
+const getCurrentMonthCostForProjects = async (projectIds: string[]) => {
   return (
     (
       await prisma.cost.aggregate({
@@ -105,4 +120,30 @@ export const getCurrentMonthCost = async (projectIds: string[]) => {
       })
     )._sum?.amount ?? 0
   );
+};
+
+export const maxMonthlyUsageLimit = async (organizationId: string) => {
+  const activePlan =
+    await dependencies.subscriptionHandler.getActivePlan(organizationId);
+  if (activePlan.name === "Open Source") {
+    const organization = await prisma.organization.findUnique({
+      where: { id: organizationId },
+    });
+
+    return organization?.usageSpendingMaxLimit ?? Infinity;
+  }
+  if (activePlan.evaluationsCredit < 10) {
+    return activePlan.evaluationsCredit;
+  }
+
+  const organization = await prisma.organization.findUnique({
+    where: { id: organizationId },
+  });
+
+  // TODO: improve this logic to be based on subscription history
+  const maxLimitAccordingToSubscription = activePlan.prices.USD;
+  const maxLimitAccordingToUser =
+    organization?.usageSpendingMaxLimit ?? maxLimitAccordingToSubscription;
+
+  return Math.min(maxLimitAccordingToSubscription, maxLimitAccordingToUser);
 };

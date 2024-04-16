@@ -404,7 +404,12 @@ export const DashboardLayout = ({
         {usage.data &&
           usage.data.currentMonthMessagesCount >=
             usage.data.activePlan.maxMessagesPerMonth && (
-            <Alert status="warning" width="full" borderBottom="1px solid" borderBottomColor="yellow.300">
+            <Alert
+              status="warning"
+              width="full"
+              borderBottom="1px solid"
+              borderBottomColor="yellow.300"
+            >
               <AlertIcon />
               <Text>
                 You reached the limit of{" "}
@@ -420,6 +425,32 @@ export const DashboardLayout = ({
                   Click here
                 </Link>{" "}
                 to upgrade your plan.
+              </Text>
+            </Alert>
+          )}
+        {usage.data &&
+          usage.data.currentMonthCost > usage.data.maxMonthlyUsageLimit && (
+            <Alert
+              status="warning"
+              width="full"
+              borderBottom="1px solid"
+              borderBottomColor="yellow.300"
+            >
+              <AlertIcon />
+              <Text>
+                You reached the limit of{" "}
+                {numeral(usage.data.maxMonthlyUsageLimit).format("$0.00")} usage cost for
+                this month, evaluations and guardrails will not be processed.{" "}
+                <Link
+                  href="/settings/usage"
+                  textDecoration="underline"
+                  _hover={{
+                    textDecoration: "none",
+                  }}
+                >
+                  Go to settings
+                </Link>{" "}
+                to check your usage spending limit or upgrade your plan.
               </Text>
             </Alert>
           )}

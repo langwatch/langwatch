@@ -21,10 +21,14 @@ import { TRACE_INDEX, esClient, traceIndexId } from "../../elasticsearch";
 import type { Trace } from "../../tracer/types";
 import { esGetSpansByTraceId } from "../../api/routers/traces";
 import { getRAGInfo } from "../../tracer/utils";
+import {
+  getCurrentMonthCost,
+  maxMonthlyUsageLimit,
+} from "../../api/routers/limits";
 
 const debug = getDebugger("langwatch:workers:traceChecksWorker");
 
-export const runEvaluation = async (
+export const runEvaluationJob = async (
   job: Job<TraceCheckJob, any, EvaluatorTypes>
 ): Promise<SingleEvaluationResult> => {
   const check = await prisma.check.findUnique({
@@ -88,15 +92,70 @@ export const runEvaluationForTrace = async ({
     contexts = ragInfo.contexts;
   }
 
+  const result = await runEvaluation({
+    projectId,
+    checkType: evaluatorType,
+    input,
+    output,
+    contexts,
+    expected_output: undefined,
+    settings: settings && typeof settings === "object" ? settings : undefined,
+  });
+
+  return result;
+};
+
+export const runEvaluation = async ({
+  projectId,
+  checkType,
+  input,
+  output,
+  contexts,
+  expected_output,
+  settings,
+}: {
+  projectId: string;
+  checkType: EvaluatorTypes;
+  input?: string;
+  output?: string;
+  contexts?: string[];
+  expected_output?: string;
+  settings?: Record<string, unknown>;
+}): Promise<SingleEvaluationResult> => {
+  const project = await prisma.project.findUnique({
+    where: { id: projectId },
+    include: { team: true },
+  });
+  if (!project) {
+    throw new Error("Project not found");
+  }
+  const maxMonthlyUsage = await maxMonthlyUsageLimit(
+    project.team.organizationId
+  );
+  const getCurrentCost = await getCurrentMonthCost(project.team.organizationId);
+  if (getCurrentCost >= maxMonthlyUsage) {
+    return {
+      status: "skipped",
+      details: "Monthly usage limit exceeded",
+    };
+  }
+
   const response = await fetch(
-    `${env.LANGEVALS_ENDPOINT}/${evaluatorType}/evaluate`,
+    `${env.LANGEVALS_ENDPOINT}/${checkType}/evaluate`,
     {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        data: [{ input, output, contexts }],
+        data: [
+          {
+            input,
+            output,
+            contexts,
+            expected_output,
+          },
+        ],
         settings: settings && typeof settings === "object" ? settings : {},
       }),
     }

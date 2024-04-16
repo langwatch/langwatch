@@ -21,6 +21,10 @@ import type {
   TopicClusteringTrace,
   TopicClusteringTraceTopicMap,
 } from "./types";
+import {
+  getCurrentMonthCost,
+  maxMonthlyUsageLimit,
+} from "../api/routers/limits";
 
 const debug = getDebugger("langwatch:topicClustering");
 
@@ -29,6 +33,25 @@ export const clusterTopicsForProject = async (
   searchAfter?: [number, string],
   scheduleNextPage = true
 ): Promise<void> => {
+  const project = await prisma.project.findUnique({
+    where: { id: projectId },
+    include: { team: true },
+  });
+  if (!project) {
+    throw new Error("Project not found");
+  }
+  const maxMonthlyUsage = await maxMonthlyUsageLimit(
+    project.team.organizationId
+  );
+  const getCurrentCost = await getCurrentMonthCost(project.team.organizationId);
+  if (getCurrentCost >= maxMonthlyUsage) {
+    debug(
+      "Skipping clustering for project",
+      projectId,
+      "as monthly limit has been reached"
+    );
+  }
+
   const assignedTracesCount = await esClient.count({
     index: TRACE_INDEX,
     body: {
