@@ -71,7 +71,6 @@ export class SubscriptionHandlerSass extends SubscriptionHandler {
       user?.impersonator && isAdmin(user?.impersonator);
 
     if (
-      organizationId === "organization_erk6Bmlfzxw2YMyzWdo8O" ||
       organizationId === "HXECRq2mRfSQpxTiSCcsS" ||
       organizationId === "XpdrHl5j4YrD6VWJffq5k" ||
       organizationId === "organization_wGxIz2Tiwl8BFDHFHZMz_" ||
@@ -79,6 +78,12 @@ export class SubscriptionHandlerSass extends SubscriptionHandler {
       organizationId === "organization_z0JEOAFun8ldnzTQgFxVA"
     ) {
       return { ...PLAN_LIMITS[PlanTypes.BUSINESS], canAlwaysAddNewMembers };
+    }
+
+    if (
+      organizationId === "organization_erk6Bmlfzxw2YMyzWdo8O"
+    ) {
+      return { ...PLAN_LIMITS[PlanTypes.ENTERPRISE], canAlwaysAddNewMembers };
     }
 
     const activeSubscription = await prisma.subscription.findFirst({
