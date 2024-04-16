@@ -18,7 +18,6 @@ import {
 
 import { SatisfactionGraphs } from "./SatisfactionGraph";
 import { SessionsSummary } from "./SessionsSummary";
-import { TopTopics } from "./TopTopics";
 import { TopicsSelector } from "../filters/TopicsSelector";
 
 export function UserMetrics() {

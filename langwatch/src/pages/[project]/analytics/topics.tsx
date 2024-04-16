@@ -18,7 +18,6 @@ import {
   DocumentsCountsSummary,
   DocumentsCountsTable,
 } from "~/components/analytics/DocumentsCountsTable";
-import { TopTopics } from "~/components/analytics/TopTopics";
 import { FilterSidebar } from "~/components/filters/FilterSidebar";
 import { AnalyticsHeader } from "../../../components/analytics/AnalyticsHeader";
 import { TopicsSelector } from "../../../components/filters/TopicsSelector";

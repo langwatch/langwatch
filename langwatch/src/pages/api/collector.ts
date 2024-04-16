@@ -82,7 +82,7 @@ export default async function handler(
   );
   if (currentMonthMessagesCount >= activePlan.maxMessagesPerMonth) {
     return res.status(429).json({
-      message: `You have reached the monthly limit of ${activePlan.maxMessagesPerMonth} messages, please go to LangWatch dashboard to verify your plan.`,
+      message: `ERR_PLAN_LIMIT: You have reached the monthly limit of ${activePlan.maxMessagesPerMonth} messages, please go to LangWatch dashboard to verify your plan.`,
     });
   }
 

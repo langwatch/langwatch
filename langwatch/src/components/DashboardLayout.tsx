@@ -20,8 +20,10 @@ import {
   useTheme,
   type BackgroundProps,
   Tooltip,
+  Alert,
+  AlertIcon,
 } from "@chakra-ui/react";
-import { type Project } from "@prisma/client";
+import { type Organization, type Project, type Team } from "@prisma/client";
 import { signOut } from "next-auth/react";
 import ErrorPage from "next/error";
 import Head from "next/head";
@@ -53,6 +55,7 @@ import React from "react";
 import { useTableView } from "./messages/HeaderButtons";
 import { CurrentDrawer } from "./CurrentDrawer";
 import { api } from "../utils/api";
+import numeral from "numeral";
 
 const Breadcrumbs = ({ currentRoute }: { currentRoute: Route | undefined }) => {
   const { project } = useOrganizationTeamProject();
@@ -398,6 +401,28 @@ export const DashboardLayout = ({
         background="gray.100"
         {...bgProps}
       >
+        {usage.data &&
+          usage.data.currentMonthMessagesCount >=
+            usage.data.activePlan.maxMessagesPerMonth && (
+            <Alert status="warning" width="full" borderBottom="1px solid" borderBottomColor="yellow.300">
+              <AlertIcon />
+              <Text>
+                You reached the limit of{" "}
+                {numeral(usage.data.activePlan.maxMessagesPerMonth).format()}{" "}
+                messages for this month, new messages will not be processed.{" "}
+                <Link
+                  href="/settings/subscription"
+                  textDecoration="underline"
+                  _hover={{
+                    textDecoration: "none",
+                  }}
+                >
+                  Click here
+                </Link>{" "}
+                to upgrade your plan.
+              </Text>
+            </Alert>
+          )}
         <HStack
           position="relative"
           zIndex={3}
