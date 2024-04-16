@@ -12,6 +12,8 @@ import {
   checkUserPermissionForProject,
   checkUserPermissionForTeam,
 } from "../permission";
+import { getOrganizationProjectsCount } from "./limits";
+import { dependencies } from "../../../injection/dependencies.server";
 
 export const projectRouter = createTRPCRouter({
   create: protectedProcedure
@@ -57,6 +59,19 @@ export const projectRouter = createTRPCRouter({
         throw new TRPCError({
           code: "FORBIDDEN",
           message: "You don't have the necessary permissions",
+        });
+      }
+
+      const projectCount = await getOrganizationProjectsCount(input.organizationId);
+      const activePlan = await dependencies.subscriptionHandler.getActivePlan(
+        input.organizationId,
+        ctx.session.user
+      );
+
+      if (projectCount >= activePlan.maxProjects) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "You have reached the maximum number of projects",
         });
       }
 

@@ -12,11 +12,13 @@ import {
   VStack,
   Tab,
   Grid,
+  CardHeader,
+  Heading,
 } from "@chakra-ui/react";
 
 import { SatisfactionGraphs } from "./SatisfactionGraph";
 import { SessionsSummary } from "./SessionsSummary";
-import { TopTopics } from "./TopTopics";
+import { TopicsSelector } from "../filters/TopicsSelector";
 
 export function UserMetrics() {
   const messagesGraph: CustomGraphInput = {
@@ -134,7 +136,14 @@ export function UserMetrics() {
       </GridItem>
       <GridItem rowSpan={2}>
         <VStack spacing={6}>
-          <TopTopics />
+          <Card width="100%" minHeight="350px">
+            <CardHeader>
+              <Heading size="sm">Top Topics</Heading>
+            </CardHeader>
+            <CardBody>
+              <TopicsSelector showTitle={false} />
+            </CardBody>
+          </Card>
           <SatisfactionGraphs />
         </VStack>
       </GridItem>

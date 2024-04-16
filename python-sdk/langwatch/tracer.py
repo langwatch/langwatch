@@ -257,11 +257,20 @@ def send_spans(data: CollectorRESTParams):
     if len(data["spans"]) == 0:
         return
     if not langwatch.api_key:
-        warn("LANGWATCH_API_KEY is not set, LLMs traces will not be sent, go to https://langwatch.ai to set it up")
+        warn(
+            "LANGWATCH_API_KEY is not set, LLMs traces will not be sent, go to https://langwatch.ai to set it up"
+        )
         return
     response = requests.post(
         langwatch.endpoint + "/api/collector",
         json=data,
         headers={"X-Auth-Token": str(langwatch.api_key)},
     )
-    response.raise_for_status()
+    if response.status_code == 429:
+        json = response.json()
+        if "message" in json and "ERR_PLAN_LIMIT" in json["message"]:
+            warn(json["message"])
+        else:
+            warn("Rate limit exceeded, dropping message from being sent to LangWatch")
+    else:
+        response.raise_for_status()

@@ -32,6 +32,7 @@ export const teamRolePermissionMapping = {
 export const organizationRolePermissionMapping = {
   ORGANIZATION_VIEW: [OrganizationUserRole.ADMIN, OrganizationUserRole.MEMBER],
   ORGANIZATION_MANAGE: [OrganizationUserRole.ADMIN],
+  ORGANIZATION_USAGE: [OrganizationUserRole.ADMIN, OrganizationUserRole.MEMBER, OrganizationUserRole.EXTERNAL],
 };
 
 export const TeamRoleGroup = Object.fromEntries(

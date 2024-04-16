@@ -4,14 +4,12 @@ import { prisma } from "../../../../server/db"; // Adjust the import based on yo
 
 import { getDebugger } from "../../../../utils/logger";
 
-import { CostReferenceType, CostType, type Check } from "@prisma/client";
+import { CostReferenceType, CostType } from "@prisma/client";
 import { nanoid } from "nanoid";
 import { z } from "zod";
-import { env } from "../../../../env.mjs";
 import { updateCheckStatusInES } from "../../../../server/background/queues/traceChecksQueue";
 import { rAGChunkSchema } from "../../../../server/tracer/types.generated";
 import type {
-  BatchEvaluationResult,
   EvaluationResult,
   EvaluationResultError,
   EvaluationResultSkipped,
@@ -22,6 +20,7 @@ import { evaluatorsSchema } from "../../../../trace_checks/evaluators.zod.genera
 import { getEvaluatorDefinitions } from "../../../../trace_checks/getEvaluator";
 import { extractChunkTextualContent } from "../../collector/rag";
 import * as Sentry from "@sentry/nextjs";
+import { runEvaluation } from "../../../../server/background/workers/traceChecksWorker";
 
 export const debug = getDebugger("langwatch:guardrail:evaluate");
 
@@ -160,7 +159,8 @@ export default async function handler(
   let result: SingleEvaluationResult;
   try {
     result = await runEvaluation({
-      guardrail,
+      projectId: project.id,
+      checkType: guardrail.checkType as EvaluatorTypes,
       input: input ? input : undefined,
       output: output ? output : undefined,
       contexts: contextList,
@@ -209,7 +209,7 @@ export default async function handler(
       ? {
           status: "skipped",
           details: result.details,
-          passed: false,
+          passed: true,
         }
       : {
           ...result,
@@ -250,46 +250,3 @@ export default async function handler(
   return res.status(200).json(guardrailResult);
 }
 
-const runEvaluation = async ({
-  guardrail,
-  input,
-  output,
-  contexts,
-  expected_output,
-  settings,
-}: {
-  guardrail: Check;
-  input?: string;
-  output?: string;
-  contexts?: string[];
-  expected_output?: string;
-  settings?: Record<string, unknown>;
-}) => {
-  const response = await fetch(
-    `${env.LANGEVALS_ENDPOINT}/${guardrail.checkType}/evaluate`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        data: [
-          {
-            input,
-            output,
-            contexts,
-            expected_output,
-          },
-        ],
-        settings: settings && typeof settings === "object" ? settings : {},
-      }),
-    }
-  );
-
-  const result = ((await response.json()) as BatchEvaluationResult)[0];
-  if (!result) {
-    throw "Unexpected response: empty results";
-  }
-
-  return result;
-};

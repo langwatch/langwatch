@@ -10,7 +10,7 @@ import type {
 import { getDebugger } from "../../utils/logger";
 import { startTopicClusteringWorker } from "./workers/topicClusteringWorker";
 import {
-  runEvaluation,
+  runEvaluationJob,
   startTraceChecksWorker,
 } from "./workers/traceChecksWorker";
 import { startTrackEventsWorker } from "./workers/trackEventsWorker";
@@ -32,7 +32,7 @@ export const start = (
   | undefined
 > => {
   return new Promise((resolve) => {
-    const traceChecksWorker = startTraceChecksWorker(runEvaluationMock ?? runEvaluation);
+    const traceChecksWorker = startTraceChecksWorker(runEvaluationMock ?? runEvaluationJob);
     const topicClusteringWorker = startTopicClusteringWorker();
     const trackEventsWorker = startTrackEventsWorker();
 

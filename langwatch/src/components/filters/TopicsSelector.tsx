@@ -15,7 +15,7 @@ import { api } from "../../utils/api";
 import { useFilterParams } from "../../hooks/useFilterParams";
 import { OverflownTextWithTooltip } from "../OverflownText";
 
-export function TopicsSelector() {
+export function TopicsSelector({ showTitle = true }: { showTitle?: boolean }) {
   const router = useRouter();
   const [selectedTopics, setSelectedTopics] = useState<string[]>([]);
   const [selectedSubtopics, setSelectedSubtopics] = useState<string[]>([]);
@@ -131,9 +131,11 @@ export function TopicsSelector() {
       ref={topicSelectorRef}
       minHeight={`${minHeight}px`}
     >
-      <Heading as="h2" size="md">
-        Topics
-      </Heading>
+      {showTitle && (
+        <Heading as="h2" size="md">
+          Topics
+        </Heading>
+      )}
       <VStack width="full" spacing={4} align="start">
         {topicCountsQuery.isLoading ? (
           <>
