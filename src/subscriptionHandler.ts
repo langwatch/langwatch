@@ -15,6 +15,10 @@ const PLAN_LIMITS: Record<PlanTypes, PlanInfo> = {
     maxProjects: 1,
     maxMessagesPerMonth: 1000,
     evaluationsCredit: 2,
+    prices: {
+      USD: 0,
+      EUR: 0,
+    },
   },
   [PlanTypes.TEAM]: {
     name: "Team",
@@ -23,6 +27,10 @@ const PLAN_LIMITS: Record<PlanTypes, PlanInfo> = {
     maxProjects: 2,
     maxMessagesPerMonth: 10_000,
     evaluationsCredit: 10,
+    prices: {
+      USD: 99,
+      EUR: 99,
+    },
   },
   [PlanTypes.BUSINESS]: {
     name: "Business",
@@ -31,6 +39,10 @@ const PLAN_LIMITS: Record<PlanTypes, PlanInfo> = {
     maxProjects: 5,
     maxMessagesPerMonth: 100_000,
     evaluationsCredit: 50,
+    prices: {
+      USD: 399,
+      EUR: 399,
+    },
   },
   [PlanTypes.ENTERPRISE]: {
     name: "Enterprise",
@@ -39,6 +51,10 @@ const PLAN_LIMITS: Record<PlanTypes, PlanInfo> = {
     maxProjects: 100,
     maxMessagesPerMonth: 1_000_000,
     evaluationsCredit: 500,
+    prices: {
+      USD: 999,
+      EUR: 999,
+    },
   },
 };
 
@@ -52,7 +68,7 @@ export class SubscriptionHandlerSass extends SubscriptionHandler {
     }
   ): Promise<PlanInfo> {
     const canAlwaysAddNewMembers =
-      user.impersonator && isAdmin(user.impersonator);
+      user?.impersonator && isAdmin(user?.impersonator);
 
     if (
       organizationId === "organization_erk6Bmlfzxw2YMyzWdo8O" ||
