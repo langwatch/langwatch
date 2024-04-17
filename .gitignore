@@ -2,4 +2,3 @@ node_modules
 .env
 prisma/schema.prisma
 .next*
-.DS_Store
