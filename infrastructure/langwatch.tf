@@ -151,16 +151,20 @@ resource "null_resource" "langwatch_docker_image" {
         git submodule update --init
       fi
       secrets=$(aws secretsmanager --profile ${module.variables.profile} --region ${data.aws_region.current.name} get-secret-value --secret-id ${data.aws_secretsmanager_secret.langwatch.id} | jq -r '.SecretString')
-      echo "$secrets" | jq -r "to_entries|map(\"\(.key)='\(.value)'\")|.[]" > .env
-      output=$(aws secretsmanager --profile ${module.variables.profile} --region ${data.aws_region.current.name} get-secret-value --secret-id ${data.aws_secretsmanager_secret.redis.id})
-      redis_secret=$(echo $output | jq -r '.SecretString' | jq -r '.password' 2>/dev/null)
-      if [[ -z "$redis_secret" || "$redis_secret" == "null" ]]; then
-        echo "Failed to retrieve or parse the redis secret."
-        exit 1
+
+      has_dotenvfile=$(ls -A .env 2>/dev/null || false)
+      if [ -z "$has_dotenvfile" ]; then
+        echo "$secrets" | jq -r "to_entries|map(\"\(.key)='\(.value)'\")|.[]" > .env
+        output=$(aws secretsmanager --profile ${module.variables.profile} --region ${data.aws_region.current.name} get-secret-value --secret-id ${data.aws_secretsmanager_secret.redis.id})
+        redis_secret=$(echo $output | jq -r '.SecretString' | jq -r '.password' 2>/dev/null)
+        if [[ -z "$redis_secret" || "$redis_secret" == "null" ]]; then
+          echo "Failed to retrieve or parse the redis secret."
+          exit 1
+        fi
+        encoded_redis_password=$(python -c "import urllib.parse; print(urllib.parse.quote(input()))" <<< "$redis_secret")
+        redis_url="redis://:$encoded_redis_password@${aws_elasticache_replication_group.redis[0].primary_endpoint_address}:6379"
+        echo "REDIS_URL=$redis_url" >> .env
       fi
-      encoded_redis_password=$(python -c "import urllib.parse; print(urllib.parse.quote(input()))" <<< "$redis_secret")
-      redis_url="redis://:$encoded_redis_password@${aws_elasticache_replication_group.redis[0].primary_endpoint_address}:6379"
-      echo "REDIS_URL=$redis_url" >> .env
       npm ci && cd langwatch/langwatch && npm ci && cd -
       npm run start:prepare
       npm run build
@@ -180,7 +184,10 @@ resource "null_resource" "langwatch_docker_image" {
       docker build . --platform="linux/amd64" --cache-to type=inline $cache_from -t ${data.aws_ecr_repository.langwatch.repository_url}:${local.tag} -t ${data.aws_ecr_repository.langwatch.repository_url}:${local.git_tag}
       docker push ${data.aws_ecr_repository.langwatch.repository_url}:${local.tag}
       docker push ${data.aws_ecr_repository.langwatch.repository_url}:${local.git_tag}
-      rm -rf .env
+      if [ -z "$has_dotenvfile" ]; then
+        rm -rf .env
+        rm -rf langwatch/langwatch/.env
+      fi
       cd -
     EOT
 
