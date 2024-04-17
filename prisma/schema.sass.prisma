@@ -9,23 +9,21 @@ model Session {
 model Organization {
   stripeCustomerId String?        @unique
   subscriptions    Subscription[]
+  currency         Currency       @default(EUR)
 }
 
 enum PlanTypes {
   FREE
-  TEAM
-  BUSINESS
+  PRO
+  GROWTH
   ENTERPRISE
 }
 
 enum SubscriptionStatus {
+  PENDING
+  FAILED
   ACTIVE
-  PAST_DUE
   CANCELLED
-  INCOMPLETE
-  INCOMPLETE_EXPIRED
-  TRIALING
-  UNPAID
 }
 
 enum Currency {
@@ -34,16 +32,16 @@ enum Currency {
 }
 
 model Subscription {
-  id                   String             @id @default(nanoid())
-  organizationId       String
-  plan                 PlanTypes
-  stripeSubscriptionId String             @unique
-  status               SubscriptionStatus
-  startDate            DateTime
-  endDate              DateTime? // Nullable for ongoing subscriptions
-  createdAt            DateTime           @default(now())
-  updatedAt            DateTime           @default(now()) @updatedAt
-  currency             Currency
+  id                    String             @id @default(nanoid())
+  organizationId        String
+  plan                  PlanTypes
+  stripeSubscriptionId  String?            @unique
+  status                SubscriptionStatus
+  startDate             DateTime?
+  endDate               DateTime? // Nullable for ongoing subscriptions
+  lastPaymentFailedDate DateTime?
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @default(now()) @updatedAt
 
   organization Organization @relation(fields: [organizationId], references: [id])
   invoices     Invoice[]

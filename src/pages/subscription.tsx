@@ -11,12 +11,21 @@ import {
   Spacer,
   Text,
   VStack,
+  Alert,
+  AlertIcon,
+  Spinner,
+  useToast,
 } from "../../langwatch/langwatch/node_modules/@chakra-ui/react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { TrendingUp } from "../../langwatch/langwatch/node_modules/react-feather";
 import SettingsLayout from "../../langwatch/langwatch/src/components/SettingsLayout";
 import { useOrganizationTeamProject } from "../../langwatch/langwatch/src/hooks/useOrganizationTeamProject";
 import { api } from "../../langwatch/langwatch/src/utils/api";
+import { useRouter } from "next/router";
+import type { Subscription } from "@prisma/client";
+import { uppercaseFirstLetterLowerCaseRest } from "../../langwatch/langwatch/src/utils/stringCasing";
+
+type PlanTypes = "PRO" | "GROWTH" | "ENTERPRISE";
 
 export default function Subscription() {
   const { organization } = useOrganizationTeamProject();
@@ -30,7 +39,31 @@ export default function Subscription() {
     }
   );
 
-  const [selectedPlan, setSelectedPlan] = useState("Team");
+  const [selectedPlan, setSelectedPlan] = useState<PlanTypes>("PRO");
+
+  const router = useRouter();
+  const onPostSubscriptionSetup = router.query.success !== undefined;
+
+  const [subscriptionFound, setSubscriptionFound] =
+    useState<Subscription | null>(null);
+  const subscription = (api as any).subscription.getLastSubscription.useQuery(
+    {
+      organizationId: organization?.id ?? "",
+    },
+    {
+      enabled:
+        !!organization &&
+        !!onPostSubscriptionSetup &&
+        (subscriptionFound === null || subscriptionFound.status === "PENDING"),
+      refetchInterval: 1000,
+    }
+  );
+
+  useEffect(() => {
+    if (subscription.data) {
+      setSubscriptionFound(subscription.data);
+    }
+  }, [subscription.data]);
 
   return (
     <SettingsLayout>
@@ -56,6 +89,40 @@ export default function Subscription() {
               paddingX={4}
               align="start"
             >
+              {onPostSubscriptionSetup &&
+              subscriptionFound &&
+              subscriptionFound.status !== "ACTIVE" ? (
+                <Alert status="error">
+                  <AlertIcon />
+                  <Text>
+                    Something went wrong with the payment or setup of your
+                    subscription. Please try setting it up again!
+                  </Text>
+                </Alert>
+              ) : onPostSubscriptionSetup ? (
+                <Alert status="success">
+                  <AlertIcon />
+                  <HStack spacing={4}>
+                    {subscription.isLoading ||
+                    subscriptionFound === null ||
+                    subscriptionFound.status === "PENDING" ? (
+                      <>
+                        <Text>
+                          Subscription updated successfully! Checking payment
+                          status...
+                        </Text>
+                        <Spinner />
+                      </>
+                    ) : (
+                      <Text>
+                        Subscription updated successfully! Your new plan is now
+                        active!
+                      </Text>
+                    )}
+                  </HStack>
+                </Alert>
+              ) : null}
+
               {activePlan.data && (
                 <>
                   <Text paddingBottom={4}>
@@ -67,7 +134,7 @@ export default function Subscription() {
               <RadioGroup width="full" value={selectedPlan}>
                 <VStack width="full" spacing={0} align="start">
                   <Plan
-                    name="Team"
+                    plan="PRO"
                     price={99}
                     description="For teams starting with LLM development"
                     features={[
@@ -76,12 +143,11 @@ export default function Subscription() {
                       "90-day messages retention",
                       "Access to all evaluations and guardrails (including €10 in credits)",
                     ]}
-                    subscribeOrCall="subscribe"
                     selectedPlan={selectedPlan}
                     setSelectedPlan={setSelectedPlan}
                   />
                   <Plan
-                    name="Business"
+                    plan="GROWTH"
                     price={399}
                     description="For business with multiple teams working with LLMs"
                     features={[
@@ -91,12 +157,11 @@ export default function Subscription() {
                       "Access to all evaluations and guardrails (including €50 in credits)",
                       "Premium onboarding & tech support",
                     ]}
-                    subscribeOrCall="subscribe"
                     selectedPlan={selectedPlan}
                     setSelectedPlan={setSelectedPlan}
                   />
                   <Plan
-                    name="Enterprise"
+                    plan="ENTERPRISE"
                     description="Most scalable solution for enterprise needs"
                     features={[
                       "Unlimited team members",
@@ -106,7 +171,6 @@ export default function Subscription() {
                       "Premium onboarding & tech support",
                       "SOC2/ISO27001 compliance",
                     ]}
-                    subscribeOrCall="call"
                     selectedPlan={selectedPlan}
                     setSelectedPlan={setSelectedPlan}
                   />
@@ -121,25 +185,25 @@ export default function Subscription() {
 }
 
 function Plan({
-  name,
+  plan,
   description,
   features,
   price,
-  subscribeOrCall,
   selectedPlan,
   setSelectedPlan,
 }: {
-  name: string;
+  plan: PlanTypes;
   description: string;
   features: string[];
   price?: number;
-  subscribeOrCall: "subscribe" | "call";
-  selectedPlan: string;
-  setSelectedPlan: (plan: string) => void;
+  selectedPlan: PlanTypes;
+  setSelectedPlan: (plan: PlanTypes) => void;
 }) {
   const { organization } = useOrganizationTeamProject();
 
   const createSubscription = (api as any).subscription.create.useMutation();
+
+  const toast = useToast();
 
   return (
     <Box
@@ -147,7 +211,7 @@ function Plan({
       border="1px solid"
       borderColor="gray.300"
       cursor="pointer"
-      background={selectedPlan == name ? "gray.50" : "white"}
+      background={selectedPlan == plan ? "gray.50" : "white"}
       borderTop="0px"
       _first={{
         borderRadius: "12px 12px 0 0",
@@ -158,15 +222,15 @@ function Plan({
         borderRadius: "0 0 12px 12px",
       }}
       onClick={() => {
-        setSelectedPlan(name);
+        setSelectedPlan(plan);
       }}
     >
       <VStack align="start" width="full" padding={6}>
         <HStack align="start" width="full" spacing={3}>
-          <Radio size="lg" value={name} marginTop="2px" />
+          <Radio size="lg" value={plan} marginTop="2px" />
           <VStack spacing={4} align="start" paddingBottom={4}>
             <Heading size="md" as="h2">
-              {name}
+              {uppercaseFirstLetterLowerCaseRest(plan)}
             </Heading>
             <Text>{description}</Text>
             {features.map((feature) => (
@@ -190,15 +254,35 @@ function Plan({
             )}
           </HStack>
         </HStack>
-        {selectedPlan == name && (
+        {selectedPlan == plan && (
           <Box alignSelf="end" marginTop="-48px">
-            {subscribeOrCall == "subscribe" ? (
+            {plan !== "ENTERPRISE" ? (
               <Button
                 colorScheme="orange"
+                isLoading={createSubscription.isLoading}
                 onClick={() => {
-                  void createSubscription.mutate({
-                    organizationId: organization?.id ?? "",
-                  });
+                  void createSubscription.mutate(
+                    {
+                      organizationId: organization?.id ?? "",
+                      baseUrl: window.location.origin,
+                      plan: plan,
+                    },
+                    {
+                      onSuccess: (result: any) => {
+                        window.location.href = result.url;
+                      },
+                      onError: () => {
+                        toast({
+                          title: "Error",
+                          description:
+                            "An error occurred trying to subscribe. Please try again.",
+                          status: "error",
+                          duration: 5000,
+                          isClosable: true,
+                        });
+                      },
+                    }
+                  );
                 }}
               >
                 Subscribe
@@ -218,6 +302,7 @@ function Plan({
 function Feature({ label }: { label: string }) {
   return (
     <HStack spacing={2}>
+      {/* @ts-ignore */}
       <TrendingUp size={16} />
       <Text>{label}</Text>
     </HStack>

@@ -13,6 +13,6 @@ export default async function handler(
     return res.status(404).json({ message: "Not Found" });
   }
 
-  const result = await defaultHandler(req.body, prisma);
+  const result = await defaultHandler(req.body, prisma as any);
   res.json(result);
 }
