@@ -21,7 +21,7 @@ import { api } from "../../langwatch/langwatch/src/utils/api";
 export default function Subscription() {
   const { organization } = useOrganizationTeamProject();
 
-  const activePlan = api.subscription.getActivePlan.useQuery(
+  const activePlan = api.plan.getActivePlan.useQuery(
     {
       organizationId: organization?.id ?? "",
     },
@@ -134,6 +134,10 @@ function Plan({
   selectedPlan: string;
   setSelectedPlan: (plan: string) => void;
 }) {
+  const { organization } = useOrganizationTeamProject();
+
+  const createSubscription = (api as any).subscription.create.useMutation();
+
   return (
     <Box
       width="full"
@@ -185,16 +189,28 @@ function Plan({
           )}
         </HStack>
         {selectedPlan == name && (
+          // <Box alignSelf="end" marginTop="-48px">
+          //   {betaOrDemo == "beta" ? (
+          //     <Link href="https://langwatch.ai/betalist" target="_blank">
+          //       <Button colorScheme="orange">Sign-up to Beta</Button>
+          //     </Link>
+          //   ) : (
+          //     <Link href="https://calendly.com/langwatch/30min" target="_blank">
+          //       <Button colorScheme="orange">Schedule a Call</Button>
+          //     </Link>
+          //   )}
+          // </Box>
           <Box alignSelf="end" marginTop="-48px">
-            {betaOrDemo == "beta" ? (
-              <Link href="https://langwatch.ai/betalist" target="_blank">
-                <Button colorScheme="orange">Sign-up to Beta</Button>
-              </Link>
-            ) : (
-              <Link href="https://calendly.com/langwatch/30min" target="_blank">
-                <Button colorScheme="orange">Schedule a Call</Button>
-              </Link>
-            )}
+            <Button
+              colorScheme="orange"
+              onClick={() => {
+                void createSubscription.mutate({
+                  organizationId: organization?.id ?? "",
+                });
+              }}
+            >
+              Subscribe
+            </Button>
           </Box>
         )}
       </VStack>

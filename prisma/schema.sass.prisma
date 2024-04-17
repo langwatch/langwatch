@@ -28,6 +28,11 @@ enum SubscriptionStatus {
   UNPAID
 }
 
+enum Currency {
+  USD
+  EUR
+}
+
 model Subscription {
   id                   String             @id @default(nanoid())
   organizationId       String
@@ -38,6 +43,7 @@ model Subscription {
   endDate              DateTime? // Nullable for ongoing subscriptions
   createdAt            DateTime           @default(now())
   updatedAt            DateTime           @default(now()) @updatedAt
+  currency             Currency
 
   organization Organization @relation(fields: [organizationId], references: [id])
   invoices     Invoice[]
