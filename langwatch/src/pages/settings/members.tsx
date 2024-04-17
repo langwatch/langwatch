@@ -68,7 +68,7 @@ export default function Members() {
       },
       { enabled: !!organization }
     );
-  const activePlan = api.subscription.getActivePlan.useQuery(
+  const activePlan = api.plan.getActivePlan.useQuery(
     {
       organizationId: organization?.id ?? "",
     },

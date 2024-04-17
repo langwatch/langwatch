@@ -7,13 +7,14 @@ import { spansRouter } from "./routers/spans";
 import { analyticsRouter } from "./routers/analytics";
 import { checksRouter } from "./routers/checks";
 import { costsRouter } from "./routers/costs";
-import { subscriptionRouter } from "./routers/subscription";
+import { planRouter } from "./routers/plan";
 import { topicsRouter } from "./routers/topics";
 import { datasetRouter } from "./routers/dataset";
 import { datasetRecordRouter } from "./routers/datasetRecord";
 import { graphsRouter } from "./routers/graphs";
 import { evaluationsRouter } from "./routers/evaluations";
 import { limitsRouter } from "./routers/limits";
+import { dependencies } from "../../injection/dependencies.server";
 
 /**
  * This is the primary router for your server.
@@ -29,13 +30,14 @@ export const appRouter = createTRPCRouter({
   analytics: analyticsRouter,
   checks: checksRouter,
   costs: costsRouter,
-  subscription: subscriptionRouter,
+  plan: planRouter,
   topics: topicsRouter,
   dataset: datasetRouter,
   datasetRecord: datasetRecordRouter,
   graphs: graphsRouter,
   evaluations: evaluationsRouter,
   limits: limitsRouter,
+  ...(dependencies.extraTRPCRoutes?.() ?? {}),
 });
 
 // export type definition of API

@@ -5,6 +5,7 @@ import type {
   NextApiRequest,
   NextApiResponse,
 } from "next";
+import type { ProcedureRouterRecord } from "@trpc/server";
 
 export interface Dependencies {
   subscriptionHandler: typeof SubscriptionHandler;
@@ -24,6 +25,7 @@ export interface Dependencies {
       res: NextApiResponse
     ) => Promise<void | NextApiResponse<any>>
   >;
+  extraTRPCRoutes?: () => ProcedureRouterRecord;
 }
 
 const dependencies: Dependencies = {
