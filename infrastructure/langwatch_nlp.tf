@@ -1,9 +1,10 @@
 locals {
-  langwatch_nlp_tag         = data.external.langwatch_nlp_git_tag.result["tag"]
+  langwatch_nlp_tag         = data.external.langwatch_nlp_docker_tag.result["tag"]
+  langwatch_nlp_git_tag     = data.external.langwatch_nlp_docker_tag.result["git_tag"]
   langwatch_nlp_secrets_map = jsondecode(data.aws_secretsmanager_secret_version.langwatch_nlp.secret_string)
 }
 
-data "external" "langwatch_nlp_git_tag" {
+data "external" "langwatch_nlp_docker_tag" {
   program = ["${path.root}/scripts/get_langwatch_nlp_git_sha.sh"]
 }
 
@@ -97,12 +98,13 @@ resource "null_resource" "langwatch_nlp_docker_image" {
       set -e
       cache_from=""
       if [ -n "$last_tag" ]; then
-        cache_from="--cache-from ${aws_ecr_repository.langwatch_nlp.repository_url}:$last_tag"
+        cache_from="--cache-from type=registry,ref=${aws_ecr_repository.langwatch_nlp.repository_url}:$last_tag"
         docker pull ${aws_ecr_repository.langwatch_nlp.repository_url}:$last_tag
       fi
 
-      docker build . -f Dockerfile.lambda --platform="linux/amd64" $cache_from -t ${data.aws_ecr_repository.langwatch_nlp.repository_url}:${local.langwatch_nlp_tag}
+      docker build . -f Dockerfile.lambda --platform="linux/amd64" --cache-to type=inline $cache_from -t ${data.aws_ecr_repository.langwatch_nlp.repository_url}:${local.langwatch_nlp_tag} -t ${data.aws_ecr_repository.langwatch_nlp.repository_url}:${local.langwatch_nlp_git_tag}
       docker push ${data.aws_ecr_repository.langwatch_nlp.repository_url}:${local.langwatch_nlp_tag}
+      docker push ${data.aws_ecr_repository.langwatch_nlp.repository_url}:${local.langwatch_nlp_git_tag}
       cd -
     EOT
 

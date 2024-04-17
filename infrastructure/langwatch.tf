@@ -1,9 +1,10 @@
 locals {
-  tag         = data.external.langwatch_git_tag.result["tag"]
+  tag         = data.external.langwatch_docker_tag.result["tag"]
+  git_tag         = data.external.langwatch_docker_tag.result["git_tag"]
   secrets_map = jsondecode(data.aws_secretsmanager_secret_version.langwatch.secret_string)
 }
 
-data "external" "langwatch_git_tag" {
+data "external" "langwatch_docker_tag" {
   program = ["${path.root}/scripts/get_langwatch_sass_git_sha.sh"]
 }
 
@@ -172,12 +173,13 @@ resource "null_resource" "langwatch_docker_image" {
       set -e
       cache_from=""
       if [ -n "$last_tag" ]; then
-        cache_from="--cache-from ${aws_ecr_repository.langwatch.repository_url}:$last_tag"
+        cache_from="--cache-from type=registry,ref=${aws_ecr_repository.langwatch.repository_url}:$last_tag"
         docker pull ${aws_ecr_repository.langwatch.repository_url}:$last_tag
       fi
 
-      docker build . --platform="linux/amd64" $cache_from -t ${data.aws_ecr_repository.langwatch.repository_url}:${local.tag}
+      docker build . --platform="linux/amd64" --cache-to type=inline $cache_from -t ${data.aws_ecr_repository.langwatch.repository_url}:${local.tag} -t ${data.aws_ecr_repository.langwatch.repository_url}:${local.git_tag}
       docker push ${data.aws_ecr_repository.langwatch.repository_url}:${local.tag}
+      docker push ${data.aws_ecr_repository.langwatch.repository_url}:${local.git_tag}
       rm -rf .env
       cd -
     EOT

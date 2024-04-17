@@ -5,10 +5,11 @@ module "variables" {
 locals {
   evaluator_package     = var.evaluator_package
   environment_variables = var.environment_variables
-  tag                   = data.external.git_tag.result["tag"]
+  tag                   = data.external.docker_tag.result["tag"]
+  git_tag               = data.external.docker_tag.result["git_tag"]
 }
 
-data "external" "git_tag" {
+data "external" "docker_tag" {
   program = ["${path.root}/scripts/get_langevals_git_sha.sh"]
 }
 
@@ -109,13 +110,14 @@ resource "null_resource" "docker_image" {
       set -e
       cache_from=""
       if [ -n "$last_tag" ]; then
-        cache_from="--cache-from ${data.aws_ecr_repository.lambda_repository.name}:$last_tag"
+        cache_from="--cache-from type=registry,ref=${data.aws_ecr_repository.lambda_repository.name}:$last_tag"
         docker pull ${data.aws_ecr_repository.lambda_repository.repository_url}:$last_tag
       fi
 
       cd ${path.root}/../langevals
-      docker build . --build-arg EVALUATOR=${local.evaluator_package} --platform="linux/amd64" $cache_from -t ${data.aws_ecr_repository.lambda_repository.repository_url}:${local.tag}
+      docker build . --build-arg EVALUATOR=${local.evaluator_package} --platform="linux/amd64" --cache-to type=inline $cache_from -t ${data.aws_ecr_repository.lambda_repository.repository_url}:${local.tag} -t ${data.aws_ecr_repository.lambda_repository.repository_url}:${local.git_tag}
       docker push ${data.aws_ecr_repository.lambda_repository.repository_url}:${local.tag}
+      docker push ${data.aws_ecr_repository.lambda_repository.repository_url}:${local.git_tag}
       cd -
     EOT
 
