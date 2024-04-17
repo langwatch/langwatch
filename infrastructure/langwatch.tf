@@ -150,7 +150,7 @@ resource "null_resource" "langwatch_docker_image" {
         git submodule update --init
       fi
       secrets=$(aws secretsmanager --profile ${module.variables.profile} --region ${data.aws_region.current.name} get-secret-value --secret-id ${data.aws_secretsmanager_secret.langwatch.id} | jq -r '.SecretString')
-      echo "$secrets" | jq -r "to_entries|map(\"export \(.key)='\(.value)'\")|.[]" > .env
+      echo "$secrets" | jq -r "to_entries|map(\"\(.key)='\(.value)'\")|.[]" > .env
       output=$(aws secretsmanager --profile ${module.variables.profile} --region ${data.aws_region.current.name} get-secret-value --secret-id ${data.aws_secretsmanager_secret.redis.id})
       redis_secret=$(echo $output | jq -r '.SecretString' | jq -r '.password' 2>/dev/null)
       if [[ -z "$redis_secret" || "$redis_secret" == "null" ]]; then
