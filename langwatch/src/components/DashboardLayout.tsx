@@ -243,7 +243,7 @@ export const AddProjectButton = ({
 }) => {
   const usage = api.limits.getUsage.useQuery(
     { organizationId: organization.id },
-    { enabled: !!organization }
+    { enabled: !!organization, refetchOnWindowFocus: false, refetchOnMount: false }
   );
 
   return !usage.data ||
@@ -301,7 +301,7 @@ export const DashboardLayout = ({
   } = useOrganizationTeamProject();
   const usage = api.limits.getUsage.useQuery(
     { organizationId: organization?.id ?? "" },
-    { enabled: !!organization }
+    { enabled: !!organization, refetchOnWindowFocus: false, refetchOnMount: false }
   );
 
   const [query, setQuery] = useState("");

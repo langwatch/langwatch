@@ -12,7 +12,7 @@ describe("PIICheck", () => {
       metrics: {},
       timestamps: { started_at: Date.now(), inserted_at: Date.now() },
     };
-    await cleanupPIIs(sampleTrace, []);
+    await cleanupPIIs(sampleTrace, [], false);
     expect(sampleTrace.input.value).toEqual("hi there");
 
     const samplePIITrace: Trace = {
@@ -26,7 +26,7 @@ describe("PIICheck", () => {
       timestamps: { started_at: Date.now(), inserted_at: Date.now() },
     };
 
-    await cleanupPIIs(samplePIITrace, []);
+    await cleanupPIIs(samplePIITrace, [], false);
     expect(samplePIITrace.input.value).toEqual(
       "hi there, my credit card number is [REDACTED]"
     );

@@ -1,6 +1,4 @@
-import { Link } from "@chakra-ui/next-js";
 import { HStack, VStack } from "@chakra-ui/react";
-import { useRouter } from "next/router";
 import { type PropsWithChildren } from "react";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { MenuLink } from "~/components/MenuLink";

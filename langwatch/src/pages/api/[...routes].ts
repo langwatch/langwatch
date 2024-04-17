@@ -1,6 +1,13 @@
 import { type NextApiRequest, type NextApiResponse } from "next";
 import { dependencies } from "../../injection/dependencies.server";
 import { pathToRegexp, type Key } from "path-to-regexp";
+import { buffer } from "micro";
+
+export const config = {
+  api: {
+    bodyParser: false,
+  },
+};
 
 export default async function handler(
   req: NextApiRequest,
@@ -24,6 +31,10 @@ export default async function handler(
         keys.map((key, index) => [key.name, match[index + 1]])
       );
       req.query = { ...req.query, ...params };
+      // @ts-ignore
+      req.rawBody = await buffer(req);
+      // @ts-ignore
+      req.body = JSON.parse(req.rawBody.toString());
       return await handler(req, res);
     }
   }
