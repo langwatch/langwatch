@@ -439,8 +439,9 @@ export const DashboardLayout = ({
               <AlertIcon />
               <Text>
                 You reached the limit of{" "}
-                {numeral(usage.data.maxMonthlyUsageLimit).format("$0.00")} usage cost for
-                this month, evaluations and guardrails will not be processed.{" "}
+                {numeral(usage.data.maxMonthlyUsageLimit).format("$0.00")} usage
+                cost for this month, evaluations and guardrails will not be
+                processed.{" "}
                 <Link
                   href="/settings/usage"
                   textDecoration="underline"
@@ -471,16 +472,12 @@ export const DashboardLayout = ({
           <Spacer />
 
           <form
-            action={`${project.slug}/messages?mode=dev`}
+            action={`${project.slug}/messages`}
             method="GET"
             style={{ width: "100%", maxWidth: "600px" }}
             onSubmit={(e) => {
               e.preventDefault();
-              if (router.query.mode === "dev") {
-                void router.replace({ query: { ...router.query, query } });
-              } else {
-                void router.push(`${project.slug}/messages?query=${query}`);
-              }
+              void router.replace({ query: { ...router.query, query } });
             }}
           >
             <InputGroup borderColor="gray.300">
