@@ -34,14 +34,7 @@ export default function Subscription() {
 
   return (
     <SettingsLayout>
-      <VStack
-        paddingX={4}
-        paddingY={6}
-        spacing={6}
-        width="full"
-        maxWidth="920px"
-        align="start"
-      >
+      <VStack paddingX={4} paddingY={6} spacing={6} width="full" align="start">
         <HStack width="full" marginTop={2}>
           <Heading size="lg" as="h1">
             Change Subscription
@@ -65,15 +58,18 @@ export default function Subscription() {
               )}
 
               <RadioGroup width="full" value={selectedPlan}>
-                <VStack width="full" spacing={0} align="start">
+                <HStack width="full" spacing={4} align="start">
                   <Plan
                     name="Team"
+                    price="€99/mo"
                     description="For teams starting with LLM development"
                     features={[
-                      "Up to 5 team members",
-                      "10k messages limit",
-                      "90-day messages retention",
-                      "Access to all guardrails",
+                      "2 projects",
+                      "10k messages",
+                      "Evaluations (incl €10 in credit)",
+                      "2 team members",
+                      "30-day messages retention",
+                      "Premium onboarding & tech support",
                     ]}
                     betaOrDemo="beta"
                     selectedPlan={selectedPlan}
@@ -81,13 +77,15 @@ export default function Subscription() {
                   />
                   <Plan
                     name="Business"
+                    price="€399/mo"
                     description="For business with multiple teams working with LLMs"
                     features={[
-                      "Up to 20 team members",
-                      "100k messages limit",
-                      "Custom retention",
-                      "Access to all guardrails",
-                      "Priority Support",
+                      "5 projects",
+                      "100k messages",
+                      "Evaluations (incl €50 in credits)",
+                      "10 team members",
+                      "90-day messages retention",
+                      "Premium onboarding & tech support",
                     ]}
                     betaOrDemo="demo"
                     selectedPlan={selectedPlan}
@@ -95,19 +93,22 @@ export default function Subscription() {
                   />
                   <Plan
                     name="Enterprise"
+                    price="Custom"
                     description="Most scalable solution for enterprise needs"
                     features={[
-                      "Unlimited team members",
+                      "Custom projects",
                       "Unlimited messages",
-                      "Custom retention",
-                      "Access to all guardrails",
-                      "Priority Support",
+                      "Custom evaluations",
+                      "Custom members",
+                      "Custom messages retention",
+                      "Premium onboarding & tech support",
+                      "SOC2 certifications",
                     ]}
                     betaOrDemo="demo"
                     selectedPlan={selectedPlan}
                     setSelectedPlan={setSelectedPlan}
                   />
-                </VStack>
+                </HStack>
               </RadioGroup>
             </VStack>
           </CardBody>
@@ -129,76 +130,72 @@ function Plan({
   name: string;
   description: string;
   features: string[];
-  price?: number;
+  price?: string;
   betaOrDemo: "beta" | "demo";
   selectedPlan: string;
   setSelectedPlan: (plan: string) => void;
 }) {
   return (
-    <Box
+    <Card
       width="full"
+      height="530"
       border="1px solid"
       borderColor="gray.300"
       cursor="pointer"
       background={selectedPlan == name ? "gray.50" : "white"}
-      borderTop="0px"
-      _first={{
-        borderRadius: "12px 12px 0 0",
-        borderTop: "1px solid",
-        borderColor: "gray.300",
-      }}
-      _last={{
-        borderRadius: "0 0 12px 12px",
-      }}
+      boxShadow="none"
+      borderRadius="12px"
       onClick={() => {
         setSelectedPlan(name);
       }}
     >
-      <VStack align="start" width="full" padding={6}>
-        <HStack align="start" width="full" spacing={3}>
-          <Radio size="lg" value={name} marginTop="2px" />
-          <VStack spacing={4} align="start" paddingBottom={4}>
-            <Heading size="md" as="h2">
-              {name}
-            </Heading>
-            <Text>{description}</Text>
-            {features.map((feature) => (
-              <Feature key={feature} label={feature} />
-            ))}
-          </VStack>
-          <Spacer />
-          {price && (
-            <HStack
-              spacing="2px"
-              fontSize={18}
-              color="gray.600"
-              marginTop="-3px"
-            >
-              <Text alignSelf="start" marginTop="3px">
-                €
-              </Text>
-              <Text fontSize={26}>{price}</Text>
-              <Text alignSelf="end" marginBottom="3px">
-                /mo
-              </Text>
-            </HStack>
-          )}
-        </HStack>
-        {selectedPlan == name && (
-          <Box alignSelf="end" marginTop="-48px">
-            {betaOrDemo == "beta" ? (
-              <Link href="https://langwatch.ai/betalist" target="_blank">
-                <Button colorScheme="orange">Sign-up to Beta</Button>
-              </Link>
-            ) : (
-              <Link href="https://calendly.com/langwatch/30min" target="_blank">
-                <Button colorScheme="orange">Schedule a Call</Button>
-              </Link>
-            )}
-          </Box>
-        )}
-      </VStack>
-    </Box>
+      <CardBody>
+        <VStack align="start" width="full" padding={6}>
+          <HStack align="start" width="full" spacing={3}>
+            <Radio size="lg" value={name} marginTop="2px" />
+            <VStack spacing={4} align="start" paddingBottom={4}>
+              <VStack spacing={1} align="start">
+                <Heading size="md" as="h2" color="orange">
+                  {name}
+                </Heading>
+                <Heading size="md" as="h3">
+                  {price}
+                </Heading>
+              </VStack>
+              <Text fontWeight="bold">Product & Services</Text>
+              {features.map((feature) => (
+                <Feature key={feature} label={feature} />
+              ))}
+              {selectedPlan == name && (
+                <Box
+                  position="absolute"
+                  bottom="20px"
+                  left="0"
+                  right="0"
+                  padding="5px"
+                  margin="0 auto"
+                  width="fit-content"
+                >
+                  {betaOrDemo == "beta" ? (
+                    <Link href="https://langwatch.ai/betalist" target="_blank">
+                      <Button colorScheme="orange">Sign-up to Beta</Button>
+                    </Link>
+                  ) : (
+                    <Link
+                      href="https://calendly.com/langwatch/30min"
+                      target="_blank"
+                    >
+                      <Button colorScheme="orange">Schedule a Call</Button>
+                    </Link>
+                  )}
+                </Box>
+              )}
+            </VStack>
+            <Spacer />
+          </HStack>
+        </VStack>
+      </CardBody>
+    </Card>
   );
 }
 
