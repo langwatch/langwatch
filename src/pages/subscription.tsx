@@ -14,6 +14,7 @@ import {
   Alert,
   AlertIcon,
   Spinner,
+  Tag,
   useToast,
 } from "../../langwatch/langwatch/node_modules/@chakra-ui/react";
 import { useEffect, useState } from "react";
@@ -31,12 +32,8 @@ export default function Subscription() {
   const { organization } = useOrganizationTeamProject();
 
   const activePlan = api.plan.getActivePlan.useQuery(
-    {
-      organizationId: organization?.id ?? "",
-    },
-    {
-      enabled: !!organization,
-    }
+    { organizationId: organization?.id ?? "" },
+    { enabled: !!organization }
   );
 
   const [selectedPlan, setSelectedPlan] = useState<PlanTypes>("PRO");
@@ -53,11 +50,13 @@ export default function Subscription() {
     {
       enabled:
         !!organization &&
-        !!onPostSubscriptionSetup &&
         (subscriptionFound === null || subscriptionFound.status === "PENDING"),
-      refetchInterval: 1000,
+      refetchInterval: onPostSubscriptionSetup ? 1000 : false,
     }
   );
+
+  const manageSubscription = (api as any).subscription.manage.useMutation();
+  const toast = useToast();
 
   useEffect(() => {
     if (subscription.data) {
@@ -124,11 +123,44 @@ export default function Subscription() {
               ) : null}
 
               {activePlan.data && (
-                <>
-                  <Text paddingBottom={4}>
+                <HStack spacing={2} paddingBottom={4}>
+                  <Text>
                     <b>Current Plan:</b> {activePlan.data.name}
                   </Text>
-                </>
+                  {!activePlan.data.free && subscription.data && (
+                    <Button
+                      variant="link"
+                      isLoading={manageSubscription.isLoading}
+                      fontWeight="normal"
+                      color="black"
+                      onClick={() => {
+                        void manageSubscription.mutate(
+                          {
+                            organizationId: organization?.id ?? "",
+                            baseUrl: window.location.origin,
+                          },
+                          {
+                            onSuccess: (result: any) => {
+                              window.open(result.url, "_blank");
+                            },
+                            onError: () => {
+                              toast({
+                                title: "Error",
+                                description:
+                                  "An error occurred trying to manage your subscription. Please try again.",
+                                status: "error",
+                                duration: 5000,
+                                isClosable: true,
+                              });
+                            },
+                          }
+                        );
+                      }}
+                    >
+                      (manage)
+                    </Button>
+                  )}
+                </HStack>
               )}
 
               <RadioGroup width="full" value={selectedPlan}>
@@ -200,10 +232,14 @@ function Plan({
   setSelectedPlan: (plan: PlanTypes) => void;
 }) {
   const { organization } = useOrganizationTeamProject();
-
+  const activePlan = api.plan.getActivePlan.useQuery(
+    { organizationId: organization?.id ?? "" },
+    { enabled: !!organization }
+  );
   const createSubscription = (api as any).subscription.create.useMutation();
-
   const toast = useToast();
+
+  const isCurrentPlan = activePlan.data?.type === plan;
 
   return (
     <Box
@@ -229,9 +265,12 @@ function Plan({
         <HStack align="start" width="full" spacing={3}>
           <Radio size="lg" value={plan} marginTop="2px" />
           <VStack spacing={4} align="start" paddingBottom={4}>
-            <Heading size="md" as="h2">
-              {uppercaseFirstLetterLowerCaseRest(plan)}
-            </Heading>
+            <HStack spacing={4}>
+              <Heading size="md" as="h2">
+                {uppercaseFirstLetterLowerCaseRest(plan)}
+              </Heading>
+              {isCurrentPlan && <Tag colorScheme="green">Current Plan</Tag>}
+            </HStack>
             <Text>{description}</Text>
             {features.map((feature) => (
               <Feature key={feature} label={feature} />
@@ -254,7 +293,7 @@ function Plan({
             )}
           </HStack>
         </HStack>
-        {selectedPlan == plan && (
+        {!isCurrentPlan && selectedPlan == plan && (
           <Box alignSelf="end" marginTop="-48px">
             {plan !== "ENTERPRISE" ? (
               <Button
@@ -285,7 +324,11 @@ function Plan({
                   );
                 }}
               >
-                Subscribe
+                {!activePlan.data || activePlan.data.free
+                  ? "Subscribe"
+                  : (price ?? 0) < activePlan.data.prices.EUR
+                  ? "Downgrade"
+                  : "Upgrade"}
               </Button>
             ) : (
               <Link href="https://calendly.com/langwatch/30min" target="_blank">

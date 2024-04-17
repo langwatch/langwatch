@@ -9,6 +9,7 @@ import { isAdmin } from "./utils/auth";
 
 const PLAN_LIMITS: Record<PlanTypes, PlanInfo> = {
   [PlanTypes.FREE]: {
+    type: PlanTypes.FREE,
     name: "Free",
     free: true,
     maxMembers: 1,
@@ -21,6 +22,7 @@ const PLAN_LIMITS: Record<PlanTypes, PlanInfo> = {
     },
   },
   [PlanTypes.PRO]: {
+    type: PlanTypes.PRO,
     name: "Pro",
     free: false,
     maxMembers: 5,
@@ -33,6 +35,7 @@ const PLAN_LIMITS: Record<PlanTypes, PlanInfo> = {
     },
   },
   [PlanTypes.GROWTH]: {
+    type: PlanTypes.GROWTH,
     name: "Growth",
     free: false,
     maxMembers: 10,
@@ -45,6 +48,7 @@ const PLAN_LIMITS: Record<PlanTypes, PlanInfo> = {
     },
   },
   [PlanTypes.ENTERPRISE]: {
+    type: PlanTypes.ENTERPRISE,
     name: "Enterprise",
     free: false,
     maxMembers: 1000,

@@ -110,22 +110,52 @@ export default async function handler(
         });
         break;
     }
-  } else if (event.type === "customer.subscription.deleted") {
+  } else if (
+    event.type === "customer.subscription.deleted" ||
+    event.type === "customer.subscription.updated"
+  ) {
     const subscription = event.data.object;
-    const subscriptionId =
-      typeof subscription.id === "string" ? subscription.id : subscription.id;
-    if (!subscriptionId) {
-      console.log("Subscription ID not found in subscription.");
+    if (!subscription.id) {
+      console.log("Subscription ID not found in payment intent.");
       return res.json({ received: true });
     }
 
-    await prisma.subscription.update({
-      where: { stripeSubscriptionId: subscriptionId },
-      data: {
-        status: "CANCELLED",
-        endDate: new Date(),
-      },
-    });
+    console.log("event", JSON.stringify(event, undefined, 2));
+
+    switch (event.type) {
+      case "customer.subscription.deleted":
+        await prisma.subscription.update({
+          where: { stripeSubscriptionId: subscription.id },
+          data: {
+            status: "CANCELLED",
+            endDate: new Date(),
+          },
+        });
+        break;
+      case "customer.subscription.updated":
+        if (
+          subscription.status !== "active" ||
+          subscription.canceled_at ||
+          subscription.ended_at
+        ) {
+          await prisma.subscription.update({
+            where: { stripeSubscriptionId: subscription.id },
+            data: {
+              status: "CANCELLED",
+              endDate: new Date(),
+            },
+          });
+        } else if (subscription.status === "active") {
+          await prisma.subscription.update({
+            where: { stripeSubscriptionId: subscription.id },
+            data: {
+              status: "ACTIVE",
+              lastPaymentFailedDate: null,
+            },
+          });
+        }
+        break;
+    }
   } else {
     console.log(`Unhandled event type ${event.type}`);
   }

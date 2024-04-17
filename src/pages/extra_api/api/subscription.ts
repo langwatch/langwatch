@@ -15,13 +15,16 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: "2024-04-10",
 });
 
-const prices: Record<"PRO" | "GROWTH", string> = env.NODE_ENV === "production" ? {
-  PRO: "price_1P6fvzIMsTw08cudWCwqfEjq",
-  GROWTH: "price_1P6fw2IMsTw08cudFUkOX7jV",
-} : {
-  PRO: "price_1P6bSyIMsTw08cudmzoqwBVN",
-  GROWTH: "price_1P6fbyIMsTw08cudKh5L8w8x",
-};
+const prices: Record<"PRO" | "GROWTH", string> =
+  env.NODE_ENV === "production"
+    ? {
+        PRO: "price_1P6fvzIMsTw08cudWCwqfEjq",
+        GROWTH: "price_1P6fw2IMsTw08cudFUkOX7jV",
+      }
+    : {
+        PRO: "price_1P6bSyIMsTw08cudmzoqwBVN",
+        GROWTH: "price_1P6fbyIMsTw08cudKh5L8w8x",
+      };
 
 export const subscriptionRouter = () =>
   createTRPCRouter({
@@ -67,6 +70,27 @@ export const subscriptionRouter = () =>
           cancel_url: `${input.baseUrl}/settings/subscription`,
           billing_address_collection: "required",
           client_reference_id: `subscription_setup_${subscription.id}`,
+        });
+
+        return { url: session.url };
+      }),
+
+    manage: protectedProcedure
+      .input(z.object({ organizationId: z.string(), baseUrl: z.string() }))
+      .use(
+        checkUserPermissionForOrganization(
+          OrganizationRoleGroup.ORGANIZATION_MANAGE
+        )
+      )
+      .mutation(async ({ input, ctx }) => {
+        const customerId = await getOrCreateCustomerId(
+          ctx.session.user,
+          input.organizationId
+        );
+
+        const session = await stripe.billingPortal.sessions.create({
+          customer: customerId,
+          return_url: `${input.baseUrl}/settings/subscription`,
         });
 
         return { url: session.url };
