@@ -68,28 +68,30 @@ export default function Subscription() {
                 <VStack width="full" spacing={0} align="start">
                   <Plan
                     name="Team"
+                    price={99}
                     description="For teams starting with LLM development"
                     features={[
-                      "Up to 5 team members",
+                      "Up to 2 projects & 5 team members",
                       "10k messages limit",
                       "90-day messages retention",
-                      "Access to all guardrails",
+                      "Access to all evaluations and guardrails (including €10 in credits)",
                     ]}
-                    betaOrDemo="beta"
+                    subscribeOrCall="subscribe"
                     selectedPlan={selectedPlan}
                     setSelectedPlan={setSelectedPlan}
                   />
                   <Plan
                     name="Business"
+                    price={399}
                     description="For business with multiple teams working with LLMs"
                     features={[
-                      "Up to 20 team members",
+                      "Up to 5 projects & 10 team members",
                       "100k messages limit",
                       "Custom retention",
-                      "Access to all guardrails",
-                      "Priority Support",
+                      "Access to all evaluations and guardrails (including €50 in credits)",
+                      "Premium onboarding & tech support",
                     ]}
-                    betaOrDemo="demo"
+                    subscribeOrCall="subscribe"
                     selectedPlan={selectedPlan}
                     setSelectedPlan={setSelectedPlan}
                   />
@@ -99,11 +101,12 @@ export default function Subscription() {
                     features={[
                       "Unlimited team members",
                       "Unlimited messages",
+                      "Custom evaluations",
                       "Custom retention",
-                      "Access to all guardrails",
-                      "Priority Support",
+                      "Premium onboarding & tech support",
+                      "SOC2/ISO27001 compliance",
                     ]}
-                    betaOrDemo="demo"
+                    subscribeOrCall="call"
                     selectedPlan={selectedPlan}
                     setSelectedPlan={setSelectedPlan}
                   />
@@ -122,7 +125,7 @@ function Plan({
   description,
   features,
   price,
-  betaOrDemo,
+  subscribeOrCall,
   selectedPlan,
   setSelectedPlan,
 }: {
@@ -130,7 +133,7 @@ function Plan({
   description: string;
   features: string[];
   price?: number;
-  betaOrDemo: "beta" | "demo";
+  subscribeOrCall: "subscribe" | "call";
   selectedPlan: string;
   setSelectedPlan: (plan: string) => void;
 }) {
@@ -171,46 +174,40 @@ function Plan({
             ))}
           </VStack>
           <Spacer />
-          {price && (
-            <HStack
-              spacing="2px"
-              fontSize={18}
-              color="gray.600"
-              marginTop="-3px"
-            >
-              <Text alignSelf="start" marginTop="3px">
-                €
-              </Text>
-              <Text fontSize={26}>{price}</Text>
-              <Text alignSelf="end" marginBottom="3px">
-                /mo
-              </Text>
-            </HStack>
-          )}
+          <HStack spacing="2px" fontSize={18} color="gray.600" marginTop="-3px">
+            {price ? (
+              <>
+                <Text alignSelf="start" marginTop="3px">
+                  €
+                </Text>
+                <Text fontSize={26}>{price}</Text>
+                <Text alignSelf="end" marginBottom="3px">
+                  /mo
+                </Text>
+              </>
+            ) : (
+              <Text fontSize={22}>Custom</Text>
+            )}
+          </HStack>
         </HStack>
         {selectedPlan == name && (
-          // <Box alignSelf="end" marginTop="-48px">
-          //   {betaOrDemo == "beta" ? (
-          //     <Link href="https://langwatch.ai/betalist" target="_blank">
-          //       <Button colorScheme="orange">Sign-up to Beta</Button>
-          //     </Link>
-          //   ) : (
-          //     <Link href="https://calendly.com/langwatch/30min" target="_blank">
-          //       <Button colorScheme="orange">Schedule a Call</Button>
-          //     </Link>
-          //   )}
-          // </Box>
           <Box alignSelf="end" marginTop="-48px">
-            <Button
-              colorScheme="orange"
-              onClick={() => {
-                void createSubscription.mutate({
-                  organizationId: organization?.id ?? "",
-                });
-              }}
-            >
-              Subscribe
-            </Button>
+            {subscribeOrCall == "subscribe" ? (
+              <Button
+                colorScheme="orange"
+                onClick={() => {
+                  void createSubscription.mutate({
+                    organizationId: organization?.id ?? "",
+                  });
+                }}
+              >
+                Subscribe
+              </Button>
+            ) : (
+              <Link href="https://calendly.com/langwatch/30min" target="_blank">
+                <Button colorScheme="orange">Schedule a Call</Button>
+              </Link>
+            )}
           </Box>
         )}
       </VStack>

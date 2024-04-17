@@ -35,7 +35,7 @@ const PLAN_LIMITS: Record<PlanTypes, PlanInfo> = {
   [PlanTypes.BUSINESS]: {
     name: "Business",
     free: false,
-    maxMembers: 100,
+    maxMembers: 10,
     maxProjects: 5,
     maxMessagesPerMonth: 100_000,
     evaluationsCredit: 50,
