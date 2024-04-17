@@ -9,6 +9,7 @@ import {
   DrawerContent,
   DrawerHeader,
   FormControl,
+  FormErrorMessage,
   HStack,
   Link,
   Select,
@@ -53,8 +54,8 @@ export function BatchEvaluationDrawer(props: BatchEvaluatioProps) {
   const [selectedDataset, setSelectedDataset] = useState<string>(
     props.datasetSlug ?? ""
   );
-  const [selectedGenerations, setSelectedGenerations] =
-    useState<string>("one-shot");
+  const [selectDBError, setSelectDBError] = useState<boolean>(false);
+
   const router = useRouter();
   const { closeDrawer } = useDrawer();
 
@@ -77,7 +78,13 @@ export function BatchEvaluationDrawer(props: BatchEvaluatioProps) {
   );
 
   const evaluations = Object.entries(AVAILABLE_EVALUATORS);
-  const checksData = [...(checks.data ?? [])];
+
+  type ExtendedCheck = Check & {
+    description?: string;
+    requiredFields?: any[];
+  };
+
+  const checksData: ExtendedCheck[] = [...(checks.data ?? [])];
 
   if (checksData) {
     checksData.forEach((check, index: number) => {
@@ -94,28 +101,12 @@ export function BatchEvaluationDrawer(props: BatchEvaluatioProps) {
     });
   }
 
-  //left join on checks.data and evaluations
-  // if (checks.data) {
-  //   checks.data.forEach((check) => {
-  //     const checkType = check.checkType;
-  //     const evaluation = evaluations.find(
-  //       (evaluation) => evaluation[0] === checkType
-  //     );
-  //     if (evaluation) {
-  //       evaluation[1] = { ...evaluation[1], ...check };
-  //     }
-  //   });
-  //   console.log(checks);
-  // }
-  // evaluations = evaluations.map(([key, value]) => {
-  //   const check = checks.data?.find((check) => check.checkType === key);
-  //   return [key, { ...value, ...check }];
-  // });
-
   const onSubmit = (e: any) => {
     e.preventDefault();
-
-    console.log(checkError);
+    if (props.selectDataset && selectedDataset === "") {
+      setSelectDBError(true);
+      return;
+    }
 
     if (checkError) {
       return;
@@ -181,9 +172,12 @@ export function BatchEvaluationDrawer(props: BatchEvaluatioProps) {
                   </Container>
                   <Container>
                     <VStack align={"start"}>
-                      <FormControl>
+                      <FormControl isInvalid={selectDBError}>
                         <Select
-                          onChange={(e) => setSelectedDataset(e.target.value)}
+                          onChange={(e) => {
+                            setSelectedDataset(e.target.value);
+                            setSelectDBError(false);
+                          }}
                         >
                           <option value={""}>Select a dataset</option>
                           {datasets.data
@@ -198,6 +192,9 @@ export function BatchEvaluationDrawer(props: BatchEvaluatioProps) {
                               ))
                             : null}
                         </Select>
+                        <FormErrorMessage>
+                          Please select dataset
+                        </FormErrorMessage>
                       </FormControl>
                     </VStack>
                   </Container>
@@ -388,8 +385,10 @@ export function BatchEvaluationDrawer(props: BatchEvaluatioProps) {
                                     <Td>
                                       <Tooltip
                                         label={
-                                          (check.parameters as JsonObject)
-                                            ?.prompt ?? check.description
+                                          (
+                                            (check.parameters as JsonObject)
+                                              ?.prompt ?? check.description
+                                          )?.toString() ?? ""
                                         }
                                       >
                                         <Text
@@ -397,8 +396,10 @@ export function BatchEvaluationDrawer(props: BatchEvaluatioProps) {
                                           display="block"
                                           maxWidth={230}
                                         >
-                                          {(check.parameters as JsonObject)
-                                            ?.prompt ?? check.description}
+                                          {(
+                                            (check.parameters as JsonObject)
+                                              ?.prompt ?? check.description
+                                          )?.toString() ?? ""}
                                         </Text>
                                       </Tooltip>
                                     </Td>
@@ -486,8 +487,10 @@ export function BatchEvaluationDrawer(props: BatchEvaluatioProps) {
                                     <Td>
                                       <Tooltip
                                         label={
-                                          (check.parameters as JsonObject)
-                                            ?.prompt ?? check.description
+                                          (
+                                            (check.parameters as JsonObject)
+                                              ?.prompt ?? check.description
+                                          )?.toString() ?? ""
                                         }
                                       >
                                         <Text
@@ -495,8 +498,10 @@ export function BatchEvaluationDrawer(props: BatchEvaluatioProps) {
                                           display="block"
                                           maxWidth={230}
                                         >
-                                          {(check.parameters as JsonObject)
-                                            ?.prompt ?? check.description}
+                                          {(
+                                            (check.parameters as JsonObject)
+                                              ?.prompt ?? check.description
+                                          )?.toString() ?? ""}
                                         </Text>
                                       </Tooltip>
                                     </Td>
@@ -546,7 +551,6 @@ export function BatchEvaluationDrawer(props: BatchEvaluatioProps) {
               <div className="markdown">
                 <BatchDatasetProcessing
                   checks={selectedChecks}
-                  generations={selectedGenerations}
                   dataset={selectedDataset}
                 />
               </div>

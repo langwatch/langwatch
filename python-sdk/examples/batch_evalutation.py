@@ -12,16 +12,16 @@ def callback(entry: DatasetEntry):
     # Process the input data using your LLM and generate a response
     # response = f"Generated response for input: {input_data}"
     # print(response)
+    # return {"output": response}
 
     return {"output": "Hello! How can I help you today?"}
 
 
 # Instantiate the BatchEvaluation object
 evaluation = BatchEvaluation(
-    dataset="python-test",  # Provide the actual dataset name here
-    evaluations=["ragas/answer_relevancy"],
+    dataset="",  # Provide the actual dataset name here
+    evaluations=[""],  # Provide the actual evaluations here
     callback=callback,
-    generations="one-shot",
 )
 
 # Run the evaluation
