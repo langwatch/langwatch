@@ -477,7 +477,14 @@ export const DashboardLayout = ({
             style={{ width: "100%", maxWidth: "600px" }}
             onSubmit={(e) => {
               e.preventDefault();
-              void router.replace({ query: { ...router.query, query } });
+              if (
+                router.query.view === "list" ||
+                router.query.view === "table"
+              ) {
+                void router.replace({ query: { ...router.query, query } });
+              } else {
+                void router.push(`/${project.slug}/messages?query=${query}`);
+              }
             }}
           >
             <InputGroup borderColor="gray.300">
