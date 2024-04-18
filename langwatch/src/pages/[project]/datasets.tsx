@@ -7,8 +7,13 @@ import {
   Heading,
   Skeleton,
   Spacer,
+  Tab,
+  TabList,
+  TabPanel,
+  TabPanels,
   Table,
   TableContainer,
+  Tabs,
   Tbody,
   Td,
   Text,
@@ -40,6 +45,19 @@ export default function Datasets() {
     }
   );
 
+  const batchEvaluationRecords = api.batchRecord.getAllByBatchIDGroup.useQuery(
+    { projectId: project?.id ?? "" },
+    {
+      enabled: !!project,
+    }
+  );
+
+  const goToBatchEvaluation = (id: string) => {
+    void router.push({
+      pathname: `/${project?.slug}/batch-evaluations/${id}`,
+    });
+  };
+
   const onSuccess = () => {
     void datasets.refetch();
     onClose();
@@ -57,7 +75,7 @@ export default function Datasets() {
       <Container maxW={"calc(100vw - 200px)"} padding={6} marginTop={8}>
         <HStack width="full" align="top">
           <Heading as={"h1"} size="lg" paddingBottom={6} paddingTop={1}>
-            Datasets
+            Datasets and Evaluations
           </Heading>
           <Spacer />
           <Button
@@ -83,55 +101,113 @@ export default function Datasets() {
           </Button>
         </HStack>
         <Card>
-          <CardBody>
-            {datasets.data && datasets.data.length == 0 ? (
-              <Text>No datasets found</Text>
-            ) : (
-              <TableContainer>
-                <Table variant="simple">
-                  <Thead>
-                    <Tr>
-                      <Th>Name</Th>
-                      <Th>Schema</Th>
-                      <Th>Entries</Th>
-                      <Th>Last Update</Th>
-                    </Tr>
-                  </Thead>
-                  <Tbody>
-                    {datasets.isLoading
-                      ? Array.from({ length: 3 }).map((_, i) => (
-                          <Tr key={i}>
-                            {Array.from({ length: 4 }).map((_, i) => (
-                              <Td key={i}>
-                                <Skeleton height="20px" />
-                              </Td>
-                            ))}
+          <Tabs>
+            <TabList>
+              <Tab padding={4}>Datasets</Tab>
+              <Tab padding={4}>Batch Evaluations</Tab>
+            </TabList>
+
+            <TabPanels>
+              <TabPanel padding={0}>
+                <CardBody>
+                  {datasets.data && datasets.data.length == 0 ? (
+                    <Text>No datasets found</Text>
+                  ) : (
+                    <TableContainer>
+                      <Table variant="simple">
+                        <Thead>
+                          <Tr>
+                            <Th>Name</Th>
+                            <Th>Schema</Th>
+                            <Th>Entries</Th>
+                            <Th>Last Update</Th>
                           </Tr>
-                        ))
-                      : datasets.data
-                      ? datasets.data?.map((dataset) => (
-                          <Tr
-                            cursor="pointer"
-                            onClick={() => goToDataset(dataset.id)}
-                            key={dataset.id}
-                          >
-                            <Td>{dataset.name}</Td>
-                            <Td>{displayName(dataset.schema)}</Td>
-                            <Td>{dataset.datasetRecords.length ?? 0}</Td>
-                            <Td>
-                              {new Date(
-                                dataset.datasetRecords[0]?.createdAt ??
-                                  dataset.createdAt
-                              ).toLocaleString()}
-                            </Td>
+                        </Thead>
+                        <Tbody>
+                          {datasets.isLoading
+                            ? Array.from({ length: 3 }).map((_, i) => (
+                                <Tr key={i}>
+                                  {Array.from({ length: 4 }).map((_, i) => (
+                                    <Td key={i}>
+                                      <Skeleton height="20px" />
+                                    </Td>
+                                  ))}
+                                </Tr>
+                              ))
+                            : datasets.data
+                            ? datasets.data?.map((dataset) => (
+                                <Tr
+                                  cursor="pointer"
+                                  onClick={() => goToDataset(dataset.id)}
+                                  key={dataset.id}
+                                >
+                                  <Td>{dataset.name}</Td>
+                                  <Td>{displayName(dataset.schema)}</Td>
+                                  <Td>{dataset.datasetRecords.length ?? 0}</Td>
+                                  <Td>
+                                    {new Date(
+                                      dataset.datasetRecords[0]?.createdAt ??
+                                        dataset.createdAt
+                                    ).toLocaleString()}
+                                  </Td>
+                                </Tr>
+                              ))
+                            : null}
+                        </Tbody>
+                      </Table>
+                    </TableContainer>
+                  )}
+                </CardBody>
+              </TabPanel>
+              <TabPanel padding={0}>
+                <CardBody>
+                  {batchEvaluationRecords.data &&
+                  batchEvaluationRecords.data.length == 0 ? (
+                    <Text>No records found</Text>
+                  ) : (
+                    <TableContainer>
+                      <Table variant="simple">
+                        <Thead>
+                          <Tr>
+                            <Th>Batch ID</Th>
+                            <Th>Dataset</Th>
+                            <Th>Entries</Th>
                           </Tr>
-                        ))
-                      : null}
-                  </Tbody>
-                </Table>
-              </TableContainer>
-            )}
-          </CardBody>
+                        </Thead>
+                        <Tbody>
+                          {batchEvaluationRecords.isLoading
+                            ? Array.from({ length: 3 }).map((_, i) => (
+                                <Tr key={i}>
+                                  {Array.from({ length: 4 }).map((_, i) => (
+                                    <Td key={i}>
+                                      <Skeleton height="20px" />
+                                    </Td>
+                                  ))}
+                                </Tr>
+                              ))
+                            : batchEvaluationRecords.data
+                            ? batchEvaluationRecords.data?.map((batch, i) => (
+                                <Tr
+                                  cursor="pointer"
+                                  onClick={() =>
+                                    goToBatchEvaluation(batch.batchId)
+                                  }
+                                  key={i}
+                                >
+                                  <Td>{batch.batchId}</Td>
+                                  <Td>{batch.datasetSlug}</Td>
+                                  <Td>{batch._count.batchId}</Td>
+                                </Tr>
+                              ))
+                            : null}
+                        </Tbody>
+                      </Table>
+                    </TableContainer>
+                  )}
+                </CardBody>
+              </TabPanel>
+            </TabPanels>
+          </Tabs>
         </Card>
       </Container>
       <AddDatasetDrawer
