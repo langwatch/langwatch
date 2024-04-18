@@ -92,7 +92,7 @@ export default function ProjectOnboarding() {
   );
   const usage = api.limits.getUsage.useQuery(
     { organizationId: organization?.id ?? "" },
-    { enabled: !!organization }
+    { enabled: !!organization, refetchOnWindowFocus: false, refetchOnMount: false }
   );
 
   useEffect(() => {

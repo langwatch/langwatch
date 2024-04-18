@@ -97,15 +97,12 @@ export default async function handler(
   let evaluation = params.evaluation;
   let settings = null;
 
-  console.log("params", evaluation, project.id);
   const check = await prisma.check.findFirst({
     where: {
       projectId: project.id,
       slug: evaluation,
     },
   });
-
-  console.log(check);
 
   if (check != null) {
     evaluation = check.checkType;
@@ -154,7 +151,6 @@ export default async function handler(
       settings: (settings as Record<string, unknown>) ?? {},
     });
   } catch (error) {
-    console.error(error);
     result = {
       status: "error",
       error_type: "INTERNAL_ERROR",

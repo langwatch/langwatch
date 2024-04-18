@@ -124,14 +124,14 @@ model Team {
 }
 
 model Organization {
-    id                          String               @id @default(nanoid())
-    name                        String
-    slug                        String               @unique
-    members                     OrganizationUser[]
-    teams                       Team[]
-    createdAt                   DateTime             @default(now())
-    updatedAt                   DateTime             @default(now()) @updatedAt
-    OrganizationInvite          OrganizationInvite[]
+    id                    String               @id @default(nanoid())
+    name                  String
+    slug                  String               @unique
+    members               OrganizationUser[]
+    teams                 Team[]
+    createdAt             DateTime             @default(now())
+    updatedAt             DateTime             @default(now()) @updatedAt
+    OrganizationInvite    OrganizationInvite[]
     usageSpendingMaxLimit Int?
 }
 
@@ -153,6 +153,7 @@ model Project {
     datasets         Dataset[]
     customGraphs     CustomGraph[]
     batchProcessings BatchProcessing[]
+    skipPIIRedacting Boolean           @default(false)
 
     @@index([teamId])
 }

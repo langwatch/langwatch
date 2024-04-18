@@ -243,7 +243,7 @@ export const AddProjectButton = ({
 }) => {
   const usage = api.limits.getUsage.useQuery(
     { organizationId: organization.id },
-    { enabled: !!organization }
+    { enabled: !!organization, refetchOnWindowFocus: false, refetchOnMount: false }
   );
 
   return !usage.data ||
@@ -301,7 +301,7 @@ export const DashboardLayout = ({
   } = useOrganizationTeamProject();
   const usage = api.limits.getUsage.useQuery(
     { organizationId: organization?.id ?? "" },
-    { enabled: !!organization }
+    { enabled: !!organization, refetchOnWindowFocus: false, refetchOnMount: false }
   );
 
   const [query, setQuery] = useState("");
@@ -439,8 +439,9 @@ export const DashboardLayout = ({
               <AlertIcon />
               <Text>
                 You reached the limit of{" "}
-                {numeral(usage.data.maxMonthlyUsageLimit).format("$0.00")} usage cost for
-                this month, evaluations and guardrails will not be processed.{" "}
+                {numeral(usage.data.maxMonthlyUsageLimit).format("$0.00")} usage
+                cost for this month, evaluations and guardrails will not be
+                processed.{" "}
                 <Link
                   href="/settings/usage"
                   textDecoration="underline"
@@ -471,15 +472,18 @@ export const DashboardLayout = ({
           <Spacer />
 
           <form
-            action={`${project.slug}/messages?mode=dev`}
+            action={`${project.slug}/messages`}
             method="GET"
             style={{ width: "100%", maxWidth: "600px" }}
             onSubmit={(e) => {
               e.preventDefault();
-              if (router.query.mode === "dev") {
+              if (
+                router.query.view === "list" ||
+                router.query.view === "table"
+              ) {
                 void router.replace({ query: { ...router.query, query } });
               } else {
-                void router.push(`${project.slug}/messages?query=${query}`);
+                void router.push(`/${project.slug}/messages?query=${query}`);
               }
             }}
           >

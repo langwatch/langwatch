@@ -180,18 +180,18 @@ export function AddDatasetRecordDrawer(props: AddDatasetDrawerProps) {
       if (databaseSchema === DatabaseSchema.STRING_I_O) {
         return {
           input: inputSpan[key],
-          expectedOutput: outputSpan[key],
+          expected_output: outputSpan[key],
         };
       } else if (databaseSchema === DatabaseSchema.FULL_TRACE) {
         return {
           input: inputSpan[key],
-          expectedOutput: outputSpan[key],
+          expected_output: outputSpan[key],
           spans: JSON.parse(spanTrace[key]),
         };
       } else if (databaseSchema === DatabaseSchema.LLM_CHAT_CALL) {
         return {
           input: JSON.parse(inputSpan[key]),
-          expectedOutput: JSON.parse(outputSpan[key]),
+          expected_output: JSON.parse(outputSpan[key]),
         };
       }
     });

@@ -6,7 +6,7 @@ import {
 } from "../permission";
 import { dependencies } from "../../../injection/dependencies.server";
 
-export const subscriptionRouter = createTRPCRouter({
+export const planRouter = createTRPCRouter({
   getActivePlan: protectedProcedure
     .input(
       z.object({

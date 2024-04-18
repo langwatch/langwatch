@@ -47,7 +47,11 @@ function ProjectsList({
 
   const usage = api.limits.getUsage.useQuery(
     { organizationId: organization.id },
-    { enabled: !!organization }
+    {
+      enabled: !!organization,
+      refetchOnWindowFocus: false,
+      refetchOnMount: false,
+    }
   );
 
   return (

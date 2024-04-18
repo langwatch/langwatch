@@ -117,13 +117,13 @@ export default function Dataset() {
 
   const getOutput = (dataset: any, schema: DatabaseSchema) => {
     if (schema === DatabaseSchema.LLM_CHAT_CALL) {
-      return JSON.stringify(dataset.entry.expectedOutput[0]) ?? "";
+      return JSON.stringify(dataset.entry.expected_output[0]) ?? "";
     }
     if (
       schema === DatabaseSchema.STRING_I_O ||
       schema === DatabaseSchema.FULL_TRACE
     ) {
-      return dataset.entry.expectedOutput;
+      return dataset.entry.expected_output;
     }
   };
 

@@ -53,7 +53,7 @@ SingleEvaluationResult = (
 
 class DatasetEntry(BaseModel):
     input: str
-    expectedOutput: str
+    expected_output: str
 
 
 class DatasetEntryWithOutput(DatasetEntry):
@@ -122,7 +122,7 @@ class BatchEvaluation:
         for result in results:
             result_dict: dict[str, Any] = {
                 "input": result.entry.input,
-                "expectedOutput": result.entry.expectedOutput,
+                "expected_output": result.entry.expected_output,
                 "output": result.entry.output,
             }
             for evaluation_name, evaluation_result in result.results:
@@ -142,9 +142,10 @@ class BatchEvaluation:
         entry = record.entry
 
         callbackResponse = self.callback(entry)
+        print(entry)
         entry_with_output = DatasetEntryWithOutput(
             input=entry.input,
-            expectedOutput=entry.expectedOutput,
+            expected_output=entry.expected_output,
             output=(
                 callbackResponse
                 if isinstance(callbackResponse, str)
