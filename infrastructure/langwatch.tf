@@ -152,7 +152,9 @@ resource "null_resource" "langwatch_docker_image" {
       fi
       secrets=$(aws secretsmanager --profile ${module.variables.profile} --region ${data.aws_region.current.name} get-secret-value --secret-id ${data.aws_secretsmanager_secret.langwatch.id} | jq -r '.SecretString')
 
-      has_dotenvfile=$(ls -A .env 2>/dev/null || false)
+      set +e
+      has_dotenvfile=$(ls -A .env 2>/dev/null)
+      set -e
       if [ -z "$has_dotenvfile" ]; then
         echo "$secrets" | jq -r "to_entries|map(\"\(.key)='\(.value)'\")|.[]" > .env
         output=$(aws secretsmanager --profile ${module.variables.profile} --region ${data.aws_region.current.name} get-secret-value --secret-id ${data.aws_secretsmanager_secret.redis.id})
