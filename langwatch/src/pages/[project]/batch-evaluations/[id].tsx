@@ -18,22 +18,17 @@ import {
   Tooltip,
   Tr,
 } from "@chakra-ui/react";
-import { DatabaseSchema, BatchProcessingS } from "@prisma/client";
 import { useRouter } from "next/router";
 import Parse from "papaparse";
-import type { Key } from "react";
-import { Play } from "react-feather";
 import { useDrawer } from "~/components/CurrentDrawer";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
-import { displayName } from "~/utils/datasets";
 
 export default function Dataset() {
   const router = useRouter();
   const { project } = useOrganizationTeamProject();
   const batchId = router.query.id;
-  const { openDrawer } = useDrawer();
 
   const evaluations = api.batchRecord.getAllByBatchID.useQuery(
     { projectId: project?.id ?? "", batchId: batchId as string },
@@ -41,8 +36,6 @@ export default function Dataset() {
       enabled: !!project,
     }
   );
-
-  console.log("ev", evaluations.data);
 
   const downloadCSV = () => {
     const fields = [
@@ -62,8 +55,8 @@ export default function Dataset() {
       string,
       string,
       string,
-      string,
-      string,
+      number,
+      number,
       string,
     ];
 
@@ -91,7 +84,7 @@ export default function Dataset() {
 
     const link = document.createElement("a");
     link.href = url;
-    const fileName = `${evaluations.data[0]?.datasetSlug}.csv`;
+    const fileName = `${evaluations.data![0]?.datasetSlug}.csv`;
     link.setAttribute("download", fileName);
     document.body.appendChild(link);
     link.click();
@@ -115,18 +108,6 @@ export default function Dataset() {
           >
             Export <DownloadIcon marginLeft={2} />
           </Button>
-          {/* <Button
-            colorScheme="blue"
-            onClick={() => {
-              openDrawer("batchEvaluation", {
-                datasetSlug: dataset.data?.slug,
-              });
-            }}
-            minWidth="fit-content"
-            leftIcon={<Play height={16} />}
-          >
-            Batch Evaluation
-          </Button> */}
         </HStack>
         <Card>
           <CardBody>
