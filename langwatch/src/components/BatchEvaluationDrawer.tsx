@@ -38,9 +38,9 @@ import { useDrawer } from "~/components/CurrentDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { AVAILABLE_EVALUATORS } from "~/trace_checks/evaluators.generated";
 import { api } from "~/utils/api";
-import { BatchDatasetProcessing } from "./integration-guides/BatchDatasetProcessing";
 import { type Check } from "@prisma/client";
 import type { JsonObject } from "@prisma/client/runtime/library";
+import { RenderCode } from "~/components/integration-guides/utils/RenderCode";
 
 interface BatchEvaluatioProps {
   datasetSlug?: string | undefined;
@@ -572,3 +572,57 @@ export function BatchEvaluationDrawer(props: BatchEvaluatioProps) {
     </Drawer>
   );
 }
+
+export const BatchDatasetProcessing = ({
+  apiKey,
+  checks,
+  dataset,
+}: {
+  apiKey?: string;
+  checks: string[];
+  dataset: string;
+}) => {
+  return (
+    <div>
+      <h3>Installation:</h3>
+      <RenderCode code={`pip install langwatch`} language="bash" />
+      <h3>Configuration:</h3>
+      <p>Make sure your local environment is set up</p>
+      <RenderCode
+        code={`export LANGWATCH_API_KEY='${apiKey ?? "your_api_key_here"}'`}
+        language="bash"
+      />
+      <h3>Usage:</h3>
+      <p>
+        Copy the code below to run locally, implement the callback function with
+        a call to your actual pipeline
+      </p>
+      <RenderCode
+        code={`from langwatch.batch_evaluation import BatchEvaluation, DatasetEntry
+            
+def callback(entry: DatasetEntry):
+    # generate messages for entry.input using your LLM
+    # input_data = entry.get("input")
+    # Assuming entry contains an "input" field
+
+    # Process the input data using your LLM and generate a response
+    # response = f"Generated response for input: {input_data}"
+    # print(response)
+    # return {"output": response}
+    return {}
+            
+            
+    # Instantiate the BatchEvaluation object
+evaluation = BatchEvaluation(
+    dataset="${dataset}",
+    evaluations=${JSON.stringify(checks)},
+    callback=callback,  
+)
+
+# Run the evaluation    
+results = evaluation.run()`}
+        language="python"
+      />
+    </div>
+  );
+};
