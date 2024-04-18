@@ -116,8 +116,11 @@ resource "null_resource" "docker_image" {
 
       cd ${path.root}/../langevals
       docker build . --build-arg EVALUATOR=${local.evaluator_package} --platform="linux/amd64" --cache-to type=inline $cache_from -t ${data.aws_ecr_repository.lambda_repository.repository_url}:${local.tag} -t ${data.aws_ecr_repository.lambda_repository.repository_url}:${local.git_tag}
-      docker push ${data.aws_ecr_repository.lambda_repository.repository_url}:${local.tag}
-      docker push ${data.aws_ecr_repository.lambda_repository.repository_url}:${local.git_tag}
+      image_exists=$(docker images -q ${data.aws_ecr_repository.lambda_repository.repository_url}:${local.tag})
+      if [ -z "$image_exists" ]; then
+        docker push ${data.aws_ecr_repository.lambda_repository.repository_url}:${local.tag}
+        docker push ${data.aws_ecr_repository.lambda_repository.repository_url}:${local.git_tag}
+      fi
       cd -
     EOT
 
