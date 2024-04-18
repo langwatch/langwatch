@@ -26,7 +26,7 @@ import { useRouter } from "next/router";
 import type { Subscription } from "@prisma/client";
 import { uppercaseFirstLetterLowerCaseRest } from "../../langwatch/langwatch/src/utils/stringCasing";
 
-type PlanTypes = "PRO" | "GROWTH" | "ENTERPRISE";
+type PlanTypes = "FREE" | "PRO" | "GROWTH" | "ENTERPRISE";
 
 export default function Subscription() {
   const { organization } = useOrganizationTeamProject();
@@ -36,7 +36,7 @@ export default function Subscription() {
     { enabled: !!organization }
   );
 
-  const [selectedPlan, setSelectedPlan] = useState<PlanTypes>("PRO");
+  const [selectedPlan, setSelectedPlan] = useState<PlanTypes>("FREE");
 
   const router = useRouter();
   const onPostSubscriptionSetup = router.query.success !== undefined;
@@ -63,6 +63,12 @@ export default function Subscription() {
       setSubscriptionFound(subscription.data);
     }
   }, [subscription.data]);
+
+  useEffect(() => {
+    if (activePlan.data) {
+      setSelectedPlan(activePlan.data.type as any);
+    }
+  }, [activePlan.data]);
 
   return (
     <SettingsLayout>
@@ -166,19 +172,33 @@ export default function Subscription() {
               <RadioGroup width="full" value={selectedPlan}>
                 <VStack width="full" spacing={0} align="start">
                   <Plan
-                    plan="PRO"
-                    price={99}
-                    description="For teams starting with LLM development"
+                    plan="FREE"
+                    price={0}
+                    description="For starting with LLM development"
                     features={[
-                      "Up to 2 projects & 5 team members",
-                      "10k messages limit",
-                      "90-day messages retention",
-                      "Access to all evaluations and guardrails (including €10 in credits)",
+                      "Single project and team member",
+                      "1k messages limit",
+                      "30-day messages retention",
+                      "Trial evaluations and guardrails",
                     ]}
                     selectedPlan={selectedPlan}
                     setSelectedPlan={setSelectedPlan}
                   />
                   <Plan
+                    plan="PRO"
+                    price={99}
+                    description="For small teams improving their LLM solutions"
+                    features={[
+                      "Up to 2 projects & 5 team members",
+                      "10k messages limit",
+                      "90-day messages retention",
+                      "Usage-based price for evaluations and guardrails (including first €10 for free)",
+                      "Slack support",
+                    ]}
+                    selectedPlan={selectedPlan}
+                    setSelectedPlan={setSelectedPlan}
+                  />
+                  {/* <Plan
                     plan="GROWTH"
                     price={399}
                     description="For business with multiple teams working with LLMs"
@@ -186,22 +206,23 @@ export default function Subscription() {
                       "Up to 5 projects & 10 team members",
                       "100k messages limit",
                       "Custom retention",
-                      "Access to all evaluations and guardrails (including €50 in credits)",
+                      "Usage-based price for evaluations and guardrails (including first €50 for free)",
                       "Premium onboarding & tech support",
                     ]}
                     selectedPlan={selectedPlan}
                     setSelectedPlan={setSelectedPlan}
-                  />
+                  /> */}
                   <Plan
                     plan="ENTERPRISE"
+                    price={399}
                     description="Most scalable solution for enterprise needs"
                     features={[
-                      "Unlimited team members",
-                      "Unlimited messages",
+                      "SOC2/ISO27001 compliance",
+                      "Custom team members limit",
+                      "Custom messages limit",
                       "Custom evaluations",
                       "Custom retention",
                       "Premium onboarding & tech support",
-                      "SOC2/ISO27001 compliance",
                     ]}
                     selectedPlan={selectedPlan}
                     setSelectedPlan={setSelectedPlan}
@@ -227,7 +248,7 @@ function Plan({
   plan: PlanTypes;
   description: string;
   features: string[];
-  price?: number;
+  price?: number | "custom";
   selectedPlan: PlanTypes;
   setSelectedPlan: (plan: PlanTypes) => void;
 }) {
@@ -277,9 +298,21 @@ function Plan({
             ))}
           </VStack>
           <Spacer />
-          <HStack spacing="2px" fontSize={18} color="gray.600" marginTop="-3px">
-            {price ? (
-              <>
+          {price === "custom" ? (
+            <Text fontSize={22}>Custom</Text>
+          ) : (
+            <VStack spacing="0">
+              {plan === "ENTERPRISE" && (
+                <Text alignSelf="start" marginTop="3px" color="gray.500">
+                  starting at
+                </Text>
+              )}
+              <HStack
+                spacing="2px"
+                fontSize={18}
+                color="gray.600"
+                marginTop="-3px"
+              >
                 <Text alignSelf="start" marginTop="3px">
                   €
                 </Text>
@@ -287,11 +320,9 @@ function Plan({
                 <Text alignSelf="end" marginBottom="3px">
                   /mo
                 </Text>
-              </>
-            ) : (
-              <Text fontSize={22}>Custom</Text>
-            )}
-          </HStack>
+              </HStack>
+            </VStack>
+          )}
         </HStack>
         {!isCurrentPlan && selectedPlan == plan && (
           <Box alignSelf="end" marginTop="-48px">
@@ -326,7 +357,8 @@ function Plan({
               >
                 {!activePlan.data || activePlan.data.free
                   ? "Subscribe"
-                  : (price ?? 0) < activePlan.data.prices.EUR
+                  : price !== "custom" &&
+                    (price ?? 0) < activePlan.data.prices.EUR
                   ? "Downgrade"
                   : "Upgrade"}
               </Button>

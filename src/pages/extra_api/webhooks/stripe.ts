@@ -31,6 +31,8 @@ export default async function handler(
     return res.status(400).send(`Webhook Error: ${(err as any)?.message}`);
   }
 
+  console.log(`🔔  Webhook received: ${event.type}`);
+
   if (
     event.type === "checkout.session.completed" ||
     event.type === "invoice.payment_succeeded" ||
@@ -83,6 +85,7 @@ export default async function handler(
         });
 
       case "invoice.payment_succeeded":
+        await new Promise((resolve) => setTimeout(resolve, 2000)); // wait for Stripe to update the subscription id
         await prisma.subscription.update({
           where: { stripeSubscriptionId: subscriptionId },
           data: {
@@ -94,6 +97,7 @@ export default async function handler(
         break;
 
       case "invoice.payment_failed":
+        await new Promise((resolve) => setTimeout(resolve, 2000)); // wait for Stripe to update the subscription id
         const currentSubscription = await prisma.subscription.findFirst({
           where: { stripeSubscriptionId: subscriptionId },
         });
@@ -120,8 +124,6 @@ export default async function handler(
       return res.json({ received: true });
     }
 
-    console.log("event", JSON.stringify(event, undefined, 2));
-
     switch (event.type) {
       case "customer.subscription.deleted":
         await prisma.subscription.update({
@@ -133,6 +135,7 @@ export default async function handler(
         });
         break;
       case "customer.subscription.updated":
+        await new Promise((resolve) => setTimeout(resolve, 2000)); // wait for Stripe to update the subscription id
         if (
           subscription.status !== "active" ||
           subscription.canceled_at ||

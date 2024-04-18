@@ -33,7 +33,7 @@ export const subscriptionRouter = () =>
         z.object({
           organizationId: z.string(),
           baseUrl: z.string(),
-          plan: z.enum(["PRO", "GROWTH"]),
+          plan: z.enum(["FREE", "PRO", "GROWTH"]),
         })
       )
       .use(
@@ -47,32 +47,92 @@ export const subscriptionRouter = () =>
           input.organizationId
         );
 
-        // TODO: if there is a already a subscription, non pending, update it
+        const lastSubscription = await getLastNonCancelledSubscription(
+          input.organizationId
+        );
+        if (
+          lastSubscription &&
+          lastSubscription.stripeSubscriptionId &&
+          lastSubscription.status !== "PENDING"
+        ) {
+          if (input.plan === "FREE") {
+            const response = await stripe.subscriptions.cancel(
+              lastSubscription.stripeSubscriptionId
+            );
 
-        const subscription = await prisma.subscription.create({
-          data: {
-            organizationId: input.organizationId,
-            status: "PENDING",
-            plan: input.plan,
-          },
-        });
+            if (response.status === "canceled") {
+              await prisma.subscription.update({
+                where: { id: lastSubscription.id },
+                data: { status: "CANCELLED" },
+              });
+            }
 
-        const session = await stripe.checkout.sessions.create({
-          mode: "subscription",
-          customer: customerId,
-          line_items: [
-            {
-              price: prices[input.plan],
-              quantity: 1,
+            return { url: `${input.baseUrl}/settings/subscription` };
+          } else {
+            const currentStripeSubscription =
+              await stripe.subscriptions.retrieve(
+                lastSubscription.stripeSubscriptionId
+              );
+            const lineItems = currentStripeSubscription.items.data;
+            const itemId = (
+              lineItems.find(
+                (item) =>
+                  item.price.id ===
+                  prices[lastSubscription.plan as "PRO" | "GROWTH"]
+              ) || lineItems[0]
+            )?.id;
+            const response = await stripe.subscriptions.update(
+              lastSubscription.stripeSubscriptionId,
+              {
+                items: [
+                  {
+                    id: itemId,
+                    price: prices[input.plan],
+                    quantity: 1,
+                  },
+                ],
+              }
+            );
+
+            if (response.status === "active") {
+              await prisma.subscription.update({
+                where: { id: lastSubscription.id },
+                data: { plan: input.plan },
+              });
+            }
+
+            return { url: `${input.baseUrl}/settings/subscription?success` };
+          }
+        } else {
+          if (input.plan === "FREE") {
+            return { url: `${input.baseUrl}/settings/subscription` };
+          }
+
+          const subscription = await prisma.subscription.create({
+            data: {
+              organizationId: input.organizationId,
+              status: "PENDING",
+              plan: input.plan,
             },
-          ],
-          success_url: `${input.baseUrl}/settings/subscription?success`,
-          cancel_url: `${input.baseUrl}/settings/subscription`,
-          billing_address_collection: "required",
-          client_reference_id: `subscription_setup_${subscription.id}`,
-        });
+          });
 
-        return { url: session.url };
+          const session = await stripe.checkout.sessions.create({
+            mode: "subscription",
+            customer: customerId,
+            line_items: [
+              {
+                price: prices[input.plan],
+                quantity: 1,
+              },
+            ],
+            success_url: `${input.baseUrl}/settings/subscription?success`,
+            cancel_url: `${input.baseUrl}/settings/subscription`,
+            billing_address_collection: "required",
+            client_reference_id: `subscription_setup_${subscription.id}`,
+          });
+
+          return { url: session.url };
+        }
       }),
 
     manage: protectedProcedure
