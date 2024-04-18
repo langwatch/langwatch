@@ -6,7 +6,7 @@ on:
       - main
 
 # Concurrency group
-concurrency: 
+concurrency:
   group: deploy-group
   cancel-in-progress: false
 
@@ -74,30 +74,6 @@ jobs:
           aws configure --profile lw-prod set role_arn ${{ secrets.LW_PROD_ROLE_ARN }}
           aws configure --profile lw-prod set source_profile lw-root-tf
           aws configure --profile lw-prod set region us-east-1
-
-      - name: Free up Disk Space
-        run: |
-          sudo apt-get clean || true
-          sudo rm -rf /usr/share/dotnet || true
-          sudo rm -rf /opt/ghc || true
-          sudo rm -rf /usr/local/.ghcup || true
-          sudo rm -rf /usr/local/lib/android || true
-          sudo rm -rf /opt/android || true
-          sudo rm -rf /usr/local/share/android-sdk || true
-          sudo apt-get remove -y '^aspnetcore-.*' || true
-          sudo apt-get remove -y '^dotnet-.*' --fix-missing || true
-          sudo apt-get remove -y '^llvm-.*' --fix-missing || true
-          sudo apt-get remove -y 'php.*' --fix-missing || true
-          sudo apt-get remove -y '^mongodb-.*' --fix-missing || true
-          sudo apt-get remove -y '^mysql-.*' --fix-missing || true
-          sudo apt-get remove -y azure-cli google-chrome-stable firefox powershell mono-devel libgl1-mesa-dri --fix-missing || true
-          sudo apt-get remove -y google-cloud-sdk --fix-missing || true
-          sudo apt-get remove -y google-cloud-cli --fix-missing || true
-          sudo apt-get autoremove -y || true
-          sudo apt-get clean || true
-          sudo swapoff -a || true
-          sudo rm -f /mnt/swapfile || true
-          free -h || true
 
       - name: Deploy Infrastructure
         run: |

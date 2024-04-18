@@ -1,7 +1,9 @@
-infra-init:
+infra-generate:
 	@cd langevals && \
 	make install && \
 	poetry run python ../infrastructure/scripts/generate_lambdas.py
+
+infra-init:
 	@terraform -chdir=infrastructure/ init
 
 infra-plan:
