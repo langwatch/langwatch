@@ -1,4 +1,5 @@
 export type PlanInfo = {
+  type: string;
   name: string;
   free: boolean;
   canAlwaysAddNewMembers?: boolean;
@@ -22,6 +23,7 @@ export abstract class SubscriptionHandler {
     }
   ): Promise<PlanInfo> {
     return {
+      type: "OPEN_SOURCE",
       name: "Open Source",
       free: true,
       canAlwaysAddNewMembers: true,
