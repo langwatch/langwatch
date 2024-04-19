@@ -25,4 +25,4 @@ evaluation = BatchEvaluation(
 )
 
 # Run the evaluation
-evaluation.run()
+results = evaluation.run()
