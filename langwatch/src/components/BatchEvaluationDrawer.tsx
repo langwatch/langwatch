@@ -264,8 +264,6 @@ export function BatchEvaluationDrawer(props: BatchEvaluatioProps) {
                                   (check, index) => {
                                     const description = check[1].description;
 
-                                    console.log(check);
-
                                     if (check[1].category != "similarity") {
                                       return null;
                                     }

@@ -37,6 +37,9 @@ export const batchRecordRouter = createTRPCRouter({
           projectId: projectId,
           batchId: batchId,
         },
+        include: {
+          dataset: true,
+        },
       });
 
       return batchRecords;

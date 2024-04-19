@@ -96,7 +96,7 @@ export default function Dataset() {
       <Container maxW={"calc(100vw - 200px)"} padding={6} marginTop={8}>
         <HStack width="full" verticalAlign={"middle"} paddingBottom={6}>
           <Heading as={"h1"} size="lg">
-            Dataset: {evaluations.data?.[0]?.datasetSlug ?? ""}
+            Dataset: {evaluations.data?.[0]?.dataset.name ?? ""}
           </Heading>
 
           <Spacer />

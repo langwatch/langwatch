@@ -136,6 +136,17 @@ export default async function handler(
     })
     .filter((x) => x);
 
+  const dataset = await prisma.dataset.findFirst({
+    where: {
+      slug: datasetSlug,
+      projectId: project.id,
+    },
+  });
+
+  if (!dataset) {
+    return res.status(404).json({ error: "Dataset not found" });
+  }
+
   let result: SingleEvaluationResult;
   try {
     result = await runEvaluation({
@@ -184,6 +195,7 @@ export default async function handler(
         cost: cost?.amount ?? 0,
         evaluation: evaluation,
         datasetSlug: datasetSlug,
+        datasetId: dataset.id,
       },
     });
   }
