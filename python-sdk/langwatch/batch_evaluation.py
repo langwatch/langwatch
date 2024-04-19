@@ -142,7 +142,6 @@ class BatchEvaluation:
         entry = record.entry
 
         callbackResponse = self.callback(entry)
-        print(entry)
         entry_with_output = DatasetEntryWithOutput(
             input=entry.input,
             expected_output=entry.expected_output,

@@ -19,6 +19,7 @@ import {
   AVAILABLE_EVALUATORS,
 } from "../../../trace_checks/evaluators.generated";
 import { extractChunkTextualContent } from "../collector/rag";
+import { c } from "vitest/dist/reporters-5f784f42";
 
 export const debug = getDebugger("langwatch:guardrail:evaluate");
 
@@ -39,14 +40,6 @@ export const evaluationInputSchema = z.object({
 });
 
 export type EvaluationRESTParams = z.infer<typeof evaluationInputSchema>;
-
-type EvalResult = (
-  | EvaluationResult
-  | EvaluationResultSkipped
-  | Omit<EvaluationResultError, "traceback">
-) & {
-  passed: boolean;
-};
 
 export default async function handler(
   req: NextApiRequest,
@@ -81,7 +74,7 @@ export default async function handler(
     params = evaluationInputSchema.parse(req.body);
   } catch (error) {
     debug(
-      "Invalid evalution data received",
+      "Invalid evaluation data received",
       error,
       JSON.stringify(req.body, null, "  "),
       { projectId: project.id }
@@ -94,8 +87,9 @@ export default async function handler(
 
   const { input, output, contexts, expected_output } = params.data;
   const { batchId, datasetSlug } = params;
-  let evaluation = params.evaluation;
+  const evaluation = params.evaluation;
   let settings = null;
+  let checkType;
 
   const check = await prisma.check.findFirst({
     where: {
@@ -105,18 +99,20 @@ export default async function handler(
   });
 
   if (check != null) {
-    evaluation = check.checkType;
+    checkType = check.checkType;
     settings = check.parameters;
+  } else {
+    checkType = evaluation;
   }
 
-  if (!AVAILABLE_EVALUATORS[evaluation as keyof typeof AVAILABLE_EVALUATORS]) {
+  if (!AVAILABLE_EVALUATORS[checkType as keyof typeof AVAILABLE_EVALUATORS]) {
     return res.status(400).json({
-      error: `Invalid evaluation type: ${evaluation}`,
+      error: `Invalid evaluation type: ${checkType}`,
     });
   }
 
   const evaluationRequiredFields =
-    AVAILABLE_EVALUATORS[evaluation as keyof typeof AVAILABLE_EVALUATORS]
+    AVAILABLE_EVALUATORS[checkType as keyof typeof AVAILABLE_EVALUATORS]
       .requiredFields;
 
   if (
@@ -125,7 +121,7 @@ export default async function handler(
     })
   ) {
     return res.status(400).json({
-      error: `Missing required field for ${evaluation}`,
+      error: `Missing required field for ${checkType}`,
       requiredFields: evaluationRequiredFields,
     });
   }
@@ -140,6 +136,17 @@ export default async function handler(
     })
     .filter((x) => x);
 
+  const dataset = await prisma.dataset.findFirst({
+    where: {
+      slug: datasetSlug,
+      projectId: project.id,
+    },
+  });
+
+  if (!dataset) {
+    return res.status(404).json({ error: "Dataset not found" });
+  }
+
   let result: SingleEvaluationResult;
   try {
     result = await runEvaluation({
@@ -147,7 +154,7 @@ export default async function handler(
       output: output ? output : undefined,
       contexts: contextList,
       expected_output: expected_output ? expected_output : undefined,
-      evalution: evaluation,
+      evaluation: checkType,
       settings: (settings as Record<string, unknown>) ?? {},
     });
   } catch (error) {
@@ -188,6 +195,7 @@ export default async function handler(
         cost: cost?.amount ?? 0,
         evaluation: evaluation,
         datasetSlug: datasetSlug,
+        datasetId: dataset.id,
       },
     });
   }
@@ -200,18 +208,18 @@ const runEvaluation = async ({
   output,
   contexts,
   expected_output,
-  evalution,
+  evaluation,
   settings,
 }: {
   input?: string;
   output?: string;
   contexts?: string[];
   expected_output?: string;
-  evalution: string;
+  evaluation: string;
   settings?: Record<string, unknown>;
 }) => {
   const response = await fetch(
-    `${env.LANGEVALS_ENDPOINT}/${evalution}/evaluate`,
+    `${env.LANGEVALS_ENDPOINT}/${evaluation}/evaluate`,
     {
       method: "POST",
       headers: {

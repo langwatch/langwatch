@@ -260,15 +260,16 @@ enum DatabaseSchema {
 }
 
 model Dataset {
-    id             String          @id @default(nanoid())
-    projectId      String
-    project        Project         @relation(fields: [projectId], references: [id])
-    name           String
-    slug           String
-    schema         DatabaseSchema
-    createdAt      DateTime        @default(now())
-    updatedAt      DateTime        @default(now()) @updatedAt
-    datasetRecords DatasetRecord[]
+    id              String            @id @default(nanoid())
+    projectId       String
+    project         Project           @relation(fields: [projectId], references: [id])
+    name            String
+    slug            String
+    schema          DatabaseSchema
+    createdAt       DateTime          @default(now())
+    updatedAt       DateTime          @default(now()) @updatedAt
+    datasetRecords  DatasetRecord[]
+    BatchProcessing BatchProcessing[]
 
     @@unique([projectId, slug])
 }
@@ -294,6 +295,7 @@ model CustomGraph {
     updatedAt DateTime @default(now()) @updatedAt
 
     @@unique([id])
+    @@index([projectId])
 }
 
 model BatchProcessing {
@@ -307,9 +309,13 @@ model BatchProcessing {
     details     String
     cost        Float
     datasetSlug String
+    datasetId   String
+    dataset     Dataset  @relation(fields: [datasetId], references: [id])
     evaluation  String
     createdAt   DateTime @default(now())
     updatedAt   DateTime @default(now()) @updatedAt
 
     @@unique([id])
+    @@index([projectId])
+    @@index([datasetId])
 }
