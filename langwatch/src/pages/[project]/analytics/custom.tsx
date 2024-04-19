@@ -118,8 +118,8 @@ import { RenderCode } from "~/components/integration-guides/utils/RenderCode";
 
 export interface CustomGraphFormData {
   title?: string;
-  startDate: Date;
-  endDate: Date;
+  startDate?: Date;
+  endDate?: Date;
   graphType?: {
     label: string;
     value: CustomGraphInput["graphType"];
