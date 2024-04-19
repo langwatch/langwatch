@@ -5,6 +5,7 @@ dist
 .venv
 examples/.chainlit
 examples/chainlit.md
+examples/.ipynb_checkpoints
 repl.ipynb
 chainlit.md
 .env
