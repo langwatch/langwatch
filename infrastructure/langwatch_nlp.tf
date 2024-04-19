@@ -103,7 +103,9 @@ resource "null_resource" "langwatch_nlp_docker_image" {
       fi
 
       docker build . -f Dockerfile.lambda --platform="linux/amd64" --cache-to type=inline $cache_from -t ${data.aws_ecr_repository.langwatch_nlp.repository_url}:${local.langwatch_nlp_tag} -t ${data.aws_ecr_repository.langwatch_nlp.repository_url}:${local.langwatch_nlp_git_tag}
-      image_exists=$(docker images -q ${data.aws_ecr_repository.langwatch_nlp.repository_url}:${local.langwatch_nlp_tag})
+      set +e
+      image_exists=$(docker manifest inspect ${data.aws_ecr_repository.langwatch_nlp.repository_url}:${local.langwatch_nlp_tag} > /dev/null 2>&1 && echo yes)
+      set -e
       if [ -z "$image_exists" ]; then
         docker push ${data.aws_ecr_repository.langwatch_nlp.repository_url}:${local.langwatch_nlp_tag}
         docker push ${data.aws_ecr_repository.langwatch_nlp.repository_url}:${local.langwatch_nlp_git_tag}
