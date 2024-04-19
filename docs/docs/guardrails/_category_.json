@@ -1,0 +1,10 @@
+{
+  "label": "Guardrails",
+  "position": 60,
+  "link": {
+    "type": "generated-index",
+    "description": "Learn how you can protect your LLM application from costly mistakes by setting up guardrails."
+  },
+  "collapsible": true,
+  "collapsed": false
+}

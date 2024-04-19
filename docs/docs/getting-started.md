@@ -1,6 +1,6 @@
 ---
 title: Getting Started
-sidebar_position: 2
+sidebar_position: 20
 ---
 
 # Getting Started with LangWatch
@@ -116,8 +116,8 @@ Now all your messages should be visible on your [LangWatch Dashboard](https://ap
 
 Now that you have integrated LangWatch, it will start capturing traces from your LLM interactions. You're all set to explore the insights and analytics provided by LangWatch. From here, you might want to:
 
-- Visit the [Trace Analysis](#) page to see how you can examine and make sense of your LLM interactions.
-- Learn more about [LLM Checks](#) and understand the automated evaluations performed by LangWatch.
+- Visit the [Integration Guides](/docs/category/integration-guides) to learn how to set up LangWatch with different LLMs and frameworks
+- Learn more about [Guardrails](#) and [Evaluations](#) and understand the automated checks performed by LangWatch.
 - Check out [Advanced Configurations](#) for details on customizing your LangWatch setup.
 
 If you encounter any hurdles or have questions, our support team is eager to assist you. Welcome aboard, and happy tracing!

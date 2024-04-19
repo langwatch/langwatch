@@ -1,6 +1,6 @@
 ---
 title: Troubleshooting and Support
-sidebar_position: 10
+sidebar_position: 90
 ---
 
 # Troubleshooting and Support

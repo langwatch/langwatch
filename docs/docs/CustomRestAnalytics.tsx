@@ -6,14 +6,15 @@ export const CustomRestAnalytics = ({ apiKey }: { apiKey?: string }) => {
     <div>
       <h3>Usage:</h3>
       <p>
-        You will need to obtain your JSON payload from the custom gragh section
-        in our application. You can find this on the Analytics page &gt; Custom Reports &gt; Add chart.
+        You will need to obtain your JSON payload from the custom graph section
+        in our application. You can find this on the Analytics page &gt; Custom
+        Reports &gt; Add chart.
       </p>
       <ol>
         <li>Pick the custom graph you want to get the analytics for.</li>
         <li>
           Prepare your JSON data. Make sure it's is the same format that is
-          showin in the LangWatch application.
+          showing in the LangWatch application.
         </li>
         <li>
           Use the <code>curl</code> command to get you analytics data. Here is a
@@ -55,12 +56,6 @@ EOF`}
           return the custom analytics data in the response.
         </li>
       </ol>
-
-      <p>
-        Remember to handle errors and retries as needed. You might need to
-        script additional logic around the <code>curl</code> command to handle
-        these cases.
-      </p>
     </div>
   );
 };
