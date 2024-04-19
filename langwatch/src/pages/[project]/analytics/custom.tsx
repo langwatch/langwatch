@@ -114,11 +114,12 @@ import {
 } from "../../../utils/stringCasing";
 import { useRouter } from "next/router";
 import { useFilterParams } from "~/hooks/useFilterParams";
+import { RenderCode } from "~/components/integration-guides/utils/RenderCode";
 
 export interface CustomGraphFormData {
   title?: string;
-  startDate?: Date;
-  endDate?: Date;
+  startDate: Date;
+  endDate: Date;
   graphType?: {
     label: string;
     value: CustomGraphInput["graphType"];
@@ -316,7 +317,7 @@ export default function AnalyticsCustomGraph() {
                       <MoreVertical />
                     </MenuButton>
                     <MenuList>
-                      <MenuItem onClick={jsonModal.onOpen}>Show JSON</MenuItem>
+                      {/* <MenuItem onClick={jsonModal.onOpen}>Show JSON</MenuItem> */}
                       <MenuItem onClick={apiModal.onOpen}>Show API</MenuItem>
                     </MenuList>
                   </Menu>
@@ -332,7 +333,7 @@ export default function AnalyticsCustomGraph() {
           </HStack>
         </VStack>
       </Container>
-      <Modal isOpen={jsonModal.isOpen} onClose={jsonModal.onClose}>
+      <Modal isOpen={jsonModal.isOpen} onClose={jsonModal.onClose} size={"2xl"}>
         <ModalOverlay />
         <ModalContent>
           <ModalHeader>Graph JSON</ModalHeader>
@@ -340,14 +341,13 @@ export default function AnalyticsCustomGraph() {
           <ModalBody>
             <Textarea rows={16}>
               {JSON.stringify(debouncedCustomGraphInput, null, 2)}
-              {/* {JSON.stringify(formData, null, 2)} */}
             </Textarea>
           </ModalBody>
 
           <ModalFooter></ModalFooter>
         </ModalContent>
       </Modal>
-      <Modal isOpen={apiModal.isOpen} onClose={apiModal.onClose}>
+      <Modal isOpen={apiModal.isOpen} onClose={apiModal.onClose} size={"2xl"}>
         <ModalOverlay />
         <ModalContent>
           <ModalHeader>JSON API</ModalHeader>
@@ -358,10 +358,22 @@ export default function AnalyticsCustomGraph() {
               HTTP POST request to access identical data tailored for the custom
               graphs.
             </Text>
-            <Textarea rows={16}>
-              {JSON.stringify(debouncedCustomAPIInput, null, 2)}
-              {/* {JSON.stringify(formData, null, 2)} */}
-            </Textarea>
+            <Box padding={4} backgroundColor={"#272822"}>
+              <RenderCode
+                code={`# Set your API key and endpoint URL
+API_KEY="your_langwatch_api_key"
+ENDPOINT="https://app.langwatch.ai/api/analytics"
+
+# Use curl to send the POST request, e.g.:
+curl -X POST "$ENDPOINT" \\
+     -H "X-Auth-Token: $API_KEY" \\
+     -H "Content-Type: application/json" \\
+     -d @- <<EOF
+${JSON.stringify(debouncedCustomAPIInput, null, 2)}
+EOF`}
+                language="bash"
+              />
+            </Box>
           </ModalBody>
 
           <ModalFooter></ModalFooter>
