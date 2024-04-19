@@ -163,7 +163,7 @@ resource "null_resource" "langwatch_docker_image" {
           echo "Failed to retrieve or parse the redis secret."
           exit 1
         fi
-        encoded_redis_password=$(python -c "import urllib.parse; print(urllib.parse.quote(input()))" <<< "$redis_secret")
+        encoded_redis_password=$(printf %s "$redis_secret" | jq -sRr @uri)
         redis_url="redis://:$encoded_redis_password@${aws_elasticache_replication_group.redis[0].primary_endpoint_address}:6379"
         echo "REDIS_URL=$redis_url" >> .env
       fi
