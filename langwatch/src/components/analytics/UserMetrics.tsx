@@ -136,11 +136,11 @@ export function UserMetrics() {
       </GridItem>
       <GridItem rowSpan={2}>
         <VStack spacing={6}>
-          <Card width="100%" minHeight="350px">
+          <Card width="100%" minHeight="328px">
             <CardHeader>
               <Heading size="sm">Top Topics</Heading>
             </CardHeader>
-            <CardBody>
+            <CardBody maxHeight="260px" overflowY="scroll">
               <TopicsSelector showTitle={false} />
             </CardBody>
           </Card>

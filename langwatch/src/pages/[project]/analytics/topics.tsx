@@ -109,7 +109,7 @@ export default function Topics() {
               <CardHeader>
                 <Heading size="sm">Top Topics</Heading>
               </CardHeader>
-              <CardBody>
+              <CardBody maxHeight="340px" overflowY="scroll">
                 <TopicsSelector showTitle={false} />
               </CardBody>
             </Card>
