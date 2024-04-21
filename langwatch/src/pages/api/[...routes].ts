@@ -34,7 +34,14 @@ export default async function handler(
       // @ts-ignore
       req.rawBody = await buffer(req);
       // @ts-ignore
-      req.body = JSON.parse(req.rawBody.toString());
+      const body = req.rawBody.toString();
+      if (body) {
+        try {
+          req.body = JSON.parse(body);
+        } catch (e) {
+          req.body = body;
+        }
+      }
       return await handler(req, res);
     }
   }
