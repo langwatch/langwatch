@@ -72,7 +72,7 @@ def generate_topic_names(
                         "properties": dict(
                             [
                                 (f"topic_{index}", {"type": "string"})
-                                for index in range(len(topic_examples_str))
+                                for index in range(len(topic_examples))
                             ]
                         ),
                     },
@@ -97,6 +97,9 @@ def generate_topic_names(
         total_cost = prompt_cost + completion_cost
 
     topic_names: list[str] = list(json.loads(response.choices[0].message.tool_calls[0].function.arguments).values())  # type: ignore
+    topic_names = topic_names[0 : len(topic_examples)]
+    if len(topic_names) != len(topic_examples):
+        raise ValueError("topic_names and topic_examples must have the same length.")
 
     return topic_names, Money(amount=total_cost, currency="USD")
 

@@ -14,5 +14,4 @@ install: lock
 
 start:
 	@echo "Starting the server..."
-	@cd langwatch_nlp && \
-	poetry run hypercorn main:app --bind :8080 $(filter-out $@,$(MAKECMDGOALS))
+	@poetry run hypercorn langwatch_nlp.main:app --bind :8080 $(filter-out $@,$(MAKECMDGOALS))
