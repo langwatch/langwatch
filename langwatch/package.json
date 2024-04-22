@@ -82,6 +82,7 @@
     "react-dom": "18.2.0",
     "react-feather": "^2.0.10",
     "react-hook-form": "^7.47.0",
+    "react-international-phone": "^4.2.8",
     "react-markdown": "^9.0.0",
     "recharts": "^2.9.3",
     "sass": "^1.66.1",

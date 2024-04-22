@@ -126,6 +126,7 @@ model Team {
 model Organization {
     id                    String               @id @default(nanoid())
     name                  String
+    phoneNumber           String?
     slug                  String               @unique
     members               OrganizationUser[]
     teams                 Team[]

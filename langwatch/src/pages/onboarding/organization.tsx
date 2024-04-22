@@ -1,11 +1,13 @@
 import {
   Button,
+  Checkbox,
   FormControl,
   FormHelperText,
   FormLabel,
   HStack,
   Heading,
   Input,
+  Link,
   Text,
   VStack,
   useToast,
@@ -17,19 +19,30 @@ import { SetupLayout } from "~/components/SetupLayout";
 import { api } from "~/utils/api";
 import { useRequiredSession } from "../../hooks/useRequiredSession";
 import { LoadingScreen } from "../../components/LoadingScreen";
+import {
+  PhoneInput,
+  buildCountryData,
+  defaultCountries,
+  parseCountry,
+} from "react-international-phone";
+import "react-international-phone/style.css";
 
 type OrganizationFormData = {
   organizationName: string;
+  phoneNumber: string;
+  terms: boolean;
 };
 
 export default function OrganizationOnboarding() {
   const { data: session } = useRequiredSession();
 
+  const form = useForm<OrganizationFormData>();
   const {
     register,
     handleSubmit,
+    formState,
     reset: resetForm,
-  } = useForm<OrganizationFormData>();
+  } = form;
   const router = useRouter();
   const toast = useToast();
 
@@ -42,6 +55,7 @@ export default function OrganizationOnboarding() {
     createOrganization.mutate(
       {
         orgName: data.organizationName,
+        phoneNumber: data.phoneNumber,
       },
       {
         onError: () => {
@@ -82,6 +96,8 @@ export default function OrganizationOnboarding() {
     return <LoadingScreen />;
   }
 
+  const phoneNumber = register("phoneNumber", { required: true });
+
   return (
     <SetupLayout>
       {/* eslint-disable-next-line @typescript-eslint/no-misused-promises */}
@@ -102,6 +118,37 @@ export default function OrganizationOnboarding() {
             <Input type="email" disabled value={session.user.email ?? ""} />
           </FormControl>
           <FormControl>
+            <FormLabel>Phone Number</FormLabel>
+            <PhoneInput
+              {...phoneNumber}
+              countries={defaultCountries.map((country) => {
+                const country_ = parseCountry(country);
+                if (country_.iso2 === "nl") {
+                  return buildCountryData({
+                    ...country_,
+                    format: ". ........",
+                  });
+                }
+                return country;
+              })}
+              inputStyle={{ width: "100%", border: "1px solid #e6e9f0" }}
+              countrySelectorStyleProps={{
+                buttonStyle: {
+                  borderColor: "#e6e9f0",
+                  paddingLeft: "8px",
+                  paddingRight: "8px",
+                },
+              }}
+              onChange={(phone) => {
+                void phoneNumber.onChange({
+                  target: {
+                    value: phone,
+                  },
+                });
+              }}
+            />
+          </FormControl>
+          <FormControl>
             <FormLabel>Organization Name</FormLabel>
             <Input
               autoFocus
@@ -111,6 +158,23 @@ export default function OrganizationOnboarding() {
               If you are signing up for a personal account, you can use your own
               name
             </FormHelperText>
+          </FormControl>
+          <FormControl marginTop={4} isInvalid={!!formState.errors?.terms}>
+            <Checkbox {...register("terms", { required: true })}>
+              <Text fontSize={14}>
+                I agree with LangWatch{" "}
+                <Link
+                  href="https://langwatch.ai/terms"
+                  textDecoration="underline"
+                  isExternal
+                  _hover={{
+                    textDecoration: "none",
+                  }}
+                >
+                  terms of service
+                </Link>
+              </Text>
+            </Checkbox>
           </FormControl>
           {createOrganization.error && <p>Something went wrong!</p>}
           <HStack width="full">
