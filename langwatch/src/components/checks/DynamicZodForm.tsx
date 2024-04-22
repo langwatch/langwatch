@@ -58,7 +58,7 @@ const DynamicZodForm = ({
     const fieldKey = fieldName.split(".").reverse()[0] ?? "";
 
     if (fieldSchema_ instanceof z.ZodString) {
-      if (["topic"].includes(fieldKey) || !isNaN(+fieldKey)) {
+      if (["topic", "name"].includes(fieldKey) || !isNaN(+fieldKey)) {
         return <Input {...register(fullPath)} />;
       }
       return <Textarea {...register(fullPath)} />;
