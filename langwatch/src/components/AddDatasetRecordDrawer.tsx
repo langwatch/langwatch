@@ -446,7 +446,9 @@ export function AddDatasetRecordDrawer(props: AddDatasetDrawerProps) {
     }
   };
 
-  const checkSelectedCalls = (obj) => {
+  type SelectedObject = Record<string, string>;
+
+  const checkSelectedCalls = (obj: SelectedObject) => {
     return (
       obj && !Object.values(obj).some((value) => value === "0" || value === "")
     );
