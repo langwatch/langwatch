@@ -71,6 +71,7 @@ export function AddDatasetRecordDrawer(props: AddDatasetDrawerProps) {
   const [selectedTraceIds, setSelectedTraceIds] = useState<string[]>(
     props.selectedTraceIds ?? []
   );
+  const [llmCallError, setLLMCallError] = useState<boolean>(false);
 
   useEffect(() => {
     setSelectedTraceIds(props.selectedTraceIds ?? []);
@@ -172,6 +173,13 @@ export function AddDatasetRecordDrawer(props: AddDatasetDrawerProps) {
   const onSubmit = (e: any) => {
     e.preventDefault();
 
+    if (databaseSchema === DatabaseSchema.LLM_CHAT_CALL) {
+      if (!checkSelectedCalls(selectedLLMCall)) {
+        setLLMCallError(true);
+        return;
+      }
+    }
+
     if (inputError || outputError || spanError) {
       return;
     }
@@ -263,6 +271,7 @@ export function AddDatasetRecordDrawer(props: AddDatasetDrawerProps) {
       databaseSchema === DatabaseSchema.LLM_CHAT_CALL &&
       callSelected !== ""
     ) {
+      setLLMCallError(false);
       const existingInputSpan = { ...inputSpan };
       existingInputSpan[selectedIndex] = JSON.stringify(
         JSON.parse(
@@ -437,6 +446,12 @@ export function AddDatasetRecordDrawer(props: AddDatasetDrawerProps) {
     }
   };
 
+  const checkSelectedCalls = (obj) => {
+    return (
+      obj && !Object.values(obj).some((value) => value === "0" || value === "")
+    );
+  };
+
   return (
     <Drawer
       isOpen={props.isOpen}
@@ -497,7 +512,7 @@ export function AddDatasetRecordDrawer(props: AddDatasetDrawerProps) {
                   </VStack>
                 </Container>
               </HStack>
-              {selectedTraceIds.length > 1 ? (
+              {selectedTraceIds.length > 1 && datasetId ? (
                 <HStack align={"start"} gap={8}>
                   <Container padding={0}>
                     <Text fontWeight={"bold"}>Edit Entries</Text>
@@ -642,9 +657,16 @@ export function AddDatasetRecordDrawer(props: AddDatasetDrawerProps) {
                   Uploading...
                 </Button>
               ) : (
-                <Button colorScheme="blue" type="submit" width="fit-content">
-                  Add to dataset
-                </Button>
+                <HStack>
+                  <Button colorScheme="blue" type="submit" width="fit-content">
+                    Add to dataset
+                  </Button>
+                  {llmCallError ? (
+                    <Text fontSize={"sm"} color={"red.500"}>
+                      Please make sure to select your LLM calls in each entry
+                    </Text>
+                  ) : null}
+                </HStack>
               )}
             </Stack>
           </form>
