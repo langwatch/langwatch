@@ -104,7 +104,7 @@ export default function CheckConfigForm({
           settings:
             evaluatorsSchema.shape[data.checkType ?? "custom/basic"].shape
               .settings,
-          isGuardrail: z.boolean(),
+          isGuardrail: z.boolean().optional(),
         })
       )({ ...data, settings: data.settings || {} }, ...args);
     },
