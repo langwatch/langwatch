@@ -448,9 +448,12 @@ export function AddDatasetRecordDrawer(props: AddDatasetDrawerProps) {
 
   type SelectedObject = Record<string, string>;
 
-  const checkSelectedCalls = (obj: SelectedObject) => {
+  const checkSelectedCalls = (selectedValues: SelectedObject) => {
     return (
-      obj && !Object.values(obj).some((value) => value === "0" || value === "")
+      selectedValues &&
+      !Object.values(selectedValues).some(
+        (value) => value === "0" || value === ""
+      )
     );
   };
 
