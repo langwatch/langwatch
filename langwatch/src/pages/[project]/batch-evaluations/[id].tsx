@@ -18,6 +18,7 @@ import {
   Tooltip,
   Tr,
 } from "@chakra-ui/react";
+import type { JsonObject } from "@prisma/client/runtime/library";
 import { useRouter } from "next/router";
 import Parse from "papaparse";
 import { useDrawer } from "~/components/CurrentDrawer";
@@ -41,6 +42,9 @@ export default function Dataset() {
     const fields = [
       "Dataset",
       "Evaluation",
+      "Input",
+      "Output",
+      "Expected Output",
       "Passed",
       "Status",
       "Details",
@@ -55,6 +59,9 @@ export default function Dataset() {
       string,
       string,
       string,
+      string,
+      string,
+      string,
       number,
       number,
       string,
@@ -63,9 +70,16 @@ export default function Dataset() {
     const csvData: CsvDataRow[] = [];
 
     evaluations.data?.forEach((evaluation) => {
+      const input = (evaluation?.data as JsonObject)?.input;
+      const output = (evaluation?.data as JsonObject)?.output;
+      const expected_output = (evaluation?.data as JsonObject)?.expected_output;
+
       csvData.push([
         evaluation.datasetSlug,
         evaluation.evaluation,
+        input as string,
+        output as string,
+        expected_output as string,
         evaluation.passed ? "True" : "False",
         evaluation.status,
         evaluation.details,
@@ -119,6 +133,9 @@ export default function Dataset() {
                   <Thead>
                     <Tr>
                       <Th>Evaluation</Th>
+                      <Th>Input</Th>
+                      <Th>Output</Th>
+                      <Th>Expected Output</Th>
                       <Th>Passed</Th>
                       <Th>Status</Th>
                       <Th>Details</Th>
@@ -139,29 +156,74 @@ export default function Dataset() {
                           </Tr>
                         ))
                       : evaluations.data
-                      ? evaluations.data?.map((evaluation, i) => (
-                          <Tr key={i}>
-                            <Td>{evaluation.evaluation}</Td>
-                            <Td>{evaluation.passed ? "True" : "False"}</Td>
-                            <Td>{evaluation.status}</Td>
-                            <Td maxWidth={300}>
-                              <Tooltip label={evaluation.details}>
-                                <Text
-                                  noOfLines={1}
-                                  wordBreak="break-all"
-                                  display="block"
-                                >
-                                  {evaluation.details}
-                                </Text>
-                              </Tooltip>
-                            </Td>
-                            <Td>{evaluation.score}</Td>
-                            <Td>${evaluation.cost}</Td>
-                            <Td>
-                              {new Date(evaluation.createdAt).toLocaleString()}
-                            </Td>
-                          </Tr>
-                        ))
+                      ? evaluations.data?.map((evaluation, i) => {
+                          const input = ((evaluation?.data as JsonObject)
+                            ?.input ?? "") as string;
+                          const output = ((evaluation?.data as JsonObject)
+                            ?.output ?? "") as string;
+                          const expected_output = ((
+                            evaluation?.data as JsonObject
+                          )?.expected_output ?? "") as string;
+
+                          return (
+                            <Tr key={i}>
+                              <Td>{evaluation.evaluation}</Td>
+                              <Td>
+                                <Tooltip label={input}>
+                                  <Text
+                                    noOfLines={2}
+                                    display="block"
+                                    maxWidth={230}
+                                  >
+                                    {input}
+                                  </Text>
+                                </Tooltip>
+                              </Td>
+                              <Td>
+                                <Tooltip label={output}>
+                                  <Text
+                                    noOfLines={2}
+                                    display="block"
+                                    maxWidth={230}
+                                  >
+                                    {output}
+                                  </Text>
+                                </Tooltip>
+                              </Td>
+                              <Td>
+                                <Tooltip label={expected_output}>
+                                  <Text
+                                    noOfLines={2}
+                                    display="block"
+                                    maxWidth={230}
+                                  >
+                                    {expected_output}
+                                  </Text>
+                                </Tooltip>
+                              </Td>
+                              <Td>{evaluation.passed ? "True" : "False"}</Td>
+                              <Td>{evaluation.status}</Td>
+                              <Td maxWidth={300}>
+                                <Tooltip label={evaluation.details}>
+                                  <Text
+                                    noOfLines={1}
+                                    wordBreak="break-all"
+                                    display="block"
+                                  >
+                                    {evaluation.details}
+                                  </Text>
+                                </Tooltip>
+                              </Td>
+                              <Td>{evaluation.score}</Td>
+                              <Td>${evaluation.cost}</Td>
+                              <Td>
+                                {new Date(
+                                  evaluation.createdAt
+                                ).toLocaleString()}
+                              </Td>
+                            </Tr>
+                          );
+                        })
                       : null}
                   </Tbody>
                 </Table>

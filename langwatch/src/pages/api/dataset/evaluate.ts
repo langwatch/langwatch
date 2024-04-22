@@ -188,6 +188,7 @@ export default async function handler(
         id: nanoid(),
         batchId: batchId,
         projectId: project.id,
+        data: params.data,
         status: status,
         score: score ?? 0,
         passed: passed ?? false,

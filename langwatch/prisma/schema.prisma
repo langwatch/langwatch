@@ -303,6 +303,7 @@ model BatchProcessing {
     batchId     String
     projectId   String
     project     Project  @relation(fields: [projectId], references: [id])
+    data        Json     @default("{}")
     status      String
     score       Float
     passed      Boolean
