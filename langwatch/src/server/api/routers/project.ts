@@ -62,7 +62,9 @@ export const projectRouter = createTRPCRouter({
         });
       }
 
-      const projectCount = await getOrganizationProjectsCount(input.organizationId);
+      const projectCount = await getOrganizationProjectsCount(
+        input.organizationId
+      );
       const activePlan = await dependencies.subscriptionHandler.getActivePlan(
         input.organizationId,
         ctx.session.user
@@ -158,6 +160,43 @@ export const projectRouter = createTRPCRouter({
       }
 
       return project;
+    }),
+  update: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        name: z.string(),
+        language: z.string(),
+        framework: z.string(),
+        piiRedactionLevel: z.enum(["STRICT", "ESSENTIAL"]),
+      })
+    )
+    .use(checkUserPermissionForProject(TeamRoleGroup.SETUP_PROJECT))
+    .mutation(async ({ input, ctx }) => {
+      const prisma = ctx.prisma;
+
+      const project = await prisma.project.findUnique({
+        where: { id: input.projectId },
+      });
+
+      if (!project) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Project not found",
+        });
+      }
+
+      const updatedProject = await prisma.project.update({
+        where: { id: input.projectId },
+        data: {
+          name: input.name,
+          language: input.language,
+          framework: input.framework,
+          piiRedactionLevel: input.piiRedactionLevel,
+        },
+      });
+
+      return { success: true, projectSlug: updatedProject.slug };
     }),
 });
 

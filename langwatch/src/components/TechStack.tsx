@@ -93,11 +93,13 @@ export const getTechStack = (project: Project) => {
   };
 };
 
-export const TechStackSelector = ({
-  form,
-}: {
-  form: UseFormReturn<ProjectFormData>;
-}) => {
+export function TechStackSelector<
+  T extends { language: string; framework: string },
+>({ form: form_ }: { form: UseFormReturn<T> }) {
+  const form = form_ as unknown as UseFormReturn<{
+    language: string;
+    framework: string;
+  }>;
   const IconWrapper = ({ children }: PropsWithChildren) => {
     return (
       <Box
@@ -204,7 +206,7 @@ export const TechStackSelector = ({
       </FormControl>
     </>
   );
-};
+}
 
 export const ProjectTechStackIcon = ({ project }: { project: Project }) => {
   const IconWrapper = ({ children }: PropsWithChildren) => {

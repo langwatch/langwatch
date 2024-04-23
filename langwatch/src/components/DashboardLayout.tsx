@@ -130,7 +130,7 @@ const SideMenuLink = ({
   );
 };
 
-const ProjectSelector = React.memo(function ProjectSelector({
+export const ProjectSelector = React.memo(function ProjectSelector({
   organizations,
   project,
 }: {
