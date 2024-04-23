@@ -284,8 +284,7 @@ export default async function handler(
   };
 
   const piiEnforced = env.NODE_ENV === "production";
-  const essentialOnly = project.skipPIIRedacting
-  await cleanupPIIs(trace, esSpans, essentialOnly, piiEnforced);
+  await cleanupPIIs(trace, esSpans, project.piiRedactionLevel, piiEnforced);
 
   const result = await esClient.helpers.bulk({
     datasource: esSpans,

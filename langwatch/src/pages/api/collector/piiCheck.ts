@@ -3,6 +3,7 @@ import { env } from "../../../env.mjs";
 import type { ElasticSearchSpan, Trace } from "../../../server/tracer/types";
 import { getDebugger } from "../../../utils/logger";
 import { DlpServiceClient } from "@google-cloud/dlp";
+import type { PIIRedactionLevel } from "@prisma/client";
 
 const debug = getDebugger("langwatch:trace_checks:piiCheck");
 
@@ -29,7 +30,7 @@ const infoTypesMap: Record<string, string> = {
   medical_record_number: "MEDICAL_RECORD_NUMBER",
 };
 
-const allInfoTypes = [
+const strictInfoTypes = [
   "FIRST_NAME",
   "LAST_NAME",
   "PERSON_NAME",
@@ -59,14 +60,15 @@ const essentialInfoTypes = [
 
 const dlpCheck = async (
   text: string,
-  essentialOnly: boolean
+  piiRedactionLevel: PIIRedactionLevel
 ): Promise<google.privacy.dlp.v2.IFinding[]> => {
   const [response] = await dlp.inspectContent({
     parent: `projects/${credentials.project_id}/locations/global`,
     inspectConfig: {
-      infoTypes: (essentialOnly ? essentialInfoTypes : allInfoTypes).map(
-        (name) => ({ name })
-      ),
+      infoTypes: (piiRedactionLevel === "ESSENTIAL"
+        ? essentialInfoTypes
+        : strictInfoTypes
+      ).map((name) => ({ name })),
       minLikelihood: "POSSIBLE",
       limits: {
         maxFindingsPerRequest: 0, // (0 = server maximum)
@@ -85,7 +87,7 @@ const dlpCheck = async (
 const clearPII = async (
   object: Record<string | number, any>,
   keysPath: (string | number)[],
-  essentialOnly: boolean
+  piiRedactionLevel: PIIRedactionLevel
 ) => {
   const lastKey = keysPath[keysPath.length - 1];
   if (!lastKey) {
@@ -104,7 +106,7 @@ const clearPII = async (
     return;
   }
 
-  const findings = await dlpCheck(currentObject[lastKey], essentialOnly);
+  const findings = await dlpCheck(currentObject[lastKey], piiRedactionLevel);
   for (const finding of findings) {
     const start = finding.location?.codepointRange?.start;
     const end = finding.location?.codepointRange?.end;
@@ -126,7 +128,7 @@ const clearPII = async (
 export const cleanupPIIs = async (
   trace: Trace,
   spans: ElasticSearchSpan[],
-  essentialOnly: boolean,
+  piiRedactionLevel: PIIRedactionLevel,
   enforced = true
 ): Promise<void> => {
   if (!credentials) {
@@ -144,39 +146,47 @@ export const cleanupPIIs = async (
   debug("Checking PII for trace", trace.trace_id);
 
   const clearPIIPromises = [
-    clearPII(trace, ["input", "value"], essentialOnly),
-    clearPII(trace, ["output", "value"], essentialOnly),
-    clearPII(trace, ["error", "message"], essentialOnly),
-    clearPII(trace, ["error", "stacktrace"], essentialOnly),
+    clearPII(trace, ["input", "value"], piiRedactionLevel),
+    clearPII(trace, ["output", "value"], piiRedactionLevel),
+    clearPII(trace, ["error", "message"], piiRedactionLevel),
+    clearPII(trace, ["error", "stacktrace"], piiRedactionLevel),
   ];
 
   for (const span of spans) {
-    clearPIIPromises.push(clearPII(span, ["input", "value"], essentialOnly));
-    clearPIIPromises.push(clearPII(span, ["error", "message"], essentialOnly));
+    clearPIIPromises.push(
+      clearPII(span, ["input", "value"], piiRedactionLevel)
+    );
+    clearPIIPromises.push(
+      clearPII(span, ["error", "message"], piiRedactionLevel)
+    );
 
     for (const output of span.outputs) {
-      clearPIIPromises.push(clearPII(output, ["value"], essentialOnly));
+      clearPIIPromises.push(clearPII(output, ["value"], piiRedactionLevel));
     }
 
     for (const context of span.contexts ?? []) {
       if (Array.isArray(context.content)) {
         for (let i = 0; i < context.content.length; i++) {
-          clearPIIPromises.push(clearPII(context.content, [i], essentialOnly));
+          clearPIIPromises.push(
+            clearPII(context.content, [i], piiRedactionLevel)
+          );
         }
       } else if (typeof context.content === "object") {
         for (const key in context.content) {
           clearPIIPromises.push(
-            clearPII(context.content, [key], essentialOnly)
+            clearPII(context.content, [key], piiRedactionLevel)
           );
         }
       } else {
-        clearPIIPromises.push(clearPII(context, ["content"], essentialOnly));
+        clearPIIPromises.push(
+          clearPII(context, ["content"], piiRedactionLevel)
+        );
       }
     }
 
     for (let i = 0; i < (span.error?.stacktrace ?? []).length; i++) {
       clearPIIPromises.push(
-        clearPII(span.error?.stacktrace ?? [], [i], essentialOnly)
+        clearPII(span.error?.stacktrace ?? [], [i], piiRedactionLevel)
       );
     }
   }
