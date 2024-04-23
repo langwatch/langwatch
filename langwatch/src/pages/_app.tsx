@@ -2,6 +2,7 @@ import { type Session } from "next-auth";
 import { SessionProvider } from "next-auth/react";
 import { type AppType } from "next/app";
 import Script from "next/script";
+import { GoogleAnalytics } from "@next/third-parties/google";
 
 import { api } from "~/utils/api";
 
@@ -163,6 +164,7 @@ const LangWatch: AppType<{
 
         <Analytics />
       </ChakraProvider>
+      <GoogleAnalytics gaId="G-SQN9XTZMZR" />
       <Script id="crisp">
         {`window.$crisp=[];window.CRISP_WEBSITE_ID="cca9eacd-c4d6-4258-a7fc-9606be6fd012";(function(){d=document;s=d.createElement("script");s.src="https://client.crisp.chat/l.js";s.async=1;d.getElementsByTagName("head")[0].appendChild(s);})();`}
       </Script>
