@@ -19,7 +19,10 @@ import {
   AVAILABLE_EVALUATORS,
 } from "../../../trace_checks/evaluators.generated";
 import { extractChunkTextualContent } from "../collector/rag";
-import { c } from "vitest/dist/reporters-5f784f42";
+import {
+  getCurrentMonthCost,
+  maxMonthlyUsageLimit,
+} from "../../../server/api/routers/limits";
 
 export const debug = getDebugger("langwatch:guardrail:evaluate");
 
@@ -59,6 +62,7 @@ export default async function handler(
 
   const project = await prisma.project.findUnique({
     where: { apiKey: authToken as string },
+    include: { team: true },
   });
 
   if (!project) {
@@ -83,6 +87,18 @@ export default async function handler(
 
     const validationError = fromZodError(error as ZodError);
     return res.status(400).json({ error: validationError.message });
+  }
+
+  const maxMonthlyUsage = await maxMonthlyUsageLimit(
+    project.team.organizationId
+  );
+  const getCurrentCost = await getCurrentMonthCost(project.team.organizationId);
+
+  if (getCurrentCost >= maxMonthlyUsage) {
+    return res.status(200).json({
+      status: "skipped",
+      details: "Monthly usage limit exceeded",
+    });
   }
 
   const { input, output, contexts, expected_output } = params.data;
