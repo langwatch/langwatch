@@ -122,7 +122,7 @@ export const runEvaluation = async ({
   contexts?: string[];
   expected_output?: string;
   settings?: Record<string, unknown>;
-  retries: number;
+  retries?: number;
 }): Promise<SingleEvaluationResult> => {
   const project = await prisma.project.findUnique({
     where: { id: projectId },

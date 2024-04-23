@@ -31,11 +31,21 @@ def evaluate(
 ):
     with langwatch.tracer.create_span(name=slug, type="guardrail") as span:
         request_params = prepare_data(slug, input, output, contexts, span=span)
-        with httpx.Client() as client:
-            response = client.post(**request_params)
-            response.raise_for_status()
+        try:
+            with httpx.Client() as client:
+                response = client.post(**request_params)
+                response.raise_for_status()
+        except Exception as e:
+            return handle_response(
+                {
+                    "status": "error",
+                    "message": str(e),
+                    "passed": True,
+                },
+                span,
+            )
 
-        return handle_response(response, span)
+        return handle_response(response.json(), span)
 
 
 async def async_evaluate(
@@ -50,11 +60,21 @@ async def async_evaluate(
         _local_context.current_span = current_span
 
         request_params = prepare_data(slug, input, output, contexts, span=span)
-        async with httpx.AsyncClient() as client:
-            response = await client.post(**request_params)
-            response.raise_for_status()
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.post(**request_params)
+                response.raise_for_status()
+        except Exception as e:
+            return handle_response(
+                {
+                    "status": "error",
+                    "message": str(e),
+                    "passed": True,
+                },
+                span,
+            )
 
-        return handle_response(response, span)
+        return handle_response(response.json(), span)
 
 
 def prepare_data(
@@ -85,12 +105,12 @@ def prepare_data(
 
 
 def handle_response(
-    response,
+    response: dict,
     span: ContextSpan,
 ):
-    result = GuardrailResultModel.model_validate(response.json())
+    result = GuardrailResultModel.model_validate(response)
     if result.status == "error":
-        result.details = response.json().get("message", "")
+        result.details = response.get("message", "")
     span.output = TypedValueGuardrailResult(
         type="guardrail_result", value=cast(GuardrailResult, result.model_dump())
     )

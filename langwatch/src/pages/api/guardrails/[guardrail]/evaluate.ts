@@ -203,7 +203,7 @@ export default async function handler(
           status: "error",
           error_type: "EVALUATOR_ERROR",
           message: result.message,
-          passed: false,
+          passed: true, // We don't want to fail the check if the evaluator throws, becuase this is likely a bug in the evaluator
         }
       : result.status === "skipped"
       ? {
@@ -249,4 +249,3 @@ export default async function handler(
 
   return res.status(200).json(guardrailResult);
 }
-
