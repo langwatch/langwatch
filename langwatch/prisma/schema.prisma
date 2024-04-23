@@ -134,6 +134,8 @@ model Organization {
     updatedAt             DateTime             @default(now()) @updatedAt
     OrganizationInvite    OrganizationInvite[]
     usageSpendingMaxLimit Int?
+
+    promoCode String?
 }
 
 enum PIIRedactionLevel {

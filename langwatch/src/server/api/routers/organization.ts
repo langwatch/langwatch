@@ -65,7 +65,8 @@ export const organizationRouter = createTRPCRouter({
     .input(
       z.object({
         orgName: z.string(),
-        phoneNumber: z.string(),
+        phoneNumber: z.string().optional(),
+        promoCode: z.string().optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
@@ -94,6 +95,7 @@ export const organizationRouter = createTRPCRouter({
             name: input.orgName,
             slug: orgSlug,
             phoneNumber: input.phoneNumber,
+            promoCode: input.promoCode,
           },
         });
 

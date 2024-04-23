@@ -31,18 +31,14 @@ type OrganizationFormData = {
   organizationName: string;
   phoneNumber: string;
   terms: boolean;
+  promoCode?: string;
 };
 
 export default function OrganizationOnboarding() {
   const { data: session } = useRequiredSession();
 
   const form = useForm<OrganizationFormData>();
-  const {
-    register,
-    handleSubmit,
-    formState,
-    reset: resetForm,
-  } = form;
+  const { register, handleSubmit, formState, reset: resetForm } = form;
   const router = useRouter();
   const toast = useToast();
 
@@ -56,6 +52,7 @@ export default function OrganizationOnboarding() {
       {
         orgName: data.organizationName,
         phoneNumber: data.phoneNumber,
+        promoCode: data.promoCode,
       },
       {
         onError: () => {
@@ -121,6 +118,7 @@ export default function OrganizationOnboarding() {
             <FormLabel>Phone Number</FormLabel>
             <PhoneInput
               {...phoneNumber}
+              autoFocus
               countries={defaultCountries.map((country) => {
                 const country_ = parseCountry(country);
                 if (country_.iso2 === "nl") {
@@ -150,15 +148,18 @@ export default function OrganizationOnboarding() {
           </FormControl>
           <FormControl>
             <FormLabel>Organization Name</FormLabel>
-            <Input
-              autoFocus
-              {...register("organizationName", { required: true })}
-            />
+            <Input {...register("organizationName", { required: true })} />
             <FormHelperText>
               If you are signing up for a personal account, you can use your own
               name
             </FormHelperText>
           </FormControl>
+          {new Date() < new Date("2024-04-30") && (
+            <FormControl>
+              <FormLabel>Promo Code (optional)</FormLabel>
+              <Input {...register("promoCode", { required: false })} />
+            </FormControl>
+          )}
           <FormControl marginTop={4} isInvalid={!!formState.errors?.terms}>
             <Checkbox {...register("terms", { required: true })}>
               <Text fontSize={14}>
