@@ -21,6 +21,12 @@ export const batchRecordRouter = createTRPCRouter({
         _count: {
           batchId: true,
         },
+        _sum: {
+          cost: true,
+        },
+        _avg: {
+          score: true,
+        },
       });
 
       return batchRecords;

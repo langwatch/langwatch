@@ -172,6 +172,7 @@ export default function Datasets() {
                             <Th>Batch ID</Th>
                             <Th>Dataset</Th>
                             <Th>Entries</Th>
+                            <Th>Cost</Th>
                           </Tr>
                         </Thead>
                         <Tbody>
@@ -197,6 +198,7 @@ export default function Datasets() {
                                   <Td>{batch.batchId}</Td>
                                   <Td>{batch.datasetSlug}</Td>
                                   <Td>{batch._count.batchId}</Td>
+                                  <Td>${batch._sum.cost?.toFixed(6)}</Td>
                                 </Tr>
                               ))
                             : null}
