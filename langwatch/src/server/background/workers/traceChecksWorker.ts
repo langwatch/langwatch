@@ -113,6 +113,7 @@ export const runEvaluation = async ({
   contexts,
   expected_output,
   settings,
+  retries = 1,
 }: {
   projectId: string;
   checkType: EvaluatorTypes;
@@ -121,6 +122,7 @@ export const runEvaluation = async ({
   contexts?: string[];
   expected_output?: string;
   settings?: Record<string, unknown>;
+  retries: number;
 }): Promise<SingleEvaluationResult> => {
   const project = await prisma.project.findUnique({
     where: { id: projectId },
@@ -162,7 +164,21 @@ export const runEvaluation = async ({
   );
 
   if (!response.ok) {
-    throw `${response.status} ${response.statusText}`;
+    if (response.status >= 500 && retries > 0) {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      return runEvaluation({
+        projectId,
+        checkType,
+        input,
+        output,
+        contexts,
+        expected_output,
+        settings,
+        retries: retries - 1,
+      });
+    } else {
+      throw `${response.status} ${response.statusText}`;
+    }
   }
 
   const result = ((await response.json()) as BatchEvaluationResult)[0];
