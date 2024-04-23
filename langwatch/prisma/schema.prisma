@@ -159,7 +159,6 @@ model Project {
     datasets          Dataset[]
     customGraphs      CustomGraph[]
     batchProcessings  BatchProcessing[]
-    skipPIIRedacting  Boolean           @default(false)
     piiRedactionLevel PIIRedactionLevel @default(ESSENTIAL)
 
     @@index([teamId])
