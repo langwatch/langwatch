@@ -2,8 +2,11 @@ import { HStack, VStack } from "@chakra-ui/react";
 import { type PropsWithChildren } from "react";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { MenuLink } from "~/components/MenuLink";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 
 export default function SettingsLayout({ children }: PropsWithChildren) {
+  const { project } = useOrganizationTeamProject();
+
   return (
     <DashboardLayout>
       <HStack align="start" width="full" height="full">
@@ -20,6 +23,7 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
         >
           <MenuLink href="/settings">General Settings</MenuLink>
           <MenuLink href="/settings/projects">Projects</MenuLink>
+          <MenuLink href={`/${project?.slug}/setup`}>Setup</MenuLink>
           <MenuLink href="/settings/teams">Teams</MenuLink>
           <MenuLink href="/settings/members">Members</MenuLink>
           <MenuLink href="/settings/usage">Usage & Billing</MenuLink>
