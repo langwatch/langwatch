@@ -15,7 +15,9 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@hubspot/api-client": "^11.1.0",
     "@prisma/client": "^5.6.0",
+    "@slack/webhook": "^7.0.2",
     "dotenv": "^16.3.1",
     "next": "13.4.19",
     "next-auth": "^4.24.5",
