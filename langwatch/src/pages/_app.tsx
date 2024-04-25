@@ -1,8 +1,6 @@
 import { type Session } from "next-auth";
 import { SessionProvider } from "next-auth/react";
 import { type AppType } from "next/app";
-import Script from "next/script";
-import { GoogleAnalytics } from "@next/third-parties/google";
 
 import { api } from "~/utils/api";
 
@@ -24,7 +22,7 @@ import Head from "next/head";
 import { useRouter } from "next/router";
 import NProgress from "nprogress";
 import { useEffect } from "react";
-import { Analytics } from "@vercel/analytics/react";
+import { dependencies } from "../injection/dependencies.client";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -162,12 +160,10 @@ const LangWatch: AppType<{
         </Head>
         <Component {...pageProps} />
 
-        <Analytics />
+        {dependencies.ExtraFooterComponents && (
+          <dependencies.ExtraFooterComponents />
+        )}
       </ChakraProvider>
-      <GoogleAnalytics gaId="G-0VEKZY9DMY" />
-      <Script id="crisp">
-        {`window.$crisp=[];window.CRISP_WEBSITE_ID="cca9eacd-c4d6-4258-a7fc-9606be6fd012";(function(){d=document;s=d.createElement("script");s.src="https://client.crisp.chat/l.js";s.async=1;d.getElementsByTagName("head")[0].appendChild(s);})();`}
-      </Script>
     </SessionProvider>
   );
 };
