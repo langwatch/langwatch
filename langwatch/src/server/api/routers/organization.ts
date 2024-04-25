@@ -21,6 +21,7 @@ import {
   checkUserPermissionForTeam,
 } from "../permission";
 import { dependencies } from "../../../injection/dependencies.server";
+import * as Sentry from "@sentry/nextjs";
 
 export type TeamWithProjects = Team & {
   projects: Project[];
@@ -128,6 +129,13 @@ export const organizationRouter = createTRPCRouter({
         });
       });
 
+      if (dependencies.postRegistrationCallback) {
+        try {
+          await dependencies.postRegistrationCallback(ctx.session.user, input);
+        } catch (err) {
+          Sentry.captureException(err);
+        }
+      }
       // Return success response
       return { success: true, teamSlug };
     }),
