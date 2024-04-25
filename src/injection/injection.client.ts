@@ -2,6 +2,7 @@ import type { Dependencies } from "../../langwatch/langwatch/src/injection/injec
 import { ImpersonationSwitchBackMenuItem } from "../components/ImpersonationSwitchBackMenuItem";
 import Subscription from "../pages/subscription";
 import Admin from "../pages/admin";
+import { ExtraFooterComponents } from "../components/ExtraFooterComponents";
 
 const dependencies: Dependencies = {
   SubscriptionPage: Subscription,
@@ -9,6 +10,7 @@ const dependencies: Dependencies = {
   extraPagesRoutes: {
     "/admin": Admin,
   },
+  ExtraFooterComponents,
 };
 
 export default dependencies;
