@@ -1,6 +1,6 @@
 import { IncomingWebhook } from "@slack/webhook";
 import { Client } from "@hubspot/api-client";
-import Sentry from "../../langwatch/langwatch/node_modules/@sentry/nextjs";
+import * as Sentry from "../../langwatch/langwatch/node_modules/@sentry/nextjs";
 
 const sendSlackNotification = async (user: any, org: any) => {
   const url = process.env.SLACK_CHANNEL_SIGNUPS!;
