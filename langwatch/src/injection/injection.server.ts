@@ -1,5 +1,6 @@
 import type { Awaitable, DefaultSession, Session } from "next-auth";
 import { SubscriptionHandler } from "../server/subscriptionHandler";
+
 import type {
   GetServerSidePropsContext,
   NextApiRequest,
@@ -26,6 +27,7 @@ export interface Dependencies {
     ) => Promise<void | NextApiResponse<any>>
   >;
   extraTRPCRoutes?: () => ProcedureRouterRecord;
+  postRegistrationCallback?: (user: any, org: any) => void | Promise<void>;
 }
 
 const dependencies: Dependencies = {
