@@ -59,4 +59,16 @@ export const datasetRouter = createTRPCRouter({
 
       return datasets;
     }),
+  deleteById: protectedProcedure
+    .input(z.object({ projectId: z.string(), datasetId: z.string() }))
+    .use(checkUserPermissionForProject(TeamRoleGroup.DATASETS_MANAGE))
+    .mutation(async ({ ctx, input }) => {
+      await ctx.prisma.dataset.delete({
+        where: {
+          id: input.datasetId,
+        },
+      });
+
+      return { success: true };
+    }),
 });
