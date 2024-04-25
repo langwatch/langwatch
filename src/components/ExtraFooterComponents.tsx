@@ -5,7 +5,9 @@ import { useRequiredSession } from "../../langwatch/langwatch/src/hooks/useRequi
 
 export function ExtraFooterComponents() {
   const session = useRequiredSession();
-  const { organization, project } = useOrganizationTeamProject();
+  const { organization, project } = useOrganizationTeamProject({
+    redirectToOnboarding: false,
+  });
 
   useEffect(() => {
     const gtag = (window as any).gtag;
