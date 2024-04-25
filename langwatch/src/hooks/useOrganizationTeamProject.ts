@@ -13,9 +13,15 @@ import type { OrganizationUserRole, TeamUserRole } from "@prisma/client";
 
 export const useOrganizationTeamProject = (
   {
+    redirectToOnboarding,
     redirectToProjectOnboarding,
     keepFetching,
-  }: { redirectToProjectOnboarding?: boolean; keepFetching?: boolean } = {
+  }: {
+    redirectToOnboarding?: boolean;
+    redirectToProjectOnboarding?: boolean;
+    keepFetching?: boolean;
+  } = {
+    redirectToOnboarding: true,
     redirectToProjectOnboarding: true,
     keepFetching: false,
   }
@@ -93,6 +99,7 @@ export const useOrganizationTeamProject = (
   }, [organization, project, team]);
 
   useEffect(() => {
+    if (!redirectToOnboarding) return;
     if (!organizations.data) return;
 
     if (!organization || !team) {
