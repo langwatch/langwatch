@@ -7,6 +7,7 @@ import adminResource from "../pages/extra_api/admin/[resource]";
 import impersonate from "../pages/extra_api/admin/impersonate";
 import stripeWebhook from "../pages/extra_api/webhooks/stripe";
 import { subscriptionRouter } from "../pages/extra_api/api/subscription";
+import { PostRegistrationCallback } from "../postRegistrationCallback";
 
 if (!process.env.STRIPE_SECRET_KEY || !process.env.STRIPE_WEBHOOK_SECRET) {
   throw new Error(
@@ -53,6 +54,7 @@ const dependencies: Dependencies = {
   extraTRPCRoutes: () => ({
     subscription: subscriptionRouter(),
   }),
+  postRegistrationCallback: PostRegistrationCallback,
 };
 
 export default dependencies;
