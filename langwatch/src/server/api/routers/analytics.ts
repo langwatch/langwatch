@@ -8,12 +8,14 @@ import { dataForFilter } from "./analytics/dataForFilter";
 import { topUsedDocuments } from "./analytics/documents";
 import { sessionsVsPreviousPeriod } from "./analytics/sessions";
 import { getTimeseries } from "./analytics/timeseries";
+import { feedbacks } from "./analytics/feedbacks";
 
 export const analyticsRouter = createTRPCRouter({
   getTimeseries,
   dataForFilter,
   sessionsVsPreviousPeriod,
   topUsedDocuments,
+  feedbacks,
   getTraceCheckStatusCounts: protectedProcedure
     .input(sharedFiltersInputSchema)
     .use(checkUserPermissionForProject(TeamRoleGroup.ANALYTICS_VIEW))

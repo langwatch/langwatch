@@ -6,7 +6,7 @@ import {
   GridItem,
   HStack,
   Heading,
-  SimpleGrid
+  SimpleGrid,
 } from "@chakra-ui/react";
 import { BarChart2 } from "react-feather";
 import GraphsLayout from "~/components/GraphsLayout";
@@ -18,6 +18,7 @@ import { SatisfactionGraphs } from "~/components/analytics/SatisfactionGraph";
 import { SessionsSummary } from "~/components/analytics/SessionsSummary";
 import { FilterSidebar } from "~/components/filters/FilterSidebar";
 import { AnalyticsHeader } from "../../../components/analytics/AnalyticsHeader";
+import { FeedbacksTable } from "../../../components/analytics/FeedbacksTable";
 
 const messagesCount = {
   graphId: "custom",
@@ -258,6 +259,17 @@ export default function Users() {
               <CardHeader>
                 <HStack>
                   <BarChart2 color="orange" />
+                  <Heading size="sm">User Leaderboard</Heading>
+                </HStack>
+              </CardHeader>
+              <CardBody>
+                <CustomGraph input={powerUsers as CustomGraphInput} />
+              </CardBody>
+            </Card>
+            {/* <Card>
+              <CardHeader>
+                <HStack>
+                  <BarChart2 color="orange" />
                   <Heading size="sm">Average Daily Threads per User</Heading>
                 </HStack>
               </CardHeader>
@@ -266,23 +278,23 @@ export default function Users() {
                   input={averageDailyThreadsPerUser as CustomGraphInput}
                 />
               </CardBody>
-            </Card>
+            </Card> */}
           </GridItem>
           <GridItem colSpan={2} display={"inline-grid"}>
+            <SatisfactionGraphs />
+          </GridItem>
+          <GridItem colSpan={4} display={"inline-grid"}>
             <Card>
               <CardHeader>
                 <HStack>
                   <BarChart2 color="orange" />
-                  <Heading size="sm">User Leaderboard</Heading>
+                  <Heading size="sm">User Feedbacks</Heading>
                 </HStack>
               </CardHeader>
               <CardBody>
-                <CustomGraph input={powerUsers as CustomGraphInput} />
+                <FeedbacksTable />
               </CardBody>
             </Card>
-          </GridItem>
-          <GridItem colSpan={2} display={"inline-grid"}>
-            <SatisfactionGraphs />
           </GridItem>
         </SimpleGrid>
         <Box padding={3}>

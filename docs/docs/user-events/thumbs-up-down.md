@@ -30,7 +30,7 @@ To use the thumbs_up_down event it's important that you have used an explicit `t
   "metrics": {
     "vote": 1 // Use 1 for thumbs up, 0 for neutral or undo feedback, and -1 for thumbs down
   },
-  "action_details": {
+  "event_details": {
     "feedback": "Optional user feedback text"
   },
   "timestamp": 1617981376000 // Unix timestamp in milliseconds
@@ -49,11 +49,11 @@ curl -X POST "https://app.langwatch.ai/api/track_event" \\
        "metrics": {
          "vote": 1
        },
-       "action_details": {
+       "event_details": {
          "feedback": "This response was helpful!"
        },
        "timestamp": 1617981376000
      }'
 ```
 
-The `vote` metric is mandatory and must be either `1` or `-1`. The `feedback` field in `action_details` is optional and can be used to provide additional context or comments from the user.
+The `vote` metric is mandatory and must be either `1` or `-1`. The `feedback` field in `event_details` is optional and can be used to provide additional context or comments from the user.
