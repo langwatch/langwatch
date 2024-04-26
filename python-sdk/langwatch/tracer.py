@@ -204,29 +204,29 @@ class BaseContextTracer:
     def delayed_send_spans(self):
         self._add_finished_at_to_missing_spans()
 
-        def send_spans_sync():
-            send_spans(
-                CollectorRESTParams(
-                    trace_id=self.trace_id,
-                    metadata=self.metadata,
-                    spans=list(self.spans.values()),
-                )
-            )
-
         if "PYTEST_CURRENT_TEST" in os.environ:
             # Keep on the same thread for tests
-            send_spans_sync()
+            self.send_spans_sync()
             return
 
         def run_in_thread():
             time.sleep(1)  # wait for other spans to be added
             self.sent_once = True
-            send_spans_sync()
+            self.send_spans_sync()
 
         if self.scheduled_send and not self.scheduled_send.done():
             self.scheduled_send.cancel()
 
         self.scheduled_send = executor.submit(run_in_thread)
+
+    def send_spans_sync(self):
+        send_spans(
+            CollectorRESTParams(
+                trace_id=self.trace_id,
+                metadata=self.metadata,
+                spans=list(self.spans.values()),
+            )
+        )
 
     def append_span(self, span: Span):
         span["span_id"] = span.get("span_id", f"span_{nanoid.generate()}")
