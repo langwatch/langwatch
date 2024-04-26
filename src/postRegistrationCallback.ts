@@ -36,12 +36,68 @@ const createLeadInHubSpot = async (user: any, org: any) => {
   }
 };
 
-export const PostRegistrationCallback = async (user: any, org: any) => {
-  const slackNotificationPromise = sendSlackNotification(user, org);
-  const hubSpotPromise = createLeadInHubSpot(user, org);
+const submitLeadFormInHubSpot = async (user: any, org: any) => {
+  const currentTimestamp = new Date().getTime();
+  const formData = {
+    submittedAt: currentTimestamp,
+    fields: [
+      {
+        objectTypeId: "0-1",
+        name: "company",
+        value: org.orgName,
+      },
+      {
+        objectTypeId: "0-1",
+        name: "firstname",
+        value: user.name,
+      },
+      {
+        objectTypeId: "0-1",
+        name: "email",
+        value: user.email,
+      },
+      {
+        objectTypeId: "0-1",
+        name: "mobilephone",
+        value: org.phoneNumber,
+      },
+    ],
+    context: {
+      pageUri: "app.langwatch.ai",
+      pageName: "Sign Up",
+    },
+  };
+
+  const hubspotPortalId = process.env.HUBSPOT_PORTAL_ID!;
+  const hubspotFormId = process.env.HUBSPOT_FORM_ID!;
+
+  const url = `https://api.hsforms.com/submissions/v3/integration/submit/${hubspotPortalId}/${hubspotFormId}`;
+  const headers = {
+    "Content-Type": "application/json",
+  };
 
   try {
-    await Promise.all([slackNotificationPromise, hubSpotPromise]);
+    const response = await fetch(url, {
+      method: "POST",
+      headers: headers,
+      body: JSON.stringify(formData),
+    });
+
+    if (!response.ok) {
+      Sentry.captureException(response);
+    }
+  } catch (error) {
+    Sentry.captureException(error);
+  }
+};
+
+export const PostRegistrationCallback = async (user: any, org: any) => {
+  const slackNotificationPromise = sendSlackNotification(user, org);
+  //const hubSpotPromise = createLeadInHubSpot(user, org);
+  const hubSpotFormPromise = submitLeadFormInHubSpot(user, org);
+
+  try {
+    await Promise.all([slackNotificationPromise, hubSpotFormPromise]);
   } catch (err) {
     Sentry.captureException(err);
   }
