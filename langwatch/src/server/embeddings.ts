@@ -18,7 +18,9 @@ export const getOpenAIEmbeddings = async (text: string) => {
       new AzureKeyCredential(env.AZURE_OPENAI_KEY)
     );
 
-    const response = await openai.getEmbeddings(model, [text]);
+    const response = await openai.getEmbeddings(model, [
+      text.slice(0, 8192 * 4),
+    ]);
     const embeddings = response.data[0]?.embedding;
     return embeddings ? { model, embeddings } : undefined;
   } else {
@@ -28,7 +30,7 @@ export const getOpenAIEmbeddings = async (text: string) => {
 
     const response = await openai.embeddings.create({
       model: model,
-      input: text,
+      input: text.slice(0, 8192 * 4),
     });
     const embeddings = response.data[0]?.embedding;
     return embeddings ? { model, embeddings } : undefined;
