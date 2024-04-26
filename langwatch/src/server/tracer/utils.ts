@@ -4,7 +4,7 @@ import {
   typedValueToText,
 } from "../../pages/api/collector/common";
 import { extractRAGTextualContext } from "../../pages/api/collector/rag";
-import type { ElasticSearchSpan, Span, SpanInputOutput } from "./types";
+import { elasticSearchToTypedValue, type ElasticSearchSpan, type Span, type SpanInputOutput } from "./types";
 
 export const getRAGInfo = (
   spans: ElasticSearchSpan[]
@@ -32,8 +32,8 @@ export const getRAGInfo = (
     throw new Error("RAG span does not have output");
   }
 
-  let input = typedValueToText(lastRagSpan.input as SpanInputOutput, true);
-  let output = typedValueToText(firstOutput as SpanInputOutput, true);
+  let input = typedValueToText(elasticSearchToTypedValue(lastRagSpan.input), true);
+  let output = typedValueToText(elasticSearchToTypedValue(firstOutput), true);
 
   try {
     input = JSON.parse(input);
