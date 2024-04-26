@@ -5,6 +5,9 @@ import {
   Container,
   HStack,
   Heading,
+  MenuButton,
+  MenuItem,
+  MenuList,
   Skeleton,
   Spacer,
   Tab,
@@ -21,6 +24,8 @@ import {
   Thead,
   Tr,
   useDisclosure,
+  useToast,
+  Menu,
 } from "@chakra-ui/react";
 
 import { useRouter } from "next/router";
@@ -29,14 +34,16 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { AddDatasetDrawer } from "~/components/AddDatasetDrawer";
 import { displayName } from "~/utils/datasets";
-import { Play } from "react-feather";
+import { Play, MoreVertical } from "react-feather";
 import { useDrawer } from "~/components/CurrentDrawer";
+import { DeleteIcon } from "@chakra-ui/icons";
 
 export default function Datasets() {
   const { isOpen, onOpen, onClose } = useDisclosure();
   const { project } = useOrganizationTeamProject();
   const router = useRouter();
   const { openDrawer } = useDrawer();
+  const toast = useToast();
 
   const datasets = api.dataset.getAll.useQuery(
     { projectId: project?.id ?? "" },
@@ -61,6 +68,30 @@ export default function Datasets() {
   const onSuccess = () => {
     void datasets.refetch();
     onClose();
+  };
+
+  const datasetDelete = api.dataset.deleteById.useMutation();
+
+  const deleteDataset = (id: string) => {
+    datasetDelete.mutate(
+      { projectId: project?.id ?? "", datasetId: id },
+      {
+        onSuccess: () => {
+          void datasets.refetch();
+        },
+        onError: () => {
+          toast({
+            title: "Failed to delete dataset",
+            description:
+              "There was an error deleting the dataset. Please try again.",
+            status: "error",
+            duration: 5000,
+            isClosable: true,
+            position: "top-right",
+          });
+        },
+      }
+    );
   };
 
   const goToDataset = (id: string) => {
@@ -121,6 +152,7 @@ export default function Datasets() {
                             <Th>Schema</Th>
                             <Th>Entries</Th>
                             <Th>Last Update</Th>
+                            <Th width={20}></Th>
                           </Tr>
                         </Thead>
                         <Tbody>
@@ -149,6 +181,32 @@ export default function Datasets() {
                                       dataset.datasetRecords[0]?.createdAt ??
                                         dataset.createdAt
                                     ).toLocaleString()}
+                                  </Td>
+                                  <Td>
+                                    <Menu>
+                                      <MenuButton
+                                        as={Button}
+                                        variant={"ghost"}
+                                        onClick={(event) => {
+                                          event.stopPropagation();
+                                        }}
+                                      >
+                                        <MoreVertical />
+                                      </MenuButton>
+                                      <MenuList>
+                                        <MenuItem
+                                          color="red.600"
+                                          onClick={(event) => {
+                                            event.stopPropagation();
+
+                                            deleteDataset(dataset.id);
+                                          }}
+                                          icon={<DeleteIcon />}
+                                        >
+                                          Delete dataset
+                                        </MenuItem>
+                                      </MenuList>
+                                    </Menu>
                                   </Td>
                                 </Tr>
                               ))
