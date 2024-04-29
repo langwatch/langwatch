@@ -21,8 +21,9 @@ export const AzureOpenAIPython = ({ apiKey }: { apiKey?: string }) => {
         instance to it to automatically trace all interactions within its block
       </p>
       <RenderCode
-        code={`import langwatch.openai
-from openai import OpenAI
+        code={`import os
+import langwatch.openai
+from openai import AzureOpenAI
 
 client = AzureOpenAI(
   api_key=os.getenv("AZURE_OPENAI_API_KEY"),
