@@ -36,7 +36,7 @@ resource "aws_security_group" "langwatch-mysql" {
     from_port       = 3306
     to_port         = 3306
     protocol        = "tcp"
-    security_groups = [aws_security_group.langwatch[0].id, aws_security_group.bation-ec2.id]
+    security_groups = [aws_security_group.langwatch[0].id, aws_security_group.metabase[0].id, aws_security_group.bation-ec2.id]
     cidr_blocks     = module.variables.profile == "lw-dev" ? ["0.0.0.0/0"] : []
   }
 

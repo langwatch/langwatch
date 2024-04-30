@@ -29,3 +29,11 @@ data "aws_secretsmanager_secret" "redis" {
 data "aws_secretsmanager_secret_version" "redis" {
   secret_id = data.aws_secretsmanager_secret.redis.id
 }
+
+data "aws_secretsmanager_secret" "metabase" {
+  name = "metabase"
+}
+
+data "aws_secretsmanager_secret_version" "metabase" {
+  secret_id = data.aws_secretsmanager_secret.metabase.id
+}
