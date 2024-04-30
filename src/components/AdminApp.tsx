@@ -11,6 +11,7 @@ import {
   EditButton,
   Button,
   FunctionField,
+  TextInput,
 } from "react-admin";
 import { dataProvider } from "ra-data-simple-prisma";
 import type { User } from "@prisma/client";
@@ -38,12 +39,17 @@ const AdminApp = () => {
     }
   };
 
+  const postFilters = [
+    <TextInput key="1" label="Search Name" source="name" alwaysOn />,
+    <TextInput key="2" label="Search Email" source="email" alwaysOn />,
+  ];
+
   return (
     <Admin dataProvider={dataProvider("/api/admin", {})}>
       <Resource
         name="user"
         list={
-          <List>
+          <List filters={postFilters}>
             <Datagrid>
               <TextField source="id" />
               <TextField source="name" />
