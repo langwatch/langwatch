@@ -5,6 +5,7 @@ import {
 } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import type { Session } from "next-auth";
+import { env } from "~/env.mjs";
 
 export const teamRolePermissionMapping = {
   SETUP_PROJECT: [TeamUserRole.ADMIN, TeamUserRole.MEMBER],
@@ -32,7 +33,11 @@ export const teamRolePermissionMapping = {
 export const organizationRolePermissionMapping = {
   ORGANIZATION_VIEW: [OrganizationUserRole.ADMIN, OrganizationUserRole.MEMBER],
   ORGANIZATION_MANAGE: [OrganizationUserRole.ADMIN],
-  ORGANIZATION_USAGE: [OrganizationUserRole.ADMIN, OrganizationUserRole.MEMBER, OrganizationUserRole.EXTERNAL],
+  ORGANIZATION_USAGE: [
+    OrganizationUserRole.ADMIN,
+    OrganizationUserRole.MEMBER,
+    OrganizationUserRole.EXTERNAL,
+  ],
 };
 
 export const TeamRoleGroup = Object.fromEntries(
@@ -48,6 +53,20 @@ export const OrganizationRoleGroup = Object.fromEntries(
   keyof typeof organizationRolePermissionMapping,
   keyof typeof organizationRolePermissionMapping
 >;
+
+const isDemoProject = (projectId: string, roleGroup: string): boolean => {
+  if (
+    projectId === env.DEMO_PROJECT_ID &&
+    (roleGroup === TeamRoleGroup.MESSAGES_VIEW ||
+      roleGroup === TeamRoleGroup.DATASETS_VIEW ||
+      roleGroup === TeamRoleGroup.ANALYTICS_VIEW ||
+      roleGroup === TeamRoleGroup.COST_VIEW ||
+      roleGroup === TeamRoleGroup.SPANS_DEBUG)
+  ) {
+    return true;
+  }
+  return false;
+};
 
 export const checkUserPermissionForProject =
   (roleGroup: keyof typeof TeamRoleGroup) =>
@@ -80,6 +99,10 @@ export const backendHasTeamProjectPermission = async (
       },
     },
   });
+
+  if (isDemoProject(input.projectId, roleGroup)) {
+    return true;
+  }
 
   const teamMember = projectTeam?.team.members.find(
     (member) => member.userId === ctx.session.user.id

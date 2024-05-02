@@ -35,6 +35,9 @@ export const env = createEnv({
     SENDGRID_API_KEY: z.string().min(1).optional(),
     LANGWATCH_NLP_SERVICE: z.string().min(1).optional(),
     LANGEVALS_ENDPOINT: z.string().min(1).optional(),
+    DEMO_PROJECT_ID: z.string().min(1).optional(),
+    DEMO_PROJECT_USER_ID: z.string().min(1).optional(),
+    DEMO_PROJECT_SLUG: z.string().min(1).optional(),
   },
 
   /**
@@ -73,6 +76,9 @@ export const env = createEnv({
     SENDGRID_API_KEY: process.env.SENDGRID_API_KEY,
     LANGWATCH_NLP_SERVICE: process.env.LANGWATCH_NLP_SERVICE,
     LANGEVALS_ENDPOINT: process.env.LANGEVALS_ENDPOINT,
+    DEMO_PROJECT_ID: process.env.DEMO_PROJECT_ID,
+    DEMO_PROJECT_USER_ID: process.env.DEMO_PROJECT_USER_ID,
+    DEMO_PROJECT_SLUG: process.env.DEMO_PROJECT_SLUG,
   },
   /**
    * Run `build` or `dev` with `SKIP_ENV_VALIDATION` to skip env validation.

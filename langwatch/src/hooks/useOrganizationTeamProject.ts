@@ -32,6 +32,7 @@ export const useOrganizationTeamProject = (
     staleTime: keepFetching ? undefined : Infinity,
     refetchInterval: keepFetching ? 5_000 : undefined,
   });
+
   const [localStorageOrganizationId, setLocalStorageOrganizationId] =
     useLocalStorage<string>("selectedOrganizationId", "");
   const [localStorageTeamId, setLocalStorageTeamId] = useLocalStorage<string>(
@@ -71,6 +72,7 @@ export const useOrganizationTeamProject = (
     ? organizations.data.find((org) => org.id == localStorageOrganizationId) ??
       organizations.data[0]
     : undefined;
+
   const team = projectsTeamsOrganizationsMatchingSlug?.[0]
     ? projectsTeamsOrganizationsMatchingSlug?.[0].team
     : organization
@@ -78,6 +80,7 @@ export const useOrganizationTeamProject = (
       organization.teams.find((team) => team.projects.length > 0) ??
       organization.teams[0]
     : undefined;
+
   const project = team
     ? projectsTeamsOrganizationsMatchingSlug?.[0]?.project ?? team.projects[0]
     : undefined;

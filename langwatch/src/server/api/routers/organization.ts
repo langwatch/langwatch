@@ -22,6 +22,7 @@ import {
 } from "../permission";
 import { dependencies } from "../../../injection/dependencies.server";
 import * as Sentry from "@sentry/nextjs";
+import { env } from "~/env.mjs";
 
 export type TeamWithProjects = Team & {
   projects: Project[];
@@ -143,13 +144,14 @@ export const organizationRouter = createTRPCRouter({
   getAll: protectedProcedure.query(async ({ ctx }) => {
     const userId = ctx.session.user.id;
     const prisma = ctx.prisma;
+    const demoProjectUserId = env.DEMO_PROJECT_USER_ID;
 
     const organizations: FullyLoadedOrganization[] =
       await prisma.organization.findMany({
         where: {
           members: {
             some: {
-              userId: userId,
+              OR: [{ userId: demoProjectUserId }, { userId: userId }],
             },
           },
         },
@@ -166,7 +168,8 @@ export const organizationRouter = createTRPCRouter({
 
     for (const organization of organizations) {
       organization.members = organization.members.filter(
-        (member) => member.userId === userId
+        (member) =>
+          member.userId === userId || member.userId === demoProjectUserId
       );
       const isExternal =
         organization.members[0]?.role !== "ADMIN" &&
@@ -174,7 +177,8 @@ export const organizationRouter = createTRPCRouter({
 
       organization.teams = organization.teams.filter((team) => {
         team.members = team.members.filter(
-          (member) => member.userId === userId
+          (member) =>
+            member.userId === userId || member.userId === demoProjectUserId
         );
         return isExternal
           ? team.members.some((member) => member.userId === userId)
