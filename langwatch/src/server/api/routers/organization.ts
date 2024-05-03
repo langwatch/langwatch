@@ -66,26 +66,28 @@ export const organizationRouter = createTRPCRouter({
   createAndAssign: protectedProcedure
     .input(
       z.object({
-        orgName: z.string(),
+        orgName: z.string().optional(),
         phoneNumber: z.string().optional(),
-        promoCode: z.string().optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
       const userId = ctx.session.user.id;
       const prisma = ctx.prisma;
 
+      const orgName = input.orgName
+        ? input.orgName
+        : ctx.session.user.name ?? "My Organization";
       const orgNanoId = nanoid();
       const orgId = `organization_${orgNanoId}`;
       const orgSlug =
-        slugify(input.orgName, { lower: true, strict: true }) +
+        slugify(orgName, { lower: true, strict: true }) +
         "-" +
         orgNanoId.substring(0, 6);
 
       const teamNanoId = nanoid();
       const teamId = `team_${teamNanoId}`;
       const teamSlug =
-        slugify(input.orgName, { lower: true, strict: true }) +
+        slugify(orgName, { lower: true, strict: true }) +
         "-" +
         teamNanoId.substring(0, 6);
 
@@ -94,10 +96,9 @@ export const organizationRouter = createTRPCRouter({
         const organization = await prisma.organization.create({
           data: {
             id: orgId,
-            name: input.orgName,
+            name: orgName,
             slug: orgSlug,
             phoneNumber: input.phoneNumber,
-            promoCode: input.promoCode,
           },
         });
 
@@ -114,7 +115,7 @@ export const organizationRouter = createTRPCRouter({
         const team = await prisma.team.create({
           data: {
             id: teamId,
-            name: input.orgName, // Same name as organization
+            name: orgName, // Same name as organization
             slug: teamSlug, // Same as organization
             organizationId: organization.id,
           },

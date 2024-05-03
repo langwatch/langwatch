@@ -28,10 +28,9 @@ import {
 import "react-international-phone/style.css";
 
 type OrganizationFormData = {
-  organizationName: string;
+  organizationName?: string;
   phoneNumber: string;
   terms: boolean;
-  promoCode?: string;
 };
 
 export default function OrganizationOnboarding() {
@@ -52,7 +51,6 @@ export default function OrganizationOnboarding() {
       {
         orgName: data.organizationName,
         phoneNumber: data.phoneNumber,
-        promoCode: data.promoCode,
       },
       {
         onError: () => {
@@ -147,19 +145,9 @@ export default function OrganizationOnboarding() {
             />
           </FormControl>
           <FormControl>
-            <FormLabel>Organization Name</FormLabel>
-            <Input {...register("organizationName", { required: true })} />
-            <FormHelperText>
-              If you are signing up for a personal account, you can use your own
-              name
-            </FormHelperText>
+            <FormLabel>Organization Name (optional)</FormLabel>
+            <Input {...register("organizationName", { required: false })} />
           </FormControl>
-          {new Date() < new Date("2024-04-30") && (
-            <FormControl>
-              <FormLabel>Promo Code (optional)</FormLabel>
-              <Input {...register("promoCode", { required: false })} />
-            </FormControl>
-          )}
           <FormControl marginTop={4} isInvalid={!!formState.errors?.terms}>
             <Checkbox {...register("terms", { required: true })}>
               <Text fontSize={14}>
