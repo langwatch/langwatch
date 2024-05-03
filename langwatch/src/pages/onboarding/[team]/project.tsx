@@ -92,7 +92,11 @@ export default function ProjectOnboarding() {
   );
   const usage = api.limits.getUsage.useQuery(
     { organizationId: organization?.id ?? "" },
-    { enabled: !!organization, refetchOnWindowFocus: false, refetchOnMount: false }
+    {
+      enabled: !!organization,
+      refetchOnWindowFocus: false,
+      refetchOnMount: false,
+    }
   );
 
   useEffect(() => {
@@ -148,7 +152,8 @@ export default function ProjectOnboarding() {
             Create New Project
           </Heading>
           {usage.data &&
-            usage.data.projectsCount >= usage.data.activePlan.maxProjects && (
+            usage.data.projectsCount >= usage.data.activePlan.maxProjects &&
+            !usage.data.activePlan.overrideAddingLimitations && (
               <Alert status="warning">
                 <AlertIcon />
                 <Text>
@@ -219,7 +224,8 @@ export default function ProjectOnboarding() {
                   createProject.isLoading ||
                   (usage.data &&
                     usage.data.projectsCount >=
-                      usage.data.activePlan.maxProjects)
+                      usage.data.activePlan.maxProjects &&
+                    !usage.data.activePlan.overrideAddingLimitations)
                 }
               >
                 {createProject.isLoading || createProject.isSuccess

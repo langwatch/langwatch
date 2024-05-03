@@ -84,7 +84,8 @@ function ProjectsList({
                         ) &&
                           (!usage.data ||
                           usage.data.projectsCount <
-                            usage.data.activePlan.maxProjects ? (
+                            usage.data.activePlan.maxProjects ||
+                          usage.data.activePlan.overrideAddingLimitations ? (
                             <Button
                               as={NextLink}
                               href={`/onboarding/${team.slug}/project`}
@@ -136,16 +137,16 @@ export function TeamProjectsList({ team }: { team: TeamWithProjects }) {
     <Tbody>
       {team.projects.map((project) => (
         <Tr key={project.id}>
-          <LinkBox>
-            <Td>
+          <Td colSpan={2}>
+            <LinkBox>
               <HStack gap={2}>
                 <ProjectTechStackIcon project={project} />
                 <LinkOverlay as={NextLink} href={`/${project.slug}/messages`}>
                   {project.name}
                 </LinkOverlay>
               </HStack>
-            </Td>
-          </LinkBox>
+            </LinkBox>
+          </Td>
         </Tr>
       ))}
       {team.projects.length === 0 && (

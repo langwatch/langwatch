@@ -2,7 +2,7 @@ export type PlanInfo = {
   type: string;
   name: string;
   free: boolean;
-  canAlwaysAddNewMembers?: boolean;
+  overrideAddingLimitations?: boolean;
   maxMembers: number;
   maxProjects: number;
   maxMessagesPerMonth: number;
@@ -26,7 +26,7 @@ export abstract class SubscriptionHandler {
       type: "OPEN_SOURCE",
       name: "Open Source",
       free: true,
-      canAlwaysAddNewMembers: true,
+      overrideAddingLimitations: true,
       maxMembers: 99_999,
       maxProjects: 9_999,
       maxMessagesPerMonth: 999_999,

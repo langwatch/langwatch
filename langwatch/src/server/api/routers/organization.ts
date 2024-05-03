@@ -327,7 +327,7 @@ export const organizationRouter = createTRPCRouter({
         );
 
       if (
-        !subscriptionLimits.canAlwaysAddNewMembers &&
+        !subscriptionLimits.overrideAddingLimitations &&
         organization.members.length >= subscriptionLimits.maxMembers
       ) {
         throw new TRPCError({

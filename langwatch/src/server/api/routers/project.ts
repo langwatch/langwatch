@@ -70,7 +70,7 @@ export const projectRouter = createTRPCRouter({
         ctx.session.user
       );
 
-      if (projectCount >= activePlan.maxProjects) {
+      if (projectCount >= activePlan.maxProjects && !activePlan.overrideAddingLimitations) {
         throw new TRPCError({
           code: "FORBIDDEN",
           message: "You have reached the maximum number of projects",

@@ -92,7 +92,7 @@ export default function Members() {
 function MembersList({
   organization,
   teams,
-  activePlan: subscriptionLimits,
+  activePlan,
 }: {
   organization: OrganizationWithMembersAndTheirTeams;
   teams: TeamWithProjects[];
@@ -192,8 +192,8 @@ function MembersList({
             Organization Members
           </Heading>
           <Spacer />
-          {!subscriptionLimits.canAlwaysAddNewMembers &&
-          organization.members.length >= subscriptionLimits.maxMembers ? (
+          {!activePlan.overrideAddingLimitations &&
+          organization.members.length >= activePlan.maxMembers ? (
             <Tooltip label="Upgrade your plan to add more members">
               <Button size="sm" colorScheme="orange" isDisabled={true}>
                 <HStack spacing={2}>
