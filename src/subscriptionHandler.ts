@@ -71,8 +71,12 @@ export class SubscriptionHandlerSass extends SubscriptionHandler {
       };
     }
   ): Promise<PlanInfo> {
-    const canAlwaysAddNewMembers =
+    const overrideAddingLimitations =
       user?.impersonator && isAdmin(user?.impersonator);
+
+    if (organizationId === "organization_lVWdCVtaqNXSKXtQYwU-y") {
+      return { ...PLAN_LIMITS[PlanTypes.PRO], overrideAddingLimitations };
+    }
 
     if (
       organizationId === "HXECRq2mRfSQpxTiSCcsS" ||
@@ -80,11 +84,11 @@ export class SubscriptionHandlerSass extends SubscriptionHandler {
       organizationId === "organization_NW_jBe8d0CCKSnK8FW8UD" ||
       organizationId === "organization_z0JEOAFun8ldnzTQgFxVA"
     ) {
-      return { ...PLAN_LIMITS[PlanTypes.GROWTH], canAlwaysAddNewMembers };
+      return { ...PLAN_LIMITS[PlanTypes.GROWTH], overrideAddingLimitations };
     }
 
     if (organizationId === "organization_erk6Bmlfzxw2YMyzWdo8O") {
-      return { ...PLAN_LIMITS[PlanTypes.ENTERPRISE], canAlwaysAddNewMembers };
+      return { ...PLAN_LIMITS[PlanTypes.ENTERPRISE], overrideAddingLimitations };
     }
 
     const activeSubscription = await prisma.subscription.findFirst({
@@ -97,8 +101,8 @@ export class SubscriptionHandlerSass extends SubscriptionHandler {
     });
 
     if (!activeSubscription)
-      return { ...PLAN_LIMITS[PlanTypes.FREE], canAlwaysAddNewMembers };
+      return { ...PLAN_LIMITS[PlanTypes.FREE], overrideAddingLimitations };
 
-    return { ...PLAN_LIMITS[activeSubscription.plan], canAlwaysAddNewMembers };
+    return { ...PLAN_LIMITS[activeSubscription.plan], overrideAddingLimitations };
   }
 }
