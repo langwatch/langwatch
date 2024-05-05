@@ -12,6 +12,9 @@ lock:
 install: lock
 	poetry install
 
+generate_proxy_config:
+	pip install pyyaml && python langwatch_nlp/generate_proxy_config.py
+
 start:
 	@echo "Starting the server..."
 	@poetry run hypercorn langwatch_nlp.main:app --bind :8080 $(filter-out $@,$(MAKECMDGOALS))

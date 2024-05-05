@@ -8,7 +8,7 @@ package-mode = false
 
 [tool.poetry.dependencies]
 python = "^3.11"
-fastapi = "^0.110.0"
+fastapi = ">=0.109.1,<0.110.0"
 pydantic = "^2.6.4"
 numpy = "^1.26.4"
 openai = "^1.14.2"
@@ -20,6 +20,7 @@ nanoid = "^2.0.0"
 python-dotenv = "^1.0.1"
 hypercorn = "^0.16.0"
 mangum = "^0.17.0"
+litellm = {extras = ["proxy"], version = "^1.35.38"}
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.1.1"

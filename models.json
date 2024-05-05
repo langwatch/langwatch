@@ -1,0 +1,62 @@
+{
+  "openai/gpt-3.5-turbo": {
+    "name": "GPT 3.5 Turbo",
+    "version": "latest",
+    "model_provider": "openai"
+  },
+  "openai/gpt-3.5-turbo-1106": {
+    "name": "GPT 3.5 Turbo",
+    "version": "1106",
+    "model_provider": "openai"
+  },
+  "openai/gpt-4-turbo": {
+    "name": "GPT 4 Turbo",
+    "version": "latest",
+    "model_provider": "openai"
+  },
+  "openai/gpt-4-turbo-1106": {
+    "name": "GPT 4 Turbo",
+    "version": "1106",
+    "model_provider": "openai"
+  },
+  "azure/gpt-35-turbo-1106": {
+    "name": "GPT 3.5 Turbo",
+    "version": "1106",
+    "model_provider": "azure"
+  },
+  "azure/gpt-4-1106-preview": {
+    "name": "GPT 4",
+    "version": "1106",
+    "model_provider": "azure"
+  },
+  "groq/llama3-70b-8192": {
+    "name": "Llama 3 70B",
+    "version": "8192",
+    "model_provider": "meta"
+  },
+  "groq/llama3-8b-8192": {
+    "name": "Llama 3 8B",
+    "version": "8192",
+    "model_provider": "meta"
+  },
+  "groq/mixtral-8x7b-32768": {
+    "name": "Mixtral 8x7B",
+    "version": "32k",
+    "model_provider": "mistral"
+  },
+  "claude-3-haiku-20240307": {
+    "name": "Claude 3 Haiku",
+    "version": "20240307",
+    "model_provider": "anthropic"
+  },
+  "claude-3-sonnet-20240229": {
+    "name": "Claude 3 Sonnet",
+    "version": "20240229",
+    "model_provider": "anthropic"
+  },
+  "claude-3-opus-20240229": {
+    "name": "Claude 3 Opus",
+    "version": "20240229",
+    "model_provider": "anthropic"
+  }
+}

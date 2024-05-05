@@ -17,7 +17,7 @@ T = TypeVar("T")
 
 azure_openai = AzureOpenAI(
     azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT") or "",
-    api_key=os.getenv("AZURE_OPENAI_KEY"),
+    api_key=os.getenv("AZURE_OPENAI_API_KEY"),
     api_version="2023-07-01-preview",
 )
 

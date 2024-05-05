@@ -44,11 +44,7 @@ const config = {
       aliasPath,
       "injection.server.ts"
     );
-    config.resolve.alias.react = path.join(
-      __dirname,
-      "node_modules",
-      "react"
-    );
+    config.resolve.alias.react = path.join(__dirname, "node_modules", "react");
 
     if (process.env.EXTRA_INCLUDE) {
       // TODO: find a less hacky way to make sure injected src will be compiled as well
