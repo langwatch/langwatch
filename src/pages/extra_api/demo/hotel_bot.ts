@@ -1,4 +1,4 @@
-import { OpenAI } from "openai";
+import OpenAI from "openai";
 import { nanoid } from "nanoid";
 import { env } from "../../../../langwatch/langwatch/src/env.mjs";
 
