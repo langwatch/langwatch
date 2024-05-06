@@ -18,10 +18,9 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { useChat } from "ai/react";
+import { useChat, type Message } from "ai/react";
 import { Select as MultiSelect, chakraComponents } from "chakra-react-select";
-import isDeepEqual from "fast-deep-equal";
-import { useEffect, useRef } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   MinusCircle,
   Plus,
@@ -35,19 +34,36 @@ import { useDebounceValue } from "usehooks-ts";
 import { DashboardLayout } from "../../components/DashboardLayout";
 import {
   modelOptions,
-  usePlaygroundStore,
-  type ChatWindowState,
-  type PlaygroundTabState,
+  usePlaygroundStore
 } from "../../hooks/usePlaygroundStore";
 import { useRequiredSession } from "../../hooks/useRequiredSession";
 
 export default function Playground() {
-  const state = usePlaygroundStore((state) => state);
+  return (
+    <DashboardLayout>
+      <PlaygroundTabs />
+    </DashboardLayout>
+  );
+}
+
+function PlaygroundTabs() {
+  const state = usePlaygroundStore((state) => {
+    return {
+      tabs: state.tabs.map(({ name, chatWindows }) => ({
+        name,
+        chatWindows: chatWindows.map(({ id }) => ({ id })),
+      })),
+      activeTabIndex: state.activeTabIndex,
+      addNewTab: state.addNewTab,
+      selectTab: state.selectTab,
+      closeTab: state.closeTab,
+    };
+  });
   const { undo, redo, pastStates, futureStates } =
     usePlaygroundStore.temporal.getState();
 
   return (
-    <DashboardLayout>
+    <>
       <Tabs
         colorScheme="orange"
         width="full"
@@ -72,19 +88,21 @@ export default function Playground() {
                     <Text whiteSpace="nowrap">{tab.name}</Text>
                     {state.tabs.length > 1 &&
                       index === state.activeTabIndex && (
-                        <Button
-                          size="xs"
-                          variant="ghost"
-                          padding={1}
+                        <Box
+                          role="button"
+                          borderRadius="8px"
+                          transition="background 0.1s"
+                          paddingX={1}
                           onClick={() => state.closeTab(index)}
                           color={
                             index === state.activeTabIndex
                               ? "orange.400"
                               : "gray.500"
                           }
+                          _hover={{ background: "gray.50" }}
                         >
                           <X width="16px" />
-                        </Button>
+                        </Box>
                       )}
                   </HStack>
                 </Tab>
@@ -119,19 +137,23 @@ export default function Playground() {
 
         <TabPanels height="full" minHeight={0}>
           {state.tabs.map((tab, tabIndex) => (
-            <PlaygroundTab key={tabIndex} tab={tab} tabIndex={tabIndex} />
+            <PlaygroundTab
+              key={tabIndex}
+              chatWindows={tab.chatWindows}
+              tabIndex={tabIndex}
+            />
           ))}
         </TabPanels>
       </Tabs>
-    </DashboardLayout>
+    </>
   );
 }
 
 function PlaygroundTab({
-  tab,
+  chatWindows,
   tabIndex,
 }: {
-  tab: PlaygroundTabState;
+  chatWindows: { id: string }[];
   tabIndex: number;
 }) {
   return (
@@ -145,10 +167,9 @@ function PlaygroundTab({
       outlineColor="gray.200"
     >
       <HStack spacing={0} overflowX="auto" height="full" minHeight={0}>
-        {tab.chatWindows.map((chatWindow, windowIndex) => (
-          <ChatWindow
-            key={windowIndex}
-            chatWindow={chatWindow}
+        {chatWindows.map((chatWindow, windowIndex) => (
+          <ChatWindowWrapper
+            key={chatWindow.id}
             tabIndex={tabIndex}
             windowIndex={windowIndex}
           />
@@ -158,55 +179,144 @@ function PlaygroundTab({
   );
 }
 
-function ChatWindow({
-  chatWindow,
-  tabIndex,
-  windowIndex,
-}: {
-  chatWindow: ChatWindowState;
-  tabIndex: number;
-  windowIndex: number;
-}) {
-  const { data: session } = useRequiredSession();
-
-  const {
-    addChatWindow,
-    removeChatWindow,
-    setModel,
-    tabs,
-    syncInputs,
-    toggleSyncInputs,
-    onChangeInput,
-    onSubmit,
-    setMessages,
-  } = usePlaygroundStore((state) => state);
-  const chatWindowState = tabs[tabIndex]?.chatWindows[windowIndex];
-  const [isFocused, setIsFocused] = useDebounceValue(false, 200);
-  const inputRef = useRef<HTMLInputElement>(null);
-  const undoHistory = usePlaygroundStore.temporal.getState();
-
+const useChatWithSubscription = (id: string, model: string) => {
   const {
     messages: localMessages,
     setMessages: setLocalMessages,
     handleInputChange,
     handleSubmit,
   } = useChat({
+    id: id,
     api: "/api/playground",
     headers: {
-      "X-Model": chatWindowState?.model.value ?? "",
+      "X-Model": model ?? "",
     },
   });
 
-  useEffect(() => {
-    if (!chatWindowState) return;
+  // Create an object as a ref that can be subscribed to with addEventListener and removeEventListener so that events using this won't trigger re-render as there is no hook change, but will be able to listen to new messages on the subscription
+  const listeners = useRef<Set<(messages: Message[]) => void>>(new Set());
+  const addMessagesListener = useCallback(
+    (listener: (messages: Message[]) => void) => {
+      listeners.current.add(listener);
+    },
+    []
+  );
+  const removeMessagesListener = useCallback(
+    (listener: (messages: Message[]) => void) => {
+      listeners.current.delete(listener);
+    },
+    []
+  );
 
+  const [skipUpdate, setSkipUpdate] = useState(false);
+  const setLocalMessagesSkippingUpdate = useCallback(
+    (messages: Message[]) => {
+      setSkipUpdate(true);
+      setLocalMessages(messages);
+    },
+    [setLocalMessages]
+  );
+
+  useEffect(() => {
+    if (skipUpdate) {
+      setSkipUpdate(false);
+      return;
+    }
+    listeners.current.forEach((listener) => listener(localMessages));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [localMessages]);
+
+  return {
+    addMessagesListener,
+    removeMessagesListener,
+    setLocalMessages: setLocalMessagesSkippingUpdate,
+    handleInputChange,
+    handleSubmit,
+  };
+};
+
+type ChatRef = ReturnType<typeof useChatWithSubscription>;
+
+const ChatWindowWrapper = React.memo(function ChatWindowWrapper({
+  tabIndex,
+  windowIndex,
+}: {
+  tabIndex: number;
+  windowIndex: number;
+}) {
+  const { id, model } = usePlaygroundStore((state) => {
+    const { id, model } = state.tabs[tabIndex]!.chatWindows[windowIndex]!;
+
+    return { id, model };
+  });
+
+  const chat = useChatWithSubscription(id, model.value);
+  const chatRef = useRef<ChatRef>(chat);
+
+  useEffect(() => {
+    chatRef.current = chat;
+  }, [chat]);
+
+  return (
+    <ChatWindow
+      tabIndex={tabIndex}
+      windowIndex={windowIndex}
+      chatRef={chatRef}
+      addMessagesListener={chat.addMessagesListener}
+      removeMessagesListener={chat.removeMessagesListener}
+    />
+  );
+});
+
+const ChatWindow = React.memo(function ChatWindow({
+  tabIndex,
+  windowIndex,
+  chatRef,
+  addMessagesListener,
+  removeMessagesListener,
+}: {
+  tabIndex: number;
+  windowIndex: number;
+  chatRef: React.MutableRefObject<ChatRef>;
+  addMessagesListener: (listener: (messages: Message[]) => void) => void;
+  removeMessagesListener: (listener: (messages: Message[]) => void) => void;
+}) {
+  const {
+    chatWindowState,
+    addChatWindow,
+    removeChatWindow,
+    syncInputs,
+    toggleSyncInputs,
+    onChangeInput,
+    onSubmit,
+  } = usePlaygroundStore((state) => {
+    const { id, model, input, requestedSubmission } =
+      state.tabs[tabIndex]!.chatWindows[windowIndex]!;
+
+    return {
+      chatWindowState: { id, model, input, requestedSubmission },
+      addChatWindow: state.addChatWindow,
+      removeChatWindow: state.removeChatWindow,
+      setModel: state.setModel,
+      syncInputs: state.syncInputs,
+      toggleSyncInputs: state.toggleSyncInputs,
+      onChangeInput: state.onChangeInput,
+      onSubmit: state.onSubmit,
+      setMessages: state.setMessages,
+    };
+  });
+  const [isFocused, setIsFocused] = useDebounceValue(false, 200);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const undoHistory = usePlaygroundStore.temporal.getState();
+
+  useEffect(() => {
     const simulatedEvent = {
       target: { value: chatWindowState.input },
     } as React.ChangeEvent<HTMLInputElement>;
 
-    handleInputChange(simulatedEvent);
+    chatRef.current.handleInputChange(simulatedEvent);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chatWindowState?.input, handleInputChange]);
+  }, [chatWindowState?.input]);
 
   useEffect(() => {
     if (!chatWindowState) return;
@@ -216,35 +326,11 @@ function ChatWindow({
         // eslint-disable-next-line @typescript-eslint/no-empty-function
         preventDefault: () => {},
       } as React.FormEvent<HTMLFormElement>;
-      handleSubmit(simulatedSubmissionEvent);
+      chatRef.current.handleSubmit(simulatedSubmissionEvent);
       onSubmit(windowIndex, false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chatWindowState?.requestedSubmission, handleSubmit]);
-
-  useEffect(() => {
-    if (!chatWindowState) return;
-
-    undoHistory.pause();
-    if (!isDeepEqual(chatWindowState.messages, localMessages)) {
-      setMessages(windowIndex, localMessages);
-    }
-    undoHistory.resume();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [localMessages]);
-
-  useEffect(() => {
-    if (!chatWindowState) return;
-
-    if (!isDeepEqual(chatWindowState.messages, localMessages)) {
-      setLocalMessages(chatWindowState.messages);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chatWindowState?.messages]);
-
-  if (!chatWindowState) {
-    return null;
-  }
+  }, [chatWindowState.requestedSubmission]);
 
   return (
     <VStack
@@ -267,78 +353,7 @@ function ChatWindow({
         padding={2}
       >
         <DragHandleIcon width="14px" height="14px" color="gray.350" />
-        <MultiSelect
-          className="fix-hidden-inputs"
-          value={chatWindowState.model}
-          onChange={(value) => value && setModel(windowIndex, value)}
-          options={modelOptions}
-          isSearchable={false}
-          chakraStyles={{
-            container: (base) => ({
-              ...base,
-              background: "white",
-              width: "250px",
-              borderRadius: "5px",
-              padding: 0,
-            }),
-            valueContainer: (base) => ({
-              ...base,
-              padding: "0px 8px",
-            }),
-            control: (base) => ({
-              ...base,
-              minHeight: 0,
-              height: "32px",
-            }),
-            dropdownIndicator: (provided, state) => ({
-              ...provided,
-              background: "white",
-              padding: 0,
-              paddingRight: 2,
-              width: "auto",
-              border: "none",
-            }),
-            indicatorSeparator: (provided, state) => ({
-              ...provided,
-              display: "none",
-            }),
-          }}
-          components={{
-            Option: ({ children, ...props }) => (
-              <chakraComponents.Option {...props}>
-                <HStack spacing={2} align="center">
-                  <Box width="14px">{props.data.icon}</Box>
-                  <Text fontSize={12} fontFamily="mono">
-                    {children}
-                  </Text>
-                  <Text fontSize={12} fontFamily="mono" color="gray.400">
-                    ({props.data.version})
-                  </Text>
-                </HStack>
-              </chakraComponents.Option>
-            ),
-            ValueContainer: ({ children, ...props }) => {
-              const { getValue } = props;
-              const value = getValue();
-              const icon = value.length > 0 ? value[0]?.icon : null;
-              const version = value.length > 0 ? value[0]?.version : null;
-
-              return (
-                <chakraComponents.ValueContainer {...props}>
-                  <HStack spacing={2} align="center">
-                    <Box width="14px">{icon}</Box>
-                    <Text fontSize={12} fontFamily="mono">
-                      {children}
-                    </Text>
-                    <Text fontSize={12} fontFamily="mono" color="gray.400">
-                      ({version})
-                    </Text>
-                  </HStack>
-                </chakraComponents.ValueContainer>
-              );
-            },
-          }}
-        />
+        <SelectModel tabIndex={tabIndex} windowIndex={windowIndex} />
         <Spacer />
         <HStack spacing={0}>
           <Button
@@ -362,52 +377,13 @@ function ChatWindow({
         </HStack>
       </HStack>
       <VStack width="full" height="full" minHeight={0}>
-        <VStack
-          width="full"
-          height="full"
-          overflowY="auto"
-          align="start"
-          spacing={0}
-          borderTop="1px solid"
-          borderColor="gray.200"
-        >
-          {chatWindowState.messages.map((message, index) => (
-            <HStack
-              key={message.id}
-              borderTop={index === 0 ? "none" : "1px solid"}
-              borderColor="gray.200"
-              padding={3}
-              width="full"
-              background={message.role === "user" ? "#FCFEFF" : "white"}
-              align="start"
-              fontSize="13px"
-              spacing={3}
-            >
-              {message.role === "user" && (
-                <Avatar
-                  size="xs"
-                  name={session?.user.name ?? ""}
-                  backgroundColor={"orange.400"}
-                  color="white"
-                  minWidth="22px"
-                  maxWidth="22px"
-                  height="22px"
-                  fontSize="8px"
-                >
-                  <AvatarBadge boxSize="1.25em" bg="green.500" />
-                </Avatar>
-              )}
-              {message.role === "assistant" && (
-                <Box minWidth="22px" height="22px" padding="1px">
-                  {chatWindowState.model.icon}
-                </Box>
-              )}
-              <Text paddingTop="2px" whiteSpace="pre-wrap">
-                {message.content}
-              </Text>
-            </HStack>
-          ))}
-        </VStack>
+        <Messages
+          tabIndex={tabIndex}
+          windowIndex={windowIndex}
+          chatRef={chatRef}
+          addMessagesListener={addMessagesListener}
+          removeMessagesListener={removeMessagesListener}
+        />
 
         <Box
           padding={4}
@@ -475,6 +451,253 @@ function ChatWindow({
           </form>
         </Box>
       </VStack>
+    </VStack>
+  );
+});
+
+const SelectModel = React.memo(function SelectModel({
+  tabIndex,
+  windowIndex,
+}: {
+  tabIndex: number;
+  windowIndex: number;
+}) {
+  const { model, setModel } = usePlaygroundStore((state) => {
+    const { model } = state.tabs[tabIndex]!.chatWindows[windowIndex]!;
+
+    return {
+      model,
+      setModel: state.setModel,
+    };
+  });
+
+  return (
+    <MultiSelect
+      className="fix-hidden-inputs"
+      value={model}
+      onChange={(value) => value && setModel(windowIndex, value)}
+      options={modelOptions}
+      isSearchable={false}
+      chakraStyles={{
+        container: (base) => ({
+          ...base,
+          background: "white",
+          width: "250px",
+          borderRadius: "5px",
+          padding: 0,
+        }),
+        valueContainer: (base) => ({
+          ...base,
+          padding: "0px 8px",
+        }),
+        control: (base) => ({
+          ...base,
+          minHeight: 0,
+          height: "32px",
+        }),
+        dropdownIndicator: (provided) => ({
+          ...provided,
+          background: "white",
+          padding: 0,
+          paddingRight: 2,
+          width: "auto",
+          border: "none",
+        }),
+        indicatorSeparator: (provided) => ({
+          ...provided,
+          display: "none",
+        }),
+      }}
+      components={{
+        Option: ({ children, ...props }) => (
+          <chakraComponents.Option {...props}>
+            <HStack spacing={2} align="center">
+              <Box width="14px">{props.data.icon}</Box>
+              <Box fontSize={12} fontFamily="mono">
+                {children}
+              </Box>
+              <Text fontSize={12} fontFamily="mono" color="gray.400">
+                ({props.data.version})
+              </Text>
+            </HStack>
+          </chakraComponents.Option>
+        ),
+        ValueContainer: ({ children, ...props }) => {
+          const { getValue } = props;
+          const value = getValue();
+          const icon = value.length > 0 ? value[0]?.icon : null;
+          const version = value.length > 0 ? value[0]?.version : null;
+
+          return (
+            <chakraComponents.ValueContainer {...props}>
+              <HStack spacing={2} align="center">
+                <Box width="14px">{icon}</Box>
+                <Box fontSize={12} fontFamily="mono">
+                  {children}
+                </Box>
+                <Text fontSize={12} fontFamily="mono" color="gray.400">
+                  ({version})
+                </Text>
+              </HStack>
+            </chakraComponents.ValueContainer>
+          );
+        },
+      }}
+    />
+  );
+});
+
+function Messages({
+  addMessagesListener,
+  removeMessagesListener,
+  chatRef,
+  tabIndex,
+  windowIndex,
+}: {
+  addMessagesListener: (listener: (messages: Message[]) => void) => void;
+  removeMessagesListener: (listener: (messages: Message[]) => void) => void;
+  chatRef: React.MutableRefObject<ChatRef>;
+  tabIndex: number;
+  windowIndex: number;
+}) {
+  const { data: session } = useRequiredSession();
+  const undoHistory = usePlaygroundStore.temporal.getState();
+
+  const { model, messages, setMessages } = usePlaygroundStore((state) => {
+    const { model, messages } = state.tabs[tabIndex]!.chatWindows[windowIndex]!;
+
+    return {
+      model,
+      messages,
+      setMessages: state.setMessages,
+    };
+  });
+
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const lastSetMessagesRef = useRef<Message[]>(messages);
+
+  const setMessagesWithoutHistory = useCallback(
+    (messages: Message[]) => {
+      if (Object.is(messages, lastSetMessagesRef.current)) {
+        return;
+      }
+      undoHistory.pause();
+      setMessages(windowIndex, messages);
+      lastSetMessagesRef.current = messages;
+      setTimeout(() => {
+        messagesEndRef.current?.scrollIntoView({
+          behavior: "instant",
+        });
+      }, 100);
+      undoHistory.resume();
+    },
+    [setMessages, windowIndex, undoHistory]
+  );
+
+  const debounceIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const localMessagesRef = useRef<Message[]>(messages);
+  const debouncedSetMessages = useCallback(
+    (messages: Message[]) => {
+      localMessagesRef.current = messages;
+      if (!debounceIntervalRef.current) {
+        console.log("first message");
+        setMessagesWithoutHistory(messages);
+      }
+      const currentTimeout = setTimeout(() => {
+        setMessagesWithoutHistory(localMessagesRef.current);
+        if (Object.is(currentTimeout, debounceIntervalRef.current)) {
+          debounceIntervalRef.current = null;
+        }
+      }, 200);
+      debounceIntervalRef.current = currentTimeout;
+    },
+    [setMessagesWithoutHistory]
+  );
+
+  useEffect(() => {
+    const listener = (localMessages: Message[]) => {
+      const lastMessage = localMessages[localMessages.length - 1];
+      const lastMessageElement = document.getElementById(
+        `message-${lastMessage?.id}`
+      );
+      if (lastMessage && lastMessageElement) {
+        lastMessageElement.innerHTML = lastMessage.content;
+      }
+      messagesEndRef.current?.scrollIntoView({
+        behavior: "instant",
+      });
+      debouncedSetMessages(localMessages);
+    };
+    addMessagesListener(listener);
+
+    return () => {
+      removeMessagesListener(listener);
+    };
+  }, [
+    addMessagesListener,
+    setMessages,
+    debouncedSetMessages,
+    removeMessagesListener,
+    windowIndex,
+  ]);
+
+  useEffect(() => {
+    if (!Object.is(messages, lastSetMessagesRef.current)) {
+      chatRef.current.setLocalMessages(messages);
+    }
+  }, [chatRef, messages]);
+
+  return (
+    <VStack
+      width="full"
+      height="full"
+      overflowY="auto"
+      align="start"
+      spacing={0}
+      borderTop="1px solid"
+      borderColor="gray.200"
+    >
+      {messages.map((message, index) => (
+        <HStack
+          key={message.id}
+          borderTop={index === 0 ? "none" : "1px solid"}
+          borderColor="gray.200"
+          padding={3}
+          width="full"
+          background={message.role === "user" ? "#FCFEFF" : "white"}
+          align="start"
+          fontSize="13px"
+          spacing={3}
+        >
+          {message.role === "user" && (
+            <Avatar
+              size="xs"
+              name={session?.user.name ?? ""}
+              backgroundColor={"orange.400"}
+              color="white"
+              minWidth="22px"
+              maxWidth="22px"
+              height="22px"
+              fontSize="8px"
+            >
+              <AvatarBadge boxSize="1.25em" bg="green.500" />
+            </Avatar>
+          )}
+          {message.role === "assistant" && (
+            <Box minWidth="22px" height="22px" padding="1px">
+              {model.icon}
+            </Box>
+          )}
+          <Text
+            paddingTop="2px"
+            whiteSpace="pre-wrap"
+            id={`message-${message.id}`}
+          >
+            {message.content}
+          </Text>
+        </HStack>
+      ))}
+      <Box width="full" height="1px" id="messages-end" ref={messagesEndRef} />
     </VStack>
   );
 }

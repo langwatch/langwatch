@@ -8,6 +8,7 @@ import { OpenAI } from "../components/icons/OpenAI";
 import models from "../../../models.json";
 import type { Message } from "ai";
 import isDeepEqual from "fast-deep-equal";
+import { nanoid } from "nanoid";
 
 interface PlaygroundStore {
   tabs: PlaygroundTabState[];
@@ -31,6 +32,7 @@ export interface PlaygroundTabState {
 }
 
 export interface ChatWindowState {
+  id: string;
   model: ModelOption;
   input: string;
   requestedSubmission?: boolean;
@@ -63,11 +65,13 @@ export const modelOptions: ModelOption[] = Object.entries(models).map(
 
 const initialChatWindows: ChatWindowState[] = [
   {
+    id: nanoid(),
     model: modelOptions.find((model) => model.value === "openai/gpt-4-turbo")!,
     input: "",
     messages: [],
   },
   {
+    id: nanoid(),
     model: modelOptions.find(
       (model) => model.value === "groq/llama3-70b-8192"
     )!,
@@ -75,6 +79,7 @@ const initialChatWindows: ChatWindowState[] = [
     messages: [],
   },
   {
+    id: nanoid(),
     model: modelOptions.find(
       (model) => model.value === "claude-3-sonnet-20240229"
     )!,
@@ -139,7 +144,10 @@ const store = (
           ...state.tabs,
           {
             name: `Conversation ${state.tabs.length + 1}`,
-            chatWindows: initialChatWindows,
+            chatWindows: initialChatWindows.map((chatWindow) => ({
+              ...chatWindow,
+              id: nanoid(),
+            })),
           },
         ],
         activeTabIndex: state.tabs.length,
@@ -159,7 +167,7 @@ const store = (
       setCurrentTab((tab) => ({
         chatWindows: [
           ...tab.chatWindows,
-          { model: modelOptions[0]!, input: "", messages: [] },
+          { id: nanoid(), model: modelOptions[0]!, input: "", messages: [] },
         ],
       }));
     },
