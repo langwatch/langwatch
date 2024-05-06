@@ -34,9 +34,26 @@ import { useDebounceValue } from "usehooks-ts";
 import { DashboardLayout } from "../../components/DashboardLayout";
 import {
   modelOptions,
-  usePlaygroundStore
+  usePlaygroundStore,
 } from "../../hooks/usePlaygroundStore";
 import { useRequiredSession } from "../../hooks/useRequiredSession";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  horizontalListSortingStrategy,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
 export default function Playground() {
   return (
@@ -156,6 +173,16 @@ function PlaygroundTab({
   chatWindows: { id: string }[];
   tabIndex: number;
 }) {
+  const reorderChatWindows = usePlaygroundStore(
+    (state) => state.reorderChatWindows
+  );
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
   return (
     <TabPanel
       key={tabIndex}
@@ -167,13 +194,31 @@ function PlaygroundTab({
       outlineColor="gray.200"
     >
       <HStack spacing={0} overflowX="auto" height="full" minHeight={0}>
-        {chatWindows.map((chatWindow, windowIndex) => (
-          <ChatWindowWrapper
-            key={chatWindow.id}
-            tabIndex={tabIndex}
-            windowIndex={windowIndex}
-          />
-        ))}
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={(event) => {
+            const { active, over } = event;
+            const windowIds = chatWindows.map((chat) => chat.id);
+            const oldIndex = windowIds.indexOf(active.id as string);
+            const newIndex = windowIds.indexOf(over!.id as string);
+            const newOrder = arrayMove(windowIds, oldIndex, newIndex);
+            reorderChatWindows(newOrder);
+          }}
+        >
+          <SortableContext
+            items={chatWindows.map((chat) => chat.id)}
+            strategy={horizontalListSortingStrategy}
+          >
+            {chatWindows.map((chatWindow, windowIndex) => (
+              <ChatWindowWrapper
+                key={chatWindow.id}
+                tabIndex={tabIndex}
+                windowIndex={windowIndex}
+              />
+            ))}
+          </SortableContext>
+        </DndContext>
       </HStack>
     </TabPanel>
   );
@@ -332,6 +377,9 @@ const ChatWindow = React.memo(function ChatWindow({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chatWindowState.requestedSubmission]);
 
+  const { attributes, listeners, setNodeRef, transform, transition } =
+    useSortable({ id: chatWindowState.id });
+
   return (
     <VStack
       minWidth="442px"
@@ -344,6 +392,11 @@ const ChatWindow = React.memo(function ChatWindow({
       marginTop="-1px"
       background="white"
       spacing={0}
+      style={{
+        transform: CSS.Transform.toString(transform),
+        transition,
+      }}
+      ref={setNodeRef}
     >
       <HStack
         width="100%"
@@ -352,7 +405,14 @@ const ChatWindow = React.memo(function ChatWindow({
         outlineColor="gray.200"
         padding={2}
       >
-        <DragHandleIcon width="14px" height="14px" color="gray.350" />
+        <DragHandleIcon
+          width="14px"
+          height="14px"
+          color="gray.350"
+          {...attributes}
+          {...listeners}
+          cursor="move"
+        />
         <SelectModel tabIndex={tabIndex} windowIndex={windowIndex} />
         <Spacer />
         <HStack spacing={0}>

@@ -17,6 +17,7 @@ interface PlaygroundStore {
   selectTab: (tabIndex: number) => void;
   addChatWindow: () => void;
   removeChatWindow: (windowIndex: number) => void;
+  reorderChatWindows: (idsOrder: string[]) => void;
   addNewTab: () => void;
   closeTab: (tabIndex: number) => void;
   setModel: (windowIndex: number, model: ModelOption) => void;
@@ -175,6 +176,13 @@ const store = (
       setCurrentTab((tab) => ({
         chatWindows: tab.chatWindows.filter(
           (_, index) => index !== windowIndex
+        ),
+      }));
+    },
+    reorderChatWindows: (idsOrder) => {
+      setCurrentTab((tab) => ({
+        chatWindows: idsOrder.map((id) =>
+          tab.chatWindows.find((chatWindow) => chatWindow.id === id)!
         ),
       }));
     },
