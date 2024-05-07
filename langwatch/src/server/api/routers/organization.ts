@@ -142,53 +142,60 @@ export const organizationRouter = createTRPCRouter({
       return { success: true, teamSlug };
     }),
 
-  getAll: protectedProcedure.query(async ({ ctx }) => {
-    const userId = ctx.session.user.id;
-    const prisma = ctx.prisma;
-    const demoProjectUserId = env.DEMO_PROJECT_USER_ID;
+  getAll: protectedProcedure
+    .input(
+      z.object({
+        isDemo: z.boolean().optional(),
+      })
+    )
+    .query(async ({ ctx, input }) => {
+      const isDemo = input?.isDemo;
+      const userId = ctx.session.user.id;
+      const prisma = ctx.prisma;
+      const demoProjectUserId = isDemo ? env.DEMO_PROJECT_USER_ID : "";
 
-    const organizations: FullyLoadedOrganization[] =
-      await prisma.organization.findMany({
-        where: {
-          members: {
-            some: {
-              OR: [{ userId: demoProjectUserId }, { userId: userId }],
+      const organizations: FullyLoadedOrganization[] =
+        await prisma.organization.findMany({
+          where: {
+            members: {
+              some: {
+                OR: [{ userId: demoProjectUserId }, { userId: userId }],
+              },
             },
           },
-        },
-        include: {
-          members: true,
-          teams: {
-            include: {
-              members: true,
-              projects: true,
+          include: {
+            members: true,
+            teams: {
+              include: {
+                members: true,
+                projects: true,
+              },
             },
           },
-        },
-      });
+        });
 
-    for (const organization of organizations) {
-      organization.members = organization.members.filter(
-        (member) =>
-          member.userId === userId || member.userId === demoProjectUserId
-      );
-      const isExternal =
-        organization.members[0]?.role !== "ADMIN" &&
-        organization.members[0]?.role !== "MEMBER";
-
-      organization.teams = organization.teams.filter((team) => {
-        team.members = team.members.filter(
+      for (const organization of organizations) {
+        organization.members = organization.members.filter(
           (member) =>
             member.userId === userId || member.userId === demoProjectUserId
         );
-        return isExternal
-          ? team.members.some((member) => member.userId === userId)
-          : true;
-      });
-    }
+        const isExternal =
+          organization.members[0]?.role !== "ADMIN" &&
+          organization.members[0]?.role !== "MEMBER";
 
-    return organizations;
-  }),
+        organization.teams = organization.teams.filter((team) => {
+          team.members = team.members.filter(
+            (member) =>
+              member.userId === userId || member.userId === demoProjectUserId
+          );
+          return isExternal
+            ? team.members.some((member) => member.userId === userId)
+            : true;
+        });
+      }
+
+      return organizations;
+    }),
 
   update: protectedProcedure
     .input(
