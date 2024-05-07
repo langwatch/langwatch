@@ -27,11 +27,18 @@ export const useOrganizationTeamProject = (
   }
 ) => {
   useRequiredSession();
+  const router = useRouter();
 
-  const organizations = api.organization.getAll.useQuery(undefined, {
-    staleTime: keepFetching ? undefined : Infinity,
-    refetchInterval: keepFetching ? 5_000 : undefined,
-  });
+  const isDemo = router.query.project === "test-jqNuqp";
+
+  const organizations = api.organization.getAll.useQuery(
+    { isDemo: isDemo },
+    {
+      staleTime: keepFetching ? undefined : Infinity,
+      refetchInterval: keepFetching ? 5_000 : undefined,
+    }
+  );
+  console.log(organizations.data);
 
   const [localStorageOrganizationId, setLocalStorageOrganizationId] =
     useLocalStorage<string>("selectedOrganizationId", "");
@@ -41,7 +48,6 @@ export const useOrganizationTeamProject = (
   );
   const [localStorageProjectSlug, setLocalStorageProjectSlug] =
     useLocalStorage<string>("selectedProjectSlug", "");
-  const router = useRouter();
 
   const projectSlug =
     typeof router.query.project == "string"
