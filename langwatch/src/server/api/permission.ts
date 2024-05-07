@@ -61,7 +61,8 @@ const isDemoProject = (projectId: string, roleGroup: string): boolean => {
       roleGroup === TeamRoleGroup.DATASETS_VIEW ||
       roleGroup === TeamRoleGroup.ANALYTICS_VIEW ||
       roleGroup === TeamRoleGroup.COST_VIEW ||
-      roleGroup === TeamRoleGroup.SPANS_DEBUG)
+      roleGroup === TeamRoleGroup.SPANS_DEBUG ||
+      roleGroup === TeamRoleGroup.GUARDRAILS_VIEW)
   ) {
     return true;
   }
@@ -91,6 +92,10 @@ export const backendHasTeamProjectPermission = async (
   input: { projectId: string },
   roleGroup: keyof typeof TeamRoleGroup
 ) => {
+  if (isDemoProject(input.projectId, roleGroup)) {
+    return true;
+  }
+
   const projectTeam = await ctx.prisma.project.findUnique({
     where: { id: input.projectId },
     select: {
@@ -99,10 +104,6 @@ export const backendHasTeamProjectPermission = async (
       },
     },
   });
-
-  if (isDemoProject(input.projectId, roleGroup)) {
-    return true;
-  }
 
   const teamMember = projectTeam?.team.members.find(
     (member) => member.userId === ctx.session.user.id
