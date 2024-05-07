@@ -51,7 +51,6 @@ import {
   SortableContext,
   sortableKeyboardCoordinates,
   useSortable,
-  verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 
@@ -214,6 +213,7 @@ function PlaygroundTab({
               <ChatWindowWrapper
                 key={chatWindow.id}
                 tabIndex={tabIndex}
+                windowId={chatWindow.id}
                 windowIndex={windowIndex}
               />
             ))}
@@ -284,13 +284,17 @@ type ChatRef = ReturnType<typeof useChatWithSubscription>;
 
 const ChatWindowWrapper = React.memo(function ChatWindowWrapper({
   tabIndex,
+  windowId,
   windowIndex,
 }: {
   tabIndex: number;
+  windowId: string;
   windowIndex: number;
 }) {
   const { id, model } = usePlaygroundStore((state) => {
-    const { id, model } = state.tabs[tabIndex]!.chatWindows[windowIndex]!;
+    const { id, model } = state.tabs[tabIndex]!.chatWindows.find(
+      (window) => window.id === windowId
+    )!;
 
     return { id, model };
   });
@@ -305,6 +309,7 @@ const ChatWindowWrapper = React.memo(function ChatWindowWrapper({
   return (
     <ChatWindow
       tabIndex={tabIndex}
+      windowId={windowId}
       windowIndex={windowIndex}
       chatRef={chatRef}
       addMessagesListener={chat.addMessagesListener}
@@ -315,12 +320,14 @@ const ChatWindowWrapper = React.memo(function ChatWindowWrapper({
 
 const ChatWindow = React.memo(function ChatWindow({
   tabIndex,
+  windowId,
   windowIndex,
   chatRef,
   addMessagesListener,
   removeMessagesListener,
 }: {
   tabIndex: number;
+  windowId: string;
   windowIndex: number;
   chatRef: React.MutableRefObject<ChatRef>;
   addMessagesListener: (listener: (messages: Message[]) => void) => void;
@@ -335,8 +342,9 @@ const ChatWindow = React.memo(function ChatWindow({
     onChangeInput,
     onSubmit,
   } = usePlaygroundStore((state) => {
-    const { id, model, input, requestedSubmission } =
-      state.tabs[tabIndex]!.chatWindows[windowIndex]!;
+    const { id, model, input, requestedSubmission } = state.tabs[
+      tabIndex
+    ]!.chatWindows.find((chatWindow) => chatWindow.id === windowId)!;
 
     return {
       chatWindowState: { id, model, input, requestedSubmission },
@@ -372,7 +380,7 @@ const ChatWindow = React.memo(function ChatWindow({
         preventDefault: () => {},
       } as React.FormEvent<HTMLFormElement>;
       chatRef.current.handleSubmit(simulatedSubmissionEvent);
-      onSubmit(windowIndex, false);
+      onSubmit(windowId, false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chatWindowState.requestedSubmission]);
@@ -413,7 +421,7 @@ const ChatWindow = React.memo(function ChatWindow({
           {...listeners}
           cursor="move"
         />
-        <SelectModel tabIndex={tabIndex} windowIndex={windowIndex} />
+        <SelectModel tabIndex={tabIndex} windowId={windowId} />
         <Spacer />
         <HStack spacing={0}>
           <Button
@@ -421,7 +429,7 @@ const ChatWindow = React.memo(function ChatWindow({
             color="gray.500"
             variant="ghost"
             padding="6px"
-            onClick={() => removeChatWindow(windowIndex)}
+            onClick={() => removeChatWindow(windowId)}
           >
             <MinusCircle width="18px" height="18px" />
           </Button>
@@ -439,7 +447,7 @@ const ChatWindow = React.memo(function ChatWindow({
       <VStack width="full" height="full" minHeight={0}>
         <Messages
           tabIndex={tabIndex}
-          windowIndex={windowIndex}
+          windowId={windowId}
           chatRef={chatRef}
           addMessagesListener={addMessagesListener}
           removeMessagesListener={removeMessagesListener}
@@ -456,7 +464,7 @@ const ChatWindow = React.memo(function ChatWindow({
             onSubmit={(e) => {
               e.preventDefault();
 
-              onSubmit(windowIndex, true);
+              onSubmit(windowId, true);
             }}
           >
             <InputGroup>
@@ -465,7 +473,7 @@ const ChatWindow = React.memo(function ChatWindow({
                 value={chatWindowState.input}
                 onChange={(e) => {
                   undoHistory.pause();
-                  onChangeInput(windowIndex, e.target.value);
+                  onChangeInput(windowId, e.target.value);
                   undoHistory.resume();
                 }}
                 placeholder="Say something..."
@@ -517,13 +525,15 @@ const ChatWindow = React.memo(function ChatWindow({
 
 const SelectModel = React.memo(function SelectModel({
   tabIndex,
-  windowIndex,
+  windowId,
 }: {
   tabIndex: number;
-  windowIndex: number;
+  windowId: string;
 }) {
   const { model, setModel } = usePlaygroundStore((state) => {
-    const { model } = state.tabs[tabIndex]!.chatWindows[windowIndex]!;
+    const { model } = state.tabs[tabIndex]!.chatWindows.find(
+      (window) => window.id === windowId
+    )!;
 
     return {
       model,
@@ -535,7 +545,7 @@ const SelectModel = React.memo(function SelectModel({
     <MultiSelect
       className="fix-hidden-inputs"
       value={model}
-      onChange={(value) => value && setModel(windowIndex, value)}
+      onChange={(value) => value && setModel(windowId, value)}
       options={modelOptions}
       isSearchable={false}
       chakraStyles={{
@@ -612,19 +622,21 @@ function Messages({
   removeMessagesListener,
   chatRef,
   tabIndex,
-  windowIndex,
+  windowId,
 }: {
   addMessagesListener: (listener: (messages: Message[]) => void) => void;
   removeMessagesListener: (listener: (messages: Message[]) => void) => void;
   chatRef: React.MutableRefObject<ChatRef>;
   tabIndex: number;
-  windowIndex: number;
+  windowId: string;
 }) {
   const { data: session } = useRequiredSession();
   const undoHistory = usePlaygroundStore.temporal.getState();
 
   const { model, messages, setMessages } = usePlaygroundStore((state) => {
-    const { model, messages } = state.tabs[tabIndex]!.chatWindows[windowIndex]!;
+    const { model, messages } = state.tabs[tabIndex]!.chatWindows.find(
+      (window) => window.id === windowId
+    )!;
 
     return {
       model,
@@ -642,7 +654,7 @@ function Messages({
         return;
       }
       undoHistory.pause();
-      setMessages(windowIndex, messages);
+      setMessages(windowId, messages);
       lastSetMessagesRef.current = messages;
       setTimeout(() => {
         messagesEndRef.current?.scrollIntoView({
@@ -651,7 +663,7 @@ function Messages({
       }, 100);
       undoHistory.resume();
     },
-    [setMessages, windowIndex, undoHistory]
+    [setMessages, windowId, undoHistory]
   );
 
   const debounceIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -698,7 +710,7 @@ function Messages({
     setMessages,
     debouncedSetMessages,
     removeMessagesListener,
-    windowIndex,
+    windowId,
   ]);
 
   useEffect(() => {

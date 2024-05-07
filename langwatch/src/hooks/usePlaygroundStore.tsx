@@ -16,15 +16,15 @@ interface PlaygroundStore {
   syncInputs: boolean;
   selectTab: (tabIndex: number) => void;
   addChatWindow: () => void;
-  removeChatWindow: (windowIndex: number) => void;
+  removeChatWindow: (windowId: string) => void;
   reorderChatWindows: (idsOrder: string[]) => void;
   addNewTab: () => void;
   closeTab: (tabIndex: number) => void;
-  setModel: (windowIndex: number, model: ModelOption) => void;
+  setModel: (windowId: string, model: ModelOption) => void;
   toggleSyncInputs: () => void;
-  onChangeInput: (windowIndex: number, input: string) => void;
-  onSubmit: (windowIndex: number, requestedSubmission: boolean) => void;
-  setMessages: (windowIndex: number, messages: Message[]) => void;
+  onChangeInput: (windowId: string, input: string) => void;
+  onSubmit: (windowId: string, requestedSubmission: boolean) => void;
+  setMessages: (windowId: string, messages: Message[]) => void;
 }
 
 export interface PlaygroundTabState {
@@ -114,12 +114,12 @@ const store = (
   };
 
   const setChatWindow = (
-    windowIndex: number,
+    windowId: string,
     fn: (current: ChatWindowState) => Partial<ChatWindowState>
   ): void => {
     setCurrentTab((tab) => ({
-      chatWindows: tab.chatWindows.map((chatWindow, index) => {
-        if (index === windowIndex) {
+      chatWindows: tab.chatWindows.map((chatWindow) => {
+        if (chatWindow.id === windowId) {
           return { ...chatWindow, ...fn(chatWindow) };
         }
         return chatWindow;
@@ -172,27 +172,27 @@ const store = (
         ],
       }));
     },
-    removeChatWindow: (windowIndex) => {
+    removeChatWindow: (windowId) => {
       setCurrentTab((tab) => ({
         chatWindows: tab.chatWindows.filter(
-          (_, index) => index !== windowIndex
+          (chatWindow) => chatWindow.id !== windowId
         ),
       }));
     },
     reorderChatWindows: (idsOrder) => {
       setCurrentTab((tab) => ({
-        chatWindows: idsOrder.map((id) =>
-          tab.chatWindows.find((chatWindow) => chatWindow.id === id)!
+        chatWindows: idsOrder.map(
+          (id) => tab.chatWindows.find((chatWindow) => chatWindow.id === id)!
         ),
       }));
     },
-    setModel: (windowIndex, model) => {
-      setChatWindow(windowIndex, () => ({ model }));
+    setModel: (windowId, model) => {
+      setChatWindow(windowId, () => ({ model }));
     },
     toggleSyncInputs: () => {
       set((state) => ({ syncInputs: !state.syncInputs }));
     },
-    onChangeInput: (windowIndex, input) => {
+    onChangeInput: (windowId, input) => {
       set((state) => {
         return {
           ...state,
@@ -200,8 +200,8 @@ const store = (
             if (tabIndex === state.activeTabIndex) {
               return {
                 ...tab,
-                chatWindows: tab.chatWindows.map((chatWindow, index) => {
-                  if (index === windowIndex || state.syncInputs) {
+                chatWindows: tab.chatWindows.map((chatWindow) => {
+                  if (chatWindow.id === windowId || state.syncInputs) {
                     return { ...chatWindow, input };
                   }
                   return chatWindow;
@@ -213,16 +213,16 @@ const store = (
         };
       });
     },
-    onSubmit: (windowIndex, requestedSubmission) => {
+    onSubmit: (windowId, requestedSubmission) => {
       set((state) => {
         return {
           tabs: state.tabs.map((tab, tabIndex) => {
             if (tabIndex === state.activeTabIndex) {
               return {
                 ...tab,
-                chatWindows: tab.chatWindows.map((chatWindow, index) => {
+                chatWindows: tab.chatWindows.map((chatWindow) => {
                   if (
-                    index === windowIndex ||
+                    chatWindow.id === windowId ||
                     (requestedSubmission && state.syncInputs)
                   ) {
                     return {
@@ -240,8 +240,8 @@ const store = (
         };
       });
     },
-    setMessages: (windowIndex, messages) => {
-      setChatWindow(windowIndex, () => ({ messages }));
+    setMessages: (windowId, messages) => {
+      setChatWindow(windowId, () => ({ messages }));
     },
   };
 };
