@@ -1,6 +1,11 @@
 import { useChat, type Message } from "ai/react";
-import { useCallback, useEffect, useRef, useState } from "react";
-
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type FormEvent,
+} from "react";
 
 export const useChatWithSubscription = (id: string, model: string) => {
   const {
@@ -31,20 +36,27 @@ export const useChatWithSubscription = (id: string, model: string) => {
     []
   );
 
-  const [skipUpdate, setSkipUpdate] = useState(false);
-  const setLocalMessagesSkippingUpdate = useCallback(
-    (messages: Message[]) => {
-      setSkipUpdate(true);
-      setLocalMessages(messages);
+  const localMessagesRef = useRef(localMessages);
+  useEffect(() => {
+    localMessagesRef.current = localMessages;
+  }, [localMessages]);
+
+  const handleSubmitWithUpdate = useCallback(
+    (e: FormEvent<HTMLFormElement>) => {
+      handleSubmit(e);
+      listeners.current.forEach((listener) =>
+        listener(localMessagesRef.current)
+      );
     },
-    [setLocalMessages]
+    [handleSubmit]
   );
 
+  const previousMessageRef = useRef<Message[]>([]);
   useEffect(() => {
-    if (skipUpdate) {
-      setSkipUpdate(false);
+    if (Object.is(previousMessageRef.current, localMessages)) {
       return;
     }
+    previousMessageRef.current = localMessages;
     listeners.current.forEach((listener) => listener(localMessages));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [localMessages]);
@@ -52,9 +64,9 @@ export const useChatWithSubscription = (id: string, model: string) => {
   return {
     addMessagesListener,
     removeMessagesListener,
-    setLocalMessages: setLocalMessagesSkippingUpdate,
+    setLocalMessages,
     handleInputChange,
-    handleSubmit,
+    handleSubmit: handleSubmitWithUpdate,
   };
 };
 

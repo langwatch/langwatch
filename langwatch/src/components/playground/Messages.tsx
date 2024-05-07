@@ -10,6 +10,7 @@ import { type Message } from "ai/react";
 import React, { useCallback, useEffect, useRef } from "react";
 import { usePlaygroundStore } from "../../hooks/usePlaygroundStore";
 import { useRequiredSession } from "../../hooks/useRequiredSession";
+import type { ChatRef } from "../../hooks/useChatWithSubscription";
 
 export function Messages({
   addMessagesListener,
@@ -66,7 +67,6 @@ export function Messages({
     (messages: Message[]) => {
       localMessagesRef.current = messages;
       if (!debounceIntervalRef.current) {
-        console.log("first message");
         setMessagesWithoutHistory(messages);
       }
       const currentTimeout = setTimeout(() => {
