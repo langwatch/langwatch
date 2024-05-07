@@ -1,11 +1,5 @@
 import { useChat, type Message } from "ai/react";
-import {
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-  type FormEvent,
-} from "react";
+import { useCallback, useEffect, useRef, type FormEvent } from "react";
 
 export const useChatWithSubscription = (id: string, model: string) => {
   const {
@@ -13,6 +7,9 @@ export const useChatWithSubscription = (id: string, model: string) => {
     setMessages: setLocalMessages,
     handleInputChange,
     handleSubmit,
+    error,
+    isLoading,
+    stop
   } = useChat({
     id: id,
     api: "/api/playground",
@@ -43,12 +40,13 @@ export const useChatWithSubscription = (id: string, model: string) => {
 
   const handleSubmitWithUpdate = useCallback(
     (e: FormEvent<HTMLFormElement>) => {
+      stop();
       handleSubmit(e);
       listeners.current.forEach((listener) =>
         listener(localMessagesRef.current)
       );
     },
-    [handleSubmit]
+    [handleSubmit, stop]
   );
 
   const previousMessageRef = useRef<Message[]>([]);
@@ -67,6 +65,9 @@ export const useChatWithSubscription = (id: string, model: string) => {
     setLocalMessages,
     handleInputChange,
     handleSubmit: handleSubmitWithUpdate,
+    stop,
+    error,
+    isLoading
   };
 };
 

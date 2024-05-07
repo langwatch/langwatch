@@ -7,10 +7,11 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { type Message } from "ai/react";
-import React, { useCallback, useEffect, useRef } from "react";
+import React, { use, useCallback, useEffect, useRef } from "react";
 import { usePlaygroundStore } from "../../hooks/usePlaygroundStore";
 import { useRequiredSession } from "../../hooks/useRequiredSession";
 import type { ChatRef } from "../../hooks/useChatWithSubscription";
+import { useDebounceValue } from "usehooks-ts";
 
 export function Messages({
   addMessagesListener,
@@ -18,12 +19,16 @@ export function Messages({
   chatRef,
   tabIndex,
   windowId,
+  error,
+  isLoading,
 }: {
   addMessagesListener: (listener: (messages: Message[]) => void) => void;
   removeMessagesListener: (listener: (messages: Message[]) => void) => void;
   chatRef: React.MutableRefObject<ChatRef>;
   tabIndex: number;
   windowId: string;
+  error: Error | undefined;
+  isLoading: boolean;
 }) {
   const { data: session } = useRequiredSession();
   const undoHistory = usePlaygroundStore.temporal.getState();
@@ -87,7 +92,7 @@ export function Messages({
         `message-${lastMessage?.id}`
       );
       if (lastMessage && lastMessageElement) {
-        lastMessageElement.innerHTML = lastMessage.content;
+        lastMessageElement.textContent = lastMessage.content;
       }
       messagesEndRef.current?.scrollIntoView({
         behavior: "instant",
@@ -109,9 +114,20 @@ export function Messages({
 
   useEffect(() => {
     if (!Object.is(messages, lastSetMessagesRef.current)) {
+      chatRef.current.stop();
       chatRef.current.setLocalMessages(messages);
     }
   }, [chatRef, messages]);
+
+  const lastMessage = messages[messages.length - 1];
+
+  const [debouncedLoading, setDebouncedLoading] = useDebounceValue(
+    isLoading,
+    200
+  );
+  useEffect(() => {
+    setDebouncedLoading(isLoading);
+  }, [isLoading, setDebouncedLoading]);
 
   return (
     <VStack
@@ -124,17 +140,7 @@ export function Messages({
       borderColor="gray.200"
     >
       {messages.map((message, index) => (
-        <HStack
-          key={message.id}
-          borderTop={index === 0 ? "none" : "1px solid"}
-          borderColor="gray.200"
-          padding={3}
-          width="full"
-          background={message.role === "user" ? "#FCFEFF" : "white"}
-          align="start"
-          fontSize="13px"
-          spacing={3}
-        >
+        <MessageBlock key={message.id} message={message} index={index}>
           {message.role === "user" && (
             <Avatar
               size="xs"
@@ -154,16 +160,82 @@ export function Messages({
               {model.icon}
             </Box>
           )}
-          <Text
-            paddingTop="2px"
-            whiteSpace="pre-wrap"
-            id={`message-${message.id}`}
-          >
-            {message.content}
+          <Text paddingTop="2px" whiteSpace="pre-wrap">
+            <span id={`message-${message.id}`}>{message.content}</span>
+            {lastMessage?.role === "assistant" &&
+              message.id === lastMessage.id &&
+              debouncedLoading && <span className="chat-loading-circle" />}
+            {lastMessage?.role === "assistant" &&
+              message.id === lastMessage.id &&
+              error && (
+                <Text as="span" color="red.500">
+                  {" "}
+                  An error has occured
+                </Text>
+              )}
           </Text>
-        </HStack>
+        </MessageBlock>
       ))}
+      {(!lastMessage || (lastMessage && lastMessage.role !== "assistant")) && (
+        <>
+          {debouncedLoading && (
+            <MessageBlock
+              message={{ id: "loading", role: "assistant", content: "" }}
+              index={messages.length}
+            >
+              <Box minWidth="22px" height="22px" padding="1px">
+                {model.icon}
+              </Box>
+              <Text paddingTop="2px">
+                <span
+                  className="chat-loading-circle"
+                  style={{ marginLeft: 0 }}
+                />
+              </Text>
+            </MessageBlock>
+          )}
+          {error && (
+            <MessageBlock
+              message={{ id: "loading", role: "assistant", content: "" }}
+              index={messages.length}
+            >
+              <Box minWidth="22px" height="22px" padding="1px">
+                {model.icon}
+              </Box>
+              <Text paddingTop="2px" color="red.500">
+                An error has occured
+              </Text>
+            </MessageBlock>
+          )}
+        </>
+      )}
       <Box width="full" height="1px" id="messages-end" ref={messagesEndRef} />
     </VStack>
+  );
+}
+
+function MessageBlock({
+  message,
+  index,
+  children,
+}: {
+  message: Message;
+  index: number;
+  children: React.ReactNode;
+}) {
+  return (
+    <HStack
+      key={message.id}
+      borderTop={index === 0 ? "none" : "1px solid"}
+      borderColor="gray.200"
+      padding={3}
+      width="full"
+      background={message.role === "user" ? "#FCFEFF" : "white"}
+      align="start"
+      fontSize="13px"
+      spacing={3}
+    >
+      {children}
+    </HStack>
   );
 }

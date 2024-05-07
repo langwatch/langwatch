@@ -160,3 +160,26 @@ div input[type="number"] {
     top: 0;
   }
 }
+
+.chat-loading-circle {
+  display: inline-block;
+  margin-left: 4px;
+  margin-bottom: -4px;
+  background: #333;
+  border-radius: 100%;
+  width: 14px;
+  height: 14px;
+  animation: chat-loading-circle 1s infinite linear;
+}
+
+@keyframes chat-loading-circle {
+  0% {
+    transform: scale(0.8);
+  }
+  50% {
+    transform: scale(1.2);
+  }
+  100% {
+    transform: scale(0.8);
+  }
+}

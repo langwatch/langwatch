@@ -9,27 +9,21 @@ import {
   InputRightElement,
   Spacer,
   Text,
-  VStack
+  VStack,
 } from "@chakra-ui/react";
-import {
-  useSortable
-} from "@dnd-kit/sortable";
+import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { type Message } from "ai/react";
 import React, { useEffect, useRef } from "react";
-import {
-  MinusCircle,
-  PlusCircle,
-  Send
-} from "react-feather";
+import { MinusCircle, PlusCircle, Send } from "react-feather";
 import { useDebounceValue } from "usehooks-ts";
-import {
-  usePlaygroundStore
-} from "../../hooks/usePlaygroundStore";
+import { usePlaygroundStore } from "../../hooks/usePlaygroundStore";
 import { SelectModel } from "./SelectModel";
-import { useChatWithSubscription, type ChatRef } from "../../hooks/useChatWithSubscription";
+import {
+  useChatWithSubscription,
+  type ChatRef,
+} from "../../hooks/useChatWithSubscription";
 import { Messages } from "./Messages";
-
 
 export const ChatWindowWrapper = React.memo(function ChatWindowWrapper({
   tabIndex,
@@ -63,6 +57,8 @@ export const ChatWindowWrapper = React.memo(function ChatWindowWrapper({
       chatRef={chatRef}
       addMessagesListener={chat.addMessagesListener}
       removeMessagesListener={chat.removeMessagesListener}
+      error={chat.error}
+      isLoading={chat.isLoading}
     />
   );
 });
@@ -74,6 +70,8 @@ const ChatWindow = React.memo(function ChatWindow({
   chatRef,
   addMessagesListener,
   removeMessagesListener,
+  error,
+  isLoading,
 }: {
   tabIndex: number;
   windowId: string;
@@ -81,6 +79,8 @@ const ChatWindow = React.memo(function ChatWindow({
   chatRef: React.MutableRefObject<ChatRef>;
   addMessagesListener: (listener: (messages: Message[]) => void) => void;
   removeMessagesListener: (listener: (messages: Message[]) => void) => void;
+  error: Error | undefined;
+  isLoading: boolean;
 }) {
   const {
     chatWindowState,
@@ -200,6 +200,8 @@ const ChatWindow = React.memo(function ChatWindow({
           chatRef={chatRef}
           addMessagesListener={addMessagesListener}
           removeMessagesListener={removeMessagesListener}
+          error={error}
+          isLoading={isLoading}
         />
 
         <Box
@@ -230,6 +232,7 @@ const ChatWindow = React.memo(function ChatWindow({
                 onFocus={() => setIsFocused(true)}
                 onBlur={() => setIsFocused(false)}
                 ref={inputRef}
+                fontSize="14px"
               />
               <InputRightElement
                 width="100px"
