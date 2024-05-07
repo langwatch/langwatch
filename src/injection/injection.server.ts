@@ -8,7 +8,7 @@ import impersonate from "../pages/extra_api/admin/impersonate";
 import stripeWebhook from "../pages/extra_api/webhooks/stripe";
 import { subscriptionRouter } from "../pages/extra_api/api/subscription";
 import { PostRegistrationCallback } from "../postRegistrationCallback";
-//import demoBot from "../pages/extra_api/demo/hotel_bot";
+import demoBot from "../pages/extra_api/demo/hotel_bot";
 
 if (!process.env.STRIPE_SECRET_KEY || !process.env.STRIPE_WEBHOOK_SECRET) {
   throw new Error(
@@ -51,7 +51,7 @@ const dependencies: Dependencies = {
     "/api/admin/impersonate": impersonate,
     "/api/admin/:resource": adminResource,
     "/api/webhooks/stripe": stripeWebhook,
-    //"/api/demo/hotel_bot": demoBot,
+    "/api/demo/hotel_bot": demoBot,
   },
   extraTRPCRoutes: () => ({
     subscription: subscriptionRouter(),
