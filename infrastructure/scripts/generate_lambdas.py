@@ -25,7 +25,7 @@ def main():
 
     for _, evaluator_module in evaluators.items():
         package_name = evaluator_module.__name__.split("langevals_")[1]
-        if package_name == "example":
+        if package_name == "example" or package_name == "huggingface":
             continue
 
         environment_variables = []
