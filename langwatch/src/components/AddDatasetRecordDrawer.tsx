@@ -350,9 +350,13 @@ export function AddDatasetRecordDrawer(props: AddDatasetDrawerProps) {
     if (spans) {
       const newArray = JSON.parse(JSON.stringify(spans));
       for (let i = 0; i < spans.length; i++) {
-        const outputObj = JSON.parse(newArray[i].outputs[0].value);
+        if (newArray[i].outputs[0]?.value) {
+          const outputObj = JSON.parse(newArray[i].outputs[0].value);
+          newArray[i].outputs[0].value = outputObj;
+        } else {
+          newArray[i].outputs.push({ value: "" });
+        }
         const inputObj = JSON.parse(newArray[i].input.value);
-        newArray[i].outputs[0].value = outputObj;
         newArray[i].input.value = inputObj;
       }
       return JSON.stringify(newArray, null, 3);
