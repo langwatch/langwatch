@@ -213,13 +213,13 @@ export function BatchEvaluationDrawer(props: BatchEvaluatioProps) {
               <HStack align={"start"} gap={12}>
                 <Tabs>
                   <TabList>
-                    <Tab>Output Comparison</Tab>
+                    {/* <Tab>Output Comparison</Tab> */}
                     <Tab>Evaluations</Tab>
                     <Tab>Guardrails</Tab>
                   </TabList>
 
                   <TabPanels>
-                    <TabPanel padding={0}>
+                    {/* <TabPanel padding={0}>
                       <HStack>
                         <TableContainer>
                           <Table
@@ -318,7 +318,7 @@ export function BatchEvaluationDrawer(props: BatchEvaluatioProps) {
                           </Table>
                         </TableContainer>
                       </HStack>
-                    </TabPanel>
+                    </TabPanel> */}
                     <TabPanel padding={0}>
                       <TableContainer>
                         <Table
