@@ -140,7 +140,7 @@ export function BatchEvaluationDrawer(props: BatchEvaluatioProps) {
     <Drawer
       isOpen={true}
       placement="right"
-      size={"xl"}
+      size={"eval"}
       onClose={() => {
         setStep(1);
         closeDrawer();

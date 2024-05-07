@@ -97,6 +97,9 @@ export const theme = extendTheme({
         full: {
           dialog: { maxWidth: "100%" },
         },
+        eval: {
+          dialog: { maxWidth: "1024px" },
+        },
       },
     }),
     Switch: defineMultiStyleConfig({
