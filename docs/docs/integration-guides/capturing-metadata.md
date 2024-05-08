@@ -40,12 +40,10 @@ import langwatch.langchain
 from langchain.llms import ChatOpenAI
 from langchain.prompts import ChatPromptTemplate
 
-# Create your LangChain
 model = ChatOpenAI()
 prompt = ChatPromptTemplate.from_template("tell me a joke about {topic}")
 chain = prompt | model
 
-# Use the tracer context manager
 with langwatch.langchain.LangChainTracer(
   metadata={
     "user_id": "optional-user-123",
@@ -59,7 +57,7 @@ with langwatch.langchain.LangChainTracer(
         config={"callbacks": [langWatchCallback]}
     )
     # Append the label after calling the LLM
-    tracer.metadata["labels"] += ["joke"]
+    langWatchCallback.metadata["labels"] += ["joke"]
 ```
 
 # Appending new spans
