@@ -354,7 +354,7 @@ export function AddDatasetRecordDrawer(props: AddDatasetDrawerProps) {
           const outputObj = JSON.parse(newArray[i].outputs[0].value);
           newArray[i].outputs[0].value = outputObj;
         } else {
-          newArray[i].outputs.push({ value: "" });
+          newArray[i].outputs.push({ value: "", type: "json" });
         }
         const inputObj = JSON.parse(newArray[i].input.value);
         newArray[i].input.value = inputObj;
