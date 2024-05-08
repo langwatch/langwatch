@@ -60,7 +60,18 @@ export const ProjectIntegration = () => {
           </HStack>
           <Text>
             Follow the instructions to setup your project with LangWatch, this
-            page will update automatically as soon as the first messages arrive
+            page will update automatically as soon as the first messages arrive.
+          </Text>
+          <Text>
+            You can also view our{" "}
+            <Link
+              textDecoration="underline"
+              href="https://app.langwatch.ai/demo-project-XuL5ue"
+              target="_blank"
+            >
+              demo account
+            </Link>
+            , where we have setup an automated chat bot.
           </Text>
         </VStack>
         <div className="markdown">
