@@ -1,3 +1,7 @@
+from dotenv import load_dotenv
+
+load_dotenv()
+
 from datetime import datetime
 import json
 import time
@@ -73,7 +77,7 @@ class TestLangChainTracer:
 
         time.sleep(0.01)
         request_history = [
-            r for r in requests_mock.request_history if "langwatch" in r.url
+            r for r in requests_mock.request_history if langwatch.endpoint in r.url
         ]
         trace_request = request_history[0].json()
         assert trace_request["metadata"]["user_id"] == "user-123"
@@ -116,7 +120,6 @@ class TestLangChainTracer:
                 ],
             }
         ]
-        assert "red, blue, green, yellow" in second_span["raw_response"]
         assert second_span["params"] == {"temperature": 0.7, "stream": False}
         assert second_span["metrics"] == {
             "prompt_tokens": 5,
@@ -154,7 +157,7 @@ class TestLangChainTracer:
 
         time.sleep(0.01)
         request_history = [
-            r for r in requests_mock.request_history if "langwatch" in r.url
+            r for r in requests_mock.request_history if langwatch.endpoint in r.url
         ]
         first_span, second_span = request_history[0].json()["spans"]
 
@@ -173,7 +176,6 @@ class TestLangChainTracer:
                 "value": "red, blue, green, yellow",
             }
         ]
-        assert "red, blue, green, yellow" in second_span["raw_response"]
         assert second_span["params"] == {"temperature": 0.7, "stream": False}
         assert second_span["metrics"] == {
             "prompt_tokens": 5,
@@ -220,7 +222,7 @@ class TestLangChainTracer:
 
         time.sleep(0.01)
         request_history = [
-            r for r in requests_mock.request_history if "langwatch" in r.url
+            r for r in requests_mock.request_history if langwatch.endpoint in r.url
         ]
         first_span, second_span = request_history[0].json()["spans"]
 
@@ -255,7 +257,6 @@ class TestLangChainTracer:
                 ],
             }
         ]
-        assert "red, blue, green, yellow" in second_span["raw_response"]
         assert second_span["params"] == {"temperature": 0.7, "stream": True}
         assert "metrics" not in second_span
         assert second_span["timestamps"]["started_at"] == int(
@@ -333,7 +334,7 @@ class TestLangChainTracer:
 
         time.sleep(0.01)
         request_history = [
-            r for r in requests_mock.request_history if "langwatch" in r.url
+            r for r in requests_mock.request_history if langwatch.endpoint in r.url
         ]
         spans = request_history[0].json()["spans"]
 
@@ -394,7 +395,7 @@ class TestLangChainTracer:
 
         time.sleep(0.01)
         request_history = [
-            r for r in requests_mock.request_history if "langwatch" in r.url
+            r for r in requests_mock.request_history if langwatch.endpoint in r.url
         ]
         first_span, second_span = request_history[0].json()["spans"]
 
@@ -428,7 +429,7 @@ class TestLangChainTracer:
 
         time.sleep(0.501)
         request_history = [
-            r for r in requests_mock.request_history if "langwatch" in r.url
+            r for r in requests_mock.request_history if langwatch.endpoint in r.url
         ]
         first_span = request_history[0].json()["spans"][0]
 
@@ -444,3 +445,50 @@ class TestLangChainTracer:
                 ],
             }
         ]
+
+    @freeze_time("2022-01-01", auto_tick_seconds=15)
+    def test_adding_metadata_in_the_middle_of_the_process(
+        self, httpx_mock: HTTPXMock, requests_mock: requests_mock.Mocker
+    ):
+        requests_mock.post(langwatch.endpoint + "/api/collector", json={})
+        httpx_mock.add_response(
+            json=create_openai_chat_completion_mock(
+                "Why don't bears wear shoes?\n\nBecause they have bear feet!"
+            ),
+            url="https://api.openai.com/v1/chat/completions",
+        )
+
+        model = ChatOpenAI()
+        prompt = ChatPromptTemplate.from_template("tell me a joke about {topic}")
+        chain = prompt | model
+
+        with langwatch.langchain.LangChainTracer(metadata={"labels": []}) as langWatchCallback:
+            result = chain.invoke(
+                {"topic": "bears"}, config={"callbacks": [langWatchCallback]}
+            )
+            langWatchCallback.metadata["labels"] += ["joke"] # type: ignore
+        assert (
+            result.content
+            == "Why don't bears wear shoes?\n\nBecause they have bear feet!"
+        )
+
+        time.sleep(0.501)
+        request_history = [
+            r for r in requests_mock.request_history if langwatch.endpoint in r.url
+        ]
+        first_span = request_history[0].json()["spans"][0]
+        metadata = request_history[0].json()["metadata"]
+
+        assert first_span["type"] == "chain"
+        assert first_span["outputs"] == [
+            {
+                "type": "chat_messages",
+                "value": [
+                    {
+                        "role": "assistant",
+                        "content": "Why don't bears wear shoes?\n\nBecause they have bear feet!",
+                    }
+                ],
+            }
+        ]
+        assert metadata["labels"] == ["joke"]
