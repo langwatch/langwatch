@@ -8,7 +8,12 @@ import {
   traceCheckIndexId,
 } from "../server/elasticsearch";
 import { type TraceCheck } from "../server/tracer/types";
-import { traceChecksQueue } from "../server/background/queues/traceChecksQueue";
+import {
+  scheduleTraceCheck,
+  traceChecksQueue,
+} from "../server/background/queues/traceChecksQueue";
+import { prisma } from "../server/db";
+import type { EvaluatorTypes } from "../trace_checks/evaluators.generated";
 
 export default async function execute(checkId: string) {
   const traceChecks = await esClient.search<TraceCheck>({
@@ -19,8 +24,14 @@ export default async function execute(checkId: string) {
         bool: {
           must: [
             {
-              term: {
-                passed: false,
+              bool: {
+                must_not: [
+                  {
+                    term: {
+                      status: "processed",
+                    },
+                  },
+                ],
               },
             },
             {
@@ -31,7 +42,7 @@ export default async function execute(checkId: string) {
             {
               range: {
                 "timestamps.inserted_at": {
-                  gt: Date.now() - 1000 * 60 * 60 * 24 * 2,
+                  gt: Date.now() - 1000 * 60 * 60 * 24 * 2, // 2 days
                 },
               },
             },
@@ -59,6 +70,26 @@ export default async function execute(checkId: string) {
         console.log("Retrying job", jobId);
         await currentJob.retry(state);
       }
+    } else {
+      const check = await prisma.check.findFirst({
+        where: {
+          id: checkId,
+        },
+      });
+      if (!check) {
+        throw "Check not found";
+      }
+
+      await scheduleTraceCheck({
+        check: {
+          ...check,
+          type: check.checkType as EvaluatorTypes,
+        },
+        trace: {
+          trace_id: traceCheck.trace_id,
+          project_id: traceCheck.project_id,
+        },
+      });
     }
   }
 }
