@@ -31,7 +31,7 @@ import { SmallLabel } from "../SmallLabel";
 
 const DynamicZodForm = ({
   schema,
-  checkType,
+  checkType: evaluatorType,
   prefix,
   errors,
 }: {
@@ -230,13 +230,17 @@ const DynamicZodForm = ({
     basePath = ""
   ) => {
     if (schema instanceof z.ZodObject) {
-      const checkDefinition = getEvaluatorDefinitions(
-        checkType
+      const evaluatorDefinition = getEvaluatorDefinitions(
+        evaluatorType
       ) as EvaluatorDefinition<T>;
 
       return Object.keys(schema.shape).map((key) => {
         const field = schema.shape[key];
         const isOptional = field instanceof z.ZodOptional;
+
+        if (evaluatorType === "huggingface/llama_guard" && key === "model") {
+          return null;
+        }
 
         return (
           <React.Fragment key={key}>
@@ -245,7 +249,7 @@ const DynamicZodForm = ({
                 camelCaseToTitleCase(key) + (isOptional ? " (Optional)" : "")
               }
               helper={
-                checkDefinition?.settings?.[
+                evaluatorDefinition?.settings?.[
                   key as keyof Evaluators[T]["settings"]
                 ].description ?? ""
               }
@@ -254,7 +258,7 @@ const DynamicZodForm = ({
               {renderField(
                 field,
                 basePath ? `${basePath}.${key}` : key,
-                checkDefinition
+                evaluatorDefinition
               )}
             </HorizontalFormControl>
           </React.Fragment>
