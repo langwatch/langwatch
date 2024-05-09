@@ -225,14 +225,6 @@ resource "aws_codestarnotifications_notification_rule" "langwatch-deploy" {
   }
 }
 
-resource "awscc_chatbot_slack_channel_configuration" "langwatch" {
-  count              = module.variables.profile == "lw-prod" ? 1 : 0
-  configuration_name = "langwatch-chatbot"
-  iam_role_arn       = awscc_iam_role.langwatch.arn
-  slack_workspace_id = "T067B8XMC0M" # langwatch
-  slack_channel_id   = "C06JQLW1HE2" # #dev
-}
-
 resource "aws_codedeploy_deployment_group" "langwatch_dg" {
   count                  = module.variables.profile == "lw-prod" ? 1 : 0
   app_name               = aws_codedeploy_app.langwatch_app[0].name
