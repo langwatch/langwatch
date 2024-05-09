@@ -160,6 +160,16 @@ resource "aws_iam_policy" "langwatch_nlp" {
           "arn:aws:secretsmanager:*:*:secret:*"
         ]
         Effect = "Allow"
+      },
+      {
+        Action   = "cloudwatch:PutMetricData",
+        Effect   = "Allow",
+        Resource = "*",
+        Condition = {
+          StringEquals = {
+            "cloudwatch:namespace" : "AWS/LambdaInsights"
+          }
+        }
       }
     ]
   })
