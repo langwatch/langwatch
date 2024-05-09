@@ -54,7 +54,7 @@ describe("Check Queue Integration Tests", () => {
   const trace_id_error = `test-trace-id-error-${nanoid()}`;
   const check: TraceCheckJob["check"] = {
     id: "check_123",
-    type: "custom/basic",
+    type: "langevals/basic",
     name: "My Custom Check",
   };
 
@@ -306,7 +306,7 @@ describe("updateCheckStatusInES", () => {
   const projectId = "test-project-id";
   const check: TraceCheckJob["check"] = {
     id: "check_123",
-    type: "custom/basic",
+    type: "langevals/basic",
     name: "My Custom Check",
   };
 

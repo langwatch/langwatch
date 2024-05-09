@@ -102,7 +102,7 @@ export default function CheckConfigForm({
           sample: z.number().min(0.01).max(1),
           preconditions: checkPreconditionsSchema,
           settings:
-            evaluatorsSchema.shape[data.checkType ?? "custom/basic"].shape
+            evaluatorsSchema.shape[data.checkType ?? "langevals/basic"].shape
               .settings,
           isGuardrail: z.boolean().optional(),
         })
