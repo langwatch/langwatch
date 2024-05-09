@@ -21,9 +21,9 @@ module "aws-evaluator" {
     sns_alarms_topic_arn = aws_sns_topic.alarms.arn
     apigw_execution_arn = aws_api_gateway_rest_api.this.execution_arn
     environment_variables = {
-        AWS_COMPREHEND_ACCESS_KEY_ID = jsondecode(data.aws_secretsmanager_secret_version.langevals.secret_string)["AWS_COMPREHEND_ACCESS_KEY_ID"]
-
         AWS_COMPREHEND_SECRET_ACCESS_KEY = jsondecode(data.aws_secretsmanager_secret_version.langevals.secret_string)["AWS_COMPREHEND_SECRET_ACCESS_KEY"]
+
+        AWS_COMPREHEND_ACCESS_KEY_ID = jsondecode(data.aws_secretsmanager_secret_version.langevals.secret_string)["AWS_COMPREHEND_ACCESS_KEY_ID"]
     }
 }
 
@@ -101,9 +101,9 @@ module "azure-evaluator" {
     sns_alarms_topic_arn = aws_sns_topic.alarms.arn
     apigw_execution_arn = aws_api_gateway_rest_api.this.execution_arn
     environment_variables = {
-        AZURE_CONTENT_SAFETY_ENDPOINT = jsondecode(data.aws_secretsmanager_secret_version.langevals.secret_string)["AZURE_CONTENT_SAFETY_ENDPOINT"]
-
         AZURE_CONTENT_SAFETY_KEY = jsondecode(data.aws_secretsmanager_secret_version.langevals.secret_string)["AZURE_CONTENT_SAFETY_KEY"]
+
+        AZURE_CONTENT_SAFETY_ENDPOINT = jsondecode(data.aws_secretsmanager_secret_version.langevals.secret_string)["AZURE_CONTENT_SAFETY_ENDPOINT"]
     }
 }
 
@@ -215,11 +215,11 @@ module "ragas-evaluator" {
     sns_alarms_topic_arn = aws_sns_topic.alarms.arn
     apigw_execution_arn = aws_api_gateway_rest_api.this.execution_arn
     environment_variables = {
-        AZURE_API_KEY = jsondecode(data.aws_secretsmanager_secret_version.langevals.secret_string)["AZURE_API_KEY"]
+        AZURE_API_BASE = jsondecode(data.aws_secretsmanager_secret_version.langevals.secret_string)["AZURE_API_BASE"]
 
         OPENAI_API_KEY = jsondecode(data.aws_secretsmanager_secret_version.langevals.secret_string)["OPENAI_API_KEY"]
 
-        AZURE_API_BASE = jsondecode(data.aws_secretsmanager_secret_version.langevals.secret_string)["AZURE_API_BASE"]
+        AZURE_API_KEY = jsondecode(data.aws_secretsmanager_secret_version.langevals.secret_string)["AZURE_API_KEY"]
     }
 }
 
@@ -347,11 +347,11 @@ module "langevals-evaluator" {
     sns_alarms_topic_arn = aws_sns_topic.alarms.arn
     apigw_execution_arn = aws_api_gateway_rest_api.this.execution_arn
     environment_variables = {
-        AZURE_API_KEY = jsondecode(data.aws_secretsmanager_secret_version.langevals.secret_string)["AZURE_API_KEY"]
+        AZURE_API_BASE = jsondecode(data.aws_secretsmanager_secret_version.langevals.secret_string)["AZURE_API_BASE"]
 
         OPENAI_API_KEY = jsondecode(data.aws_secretsmanager_secret_version.langevals.secret_string)["OPENAI_API_KEY"]
 
-        AZURE_API_BASE = jsondecode(data.aws_secretsmanager_secret_version.langevals.secret_string)["AZURE_API_BASE"]
+        AZURE_API_KEY = jsondecode(data.aws_secretsmanager_secret_version.langevals.secret_string)["AZURE_API_KEY"]
     }
 }
 
@@ -393,6 +393,40 @@ resource "aws_api_gateway_resource" "openai" {
     path_part   = "openai"
 }
 
+resource "aws_api_gateway_resource" "llama_guard" {
+    rest_api_id = aws_api_gateway_rest_api.this.id
+    parent_id   = aws_api_gateway_resource.huggingface.id
+    path_part   = "llama_guard"
+}
+
+module "huggingface-llama_guard-api-gw" {
+    source                 = "./api-gw-resource"
+    apigw_id               = aws_api_gateway_rest_api.this.id
+    apigw_root_resource_id = aws_api_gateway_resource.llama_guard.id
+    path                   = "evaluate"
+    method                 = "POST"
+
+    lambda_invoke_arn = module.huggingface-evaluator.lambda_invoke_arn
+}
+
+module "huggingface-evaluator" {
+    source              = "./lambda"
+    evaluator_package   = "huggingface"
+    sns_alarms_topic_arn = aws_sns_topic.alarms.arn
+    apigw_execution_arn = aws_api_gateway_rest_api.this.execution_arn
+    environment_variables = {
+        CLOUDFLARE_API_KEY = jsondecode(data.aws_secretsmanager_secret_version.langevals.secret_string)["CLOUDFLARE_API_KEY"]
+
+        CLOUDFLARE_ACCOUNT_ID = jsondecode(data.aws_secretsmanager_secret_version.langevals.secret_string)["CLOUDFLARE_ACCOUNT_ID"]
+    }
+}
+
+resource "aws_api_gateway_resource" "huggingface" {
+    rest_api_id = aws_api_gateway_rest_api.this.id
+    parent_id   = aws_api_gateway_rest_api.this.root_resource_id
+    path_part   = "huggingface"
+}
+
 resource "aws_api_gateway_resource" "dlp_pii_detection" {
     rest_api_id = aws_api_gateway_rest_api.this.id
     parent_id   = aws_api_gateway_resource.google_cloud.id
@@ -429,11 +463,11 @@ resource "aws_api_gateway_deployment" "this" {
     count = module.variables.profile == "lw-prod" ? 1 : 0
 
     triggers = {
-        redeployment = sha1(jsonencode([module.aws-comprehend_pii_detection-api-gw, module.lingua-language_detection-api-gw, module.azure-content_safety-api-gw, module.azure-jailbreak-api-gw, module.ragas-answer_relevancy-api-gw, module.ragas-context_precision-api-gw, module.ragas-context_recall-api-gw, module.ragas-context_relevancy-api-gw, module.ragas-context_utilization-api-gw, module.ragas-faithfulness-api-gw, module.langevals-basic-api-gw, module.langevals-competitor_blocklist-api-gw, module.langevals-competitor_llm-api-gw, module.langevals-llm_boolean-api-gw, module.langevals-llm_score-api-gw, module.langevals-off_topic-api-gw, module.langevals-similarity-api-gw, module.openai-moderation-api-gw, module.google_cloud-dlp_pii_detection-api-gw]))
+        redeployment = sha1(jsonencode([module.aws-comprehend_pii_detection-api-gw, module.lingua-language_detection-api-gw, module.azure-content_safety-api-gw, module.azure-jailbreak-api-gw, module.ragas-answer_relevancy-api-gw, module.ragas-context_precision-api-gw, module.ragas-context_recall-api-gw, module.ragas-context_relevancy-api-gw, module.ragas-context_utilization-api-gw, module.ragas-faithfulness-api-gw, module.langevals-basic-api-gw, module.langevals-competitor_blocklist-api-gw, module.langevals-competitor_llm-api-gw, module.langevals-llm_boolean-api-gw, module.langevals-llm_score-api-gw, module.langevals-off_topic-api-gw, module.langevals-similarity-api-gw, module.openai-moderation-api-gw, module.huggingface-llama_guard-api-gw, module.google_cloud-dlp_pii_detection-api-gw]))
     }
 
     depends_on = [
-        module.aws-comprehend_pii_detection-api-gw, module.lingua-language_detection-api-gw, module.azure-content_safety-api-gw, module.azure-jailbreak-api-gw, module.ragas-answer_relevancy-api-gw, module.ragas-context_precision-api-gw, module.ragas-context_recall-api-gw, module.ragas-context_relevancy-api-gw, module.ragas-context_utilization-api-gw, module.ragas-faithfulness-api-gw, module.langevals-basic-api-gw, module.langevals-competitor_blocklist-api-gw, module.langevals-competitor_llm-api-gw, module.langevals-llm_boolean-api-gw, module.langevals-llm_score-api-gw, module.langevals-off_topic-api-gw, module.langevals-similarity-api-gw, module.openai-moderation-api-gw, module.google_cloud-dlp_pii_detection-api-gw
+        module.aws-comprehend_pii_detection-api-gw, module.lingua-language_detection-api-gw, module.azure-content_safety-api-gw, module.azure-jailbreak-api-gw, module.ragas-answer_relevancy-api-gw, module.ragas-context_precision-api-gw, module.ragas-context_recall-api-gw, module.ragas-context_relevancy-api-gw, module.ragas-context_utilization-api-gw, module.ragas-faithfulness-api-gw, module.langevals-basic-api-gw, module.langevals-competitor_blocklist-api-gw, module.langevals-competitor_llm-api-gw, module.langevals-llm_boolean-api-gw, module.langevals-llm_score-api-gw, module.langevals-off_topic-api-gw, module.langevals-similarity-api-gw, module.openai-moderation-api-gw, module.huggingface-llama_guard-api-gw, module.google_cloud-dlp_pii_detection-api-gw
     ]
 
     rest_api_id = aws_api_gateway_rest_api.this.id
