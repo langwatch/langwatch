@@ -56,18 +56,6 @@ resource "aws_cloudwatch_metric_alarm" "lambda_function_errors" {
   treat_missing_data = "notBreaching"
 }
 
-resource "awscc_chatbot_slack_channel_configuration" "langwatch" {
-  count              = module.variables.profile == "lw-prod" ? 1 : 0
-  configuration_name = "langwatch-chatbot"
-  iam_role_arn       = awscc_iam_role.langwatch.arn
-  slack_workspace_id = "T067B8XMC0M" # langwatch
-  slack_channel_id   = "C06JQLW1HE2" # #dev
-
-  sns_topic_arns = [
-    var.sns_alarms_topic_arn
-  ]
-}
-
 resource "aws_cloudwatch_log_group" "this" {
   name              = "/aws/lambda/${local.evaluator_package}-evaluator-lambda"
   retention_in_days = 365
