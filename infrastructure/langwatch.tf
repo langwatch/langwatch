@@ -1,6 +1,6 @@
 locals {
   tag         = data.external.langwatch_docker_tag.result["tag"]
-  git_tag         = data.external.langwatch_docker_tag.result["git_tag"]
+  git_tag     = data.external.langwatch_docker_tag.result["git_tag"]
   secrets_map = jsondecode(data.aws_secretsmanager_secret_version.langwatch.secret_string)
 }
 
@@ -211,6 +211,10 @@ resource "aws_codedeploy_app" "langwatch_app" {
   compute_platform = "ECS"
 }
 
+resource "aws_sns_topic" "langwatch-deploy-notifications" {
+  name = "langwatch-deploy-notifications"
+}
+
 resource "aws_codestarnotifications_notification_rule" "langwatch-deploy" {
   count          = module.variables.profile == "lw-prod" ? 1 : 0
   detail_type    = "FULL"
@@ -220,8 +224,7 @@ resource "aws_codestarnotifications_notification_rule" "langwatch-deploy" {
   resource = aws_codedeploy_app.langwatch_app[0].arn
 
   target {
-    type    = "AWSChatbotSlack"
-    address = awscc_chatbot_slack_channel_configuration.langwatch[0].arn
+    address = aws_sns_topic.langwatch-deploy-notifications.arn
   }
 }
 

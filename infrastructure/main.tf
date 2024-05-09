@@ -33,6 +33,7 @@ resource "awscc_chatbot_slack_channel_configuration" "langwatch" {
   slack_channel_id   = "C06JQLW1HE2" # #dev
 
   sns_topic_arns = [
-    aws_sns_topic.alarms.arn
+    aws_sns_topic.alarms.arn,
+    aws_sns_topic.langwatch-deploy-notifications.arn
   ]
 }
