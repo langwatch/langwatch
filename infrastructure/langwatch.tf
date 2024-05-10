@@ -80,7 +80,7 @@ resource "aws_ecs_task_definition" "langwatch" {
         ], [
         {
           name  = "LANGWATCH_NLP_SERVICE"
-          value = aws_lambda_function_url.langwatch_nlp[0].function_url
+          value = "http://${aws_lb.langwatch_nlp_alb[0].dns_name}/"
         },
         {
           name  = "REDIS_URL"
@@ -93,7 +93,7 @@ resource "aws_ecs_task_definition" "langwatch" {
   depends_on = [
     null_resource.langwatch_docker_image,
     aws_iam_role_policy_attachment.langwatch,
-    aws_lambda_function_url.langwatch_nlp,
+    aws_lb.langwatch_nlp_alb[0],
   ]
 }
 
