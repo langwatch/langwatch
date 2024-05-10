@@ -4,6 +4,11 @@
     "version": "latest",
     "model_provider": "openai"
   },
+  "openai/gpt-3.5-turbo-0125": {
+    "name": "GPT 3.5 Turbo",
+    "version": "0125",
+    "model_provider": "openai"
+  },
   "openai/gpt-3.5-turbo-1106": {
     "name": "GPT 3.5 Turbo",
     "version": "1106",
@@ -27,6 +32,11 @@
   "azure/gpt-35-turbo-1106": {
     "name": "GPT 3.5 Turbo",
     "version": "1106",
+    "model_provider": "azure"
+  },
+  "azure/gpt-35-turbo-16k": {
+    "name": "GPT 3.5 Turbo",
+    "version": "16k",
     "model_provider": "azure"
   },
   "azure/gpt-4-turbo-2024-04-09": {
