@@ -156,7 +156,7 @@ export type CustomAPICallData = Omit<SharedFiltersInput, "projectId"> & {
     };
   }[];
   groupBy?: FlattenAnalyticsGroupsEnum;
-  timeScale: "full" | number;
+  timeScale: number | "full";
 };
 
 const chartOptions: Required<CustomGraphFormData>["graphType"][] = [
@@ -262,24 +262,23 @@ export default function AnalyticsCustomGraph() {
     useDebounceValue<CustomAPICallData | undefined>(undefined, 400);
 
   useEffect(() => {
-    const customGraphInput = customGraphFormToCustomGraphInput(
-      JSON.parse(formData) as CustomGraphFormData
-    );
+    const parsedFormData = JSON.parse(formData) as CustomGraphFormData;
 
-    const apiJson = customAPIinput(
-      JSON.parse(formData) as CustomGraphFormData,
-      filterParams
-    );
-
+    const customGraphInput = customGraphFormToCustomGraphInput(parsedFormData);
+    const apiJson = customAPIinput(parsedFormData, filterParams);
+    if (
+      typeof apiJson?.timeScale === "string" &&
+      apiJson.timeScale !== "full"
+    ) {
+      apiJson.timeScale = parseInt(apiJson.timeScale);
+    }
     setDebouncedCustomAPIInput(apiJson);
-
     setDebouncedCustomGraphInput(customGraphInput);
   }, [
     formData,
-    setDebouncedCustomGraphInput,
-    form,
     filterParams,
     setDebouncedCustomAPIInput,
+    setDebouncedCustomGraphInput,
   ]);
 
   return (
@@ -542,8 +541,8 @@ function CustomGraphForm({
             <option value={1}>Daily</option>
             <option value={7}>7 days</option>
             <option value={30}>30 days</option>
-            <option value={30}>90 days</option>
-            <option value={30}>365 days</option>
+            <option value={90}>90 days</option>
+            <option value={356}>365 days</option>
           </Select>
         </FormControl>
       )}
