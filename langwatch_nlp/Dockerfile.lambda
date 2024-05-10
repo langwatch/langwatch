@@ -5,11 +5,9 @@ WORKDIR /usr/src/app
 RUN pip install poetry
 RUN pip install --target . awslambdaric
 
-# Install dependencies
 COPY poetry.toml poetry.lock pyproject.toml .
 RUN poetry install
 
-# Copy the source code
 COPY . .
 
 EXPOSE 8080
