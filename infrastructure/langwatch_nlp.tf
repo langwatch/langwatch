@@ -17,63 +17,216 @@ data "aws_ecr_repository" "langwatch_nlp" {
   name = aws_ecr_repository.langwatch_nlp.name
 }
 
-resource "aws_lambda_function" "langwatch_nlp" {
-  count         = module.variables.profile == "lw-prod" ? 1 : 0
-  package_type  = "Image"
-  function_name = "langwatch-nlp-lambda"
-  image_uri     = "${aws_ecr_repository.langwatch_nlp.repository_url}:${local.langwatch_nlp_tag}"
-  role          = aws_iam_role.langwatch_nlp.arn
-  timeout       = 60
+resource "aws_ecs_cluster" "langwatch_nlp" {
+  count = module.variables.profile == "lw-prod" ? 1 : 0
+  name  = "langwatch-nlp-cluster"
+}
 
-  # use `/usr/bin/time -alh make start` to get the memory usage (maximum resident set size in bytes)
-  memory_size = 1024
+resource "aws_ecs_task_definition" "langwatch_nlp" {
+  count                    = module.variables.profile == "lw-prod" ? 1 : 0
+  family                   = "langwatch-nlp-task"
+  network_mode             = "awsvpc"
+  requires_compatibilities = ["FARGATE"]
+  cpu                      = 512
+  memory                   = 1024
+  execution_role_arn       = aws_iam_role.ecs_task_execution_role_langwatch_nlp.arn
 
-  environment {
-    variables = local.langwatch_nlp_secrets_map
-  }
+  container_definitions = jsonencode([
+    {
+      name      = "langwatch_nlp"
+      image     = "${aws_ecr_repository.langwatch_nlp.repository_url}:${local.langwatch_nlp_tag}"
+      cpu       = 512
+      memory    = 1024
+      essential = true
+      portMappings = [
+        {
+          containerPort = 8080
+          hostPort      = 8080
+          protocol      = "tcp"
+        }
+      ]
+      environment = [
+        for k, v in local.langwatch_nlp_secrets_map : { name = k, value = v }
+      ]
+      logConfiguration = {
+        logDriver = "awslogs"
+        options = {
+          awslogs-group         = aws_cloudwatch_log_group.langwatch_nlp_logs.name
+          awslogs-region        = "eu-central-1"
+          awslogs-stream-prefix = "langwatch_nlp"
+        }
+      }
+      healthCheck = {
+        command     = ["CMD-SHELL", "curl -f http://localhost:8080/health || exit 1"]
+        interval    = 30
+        timeout     = 5
+        retries     = 3
+        startPeriod = 15
+      }
+    }
+  ])
 
   depends_on = [
     aws_iam_role_policy_attachment.langwatch_nlp,
-    null_resource.langwatch_nlp_docker_image,
-    aws_cloudwatch_log_group.langwatch_nlp
+    aws_cloudwatch_log_group.langwatch_nlp_logs
   ]
 }
 
-resource "aws_cloudwatch_metric_alarm" "langwatch_nlp_function_errors" {
-  count               = module.variables.profile == "lw-prod" ? 1 : 0
-  alarm_name          = "langwatch-nlp-lambda-errors"
-  comparison_operator = "GreaterThanOrEqualToThreshold"
-  evaluation_periods  = "1"
-  metric_name         = "Errors"
-  namespace           = "AWS/Lambda"
-  period              = "60"
-  statistic           = "Sum"
-  threshold           = "1"
-  alarm_description   = "Alarm when langwatch-nlp lambda has errors"
-  actions_enabled     = true
-  alarm_actions       = [aws_sns_topic.alarms.arn]
+resource "aws_cloudwatch_log_group" "langwatch_nlp_logs" {
+  name = "/ecs/langwatch-nlp"
+}
 
-  dimensions = {
-    FunctionName = aws_lambda_function.langwatch_nlp[0].function_name
+resource "aws_ecs_service" "langwatch_nlp" {
+  count           = module.variables.profile == "lw-prod" ? 1 : 0
+  name            = "langwatch-nlp-service"
+  cluster         = aws_ecs_cluster.langwatch_nlp[0].id
+  task_definition = aws_ecs_task_definition.langwatch_nlp[0].arn
+  desired_count   = 1
+  launch_type     = "FARGATE"
+
+  network_configuration {
+    subnets          = [aws_subnet.public_subnet_1.id, aws_subnet.public_subnet_2.id]
+    security_groups  = [aws_security_group.langwatch_nlp[0].id]
+    assign_public_ip = true
   }
 
-  treat_missing_data = "notBreaching"
+  load_balancer {
+    target_group_arn = aws_alb_target_group.langwatch_nlp_tg[0].arn
+    container_name   = "langwatch_nlp"
+    container_port   = 8080
+  }
 }
 
-resource "aws_cloudwatch_log_group" "langwatch_nlp" {
-  name              = "/aws/lambda/langwatch-nlp-lambda"
-  retention_in_days = 365
+resource "aws_alb_target_group" "langwatch_nlp_tg" {
+  count       = module.variables.profile == "lw-prod" ? 1 : 0
+  name        = "langwatch-nlp-tg"
+  port        = 8080
+  protocol    = "HTTP"
+  vpc_id      = aws_vpc.main.id
+  target_type = "ip"
+
+  health_check {
+    enabled             = true
+    healthy_threshold   = 2
+    unhealthy_threshold = 2
+    timeout             = 5
+    path                = "/health"
+    protocol            = "HTTP"
+    interval            = 30
+    matcher             = "200"
+  }
 }
 
-resource "aws_lambda_function_url" "langwatch_nlp" {
+resource "aws_lb_listener" "langwatch_nlp_listener" {
+  count             = module.variables.profile == "lw-prod" ? 1 : 0
+  load_balancer_arn = aws_lb.langwatch_nlp_alb[0].arn
+  port              = 80
+  protocol          = "HTTP"
+
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_alb_target_group.langwatch_nlp_tg[0].arn
+  }
+}
+
+resource "aws_security_group" "langwatch_nlp" {
+  count  = module.variables.profile == "lw-prod" ? 1 : 0
+  name   = "langwatch-nlp-sg"
+  vpc_id = aws_vpc.main.id
+
+  ingress {
+    from_port   = 8080
+    to_port     = 8080
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  egress {
+    description      = "Allow Egress"
+    from_port        = 0
+    to_port          = 0
+    protocol         = -1
+    cidr_blocks      = ["0.0.0.0/0"]
+    ipv6_cidr_blocks = ["::/0"]
+  }
+}
+
+resource "aws_lb" "langwatch_nlp_alb" {
   count              = module.variables.profile == "lw-prod" ? 1 : 0
-  function_name      = aws_lambda_function.langwatch_nlp[0].function_name
-  authorization_type = "NONE"
+  name               = "langwatch-nlp-alb"
+  internal           = false
+  load_balancer_type = "application"
+  security_groups    = [aws_security_group.langwatch_nlp_alb_sg[0].id]
+  subnets            = [aws_subnet.public_subnet_1.id, aws_subnet.public_subnet_2.id]
+
+  enable_deletion_protection = false
 }
 
-data "aws_lambda_function_url" "langwatch_nlp" {
-  count         = module.variables.profile == "lw-prod" ? 1 : 0
-  function_name = aws_lambda_function_url.langwatch_nlp[0].function_name
+resource "aws_security_group" "langwatch_nlp_alb_sg" {
+  count       = module.variables.profile == "lw-prod" ? 1 : 0
+  name        = "alb-sg"
+  vpc_id      = aws_vpc.main.id
+  description = "Security group for LangWatch NLP ALB"
+
+  ingress {
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+}
+
+resource "aws_iam_role" "ecs_task_execution_role_langwatch_nlp" {
+  name = "ecs_task_execution_role_langwatch_nlp"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRole"
+        Principal = {
+          Service = "ecs-tasks.amazonaws.com"
+        }
+        Effect = "Allow"
+      },
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "langwatch_nlp" {
+  role       = aws_iam_role.ecs_task_execution_role_langwatch_nlp.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
+}
+
+resource "aws_iam_policy" "ecs_logging_langwatch_nlp" {
+  name        = "ecs_logging_langwatch_nlp_policy"
+  description = "Allows ECS tasks to push logs to CloudWatch"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = [
+          "logs:CreateLogStream",
+          "logs:PutLogEvents"
+        ],
+        Effect   = "Allow",
+        Resource = aws_cloudwatch_log_group.langwatch_nlp_logs.arn
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "ecs_logging_langwatch_nlp_attach" {
+  role       = aws_iam_role.ecs_task_execution_role_langwatch_nlp.name
+  policy_arn = aws_iam_policy.ecs_logging_langwatch_nlp.arn
 }
 
 resource "null_resource" "langwatch_nlp_docker_image" {
@@ -103,7 +256,7 @@ resource "null_resource" "langwatch_nlp_docker_image" {
         docker pull ${aws_ecr_repository.langwatch_nlp.repository_url}:$last_tag
       fi
 
-      docker build . -f Dockerfile.lambda --platform="linux/amd64" --cache-to type=inline $cache_from -t ${data.aws_ecr_repository.langwatch_nlp.repository_url}:${local.langwatch_nlp_tag} -t ${data.aws_ecr_repository.langwatch_nlp.repository_url}:${local.langwatch_nlp_git_tag}
+      docker build . -f Dockerfile --platform="linux/amd64" --cache-to type=inline $cache_from -t ${data.aws_ecr_repository.langwatch_nlp.repository_url}:${local.langwatch_nlp_tag} -t ${data.aws_ecr_repository.langwatch_nlp.repository_url}:${local.langwatch_nlp_git_tag}
       set +e
       image_exists=$(docker manifest inspect ${data.aws_ecr_repository.langwatch_nlp.repository_url}:${local.langwatch_nlp_tag} > /dev/null 2>&1 && echo yes)
       set -e
@@ -119,63 +272,4 @@ resource "null_resource" "langwatch_nlp_docker_image" {
   }
 
   depends_on = [aws_ecr_repository.langwatch_nlp]
-}
-
-# IAM role which dictates what other AWS services the Lambda function
-# may access.
-resource "aws_iam_role" "langwatch_nlp" {
-  name = "langwatch-nlp-lambda-role"
-
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Action = "sts:AssumeRole"
-        Principal = {
-          Service = "lambda.amazonaws.com"
-        }
-        Effect = "Allow",
-        Sid    = ""
-      }
-    ]
-  })
-}
-
-resource "aws_iam_policy" "langwatch_nlp" {
-  name        = "langwatch-nlp-lambda-policy"
-  path        = "/"
-  description = "AWS IAM Policy for managing aws lambda role"
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Action = [
-          "logs:CreateLogGroup",
-          "logs:CreateLogStream",
-          "logs:PutLogEvents",
-        ]
-        Resource = [
-          "arn:aws:logs:*:*:*",
-          "arn:aws:secretsmanager:*:*:secret:*"
-        ]
-        Effect = "Allow"
-      },
-      {
-        Action   = "cloudwatch:PutMetricData",
-        Effect   = "Allow",
-        Resource = "*",
-        Condition = {
-          StringEquals = {
-            "cloudwatch:namespace" : "AWS/LambdaInsights"
-          }
-        }
-      }
-    ]
-  })
-}
-
-resource "aws_iam_role_policy_attachment" "langwatch_nlp" {
-  role       = aws_iam_role.langwatch_nlp.name
-  policy_arn = aws_iam_policy.langwatch_nlp.arn
 }
