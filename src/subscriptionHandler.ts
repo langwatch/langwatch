@@ -62,7 +62,7 @@ const PLAN_LIMITS: Record<PlanTypes, PlanInfo> = {
   },
 };
 
-export class SubscriptionHandlerSass extends SubscriptionHandler {
+export class SubscriptionHandlerSaas extends SubscriptionHandler {
   static async getActivePlan(
     organizationId: string,
     user?: any & {

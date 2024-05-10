@@ -5,7 +5,7 @@ locals {
 }
 
 data "external" "langwatch_docker_tag" {
-  program = ["${path.root}/scripts/get_langwatch_sass_git_sha.sh"]
+  program = ["${path.root}/scripts/get_langwatch_saas_git_sha.sh"]
 }
 
 resource "aws_ecr_repository" "langwatch" {

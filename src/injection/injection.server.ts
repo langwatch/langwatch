@@ -1,7 +1,7 @@
 import type { Dependencies } from "../../langwatch/langwatch/src/injection/injection.server";
 import { prisma } from "../../langwatch/langwatch/src/server/db";
 import { getServerSideProps as adminGetServerSideProps } from "../pages/admin";
-import { SubscriptionHandlerSass } from "../subscriptionHandler";
+import { SubscriptionHandlerSaas } from "../subscriptionHandler";
 import { getNextAuthSessionToken, isAdmin } from "../utils/auth";
 import adminResource from "../pages/extra_api/admin/[resource]";
 import impersonate from "../pages/extra_api/admin/impersonate";
@@ -17,7 +17,7 @@ if (!process.env.STRIPE_SECRET_KEY || !process.env.STRIPE_WEBHOOK_SECRET) {
 }
 
 const dependencies: Dependencies = {
-  subscriptionHandler: SubscriptionHandlerSass,
+  subscriptionHandler: SubscriptionHandlerSaas,
   sessionHandler: async ({ req, session, user }) => {
     const sessionToken = getNextAuthSessionToken(req);
     if (!isAdmin(user) || !sessionToken) return null;

@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   web:
-    container_name: langwatch-sass-web
+    container_name: langwatch-saas-web
     env_file:
       - .env
     build:
