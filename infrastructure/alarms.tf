@@ -1,12 +1,3 @@
-resource "aws_sns_topic" "alarms" {
-  name              = "cw-alarms-topic"
-  kms_master_key_id = "alias/aws/sns"
-
-  tags = {
-    Name = "cw-alarms-topic"
-  }
-}
-
 # ALB CloudWatch alarms
 resource "aws_cloudwatch_metric_alarm" "unhealthy_host_count" {
   count               = module.variables.profile == "lw-prod" ? 1 : 0

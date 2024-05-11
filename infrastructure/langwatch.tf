@@ -213,10 +213,6 @@ resource "aws_codedeploy_app" "langwatch_app" {
   compute_platform = "ECS"
 }
 
-resource "aws_sns_topic" "langwatch-deploy-notifications" {
-  name = "langwatch-deploy-notifications"
-}
-
 resource "aws_codestarnotifications_notification_rule" "langwatch-deploy" {
   count          = module.variables.profile == "lw-prod" ? 1 : 0
   detail_type    = "FULL"
@@ -531,22 +527,4 @@ resource "aws_iam_policy" "codedeploy_ecs_policy" {
 resource "aws_iam_role_policy_attachment" "codedeploy_ecs_policy_attachment" {
   role       = aws_iam_role.codedeploy_role.name
   policy_arn = aws_iam_policy.codedeploy_ecs_policy.arn
-}
-
-resource "awscc_iam_role" "langwatch" {
-  role_name = "ChatBot-Channel-Role"
-  assume_role_policy_document = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Action = "sts:AssumeRole"
-        Effect = "Allow"
-        Sid    = ""
-        Principal = {
-          Service = "chatbot.amazonaws.com"
-        }
-      },
-    ]
-  })
-  managed_policy_arns = ["arn:aws:iam::aws:policy/AWSResourceExplorerReadOnlyAccess"]
 }
