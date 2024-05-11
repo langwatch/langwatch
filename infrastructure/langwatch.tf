@@ -167,9 +167,6 @@ resource "null_resource" "langwatch_docker_image" {
         redis_url="redis://:$encoded_redis_password@${aws_elasticache_replication_group.redis[0].primary_endpoint_address}:6379"
         echo "REDIS_URL=$redis_url" >> .env
       fi
-      npm ci && cd langwatch/langwatch && npm ci && cd -
-      npm run start:prepare
-      npm run build
       aws ecr get-login-password --profile ${module.variables.profile} --region ${data.aws_region.current.name} | docker login --username AWS --password-stdin ${data.aws_caller_identity.current.account_id}.dkr.ecr.${data.aws_region.current.name}.amazonaws.com || true
 
       set +e
@@ -188,7 +185,7 @@ resource "null_resource" "langwatch_docker_image" {
       if [ -z "$image_exists" ]; then
         docker buildx build . --platform="linux/amd64" $cache_from --cache-to type=inline --push -t ${data.aws_ecr_repository.langwatch.repository_url}:${local.tag}
         set +e
-        MANIFEST=$(aws ecr --profile ${module.variables.profile} --region ${data.aws_region.current.name} batch-get-image --repository-name ${data.aws_ecr_repository.langwatch.repository_url} --image-ids imageTag=${local.tag} --query 'images[].imageManifest' --output text)
+        MANIFEST=$(aws ecr --profile ${module.variables.profile} --region ${data.aws_region.current.name} batch-get-image --repository-name ${aws_ecr_repository.langwatch.name} --image-ids imageTag=${local.tag} --query 'images[].imageManifest' --output text)
         aws ecr put-image --repository-name ${data.aws_ecr_repository.langwatch.repository_url} --image-tag ${local.git_tag} --image-manifest "$MANIFEST"
         set -e
       fi

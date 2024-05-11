@@ -120,7 +120,7 @@ resource "null_resource" "docker_image" {
       if [ -z "$image_exists" ]; then
         docker buildx build . --build-arg EVALUATOR=${local.evaluator_package} --platform="linux/amd64" $cache_from --cache-to type=inline --push -t ${data.aws_ecr_repository.lambda_repository.repository_url}:${local.tag}
         set +e
-        MANIFEST=$(aws ecr --profile ${module.variables.profile} --region ${data.aws_region.current.name} batch-get-image --repository-name ${data.aws_ecr_repository.lambda_repository.repository_url} --image-ids imageTag=${local.tag} --query 'images[].imageManifest' --output text)
+        MANIFEST=$(aws ecr --profile ${module.variables.profile} --region ${data.aws_region.current.name} batch-get-image --repository-name ${data.aws_ecr_repository.lambda_repository.name} --image-ids imageTag=${local.tag} --query 'images[].imageManifest' --output text)
         aws ecr put-image --repository-name ${data.aws_ecr_repository.lambda_repository.repository_url} --image-tag ${local.git_tag} --image-manifest "$MANIFEST"
         set -e
       fi

@@ -10,7 +10,7 @@ COPY langwatch/ langwatch/
 COPY prisma/ prisma/
 RUN npm run start:prepare
 COPY . .
-# RUN npm run build
+RUN npm run build
 ENV NODE_ENV=production
 
 EXPOSE 3000
