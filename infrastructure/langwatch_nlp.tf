@@ -57,7 +57,7 @@ resource "aws_ecs_task_definition" "langwatch_nlp" {
         }
       }
       healthCheck = {
-        command     = ["CMD-SHELL", "curl -f http://localhost:8080/health || exit 1"]
+        command     = ["CMD-SHELL", "curl -f http://localhost:8080/docs || exit 1"]
         interval    = 30
         timeout     = 5
         retries     = 3
@@ -110,7 +110,7 @@ resource "aws_alb_target_group" "langwatch_nlp_tg" {
     healthy_threshold   = 2
     unhealthy_threshold = 2
     timeout             = 5
-    path                = "/health"
+    path                = "/docs"
     protocol            = "HTTP"
     interval            = 30
     matcher             = "200"
@@ -164,7 +164,7 @@ resource "aws_lb" "langwatch_nlp_alb" {
 
 resource "aws_security_group" "langwatch_nlp_alb_sg" {
   count       = module.variables.profile == "lw-prod" ? 1 : 0
-  name        = "alb-sg"
+  name        = "langwatch-alb-sg"
   vpc_id      = aws_vpc.main.id
   description = "Security group for LangWatch NLP ALB"
 

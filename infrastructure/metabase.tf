@@ -156,7 +156,7 @@ resource "aws_lb" "metabase_alb" {
 
 resource "aws_security_group" "metabase_alb_sg" {
   count       = module.variables.profile == "lw-prod" ? 1 : 0
-  name        = "alb-sg"
+  name        = "metabase-alb-sg"
   vpc_id      = aws_vpc.main.id
   description = "Security group for Metabase ALB"
 
