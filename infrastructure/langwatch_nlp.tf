@@ -164,7 +164,7 @@ resource "aws_lb" "langwatch_nlp_alb" {
 
 resource "aws_security_group" "langwatch_nlp_alb_sg" {
   count       = module.variables.profile == "lw-prod" ? 1 : 0
-  name        = "langwatch-alb-sg"
+  name        = "langwatch-nlp-alb-sg"
   vpc_id      = aws_vpc.main.id
   description = "Security group for LangWatch NLP ALB"
 
