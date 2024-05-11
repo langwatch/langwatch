@@ -29,10 +29,12 @@ export const ChatWindowWrapper = React.memo(function ChatWindowWrapper({
   tabIndex,
   windowId,
   windowIndex,
+  windowsCount,
 }: {
   tabIndex: number;
   windowId: string;
   windowIndex: number;
+  windowsCount: number;
 }) {
   const { id, model } = usePlaygroundStore((state) => {
     const { id, model } = state.tabs[tabIndex]!.chatWindows.find(
@@ -59,6 +61,7 @@ export const ChatWindowWrapper = React.memo(function ChatWindowWrapper({
       removeMessagesListener={chat.removeMessagesListener}
       error={chat.error}
       isLoading={chat.isLoading}
+      windowsCount={windowsCount}
     />
   );
 });
@@ -72,6 +75,7 @@ const ChatWindow = React.memo(function ChatWindow({
   removeMessagesListener,
   error,
   isLoading,
+  windowsCount,
 }: {
   tabIndex: number;
   windowId: string;
@@ -81,6 +85,7 @@ const ChatWindow = React.memo(function ChatWindow({
   removeMessagesListener: (listener: (messages: Message[]) => void) => void;
   error: Error | undefined;
   isLoading: boolean;
+  windowsCount: number;
 }) {
   const {
     chatWindowState,
@@ -179,6 +184,7 @@ const ChatWindow = React.memo(function ChatWindow({
             variant="ghost"
             padding="6px"
             onClick={() => removeChatWindow(windowId)}
+            isDisabled={windowsCount === 1}
           >
             <MinusCircle width="18px" height="18px" />
           </Button>
@@ -187,7 +193,8 @@ const ChatWindow = React.memo(function ChatWindow({
             color="gray.500"
             variant="ghost"
             padding="6px"
-            onClick={addChatWindow}
+            onClick={() => addChatWindow(windowId)}
+            isDisabled={windowsCount >= 10}
           >
             <PlusCircle width="18px" height="18px" />
           </Button>

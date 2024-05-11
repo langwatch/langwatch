@@ -15,7 +15,7 @@ interface PlaygroundStore {
   activeTabIndex: number;
   syncInputs: boolean;
   selectTab: (tabIndex: number) => void;
-  addChatWindow: () => void;
+  addChatWindow: (windowId: string) => void;
   removeChatWindow: (windowId: string) => void;
   reorderChatWindows: (idsOrder: string[]) => void;
   addNewTab: () => void;
@@ -101,12 +101,15 @@ const store = (
   ) => void
 ): PlaygroundStore => {
   const setCurrentTab = (
-    fn: (current: PlaygroundTabState) => Partial<PlaygroundTabState>
+    fn: (
+      current: PlaygroundTabState,
+      state: PlaygroundStore
+    ) => Partial<PlaygroundTabState>
   ): void => {
     set((state) => ({
       tabs: state.tabs.map((tab, index) => {
         if (index === state.activeTabIndex) {
-          return { ...tab, ...fn(tab) };
+          return { ...tab, ...fn(tab, state) };
         }
         return tab;
       }),
@@ -140,19 +143,27 @@ const store = (
       set({ activeTabIndex: index });
     },
     addNewTab: () => {
-      set((state) => ({
-        tabs: [
-          ...state.tabs,
-          {
-            name: `Conversation ${state.tabs.length + 1}`,
-            chatWindows: initialChatWindows.map((chatWindow) => ({
-              ...chatWindow,
-              id: nanoid(),
-            })),
-          },
-        ],
-        activeTabIndex: state.tabs.length,
-      }));
+      set((state) => {
+        const currentTab = state.tabs[state.activeTabIndex] ?? {
+          name: "Conversation 1",
+          chatWindows: initialChatWindows,
+        };
+        return {
+          tabs: [
+            ...state.tabs,
+            {
+              ...currentTab,
+              name: `Conversation ${state.tabs.length + 1}`,
+              chatWindows: currentTab.chatWindows.map((chatWindow) => ({
+                ...chatWindow,
+                id: nanoid(),
+                messages: [],
+              })),
+            },
+          ],
+          activeTabIndex: state.tabs.length,
+        };
+      });
     },
     closeTab: (index) => {
       set((state) => {
@@ -164,13 +175,20 @@ const store = (
         };
       });
     },
-    addChatWindow: () => {
-      setCurrentTab((tab) => ({
-        chatWindows: [
-          ...tab.chatWindows,
-          { id: nanoid(), model: modelOptions[0]!, input: "", messages: [] },
-        ],
-      }));
+    addChatWindow: (windowId) => {
+      setCurrentTab((tab, state) => {
+        const currentChatWindowIndex = Math.max(
+          tab.chatWindows.findIndex((chatWindow) => chatWindow.id === windowId),
+          0
+        );
+        return {
+          chatWindows: [
+            ...tab.chatWindows.slice(0, currentChatWindowIndex + 1),
+            { id: nanoid(), model: modelOptions[0]!, input: "", messages: [] },
+            ...tab.chatWindows.slice(currentChatWindowIndex + 1),
+          ],
+        };
+      });
     },
     removeChatWindow: (windowId) => {
       setCurrentTab((tab) => ({

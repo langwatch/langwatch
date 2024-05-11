@@ -8,7 +8,7 @@ import {
   TabPanel,
   TabPanels,
   Tabs,
-  Text
+  Text,
 } from "@chakra-ui/react";
 import {
   DndContext,
@@ -22,17 +22,10 @@ import {
   SortableContext,
   arrayMove,
   horizontalListSortingStrategy,
-  sortableKeyboardCoordinates
+  sortableKeyboardCoordinates,
 } from "@dnd-kit/sortable";
-import {
-  Plus,
-  RotateCcw,
-  RotateCw,
-  X
-} from "react-feather";
-import {
-  usePlaygroundStore
-} from "../../hooks/usePlaygroundStore";
+import { Plus, RotateCcw, RotateCw, X } from "react-feather";
+import { usePlaygroundStore } from "../../hooks/usePlaygroundStore";
 import { ChatWindowWrapper } from "./ChatWindow";
 
 export function PlaygroundTabs() {
@@ -188,6 +181,7 @@ function PlaygroundTab({
                 tabIndex={tabIndex}
                 windowId={chatWindow.id}
                 windowIndex={windowIndex}
+                windowsCount={chatWindows.length}
               />
             ))}
           </SortableContext>
