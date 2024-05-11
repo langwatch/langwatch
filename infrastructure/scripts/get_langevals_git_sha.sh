@@ -6,7 +6,7 @@ cd ../langevals
 
 evaluator=$1
 
-global_affecting_files=$(git ls-files -o -c -m --exclude-standard | grep -v ^.github | grep -v ^README.md | grep -v ^evaluators | grep -v ^notebooks | grep -v ^tests | grep -v ^ts-integration)
+global_affecting_files=$(git ls-files -o -c -m --exclude-standard | grep -v ^.github | grep -v ^README.md | grep -v ^evaluators | grep -v ^notebooks | grep -v ^tests | grep -v ^ts-integration | grep -v ^poetry.lock)
 evaluators_files=$(git ls-files -o -c -m --exclude-standard | grep ^evaluators/$evaluator)
 all_files="$global_affecting_files\n$evaluators_files"
 current_hash=$(echo -e "$all_files" | xargs cat | sha256sum | cut -d' ' -f1 | cut -c 1-7)
