@@ -15,5 +15,4 @@ langwatch/python-sdk
 langwatch/docs/.docusaurus
 langwatch/langwatch_nlp/notebooks
 infrastructure
-.env
 */**/.env

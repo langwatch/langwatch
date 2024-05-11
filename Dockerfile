@@ -11,6 +11,7 @@ COPY prisma/ prisma/
 RUN npm run start:prepare
 COPY . .
 RUN npm run build
+RUN rm .env
 ENV NODE_ENV=production
 
 EXPOSE 3000
