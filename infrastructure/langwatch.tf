@@ -182,14 +182,14 @@ resource "null_resource" "langwatch_docker_image" {
         cache_from="--cache-from type=registry,ref=${aws_ecr_repository.langwatch.repository_url}:$last_tag"
       fi
 
-      docker buildx build . --platform="linux/amd64" --cache-to type=inline $cache_from -t ${data.aws_ecr_repository.langwatch.repository_url}:${local.tag} -t ${data.aws_ecr_repository.langwatch.repository_url}:${local.git_tag}
       set +e
       image_exists=$(docker manifest inspect ${data.aws_ecr_repository.langwatch.repository_url}:${local.tag} > /dev/null 2>&1 && echo yes)
       set -e
       if [ -z "$image_exists" ]; then
-        docker push ${data.aws_ecr_repository.langwatch.repository_url}:${local.tag}
+        docker buildx build . --platform="linux/amd64" $cache_from --cache-to type=inline --push -t ${data.aws_ecr_repository.langwatch.repository_url}:${local.tag}
         set +e
-        docker push ${data.aws_ecr_repository.langwatch.repository_url}:${local.git_tag}
+        MANIFEST=$(aws ecr --profile ${module.variables.profile} --region ${data.aws_region.current.name} batch-get-image --repository-name ${data.aws_ecr_repository.langwatch.repository_url} --image-ids imageTag=${local.tag} --query 'images[].imageManifest' --output text)
+        aws ecr put-image --repository-name ${data.aws_ecr_repository.langwatch.repository_url} --image-tag ${local.git_tag} --image-manifest "$MANIFEST"
         set -e
       fi
       if [ -z "$has_dotenvfile" ]; then

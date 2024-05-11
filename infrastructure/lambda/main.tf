@@ -114,15 +114,15 @@ resource "null_resource" "docker_image" {
       fi
 
       cd ${path.root}/../langevals
-      docker buildx build . --build-arg EVALUATOR=${local.evaluator_package} --platform="linux/amd64" --cache-to type=inline $cache_from -t ${data.aws_ecr_repository.lambda_repository.repository_url}:${local.tag} -t ${data.aws_ecr_repository.lambda_repository.repository_url}:${local.git_tag}
       set +e
       image_exists=$(docker manifest inspect ${data.aws_ecr_repository.lambda_repository.repository_url}:${local.tag} > /dev/null 2>&1 && echo yes)
       set -e
       if [ -z "$image_exists" ]; then
-        docker push ${data.aws_ecr_repository.lambda_repository.repository_url}:${local.tag}
-        set -e
-        docker push ${data.aws_ecr_repository.lambda_repository.repository_url}:${local.git_tag}
+        docker buildx build . --build-arg EVALUATOR=${local.evaluator_package} --platform="linux/amd64" $cache_from --cache-to type=inline --push -t ${data.aws_ecr_repository.lambda_repository.repository_url}:${local.tag}
         set +e
+        MANIFEST=$(aws ecr --profile ${module.variables.profile} --region ${data.aws_region.current.name} batch-get-image --repository-name ${data.aws_ecr_repository.lambda_repository.repository_url} --image-ids imageTag=${local.tag} --query 'images[].imageManifest' --output text)
+        aws ecr put-image --repository-name ${data.aws_ecr_repository.lambda_repository.repository_url} --image-tag ${local.git_tag} --image-manifest "$MANIFEST"
+        set -e
       fi
       cd -
     EOT
