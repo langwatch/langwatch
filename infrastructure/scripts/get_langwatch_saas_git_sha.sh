@@ -4,7 +4,7 @@ set -e
 
 cd ..
 
-salt="2024-05-11"
+salt="2024-05-11 20"
 files=$(git ls-files -o -c -m --exclude-standard | grep -v ^infrastructure | grep -v ^langwatch | grep -v ^src/pages/api | grep -v ^langevals | grep -v ^.github |  xargs cat)
 current_hash=$(echo -e "$files $salt" | sha256sum | cut -d' ' -f1 | cut -c 1-7)
 cd infrastructure
