@@ -80,7 +80,7 @@ resource "aws_ecs_task_definition" "langwatch" {
         ], [
         {
           name  = "LANGWATCH_NLP_SERVICE"
-          value = "http://${aws_lb.langwatch_nlp_alb[0].dns_name}/"
+          value = "http://${aws_lb.langwatch_nlp_alb[0].dns_name}"
         },
         {
           name  = "REDIS_URL"
