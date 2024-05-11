@@ -10,7 +10,7 @@ locals {
 }
 
 data "external" "docker_tag" {
-  program = ["${path.root}/scripts/get_langevals_git_sha.sh ${local.evaluator_package}"]
+  program = ["${path.root}/scripts/get_langevals_git_sha.sh", local.evaluator_package]
 }
 
 resource "aws_lambda_function" "this" {
