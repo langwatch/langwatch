@@ -1,17 +1,19 @@
 # ALB CloudWatch alarms
 resource "aws_cloudwatch_metric_alarm" "unhealthy_host_count" {
-  count               = module.variables.profile == "lw-prod" ? 1 : 0
-  alarm_name          = "unhealthy-host-count"
-  comparison_operator = "GreaterThanOrEqualToThreshold"
-  evaluation_periods  = "2"
-  metric_name         = "UnHealthyHostCount"
-  namespace           = "AWS/ApplicationELB"
-  period              = "300"
-  statistic           = "Average"
-  threshold           = "1"
-  alarm_description   = "Triggers when the number of unhealthy hosts exceeds the threshold"
-  actions_enabled     = true
-  alarm_actions       = [aws_sns_topic.alarms.arn]
+  count                     = module.variables.profile == "lw-prod" ? 1 : 0
+  alarm_name                = "unhealthy-host-count"
+  comparison_operator       = "GreaterThanOrEqualToThreshold"
+  evaluation_periods        = "2"
+  metric_name               = "UnHealthyHostCount"
+  namespace                 = "AWS/ApplicationELB"
+  period                    = "300"
+  statistic                 = "Average"
+  threshold                 = "1"
+  alarm_description         = "Triggers when the number of unhealthy hosts exceeds the threshold"
+  actions_enabled           = true
+  alarm_actions             = [aws_sns_topic.alarms.arn]
+  ok_actions                = [aws_sns_topic.alarms.arn]
+  insufficient_data_actions = [aws_sns_topic.alarms.arn]
 
   dimensions = {
     LoadBalancer = aws_alb.langwatch_alb[0].arn
@@ -21,18 +23,20 @@ resource "aws_cloudwatch_metric_alarm" "unhealthy_host_count" {
 }
 
 resource "aws_cloudwatch_metric_alarm" "latency" {
-  count               = module.variables.profile == "lw-prod" ? 1 : 0
-  alarm_name          = "high-latency"
-  comparison_operator = "GreaterThanThreshold"
-  evaluation_periods  = "3"
-  metric_name         = "TargetResponseTime"
-  namespace           = "AWS/ApplicationELB"
-  period              = "60"
-  statistic           = "Average"
-  threshold           = "0.5" # Threshold in seconds
-  alarm_description   = "Alarm when target response time exceeds 500 ms"
-  actions_enabled     = true
-  alarm_actions       = [aws_sns_topic.alarms.arn]
+  count                     = module.variables.profile == "lw-prod" ? 1 : 0
+  alarm_name                = "high-latency"
+  comparison_operator       = "GreaterThanThreshold"
+  evaluation_periods        = "3"
+  metric_name               = "TargetResponseTime"
+  namespace                 = "AWS/ApplicationELB"
+  period                    = "60"
+  statistic                 = "Average"
+  threshold                 = "0.5" # Threshold in seconds
+  alarm_description         = "Alarm when target response time exceeds 500 ms"
+  actions_enabled           = true
+  alarm_actions             = [aws_sns_topic.alarms.arn]
+  ok_actions                = [aws_sns_topic.alarms.arn]
+  insufficient_data_actions = [aws_sns_topic.alarms.arn]
 
   dimensions = {
     LoadBalancer = aws_alb.langwatch_alb[0].arn
@@ -42,18 +46,20 @@ resource "aws_cloudwatch_metric_alarm" "latency" {
 }
 
 resource "aws_cloudwatch_metric_alarm" "server_errors" {
-  count               = module.variables.profile == "lw-prod" ? 1 : 0
-  alarm_name          = "alb-server-errors"
-  comparison_operator = "GreaterThanThreshold"
-  evaluation_periods  = "1"
-  metric_name         = "HTTPCode_Target_5XX_Count"
-  namespace           = "AWS/ApplicationELB"
-  period              = "300" # 5 minutes
-  statistic           = "Sum"
-  threshold           = "1" # Trigger the alarm if there is at least one 5XX error
-  alarm_description   = "Triggers when the ALB returns 5XX server errors"
-  actions_enabled     = true
-  alarm_actions       = [aws_sns_topic.alarms.arn]
+  count                     = module.variables.profile == "lw-prod" ? 1 : 0
+  alarm_name                = "alb-server-errors"
+  comparison_operator       = "GreaterThanThreshold"
+  evaluation_periods        = "1"
+  metric_name               = "HTTPCode_Target_5XX_Count"
+  namespace                 = "AWS/ApplicationELB"
+  period                    = "300" # 5 minutes
+  statistic                 = "Sum"
+  threshold                 = "1" # Trigger the alarm if there is at least one 5XX error
+  alarm_description         = "Triggers when the ALB returns 5XX server errors"
+  actions_enabled           = true
+  alarm_actions             = [aws_sns_topic.alarms.arn]
+  ok_actions                = [aws_sns_topic.alarms.arn]
+  insufficient_data_actions = [aws_sns_topic.alarms.arn]
 
   dimensions = {
     LoadBalancer = aws_alb.langwatch_alb[0].arn
@@ -96,18 +102,20 @@ resource "aws_cloudwatch_event_target" "guardduty_to_sns" {
 
 # MySQL RDS CloudWatch alarms
 resource "aws_cloudwatch_metric_alarm" "rds_cpu_utilization_instance" {
-  count               = module.variables.profile == "lw-prod" ? 1 : 0
-  alarm_name          = "rds-cpu-utilization-instance-${count.index}"
-  comparison_operator = "GreaterThanThreshold"
-  evaluation_periods  = "1"
-  metric_name         = "CPUUtilization"
-  namespace           = "AWS/RDS"
-  period              = "300" # 5 minutes
-  statistic           = "Average"
-  threshold           = 80.0 # Trigger alarm at 80% CPU utilization
-  alarm_description   = "Alarm when RDS instance CPU exceeds 80%"
-  actions_enabled     = true
-  alarm_actions       = [aws_sns_topic.alarms.arn]
+  count                     = module.variables.profile == "lw-prod" ? 1 : 0
+  alarm_name                = "rds-cpu-utilization-instance-${count.index}"
+  comparison_operator       = "GreaterThanThreshold"
+  evaluation_periods        = "1"
+  metric_name               = "CPUUtilization"
+  namespace                 = "AWS/RDS"
+  period                    = "300" # 5 minutes
+  statistic                 = "Average"
+  threshold                 = 80.0 # Trigger alarm at 80% CPU utilization
+  alarm_description         = "Alarm when RDS instance CPU exceeds 80%"
+  actions_enabled           = true
+  alarm_actions             = [aws_sns_topic.alarms.arn]
+  ok_actions                = [aws_sns_topic.alarms.arn]
+  insufficient_data_actions = [aws_sns_topic.alarms.arn]
 
   dimensions = {
     DBInstanceIdentifier = aws_db_instance.langwatch.identifier
@@ -115,18 +123,20 @@ resource "aws_cloudwatch_metric_alarm" "rds_cpu_utilization_instance" {
 }
 
 resource "aws_cloudwatch_metric_alarm" "rds_freeable_memory_instance" {
-  count               = module.variables.profile == "lw-prod" ? 1 : 0
-  alarm_name          = "rds-freeable-memory-instance-${count.index}"
-  comparison_operator = "LessThanThreshold"
-  evaluation_periods  = "1"
-  metric_name         = "FreeableMemory"
-  namespace           = "AWS/RDS"
-  period              = "300" # 5 minutes
-  statistic           = "Average"
-  threshold           = 50000000 # Trigger alarm if freeable memory is less than 50 MB
-  alarm_description   = "Alarm when RDS instance freeable memory is less than 50MB"
-  actions_enabled     = true
-  alarm_actions       = [aws_sns_topic.alarms.arn]
+  count                     = module.variables.profile == "lw-prod" ? 1 : 0
+  alarm_name                = "rds-freeable-memory-instance-${count.index}"
+  comparison_operator       = "LessThanThreshold"
+  evaluation_periods        = "1"
+  metric_name               = "FreeableMemory"
+  namespace                 = "AWS/RDS"
+  period                    = "300" # 5 minutes
+  statistic                 = "Average"
+  threshold                 = 50000000 # Trigger alarm if freeable memory is less than 50 MB
+  alarm_description         = "Alarm when RDS instance freeable memory is less than 50MB"
+  actions_enabled           = true
+  alarm_actions             = [aws_sns_topic.alarms.arn]
+  ok_actions                = [aws_sns_topic.alarms.arn]
+  insufficient_data_actions = [aws_sns_topic.alarms.arn]
 
   dimensions = {
     DBInstanceIdentifier = aws_db_instance.langwatch.identifier
@@ -134,18 +144,20 @@ resource "aws_cloudwatch_metric_alarm" "rds_freeable_memory_instance" {
 }
 
 resource "aws_cloudwatch_metric_alarm" "rds_disk_queue_depth" {
-  count               = module.variables.profile == "lw-prod" ? 1 : 0
-  alarm_name          = "rds-disk-queue-depth-${count.index}"
-  comparison_operator = "GreaterThanThreshold"
-  evaluation_periods  = "1"
-  metric_name         = "DiskQueueDepth"
-  namespace           = "AWS/RDS"
-  period              = "300" # 5 minutes
-  statistic           = "Average"
-  threshold           = 5 # TODO: Needs to be adjusted based on the performance of the RDS instance
-  alarm_description   = "Alarm when RDS instance DiskQueueDepth exceeds 5"
-  actions_enabled     = true
-  alarm_actions       = [aws_sns_topic.alarms.arn]
+  count                     = module.variables.profile == "lw-prod" ? 1 : 0
+  alarm_name                = "rds-disk-queue-depth-${count.index}"
+  comparison_operator       = "GreaterThanThreshold"
+  evaluation_periods        = "1"
+  metric_name               = "DiskQueueDepth"
+  namespace                 = "AWS/RDS"
+  period                    = "300" # 5 minutes
+  statistic                 = "Average"
+  threshold                 = 5 # TODO: Needs to be adjusted based on the performance of the RDS instance
+  alarm_description         = "Alarm when RDS instance DiskQueueDepth exceeds 5"
+  actions_enabled           = true
+  alarm_actions             = [aws_sns_topic.alarms.arn]
+  ok_actions                = [aws_sns_topic.alarms.arn]
+  insufficient_data_actions = [aws_sns_topic.alarms.arn]
 
   dimensions = {
     DBInstanceIdentifier = aws_db_instance.langwatch.identifier
@@ -153,18 +165,20 @@ resource "aws_cloudwatch_metric_alarm" "rds_disk_queue_depth" {
 }
 
 resource "aws_cloudwatch_metric_alarm" "rds_read_iops" {
-  count               = module.variables.profile == "lw-prod" ? 1 : 0
-  alarm_name          = "rds-read-iops-${count.index}"
-  comparison_operator = "GreaterThanThreshold"
-  evaluation_periods  = "1"
-  metric_name         = "ReadIOPS"
-  namespace           = "AWS/RDS"
-  period              = "300"
-  statistic           = "Average"
-  threshold           = 100 # TODO: Adjust based on your typical workload and performance needs
-  alarm_description   = "Alarm when RDS instance ReadIOPS exceeds 1000"
-  actions_enabled     = true
-  alarm_actions       = [aws_sns_topic.alarms.arn]
+  count                     = module.variables.profile == "lw-prod" ? 1 : 0
+  alarm_name                = "rds-read-iops-${count.index}"
+  comparison_operator       = "GreaterThanThreshold"
+  evaluation_periods        = "1"
+  metric_name               = "ReadIOPS"
+  namespace                 = "AWS/RDS"
+  period                    = "300"
+  statistic                 = "Average"
+  threshold                 = 100 # TODO: Adjust based on your typical workload and performance needs
+  alarm_description         = "Alarm when RDS instance ReadIOPS exceeds 1000"
+  actions_enabled           = true
+  alarm_actions             = [aws_sns_topic.alarms.arn]
+  ok_actions                = [aws_sns_topic.alarms.arn]
+  insufficient_data_actions = [aws_sns_topic.alarms.arn]
 
   dimensions = {
     DBInstanceIdentifier = aws_db_instance.langwatch.identifier
@@ -172,18 +186,20 @@ resource "aws_cloudwatch_metric_alarm" "rds_read_iops" {
 }
 
 resource "aws_cloudwatch_metric_alarm" "rds_write_iops" {
-  count               = module.variables.profile == "lw-prod" ? 1 : 0
-  alarm_name          = "rds-write-iops-${count.index}"
-  comparison_operator = "GreaterThanThreshold"
-  evaluation_periods  = "1"
-  metric_name         = "WriteIOPS"
-  namespace           = "AWS/RDS"
-  period              = "300"
-  statistic           = "Average"
-  threshold           = 100 # #TODO: Adjust based on your typical workload and performance needs
-  alarm_description   = "Alarm when RDS instance WriteIOPS exceeds 1000"
-  actions_enabled     = true
-  alarm_actions       = [aws_sns_topic.alarms.arn]
+  count                     = module.variables.profile == "lw-prod" ? 1 : 0
+  alarm_name                = "rds-write-iops-${count.index}"
+  comparison_operator       = "GreaterThanThreshold"
+  evaluation_periods        = "1"
+  metric_name               = "WriteIOPS"
+  namespace                 = "AWS/RDS"
+  period                    = "300"
+  statistic                 = "Average"
+  threshold                 = 100 # #TODO: Adjust based on your typical workload and performance needs
+  alarm_description         = "Alarm when RDS instance WriteIOPS exceeds 1000"
+  actions_enabled           = true
+  alarm_actions             = [aws_sns_topic.alarms.arn]
+  ok_actions                = [aws_sns_topic.alarms.arn]
+  insufficient_data_actions = [aws_sns_topic.alarms.arn]
 
   dimensions = {
     DBInstanceIdentifier = aws_db_instance.langwatch.identifier
@@ -191,18 +207,20 @@ resource "aws_cloudwatch_metric_alarm" "rds_write_iops" {
 }
 
 resource "aws_cloudwatch_metric_alarm" "rds_free_storage_space" {
-  count               = module.variables.profile == "lw-prod" ? 1 : 0
-  alarm_name          = "rds-free-storage-space-${count.index}"
-  comparison_operator = "LessThanThreshold"
-  evaluation_periods  = "1"
-  metric_name         = "FreeStorageSpace"
-  namespace           = "AWS/RDS"
-  period              = "300" # 5 minutes
-  statistic           = "Average"
-  threshold           = 1000000000 # 1GB in bytes
-  alarm_description   = "Alarm when RDS instance free storage space is less than 1GB"
-  actions_enabled     = true
-  alarm_actions       = [aws_sns_topic.alarms.arn]
+  count                     = module.variables.profile == "lw-prod" ? 1 : 0
+  alarm_name                = "rds-free-storage-space-${count.index}"
+  comparison_operator       = "LessThanThreshold"
+  evaluation_periods        = "1"
+  metric_name               = "FreeStorageSpace"
+  namespace                 = "AWS/RDS"
+  period                    = "300" # 5 minutes
+  statistic                 = "Average"
+  threshold                 = 1000000000 # 1GB in bytes
+  alarm_description         = "Alarm when RDS instance free storage space is less than 1GB"
+  actions_enabled           = true
+  alarm_actions             = [aws_sns_topic.alarms.arn]
+  ok_actions                = [aws_sns_topic.alarms.arn]
+  insufficient_data_actions = [aws_sns_topic.alarms.arn]
 
   dimensions = {
     DBInstanceIdentifier = aws_db_instance.langwatch.identifier
@@ -211,18 +229,20 @@ resource "aws_cloudwatch_metric_alarm" "rds_free_storage_space" {
 
 # EC2 Bastion CloudWatch alarms
 resource "aws_cloudwatch_metric_alarm" "ec2_cpu_utilization_alarm" {
-  count               = module.variables.profile == "lw-prod" ? 1 : 0
-  alarm_name          = "ec2-cpu-high"
-  comparison_operator = "GreaterThanThreshold"
-  evaluation_periods  = "2"
-  metric_name         = "CPUUtilization"
-  namespace           = "AWS/EC2"
-  period              = "300" # 5 minutes
-  statistic           = "Average"
-  threshold           = 80.0 # Trigger at 80% CPU utilization
-  alarm_description   = "Alarm when EC2 CPU exceeds 80%"
-  actions_enabled     = true
-  alarm_actions       = [aws_sns_topic.alarms.arn]
+  count                     = module.variables.profile == "lw-prod" ? 1 : 0
+  alarm_name                = "ec2-cpu-high"
+  comparison_operator       = "GreaterThanThreshold"
+  evaluation_periods        = "2"
+  metric_name               = "CPUUtilization"
+  namespace                 = "AWS/EC2"
+  period                    = "300" # 5 minutes
+  statistic                 = "Average"
+  threshold                 = 80.0 # Trigger at 80% CPU utilization
+  alarm_description         = "Alarm when EC2 CPU exceeds 80%"
+  actions_enabled           = true
+  alarm_actions             = [aws_sns_topic.alarms.arn]
+  ok_actions                = [aws_sns_topic.alarms.arn]
+  insufficient_data_actions = [aws_sns_topic.alarms.arn]
 
   dimensions = {
     InstanceId = aws_instance.bastion[0].id
