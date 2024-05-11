@@ -189,7 +189,9 @@ resource "null_resource" "langwatch_docker_image" {
       set -e
       if [ -z "$image_exists" ]; then
         docker push ${data.aws_ecr_repository.langwatch.repository_url}:${local.tag}
+        set +e
         docker push ${data.aws_ecr_repository.langwatch.repository_url}:${local.git_tag}
+        set -e
       fi
       if [ -z "$has_dotenvfile" ]; then
         rm -rf .env

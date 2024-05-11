@@ -262,7 +262,9 @@ resource "null_resource" "langwatch_nlp_docker_image" {
       set -e
       if [ -z "$image_exists" ]; then
         docker push ${data.aws_ecr_repository.langwatch_nlp.repository_url}:${local.langwatch_nlp_tag}
+        set +e
         docker push ${data.aws_ecr_repository.langwatch_nlp.repository_url}:${local.langwatch_nlp_git_tag}
+        set -e
       fi
       cd -
     EOT
