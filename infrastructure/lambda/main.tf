@@ -121,7 +121,9 @@ resource "null_resource" "docker_image" {
       set -e
       if [ -z "$image_exists" ]; then
         docker push ${data.aws_ecr_repository.lambda_repository.repository_url}:${local.tag}
+        set -e
         docker push ${data.aws_ecr_repository.lambda_repository.repository_url}:${local.git_tag}
+        set +e
       fi
       cd -
     EOT
