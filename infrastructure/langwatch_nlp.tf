@@ -262,7 +262,7 @@ resource "null_resource" "langwatch_nlp_docker_image" {
         docker buildx build . -f Dockerfile --platform="linux/amd64" $cache_from --cache-to type=inline --push -t ${data.aws_ecr_repository.langwatch_nlp.repository_url}:${local.langwatch_nlp_tag}
         set +e
         MANIFEST=$(aws ecr --profile ${module.variables.profile} --region ${data.aws_region.current.name} batch-get-image --repository-name ${aws_ecr_repository.langwatch_nlp.name} --image-ids imageTag=${local.langwatch_nlp_tag} --query 'images[].imageManifest' --output text)
-        aws ecr put-image --repository-name ${aws_ecr_repository.langwatch_nlp.name} --image-tag ${local.langwatch_nlp_git_tag} --image-manifest "$MANIFEST"
+        aws ecr --profile ${module.variables.profile} --region ${data.aws_region.current.name} put-image --repository-name ${aws_ecr_repository.langwatch_nlp.name} --image-tag ${local.langwatch_nlp_git_tag} --image-manifest "$MANIFEST"
         set -e
       fi
       cd -

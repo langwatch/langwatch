@@ -176,7 +176,7 @@ resource "null_resource" "langwatch_docker_image" {
         docker buildx build . --platform="linux/amd64" --push -t ${data.aws_ecr_repository.langwatch.repository_url}:${local.tag}
         set +e
         MANIFEST=$(aws ecr --profile ${module.variables.profile} --region ${data.aws_region.current.name} batch-get-image --repository-name ${aws_ecr_repository.langwatch.name} --image-ids imageTag=${local.tag} --query 'images[].imageManifest' --output text)
-        aws ecr put-image --repository-name ${aws_ecr_repository.langwatch.name} --image-tag ${local.git_tag} --image-manifest "$MANIFEST"
+        aws ecr --profile ${module.variables.profile} --region ${data.aws_region.current.name} put-image --repository-name ${aws_ecr_repository.langwatch.name} --image-tag ${local.git_tag} --image-manifest "$MANIFEST"
         set -e
       fi
       if [ -z "$has_dotenvfile" ]; then
