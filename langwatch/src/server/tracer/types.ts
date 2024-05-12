@@ -78,6 +78,7 @@ export type SpanInputOutput =
   | TypedValueRaw;
 
 export interface ErrorCapture {
+  has_error: true;
   message: string;
   stacktrace: string[];
 }

@@ -166,6 +166,9 @@ export default async function handler(
           : {}),
       }));
     }
+    if (span.error) {
+      span.error.has_error = true;
+    }
 
     for (const key of Object.keys(span)) {
       if (!spanFields.includes(key)) {

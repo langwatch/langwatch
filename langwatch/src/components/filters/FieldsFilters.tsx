@@ -47,11 +47,12 @@ export function FieldsFilters() {
     "metadata.labels",
     "trace_checks.passed",
     "trace_checks.score",
-    // "trace_checks.state",
     "events.metrics.value",
     "metadata.user_id",
     "metadata.thread_id",
     "metadata.customer_id",
+    "trace_checks.state",
+    "traces.error",
   ];
 
   const filters: [FilterField, FilterDefinition][] = filterKeys.map((id) => [

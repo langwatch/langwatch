@@ -267,6 +267,56 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
       },
     },
   },
+  "traces.error": {
+    name: "Contains Error",
+    urlKey: "has_error",
+    query: (values) => {
+      if (values.includes("true") && !values.includes("false")) {
+        return {
+          term: {
+            "trace.has_error": true,
+          },
+        };
+      } else if (values.includes("false") && !values.includes("true")) {
+        return {
+          bool: {
+            must_not: {
+              term: {
+                "trace.has_error": true,
+              },
+            } as QueryDslQueryContainer,
+          } as QueryDslBoolQuery,
+        };
+      } else {
+        return {
+          match_all: {},
+        };
+      }
+    },
+    listMatch: {
+      aggregation: (query) => ({
+        unique_values: {
+          terms: {
+            field: "trace.has_error",
+            size: 2,
+            order: { _key: "asc" },
+            missing: false,
+          },
+        },
+      }),
+      extract: (result: Record<string, any>) => {
+        return (
+          result.unique_values?.buckets?.map((bucket: any) => ({
+            field: bucket.key ? "true" : "false",
+            label: bucket.key
+              ? "Messages with error"
+              : "Messages without error",
+            count: bucket.doc_count,
+          })) ?? []
+        );
+      },
+    },
+  },
   "spans.type": {
     name: "Span Type",
     urlKey: "span_type",

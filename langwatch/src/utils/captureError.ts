@@ -3,6 +3,7 @@ import type { ErrorCapture } from "../server/tracer/types";
 export const captureError = (error: unknown): ErrorCapture => {
   if (error instanceof Error) {
     return {
+      has_error: true,
       message: error.message,
       stacktrace: error.stack ? error.stack.split("\n") : [],
     };
@@ -21,12 +22,14 @@ export const captureError = (error: unknown): ErrorCapture => {
         ? err.stack
         : ["No stack trace available"];
     return {
+      has_error: true,
       message,
       stacktrace,
     };
   } else {
     // Handle primitives and other types that are not an error object
     return {
+      has_error: true,
       message: String(error),
       stacktrace: [],
     };

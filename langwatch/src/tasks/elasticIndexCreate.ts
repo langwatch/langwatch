@@ -106,6 +106,7 @@ const traceMapping: ElasticSearchMappingFrom<ElasticSearchTrace> = {
   },
   error: {
     properties: {
+      has_error: { type: "boolean" }, // workaround to make has_error available on pivot index since text fields are not
       message: { type: "text" },
       stacktrace: { type: "text" } as any,
     },
@@ -141,6 +142,7 @@ const spanMapping: ElasticSearchMappingFrom<ElasticSearchSpan> = {
   },
   error: {
     properties: {
+      has_error: { type: "boolean" }, // workaround to make has_error available on pivot index since text fields are not
       message: { type: "text" },
       stacktrace: { type: "text" },
     },
@@ -195,6 +197,7 @@ const traceChecksMapping: ElasticSearchMappingFrom<TraceCheck> = {
   details: { type: "text" },
   error: {
     properties: {
+      has_error: { type: "boolean" }, // workaround to make has_error available on pivot index since text fields are not
       message: { type: "text" },
       stacktrace: { type: "text" },
     },
@@ -378,9 +381,10 @@ async function createPivotTableTransform() {
           [...parents, key]
         );
       } else if (key == "has_error") {
+        const keyPath = [...parents, key].join(".");
         copyScript += `
-          if (doc.containsKey('error') && !doc['error'].empty) {
-            ${stateKey}.put('has_error', true);
+          if (doc.containsKey('error.has_error') && !doc['error.has_error'].empty) {
+            ${stateKey}.put('${keyPath}', true);
           }
         `;
       } else {
