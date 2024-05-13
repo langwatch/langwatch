@@ -39,9 +39,15 @@ export default async function handler(
 
   try {
     const threadId = `thread_${nanoid()}`;
+    const userId = `user_${nanoid()}`;
     const userInput = (await getInitialMessage()) ?? ""; // Ensure userInput is a string
 
-    const assistantResponse = await firstChatMessage(userInput, threadId, res);
+    const assistantResponse = await firstChatMessage(
+      userInput,
+      threadId,
+      userId,
+      res
+    );
     const expectedUserResponse = await userResponse(
       userInput,
       assistantResponse ?? ""
@@ -51,6 +57,7 @@ export default async function handler(
       assistantResponse ?? "",
       expectedUserResponse ?? "",
       threadId,
+      userId,
       res
     );
 
@@ -67,9 +74,9 @@ const langwatchAPI = async (
   completion: any,
   input: string,
   res: NextApiResponse,
-  threadId: string
+  threadId: string,
+  userId: string
 ) => {
-  console.log(env.NEXTAUTH_URL);
   try {
     const langwatchResponse = await fetch(`${env.NEXTAUTH_URL}/api/collector`, {
       method: "POST",
@@ -124,6 +131,7 @@ const langwatchAPI = async (
         ],
         metadata: {
           thread_id: threadId,
+          user_id: userId,
         },
       }),
     });
@@ -186,6 +194,7 @@ const getInitialMessage = async () => {
 const firstChatMessage = async (
   userInput: string,
   threadId: string,
+  userId: string,
   res: NextApiResponse
 ) => {
   const completion = await openai.chat.completions.create({
@@ -202,7 +211,7 @@ const firstChatMessage = async (
     model: "gpt-3.5-turbo",
   });
 
-  await langwatchAPI(completion, userInput ?? "", res, threadId);
+  await langwatchAPI(completion, userInput ?? "", res, threadId, userId);
 
   return completion.choices[0]!.message.content;
 };
@@ -212,6 +221,7 @@ const secondChatMessage = async (
   assistantResponse: string,
   expectedUserResponse: string,
   threadId: string,
+  userId: string,
   res: NextApiResponse
 ) => {
   const completion = await openai.chat.completions.create({
@@ -236,7 +246,13 @@ const secondChatMessage = async (
     model: "gpt-3.5-turbo",
   });
 
-  await langwatchAPI(completion, expectedUserResponse ?? "", res, threadId);
+  await langwatchAPI(
+    completion,
+    expectedUserResponse ?? "",
+    res,
+    threadId,
+    userId
+  );
 
   return completion.choices[0]!.message.content;
 };
