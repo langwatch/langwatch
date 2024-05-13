@@ -58,6 +58,10 @@ export const projectRoutes = {
     path: "/settings",
     title: "Settings",
   },
+  playground: {
+    path: "/[project]/playground",
+    title: "Playground",
+  },
   datasets: {
     path: "/[project]/datasets",
     title: "Datasets",

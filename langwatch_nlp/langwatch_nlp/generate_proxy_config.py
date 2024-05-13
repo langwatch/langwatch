@@ -16,7 +16,10 @@ def generate_proxy_config():
     yaml_data = {"model_list": []}
 
     for key, value in data.items():
-        model_entry = {"model_name": key, "litellm_params": {"model": key}}
+        if key == "openai/gpt-4o":
+            model_entry = {"model_name": "*", "litellm_params": {"model": "openai/*"}}
+        else:
+            model_entry = {"model_name": key, "litellm_params": {"model": key}}
         # Check if the model provider is Azure and add the 'api_base' key
         if key.startswith("azure/"):
             model_entry["litellm_params"]["api_base"] = os.environ.get(

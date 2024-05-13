@@ -19,6 +19,11 @@
     "version": "latest",
     "model_provider": "openai"
   },
+  "openai/gpt-4o": {
+    "name": "GPT 4o",
+    "version": "latest",
+    "model_provider": "openai"
+  },
   "openai/gpt-4-0125-preview": {
     "name": "GPT 4 Turbo",
     "version": "0125",

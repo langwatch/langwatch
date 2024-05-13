@@ -41,6 +41,7 @@ import {
   type Icon,
   Database,
   Lock,
+  Image as ImageIcon,
 } from "react-feather";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import { useRequiredSession } from "../hooks/useRequiredSession";
@@ -243,7 +244,11 @@ export const AddProjectButton = ({
 }) => {
   const usage = api.limits.getUsage.useQuery(
     { organizationId: organization.id },
-    { enabled: !!organization, refetchOnWindowFocus: false, refetchOnMount: false }
+    {
+      enabled: !!organization,
+      refetchOnWindowFocus: false,
+      refetchOnMount: false,
+    }
   );
 
   return !usage.data ||
@@ -301,7 +306,11 @@ export const DashboardLayout = ({
   } = useOrganizationTeamProject();
   const usage = api.limits.getUsage.useQuery(
     { organizationId: organization?.id ?? "" },
-    { enabled: !!organization, refetchOnWindowFocus: false, refetchOnMount: false }
+    {
+      enabled: !!organization,
+      refetchOnWindowFocus: false,
+      refetchOnMount: false,
+    }
   );
 
   const [query, setQuery] = useState("");
@@ -366,6 +375,12 @@ export const DashboardLayout = ({
               path={projectRoutes.evaluations.path}
               icon={Shield}
               label={projectRoutes.evaluations.title}
+              project={project}
+            />
+            <SideMenuLink
+              path={projectRoutes.playground.path}
+              icon={ImageIcon}
+              label={projectRoutes.playground.title}
               project={project}
             />
             <SideMenuLink
