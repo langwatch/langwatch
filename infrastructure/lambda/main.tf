@@ -2,6 +2,14 @@ module "variables" {
   source = "../variables"
 }
 
+data "aws_secretsmanager_secret" "langevals" {
+  name = "langevals_secrets"
+}
+
+data "aws_secretsmanager_secret_version" "langevals" {
+  secret_id = data.aws_secretsmanager_secret.langevals.id
+}
+
 locals {
   evaluator_package     = var.evaluator_package
   tag                   = data.external.docker_tag.result["tag"]
