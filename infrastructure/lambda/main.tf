@@ -4,7 +4,6 @@ module "variables" {
 
 locals {
   evaluator_package     = var.evaluator_package
-  environment_variables = var.environment_variables
   tag                   = data.external.docker_tag.result["tag"]
   git_tag               = data.external.docker_tag.result["git_tag"]
 }
@@ -25,7 +24,7 @@ resource "aws_lambda_function" "this" {
   memory_size = local.evaluator_package == "lingua" ? 1896 : local.evaluator_package == "ragas" ? 512 : 256
 
   environment {
-    variables = local.environment_variables
+    variables = jsondecode(data.aws_secretsmanager_secret_version.langevals.secret_string)
   }
 
   depends_on = [

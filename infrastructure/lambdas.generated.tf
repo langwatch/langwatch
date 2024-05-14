@@ -20,11 +20,6 @@ module "aws-evaluator" {
     evaluator_package   = "aws"
     sns_alarms_topic_arn = aws_sns_topic.alarms.arn
     apigw_execution_arn = aws_api_gateway_rest_api.this.execution_arn
-    environment_variables = {
-        AWS_COMPREHEND_SECRET_ACCESS_KEY = jsondecode(data.aws_secretsmanager_secret_version.langevals.secret_string)["AWS_COMPREHEND_SECRET_ACCESS_KEY"]
-
-        AWS_COMPREHEND_ACCESS_KEY_ID = jsondecode(data.aws_secretsmanager_secret_version.langevals.secret_string)["AWS_COMPREHEND_ACCESS_KEY_ID"]
-    }
 }
 
 resource "aws_api_gateway_resource" "aws" {
@@ -54,7 +49,6 @@ module "lingua-evaluator" {
     evaluator_package   = "lingua"
     sns_alarms_topic_arn = aws_sns_topic.alarms.arn
     apigw_execution_arn = aws_api_gateway_rest_api.this.execution_arn
-    environment_variables = {}
 }
 
 resource "aws_api_gateway_resource" "lingua" {
@@ -100,11 +94,6 @@ module "azure-evaluator" {
     evaluator_package   = "azure"
     sns_alarms_topic_arn = aws_sns_topic.alarms.arn
     apigw_execution_arn = aws_api_gateway_rest_api.this.execution_arn
-    environment_variables = {
-        AZURE_CONTENT_SAFETY_KEY = jsondecode(data.aws_secretsmanager_secret_version.langevals.secret_string)["AZURE_CONTENT_SAFETY_KEY"]
-
-        AZURE_CONTENT_SAFETY_ENDPOINT = jsondecode(data.aws_secretsmanager_secret_version.langevals.secret_string)["AZURE_CONTENT_SAFETY_ENDPOINT"]
-    }
 }
 
 resource "aws_api_gateway_resource" "azure" {
@@ -214,13 +203,6 @@ module "ragas-evaluator" {
     evaluator_package   = "ragas"
     sns_alarms_topic_arn = aws_sns_topic.alarms.arn
     apigw_execution_arn = aws_api_gateway_rest_api.this.execution_arn
-    environment_variables = {
-        AZURE_API_BASE = jsondecode(data.aws_secretsmanager_secret_version.langevals.secret_string)["AZURE_API_BASE"]
-
-        OPENAI_API_KEY = jsondecode(data.aws_secretsmanager_secret_version.langevals.secret_string)["OPENAI_API_KEY"]
-
-        AZURE_API_KEY = jsondecode(data.aws_secretsmanager_secret_version.langevals.secret_string)["AZURE_API_KEY"]
-    }
 }
 
 resource "aws_api_gateway_resource" "ragas" {
@@ -346,13 +328,6 @@ module "langevals-evaluator" {
     evaluator_package   = "langevals"
     sns_alarms_topic_arn = aws_sns_topic.alarms.arn
     apigw_execution_arn = aws_api_gateway_rest_api.this.execution_arn
-    environment_variables = {
-        AZURE_API_BASE = jsondecode(data.aws_secretsmanager_secret_version.langevals.secret_string)["AZURE_API_BASE"]
-
-        OPENAI_API_KEY = jsondecode(data.aws_secretsmanager_secret_version.langevals.secret_string)["OPENAI_API_KEY"]
-
-        AZURE_API_KEY = jsondecode(data.aws_secretsmanager_secret_version.langevals.secret_string)["AZURE_API_KEY"]
-    }
 }
 
 resource "aws_api_gateway_resource" "langevals" {
@@ -382,9 +357,6 @@ module "openai-evaluator" {
     evaluator_package   = "openai"
     sns_alarms_topic_arn = aws_sns_topic.alarms.arn
     apigw_execution_arn = aws_api_gateway_rest_api.this.execution_arn
-    environment_variables = {
-        OPENAI_API_KEY = jsondecode(data.aws_secretsmanager_secret_version.langevals.secret_string)["OPENAI_API_KEY"]
-    }
 }
 
 resource "aws_api_gateway_resource" "openai" {
@@ -414,11 +386,6 @@ module "huggingface-evaluator" {
     evaluator_package   = "huggingface"
     sns_alarms_topic_arn = aws_sns_topic.alarms.arn
     apigw_execution_arn = aws_api_gateway_rest_api.this.execution_arn
-    environment_variables = {
-        CLOUDFLARE_API_KEY = jsondecode(data.aws_secretsmanager_secret_version.langevals.secret_string)["CLOUDFLARE_API_KEY"]
-
-        CLOUDFLARE_ACCOUNT_ID = jsondecode(data.aws_secretsmanager_secret_version.langevals.secret_string)["CLOUDFLARE_ACCOUNT_ID"]
-    }
 }
 
 resource "aws_api_gateway_resource" "huggingface" {
@@ -448,9 +415,6 @@ module "google_cloud-evaluator" {
     evaluator_package   = "google_cloud"
     sns_alarms_topic_arn = aws_sns_topic.alarms.arn
     apigw_execution_arn = aws_api_gateway_rest_api.this.execution_arn
-    environment_variables = {
-        GOOGLE_CREDENTIALS_JSON = jsondecode(data.aws_secretsmanager_secret_version.langevals.secret_string)["GOOGLE_CREDENTIALS_JSON"]
-    }
 }
 
 resource "aws_api_gateway_resource" "google_cloud" {
