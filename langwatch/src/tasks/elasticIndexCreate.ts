@@ -550,6 +550,14 @@ async function createPivotTableTransform() {
               reduce_script: reduceListScript,
             },
           },
+          updated_at: {
+            max: {
+              script: {
+                source: "doc['timestamps.updated_at'].value.toInstant().toEpochMilli()",
+                lang: "painless"
+              }
+            }
+          }
         },
       },
       sync: {
