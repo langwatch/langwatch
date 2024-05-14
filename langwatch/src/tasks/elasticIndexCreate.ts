@@ -398,7 +398,11 @@ async function createPivotTableTransform() {
         } else {
           copyScript += `
             if (doc.containsKey('${namespacePrefix}${keyPath}') && !doc['${namespacePrefix}${keyPath}'].empty) {
-              ${stateKey}.put('${keyPath}', doc['${namespacePrefix}${keyPath}'].value);
+              if (doc['${namespacePrefix}${keyPath}'].size() > 1) {
+                ${stateKey}.put('${keyPath}', doc['${namespacePrefix}${keyPath}']);
+              } else {
+                ${stateKey}.put('${keyPath}', doc['${namespacePrefix}${keyPath}'].value);
+              }
             }
           `;
         }
