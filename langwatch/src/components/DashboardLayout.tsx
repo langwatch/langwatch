@@ -551,6 +551,18 @@ export const DashboardLayout = ({
             </Portal>
           </Menu>
         </HStack>
+        {process.env.NEXT_PUBLIC_DEMO_SLUG === router.query.project && (
+          <HStack width={"full"} backgroundColor={"orange.400"} padding={1}>
+            <Spacer />
+            <Text fontSize={"sm"}>
+              Viewing Demo Project - Go back to yours{" "}
+              <Link href={"/"} textDecoration={"underline"}>
+                here
+              </Link>
+            </Text>
+            <Spacer />
+          </HStack>
+        )}
         <CurrentDrawer />
         {children}
       </VStack>
