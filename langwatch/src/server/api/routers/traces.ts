@@ -441,6 +441,7 @@ const getAllForProject = async (
 
   let totalHits = 0;
   let usePivotIndex = false;
+  console.log("input", JSON.stringify(input));
   if (isAnyFilterPresent || input.sortBy) {
     usePivotIndex = true;
     const pivotIndexResults = await esClient.search<TracesPivot>({
