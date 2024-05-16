@@ -87,6 +87,52 @@ export const datasetRecordRouter = createTRPCRouter({
         data: recordData,
       });
     }),
+  update: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        datasetId: z.string(),
+        recordId: z.string(),
+        updatedRecord: z.object({
+          input: z.string(),
+          expected_output: z.string(),
+          spans: z.optional(z.string()),
+        }),
+      })
+    )
+    .use(checkUserPermissionForProject(TeamRoleGroup.DATASETS_MANAGE))
+    .mutation(async ({ ctx, input }) => {
+      const { recordId, updatedRecord } = input;
+
+      const record = await ctx.prisma.datasetRecord.findUnique({
+        where: { id: recordId },
+      });
+
+      if (!record) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Record not found",
+        });
+      }
+
+      const updatedData: any = {
+        input: updatedRecord.input,
+        expected_output: updatedRecord.expected_output,
+      };
+
+      if (updatedRecord.spans) {
+        updatedData.spans = updatedRecord.spans;
+      }
+
+      await ctx.prisma.datasetRecord.update({
+        where: { id: recordId },
+        data: {
+          entry: updatedData,
+        },
+      });
+
+      return { success: true };
+    }),
   getAll: protectedProcedure
     .input(z.object({ projectId: z.string(), datasetId: z.string() }))
     .use(checkUserPermissionForProject(TeamRoleGroup.DATASETS_VIEW))
