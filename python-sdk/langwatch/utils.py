@@ -25,6 +25,8 @@ from langwatch.types import (
     TypedValueText,
 )
 
+from langchain_core.load.serializable import Serializable
+
 T = TypeVar("T")
 
 
@@ -93,13 +95,19 @@ def list_get(l, i, default=None):
 
 
 def autoconvert_typed_values(value: Any) -> SpanInputOutput:
+    class SerializableEncoder(json.JSONEncoder):
+        def default(self, o):
+            if isinstance(o, Serializable):
+                return o.__repr__()
+            return super().default(o)
+
     if type(value) == dict and "type" in value:
         return cast(SpanInputOutput, value)
     if type(value) == str:
         return TypedValueText(type="text", value=value)
     else:
         try:
-            _ = json.dumps(value)
-            return TypedValueJson(type="json", value=value)
+            json_ = json.dumps(value, cls=SerializableEncoder)
+            return TypedValueJson(type="json", value=json.loads(json_))
         except:
             return TypedValueRaw(type="raw", value=str(value))

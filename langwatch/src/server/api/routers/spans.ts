@@ -11,6 +11,7 @@ export const spansRouter = createTRPCRouter({
     .query(async ({ input }) => {
       const result = await esClient.search<ElasticSearchSpan>({
         index: SPAN_INDEX,
+        size: 50,
         body: {
           query: {
             //@ts-ignore

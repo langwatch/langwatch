@@ -1,5 +1,5 @@
 import json
-from typing import Any, Dict, List, Literal, Optional, Union, cast
+from typing import Any, Callable, Dict, List, Literal, Optional, Union, cast
 from langchain.schema import (
     LLMResult,
     AgentAction,
@@ -12,11 +12,17 @@ from langchain.schema import (
     ChatGeneration,
 )
 from langchain.callbacks.base import BaseCallbackHandler
-from langwatch.tracer import BaseContextTracer
+import langwatch
+from langwatch.tracer import (
+    BaseContextTracer,
+    ContextSpan,
+    current_tracer_var,
+)
 from langwatch.types import (
     BaseSpan,
     ChatMessage,
     ChatRole,
+    RAGChunk,
     SpanInputOutput,
     SpanMetrics,
     SpanParams,
@@ -35,6 +41,7 @@ from langwatch.utils import (
     milliseconds_timestamp,
 )
 from uuid import UUID
+from langchain.tools import BaseTool
 
 
 def langchain_messages_to_chat_messages(
@@ -61,7 +68,7 @@ def langchain_message_to_chat_message(message: BaseMessage) -> ChatMessage:
     else:
         role = "unknown"
     # TODO: handle function types! where is the name?
-    return ChatMessage(role=role, content=message.content) # type: ignore
+    return ChatMessage(role=role, content=message.content)  # type: ignore
 
 
 class LangChainTracer(BaseContextTracer, BaseCallbackHandler):
@@ -195,7 +202,7 @@ class LangChainTracer(BaseContextTracer, BaseCallbackHandler):
         inputs: Dict[str, Any],
         *,
         run_id: UUID,
-        parent_run_id: UUID,
+        parent_run_id: Optional[UUID],
         name: Optional[str],
         **kwargs: Any,
     ) -> Any:
@@ -236,6 +243,8 @@ class LangChainTracer(BaseContextTracer, BaseCallbackHandler):
             input=self._autoconvert_typed_values(input_str),
         )
 
+    context_spans: dict[str, ContextSpan] = {}
+
     def _build_base_span(
         self,
         type: Literal["span", "chain", "tool", "agent"],
@@ -244,7 +253,7 @@ class LangChainTracer(BaseContextTracer, BaseCallbackHandler):
         name: Optional[str],
         input: Optional[SpanInputOutput],
     ) -> BaseSpan:
-        return BaseSpan(
+        span = BaseSpan(
             type=type,
             name=name,
             span_id=f"span_{run_id}",
@@ -253,8 +262,17 @@ class LangChainTracer(BaseContextTracer, BaseCallbackHandler):
             input=input,
             outputs=[],
             error=None,
+            metrics=None,
             timestamps=SpanTimestamps(started_at=milliseconds_timestamp()),
         )
+        self.context_spans[str(run_id)] = ContextSpan(
+            span_id=f"span_{run_id}",
+            name=name,
+            type=type,
+            input=input,
+        )
+
+        return span
 
     def _end_base_span(self, run_id: UUID, outputs: List[SpanInputOutput]):
         span = self.spans.get(str(run_id))
@@ -264,6 +282,11 @@ class LangChainTracer(BaseContextTracer, BaseCallbackHandler):
         if "timestamps" in span and span["timestamps"]:
             span["timestamps"]["finished_at"] = milliseconds_timestamp()
         span["outputs"] = outputs
+
+        context_span = self.context_spans.get(str(run_id))
+        current_tracer = current_tracer_var.get()
+        if context_span and current_tracer:
+            current_tracer.current_span = context_span.parent
 
     def _on_error_base_span(self, run_id: UUID, error: BaseException):
         span = self.spans.get(str(run_id))
@@ -334,3 +357,50 @@ class LangChainTracer(BaseContextTracer, BaseCallbackHandler):
             )
         else:
             return autoconvert_typed_values(output)
+
+
+class WrappedRetrieverTool(BaseTool):
+    tool: Optional[BaseTool] = None
+    context_extractor: Optional[Callable[[Any], List[RAGChunk]]] = None
+
+    def __init__(self, tool, context_extractor):
+        super().__init__(name=tool.name, description=tool.description)
+        self.tool = tool
+        self.context_extractor = context_extractor
+
+    def _run(self, *args, **kwargs):
+        if self.tool is None or self.context_extractor is None:
+            raise ValueError("tool or context_extractor is not set")
+        response = self.tool(*args, **kwargs)
+
+        input = ""
+        try:
+            if len(args) == 1:
+                if type(args[0]) == str:
+                    input = args[0]
+                else:
+                    input = json.dumps(args[0])
+            elif len(args) > 0:
+                input = json.dumps(args)
+            else:
+                input = json.dumps(kwargs)
+        except Exception as e:
+            if len(args) == 1:
+                input = str(args[0])
+            elif len(args) > 0:
+                input = str(args)
+            else:
+                input = str(kwargs)
+
+        captured = self.context_extractor(response)
+        with langwatch.capture_rag(
+            input=input,
+            contexts=captured,
+        ):
+            return response
+
+
+def capture_rag_from_tool(
+    tool: BaseTool, context_extractor: Callable[[Any], List[RAGChunk]]
+):
+    return WrappedRetrieverTool(tool=tool, context_extractor=context_extractor)

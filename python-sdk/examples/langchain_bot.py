@@ -1,11 +1,11 @@
 from dotenv import load_dotenv
+from langchain_openai import ChatOpenAI
 
 load_dotenv()
 
 import chainlit as cl
 from langchain.chains import LLMMathChain
 from langchain.llms import OpenAI
-from langchain.chat_models import ChatOpenAI
 from langchain.prompts import PromptTemplate, ChatPromptTemplate
 from langchain.schema import StrOutputParser
 from langchain.schema.runnable import Runnable
@@ -40,7 +40,7 @@ async def main(message: cl.Message):
     msg = cl.Message(content="")
 
     with langwatch.langchain.LangChainTracer(
-        customer_id="customer_example", labels=["v1.0.0"]
+        metadata={"customer_id": "customer_example", "labels": ["v1.0.0"]}
     ) as langWatchCallback:
         async for chunk in runnable.astream(
             {"question": message.content},

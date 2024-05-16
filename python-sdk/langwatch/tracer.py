@@ -27,11 +27,7 @@ from langwatch.utils import (
 from retry import retry
 
 import langwatch
-
-T = TypeVar("T")
-
-_local_context = threading.local()
-
+import contextvars  # Import contextvars module
 
 class ContextSpan:
     span_id: str
@@ -54,12 +50,14 @@ class ContextSpan:
         self.type = type
         self.input = input
 
-        current_span = getattr(_local_context, "current_span", None)
+        current_tracer = current_tracer_var.get()
 
-        if current_span:
-            self.parent = current_span
-
-        _local_context.current_span = self
+        if current_tracer:
+            if current_tracer.current_span:
+                self.parent = current_tracer.current_span
+            current_tracer.current_span = self
+        else:
+            warn("No current tracer found, some spans will not be sent to LangWatch")
 
         self.started_at = milliseconds_timestamp()
 
@@ -72,16 +70,14 @@ class ContextSpan:
         )
         finished_at = milliseconds_timestamp()
 
-        context_tracer: Optional[BaseContextTracer] = getattr(
-            _local_context, "current_tracer", None
-        )
-        if context_tracer:
+        current_tracer = current_tracer_var.get()
+        if current_tracer:
             span_id = self.span_id  # TODO: test?
-            context_tracer.append_span(
-                self.create_span(span_id, context_tracer, error, finished_at)
+            current_tracer.append_span(
+                self.create_span(span_id, current_tracer, error, finished_at)
             )
 
-        _local_context.current_span = self.parent
+            current_tracer.current_span = self.parent
 
     def create_span(
         self,
@@ -94,13 +90,12 @@ class ContextSpan:
             type=self.type,
             name=self.name,
             span_id=span_id,
-            parent_id=self.parent.span_id if self.parent else None,  # TODO: test
-            trace_id=context_tracer.trace_id,  # TODO: test
+            parent_id=self.parent.span_id if self.parent else None,
+            trace_id=context_tracer.trace_id,
             input=autoconvert_typed_values(self.input) if self.input else None,
-            outputs=(
-                [autoconvert_typed_values(self.output)] if self.output else []
-            ),  # TODO test?
-            error=error,  # TODO: test
+            outputs=([autoconvert_typed_values(self.output)] if self.output else []),
+            error=error,
+            metrics=None,
             timestamps=SpanTimestamps(
                 started_at=self.started_at, finished_at=finished_at
             ),
@@ -174,7 +169,7 @@ def span(name: Optional[str] = None, type: SpanTypes = "span"):
 
 
 def get_current_tracer():
-    return getattr(_local_context, "current_tracer", None)
+    return current_tracer_var.get()
 
 
 executor = ThreadPoolExecutor(max_workers=10)
@@ -183,6 +178,7 @@ executor = ThreadPoolExecutor(max_workers=10)
 class BaseContextTracer:
     sent_once = False
     scheduled_send: Optional[Future[None]] = None
+    current_span: Optional[ContextSpan] = None
 
     def __init__(
         self,
@@ -194,12 +190,12 @@ class BaseContextTracer:
         self.metadata = metadata
 
     def __enter__(self):
-        _local_context.current_tracer = self
+        self.token = current_tracer_var.set(self)
         return self
 
     def __exit__(self, _type, _value, _traceback):
         self.delayed_send_spans()
-        _local_context.current_tracer = None
+        current_tracer_var.reset(self.token)
 
     def delayed_send_spans(self):
         self._add_finished_at_to_missing_spans()
@@ -235,11 +231,8 @@ class BaseContextTracer:
             self.delayed_send_spans()  # send again if needed
 
     def get_parent_id(self):
-        current_span: Optional[ContextSpan] = getattr(
-            _local_context, "current_span", None
-        )
-        if current_span:
-            return current_span.span_id
+        if self.current_span:
+            return self.current_span.span_id
         return None
 
     # Some spans get interrupted in the middle, for example by an exception, and we might end up never tagging their finish timestamp, so we do it here as a fallback
@@ -250,6 +243,9 @@ class BaseContextTracer:
                 or span["timestamps"]["finished_at"] == None
             ):
                 span["timestamps"]["finished_at"] = milliseconds_timestamp()
+
+
+current_tracer_var = contextvars.ContextVar[Optional[BaseContextTracer]]("current_tracer", default=None)
 
 
 @retry(tries=5, delay=0.5, backoff=3)

@@ -126,7 +126,7 @@ class LLMSpan(TypedDict, total=False):
 
 
 class RAGChunk(TypedDict, total=False):
-    document_id: str
+    document_id: Optional[str]
     chunk_id: Optional[str]
     content: Union[str, dict, list]
 

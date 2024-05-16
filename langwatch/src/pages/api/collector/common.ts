@@ -16,7 +16,15 @@ export const getFirstInputAsText = (spans: Span[]): string => {
   if (!input) {
     return "";
   }
-  return typedValueToText(input, true);
+  const text = typedValueToText(input, true);
+  if (
+    !text &&
+    topmostInputs[0]?.name === "RunnableSequence" &&
+    topmostInputs[1]?.input
+  ) {
+    return typedValueToText(topmostInputs[1].input, true);
+  }
+  return text;
 };
 
 export const getLastOutputAsText = (spans: Span[]): string => {
@@ -60,17 +68,22 @@ export const typedValueToText = (
   } else if (typed.type == "json") {
     try {
       const json = typed.value as any;
-      if (json.text) {
+      // TODO: test those
+      if (json.text !== undefined) {
         return json.text;
       }
-      if (json.input) {
+      if (json.input !== undefined) {
         return json.input;
       }
-      if (json.question) {
+      if (json.question !== undefined) {
         return json.question;
       }
-      if (json.user_query) {
+      if (json.user_query !== undefined) {
         return json.user_query;
+      }
+      // TODO: test this happens for finding outputs
+      if (json.output !== undefined) {
+        return json.output;
       }
       return JSON.stringify(typed.value);
     } catch (_e) {

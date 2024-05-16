@@ -164,6 +164,10 @@ export default async function handler(
         ...(typeof context.chunk_id === "number"
           ? { chunk_id: `${context.chunk_id as number}` }
           : {}),
+        content:
+          typeof context.content === "string"
+            ? context.content
+            : JSON.stringify(context.content),
       }));
     }
     if (span.error) {

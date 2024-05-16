@@ -9,3 +9,4 @@ examples/.ipynb_checkpoints
 repl.ipynb
 chainlit.md
 .env
+.chainlit

@@ -135,7 +135,7 @@ export interface LLMSpan extends BaseSpan {
 }
 
 export interface RAGChunk {
-  document_id: string;
+  document_id?: string | null;
   chunk_id?: string | null;
   content: string | Record<string, any> | any[];
 }

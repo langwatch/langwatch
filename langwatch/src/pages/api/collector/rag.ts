@@ -106,6 +106,9 @@ export const maybeAddIdsToContextList = (
       .createHash("md5")
       .update(extractChunkTextualContent(content))
       .digest("hex"),
-    content: content,
+    content:
+      typeof content === "object" && "content" in content
+        ? content.content
+        : content,
   }));
 };
