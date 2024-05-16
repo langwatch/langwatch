@@ -11,6 +11,10 @@ import {
 import type { TracesPivot } from "~/server/analytics/types";
 import type { Sort } from "@elastic/elasticsearch/lib/api/types";
 
+import { generateTracesPivotQueryConditions } from "~/server/api/routers/analytics/common";
+
+import { getAllForProject } from "~/server/api/routers/traces";
+
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
@@ -27,6 +31,14 @@ export default async function handler(
     },
     groupBy: "input",
   };
+
+
+  //const traces = await getAllForProject({},input);
+
+  const { pivotIndexConditions } = generateTracesPivotQueryConditions(input);
+
+  const pageSize = input.pageSize ? input.pageSize : 25;
+  const pageOffset = input.pageOffset ? input.pageOffset : 0;
 
   const pivotIndexResults = await esClient.search<TracesPivot>({
     index: TRACES_PIVOT_INDEX,
@@ -81,5 +93,9 @@ export default async function handler(
     },
   });
 
+<<<<<<< Updated upstream
   return res.status(200).json({ hello: "world" });
+=======
+  return res.status(200).json({ hello: pivotIndexResults });
+>>>>>>> Stashed changes
 }

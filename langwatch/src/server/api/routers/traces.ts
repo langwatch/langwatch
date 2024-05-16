@@ -420,6 +420,7 @@ const getAllForProject = async (
   ctx: { prisma: PrismaClient; session: Session },
   input: z.infer<typeof getAllForProjectInput>
 ) => {
+  console.log("rrrr", ctx);
   const embeddings = input.query
     ? await getOpenAIEmbeddings(input.query)
     : undefined;

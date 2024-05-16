@@ -99,6 +99,8 @@ export function MessagesTable() {
     queryOpts
   );
 
+  console.log(traceGroups.data);
+
   const traceIds =
     traceGroups.data?.groups.flatMap((group) =>
       group.map((trace) => trace.trace_id)
