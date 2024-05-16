@@ -32,7 +32,6 @@ export default async function handler(
     groupBy: "input",
   };
 
-
   //const traces = await getAllForProject({},input);
 
   const { pivotIndexConditions } = generateTracesPivotQueryConditions(input);
@@ -43,7 +42,18 @@ export default async function handler(
   const pivotIndexResults = await esClient.search<TracesPivot>({
     index: TRACES_PIVOT_INDEX,
     body: {
-      query: pivotIndexConditions,
+      query: {
+        bool: {
+          must: pivotIndexConditions,
+          filter: {
+            range: {
+              updated_at: {
+                gt: "1715581589883", // Replace "your_timestamp_here" with the timestamp you want to compare against
+              },
+            },
+          },
+        },
+      },
       _source: ["trace.trace_id"],
       from: input.query ? 0 : pageOffset,
       size: input.query ? 10_000 : pageSize,
@@ -93,9 +103,5 @@ export default async function handler(
     },
   });
 
-<<<<<<< Updated upstream
-  return res.status(200).json({ hello: "world" });
-=======
   return res.status(200).json({ hello: pivotIndexResults });
->>>>>>> Stashed changes
 }
