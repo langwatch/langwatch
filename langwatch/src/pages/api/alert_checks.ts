@@ -22,86 +22,37 @@ export default async function handler(
   if (req.method !== "POST") {
     return res.status(405).end(); // Only accept POST requests
   }
-  const input = {
-    projectId: "project_z-CcZUgvtagE70FuegKFg",
-    startDate: 1713268800000,
-    endDate: 1715774400000,
-    filters: {
-      "trace_checks.passed": { "check_b8deNyrYL53-u81gyLrFG": ["1"] },
-    },
-    groupBy: "input",
+  // const input = {
+  //   projectId: "project_z-CcZUgvtagE70FuegKFg",
+  //   startDate: 1713268800000,
+  //   endDate: 1715774400000,
+  //   filters: {
+  //     "trace_checks.passed": { "check_b8deNyrYL53-u81gyLrFG": ["1"] },
+  //   },
+  //   groupBy: "input",
+  // };
+
+  const test = {
+    projectId: "KAXYxPR8MUgTcP8CF193y",
+    startDate: 1713351600000,
+    endDate: 1715857200000,
+    filters: { "trace_checks.passed": { check_wEVmNQKttsYpWhZYPz1Sa: ["0"] } },
+    pageOffset: 0,
+    pageSize: 25,
+    groupBy: "none",
   };
 
-  //const traces = await getAllForProject({},input);
+  const input = {
+    projectId: "KAXYxPR8MUgTcP8CF193y",
+    filters: { "trace_checks.passed": { check_wEVmNQKttsYpWhZYPz1Sa: ["0"] } },
+    updatedAt: 1713882821927,
+  };
 
-  const { pivotIndexConditions } = generateTracesPivotQueryConditions(input);
+  const traces = await getAllForProject({}, input);
 
-  const pageSize = input.pageSize ? input.pageSize : 25;
-  const pageOffset = input.pageOffset ? input.pageOffset : 0;
+  let updatedTimes = traces.groups
+    .flatMap((group) => group.map((item) => item.timestamps.updated_at))
+    .sort((a, b) => b - a);
 
-  const pivotIndexResults = await esClient.search<TracesPivot>({
-    index: TRACES_PIVOT_INDEX,
-    body: {
-      query: {
-        bool: {
-          must: pivotIndexConditions,
-          filter: {
-            range: {
-              updated_at: {
-                gt: "1715581589883", // Replace "your_timestamp_here" with the timestamp you want to compare against
-              },
-            },
-          },
-        },
-      },
-      _source: ["trace.trace_id"],
-      from: input.query ? 0 : pageOffset,
-      size: input.query ? 10_000 : pageSize,
-      ...(input.sortBy
-        ? input.sortBy.startsWith("random.")
-          ? {
-              sort: {
-                _script: {
-                  type: "number",
-                  script: {
-                    source: "Math.random()",
-                  },
-                  order: input.sortDirection ?? "desc",
-                },
-              } as Sort,
-            }
-          : input.sortBy.startsWith("trace_checks.")
-          ? {
-              sort: {
-                "trace_checks.score": {
-                  order: input.sortDirection ?? "desc",
-                  nested: {
-                    path: "trace_checks",
-                    filter: {
-                      term: {
-                        "trace_checks.check_id": input.sortBy.split(".")[1],
-                      },
-                    },
-                  },
-                },
-              } as Sort,
-            }
-          : {
-              sort: {
-                [input.sortBy]: {
-                  order: input.sortDirection ?? "desc",
-                },
-              } as Sort,
-            }
-        : {
-            sort: {
-              "trace.timestamps.started_at": {
-                order: "desc",
-              },
-            } as Sort,
-          }),
-    },
-  });
-
-  return res.status(200).json({ hello: pivotIndexResults });
+  return res.status(200).json({ hello: traces });
 }

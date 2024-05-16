@@ -6,6 +6,7 @@ import type {
   Sort,
 } from "@elastic/elasticsearch/lib/api/types";
 import type { PrismaClient } from "@prisma/client";
+import { prisma } from "~/server/db";
 import { TRPCError } from "@trpc/server";
 import similarity from "compute-cosine-similarity";
 import shuffle from "lodash/shuffle";
@@ -52,6 +53,7 @@ const getAllForProjectInput = tracesFilterInput.extend({
   groupBy: z.string().optional(),
   sortBy: z.string().optional(),
   sortDirection: z.string().optional(),
+  updatedAt: z.number().optional(),
 });
 
 export const esGetSpansByTraceId = async ({
@@ -416,11 +418,10 @@ export const tracesRouter = createTRPCRouter({
     }),
 });
 
-const getAllForProject = async (
+export const getAllForProject = async (
   ctx: { prisma: PrismaClient; session: Session },
   input: z.infer<typeof getAllForProjectInput>
 ) => {
-  console.log("rrrr", ctx);
   const embeddings = input.query
     ? await getOpenAIEmbeddings(input.query)
     : undefined;
@@ -442,13 +443,34 @@ const getAllForProject = async (
 
   let totalHits = 0;
   let usePivotIndex = false;
-  console.log("input", JSON.stringify(input));
+  console.log("myinputt", JSON.stringify(input));
+  const includeUpdatedAtFilter = false;
+  console.log("input.updatedAt", input.updatedAt);
+  if (input.updatedAt) {
+    console.log("yyyyy", true);
+  }
   if (isAnyFilterPresent || input.sortBy) {
+    console.log("pivotIndexConditions", JSON.stringify(pivotIndexConditions));
     usePivotIndex = true;
     const pivotIndexResults = await esClient.search<TracesPivot>({
       index: TRACES_PIVOT_INDEX,
       body: {
-        query: pivotIndexConditions,
+        query: {
+          bool: {
+            must: pivotIndexConditions,
+            ...(input.updatedAt
+              ? {
+                  filter: {
+                    range: {
+                      updated_at: {
+                        gt: input.updatedAt, // Replace "your_timestamp_here" with the timestamp you want to compare against
+                      },
+                    },
+                  },
+                }
+              : {}), // Empty object if the condition is not met
+          } as QueryDslBoolQuery,
+        },
         _source: ["trace.trace_id"],
         from: input.query ? 0 : pageOffset,
         size: input.query ? 10_000 : pageSize,
@@ -526,11 +548,17 @@ const getAllForProject = async (
     ...(usePivotIndex ? [{ terms: { trace_id: traceIds } }] : []),
   ];
 
-  const canSeeCosts = await backendHasTeamProjectPermission(
-    ctx,
-    input,
-    TeamRoleGroup.COST_VIEW
-  );
+  let canSeeCosts = false;
+  if (ctx.prisma) {
+    canSeeCosts =
+      (await backendHasTeamProjectPermission(
+        ctx,
+        input,
+        TeamRoleGroup.COST_VIEW
+      )) ?? false;
+  }
+
+  console.log("canSeeCosts", canSeeCosts);
 
   //@ts-ignore
   const tracesResult = await esClient.search<Trace>({
@@ -621,7 +649,7 @@ const getAllForProject = async (
   );
   const guardrailsSlugToName = Object.fromEntries(
     (
-      await ctx.prisma.check.findMany({
+      await prisma.check.findMany({
         where: {
           projectId: input.projectId,
         },
