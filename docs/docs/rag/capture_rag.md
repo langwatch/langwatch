@@ -213,6 +213,8 @@ EOF`
 </TabItem>
 </Tabs>
 
+Here is what each of the keys mean:
+
 `input`: The initial user input or query. If not specified, the `input` will be automatically extracted as the last user message to the LLM.
 
 `contexts`: A list of the retrieved content that will be used for the LLM generation
