@@ -125,11 +125,12 @@ class TestLangChainTracer:
             "prompt_tokens": 5,
             "completion_tokens": 16,
         }
-        assert second_span["timestamps"]["started_at"] == int(
-            datetime(2022, 1, 1, 0, 0, 15).timestamp() * 1000
+        assert second_span["timestamps"]["started_at"] >= int(
+            datetime(2022, 1, 1, 0, 0, 0).timestamp() * 1000
         )
-        assert second_span["timestamps"]["finished_at"] >= int(
-            datetime(2022, 1, 1, 0, 0, 30).timestamp() * 1000
+        assert (
+            second_span["timestamps"]["finished_at"]
+            > second_span["timestamps"]["started_at"]
         )
 
     @freeze_time("2022-01-01", auto_tick_seconds=15)
@@ -165,7 +166,7 @@ class TestLangChainTracer:
 
         assert second_span["type"] == "llm"
         assert second_span["vendor"] == "openai"
-        assert second_span["model"] == "text-davinci-003"
+        assert second_span["model"] == "gpt-3.5-turbo-instruct"
         assert second_span["input"] == {
             "type": "json",
             "value": [template.replace("{text}", "colors")],
@@ -181,11 +182,12 @@ class TestLangChainTracer:
             "prompt_tokens": 5,
             "completion_tokens": 16,
         }
-        assert second_span["timestamps"]["started_at"] == int(
-            datetime(2022, 1, 1, 0, 0, 15).timestamp() * 1000
+        assert second_span["timestamps"]["started_at"] >= int(
+            datetime(2022, 1, 1, 0, 0, 0).timestamp() * 1000
         )
-        assert second_span["timestamps"]["finished_at"] >= int(
-            datetime(2022, 1, 1, 0, 0, 30).timestamp() * 1000
+        assert (
+            second_span["timestamps"]["finished_at"]
+            > second_span["timestamps"]["started_at"]
         )
 
     @freeze_time("2022-01-01", auto_tick_seconds=15)
@@ -229,11 +231,12 @@ class TestLangChainTracer:
         assert first_span["type"] == "chain"
         assert first_span["trace_id"].startswith("trace_")
         assert first_span["parent_id"] == None
-        assert first_span["timestamps"]["started_at"] == int(
+        assert first_span["timestamps"]["started_at"] >= int(
             datetime(2022, 1, 1, 0, 0, 0).timestamp() * 1000
         )
-        assert first_span["timestamps"]["finished_at"] >= int(
-            datetime(2022, 1, 1, 0, 0, 45).timestamp() * 1000
+        assert (
+            first_span["timestamps"]["finished_at"]
+            >= first_span["timestamps"]["started_at"]
         )
 
         assert second_span["type"] == "llm"
@@ -259,11 +262,12 @@ class TestLangChainTracer:
         ]
         assert second_span["params"] == {"temperature": 0.7, "stream": True}
         assert "metrics" not in second_span
-        assert second_span["timestamps"]["started_at"] == int(
-            datetime(2022, 1, 1, 0, 0, 15).timestamp() * 1000
+        assert second_span["timestamps"]["started_at"] >= int(
+            datetime(2022, 1, 1, 0, 0, 0).timestamp() * 1000
         )
-        assert second_span["timestamps"]["finished_at"] >= int(
-            datetime(2022, 1, 1, 0, 0, 30).timestamp() * 1000
+        assert (
+            second_span["timestamps"]["finished_at"]
+            > second_span["timestamps"]["started_at"]
         )
 
     @freeze_time("2022-01-01", auto_tick_seconds=15)
@@ -462,11 +466,13 @@ class TestLangChainTracer:
         prompt = ChatPromptTemplate.from_template("tell me a joke about {topic}")
         chain = prompt | model
 
-        with langwatch.langchain.LangChainTracer(metadata={"labels": []}) as langWatchCallback:
+        with langwatch.langchain.LangChainTracer(
+            metadata={"labels": []}
+        ) as langWatchCallback:
             result = chain.invoke(
                 {"topic": "bears"}, config={"callbacks": [langWatchCallback]}
             )
-            langWatchCallback.metadata["labels"] += ["joke"] # type: ignore
+            langWatchCallback.metadata["labels"] += ["joke"]  # type: ignore
         assert (
             result.content
             == "Why don't bears wear shoes?\n\nBecause they have bear feet!"

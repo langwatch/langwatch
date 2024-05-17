@@ -82,6 +82,7 @@ def create_openai_chat_completion_mock(text):
         "choices": [
             {
                 "index": 0,
+                "logprobs": None,
                 "message": {
                     "role": "assistant",
                     "content": text,
