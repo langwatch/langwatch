@@ -45,9 +45,9 @@ with langwatch.openai.OpenAIChatCompletionTracer(client):
 
 </TabItem>
 <TabItem value="langchain" label="LangChain">
-When using LangChain, generally your RAG happens by calling a tool that does the retrieval.
+When using LangChain, generally your RAG happens by calling a [`Retriever`](https://python.langchain.com/v0.1/docs/modules/data_connection/retrievers/).
 
-We provide a utility `langwatch.langchain.capture_rag_from_tool` to capture the context that was retrieved by wrapping around your tool. For that you need to pass the tool as first argument, and then a function to map the tool's output to `RAGChunk`s, like in the example below:
+We provide a utility `langwatch.langchain.capture_rag_from_retriever` to capture the documents found by the retriever and convert it into a LangWatch compatible format for tracking. For that you need to pass the retriever as first argument, and then a function to map each document to a `RAGChunk`, like in the example below:
 
 ```python
 import langwatch.langchain
@@ -55,14 +55,47 @@ from langwatch.types import RAGChunk
 
   with langwatch.langchain.LangChainTracer() as langWatchCallback:
     retriever_tool = create_retriever_tool(
-        retriever,
+        # highlight-start
+        langwatch.langchain.capture_rag_from_retriever(
+            retriever,
+            lambda document: RAGChunk(
+                document_id=document.metadata["source"],
+                content=document.page_content
+            ),
+        ),
+        # highlight-end
         "langwatch_search",
         "Search for information about LangWatch. For any questions about LangWatch, use this tool if you didn't already",
     )
 
+    tools = [retriever_tool]
+    model = ChatOpenAI(streaming=True)
+    prompt = ChatPromptTemplate.from_messages(
+        [
+            (
+                "system",
+                "You are a helpful assistant that only reply in short tweet-like responses, using lots of emojis and use tools only once.\n\n{agent_scratchpad}",
+            ),
+            ("human", "{question}"),
+        ]
+    )
+    agent = create_tool_calling_agent(model, tools, prompt)
+    executor = AgentExecutor(agent=agent, tools=tools, verbose=True)
+    return executor.invoke(user_input, config=RunnableConfig(
+        callbacks=[langWatchCallback]
+    ))
+```
+
+Alternatively, if you don't use retrievers, but still want to capture the context for example from a tool call that you do, we also provide a utility `langwatch.langchain.capture_rag_from_tool` to capture RAG contexts around a tool. For that you need to pass the tool as first argument, and then a function to map the tool's output to `RAGChunk`s, like in the example below:
+
+```python
+import langwatch.langchain
+from langwatch.types import RAGChunk
+
+  with langwatch.langchain.LangChainTracer() as langWatchCallback:
     # highlight-start
     wrapped_tool = langwatch.langchain.capture_rag_from_tool(
-        retriever_tool, lambda response: [
+        my_custom_tool, lambda response: [
           RAGChunk(
             document_id=response["id"], # optional
             chunk_id=response["chunk_id"], # optional

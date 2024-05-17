@@ -1,4 +1,5 @@
 import json
+from types import MethodType
 from typing import Any, Callable, Dict, List, Literal, Optional, Union, cast
 from langchain.schema import (
     LLMResult,
@@ -42,6 +43,11 @@ from langwatch.utils import (
 )
 from uuid import UUID
 from langchain.tools import BaseTool
+from langchain_core.documents import Document
+from langchain_core.retrievers import BaseRetriever
+from langchain_core.callbacks.manager import (
+    CallbackManagerForRetrieverRun,
+)
 
 
 def langchain_messages_to_chat_messages(
@@ -359,7 +365,7 @@ class LangChainTracer(BaseContextTracer, BaseCallbackHandler):
             return autoconvert_typed_values(output)
 
 
-class WrappedRetrieverTool(BaseTool):
+class WrappedRagTool(BaseTool):
     tool: Optional[BaseTool] = None
     context_extractor: Optional[Callable[[Any], List[RAGChunk]]] = None
 
@@ -403,4 +409,36 @@ class WrappedRetrieverTool(BaseTool):
 def capture_rag_from_tool(
     tool: BaseTool, context_extractor: Callable[[Any], List[RAGChunk]]
 ):
-    return WrappedRetrieverTool(tool=tool, context_extractor=context_extractor)
+    return WrappedRagTool(tool=tool, context_extractor=context_extractor)
+
+
+def capture_rag_from_retriever(
+    retriever: BaseRetriever, context_extractor: Callable[[Document], RAGChunk]
+):
+    _orig_get_relevant_documents = retriever._get_relevant_documents
+    _orig_aget_relevant_documents = retriever._aget_relevant_documents
+
+    def _patched_get_relevant_documents(
+        self, query: str, *args, **kwargs
+    ) -> List[Document]:
+        documents = _orig_get_relevant_documents(query, *args, **kwargs)
+        with langwatch.capture_rag(
+            input=query,
+            contexts=[context_extractor(doc) for doc in documents],
+        ):
+            return documents
+
+    async def _patched_aget_relevant_documents(
+        self, query: str, *args, **kwargs
+    ) -> List[Document]:
+        documents = await _orig_aget_relevant_documents(query, *args, **kwargs)
+        with langwatch.capture_rag(
+            input=query,
+            contexts=[context_extractor(doc) for doc in documents],
+        ):
+            return documents
+
+    retriever.__dict__['_get_relevant_documents'] = MethodType(_patched_get_relevant_documents, retriever)
+    retriever.__dict__['_aget_relevant_documents'] = MethodType(_patched_aget_relevant_documents, retriever)
+
+    return retriever

@@ -34,16 +34,22 @@ retriever = vector.as_retriever()
 @cl.on_chat_start
 async def on_chat_start():
     retriever_tool = create_retriever_tool(
-        retriever,
+        langwatch.langchain.capture_rag_from_retriever(
+            retriever,
+            lambda document: RAGChunk(
+                document_id=document.metadata["source"],
+                content=document.page_content
+            ),
+        ),
         "langwatch_search",
         "Search for information about LangWatch. For any questions about LangWatch, use this tool if you didn't already",
     )
 
-    wrapped_tool = langwatch.langchain.capture_rag_from_tool(
-        retriever_tool, lambda response: [RAGChunk(content=response)]
-    )
+    # wrapped_tool = langwatch.langchain.capture_rag_from_tool(
+    #     retriever_tool, lambda response: [RAGChunk(content=response)]
+    # )
 
-    tools = [wrapped_tool]
+    tools = [retriever_tool]
     model = ChatOpenAI(streaming=True)
     prompt = ChatPromptTemplate.from_messages(
         [
