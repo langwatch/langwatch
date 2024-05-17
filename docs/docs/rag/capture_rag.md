@@ -44,6 +44,53 @@ with langwatch.openai.OpenAIChatCompletionTracer(client):
 ```
 
 </TabItem>
+<TabItem value="langchain" label="LangChain">
+When using LangChain, generally your RAG happens by calling a tool that does the retrieval.
+
+We provide a utility `langwatch.langchain.capture_rag_from_tool` to capture the context that was retrieved by wrapping around your tool. For that you need to pass the tool as first argument, and then a function to map the tool's output to `RAGChunk`s, like in the example below:
+
+```python
+import langwatch.langchain
+from langwatch.types import RAGChunk
+
+  with langwatch.langchain.LangChainTracer() as langWatchCallback:
+    retriever_tool = create_retriever_tool(
+        retriever,
+        "langwatch_search",
+        "Search for information about LangWatch. For any questions about LangWatch, use this tool if you didn't already",
+    )
+
+    # highlight-start
+    wrapped_tool = langwatch.langchain.capture_rag_from_tool(
+        retriever_tool, lambda response: [
+          RAGChunk(
+            document_id=response["id"], # optional
+            chunk_id=response["chunk_id"], # optional
+            content=response["content"]
+          )
+        ]
+    )
+
+    tools = [wrapped_tool] # use the new wrapped tool in your agent instead of the original one
+    # highlight-end
+    model = ChatOpenAI(streaming=True)
+    prompt = ChatPromptTemplate.from_messages(
+        [
+            (
+                "system",
+                "You are a helpful assistant that only reply in short tweet-like responses, using lots of emojis and use tools only once.\n\n{agent_scratchpad}",
+            ),
+            ("human", "{question}"),
+        ]
+    )
+    agent = create_tool_calling_agent(model, tools, prompt)
+    executor = AgentExecutor(agent=agent, tools=tools, verbose=True)
+    return executor.invoke(user_input, config=RunnableConfig(
+        callbacks=[langWatchCallback]
+    ))
+```
+
+</TabItem>
 <TabItem value="rest" label="REST API">
 To track the RAG context when using the REST API, add a new span of type `rag`, you may also refer the LLM generation as the child of it:
 
@@ -137,7 +184,7 @@ EOF`
 
 `contexts`: A list of the retrieved content that will be used for the LLM generation
 
-- `document_id`: A unique identified of the where this content originally comes from, can identify a document but also an id for an API call
+- `document_id`: A unique identified of the where this content originally comes from, can identify a document but also an id for an API call. Optional but highly recommended to track your documents, if not set an automatic ID will be generated for it based on the md5 hashing of the content.
 
 - `chunk_id`: Optional. If you are splitting content into chunks, you may identify as well which chunk specifically this content is from
 
