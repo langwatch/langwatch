@@ -265,6 +265,8 @@ enum DatabaseSchema {
     LLM_CHAT_CALL
     STRING_I_O
     KEY_VALUE
+    ONE_MESSAGE_PER_ROW
+    ONE_LLM_CALL_PER_ROW
 }
 
 model Dataset {
@@ -274,6 +276,7 @@ model Dataset {
     name            String
     slug            String
     schema          DatabaseSchema
+    columns         String            @default("input,output")
     createdAt       DateTime          @default(now())
     updatedAt       DateTime          @default(now()) @updatedAt
     datasetRecords  DatasetRecord[]

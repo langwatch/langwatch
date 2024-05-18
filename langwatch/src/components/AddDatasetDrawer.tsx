@@ -1,159 +1,343 @@
-import { Box, Button, Container, Drawer, DrawerBody, DrawerCloseButton, DrawerContent, DrawerHeader, FormControl, FormErrorMessage, FormHelperText, HStack, Input, Radio, RadioGroup, Stack, VStack, useToast, Text } from "@chakra-ui/react";
+import {
+  Box,
+  Button,
+  Container,
+  Drawer,
+  DrawerBody,
+  DrawerCloseButton,
+  DrawerContent,
+  DrawerHeader,
+  FormControl,
+  FormErrorMessage,
+  FormHelperText,
+  HStack,
+  Input,
+  Radio,
+  RadioGroup,
+  VStack,
+  useToast,
+  Text,
+  CheckboxGroup,
+  Checkbox,
+} from "@chakra-ui/react";
 import { DatabaseSchema } from "@prisma/client";
-import { useState, useEffect } from "react";
+import { useForm } from "react-hook-form";
 import { api } from "~/utils/api";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import slugify from "slugify";
-
+import { HorizontalFormControl } from "./HorizontalFormControl";
+import { SmallLabel } from "./SmallLabel";
+import { useEffect } from "react";
 
 interface AddDatasetDrawerProps {
-    isOpen: boolean;
-    onClose: () => void;
-    onSuccess: () => void;
+  isOpen: boolean;
+  onClose: () => void;
+  onSuccess: () => void;
 }
 
-export function AddDatasetDrawer(props: AddDatasetDrawerProps) {
-
-    const [schemaValue, setSchemaValue] = useState<string>(DatabaseSchema.LLM_CHAT_CALL);
-    const [dataSetName, setDataSetName] = useState<string>("");
-    const [slug, setSlug] = useState<string>("");
-    const [hasError, setHasError] = useState<boolean>(false);
-    const { project } = useOrganizationTeamProject();
-
-
-
-
-    const toast = useToast();
-
-    const createDataset = api.dataset.create.useMutation();
-
-    const onSubmit = (e: any) => {
-        e.preventDefault()
-        createDataset.mutate({
-            projectId: project?.id ?? "",
-            name: dataSetName,
-            schema: schemaValue
-        },
-            {
-                onSuccess: () => {
-                    props.onSuccess();
-                    setSlug("");
-
-                    toast({
-                        title: "Dataset Created",
-                        description: `You have successfully created the dataset ${dataSetName}`,
-
-                        status: "success",
-                        duration: 5000,
-                        isClosable: true,
-                        position: "top-right",
-                    });
-                }
-            })
-    }
-
-    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        createDataset.reset()
-        setHasError(false)
-        setDataSetName(e.target.value)
-        setSlug(slugify(e.target.value || "", { lower: true, strict: true, }))
-    }
-
-    useEffect(() => {
-        if (createDataset.error) {
-            setHasError(true)
-        }
-    }, [createDataset.error])
-
-    return (
-        <Drawer
-            isOpen={props.isOpen}
-            placement="right"
-            size={'xl'}
-            onClose={props.onClose}
-        >
-            <DrawerContent>
-                <DrawerHeader>
-                    <HStack>
-                        <DrawerCloseButton />
-                    </HStack>
-                    <HStack>
-                        <Text paddingTop={5} fontSize='2xl'>New Dataset</Text>
-                    </HStack>
-                </DrawerHeader>
-                <DrawerBody>
-                    <form onSubmit={onSubmit}>
-                        <HStack align={'start'} gap={12}>
-                            <Container padding={0}>
-                                <VStack align={'start'} padding={0}>
-                                    <Text fontWeight={'bold'}>Name</Text>
-                                    <Text fontSize={'sm'}>Give it a name that identifies hat this groups of examples is going to focus on</Text>
-                                </VStack>
-                            </Container>
-                            <Container>
-                                <VStack align={'start'}>
-                                    <FormControl isInvalid={hasError}>
-                                        <Input placeholder="Good Responses Dataset" onChange={handleInputChange} required />
-                                        <FormHelperText>slug: {slug}</FormHelperText>
-                                        <FormErrorMessage >{createDataset.error?.message}</FormErrorMessage>
-                                    </FormControl>
-                                </VStack>
-                            </Container>
-                        </HStack>
-                        <HStack align={'start'} marginTop={8} gap={12}>
-                            <Container padding={0}>
-                                <VStack align={'start'} padding={0}>
-                                    <Text fontWeight={'bold'}>Schema</Text>
-                                    <Text fontSize={'sm'}>Define the type if structure for this dataset</Text>
-                                </VStack>
-                            </Container>
-                            <Container>
-                                <VStack align={'start'}>
-                                    <RadioGroup value={schemaValue} onChange={setSchemaValue}>
-                                        <Stack spacing={4}>
-                                            <HStack align={'start'}>
-                                                <Radio size="md" value={DatabaseSchema.FULL_TRACE} colorScheme="blue" padding={1} />
-                                                <Box>
-                                                    <Text fontWeight="bold">Full Trace</Text>
-                                                    <Text>Each entry will include all the spans of a complete trace call, that is, all the steps on your pipeline, and the expected output</Text>
-                                                </Box>
-                                            </HStack>
-                                            <HStack align={'start'}>
-                                                <Radio size="md" value={DatabaseSchema.LLM_CHAT_CALL} colorScheme="blue" padding={1} />
-                                                <Box>
-                                                    <Text fontWeight="bold">LLM Call</Text>
-                                                    <Text>Each entry will be a single LLM Call with the expected output, this allows you to focus on improving on a single step of your pipeline with both the playground and manual runs</Text>
-                                                </Box>
-                                            </HStack>
-                                            <HStack align={'start'}>
-                                                <Radio size="md" value={DatabaseSchema.STRING_I_O} colorScheme="blue" padding={1} />
-                                                <Box>
-                                                    <Text fontWeight="bold">String Input/Output</Text>
-                                                    <Text>Each entry will be a simple input/output string pair, for running batch evaluations without the whole LLM structure</Text>
-                                                </Box>
-                                            </HStack>
-                                            <HStack align={'start'} display={'none'}>
-                                                <Radio size="md" value={DatabaseSchema.KEY_VALUE} colorScheme="blue" padding={1} />
-                                                <Box>
-                                                    <Text fontWeight="bold">Key-Value</Text>
-                                                    <Text>You can use the generic key-value schema for storing any dataset format, however requires manual implementation for batch evaluations</Text>
-                                                </Box>
-                                            </HStack>
-                                        </Stack>
-                                    </RadioGroup>
-                                </VStack>
-                            </Container>
-                        </HStack>
-                        <Button
-                            colorScheme="blue"
-                            type="submit"
-                            minWidth="fit-content"
-                        >
-                            Create Dataset
-                        </Button>
-                    </form>
-                </DrawerBody >
-            </DrawerContent >
-        </Drawer >
-    )
+interface AddDatasetForm {
+  dataSetName: string;
+  schemaValue: DatabaseSchema;
+  columns: (
+    | "input"
+    | "expected_output"
+    | "contexts"
+    | "spans"
+    | "llm_input"
+    | "expected_llm_output"
+  )[];
 }
+
+export const AddDatasetDrawer = (props: AddDatasetDrawerProps) => {
+  const { project } = useOrganizationTeamProject();
+  const toast = useToast();
+  const createDataset = api.dataset.create.useMutation();
+
+  const {
+    register,
+    handleSubmit,
+    watch,
+    formState: { errors },
+    reset,
+    getValues,
+    setValue,
+  } = useForm<AddDatasetForm>({
+    defaultValues: {
+      dataSetName: "",
+      schemaValue: DatabaseSchema.ONE_MESSAGE_PER_ROW,
+      columns: ["input", "expected_output"],
+    },
+  });
+
+  const defaultColumns = getValues("columns");
+  const currentSchemaValue = watch("schemaValue");
+
+  const dataSetName = watch("dataSetName");
+  const slug = slugify(dataSetName || "", { lower: true, strict: true });
+
+  useEffect(() => {
+    if (currentSchemaValue === DatabaseSchema.ONE_LLM_CALL_PER_ROW) {
+      setValue("columns", ["llm_input", "expected_llm_output"]);
+    } else {
+      setValue("columns", ["input", "expected_output"]);
+    }
+  }, [currentSchemaValue, setValue]);
+
+  const onSubmit = (data: AddDatasetForm) => {
+    console.log("data", data);
+    // createDataset.mutate(
+    //   {
+    //     projectId: project?.id ?? "",
+    //     name: data.dataSetName,
+    //     schema: data.schemaValue,
+    //   },
+    //   {
+    //     onSuccess: () => {
+    //       props.onSuccess();
+    //       toast({
+    //         title: "Dataset Created",
+    //         description: `You have successfully created the dataset ${data.dataSetName}`,
+    //         status: "success",
+    //         duration: 5000,
+    //         isClosable: true,
+    //         position: "top-right",
+    //       });
+    //       reset();
+    //     },
+    //     onError: (error) => {
+    //       toast({
+    //         title: "Error creating dataset",
+    //         description: error.message,
+    //         status: "error",
+    //         duration: 5000,
+    //         isClosable: true,
+    //         position: "top-right",
+    //       });
+    //     },
+    //   }
+    // );
+  };
+
+  return (
+    <Drawer
+      isOpen={props.isOpen}
+      placement="right"
+      size={"xl"}
+      onClose={props.onClose}
+    >
+      <DrawerContent>
+        <DrawerHeader>
+          <HStack>
+            <DrawerCloseButton />
+          </HStack>
+          <HStack>
+            <Text paddingTop={5} fontSize="2xl">
+              New Dataset
+            </Text>
+          </HStack>
+        </DrawerHeader>
+        <DrawerBody>
+          {/* eslint-disable-next-line @typescript-eslint/no-misused-promises */}
+          <form onSubmit={handleSubmit(onSubmit)}>
+            <HorizontalFormControl
+              label="Name"
+              helper="Give it a name that identifies what this group of examples is
+              going to focus on"
+              isInvalid={!!errors.schemaValue}
+            >
+              <Input
+                placeholder="Good Responses Dataset"
+                {...register("dataSetName", {
+                  required: "Dataset name is required",
+                })}
+              />
+              {slug && <FormHelperText>slug: {slug}</FormHelperText>}
+              <FormErrorMessage>{errors.dataSetName?.message}</FormErrorMessage>
+            </HorizontalFormControl>
+
+            <HorizontalFormControl
+              label="Schema"
+              helper="Define the type of structure for this dataset"
+              isInvalid={!!errors.schemaValue}
+              minWidth="calc(50% - 16px)"
+            >
+              <RadioGroup defaultValue={DatabaseSchema.ONE_MESSAGE_PER_ROW}>
+                <VStack spacing={4}>
+                  <VStack align="start">
+                    <Radio
+                      size="md"
+                      value={DatabaseSchema.ONE_MESSAGE_PER_ROW}
+                      colorScheme="blue"
+                      alignItems="start"
+                      spacing={3}
+                      paddingTop={2}
+                      {...register("schemaValue")}
+                    >
+                      <VStack align="start" marginTop={-1}>
+                        <Text fontWeight="500">One Message Per Row</Text>
+                        <Text fontSize={13}>
+                          This is the most common type of dataset for doing
+                          batch evaluations and fine-tuning your model
+                        </Text>
+                      </VStack>
+                    </Radio>
+                  </VStack>
+                  <VStack align="start">
+                    <Radio
+                      size="md"
+                      value={DatabaseSchema.ONE_LLM_CALL_PER_ROW}
+                      colorScheme="blue"
+                      alignItems="start"
+                      spacing={3}
+                      paddingTop={2}
+                      {...register("schemaValue")}
+                    >
+                      <VStack align="start" marginTop={-1}>
+                        <Text fontWeight="500">One LLM Call Per Row</Text>
+                        <Text fontSize={13}>
+                          Each entry will be a single LLM Call within a message,
+                          this allows you to focus on improving on a single step
+                          of your pipeline with both the playground and manual
+                          runs
+                        </Text>
+                      </VStack>
+                    </Radio>
+                  </VStack>
+                </VStack>
+              </RadioGroup>
+            </HorizontalFormControl>
+
+            <HorizontalFormControl
+              label="Columns"
+              helper="Which columns should be present in the dataset"
+              isInvalid={!!errors.columns}
+            >
+              <VStack align="start">
+                {currentSchemaValue === DatabaseSchema.ONE_MESSAGE_PER_ROW && (
+                  <CheckboxGroup defaultValue={["input", "expected_output"]}>
+                    <Checkbox
+                      value="input"
+                      {...register("columns")}
+                      alignItems="start"
+                      paddingTop={2}
+                      readOnly
+                    >
+                      <VStack align="start" marginTop={-1}>
+                        <HStack>
+                          <Text fontWeight="500">Input</Text>
+                          <Text fontSize={13} color="gray.500">
+                            (required)
+                          </Text>
+                        </HStack>
+                        <Text fontSize={13}>The message input string</Text>
+                      </VStack>
+                    </Checkbox>
+                    <Checkbox
+                      value="expected_output"
+                      {...register("columns")}
+                      alignItems="start"
+                      paddingTop={2}
+                      readOnly
+                    >
+                      <VStack align="start" marginTop={-1}>
+                        <HStack>
+                          <Text fontWeight="500">Expected Output</Text>
+                          <Text fontSize={13} color="gray.500">
+                            (required)
+                          </Text>
+                        </HStack>
+                        <Text fontSize={13}>
+                          The gold-standard expected output for the given input,
+                          useful for output-comparison metrics
+                        </Text>
+                      </VStack>
+                    </Checkbox>
+                    <Checkbox
+                      value="contexts"
+                      {...register("columns")}
+                      alignItems="start"
+                      paddingTop={2}
+                    >
+                      <VStack align="start" marginTop={-1}>
+                        <Text fontWeight="500">Contexts</Text>
+                        <Text fontSize={13}>
+                          The contexts provided if your are doing RAG, useful
+                          for RAG-metric evaluations
+                        </Text>
+                      </VStack>
+                    </Checkbox>
+                    <Checkbox
+                      value="spans"
+                      {...register("columns")}
+                      alignItems="start"
+                      paddingTop={2}
+                    >
+                      <VStack align="start" marginTop={-1}>
+                        <Text fontWeight="500">Spans</Text>
+                        <Text fontSize={13}>
+                          A JSON with all the spans contained in the message
+                          trace, that is, all the steps in your pipeline, for
+                          more complex evaluations
+                        </Text>
+                      </VStack>
+                    </Checkbox>
+                  </CheckboxGroup>
+                )}
+
+                {currentSchemaValue === DatabaseSchema.ONE_LLM_CALL_PER_ROW && (
+                  <CheckboxGroup
+                    defaultValue={["llm_input", "expected_llm_output"]}
+                  >
+                    <Checkbox
+                      value="llm_input"
+                      {...register("columns")}
+                      alignItems="start"
+                      paddingTop={2}
+                      readOnly
+                    >
+                      <VStack align="start" marginTop={-1}>
+                        <HStack>
+                          <Text fontWeight="500">LLM Input</Text>
+                          <Text fontSize={13} color="gray.500">
+                            (required)
+                          </Text>
+                        </HStack>
+                        <Text fontSize={13}>
+                          The input the LLM received, in LLM chat history json
+                          format
+                        </Text>
+                      </VStack>
+                    </Checkbox>
+                    <Checkbox
+                      value="expected_llm_output"
+                      {...register("columns")}
+                      alignItems="start"
+                      paddingTop={2}
+                      readOnly
+                    >
+                      <VStack align="start" marginTop={-1}>
+                        <HStack>
+                          <Text fontWeight="500">Expected LLM Output</Text>
+                          <Text fontSize={13} color="gray.500">
+                            (required)
+                          </Text>
+                        </HStack>
+                        <Text fontSize={13}>
+                          The gold-standard expected output for the given input,
+                          in LLM chat history json format
+                        </Text>
+                      </VStack>
+                    </Checkbox>
+                  </CheckboxGroup>
+                )}
+              </VStack>
+            </HorizontalFormControl>
+            <Button colorScheme="blue" type="submit" minWidth="fit-content">
+              Create Dataset
+            </Button>
+          </form>
+        </DrawerBody>
+      </DrawerContent>
+    </Drawer>
+  );
+};

@@ -210,7 +210,9 @@ const DynamicZodForm = ({
         <VStack width="full" spacing={2}>
           {Object.keys(fieldSchema_.shape).map((key) => (
             <VStack key={key} align="start" width="full">
-              <SmallLabel>{titleCase(key)}</SmallLabel>
+              {!(fieldSchema_.shape[key] instanceof z.ZodBoolean) && (
+                <SmallLabel>{titleCase(key)}</SmallLabel>
+              )}
               {renderField(
                 fieldSchema_.shape[key],
                 `${fieldName}.${key}`,
