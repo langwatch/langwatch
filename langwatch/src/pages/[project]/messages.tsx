@@ -43,7 +43,11 @@ export default function MessagesOrIntegrationGuide() {
   }
 
   if (isTableView) {
-    return <MessagesTable />;
+    return (
+      <DashboardLayout>
+        <MessagesTable />
+      </DashboardLayout>
+    );
   }
 
   return (

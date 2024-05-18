@@ -611,7 +611,7 @@ export function MessagesTable() {
   };
 
   return (
-    <DashboardLayout>
+    <>
       <Container maxW={"calc(100vw - 200px)"} padding={6}>
         <HStack width="full" align="top" paddingBottom={6}>
           <HStack align="center" spacing={6}>
@@ -863,6 +863,6 @@ export function MessagesTable() {
         onClose={addDatasetModal.onClose}
         selectedTraceIds={selectedTraceIds}
       />
-    </DashboardLayout>
+    </>
   );
 }
