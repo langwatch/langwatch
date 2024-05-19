@@ -55,7 +55,7 @@ export const datasetRouter = createTRPCRouter({
       const prisma = ctx.prisma;
 
       const datasets = await prisma.dataset.findMany({
-        where: { projectId },
+        where: { projectId, archived: false },
         orderBy: { createdAt: "desc" },
         include: {
           datasetRecords: {
@@ -67,12 +67,21 @@ export const datasetRouter = createTRPCRouter({
       return datasets;
     }),
   deleteById: protectedProcedure
-    .input(z.object({ projectId: z.string(), datasetId: z.string() }))
+    .input(
+      z.object({
+        projectId: z.string(),
+        datasetId: z.string(),
+        undo: z.boolean().optional(),
+      })
+    )
     .use(checkUserPermissionForProject(TeamRoleGroup.DATASETS_MANAGE))
     .mutation(async ({ ctx, input }) => {
-      await ctx.prisma.dataset.delete({
+      await ctx.prisma.dataset.update({
         where: {
           id: input.datasetId,
+        },
+        data: {
+          archived: input.undo ? false : true,
         },
       });
 

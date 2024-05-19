@@ -82,8 +82,43 @@ export default function Datasets() {
           void datasets.refetch();
           toast({
             title: "Dataset deleted",
+            description: (
+              <HStack>
+                <Button
+                  colorScheme="white"
+                  variant="link"
+                  textDecoration="underline"
+                  onClick={() => {
+                    toast.closeAll();
+                    datasetDelete.mutate(
+                      {
+                        projectId: project?.id ?? "",
+                        datasetId: id,
+                        undo: true,
+                      },
+                      {
+                        onSuccess: () => {
+                          void datasets.refetch();
+                          toast({
+                            title: "Dataset restored",
+                            description: "The dataset has been restored.",
+                            status: "success",
+                            duration: 5000,
+                            isClosable: true,
+                            position: "top-right",
+                          });
+                          onClose();
+                        },
+                      }
+                    );
+                  }}
+                >
+                  Undo
+                </Button>
+              </HStack>
+            ),
             status: "success",
-            duration: 5000,
+            duration: 10_000,
             isClosable: true,
             position: "top-right",
           });
@@ -161,7 +196,7 @@ export default function Datasets() {
                             <Th>Schema</Th>
                             <Th>Columns</Th>
                             <Th>Entries</Th>
-                            <Th>Last Update</Th>
+                            <Th width={240}>Last Update</Th>
                             <Th width={20}></Th>
                           </Tr>
                         </Thead>

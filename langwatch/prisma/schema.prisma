@@ -279,6 +279,7 @@ model Dataset {
     columns         String            @default("input,expected_output")
     createdAt       DateTime          @default(now())
     updatedAt       DateTime          @default(now()) @updatedAt
+    archived        Boolean           @default(false)
     datasetRecords  DatasetRecord[]
     BatchProcessing BatchProcessing[]
 
