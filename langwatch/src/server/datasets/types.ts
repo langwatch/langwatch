@@ -9,6 +9,9 @@ export type OneLLMCallPerRowColumns = "llm_input" | "expected_llm_output";
 export type DatasetColumns = OneMessagePerRowColumns & OneLLMCallPerRowColumns;
 
 export type DatasetRecordForm = {
+  /**
+   * @minLength 1
+   */
   name: string;
 } & (
   | {

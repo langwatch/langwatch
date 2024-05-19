@@ -24,10 +24,10 @@ import { CheckPassingDrawer } from "./CheckPassingDrawer";
 import { SpanTree } from "./traces/SpanTree";
 import { TraceSummary } from "./traces/Summary";
 import { Link } from "@chakra-ui/next-js";
-import { AddDatasetRecordDrawer } from "./AddDatasetRecordDrawer";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import { api } from "../utils/api";
 import { useDrawer } from "./CurrentDrawer";
+import { AddDatasetRecordDrawerV2 } from "./AddDatasetRecordDrawerV2";
 
 interface TraceDetailsDrawerProps {
   traceId: string;
@@ -264,7 +264,7 @@ export const TraceDetailsDrawer = (props: TraceDetailsDrawerProps) => {
           </Tabs>
         </DrawerBody>
       </DrawerContent>
-      <AddDatasetRecordDrawer
+      <AddDatasetRecordDrawerV2
         isOpen={isOpen}
         onClose={onClose}
         traceId={props.traceId ?? ""}

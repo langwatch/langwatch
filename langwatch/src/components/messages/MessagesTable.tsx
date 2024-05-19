@@ -56,11 +56,9 @@ import { api } from "~/utils/api";
 import { durationColor } from "~/utils/durationColor";
 import { getSingleQueryParam } from "~/utils/getSingleQueryParam";
 import { useFilterParams } from "../../hooks/useFilterParams";
-import { DashboardLayout } from "../DashboardLayout";
 
 import Parse from "papaparse";
 import { useLocalStorage } from "usehooks-ts";
-import { AddDatasetRecordDrawer } from "../AddDatasetRecordDrawer";
 import { checkStatusColorMap } from "../checks/EvaluationStatus";
 import { FilterSidebar } from "../filters/FilterSidebar";
 import { usePeriodSelector, PeriodSelector } from "../PeriodSelector";
@@ -69,6 +67,7 @@ import { ToggleAnalytics, ToggleTableView } from "./HeaderButtons";
 import { useDrawer } from "../CurrentDrawer";
 import type { TraceWithGuardrail } from "./MessageCard";
 import { titleCase } from "../../utils/stringCasing";
+import { AddDatasetRecordDrawerV2 } from "../AddDatasetRecordDrawerV2";
 
 export function MessagesTable() {
   const router = useRouter();
@@ -858,7 +857,7 @@ export function MessagesTable() {
           </HStack>
         </Box>
       )}
-      <AddDatasetRecordDrawer
+      <AddDatasetRecordDrawerV2
         isOpen={addDatasetModal.isOpen}
         onClose={addDatasetModal.onClose}
         selectedTraceIds={selectedTraceIds}

@@ -19,7 +19,7 @@ import {
 } from "@chakra-ui/react";
 import { DatabaseSchema } from "@prisma/client";
 import { useEffect } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, type FieldErrors } from "react-hook-form";
 import slugify from "slugify";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
@@ -52,7 +52,20 @@ export const AddDatasetDrawer = (props: AddDatasetDrawerProps) => {
       schema: DatabaseSchema.ONE_MESSAGE_PER_ROW,
       columns: ["input", "expected_output"],
     },
-    resolver: zodResolver(datasetRecordFormSchema),
+    resolver: async (data, context, options) => {
+      const result = await zodResolver(datasetRecordFormSchema)(
+        data,
+        context,
+        options
+      );
+      if (!data.name || data.name.trim() === "") {
+        (result.errors as FieldErrors<DatasetRecordForm>).name = {
+          type: "required",
+          message: "Name is required",
+        };
+      }
+      return result;
+    },
   });
 
   const currentSchema = watch("schema");
@@ -128,13 +141,11 @@ export const AddDatasetDrawer = (props: AddDatasetDrawerProps) => {
               label="Name"
               helper="Give it a name that identifies what this group of examples is
               going to focus on"
-              isInvalid={!!errors.schema}
+              isInvalid={!!errors.name}
             >
               <Input
                 placeholder="Good Responses Dataset"
-                {...register("name", {
-                  required: "Dataset name is required",
-                })}
+                {...register("name")}
               />
               {slug && <FormHelperText>slug: {slug}</FormHelperText>}
               <FormErrorMessage>{errors.name?.message}</FormErrorMessage>
