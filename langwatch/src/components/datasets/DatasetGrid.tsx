@@ -1,4 +1,8 @@
-import { AgGridReact, type AgGridReactProps } from "ag-grid-react";
+import {
+  AgGridReact,
+  type AgGridReactProps,
+  type CustomCellEditorProps,
+} from "ag-grid-react";
 import { useMemo } from "react";
 import { MultilineCellEditor } from "./MultilineCellEditor";
 import { Skeleton } from "@chakra-ui/react";
@@ -7,6 +11,10 @@ import type { GridOptions } from "ag-grid-community";
 import "ag-grid-community/styles/ag-grid.css";
 import "ag-grid-community/styles/ag-theme-balham.css";
 import { RenderInputOutput } from "../traces/RenderInputOutput";
+import { MultilineJSONCellEditor } from "./MultilineJSONCellEditor";
+import { type ColDef } from "ag-grid-community";
+import { datasetSpanSchema, spanSchema } from "../../server/tracer/types.generated";
+import { z } from "zod";
 
 export const JSONCellRenderer = (props: { value: string | undefined }) => {
   return (
@@ -30,6 +38,24 @@ export function DatasetGrid(props: AgGridReactProps) {
     }),
     []
   );
+
+  const columnDefs_ = useMemo(() => {
+    return props.columnDefs?.map((column: ColDef) => {
+      if (column.field === "spans") {
+        return {
+          ...column,
+          cellRenderer: JSONCellRenderer,
+          cellEditor: (props: CustomCellEditorProps) => (
+            <MultilineJSONCellEditor
+              zodValidator={z.array(datasetSpanSchema)}
+              {...props}
+            />
+          ),
+        };
+      }
+      return column;
+    });
+  }, [props.columnDefs]);
 
   return (
     <div className="ag-theme-balham">
@@ -93,6 +119,7 @@ export function DatasetGrid(props: AgGridReactProps) {
           },
         }}
         {...props}
+        columnDefs={columnDefs_}
       />
     </div>
   );

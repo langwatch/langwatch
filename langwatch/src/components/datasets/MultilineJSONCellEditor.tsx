@@ -1,9 +1,17 @@
 import React, { useRef, useEffect, useState } from "react";
 import type { CustomCellEditorProps } from "ag-grid-react";
-import { Textarea, VStack, Text, useToast, Alert } from "@chakra-ui/react";
+import {
+  Textarea,
+  VStack,
+  Text,
+  Alert,
+  Tooltip,
+} from "@chakra-ui/react";
+import { ZodError, type ZodType } from "zod";
+import { fromZodError } from "zod-validation-error";
 
 export const MultilineJSONCellEditor = React.forwardRef(
-  (props: CustomCellEditorProps, ref) => {
+  (props: CustomCellEditorProps & { zodValidator: ZodType }, ref) => {
     const { value, onValueChange } = props;
     const updateValue = (val: string) => {
       onValueChange(val === "" ? null : val);
@@ -28,13 +36,25 @@ export const MultilineJSONCellEditor = React.forwardRef(
     }, []);
 
     const refInput = useRef<HTMLTextAreaElement>(null);
-    const toast = useToast();
 
     const [jsonError, setJsonError] = useState<string | null>(null);
 
     return (
       <VStack width="100%" minHeight="100%" spacing={0}>
-        {jsonError && <Alert status="error">{jsonError}</Alert>}
+        {jsonError && (
+          <Tooltip
+            maxWidth="700px"
+            label={
+              <Text whiteSpace="pre-wrap">
+                {jsonError}
+              </Text>
+            }
+          >
+            <Alert status="error">
+              <Text noOfLines={1}>{jsonError}</Text>
+            </Alert>
+          </Tooltip>
+        )}
         <Textarea
           borderRadius={0}
           resize="none"
@@ -47,16 +67,19 @@ export const MultilineJSONCellEditor = React.forwardRef(
           ref={refInput}
           onChange={(event) => {
             try {
-              JSON.parse(event.target.value);
+              const parsed = JSON.parse(event.target.value);
+              const validated = props.zodValidator.parse(parsed);
               setJsonError(null);
-              updateValue(event.target.value);
+              updateValue(JSON.stringify(validated, null, 2));
             } catch (e: any) {
-              setJsonError(e.message);
-              toast({
-                title: "Invalid JSON",
-                status: "error",
-                duration: 3000,
-              });
+              if (e instanceof ZodError) {
+                const validationError = fromZodError(e, {
+                  unionSeparator: ", or\n",
+                });
+                setJsonError(validationError.message);
+              } else {
+                setJsonError(e.message);
+              }
             }
           }}
         />

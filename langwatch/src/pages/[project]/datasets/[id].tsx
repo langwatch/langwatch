@@ -6,7 +6,6 @@ import {
   Container,
   HStack,
   Heading,
-  Skeleton,
   Spacer,
   Text,
   useToast,
@@ -21,12 +20,8 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { schemaDisplayName } from "~/utils/datasets";
 import { useCallback, useMemo } from "react";
-import {
-  DatasetGrid,
-  JSONCellRenderer,
-} from "../../../components/datasets/DatasetGrid";
+import { DatasetGrid } from "../../../components/datasets/DatasetGrid";
 import { type ColDef } from "ag-grid-community";
-import { MultilineJSONCellEditor } from "../../../components/datasets/MultilineJSONCellEditor";
 
 export default function Dataset() {
   return (
@@ -72,8 +67,6 @@ function DatasetTable() {
       field,
       cellClass: "v-align",
       sortable: false,
-      cellRenderer: field === "spans" ? JSONCellRenderer : undefined,
-      cellEditor: field === "spans" ? MultilineJSONCellEditor : undefined,
     }));
 
     // Add row number column
