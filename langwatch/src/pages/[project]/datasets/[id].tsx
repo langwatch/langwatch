@@ -21,8 +21,12 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { schemaDisplayName } from "~/utils/datasets";
 import { useCallback, useMemo } from "react";
-import { DatasetGrid } from "../../../components/datasets/DatasetGrid";
+import {
+  DatasetGrid,
+  JSONCellRenderer,
+} from "../../../components/datasets/DatasetGrid";
 import { type ColDef } from "ag-grid-community";
+import { MultilineJSONCellEditor } from "../../../components/datasets/MultilineJSONCellEditor";
 
 export default function Dataset() {
   return (
@@ -42,6 +46,7 @@ function DatasetTable() {
     { projectId: project?.id ?? "", datasetId: dataSetId as string },
     {
       enabled: !!project,
+      refetchOnWindowFocus: false,
     }
   );
 
@@ -62,16 +67,32 @@ function DatasetTable() {
       fields = ["input", "expected_output", "spans"];
     }
 
-    return fields.map((field) => ({
+    const headers: ColDef[] = fields.map((field) => ({
       headerName: fieldToLabelMap[field],
       field,
       cellClass: "v-align",
+      sortable: false,
+      cellRenderer: field === "spans" ? JSONCellRenderer : undefined,
+      cellEditor: field === "spans" ? MultilineJSONCellEditor : undefined,
     }));
+
+    // Add row number column
+    headers.unshift({
+      headerName: "#",
+      valueGetter: "node.rowIndex + 1",
+      width: 42,
+      pinned: "left",
+      sortable: false,
+      filter: false,
+      editable: false,
+    });
+
+    return headers;
   };
 
   const getTableRows = useCallback(
     (datasetRecord: DatasetRecord, schema: DatabaseSchema) => {
-      let tableRows: any = {};
+      let tableRows: Record<string, any> = {};
 
       if (
         schema === DatabaseSchema.STRING_I_O ||
@@ -97,7 +118,10 @@ function DatasetTable() {
     []
   );
 
-  const getInput = (datasetRecord: DatasetRecord, schema: DatabaseSchema) => {
+  const getInput = (
+    datasetRecord: DatasetRecord,
+    schema: DatabaseSchema
+  ): string => {
     if (schema === DatabaseSchema.LLM_CHAT_CALL) {
       return JSON.stringify((datasetRecord.entry as any).input[0]) ?? "";
     }
@@ -107,9 +131,13 @@ function DatasetTable() {
     ) {
       return (datasetRecord.entry as any).input;
     }
+    return "";
   };
 
-  const getOutput = (datasetRecord: any, schema: DatabaseSchema) => {
+  const getOutput = (
+    datasetRecord: DatasetRecord,
+    schema: DatabaseSchema
+  ): string => {
     if (schema === DatabaseSchema.LLM_CHAT_CALL) {
       return JSON.stringify(datasetRecord.entry.expected_output[0]) ?? "";
     }
@@ -119,9 +147,13 @@ function DatasetTable() {
     ) {
       return datasetRecord.entry.expected_output;
     }
+    return "";
   };
 
-  const getTrace = (datasetRecord: any, schema: DatabaseSchema) => {
+  const getTrace = (
+    datasetRecord: DatasetRecord,
+    schema: DatabaseSchema
+  ): string => {
     if (schema === DatabaseSchema.FULL_TRACE) {
       return JSON.stringify(datasetRecord.entry.spans) ?? "";
     }
@@ -261,7 +293,7 @@ function DatasetTable() {
           </Button>
         </HStack>
         <Card>
-          <CardBody>
+          <CardBody padding={0}>
             <DatasetGrid
               columnDefs={columnDefs}
               autoGroupColumnDef={{

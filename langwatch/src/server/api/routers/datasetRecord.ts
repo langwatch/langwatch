@@ -94,8 +94,8 @@ export const datasetRecordRouter = createTRPCRouter({
         datasetId: z.string(),
         recordId: z.string(),
         updatedRecord: z.object({
-          input: z.string(),
-          expected_output: z.string(),
+          input: z.optional(z.string()),
+          expected_output: z.optional(z.string()),
           spans: z.optional(z.string()),
         }),
       })
@@ -115,13 +115,18 @@ export const datasetRecordRouter = createTRPCRouter({
         });
       }
 
-      const updatedData: any = {
-        input: updatedRecord.input,
-        expected_output: updatedRecord.expected_output,
-      };
+      const updatedData: any = {}
+
+      if (updatedRecord.input) {
+        updatedData.input = updatedRecord.input;
+      }
+
+      if (updatedRecord.expected_output) {
+        updatedData.expected_output = updatedRecord.expected_output;
+      }
 
       if (updatedRecord.spans) {
-        updatedData.spans = updatedRecord.spans;
+        updatedData.spans = JSON.parse(updatedRecord.spans);
       }
 
       await ctx.prisma.datasetRecord.update({
