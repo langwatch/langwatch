@@ -6,11 +6,17 @@ import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { nanoid } from "nanoid";
 import slugify from "slugify";
 import { TeamRoleGroup, checkUserPermissionForProject } from "../permission";
+import { datasetRecordFormSchema } from "../../datasets/types.generated";
 
 export const datasetRouter = createTRPCRouter({
   create: protectedProcedure
     .input(
-      z.object({ projectId: z.string(), name: z.string(), schema: z.string() })
+      z.intersection(
+        z.object({
+          projectId: z.string(),
+        }),
+        datasetRecordFormSchema
+      )
     )
     .use(checkUserPermissionForProject(TeamRoleGroup.DATASETS_MANAGE))
     .mutation(async ({ ctx, input }) => {
@@ -37,6 +43,7 @@ export const datasetRouter = createTRPCRouter({
           name: input.name,
           schema: input.schema as keyof typeof DatabaseSchema,
           projectId: input.projectId,
+          columns: input.columns.join(","),
         },
       });
     }),

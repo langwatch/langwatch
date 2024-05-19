@@ -276,7 +276,7 @@ model Dataset {
     name            String
     slug            String
     schema          DatabaseSchema
-    columns         String            @default("input,output")
+    columns         String            @default("input,expected_output")
     createdAt       DateTime          @default(now())
     updatedAt       DateTime          @default(now()) @updatedAt
     datasetRecords  DatasetRecord[]

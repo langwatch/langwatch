@@ -26,6 +26,7 @@ import {
   useDisclosure,
   useToast,
   Menu,
+  Tag,
 } from "@chakra-ui/react";
 
 import { useRouter } from "next/router";
@@ -150,6 +151,7 @@ export default function Datasets() {
                           <Tr>
                             <Th>Name</Th>
                             <Th>Schema</Th>
+                            <Th>Columns</Th>
                             <Th>Entries</Th>
                             <Th>Last Update</Th>
                             <Th width={20}></Th>
@@ -175,6 +177,15 @@ export default function Datasets() {
                                 >
                                   <Td>{dataset.name}</Td>
                                   <Td>{displayName(dataset.schema)}</Td>
+                                  <Td maxWidth="250px">
+                                    <HStack>
+                                      {dataset.columns
+                                        .split(",")
+                                        .map((column) => (
+                                          <Tag size="sm">{column}</Tag>
+                                        ))}
+                                    </HStack>
+                                  </Td>
                                   <Td>{dataset.datasetRecords.length ?? 0}</Td>
                                   <Td>
                                     {new Date(

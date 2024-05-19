@@ -1,51 +1,37 @@
 import {
-  Box,
   Button,
-  Container,
+  Checkbox,
+  CheckboxGroup,
   Drawer,
   DrawerBody,
   DrawerCloseButton,
   DrawerContent,
   DrawerHeader,
-  FormControl,
   FormErrorMessage,
   FormHelperText,
   HStack,
   Input,
   Radio,
   RadioGroup,
+  Text,
   VStack,
   useToast,
-  Text,
-  CheckboxGroup,
-  Checkbox,
 } from "@chakra-ui/react";
 import { DatabaseSchema } from "@prisma/client";
-import { useForm } from "react-hook-form";
-import { api } from "~/utils/api";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import slugify from "slugify";
-import { HorizontalFormControl } from "./HorizontalFormControl";
-import { SmallLabel } from "./SmallLabel";
 import { useEffect } from "react";
+import { useForm } from "react-hook-form";
+import slugify from "slugify";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { api } from "~/utils/api";
+import { HorizontalFormControl } from "./HorizontalFormControl";
+import type { DatasetRecordForm } from "../server/datasets/types";
+import { datasetRecordFormSchema } from "../server/datasets/types.generated";
+import { zodResolver } from "@hookform/resolvers/zod";
 
 interface AddDatasetDrawerProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
-}
-
-interface AddDatasetForm {
-  dataSetName: string;
-  schemaValue: DatabaseSchema;
-  columns: (
-    | "input"
-    | "expected_output"
-    | "contexts"
-    | "spans"
-    | "llm_input"
-    | "expected_llm_output"
-  )[];
 }
 
 export const AddDatasetDrawer = (props: AddDatasetDrawerProps) => {
@@ -59,63 +45,62 @@ export const AddDatasetDrawer = (props: AddDatasetDrawerProps) => {
     watch,
     formState: { errors },
     reset,
-    getValues,
     setValue,
-  } = useForm<AddDatasetForm>({
+  } = useForm<DatasetRecordForm>({
     defaultValues: {
-      dataSetName: "",
-      schemaValue: DatabaseSchema.ONE_MESSAGE_PER_ROW,
+      name: "",
+      schema: DatabaseSchema.ONE_MESSAGE_PER_ROW,
       columns: ["input", "expected_output"],
     },
+    resolver: zodResolver(datasetRecordFormSchema),
   });
 
-  const defaultColumns = getValues("columns");
-  const currentSchemaValue = watch("schemaValue");
+  const currentSchema = watch("schema");
 
-  const dataSetName = watch("dataSetName");
-  const slug = slugify(dataSetName || "", { lower: true, strict: true });
+  const name = watch("name");
+  const slug = slugify(name || "", { lower: true, strict: true });
 
   useEffect(() => {
-    if (currentSchemaValue === DatabaseSchema.ONE_LLM_CALL_PER_ROW) {
+    if (currentSchema === DatabaseSchema.ONE_LLM_CALL_PER_ROW) {
       setValue("columns", ["llm_input", "expected_llm_output"]);
     } else {
       setValue("columns", ["input", "expected_output"]);
     }
-  }, [currentSchemaValue, setValue]);
+  }, [currentSchema, setValue]);
 
-  const onSubmit = (data: AddDatasetForm) => {
-    console.log("data", data);
-    // createDataset.mutate(
-    //   {
-    //     projectId: project?.id ?? "",
-    //     name: data.dataSetName,
-    //     schema: data.schemaValue,
-    //   },
-    //   {
-    //     onSuccess: () => {
-    //       props.onSuccess();
-    //       toast({
-    //         title: "Dataset Created",
-    //         description: `You have successfully created the dataset ${data.dataSetName}`,
-    //         status: "success",
-    //         duration: 5000,
-    //         isClosable: true,
-    //         position: "top-right",
-    //       });
-    //       reset();
-    //     },
-    //     onError: (error) => {
-    //       toast({
-    //         title: "Error creating dataset",
-    //         description: error.message,
-    //         status: "error",
-    //         duration: 5000,
-    //         isClosable: true,
-    //         position: "top-right",
-    //       });
-    //     },
-    //   }
-    // );
+  const onSubmit = (data: DatasetRecordForm) => {
+    createDataset.mutate(
+      {
+        projectId: project?.id ?? "",
+        name: data.name,
+        schema: data.schema,
+        columns: data.columns,
+      } as DatasetRecordForm & { projectId: string },
+      {
+        onSuccess: () => {
+          props.onSuccess();
+          toast({
+            title: "Dataset Created",
+            description: `Successfully created ${data.name} dataset`,
+            status: "success",
+            duration: 5000,
+            isClosable: true,
+            position: "top-right",
+          });
+          reset();
+        },
+        onError: (error) => {
+          toast({
+            title: "Error creating dataset",
+            description: error.message,
+            status: "error",
+            duration: 5000,
+            isClosable: true,
+            position: "top-right",
+          });
+        },
+      }
+    );
   };
 
   return (
@@ -143,22 +128,22 @@ export const AddDatasetDrawer = (props: AddDatasetDrawerProps) => {
               label="Name"
               helper="Give it a name that identifies what this group of examples is
               going to focus on"
-              isInvalid={!!errors.schemaValue}
+              isInvalid={!!errors.schema}
             >
               <Input
                 placeholder="Good Responses Dataset"
-                {...register("dataSetName", {
+                {...register("name", {
                   required: "Dataset name is required",
                 })}
               />
               {slug && <FormHelperText>slug: {slug}</FormHelperText>}
-              <FormErrorMessage>{errors.dataSetName?.message}</FormErrorMessage>
+              <FormErrorMessage>{errors.name?.message}</FormErrorMessage>
             </HorizontalFormControl>
 
             <HorizontalFormControl
               label="Schema"
               helper="Define the type of structure for this dataset"
-              isInvalid={!!errors.schemaValue}
+              isInvalid={!!errors.schema}
               minWidth="calc(50% - 16px)"
             >
               <RadioGroup defaultValue={DatabaseSchema.ONE_MESSAGE_PER_ROW}>
@@ -171,7 +156,7 @@ export const AddDatasetDrawer = (props: AddDatasetDrawerProps) => {
                       alignItems="start"
                       spacing={3}
                       paddingTop={2}
-                      {...register("schemaValue")}
+                      {...register("schema")}
                     >
                       <VStack align="start" marginTop={-1}>
                         <Text fontWeight="500">One Message Per Row</Text>
@@ -190,7 +175,7 @@ export const AddDatasetDrawer = (props: AddDatasetDrawerProps) => {
                       alignItems="start"
                       spacing={3}
                       paddingTop={2}
-                      {...register("schemaValue")}
+                      {...register("schema")}
                     >
                       <VStack align="start" marginTop={-1}>
                         <Text fontWeight="500">One LLM Call Per Row</Text>
@@ -213,7 +198,7 @@ export const AddDatasetDrawer = (props: AddDatasetDrawerProps) => {
               isInvalid={!!errors.columns}
             >
               <VStack align="start">
-                {currentSchemaValue === DatabaseSchema.ONE_MESSAGE_PER_ROW && (
+                {currentSchema === DatabaseSchema.ONE_MESSAGE_PER_ROW && (
                   <CheckboxGroup defaultValue={["input", "expected_output"]}>
                     <Checkbox
                       value="input"
@@ -284,7 +269,7 @@ export const AddDatasetDrawer = (props: AddDatasetDrawerProps) => {
                   </CheckboxGroup>
                 )}
 
-                {currentSchemaValue === DatabaseSchema.ONE_LLM_CALL_PER_ROW && (
+                {currentSchema === DatabaseSchema.ONE_LLM_CALL_PER_ROW && (
                   <CheckboxGroup
                     defaultValue={["llm_input", "expected_llm_output"]}
                   >
@@ -332,7 +317,12 @@ export const AddDatasetDrawer = (props: AddDatasetDrawerProps) => {
                 )}
               </VStack>
             </HorizontalFormControl>
-            <Button colorScheme="blue" type="submit" minWidth="fit-content">
+            <Button
+              colorScheme="blue"
+              type="submit"
+              minWidth="fit-content"
+              isLoading={createDataset.isLoading}
+            >
               Create Dataset
             </Button>
           </form>

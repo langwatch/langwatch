@@ -16,7 +16,7 @@
     "task": "DEBUG=langwatch:* tsx --tsconfig tsconfig.workers.json src/task.ts",
     "prisma:db:push": "npx prisma db push",
     "elastic:index:create": "npm run task -- elasticIndexCreate",
-    "types:zod:generate": "ts-to-zod src/server/tracer/types.ts src/server/tracer/types.generated.ts && ts-to-zod src/trace_checks/types.ts src/trace_checks/types.generated.ts && ts-to-zod src/trace_checks/evaluators.generated.ts src/trace_checks/evaluators.zod.generated.ts",
+    "types:zod:generate": "concurrently -r \"ts-to-zod src/server/tracer/types.ts src/server/tracer/types.generated.ts\" \"ts-to-zod src/trace_checks/types.ts src/trace_checks/types.generated.ts\" \"ts-to-zod src/trace_checks/evaluators.generated.ts src/trace_checks/evaluators.zod.generated.ts\" \"ts-to-zod src/server/datasets/types.ts src/server/datasets/types.generated.ts\"",
     "copy:integration": "cp -R ../docs/docs/integration-guides src/components/",
     "copy:langevals-types": "cd src/trace_checks && curl -L \"https://raw.githubusercontent.com/langwatch/langevals/main/ts-integration/evaluators.generated.ts?$(date +%s)\" -o evaluators.generated.ts"
   },
