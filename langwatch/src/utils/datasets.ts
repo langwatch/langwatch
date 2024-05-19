@@ -1,6 +1,6 @@
 import { DatabaseSchema } from "@prisma/client";
 
-export function displayName(value: DatabaseSchema): string {
+export function schemaDisplayName(value: DatabaseSchema): string {
   switch (value) {
     case DatabaseSchema.FULL_TRACE:
       return "Full Trace";

@@ -19,13 +19,10 @@ import { useDrawer } from "~/components/CurrentDrawer";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
-import { displayName } from "~/utils/datasets";
-
-import "ag-grid-community/styles/ag-grid.css";
-import "ag-grid-community/styles/ag-theme-quartz.css";
-import { AgGridReact } from "ag-grid-react";
+import { schemaDisplayName } from "~/utils/datasets";
 import { useCallback, useMemo } from "react";
-import { MultilineCellEditor } from "../../../components/datasets/MultilineCellEditor";
+import { DatasetGrid } from "../../../components/datasets/DatasetGrid";
+import { type ColDef } from "ag-grid-community";
 
 export default function Dataset() {
   return (
@@ -48,7 +45,7 @@ function DatasetTable() {
     }
   );
 
-  const getHeaders = (schema: DatabaseSchema) => {
+  const getHeaders = (schema: DatabaseSchema): ColDef[] => {
     const fieldToLabelMap: Record<string, string> = {
       input: "Input",
       expected_output: "Expected Output",
@@ -68,7 +65,7 @@ function DatasetTable() {
     return fields.map((field) => ({
       headerName: fieldToLabelMap[field],
       field,
-      editable: true,
+      cellClass: "v-align",
     }));
   };
 
@@ -223,28 +220,6 @@ function DatasetTable() {
 
   return (
     <>
-      <style>{`
-        .ag-theme-quartz .ag-cell {
-          white-space: pre-wrap; /* Enable word wrapping */
-          overflow: visible; /* Ensure the cell expands to fit content */
-          line-height: 1.6em;
-          padding: 0;
-        }
-        .ag-theme-quartz .ag-cell .ag-cell-value {
-          padding: 8px 16px;
-        }
-        .ag-theme-quartz .ag-cell .chakra-textarea {
-          height: 100%!important;
-        }
-        .ag-large-text, .ag-large-text-input, .ag-large-text-input > .ag-input-wrapper, .ag-input-wrapper > textarea {
-          width: 100%;
-          height: 100%!important;
-          padding: 0;
-        }
-        .ag-input-wrapper > textarea {
-          padding: 8px 16px;
-        }
-      `}</style>
       <Container maxW={"calc(100vw - 200px)"} padding={6} marginTop={8}>
         <HStack width="full" verticalAlign={"middle"} paddingBottom={6}>
           <Heading as={"h1"} size="lg">
@@ -259,7 +234,7 @@ function DatasetTable() {
             fontSize={12}
             marginLeft={4}
           >
-            {dataset.data ? displayName(dataset.data?.schema) : ""}
+            {dataset.data ? schemaDisplayName(dataset.data?.schema) : ""}
           </Text>
           <Spacer />
           <Button
@@ -286,37 +261,17 @@ function DatasetTable() {
           </Button>
         </HStack>
         <Card>
-          <CardBody className="ag-theme-quartz">
-            {dataset.data && dataset.data.datasetRecords.length == 0 ? (
-              <Text>No data found</Text>
-            ) : (
-              <AgGridReact
-                columnDefs={columnDefs}
-                rowData={rowData}
-                onCellValueChanged={onCellValueChanged}
-                loadingOverlayComponent={() => <Skeleton height="20px" />}
-                reactiveCustomComponents={true}
-                enableCellEditingOnBackspace={false}
-                domLayout="autoHeight"
-                defaultColDef={{
-                  flex: 1,
-                  minWidth: 100,
-                  resizable: true,
-                  sortable: true,
-                  filter: true,
-                  editable: true,
-                  autoHeight: true,
-                  cellEditor: MultilineCellEditor,
-                  suppressKeyboardEvent: (props) => {
-                    if (props.event.key == "Enter" && props.event.shiftKey) {
-                      props.event.stopPropagation();
-                      return true;
-                    }
-                    return false;
-                  },
-                }}
-              />
-            )}
+          <CardBody>
+            <DatasetGrid
+              columnDefs={columnDefs}
+              autoGroupColumnDef={{
+                headerName: "Group",
+                width: 250,
+                field: "name",
+              }}
+              rowData={rowData}
+              onCellValueChanged={onCellValueChanged}
+            />
           </CardBody>
         </Card>
       </Container>

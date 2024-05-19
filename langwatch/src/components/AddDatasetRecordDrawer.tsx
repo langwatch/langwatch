@@ -37,7 +37,7 @@ import {
   datasetSpanSchema,
 } from "~/server/tracer/types.generated";
 import { api } from "~/utils/api";
-import { displayName } from "~/utils/datasets";
+import { schemaDisplayName } from "~/utils/datasets";
 import { AddDatasetDrawer } from "./AddDatasetDrawer";
 
 function formatNumberWithSuffix(number: number) {
@@ -426,7 +426,7 @@ export function AddDatasetRecordDrawer(props: AddDatasetDrawerProps) {
     setSelectedIndex(0);
 
     setDatabaseSchema(datasetSchema ?? "");
-    setDatabaseSchemaName(displayName(datasetSchema!));
+    setDatabaseSchemaName(schemaDisplayName(datasetSchema!));
     setDatasetId(e.target.value);
   };
 

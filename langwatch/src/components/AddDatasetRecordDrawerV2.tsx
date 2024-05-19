@@ -15,6 +15,7 @@ import {
   Select,
   Spacer,
   Stack,
+  Tag,
   Text,
   Textarea,
   Tooltip,
@@ -33,7 +34,7 @@ import {
   datasetSpanSchema,
 } from "~/server/tracer/types.generated";
 import { api } from "~/utils/api";
-import { displayName } from "~/utils/datasets";
+import { schemaDisplayName } from "~/utils/datasets";
 import { AddDatasetDrawer } from "./AddDatasetDrawer";
 import { useForm, type SubmitHandler } from "react-hook-form";
 
@@ -58,6 +59,7 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
     register,
     handleSubmit,
     reset,
+    watch,
     formState: { errors },
   } = useForm<FormValues>();
 
@@ -69,6 +71,11 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
   const datasets = api.dataset.getAll.useQuery(
     { projectId: project?.id ?? "" },
     { enabled: !!project }
+  );
+
+  const datasetId = watch("datasetId");
+  const selectedDataset = datasets.data?.find(
+    (dataset) => dataset.id === datasetId
   );
 
   const onCreateDatasetSuccess = () => {
@@ -141,6 +148,14 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
                 + Create New
               </Button>
             </HorizontalFormControl>
+
+            {selectedDataset?.schema ? (
+              <HStack align={"start"} paddingY={4}>
+                <Text>Dataset Schema:</Text>
+                <Tag>{schemaDisplayName(selectedDataset?.schema)}</Tag>
+              </HStack>
+            ) : null}
+
             <Button type="submit" colorScheme="blue" mt={4}>
               Submit
             </Button>

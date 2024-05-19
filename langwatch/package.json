@@ -21,6 +21,7 @@
     "copy:langevals-types": "cd src/trace_checks && curl -L \"https://raw.githubusercontent.com/langwatch/langevals/main/ts-integration/evaluators.generated.ts?$(date +%s)\" -o evaluators.generated.ts"
   },
   "dependencies": {
+    "@ag-grid-community/core": "^31.3.2",
     "@ai-sdk/openai": "^0.0.9",
     "@azure/openai": "^1.0.0-beta.10",
     "@chakra-ui/icons": "^2.1.1",

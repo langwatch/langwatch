@@ -34,7 +34,7 @@ import { DashboardLayout } from "~/components/DashboardLayout";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { AddDatasetDrawer } from "~/components/AddDatasetDrawer";
-import { displayName } from "~/utils/datasets";
+import { schemaDisplayName } from "~/utils/datasets";
 import { Play, MoreVertical } from "react-feather";
 import { useDrawer } from "~/components/CurrentDrawer";
 import { DeleteIcon } from "@chakra-ui/icons";
@@ -73,12 +73,20 @@ export default function Datasets() {
 
   const datasetDelete = api.dataset.deleteById.useMutation();
 
+  // TODO: make this a soft delete only
   const deleteDataset = (id: string) => {
     datasetDelete.mutate(
       { projectId: project?.id ?? "", datasetId: id },
       {
         onSuccess: () => {
           void datasets.refetch();
+          toast({
+            title: "Dataset deleted",
+            status: "success",
+            duration: 5000,
+            isClosable: true,
+            position: "top-right",
+          });
         },
         onError: () => {
           toast({
@@ -176,7 +184,7 @@ export default function Datasets() {
                                   key={dataset.id}
                                 >
                                   <Td>{dataset.name}</Td>
-                                  <Td>{displayName(dataset.schema)}</Td>
+                                  <Td>{schemaDisplayName(dataset.schema)}</Td>
                                   <Td maxWidth="250px">
                                     <HStack>
                                       {dataset.columns
