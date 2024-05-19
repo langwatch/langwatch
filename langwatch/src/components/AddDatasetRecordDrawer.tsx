@@ -99,6 +99,16 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
     }
   }, [datasetId, setLocalStorageDatasetId]);
 
+  useEffect(() => {
+    if (
+      datasetId &&
+      datasets.data &&
+      !datasets.data.find((dataset) => dataset.id === datasetId)
+    ) {
+      setValue("datasetId", "");
+    }
+  }, [datasetId, datasets.data, setValue]);
+
   const onCreateDatasetSuccess = (datasetId: string) => {
     onClose();
     void datasets.refetch().then(() => {
