@@ -37,6 +37,7 @@ import { AddDatasetDrawer } from "./AddDatasetDrawer";
 import { HorizontalFormControl } from "./HorizontalFormControl";
 import { DatasetGrid } from "./datasets/DatasetGrid";
 import NextLink from "next/link";
+import { useLocalStorage } from "usehooks-ts";
 
 type FormValues = {
   datasetId: string;
@@ -55,13 +56,21 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
   const createDatasetRecord = api.datasetRecord.create.useMutation();
   const toast = useToast();
   const { onOpen, onClose, isOpen } = useDisclosure();
+
+  const [localStorageDatasetId, setLocalStorageDatasetId] =
+    useLocalStorage<string>("selectedDatasetId", "");
   const {
     register,
     handleSubmit,
     reset,
     watch,
     formState: { errors },
-  } = useForm<FormValues>();
+    setValue,
+  } = useForm<FormValues>({
+    defaultValues: {
+      datasetId: localStorageDatasetId,
+    },
+  });
 
   const tracesWithSpans = api.traces.getTracesWithSpans.useQuery(
     {
@@ -84,14 +93,26 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
     (dataset) => dataset.id === datasetId
   );
 
-  const onCreateDatasetSuccess = () => {
+  useEffect(() => {
+    if (datasetId) {
+      setLocalStorageDatasetId(datasetId);
+    }
+  }, [datasetId, setLocalStorageDatasetId]);
+
+  const onCreateDatasetSuccess = (datasetId: string) => {
     onClose();
-    void datasets.refetch();
+    void datasets.refetch().then(() => {
+      setTimeout(() => {
+        setValue("datasetId", datasetId);
+      }, 100);
+    });
   };
 
   const handleOnClose = () => {
     props.onClose();
-    reset();
+    reset({
+      datasetId,
+    });
   };
 
   const [editableRowData, setEditableRowData] = useState<
@@ -152,32 +173,19 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
           props.onClose();
           toast({
             duration: 3000,
+            isClosable: true,
             position: "top-right",
-            render: () => (
-              <Box
-                p={5}
-                paddingRight={20}
-                bg="green.200"
-                borderTop={"green.600"}
-                borderTopWidth={2}
+            title: "Succesfully added to dataset",
+            status: "success",
+            description: (
+              <Link
+                as={NextLink}
+                colorScheme="white"
+                textDecoration={"underline"}
+                href={`/${project?.slug}/datasets/${datasetId}`}
               >
-                <HStack>
-                  <CheckCircleIcon w={18} h={18} color={"green.600"} />
-                  <Box>
-                    <Text color={"black"} fontWeight={"bold"}>
-                      Succesfully added to dataset
-                    </Text>
-                    <Link
-                      as={NextLink}
-                      color={"black"}
-                      textDecoration={"underline"}
-                      href={`/${project?.slug}/datasets/${datasetId}`}
-                    >
-                      View the dataset
-                    </Link>
-                  </Box>
-                </HStack>
-              </Box>
+                View the dataset
+              </Link>
             ),
           });
         },
@@ -185,7 +193,7 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
           toast({
             title: "Failed to add to the dataset",
             description:
-              "Please make sure you have edited the input and output fields correctly",
+              "Please check if the rows were not already inserted in the dataset",
             status: "error",
             duration: 5000,
             isClosable: true,

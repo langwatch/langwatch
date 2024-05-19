@@ -105,6 +105,10 @@ export function DatasetGrid(props: AgGridReactProps) {
           line-height: 19.2px;
           font-feature-settings: "kern";
         }
+
+        .ag-layout-auto-height .ag-center-cols-viewport, .ag-layout-auto-height .ag-center-cols-container {
+          min-height: 29px;
+        }
       `}</style>
       <AgGridReact
         gridOptions={gridOptions}

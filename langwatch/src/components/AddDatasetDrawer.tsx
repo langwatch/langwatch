@@ -31,7 +31,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 interface AddDatasetDrawerProps {
   isOpen: boolean;
   onClose: () => void;
-  onSuccess: () => void;
+  onSuccess: (datasetId: string) => void;
 }
 
 export const AddDatasetDrawer = (props: AddDatasetDrawerProps) => {
@@ -90,8 +90,8 @@ export const AddDatasetDrawer = (props: AddDatasetDrawerProps) => {
         columns: data.columns,
       } as DatasetRecordForm & { projectId: string },
       {
-        onSuccess: () => {
-          props.onSuccess();
+        onSuccess: (data) => {
+          props.onSuccess(data.id);
           toast({
             title: "Dataset Created",
             description: `Successfully created ${data.name} dataset`,
