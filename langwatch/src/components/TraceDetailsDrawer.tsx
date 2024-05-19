@@ -27,7 +27,7 @@ import { Link } from "@chakra-ui/next-js";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import { api } from "../utils/api";
 import { useDrawer } from "./CurrentDrawer";
-import { AddDatasetRecordDrawerV2 } from "./AddDatasetRecordDrawerV2";
+import { AddDatasetRecordDrawerV2 } from "./AddDatasetRecordDrawer";
 
 interface TraceDetailsDrawerProps {
   traceId: string;

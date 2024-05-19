@@ -5,7 +5,7 @@ import {
 } from "ag-grid-react";
 import { useMemo } from "react";
 import { MultilineCellEditor } from "./MultilineCellEditor";
-import { Skeleton } from "@chakra-ui/react";
+import { Skeleton, Text } from "@chakra-ui/react";
 import type { GridOptions } from "ag-grid-community";
 
 import "ag-grid-community/styles/ag-grid.css";
@@ -13,15 +13,18 @@ import "ag-grid-community/styles/ag-theme-balham.css";
 import { RenderInputOutput } from "../traces/RenderInputOutput";
 import { MultilineJSONCellEditor } from "./MultilineJSONCellEditor";
 import { type ColDef } from "ag-grid-community";
-import { datasetSpanSchema, spanSchema } from "../../server/tracer/types.generated";
+import {
+  chatMessageSchema,
+  datasetSpanSchema,
+} from "../../server/tracer/types.generated";
 import { z } from "zod";
 
 export const JSONCellRenderer = (props: { value: string | undefined }) => {
   return (
     <RenderInputOutput
       value={props.value}
-      groupArraysAfterLength={1}
-      collapseStringsAfterLength={100}
+      groupArraysAfterLength={2}
+      collapseStringsAfterLength={140}
     />
   );
 };
@@ -40,14 +43,21 @@ export function DatasetGrid(props: AgGridReactProps) {
   );
 
   const columnDefs_ = useMemo(() => {
+    const jsonFields = {
+      spans: z.array(datasetSpanSchema),
+      llm_input: z.array(chatMessageSchema),
+      expected_llm_output: z.array(chatMessageSchema),
+      contexts: z.array(z.string()),
+    };
+
     return props.columnDefs?.map((column: ColDef) => {
-      if (column.field === "spans") {
+      if (Object.keys(jsonFields).includes(column.field ?? "")) {
         return {
           ...column,
           cellRenderer: JSONCellRenderer,
           cellEditor: (props: CustomCellEditorProps) => (
             <MultilineJSONCellEditor
-              zodValidator={z.array(datasetSpanSchema)}
+              zodValidator={jsonFields[column.field as keyof typeof jsonFields]}
               {...props}
             />
           ),
@@ -89,14 +99,16 @@ export function DatasetGrid(props: AgGridReactProps) {
           padding: 0;
         }
         .ag-cell-wrapper textarea {
-          padding: 3px 11px;
+          padding: 4px 11px;
           outline: none;
           border: none;
+          line-height: 19.2px;
+          font-feature-settings: "kern";
         }
       `}</style>
       <AgGridReact
         gridOptions={gridOptions}
-        loadingOverlayComponent={() => <Skeleton height="20px" />}
+        loadingOverlayComponent={() => <Text paddingTop={4}>Loading...</Text>}
         reactiveCustomComponents={true}
         enableCellEditingOnBackspace={false}
         domLayout="autoHeight"

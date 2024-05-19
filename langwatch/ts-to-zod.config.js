@@ -13,5 +13,6 @@ module.exports = {
       "EvaluatorDefinition",
       "TraceCheckJob",
       "AnalyticsMetric",
+      "NewDatasetEntries",
     ].includes(name),
 };

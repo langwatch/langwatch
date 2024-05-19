@@ -67,7 +67,7 @@ import { ToggleAnalytics, ToggleTableView } from "./HeaderButtons";
 import { useDrawer } from "../CurrentDrawer";
 import type { TraceWithGuardrail } from "./MessageCard";
 import { titleCase } from "../../utils/stringCasing";
-import { AddDatasetRecordDrawerV2 } from "../AddDatasetRecordDrawerV2";
+import { AddDatasetRecordDrawerV2 } from "../AddDatasetRecordDrawer";
 
 export function MessagesTable() {
   const router = useRouter();

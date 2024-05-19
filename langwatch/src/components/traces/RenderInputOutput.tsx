@@ -36,6 +36,12 @@ export function RenderInputOutput(
       {...propsWithoutValue}
     />
   ) : (
-    <Text>{value ?? ""}</Text>
+    <Text>
+      {value
+        ? typeof value === "string"
+          ? value
+          : (value as any).toString()
+        : ""}
+    </Text>
   );
 }

@@ -1,90 +1,57 @@
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { TeamRoleGroup, checkUserPermissionForProject } from "../permission";
-import { nanoid } from "nanoid";
-import {
-  chatMessageSchema,
-  datasetSpanSchema,
-} from "~/server/tracer/types.generated";
-import { DatabaseSchema } from "@prisma/client";
+import { type DatasetRecord } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
-
-const LLMChatSchema = z.object({
-  input: z.array(chatMessageSchema),
-  expected_output: z.array(chatMessageSchema),
-});
-
-const FullTraceSchema = z.object({
-  input: z.string(),
-  expected_output: z.string(),
-  spans: z.array(datasetSpanSchema),
-});
-
-const StringIOSchema = z.object({
-  input: z.string(),
-  expected_output: z.string(),
-});
+import { newDatasetEntriesSchema } from "../../datasets/types";
 
 export const datasetRecordRouter = createTRPCRouter({
   create: protectedProcedure
     .input(
-      z.object({
-        projectId: z.string(),
-        datasetSchema: z.string(),
-        datasetId: z.string(),
-        entries: z.array(z.unknown()), // Fix: Provide the missing argument for z.array()
-      })
+      z.intersection(
+        z.object({
+          projectId: z.string(),
+          datasetId: z.string(),
+        }),
+        newDatasetEntriesSchema
+      )
     )
     .use(checkUserPermissionForProject(TeamRoleGroup.DATASETS_MANAGE))
     .mutation(async ({ ctx, input }) => {
-      const recordData = [];
+      const dataset = await ctx.prisma.dataset.findFirst({
+        where: {
+          id: input.datasetId,
+          projectId: input.projectId,
+          schema: input.schema,
+        },
+      });
+
+      if (!dataset) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Dataset not found",
+        });
+      }
+
+      const recordData: DatasetRecord[] = [];
 
       for (const entry of input.entries) {
-        let validatedInput = null;
-        let entryInput = {};
-        if (input.datasetSchema === DatabaseSchema.LLM_CHAT_CALL) {
-          validatedInput = LLMChatSchema.safeParse(entry);
-          entryInput = validatedInput.success
-            ? {
-                input: validatedInput.data.input,
-                expected_output: validatedInput.data.expected_output,
-              }
-            : {};
-        } else if (input.datasetSchema === DatabaseSchema.FULL_TRACE) {
-          validatedInput = FullTraceSchema.safeParse(entry);
-          entryInput = validatedInput.success
-            ? {
-                input: validatedInput.data.input,
-                expected_output: validatedInput.data.expected_output,
-                spans: validatedInput.data.spans,
-              }
-            : {};
-        } else if (input.datasetSchema === DatabaseSchema.STRING_I_O) {
-          validatedInput = StringIOSchema.safeParse(entry);
-          entryInput = validatedInput.success
-            ? {
-                input: validatedInput.data.input,
-                expected_output: validatedInput.data.expected_output,
-              }
-            : {};
-        }
+        const id = entry.id;
+        const entryWithoutId: Omit<typeof entry, "id"> = { ...entry };
+        // @ts-ignore
+        delete entryWithoutId.id;
 
-        if (validatedInput && validatedInput.success) {
-          recordData.push({
-            id: nanoid(),
-            entry: entryInput,
-            datasetId: input.datasetId,
-          });
-        } else {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: "PLEASE PROVIDE VALID INPUTS",
-          });
-        }
+        recordData.push({
+          id,
+          entry: entryWithoutId,
+          datasetId: input.datasetId,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        });
       }
 
       return ctx.prisma.datasetRecord.createMany({
-        data: recordData,
+        data: recordData as (DatasetRecord & { entry: any })[],
       });
     }),
   update: protectedProcedure
@@ -97,11 +64,28 @@ export const datasetRecordRouter = createTRPCRouter({
           input: z.optional(z.string()),
           expected_output: z.optional(z.string()),
           spans: z.optional(z.string()),
+          contexts: z.optional(z.string()),
+          llm_input: z.optional(z.string()),
+          expected_llm_output: z.optional(z.string()),
         }),
       })
     )
     .use(checkUserPermissionForProject(TeamRoleGroup.DATASETS_MANAGE))
     .mutation(async ({ ctx, input }) => {
+      const dataset = await ctx.prisma.dataset.findFirst({
+        where: {
+          id: input.datasetId,
+          projectId: input.projectId,
+        },
+      });
+
+      if (!dataset) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Dataset not found",
+        });
+      }
+
       const { recordId, updatedRecord } = input;
 
       const record = await ctx.prisma.datasetRecord.findUnique({
@@ -115,18 +99,13 @@ export const datasetRecordRouter = createTRPCRouter({
         });
       }
 
-      const updatedData: any = {}
-
-      if (updatedRecord.input) {
-        updatedData.input = updatedRecord.input;
-      }
-
-      if (updatedRecord.expected_output) {
-        updatedData.expected_output = updatedRecord.expected_output;
-      }
-
-      if (updatedRecord.spans) {
-        updatedData.spans = JSON.parse(updatedRecord.spans);
+      const updatedData: any = {};
+      for (const key in updatedRecord) {
+        if (key === "input" || key === "expected_output") {
+          updatedData[key] = updatedRecord[key];
+        } else if ((updatedRecord as any)[key]) {
+          updatedData[key] = JSON.parse((updatedRecord as any)[key] as string);
+        }
       }
 
       await ctx.prisma.datasetRecord.update({
@@ -145,7 +124,7 @@ export const datasetRecordRouter = createTRPCRouter({
       const prisma = ctx.prisma;
 
       const datasets = await prisma.dataset.findFirst({
-        where: { id: input.datasetId },
+        where: { id: input.datasetId, projectId: input.projectId },
         include: {
           datasetRecords: {
             orderBy: { createdAt: "desc" },

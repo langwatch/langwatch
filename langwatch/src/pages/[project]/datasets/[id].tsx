@@ -10,7 +10,7 @@ import {
   Text,
   useToast,
 } from "@chakra-ui/react";
-import { DatabaseSchema, type DatasetRecord } from "@prisma/client";
+import { type DatabaseSchema, type Dataset } from "@prisma/client";
 import { useRouter } from "next/router";
 import Parse from "papaparse";
 import { Play } from "react-feather";
@@ -45,24 +45,19 @@ function DatasetTable() {
     }
   );
 
-  const getHeaders = (schema: DatabaseSchema): ColDef[] => {
+  const columnDefs = useMemo(() => {
+    if (!dataset.data) return [];
+
     const fieldToLabelMap: Record<string, string> = {
       input: "Input",
       expected_output: "Expected Output",
+      contexts: "Contexts",
       spans: "Spans",
+      llm_input: "LLM Input",
+      expected_llm_output: "Expected LLM Output",
     };
 
-    let fields: string[] = [];
-    if (
-      schema === DatabaseSchema.STRING_I_O ||
-      schema === DatabaseSchema.LLM_CHAT_CALL
-    ) {
-      fields = ["input", "expected_output"];
-    } else if (schema === DatabaseSchema.FULL_TRACE) {
-      fields = ["input", "expected_output", "spans"];
-    }
-
-    const headers: ColDef[] = fields.map((field) => ({
+    const headers: ColDef[] = dataset.data.columns.split(",").map((field) => ({
       headerName: fieldToLabelMap[field],
       field,
       cellClass: "v-align",
@@ -81,137 +76,21 @@ function DatasetTable() {
     });
 
     return headers;
-  };
-
-  const getTableRows = useCallback(
-    (datasetRecord: DatasetRecord, schema: DatabaseSchema) => {
-      let tableRows: Record<string, any> = {};
-
-      if (
-        schema === DatabaseSchema.STRING_I_O ||
-        schema === DatabaseSchema.LLM_CHAT_CALL
-      ) {
-        tableRows = {
-          id: datasetRecord.id,
-          input: getInput(datasetRecord, schema),
-          expected_output: getOutput(datasetRecord, schema),
-        };
-      }
-      if (schema === DatabaseSchema.FULL_TRACE) {
-        tableRows = {
-          id: datasetRecord.id,
-          input: getInput(datasetRecord, schema),
-          expected_output: getOutput(datasetRecord, schema),
-          spans: getTrace(datasetRecord, schema),
-        };
-      }
-
-      return tableRows;
-    },
-    []
-  );
-
-  const getInput = (
-    datasetRecord: DatasetRecord,
-    schema: DatabaseSchema
-  ): string => {
-    if (schema === DatabaseSchema.LLM_CHAT_CALL) {
-      return JSON.stringify((datasetRecord.entry as any).input[0]) ?? "";
-    }
-    if (
-      schema === DatabaseSchema.STRING_I_O ||
-      schema === DatabaseSchema.FULL_TRACE
-    ) {
-      return (datasetRecord.entry as any).input;
-    }
-    return "";
-  };
-
-  const getOutput = (
-    datasetRecord: DatasetRecord,
-    schema: DatabaseSchema
-  ): string => {
-    if (schema === DatabaseSchema.LLM_CHAT_CALL) {
-      return JSON.stringify(datasetRecord.entry.expected_output[0]) ?? "";
-    }
-    if (
-      schema === DatabaseSchema.STRING_I_O ||
-      schema === DatabaseSchema.FULL_TRACE
-    ) {
-      return datasetRecord.entry.expected_output;
-    }
-    return "";
-  };
-
-  const getTrace = (
-    datasetRecord: DatasetRecord,
-    schema: DatabaseSchema
-  ): string => {
-    if (schema === DatabaseSchema.FULL_TRACE) {
-      return JSON.stringify(datasetRecord.entry.spans) ?? "";
-    }
-    return "";
-  };
-
-  const downloadCSV = (schema: DatabaseSchema) => {
-    let fields: string[] = [];
-
-    if (
-      schema === DatabaseSchema.STRING_I_O ||
-      schema === DatabaseSchema.LLM_CHAT_CALL
-    ) {
-      fields = ["Input", "Expected Output"];
-    } else if (schema === DatabaseSchema.FULL_TRACE) {
-      fields = ["Input", "Expected Output", "Spans"];
-    }
-
-    type CsvDataRow = [string, string] | [string, string, string];
-
-    const csvData: CsvDataRow[] = [];
-
-    dataset.data?.datasetRecords.forEach((record) => {
-      if (
-        schema === DatabaseSchema.STRING_I_O ||
-        schema === DatabaseSchema.LLM_CHAT_CALL
-      ) {
-        csvData.push([
-          getInput(record, dataset.data!.schema),
-          getOutput(record, dataset.data!.schema),
-        ]);
-      } else {
-        csvData.push([
-          getInput(record, dataset.data!.schema),
-          getOutput(record, dataset.data!.schema),
-          getTrace(record, dataset.data!.schema),
-        ]);
-      }
-    });
-
-    const csv = Parse.unparse({
-      fields: fields,
-      data: csvData,
-    });
-
-    const url = window.URL.createObjectURL(new Blob([csv]));
-
-    const link = document.createElement("a");
-    link.href = url;
-    const fileName = `${dataset.data?.name}.csv`;
-    link.setAttribute("download", fileName);
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-  };
-
-  const columnDefs = useMemo(() => {
-    return dataset.data?.schema ? getHeaders(dataset.data.schema) : [];
-  }, [dataset.data?.schema]);
+  }, [dataset.data]);
 
   const rowData = useMemo(() => {
-    return dataset.data?.datasetRecords?.map((record) =>
-      getTableRows(record, dataset.data!.schema)
-    );
-  }, [dataset.data, getTableRows]);
+    if (!dataset.data) return;
+
+    const columns = dataset.data.columns.split(",");
+    return dataset.data.datasetRecords.map((record) => {
+      const row: Record<string, any> = { id: record.id };
+      columns.forEach((col) => {
+        const value = (record.entry as any)[col];
+        row[col] = typeof value === "object" ? JSON.stringify(value) : value;
+      });
+      return row;
+    });
+  }, [dataset.data]);
 
   const updateDatasetRecord = api.datasetRecord.update.useMutation();
 
@@ -228,20 +107,44 @@ function DatasetTable() {
           updatedRecord,
         },
         {
-          onError: (error: any) => {
+          onError: () => {
             toast({
               title: "Error updating record.",
-              description: error.message,
+              description: "Changes will be reverted, please try again",
               status: "error",
               duration: 5000,
               isClosable: true,
             });
+            void dataset.refetch();
           },
         }
       );
     },
-    [updateDatasetRecord, project?.id, dataSetId, toast]
+    [updateDatasetRecord, project?.id, dataSetId, toast, dataset]
   );
+
+  const downloadCSV = (schema: DatabaseSchema) => {
+    const fields = dataset.data?.columns.split(",") || [];
+    const csvData =
+      dataset.data?.datasetRecords.map((record) =>
+        fields.map((field) => (record.entry as any)[field])
+      ) ?? [];
+
+    const csv = Parse.unparse({
+      fields,
+      data: csvData,
+    });
+
+    const url = window.URL.createObjectURL(new Blob([csv]));
+
+    const link = document.createElement("a");
+    link.href = url;
+    const fileName = `${dataset.data?.name}.csv`;
+    link.setAttribute("download", fileName);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  };
 
   return (
     <>
@@ -289,11 +192,6 @@ function DatasetTable() {
           <CardBody padding={0}>
             <DatasetGrid
               columnDefs={columnDefs}
-              autoGroupColumnDef={{
-                headerName: "Group",
-                width: 250,
-                field: "name",
-              }}
               rowData={rowData}
               onCellValueChanged={onCellValueChanged}
             />
