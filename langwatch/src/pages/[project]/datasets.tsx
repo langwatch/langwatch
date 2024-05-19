@@ -73,15 +73,14 @@ export default function Datasets() {
 
   const datasetDelete = api.dataset.deleteById.useMutation();
 
-  // TODO: make this a soft delete only
-  const deleteDataset = (id: string) => {
+  const deleteDataset = (id: string, name: string) => {
     datasetDelete.mutate(
       { projectId: project?.id ?? "", datasetId: id },
       {
         onSuccess: () => {
           void datasets.refetch();
           toast({
-            title: "Dataset deleted",
+            title: `Dataset ${name} deleted`,
             description: (
               <HStack>
                 <Button
@@ -89,7 +88,7 @@ export default function Datasets() {
                   variant="link"
                   textDecoration="underline"
                   onClick={() => {
-                    toast.closeAll();
+                    toast.close(`delete-dataset-${id}`);
                     datasetDelete.mutate(
                       {
                         projectId: project?.id ?? "",
@@ -117,6 +116,7 @@ export default function Datasets() {
                 </Button>
               </HStack>
             ),
+            id: `delete-dataset-${id}`,
             status: "success",
             duration: 10_000,
             isClosable: true,
@@ -253,7 +253,10 @@ export default function Datasets() {
                                           onClick={(event) => {
                                             event.stopPropagation();
 
-                                            deleteDataset(dataset.id);
+                                            deleteDataset(
+                                              dataset.id,
+                                              dataset.name
+                                            );
                                           }}
                                           icon={<DeleteIcon />}
                                         >
