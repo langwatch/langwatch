@@ -124,14 +124,17 @@ function DatasetTable() {
   );
 
   const downloadCSV = (schema: DatabaseSchema) => {
-    const fields = dataset.data?.columns.split(",") || [];
+    const columns = dataset.data?.columns.split(",") ?? [];
     const csvData =
       dataset.data?.datasetRecords.map((record) =>
-        fields.map((field) => (record.entry as any)[field])
+        columns.map((col) => {
+          const value = (record.entry as any)[col];
+          return typeof value === "object" ? JSON.stringify(value) : value;
+        })
       ) ?? [];
 
     const csv = Parse.unparse({
-      fields,
+      fields: columns,
       data: csvData,
     });
 
