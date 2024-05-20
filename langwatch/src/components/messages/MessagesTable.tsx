@@ -86,6 +86,8 @@ export function MessagesTable() {
     setPeriod,
   } = usePeriodSelector();
 
+  console.log(filterParams);
+
   const traceGroups = api.traces.getAllForProject.useQuery(
     {
       ...filterParams,

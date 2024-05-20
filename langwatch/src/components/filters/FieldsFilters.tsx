@@ -40,8 +40,12 @@ import type { AppRouter } from "../../server/api/root";
 import { availableFilters } from "../../server/filters/registry";
 import type { FilterDefinition, FilterField } from "../../server/filters/types";
 import { api } from "../../utils/api";
+import { useDrawer } from "~/components/CurrentDrawer";
 
 export function FieldsFilters() {
+  const { filterParams } = useFilterParams();
+  const { openDrawer } = useDrawer();
+
   const filterKeys: FilterField[] = [
     "spans.model",
     "metadata.labels",
@@ -60,9 +64,32 @@ export function FieldsFilters() {
     availableFilters[id],
   ]);
 
+  const nonEmptyFilters = Object.values(filterParams.filters).filter((f) =>
+    typeof f === "string"
+      ? !!f
+      : Array.isArray(f)
+      ? f.length > 0
+      : Object.keys(f).length > 0
+  );
+
+  const hasAnyFilters = nonEmptyFilters.length > 0;
+
   return (
     <VStack align="start" width="full" spacing={6}>
-      <Heading size="md">Filters</Heading>
+      <HStack width={"full"}>
+        <Heading size="md">Filters</Heading>
+
+        <Spacer />
+
+        {hasAnyFilters && (
+          <Button
+            colorScheme="orange"
+            onClick={() => openDrawer("rule", undefined)}
+          >
+            Add Rule
+          </Button>
+        )}
+      </HStack>
       <VStack spacing={4} width="full">
         {filters.map(([id, filter]) => (
           <FieldsFilter key={id} filterId={id} filter={filter} />

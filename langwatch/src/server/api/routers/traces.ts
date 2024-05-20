@@ -458,18 +458,20 @@ export const getAllForProject = async (
         query: {
           bool: {
             must: pivotIndexConditions,
-            ...(input.updatedAt
-              ? {
-                  filter: {
-                    range: {
-                      updated_at: {
-                        gt: input.updatedAt, // Replace "your_timestamp_here" with the timestamp you want to compare against
+            filter: [
+              ...(input.updatedAt
+                ? [
+                    {
+                      range: {
+                        updated_at: {
+                          gt: input.updatedAt,
+                        },
                       },
                     },
-                  },
-                }
-              : {}), // Empty object if the condition is not met
-          } as QueryDslBoolQuery,
+                  ]
+                : []),
+            ],
+          } as any,
         },
         _source: ["trace.trace_id"],
         from: input.query ? 0 : pageOffset,

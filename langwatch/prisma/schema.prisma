@@ -163,6 +163,7 @@ model Project {
     customGraphs      CustomGraph[]
     batchProcessings  BatchProcessing[]
     piiRedactionLevel PIIRedactionLevel @default(ESSENTIAL)
+    rules             Rule[]
 
     @@index([teamId])
 }
@@ -335,4 +336,24 @@ model BatchProcessing {
     @@unique([id])
     @@index([projectId])
     @@index([datasetId])
+}
+
+enum RuleAction {
+    EMAIL
+    DATASET
+}
+
+model Rule {
+    id           String     @id @default(nanoid())
+    name         String
+    projectId    String
+    project      Project    @relation(fields: [projectId], references: [id])
+    action       RuleAction
+    actionParams Json
+    filters      Json
+    lastRunAt    Float      @default(0)
+    createdAt    DateTime   @default(now())
+    updatedAt    DateTime   @default(now()) @updatedAt
+
+    @@index([projectId])
 }
