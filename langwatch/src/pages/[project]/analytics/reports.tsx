@@ -19,16 +19,15 @@ import {
   Skeleton,
   Spacer,
   Text,
-  VStack
+  VStack,
+  useToast,
 } from "@chakra-ui/react";
 import { BarChart2, MoreVertical } from "react-feather";
 import {
   CustomGraph,
   type CustomGraphInput,
 } from "~/components/analytics/CustomGraph";
-import {
-  useFilterToggle
-} from "~/components/filters/FilterToggle";
+import { useFilterToggle } from "~/components/filters/FilterToggle";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 
@@ -42,6 +41,7 @@ export default function Reports() {
 
   const graphs = api.graphs.getAll.useQuery({ projectId: project?.id ?? "" });
   const deleteGraphs = api.graphs.delete.useMutation();
+  const toast = useToast();
 
   const deleteGraph = (id: string) => () => {
     deleteGraphs.mutate(
@@ -51,7 +51,13 @@ export default function Reports() {
           void graphs.refetch();
         },
         onError: () => {
-          alert("Error deleting graph");
+          toast({
+            title: "Error deleting graph",
+            status: "error",
+            duration: 3000,
+            isClosable: true,
+            position: "top-right",
+          });
         },
       }
     );

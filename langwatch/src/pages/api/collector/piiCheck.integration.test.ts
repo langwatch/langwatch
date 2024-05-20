@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Trace } from "../../../server/tracer/types";
 import { cleanupPIIs } from "./piiCheck";
+import { PIIRedactionLevel } from "@prisma/client";
 
 describe("PIICheck", () => {
   it("detects PII on traces", async () => {
@@ -12,7 +13,7 @@ describe("PIICheck", () => {
       metrics: {},
       timestamps: { started_at: Date.now(), inserted_at: Date.now() },
     };
-    await cleanupPIIs(sampleTrace, [], false);
+    await cleanupPIIs(sampleTrace, [], PIIRedactionLevel.ESSENTIAL);
     expect(sampleTrace.input.value).toEqual("hi there");
 
     const samplePIITrace: Trace = {
@@ -26,7 +27,7 @@ describe("PIICheck", () => {
       timestamps: { started_at: Date.now(), inserted_at: Date.now() },
     };
 
-    await cleanupPIIs(samplePIITrace, [], false);
+    await cleanupPIIs(samplePIITrace, [], PIIRedactionLevel.ESSENTIAL);
     expect(samplePIITrace.input.value).toEqual(
       "hi there, my credit card number is [REDACTED]"
     );

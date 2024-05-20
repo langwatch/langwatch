@@ -13,23 +13,6 @@ const credentials = env.GOOGLE_CREDENTIALS_JSON
   : undefined;
 const dlp = new DlpServiceClient({ credentials });
 
-const infoTypesMap: Record<string, string> = {
-  first_name: "FIRST_NAME",
-  last_name: "LAST_NAME",
-  person_name: "PERSON_NAME",
-  dob: "DATE_OF_BIRTH",
-  location: "LOCATION",
-  street_address: "STREET_ADDRESS",
-  phone_number: "PHONE_NUMBER",
-  email_address: "EMAIL_ADDRESS",
-  credit_card_number: "CREDIT_CARD_NUMBER",
-  iban_code: "IBAN_CODE",
-  ip_address: "IP_ADDRESS",
-  passport: "PASSPORT",
-  vat_number: "VAT_NUMBER",
-  medical_record_number: "MEDICAL_RECORD_NUMBER",
-};
-
 const strictInfoTypes = [
   "FIRST_NAME",
   "LAST_NAME",

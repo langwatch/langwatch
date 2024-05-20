@@ -159,6 +159,7 @@ model Project {
     costs             Cost[]
     topics            Topic[]
     datasets          Dataset[]
+    datasetRecords    DatasetRecord[]
     customGraphs      CustomGraph[]
     batchProcessings  BatchProcessing[]
     piiRedactionLevel PIIRedactionLevel @default(ESSENTIAL)
@@ -290,11 +291,14 @@ model DatasetRecord {
     id        String   @id @default(nanoid())
     datasetId String
     dataset   Dataset  @relation(fields: [datasetId], references: [id])
+    projectId String
+    project   Project @relation(fields: [projectId], references: [id])
     entry     Json
     createdAt DateTime @default(now())
     updatedAt DateTime @default(now()) @updatedAt
 
     @@index([datasetId])
+    @@index([projectId])
 }
 
 model CustomGraph {

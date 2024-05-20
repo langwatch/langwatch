@@ -31,7 +31,7 @@ export default async function handler(
 
   try {
     const dataset = await prisma.dataset.findFirst({
-      where: { slug: req.query.slug as string },
+      where: { slug: req.query.slug as string, projectId: project.id },
     });
 
     if (!dataset) {
@@ -41,7 +41,7 @@ export default async function handler(
     }
 
     const datasetRecords = await prisma.datasetRecord.findMany({
-      where: { datasetId: dataset.id },
+      where: { datasetId: dataset.id, projectId: project.id },
     });
 
     return res.status(200).json({ data: datasetRecords });

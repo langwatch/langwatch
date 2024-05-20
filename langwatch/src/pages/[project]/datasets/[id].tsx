@@ -10,7 +10,7 @@ import {
   Text,
   useToast,
 } from "@chakra-ui/react";
-import { type DatabaseSchema, type Dataset } from "@prisma/client";
+import { type Dataset } from "@prisma/client";
 import { useRouter } from "next/router";
 import Parse from "papaparse";
 import { Play } from "react-feather";
@@ -123,7 +123,7 @@ function DatasetTable() {
     [updateDatasetRecord, project?.id, dataSetId, toast, dataset]
   );
 
-  const downloadCSV = (schema: DatabaseSchema) => {
+  const downloadCSV = () => {
     const columns = dataset.data?.columns.split(",") ?? [];
     const csvData =
       dataset.data?.datasetRecords.map((record) =>
@@ -172,9 +172,7 @@ function DatasetTable() {
             colorScheme="black"
             minWidth="fit-content"
             variant="ghost"
-            onClick={() =>
-              dataset.data?.schema && downloadCSV(dataset.data.schema)
-            }
+            onClick={() => dataset.data?.schema && downloadCSV()}
           >
             Export <DownloadIcon marginLeft={2} />
           </Button>

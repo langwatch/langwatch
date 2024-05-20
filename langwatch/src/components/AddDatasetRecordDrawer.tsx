@@ -1,6 +1,4 @@
-import { CheckCircleIcon } from "@chakra-ui/icons";
 import {
-  Box,
   Button,
   Checkbox,
   Drawer,
@@ -15,13 +13,15 @@ import {
   Tag,
   Text,
   useDisclosure,
-  useToast,
+  useToast
 } from "@chakra-ui/react";
 import { type ColDef } from "ag-grid-community";
 import type { CustomCellRendererProps } from "ag-grid-react";
 import { nanoid } from "nanoid";
+import NextLink from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useForm, type SubmitHandler } from "react-hook-form";
+import { useLocalStorage } from "usehooks-ts";
 import { z } from "zod";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { datasetSpanSchema } from "~/server/tracer/types.generated";
@@ -36,8 +36,6 @@ import { getRAGInfo } from "../server/tracer/utils";
 import { AddDatasetDrawer } from "./AddDatasetDrawer";
 import { HorizontalFormControl } from "./HorizontalFormControl";
 import { DatasetGrid } from "./datasets/DatasetGrid";
-import NextLink from "next/link";
-import { useLocalStorage } from "usehooks-ts";
 
 type FormValues = {
   datasetId: string;

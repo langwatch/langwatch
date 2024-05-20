@@ -79,6 +79,7 @@ export const datasetRouter = createTRPCRouter({
       await ctx.prisma.dataset.update({
         where: {
           id: input.datasetId,
+          projectId: input.projectId,
         },
         data: {
           archivedAt: input.undo ? null : new Date(),

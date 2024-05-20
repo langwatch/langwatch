@@ -47,6 +47,7 @@ export const datasetRecordRouter = createTRPCRouter({
           datasetId: input.datasetId,
           createdAt: new Date(),
           updatedAt: new Date(),
+          projectId: input.projectId,
         });
       }
 
@@ -89,7 +90,7 @@ export const datasetRecordRouter = createTRPCRouter({
       const { recordId, updatedRecord } = input;
 
       const record = await ctx.prisma.datasetRecord.findUnique({
-        where: { id: recordId },
+        where: { id: recordId, projectId: dataset.projectId },
       });
 
       if (!record) {
@@ -109,7 +110,7 @@ export const datasetRecordRouter = createTRPCRouter({
       }
 
       await ctx.prisma.datasetRecord.update({
-        where: { id: recordId },
+        where: { id: recordId, projectId: dataset.projectId },
         data: {
           entry: updatedData,
         },

@@ -29,7 +29,7 @@ async def main(message: cl.Message):
         )
         off_topic_guardrail = asyncio.create_task(
             langwatch.guardrails.async_evaluate(
-                "azure-jailbreak-detection", input=message.content
+                "off-topic-evaluator", input=message.content
             )
         )
 

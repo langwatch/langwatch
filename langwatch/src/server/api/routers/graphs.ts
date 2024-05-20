@@ -44,12 +44,14 @@ export const graphsRouter = createTRPCRouter({
       const { id } = input;
       const prisma = ctx.prisma;
 
-      const graph = await prisma.customGraph.findUnique({ where: { id } });
+      const graph = await prisma.customGraph.findUnique({
+        where: { id, projectId: input.projectId },
+      });
       if (!graph) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Graph not found" });
       }
 
-      await prisma.customGraph.delete({ where: { id } });
+      await prisma.customGraph.delete({ where: { id, projectId: input.projectId } });
 
       return graph;
     }),

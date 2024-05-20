@@ -79,6 +79,7 @@ const migrateIndex = async (index: string) => {
   await prisma.check.updateMany({
     where: {
       checkType: "ragas_context_precision",
+      // projectId: input.projectId,
     },
     data: {
       checkType: "ragas_context_utilization",

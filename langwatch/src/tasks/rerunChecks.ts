@@ -74,6 +74,7 @@ export default async function execute(checkId: string) {
       const check = await prisma.check.findFirst({
         where: {
           id: checkId,
+          projectId: traceCheck.project_id,
         },
       });
       if (!check) {

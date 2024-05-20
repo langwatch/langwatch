@@ -94,6 +94,7 @@ const migrateIndex = async (index: string) => {
     await prisma.check.updateMany({
       where: {
         checkType: checkType,
+        // projectId: input.projectId,
       },
       data: {
         checkType: evaluatorType,
