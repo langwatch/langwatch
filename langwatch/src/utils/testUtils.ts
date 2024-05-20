@@ -36,6 +36,7 @@ export async function getTestUser() {
   let team = await prisma.team.findUnique({
     where: {
       slug: "test-team",
+      organizationId: organization.id,
     },
   });
   if (!team) {

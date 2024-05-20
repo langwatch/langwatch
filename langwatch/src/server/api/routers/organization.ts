@@ -499,7 +499,7 @@ export const organizationRouter = createTRPCRouter({
         }
 
         await prisma.organizationInvite.update({
-          where: { id: invite.id },
+          where: { id: invite.id, organizationId: invite.organizationId },
           data: { status: "ACCEPTED" },
         });
       });

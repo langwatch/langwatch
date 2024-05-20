@@ -83,7 +83,10 @@ export default function ProjectOnboarding() {
 
   const { team: teamSlug } = router.query;
   const team = api.team.getBySlug.useQuery(
-    { slug: typeof teamSlug == "string" ? teamSlug : "" },
+    {
+      slug: typeof teamSlug == "string" ? teamSlug : "",
+      organizationId: organization?.id ?? "",
+    },
     { enabled: !!organization }
   );
   const teams = api.team.getTeamsWithMembers.useQuery(

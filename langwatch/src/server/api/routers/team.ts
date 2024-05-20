@@ -14,7 +14,12 @@ import slugify from "slugify";
 
 export const teamRouter = createTRPCRouter({
   getBySlug: protectedProcedure
-    .input(z.object({ slug: z.string() }))
+    .input(z.object({ organizationId: z.string(), slug: z.string() }))
+    .use(
+      checkUserPermissionForOrganization(
+        OrganizationRoleGroup.ORGANIZATION_VIEW
+      )
+    )
     .query(async ({ input, ctx }) => {
       const userId = ctx.session.user.id;
       const prisma = ctx.prisma;
@@ -22,6 +27,7 @@ export const teamRouter = createTRPCRouter({
       const team = await prisma.team.findFirst({
         where: {
           slug: input.slug,
+          organizationId: input.organizationId,
           members: {
             some: {
               userId: userId,
@@ -59,13 +65,19 @@ export const teamRouter = createTRPCRouter({
       return teams;
     }),
   getTeamWithMembers: protectedProcedure
-    .input(z.object({ slug: z.string() }))
+    .input(z.object({ slug: z.string(), organizationId: z.string() }))
+    .use(
+      checkUserPermissionForOrganization(
+        OrganizationRoleGroup.ORGANIZATION_VIEW
+      )
+    )
     .query(async ({ input, ctx }) => {
       const prisma = ctx.prisma;
 
       const team = await prisma.team.findFirst({
         where: {
           slug: input.slug,
+          organizationId: input.organizationId,
         },
         include: {
           members: {

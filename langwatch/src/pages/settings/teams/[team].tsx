@@ -11,15 +11,18 @@ import {
 import type { TeamWithProjectsAndMembersAndUsers } from "../../../server/api/routers/organization";
 import { api } from "../../../utils/api";
 import { teamRolesOptions } from "../../../components/settings/TeamUserRoleField";
+import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
 
 export default function EditTeamPage() {
   const router = useRouter();
   const teamSlug = router.query.team;
+  const { organization } = useOrganizationTeamProject();
   const team = api.team.getTeamWithMembers.useQuery(
     {
       slug: teamSlug as string,
+      organizationId: organization?.id ?? "",
     },
-    { enabled: typeof teamSlug === "string" }
+    { enabled: typeof teamSlug === "string" && !!organization?.id }
   );
 
   if (!team.data) return <SettingsLayout />;
