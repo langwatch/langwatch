@@ -29,6 +29,7 @@ const _guardOrganizationId = ({
   } else if (
     !params.args?.where?.organizationId &&
     !params.args?.where?.inviteCode &&
+    !params.args?.where?.userId_organizationId &&
     !(params.model === "Team" && params.args?.where?.id)
   ) {
     throw new Error(

@@ -1,5 +1,11 @@
-import { OrganizationUserRole, TeamUserRole } from "@prisma/client";
+import {
+  OrganizationUserRole,
+  PIIRedactionLevel,
+  TeamUserRole,
+  type Project,
+} from "@prisma/client";
 import { prisma } from "../server/db";
+import { nanoid } from "nanoid";
 
 export async function getTestUser() {
   // Ensure a user exists
@@ -107,4 +113,53 @@ export async function getTestUser() {
   }
 
   return user;
+}
+
+export async function getTestProject(namespace: string) : Promise<Project> {
+  let organization = await prisma.organization.findUnique({
+    where: { slug: `--test-organization-${namespace}` },
+  });
+  if (!organization) {
+    organization = await prisma.organization.create({
+      data: {
+        name: "Test Organization",
+        slug: `--test-organization-${namespace}`,
+      },
+    });
+  }
+
+  let team = await prisma.team.findUnique({
+    where: {
+      slug: `--test-team-${namespace}`,
+      organizationId: organization.id,
+    },
+  });
+  if (!team) {
+    team = await prisma.team.create({
+      data: {
+        name: "Test Team",
+        slug: `--test-team-${namespace}`,
+        organizationId: organization.id,
+      },
+    });
+  }
+
+  let project = await prisma.project.findUnique({
+    where: { slug: `--test-project-${namespace}`, teamId: team.id },
+  });
+  if (!project) {
+    project = await prisma.project.create({
+      data: {
+        name: "Test Project",
+        slug: `--test-project-${namespace}`,
+        language: "python",
+        framework: "openai",
+        apiKey: `test-auth-token-${nanoid()}`,
+        teamId: team.id,
+        piiRedactionLevel: PIIRedactionLevel.ESSENTIAL,
+      },
+    });
+  }
+
+  return project;
 }

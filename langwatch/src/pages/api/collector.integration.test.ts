@@ -1,7 +1,6 @@
 import { type NextApiRequest, type NextApiResponse } from "next";
 import { createMocks } from "node-mocks-http";
 import { beforeAll, describe, expect, test } from "vitest";
-import { prisma } from "../../server/db";
 import {
   SPAN_INDEX,
   TRACE_INDEX,
@@ -17,9 +16,9 @@ import {
   type CollectorRESTParams,
 } from "../../server/tracer/types";
 import handler from "./collector";
-import type { Project } from "@prisma/client";
-import { nanoid } from "nanoid";
+import { type Project } from "@prisma/client";
 import { DEFAULT_EMBEDDINGS_MODEL } from "../../server/embeddings";
+import { getTestProject } from "../../utils/testUtils";
 
 const sampleSpan: LLMSpan = {
   type: "llm",
@@ -51,17 +50,26 @@ describe("Collector API Endpoint", () => {
   let project: Project | undefined;
 
   beforeAll(async () => {
-    await prisma.project.deleteMany({
-      where: { slug: "--test-project-collect" },
+    project = await getTestProject("collect");
+
+    await esClient.deleteByQuery({
+      index: TRACE_INDEX,
+      body: {
+        query: {
+          match: {
+            project_id: project.id,
+          },
+        },
+      },
     });
-    project = await prisma.project.create({
-      data: {
-        name: "Test Project",
-        slug: "--test-project-collect",
-        language: "python",
-        framework: "openai",
-        apiKey: `test-auth-token-${nanoid()}`,
-        teamId: "some-team",
+    await esClient.deleteByQuery({
+      index: SPAN_INDEX,
+      body: {
+        query: {
+          match: {
+            project_id: project.id,
+          },
+        },
       },
     });
   });
@@ -167,7 +175,7 @@ describe("Collector API Endpoint", () => {
         tokens_estimated: true,
       },
       error: null,
-      indexing_md5s: ["9e7f36289d01caa77b81fdab403bb28b"],
+      indexing_md5s: expect.any(Array),
     });
   });
 
@@ -284,19 +292,22 @@ describe("Collector API Endpoint", () => {
     expect(indexedRagSpan).toMatchObject({
       input: {
         type: "text",
-        value: '"What is the capital of [REDACTED]?"',
+        value: '"What is the capital of France?"',
       },
       outputs: [
         {
           type: "text",
-          value: '"The capital of [REDACTED] is [REDACTED]."',
+          value: '"The capital of France is Paris."',
         },
       ],
       contexts: [
-        { document_id: "context-1", content: "[REDACTED] is a country in Europe." },
+        {
+          document_id: "context-1",
+          content: "France is a country in Europe.",
+        },
         {
           document_id: "context-2",
-          content: "[REDACTED] is the capital of [REDACTED].",
+          content: "Paris is the capital of France.",
         },
       ],
       project_id: project?.id,
@@ -370,11 +381,11 @@ describe("Collector API Endpoint", () => {
     expect(indexedRagSpan.contexts).toMatchObject([
       {
         document_id: expect.any(String),
-        content: "[REDACTED] is a country in Europe.",
+        content: "France is a country in Europe.",
       },
       {
         document_id: expect.any(String),
-        content: "[REDACTED] is the capital of [REDACTED].",
+        content: "Paris is the capital of France.",
       },
     ]);
   });

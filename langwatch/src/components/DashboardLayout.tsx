@@ -551,7 +551,7 @@ export const DashboardLayout = ({
             </Portal>
           </Menu>
         </HStack>
-        {process.env.NEXT_PUBLIC_DEMO_SLUG === router.query.project && (
+        {process.env.NEXT_PUBLIC_DEMO_SLUG && process.env.NEXT_PUBLIC_DEMO_SLUG === router.query.project && (
           <HStack width={"full"} backgroundColor={"orange.400"} padding={1}>
             <Spacer />
             <Text fontSize={"sm"}>
