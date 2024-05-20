@@ -69,21 +69,28 @@ const isDemoProject = (projectId: string, roleGroup: string): boolean => {
   return false;
 };
 
+type PermissionMiddlewareParams<InputType> = {
+  ctx: { prisma: PrismaClient; session: Session; permissionChecked: boolean };
+  input: InputType;
+  next: () => any;
+};
+
+export type PermissionMiddleware<InputType> = (
+  params: PermissionMiddlewareParams<InputType>
+) => Promise<any>;
+
 export const checkUserPermissionForProject =
   (roleGroup: keyof typeof TeamRoleGroup) =>
   async ({
     ctx,
     input,
     next,
-  }: {
-    ctx: { prisma: PrismaClient; session: Session };
-    input: { projectId: string };
-    next: () => any;
-  }) => {
+  }: PermissionMiddlewareParams<{ projectId: string }>) => {
     if (!(await backendHasTeamProjectPermission(ctx, input, roleGroup))) {
       throw new TRPCError({ code: "UNAUTHORIZED" });
     }
 
+    ctx.permissionChecked = true;
     return next();
   };
 
@@ -125,15 +132,12 @@ export const checkUserPermissionForTeam =
     ctx,
     input,
     next,
-  }: {
-    ctx: { prisma: PrismaClient; session: Session };
-    input: { teamId: string };
-    next: () => any;
-  }) => {
+  }: PermissionMiddlewareParams<{ teamId: string }>) => {
     if (!(await backendHasTeamPermission(ctx, input, roleGroup))) {
       throw new TRPCError({ code: "UNAUTHORIZED" });
     }
 
+    ctx.permissionChecked = true;
     return next();
   };
 
@@ -183,15 +187,12 @@ export const checkUserPermissionForOrganization =
     ctx,
     input,
     next,
-  }: {
-    ctx: { prisma: PrismaClient; session: Session };
-    input: { organizationId: string };
-    next: () => any;
-  }) => {
+  }: PermissionMiddlewareParams<{ organizationId: string }>) => {
     if (!(await backendHasOrganizationPermission(ctx, input, roleGroup))) {
       throw new TRPCError({ code: "UNAUTHORIZED" });
     }
 
+    ctx.permissionChecked = true;
     return next();
   };
 
@@ -213,4 +214,12 @@ export const backendHasOrganizationPermission = async (
       organizationRolePermissionMapping[roleGroup] as OrganizationUserRole[]
     ).includes(organizationUser.role)
   );
+};
+
+export const skipPermissionCheck = ({
+  ctx,
+  next,
+}: PermissionMiddlewareParams<object>) => {
+  ctx.permissionChecked = true;
+  return next();
 };

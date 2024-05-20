@@ -12,6 +12,7 @@ async function createInnerTRPCContext(context: GetServerSidePropsContext) {
     session,
     req: undefined,
     res: undefined,
+    permissionChecked: false,
   };
 }
 

@@ -19,6 +19,7 @@ import {
   TeamRoleGroup,
   checkUserPermissionForOrganization,
   checkUserPermissionForTeam,
+  skipPermissionCheck,
 } from "../permission";
 import { dependencies } from "../../../injection/dependencies.server";
 import * as Sentry from "@sentry/nextjs";
@@ -70,6 +71,7 @@ export const organizationRouter = createTRPCRouter({
         phoneNumber: z.string().optional(),
       })
     )
+    .use(skipPermissionCheck)
     .mutation(async ({ input, ctx }) => {
       const userId = ctx.session.user.id;
       const prisma = ctx.prisma;
@@ -148,6 +150,7 @@ export const organizationRouter = createTRPCRouter({
         isDemo: z.boolean().optional(),
       })
     )
+    .use(skipPermissionCheck)
     .query(async ({ ctx, input }) => {
       const isDemo = input?.isDemo;
       const userId = ctx.session.user.id;
@@ -434,6 +437,7 @@ export const organizationRouter = createTRPCRouter({
         inviteCode: z.string(),
       })
     )
+    .use(skipPermissionCheck)
     .mutation(async ({ input, ctx }) => {
       const prisma = ctx.prisma;
       const session = ctx.session;

@@ -11,6 +11,7 @@ import {
   checkUserPermissionForOrganization,
   checkUserPermissionForProject,
   checkUserPermissionForTeam,
+  skipPermissionCheck,
 } from "../permission";
 import { getOrganizationProjectsCount } from "./limits";
 import { dependencies } from "../../../injection/dependencies.server";
@@ -27,6 +28,7 @@ export const projectRouter = createTRPCRouter({
         framework: z.string(),
       })
     )
+    .use(skipPermissionCheck)
     .use(({ ctx, input, next }) => {
       if (input.teamId) {
         return checkUserPermissionForTeam(

@@ -7,15 +7,24 @@
  * need to use are documented accordingly near the end.
  */
 
-import { initTRPC, TRPCError } from "@trpc/server";
+import {
+  initTRPC,
+  TRPCError,
+  type ProcedureBuilder,
+  type ProcedureParams,
+  type Simplify,
+} from "@trpc/server";
 import { type CreateNextContextOptions } from "@trpc/server/adapters/next";
+import type { inferParser, Parser } from "@trpc/server/dist/core/parser";
 import type { NextApiRequest, NextApiResponse } from "next";
 import { type Session } from "next-auth";
 import superjson from "superjson";
 import { ZodError } from "zod";
 
+import type { UnsetMarker } from "@trpc/server/dist/core/internals/utils";
 import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
+import { type PermissionMiddleware } from "./permission";
 
 /**
  * 1. CONTEXT
@@ -29,6 +38,7 @@ interface CreateContextOptions {
   req?: NextApiRequest;
   res?: NextApiResponse;
   session: Session | null;
+  permissionChecked?: boolean;
 }
 
 /**
@@ -47,6 +57,7 @@ export const createInnerTRPCContext = (opts: CreateContextOptions) => {
     req: opts.req,
     res: opts.res,
     prisma,
+    permissionChecked: opts.permissionChecked ?? false,
   };
 };
 
@@ -66,6 +77,7 @@ export const createTRPCContext = async (opts: CreateNextContextOptions) => {
     req,
     res,
     session,
+    permissionChecked: false,
   });
 };
 
@@ -111,8 +123,10 @@ export const createTRPCRouter = t.router;
  * This is the base piece you use to build new queries and mutations on your tRPC API. It does not
  * guarantee that a user querying is authorized, but you can still access user session data if they
  * are logged in.
+ *
+ * Commented out because we don't have a use case for it yet
  */
-export const publicProcedure = t.procedure;
+// export const publicProcedure = t.procedure;
 
 /** Reusable middleware that enforces users are logged in before running the procedure. */
 const enforceUserIsAuthed = t.middleware(({ ctx, next }) => {
@@ -127,6 +141,16 @@ const enforceUserIsAuthed = t.middleware(({ ctx, next }) => {
   });
 });
 
+const enforcePermissionCheck = t.middleware(({ ctx, next }) => {
+  if (!ctx.permissionChecked) {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "Permission check is required",
+    });
+  }
+  return next();
+});
+
 /**
  * Protected (authenticated) procedure
  *
@@ -135,4 +159,57 @@ const enforceUserIsAuthed = t.middleware(({ ctx, next }) => {
  *
  * @see https://trpc.io/docs/procedures
  */
-export const protectedProcedure = t.procedure.use(enforceUserIsAuthed);
+const authProtectedProcedure = t.procedure.use(enforceUserIsAuthed);
+
+type OverwriteIfDefined<TType, TWith> = UnsetMarker extends TType
+  ? TWith
+  : Simplify<TType & TWith>;
+
+/**
+ * Typescript hackery to make sure all endpoints are forced to set the input, then to explicitly tell
+ * a permission check middleware to use, and that this permission check should be compatible with the
+ * inputs required
+ */
+interface PendingPermissionProcedureBuilder<TParams extends ProcedureParams> {
+  // Copy-paste from @trpc core internals procedureBuilder
+  input: <$Parser extends Parser>(
+    schema: $Parser
+  ) => PendingPermissionProcedureBuilder<{
+    _config: TParams["_config"];
+    _meta: TParams["_meta"];
+    _ctx_out: TParams["_ctx_out"];
+    _input_in: OverwriteIfDefined<
+      TParams["_input_in"],
+      inferParser<$Parser>["in"]
+    >;
+    _input_out: OverwriteIfDefined<
+      TParams["_input_out"],
+      inferParser<$Parser>["out"]
+    >;
+
+    _output_in: TParams["_output_in"];
+    _output_out: TParams["_output_out"];
+  }>;
+  use: (
+    middleware: PermissionMiddleware<TParams["_input_out"]>
+  ) => ReturnType<ProcedureBuilder<TParams>["use"]>;
+}
+
+const permissionProcedureBuilder = <TParams extends ProcedureParams>(
+  procedure: ProcedureBuilder<TParams>
+): PendingPermissionProcedureBuilder<TParams> => {
+  return {
+    input: (input) => {
+      return permissionProcedureBuilder(procedure.input(input as any));
+    },
+    use: (middleware) => {
+      return procedure
+        .use(middleware as any)
+        .use(enforcePermissionCheck as any) as any;
+    },
+  };
+};
+
+export const protectedProcedure = permissionProcedureBuilder(
+  authProtectedProcedure
+);
