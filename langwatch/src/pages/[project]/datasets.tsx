@@ -221,11 +221,13 @@ export default function Datasets() {
                                   <Td>{dataset.name}</Td>
                                   <Td>{schemaDisplayName(dataset.schema)}</Td>
                                   <Td maxWidth="250px">
-                                    <HStack>
+                                    <HStack wrap="wrap">
                                       {dataset.columns
                                         .split(",")
                                         .map((column) => (
-                                          <Tag size="sm">{column}</Tag>
+                                          <Tag size="sm" key={column}>
+                                            {column}
+                                          </Tag>
                                         ))}
                                     </HStack>
                                   </Td>
