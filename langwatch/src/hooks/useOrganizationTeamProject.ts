@@ -48,6 +48,7 @@ export const useOrganizationTeamProject = (
   const [localStorageProjectSlug, setLocalStorageProjectSlug] =
     useLocalStorage<string>("selectedProjectSlug", "");
 
+  // TODO: test all this
   const projectSlug =
     typeof router.query.project == "string"
       ? router.query.project
