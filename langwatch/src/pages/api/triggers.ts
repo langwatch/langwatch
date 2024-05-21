@@ -15,6 +15,7 @@ import { generateTracesPivotQueryConditions } from "~/server/api/routers/analyti
 
 import { getAllForProject } from "~/server/api/routers/traces";
 import { prisma } from "../../server/db";
+import { sendTriggerEmail } from "~/server/mailer/triggerEmail";
 
 export default async function handler(
   req: NextApiRequest,
@@ -24,13 +25,12 @@ export default async function handler(
     return res.status(405).end(); // Only accept POST requests
   }
 
-  const rules = await prisma.rule.findMany();
+  const triggers = await prisma.trigger.findMany();
 
   const results = [];
 
-  for (const rule of rules) {
-    const { id, projectId, filters, lastRunAt, alert_type, alert_params } =
-      rule;
+  for (const trigger of triggers) {
+    const { id, projectId, filters, lastRunAt, action, actionParams } = trigger;
     const input = {
       projectId,
       filters,
@@ -45,6 +45,7 @@ export default async function handler(
 }
 
 const getTracesForAlert = async (input, alertId) => {
+  console.log("alertId", alertId);
   const traces = await getAllForProject({}, input);
 
   if (traces.groups.length > 0) {
@@ -62,7 +63,11 @@ const getTracesForAlert = async (input, alertId) => {
       .flatMap((group) => group.map((item) => item.timestamps.updated_at))
       .sort((a, b) => b - a);
 
-    void updateAlert(alertId, updatedTimes[0]);
+    console.log(updatedTimes);
+
+    void sendTriggerEmail("richard@langwatch.ai", emailData, "test name");
+
+    // void updateAlert(alertId, updatedTimes[0]);
 
     return {
       alertId,
@@ -83,7 +88,7 @@ const getTracesForAlert = async (input, alertId) => {
 };
 
 const updateAlert = async (alertId: string, updatedAt: number) => {
-  await prisma.rule.update({
+  await prisma.trigger.update({
     where: { id: alertId },
     data: { lastRunAt: updatedAt },
   });

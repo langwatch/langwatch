@@ -84,9 +84,9 @@ export function FieldsFilters() {
         {hasAnyFilters && (
           <Button
             colorScheme="orange"
-            onClick={() => openDrawer("rule", undefined)}
+            onClick={() => openDrawer("trigger", undefined)}
           >
-            Add Rule
+            Add Trigger
           </Button>
         )}
       </HStack>

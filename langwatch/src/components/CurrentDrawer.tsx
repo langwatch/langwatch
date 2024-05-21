@@ -2,7 +2,7 @@ import { useRouter } from "next/router";
 import qs from "qs";
 import { TraceDetailsDrawer } from "./TraceDetailsDrawer";
 import { BatchEvaluationDrawer } from "./BatchEvaluationDrawer";
-import { RuleDrawer } from "./AddRuleDrawer";
+import { TriggerDrawer } from "./AddTriggerDrawer";
 
 type DrawerProps = {
   open: string;
@@ -11,7 +11,7 @@ type DrawerProps = {
 const drawers = {
   traceDetails: TraceDetailsDrawer,
   batchEvaluation: BatchEvaluationDrawer,
-  rule: RuleDrawer,
+  trigger: TriggerDrawer,
 } satisfies Record<string, React.FC<any>>;
 
 export function CurrentDrawer() {

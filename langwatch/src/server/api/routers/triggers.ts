@@ -1,18 +1,18 @@
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
-import { RuleAction } from "@prisma/client";
+import { TriggerAction } from "@prisma/client";
 
 import { nanoid } from "nanoid";
 import { TeamRoleGroup, checkUserPermissionForProject } from "../permission";
 
-export const ruleRouter = createTRPCRouter({
+export const triggerRouter = createTRPCRouter({
   create: protectedProcedure
     .input(
       z.object({
         projectId: z.string(),
         email: z.string(),
         name: z.string(),
-        action: z.nativeEnum(RuleAction),
+        action: z.nativeEnum(TriggerAction),
         actionParams: z.any(),
         filters: z.any(),
       })
@@ -20,7 +20,7 @@ export const ruleRouter = createTRPCRouter({
     .use(checkUserPermissionForProject(TeamRoleGroup.ALERTS_MANAGE))
     .mutation(async ({ ctx, input }) => {
       console.log("dasdasd", input);
-      return ctx.prisma.rule.create({
+      return ctx.prisma.trigger.create({
         data: {
           id: nanoid(),
           name: input.name,
@@ -35,7 +35,7 @@ export const ruleRouter = createTRPCRouter({
     .input(z.object({ projectId: z.string(), datasetId: z.string() }))
     .use(checkUserPermissionForProject(TeamRoleGroup.DATASETS_MANAGE))
     .mutation(async ({ ctx, input }) => {
-      await ctx.prisma.alert.delete({
+      await ctx.prisma.trigger.delete({
         where: {
           id: input.datasetId,
         },
