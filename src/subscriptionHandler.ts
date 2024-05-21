@@ -82,13 +82,17 @@ export class SubscriptionHandlerSaas extends SubscriptionHandler {
       organizationId === "HXECRq2mRfSQpxTiSCcsS" ||
       organizationId === "organization_wGxIz2Tiwl8BFDHFHZMz_" ||
       organizationId === "organization_NW_jBe8d0CCKSnK8FW8UD" ||
-      organizationId === "organization_z0JEOAFun8ldnzTQgFxVA"
+      organizationId === "organization_z0JEOAFun8ldnzTQgFxVA" ||
+      organizationId === "organization_3ko1Hf2jnsH8ElKJflyoS"
     ) {
       return { ...PLAN_LIMITS[PlanTypes.GROWTH], overrideAddingLimitations };
     }
 
     if (organizationId === "organization_erk6Bmlfzxw2YMyzWdo8O") {
-      return { ...PLAN_LIMITS[PlanTypes.ENTERPRISE], overrideAddingLimitations };
+      return {
+        ...PLAN_LIMITS[PlanTypes.ENTERPRISE],
+        overrideAddingLimitations,
+      };
     }
 
     const activeSubscription = await prisma.subscription.findFirst({
@@ -103,6 +107,9 @@ export class SubscriptionHandlerSaas extends SubscriptionHandler {
     if (!activeSubscription)
       return { ...PLAN_LIMITS[PlanTypes.FREE], overrideAddingLimitations };
 
-    return { ...PLAN_LIMITS[activeSubscription.plan], overrideAddingLimitations };
+    return {
+      ...PLAN_LIMITS[activeSubscription.plan],
+      overrideAddingLimitations,
+    };
   }
 }
