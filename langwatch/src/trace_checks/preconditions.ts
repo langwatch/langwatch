@@ -4,6 +4,7 @@ import { getEvaluatorDefinitions } from "../trace_checks/getEvaluator";
 import type { CheckPreconditions } from "../trace_checks/types";
 import { extractRAGTextualContext } from "../pages/api/collector/rag";
 
+// TODO: write tests
 export function evaluatePreconditions(
   evaluatorType: string,
   trace: Trace,
@@ -33,7 +34,7 @@ export function evaluatePreconditions(
     };
     const valueToCheck = valueMap[precondition.field];
     const valueToCheckArrayOrLowercase = Array.isArray(valueToCheck)
-      ? valueToCheck
+      ? valueToCheck.map((value) => value.toLowerCase())
       : valueToCheck.toLowerCase();
     const valueToCheckStringOrStringified = Array.isArray(valueToCheck)
       ? JSON.stringify(valueToCheck)
@@ -60,6 +61,7 @@ export function evaluatePreconditions(
         break;
       case "matches_regex":
         try {
+          // TODO: should we do a match on each item of the array here?
           const regex = new RegExp(precondition.value, "gi");
           if (!regex.test(valueToCheckStringOrStringified)) {
             return false;
