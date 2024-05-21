@@ -25,7 +25,7 @@ import { runEvaluation } from "../../../../server/background/workers/traceChecks
 export const debug = getDebugger("langwatch:guardrail:evaluate");
 
 export const guardrailInputSchema = z.object({
-  trace_id: z.string().optional(),
+  trace_id: z.string().optional().nullable(),
   data: z.object({
     input: z.string().optional().nullable(),
     output: z.string().optional().nullable(),

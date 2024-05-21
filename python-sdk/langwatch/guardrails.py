@@ -1,3 +1,4 @@
+from contextlib import contextmanager
 from typing import List, Literal, Optional, Union, cast
 from warnings import warn
 
@@ -7,7 +8,12 @@ from pydantic import BaseModel
 import langwatch
 import langwatch.tracer
 from langwatch.tracer import ContextSpan, get_current_tracer
-from langwatch.types import GuardrailResult, RAGChunk, TypedValueGuardrailResult
+from langwatch.types import (
+    GuardrailResult,
+    RAGChunk,
+    SpanTypes,
+    TypedValueGuardrailResult,
+)
 
 
 class Money(BaseModel):
@@ -29,7 +35,7 @@ def evaluate(
     output: Optional[str] = None,
     contexts: List[RAGChunk] = [],
 ):
-    with langwatch.tracer.create_span(name=slug, type="guardrail") as span:
+    with _optional_create_span(name=slug, type="guardrail") as span:
         request_params = prepare_data(slug, input, output, contexts, span=span)
         try:
             with httpx.Client() as client:
@@ -46,6 +52,16 @@ def evaluate(
             )
 
         return handle_response(response.json(), span)
+
+
+@contextmanager
+def _optional_create_span(name: str, type: SpanTypes):
+    current_tracer = get_current_tracer()
+    if current_tracer:
+        with langwatch.tracer.create_span(name=name, type=type) as span:
+            yield span
+    else:
+        yield None
 
 
 async def async_evaluate(
@@ -84,7 +100,7 @@ def prepare_data(
     input: Optional[str],
     output: Optional[str],
     contexts: List[RAGChunk],
-    span: ContextSpan,
+    span: Optional[ContextSpan],
 ):
     current_tracer = get_current_tracer()
     data = {}
@@ -94,7 +110,8 @@ def prepare_data(
         data["output"] = output
     if contexts and len(contexts) > 0:
         data["contexts"] = contexts
-    span.input = data
+    if span:
+        span.input = data
 
     return {
         "url": langwatch.endpoint + f"/api/guardrails/{slug}/evaluate",
@@ -108,12 +125,13 @@ def prepare_data(
 
 def handle_response(
     response: dict,
-    span: ContextSpan,
+    span: Optional[ContextSpan],
 ):
     result = GuardrailResultModel.model_validate(response)
     if result.status == "error":
         result.details = response.get("message", "")
-    span.output = TypedValueGuardrailResult(
-        type="guardrail_result", value=cast(GuardrailResult, result.model_dump())
-    )
+    if span:
+        span.output = TypedValueGuardrailResult(
+            type="guardrail_result", value=cast(GuardrailResult, result.model_dump())
+        )
     return result
