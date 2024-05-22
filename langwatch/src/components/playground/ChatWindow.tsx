@@ -187,7 +187,7 @@ const ChatWindow = React.memo(function ChatWindow({
         </HStack>
       </HStack>
       <VStack width="full" height="full" minHeight={0} spacing={0}>
-        <ChatSystemPrompt windowId={windowId} chatRef={chatRef} />
+        <ChatSystemPrompt windowId={windowId} />
         <Messages
           tabIndex={tabIndex}
           windowId={windowId}
@@ -207,20 +207,14 @@ const ChatWindow = React.memo(function ChatWindow({
   );
 });
 
-function ChatSystemPrompt({
-  windowId,
-  chatRef,
-}: {
-  windowId: string;
-  chatRef: React.MutableRefObject<ChatRef>;
-}) {
+function ChatSystemPrompt({ windowId }: { windowId: string }) {
   const {
     systemPromptExpanded,
     toggleSystemPromptExpanded,
     onChangeSystemPrompt,
     systemPrompt,
-    messages,
-    setMessages,
+    syncSystemPrompts,
+    toggleSyncSystemPrompts,
   } = usePlaygroundStore((state) => {
     const currentChatWindow = state.tabs[
       state.activeTabIndex
@@ -231,8 +225,8 @@ function ChatSystemPrompt({
       toggleSystemPromptExpanded: state.toggleSystemPromptExpanded,
       onChangeSystemPrompt: state.onChangeSystemPrompt,
       systemPrompt: currentChatWindow.systemPrompt,
-      messages: currentChatWindow.messages,
-      setMessages: state.setMessages,
+      syncSystemPrompts: state.syncSystemPrompts,
+      toggleSyncSystemPrompts: state.toggleSyncSystemPrompts,
     };
   });
 
@@ -248,8 +242,21 @@ function ChatSystemPrompt({
         <Text textTransform="uppercase" fontSize="12px" color="gray.500">
           System Prompt
         </Text>
-
         <Spacer />
+        {systemPromptExpanded && (
+          <Checkbox
+            size="sm"
+            isChecked={syncSystemPrompts}
+            onChange={(e) => {
+              e.stopPropagation();
+              toggleSyncSystemPrompts(systemPrompt);
+            }}
+          >
+            <Text color="gray.400" fontSize="13px">
+              Sync
+            </Text>
+          </Checkbox>
+        )}
         <Button
           size="xs"
           color="gray.500"
@@ -261,7 +268,7 @@ function ChatSystemPrompt({
         </Button>
       </HStack>
 
-      {systemPromptExpanded ? (
+      {systemPromptExpanded && (
         <Box paddingLeft={6} width="full">
           <Textarea
             fontSize="13px"
@@ -270,7 +277,7 @@ function ChatSystemPrompt({
             value={systemPrompt}
           />
         </Box>
-      ) : null}
+      )}
     </VStack>
   );
 }

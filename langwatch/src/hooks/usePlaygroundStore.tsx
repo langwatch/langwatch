@@ -28,6 +28,7 @@ interface PlaygroundStore {
   setMessages: (windowId: string, messages: Message[]) => void;
   toggleSystemPromptExpanded: (windowId: string) => void;
   onChangeSystemPrompt: (windowId: string, systemPrompt: string) => void;
+  toggleSyncSystemPrompts: (currentSystemPrompt: string) => void;
 }
 
 export interface PlaygroundTabState {
@@ -72,7 +73,7 @@ export const modelOptions: ModelOption[] = Object.entries(models).map(
 const initialChatWindows: ChatWindowState[] = [
   {
     id: nanoid(),
-    model: modelOptions.find((model) => model.value === "openai/gpt-4-turbo")!,
+    model: modelOptions.find((model) => model.value === "openai/gpt-4o")!,
     input: "",
     messages: [],
     systemPrompt: "",
@@ -282,14 +283,72 @@ const store = (
       setChatWindow(windowId, () => ({ messages }));
     },
     toggleSystemPromptExpanded: (windowId) => {
-      setChatWindow(windowId, (chatWindow) => ({
-        systemPromptExpanded: !chatWindow.systemPromptExpanded,
-      }));
+      set((state) => {
+        const currentExpanded = !!state.tabs[
+          state.activeTabIndex
+        ]?.chatWindows.find((chatWindow) => chatWindow.id === windowId)
+          ?.systemPromptExpanded;
+
+        return {
+          tabs: state.tabs.map((tab, tabIndex) => {
+            if (tabIndex === state.activeTabIndex) {
+              return {
+                ...tab,
+                chatWindows: tab.chatWindows.map((chatWindow) => {
+                  if (chatWindow.id === windowId || state.syncSystemPrompts) {
+                    return {
+                      ...chatWindow,
+                      systemPromptExpanded: !currentExpanded,
+                    };
+                  }
+                  return chatWindow;
+                }),
+              };
+            }
+            return tab;
+          }),
+        };
+      });
     },
     onChangeSystemPrompt: (windowId, systemPrompt) => {
-      setChatWindow(windowId, ({ messages }) => ({
-        systemPrompt,
-      }));
+      set((state) => {
+        return {
+          tabs: state.tabs.map((tab, tabIndex) => {
+            if (tabIndex === state.activeTabIndex) {
+              return {
+                ...tab,
+                chatWindows: tab.chatWindows.map((chatWindow) => {
+                  if (chatWindow.id === windowId || state.syncSystemPrompts) {
+                    return { ...chatWindow, systemPrompt };
+                  }
+                  return chatWindow;
+                }),
+              };
+            }
+            return tab;
+          }),
+        };
+      });
+    },
+    toggleSyncSystemPrompts: (currentSystemPrompt: string) => {
+      set((state) => {
+        if (!state.syncSystemPrompts) {
+          return {
+            syncSystemPrompts: true,
+            tabs: state.tabs.map((tab) => {
+              return {
+                ...tab,
+                chatWindows: tab.chatWindows.map((chatWindow) => ({
+                  ...chatWindow,
+                  systemPromptExpanded: true,
+                  systemPrompt: currentSystemPrompt,
+                })),
+              };
+            }),
+          };
+        }
+        return { syncSystemPrompts: false };
+      });
     },
   };
 };
