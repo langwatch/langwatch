@@ -36,6 +36,7 @@ from langwatch.types import (
 )
 
 from langwatch.utils import (
+    SerializableAndPydanticEncoder,
     autoconvert_typed_values,
     capture_exception,
     list_get,
@@ -385,11 +386,11 @@ class WrappedRagTool(BaseTool):
                 if type(args[0]) == str:
                     input = args[0]
                 else:
-                    input = json.dumps(args[0])
+                    input = json.dumps(args[0], cls=SerializableAndPydanticEncoder)
             elif len(args) > 0:
-                input = json.dumps(args)
+                input = json.dumps(args, cls=SerializableAndPydanticEncoder)
             else:
-                input = json.dumps(kwargs)
+                input = json.dumps(kwargs, cls=SerializableAndPydanticEncoder)
         except Exception as e:
             if len(args) == 1:
                 input = str(args[0])
@@ -438,7 +439,11 @@ def capture_rag_from_retriever(
         ):
             return documents
 
-    retriever.__dict__['_get_relevant_documents'] = MethodType(_patched_get_relevant_documents, retriever)
-    retriever.__dict__['_aget_relevant_documents'] = MethodType(_patched_aget_relevant_documents, retriever)
+    retriever.__dict__["_get_relevant_documents"] = MethodType(
+        _patched_get_relevant_documents, retriever
+    )
+    retriever.__dict__["_aget_relevant_documents"] = MethodType(
+        _patched_aget_relevant_documents, retriever
+    )
 
     return retriever

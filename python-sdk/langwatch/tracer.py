@@ -20,6 +20,7 @@ from langwatch.types import (
     TraceMetadata,
 )
 from langwatch.utils import (
+    SerializableAndPydanticEncoder,
     autoconvert_typed_values,
     capture_exception,
     milliseconds_timestamp,
@@ -28,6 +29,7 @@ from retry import retry
 
 import langwatch
 import contextvars  # Import contextvars module
+
 
 class ContextSpan:
     span_id: str
@@ -245,7 +247,9 @@ class BaseContextTracer:
                 span["timestamps"]["finished_at"] = milliseconds_timestamp()
 
 
-current_tracer_var = contextvars.ContextVar[Optional[BaseContextTracer]]("current_tracer", default=None)
+current_tracer_var = contextvars.ContextVar[Optional[BaseContextTracer]](
+    "current_tracer", default=None
+)
 
 
 @retry(tries=5, delay=0.5, backoff=3)
@@ -257,10 +261,16 @@ def send_spans(data: CollectorRESTParams):
             "LANGWATCH_API_KEY is not set, LLMs traces will not be sent, go to https://langwatch.ai to set it up"
         )
         return
+    import json
+
+    # TODO: replace this with httpx, don't forget the custom SerializableAndPydanticEncoder encoder
     response = requests.post(
         langwatch.endpoint + "/api/collector",
-        json=data,
-        headers={"X-Auth-Token": str(langwatch.api_key)},
+        data=json.dumps(data, cls=SerializableAndPydanticEncoder),
+        headers={
+            "X-Auth-Token": str(langwatch.api_key),
+            "Content-Type": "application/json",
+        },
     )
     if response.status_code == 429:
         json = response.json()

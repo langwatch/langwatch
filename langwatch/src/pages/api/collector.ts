@@ -63,6 +63,10 @@ export default async function handler(
       .json({ message: "X-Auth-Token header is required." });
   }
 
+  if (req.headers["content-type"] !== "application/json" || typeof req.body !== "object") {
+    return res.status(400).json({ message: "Invalid body, expecting json" });
+  }
+
   const project = await prisma.project.findUnique({
     where: { apiKey: authToken as string },
     include: {
