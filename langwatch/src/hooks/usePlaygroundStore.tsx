@@ -92,7 +92,7 @@ const initialChatWindows: ChatWindowState[] = [
   {
     id: nanoid(),
     model: modelOptions.find(
-      (model) => model.value === "claude-3-sonnet-20240229"
+      (model) => model.value === "anthropic/claude-3-sonnet-20240229"
     )!,
     input: "",
     messages: [],
