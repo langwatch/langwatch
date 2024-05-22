@@ -48,14 +48,29 @@ export const useOrganizationTeamProject = (
   const [localStorageProjectSlug, setLocalStorageProjectSlug] =
     useLocalStorage<string>("selectedProjectSlug", "");
 
+  // TODO: test all this
   const projectSlug =
     typeof router.query.project == "string"
       ? router.query.project
       : localStorageProjectSlug;
 
+  const teamSlug =
+    typeof router.query.team == "string" ? router.query.team : undefined;
+
+  const teamsMatchingSlug = teamSlug
+    ? organizations.data?.flatMap((organization) =>
+        organization.teams
+          .filter((team) => team.slug === teamSlug)
+          .map((team) => ({ organization, team }))
+      )
+    : undefined;
+
   const projectsTeamsOrganizationsMatchingSlug = organizations.data?.flatMap(
     (organization) =>
-      organization.teams.flatMap((team) =>
+      (teamsMatchingSlug?.[0]
+        ? teamsMatchingSlug.map(({ team }) => team)
+        : organization.teams
+      ).flatMap((team) =>
         team.projects
           .filter((project) => project.slug == projectSlug)
           .map((project) => ({ organization, project, team }))
@@ -71,7 +86,9 @@ export const useOrganizationTeamProject = (
       )
   );
 
-  const organization = projectsTeamsOrganizationsMatchingSlug?.[0]
+  const organization = teamsMatchingSlug?.[0]
+    ? teamsMatchingSlug?.[0].organization
+    : projectsTeamsOrganizationsMatchingSlug?.[0]
     ? projectsTeamsOrganizationsMatchingSlug?.[0].organization
     : organizations.data
     ? organizations.data.find((org) => org.id == localStorageOrganizationId) ??
@@ -115,10 +132,23 @@ export const useOrganizationTeamProject = (
       return;
     }
 
+    const teamsWithProjectsOnAnyOrg = organizations.data.flatMap((org) =>
+      org.teams.filter((team) => team.projects.length > 0)
+    );
+    const hasTeamsWithProjectsOnCurrentOrg = organization.teams.some(
+      (team) => team.projects.length > 0
+    );
     if (
-      redirectToProjectOnboarding &&
-      !organization.teams.some((team) => team.projects.length > 0)
+      !hasTeamsWithProjectsOnCurrentOrg &&
+      teamsWithProjectsOnAnyOrg.length > 0
     ) {
+      const availableProjectSlug =
+        teamsWithProjectsOnAnyOrg[0]!.projects[0]!.slug;
+      void router.push(`/${availableProjectSlug}`);
+      return;
+    }
+
+    if (redirectToProjectOnboarding && !teamsWithProjectsOnAnyOrg.length) {
       const firstTeamSlug = organizations.data.flatMap((org) => org.teams)[0]
         ?.slug;
       void router.push(`/onboarding/${firstTeamSlug}/project`);
@@ -136,6 +166,7 @@ export const useOrganizationTeamProject = (
     organization,
     organizations.data,
     project,
+    redirectToOnboarding,
     redirectToProjectOnboarding,
     router,
     team,

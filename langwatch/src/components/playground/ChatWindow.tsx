@@ -87,34 +87,19 @@ const ChatWindow = React.memo(function ChatWindow({
   isLoading: boolean;
   windowsCount: number;
 }) {
-  const {
-    chatWindowState,
-    addChatWindow,
-    removeChatWindow,
-    syncInputs,
-    toggleSyncInputs,
-    onChangeInput,
-    onSubmit,
-  } = usePlaygroundStore((state) => {
-    const { id, model, input, requestedSubmission } = state.tabs[
-      tabIndex
-    ]!.chatWindows.find((chatWindow) => chatWindow.id === windowId)!;
+  const { chatWindowState, addChatWindow, removeChatWindow, onSubmit } =
+    usePlaygroundStore((state) => {
+      const { id, model, input, requestedSubmission } = state.tabs[
+        tabIndex
+      ]!.chatWindows.find((chatWindow) => chatWindow.id === windowId)!;
 
-    return {
-      chatWindowState: { id, model, input, requestedSubmission },
-      addChatWindow: state.addChatWindow,
-      removeChatWindow: state.removeChatWindow,
-      setModel: state.setModel,
-      syncInputs: state.syncInputs,
-      toggleSyncInputs: state.toggleSyncInputs,
-      onChangeInput: state.onChangeInput,
-      onSubmit: state.onSubmit,
-      setMessages: state.setMessages,
-    };
-  });
-  const [isFocused, setIsFocused] = useDebounceValue(false, 200);
-  const inputRef = useRef<HTMLInputElement>(null);
-  const undoHistory = usePlaygroundStore.temporal.getState();
+      return {
+        chatWindowState: { id, model, input, requestedSubmission },
+        addChatWindow: state.addChatWindow,
+        removeChatWindow: state.removeChatWindow,
+        onSubmit: state.onSubmit,
+      };
+    });
 
   useEffect(() => {
     const simulatedEvent = {
@@ -211,73 +196,104 @@ const ChatWindow = React.memo(function ChatWindow({
           isLoading={isLoading}
         />
 
-        <Box
-          padding={4}
-          background="gray.50"
-          width="full"
-          outline="1px solid"
-          outlineColor="gray.200"
-        >
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-
-              onSubmit(windowId, true);
-            }}
-          >
-            <InputGroup>
-              <Input
-                autoFocus={windowIndex === 0}
-                value={chatWindowState.input}
-                onChange={(e) => {
-                  undoHistory.pause();
-                  onChangeInput(windowId, e.target.value);
-                  undoHistory.resume();
-                }}
-                placeholder="Say something..."
-                background="white"
-                onFocus={() => setIsFocused(true)}
-                onBlur={() => setIsFocused(false)}
-                ref={inputRef}
-                fontSize="14px"
-              />
-              <InputRightElement
-                width="100px"
-                justifyContent="end"
-                paddingRight={2}
-              >
-                <HStack spacing={2}>
-                  {isFocused && (
-                    <Checkbox
-                      size="sm"
-                      isChecked={syncInputs}
-                      onChange={(e) => {
-                        inputRef.current?.focus();
-                        e.stopPropagation();
-                        toggleSyncInputs();
-                      }}
-                    >
-                      <Text color="gray.400" fontSize="13px">
-                        Sync
-                      </Text>
-                    </Checkbox>
-                  )}
-                  <Button
-                    type="submit"
-                    size="xs"
-                    variant="ghost"
-                    color="gray.400"
-                    minWidth="16px"
-                    minHeight="16px"
-                  >
-                    <Send width="16px" height="16px" />
-                  </Button>
-                </HStack>
-              </InputRightElement>
-            </InputGroup>
-          </form>
-        </Box>
+        <ChatInputBox
+          windowId={windowId}
+          windowIndex={windowIndex}
+          chatWindowState={chatWindowState}
+        />
       </VStack>
     </VStack>
   );
 });
+
+function ChatInputBox({
+  windowId,
+  windowIndex,
+  chatWindowState,
+}: {
+  windowId: string;
+  windowIndex: number;
+  chatWindowState: { input: string };
+}) {
+  const [isFocused, setIsFocused] = useDebounceValue(false, 200);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const undoHistory = usePlaygroundStore.temporal.getState();
+
+  const { syncInputs, toggleSyncInputs, onChangeInput, onSubmit } =
+    usePlaygroundStore((state) => {
+      return {
+        syncInputs: state.syncInputs,
+        toggleSyncInputs: state.toggleSyncInputs,
+        onChangeInput: state.onChangeInput,
+        onSubmit: state.onSubmit,
+      };
+    });
+
+  return (
+    <Box
+      padding={4}
+      background="gray.50"
+      width="full"
+      outline="1px solid"
+      outlineColor="gray.200"
+    >
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          onSubmit(windowId, true);
+        }}
+      >
+        <InputGroup>
+          <Input
+            autoFocus={windowIndex === 0}
+            value={chatWindowState.input}
+            onChange={(e) => {
+              undoHistory.pause();
+              onChangeInput(windowId, e.target.value);
+              undoHistory.resume();
+            }}
+            placeholder="Say something..."
+            background="white"
+            onFocus={() => setIsFocused(true)}
+            onBlur={() => setIsFocused(false)}
+            ref={inputRef}
+            fontSize="14px"
+          />
+          <InputRightElement
+            width="100px"
+            justifyContent="end"
+            paddingRight={2}
+          >
+            <HStack spacing={2}>
+              {isFocused && (
+                <Checkbox
+                  size="sm"
+                  isChecked={syncInputs}
+                  onChange={(e) => {
+                    inputRef.current?.focus();
+                    e.stopPropagation();
+                    toggleSyncInputs();
+                  }}
+                >
+                  <Text color="gray.400" fontSize="13px">
+                    Sync
+                  </Text>
+                </Checkbox>
+              )}
+              <Button
+                type="submit"
+                size="xs"
+                variant="ghost"
+                color="gray.400"
+                minWidth="16px"
+                minHeight="16px"
+              >
+                <Send width="16px" height="16px" />
+              </Button>
+            </HStack>
+          </InputRightElement>
+        </InputGroup>
+      </form>
+    </Box>
+  );
+}

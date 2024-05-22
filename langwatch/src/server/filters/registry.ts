@@ -482,6 +482,10 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
       extract: (result: Record<string, any>) => {
         return (
           result.unique_check_ids?.child?.buckets
+            ?.filter(
+              (bucket: any) =>
+                bucket.labels.type.buckets?.[0]?.key !== undefined
+            )
             ?.map((bucket: any) => {
               const checkType: string = bucket.labels.type.buckets?.[0]?.key;
               const checkName: string = bucket.labels.name.buckets?.[0]?.key;
@@ -493,8 +497,7 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
                 label: `[${checkDefinition?.name ?? checkType}] ${checkName}`,
                 count: bucket.doc_count,
               };
-            })
-            .filter((option: any) => option.label !== undefined) ?? []
+            }) ?? []
         );
       },
     },
