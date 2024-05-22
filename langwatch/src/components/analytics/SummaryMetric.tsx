@@ -8,6 +8,7 @@ import {
   HStack,
   type TypographyProps,
   type ColorProps,
+  Spacer,
 } from "@chakra-ui/react";
 import numeral from "numeral";
 import { ArrowDown, ArrowUp, HelpCircle } from "react-feather";
@@ -70,6 +71,7 @@ export function SummaryMetric({
           </Tooltip>
         )}
       </Heading>
+      <Spacer />
       <SummaryMetricValue
         current={current}
         previous={previous}

@@ -7,6 +7,7 @@ import {
   useTheme,
   type ColorProps,
   type TypographyProps,
+  Flex,
 } from "@chakra-ui/react";
 import type { TRPCClientErrorLike } from "@trpc/client";
 import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
@@ -327,26 +328,28 @@ export const CustomGraph = React.memo(
       );
 
       return container(
-        <HStack spacing={0} align="start" minHeight="101px">
-          {timeseries.isLoading &&
-            Object.entries(seriesSet).map(([key, series]) => (
+        <HStack spacing={0} align="start" minHeight="101px" overflowX={"auto"}>
+          <Flex paddingBottom={3}>
+            {timeseries.isLoading &&
+              Object.entries(seriesSet).map(([key, series]) => (
+                <SummaryMetric
+                  key={key}
+                  label={series.name}
+                  titleProps={titleProps}
+                />
+              ))}
+            {summaryData.current.slice(0, 10).map((entry, index) => (
               <SummaryMetric
-                key={key}
-                label={series.name}
+                key={entry.key}
+                label={entry.name}
+                current={entry.value}
+                previous={summaryData.previous[index]?.value}
+                format={entry.metric?.format}
+                increaseIs={entry.metric?.increaseIs}
                 titleProps={titleProps}
               />
             ))}
-          {summaryData.current.slice(0, 10).map((entry, index) => (
-            <SummaryMetric
-              key={entry.key}
-              label={entry.name}
-              current={entry.value}
-              previous={summaryData.previous[index]?.value}
-              format={entry.metric?.format}
-              increaseIs={entry.metric?.increaseIs}
-              titleProps={titleProps}
-            />
-          ))}
+          </Flex>
         </HStack>
       );
     }
