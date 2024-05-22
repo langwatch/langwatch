@@ -14,6 +14,7 @@ interface PlaygroundStore {
   tabs: PlaygroundTabState[];
   activeTabIndex: number;
   syncInputs: boolean;
+  syncSystemPrompts: boolean;
   selectTab: (tabIndex: number) => void;
   addChatWindow: (windowId: string) => void;
   removeChatWindow: (windowId: string) => void;
@@ -25,6 +26,8 @@ interface PlaygroundStore {
   onChangeInput: (windowId: string, input: string) => void;
   onSubmit: (windowId: string, requestedSubmission: boolean) => void;
   setMessages: (windowId: string, messages: Message[]) => void;
+  toggleSystemPromptExpanded: (windowId: string) => void;
+  onChangeSystemPrompt: (windowId: string, systemPrompt: string) => void;
 }
 
 export interface PlaygroundTabState {
@@ -38,6 +41,8 @@ export interface ChatWindowState {
   input: string;
   requestedSubmission?: boolean;
   messages: Message[];
+  systemPrompt: string;
+  systemPromptExpanded: boolean;
 }
 
 type ModelOption = {
@@ -70,6 +75,8 @@ const initialChatWindows: ChatWindowState[] = [
     model: modelOptions.find((model) => model.value === "openai/gpt-4-turbo")!,
     input: "",
     messages: [],
+    systemPrompt: "",
+    systemPromptExpanded: false,
   },
   {
     id: nanoid(),
@@ -78,6 +85,8 @@ const initialChatWindows: ChatWindowState[] = [
     )!,
     input: "",
     messages: [],
+    systemPrompt: "",
+    systemPromptExpanded: false,
   },
   {
     id: nanoid(),
@@ -86,6 +95,8 @@ const initialChatWindows: ChatWindowState[] = [
     )!,
     input: "",
     messages: [],
+    systemPrompt: "",
+    systemPromptExpanded: false,
   },
 ];
 
@@ -133,6 +144,7 @@ const store = (
   return {
     activeTabIndex: 0,
     syncInputs: true,
+    syncSystemPrompts: true,
     tabs: [
       {
         name: "Conversation 1",
@@ -176,7 +188,7 @@ const store = (
       });
     },
     addChatWindow: (windowId) => {
-      setCurrentTab((tab, state) => {
+      setCurrentTab((tab, _state) => {
         const currentChatWindowIndex = Math.max(
           tab.chatWindows.findIndex((chatWindow) => chatWindow.id === windowId),
           0
@@ -184,7 +196,15 @@ const store = (
         return {
           chatWindows: [
             ...tab.chatWindows.slice(0, currentChatWindowIndex + 1),
-            { id: nanoid(), model: modelOptions[0]!, input: "", messages: [] },
+            {
+              id: nanoid(),
+              model: modelOptions[0]!,
+              input: "",
+              messages: [],
+              // TODO: get from others if in sync
+              systemPrompt: "",
+              systemPromptExpanded: false,
+            },
             ...tab.chatWindows.slice(currentChatWindowIndex + 1),
           ],
         };
@@ -260,6 +280,16 @@ const store = (
     },
     setMessages: (windowId, messages) => {
       setChatWindow(windowId, () => ({ messages }));
+    },
+    toggleSystemPromptExpanded: (windowId) => {
+      setChatWindow(windowId, (chatWindow) => ({
+        systemPromptExpanded: !chatWindow.systemPromptExpanded,
+      }));
+    },
+    onChangeSystemPrompt: (windowId, systemPrompt) => {
+      setChatWindow(windowId, ({ messages }) => ({
+        systemPrompt,
+      }));
     },
   };
 };

@@ -7,7 +7,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { type Message } from "ai/react";
-import React, { use, useCallback, useEffect, useRef } from "react";
+import React, { useCallback, useEffect, useRef } from "react";
 import { usePlaygroundStore } from "../../hooks/usePlaygroundStore";
 import { useRequiredSession } from "../../hooks/useRequiredSession";
 import type { ChatRef } from "../../hooks/useChatWithSubscription";

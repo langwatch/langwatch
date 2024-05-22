@@ -1,7 +1,7 @@
 import { useChat, type Message } from "ai/react";
 import { useCallback, useEffect, useRef, type FormEvent } from "react";
 
-export const useChatWithSubscription = (id: string, model: string) => {
+export const useChatWithSubscription = (id: string, model: string, systemPrompt: string) => {
   const {
     messages: localMessages,
     setMessages: setLocalMessages,
@@ -15,6 +15,7 @@ export const useChatWithSubscription = (id: string, model: string) => {
     api: "/api/playground",
     headers: {
       "X-Model": model ?? "",
+      "X-System-Prompt": systemPrompt ?? "",
     },
   });
 

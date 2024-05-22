@@ -23,6 +23,7 @@ export default async function handler(req: Request, res: NextApiResponse) {
 
   const result = await streamText({
     model: openai(model),
+    system: req.headers.get("x-system-prompt") ?? undefined,
     messages,
   });
 

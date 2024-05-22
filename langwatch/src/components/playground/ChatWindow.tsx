@@ -9,13 +9,14 @@ import {
   InputRightElement,
   Spacer,
   Text,
+  Textarea,
   VStack,
 } from "@chakra-ui/react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { type Message } from "ai/react";
 import React, { useEffect, useRef } from "react";
-import { MinusCircle, PlusCircle, Send } from "react-feather";
+import { ChevronDown, MinusCircle, PlusCircle, Send } from "react-feather";
 import { useDebounceValue } from "usehooks-ts";
 import { usePlaygroundStore } from "../../hooks/usePlaygroundStore";
 import { SelectModel } from "./SelectModel";
@@ -36,15 +37,15 @@ export const ChatWindowWrapper = React.memo(function ChatWindowWrapper({
   windowIndex: number;
   windowsCount: number;
 }) {
-  const { id, model } = usePlaygroundStore((state) => {
-    const { id, model } = state.tabs[tabIndex]!.chatWindows.find(
+  const { id, model, systemPrompt } = usePlaygroundStore((state) => {
+    const { id, model, systemPrompt } = state.tabs[tabIndex]!.chatWindows.find(
       (window) => window.id === windowId
     )!;
 
-    return { id, model };
+    return { id, model, systemPrompt };
   });
 
-  const chat = useChatWithSubscription(id, model.value);
+  const chat = useChatWithSubscription(id, model.value, systemPrompt);
   const chatRef = useRef<ChatRef>(chat);
 
   useEffect(() => {
@@ -185,7 +186,8 @@ const ChatWindow = React.memo(function ChatWindow({
           </Button>
         </HStack>
       </HStack>
-      <VStack width="full" height="full" minHeight={0}>
+      <VStack width="full" height="full" minHeight={0} spacing={0}>
+        <ChatSystemPrompt windowId={windowId} chatRef={chatRef} />
         <Messages
           tabIndex={tabIndex}
           windowId={windowId}
@@ -195,7 +197,6 @@ const ChatWindow = React.memo(function ChatWindow({
           error={error}
           isLoading={isLoading}
         />
-
         <ChatInputBox
           windowId={windowId}
           windowIndex={windowIndex}
@@ -205,6 +206,74 @@ const ChatWindow = React.memo(function ChatWindow({
     </VStack>
   );
 });
+
+function ChatSystemPrompt({
+  windowId,
+  chatRef,
+}: {
+  windowId: string;
+  chatRef: React.MutableRefObject<ChatRef>;
+}) {
+  const {
+    systemPromptExpanded,
+    toggleSystemPromptExpanded,
+    onChangeSystemPrompt,
+    systemPrompt,
+    messages,
+    setMessages,
+  } = usePlaygroundStore((state) => {
+    const currentChatWindow = state.tabs[
+      state.activeTabIndex
+    ]!.chatWindows.find((chatWindow) => chatWindow.id === windowId)!;
+
+    return {
+      systemPromptExpanded: currentChatWindow.systemPromptExpanded,
+      toggleSystemPromptExpanded: state.toggleSystemPromptExpanded,
+      onChangeSystemPrompt: state.onChangeSystemPrompt,
+      systemPrompt: currentChatWindow.systemPrompt,
+      messages: currentChatWindow.messages,
+      setMessages: state.setMessages,
+    };
+  });
+
+  return (
+    <VStack
+      width="full"
+      backgroundColor="gray.50"
+      borderTop="1px solid"
+      borderColor="gray.200"
+      padding={3}
+    >
+      <HStack width="full" paddingLeft={8}>
+        <Text textTransform="uppercase" fontSize="12px" color="gray.500">
+          System Prompt
+        </Text>
+
+        <Spacer />
+        <Button
+          size="xs"
+          color="gray.500"
+          variant="ghost"
+          padding="6px"
+          onClick={() => toggleSystemPromptExpanded(windowId)}
+        >
+          <ChevronDown width="16px" height="16px" />
+        </Button>
+      </HStack>
+
+      {systemPromptExpanded ? (
+        <Box paddingLeft={6} width="full">
+          <Textarea
+            fontSize="13px"
+            placeholder="You are a helpful assistant..."
+            onChange={(e) => onChangeSystemPrompt(windowId, e.target.value)}
+            value={systemPrompt}
+          />
+        </Box>
+      ) : null}
+    </VStack>
+  );
+}
 
 function ChatInputBox({
   windowId,
