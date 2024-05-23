@@ -9,8 +9,6 @@ import sgMail from "@sendgrid/mail";
 import { env } from "../../env.mjs";
 
 interface TriggerData {
-  input: string;
-  output: string;
   traceId: string;
 }
 

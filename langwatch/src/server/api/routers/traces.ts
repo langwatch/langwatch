@@ -557,8 +557,6 @@ export const getAllForProject = async (
       )) ?? false;
   }
 
-  console.log("canSeeCosts", canSeeCosts);
-
   //@ts-ignore
   const tracesResult = await esClient.search<Trace>({
     index: TRACE_INDEX,
