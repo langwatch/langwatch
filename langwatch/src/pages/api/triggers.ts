@@ -56,10 +56,14 @@ const getTracesForAlert = async (trigger: Trigger, projects: Project[]) => {
     name,
   } = trigger;
 
+  const parsedFilters = JSON.parse(filters as string);
+
   const input = {
     projectId,
-    filters,
+    filters: parsedFilters,
     updatedAt: lastRunAt,
+    startDate: lastRunAt - 1000 * 60 * 60 * 24,
+    endDate: new Date().getTime(),
   };
 
   const traces = await getAllForProject(input);

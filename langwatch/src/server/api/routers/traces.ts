@@ -551,7 +551,7 @@ export const getAllForProject = async (
   ];
 
   let canSeeCosts = false;
-  if (ctx.prisma) {
+  if (ctx?.prisma) {
     canSeeCosts =
       (await backendHasTeamProjectPermission(
         ctx,

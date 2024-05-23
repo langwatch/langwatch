@@ -61,7 +61,7 @@ export const triggerRouter = createTRPCRouter({
           name: input.name,
           action: input.action,
           actionParams: actionParams,
-          filters: input.filters,
+          filters: JSON.stringify(input.filters),
           projectId: input.projectId,
           lastRunAt: new Date().getTime(),
         },
