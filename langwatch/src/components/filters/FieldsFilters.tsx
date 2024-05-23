@@ -43,7 +43,7 @@ import { api } from "../../utils/api";
 import { useDrawer } from "~/components/CurrentDrawer";
 
 export function FieldsFilters() {
-  const { filterParams } = useFilterParams();
+  const { nonEmptyFilters } = useFilterParams();
   const { openDrawer } = useDrawer();
 
   const filterKeys: FilterField[] = [
@@ -63,14 +63,6 @@ export function FieldsFilters() {
     id,
     availableFilters[id],
   ]);
-
-  const nonEmptyFilters = Object.values(filterParams.filters).filter((f) =>
-    typeof f === "string"
-      ? !!f
-      : Array.isArray(f)
-      ? f.length > 0
-      : Object.keys(f).length > 0
-  );
 
   const hasAnyFilters = nonEmptyFilters.length > 0;
 

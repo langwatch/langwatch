@@ -23,7 +23,7 @@ import {
   useDisclosure,
   useToast,
 } from "@chakra-ui/react";
-import { TriggerAction } from "@prisma/client";
+import { TriggerAction, type Trigger } from "@prisma/client";
 import { useDrawer } from "~/components/CurrentDrawer";
 
 import { HorizontalFormControl } from "./HorizontalFormControl";
@@ -35,19 +35,20 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 
 export function TriggerDrawer() {
-  const { project, organization } = useOrganizationTeamProject();
+  const { project, organization, team } = useOrganizationTeamProject();
   const { onOpen, onClose, isOpen } = useDisclosure();
 
   const toast = useToast();
   const createTrigger = api.trigger.create.useMutation();
+  const teamSlug = team?.slug;
 
-  const organizationWithMembers =
-    api.organization.getOrganizationWithMembersAndTheirTeams.useQuery(
-      {
-        organizationId: organization?.id ?? "",
-      },
-      { enabled: !!organization }
-    );
+  const teamWithMembers = api.team.getTeamWithMembers.useQuery(
+    {
+      slug: teamSlug ?? "",
+      organizationId: organization?.id ?? "",
+    },
+    { enabled: typeof teamSlug === "string" && !!organization?.id }
+  );
 
   const { closeDrawer } = useDrawer();
 
@@ -71,7 +72,14 @@ export function TriggerDrawer() {
 
   const currentAction = watch("action");
 
-  const onSubmit = (data: any) => {
+  type Trigger = {
+    name: string;
+    action: TriggerAction;
+    email?: string;
+    members?: string[];
+  };
+
+  const onSubmit = (data: Trigger) => {
     createTrigger.mutate(
       {
         projectId: project?.id ?? "",
@@ -79,13 +87,13 @@ export function TriggerDrawer() {
         action: data.action,
         filters: filterParams.filters,
         organizationId: organization?.id ?? "",
-        members: data.members,
+        members: data.members ?? [],
       },
       {
         onSuccess: () => {
           toast({
-            title: "Alert Created",
-            description: `You have successfully created an alert`,
+            title: "Trigger Created",
+            description: `You have successfully created a trigger`,
 
             status: "success",
             duration: 5000,
@@ -95,10 +103,10 @@ export function TriggerDrawer() {
           reset();
           closeDrawer();
         },
-        onError: (error) => {
+        onError: () => {
           toast({
             title: "Error",
-            description: error.message,
+            description: "Error creating trigger",
             status: "error",
             duration: 5000,
             isClosable: true,
@@ -138,8 +146,8 @@ export function TriggerDrawer() {
             <PopoverBody>
               <FormControl>
                 <Stack spacing={5} direction="column" marginRight={4}>
-                  {organizationWithMembers.data &&
-                    organizationWithMembers.data?.members.map((member) => {
+                  {teamWithMembers.data &&
+                    teamWithMembers.data?.members.map((member) => {
                       return (
                         <Checkbox
                           key={member.user.id}

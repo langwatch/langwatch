@@ -19,8 +19,9 @@ export const triggerRouter = createTRPCRouter({
         organizationId: z.string(),
       })
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.ALERTS_MANAGE))
+    .use(checkUserPermissionForProject(TeamRoleGroup.TRIGGERS_MANAGE))
     .mutation(async ({ ctx, input }) => {
+      console.log("input", input);
       const organizationUsers = await ctx.prisma.organizationUser.findMany({
         where: {
           organizationId: input.organizationId,
@@ -68,7 +69,7 @@ export const triggerRouter = createTRPCRouter({
     }),
   deleteById: protectedProcedure
     .input(z.object({ projectId: z.string(), triggerId: z.string() }))
-    .use(checkUserPermissionForProject(TeamRoleGroup.ALERTS_MANAGE))
+    .use(checkUserPermissionForProject(TeamRoleGroup.TRIGGERS_MANAGE))
     .mutation(async ({ ctx, input }) => {
       await ctx.prisma.trigger.delete({
         where: {
@@ -80,7 +81,7 @@ export const triggerRouter = createTRPCRouter({
     }),
   getTriggers: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .use(checkUserPermissionForProject(TeamRoleGroup.ALERTS_MANAGE))
+    .use(checkUserPermissionForProject(TeamRoleGroup.TRIGGERS_MANAGE))
     .query(async ({ ctx, input }) => {
       return ctx.prisma.trigger.findMany({
         where: {
@@ -96,7 +97,7 @@ export const triggerRouter = createTRPCRouter({
         projectId: z.string(),
       })
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.ALERTS_MANAGE))
+    .use(checkUserPermissionForProject(TeamRoleGroup.TRIGGERS_MANAGE))
     .mutation(async ({ ctx, input }) => {
       return ctx.prisma.trigger.update({
         where: {

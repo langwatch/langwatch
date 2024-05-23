@@ -90,7 +90,7 @@ export const tracesRouter = createTRPCRouter({
     .input(getAllForProjectInput)
     .use(checkUserPermissionForProject(TeamRoleGroup.MESSAGES_VIEW))
     .query(async ({ ctx, input }) => {
-      return await getAllForProject(ctx, input);
+      return await getAllForProject(input, ctx);
     }),
   getById: protectedProcedure
     .input(z.object({ projectId: z.string(), traceId: z.string() }))
@@ -367,11 +367,14 @@ export const tracesRouter = createTRPCRouter({
     )
     .use(checkUserPermissionForProject(TeamRoleGroup.MESSAGES_VIEW))
     .query(async ({ ctx, input }) => {
-      const { groups } = await getAllForProject(ctx, {
-        ...input,
-        groupBy: "none",
-        pageSize: 100,
-      });
+      const { groups } = await getAllForProject(
+        {
+          ...input,
+          groupBy: "none",
+          pageSize: 100,
+        },
+        ctx
+      );
       const traceIds = groups.flatMap((group) =>
         group.map((trace) => trace.trace_id)
       );
@@ -419,8 +422,8 @@ export const tracesRouter = createTRPCRouter({
 });
 
 export const getAllForProject = async (
-  ctx: { prisma: PrismaClient; session: Session },
-  input: z.infer<typeof getAllForProjectInput>
+  input: z.infer<typeof getAllForProjectInput>,
+  ctx?: { prisma: PrismaClient; session: Session }
 ) => {
   const embeddings = input.query
     ? await getOpenAIEmbeddings(input.query)

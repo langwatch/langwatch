@@ -1,6 +1,6 @@
 import { type NextApiRequest, type NextApiResponse } from "next";
 
-import { type Trigger, TriggerAction } from "@prisma/client";
+import { type Trigger, TriggerAction, type Project } from "@prisma/client";
 import { getAllForProject } from "~/server/api/routers/traces";
 import { prisma } from "../../server/db";
 
@@ -20,23 +20,32 @@ export default async function handler(
     return res.status(405).end(); // Only accept POST requests
   }
 
+  const projects = await prisma.project.findMany({
+    where: {
+      firstMessage: true,
+    },
+  });
+
   const triggers = await prisma.trigger.findMany({
     where: {
       active: true,
+      projectId: {
+        in: projects.map((project) => project.id),
+      },
     },
   });
 
   const results = [];
 
   for (const trigger of triggers) {
-    const traces = await getTracesForAlert(trigger);
+    const traces = await getTracesForAlert(trigger, projects);
     results.push(traces);
   }
 
   return res.status(200).json(results);
 }
 
-const getTracesForAlert = async (trigger: Trigger) => {
+const getTracesForAlert = async (trigger: Trigger, projects: Project[]) => {
   const {
     id: alertId,
     projectId,
@@ -53,8 +62,7 @@ const getTracesForAlert = async (trigger: Trigger) => {
     updatedAt: lastRunAt,
   };
 
-  // @ts-ignore
-  const traces = await getAllForProject({}, input);
+  const traces = await getAllForProject(input);
 
   if (traces.groups.length > 0) {
     const triggerData = traces.groups.flatMap((group) =>
@@ -65,11 +73,7 @@ const getTracesForAlert = async (trigger: Trigger) => {
       }))
     );
 
-    const project = await prisma.project.findFirst({
-      where: {
-        id: input.projectId,
-      },
-    });
+    const project = projects.find((project) => project.id === input.projectId);
 
     let triggerInfo;
     let updatedAt = 0;
@@ -85,7 +89,11 @@ const getTracesForAlert = async (trigger: Trigger) => {
       updatedAt = getLatestUpdatedAt(traces);
 
       await sendTriggerEmail(triggerInfo);
-      void updateAlert(alertId, updatedAt);
+      if (project) {
+        void updateAlert(alertId, updatedAt, project.id);
+      } else {
+        console.error("Project not found for alertId:", alertId);
+      }
     }
 
     return {
@@ -106,9 +114,13 @@ const getTracesForAlert = async (trigger: Trigger) => {
   };
 };
 
-const updateAlert = async (alertId: string, updatedAt: number) => {
+const updateAlert = async (
+  alertId: string,
+  updatedAt: number,
+  projectId: string
+) => {
   await prisma.trigger.update({
-    where: { id: alertId },
+    where: { id: alertId, projectId },
     data: { lastRunAt: updatedAt },
   });
 };

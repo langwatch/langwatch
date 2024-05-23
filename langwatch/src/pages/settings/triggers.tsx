@@ -45,11 +45,11 @@ export default function Members() {
         onSuccess: () => {
           void triggers.refetch();
         },
-        onError: (error) => {
+        onError: () => {
           toast({
-            title: "Failed to update trigger",
+            title: "Update trigger",
             status: "error",
-            description: error.message,
+            description: "Failed to update trigger",
             duration: 6000,
             isClosable: true,
           });
@@ -63,14 +63,21 @@ export default function Members() {
       { triggerId, projectId: project?.id ?? "" },
       {
         onSuccess: () => {
+          toast({
+            title: "Delete trigger",
+            status: "success",
+            description: "Trigger deleted",
+            duration: 5000,
+            isClosable: true,
+          });
           void triggers.refetch();
         },
-        onError: (error) => {
+        onError: () => {
           toast({
-            title: "Failed to delete trigger",
+            title: "Delete trigger",
             status: "error",
-            description: error.message,
-            duration: 6000,
+            description: "Failed to delete trigger",
+            duration: 5000,
             isClosable: true,
           });
         },
