@@ -219,18 +219,6 @@ export function TriggerDrawer() {
                     </Radio>
                     {currentAction === TriggerAction.SEND_EMAIL && (
                       <MultiSelect />
-                      // <FormControl marginTop={2} paddingLeft={6}>
-                      //   <Input
-                      //     placeholder="your email"
-                      //     type="email"
-                      //     value={email}
-                      //     required
-                      //     {...register("email")}
-                      //   />
-                      //   <FormErrorMessage>
-                      //     {errors.email?.message}
-                      //   </FormErrorMessage>
-                      // </FormControl>
                     )}
                   </VStack>
                   <VStack align="start">
