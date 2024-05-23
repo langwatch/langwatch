@@ -1,9 +1,8 @@
 import { type NextApiRequest, type NextApiResponse } from "next";
 
-import { TriggerAction } from "@prisma/client";
+import { type Trigger, TriggerAction } from "@prisma/client";
 import { getAllForProject } from "~/server/api/routers/traces";
 import { prisma } from "../../server/db";
-import type { Prisma } from "@prisma/client";
 
 import { sendTriggerEmail } from "~/server/mailer/triggerEmail";
 import { getLatestUpdatedAt } from "./utils";
@@ -11,15 +10,6 @@ import { getLatestUpdatedAt } from "./utils";
 interface ActionParams {
   members?: string[] | null;
   dataset?: string | null;
-}
-interface Trigger {
-  id: string;
-  projectId: string;
-  filters: Prisma.JsonValue;
-  lastRunAt: number;
-  action: string;
-  actionParams: Prisma.JsonValue;
-  name: string;
 }
 
 export default async function handler(
@@ -86,7 +76,7 @@ const getTracesForAlert = async (trigger: Trigger) => {
 
     if (action === TriggerAction.SEND_EMAIL) {
       triggerInfo = {
-        triggerEmails: (actionParams as ActionParams)?.members ?? "",
+        triggerEmails: (actionParams as ActionParams)?.members ?? [],
         triggerData,
         triggerName: name,
         projectSlug: project!.slug,
