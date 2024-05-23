@@ -438,19 +438,16 @@ export const getAllForProject = async (
 
   let traceIds: string[] = [];
 
-  const pageSize = input.pageSize ? input.pageSize : 25;
+  let pageSize = input.pageSize ? input.pageSize : 25;
   const pageOffset = input.pageOffset ? input.pageOffset : 0;
 
   let totalHits = 0;
   let usePivotIndex = false;
-  console.log("myinputt", JSON.stringify(input));
-  const includeUpdatedAtFilter = false;
-  console.log("input.updatedAt", input.updatedAt);
-  if (input.updatedAt) {
-    console.log("yyyyy", true);
+
+  if (input.updatedAt !== undefined && input.updatedAt >= 0) {
+    pageSize = 10_000;
   }
   if (isAnyFilterPresent || input.sortBy) {
-    console.log("pivotIndexConditions", JSON.stringify(pivotIndexConditions));
     usePivotIndex = true;
     const pivotIndexResults = await esClient.search<TracesPivot>({
       index: TRACES_PIVOT_INDEX,

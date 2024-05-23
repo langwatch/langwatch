@@ -1,5 +1,6 @@
 import {
   Button,
+  Checkbox,
   Drawer,
   DrawerBody,
   DrawerCloseButton,
@@ -9,11 +10,17 @@ import {
   FormErrorMessage,
   HStack,
   Input,
+  Popover,
+  PopoverBody,
+  PopoverCloseButton,
+  PopoverContent,
+  PopoverTrigger,
   Radio,
   RadioGroup,
   Stack,
   Text,
   VStack,
+  useDisclosure,
   useToast,
 } from "@chakra-ui/react";
 import { TriggerAction } from "@prisma/client";
@@ -28,9 +35,20 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 
 export function TriggerDrawer() {
-  const { project } = useOrganizationTeamProject();
+  const { project, organization } = useOrganizationTeamProject();
+  const { onOpen, onClose, isOpen } = useDisclosure();
+
   const toast = useToast();
   const createTrigger = api.trigger.create.useMutation();
+
+  const organizationWithMembers =
+    api.organization.getOrganizationWithMembersAndTheirTeams.useQuery(
+      {
+        organizationId: organization?.id ?? "",
+      },
+      { enabled: !!organization }
+    );
+
   const { closeDrawer } = useDrawer();
 
   const { filterParams } = useFilterParams();
@@ -39,6 +57,7 @@ export function TriggerDrawer() {
     register,
     handleSubmit,
     watch,
+    getValues,
     formState: { errors },
     reset,
   } = useForm({
@@ -46,42 +65,21 @@ export function TriggerDrawer() {
       name: "",
       action: TriggerAction.SEND_EMAIL,
       email: "",
+      members: [],
     },
   });
 
   const currentAction = watch("action");
-  const email = watch("email");
-
-  console.log(currentAction);
 
   const onSubmit = (data: any) => {
-    let actionParams;
-    if (data.action === TriggerAction.SEND_EMAIL) {
-      actionParams = {
-        email: data.email,
-      };
-    } else if (data.action === TriggerAction.ADD_TO_DATASET) {
-      actionParams = {
-        datasetId: "yy",
-      };
-    }
-    console.log("sdasds", {
-      projectId: project?.id ?? "",
-      email: data.email,
-      name: data.name,
-      action: data.action,
-      actionParams: actionParams,
-      filters: filterParams.filters,
-    });
-
     createTrigger.mutate(
       {
         projectId: project?.id ?? "",
-        email: data.email,
         name: data.name,
         action: data.action,
-        actionParams: actionParams,
         filters: filterParams.filters,
+        organizationId: organization?.id ?? "",
+        members: data.members,
       },
       {
         onSuccess: () => {
@@ -97,12 +95,78 @@ export function TriggerDrawer() {
           reset();
           closeDrawer();
         },
+        onError: (error) => {
+          toast({
+            title: "Error",
+            description: error.message,
+            status: "error",
+            duration: 5000,
+            isClosable: true,
+            position: "top-right",
+          });
+        },
       }
     );
   };
 
+  const MultiSelect = () => {
+    const members = watch("members");
+    return (
+      <>
+        <Popover
+          placement="bottom"
+          matchWidth={true}
+          isOpen={isOpen}
+          onOpen={onOpen}
+          onClose={onClose}
+        >
+          <PopoverTrigger>
+            <FormControl isInvalid={!!errors.email}>
+              <Input
+                placeholder="Select emails"
+                defaultValue={members}
+                readOnly
+                {...register("members", {
+                  required: "Please select at least one member",
+                })}
+              />
+              <FormErrorMessage>{errors.email?.message}</FormErrorMessage>
+            </FormControl>
+          </PopoverTrigger>
+          <PopoverContent marginTop="-8px" width="100%">
+            <PopoverCloseButton onClick={onClose} zIndex={1000} />
+            <PopoverBody>
+              <FormControl>
+                <Stack spacing={5} direction="column" marginRight={4}>
+                  {organizationWithMembers.data &&
+                    organizationWithMembers.data?.members.map((member) => {
+                      return (
+                        <Checkbox
+                          key={member.user.id}
+                          {...register("members")}
+                          value={member.user!.email ?? ""}
+                        >
+                          {member.user.email}
+                        </Checkbox>
+                      );
+                    })}
+                </Stack>
+              </FormControl>
+            </PopoverBody>
+          </PopoverContent>
+        </Popover>
+      </>
+    );
+  };
+
   return (
-    <Drawer isOpen={true} placement="right" size={"xl"} onClose={closeDrawer}>
+    <Drawer
+      isOpen={true}
+      placement="right"
+      size={"xl"}
+      onClose={closeDrawer}
+      onOverlayClick={onClose}
+    >
       <DrawerContent>
         <DrawerHeader>
           <HStack>
@@ -154,17 +218,19 @@ export function TriggerDrawer() {
                       </Text>
                     </Radio>
                     {currentAction === TriggerAction.SEND_EMAIL && (
-                      <FormControl marginTop={2} paddingLeft={6}>
-                        <Input
-                          placeholder="your email"
-                          type="email"
-                          value={email}
-                          {...register("email")}
-                        />
-                        <FormErrorMessage>
-                          {errors.email?.message}
-                        </FormErrorMessage>
-                      </FormControl>
+                      <MultiSelect />
+                      // <FormControl marginTop={2} paddingLeft={6}>
+                      //   <Input
+                      //     placeholder="your email"
+                      //     type="email"
+                      //     value={email}
+                      //     required
+                      //     {...register("email")}
+                      //   />
+                      //   <FormErrorMessage>
+                      //     {errors.email?.message}
+                      //   </FormErrorMessage>
+                      // </FormControl>
                     )}
                   </VStack>
                   <VStack align="start">
@@ -175,6 +241,7 @@ export function TriggerDrawer() {
                       alignItems="start"
                       spacing={3}
                       paddingTop={2}
+                      isDisabled={true}
                       {...register("action")}
                     >
                       <VStack align="start" marginTop={-1}>
@@ -189,8 +256,12 @@ export function TriggerDrawer() {
                 </Stack>
               </RadioGroup>
             </HorizontalFormControl>
-
-            <Button colorScheme="blue" type="submit" minWidth="fit-content">
+            <Button
+              colorScheme="blue"
+              type="submit"
+              minWidth="fit-content"
+              isLoading={createTrigger.isLoading}
+            >
               Add Trigger
             </Button>
           </form>

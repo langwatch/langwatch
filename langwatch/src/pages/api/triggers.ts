@@ -1,21 +1,26 @@
 import { type NextApiRequest, type NextApiResponse } from "next";
-import {
-  SPAN_INDEX,
-  TRACES_PIVOT_INDEX,
-  TRACE_CHECKS_INDEX,
-  TRACE_INDEX,
-  esClient,
-  traceIndexId,
-} from "~/server/elasticsearch";
 
-import type { TracesPivot } from "~/server/analytics/types";
-import type { Sort } from "@elastic/elasticsearch/lib/api/types";
-
-import { generateTracesPivotQueryConditions } from "~/server/api/routers/analytics/common";
-
+import { TriggerAction } from "@prisma/client";
 import { getAllForProject } from "~/server/api/routers/traces";
 import { prisma } from "../../server/db";
+import type { Prisma } from "@prisma/client";
+
 import { sendTriggerEmail } from "~/server/mailer/triggerEmail";
+import { getLatestUpdatedAt } from "./utils";
+
+interface ActionParams {
+  members?: string[] | null;
+  dataset?: string | null;
+}
+interface Trigger {
+  id: string;
+  projectId: string;
+  filters: Prisma.JsonValue;
+  lastRunAt: number;
+  action: string;
+  actionParams: Prisma.JsonValue;
+  name: string;
+}
 
 export default async function handler(
   req: NextApiRequest,
@@ -30,51 +35,71 @@ export default async function handler(
   const results = [];
 
   for (const trigger of triggers) {
-    const { id, projectId, filters, lastRunAt, action, actionParams } = trigger;
-    const input = {
-      projectId,
-      filters,
-      updatedAt: lastRunAt,
-    };
-
-    const traces = await getTracesForAlert(input, id);
+    const traces = await getTracesForAlert(trigger);
     results.push(traces);
   }
 
   return res.status(200).json(results);
 }
 
-const getTracesForAlert = async (input, alertId) => {
-  console.log("alertId", alertId);
+const getTracesForAlert = async (trigger: Trigger) => {
+  const {
+    id: alertId,
+    projectId,
+    filters,
+    lastRunAt,
+    action,
+    actionParams,
+    name,
+  } = trigger;
+
+  const input = {
+    projectId,
+    filters,
+    updatedAt: lastRunAt,
+  };
+
+  // @ts-ignore
   const traces = await getAllForProject({}, input);
 
   if (traces.groups.length > 0) {
-    console.log("traces.groups", traces.groups);
-
-    const emailData = traces.groups.flatMap((group) =>
+    const triggerData = traces.groups.flatMap((group) =>
       group.map((trace) => ({
         input: trace.input?.value,
-        output: trace.output?.value,
+        output: trace.output?.value ?? "",
         traceId: trace.trace_id,
       }))
     );
 
-    const updatedTimes = traces.groups
-      .flatMap((group) => group.map((item) => item.timestamps.updated_at))
-      .sort((a, b) => b - a);
+    const project = await prisma.project.findFirst({
+      where: {
+        id: input.projectId,
+      },
+    });
 
-    console.log(updatedTimes);
+    let triggerInfo;
+    let updatedAt = 0;
 
-    void sendTriggerEmail("richard@langwatch.ai", emailData, "test name");
+    if (action === TriggerAction.SEND_EMAIL) {
+      triggerInfo = {
+        triggerEmails: (actionParams as ActionParams)?.members ?? "",
+        triggerData,
+        triggerName: name,
+        projectSlug: project!.slug,
+      };
 
-    // void updateAlert(alertId, updatedTimes[0]);
+      updatedAt = getLatestUpdatedAt(traces);
+
+      await sendTriggerEmail(triggerInfo);
+      void updateAlert(alertId, updatedAt);
+    }
 
     return {
       alertId,
-      updatedAt: updatedTimes[0],
+      updatedAt: updatedAt,
       status: "triggered",
       totalFound: traces.groups.length,
-      emailData,
+      triggerInfo,
       traces: traces.groups,
     };
   }
