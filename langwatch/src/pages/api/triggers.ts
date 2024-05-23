@@ -30,7 +30,11 @@ export default async function handler(
     return res.status(405).end(); // Only accept POST requests
   }
 
-  const triggers = await prisma.trigger.findMany();
+  const triggers = await prisma.trigger.findMany({
+    where: {
+      active: true,
+    },
+  });
 
   const results = [];
 

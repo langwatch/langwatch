@@ -62,6 +62,7 @@ export const triggerRouter = createTRPCRouter({
           actionParams: actionParams,
           filters: input.filters,
           projectId: input.projectId,
+          lastRunAt: new Date().getTime(),
         },
       });
     }),
@@ -76,5 +77,36 @@ export const triggerRouter = createTRPCRouter({
       });
 
       return { success: true };
+    }),
+  getTriggers: protectedProcedure
+    .input(z.object({ projectId: z.string() }))
+    .use(checkUserPermissionForProject(TeamRoleGroup.ALERTS_MANAGE))
+    .query(async ({ ctx, input }) => {
+      return ctx.prisma.trigger.findMany({
+        where: {
+          projectId: input.projectId,
+        },
+      });
+    }),
+  toggleTrigger: protectedProcedure
+    .input(
+      z.object({
+        triggerId: z.string(),
+        active: z.boolean(),
+        projectId: z.string(),
+      })
+    )
+    .use(checkUserPermissionForProject(TeamRoleGroup.ALERTS_MANAGE))
+    .mutation(async ({ ctx, input }) => {
+      return ctx.prisma.trigger.update({
+        where: {
+          id: input.triggerId,
+          projectId: input.projectId,
+        },
+        data: {
+          active: input.active,
+          lastRunAt: new Date().getTime(),
+        },
+      });
     }),
 });

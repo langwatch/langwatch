@@ -56,7 +56,10 @@ export const sendTriggerEmail = async ({
 
         <TriggerTable triggerData={triggerData} projectSlug={projectSlug} />
 
-        <p>To stop further emails, please de-activate or delete your trigger</p>
+        <p>
+          To stop further emails, please de-activate or delete your trigger{" "}
+          <Link href={`${env.NEXTAUTH_URL}/settings/triggers`}>here</Link>
+        </p>
       </Container>
     </Html>
   );

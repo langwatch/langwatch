@@ -354,6 +354,7 @@ model Trigger {
     lastRunAt    Float         @default(0)
     createdAt    DateTime      @default(now())
     updatedAt    DateTime      @default(now()) @updatedAt
+    active       Boolean       @default(true)
 
     @@index([projectId])
 }

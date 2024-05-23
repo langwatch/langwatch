@@ -121,16 +121,16 @@ export function TriggerDrawer() {
           onClose={onClose}
         >
           <PopoverTrigger>
-            <FormControl isInvalid={!!errors.email}>
+            <FormControl isInvalid={!!errors.members}>
               <Input
-                placeholder="Select emails"
+                placeholder="Select email/s"
                 defaultValue={members}
                 readOnly
                 {...register("members", {
                   required: "Please select at least one member",
                 })}
               />
-              <FormErrorMessage>{errors.email?.message}</FormErrorMessage>
+              <FormErrorMessage>{errors.members?.message}</FormErrorMessage>
             </FormControl>
           </PopoverTrigger>
           <PopoverContent marginTop="-8px" width="100%">
