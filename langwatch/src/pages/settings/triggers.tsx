@@ -113,7 +113,7 @@ export default function Members() {
                   const lastRunAtFormatted = lastRunAt.toLocaleString();
 
                   return (
-                    <LinkBox as="tr" key={trigger.id}>
+                    <Tr key={trigger.id}>
                       <Td>{trigger.name}</Td>
                       <Td>{trigger.action}</Td>
                       <Td>
@@ -157,7 +157,7 @@ export default function Members() {
                           </MenuList>
                         </Menu>
                       </Td>
-                    </LinkBox>
+                    </Tr>
                   );
                 })}
               </Tbody>
