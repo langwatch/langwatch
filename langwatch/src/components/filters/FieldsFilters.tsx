@@ -85,6 +85,7 @@ export function FieldsFilters() {
           <Button
             colorScheme="orange"
             onClick={() => openDrawer("trigger", undefined)}
+            size="sm"
           >
             Add Trigger
           </Button>
