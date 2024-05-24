@@ -16,8 +16,8 @@ export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
-  if (req.method !== "POST") {
-    return res.status(405).end(); // Only accept POST requests
+  if (req.method !== "GET") {
+    return res.status(405).end();
   }
 
   const projects = await prisma.project.findMany({
