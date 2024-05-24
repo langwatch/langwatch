@@ -8,11 +8,10 @@ from typing import (
     Literal,
     Optional,
     Tuple,
-    TypedDict,
     Union,
 )
 from pydantic import BaseModel, Field
-import nanoid
+from coolname import generate_slug
 import langwatch
 import httpx
 from tqdm import tqdm
@@ -94,7 +93,7 @@ class BatchEvaluation:
 
     def run(self):
         print("Starting batch evaluation...")
-        batchId = f"batch_{nanoid.generate()}"
+        experimentSlug = generate_slug(3)
         dataset = get_dataset(self.dataset)
 
         if dataset is None:
@@ -107,7 +106,8 @@ class BatchEvaluation:
 
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
             futures: List[Future] = [
-                executor.submit(self.run_record, record, batchId) for record in dataset
+                executor.submit(self.run_record, record, experimentSlug)
+                for record in dataset
             ]
             for future in tqdm(as_completed(futures), total=len(futures)):
                 results.append(future.result())
@@ -138,7 +138,7 @@ class BatchEvaluation:
 
         return pd.DataFrame(results_df)
 
-    def run_record(self, record: DatasetRecord, batchId: str):
+    def run_record(self, record: DatasetRecord, experimentSlug: str):
         entry = record.entry
 
         callbackResponse = self.callback(entry)
@@ -155,7 +155,9 @@ class BatchEvaluation:
         coroutines: list[Coroutine[Tuple[str, SingleEvaluationResult], Any, Any]] = []
         for evaluation in self.evaluations:
             coroutines.append(
-                run_evaluation(entry_with_output, evaluation, batchId, self.dataset)
+                run_evaluation(
+                    entry_with_output, evaluation, experimentSlug, self.dataset
+                )
             )
 
         async def gather_results(futures):
@@ -171,13 +173,13 @@ class BatchEvaluation:
 
 
 async def run_evaluation(
-    data: DatasetEntryWithOutput, evaluation: str, batchId: str, datasetSlug: str
+    data: DatasetEntryWithOutput, evaluation: str, experimentSlug: str, datasetSlug: str
 ) -> Tuple[str, SingleEvaluationResult]:
     try:
         json_data = {
             "data": data.model_dump(),
             "evaluation": evaluation,
-            "batchId": batchId,
+            "experimentSlug": experimentSlug,
             "datasetSlug": datasetSlug,
         }
 

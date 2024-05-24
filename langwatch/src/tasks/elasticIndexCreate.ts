@@ -11,6 +11,7 @@ import {
   TRACES_PIVOT_INDEX,
   esClient,
   TRACES_PIVOT_TRANSFORM,
+  DSPY_STEPS_INDEX,
 } from "../server/elasticsearch";
 import {
   type ElasticSearchSpan,
@@ -20,6 +21,7 @@ import {
 } from "../server/tracer/types";
 import omit from "lodash.omit";
 import type { TracesPivot } from "../server/analytics/types";
+import type { DSPyStep } from "../server/experiments/types";
 
 type NonNestedMappingProperty =
   | Omit<MappingProperty, "properties">
@@ -257,6 +259,34 @@ const eventsMapping: ElasticSearchMappingFrom<ElasticSearchEvent> = {
       customer_id: { type: "keyword" },
       labels: { type: "keyword" },
       topics: { type: "keyword" },
+    },
+  },
+};
+
+const dspyStepsMapping: ElasticSearchMappingFrom<DSPyStep> = {
+  project_id: { type: "keyword" },
+  experiment_id: { type: "keyword" },
+  run_id: { type: "keyword" },
+  index: { type: "integer" },
+  parameters_hash: { type: "keyword" },
+  parameters: { type: "flattened" } as any,
+  examples: { type: "flattened" } as any,
+  llm_calls: {
+    type: "nested",
+    properties: {
+      model: { type: "keyword" },
+      prompt_tokens: { type: "integer" },
+      completion_tokens: { type: "integer" },
+      tokens_estimated: { type: "boolean" },
+      cost: { type: "float" },
+      response: { type: "flattened" } as any,
+    },
+  },
+  timestamps: {
+    properties: {
+      created_at: { type: "date" },
+      inserted_at: { type: "date" },
+      updated_at: { type: "date" },
     },
   },
 };
@@ -553,11 +583,12 @@ async function createPivotTableTransform() {
           updated_at: {
             max: {
               script: {
-                source: "doc['timestamps.updated_at'].value.toInstant().toEpochMilli()",
-                lang: "painless"
-              }
-            }
-          }
+                source:
+                  "doc['timestamps.updated_at'].value.toInstant().toEpochMilli()",
+                lang: "painless",
+              },
+            },
+          },
         },
       },
       sync: {
@@ -647,6 +678,22 @@ export const createIndexes = async () => {
     index: EVENTS_INDEX,
     properties: eventsMapping as Record<string, MappingProperty>,
   });
+
+  const dspyStepExists = await esClient.indices.exists({
+    index: DSPY_STEPS_INDEX,
+  });
+  if (!dspyStepExists) {
+    await esClient.indices.create({
+      index: DSPY_STEPS_INDEX,
+      settings: {
+        number_of_shards: 1,
+        number_of_replicas: 0,
+      },
+      mappings: {
+        properties: dspyStepsMapping as Record<string, MappingProperty>,
+      },
+    });
+  }
 
   const tracesPivotExists = await esClient.indices.exists({
     index: TRACES_PIVOT_INDEX,

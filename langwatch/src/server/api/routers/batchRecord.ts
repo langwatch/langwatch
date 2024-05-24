@@ -4,7 +4,7 @@ import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { TeamRoleGroup, checkUserPermissionForProject } from "../permission";
 
 export const batchRecordRouter = createTRPCRouter({
-  getAllByBatchIDGroup: protectedProcedure
+  getAllByexperimentIdGroup: protectedProcedure
     .input(z.object({ projectId: z.string() }))
     .use(checkUserPermissionForProject(TeamRoleGroup.DATASETS_VIEW))
     .query(async ({ input, ctx }) => {
@@ -12,10 +12,10 @@ export const batchRecordRouter = createTRPCRouter({
       const prisma = ctx.prisma;
 
       const batchRecords = await prisma.batchProcessing.groupBy({
-        by: ["batchId", "datasetSlug"],
+        by: ["experimentId", "datasetSlug"],
         where: { projectId },
         _count: {
-          batchId: true,
+          experimentId: true,
         },
         _sum: {
           cost: true,
@@ -27,17 +27,17 @@ export const batchRecordRouter = createTRPCRouter({
 
       return batchRecords;
     }),
-  getAllByBatchID: protectedProcedure
-    .input(z.object({ projectId: z.string(), batchId: z.string() }))
+  getAllByexperimentId: protectedProcedure
+    .input(z.object({ projectId: z.string(), experimentId: z.string() }))
     .use(checkUserPermissionForProject(TeamRoleGroup.DATASETS_VIEW))
     .query(async ({ input, ctx }) => {
-      const { projectId, batchId } = input;
+      const { projectId, experimentId } = input;
       const prisma = ctx.prisma;
 
       const batchRecords = await prisma.batchProcessing.findMany({
         where: {
           projectId: projectId,
-          batchId: batchId,
+          experimentId: experimentId,
         },
         include: {
           dataset: true,

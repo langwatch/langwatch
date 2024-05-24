@@ -4,31 +4,29 @@ import { prisma } from "../../../server/db"; // Adjust the import based on your 
 
 import { getDebugger } from "../../../utils/logger";
 
-import { CostReferenceType, CostType } from "@prisma/client";
+import { CostReferenceType, CostType, ExperimentType } from "@prisma/client";
 import * as Sentry from "@sentry/nextjs";
 import { nanoid } from "nanoid";
 import { z } from "zod";
 import { env } from "../../../env.mjs";
-import { rAGChunkSchema } from "../../../server/tracer/types.generated";
-import {
-  type BatchEvaluationResult,
-  type EvaluationResult,
-  type EvaluationResultError,
-  type EvaluationResultSkipped,
-  type SingleEvaluationResult,
-  AVAILABLE_EVALUATORS,
-} from "../../../trace_checks/evaluators.generated";
-import { extractChunkTextualContent } from "../collector/rag";
 import {
   getCurrentMonthCost,
   maxMonthlyUsageLimit,
 } from "../../../server/api/routers/limits";
+import { rAGChunkSchema } from "../../../server/tracer/types.generated";
+import {
+  AVAILABLE_EVALUATORS,
+  type BatchEvaluationResult,
+  type EvaluationResult,
+  type SingleEvaluationResult
+} from "../../../trace_checks/evaluators.generated";
+import { extractChunkTextualContent } from "../collector/rag";
 
 export const debug = getDebugger("langwatch:guardrail:evaluate");
 
 export const evaluationInputSchema = z.object({
   evaluation: z.string(),
-  batchId: z.string(),
+  experimentSlug: z.string(),
   datasetSlug: z.string(),
   data: z.object({
     input: z.string().optional().nullable(),
@@ -102,7 +100,7 @@ export default async function handler(
   }
 
   const { input, output, contexts, expected_output } = params.data;
-  const { batchId, datasetSlug } = params;
+  const { experimentSlug, datasetSlug } = params;
   const evaluation = params.evaluation;
   let settings = null;
   let checkType;
@@ -182,6 +180,20 @@ export default async function handler(
     };
   }
 
+  let experiment = await prisma.experiment.findFirst({
+    where: { slug: experimentSlug, projectId: project.id },
+  });
+    if (!experiment) {
+      experiment = await prisma.experiment.create({
+        data: {
+          id: `experiment_${nanoid()}`,
+          projectId: project.id,
+          type: ExperimentType.BATCH_PROCESSING,
+          slug: experimentSlug,
+        },
+      });
+    }
+
   if ("cost" in result && result.cost) {
     await prisma.cost.create({
       data: {
@@ -190,7 +202,7 @@ export default async function handler(
         costType: CostType.BATCH_PROCESSING,
         costName: evaluation,
         referenceType: CostReferenceType.BATCH,
-        referenceId: params.batchId,
+        referenceId: experiment.id,
         amount: result.cost.amount,
         currency: result.cost.currency,
       },
@@ -199,10 +211,12 @@ export default async function handler(
 
   if (result.status != "error") {
     const { score, passed, details, cost, status } = result as EvaluationResult;
+
+
     await prisma.batchProcessing.create({
       data: {
         id: nanoid(),
-        batchId: batchId,
+        experimentId: experiment.id,
         projectId: project.id,
         data: params.data,
         status: status,

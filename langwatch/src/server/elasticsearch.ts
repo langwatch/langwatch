@@ -9,6 +9,8 @@ export const TRACE_CHECKS_INDEX = "search-trace-checks";
 
 export const EVENTS_INDEX = "search-events";
 
+export const DSPY_STEPS_INDEX = "search-dspy-steps";
+
 export const TRACES_PIVOT_INDEX = "search-traces-pivot";
 
 export const TRACES_PIVOT_TRANSFORM = "traces-pivot-transform";

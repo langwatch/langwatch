@@ -36,6 +36,7 @@ langchain = { version = "^0.1.20", optional = true }
 retry = "^0.9.2"
 tqdm = "^4.66.2"
 pandas = "^2.2.2"
+coolname = "^2.2.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.4.2"

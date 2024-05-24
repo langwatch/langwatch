@@ -53,7 +53,7 @@ export default function Datasets() {
     }
   );
 
-  const batchEvaluationRecords = api.batchRecord.getAllByBatchIDGroup.useQuery(
+  const batchEvaluationRecords = api.batchRecord.getAllByexperimentIdGroup.useQuery(
     { projectId: project?.id ?? "" },
     {
       enabled: !!project,
@@ -308,13 +308,13 @@ export default function Datasets() {
                                 <Tr
                                   cursor="pointer"
                                   onClick={() =>
-                                    goToBatchEvaluation(batch.batchId)
+                                    goToBatchEvaluation(batch.experimentId)
                                   }
                                   key={i}
                                 >
-                                  <Td>{batch.batchId}</Td>
+                                  <Td>{batch.experimentId}</Td>
                                   <Td>{batch.datasetSlug}</Td>
-                                  <Td>{batch._count.batchId}</Td>
+                                  <Td>{batch._count.experimentId}</Td>
                                   <Td>${batch._sum.cost?.toFixed(6)}</Td>
                                 </Tr>
                               ))

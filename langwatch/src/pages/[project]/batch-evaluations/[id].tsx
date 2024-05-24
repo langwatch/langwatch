@@ -29,10 +29,10 @@ import { api } from "~/utils/api";
 export default function Dataset() {
   const router = useRouter();
   const { project } = useOrganizationTeamProject();
-  const batchId = router.query.id;
+  const experimentId = router.query.id;
 
-  const evaluations = api.batchRecord.getAllByBatchID.useQuery(
-    { projectId: project?.id ?? "", batchId: batchId as string },
+  const evaluations = api.batchRecord.getAllByexperimentId.useQuery(
+    { projectId: project?.id ?? "", experimentId: experimentId as string },
     {
       enabled: !!project,
     }

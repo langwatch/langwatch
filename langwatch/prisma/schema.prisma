@@ -164,6 +164,7 @@ model Project {
     batchProcessings  BatchProcessing[]
     piiRedactionLevel PIIRedactionLevel @default(ESSENTIAL)
     triggers          Trigger[]
+    experiments       Experiment[]
 
     @@index([teamId])
 }
@@ -316,26 +317,28 @@ model CustomGraph {
 }
 
 model BatchProcessing {
-    id          String   @id @default(nanoid())
-    batchId     String
-    projectId   String
-    project     Project  @relation(fields: [projectId], references: [id])
-    data        Json     @default("{}")
-    status      String
-    score       Float
-    passed      Boolean
-    details     String
-    cost        Float
-    datasetSlug String
-    datasetId   String
-    dataset     Dataset  @relation(fields: [datasetId], references: [id])
-    evaluation  String
-    createdAt   DateTime @default(now())
-    updatedAt   DateTime @default(now()) @updatedAt
+    id           String     @id @default(nanoid())
+    experimentId String
+    experiment   Experiment @relation(fields: [experimentId], references: [id])
+    projectId    String
+    project      Project    @relation(fields: [projectId], references: [id])
+    data         Json       @default("{}")
+    status       String
+    score        Float
+    passed       Boolean
+    details      String
+    cost         Float
+    datasetSlug  String
+    datasetId    String
+    dataset      Dataset    @relation(fields: [datasetId], references: [id])
+    evaluation   String
+    createdAt    DateTime   @default(now())
+    updatedAt    DateTime   @default(now()) @updatedAt
 
     @@unique([id])
     @@index([projectId])
     @@index([datasetId])
+    @@index([experimentId])
 }
 
 enum TriggerAction {
@@ -356,5 +359,24 @@ model Trigger {
     updatedAt    DateTime      @default(now()) @updatedAt
     active       Boolean       @default(true)
 
+    @@index([projectId])
+}
+
+enum ExperimentType {
+    DSPY
+    BATCH_PROCESSING
+}
+
+model Experiment {
+    id               String            @id @default(nanoid())
+    type             ExperimentType
+    slug             String
+    projectId        String
+    project          Project           @relation(fields: [projectId], references: [id])
+    createdAt        DateTime          @default(now())
+    updatedAt        DateTime          @default(now()) @updatedAt
+    batchProcessings BatchProcessing[]
+
+    @@unique([projectId, slug])
     @@index([projectId])
 }

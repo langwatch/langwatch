@@ -631,6 +631,17 @@ traitlets = ">=4"
 test = ["pytest"]
 
 [[package]]
+name = "coolname"
+version = "2.2.0"
+description = "Random name and slug generator"
+optional = false
+python-versions = "*"
+files = [
+    {file = "coolname-2.2.0-py2.py3-none-any.whl", hash = "sha256:4d1563186cfaf71b394d5df4c744f8c41303b6846413645e31d31915cdeb13e8"},
+    {file = "coolname-2.2.0.tar.gz", hash = "sha256:6c5d5731759104479e7ca195a9b64f7900ac5bead40183c09323c7d0be9e75c7"},
+]
+
+[[package]]
 name = "dataclasses-json"
 version = "0.5.9"
 description = "Easily serialize dataclasses to and from JSON"
@@ -4575,4 +4586,4 @@ openai = ["openai"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.9"
-content-hash = "1335864da0794d8749e3953c4c5c3c95cd7d8c2f700ba0d77d1093820da3922e"
+content-hash = "d77967b479a351ee11e6f9d95e9c365f8fe3e8d9b884da854192734289fbefe5"
