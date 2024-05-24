@@ -79,7 +79,20 @@ export function TriggerDrawer() {
     members?: string[];
   };
 
+  type ActionParams = {
+    members: string[];
+  };
+
   const onSubmit = (data: Trigger) => {
+    let actionParams: ActionParams = {
+      members: [],
+    };
+    if (data.action === TriggerAction.SEND_EMAIL) {
+      actionParams = {
+        members: data.members ?? [],
+      };
+    }
+
     createTrigger.mutate(
       {
         projectId: project?.id ?? "",
@@ -87,7 +100,7 @@ export function TriggerDrawer() {
         action: data.action,
         filters: filterParams.filters,
         organizationId: organization?.id ?? "",
-        members: data.members ?? [],
+        actionParams: actionParams,
       },
       {
         onSuccess: () => {
