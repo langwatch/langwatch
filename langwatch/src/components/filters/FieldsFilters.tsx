@@ -37,14 +37,17 @@ import { ChevronDown, Search, X } from "react-feather";
 import { useDebounceValue } from "usehooks-ts";
 import { useFilterParams, type FilterParam } from "../../hooks/useFilterParams";
 import type { AppRouter } from "../../server/api/root";
+import { TeamRoleGroup } from "../../server/api/permission";
 import { availableFilters } from "../../server/filters/registry";
 import type { FilterDefinition, FilterField } from "../../server/filters/types";
 import { api } from "../../utils/api";
 import { useDrawer } from "~/components/CurrentDrawer";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 
 export function FieldsFilters() {
   const { nonEmptyFilters } = useFilterParams();
   const { openDrawer } = useDrawer();
+  const { hasTeamPermission } = useOrganizationTeamProject();
 
   const filterKeys: FilterField[] = [
     "spans.model",
@@ -73,7 +76,7 @@ export function FieldsFilters() {
 
         <Spacer />
 
-        {hasAnyFilters && (
+        {hasAnyFilters && hasTeamPermission(TeamRoleGroup.TRIGGERS_MANAGE) && (
           <Button
             colorScheme="orange"
             onClick={() => openDrawer("trigger", undefined)}
