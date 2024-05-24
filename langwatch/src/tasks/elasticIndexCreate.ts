@@ -274,6 +274,7 @@ const dspyStepsMapping: ElasticSearchMappingFrom<DSPyStep> = {
   llm_calls: {
     type: "nested",
     properties: {
+      __class__: { type: "keyword" },
       model: { type: "keyword" },
       prompt_tokens: { type: "integer" },
       completion_tokens: { type: "integer" },

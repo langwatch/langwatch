@@ -15,8 +15,9 @@ type DSPyExample = {
 };
 
 type DSPyLLMCall = {
+  __class__: string;
   response: AnyJSONDumpedClass;
-  model: string;
+  model?: string | null;
   prompt_tokens?: number | null;
   completion_tokens?: number | null;
   tokens_estimated?: boolean | null;
@@ -25,10 +26,10 @@ type DSPyLLMCall = {
 
 export type DSPyStep = {
   project_id: string;
-  experiment_id: string;
   run_id: string;
-  index: number;
   parameters_hash: string;
+  experiment_id: string;
+  index: number;
   parameters: AnyJSONDumpedClass[];
   examples: DSPyExample[];
   llm_calls: DSPyLLMCall[];
@@ -36,5 +37,15 @@ export type DSPyStep = {
     created_at: number;
     inserted_at: number;
     updated_at: number;
+  };
+};
+
+export type DSPyStepRESTParams = Omit<
+  DSPyStep,
+  "timestamps" | "project_id" | "experiment_id"
+> & {
+  experiment_slug: string;
+  timestamps: {
+    created_at: number;
   };
 };
