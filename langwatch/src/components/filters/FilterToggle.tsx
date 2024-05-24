@@ -45,15 +45,7 @@ export function FilterToggle({
   const { showFilters, setShowFilters } = useFilterToggle({
     defaultShowFilters,
   });
-  const { filterParams, clearFilters } = useFilterParams();
-
-  const nonEmptyFilters = Object.values(filterParams.filters).filter((f) =>
-    typeof f === "string"
-      ? !!f
-      : Array.isArray(f)
-      ? f.length > 0
-      : Object.keys(f).length > 0
-  );
+  const { filterParams, clearFilters, nonEmptyFilters } = useFilterParams();
 
   const hasAnyFilters = nonEmptyFilters.length > 0;
 

@@ -114,16 +114,27 @@ export const useFilterParams = () => {
     );
   };
 
+  const filterParams = {
+    projectId: project?.id ?? "",
+    startDate: startDate.getTime(),
+    endDate: endDate.getTime(),
+    filters: filters,
+  };
+
+  const nonEmptyFilters = Object.values(filterParams.filters).filter((f) =>
+    typeof f === "string"
+      ? !!f
+      : Array.isArray(f)
+      ? f.length > 0
+      : Object.keys(f).length > 0
+  );
+
   return {
     filters,
     setFilter,
     clearFilters,
-    filterParams: {
-      projectId: project?.id ?? "",
-      startDate: startDate.getTime(),
-      endDate: endDate.getTime(),
-      filters: filters,
-    },
+    filterParams,
+    nonEmptyFilters,
     queryOpts: {
       enabled: !!project && !!startDate && !!endDate,
       refetchOnMount: false,

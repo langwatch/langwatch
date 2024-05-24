@@ -6,6 +6,7 @@ import type {
   Sort,
 } from "@elastic/elasticsearch/lib/api/types";
 import type { PrismaClient } from "@prisma/client";
+import { prisma } from "~/server/db";
 import { TRPCError } from "@trpc/server";
 import similarity from "compute-cosine-similarity";
 import shuffle from "lodash/shuffle";
@@ -52,6 +53,7 @@ const getAllForProjectInput = tracesFilterInput.extend({
   groupBy: z.string().optional(),
   sortBy: z.string().optional(),
   sortDirection: z.string().optional(),
+  updatedAt: z.number().optional(),
 });
 
 export const esGetSpansByTraceId = async ({
@@ -88,7 +90,7 @@ export const tracesRouter = createTRPCRouter({
     .input(getAllForProjectInput)
     .use(checkUserPermissionForProject(TeamRoleGroup.MESSAGES_VIEW))
     .query(async ({ ctx, input }) => {
-      return await getAllForProject(ctx, input);
+      return await getAllForProject(input, ctx);
     }),
   getById: protectedProcedure
     .input(z.object({ projectId: z.string(), traceId: z.string() }))
@@ -365,11 +367,14 @@ export const tracesRouter = createTRPCRouter({
     )
     .use(checkUserPermissionForProject(TeamRoleGroup.MESSAGES_VIEW))
     .query(async ({ ctx, input }) => {
-      const { groups } = await getAllForProject(ctx, {
-        ...input,
-        groupBy: "none",
-        pageSize: 100,
-      });
+      const { groups } = await getAllForProject(
+        {
+          ...input,
+          groupBy: "none",
+          pageSize: 100,
+        },
+        ctx
+      );
       const traceIds = groups.flatMap((group) =>
         group.map((trace) => trace.trace_id)
       );
@@ -416,9 +421,9 @@ export const tracesRouter = createTRPCRouter({
     }),
 });
 
-const getAllForProject = async (
-  ctx: { prisma: PrismaClient; session: Session },
-  input: z.infer<typeof getAllForProjectInput>
+export const getAllForProject = async (
+  input: z.infer<typeof getAllForProjectInput>,
+  ctx?: { prisma: PrismaClient; session: Session }
 ) => {
   const embeddings = input.query
     ? await getOpenAIEmbeddings(input.query)
@@ -436,17 +441,38 @@ const getAllForProject = async (
 
   let traceIds: string[] = [];
 
-  const pageSize = input.pageSize ? input.pageSize : 25;
+  let pageSize = input.pageSize ? input.pageSize : 25;
   const pageOffset = input.pageOffset ? input.pageOffset : 0;
 
   let totalHits = 0;
   let usePivotIndex = false;
+
+  if (input.updatedAt !== undefined && input.updatedAt >= 0) {
+    pageSize = 10_000;
+  }
   if (isAnyFilterPresent || input.sortBy) {
     usePivotIndex = true;
     const pivotIndexResults = await esClient.search<TracesPivot>({
       index: TRACES_PIVOT_INDEX,
       body: {
-        query: pivotIndexConditions,
+        query: {
+          bool: {
+            must: pivotIndexConditions,
+            filter: [
+              ...(input.updatedAt
+                ? [
+                    {
+                      range: {
+                        updated_at: {
+                          gt: input.updatedAt,
+                        },
+                      },
+                    },
+                  ]
+                : []),
+            ],
+          } as any,
+        },
         _source: ["trace.trace_id"],
         from: input.query ? 0 : pageOffset,
         size: input.query ? 10_000 : pageSize,
@@ -524,11 +550,15 @@ const getAllForProject = async (
     ...(usePivotIndex ? [{ terms: { trace_id: traceIds } }] : []),
   ];
 
-  const canSeeCosts = await backendHasTeamProjectPermission(
-    ctx,
-    input,
-    TeamRoleGroup.COST_VIEW
-  );
+  let canSeeCosts = false;
+  if (ctx?.prisma) {
+    canSeeCosts =
+      (await backendHasTeamProjectPermission(
+        ctx,
+        input,
+        TeamRoleGroup.COST_VIEW
+      )) ?? false;
+  }
 
   //@ts-ignore
   const tracesResult = await esClient.search<Trace>({
@@ -619,7 +649,7 @@ const getAllForProject = async (
   );
   const guardrailsSlugToName = Object.fromEntries(
     (
-      await ctx.prisma.check.findMany({
+      await prisma.check.findMany({
         where: {
           projectId: input.projectId,
         },

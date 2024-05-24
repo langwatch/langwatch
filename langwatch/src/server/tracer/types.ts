@@ -222,7 +222,7 @@ export type Trace = {
     topic_id?: string;
     subtopic_id?: string;
   };
-  timestamps: { started_at: number; inserted_at: number };
+  timestamps: { started_at: number; inserted_at: number; updated_at: number };
   input: TraceInput;
   output?: TraceOutput;
   metrics: {

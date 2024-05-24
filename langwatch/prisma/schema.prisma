@@ -163,6 +163,7 @@ model Project {
     customGraphs      CustomGraph[]
     batchProcessings  BatchProcessing[]
     piiRedactionLevel PIIRedactionLevel @default(ESSENTIAL)
+    triggers          Trigger[]
 
     @@index([teamId])
 }
@@ -292,7 +293,7 @@ model DatasetRecord {
     datasetId String
     dataset   Dataset  @relation(fields: [datasetId], references: [id])
     projectId String
-    project   Project @relation(fields: [projectId], references: [id])
+    project   Project  @relation(fields: [projectId], references: [id])
     entry     Json
     createdAt DateTime @default(now())
     updatedAt DateTime @default(now()) @updatedAt
@@ -335,4 +336,25 @@ model BatchProcessing {
     @@unique([id])
     @@index([projectId])
     @@index([datasetId])
+}
+
+enum TriggerAction {
+    SEND_EMAIL
+    ADD_TO_DATASET
+}
+
+model Trigger {
+    id           String        @id @default(nanoid())
+    name         String
+    projectId    String
+    project      Project       @relation(fields: [projectId], references: [id])
+    action       TriggerAction
+    actionParams Json
+    filters      Json
+    lastRunAt    Float         @default(0)
+    createdAt    DateTime      @default(now())
+    updatedAt    DateTime      @default(now()) @updatedAt
+    active       Boolean       @default(true)
+
+    @@index([projectId])
 }

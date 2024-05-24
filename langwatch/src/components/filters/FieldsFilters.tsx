@@ -37,11 +37,18 @@ import { ChevronDown, Search, X } from "react-feather";
 import { useDebounceValue } from "usehooks-ts";
 import { useFilterParams, type FilterParam } from "../../hooks/useFilterParams";
 import type { AppRouter } from "../../server/api/root";
+import { TeamRoleGroup } from "../../server/api/permission";
 import { availableFilters } from "../../server/filters/registry";
 import type { FilterDefinition, FilterField } from "../../server/filters/types";
 import { api } from "../../utils/api";
+import { useDrawer } from "~/components/CurrentDrawer";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 
 export function FieldsFilters() {
+  const { nonEmptyFilters } = useFilterParams();
+  const { openDrawer } = useDrawer();
+  const { hasTeamPermission } = useOrganizationTeamProject();
+
   const filterKeys: FilterField[] = [
     "spans.model",
     "metadata.labels",
@@ -60,9 +67,25 @@ export function FieldsFilters() {
     availableFilters[id],
   ]);
 
+  const hasAnyFilters = nonEmptyFilters.length > 0;
+
   return (
     <VStack align="start" width="full" spacing={6}>
-      <Heading size="md">Filters</Heading>
+      <HStack width={"full"}>
+        <Heading size="md">Filters</Heading>
+
+        <Spacer />
+
+        {hasAnyFilters && hasTeamPermission(TeamRoleGroup.TRIGGERS_MANAGE) && (
+          <Button
+            colorScheme="orange"
+            onClick={() => openDrawer("trigger", undefined)}
+            size="sm"
+          >
+            Add Trigger
+          </Button>
+        )}
+      </HStack>
       <VStack spacing={4} width="full">
         {filters.map(([id, filter]) => (
           <FieldsFilter key={id} filterId={id} filter={filter} />
