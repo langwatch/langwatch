@@ -11,7 +11,11 @@ describe("PIICheck", () => {
       metadata: {},
       input: { value: "hi there" },
       metrics: {},
-      timestamps: { started_at: Date.now(), inserted_at: Date.now() },
+      timestamps: {
+        started_at: Date.now(),
+        inserted_at: Date.now(),
+        updated_at: Date.now(),
+      },
     };
     await cleanupPIIs(sampleTrace, [], PIIRedactionLevel.ESSENTIAL);
     expect(sampleTrace.input.value).toEqual("hi there");
@@ -24,7 +28,11 @@ describe("PIICheck", () => {
         value: "hi there, my credit card number is 4012-8888-8888-1881",
       },
       metrics: {},
-      timestamps: { started_at: Date.now(), inserted_at: Date.now() },
+      timestamps: {
+        started_at: Date.now(),
+        inserted_at: Date.now(),
+        updated_at: Date.now(),
+      },
     };
 
     await cleanupPIIs(samplePIITrace, [], PIIRedactionLevel.ESSENTIAL);

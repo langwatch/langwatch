@@ -45,9 +45,9 @@ class EvaluationResultError(BaseModel):
     traceback: List[str] = Field(description="Traceback information for debugging")
 
 
-SingleEvaluationResult = (
-    EvaluationResult | EvaluationResultSkipped | EvaluationResultError
-)
+SingleEvaluationResult = Union[
+    EvaluationResult, EvaluationResultSkipped, EvaluationResultError
+]
 
 
 class DatasetEntry(BaseModel):

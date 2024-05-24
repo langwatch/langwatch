@@ -21,6 +21,7 @@ describe("Sessions Endpoint Integration Tests", () => {
       timestamps: {
         inserted_at: new Date().getTime(),
         started_at: new Date().getTime(),
+        updated_at: new Date().getTime(),
       },
     },
     {
@@ -35,6 +36,7 @@ describe("Sessions Endpoint Integration Tests", () => {
       timestamps: {
         inserted_at: new Date().getTime(),
         started_at: new Date().getTime() - 1 * 2 * 60 * 1000, // 2 minutes ago
+        updated_at: new Date().getTime(),
       },
     },
     // One message on another session
@@ -50,6 +52,7 @@ describe("Sessions Endpoint Integration Tests", () => {
       timestamps: {
         inserted_at: new Date().getTime(),
         started_at: new Date().getTime() - 1 * 61 * 60 * 1000, // 1 hour and a minute ago,
+        updated_at: new Date().getTime(),
       },
       metrics: {
         total_time_ms: 2000,
@@ -68,6 +71,7 @@ describe("Sessions Endpoint Integration Tests", () => {
       timestamps: {
         inserted_at: new Date().getTime(),
         started_at: new Date().getTime() - 2 * 61 * 60 * 1000, // 2 hours and a minute ago,
+        updated_at: new Date().getTime(),
       },
     },
     // Different user
@@ -83,6 +87,7 @@ describe("Sessions Endpoint Integration Tests", () => {
       timestamps: {
         inserted_at: new Date().getTime(),
         started_at: new Date().getTime(),
+        updated_at: new Date().getTime(),
       },
     },
   ];

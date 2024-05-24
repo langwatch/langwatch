@@ -111,7 +111,11 @@ describe("/api/track_event", () => {
       output: {
         value: "Test output for trace",
       },
-      timestamps: { started_at: Date.now(), inserted_at: Date.now() },
+      timestamps: {
+        started_at: Date.now(),
+        inserted_at: Date.now(),
+        updated_at: Date.now(),
+      },
       metadata: {
         thread_id: "test-thread",
         user_id: "test-user",

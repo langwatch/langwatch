@@ -16,9 +16,13 @@ describe("Satisfaction Scoring Integration Test", () => {
     input: {
       value: "I am very happy with the service!",
     },
-    timestamps: { started_at: Date.now(), inserted_at: Date.now() },
+    timestamps: {
+      started_at: Date.now(),
+      inserted_at: Date.now(),
+      updated_at: Date.now(),
+    },
     metrics: {},
-    metadata: {}
+    metadata: {},
   };
 
   beforeAll(async () => {
