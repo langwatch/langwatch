@@ -14,7 +14,6 @@ export const triggerRouter = createTRPCRouter({
         name: z.string(),
         action: z.nativeEnum(TriggerAction),
         filters: z.any(),
-        organizationId: z.string(),
         actionParams: z.object({
           members: z.string().array(),
         }),
@@ -22,22 +21,32 @@ export const triggerRouter = createTRPCRouter({
     )
     .use(checkUserPermissionForProject(TeamRoleGroup.TRIGGERS_MANAGE))
     .mutation(async ({ ctx, input }) => {
-      console.log("input", input);
-      const organizationUsers = await ctx.prisma.organizationUser.findMany({
+      const project = await ctx.prisma.project.findUnique({
         where: {
-          organizationId: input.organizationId,
+          id: input.projectId,
+        },
+        select: {
+          teamId: true,
+        },
+      });
+
+      if (!project) {
+        throw new Error(`Project with id ${input.projectId} not found`);
+      }
+
+      const teamMembers = await ctx.prisma.teamUser.findMany({
+        where: {
+          teamId: project.teamId,
         },
         include: {
           user: true,
         },
       });
 
-      const organizationUserEmails = organizationUsers.map(
-        (user) => user.user.email
-      );
+      const teamEmails = teamMembers.map((user) => user.user.email);
 
-      input.actionParams.members.map((email) => {
-        if (!organizationUserEmails.includes(email)) {
+      input.actionParams.members.map((email: string) => {
+        if (!teamEmails.includes(email)) {
           throw new TRPCError({
             code: "BAD_REQUEST",
             message: "Error with selected emails",

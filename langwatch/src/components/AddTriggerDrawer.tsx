@@ -99,7 +99,6 @@ export function TriggerDrawer() {
         name: data.name,
         action: data.action,
         filters: filterParams.filters,
-        organizationId: organization?.id ?? "",
         actionParams: actionParams,
       },
       {

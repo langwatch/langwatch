@@ -62,7 +62,7 @@ const getTracesForAlert = async (trigger: Trigger, projects: Project[]) => {
     projectId,
     filters: parsedFilters,
     updatedAt: lastRunAt,
-    startDate: lastRunAt - 1000 * 60 * 60 * 24,
+    startDate: new Date().getTime() - 1000 * 60 * 60 * 24,
     endDate: new Date().getTime(),
   };
 
