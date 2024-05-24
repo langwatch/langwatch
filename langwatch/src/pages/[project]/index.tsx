@@ -35,6 +35,7 @@ import { api } from "../../utils/api";
 import GraphsLayout from "~/components/GraphsLayout";
 import { AnalyticsHeader } from "../../components/analytics/AnalyticsHeader";
 import { LLMMetrics } from "../../components/LLMMetrics";
+import { useEffect } from "react";
 
 export default function ProjectRouter() {
   const router = useRouter();
@@ -71,6 +72,13 @@ export const getServerSideProps = async (
 
 function Index() {
   const { project } = useOrganizationTeamProject();
+
+  const router = useRouter();
+  const returnTo = router.query.return_to;
+  if (typeof returnTo === "string") {
+    void router.push(returnTo);
+    return null;
+  }
 
   return (
     <GraphsLayout>
