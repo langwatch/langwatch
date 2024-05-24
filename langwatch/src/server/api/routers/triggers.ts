@@ -73,6 +73,7 @@ export const triggerRouter = createTRPCRouter({
       await ctx.prisma.trigger.delete({
         where: {
           id: input.triggerId,
+          projectId: input.projectId,
         },
       });
 
