@@ -1,6 +1,6 @@
 import { type NextApiRequest, type NextApiResponse } from "next";
 import { fromZodError, type ZodError } from "zod-validation-error";
-import { prisma } from "../../../server/db"; // Adjust the import based on your setup
+import { prisma } from "../../../server/db";
 
 import { getDebugger } from "../../../utils/logger";
 

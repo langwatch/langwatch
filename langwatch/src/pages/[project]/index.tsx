@@ -35,7 +35,6 @@ import { api } from "../../utils/api";
 import GraphsLayout from "~/components/GraphsLayout";
 import { AnalyticsHeader } from "../../components/analytics/AnalyticsHeader";
 import { LLMMetrics } from "../../components/LLMMetrics";
-import { useEffect } from "react";
 
 export default function ProjectRouter() {
   const router = useRouter();

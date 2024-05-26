@@ -276,7 +276,7 @@ const dspyStepsMapping: ElasticSearchMappingFrom<DSPyStep> = {
       hash: { type: "keyword" },
       example: { type: "flattened" } as any,
       pred: { type: "flattened" } as any,
-      result: { type: "boolean" },
+      score: { type: "float" },
       trace: { type: "nested" } as any,
     },
   },

@@ -1,10 +1,19 @@
 import { type NextApiRequest, type NextApiResponse } from "next";
 import { fromZodError, type ZodError } from "zod-validation-error";
-import { prisma } from "../../../server/db"; // Adjust the import based on your setup
+import { prisma } from "../../../server/db";
 
 import { getDebugger } from "../../../utils/logger";
 
+import { type Project } from "@prisma/client";
 import * as Sentry from "@sentry/nextjs";
+import crypto from "crypto";
+import { estimateCost } from "llm-cost";
+import { z } from "zod";
+import {
+  DSPY_STEPS_INDEX,
+  dspyStepIndexId,
+  esClient,
+} from "../../../server/elasticsearch";
 import type {
   DSPyLLMCall,
   DSPyStep,
@@ -14,15 +23,7 @@ import {
   dSPyStepRESTParamsSchema,
   dSPyStepSchema,
 } from "../../../server/experiments/types.generated";
-import { z } from "zod";
-import {
-  DSPY_STEPS_INDEX,
-  dspyStepIndexId,
-  esClient,
-} from "../../../server/elasticsearch";
-import { ExperimentType, type Project } from "@prisma/client";
-import crypto from "crypto";
-import { estimateCost } from "llm-cost";
+import { findOrCreateExperiment } from "./init";
 
 export const debug = getDebugger("langwatch:dspy:log_steps");
 
@@ -55,7 +56,7 @@ export default async function handler(
     params = z.array(dSPyStepRESTParamsSchema).parse(req.body);
   } catch (error) {
     debug(
-      "Invalid evaluation data received",
+      "Invalid log_steps data received",
       error,
       JSON.stringify(req.body, null, "  "),
       { projectId: project.id }
@@ -104,23 +105,14 @@ export default async function handler(
       }
     }
   }
+
+  return res.status(200).json({ message: "ok" });
 }
 
 const processDSPyStep = async (project: Project, param: DSPyStepRESTParams) => {
   const { run_id, parameters_hash, experiment_slug } = param;
 
-  let experiment = await prisma.experiment.findUnique({
-    where: { projectId_slug: { projectId: project.id, slug: experiment_slug } },
-  });
-  if (!experiment) {
-    experiment = await prisma.experiment.create({
-      data: {
-        slug: experiment_slug,
-        projectId: project.id,
-        type: ExperimentType.DSPY,
-      },
-    });
-  }
+  const experiment = await findOrCreateExperiment(project, experiment_slug);
 
   const id = dspyStepIndexId({
     runId: run_id,

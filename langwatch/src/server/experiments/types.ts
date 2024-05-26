@@ -7,11 +7,11 @@ type DSPyTrace = {
   pred: AnyJSONDumpedClass;
 };
 
-type DSPyExample = {
+export type DSPyExample = {
   hash: string;
   example: AnyJSONDumpedClass;
   pred: AnyJSONDumpedClass;
-  result: boolean;
+  score: number;
   trace: DSPyTrace[];
 };
 
@@ -51,4 +51,27 @@ export type DSPyStepRESTParams = Omit<
   };
   examples: Omit<DSPyExample, "hash">[];
   llm_calls: Omit<DSPyLLMCall, "hash">[];
+};
+
+export type DSPyStepSummary = {
+  run_id: string;
+  index: number;
+  examples_summary: {
+    total: number;
+    average_score: number;
+  };
+  llm_calls_summary: {
+    total: number;
+    total_tokens: number;
+    total_cost: number;
+  };
+  timestamps: {
+    created_at: number;
+  };
+};
+
+export type DSPyRunsSummary = {
+  runId: string;
+  steps: DSPyStepSummary[];
+  created_at: number;
 };

@@ -25,7 +25,7 @@ const sampleDSPyStep: DSPyStepRESTParams = {
     {
       example: { key: "example_value" },
       pred: { key: "pred_value" },
-      result: true,
+      score: 0.5,
       trace: [
         {
           input: { key: "input_value" },
@@ -84,7 +84,7 @@ const sampleDSPyStepSecondExampleAndLLMCall: DSPyStepRESTParams = {
     {
       example: { key: "example_value2" },
       pred: { key: "pred_value2" },
-      result: true,
+      score: 0.5,
       trace: [
         {
           input: { key: "input_value2" },
