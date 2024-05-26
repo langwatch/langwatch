@@ -1,60 +1,57 @@
 import { DashboardLayout } from "../../../components/DashboardLayout";
 
-import { useRouter } from "next/router";
-import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
-import type { Experiment, Project } from "@prisma/client";
-import { api } from "../../../utils/api";
 import {
-  Box,
-  HStack,
-  VStack,
-  Text,
   Alert,
   AlertIcon,
-  Skeleton,
-  Heading,
+  Box,
   Card,
   CardBody,
   CardHeader,
-  useTheme,
+  HStack,
+  Heading,
+  Skeleton,
+  Spacer,
+  Switch,
   Tab,
   TabList,
   TabPanel,
   TabPanels,
-  Tabs,
   Table,
-  TableCaption,
+  Tabs,
   Tbody,
   Td,
+  Text,
   Th,
   Thead,
   Tr,
-  Switch,
-  Spacer,
+  VStack,
+  useTheme,
 } from "@chakra-ui/react";
-import { getColorForString } from "../../../utils/rotatingColors";
-import type {
-  DSPyRunsSummary,
-  DSPyStep,
-  DSPyStepSummary,
-} from "../../../server/experiments/types";
+import type { Experiment, Project } from "@prisma/client";
+import { useRouter } from "next/router";
+import numeral from "numeral";
+import { useEffect, useState } from "react";
 import {
-  LineChart,
+  CartesianGrid,
   Line,
+  LineChart,
+  ReferenceDot,
+  ResponsiveContainer,
+  Tooltip,
   XAxis,
   YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-  ReferenceDot,
 } from "recharts";
-import { useEffect, useState } from "react";
-import { formatTimeAgo } from "../../../utils/formatTimeAgo";
-import { RenderInputOutput } from "../../../components/traces/RenderInputOutput";
-import { formatMoney } from "../../../utils/formatMoney";
 import { MetadataTag } from "../../../components/MetadataTag";
-import numeral from "numeral";
+import { RenderInputOutput } from "../../../components/traces/RenderInputOutput";
+import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
+import type {
+  DSPyRunsSummary,
+  DSPyStepSummary,
+} from "../../../server/experiments/types";
+import { api } from "../../../utils/api";
+import { formatMoney } from "../../../utils/formatMoney";
+import { formatTimeAgo } from "../../../utils/formatTimeAgo";
+import { getColorForString } from "../../../utils/rotatingColors";
 
 export default function ExperimentPage() {
   const router = useRouter();
@@ -99,8 +96,11 @@ function DSPyExperiment({
     }
   );
 
+  const router = useRouter();
+
   const [highlightedRun, setHighlightedRun] = useState<string | null>(null);
-  const [selectedRun, setSelectedRun] = useState<string | null>(null);
+  const selectedRun =
+    typeof router.query.runId === "string" ? router.query.runId : null;
   const [selectedRunIndex, setSelectedRunIndex] = useState<{
     runId: string;
     index: number;
@@ -115,14 +115,24 @@ function DSPyExperiment({
     (selectedRun
       ? dspyRuns.data.find((run) => run.runId === selectedRun)
       : dspyRuns.data[0]);
-  // TODO: do not change selection automatic, better use an useEffect to select last one by default
+
+  useEffect(() => {
+    if (!firstVisibleRun || selectedRunIndex !== null) return;
+
+    const lastStep = firstVisibleRun.steps[firstVisibleRun.steps.length - 1];
+    lastStep &&
+      setSelectedRunIndex({
+        runId: firstVisibleRun.runId,
+        index: lastStep.index,
+      });
+  }, [firstVisibleRun, selectedRunIndex]);
+
   const stepToDisplay =
     dspyRuns.data &&
-    ((
+    (
       selectedRunIndex &&
       dspyRuns.data.find((run) => run.runId === selectedRunIndex.runId)
-    )?.steps.find((step) => step.index === selectedRunIndex.index) ??
-      firstVisibleRun!.steps[firstVisibleRun!.steps.length - 1]);
+    )?.steps.find((step) => step.index === selectedRunIndex.index);
 
   return (
     <HStack align="start" width="full" height="full">
@@ -136,7 +146,11 @@ function DSPyExperiment({
         minWidth="300px"
         height="full"
         spacing={1}
-        onClick={() => setSelectedRun(null)}
+        onClick={() => {
+          const query = { ...router.query };
+          delete query.runId;
+          void router.push({ query });
+        }}
       >
         <Heading as="h2" size="md" paddingX={6} paddingY={4}>
           DSPy Optimizer Runs
@@ -182,9 +196,14 @@ function DSPyExperiment({
                 onMouseLeave={() => setHighlightedRun(null)}
                 onClick={(e) => {
                   e.stopPropagation();
-                  selectedRun === run.runId
-                    ? setSelectedRun(null)
-                    : setSelectedRun(run.runId);
+                  const query = {
+                    ...router.query,
+                    runId: selectedRun === run.runId ? undefined : run.runId,
+                  };
+                  if (!query.runId) {
+                    delete query.runId;
+                  }
+                  void router.push({ query });
                 }}
                 spacing={3}
               >
