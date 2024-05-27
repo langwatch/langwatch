@@ -187,7 +187,7 @@ const ChatWindow = React.memo(function ChatWindow({
         </HStack>
       </HStack>
       <VStack width="full" height="full" minHeight={0} spacing={0}>
-        <ChatSystemPrompt windowId={windowId} />
+        <ChatSystemPrompt tabIndex={tabIndex} windowId={windowId} />
         <Messages
           tabIndex={tabIndex}
           windowId={windowId}
@@ -207,7 +207,13 @@ const ChatWindow = React.memo(function ChatWindow({
   );
 });
 
-function ChatSystemPrompt({ windowId }: { windowId: string }) {
+function ChatSystemPrompt({
+  tabIndex,
+  windowId,
+}: {
+  tabIndex: number;
+  windowId: string;
+}) {
   const {
     systemPromptExpanded,
     toggleSystemPromptExpanded,
@@ -216,9 +222,9 @@ function ChatSystemPrompt({ windowId }: { windowId: string }) {
     syncSystemPrompts,
     toggleSyncSystemPrompts,
   } = usePlaygroundStore((state) => {
-    const currentChatWindow = state.tabs[
-      state.activeTabIndex
-    ]!.chatWindows.find((chatWindow) => chatWindow.id === windowId)!;
+    const currentChatWindow = state.tabs[tabIndex]!.chatWindows.find(
+      (chatWindow) => chatWindow.id === windowId
+    )!;
 
     return {
       systemPromptExpanded: currentChatWindow.systemPromptExpanded,
