@@ -2,6 +2,7 @@ import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { TriggerAction } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
+import { extractCheckKeys } from "../utils";
 
 import { nanoid } from "nanoid";
 import { TeamRoleGroup, checkUserPermissionForProject } from "../permission";
@@ -83,11 +84,38 @@ export const triggerRouter = createTRPCRouter({
     .input(z.object({ projectId: z.string() }))
     .use(checkUserPermissionForProject(TeamRoleGroup.TRIGGERS_MANAGE))
     .query(async ({ ctx, input }) => {
-      return ctx.prisma.trigger.findMany({
+      const triggers = await ctx.prisma.trigger.findMany({
         where: {
           projectId: input.projectId,
         },
       });
+
+      // Parse filters from triggers to find relevant check IDs
+      const checkIds = triggers.flatMap((trigger) => {
+        const triggerFilters = JSON.parse(trigger.filters);
+        const keys = extractCheckKeys(triggerFilters);
+        console.log("keys", keys);
+
+        return Object.keys(triggerFilters);
+      });
+
+      console.log("checkIds", checkIds);
+
+      // Fetch checks based on extracted check IDs
+      const checks = await ctx.prisma.check.findMany({
+        where: {
+          id: {
+            in: checkIds,
+          },
+          projectId: input.projectId,
+        },
+      });
+
+      // Combine triggers and checks into a single response
+      return {
+        triggers,
+        checks,
+      };
     }),
   toggleTrigger: protectedProcedure
     .input(

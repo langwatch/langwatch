@@ -35,6 +35,8 @@ export default function Members() {
     projectId: project?.id ?? "",
   });
 
+  console.log("triggers", triggers.data);
+
   const toggleTrigger = api.trigger.toggleTrigger.useMutation();
   const deleteTriggerMutation = api.trigger.deleteById.useMutation();
 
@@ -115,7 +117,7 @@ export default function Members() {
                 </Tr>
               </Thead>
               <Tbody>
-                {triggers.data?.map((trigger) => {
+                {/* {triggers.data?.map((trigger) => {
                   const lastRunAt = new Date(trigger.lastRunAt);
                   const lastRunAtFormatted = lastRunAt.toLocaleString();
 
@@ -166,7 +168,7 @@ export default function Members() {
                       </Td>
                     </Tr>
                   );
-                })}
+                })} */}
               </Tbody>
             </Table>
           </CardBody>
