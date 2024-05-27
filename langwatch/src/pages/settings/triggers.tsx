@@ -123,70 +123,83 @@ export default function Members() {
                 </Tr>
               </Thead>
               <Tbody>
-                {triggers.data?.map((trigger) => {
-                  const lastRunAt = new Date(trigger.lastRunAt);
-                  const lastRunAtFormatted = lastRunAt.toLocaleString();
+                {triggers.isLoading ? (
+                  <Tr>
+                    <Td colSpan={5}>Loading...</Td>
+                  </Tr>
+                ) : triggers.data?.length === 0 ? (
+                  <Tr>
+                    <Td colSpan={5}>
+                      No triggers, set one up by creating a filter on your
+                      messages.
+                    </Td>
+                  </Tr>
+                ) : (
+                  triggers.data?.map((trigger) => {
+                    const lastRunAt = new Date(trigger.lastRunAt);
+                    const lastRunAtFormatted = lastRunAt.toLocaleString();
 
-                  return (
-                    <Tr key={trigger.id}>
-                      <Td>{trigger.name}</Td>
-                      <Td>{trigger.action}</Td>
-                      <Td>
-                        {(
-                          trigger.actionParams as { members: string[] }
-                        ).members?.join(", ")}
-                      </Td>
-                      <Td>
-                        <Tooltip
-                          label={trigger.checks
-                            .map((check) => check?.name)
-                            .join(", ")}
-                        >
-                          <Text noOfLines={1} display="block">
-                            {trigger.checks
+                    return (
+                      <Tr key={trigger.id}>
+                        <Td>{trigger.name}</Td>
+                        <Td>{trigger.action}</Td>
+                        <Td>
+                          {(
+                            trigger.actionParams as { members: string[] }
+                          ).members?.join(", ")}
+                        </Td>
+                        <Td>
+                          <Tooltip
+                            label={trigger.checks
                               .map((check) => check?.name)
                               .join(", ")}
-                          </Text>
-                        </Tooltip>
-                      </Td>
-                      <Td whiteSpace="nowrap">{lastRunAtFormatted}</Td>
-                      <Td textAlign="center">
-                        <Switch
-                          isChecked={trigger.active}
-                          onChange={() => {
-                            handleToggleTrigger(trigger.id, !trigger.active);
-                          }}
-                        />
-                      </Td>
-                      <Td>
-                        <Menu>
-                          <MenuButton
-                            as={Button}
-                            variant={"ghost"}
-                            onClick={(event) => {
-                              event.stopPropagation();
-                            }}
                           >
-                            <MoreVertical />
-                          </MenuButton>
-                          <MenuList>
-                            <MenuItem
-                              color="red.600"
+                            <Text noOfLines={1} display="block">
+                              {trigger.checks
+                                .map((check) => check?.name)
+                                .join(", ")}
+                            </Text>
+                          </Tooltip>
+                        </Td>
+                        <Td whiteSpace="nowrap">{lastRunAtFormatted}</Td>
+                        <Td textAlign="center">
+                          <Switch
+                            isChecked={trigger.active}
+                            onChange={() => {
+                              handleToggleTrigger(trigger.id, !trigger.active);
+                            }}
+                          />
+                        </Td>
+                        <Td>
+                          <Menu>
+                            <MenuButton
+                              as={Button}
+                              variant={"ghost"}
                               onClick={(event) => {
                                 event.stopPropagation();
-
-                                deleteTrigger(trigger.id);
                               }}
-                              icon={<DeleteIcon />}
                             >
-                              Delete trigger
-                            </MenuItem>
-                          </MenuList>
-                        </Menu>
-                      </Td>
-                    </Tr>
-                  );
-                })}
+                              <MoreVertical />
+                            </MenuButton>
+                            <MenuList>
+                              <MenuItem
+                                color="red.600"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+
+                                  deleteTrigger(trigger.id);
+                                }}
+                                icon={<DeleteIcon />}
+                              >
+                                Delete trigger
+                              </MenuItem>
+                            </MenuList>
+                          </Menu>
+                        </Td>
+                      </Tr>
+                    );
+                  })
+                )}
               </Tbody>
             </Table>
           </CardBody>
