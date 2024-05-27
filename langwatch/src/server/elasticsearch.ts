@@ -57,3 +57,13 @@ export const eventIndexId = ({
   eventId: string;
   projectId: string;
 }) => `${projectId}/${eventId}`;
+
+export const dspyStepIndexId = ({
+  runId,
+  parametersHash,
+  projectId,
+}: {
+  runId: string;
+  parametersHash: string;
+  projectId: string;
+}) => `${projectId}/${runId}/${parametersHash}`;

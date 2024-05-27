@@ -72,6 +72,13 @@ export const getServerSideProps = async (
 function Index() {
   const { project } = useOrganizationTeamProject();
 
+  const router = useRouter();
+  const returnTo = router.query.return_to;
+  if (typeof returnTo === "string") {
+    void router.push(returnTo);
+    return null;
+  }
+
   return (
     <GraphsLayout>
       {project && !project.firstMessage && (

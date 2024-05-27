@@ -207,7 +207,7 @@ export const ProjectSelector = React.memo(function ProjectSelector({
                                 .replace("[project]", project.slug)
                                 .replace(/\[.*?\]/g, "")
                                 .replace(/\/\/+/g, "/")
-                            : `/${project.slug}`
+                            : `/${project.slug}?return_to=${window.location.pathname}`
                         }
                         _hover={{
                           textDecoration: "none",

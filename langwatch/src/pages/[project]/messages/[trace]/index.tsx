@@ -32,6 +32,7 @@ import { isNotFound } from "../../../../utils/trpcError";
 
 import { useDrawer } from "../../../../components/CurrentDrawer";
 import { getExtractedInput } from "../../../../components/messages/MessageCard";
+import { formatTimeAgo } from "../../../../utils/formatTimeAgo";
 
 export default function TraceDetails() {
   const { hasTeamPermission } = useOrganizationTeamProject();
@@ -347,13 +348,7 @@ function Message({
 
   // show time ago if less than a day old
   const timestampDate = timestamp ? new Date(timestamp) : undefined;
-  const timeAgo = timestampDate
-    ? timestampDate.getTime() < Date.now() - 1000 * 60 * 60 * 24
-      ? format(timestampDate, "dd/MMM HH:mm")
-      : formatDistanceToNow(timestampDate, {
-          addSuffix: true,
-        })
-    : undefined;
+  const timeAgo = formatTimeAgo(timestamp!);
 
   if (!project) return null;
 

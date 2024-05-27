@@ -6,7 +6,7 @@ import { TeamRoleGroup, checkUserPermissionForProject } from "../permission";
 export const batchRecordRouter = createTRPCRouter({
   getAllByexperimentIdGroup: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .use(checkUserPermissionForProject(TeamRoleGroup.DATASETS_VIEW))
+    .use(checkUserPermissionForProject(TeamRoleGroup.EXPERIMENTS_MANAGE))
     .query(async ({ input, ctx }) => {
       const { projectId } = input;
       const prisma = ctx.prisma;
@@ -29,7 +29,7 @@ export const batchRecordRouter = createTRPCRouter({
     }),
   getAllByexperimentId: protectedProcedure
     .input(z.object({ projectId: z.string(), experimentId: z.string() }))
-    .use(checkUserPermissionForProject(TeamRoleGroup.DATASETS_VIEW))
+    .use(checkUserPermissionForProject(TeamRoleGroup.EXPERIMENTS_MANAGE))
     .query(async ({ input, ctx }) => {
       const { projectId, experimentId } = input;
       const prisma = ctx.prisma;

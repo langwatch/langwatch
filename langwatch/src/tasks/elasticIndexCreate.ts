@@ -270,14 +270,24 @@ const dspyStepsMapping: ElasticSearchMappingFrom<DSPyStep> = {
   index: { type: "integer" },
   parameters_hash: { type: "keyword" },
   parameters: { type: "flattened" } as any,
-  examples: { type: "flattened" } as any,
+  examples: {
+    type: "nested",
+    properties: {
+      hash: { type: "keyword" },
+      example: { type: "flattened" } as any,
+      pred: { type: "flattened" } as any,
+      score: { type: "float" },
+      trace: { type: "nested" } as any,
+    },
+  },
   llm_calls: {
     type: "nested",
     properties: {
+      hash: { type: "keyword" },
+      __class__: { type: "keyword" },
       model: { type: "keyword" },
       prompt_tokens: { type: "integer" },
       completion_tokens: { type: "integer" },
-      tokens_estimated: { type: "boolean" },
       cost: { type: "float" },
       response: { type: "flattened" } as any,
     },

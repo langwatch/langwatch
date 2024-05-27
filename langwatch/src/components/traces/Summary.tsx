@@ -20,6 +20,7 @@ import { getTotalTokensDisplay } from "~/utils/getTotalTokensDisplay";
 import { useTraceDetailsState } from "../../hooks/useTraceDetailsState";
 import type { Trace } from "../../server/tracer/types";
 import { formatMilliseconds } from "../../utils/formatMilliseconds";
+import { MetadataTag } from "../MetadataTag";
 
 const SummaryItem = ({
   label,
@@ -159,27 +160,11 @@ const TraceSummaryValues = React.forwardRef(function TraceSummaryValues(
 
             return (
               renderValue && (
-                <HStack gap={0} fontSize={"smaller"} margin={0} key={i}>
-                  <Text
-                    borderWidth={1}
-                    borderColor={"gray.200"}
-                    paddingX={2}
-                    borderLeftRadius={"md"}
-                  >
-                    {key}:
-                  </Text>
-                  <Text
-                    borderWidth={1}
-                    borderColor={"gray.200"}
-                    paddingX={2}
-                    borderLeft={"none"}
-                    backgroundColor={"gray.100"}
-                    borderRightRadius={"md"}
-                    fontFamily="mono"
-                  >
-                    {renderValue}
-                  </Text>
-                </HStack>
+                <MetadataTag
+                  key={i}
+                  label={key}
+                  value={renderValue as string}
+                />
               )
             );
           }

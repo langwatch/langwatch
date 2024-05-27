@@ -7,28 +7,30 @@ type DSPyTrace = {
   pred: AnyJSONDumpedClass;
 };
 
-type DSPyExample = {
+export type DSPyExample = {
+  hash: string;
   example: AnyJSONDumpedClass;
   pred: AnyJSONDumpedClass;
-  result: boolean;
+  score: number;
   trace: DSPyTrace[];
 };
 
-type DSPyLLMCall = {
+export type DSPyLLMCall = {
+  hash: string;
+  __class__: string;
   response: AnyJSONDumpedClass;
-  model: string;
+  model?: string | null;
   prompt_tokens?: number | null;
   completion_tokens?: number | null;
-  tokens_estimated?: boolean | null;
   cost?: number | null;
 };
 
 export type DSPyStep = {
   project_id: string;
-  experiment_id: string;
   run_id: string;
-  index: number;
   parameters_hash: string;
+  experiment_id: string;
+  index: number;
   parameters: AnyJSONDumpedClass[];
   examples: DSPyExample[];
   llm_calls: DSPyLLMCall[];
@@ -37,4 +39,39 @@ export type DSPyStep = {
     inserted_at: number;
     updated_at: number;
   };
+};
+
+export type DSPyStepRESTParams = Omit<
+  DSPyStep,
+  "timestamps" | "project_id" | "experiment_id" | "examples" | "llm_calls"
+> & {
+  experiment_slug: string;
+  timestamps: {
+    created_at: number;
+  };
+  examples: Omit<DSPyExample, "hash">[];
+  llm_calls: Omit<DSPyLLMCall, "hash">[];
+};
+
+export type DSPyStepSummary = {
+  run_id: string;
+  index: number;
+  examples_summary: {
+    total: number;
+    average_score: number;
+  };
+  llm_calls_summary: {
+    total: number;
+    total_tokens: number;
+    total_cost: number;
+  };
+  timestamps: {
+    created_at: number;
+  };
+};
+
+export type DSPyRunsSummary = {
+  runId: string;
+  steps: DSPyStepSummary[];
+  created_at: number;
 };

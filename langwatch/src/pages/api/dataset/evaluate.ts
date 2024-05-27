@@ -1,6 +1,6 @@
 import { type NextApiRequest, type NextApiResponse } from "next";
 import { fromZodError, type ZodError } from "zod-validation-error";
-import { prisma } from "../../../server/db"; // Adjust the import based on your setup
+import { prisma } from "../../../server/db";
 
 import { getDebugger } from "../../../utils/logger";
 
@@ -26,7 +26,8 @@ export const debug = getDebugger("langwatch:guardrail:evaluate");
 
 export const evaluationInputSchema = z.object({
   evaluation: z.string(),
-  experimentSlug: z.string(),
+  experimentSlug: z.string().optional(),
+  batchId: z.string().optional(),
   datasetSlug: z.string(),
   data: z.object({
     input: z.string().optional().nullable(),
@@ -100,7 +101,8 @@ export default async function handler(
   }
 
   const { input, output, contexts, expected_output } = params.data;
-  const { experimentSlug, datasetSlug } = params;
+  const { datasetSlug } = params;
+  const experimentSlug = params.experimentSlug ?? params.batchId ?? nanoid(); // backwards compatibility
   const evaluation = params.evaluation;
   let settings = null;
   let checkType;

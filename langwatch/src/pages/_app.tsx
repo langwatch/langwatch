@@ -67,6 +67,21 @@ export const theme = extendTheme({
     },
   },
   components: {
+    Table: {
+      variants: {
+        grid: {
+          th: {
+            border: "1px solid",
+            borderColor: "gray.200",
+            background: "gray.50",
+          },
+          td: {
+            border: "1px solid",
+            borderColor: "gray.200",
+          },
+        },
+      },
+    },
     Card: defineStyleConfig({
       baseStyle: {
         container: {

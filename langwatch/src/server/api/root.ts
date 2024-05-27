@@ -17,6 +17,7 @@ import { batchRecordRouter } from "./routers/batchRecord";
 import { limitsRouter } from "./routers/limits";
 import { dependencies } from "../../injection/dependencies.server";
 import { triggerRouter } from "./routers/triggers";
+import { experimentsRouter } from "./routers/experiments";
 
 /**
  * This is the primary router for your server.
@@ -41,6 +42,7 @@ export const appRouter = createTRPCRouter({
   batchRecord: batchRecordRouter,
   limits: limitsRouter,
   trigger: triggerRouter,
+  experiments: experimentsRouter,
   ...(dependencies.extraTRPCRoutes?.() ?? {}),
 });
 
