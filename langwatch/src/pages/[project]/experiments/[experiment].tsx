@@ -647,31 +647,39 @@ const RunDetails = React.memo(
                         <Td colSpan={6}>No entries</Td>
                       </Tr>
                     ) : dspyStep.data ? (
-                      dspyStep.data.llm_calls.map((llmCall, index) => (
-                        <Tr key={index}>
-                          <Td background="gray.50" textAlign="center">
-                            {index + 1}
-                          </Td>
-                          <Td>{llmCall.model}</Td>
-                          <Td>
-                            <RenderInputOutput
-                              value={JSON.stringify(llmCall.response)}
-                              collapseStringsAfterLength={140}
-                              collapsed={true}
-                            />
-                          </Td>
-                          <Td>{llmCall.prompt_tokens}</Td>
-                          <Td>{llmCall.completion_tokens}</Td>
-                          <Td>
-                            {llmCall.cost
-                              ? formatMoney(
-                                  { amount: llmCall.cost, currency: "USD" },
-                                  "$0.00[0000]"
-                                )
-                              : "-"}
-                          </Td>
-                        </Tr>
-                      ))
+                      dspyStep.data.llm_calls.map((llmCall, index) => {
+                        const response =
+                          llmCall.response?.choices?.[0]?.message?.content;
+                        return (
+                          <Tr key={index}>
+                            <Td background="gray.50" textAlign="center">
+                              {index + 1}
+                            </Td>
+                            <Td>{llmCall.model}</Td>
+                            <Td>
+                              {response ? (
+                                response
+                              ) : (
+                                <RenderInputOutput
+                                  value={JSON.stringify(llmCall.response)}
+                                  collapseStringsAfterLength={140}
+                                  collapsed={true}
+                                />
+                              )}
+                            </Td>
+                            <Td>{llmCall.prompt_tokens}</Td>
+                            <Td>{llmCall.completion_tokens}</Td>
+                            <Td>
+                              {llmCall.cost
+                                ? formatMoney(
+                                    { amount: llmCall.cost, currency: "USD" },
+                                    "$0.00[0000]"
+                                  )
+                                : "-"}
+                            </Td>
+                          </Tr>
+                        );
+                      })
                     ) : null}
                   </Tbody>
                 </Table>
