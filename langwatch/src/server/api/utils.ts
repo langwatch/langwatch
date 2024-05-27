@@ -1,7 +1,9 @@
-export const extractCheckKeys = (inputObject) => {
-  const keys = [];
+export const extractCheckKeys = (
+  inputObject: Record<string, any>
+): string[] => {
+  const keys: string[] = [];
 
-  const recurse = (obj) => {
+  const recurse = (obj: Record<string, any>) => {
     for (const key in obj) {
       if (key.startsWith("check_")) {
         keys.push(key);

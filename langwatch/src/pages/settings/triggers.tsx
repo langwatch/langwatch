@@ -15,9 +15,11 @@ import {
   Td,
   Th,
   Thead,
+  Tooltip,
   Tr,
   VStack,
   useToast,
+  Text,
 } from "@chakra-ui/react";
 import { MoreVertical } from "react-feather";
 import SettingsLayout from "../../components/SettingsLayout";
@@ -34,8 +36,6 @@ export default function Members() {
   const triggers = api.trigger.getTriggers.useQuery({
     projectId: project?.id ?? "",
   });
-
-  console.log("triggers", triggers.data);
 
   const toggleTrigger = api.trigger.toggleTrigger.useMutation();
   const deleteTriggerMutation = api.trigger.deleteById.useMutation();
@@ -94,7 +94,7 @@ export default function Members() {
         paddingY={6}
         spacing={6}
         width="full"
-        maxWidth="1024px"
+        maxWidth="6xl"
         align="start"
       >
         <HStack width="full" marginTop={2}>
@@ -110,14 +110,15 @@ export default function Members() {
                 <Tr>
                   <Th>Name</Th>
                   <Th>Action</Th>
-                  <Th>Emails</Th>
+                  <Th>Action Items</Th>
+                  <Th>Checks</Th>
                   <Th>Last Triggered At</Th>
                   <Th>Active</Th>
                   <Th></Th>
                 </Tr>
               </Thead>
               <Tbody>
-                {/* {triggers.data?.map((trigger) => {
+                {triggers.data?.map((trigger) => {
                   const lastRunAt = new Date(trigger.lastRunAt);
                   const lastRunAtFormatted = lastRunAt.toLocaleString();
 
@@ -130,7 +131,19 @@ export default function Members() {
                           trigger.actionParams as { members: string[] }
                         ).members?.join(", ")}
                       </Td>
-
+                      <Td>
+                        <Tooltip
+                          label={trigger.checks
+                            .map((check) => check?.name)
+                            .join(", ")}
+                        >
+                          <Text noOfLines={1} display="block">
+                            {trigger.checks
+                              .map((check) => check?.name)
+                              .join(", ")}
+                          </Text>
+                        </Tooltip>
+                      </Td>
                       <Td whiteSpace="nowrap">{lastRunAtFormatted}</Td>
                       <Td textAlign="center">
                         <Switch
@@ -168,7 +181,7 @@ export default function Members() {
                       </Td>
                     </Tr>
                   );
-                })} */}
+                })}
               </Tbody>
             </Table>
           </CardBody>

@@ -90,32 +90,40 @@ export const triggerRouter = createTRPCRouter({
         },
       });
 
-      // Parse filters from triggers to find relevant check IDs
-      const checkIds = triggers.flatMap((trigger) => {
+      const allCheckIds = triggers.flatMap((trigger) => {
         const triggerFilters = JSON.parse(trigger.filters);
-        const keys = extractCheckKeys(triggerFilters);
-        console.log("keys", keys);
-
-        return Object.keys(triggerFilters);
+        return extractCheckKeys(triggerFilters);
       });
 
-      console.log("checkIds", checkIds);
-
-      // Fetch checks based on extracted check IDs
-      const checks = await ctx.prisma.check.findMany({
+      const allChecks = await ctx.prisma.check.findMany({
         where: {
           id: {
-            in: checkIds,
+            in: allCheckIds,
           },
           projectId: input.projectId,
         },
       });
 
-      // Combine triggers and checks into a single response
-      return {
-        triggers,
-        checks,
-      };
+      const checksMap = allChecks.reduce<
+        Record<string, (typeof allChecks)[number]>
+      >((map, check) => {
+        map[check.id] = check;
+        return map;
+      }, {});
+
+      const enhancedTriggers = triggers.map((trigger) => {
+        const triggerFilters = JSON.parse(trigger.filters);
+        const checkIds = extractCheckKeys(triggerFilters);
+
+        const checks = checkIds.map((id) => checksMap[id]).filter(Boolean);
+
+        return {
+          ...trigger,
+          checks,
+        };
+      });
+
+      return enhancedTriggers;
     }),
   toggleTrigger: protectedProcedure
     .input(
