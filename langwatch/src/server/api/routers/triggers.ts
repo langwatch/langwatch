@@ -91,8 +91,12 @@ export const triggerRouter = createTRPCRouter({
       });
 
       const allCheckIds = triggers.flatMap((trigger) => {
-        const triggerFilters = JSON.parse(trigger.filters);
-        return extractCheckKeys(triggerFilters);
+        if (typeof trigger.filters === "string") {
+          const triggerFilters = JSON.parse(trigger.filters);
+          return extractCheckKeys(triggerFilters);
+        } else {
+          return [];
+        }
       });
 
       const allChecks = await ctx.prisma.check.findMany({
@@ -112,7 +116,12 @@ export const triggerRouter = createTRPCRouter({
       }, {});
 
       const enhancedTriggers = triggers.map((trigger) => {
-        const triggerFilters = JSON.parse(trigger.filters);
+        let triggerFilters: Record<string, any> = {};
+
+        if (typeof trigger.filters === "string") {
+          triggerFilters = JSON.parse(trigger.filters);
+        }
+
         const checkIds = extractCheckKeys(triggerFilters);
 
         const checks = checkIds.map((id) => checksMap[id]).filter(Boolean);
