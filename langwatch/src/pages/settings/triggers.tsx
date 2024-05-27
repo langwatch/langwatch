@@ -33,9 +33,14 @@ export default function Members() {
   const { project } = useOrganizationTeamProject();
   const toast = useToast();
 
-  const triggers = api.trigger.getTriggers.useQuery({
-    projectId: project?.id ?? "",
-  });
+  const triggers = api.trigger.getTriggers.useQuery(
+    {
+      projectId: project?.id ?? "",
+    },
+    {
+      enabled: !!project?.id,
+    }
+  );
 
   const toggleTrigger = api.trigger.toggleTrigger.useMutation();
   const deleteTriggerMutation = api.trigger.deleteById.useMutation();
