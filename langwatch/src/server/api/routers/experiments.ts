@@ -124,6 +124,7 @@ export const experimentsRouter = createTRPCRouter({
         projectId: z.string(),
         experimentSlug: z.string(),
         runId: z.string(),
+        index: z.number(),
       })
     )
     .use(checkUserPermissionForProject(TeamRoleGroup.EXPERIMENTS_MANAGE))
@@ -143,6 +144,7 @@ export const experimentsRouter = createTRPCRouter({
                 { term: { experiment_id: experiment.id } },
                 { term: { project_id: input.projectId } },
                 { term: { run_id: input.runId } },
+                { term: { index: input.index } },
               ] as QueryDslBoolQuery["must"],
             } as QueryDslBoolQuery,
           },
