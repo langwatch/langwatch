@@ -4,7 +4,6 @@ import {
   CardBody,
   HStack,
   Heading,
-  LinkBox,
   Menu,
   MenuButton,
   MenuItem,
@@ -13,19 +12,19 @@ import {
   Table,
   Tbody,
   Td,
+  Text,
   Th,
   Thead,
   Tooltip,
   Tr,
   VStack,
   useToast,
-  Text,
 } from "@chakra-ui/react";
+import type { TriggerAction } from "@prisma/client";
 import { MoreVertical } from "react-feather";
 import SettingsLayout from "../../components/SettingsLayout";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
-
 import { DeleteIcon } from "@chakra-ui/icons";
 import { Switch } from "@chakra-ui/react";
 
@@ -92,6 +91,37 @@ export default function Members() {
     );
   };
 
+  const triggerActionName = (action: TriggerAction) => {
+    switch (action) {
+      case "SEND_SLACK_MESSAGE":
+        return "Slack";
+      case "SEND_EMAIL":
+        return "Email";
+    }
+  };
+
+  interface ActionParams {
+    slackWebhook?: string;
+    members?: string[];
+  }
+
+  const actionItems = (action: TriggerAction, actionParams: ActionParams) => {
+    switch (action) {
+      case "SEND_SLACK_MESSAGE":
+        return (
+          <Tooltip
+            label={(actionParams as { slackWebhook: string }).slackWebhook}
+          >
+            <Text noOfLines={1} display="block">
+              Webhook
+            </Text>
+          </Tooltip>
+        );
+      case "SEND_EMAIL":
+        return (actionParams as { members: string[] }).members?.join(", ");
+    }
+  };
+
   return (
     <SettingsLayout>
       <VStack
@@ -142,11 +172,12 @@ export default function Members() {
                     return (
                       <Tr key={trigger.id}>
                         <Td>{trigger.name}</Td>
-                        <Td>{trigger.action}</Td>
+                        <Td>{triggerActionName(trigger.action)}</Td>
                         <Td>
-                          {(
-                            trigger.actionParams as { members: string[] }
-                          ).members?.join(", ")}
+                          {actionItems(
+                            trigger.action,
+                            trigger.actionParams as ActionParams
+                          )}
                         </Td>
                         <Td>
                           <Tooltip

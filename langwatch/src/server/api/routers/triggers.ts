@@ -16,7 +16,8 @@ export const triggerRouter = createTRPCRouter({
         action: z.nativeEnum(TriggerAction),
         filters: z.any(),
         actionParams: z.object({
-          members: z.string().array(),
+          members: z.string().array().optional(),
+          slackWebhook: z.string().optional(),
         }),
       })
     )
@@ -44,16 +45,27 @@ export const triggerRouter = createTRPCRouter({
         },
       });
 
-      const teamEmails = teamMembers.map((user) => user.user.email);
-
-      input.actionParams.members.map((email: string) => {
-        if (!teamEmails.includes(email)) {
+      if (input.action === TriggerAction.SEND_SLACK_MESSAGE) {
+        if (!input.actionParams.slackWebhook) {
           throw new TRPCError({
             code: "BAD_REQUEST",
-            message: "Error with selected emails",
+            message: "Slack webhook is required",
           });
         }
-      });
+      } else if (input.action === TriggerAction.SEND_EMAIL) {
+        const teamEmails = teamMembers.map((user) => user.user.email);
+
+        if (input.actionParams.members) {
+          input.actionParams.members.map((email: string) => {
+            if (!teamEmails.includes(email)) {
+              throw new TRPCError({
+                code: "BAD_REQUEST",
+                message: "Error with selected emails",
+              });
+            }
+          });
+        }
+      }
 
       return ctx.prisma.trigger.create({
         data: {

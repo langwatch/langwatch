@@ -344,6 +344,7 @@ model BatchProcessing {
 enum TriggerAction {
     SEND_EMAIL
     ADD_TO_DATASET
+    SEND_SLACK_MESSAGE
 }
 
 model Trigger {

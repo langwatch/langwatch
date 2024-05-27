@@ -1,15 +1,15 @@
 import { type NextApiRequest, type NextApiResponse } from "next";
-
 import { type Trigger, TriggerAction, type Project } from "@prisma/client";
 import { getAllForProject } from "~/server/api/routers/traces";
 import { prisma } from "../../server/db";
-
 import { sendTriggerEmail } from "~/server/mailer/triggerEmail";
+import { sendSlackWebhook } from "~/server/triggers/sendSlackWebhook";
 import { getLatestUpdatedAt } from "./utils";
 
 interface ActionParams {
   members?: string[] | null;
   dataset?: string | null;
+  slackWebhook?: string | null;
 }
 
 export default async function handler(
@@ -96,7 +96,23 @@ const getTracesForAlert = async (trigger: Trigger, projects: Project[]) => {
       if (project) {
         void updateAlert(alertId, updatedAt, project.id);
       } else {
-        console.error("Project not found for alertId:", alertId);
+        throw new Error("Project not found for alertId: " + alertId);
+      }
+    } else if (action === TriggerAction.SEND_SLACK_MESSAGE) {
+      triggerInfo = {
+        triggerWebhook: (actionParams as ActionParams)?.slackWebhook ?? "",
+        triggerData,
+        triggerName: name,
+        projectSlug: project!.slug,
+      };
+
+      updatedAt = getLatestUpdatedAt(traces);
+
+      await sendSlackWebhook(triggerInfo);
+      if (project) {
+        void updateAlert(alertId, updatedAt, project.id);
+      } else {
+        throw new Error("Project not found for alertId: " + alertId);
       }
     }
 

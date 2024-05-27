@@ -67,29 +67,37 @@ export function TriggerDrawer() {
       action: TriggerAction.SEND_EMAIL,
       email: "",
       members: [],
+      slackWebhook: "",
     },
   });
 
-  const currentAction = watch("action");
+  const currentAction: TriggerAction = watch("action");
 
   type Trigger = {
     name: string;
     action: TriggerAction;
     email?: string;
     members?: string[];
+    slackWebhook?: string;
   };
 
   type ActionParams = {
-    members: string[];
+    members?: string[];
+    slackWebhook?: string;
   };
 
   const onSubmit = (data: Trigger) => {
     let actionParams: ActionParams = {
       members: [],
+      slackWebhook: "",
     };
     if (data.action === TriggerAction.SEND_EMAIL) {
       actionParams = {
         members: data.members ?? [],
+      };
+    } else if (data.action === TriggerAction.SEND_SLACK_MESSAGE) {
+      actionParams = {
+        slackWebhook: data.slackWebhook ?? "",
       };
     }
 
@@ -239,6 +247,33 @@ export function TriggerDrawer() {
                     </Radio>
                     {currentAction === TriggerAction.SEND_EMAIL && (
                       <MultiSelect />
+                    )}
+                  </VStack>
+                  <VStack align="start">
+                    <Radio
+                      size="md"
+                      value={TriggerAction.SEND_SLACK_MESSAGE}
+                      colorScheme="blue"
+                      alignItems="start"
+                      spacing={3}
+                      paddingTop={2}
+                      {...register("action")}
+                    >
+                      <VStack align="start" marginTop={-1}>
+                        <Text fontWeight="500">Send Slack Message</Text>
+                        <Text fontSize={13}>
+                          Add your slack webhook and channel to send a message
+                          to when the trigger is activated.
+                        </Text>
+                      </VStack>
+                    </Radio>
+                    {currentAction ===
+                      (TriggerAction.SEND_SLACK_MESSAGE as TriggerAction) && (
+                      <Input
+                        placeholder="Your slack hook url"
+                        required
+                        {...register("slackWebhook")}
+                      />
                     )}
                   </VStack>
                   <VStack align="start">
