@@ -100,41 +100,46 @@ function DSPyExperiment({
   const router = useRouter();
 
   const [highlightedRun, setHighlightedRun] = useState<string | null>(null);
-  const selectedRun =
-    typeof router.query.runId === "string" ? router.query.runId : null;
-  const [selectedRunIndex, setSelectedRunIndex] = useState<{
+  const selectedRuns =
+    typeof router.query.runIds === "string"
+      ? router.query.runIds.split(",")
+      : null;
+  const [selectedPoint, setSelectedPoint] = useState<{
     runId: string;
     index: number;
   } | null>(null);
 
   useEffect(() => {
-    setSelectedRunIndex(null);
-  }, [selectedRun]);
+    if (selectedPoint && !selectedRuns?.includes(selectedPoint.runId)) {
+      setSelectedPoint(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedRuns]);
 
   const visibleRuns =
-    dspyRuns.data && selectedRun
-      ? [dspyRuns.data.find((run) => run.runId === selectedRun)!].filter(x => x)
+    dspyRuns.data && selectedRuns
+      ? dspyRuns.data.filter((run) => selectedRuns.includes(run.runId))
       : dspyRuns.data;
 
   const firstVisibleRun = visibleRuns?.[0];
 
   useEffect(() => {
-    if (!firstVisibleRun || selectedRunIndex !== null) return;
+    if (!firstVisibleRun || selectedPoint !== null) return;
 
     const lastStep = firstVisibleRun.steps[firstVisibleRun.steps.length - 1];
     lastStep &&
-      setSelectedRunIndex({
+      setSelectedPoint({
         runId: firstVisibleRun.runId,
         index: lastStep.index,
       });
-  }, [firstVisibleRun, selectedRunIndex]);
+  }, [firstVisibleRun, selectedPoint]);
 
   const stepToDisplay =
     dspyRuns.data &&
     (
-      selectedRunIndex &&
-      dspyRuns.data.find((run) => run.runId === selectedRunIndex.runId)
-    )?.steps.find((step) => step.index === selectedRunIndex.index);
+      selectedPoint &&
+      dspyRuns.data.find((run) => run.runId === selectedPoint.runId)
+    )?.steps.find((step) => step.index === selectedPoint.index);
 
   const optimizerNames = Array.from(
     new Set(
@@ -149,6 +154,17 @@ function DSPyExperiment({
     )
   );
 
+  const nonMatchingRunIds =
+    selectedRuns?.filter(
+      (runId) => !dspyRuns.data?.some((run) => run.runId === runId)
+    ) ?? [];
+  const dspyRunsPlusIncoming =
+    nonMatchingRunIds.length > 0
+      ? ([{ runId: nonMatchingRunIds[0] }, ...(dspyRuns.data ?? [])] as ({
+          runId: string;
+        } & Partial<DSPyRunsSummary>)[])
+      : dspyRuns.data;
+
   return (
     <HStack align="start" width="full" height="full">
       <VStack
@@ -160,7 +176,7 @@ function DSPyExperiment({
         fontSize="14px"
         minWidth="300px"
         height="full"
-        spacing={1}
+        spacing={0}
         onClick={() => {
           const query = { ...router.query };
           delete query.runId;
@@ -188,37 +204,50 @@ function DSPyExperiment({
             Waiting for runs...
           </Text>
         ) : (
-          dspyRuns.data?.map((run) => {
+          dspyRunsPlusIncoming?.map((run) => {
             const runCost = run.steps
-              .map((step) => step.llm_calls_summary.total_cost)
+              ?.map((step) => step.llm_calls_summary.total_cost)
               .reduce((acc, cost) => acc + cost, 0);
 
             return (
               <HStack
-                key={run.runId}
+                key={run?.runId ?? "new"}
                 paddingX={6}
                 paddingY={4}
                 width="100%"
                 cursor="pointer"
                 role="button"
-                opacity={!selectedRun || selectedRun === run.runId ? 1 : 0.5}
-                background={selectedRun === run.runId ? "gray.200" : "none"}
+                opacity={
+                  !selectedRuns || selectedRuns.includes(run.runId) ? 1 : 0.5
+                }
+                background={
+                  selectedRuns?.includes(run.runId) ? "gray.200" : "none"
+                }
                 _hover={{
-                  background:
-                    selectedRun === run.runId ? "gray.200" : "gray.100",
+                  background: selectedRuns?.includes(run.runId)
+                    ? "gray.200"
+                    : "gray.100",
                 }}
-                onMouseEnter={() => setHighlightedRun(run.runId)}
+                onMouseEnter={() => {
+                  if (!selectedRuns?.includes(run.runId)) {
+                    setHighlightedRun(run.runId);
+                  }
+                }}
                 onMouseLeave={() => setHighlightedRun(null)}
                 onClick={(e) => {
                   e.stopPropagation();
-                  const query = {
+                  const query: Record<string, string | undefined> = {
                     ...router.query,
-                    runId: selectedRun === run.runId ? undefined : run.runId,
+                    runIds: (selectedRuns?.includes(run.runId)
+                      ? selectedRuns.filter((id) => id !== run.runId)
+                      : [...(selectedRuns ?? []), run.runId]
+                    ).join(","),
                   };
-                  if (!query.runId) {
-                    delete query.runId;
+                  if (!query.runIds) {
+                    delete query.runIds;
                   }
                   void router.push({ query });
+                  setHighlightedRun(null);
                 }}
                 spacing={3}
               >
@@ -233,7 +262,8 @@ function DSPyExperiment({
                   <Text>{run.runId}</Text>
                   <HStack color="gray.400">
                     <Text>
-                      {formatTimeAgo(run.created_at, "yyyy-MM-dd HH:mm", 5)}
+                      {run.created_at ?
+                        formatTimeAgo(run.created_at, "yyyy-MM-dd HH:mm", 5) : "Waiting for steps..."}
                     </Text>
                     {runCost && (
                       <>
@@ -283,26 +313,32 @@ function DSPyExperiment({
                   <Heading as="h2" size="md">
                     {optimizerNames.length == 1
                       ? optimizerNames[0]!
-                      : "Multiple Optimizers"}
+                      : optimizerNames.length > 1
+                      ? "Multiple Optimizers"
+                      : "Waiting for steps..."}
                   </Heading>
                 </CardHeader>
                 <CardBody>
                   <DSPyRunsScoresChart
                     dspyRuns={dspyRuns.data}
-                    selectedRunIndex={selectedRunIndex}
-                    setSelectedRunIndex={setSelectedRunIndex}
+                    selectedPoint={selectedPoint}
+                    setSelectedPoint={setSelectedPoint}
                     highlightedRun={highlightedRun}
-                    selectedRun={selectedRun}
+                    selectedRuns={selectedRuns}
                     stepToDisplay={stepToDisplay}
                     labelNames={labelNames}
                   />
                 </CardBody>
               </Card>
-              <RunDetails
-                project={project}
-                experiment={experiment}
-                dspyStepSummary={stepToDisplay}
-              />
+              {stepToDisplay &&
+                (!highlightedRun ||
+                  highlightedRun === stepToDisplay.run_id) && (
+                  <RunDetails
+                    project={project}
+                    experiment={experiment}
+                    dspyStepSummary={stepToDisplay}
+                  />
+                )}
             </>
           )
         )}
@@ -319,7 +355,7 @@ const RunDetails = React.memo(
   }: {
     project: Project;
     experiment: Experiment;
-    dspyStepSummary: DSPyStepSummary | undefined;
+    dspyStepSummary: DSPyStepSummary;
   }) {
     const dspyStep = api.experiments.getExperimentDSPyStep.useQuery(
       {
@@ -335,10 +371,6 @@ const RunDetails = React.memo(
 
     const [tabIndex, setTabIndex] = useState(0);
     const [displayRawParams, setDisplayRawParams] = useState(false);
-
-    if (!dspyStepSummary) {
-      return null;
-    }
 
     return (
       <Card width="100%">
@@ -728,18 +760,18 @@ const RunDetails = React.memo(
 
 function DSPyRunsScoresChart({
   dspyRuns,
-  selectedRunIndex,
-  setSelectedRunIndex,
+  selectedPoint,
+  setSelectedPoint,
   highlightedRun,
-  selectedRun,
+  selectedRuns,
   stepToDisplay,
   labelNames,
 }: {
   dspyRuns: DSPyRunsSummary[];
-  selectedRunIndex: { runId: string; index: number } | null;
-  setSelectedRunIndex: (value: { runId: string; index: number } | null) => void;
+  selectedPoint: { runId: string; index: number } | null;
+  setSelectedPoint: (value: { runId: string; index: number } | null) => void;
   highlightedRun: string | null;
-  selectedRun: string | null;
+  selectedRuns: string[] | null;
   stepToDisplay: DSPyStepSummary | undefined;
   labelNames: string[];
 }) {
@@ -796,12 +828,12 @@ function DSPyRunsScoresChart({
           onClick={() => {
             if (
               hoveredRunIndex &&
-              (hoveredRunIndex.runId !== selectedRunIndex?.runId ||
-                hoveredRunIndex.index !== selectedRunIndex?.index)
+              (hoveredRunIndex.runId !== selectedPoint?.runId ||
+                hoveredRunIndex.index !== selectedPoint?.index)
             ) {
-              setSelectedRunIndex(hoveredRunIndex);
+              setSelectedPoint(hoveredRunIndex);
             } else {
-              setSelectedRunIndex(null);
+              setSelectedPoint(null);
             }
           }}
           onMouseMove={(state) => {
@@ -853,9 +885,9 @@ function DSPyRunsScoresChart({
             }}
           />
           {dspyRuns.map(({ runId }) =>
-            !selectedRun ||
-            (!!highlightedRun && highlightedRun !== selectedRun) ||
-            selectedRun === runId ? (
+            !selectedRuns ||
+            (!!highlightedRun && !selectedRuns.includes(highlightedRun)) ||
+            selectedRuns.includes(runId) ? (
               <Line
                 key={runId}
                 type="monotone"
@@ -875,18 +907,19 @@ function DSPyRunsScoresChart({
               />
             ) : null
           )}
-          {stepToDisplay && (
-            <ReferenceDot
-              x={stepToDisplay.index}
-              y={
-                stepsFlattenedByIndex[stepToDisplay.index]?.[
-                  stepToDisplay.run_id
-                ]
-              }
-              stroke={getColor(stepToDisplay.run_id)}
-              fill={getColor(stepToDisplay.run_id)}
-            />
-          )}
+          {stepToDisplay &&
+            (!highlightedRun || highlightedRun === stepToDisplay.run_id) && (
+              <ReferenceDot
+                x={stepToDisplay.index}
+                y={
+                  stepsFlattenedByIndex[stepToDisplay.index]?.[
+                    stepToDisplay.run_id
+                  ]
+                }
+                stroke={getColor(stepToDisplay.run_id)}
+                fill={getColor(stepToDisplay.run_id)}
+              />
+            )}
         </LineChart>
       </ResponsiveContainer>
     </Box>

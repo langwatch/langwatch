@@ -97,7 +97,6 @@ class LangWatchDSPy:
 
     _instance: Optional["LangWatchDSPy"] = None
     experiment_slug: Optional[str] = None
-    batch_send: bool = True
     experiment_path: str = ""
     run_id: Optional[str] = None
 
@@ -114,8 +113,7 @@ class LangWatchDSPy:
             cls._instance = super().__new__(cls)
         return cls._instance
 
-    def init(self, experiment: str, optimizer: Teleprompter, batch_send: bool = True):
-        self.batch_send = batch_send
+    def init(self, experiment: str, optimizer: Teleprompter):
         if langwatch.api_key is None:
             print("API key was not detected, calling langwatch.login()...")
             langwatch.login()
@@ -140,8 +138,9 @@ class LangWatchDSPy:
 
         result = response.json()
         self.experiment_path = result["path"]
+        print(f"Experiment initialized, run_id: {self.run_id}")
         print(
-            f"Experiment initialized, open {langwatch.endpoint}{self.experiment_path} to track your DSPy training session live\n"
+            f"Open {langwatch.endpoint}{self.experiment_path}?runIds={self.run_id} to track your DSPy training session live\n"
         )
 
     def patch_optimizer(self, optimizer: Teleprompter):
