@@ -19,8 +19,10 @@ const sampleDSPyStep: DSPyStepRESTParams = {
   experiment_slug: "sample-experiment",
   run_id: "run_1",
   index: 0,
-  parameters_hash: "hash_1",
-  parameters: [{ key: "value" }],
+  score: 0.5,
+  label: "score",
+  optimizer: { name: "foo", parameters: { key: "value" } },
+  predictors: [{ name: "bar", predictor: { key: "value" } }],
   examples: [
     {
       example: { key: "example_value" },
@@ -77,9 +79,11 @@ const sampleDSPyStep: DSPyStepRESTParams = {
 const sampleDSPyStepSecondExampleAndLLMCall: DSPyStepRESTParams = {
   experiment_slug: "sample-experiment",
   run_id: "run_1",
-  index: 0,
-  parameters_hash: "hash_1",
-  parameters: [{ key: "value" }],
+  index: 1,
+  score: 0.6,
+  label: "score",
+  optimizer: { name: "foo", parameters: { key: "value" } },
+  predictors: [{ name: "bar", predictor: { key: "value" } }],
   examples: [
     {
       example: { key: "example_value2" },
@@ -181,9 +185,9 @@ describe("Log Steps API Endpoint", () => {
     const indexedStep = await esClient.get<DSPyStep>({
       index: DSPY_STEPS_INDEX,
       id: dspyStepIndexId({
-        runId: sampleDSPyStep.run_id,
-        parametersHash: sampleDSPyStep.parameters_hash,
         projectId: project.id,
+        runId: sampleDSPyStep.run_id,
+        index: sampleDSPyStep.index,
       }),
     });
     expect(indexedStep).not.toBeNull();

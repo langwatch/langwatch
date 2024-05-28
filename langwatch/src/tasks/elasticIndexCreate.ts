@@ -268,8 +268,21 @@ const dspyStepsMapping: ElasticSearchMappingFrom<DSPyStep> = {
   experiment_id: { type: "keyword" },
   run_id: { type: "keyword" },
   index: { type: "integer" },
-  parameters_hash: { type: "keyword" },
-  parameters: { type: "flattened" } as any,
+  score: { type: "float" },
+  label: { type: "keyword" },
+  optimizer: {
+    properties: {
+      name: { type: "keyword" },
+      parameters: { type: "flattened" } as any,
+    },
+  },
+  predictors: {
+    type: "nested",
+    properties: {
+      name: { type: "keyword" },
+      predictor: { type: "flattened" } as any,
+    },
+  },
   examples: {
     type: "nested",
     properties: {

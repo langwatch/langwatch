@@ -111,11 +111,12 @@ function DSPyExperiment({
     setSelectedRunIndex(null);
   }, [selectedRun]);
 
-  const firstVisibleRun =
-    dspyRuns.data &&
-    (selectedRun
-      ? dspyRuns.data.find((run) => run.runId === selectedRun)
-      : dspyRuns.data[0]);
+  const visibleRuns =
+    dspyRuns.data && selectedRun
+      ? [dspyRuns.data.find((run) => run.runId === selectedRun)!].filter(x => x)
+      : dspyRuns.data;
+
+  const firstVisibleRun = visibleRuns?.[0];
 
   useEffect(() => {
     if (!firstVisibleRun || selectedRunIndex !== null) return;
@@ -134,6 +135,19 @@ function DSPyExperiment({
       selectedRunIndex &&
       dspyRuns.data.find((run) => run.runId === selectedRunIndex.runId)
     )?.steps.find((step) => step.index === selectedRunIndex.index);
+
+  const optimizerNames = Array.from(
+    new Set(
+      visibleRuns?.flatMap((run) =>
+        run.steps.map((step) => step.optimizer.name)
+      ) ?? []
+    )
+  );
+  const labelNames = Array.from(
+    new Set(
+      visibleRuns?.flatMap((run) => run.steps.map((step) => step.label)) ?? []
+    )
+  );
 
   return (
     <HStack align="start" width="full" height="full">
@@ -267,7 +281,9 @@ function DSPyExperiment({
               <Card width="100%">
                 <CardHeader>
                   <Heading as="h2" size="md">
-                    Metric Score
+                    {optimizerNames.length == 1
+                      ? optimizerNames[0]!
+                      : "Multiple Optimizers"}
                   </Heading>
                 </CardHeader>
                 <CardBody>
@@ -278,6 +294,7 @@ function DSPyExperiment({
                     highlightedRun={highlightedRun}
                     selectedRun={selectedRun}
                     stepToDisplay={stepToDisplay}
+                    labelNames={labelNames}
                   />
                 </CardBody>
               </Card>
@@ -359,10 +376,8 @@ const RunDetails = React.memo(
                 ).format("0a")}
               />
               <MetadataTag
-                label="Avg Score"
-                value={numeral(
-                  dspyStepSummary.examples_summary.average_score
-                ).format("0.00")}
+                label={dspyStepSummary.label}
+                value={numeral(dspyStepSummary.score).format("0.[00]")}
               />
             </HStack>
           </HStack>
@@ -382,8 +397,8 @@ const RunDetails = React.memo(
                 </Box>
               )}
               <Tab>
-                Parameters{" "}
-                {dspyStep.data && `(${dspyStep.data.parameters.length})`}
+                Predictors{" "}
+                {dspyStep.data && `(${dspyStep.data.predictors.length})`}
               </Tab>
               <Tab>
                 Examples {dspyStep.data && `(${dspyStep.data.examples.length})`}
@@ -410,7 +425,7 @@ const RunDetails = React.memo(
                   </Alert>
                 ) : dspyStep.data && displayRawParams ? (
                   <RenderInputOutput
-                    value={JSON.stringify(dspyStep.data?.parameters)}
+                    value={JSON.stringify(dspyStep.data?.predictors)}
                     collapseStringsAfterLength={140}
                   />
                 ) : dspyStep.data ? (
@@ -418,10 +433,13 @@ const RunDetails = React.memo(
                     <Thead>
                       <Tr>
                         <Th minWidth="15px" maxWidth="15px" paddingY={3}></Th>
-                        <Th width="30%" paddingY={3}>
-                          Instructions
+                        <Th width="15%" paddingY={3}>
+                          Name
                         </Th>
                         <Th width="20%" paddingY={3}>
+                          Instructions
+                        </Th>
+                        <Th width="15%" paddingY={3}>
                           Signature
                         </Th>
                         <Th width="20%" paddingY={3}>
@@ -449,6 +467,9 @@ const RunDetails = React.memo(
                             <Td>
                               <Skeleton width="100%" height="30px" />
                             </Td>
+                            <Td>
+                              <Skeleton width="100%" height="30px" />
+                            </Td>
                           </Tr>
                         ))
                       ) : dspyStep.error ? (
@@ -457,48 +478,53 @@ const RunDetails = React.memo(
                             Error loading step data
                           </Td>
                         </Tr>
-                      ) : dspyStep.data.parameters.length === 0 ? (
+                      ) : dspyStep.data.predictors.length === 0 ? (
                         <Tr>
                           <Td colSpan={5}>No entries</Td>
                         </Tr>
                       ) : dspyStep.data ? (
-                        dspyStep.data.parameters.map((parameter, index) => (
-                          <Tr key={index}>
-                            <Td background="gray.50" textAlign="center">
-                              {index + 1}
-                            </Td>
-                            <Td>{parameter?.signature?.instructions ?? "-"}</Td>
-                            <Td>{parameter?.signature?.signature ?? "-"}</Td>
-                            <Td>
-                              {parameter?.signature?.fields ? (
-                                <RenderInputOutput
-                                  value={JSON.stringify(
-                                    parameter.signature.fields
-                                  )}
-                                  collapseStringsAfterLength={140}
-                                  collapsed={true}
-                                />
-                              ) : (
-                                "-"
-                              )}
-                            </Td>
-                            <Td>
-                              {parameter?.demos ? (
-                                <RenderInputOutput
-                                  value={JSON.stringify(
-                                    parameter.demos.map((demo: any) =>
-                                      demo._store ? demo._store : demo
-                                    )
-                                  )}
-                                  collapseStringsAfterLength={140}
-                                  groupArraysAfterLength={5}
-                                />
-                              ) : (
-                                "-"
-                              )}
-                            </Td>
-                          </Tr>
-                        ))
+                        dspyStep.data.predictors.map(
+                          ({ name, predictor }, index) => (
+                            <Tr key={index}>
+                              <Td background="gray.50" textAlign="center">
+                                {index + 1}
+                              </Td>
+                              <Td>{name}</Td>
+                              <Td>
+                                {predictor?.signature?.instructions ?? "-"}
+                              </Td>
+                              <Td>{predictor?.signature?.signature ?? "-"}</Td>
+                              <Td>
+                                {predictor?.signature?.fields ? (
+                                  <RenderInputOutput
+                                    value={JSON.stringify(
+                                      predictor.signature.fields
+                                    )}
+                                    collapseStringsAfterLength={140}
+                                    collapsed={true}
+                                  />
+                                ) : (
+                                  "-"
+                                )}
+                              </Td>
+                              <Td>
+                                {predictor?.demos ? (
+                                  <RenderInputOutput
+                                    value={JSON.stringify(
+                                      predictor.demos.map((demo: any) =>
+                                        demo._store ? demo._store : demo
+                                      )
+                                    )}
+                                    collapseStringsAfterLength={140}
+                                    groupArraysAfterLength={5}
+                                  />
+                                ) : (
+                                  "-"
+                                )}
+                              </Td>
+                            </Tr>
+                          )
+                        )
                       ) : null}
                     </Tbody>
                   </Table>
@@ -707,6 +733,7 @@ function DSPyRunsScoresChart({
   highlightedRun,
   selectedRun,
   stepToDisplay,
+  labelNames,
 }: {
   dspyRuns: DSPyRunsSummary[];
   selectedRunIndex: { runId: string; index: number } | null;
@@ -714,6 +741,7 @@ function DSPyRunsScoresChart({
   highlightedRun: string | null;
   selectedRun: string | null;
   stepToDisplay: DSPyStepSummary | undefined;
+  labelNames: string[];
 }) {
   const stepsFlattenedByIndex = dspyRuns.reduce(
     (acc, run) => {
@@ -721,7 +749,8 @@ function DSPyRunsScoresChart({
         acc[step.index] = {
           ...(acc[step.index] ?? {}),
           index: step.index,
-          [run.runId]: step.examples_summary.average_score,
+          [run.runId]: step.score,
+          [`${run.runId}_label`]: step.label,
         } as { index: number } & Record<string, number>;
       });
       return acc;
@@ -764,7 +793,7 @@ function DSPyRunsScoresChart({
           style={{
             cursor: hoveredRunIndex ? "pointer" : "default",
           }}
-          onClick={(e) => {
+          onClick={() => {
             if (
               hoveredRunIndex &&
               (hoveredRunIndex.runId !== selectedRunIndex?.runId ||
@@ -804,13 +833,23 @@ function DSPyRunsScoresChart({
           />
           <YAxis
             type="number"
-            name="Score"
-            label={{ value: "Score", angle: -90, position: "insideLeft" }}
+            name={labelNames.length == 1 ? labelNames[0] : "Score"}
+            label={{
+              value: labelNames.length == 1 ? labelNames[0] : "Score",
+              angle: -90,
+              position: "insideLeft",
+              offset: -5,
+              style: { textAnchor: "middle" },
+            }}
           />
           <Tooltip
             labelFormatter={(value) => `Step ${value}`}
             formatter={(value, name, props) => {
-              return [numeral(value).format("0.00"), `${name} avg score`];
+              const label = props.payload[`${name}_label`];
+              return [
+                numeral(value).format("0.[00]"),
+                [name, label].filter((x) => x).join(" "),
+              ];
             }}
           />
           {dspyRuns.map(({ runId }) =>

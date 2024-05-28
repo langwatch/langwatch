@@ -74,12 +74,12 @@ export default async function handler(
       param.timestamps.created_at.toString().length === 10
     ) {
       debug(
-        "Timestamps not in milliseconds for",
-        param.parameters_hash,
-        "on experiment",
-        param.experiment_slug,
+        "Timestamps not in milliseconds for step",
+        param.index,
         "run",
-        param.run_id
+        param.run_id,
+        "on experiment",
+        param.experiment_slug
       );
       return res.status(400).json({
         error:
@@ -110,14 +110,14 @@ export default async function handler(
 }
 
 const processDSPyStep = async (project: Project, param: DSPyStepRESTParams) => {
-  const { run_id, parameters_hash, experiment_slug } = param;
+  const { run_id, index, experiment_slug } = param;
 
   const experiment = await findOrCreateExperiment(project, experiment_slug);
 
   const id = dspyStepIndexId({
-    runId: run_id,
-    parametersHash: parameters_hash,
     projectId: project.id,
+    runId: run_id,
+    index,
   });
 
   const dspyStep: DSPyStep = {

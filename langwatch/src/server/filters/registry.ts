@@ -294,7 +294,7 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
       }
     },
     listMatch: {
-      aggregation: (query) => ({
+      aggregation: (_query) => ({
         unique_values: {
           terms: {
             field: "trace.has_error",

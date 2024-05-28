@@ -1,4 +1,3 @@
-import os
 import time
 import dspy
 from typing import Callable, List, Optional, Any, Union
@@ -6,9 +5,9 @@ from typing_extensions import TypedDict
 import langwatch
 import httpx
 import json
-import hashlib
 from pydantic import BaseModel
 from dspy.predict import Predict
+from dspy.teleprompt import Teleprompter, BootstrapFewShot
 from dspy.signatures.signature import SignatureMeta
 from dspy.primitives.prediction import Prediction, Completions
 from dspy.primitives.example import Example
@@ -23,15 +22,11 @@ class SerializableAndPydanticEncoder(json.JSONEncoder):
         if isinstance(o, BaseModel):
             return o.model_dump()
         if isinstance(o, FieldInfo):
-            # return {"__class__": classname} | o.__dict__
             return o.__repr__()
         if isinstance(o, set):
             return list(o)
         if isinstance(o, Predict):
-            predict_dict = o.__dict__.copy()
-            # to prevent two equal predicts but simply different instances
-            del predict_dict["stage"]
-            return {"__class__": classname} | predict_dict
+            return {"__class__": classname} | o.__dict__
         if isinstance(o, Example):
             return {"__class__": classname} | o.__dict__
         if isinstance(o, SignatureMeta):
@@ -65,15 +60,27 @@ class DSPyExample(BaseModel):
     example: Any
     pred: Any
     score: float
-    trace: List[DSPyTrace]
+    trace: Optional[List[DSPyTrace]]
+
+
+class DSPyPredictor(BaseModel):
+    name: str
+    predictor: Any
+
+
+class DSPyOptimizer(BaseModel):
+    name: str
+    parameters: Any
 
 
 class DSPyStep(BaseModel):
     run_id: str
     experiment_slug: str
-    parameters_hash: str
     index: int
-    parameters: List[Any]
+    score: float
+    label: str
+    optimizer: DSPyOptimizer
+    predictors: List[DSPyPredictor]
     examples: List[DSPyExample]
     llm_calls: List[DSPyLLMCall]
     timestamps: Timestamps
@@ -83,16 +90,12 @@ class LangWatchDSPy:
     """LangWatch DSPy visualization tracker"""
 
     _instance: Optional["LangWatchDSPy"] = None
-    api_key: Optional[str] = None
     experiment_slug: Optional[str] = None
     batch_send: bool = True
     experiment_path: str = ""
-
     run_id: Optional[str] = None
-    current_step: int = 0
-    current_step_hash: Optional[str] = None
-    current_step_parameters: Optional[List[Predict]] = None
 
+    examples_buffer: List[DSPyExample] = []
     llm_calls_buffer: List[DSPyLLMCall] = []
     steps_buffer: List[DSPyStep] = []
 
@@ -105,50 +108,54 @@ class LangWatchDSPy:
             cls._instance = super().__new__(cls)
         return cls._instance
 
-    def init(self, experiment: str, batch_send: bool = True):
+    def init(self, experiment: str, optimizer: Teleprompter, batch_send: bool = True):
         self.batch_send = batch_send
-        if self.api_key is None:
-            if os.environ.get("LANGWATCH_API_KEY") is not None:
-                self.api_key = os.environ.get("LANGWATCH_API_KEY")
-            else:
-                self.login()
+        if langwatch.api_key is None:
+            print("API key was not detected, calling langwatch.login()...")
+            langwatch.login()
+            return
 
         response = httpx.post(
             f"{langwatch.endpoint}/api/dspy/init",
-            headers={"X-Auth-Token": self.api_key or ""},
+            headers={"X-Auth-Token": langwatch.api_key or ""},
             json={"experiment_slug": experiment},
         )
         if response.status_code == 401:
-            self.api_key = None
+            langwatch.api_key = None
             raise ValueError("API key is not valid, please try to login again")
         response.raise_for_status()
 
         self.experiment_slug = experiment
+        self.run_id = generate_slug(3)
         self.reset()
-        self.run_id = None
 
         self.patch_llms()
+        self.patch_optimizer(optimizer)
 
         result = response.json()
         self.experiment_path = result["path"]
         print(
-            f"Experiment initialized, open {langwatch.endpoint}{self.experiment_path} to track your DSPy training session live"
+            f"Experiment initialized, open {langwatch.endpoint}{self.experiment_path} to track your DSPy training session live\n"
         )
 
+    def patch_optimizer(self, optimizer: Teleprompter):
+        classmap = {
+            BootstrapFewShot: LangWatchTrackedBootstrapFewShot,
+        }
+
+        if optimizer.__class__ in classmap:
+            optimizer.__class__ = classmap[optimizer.__class__]
+            optimizer.patch()  # type: ignore
+        else:
+            supported = ", ".join([f"{c.__name__}" for c in classmap.keys()])
+            raise ValueError(
+                f"Optimizer {optimizer.__class__.__name__} is not supported by LangWatch DSPy visualizer yet, only [{supported}] are supported"
+            )
+
     def reset(self):
-        self.run_id = generate_slug(3)
-        self.current_step = 0
-        self.current_step_hash = None
+        self.examples_buffer = []
         self.llm_calls_buffer = []
         self.steps_buffer = []
-
-    def login(self):
-        print(f"Please go to {langwatch.endpoint}/authorize to get your API key")
-        self.api_key = input(f"Paste your API key here: ")
-        if not self.api_key:
-            self.api_key = None
-            raise ValueError("API key was not set")
-        print("API key set")
 
     def patch_llms(self):
         if not hasattr(dspy.OpenAI, "_original_request"):
@@ -172,74 +179,58 @@ class LangWatchDSPy:
             [Example, Prediction, Optional[List[Any]]], Union[bool, float]
         ],
     ):
-        if not self.api_key or not self.experiment_slug:
-            raise ValueError(
-                'langwatch.dspy was not initialized yet, please call langwatch.dspy.init(experiment="your-experiment-name") first'
-            )
-
-        self.reset()
-        print(f"Tracking run {self.run_id}: {langwatch.endpoint}{self.experiment_path}")
-
         def wrapped(example, pred, trace=None):
             score = metric_fn(example, pred, trace=trace)  # type: ignore
 
-            is_bootstrap = trace is not None
-
-            trace = dspy.settings.trace
-            if not trace:
-                return score
-
-            def get_md5(obj):
-                return hashlib.md5(
-                    json.dumps(obj, cls=SerializableAndPydanticEncoder).encode()
-                ).hexdigest()
-
-            # Each trace is a tuple of (parameters, input, pred)
-            parameters = list({get_md5(t[0]): t[0] for t in trace}.values())
-            md5_of_predict = get_md5(parameters)
-            if self.current_step_hash != md5_of_predict:
-                self.current_step += 1
-                self.current_step_hash = md5_of_predict
-                if self.current_step_parameters is not None and not is_bootstrap:
-                    self.current_step_parameters = parameters[
-                        len(self.current_step_parameters) :
-                    ]
-                else:
-                    self.current_step_parameters = parameters
-
-            self.steps_buffer.append(
-                DSPyStep(
-                    run_id=self.run_id or "unknown",
-                    experiment_slug=self.experiment_slug or "unknown",
-                    parameters_hash=self.current_step_hash or "unknown",
-                    index=self.current_step,
-                    parameters=self.current_step_parameters,  # type: ignore
-                    examples=[
-                        DSPyExample(
-                            example=example._store,
-                            pred=pred._store,
-                            score=float(score),
-                            # Each trace is a tuple of (parameters, input, pred)
-                            trace=[],  # [DSPyTrace(input=t[1], pred=t[2]) for t in trace],
-                        )
-                    ],
-                    llm_calls=self.llm_calls_buffer,
-                    timestamps=Timestamps(created_at=int(time.time() * 1000)),
+            self.examples_buffer.append(
+                DSPyExample(
+                    example=example._store,
+                    pred=pred._store,
+                    score=float(score),
+                    trace=(
+                        [DSPyTrace(input=t[1], pred=t[2]) for t in trace]
+                        if trace
+                        else None
+                    ),
                 )
             )
-            self.llm_calls_buffer = []
-            self.send_steps()
 
             return score
 
         return wrapped
+
+    def log_step(
+        self,
+        *,
+        optimizer: DSPyOptimizer,
+        index: int,
+        score: float,
+        label: str,
+        predictors: List[DSPyPredictor],
+    ):
+        step = DSPyStep(
+            run_id=self.run_id or "unknown",
+            experiment_slug=self.experiment_slug or "unknown",
+            index=index,
+            score=score,
+            label=label,
+            optimizer=optimizer,
+            predictors=predictors,
+            examples=self.examples_buffer,
+            llm_calls=self.llm_calls_buffer,
+            timestamps=Timestamps(created_at=int(time.time() * 1000)),
+        )
+        self.steps_buffer.append(step)
+        self.examples_buffer = []
+        self.llm_calls_buffer = []
+        self.send_steps()
 
     @retry(tries=3, delay=0.5)
     def send_steps(self):
         response = httpx.post(
             f"{langwatch.endpoint}/api/dspy/log_steps",
             headers={
-                "X-Auth-Token": self.api_key or "",
+                "X-Auth-Token": langwatch.api_key or "",
                 "Content-Type": "application/json",
             },
             data=json.dumps(self.steps_buffer, cls=SerializableAndPydanticEncoder),  # type: ignore
@@ -249,3 +240,57 @@ class LangWatchDSPy:
 
 
 langwatch_dspy = LangWatchDSPy()
+
+
+class LangWatchTrackedBootstrapFewShot(BootstrapFewShot):
+    last_step: int = 0
+    last_round_idx: int = 0
+
+    def patch(self):
+        self.metric = langwatch_dspy.track_metric(self.metric)
+
+    def _bootstrap_one_example(self, example, round_idx=0):
+        self.last_round_idx = round_idx
+        if round_idx != self.last_step and round_idx < self.max_rounds:
+            self._log_step(round_idx)
+        return super()._bootstrap_one_example(example, round_idx=round_idx)
+
+    def _train(self):
+        result = super()._train()
+        final_predictors = [
+            DSPyPredictor(name=name, predictor=predictor)
+            for name, predictor in self.student.named_predictors()
+        ]
+        self._log_step(round_idx=self.last_round_idx + 1, predictors=final_predictors)
+        return result
+
+    def _log_step(self, round_idx: int, predictors: List[DSPyPredictor] = []):
+        self.last_step = round_idx
+
+        bootstrapped_demos_count = sum(
+            [len(demos) for demos in self.name2traces.values()]
+        )
+
+        if len(predictors) == 0:
+            student_ = self.student.deepcopy()
+            for name, predictor in student_.named_predictors():
+                augmented_demos = self.name2traces[name][: self.max_bootstrapped_demos]
+                predictor.demos = augmented_demos
+                predictors.append(DSPyPredictor(name=name, predictor=predictor))
+
+        langwatch_dspy.log_step(
+            optimizer=DSPyOptimizer(
+                name=BootstrapFewShot.__name__,
+                parameters={
+                    "max_bootstrapped_demos": self.max_bootstrapped_demos,
+                    "max_labeled_demos": self.max_labeled_demos,
+                    "max_rounds": self.max_rounds,
+                    "max_errors": self.max_errors,
+                    "metric_threshold": self.metric_threshold,
+                },
+            ),
+            index=round_idx,
+            score=bootstrapped_demos_count,
+            label="bootstrapped demos",
+            predictors=predictors,
+        )

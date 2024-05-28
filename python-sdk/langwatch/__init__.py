@@ -11,8 +11,9 @@ import os
 
 from langwatch.tracer import span, create_span, capture_rag
 from langwatch.dspy import langwatch_dspy as dspy
+from langwatch.login import login
 
 endpoint = os.environ.get("LANGWATCH_ENDPOINT") or "https://app.langwatch.ai"
 api_key = os.environ.get("LANGWATCH_API_KEY")
 
-__all__ = ("endpoint", "api_key", "span", "create_span", "capture_rag", "dspy")
+__all__ = ("endpoint", "api_key", "span", "create_span", "capture_rag", "dspy", "login")

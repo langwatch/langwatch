@@ -49,7 +49,9 @@ export const experimentsRouter = createTRPCRouter({
           _source: [
             "run_id",
             "index",
-            "examples.score",
+            "score",
+            "label",
+            "optimizer.name",
             "llm_calls.completion_tokens",
             "llm_calls.prompt_tokens",
             "llm_calls.cost",
@@ -74,17 +76,15 @@ export const experimentsRouter = createTRPCRouter({
           return {
             runId: bucket.key,
             steps: steps.map((hit) => {
-              const examples = hit._source!.examples ?? [];
               const llmCalls = hit._source!.llm_calls ?? [];
 
               return {
                 run_id: hit._source!.run_id,
                 index: hit._source!.index,
-                examples_summary: {
-                  total: examples.length,
-                  average_score:
-                    examples.reduce((acc, curr) => acc + curr.score, 0) /
-                    Math.max(examples.length, 1),
+                score: hit._source!.score,
+                label: hit._source!.label,
+                optimizer: {
+                  name: hit._source!.optimizer.name,
                 },
                 llm_calls_summary: {
                   total: llmCalls.length,
