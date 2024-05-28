@@ -1,3 +1,4 @@
+from contextlib import contextmanager
 import time
 import dspy
 from typing import Callable, List, Optional, Any, Union
@@ -7,13 +8,18 @@ import httpx
 import json
 from pydantic import BaseModel
 from dspy.predict import Predict
-from dspy.teleprompt import Teleprompter, BootstrapFewShot
+from dspy.teleprompt import (
+    Teleprompter,
+    BootstrapFewShot,
+    BootstrapFewShotWithRandomSearch,
+)
 from dspy.signatures.signature import SignatureMeta
 from dspy.primitives.prediction import Prediction, Completions
 from dspy.primitives.example import Example
 from pydantic.fields import FieldInfo
 from coolname import generate_slug
 from retry import retry
+from dspy.evaluate.evaluate import Evaluate
 
 
 class SerializableAndPydanticEncoder(json.JSONEncoder):
@@ -139,17 +145,20 @@ class LangWatchDSPy:
         )
 
     def patch_optimizer(self, optimizer: Teleprompter):
-        classmap = {
+        METRIC_TRACKING_CLASSMAP = {
             BootstrapFewShot: LangWatchTrackedBootstrapFewShot,
+            BootstrapFewShotWithRandomSearch: LangWatchTrackedBootstrapFewShotWithRandomSearch,
         }
 
-        if optimizer.__class__ in classmap:
-            optimizer.__class__ = classmap[optimizer.__class__]
+        if optimizer.__class__ in METRIC_TRACKING_CLASSMAP:
+            optimizer.__class__ = METRIC_TRACKING_CLASSMAP[optimizer.__class__]
             optimizer.patch()  # type: ignore
         else:
-            supported = ", ".join([f"{c.__name__}" for c in classmap.keys()])
+            supported = ", ".join(
+                [f"{c.__name__}" for c in METRIC_TRACKING_CLASSMAP.keys()]
+            )
             raise ValueError(
-                f"Optimizer {optimizer.__class__.__name__} is not supported by LangWatch DSPy visualizer yet, only [{supported}] are supported"
+                f"Optimizer {optimizer.__class__.__name__} is not supported by LangWatch DSPy visualizer yet, only [{supported}] are supported, please open an issue: https://github.com/langwatch/langwatch/issues"
             )
 
     def reset(self):
@@ -294,3 +303,64 @@ class LangWatchTrackedBootstrapFewShot(BootstrapFewShot):
             label="bootstrapped demos",
             predictors=predictors,
         )
+
+
+class LangWatchTrackedBootstrapFewShotWithRandomSearch(
+    BootstrapFewShotWithRandomSearch
+):
+    def patch(self):
+        self.metric = langwatch_dspy.track_metric(self.metric)
+
+    def compile(self, student, **kwargs):
+        with self._patch_evaluate():
+            return super().compile(student, **kwargs)
+
+    @contextmanager
+    def _patch_evaluate(self):
+        original_evaluate_call = Evaluate.__call__
+        step = 1
+
+        this = self
+
+        def patched_evaluate_call(self, program: dspy.Module, *args, **kwargs):
+            nonlocal step
+
+            if "return_all_scores" not in kwargs or not kwargs["return_all_scores"]:
+                raise ValueError(
+                    "return_all_scores is not True for some reason, please report it at https://github.com/langwatch/langwatch/issues"
+                )
+            score, subscores = original_evaluate_call(self, program, *args, **kwargs)  # type: ignore
+
+            langwatch_dspy.log_step(
+                optimizer=DSPyOptimizer(
+                    name=BootstrapFewShotWithRandomSearch.__name__,
+                    parameters={
+                        "max_num_samples": this.max_num_samples,
+                        "max_labeled_demos": this.max_labeled_demos,
+                        "max_rounds": this.max_rounds,
+                        "num_candidate_sets": this.num_candidate_sets,
+                        "num_threads": this.num_threads,
+                        "max_errors": this.max_errors,
+                        "stop_at_score": this.stop_at_score,
+                        "metric_threshold": this.metric_threshold,
+                    },
+                ),
+                index=step,
+                score=score,
+                label="score",
+                predictors=[
+                    DSPyPredictor(name=name, predictor=predictor)
+                    for name, predictor in program.named_predictors()
+                ],
+            )
+
+            step += 1
+
+            return score, subscores
+
+        Evaluate.__call__ = patched_evaluate_call
+
+        try:
+            yield
+        finally:
+            Evaluate.__call__ = original_evaluate_call
