@@ -262,8 +262,8 @@ export function TriggerDrawer() {
                       <VStack align="start" marginTop={-1}>
                         <Text fontWeight="500">Send Slack Message</Text>
                         <Text fontSize={13}>
-                          Add your slack webhook and channel to send a message
-                          to when the trigger is activated.
+                          Add your slack webhook url to send a message to when
+                          the trigger is activated.
                         </Text>
                       </VStack>
                     </Radio>
