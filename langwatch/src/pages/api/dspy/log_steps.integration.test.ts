@@ -18,9 +18,11 @@ import type { Project } from "@prisma/client";
 const sampleDSPyStep: DSPyStepRESTParams = {
   experiment_slug: "sample-experiment",
   run_id: "run_1",
-  index: 0,
-  parameters_hash: "hash_1",
-  parameters: [{ key: "value" }],
+  index: "0",
+  score: 0.5,
+  label: "score",
+  optimizer: { name: "foo", parameters: { key: "value" } },
+  predictors: [{ name: "bar", predictor: { key: "value" } }],
   examples: [
     {
       example: { key: "example_value" },
@@ -77,9 +79,11 @@ const sampleDSPyStep: DSPyStepRESTParams = {
 const sampleDSPyStepSecondExampleAndLLMCall: DSPyStepRESTParams = {
   experiment_slug: "sample-experiment",
   run_id: "run_1",
-  index: 0,
-  parameters_hash: "hash_1",
-  parameters: [{ key: "value" }],
+  index: "0",
+  score: 0.5,
+  label: "score",
+  optimizer: { name: "foo", parameters: { key: "value" } },
+  predictors: [{ name: "bar", predictor: { key: "value" } }],
   examples: [
     {
       example: { key: "example_value2" },
@@ -151,7 +155,7 @@ describe("Log Steps API Endpoint", () => {
     });
   });
 
-  test("should create experiment and insert DSPyStep into Elasticsearch, appending the examples and llm_calls together, without duplication", async () => {
+  test("should create experiment and insert DSPyStep into Elasticsearch, appending the examples and llm_calls together, without duplication, and updating the score", async () => {
     const { req, res }: { req: NextApiRequest; res: NextApiResponse } =
       createMocks({
         method: "POST",
@@ -161,7 +165,7 @@ describe("Log Steps API Endpoint", () => {
         body: [
           sampleDSPyStep,
           sampleDSPyStepSecondExampleAndLLMCall,
-          sampleDSPyStep,
+          { ...sampleDSPyStep, score: 0.6 },
         ],
       });
 
@@ -181,12 +185,13 @@ describe("Log Steps API Endpoint", () => {
     const indexedStep = await esClient.get<DSPyStep>({
       index: DSPY_STEPS_INDEX,
       id: dspyStepIndexId({
-        runId: sampleDSPyStep.run_id,
-        parametersHash: sampleDSPyStep.parameters_hash,
         projectId: project.id,
+        runId: sampleDSPyStep.run_id,
+        index: sampleDSPyStep.index,
       }),
     });
     expect(indexedStep).not.toBeNull();
+    expect(indexedStep._source?.score).toEqual(0.6);
     expect(indexedStep._source?.examples).toHaveLength(2);
 
     expect(indexedStep._source?.llm_calls[0]?.model).toEqual(

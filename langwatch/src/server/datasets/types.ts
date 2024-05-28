@@ -1,5 +1,4 @@
 import { z } from "zod";
-import type { ChatMessage, DatasetSpan } from "../tracer/types";
 import {
   datasetSpanSchema,
   chatMessageSchema,
