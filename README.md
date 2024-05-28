@@ -1,6 +1,6 @@
 ![PyPI Version](https://img.shields.io/pypi/v/langwatch.svg)
 ![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)
-[![Discord](https://img.shields.io/discord/1227886780536324106?logo=discord&label=Discord)](https://discord.gg/DdZNf4uS)
+[![Discord](https://img.shields.io/discord/1227886780536324106?logo=discord&label=Discord)](https://discord.gg/kT4PhDS2gH)
 
 # LangWatch: LLM Monitoring & Analytics Platform
 
