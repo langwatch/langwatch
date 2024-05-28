@@ -178,11 +178,13 @@ const processDSPyStep = async (project: Project, param: DSPyStepRESTParams) => {
         }
       }
 
+      ctx._source.score = params.new_score;
       ctx._source.timestamps.updated_at = params.updated_at;
     `,
     params: {
       new_examples: validatedDspyStep.examples,
       new_llm_calls: validatedDspyStep.llm_calls,
+      new_score: validatedDspyStep.score,
       updated_at: new Date().getTime(),
     },
   };

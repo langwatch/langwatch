@@ -124,7 +124,7 @@ export const experimentsRouter = createTRPCRouter({
         projectId: z.string(),
         experimentSlug: z.string(),
         runId: z.string(),
-        index: z.number(),
+        index: z.string(),
       })
     )
     .use(checkUserPermissionForProject(TeamRoleGroup.EXPERIMENTS_MANAGE))

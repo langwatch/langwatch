@@ -1,4 +1,5 @@
 from contextlib import contextmanager
+import re
 import time
 import dspy
 from typing import Callable, List, Optional, Any, Union
@@ -12,6 +13,7 @@ from dspy.teleprompt import (
     Teleprompter,
     BootstrapFewShot,
     BootstrapFewShotWithRandomSearch,
+    COPRO,
 )
 from dspy.signatures.signature import SignatureMeta
 from dspy.primitives.prediction import Prediction, Completions
@@ -82,7 +84,7 @@ class DSPyOptimizer(BaseModel):
 class DSPyStep(BaseModel):
     run_id: str
     experiment_slug: str
-    index: int
+    index: str
     score: float
     label: str
     optimizer: DSPyOptimizer
@@ -147,6 +149,7 @@ class LangWatchDSPy:
         METRIC_TRACKING_CLASSMAP = {
             BootstrapFewShot: LangWatchTrackedBootstrapFewShot,
             BootstrapFewShotWithRandomSearch: LangWatchTrackedBootstrapFewShotWithRandomSearch,
+            COPRO: LangWatchTrackedCOPRO,
         }
 
         if optimizer.__class__ in METRIC_TRACKING_CLASSMAP:
@@ -362,4 +365,79 @@ class LangWatchTrackedBootstrapFewShotWithRandomSearch(
         try:
             yield
         finally:
+            Evaluate.__call__ = original_evaluate_call
+
+
+class LangWatchTrackedCOPRO(COPRO):
+    def patch(self):
+        self.metric = langwatch_dspy.track_metric(self.metric)
+
+    def compile(self, student, **kwargs):
+        with self._patch_logger_and_evaluate():
+            return super().compile(student, **kwargs)
+
+    @contextmanager
+    def _patch_logger_and_evaluate(self):
+        original_logger_info = dspy.logger.info
+        original_evaluate_call = Evaluate.__call__
+        step = None
+        scores = []
+
+        this = self
+
+        def patched_logger_info(text, *args, **kwargs):
+            nonlocal step, scores
+
+            match = re.search(
+                r"At Depth (\d+)/(\d+), Evaluating Prompt Candidate #(\d+)/(\d+) for Predictor (\d+) of (\d+)",
+                text,
+            )
+            if match:
+                depth, _, breadth, _, predictor, _ = match.groups()
+                if int(depth) != step:
+                    step = f"{depth}.{predictor}.{breadth}"
+                    scores = []
+            return original_logger_info(text, *args, **kwargs)
+
+        def patched_evaluate_call(self, program: dspy.Module, *args, **kwargs):
+            nonlocal step
+            if not step:
+                raise ValueError(
+                    "Step is not defined, please report it at https://github.com/langwatch/langwatch/issues"
+                )
+
+            step_ = step
+
+            score: float = original_evaluate_call(self, program, *args, **kwargs)  # type: ignore
+
+            scores.append(score)
+
+            if max(scores) == score:
+                langwatch_dspy.log_step(
+                    optimizer=DSPyOptimizer(
+                        name=COPRO.__name__,
+                        parameters={
+                            "breadth": this.breadth,
+                            "depth": this.depth,
+                            "init_temperature": this.init_temperature,
+                        },
+                    ),
+                    index=step_,
+                    score=score,
+                    label="score",
+                    predictors=[
+                        DSPyPredictor(name=name, predictor=predictor)
+                        for name, predictor in program.named_predictors()
+                    ],
+                )
+
+            return score
+
+        dspy.logger.info = patched_logger_info
+        Evaluate.__call__ = patched_evaluate_call
+
+        try:
+            yield
+        finally:
+            dspy.logger.info = original_logger_info
             Evaluate.__call__ = original_evaluate_call

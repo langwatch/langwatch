@@ -65,5 +65,5 @@ export const dspyStepIndexId = ({
 }: {
   projectId: string;
   runId: string;
-  index: number;
+  index: string;
 }) => `${projectId}/${runId}/${index}`;

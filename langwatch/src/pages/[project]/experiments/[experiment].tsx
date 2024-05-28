@@ -106,7 +106,7 @@ function DSPyExperiment({
       : null;
   const [selectedPoint, setSelectedPoint] = useState<{
     runId: string;
-    index: number;
+    index: string;
   } | null>(null);
 
   useEffect(() => {
@@ -262,8 +262,9 @@ function DSPyExperiment({
                   <Text>{run.runId}</Text>
                   <HStack color="gray.400">
                     <Text>
-                      {run.created_at ?
-                        formatTimeAgo(run.created_at, "yyyy-MM-dd HH:mm", 5) : "Waiting for steps..."}
+                      {run.created_at
+                        ? formatTimeAgo(run.created_at, "yyyy-MM-dd HH:mm", 5)
+                        : "Waiting for steps..."}
                     </Text>
                     {runCost && (
                       <>
@@ -362,7 +363,7 @@ const RunDetails = React.memo(
         projectId: project.id,
         experimentSlug: experiment.slug,
         runId: dspyStepSummary?.run_id ?? "",
-        index: dspyStepSummary?.index ?? 0,
+        index: dspyStepSummary?.index ?? "",
       },
       {
         enabled: !!dspyStepSummary,
@@ -371,6 +372,7 @@ const RunDetails = React.memo(
 
     const [tabIndex, setTabIndex] = useState(0);
     const [displayRawParams, setDisplayRawParams] = useState(false);
+    const hasTrace = dspyStep.data?.examples.some((example) => example.trace);
 
     return (
       <Card width="100%">
@@ -516,46 +518,49 @@ const RunDetails = React.memo(
                         </Tr>
                       ) : dspyStep.data ? (
                         dspyStep.data.predictors.map(
-                          ({ name, predictor }, index) => (
-                            <Tr key={index}>
-                              <Td background="gray.50" textAlign="center">
-                                {index + 1}
-                              </Td>
-                              <Td>{name}</Td>
-                              <Td>
-                                {predictor?.signature?.instructions ?? "-"}
-                              </Td>
-                              <Td>{predictor?.signature?.signature ?? "-"}</Td>
-                              <Td>
-                                {predictor?.signature?.fields ? (
-                                  <RenderInputOutput
-                                    value={JSON.stringify(
-                                      predictor.signature.fields
-                                    )}
-                                    collapseStringsAfterLength={140}
-                                    collapsed={true}
-                                  />
-                                ) : (
-                                  "-"
-                                )}
-                              </Td>
-                              <Td>
-                                {predictor?.demos ? (
-                                  <RenderInputOutput
-                                    value={JSON.stringify(
-                                      predictor.demos.map((demo: any) =>
-                                        demo._store ? demo._store : demo
-                                      )
-                                    )}
-                                    collapseStringsAfterLength={140}
-                                    groupArraysAfterLength={5}
-                                  />
-                                ) : (
-                                  "-"
-                                )}
-                              </Td>
-                            </Tr>
-                          )
+                          ({ name, predictor }, index) => {
+                            const signature =
+                              predictor?.extended_signature ??
+                              predictor?.signature;
+                            return (
+                              <Tr key={index}>
+                                <Td background="gray.50" textAlign="center">
+                                  {index + 1}
+                                </Td>
+                                <Td>{name}</Td>
+                                <Td>{signature?.instructions ?? "-"}</Td>
+                                <Td>{signature?.signature ?? "-"}</Td>
+                                <Td>
+                                  {signature?.fields ? (
+                                    <RenderInputOutput
+                                      value={JSON.stringify(
+                                        predictor.signature.fields
+                                      )}
+                                      collapseStringsAfterLength={140}
+                                      collapsed={true}
+                                    />
+                                  ) : (
+                                    "-"
+                                  )}
+                                </Td>
+                                <Td>
+                                  {predictor?.demos ? (
+                                    <RenderInputOutput
+                                      value={JSON.stringify(
+                                        predictor.demos.map((demo: any) =>
+                                          demo._store ? demo._store : demo
+                                        )
+                                      )}
+                                      collapseStringsAfterLength={140}
+                                      groupArraysAfterLength={5}
+                                    />
+                                  ) : (
+                                    "-"
+                                  )}
+                                </Td>
+                              </Tr>
+                            );
+                          }
                         )
                       ) : null}
                     </Tbody>
@@ -571,18 +576,20 @@ const RunDetails = React.memo(
                   <Thead>
                     <Tr>
                       <Th minWidth="15px" maxWidth="15px" paddingY={3}></Th>
-                      <Th width="35%" paddingY={3}>
+                      <Th width="30%" paddingY={3}>
                         Example
                       </Th>
-                      <Th width="35%" paddingY={3}>
+                      <Th width="50%" paddingY={3}>
                         Prediction
                       </Th>
-                      <Th width="10%" paddingY={3}>
+                      <Th width="20%" paddingY={3}>
                         Score
                       </Th>
-                      <Th width="20%" paddingY={3}>
-                        Trace
-                      </Th>
+                      {hasTrace && (
+                        <Th minWidth="200px" paddingY={3}>
+                          Trace
+                        </Th>
+                      )}
                     </Tr>
                   </Thead>
                   <Tbody>
@@ -599,20 +606,17 @@ const RunDetails = React.memo(
                           <Td>
                             <Skeleton width="100%" height="30px" />
                           </Td>
-                          <Td>
-                            <Skeleton width="100%" height="30px" />
-                          </Td>
                         </Tr>
                       ))
                     ) : dspyStep.error ? (
                       <Tr>
-                        <Td colSpan={5} color="red.600">
+                        <Td colSpan={4} color="red.600">
                           Error loading step data
                         </Td>
                       </Tr>
                     ) : dspyStep.data.examples.length === 0 ? (
                       <Tr>
-                        <Td colSpan={5}>No entries</Td>
+                        <Td colSpan={4}>No entries</Td>
                       </Tr>
                     ) : dspyStep.data ? (
                       dspyStep.data.examples.map((example, index) => (
@@ -633,13 +637,15 @@ const RunDetails = React.memo(
                             />
                           </Td>
                           <Td>{example.score}</Td>
-                          <Td>
-                            <RenderInputOutput
-                              value={JSON.stringify(example.trace)}
-                              collapseStringsAfterLength={140}
-                              collapsed={true}
-                            />
-                          </Td>
+                          {hasTrace && (
+                            <Td>
+                              <RenderInputOutput
+                                value={JSON.stringify(example.trace)}
+                                collapseStringsAfterLength={140}
+                                collapsed={true}
+                              />
+                            </Td>
+                          )}
                         </Tr>
                       ))
                     ) : null}
@@ -768,8 +774,8 @@ function DSPyRunsScoresChart({
   labelNames,
 }: {
   dspyRuns: DSPyRunsSummary[];
-  selectedPoint: { runId: string; index: number } | null;
-  setSelectedPoint: (value: { runId: string; index: number } | null) => void;
+  selectedPoint: { runId: string; index: string } | null;
+  setSelectedPoint: (value: { runId: string; index: string } | null) => void;
   highlightedRun: string | null;
   selectedRuns: string[] | null;
   stepToDisplay: DSPyStepSummary | undefined;
@@ -783,11 +789,11 @@ function DSPyRunsScoresChart({
           index: step.index,
           [run.runId]: step.score,
           [`${run.runId}_label`]: step.label,
-        } as { index: number } & Record<string, number>;
+        } as { index: string } & Record<string, number>;
       });
       return acc;
     },
-    {} as Record<number, { index: number } & Record<string, number>>
+    {} as Record<string, { index: string } & Record<string, number>>
   );
 
   const data = Object.values(stepsFlattenedByIndex);
@@ -803,7 +809,7 @@ function DSPyRunsScoresChart({
 
   const [hoveredRunIndex, setHoveredRunIndex] = useState<{
     runId: string;
-    index: number;
+    index: string;
   } | null>(null);
 
   return (
@@ -843,7 +849,7 @@ function DSPyRunsScoresChart({
               if (runId && index !== undefined) {
                 setHoveredRunIndex({
                   runId,
-                  index: parseInt(index),
+                  index,
                 });
               } else {
                 setHoveredRunIndex(null);

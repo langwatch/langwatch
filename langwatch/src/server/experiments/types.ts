@@ -39,7 +39,7 @@ export type DSPyStep = {
   project_id: string;
   run_id: string;
   experiment_id: string;
-  index: number;
+  index: string;
   score: number;
   label: string;
   optimizer: DSPyOptimizer;
@@ -67,7 +67,7 @@ export type DSPyStepRESTParams = Omit<
 
 export type DSPyStepSummary = {
   run_id: string;
-  index: number;
+  index: string;
   score: number;
   label: string;
   optimizer: {

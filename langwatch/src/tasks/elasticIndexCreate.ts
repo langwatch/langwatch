@@ -267,7 +267,7 @@ const dspyStepsMapping: ElasticSearchMappingFrom<DSPyStep> = {
   project_id: { type: "keyword" },
   experiment_id: { type: "keyword" },
   run_id: { type: "keyword" },
-  index: { type: "integer" },
+  index: { type: "keyword" },
   score: { type: "float" },
   label: { type: "keyword" },
   optimizer: {
