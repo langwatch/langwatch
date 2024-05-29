@@ -10,3 +10,4 @@ repl.ipynb
 chainlit.md
 .env
 .chainlit
+*.ignored.*
