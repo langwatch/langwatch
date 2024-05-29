@@ -304,9 +304,7 @@ function DSPyExperiment({
             Error loading experiment runs
           </Alert>
         ) : dspyRuns.data?.length === 0 ? (
-          <Text>
-            Waiting for the first completed step to arrive...
-          </Text>
+          <Text>Waiting for the first completed step to arrive...</Text>
         ) : (
           dspyRuns.data && (
             <>
@@ -523,7 +521,9 @@ const RunDetails = React.memo(
                                   {index + 1}
                                 </Td>
                                 <Td>{name}</Td>
-                                <Td whiteSpace="pre-wrap">{signature?.instructions ?? "-"}</Td>
+                                <Td whiteSpace="pre-wrap">
+                                  {signature?.instructions ?? "-"}
+                                </Td>
                                 <Td>
                                   <CollapsableSignature signature={signature} />
                                 </Td>
@@ -749,7 +749,11 @@ const RunDetails = React.memo(
   }
 );
 
-function CollapsableSignature({ signature }: { signature: DSPySignature }) {
+function CollapsableSignature({
+  signature,
+}: {
+  signature: Record<string, any> | undefined;
+}) {
   const [isOpen, setIsOpen] = useState(false);
   return (
     <VStack>
