@@ -25,8 +25,6 @@ from langwatch.types import (
     TypedValueText,
 )
 
-from langchain_core.load.serializable import Serializable
-
 T = TypeVar("T")
 
 
@@ -109,8 +107,13 @@ def autoconvert_typed_values(value: Any) -> SpanInputOutput:
 
 class SerializableAndPydanticEncoder(json.JSONEncoder):
     def default(self, o):
-        if isinstance(o, Serializable):
-            return o.__repr__()
+        try:
+            from langchain_core.load.serializable import Serializable  # type: ignore
+
+            if isinstance(o, Serializable):
+                return o.__repr__()
+        except ImportError:
+            pass
         if isinstance(o, BaseModel):
             return o.model_dump()
         return super().default(o)
