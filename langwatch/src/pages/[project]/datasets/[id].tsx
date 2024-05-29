@@ -1,4 +1,4 @@
-import { DownloadIcon } from "@chakra-ui/icons";
+import { DownloadIcon, SpinnerIcon, CheckIcon, WarningTwoIcon } from "@chakra-ui/icons";
 import {
   Button,
   Card,
@@ -7,8 +7,9 @@ import {
   HStack,
   Heading,
   Spacer,
+  Spinner,
   Text,
-  useToast,
+  useToast
 } from "@chakra-ui/react";
 import { type Dataset } from "@prisma/client";
 import { useRouter } from "next/router";
@@ -19,7 +20,7 @@ import { DashboardLayout } from "~/components/DashboardLayout";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { schemaDisplayName } from "~/utils/datasets";
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, useRef, useState, } from "react";
 import { DatasetGrid } from "../../../components/datasets/DatasetGrid";
 import { type ColDef } from "ag-grid-community";
 
@@ -35,7 +36,9 @@ function DatasetTable() {
   const router = useRouter();
   const { project } = useOrganizationTeamProject();
   const dataSetId = router.query.id;
+
   const { openDrawer } = useDrawer();
+  const [savingStatus, setSavingStatus] = useState<'saving' | 'saved' | ''>('');
 
   const dataset = api.datasetRecord.getAll.useQuery(
     { projectId: project?.id ?? "", datasetId: dataSetId as string },
@@ -96,8 +99,11 @@ function DatasetTable() {
 
   const toast = useToast();
 
+  const timeoutRef = useRef<NodeJS.Timeout>(null);
+
   const onCellValueChanged = useCallback(
     (params: any) => {
+      setSavingStatus("saving");
       const updatedRecord = params.data;
       updateDatasetRecord.mutate(
         {
@@ -107,6 +113,16 @@ function DatasetTable() {
           updatedRecord,
         },
         {
+          onSuccess: () => {
+            setSavingStatus("saved");
+            if (timeoutRef.current) {
+              clearInterval(timeoutRef.current);
+            }
+            //@ts-ignore
+            timeoutRef.current = setTimeout(() => {
+              setSavingStatus("");
+            }, 3000);
+          },
           onError: () => {
             toast({
               title: "Error updating record.",
@@ -116,6 +132,7 @@ function DatasetTable() {
               isClosable: true,
             });
             void dataset.refetch();
+            setSavingStatus("");
           },
         }
       );
@@ -167,6 +184,9 @@ function DatasetTable() {
           >
             {dataset.data ? schemaDisplayName(dataset.data?.schema) : ""}
           </Text>
+          <HStack padding={2}>
+            <Text fontSize={"12px"} color="gray.400">{ savingStatus === 'saving' ? "Saving..." : "Saved" }</Text>
+          </HStack>
           <Spacer />
           <Button
             colorScheme="black"

@@ -66,7 +66,11 @@ export const projectRoutes = {
     path: "/[project]/datasets",
     title: "Datasets",
   },
-
+  dataset_edit: {
+    path: "/[project]/datasets/[id]",
+    title: "Editing Dataset",
+    parent: "datasets",
+  },
 };
 
 export type Route = {
