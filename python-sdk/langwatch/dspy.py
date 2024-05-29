@@ -117,7 +117,7 @@ class LangWatchDSPy:
             cls._instance = super().__new__(cls)
         return cls._instance
 
-    def init(self, experiment: str, optimizer: Teleprompter):
+    def init(self, experiment: str, optimizer: Optional[Teleprompter]):
         if langwatch.api_key is None:
             print("API key was not detected, calling langwatch.login()...")
             langwatch.login()
@@ -139,7 +139,12 @@ class LangWatchDSPy:
         self.reset()
 
         self.patch_llms()
-        self.patch_optimizer(optimizer)
+        if optimizer is not None:
+            self.patch_optimizer(optimizer)
+        else:
+            print(
+                "No optimizer provided, assuming custom optimizer tracking, make sure to call `track_metric` and `log_step` manually: https://docs.langwatch.ai/dspy-visualization/custom-optimizer"
+            )
 
         result = response.json()
         self.experiment_path = result["path"]
