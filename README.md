@@ -99,7 +99,7 @@ Detailed documentation is available to help you get the most out of LangWatch:
 
 ## Self-Hosting
 
-LangWatch is open-source, self-hosting docs are still comming soon, however if you are interested already, [please reach out to us](mailto:rogerio@langwatch.ai).
+LangWatch is open-source, self-hosting docs are still coming soon, however if you are interested already, [please reach out to us](mailto:rogerio@langwatch.ai).
 
 ## Contributing
 
