@@ -51,6 +51,7 @@ resource "aws_ecs_task_definition" "langwatch" {
   execution_role_arn       = aws_iam_role.ecs_task_execution_role.arn
   cpu                      = 1024
   memory                   = 2048
+  task_role_arn            = aws_iam_role.ecs_task_execution_role.arn
 
   container_definitions = jsonencode([
     {
@@ -338,11 +339,11 @@ resource "aws_security_group" "langwatch" {
   vpc_id = aws_vpc.main.id
 
   ingress {
-    description     = "HTTP from ALB and bastion ec2"
+    description     = "HTTP from ALB, bastion ec2 and VPC TLS"
     from_port       = 3000
     to_port         = 3000
     protocol        = "tcp"
-    security_groups = [aws_security_group.alb_sg[0].id, aws_security_group.bation-ec2.id]
+    security_groups = [aws_security_group.alb_sg[0].id, aws_security_group.bation-ec2.id, aws_security_group.vpc_tls.id]
   }
 
   egress {
@@ -426,6 +427,21 @@ resource "aws_iam_role" "ecs_task_execution_role" {
         }
         Effect = "Allow"
       },
+    ]
+  })
+}
+
+resource "aws_iam_role_policy" "ecs_task_policy" {
+  role = aws_iam_role.ecs_task_execution_role.name
+
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Action   = "execute-api:Invoke",
+        Resource = "${aws_api_gateway_rest_api.this.arn}/*",
+        Effect   = "Allow"
+      }
     ]
   })
 }
