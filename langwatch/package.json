@@ -93,6 +93,7 @@
     "react-hook-form": "^7.47.0",
     "react-international-phone": "^4.2.8",
     "react-markdown": "^9.0.0",
+    "react-papaparse": "^4.4.0",
     "recharts": "^2.9.3",
     "sass": "^1.66.1",
     "slugify": "^1.6.6",
