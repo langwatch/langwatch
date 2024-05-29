@@ -27,6 +27,14 @@ import { findOrCreateExperiment } from "./init";
 
 export const debug = getDebugger("langwatch:dspy:log_steps");
 
+export const config = {
+  api: {
+    bodyParser: {
+      sizeLimit: "20mb",
+    },
+  },
+};
+
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
