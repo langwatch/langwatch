@@ -1,13 +1,16 @@
 import httpx
 import langwatch
+from getpass import getpass
 
 
 def login(relogin=False):
     if not relogin and langwatch.api_key:
-        print("LangWatch API key is already set, if you want to login again, please call as langwatch.login(relogin=True)")
+        print(
+            "LangWatch API key is already set, if you want to login again, please call as langwatch.login(relogin=True)"
+        )
         return
     print(f"Please go to {langwatch.endpoint}/authorize to get your API key")
-    api_key = input(f"Paste your API key here: ")
+    api_key = getpass(f"Paste your API key here: ")
     if not api_key:
         raise ValueError("API key was not set")
 

@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "langwatch"
-version = "0.0.27"
+version = "0.0.28"
 description = "Python SDK for LangWatch for monitoring your LLMs"
 authors = ["Rogerio Chaves <rogerio@langwatch.ai>"]
 homepage = "https://github.com/langwatch/langwatch"
