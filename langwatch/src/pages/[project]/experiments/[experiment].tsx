@@ -4,6 +4,7 @@ import {
   Alert,
   AlertIcon,
   Box,
+  Button,
   Card,
   CardBody,
   CardHeader,
@@ -53,6 +54,7 @@ import { formatMoney } from "../../../utils/formatMoney";
 import { formatTimeAgo } from "../../../utils/formatTimeAgo";
 import { getColorForString } from "../../../utils/rotatingColors";
 import React from "react";
+import { ChevronDown, ChevronUp } from "react-feather";
 
 export default function ExperimentPage() {
   const router = useRouter();
@@ -303,8 +305,7 @@ function DSPyExperiment({
           </Alert>
         ) : dspyRuns.data?.length === 0 ? (
           <Text>
-            No DSPy runs were captured yet, start the optimizer and come back
-            here to follow the progress.
+            Waiting for the first completed step to arrive...
           </Text>
         ) : (
           dspyRuns.data && (
@@ -316,7 +317,7 @@ function DSPyExperiment({
                       ? optimizerNames[0]!
                       : optimizerNames.length > 1
                       ? "Multiple Optimizers"
-                      : "Waiting for steps..."}
+                      : "Waiting for the first completed step to arrive..."}
                   </Heading>
                 </CardHeader>
                 <CardBody>
@@ -467,20 +468,17 @@ const RunDetails = React.memo(
                     <Thead>
                       <Tr>
                         <Th minWidth="15px" maxWidth="15px" paddingY={3}></Th>
-                        <Th width="15%" paddingY={3}>
+                        <Th width="10%" paddingY={3}>
                           Name
                         </Th>
-                        <Th width="20%" paddingY={3}>
+                        <Th width="25%" paddingY={3}>
                           Instructions
                         </Th>
-                        <Th width="15%" paddingY={3}>
+                        <Th width="25%" paddingY={3}>
                           Signature
                         </Th>
-                        <Th width="20%" paddingY={3}>
-                          Fields
-                        </Th>
-                        <Th width="30%" paddingY={3}>
-                          Demos
+                        <Th width="40%" paddingY={3}>
+                          Demonstrations
                         </Th>
                       </Tr>
                     </Thead>
@@ -489,9 +487,6 @@ const RunDetails = React.memo(
                         Array.from({ length: 3 }).map((_, index) => (
                           <Tr key={index}>
                             <Td background="gray.50">&nbsp;</Td>
-                            <Td>
-                              <Skeleton width="100%" height="30px" />
-                            </Td>
                             <Td>
                               <Skeleton width="100%" height="30px" />
                             </Td>
@@ -528,20 +523,9 @@ const RunDetails = React.memo(
                                   {index + 1}
                                 </Td>
                                 <Td>{name}</Td>
-                                <Td>{signature?.instructions ?? "-"}</Td>
-                                <Td>{signature?.signature ?? "-"}</Td>
+                                <Td whiteSpace="pre-wrap">{signature?.instructions ?? "-"}</Td>
                                 <Td>
-                                  {signature?.fields ? (
-                                    <RenderInputOutput
-                                      value={JSON.stringify(
-                                        predictor.signature.fields
-                                      )}
-                                      collapseStringsAfterLength={140}
-                                      collapsed={true}
-                                    />
-                                  ) : (
-                                    "-"
-                                  )}
+                                  <CollapsableSignature signature={signature} />
                                 </Td>
                                 <Td>
                                   {predictor?.demos ? (
@@ -553,6 +537,7 @@ const RunDetails = React.memo(
                                       )}
                                       collapseStringsAfterLength={140}
                                       groupArraysAfterLength={5}
+                                      collapsed={true}
                                     />
                                   ) : (
                                     "-"
@@ -763,6 +748,35 @@ const RunDetails = React.memo(
     );
   }
 );
+
+function CollapsableSignature({ signature }: { signature: DSPySignature }) {
+  const [isOpen, setIsOpen] = useState(false);
+  return (
+    <VStack>
+      <HStack>
+        <Button
+          size="sm"
+          fontSize="14px"
+          fontWeight="normal"
+          variant="ghost"
+          onClick={() => setIsOpen(!isOpen)}
+          rightIcon={
+            isOpen ? <ChevronUp width="12px" /> : <ChevronDown width="12px" />
+          }
+        >
+          {signature?.signature ?? "-"}
+        </Button>
+      </HStack>
+      {isOpen && signature?.fields ? (
+        <RenderInputOutput
+          value={JSON.stringify(signature.fields)}
+          collapseStringsAfterLength={140}
+          collapsed={false}
+        />
+      ) : null}
+    </VStack>
+  );
+}
 
 function DSPyRunsScoresChart({
   dspyRuns,

@@ -1,4 +1,5 @@
 from contextlib import contextmanager
+import random
 import re
 import time
 import dspy
@@ -14,6 +15,7 @@ from dspy.teleprompt import (
     BootstrapFewShot,
     BootstrapFewShotWithRandomSearch,
     COPRO,
+    MIPRO,
 )
 from dspy.signatures.signature import SignatureMeta
 from dspy.primitives.prediction import Prediction, Completions
@@ -132,6 +134,7 @@ class LangWatchDSPy:
         response.raise_for_status()
 
         self.experiment_slug = experiment
+        random.seed()  # MIPRO meses up the global seed, so we need to reset it to random to get a new run_id
         self.run_id = generate_slug(3)
         self.reset()
 
@@ -150,6 +153,7 @@ class LangWatchDSPy:
             BootstrapFewShot: LangWatchTrackedBootstrapFewShot,
             BootstrapFewShotWithRandomSearch: LangWatchTrackedBootstrapFewShotWithRandomSearch,
             COPRO: LangWatchTrackedCOPRO,
+            MIPRO: LangWatchTrackedMIPRO,
         }
 
         if optimizer.__class__ in METRIC_TRACKING_CLASSMAP:
@@ -394,8 +398,9 @@ class LangWatchTrackedCOPRO(COPRO):
             )
             if match:
                 depth, _, breadth, _, predictor, _ = match.groups()
-                if int(depth) != step:
-                    step = f"{depth}.{predictor}.{breadth}"
+                new_step = f"{depth}.{predictor}.{breadth}"
+                if new_step != step:
+                    step = new_step
                     scores = []
             return original_logger_info(text, *args, **kwargs)
 
@@ -440,4 +445,67 @@ class LangWatchTrackedCOPRO(COPRO):
             yield
         finally:
             dspy.logger.info = original_logger_info
+            Evaluate.__call__ = original_evaluate_call
+
+
+class LangWatchTrackedMIPRO(MIPRO):
+    def patch(self):
+        self.metric = langwatch_dspy.track_metric(self.metric)
+
+    def compile(self, student, **kwargs):
+        with self._patch_print_and_evaluate():
+            return super().compile(student, **kwargs)
+
+    @contextmanager
+    def _patch_print_and_evaluate(self):
+        original_evaluate_call = Evaluate.__call__
+        step = 0
+        substep = 0
+        scores = []
+
+        this = self
+
+        last_candidate_program: Optional[int] = None
+
+        def patched_evaluate_call(self, program: dspy.Module, *args, **kwargs):
+            nonlocal step, scores, substep, last_candidate_program
+
+            if last_candidate_program != id(program):
+                step += 1
+                substep = 0
+                scores = []
+                last_candidate_program = id(program)
+
+            step_ = str(step) if substep == 0 else f"{step}.{substep}"
+            substep += 1
+
+            score: float = original_evaluate_call(self, program, *args, **kwargs)  # type: ignore
+
+            scores.append(score)
+
+            if max(scores) == score:
+                langwatch_dspy.log_step(
+                    optimizer=DSPyOptimizer(
+                        name=MIPRO.__name__,
+                        parameters={
+                            "num_candidates": this.num_candidates,
+                            "init_temperature": this.init_temperature,
+                        },
+                    ),
+                    index=step_,
+                    score=score,
+                    label="score",
+                    predictors=[
+                        DSPyPredictor(name=name, predictor=predictor)
+                        for name, predictor in program.named_predictors()
+                    ],
+                )
+
+            return score
+
+        Evaluate.__call__ = patched_evaluate_call
+
+        try:
+            yield
+        finally:
             Evaluate.__call__ = original_evaluate_call
