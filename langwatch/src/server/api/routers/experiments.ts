@@ -59,7 +59,7 @@ export const experimentsRouter = createTRPCRouter({
           ],
           aggs: {
             runs: {
-              terms: { field: "run_id" },
+              terms: { field: "run_id", size: 1_000 },
             },
           },
         },

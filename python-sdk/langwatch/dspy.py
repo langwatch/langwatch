@@ -143,9 +143,9 @@ class LangWatchDSPy:
 
         result = response.json()
         self.experiment_path = result["path"]
-        print(f"Experiment initialized, run_id: {self.run_id}")
+        print(f"\n[LangWatch] Experiment initialized, run_id: {self.run_id}")
         print(
-            f"Open {langwatch.endpoint}{self.experiment_path}?runIds={self.run_id} to track your DSPy training session live\n"
+            f"[LangWatch] Open {langwatch.endpoint}{self.experiment_path}?runIds={self.run_id} to track your DSPy training session live\n"
         )
 
     def patch_optimizer(self, optimizer: Teleprompter):
