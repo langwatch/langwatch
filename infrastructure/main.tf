@@ -12,9 +12,9 @@ provider "awscc" {
   profile = module.variables.profile
 }
 
-resource "aws_api_gateway_rest_api" "this" {
-  name        = "langevals-api"
-  description = "LangEvals API"
+resource "aws_api_gateway_rest_api" "langevals" {
+  name        = "langevals-api-public"
+  description = "LangEvals API - public"
 }
 
 resource "aws_guardduty_detector" "this" {

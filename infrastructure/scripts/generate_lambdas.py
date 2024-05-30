@@ -33,14 +33,14 @@ def main():
             evaluator_name = definitions.evaluator_name
             lambdas_tf += f"""
             resource "aws_api_gateway_resource" "{evaluator_name}" {{
-                rest_api_id = aws_api_gateway_rest_api.this.id
+                rest_api_id = aws_api_gateway_rest_api.langevals.id
                 parent_id   = aws_api_gateway_resource.{package_name}.id
                 path_part   = "{evaluator_name}"
             }}
 
             module "{package_name}-{evaluator_name}-api-gw" {{
                 source                 = "./api-gw-resource"
-                apigw_id               = aws_api_gateway_rest_api.this.id
+                apigw_id               = aws_api_gateway_rest_api.langevals.id
                 apigw_root_resource_id = aws_api_gateway_resource.{evaluator_name}.id
                 path                   = "evaluate"
                 method                 = "POST"
@@ -55,12 +55,12 @@ def main():
                 source              = "./lambda"
                 evaluator_package   = "{package_name}"
                 sns_alarms_topic_arn = aws_sns_topic.alarms.arn
-                apigw_execution_arn = aws_api_gateway_rest_api.this.execution_arn
+                apigw_execution_arn = aws_api_gateway_rest_api.langevals.execution_arn
             }}
 
             resource "aws_api_gateway_resource" "{package_name}" {{
-                rest_api_id = aws_api_gateway_rest_api.this.id
-                parent_id   = aws_api_gateway_rest_api.this.root_resource_id
+                rest_api_id = aws_api_gateway_rest_api.langevals.id
+                parent_id   = aws_api_gateway_rest_api.langevals.root_resource_id
                 path_part   = "{package_name}"
             }}
             """
@@ -77,7 +77,7 @@ def main():
                     {", ".join(depends_on)}
                 ]
 
-                rest_api_id = aws_api_gateway_rest_api.this.id
+                rest_api_id = aws_api_gateway_rest_api.langevals.id
                 stage_name  = "v1"
             }}
             """
