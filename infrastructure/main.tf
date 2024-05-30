@@ -15,11 +15,6 @@ provider "awscc" {
 resource "aws_api_gateway_rest_api" "this" {
   name        = "langevals-api"
   description = "LangEvals API"
-
-  endpoint_configuration {
-    types            = ["PRIVATE"]
-    vpc_endpoint_ids = [module.endpoints[0].endpoints["execute_api"].id]
-  }
 }
 
 resource "aws_guardduty_detector" "this" {
