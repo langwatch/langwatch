@@ -18,7 +18,6 @@ export const datasetRecordRouter = createTRPCRouter({
     )
     .use(checkUserPermissionForProject(TeamRoleGroup.DATASETS_MANAGE))
     .mutation(async ({ ctx, input }) => {
-      console.log(input);
       const dataset = await ctx.prisma.dataset.findFirst({
         where: {
           id: input.datasetId,
