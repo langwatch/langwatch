@@ -69,13 +69,13 @@ function DatasetTable() {
   const { openDrawer } = useDrawer();
   const { isOpen, onOpen, onClose } = useDisclosure();
   const { CSVReader } = useCSVReader();
-
   const [recordEntries, setRecordEntries] = useState<RecordEntry[]>([]);
   const [CSVHeaders, setCSVHeaders] = useState([]);
   const [hasErrors, setErrors] = useState<string[]>([]);
   const [csvUploaded, setCSVUploaded] = useState([]);
   const [mapping, setMapping] = useState<Record<string, string>>({});
   const [canUpload, setCanUpload] = useState(false);
+
   const dataset = api.datasetRecord.getAll.useQuery(
     { projectId: project?.id ?? "", datasetId: dataSetId as string },
     {
@@ -556,7 +556,7 @@ const CustomSelect = ({
 
   return (
     <Select
-      placeholder="Select option"
+      placeholder="Select column"
       onChange={handleSelectChange}
       value={selectedValue}
     >
@@ -565,7 +565,7 @@ const CustomSelect = ({
           {column}
         </option>
       ))}
-      <option value={`${mapping}-empty`}>Set Empty</option>
+      <option value={`${mapping}-empty`}>Set empty</option>
     </Select>
   );
 };
