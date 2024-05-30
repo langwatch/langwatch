@@ -1,4 +1,4 @@
-import { DownloadIcon, SpinnerIcon, CheckIcon, WarningTwoIcon } from "@chakra-ui/icons";
+import { DownloadIcon } from "@chakra-ui/icons";
 import {
   Button,
   Card,
@@ -7,7 +7,6 @@ import {
   HStack,
   Heading,
   Spacer,
-  Spinner,
   Text,
   useToast
 } from "@chakra-ui/react";
@@ -185,7 +184,7 @@ function DatasetTable() {
             {dataset.data ? schemaDisplayName(dataset.data?.schema) : ""}
           </Text>
           <HStack padding={2}>
-            <Text fontSize={"12px"} color="gray.400">{ savingStatus === 'saving' ? "Saving..." : "Saved" }</Text>
+            <Text fontSize={"12px"} color="gray.400">{ savingStatus === 'saving' ? "Saving..." : savingStatus === "saved" ? "Saved" : "" }</Text>
           </HStack>
           <Spacer />
           <Button
