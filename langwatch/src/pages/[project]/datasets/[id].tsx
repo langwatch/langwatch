@@ -1,57 +1,48 @@
 import { DownloadIcon } from "@chakra-ui/icons";
 import {
+  Box,
   Button,
   Card,
   CardBody,
   Container,
   HStack,
   Heading,
-  Spacer,
-  Text,
-  useToast,
   Modal,
-  ModalOverlay,
-  ModalContent,
-  ModalHeader,
-  ModalFooter,
   ModalBody,
   ModalCloseButton,
-  useDisclosure,
+  ModalContent,
+  ModalFooter,
+  ModalHeader,
+  ModalOverlay,
   Select,
-  Grid,
-  GridItem,
-  Box,
+  Spacer,
+  Text,
   VStack,
+  useDisclosure,
+  useToast,
 } from "@chakra-ui/react";
-import { type Dataset } from "@prisma/client";
+import { type ColDef } from "ag-grid-community";
 import { useRouter } from "next/router";
 import Parse from "papaparse";
-import { Play, Upload, ArrowRight } from "react-feather";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type ChangeEvent,
+} from "react";
+import { ArrowRight, Play, Upload } from "react-feather";
 import { useDrawer } from "~/components/CurrentDrawer";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { schemaDisplayName } from "~/utils/datasets";
-import {
-  useCallback,
-  useMemo,
-  useState,
-  type ChangeEvent,
-  useEffect,
-} from "react";
 import { DatasetGrid } from "../../../components/datasets/DatasetGrid";
-import { type ColDef } from "ag-grid-community";
-import {
-  chatMessageSchema,
-  type datasetSpanSchema,
-} from "~/server/tracer/types.generated";
+import { newDatasetEntriesSchema } from "~/server/datasets/types";
+import { datasetSpanSchema } from "~/server/tracer/types.generated";
 
-import {
-  useCSVReader,
-  lightenDarkenColor,
-  formatFileSize,
-} from "react-papaparse";
 import { nanoid } from "nanoid";
+import { formatFileSize, useCSVReader } from "react-papaparse";
 
 export default function Dataset() {
   return (
@@ -79,11 +70,11 @@ function DatasetTable() {
   const { isOpen, onOpen, onClose } = useDisclosure();
   const { CSVReader } = useCSVReader();
 
-  const [recordEntries, setRecordEntries] = useState([]);
+  const [recordEntries, setRecordEntries] = useState<RecordEntry[]>([]);
   const [CSVHeaders, setCSVHeaders] = useState([]);
-
+  const [hasErrors, setErrors] = useState<string[]>([]);
   const [csvUploaded, setCSVUploaded] = useState([]);
-  const [mapping, setMapping] = useState<string[]>([]);
+  const [mapping, setMapping] = useState<Record<string, string>>({});
   const [canUpload, setCanUpload] = useState(false);
   const dataset = api.datasetRecord.getAll.useQuery(
     { projectId: project?.id ?? "", datasetId: dataSetId as string },
@@ -178,23 +169,71 @@ function DatasetTable() {
     setCSVUploaded(csv);
   };
 
-  const setupRecordsUpload = (mappings: string[]) => {
+  function safeGetRowValue(row: any[], headers: string[], key: string): string {
+    const index = headers.indexOf(key);
+    return index !== -1 ? row[index] : "";
+  }
+
+  const parseJSONField = (
+    row: any[],
+    headers: string[],
+    key: string,
+    field: string
+  ): any => {
+    const rawValue = safeGetRowValue(row, headers, key);
+
+    try {
+      if (rawValue) {
+        const parsedValue = JSON.parse(rawValue);
+        setErrors((prevErrors) =>
+          prevErrors.filter((error) => error !== field)
+        );
+        return parsedValue;
+      } else {
+        return undefined;
+      }
+    } catch (error) {
+      setErrors((prevErrors) => {
+        if (prevErrors.includes(field)) return prevErrors;
+        return [...prevErrors, field];
+      });
+      return undefined;
+    }
+  };
+
+  const setupRecordsUpload = (mappings: Record<string, string>) => {
     const records: RecordEntry[] = [];
 
     csvUploaded.slice(1).forEach((row: any) => {
       const entries: RecordEntry = {
         id: nanoid(),
-        input: row[mappings.indexOf("input")],
-        expected_output: row[mappings.indexOf("expected_output")],
-        contexts: row[mappings.indexOf("contexts")],
-        spans: row[mappings.indexOf("spans")],
-        llm_input: row[mappings.indexOf("llm_input")]
-          ? JSON.parse(row[mappings.indexOf("llm_input")])
-          : undefined,
-        expected_llm_output: row[mappings.indexOf("expected_llm_output")]
-          ? JSON.parse(row[mappings.indexOf("expected_llm_output")])
-          : undefined,
+        input: safeGetRowValue(row, CSVHeaders, mappings.input ?? ""),
+        expected_output: safeGetRowValue(
+          row,
+          CSVHeaders,
+          mappings.expected_output ?? ""
+        ),
+        contexts: parseJSONField(
+          row,
+          CSVHeaders,
+          mappings.contexts ?? "",
+          "contexts"
+        ),
+        spans: parseJSONField(row, CSVHeaders, mappings.spans ?? "", "spans"),
+        llm_input: parseJSONField(
+          row,
+          CSVHeaders,
+          mappings.llm_input ?? "",
+          "llm_input"
+        ),
+        expected_llm_output: parseJSONField(
+          row,
+          CSVHeaders,
+          mappings.expected_llm_output ?? "",
+          "expected_llm_output"
+        ),
       };
+
       records.push(entries);
     });
 
@@ -204,49 +243,58 @@ function DatasetTable() {
 
   const isMappingsComplete = useCallback(() => {
     const columns = dataset.data?.columns.split(",") ?? [];
-    return columns.every((column) => mapping.includes(column));
+    return columns.every((column) => Object.keys(mapping).includes(column));
   }, [dataset.data?.columns, mapping]);
 
   useEffect(() => {
     setCanUpload(isMappingsComplete());
-  }, [isMappingsComplete]);
+  }, [isMappingsComplete, mapping]);
 
   const onSelectChange = (value: string) => {
-    const [field, index] = value.split("-");
-    const numericIndex = parseInt(index, 10);
-    const newMapping: string[] = [...mapping]; // Explicitly define as string array and use spread to copy existing mappings
-    newMapping[numericIndex] = field ?? ""; // Provide a default empty string if field is undefined
-    console.log(newMapping);
-    setMapping(newMapping);
-    setupRecordsUpload(newMapping);
+    const [map, column] = value.split("-");
 
-    return newMapping;
+    if (!map || !column) return;
+    mapping[map] = column;
+
+    setMapping((prevMapping) => ({
+      ...prevMapping,
+      [map]: column,
+    }));
+    setupRecordsUpload(mapping);
   };
 
   const uploadCSVData = () => {
-    console.log(recordEntries);
+    let entries;
+    try {
+      entries = newDatasetEntriesSchema.parse({
+        entries: recordEntries,
+        schema: dataset.data?.schema as
+          | "ONE_MESSAGE_PER_ROW"
+          | "ONE_LLM_CALL_PER_ROW",
+      });
+    } catch (error) {
+      toast({
+        title: "Error processing CSV",
+        description: "The CSV file does not match the expected format.",
+        status: "error",
+        duration: 5000,
+        isClosable: true,
+      });
 
-    let test = {
-      projectId: project?.id ?? "",
-      datasetId: dataSetId as string,
-      entries: recordEntries,
-      schema: dataset.data?.schema ?? "ONE_MESSAGE_PER_ROW",
-    };
-
-    console.log(test);
+      return;
+    }
 
     uploadRecords.mutate(
       {
         projectId: project?.id ?? "",
         datasetId: dataSetId as string,
-        entries: recordEntries,
-        schema: dataset.data?.schema ?? "ONE_MESSAGE_PER_ROW",
+        ...entries,
       },
       {
         onSuccess: () => {
           void dataset.refetch();
           setRecordEntries([]);
-          setMapping([]);
+          setMapping({});
           onClose();
           toast({
             title: "CSV uploaded successfully",
@@ -297,28 +345,30 @@ function DatasetTable() {
 
   const [zoneHover, setZoneHover] = useState(false);
 
-  const selectOptions = useMemo(() => {
+  const selectMappings = useMemo(() => {
     const columns = dataset.data?.columns.split(",") ?? [];
     return columns.map((col) => ({
-      label: col,
       value: col,
     }));
   }, [dataset.data]);
 
-  const renderMapping = () => {
-    return (CSVHeaders ?? []).map((header, index) => {
+  const renderMapping = (acceptedFile: boolean) => {
+    if (!acceptedFile) return;
+
+    return selectMappings.map((option, index) => {
       return (
         <HStack key={index} marginY={2}>
-          <Text>{header}</Text>
-          <Spacer />
-          <ArrowRight />
           <Box width={200}>
             <CustomSelect
-              selectOptions={selectOptions}
-              index={index}
+              selectOptions={CSVHeaders}
+              mapping={option.value}
               onSelectChange={onSelectChange}
             />
           </Box>
+
+          <ArrowRight />
+          <Spacer />
+          <Text>{option.value}</Text>
         </HStack>
       );
     });
@@ -326,9 +376,10 @@ function DatasetTable() {
 
   const openCSVUploader = () => {
     setRecordEntries([]);
-    setMapping([]);
+    setMapping({});
     setCSVHeaders([]);
     setCSVUploaded([]);
+    setErrors([]);
     onOpen();
   };
 
@@ -353,7 +404,7 @@ function DatasetTable() {
           <Spacer />
           <Button
             onClick={() => openCSVUploader()}
-            rightIcon={<Upload height={20} />}
+            rightIcon={<Upload height={17} width={17} strokeWidth={2.5} />}
           >
             Upload CSV
           </Button>
@@ -395,10 +446,7 @@ function DatasetTable() {
             <ModalBody>
               <CSVReader
                 onUploadAccepted={(results: any) => {
-                  console.log("---------------------------");
-                  console.log(results);
                   preprocessCSV(results.data);
-                  console.log("---------------------------");
                   setZoneHover(false);
                 }}
                 onDragOver={(event: DragEvent) => {
@@ -447,14 +495,7 @@ function DatasetTable() {
                               top={-1}
                               {...getRemoveFileProps()}
                             >
-                              <Remove
-                                onClick={() => {
-                                  setRecordEntries([]);
-                                  setCSVUploaded([]);
-                                  setCSVHeaders([]);
-                                  setMapping([]);
-                                }}
-                              />
+                              <Remove />
                             </Box>
                           </Box>
                         </>
@@ -462,11 +503,15 @@ function DatasetTable() {
                         "Drop CSV file here or click to upload"
                       )}
                     </Box>
+                    {renderMapping(acceptedFile)}
                   </>
                 )}
               </CSVReader>
-
-              {renderMapping()}
+              {hasErrors.length > 0 && (
+                <Text color="red">
+                  Please check columns have valid formatting
+                </Text>
+              )}
             </ModalBody>
 
             <ModalFooter>
@@ -475,7 +520,11 @@ function DatasetTable() {
               </Button>
               <Button
                 colorScheme="blue"
-                isDisabled={recordEntries.length === 0 || !canUpload}
+                isDisabled={
+                  recordEntries.length === 0 ||
+                  !canUpload ||
+                  hasErrors.length > 0
+                }
                 onClick={uploadCSVData}
                 isLoading={uploadRecords.isLoading}
               >
@@ -490,14 +539,14 @@ function DatasetTable() {
 }
 
 interface CustomSelectProps {
-  selectOptions: { label: string; value: string }[];
-  index: number;
+  selectOptions: string[];
+  mapping: string;
   onSelectChange: (value: string) => void;
 }
 const CustomSelect = ({
   selectOptions,
-  index,
   onSelectChange,
+  mapping,
 }: CustomSelectProps) => {
   const [selectedValue, setSelectedValue] = useState("");
   const handleSelectChange = (event: ChangeEvent<HTMLSelectElement>) => {
@@ -511,11 +560,12 @@ const CustomSelect = ({
       onChange={handleSelectChange}
       value={selectedValue}
     >
-      {selectOptions.map((option, i) => (
-        <option key={i} value={`${option.value}-${index}`}>
-          {option.label}
+      {selectOptions.map((column, i) => (
+        <option key={i} value={`${mapping}-${column}`}>
+          {column}
         </option>
       ))}
+      <option value={`${mapping}-empty`}>Set Empty</option>
     </Select>
   );
 };
