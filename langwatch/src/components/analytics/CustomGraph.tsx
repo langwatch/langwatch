@@ -195,6 +195,8 @@ export const CustomGraph = React.memo(
         ? (series?.name ?? aggKey) + (groupName ? ` (${groupName})` : "")
         : groupName
         ? uppercaseFirstLetter(groupName)
+            .replace("Evaluation passed passed", "Evaluation Passed")
+            .replace("Evaluation passed failed", "Evaluation Failed")
         : series?.name ?? aggKey;
     };
 
