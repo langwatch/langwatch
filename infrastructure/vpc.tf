@@ -169,12 +169,6 @@ module "endpoints" {
       subnet_ids          = [aws_subnet.private_subnet_1.id, aws_subnet.private_subnet_2.id]
       security_group_ids  = [aws_security_group.vpc_tls.id]
     },
-    execute_api = {
-      service             = "execute-api"
-      private_dns_enabled = true
-      subnet_ids          = [aws_subnet.private_subnet_1.id, aws_subnet.private_subnet_2.id]
-      security_group_ids  = [aws_security_group.vpc_tls.id]
-    },
   }
 
   tags = {
