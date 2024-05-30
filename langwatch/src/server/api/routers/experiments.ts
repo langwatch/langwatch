@@ -24,6 +24,19 @@ export const experimentsRouter = createTRPCRouter({
       return experiment;
     }),
 
+  getAllByProjectId: protectedProcedure
+    .input(z.object({ projectId: z.string() }))
+    .use(checkUserPermissionForProject(TeamRoleGroup.EXPERIMENTS_MANAGE))
+    .query(async ({ input }) => {
+      const experiments = await prisma.experiment.findMany({
+        where: {
+          projectId: input.projectId,
+        },
+      });
+
+      return experiments;
+    }),
+
   getExperimentDSPyRuns: protectedProcedure
     .input(z.object({ projectId: z.string(), experimentSlug: z.string() }))
     .use(checkUserPermissionForProject(TeamRoleGroup.EXPERIMENTS_MANAGE))

@@ -1,5 +1,5 @@
 import { useRouter } from "next/router";
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { useLocalStorage } from "usehooks-ts";
 import { api } from "../utils/api";
 import { useRequiredSession } from "./useRequiredSession";
@@ -48,10 +48,18 @@ export const useOrganizationTeamProject = (
   const [localStorageProjectSlug, setLocalStorageProjectSlug] =
     useLocalStorage<string>("selectedProjectSlug", "");
 
+  const reservedProjectSlugs = useMemo(
+    () => ["analytics", "datasets", "evaluations", "experiments", "messages"],
+    []
+  );
+
+  const projectQueryParam =
+    typeof router.query.project == "string" ? router.query.project : undefined;
+
   // TODO: test all this
   const projectSlug =
-    typeof router.query.project == "string"
-      ? router.query.project
+    projectQueryParam && !reservedProjectSlugs.includes(projectQueryParam)
+      ? projectQueryParam
       : localStorageProjectSlug;
 
   const teamSlug =
@@ -124,6 +132,15 @@ export const useOrganizationTeamProject = (
   }, [organization, project, team]);
 
   useEffect(() => {
+    if (
+      projectQueryParam &&
+      reservedProjectSlugs.includes(projectQueryParam) &&
+      project
+    ) {
+      void router.push(`/${project.slug}/${projectQueryParam}`);
+      return;
+    }
+
     if (!redirectToOnboarding) return;
     if (!organizations.data) return;
 
@@ -166,8 +183,10 @@ export const useOrganizationTeamProject = (
     organization,
     organizations.data,
     project,
+    projectQueryParam,
     redirectToOnboarding,
     redirectToProjectOnboarding,
+    reservedProjectSlugs,
     router,
     team,
   ]);

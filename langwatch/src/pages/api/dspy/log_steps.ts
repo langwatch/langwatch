@@ -23,7 +23,7 @@ import {
   dSPyStepRESTParamsSchema,
   dSPyStepSchema,
 } from "../../../server/experiments/types.generated";
-import { findOrCreateExperiment } from "./init";
+import { findOrCreateExperiment } from "../experiment/init";
 
 export const debug = getDebugger("langwatch:dspy:log_steps");
 

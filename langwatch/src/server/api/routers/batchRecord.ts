@@ -2,6 +2,7 @@ import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 import { TeamRoleGroup, checkUserPermissionForProject } from "../permission";
+import { TRPCError } from "@trpc/server";
 
 export const batchRecordRouter = createTRPCRouter({
   getAllByexperimentIdGroup: protectedProcedure
@@ -11,7 +12,7 @@ export const batchRecordRouter = createTRPCRouter({
       const { projectId } = input;
       const prisma = ctx.prisma;
 
-      const batchRecords = await prisma.batchProcessing.groupBy({
+      const batchRecords = await prisma.batchEvaluation.groupBy({
         by: ["experimentId", "datasetSlug"],
         where: { projectId },
         _count: {
@@ -27,17 +28,33 @@ export const batchRecordRouter = createTRPCRouter({
 
       return batchRecords;
     }),
-  getAllByexperimentId: protectedProcedure
-    .input(z.object({ projectId: z.string(), experimentId: z.string() }))
+  getAllByexperimentSlug: protectedProcedure
+    .input(z.object({ projectId: z.string(), experimentSlug: z.string() }))
     .use(checkUserPermissionForProject(TeamRoleGroup.EXPERIMENTS_MANAGE))
     .query(async ({ input, ctx }) => {
-      const { projectId, experimentId } = input;
+      const { projectId, experimentSlug } = input;
       const prisma = ctx.prisma;
 
-      const batchRecords = await prisma.batchProcessing.findMany({
+      const experiment = await prisma.experiment.findUnique({
+        where: {
+          projectId_slug: {
+            projectId,
+            slug: experimentSlug,
+          },
+        },
+      });
+
+      if (!experiment) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Experiment not found",
+        });
+      }
+
+      const batchRecords = await prisma.batchEvaluation.findMany({
         where: {
           projectId: projectId,
-          experimentId: experimentId,
+          experimentId: experiment.id,
         },
         include: {
           dataset: true,

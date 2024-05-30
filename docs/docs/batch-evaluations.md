@@ -21,7 +21,7 @@ In the below screenshot you will see where you can select the dataset you want t
 
 ![langwatch dashboard](@site/static/img/screenshot-batch-evaluation-drawer.png)
 
-In the screenshot below, you'll find a Python code snippet ready for execution to perform your batch processing. The parameters passed into the `BatchEvaluation` include your chosen dataset and an array of selected evaluations to run against it.
+In the screenshot below, you'll find a Python code snippet ready for execution to perform your batch evaluation. The parameters passed into the `BatchEvaluation` include your chosen dataset and an array of selected evaluations to run against it.
 
 ![langwatch dashboard](@site/static/img/screenshot-batch-evaluation-python.png)
 

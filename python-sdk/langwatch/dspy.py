@@ -124,13 +124,15 @@ class LangWatchDSPy:
             return
 
         response = httpx.post(
-            f"{langwatch.endpoint}/api/dspy/init",
+            f"{langwatch.endpoint}/api/experiment/init",
             headers={"X-Auth-Token": langwatch.api_key or ""},
-            json={"experiment_slug": experiment},
+            json={"experiment_slug": experiment, "experiment_type": "DSPY"},
         )
         if response.status_code == 401:
             langwatch.api_key = None
-            raise ValueError("API key is not valid, please try to login again")
+            raise ValueError(
+                "API key is not valid, please try to login again with langwatch.login()"
+            )
         response.raise_for_status()
 
         self.experiment_slug = experiment

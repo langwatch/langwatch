@@ -35,6 +35,15 @@ export const projectRoutes = {
     title: "Editing Evaluation",
     parent: "evaluations",
   },
+  experiments: {
+    path: "/[project]/experiments",
+    title: "Experiments",
+  },
+  experiments_show: {
+    path: "/[project]/experiments/[experiment]",
+    title: "Experiment Details",
+    parent: "experiments",
+  },
   prompts: {
     path: "/[project]/prompts",
     title: "Prompts DB",

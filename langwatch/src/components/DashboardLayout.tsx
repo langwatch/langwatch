@@ -42,6 +42,7 @@ import {
   Database,
   Lock,
   Image as ImageIcon,
+  Play,
 } from "react-feather";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import { useRequiredSession } from "../hooks/useRequiredSession";
@@ -111,6 +112,10 @@ const SideMenuLink = ({
     (path.includes("/evaluations") &&
       router.pathname.includes("/evaluations")) ||
     (path.includes("/datasets") && router.pathname.includes("/datasets")) ||
+    (path.includes("/experiments") &&
+      router.pathname.includes("/experiments")) ||
+    (path.includes("/playground") && router.pathname.includes("/playground")) ||
+    (path === "/[project]" && router.pathname.includes("/analytics")) ||
     (path.includes("/settings") && router.pathname.includes("/settings"));
 
   const viewModeQuery = path.includes("/messages")
@@ -389,6 +394,12 @@ export const DashboardLayout = ({
               label={projectRoutes.datasets.title}
               project={project}
             />
+            <SideMenuLink
+              path={projectRoutes.experiments.path}
+              icon={Play}
+              label={projectRoutes.experiments.title}
+              project={project}
+            />
 
             {/*<SideMenuLink
               path={projectRoutes.prompts.path}
@@ -551,18 +562,19 @@ export const DashboardLayout = ({
             </Portal>
           </Menu>
         </HStack>
-        {process.env.NEXT_PUBLIC_DEMO_SLUG && process.env.NEXT_PUBLIC_DEMO_SLUG === router.query.project && (
-          <HStack width={"full"} backgroundColor={"orange.400"} padding={1}>
-            <Spacer />
-            <Text fontSize={"sm"}>
-              Viewing Demo Project - Go back to yours{" "}
-              <Link href={"/"} textDecoration={"underline"}>
-                here
-              </Link>
-            </Text>
-            <Spacer />
-          </HStack>
-        )}
+        {process.env.NEXT_PUBLIC_DEMO_SLUG &&
+          process.env.NEXT_PUBLIC_DEMO_SLUG === router.query.project && (
+            <HStack width={"full"} backgroundColor={"orange.400"} padding={1}>
+              <Spacer />
+              <Text fontSize={"sm"}>
+                Viewing Demo Project - Go back to yours{" "}
+                <Link href={"/"} textDecoration={"underline"}>
+                  here
+                </Link>
+              </Text>
+              <Spacer />
+            </HStack>
+          )}
         <CurrentDrawer />
         {children}
       </VStack>

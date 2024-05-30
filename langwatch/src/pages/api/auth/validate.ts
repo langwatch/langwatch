@@ -28,5 +28,5 @@ export default async function handler(
     return res.status(401).json({ message: "Invalid auth token." });
   }
 
-  return res.status(200).json({ success: true });
+  return res.status(200).json({ projectSlug: project.slug });
 }
