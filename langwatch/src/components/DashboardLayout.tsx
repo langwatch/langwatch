@@ -1,5 +1,7 @@
 import { Link } from "@chakra-ui/next-js";
 import {
+  Alert,
+  AlertIcon,
   Avatar,
   Box,
   Button,
@@ -16,48 +18,45 @@ import {
   Portal,
   Spacer,
   Text,
+  Tooltip,
   VStack,
   useTheme,
   type BackgroundProps,
-  Tooltip,
-  Alert,
-  AlertIcon,
 } from "@chakra-ui/react";
 import { type Organization, type Project, type Team } from "@prisma/client";
 import { signOut } from "next-auth/react";
 import ErrorPage from "next/error";
 import Head from "next/head";
 import { useRouter } from "next/router";
-import { useState, type PropsWithChildren } from "react";
+import numeral from "numeral";
+import React, { useState, type PropsWithChildren } from "react";
 import {
   ChevronDown,
   ChevronRight,
+  Image as ImageIcon,
+  Lock,
   MessageSquare,
+  Play,
   Plus,
   Search,
   Settings,
   Shield,
+  Table,
   TrendingUp,
-  type Icon,
-  Database,
-  Lock,
-  Image as ImageIcon,
-  Play,
+  type Icon
 } from "react-feather";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import { useRequiredSession } from "../hooks/useRequiredSession";
 import { dependencies } from "../injection/dependencies.client";
 import { OrganizationRoleGroup } from "../server/api/permission";
 import type { FullyLoadedOrganization } from "../server/api/routers/organization";
+import { api } from "../utils/api";
 import { findCurrentRoute, projectRoutes, type Route } from "../utils/routes";
+import { CurrentDrawer } from "./CurrentDrawer";
 import { LoadingScreen } from "./LoadingScreen";
 import { ProjectTechStackIcon } from "./TechStack";
 import { LogoIcon } from "./icons/LogoIcon";
-import React from "react";
 import { useTableView } from "./messages/HeaderButtons";
-import { CurrentDrawer } from "./CurrentDrawer";
-import { api } from "../utils/api";
-import numeral from "numeral";
 
 const Breadcrumbs = ({ currentRoute }: { currentRoute: Route | undefined }) => {
   const { project } = useOrganizationTeamProject();
@@ -125,14 +124,16 @@ const SideMenuLink = ({
     : "";
 
   return (
-    <Link
-      href={path.replace("[project]", project.slug) + viewModeQuery}
-      aria-label={label}
-    >
-      <VStack>
-        <IconElem size={24} color={isActive ? orange400 : undefined} />
-      </VStack>
-    </Link>
+    <Tooltip label={label === "Home" ? "Analytics" : label} hasArrow placement="right" gutter={16}>
+      <Link
+        href={path.replace("[project]", project.slug) + viewModeQuery}
+        aria-label={label}
+      >
+        <VStack>
+          <IconElem size={24} color={isActive ? orange400 : undefined} />
+        </VStack>
+      </Link>
+    </Tooltip>
   );
 };
 
@@ -390,7 +391,7 @@ export const DashboardLayout = ({
             />
             <SideMenuLink
               path={projectRoutes.datasets.path}
-              icon={Database}
+              icon={Table}
               label={projectRoutes.datasets.title}
               project={project}
             />

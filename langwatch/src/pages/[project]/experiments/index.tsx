@@ -65,7 +65,7 @@ export default function Experiments() {
                 <Table variant="simple">
                   <Thead>
                     <Tr>
-                      <Th>Experiment ID</Th>
+                      <Th>Experiment</Th>
                       <Th>Type</Th>
                       <Th>Created At</Th>
                     </Tr>

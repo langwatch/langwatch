@@ -5,7 +5,7 @@ export const projectRoutes = {
   },
   messages: {
     path: "/[project]/messages",
-    title: "Messages Explorer",
+    title: "Messages",
   },
   analytics: {
     path: "/[project]/analytics",
