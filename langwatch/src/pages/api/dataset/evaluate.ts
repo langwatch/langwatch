@@ -4,7 +4,7 @@ import { prisma } from "../../../server/db";
 
 import { getDebugger } from "../../../utils/logger";
 
-import { CostReferenceType, CostType, ExperimentType } from "@prisma/client";
+import { CostReferenceType, CostType } from "@prisma/client";
 import * as Sentry from "@sentry/nextjs";
 import { nanoid } from "nanoid";
 import { z } from "zod";

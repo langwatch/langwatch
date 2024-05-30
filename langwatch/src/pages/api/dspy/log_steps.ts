@@ -4,7 +4,7 @@ import { prisma } from "../../../server/db";
 
 import { getDebugger } from "../../../utils/logger";
 
-import { type Project } from "@prisma/client";
+import { ExperimentType, type Project } from "@prisma/client";
 import * as Sentry from "@sentry/nextjs";
 import crypto from "crypto";
 import { estimateCost } from "llm-cost";
@@ -120,7 +120,11 @@ export default async function handler(
 const processDSPyStep = async (project: Project, param: DSPyStepRESTParams) => {
   const { run_id, index, experiment_slug } = param;
 
-  const experiment = await findOrCreateExperiment(project, experiment_slug);
+  const experiment = await findOrCreateExperiment(
+    project,
+    experiment_slug,
+    ExperimentType.DSPY
+  );
 
   const id = dspyStepIndexId({
     projectId: project.id,
