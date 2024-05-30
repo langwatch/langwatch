@@ -4,14 +4,16 @@ import { prisma } from "../../../server/db";
 
 import { getDebugger } from "../../../utils/logger";
 
-import { ExperimentType, type Project } from "@prisma/client";
+import { type ExperimentType, type Project } from "@prisma/client";
 import * as Sentry from "@sentry/nextjs";
 import { z } from "zod";
+import { nanoid } from "nanoid";
 
 export const debug = getDebugger("langwatch:dspy:init");
 
 const dspyInitParamsSchema = z.object({
   experiment_slug: z.string(),
+  experiment_type: z.enum(["DSPY", "BATCH_EVALUATION"]),
 });
 
 export default async function handler(
@@ -57,7 +59,8 @@ export default async function handler(
 
   const experiment = await findOrCreateExperiment(
     project,
-    params.experiment_slug
+    params.experiment_slug,
+    params.experiment_type
   );
 
   return res.status(200).json({ path: `/${project.slug}/experiments/${experiment.slug}` });
@@ -65,7 +68,8 @@ export default async function handler(
 
 export const findOrCreateExperiment = async (
   project: Project,
-  experiment_slug: string
+  experiment_slug: string,
+  experiment_type: ExperimentType
 ) => {
   let experiment = await prisma.experiment.findUnique({
     where: { projectId_slug: { projectId: project.id, slug: experiment_slug } },
@@ -73,9 +77,10 @@ export const findOrCreateExperiment = async (
   if (!experiment) {
     experiment = await prisma.experiment.create({
       data: {
+        id: `experiment_${nanoid()}`,
         slug: experiment_slug,
         projectId: project.id,
-        type: ExperimentType.DSPY,
+        type: experiment_type,
       },
     });
   }

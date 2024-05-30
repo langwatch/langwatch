@@ -12,7 +12,7 @@ export type DSPyExample = {
   example: AnyJSONDumpedClass;
   pred: AnyJSONDumpedClass;
   score: number;
-  trace: DSPyTrace[];
+  trace?: DSPyTrace[] | null;
 };
 
 export type DSPyLLMCall = {
@@ -25,13 +25,25 @@ export type DSPyLLMCall = {
   cost?: number | null;
 };
 
+export type DSPyOptimizer = {
+  name: string;
+  parameters: Record<string, any>;
+};
+
+export type DSPyPredictor = {
+  name: string;
+  predictor: AnyJSONDumpedClass;
+};
+
 export type DSPyStep = {
   project_id: string;
   run_id: string;
-  parameters_hash: string;
   experiment_id: string;
-  index: number;
-  parameters: AnyJSONDumpedClass[];
+  index: string;
+  score: number;
+  label: string;
+  optimizer: DSPyOptimizer;
+  predictors: DSPyPredictor[];
   examples: DSPyExample[];
   llm_calls: DSPyLLMCall[];
   timestamps: {
@@ -55,10 +67,11 @@ export type DSPyStepRESTParams = Omit<
 
 export type DSPyStepSummary = {
   run_id: string;
-  index: number;
-  examples_summary: {
-    total: number;
-    average_score: number;
+  index: string;
+  score: number;
+  label: string;
+  optimizer: {
+    name: string;
   };
   llm_calls_summary: {
     total: number;

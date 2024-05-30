@@ -248,7 +248,23 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
           aggs: {
             child: {
               terms: {
-                field: "trace.metadata.labels",
+                ...(query
+                  ? {
+                      script: {
+                        source: `
+                          for (label in doc['trace.metadata.labels']) {
+                            if (label.toLowerCase().startsWith(params.query.toLowerCase())) {
+                              return label;
+                            }
+                          }
+                          return null;
+                        `,
+                        params: {
+                          query: query,
+                        },
+                      },
+                    }
+                  : { field: "trace.metadata.labels" }),
                 size: 100,
                 order: { _key: "asc" },
               },
@@ -294,7 +310,7 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
       }
     },
     listMatch: {
-      aggregation: (query) => ({
+      aggregation: (_query) => ({
         unique_values: {
           terms: {
             field: "trace.has_error",

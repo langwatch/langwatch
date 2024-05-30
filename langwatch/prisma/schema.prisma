@@ -161,7 +161,7 @@ model Project {
     datasets          Dataset[]
     datasetRecords    DatasetRecord[]
     customGraphs      CustomGraph[]
-    batchProcessings  BatchProcessing[]
+    batchEvaluations  BatchEvaluation[]
     piiRedactionLevel PIIRedactionLevel @default(ESSENTIAL)
     triggers          Trigger[]
     experiments       Experiment[]
@@ -213,7 +213,7 @@ enum CostType {
     TRACE_CHECK
     GUARDRAIL
     CLUSTERING
-    BATCH_PROCESSING
+    BATCH_EVALUATION
 }
 
 enum CostReferenceType {
@@ -273,18 +273,18 @@ enum DatabaseSchema {
 }
 
 model Dataset {
-    id              String            @id @default(nanoid())
-    projectId       String
-    project         Project           @relation(fields: [projectId], references: [id])
-    name            String
-    slug            String
-    schema          DatabaseSchema
-    columns         String            @default("input,expected_output")
-    createdAt       DateTime          @default(now())
-    updatedAt       DateTime          @default(now()) @updatedAt
-    archivedAt      DateTime?
-    datasetRecords  DatasetRecord[]
-    BatchProcessing BatchProcessing[]
+    id               String            @id @default(nanoid())
+    projectId        String
+    project          Project           @relation(fields: [projectId], references: [id])
+    name             String
+    slug             String
+    schema           DatabaseSchema
+    columns          String            @default("input,expected_output")
+    createdAt        DateTime          @default(now())
+    updatedAt        DateTime          @default(now()) @updatedAt
+    archivedAt       DateTime?
+    datasetRecords   DatasetRecord[]
+    batchEvaluations BatchEvaluation[]
 
     @@unique([projectId, slug])
 }
@@ -316,7 +316,7 @@ model CustomGraph {
     @@index([projectId])
 }
 
-model BatchProcessing {
+model BatchEvaluation {
     id           String     @id @default(nanoid())
     experimentId String
     experiment   Experiment @relation(fields: [experimentId], references: [id])
@@ -365,7 +365,7 @@ model Trigger {
 
 enum ExperimentType {
     DSPY
-    BATCH_PROCESSING
+    BATCH_EVALUATION
 }
 
 model Experiment {
@@ -376,7 +376,7 @@ model Experiment {
     project          Project           @relation(fields: [projectId], references: [id])
     createdAt        DateTime          @default(now())
     updatedAt        DateTime          @default(now()) @updatedAt
-    batchProcessings BatchProcessing[]
+    batchEvaluations BatchEvaluation[]
 
     @@unique([projectId, slug])
     @@index([projectId])

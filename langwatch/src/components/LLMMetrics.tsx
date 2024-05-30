@@ -1,13 +1,10 @@
 import {
-  Box,
   Card,
   CardBody,
   CardHeader,
   Grid,
   GridItem,
-  HStack,
   Heading,
-  Skeleton,
   Tab,
   TabIndicator,
   TabList,
@@ -16,20 +13,13 @@ import {
   Tabs,
   VStack,
 } from "@chakra-ui/react";
-import numeral from "numeral";
-import { CheckCircle, XCircle } from "react-feather";
-import { CustomGraph, type CustomGraphInput } from "./analytics/CustomGraph";
-import { LLMSummary } from "./analytics/LLMSummary";
-import { useFilterParams } from "../hooks/useFilterParams";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import { analyticsMetrics } from "../server/analytics/registry";
 import { TeamRoleGroup } from "../server/api/permission";
-import { api } from "../utils/api";
+import { CustomGraph, type CustomGraphInput } from "./analytics/CustomGraph";
+import { LLMSummary } from "./analytics/LLMSummary";
 
 export function LLMMetrics() {
-  const { filterParams, queryOpts } = useFilterParams();
-  const traceCheckStatusCounts =
-    api.analytics.getTraceCheckStatusCounts.useQuery(filterParams, queryOpts);
   const { hasTeamPermission } = useOrganizationTeamProject();
 
   const llmCallsGraph: CustomGraphInput = {
@@ -101,6 +91,23 @@ export function LLMMetrics() {
     groupBy: undefined,
     includePrevious: false,
     timeScale: 1,
+  };
+
+  const evaluationsSummary: CustomGraphInput = {
+    graphId: "evaluationsSummary",
+    graphType: "summary",
+    series: [
+      {
+        name: "Evaluation execution count",
+        metric: "evaluations.evaluation_runs",
+        aggregation: "cardinality",
+        key: "",
+        colorSet: "colors",
+      },
+    ],
+    groupBy: "evaluations.evaluation_passed",
+    includePrevious: false,
+    timeScale: "full",
   };
 
   return (
@@ -179,38 +186,15 @@ export function LLMMetrics() {
         <GridItem>
           <Card height="full">
             <CardHeader>
-              <Heading size="sm">Validation Summary</Heading>
+              <Heading size="sm">Evaluations Summary</Heading>
             </CardHeader>
             <CardBody>
-              <VStack align="start" spacing={4}>
-                <HStack>
-                  <Box color="red.600">
-                    <XCircle />
-                  </Box>
-                  <Box>
-                    {traceCheckStatusCounts.data ? (
-                      numeral(traceCheckStatusCounts.data.failed).format("0a") +
-                      " failed checks"
-                    ) : (
-                      <Skeleton height="1em" width="140px" />
-                    )}
-                  </Box>
-                </HStack>
-                <HStack>
-                  <Box color="green.600">
-                    <CheckCircle />
-                  </Box>
-                  <Box>
-                    {traceCheckStatusCounts.data ? (
-                      numeral(traceCheckStatusCounts.data.succeeded).format(
-                        "0a"
-                      ) + " successful checks"
-                    ) : (
-                      <Skeleton height="1em" width="170px" />
-                    )}
-                  </Box>
-                </HStack>
-              </VStack>
+              <CustomGraph
+                input={{
+                  ...evaluationsSummary,
+                  graphType: "summary",
+                }}
+              />
             </CardBody>
           </Card>
         </GridItem>

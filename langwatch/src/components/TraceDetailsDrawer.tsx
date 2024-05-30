@@ -206,7 +206,6 @@ export const TraceDetailsDrawer = (props: TraceDetailsDrawerProps) => {
               Trace Details
             </Text>
             <Spacer />
-            {process.env.NEXT_PUBLIC_FEATURE_DATASETS && (
               <Button
                 colorScheme="black"
                 type="submit"
@@ -216,7 +215,6 @@ export const TraceDetailsDrawer = (props: TraceDetailsDrawerProps) => {
               >
                 Add to Dataset
               </Button>
-            )}
           </Flex>
         </DrawerHeader>
         <DrawerBody>

@@ -93,7 +93,27 @@ class BatchEvaluation:
 
     def run(self):
         print("Starting batch evaluation...")
-        experimentSlug = generate_slug(3)
+        if langwatch.api_key is None:
+            print("API key was not detected, calling langwatch.login()...")
+            langwatch.login()
+
+        experiment_slug = generate_slug(3)
+        response = httpx.post(
+            f"{langwatch.endpoint}/api/experiment/init",
+            headers={"X-Auth-Token": langwatch.api_key or ""},
+            json={
+                "experiment_slug": experiment_slug,
+                "experiment_type": "BATCH_EVALUATION",
+            },
+        )
+        if response.status_code == 401:
+            langwatch.api_key = None
+            raise ValueError(
+                "API key is not valid, please try to login again with langwatch.login()"
+            )
+        response.raise_for_status()
+        experiment_path = response.json()["path"]
+
         dataset = get_dataset(self.dataset)
 
         if dataset is None:
@@ -106,11 +126,15 @@ class BatchEvaluation:
 
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
             futures: List[Future] = [
-                executor.submit(self.run_record, record, experimentSlug)
+                executor.submit(self.run_record, record, experiment_slug)
                 for record in dataset
             ]
             for future in tqdm(as_completed(futures), total=len(futures)):
                 results.append(future.result())
+
+        print(
+            f"Batch evaluation done! You can see the results at: {langwatch.endpoint}{experiment_path}"
+        )
 
         return BatchEvaluationRun(
             list=results,
@@ -138,7 +162,7 @@ class BatchEvaluation:
 
         return pd.DataFrame(results_df)
 
-    def run_record(self, record: DatasetRecord, experimentSlug: str):
+    def run_record(self, record: DatasetRecord, experiment_slug: str):
         entry = record.entry
 
         callbackResponse = self.callback(entry)
@@ -156,7 +180,7 @@ class BatchEvaluation:
         for evaluation in self.evaluations:
             coroutines.append(
                 run_evaluation(
-                    entry_with_output, evaluation, experimentSlug, self.dataset
+                    entry_with_output, evaluation, experiment_slug, self.dataset
                 )
             )
 
@@ -173,19 +197,22 @@ class BatchEvaluation:
 
 
 async def run_evaluation(
-    data: DatasetEntryWithOutput, evaluation: str, experimentSlug: str, datasetSlug: str
+    data: DatasetEntryWithOutput,
+    evaluation: str,
+    experiment_slug: str,
+    dataset_slug: str,
 ) -> Tuple[str, SingleEvaluationResult]:
     try:
         json_data = {
             "data": data.model_dump(),
             "evaluation": evaluation,
-            "experimentSlug": experimentSlug,
-            "datasetSlug": datasetSlug,
+            "experimentSlug": experiment_slug,
+            "datasetSlug": dataset_slug,
         }
 
         request_params = {
             "url": langwatch.endpoint + f"/api/dataset/evaluate",
-            "headers": {"X-Auth-Token": str(langwatch.api_key)},
+            "headers": {"X-Auth-Token": langwatch.api_key},
             "json": json_data,
         }
 

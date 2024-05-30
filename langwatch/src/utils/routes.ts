@@ -5,7 +5,7 @@ export const projectRoutes = {
   },
   messages: {
     path: "/[project]/messages",
-    title: "Messages Explorer",
+    title: "Messages",
   },
   analytics: {
     path: "/[project]/analytics",
@@ -34,6 +34,15 @@ export const projectRoutes = {
     path: "/[project]/evaluations/[id]/edit",
     title: "Editing Evaluation",
     parent: "evaluations",
+  },
+  experiments: {
+    path: "/[project]/experiments",
+    title: "Experiments",
+  },
+  experiments_show: {
+    path: "/[project]/experiments/[experiment]",
+    title: "Experiment Details",
+    parent: "experiments",
   },
   prompts: {
     path: "/[project]/prompts",
@@ -66,7 +75,11 @@ export const projectRoutes = {
     path: "/[project]/datasets",
     title: "Datasets",
   },
-
+  dataset_edit: {
+    path: "/[project]/datasets/[id]",
+    title: "Editing Dataset",
+    parent: "datasets",
+  },
 };
 
 export type Route = {

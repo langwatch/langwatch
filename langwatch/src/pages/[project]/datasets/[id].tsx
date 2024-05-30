@@ -29,6 +29,7 @@ import {
   useEffect,
   useMemo,
   useState,
+  useRef,
   type ChangeEvent,
 } from "react";
 import { ArrowRight, Play, Upload } from "react-feather";
@@ -66,6 +67,7 @@ function DatasetTable() {
   const router = useRouter();
   const { project } = useOrganizationTeamProject();
   const dataSetId = router.query.id;
+
   const { openDrawer } = useDrawer();
   const { isOpen, onOpen, onClose } = useDisclosure();
   const { CSVReader } = useCSVReader();
@@ -75,6 +77,7 @@ function DatasetTable() {
   const [csvUploaded, setCSVUploaded] = useState([]);
   const [mapping, setMapping] = useState<Record<string, string>>({});
   const [canUpload, setCanUpload] = useState(false);
+  const [savingStatus, setSavingStatus] = useState<"saving" | "saved" | "">("");
 
   const dataset = api.datasetRecord.getAll.useQuery(
     { projectId: project?.id ?? "", datasetId: dataSetId as string },
@@ -137,8 +140,11 @@ function DatasetTable() {
 
   const toast = useToast();
 
+  const timeoutRef = useRef<NodeJS.Timeout>(null);
+
   const onCellValueChanged = useCallback(
     (params: any) => {
+      setSavingStatus("saving");
       const updatedRecord = params.data;
       updateDatasetRecord.mutate(
         {
@@ -148,6 +154,16 @@ function DatasetTable() {
           updatedRecord,
         },
         {
+          onSuccess: () => {
+            setSavingStatus("saved");
+            if (timeoutRef.current) {
+              clearInterval(timeoutRef.current);
+            }
+            //@ts-ignore
+            timeoutRef.current = setTimeout(() => {
+              setSavingStatus("");
+            }, 3000);
+          },
           onError: () => {
             toast({
               title: "Error updating record.",
@@ -157,6 +173,7 @@ function DatasetTable() {
               isClosable: true,
             });
             void dataset.refetch();
+            setSavingStatus("");
           },
         }
       );
@@ -401,6 +418,15 @@ function DatasetTable() {
           >
             {dataset.data ? schemaDisplayName(dataset.data?.schema) : ""}
           </Text>
+          <HStack padding={2}>
+            <Text fontSize={"12px"} color="gray.400">
+              {savingStatus === "saving"
+                ? "Saving..."
+                : savingStatus === "saved"
+                ? "Saved"
+                : ""}
+            </Text>
+          </HStack>
           <Spacer />
           <Button
             onClick={() => openCSVUploader()}

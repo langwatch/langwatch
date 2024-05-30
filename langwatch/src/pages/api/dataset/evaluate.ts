@@ -4,7 +4,7 @@ import { prisma } from "../../../server/db";
 
 import { getDebugger } from "../../../utils/logger";
 
-import { CostReferenceType, CostType, ExperimentType } from "@prisma/client";
+import { CostReferenceType, CostType } from "@prisma/client";
 import * as Sentry from "@sentry/nextjs";
 import { nanoid } from "nanoid";
 import { z } from "zod";
@@ -18,9 +18,10 @@ import {
   AVAILABLE_EVALUATORS,
   type BatchEvaluationResult,
   type EvaluationResult,
-  type SingleEvaluationResult
+  type SingleEvaluationResult,
 } from "../../../trace_checks/evaluators.generated";
 import { extractChunkTextualContent } from "../collector/rag";
+import { TRPCError } from "@trpc/server";
 
 export const debug = getDebugger("langwatch:guardrail:evaluate");
 
@@ -182,26 +183,25 @@ export default async function handler(
     };
   }
 
-  let experiment = await prisma.experiment.findFirst({
-    where: { slug: experimentSlug, projectId: project.id },
+  const experiment = await prisma.experiment.findUnique({
+    where: {
+      projectId_slug: {
+        projectId: project.id,
+        slug: experimentSlug,
+      },
+    },
   });
-    if (!experiment) {
-      experiment = await prisma.experiment.create({
-        data: {
-          id: `experiment_${nanoid()}`,
-          projectId: project.id,
-          type: ExperimentType.BATCH_PROCESSING,
-          slug: experimentSlug,
-        },
-      });
-    }
+
+  if (!experiment) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "Experiment not found" });
+  }
 
   if ("cost" in result && result.cost) {
     await prisma.cost.create({
       data: {
         id: `cost_${nanoid()}`,
         projectId: project.id,
-        costType: CostType.BATCH_PROCESSING,
+        costType: CostType.BATCH_EVALUATION,
         costName: evaluation,
         referenceType: CostReferenceType.BATCH,
         referenceId: experiment.id,
@@ -211,27 +211,24 @@ export default async function handler(
     });
   }
 
-  if (result.status != "error") {
-    const { score, passed, details, cost, status } = result as EvaluationResult;
+  const { score, passed, details, cost, status } = result as EvaluationResult;
 
-
-    await prisma.batchProcessing.create({
-      data: {
-        id: nanoid(),
-        experimentId: experiment.id,
-        projectId: project.id,
-        data: params.data,
-        status: status,
-        score: score ?? 0,
-        passed: passed ?? false,
-        details: details ?? "",
-        cost: cost?.amount ?? 0,
-        evaluation: evaluation,
-        datasetSlug: datasetSlug,
-        datasetId: dataset.id,
-      },
-    });
-  }
+  await prisma.batchEvaluation.create({
+    data: {
+      id: nanoid(),
+      experimentId: experiment.id,
+      projectId: project.id,
+      data: params.data,
+      status: status,
+      score: score ?? 0,
+      passed: passed ?? false,
+      details: details ?? "",
+      cost: cost?.amount ?? 0,
+      evaluation: evaluation,
+      datasetSlug: datasetSlug,
+      datasetId: dataset.id,
+    },
+  });
 
   return res.status(200).json(result);
 }
