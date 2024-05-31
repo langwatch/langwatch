@@ -144,8 +144,14 @@ export const useOrganizationTeamProject = (
     if (!redirectToOnboarding) return;
     if (!organizations.data) return;
 
+    const currentPath = router.pathname;
+    const redirectBackPaths = ["/authorize"];
+    const returnTo = redirectBackPaths.includes(currentPath)
+      ? `?return_to=${currentPath}`
+      : "";
+
     if (!organization || !team) {
-      void router.push("/onboarding/organization");
+      void router.push(`/onboarding/organization${returnTo}`);
       return;
     }
 
@@ -168,7 +174,7 @@ export const useOrganizationTeamProject = (
     if (redirectToProjectOnboarding && !teamsWithProjectsOnAnyOrg.length) {
       const firstTeamSlug = organizations.data.flatMap((org) => org.teams)[0]
         ?.slug;
-      void router.push(`/onboarding/${firstTeamSlug}/project`);
+      void router.push(`/onboarding/${firstTeamSlug}/project${returnTo}`);
       return;
     }
 
