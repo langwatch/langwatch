@@ -2,7 +2,9 @@
 ![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)
 [![Discord](https://img.shields.io/discord/1227886780536324106?logo=discord&label=Discord)](https://discord.gg/kT4PhDS2gH)
 
-# LangWatch: LLM Monitoring & Analytics Platform
+# LangWatch
+
+## LLMOps Platform | DSPy Visualizer | Monitoring | Evaluations | Analytics
 
 LangWatch provides a suite of tools to track, visualize, and analyze interactions with LLMs focused on usability, helping both developers and non-technical team members to fine-tune performance and gain insights into user engagement.
 
@@ -13,9 +15,11 @@ LangWatch provides a suite of tools to track, visualize, and analyze interaction
 ## Features
 
 - ⚡️ **Real-time Telemetry**: Capture detailed interaction tracings for analytics for LLM cost, latency, and so on for further optimization.
-- ✨ **Easier \~Vibe Checking\~**: A clean, friendly interface focused on usability with automatic topic clustering, so you can deep dive on the messages being generated and really get a deep understanding of how your LLM is behaving, finding insights to iterate.
-- 🚀 **User Analytics**: Metrics on engagement, user interactions and more insights into users behaviour so you can improve your product.
 - 🐛 **Detailed Debugging**: Capture every step in the chain of your LLM calls, with all metadata and history, grouping by threads and user for easy troubleshooting and reproduction.
+- 📈 **Make LLM Quality Measurable**: Stop relying on just feeling and use Evaluators to measure your LLM pipeline output quality with numbers, to improve your pipelines, change prompts and switch models with confidence.
+- 📊 **DSPy Visualizer**: Go a step further into finding the best prompts and pipelines automatically with DSPy optimizers, and plug it into LangWatch DSPy visualizer to very easily inspect and track the progress of your DSPy experiments, keeping the history and comparing runs to keep iterating.
+- ✨ **Easier \~Vibe Checking\~ too**: Even though LangWatch helps grounding the quality into numbers and run automated experiments, a human look is still as important as ever. A clean, friendly interface focused on usability with automatic topic clustering, so you can deep dive on the messages being generated and really get a deep understanding of how your LLM is behaving, finding insights to iterate.
+- 🚀 **User Analytics**: Metrics on engagement, user interactions and more insights into users behaviour so you can improve your product.
 - 🛡️ **Guardrails**: Detect PII leak with Google DLP, toxic language with Azure Moderation and many others LangWatch Guardrails available to monitor your LLM outputs and trigger alerts. Build custom Guardrails yourself with semantic matching or another LLM on top evaluating the response.
 
 ## Quickstart
