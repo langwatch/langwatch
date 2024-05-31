@@ -8,9 +8,13 @@ export type OneMessagePerRowColumns =
   | "input"
   | "expected_output"
   | "contexts"
-  | "spans";
+  | "spans"
+  | "comments";
 
-export type OneLLMCallPerRowColumns = "llm_input" | "expected_llm_output";
+export type OneLLMCallPerRowColumns =
+  | "llm_input"
+  | "expected_llm_output"
+  | "comments";
 
 export type DatasetColumns = OneMessagePerRowColumns & OneLLMCallPerRowColumns;
 
