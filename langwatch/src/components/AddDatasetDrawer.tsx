@@ -58,6 +58,7 @@ export const AddDatasetDrawer = (props: AddDatasetDrawerProps) => {
         context,
         options
       );
+
       if (!data.name || data.name.trim() === "") {
         (result.errors as FieldErrors<DatasetRecordForm>).name = {
           type: "required",
@@ -277,6 +278,25 @@ export const AddDatasetDrawer = (props: AddDatasetDrawerProps) => {
                         </Text>
                       </VStack>
                     </Checkbox>
+                    <Checkbox
+                      value="comments"
+                      {...register("columns")}
+                      alignItems="start"
+                      paddingTop={2}
+                    >
+                      <VStack align="start" marginTop={-1}>
+                        <HStack>
+                          <Text fontWeight="500">Comments</Text>
+                          <Text fontSize={13} color="gray.500">
+                            (optional)
+                          </Text>
+                        </HStack>
+                        <Text fontSize={13}>
+                          A comment field for annotating the data in the given
+                          row.
+                        </Text>
+                      </VStack>
+                    </Checkbox>
                   </CheckboxGroup>
                 )}
 
@@ -321,6 +341,25 @@ export const AddDatasetDrawer = (props: AddDatasetDrawerProps) => {
                         <Text fontSize={13}>
                           The gold-standard expected output for the given input,
                           in LLM chat history json format
+                        </Text>
+                      </VStack>
+                    </Checkbox>
+                    <Checkbox
+                      value="comments"
+                      {...register("columns")}
+                      alignItems="start"
+                      paddingTop={2}
+                    >
+                      <VStack align="start" marginTop={-1}>
+                        <HStack>
+                          <Text fontWeight="500">Comments</Text>
+                          <Text fontSize={13} color="gray.500">
+                            (optional)
+                          </Text>
+                        </HStack>
+                        <Text fontSize={13}>
+                          A comment field for annotating the data in the given
+                          row.
                         </Text>
                       </VStack>
                     </Checkbox>

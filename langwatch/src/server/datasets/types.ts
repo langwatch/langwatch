@@ -40,6 +40,7 @@ export const newDatasetEntriesSchema = z.union([
         expected_output: z.string().optional(),
         spans: z.array(datasetSpanSchema).optional(),
         contexts: z.array(z.string()).optional(),
+        comments: z.string().optional(),
       })
     ),
   }),
@@ -50,6 +51,7 @@ export const newDatasetEntriesSchema = z.union([
         id: z.string(),
         llm_input: z.array(chatMessageSchema).optional(),
         expected_llm_output: z.array(chatMessageSchema).optional(),
+        comments: z.string().optional(),
       })
     ),
   }),
@@ -64,4 +66,5 @@ export type FlattenStringifiedDatasetEntry = {
   contexts?: string;
   llm_input?: string;
   expected_llm_output?: string;
+  comments?: string;
 };
