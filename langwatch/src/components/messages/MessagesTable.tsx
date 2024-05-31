@@ -99,19 +99,6 @@ export function MessagesTable() {
     queryOpts
   );
 
-  const traceGroupsCSV = api.traces.getAllForProject.useQuery(
-    {
-      ...filterParams,
-      query: getSingleQueryParam(router.query.query),
-      groupBy: "none",
-      pageOffset: 0,
-      pageSize: 10000,
-      sortBy: getSingleQueryParam(router.query.sortBy),
-      sortDirection: getSingleQueryParam(router.query.orderBy),
-    },
-    queryOpts
-  );
-
   const traceIds =
     traceGroups.data?.groups.flatMap((group) =>
       group.map((trace) => trace.trace_id)
@@ -589,7 +576,7 @@ export function MessagesTable() {
         )
         .filter((row) => row.some((cell) => cell !== ""));
     } else {
-      csv = traceGroupsCSV.data?.groups.flatMap((traceGroup) =>
+      csv = traceGroups.data?.groups.flatMap((traceGroup) =>
         traceGroup.map((trace) =>
           checkedHeaderColumnsEntries.map(
             ([column, _]) => headerColumns[column]?.value?.(trace) ?? ""
