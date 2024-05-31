@@ -101,6 +101,10 @@ export default function ProjectOnboarding() {
       refetchOnMount: false,
     }
   );
+  const returnTo =
+    typeof router.query.return_to === "string"
+      ? router.query.return_to
+      : undefined;
 
   useEffect(() => {
     if (team.data) {
@@ -130,7 +134,11 @@ export default function ProjectOnboarding() {
         await apiContext.organization.getAll.refetch();
         // For some reason even though we await for the refetch it's not done yet when we move pages
         setTimeout(() => {
-          void router.push(`/${createProject.data.projectSlug}/messages`);
+          if (returnTo) {
+            void router.push(returnTo);
+          } else {
+            void router.push(`/${createProject.data.projectSlug}/messages`);
+          }
         }, 1000);
       })();
     }
@@ -139,6 +147,7 @@ export default function ProjectOnboarding() {
     apiContext.organization.getAll,
     createProject.data?.projectSlug,
     createProject.isSuccess,
+    returnTo,
     router,
   ]);
 

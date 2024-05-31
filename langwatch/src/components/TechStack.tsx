@@ -21,6 +21,7 @@ import { CustomPython } from "./integration-guides/CustomPython";
 import { CustomRest } from "./integration-guides/CustomRest";
 import { LangChainPython } from "./integration-guides/LangChainPython";
 import { OpenAIPython } from "./integration-guides/OpenAIPython";
+import { DSPy } from "./icons/DSPy";
 
 export type ProjectFormData = {
   name: string;
@@ -67,6 +68,13 @@ export const techStackFrameworkOptions = {
     languages: {
       python: LangChainPython,
       javascript: CustomRest,
+    } as LanguagesMap,
+  },
+  dspy: {
+    label: "DSPy",
+    icon: <DSPy />,
+    languages: {
+      python: CustomPython,
     } as LanguagesMap,
   },
   other: {

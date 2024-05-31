@@ -40,6 +40,10 @@ export default function OrganizationOnboarding() {
   const { register, handleSubmit, formState, reset: resetForm } = form;
   const router = useRouter();
   const toast = useToast();
+  const returnTo =
+    typeof router.query.return_to === "string"
+      ? router.query.return_to
+      : undefined;
 
   const createOrganization = api.organization.createAndAssign.useMutation();
   const apiContext = api.useContext();
@@ -75,7 +79,9 @@ export default function OrganizationOnboarding() {
         // For some reason even though we await for the refetch it's not done yet when we move pages
         setTimeout(() => {
           void router.push(
-            `/onboarding/${createOrganization.data.teamSlug}/project`
+            `/onboarding/${createOrganization.data.teamSlug}/project${
+              returnTo ? `?return_to=${returnTo}` : ""
+            }`
           );
         });
       })();
@@ -84,6 +90,7 @@ export default function OrganizationOnboarding() {
     apiContext.organization.getAll,
     createOrganization.data?.teamSlug,
     createOrganization.isSuccess,
+    returnTo,
     router,
   ]);
 
