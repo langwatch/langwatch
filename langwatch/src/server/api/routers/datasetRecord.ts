@@ -68,6 +68,7 @@ export const datasetRecordRouter = createTRPCRouter({
           contexts: z.optional(z.string()),
           llm_input: z.optional(z.string()),
           expected_llm_output: z.optional(z.string()),
+          comments: z.nullable(z.optional(z.string())),
         }),
       })
     )
@@ -102,7 +103,11 @@ export const datasetRecordRouter = createTRPCRouter({
 
       const updatedData: any = {};
       for (const key in updatedRecord) {
-        if (key === "input" || key === "expected_output") {
+        if (
+          key === "input" ||
+          key === "expected_output" ||
+          key === "comments"
+        ) {
           updatedData[key] = updatedRecord[key] ?? "";
         } else if ((updatedRecord as any)[key]) {
           updatedData[key] = JSON.parse((updatedRecord as any)[key] as string);

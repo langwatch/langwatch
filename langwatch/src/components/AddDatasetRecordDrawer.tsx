@@ -147,6 +147,7 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
                 row.contexts !== undefined
                   ? JSON.parse(row.contexts)
                   : undefined,
+              comments: row.comments,
             })),
           }
         : selectedDataset.schema === "ONE_LLM_CALL_PER_ROW"
@@ -162,6 +163,7 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
                 row.expected_llm_output !== undefined
                   ? JSON.parse(row.expected_llm_output)
                   : undefined,
+              comments: row.comments,
             })),
           }
         : undefined;
@@ -302,6 +304,7 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
       spans: "Spans",
       llm_input: "LLM Input",
       expected_llm_output: "Expected LLM Output",
+      comments: "Comments",
     };
 
     const headers: ColDef[] = selectedDataset.columns
