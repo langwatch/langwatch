@@ -61,6 +61,7 @@ type RecordEntry = {
   spans?: (typeof datasetSpanSchema)[];
   llm_input?: string;
   expected_llm_output?: string;
+  comments?: string;
 };
 
 function DatasetTable() {
@@ -99,6 +100,7 @@ function DatasetTable() {
       spans: "Spans",
       llm_input: "LLM Input",
       expected_llm_output: "Expected LLM Output",
+      comments: "Comments",
     };
 
     const headers: ColDef[] = dataset.data.columns.split(",").map((field) => ({
@@ -230,6 +232,7 @@ function DatasetTable() {
           CSVHeaders,
           mappings.expected_output ?? ""
         ),
+        comments: safeGetRowValue(row, CSVHeaders, mappings.comments ?? ""),
         contexts: parseJSONField(
           row,
           CSVHeaders,
