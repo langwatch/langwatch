@@ -86,7 +86,7 @@ compiled_rag = optimizer.compile(RAG(), trainset=trainset)
 
 That's it! Now open the link provided when the compilation starts or go to your LangWatch dashboard to follow the progress of your experiments:
 
-![DSPy Visualizer](https://mintlify.s3-us-west-1.amazonaws.com/langwatch/images/dspy-visualizer.png)
+![DSPy Visualizer](https://github.com/langwatch/langwatch/assets/792201/47312dfe-980f-4c09-9610-67ad064cbe86)
 
 
 ## Local Development
