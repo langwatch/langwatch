@@ -25,7 +25,7 @@
     "react": "^18.2.0",
     "react-admin": "^4.16.6",
     "stripe": "^15.2.0",
-    "zod": "3.23.8"
+    "zod": "3.22.4"
   },
   "devDependencies": {
     "@types/react": "^18.2.45",
