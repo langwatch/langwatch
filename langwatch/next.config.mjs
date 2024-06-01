@@ -2,6 +2,8 @@ import { withSentryConfig } from "@sentry/nextjs";
 import path from "path";
 import { fileURLToPath } from "url";
 
+process.env.SENTRY_IGNORE_API_RESOLUTION_ERROR = "1";
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -48,7 +50,7 @@ const config = {
 
     if (process.env.EXTRA_INCLUDE) {
       // TODO: find a less hacky way to make sure injected src will be compiled as well
-      for (const rule of config.module.rules?.[1].oneOf ?? []) {
+      for (const rule of config.module.rules?.[7].oneOf ?? []) {
         const includeIsArray = Array.isArray(rule.include);
         if (includeIsArray) {
           rule.include.push(process.env.EXTRA_INCLUDE);
