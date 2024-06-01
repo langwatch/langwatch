@@ -87,6 +87,10 @@ export const authOptions = (
      * @see https://next-auth.js.org/providers/github
      */
   ],
+  pages: {
+    error: "/auth/error",
+    signIn: "/auth/signin",
+  },
 });
 
 /**

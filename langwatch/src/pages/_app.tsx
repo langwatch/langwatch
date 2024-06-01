@@ -174,7 +174,7 @@ const LangWatch: AppType<{
         </Head>
         <Component {...pageProps} />
 
-        {dependencies.ExtraFooterComponents && (
+        {session && dependencies.ExtraFooterComponents && (
           <dependencies.ExtraFooterComponents />
         )}
       </ChakraProvider>
