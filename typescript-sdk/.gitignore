@@ -2,5 +2,5 @@
 tsconfig.tsbuildinfo
 dist
 *.generated.ts
-src/server/types
-!src/server/types/.gitkeep
+src/server/types/**/*
+!**/.gitkeep
