@@ -19,10 +19,23 @@ interface ToolCall {
 
 export interface ChatMessage {
   role?: ChatRole;
-  content?: string | null;
+  content?: string | ChatRichContent[] | null;
   function_call?: FunctionCall | null;
   tool_calls?: ToolCall[] | null;
 }
+
+type ChatRichContent =
+  | {
+      type: "text";
+      text: string;
+    }
+  | {
+      type: "image_url";
+      image_url: {
+        url: string;
+        detail?: "auto" | "low" | "high";
+      };
+    };
 
 export interface TypedValueChatMessages {
   type: "chat_messages";
@@ -129,7 +142,8 @@ export interface BaseSpan {
 
 export interface LLMSpan extends BaseSpan {
   type: "llm";
-  vendor: string;
+  // TODO: deprecate field, standardize on litellm model names
+  vendor?: string | null;
   model: string;
   params: SpanParams;
 }

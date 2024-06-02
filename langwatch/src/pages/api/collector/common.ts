@@ -58,7 +58,13 @@ export const typedValueToText = (
     if (last) {
       const lastMessage = typed.value[typed.value.length - 1];
       return lastMessage
-        ? lastMessage.content ?? JSON.stringify(lastMessage)
+        ? typeof lastMessage.content === "string"
+          ? lastMessage.content
+          : Array.isArray(lastMessage.content)
+          ? lastMessage.content
+              .map((c) => (c.type === "text" ? c.text : JSON.stringify(c)))
+              .join("")
+          : JSON.stringify(lastMessage)
         : "";
     } else {
       return typed.value

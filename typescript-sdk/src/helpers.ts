@@ -1,3 +1,5 @@
+export type Strict<T> = T & { [K in Exclude<keyof any, keyof T>]: never };
+
 type SnakeToCamelCase<S extends string> = S extends `${infer T}_${infer U}`
   ? `${T}${Capitalize<SnakeToCamelCase<U>>}`
   : S;
