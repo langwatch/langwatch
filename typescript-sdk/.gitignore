@@ -1,0 +1,4 @@
+.env
+tsconfig.tsbuildinfo
+dist
+*.generated.ts
