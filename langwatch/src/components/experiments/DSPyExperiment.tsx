@@ -8,6 +8,12 @@ import {
   CardHeader,
   HStack,
   Heading,
+  Modal,
+  ModalBody,
+  ModalCloseButton,
+  ModalContent,
+  ModalHeader,
+  ModalOverlay,
   Skeleton,
   Spacer,
   Switch,
@@ -24,12 +30,15 @@ import {
   Thead,
   Tr,
   VStack,
+  useDisclosure,
   useTheme,
 } from "@chakra-ui/react";
 import type { Experiment, Project } from "@prisma/client";
+import NextLink from "next/link";
 import { useRouter } from "next/router";
 import numeral from "numeral";
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
+import { ChevronDown, ChevronUp } from "react-feather";
 import {
   CartesianGrid,
   Line,
@@ -40,8 +49,6 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { MetadataTag } from "../MetadataTag";
-import { RenderInputOutput } from "../traces/RenderInputOutput";
 import type {
   DSPyRunsSummary,
   DSPyStepSummary,
@@ -50,8 +57,10 @@ import { api } from "../../utils/api";
 import { formatMoney } from "../../utils/formatMoney";
 import { formatTimeAgo } from "../../utils/formatTimeAgo";
 import { getColorForString } from "../../utils/rotatingColors";
-import React from "react";
-import { ChevronDown, ChevronUp } from "react-feather";
+import { MetadataTag } from "../MetadataTag";
+import { Discord } from "../icons/Discord";
+import { GitHub } from "../icons/GitHub";
+import { RenderInputOutput } from "../traces/RenderInputOutput";
 
 export function DSPyExperiment({
   project,
@@ -265,9 +274,13 @@ export function DSPyExperiment({
         spacing={8}
         padding={6}
       >
-        <Heading as="h1" size="lg">
-          {experiment.slug}
-        </Heading>
+        <HStack width="full" align="end">
+          <Heading as="h1" size="lg">
+            {experiment.slug}
+          </Heading>
+          <Spacer />
+          <FeedbackLink />
+        </HStack>
         {dspyRuns.isLoading ? (
           <Skeleton width="100%" height="30px" />
         ) : dspyRuns.error ? (
@@ -316,6 +329,56 @@ export function DSPyExperiment({
         )}
       </VStack>
     </HStack>
+  );
+}
+
+function FeedbackLink() {
+  const { isOpen, onOpen, onClose } = useDisclosure();
+
+  return (
+    <>
+      <Modal isOpen={isOpen} onClose={onClose}>
+        <ModalOverlay />
+        <ModalContent>
+          <ModalHeader>Feedback on DSPy Visualizer</ModalHeader>
+          <ModalCloseButton />
+          <ModalBody>
+            <VStack align="start" paddingBottom={4}>
+              <Text paddingBottom={4}>
+                Join our Discord community or open a Github Issue for any
+                issues, questions or ideas.
+              </Text>
+              <NextLink
+                href="https://discord.gg/kT4PhDS2gH"
+                target="_blank"
+                passHref
+              >
+                <Button as="span" variant="link" leftIcon={<Discord />}>
+                  Discord
+                </Button>
+              </NextLink>
+              <NextLink
+                href="https://github.com/langwatch/langwatch"
+                target="_blank"
+                passHref
+              >
+                <Button as="span" variant="link" leftIcon={<GitHub />}>
+                  Github
+                </Button>
+              </NextLink>
+            </VStack>
+          </ModalBody>
+        </ModalContent>
+      </Modal>
+      <Button
+        variant="link"
+        onClick={onOpen}
+        fontWeight="normal"
+        color="gray.800"
+      >
+        Give Feedback
+      </Button>
+    </>
   );
 }
 
