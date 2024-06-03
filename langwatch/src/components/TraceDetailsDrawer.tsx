@@ -39,7 +39,7 @@ interface TraceEval {
 }
 
 export const TraceDetailsDrawer = (props: TraceDetailsDrawerProps) => {
-  const { closeDrawer } = useDrawer();
+  const { closeDrawer, openDrawer } = useDrawer();
   const { isOpen, onOpen, onClose } = useDisclosure();
 
   const [traceView, setTraceView] = useState<"span" | "full">("span");
@@ -206,6 +206,14 @@ export const TraceDetailsDrawer = (props: TraceDetailsDrawerProps) => {
               Trace Details
             </Text>
             <Spacer />
+            <HStack>
+              <Button
+                colorScheme="black"
+                variant="outline"
+                onClick={() => openDrawer("annotation", undefined)}
+              >
+                Annotate
+              </Button>
               <Button
                 colorScheme="black"
                 type="submit"
@@ -215,6 +223,7 @@ export const TraceDetailsDrawer = (props: TraceDetailsDrawerProps) => {
               >
                 Add to Dataset
               </Button>
+            </HStack>
           </Flex>
         </DrawerHeader>
         <DrawerBody>

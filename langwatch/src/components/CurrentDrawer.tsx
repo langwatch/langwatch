@@ -3,6 +3,7 @@ import qs from "qs";
 import { TraceDetailsDrawer } from "./TraceDetailsDrawer";
 import { BatchEvaluationDrawer } from "./BatchEvaluationDrawer";
 import { TriggerDrawer } from "./AddTriggerDrawer";
+import { AnnotationDrawer } from "./AnnotationDrawer";
 
 type DrawerProps = {
   open: string;
@@ -12,6 +13,7 @@ const drawers = {
   traceDetails: TraceDetailsDrawer,
   batchEvaluation: BatchEvaluationDrawer,
   trigger: TriggerDrawer,
+  annotation: AnnotationDrawer,
 } satisfies Record<string, React.FC<any>>;
 
 export function CurrentDrawer() {
