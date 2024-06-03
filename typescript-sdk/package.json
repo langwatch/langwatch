@@ -5,6 +5,11 @@
   "main": "dist/src/index.js",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/langwatch/langwatch.git",
+    "directory": "typescript-sdk"
+  },
   "scripts": {
     "postinstall": "cp ../langwatch/src/server/tracer/types.ts src/server/types/tracer.ts && ts-to-zod src/server/types/tracer.ts src/server/types/tracer.generated.ts",
     "test": "vitest",
