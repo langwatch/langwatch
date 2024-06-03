@@ -7,7 +7,7 @@ on:
 
 jobs:
   publish-npm:
-    if: startsWith(github.event.release.tag_name, 'typescript-')
+    if: startsWith(github.event.release.tag_name, 'typescript-sdk-')
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
