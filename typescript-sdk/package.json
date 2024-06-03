@@ -1,6 +1,6 @@
 {
   "name": "langwatch",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "",
   "main": "dist/src/index.js",
   "module": "./dist/index.mjs",
@@ -11,9 +11,9 @@
     "directory": "typescript-sdk"
   },
   "scripts": {
-    "postinstall": "cp ../langwatch/src/server/tracer/types.ts src/server/types/tracer.ts && ts-to-zod src/server/types/tracer.ts src/server/types/tracer.generated.ts",
+    "prepare": "cp ../langwatch/src/server/tracer/types.ts src/server/types/tracer.ts && ts-to-zod src/server/types/tracer.ts src/server/types/tracer.generated.ts",
     "test": "vitest",
-    "build": "tsup",
+    "build": "npm run prepare && tsup",
     "prepublish": "npm run build"
   },
   "author": "",
