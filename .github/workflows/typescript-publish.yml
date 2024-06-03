@@ -8,7 +8,7 @@ on:
 
 jobs:
   publish-npm:
-    if: startsWith(github.event.release.tag_name, 'typescript-sdk-')
+    if: startsWith(github.event.release.tag_name, 'typescript-sdk-') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
