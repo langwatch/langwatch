@@ -62,7 +62,7 @@ export type PendingBaseSpan = PendingSpan<BaseSpan>;
 // vendor is deprecated, and we try to force the available models here
 export type LLMSpan = ConvertServerSpan<
   Omit<ServerLLMSpan, "vendor" | "model">
-> & { model: keyof typeof modelPrices | "unknown" };
+> & { model: keyof typeof modelPrices | (string & NonNullable<unknown>) };
 export type PendingLLMSpan = PendingSpan<LLMSpan>;
 
 export type RAGSpan = ConvertServerSpan<ServerRAGSpan>;

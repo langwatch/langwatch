@@ -63,7 +63,10 @@ export class LangWatch extends EventEmitter {
     this.endpoint = endpoint;
   }
 
-  getTrace(traceId?: string, metadata?: Metadata) {
+  getTrace({
+    traceId,
+    metadata,
+  }: { traceId?: string; metadata?: Metadata } = {}) {
     return new LangWatchTrace({
       client: this,
       traceId: traceId ?? `trace_${nanoid()}`,
@@ -155,6 +158,9 @@ export class LangWatchTrace {
     this.metadata = {
       ...this.metadata,
       ...metadata,
+      ...(typeof metadata.labels !== "undefined"
+        ? { labels: [...(this.metadata?.labels ?? []), ...metadata.labels] }
+        : {}),
     };
   }
 
@@ -362,6 +368,10 @@ export class LangWatchLLMSpan extends LangWatchSpan implements PendingLLMSpan {
       this.params = params.params;
     }
   }
+
+  end(params?: Partial<PendingLLMSpan>) {
+    super.end(params);
+  }
 }
 
 export class LangWatchRAGSpan extends LangWatchSpan implements PendingRAGSpan {
@@ -379,5 +389,9 @@ export class LangWatchRAGSpan extends LangWatchSpan implements PendingRAGSpan {
     if (params.contexts) {
       this.contexts = params.contexts;
     }
+  }
+
+  end(params?: Partial<PendingRAGSpan>) {
+    super.end(params);
   }
 }
