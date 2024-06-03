@@ -1,0 +1,33 @@
+name: Publish TypeScript SDK to npm
+
+on:
+  release:
+    types:
+      - published
+
+jobs:
+  publish-npm:
+    if: startsWith(github.event.release.tag_name, 'typescript-')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: "18"
+
+      - name: Install and build
+        working-directory: ./typescript-sdk
+        run: npm install
+
+      - name: Run unit tests
+        working-directory: ./typescript-sdk
+        run: npm test
+
+      - name: Publish to npm
+        working-directory: ./typescript-sdk
+        run: npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

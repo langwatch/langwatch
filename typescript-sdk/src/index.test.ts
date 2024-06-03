@@ -42,8 +42,25 @@ describe("LangWatch tracer", () => {
     });
     trace.update({ metadata: { userId: "456", labels: ["bar"] } });
 
-    const span = trace.startSpan({ name: "test" });
-    span.end();
+    const span = trace.startSpan({
+      name: "weather_function",
+      input: {
+        type: "json",
+        value: {
+          city: "Tokyo",
+        },
+      },
+    });
+    span.end({
+      outputs: [
+        {
+          type: "json",
+          value: {
+            weather: "sunny",
+          },
+        },
+      ],
+    });
 
     expect(trace.metadata).toEqual({
       threadId: "123",
