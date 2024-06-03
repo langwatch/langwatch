@@ -3,10 +3,12 @@
   "version": "0.0.1",
   "description": "",
   "main": "dist/src/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
   "scripts": {
     "postinstall": "cp ../langwatch/src/server/tracer/types.ts src/server/types/tracer.ts && ts-to-zod src/server/types/tracer.ts src/server/types/tracer.generated.ts",
     "test": "vitest",
-    "build": "tsc",
+    "build": "tsup",
     "prepublish": "npm run build"
   },
   "author": "",
@@ -14,7 +16,6 @@
   "engines": {
     "node": ">=18.0.0"
   },
-  "types": "dist/src/index.d.ts",
   "devDependencies": {
     "@eslint/js": "^9.4.0",
     "@types/debug": "^4.1.12",
@@ -22,11 +23,13 @@
     "@types/node": "^16.0.0",
     "eslint": "^8.57.0",
     "ts-to-zod": "^3.4.1",
+    "tsup": "^8.1.0",
     "typescript": "^4.9.5",
     "typescript-eslint": "^7.11.0",
     "vitest": "^0.5.0"
   },
   "dependencies": {
+    "ai": "^3.1.23",
     "llm-cost": "^1.0.4",
     "nanoid": "^5.0.7",
     "openai": "^4.47.3",

@@ -22,16 +22,17 @@ export interface ChatMessage {
   content?: string | ChatRichContent[] | null;
   function_call?: FunctionCall | null;
   tool_calls?: ToolCall[] | null;
+  tool_call_id?: string | null;
 }
 
-type ChatRichContent =
+export type ChatRichContent =
   | {
       type: "text";
-      text: string;
+      text?: string;
     }
   | {
       type: "image_url";
-      image_url: {
+      image_url?: {
         url: string;
         detail?: "auto" | "low" | "high";
       };

@@ -1,4 +1,4 @@
-import { LangWatch } from "./index";
+import { LangWatch, convertFromVercelAIMessages } from "./index";
 import { describe, it, expect, vi } from "vitest";
 
 describe("LangWatch tracer", () => {
@@ -35,17 +35,27 @@ describe("LangWatch tracer", () => {
     const llmSpan = ragSpan.startLLMSpan({
       name: "llm",
       model: "gpt-3.5-turbo",
-    });
-    llmSpan.update({
       input: {
         type: "chat_messages",
-        value: [
+        value: convertFromVercelAIMessages([
           { role: "system", content: "You are a helpful assistant." },
           { role: "user", content: "What is the weather in Tokyo?" },
-        ],
+        ]),
       },
     });
-    llmSpan.end();
+    llmSpan.end({
+      outputs: [
+        {
+          type: "chat_messages",
+          value: [
+            {
+              role: "assistant",
+              content: "It's cloudy in Tokyo.",
+            },
+          ],
+        },
+      ],
+    });
 
     ragSpan.end();
 
