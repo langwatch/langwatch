@@ -24,7 +24,7 @@ import {
   type RAGSpan,
   type SpanInputOutput,
 } from "./types";
-import { convertFromVercelAIMessages } from "./utils";
+import { captureError, convertFromVercelAIMessages } from "./utils";
 
 export type {
   BaseSpan,
@@ -39,7 +39,7 @@ export type {
   SpanInputOutput,
 };
 
-export { convertFromVercelAIMessages };
+export { convertFromVercelAIMessages, captureError };
 
 export class LangWatch extends EventEmitter {
   apiKey: string | undefined;
@@ -55,9 +55,10 @@ export class LangWatch extends EventEmitter {
     super();
     const apiKey_ = apiKey ?? process.env.LANGWATCH_API_KEY;
     if (!apiKey_) {
-      console.warn(
-        "[LangWatch] ⚠️ LangWatch API key is not set, please set the LANGWATCH_API_KEY environment variable or pass it in the constructor. Traces will not be captured."
+      const error = new Error(
+        "LangWatch API key is not set, please set the LANGWATCH_API_KEY environment variable or pass it in the constructor. Traces will not be captured."
       );
+      this.emit("error", error);
     }
     this.apiKey = apiKey_;
     this.endpoint = endpoint;
@@ -99,10 +100,9 @@ export class LangWatch extends EventEmitter {
 
     if (!this.apiKey) {
       const error = new Error(
-        "[LangWatch] ⚠️ LangWatch API key is not set, LLMs traces will not be sent, go to https://langwatch.ai to set it up"
+        "LangWatch API key is not set, LLMs traces will not be sent, go to https://langwatch.ai to set it up"
       );
       this.emit("error", error);
-      console.warn(error.message);
       return;
     }
 
@@ -117,15 +117,14 @@ export class LangWatch extends EventEmitter {
 
     if (response.status === 429) {
       const error = new Error(
-        "[LangWatch] ⚠️ Rate limit exceeded, dropping message from being sent to LangWatch. Please check your dashboard to upgrade your plan."
+        "Rate limit exceeded, dropping message from being sent to LangWatch. Please check your dashboard to upgrade your plan."
       );
       this.emit("error", error);
-      console.warn(error.message);
       return;
     }
     if (!response.ok) {
       const error = new Error(
-        `[LangWatch] ⚠️ Failed to send trace, status: ${response.status}`
+        `Failed to send trace, status: ${response.status}`
       );
       this.emit("error", error);
       throw error;
@@ -214,8 +213,6 @@ export class LangWatchTrace {
       if (error instanceof ZodError) {
         console.warn("[LangWatch] ⚠️ Failed to parse trace");
         console.warn(fromZodError(error).message);
-      } else {
-        console.warn(error);
       }
       this.client.emit("error", error);
     }
@@ -266,6 +263,14 @@ export class LangWatchSpan implements PendingBaseSpan {
   }
 
   update(params: Partial<Omit<PendingBaseSpan, "spanId" | "parentId">>) {
+    if (Object.isFrozen(this)) {
+      const error = new Error(
+        `Tried to update span ${this.spanId}, but the span is already finished, discarding update`
+      );
+      this.trace.client.emit("error", error);
+      return;
+    }
+
     if (params.type) {
       this.type = params.type;
     }
@@ -322,6 +327,8 @@ export class LangWatchSpan implements PendingBaseSpan {
       this.update(params);
     }
 
+    Object.freeze(this);
+
     try {
       const finalSpan = spanSchema.parse(
         camelToSnakeCaseNested({
@@ -332,6 +339,7 @@ export class LangWatchSpan implements PendingBaseSpan {
             ...this.timestamps,
             finishedAt: this.timestamps.finishedAt,
           },
+          ...(this.error && { error: captureError(this.error) }),
         }) as ServerSpan
       );
       this.trace.onEnd(finalSpan);
@@ -339,8 +347,6 @@ export class LangWatchSpan implements PendingBaseSpan {
       if (error instanceof ZodError) {
         console.warn("[LangWatch] ⚠️ Failed to parse span");
         console.warn(fromZodError(error).message);
-      } else {
-        console.warn(error);
       }
       this.trace.client.emit("error", error);
     }

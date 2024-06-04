@@ -140,6 +140,47 @@ describe("LangWatch tracer", () => {
     expect(requestBody.spans.length).toBe(3);
   });
 
+  it("captures exceptions", async () => {
+    const langwatch = new LangWatch({
+      apiKey: "test",
+      endpoint: "http://localhost.test",
+    });
+    const trace = langwatch.getTrace();
+    trace.update({
+      metadata: { threadId: "123", userId: "123", labels: ["foo"] },
+    });
+    trace.update({ metadata: { userId: "456", labels: ["bar"] } });
+
+    const span = trace.startSpan({
+      name: "weather_function",
+      input: {
+        type: "json",
+        value: {
+          city: "Tokyo",
+        },
+      },
+    });
+
+    try {
+      throw new Error("unexpected error");
+    } catch (error) {
+      span.end({
+        error: error,
+      });
+    }
+
+    await trace.sendSpans();
+
+    expect(mockFetch).toHaveBeenCalled();
+    const firstCall: any = mockFetch.mock.calls[0];
+    const requestBody = JSON.parse(firstCall[1].body);
+    expect(requestBody.spans[0].error).toEqual({
+      has_error: true,
+      message: "unexpected error",
+      stacktrace: expect.any(Array),
+    });
+  });
+
   it.skip("captures openai llm call", async () => {
     const langwatch = new LangWatch({
       apiKey: "test",

@@ -41,9 +41,10 @@ export type SpanInputOutput =
   | (TypedValueChatMessages & { type: ChatMessage });
 
 export type ConvertServerSpan<T extends ServerBaseSpan> =
-  SnakeToCamelCaseNested<Omit<T, "input" | "outputs">> & {
+  SnakeToCamelCaseNested<Omit<T, "input" | "outputs" | "error">> & {
     input?: SpanInputOutput | null;
     outputs: SpanInputOutput[];
+    error?: T["error"] | NonNullable<unknown>;
   };
 
 export type PendingSpan<T extends BaseSpan> = Omit<
