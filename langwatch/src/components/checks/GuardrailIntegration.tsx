@@ -14,8 +14,8 @@ import {
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import type { AVAILABLE_EVALUATORS } from "../../trace_checks/evaluators.generated";
 import { api } from "../../utils/api";
-import { RenderCode } from "../integration-guides/utils/RenderCode";
-import { langwatchEndpoint } from "../integration-guides/utils/langwatchEndpointEnv";
+import { RenderCode } from "../code/RenderCode";
+import { langwatchEndpoint } from "../code/langwatchEndpointEnv";
 
 export function GuardrailIntegration({
   slug,

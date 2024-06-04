@@ -40,7 +40,7 @@ import { AVAILABLE_EVALUATORS } from "~/trace_checks/evaluators.generated";
 import { api } from "~/utils/api";
 import { type Check } from "@prisma/client";
 import type { JsonObject } from "@prisma/client/runtime/library";
-import { RenderCode } from "~/components/integration-guides/utils/RenderCode";
+import { RenderCode } from "~/components/code/RenderCode";
 
 interface BatchEvaluatioProps {
   datasetSlug?: string | undefined;
@@ -597,7 +597,7 @@ export const BatchDatasetProcessing = ({
       </p>
       <RenderCode
         code={`from langwatch.batch_evaluation import BatchEvaluation, DatasetEntry
-            
+
 def callback(entry: DatasetEntry):
     # generate messages for entry.input using your LLM
     # input_data = entry.get("input")
@@ -608,16 +608,16 @@ def callback(entry: DatasetEntry):
     # print(response)
     # return {"output": response}
     return {}
-            
-            
+
+
     # Instantiate the BatchEvaluation object
 evaluation = BatchEvaluation(
     dataset="${dataset}",
     evaluations=${JSON.stringify(checks)},
-    callback=callback,  
+    callback=callback,
 )
 
-# Run the evaluation    
+# Run the evaluation
 results = evaluation.run()`}
         language="python"
       />

@@ -47,7 +47,7 @@ import type { CheckPreconditions } from "../../trace_checks/types";
 import { checkPreconditionsSchema } from "../../trace_checks/types.generated";
 import { api } from "../../utils/api";
 import { HorizontalFormControl } from "../HorizontalFormControl";
-import { RenderCode } from "../integration-guides/utils/RenderCode";
+import { RenderCode } from "../code/RenderCode";
 import DynamicZodForm from "./DynamicZodForm";
 import { EvaluatorSelection } from "./EvaluatorSelection";
 import { PreconditionsField } from "./PreconditionsField";
