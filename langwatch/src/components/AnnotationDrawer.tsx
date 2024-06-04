@@ -118,6 +118,8 @@ export function AnnotationDrawer() {
               isClosable: true,
               position: "top-right",
             });
+            reset();
+            closeDrawer();
           },
           onError: () => {
             toast({

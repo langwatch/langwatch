@@ -68,6 +68,9 @@ export const annotationRouter = createTRPCRouter({
           traceId: input.traceId,
           projectId: input.projectId,
         },
+        include: {
+          user: true,
+        },
       });
     }),
 });
