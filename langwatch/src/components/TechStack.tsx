@@ -12,7 +12,7 @@ import { Code } from "react-feather";
 import { type UseFormReturn } from "react-hook-form";
 import { RadioCard } from "~/pages/onboarding/[team]/project";
 import { Azure } from "./icons/Azure";
-import { JavaScript } from "./icons/JavaScript";
+import { TypeScript } from "./icons/TypeScript";
 import { LangChainParrot } from "./icons/LangChainParrot";
 import { OpenAI } from "./icons/OpenAI";
 import { Python } from "./icons/Python";
@@ -36,9 +36,9 @@ export const techStackLanguageOptions = {
     label: "Python",
     icon: <Python />,
   },
-  javascript: {
-    label: "JavaScript",
-    icon: <JavaScript />,
+  typescript: {
+    label: "TypeScript",
+    icon: <TypeScript />,
   },
   other: { label: "Other", icon: <Code /> },
 };
@@ -52,14 +52,14 @@ export const techStackFrameworkOptions = {
   openai: {
     label: "OpenAI",
     icon: <OpenAI />,
-    languages: { python: OpenAIPython, javascript: CustomRest } as LanguagesMap,
+    languages: { python: OpenAIPython, typescript: CustomRest } as LanguagesMap,
   },
   azure_openai: {
     label: "Azure OpenAI",
     icon: <Azure />,
     languages: {
       python: AzureOpenAIPython,
-      javascript: CustomRest,
+      typescript: CustomRest,
     } as LanguagesMap,
   },
   langchain: {
@@ -67,7 +67,7 @@ export const techStackFrameworkOptions = {
     icon: <LangChainParrot />,
     languages: {
       python: LangChainPython,
-      javascript: CustomRest,
+      typescript: CustomRest,
     } as LanguagesMap,
   },
   dspy: {
@@ -82,7 +82,7 @@ export const techStackFrameworkOptions = {
     icon: <Code />,
     languages: {
       python: CustomPython,
-      javascript: CustomRest,
+      typescript: CustomRest,
       other: CustomRest,
     } as LanguagesMap,
   },
