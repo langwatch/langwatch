@@ -27,6 +27,7 @@
     "@types/debug": "^4.1.12",
     "@types/eslint__js": "^8.42.3",
     "@types/node": "^16.0.0",
+    "dotenv": "^16.4.5",
     "eslint": "^8.57.0",
     "ts-to-zod": "^3.4.1",
     "tsup": "^8.1.0",

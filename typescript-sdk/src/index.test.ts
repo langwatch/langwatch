@@ -1,4 +1,4 @@
-import { OpenAI } from "openai";
+import { AzureOpenAI, OpenAI } from "openai";
 import { LangWatch, convertFromVercelAIMessages } from "./index";
 import {
   describe,
@@ -10,6 +10,7 @@ import {
 } from "vitest";
 import { openai } from "@ai-sdk/openai";
 import { generateText, type CoreMessage } from "ai";
+import "dotenv/config";
 
 describe("LangWatch tracer", () => {
   let mockFetch: SpyInstanceFn;
@@ -210,6 +211,67 @@ describe("LangWatch tracer", () => {
 
     // Continue with the LLM call normally
     const openai = new OpenAI();
+    const chatCompletion = await openai.chat.completions.create({
+      messages: messages,
+      model: model,
+    });
+
+    span.end({
+      outputs: chatCompletion.choices.map((choice) => ({
+        type: "chat_messages",
+        value: [choice.message],
+      })),
+    });
+
+    await trace.sendSpans();
+
+    expect(mockFetch).toHaveBeenCalled();
+    expect(mockFetch).toHaveBeenCalledWith(
+      "http://localhost.test/api/collector",
+      expect.objectContaining({
+        method: "POST",
+        headers: {
+          "X-Auth-Token": "test",
+          "Content-Type": "application/json",
+        },
+        body: expect.any(String),
+      })
+    );
+  });
+
+  it.skip("captures azure openai llm call", async () => {
+    const langwatch = new LangWatch({
+      apiKey: "test",
+      endpoint: "http://localhost.test",
+    });
+    const trace = langwatch.getTrace();
+
+    // Model to be used and messages that will be sent to the LLM
+    const model = "gpt-4-turbo-2024-04-09";
+    const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
+      { role: "system", content: "You are a helpful assistant." },
+      {
+        role: "user",
+        content: "Write a tweet-size vegetarian lasagna recipe for 4 people.",
+      },
+    ];
+
+    // Capture the llm call with a span
+    const span = trace.startLLMSpan({
+      name: "llm",
+      model: model,
+      input: {
+        type: "chat_messages",
+        value: messages,
+      },
+    });
+
+    // Continue with the LLM call normally
+    const openai = new AzureOpenAI({
+      apiKey: process.env.AZURE_OPENAI_API_KEY,
+      apiVersion: "2024-02-01",
+      endpoint: process.env.AZURE_OPENAI_ENDPOINT,
+    });
     const chatCompletion = await openai.chat.completions.create({
       messages: messages,
       model: model,
