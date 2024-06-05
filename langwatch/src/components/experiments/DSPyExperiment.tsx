@@ -834,8 +834,14 @@ function DSPyRunsScoresChart({
   stepToDisplay: DSPyStepSummary | undefined;
   labelNames: string[];
 }) {
+  const runIsVisible = (runId: string) =>
+    (!selectedRuns && !highlightedRun) ||
+    (!!highlightedRun && highlightedRun === runId) ||
+    (!highlightedRun && !!selectedRuns && selectedRuns.includes(runId));
+
   const stepsFlattenedByIndex = dspyRuns.reduce(
     (acc, run) => {
+      if (!runIsVisible(run.runId)) return acc;
       run.steps.forEach((step) => {
         acc[step.index] = {
           ...(acc[step.index] ?? {}),
@@ -849,7 +855,19 @@ function DSPyRunsScoresChart({
     {} as Record<string, { index: string } & Record<string, number>>
   );
 
-  const data = Object.values(stepsFlattenedByIndex);
+  const data = Object.values(stepsFlattenedByIndex).sort((a, b) => {
+    const aParts = a.index.split(".").map(Number);
+    const bParts = b.index.split(".").map(Number);
+
+    for (let i = 0; i < 3; i++) {
+      const aPart = aParts[i] || 0;
+      const bPart = bParts[i] || 0;
+      if (aPart < bPart) return -1;
+      if (aPart > bPart) return 1;
+    }
+
+    return 0;
+  });
 
   const theme = useTheme();
   const getColor = (runId: string) => {
@@ -944,9 +962,7 @@ function DSPyRunsScoresChart({
             }}
           />
           {dspyRuns.map(({ runId }) =>
-            !selectedRuns ||
-            (!!highlightedRun && !selectedRuns.includes(highlightedRun)) ||
-            selectedRuns.includes(runId) ? (
+            runIsVisible(runId) ? (
               <Line
                 key={runId}
                 type="monotone"
@@ -958,11 +974,6 @@ function DSPyRunsScoresChart({
                   fill: getColor(runId),
                 }}
                 isAnimationActive={false}
-                visibility={
-                  !highlightedRun || highlightedRun === runId
-                    ? "visible"
-                    : "hidden"
-                }
               />
             ) : null
           )}
