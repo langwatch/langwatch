@@ -86,6 +86,8 @@ export function MessagesTable() {
     setPeriod,
   } = usePeriodSelector();
 
+
+
   const traceGroups = api.traces.getAllForProject.useQuery(
     {
       ...filterParams,
@@ -103,6 +105,8 @@ export function MessagesTable() {
     traceGroups.data?.groups.flatMap((group) =>
       group.map((trace) => trace.trace_id)
     ) ?? [];
+
+  console.log(traceIds);
 
   const traceChecksQuery = api.traces.getTraceChecks.useQuery(
     { projectId: project?.id ?? "", traceIds },

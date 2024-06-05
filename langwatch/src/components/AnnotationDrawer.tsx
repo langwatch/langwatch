@@ -1,57 +1,48 @@
 import {
   Button,
-  Checkbox,
   Drawer,
   DrawerBody,
   DrawerCloseButton,
   DrawerContent,
   DrawerHeader,
-  FormControl,
-  FormErrorMessage,
   HStack,
-  Input,
-  Popover,
-  PopoverBody,
-  PopoverCloseButton,
-  PopoverContent,
-  PopoverTrigger,
   Radio,
   RadioGroup,
-  Stack,
   Text,
+  Textarea,
   VStack,
   useDisclosure,
   useToast,
-  Textarea,
 } from "@chakra-ui/react";
-import { TriggerAction, type Trigger } from "@prisma/client";
+import { ThumbsDown, ThumbsUp } from "react-feather";
 import { useDrawer } from "~/components/CurrentDrawer";
-import { ThumbsUp, ThumbsDown } from "react-feather";
 
-import { HorizontalFormControl } from "./HorizontalFormControl";
-
-import { useFilterParams } from "~/hooks/useFilterParams";
-
+import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
-import { useRouter } from "next/router";
-import { useEffect } from "react";
 
-export function AnnotationDrawer() {
-  const { project, organization, team } = useOrganizationTeamProject();
-  const { onOpen, onClose, isOpen } = useDisclosure();
+export function AnnotationDrawer({
+  traceId,
+  action,
+  annotationId,
+}: {
+  traceId: string;
+  action: "new" | "edit";
+  annotationId?: string;
+}) {
+  const { project } = useOrganizationTeamProject();
+  const { onClose } = useDisclosure();
   const { closeDrawer } = useDrawer();
-  const router = useRouter();
-
-  const traceId = router.query.trace as string;
 
   const toast = useToast();
 
   const createAnnotation = api.annotation.create.useMutation();
-  const getAnnotation = api.annotation.getByTraceId.useQuery({
+  const deleteAnnotation = api.annotation.deleteById.useMutation();
+
+  const getAnnotation = api.annotation.getById.useQuery({
     projectId: project?.id ?? "",
-    traceId: traceId,
+    annotationId: annotationId ?? "",
   });
 
   const updateAnnotation = api.annotation.updateByTraceId.useMutation();
@@ -99,10 +90,10 @@ export function AnnotationDrawer() {
 
     const isThumbsUp = data.isThumbsUp === "thumbsUp";
 
-    if (id) {
+    if (action === "edit") {
       updateAnnotation.mutate(
         {
-          id,
+          id: id ?? "",
           projectId: project?.id ?? "",
           isThumbsUp: isThumbsUp,
           comment: data.comment,
@@ -169,6 +160,29 @@ export function AnnotationDrawer() {
     }
   };
 
+  const handleDelete = () => {
+    deleteAnnotation.mutate(
+      {
+        annotationId: id ?? "",
+        projectId: project?.id ?? "",
+      },
+      {
+        onSuccess: () => {
+          toast({
+            title: "Annotation Deleted",
+            description: `You have successfully deleted the annotation`,
+            status: "success",
+            duration: 5000,
+            isClosable: true,
+            position: "top-right",
+          });
+          reset();
+          closeDrawer();
+        },
+      }
+    );
+  };
+
   return (
     <Drawer
       isOpen={true}
@@ -230,16 +244,27 @@ export function AnnotationDrawer() {
                 <Text>Comments</Text>
                 <Textarea {...register("comment")} />
               </VStack>
-              <Button
-                colorScheme="blue"
-                type="submit"
-                minWidth="fit-content"
-                isLoading={
-                  createAnnotation.isLoading || updateAnnotation.isLoading
-                }
-              >
-                {id ? "Update" : "Save"}
-              </Button>
+              <HStack>
+                <Button
+                  colorScheme="blue"
+                  type="submit"
+                  minWidth="fit-content"
+                  isLoading={
+                    createAnnotation.isLoading || updateAnnotation.isLoading
+                  }
+                >
+                  {action === "new" ? "Save" : "Update"}
+                </Button>
+                {action === "edit" && (
+                  <Button
+                    colorScheme="red"
+                    isLoading={deleteAnnotation.isLoading}
+                    onClick={() => handleDelete()}
+                  >
+                    Delete
+                  </Button>
+                )}
+              </HStack>
             </VStack>
           </form>
         </DrawerBody>

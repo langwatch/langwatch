@@ -25,7 +25,10 @@ import {
   Clock,
   MinusCircle,
   Shield,
+  ThumbsUp,
   XCircle,
+  ThumbsDown,
+  Edit,
 } from "react-feather";
 import Markdown from "react-markdown";
 import type {
@@ -94,6 +97,35 @@ export function MessageCard({
   );
   const traceTopic = topicsMap[trace.metadata.topic_id ?? ""];
   const traceSubtopic = topicsMap[trace.metadata.subtopic_id ?? ""];
+
+  const annotations = api.annotation.getByTraceId.useQuery({
+    traceId: trace.trace_id,
+    projectId: project.id,
+  });
+
+  console.log("annotations", annotations.data);
+
+  const Annotation = ({ annotations }: { annotations: Annotation[] }) => {
+    return (
+      <Tooltip label={`${annotations.length} Annotations`}>
+        <Box
+          right={2}
+          top={2}
+          borderRadius="xl"
+          borderWidth={1}
+          borderColor="gray.300"
+          paddingY={1}
+          paddingX={2}
+          zIndex="99"
+        >
+          <HStack>
+            <Edit size="20px" />
+            <Text fontSize="sm">{annotations.length} Annotations</Text>
+          </HStack>
+        </Box>
+      </Tooltip>
+    );
+  };
 
   return (
     <VStack alignItems="flex-start" spacing={4} width="fill">
@@ -290,6 +322,9 @@ export function MessageCard({
           </HStack>
         </VStack>
         <Spacer />
+        {annotations.data && annotations.data.length > 0 && (
+          <Annotation annotations={annotations.data} />
+        )}
         {!checksMap && <Skeleton width={100} height="1em" />}
         {checksMap && totalGuardrails > 0 && (
           <Popover trigger="hover">

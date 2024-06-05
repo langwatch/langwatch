@@ -16,6 +16,7 @@ import {
   Text,
   VStack,
   useDisclosure,
+  Box,
 } from "@chakra-ui/react";
 import { useState } from "react";
 import { Maximize2, Minimize2 } from "react-feather";
@@ -28,6 +29,7 @@ import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject"
 import { api } from "../utils/api";
 import { useDrawer } from "./CurrentDrawer";
 import { AddDatasetRecordDrawerV2 } from "./AddDatasetRecordDrawer";
+import { Annotations } from "./Annotations";
 
 interface TraceDetailsDrawerProps {
   traceId: string;
@@ -57,6 +59,11 @@ export const TraceDetailsDrawer = (props: TraceDetailsDrawerProps) => {
       refetchOnWindowFocus: false,
     }
   );
+
+  const annotationsQuery = api.annotation.getByTraceId.useQuery({
+    projectId: project?.id ?? "",
+    traceId: props.traceId,
+  });
 
   const anyGuardrails = traceChecksQuery.data?.[props.traceId]?.some(
     (x) => x.is_guardrail
@@ -158,6 +165,24 @@ export const TraceDetailsDrawer = (props: TraceDetailsDrawerProps) => {
     );
   };
 
+  const AnnotationMsgs = ({ annotations }: { annotations: Annotation[] }) => {
+    console.log(annotations);
+    if (!annotations.length) return null;
+
+    return (
+      <Text
+        marginLeft={3}
+        borderRadius={"md"}
+        paddingX={2}
+        backgroundColor={"green.500"}
+        color={"white"}
+        fontSize={"sm"}
+      >
+        {annotations.length}
+      </Text>
+    );
+  };
+
   const Blocked = (trace: TraceEval) => {
     const totalBlocked = trace
       ? trace.traceChecks?.[trace.traceId]?.filter(
@@ -210,7 +235,9 @@ export const TraceDetailsDrawer = (props: TraceDetailsDrawerProps) => {
               <Button
                 colorScheme="black"
                 variant="outline"
-                onClick={() => openDrawer("annotation", undefined)}
+                onClick={() =>
+                  openDrawer("annotation", { traceId: props.traceId })
+                }
               >
                 Annotate
               </Button>
@@ -246,6 +273,12 @@ export const TraceDetailsDrawer = (props: TraceDetailsDrawerProps) => {
                   traceChecks={traceChecksQuery.data}
                 />
               </Tab>
+              <Tab>
+                Annotations{" "}
+                {annotationsQuery.data && (
+                  <AnnotationMsgs annotations={annotationsQuery.data} />
+                )}
+              </Tab>
             </TabList>
 
             <TabPanels>
@@ -266,6 +299,13 @@ export const TraceDetailsDrawer = (props: TraceDetailsDrawerProps) => {
                   traceId={props.traceId ?? ""}
                   traceChecks={traceChecksQuery.data}
                 />
+              </TabPanel>
+              <TabPanel>
+                {annotationsQuery.data && annotationsQuery.data.length > 0 ? (
+                  <Annotations traceId={props.traceId} />
+                ) : (
+                  <Text>No annotations found</Text>
+                )}
               </TabPanel>
             </TabPanels>
           </Tabs>

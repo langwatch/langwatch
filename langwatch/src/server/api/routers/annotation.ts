@@ -63,13 +63,38 @@ export const annotationRouter = createTRPCRouter({
     )
     .use(checkUserPermissionForProject(TeamRoleGroup.DATASETS_MANAGE))
     .query(async ({ ctx, input }) => {
-      return ctx.prisma.annotation.findFirst({
+      return ctx.prisma.annotation.findMany({
         where: {
           traceId: input.traceId,
           projectId: input.projectId,
         },
         include: {
           user: true,
+        },
+        orderBy: {
+          createdAt: "asc",
+        },
+      });
+    }),
+  getById: protectedProcedure
+    .input(z.object({ annotationId: z.string(), projectId: z.string() }))
+    .use(checkUserPermissionForProject(TeamRoleGroup.DATASETS_MANAGE))
+    .query(async ({ ctx, input }) => {
+      return ctx.prisma.annotation.findUnique({
+        where: {
+          id: input.annotationId,
+          projectId: input.projectId,
+        },
+      });
+    }),
+  deleteById: protectedProcedure
+    .input(z.object({ annotationId: z.string(), projectId: z.string() }))
+    .use(checkUserPermissionForProject(TeamRoleGroup.DATASETS_MANAGE))
+    .mutation(async ({ ctx, input }) => {
+      return ctx.prisma.annotation.delete({
+        where: {
+          id: input.annotationId,
+          projectId: input.projectId,
         },
       });
     }),

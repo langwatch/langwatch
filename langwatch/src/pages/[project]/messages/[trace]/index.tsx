@@ -16,6 +16,7 @@ import { format, formatDistanceToNow } from "date-fns";
 import ErrorPage from "next/error";
 import { useRouter } from "next/router";
 import React, {
+  useCallback,
   useEffect,
   useRef,
   useState,
@@ -33,7 +34,9 @@ import { isNotFound } from "../../../../utils/trpcError";
 import { useDrawer } from "../../../../components/CurrentDrawer";
 import { getExtractedInput } from "../../../../components/messages/MessageCard";
 import { formatTimeAgo } from "../../../../utils/formatTimeAgo";
-import { ThumbsUp } from "react-feather";
+import { ThumbsUp, ThumbsDown, Edit } from "react-feather";
+import { useRequiredSession } from "../../../../hooks/useRequiredSession";
+import { Annotations } from "../../../../components/Annotations";
 
 export default function TraceDetails() {
   const { hasTeamPermission } = useOrganizationTeamProject();
@@ -141,6 +144,7 @@ function Conversation({ threadId }: { threadId?: string }) {
   const { project } = useOrganizationTeamProject();
 
   const currentTraceRef = useRef<HTMLDivElement>(null);
+
   const threadTraces = api.traces.getTracesByThreadId.useQuery(
     {
       projectId: project?.id ?? "",
@@ -264,13 +268,39 @@ const TraceMessages = React.forwardRef(function TraceMessages(
   ref
 ) {
   const { project } = useOrganizationTeamProject();
+  const { openDrawer } = useDrawer();
 
-  const annotations = api.annotation.getByTraceId.useQuery({
-    projectId: project?.id ?? "",
-    traceId: trace.trace_id,
-  });
+  const [showAnnotationHover, setShowAnnotationHover] = useState(false);
 
-  console.log("test", annotations.data);
+  const AnnotationHover = () => {
+    return (
+      <Box
+        position="absolute"
+        right={-5}
+        paddingY={3}
+        paddingX={2}
+        top={"50%"}
+        marginTop={"-48px"}
+        borderRadius={"3xl"}
+        border="1px solid"
+        borderColor="gray.200"
+        backgroundColor="white"
+        onClick={() =>
+          openDrawer("annotation", {
+            traceId: trace.trace_id,
+            action: "new",
+          })
+        }
+        cursor="pointer"
+      >
+        <VStack>
+          <ThumbsUp size={"20px"} />
+          <ThumbsDown size={"20px"} />
+          <Edit size={"20px"} />
+        </VStack>
+      </Box>
+    );
+  };
 
   return (
     <VStack
@@ -284,19 +314,25 @@ const TraceMessages = React.forwardRef(function TraceMessages(
       <Box
         width="full"
         borderY="1px solid"
+        paddingY={4}
         borderColor={highlighted ? "blue.500" : "white"}
         background={highlighted ? "blue.50" : "white"}
         _hover={{ background: highlighted ? "blue.50" : "gray.50" }}
+        onMouseEnter={() => setShowAnnotationHover(true)}
+        onMouseLeave={() => setShowAnnotationHover(false)}
+        position="relative"
       >
         <Container maxWidth="6xl">
           <HStack width="full">
             <Box
               width="full"
+              position="relative"
               borderRight="1px solid"
               borderColor="gray.200"
-              marginRight={4}
-              paddingRight={4}
+              marginRight={10}
+              paddingRight={10}
             >
+              {showAnnotationHover && <AnnotationHover />}
               <Message
                 trace={trace}
                 author="Input"
@@ -305,7 +341,7 @@ const TraceMessages = React.forwardRef(function TraceMessages(
                 paddingTop="20px"
               >
                 <Text paddingY="6px" marginBottom="38px" whiteSpace="pre-wrap">
-                  {getExtractedInput(trace)}ssdasdasdasd
+                  {getExtractedInput(trace)}
                 </Text>
               </Message>
               <Message
@@ -346,47 +382,14 @@ const TraceMessages = React.forwardRef(function TraceMessages(
                 )}
               </Message>
             </Box>
-            {annotations.data && (
-              <Box>
-                <Annotation annotation={annotations.data} />
-              </Box>
-            )}
+
+            <Annotations traceId={trace.trace_id} />
           </HStack>
         </Container>
       </Box>
     </VStack>
   );
 });
-
-type Annotation = {
-  comment: string;
-  isThumbsUp: boolean;
-  createdAt: Date;
-};
-
-const Annotation = ({ annotation }: { annotation: Annotation }) => {
-  return (
-    <Box
-      backgroundColor="gray.100"
-      padding={3}
-      borderRadius={5}
-      width="300px"
-      align="start"
-    >
-      <VStack align="start">
-        <HStack width="full" align={"top"}>
-          <VStack align="start" spacing={0}>
-            <Text fontWeight="bold">{annotation.name}</Text>
-            <Text fontSize="sm">{annotation.createdAt.toLocaleString()}</Text>
-          </VStack>
-          <Spacer />
-          <ThumbsUp size={"18px"} />
-        </HStack>
-        <Text>{annotation.comment}</Text>
-      </VStack>
-    </Box>
-  );
-};
 
 function Message({
   trace,
