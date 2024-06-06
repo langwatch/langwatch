@@ -16,10 +16,12 @@ import {
   Text,
   VStack,
   useDisclosure,
+  Box,
 } from "@chakra-ui/react";
 import { useState } from "react";
 import { Maximize2, Minimize2 } from "react-feather";
 import type { TraceCheck } from "~/server/tracer/types";
+import type { Annotation } from "@prisma/client";
 import { CheckPassingDrawer } from "./CheckPassingDrawer";
 import { SpanTree } from "./traces/SpanTree";
 import { TraceSummary } from "./traces/Summary";
@@ -28,9 +30,12 @@ import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject"
 import { api } from "../utils/api";
 import { useDrawer } from "./CurrentDrawer";
 import { AddDatasetRecordDrawerV2 } from "./AddDatasetRecordDrawer";
+import { Annotations } from "./Annotations";
+import { useRouter } from "next/router";
 
 interface TraceDetailsDrawerProps {
   traceId: string;
+  isAnnotationTab?: boolean;
 }
 
 interface TraceEval {
@@ -39,8 +44,11 @@ interface TraceEval {
 }
 
 export const TraceDetailsDrawer = (props: TraceDetailsDrawerProps) => {
-  const { closeDrawer } = useDrawer();
+  const { closeDrawer, openDrawer } = useDrawer();
   const { isOpen, onOpen, onClose } = useDisclosure();
+  const router = useRouter();
+
+  const isAnnotationTab = router.query["drawer.annotationTab"];
 
   const [traceView, setTraceView] = useState<"span" | "full">("span");
   const toggleView = () => {
@@ -57,6 +65,11 @@ export const TraceDetailsDrawer = (props: TraceDetailsDrawerProps) => {
       refetchOnWindowFocus: false,
     }
   );
+
+  const annotationsQuery = api.annotation.getByTraceId.useQuery({
+    projectId: project?.id ?? "",
+    traceId: props.traceId,
+  });
 
   const anyGuardrails = traceChecksQuery.data?.[props.traceId]?.some(
     (x) => x.is_guardrail
@@ -158,6 +171,23 @@ export const TraceDetailsDrawer = (props: TraceDetailsDrawerProps) => {
     );
   };
 
+  const AnnotationMsgs = ({ annotations }: { annotations: Annotation[] }) => {
+    if (!annotations.length) return null;
+
+    return (
+      <Text
+        marginLeft={3}
+        borderRadius={"md"}
+        paddingX={2}
+        backgroundColor={"green.500"}
+        color={"white"}
+        fontSize={"sm"}
+      >
+        {annotations.length}
+      </Text>
+    );
+  };
+
   const Blocked = (trace: TraceEval) => {
     const totalBlocked = trace
       ? trace.traceChecks?.[trace.traceId]?.filter(
@@ -206,6 +236,19 @@ export const TraceDetailsDrawer = (props: TraceDetailsDrawerProps) => {
               Trace Details
             </Text>
             <Spacer />
+            <HStack>
+              <Button
+                colorScheme="black"
+                variant="outline"
+                onClick={() =>
+                  openDrawer("annotation", {
+                    traceId: props.traceId,
+                    action: "new",
+                  })
+                }
+              >
+                Annotate
+              </Button>
               <Button
                 colorScheme="black"
                 type="submit"
@@ -215,10 +258,11 @@ export const TraceDetailsDrawer = (props: TraceDetailsDrawerProps) => {
               >
                 Add to Dataset
               </Button>
+            </HStack>
           </Flex>
         </DrawerHeader>
         <DrawerBody>
-          <Tabs>
+          <Tabs defaultIndex={isAnnotationTab ? 2 : 0}>
             <TabList>
               <Tab>Details</Tab>
               {anyGuardrails && (
@@ -236,6 +280,12 @@ export const TraceDetailsDrawer = (props: TraceDetailsDrawerProps) => {
                   traceId={props.traceId}
                   traceChecks={traceChecksQuery.data}
                 />
+              </Tab>
+              <Tab>
+                Annotations{" "}
+                {annotationsQuery.data && (
+                  <AnnotationMsgs annotations={annotationsQuery.data} />
+                )}
               </Tab>
             </TabList>
 
@@ -257,6 +307,13 @@ export const TraceDetailsDrawer = (props: TraceDetailsDrawerProps) => {
                   traceId={props.traceId ?? ""}
                   traceChecks={traceChecksQuery.data}
                 />
+              </TabPanel>
+              <TabPanel>
+                {annotationsQuery.data && annotationsQuery.data.length > 0 ? (
+                  <Annotations traceId={props.traceId} />
+                ) : (
+                  <Text>No annotations found</Text>
+                )}
               </TabPanel>
             </TabPanels>
           </Tabs>

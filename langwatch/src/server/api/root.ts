@@ -18,6 +18,7 @@ import { limitsRouter } from "./routers/limits";
 import { dependencies } from "../../injection/dependencies.server";
 import { triggerRouter } from "./routers/triggers";
 import { experimentsRouter } from "./routers/experiments";
+import { annotationRouter } from "./routers/annotation";
 
 /**
  * This is the primary router for your server.
@@ -43,6 +44,7 @@ export const appRouter = createTRPCRouter({
   limits: limitsRouter,
   trigger: triggerRouter,
   experiments: experimentsRouter,
+  annotation: annotationRouter,
   ...(dependencies.extraTRPCRoutes?.() ?? {}),
 });
 

@@ -59,6 +59,7 @@ model User {
     orgMemberships  OrganizationUser[]
     createdAt       DateTime           @default(now())
     updatedAt       DateTime           @default(now()) @updatedAt
+    Annotation      Annotation[]
 }
 
 model VerificationToken {
@@ -165,6 +166,7 @@ model Project {
     piiRedactionLevel PIIRedactionLevel @default(ESSENTIAL)
     triggers          Trigger[]
     experiments       Experiment[]
+    Annotation        Annotation[]
 
     @@index([teamId])
 }
@@ -380,4 +382,21 @@ model Experiment {
 
     @@unique([projectId, slug])
     @@index([projectId])
+}
+
+model Annotation {
+    id         String   @id @default(nanoid())
+    projectId  String
+    project    Project  @relation(fields: [projectId], references: [id])
+    traceId    String
+    comment    String
+    isThumbsUp Boolean
+    userId     String
+    user       User     @relation(fields: [userId], references: [id])
+    createdAt  DateTime @default(now())
+    updatedAt  DateTime @default(now()) @updatedAt
+
+    @@index([projectId])
+    @@index([traceId])
+    @@index([userId])
 }

@@ -16,13 +16,14 @@ import {
   Tooltip,
   VStack,
 } from "@chakra-ui/react";
-import type { Project } from "@prisma/client";
+import type { Annotation, Project } from "@prisma/client";
 import { formatDistanceToNow } from "date-fns";
 import NextLink from "next/link";
 import numeral from "numeral";
 import {
   CheckCircle,
   Clock,
+  Edit,
   MinusCircle,
   Shield,
   XCircle,
@@ -35,9 +36,10 @@ import type {
 } from "../../server/tracer/types";
 import { api } from "../../utils/api";
 import { formatMilliseconds } from "../../utils/formatMilliseconds";
+import { pluralize } from "../../utils/pluralize";
 import { getColorForString } from "../../utils/rotatingColors";
 import { CheckPassing } from "../CheckPassing";
-import { pluralize } from "../../utils/pluralize";
+import { useDrawer } from "../CurrentDrawer";
 
 export type TraceWithGuardrail = Trace & {
   lastGuardrail: (GuardrailResult & { name?: string }) | undefined;
@@ -94,6 +96,43 @@ export function MessageCard({
   );
   const traceTopic = topicsMap[trace.metadata.topic_id ?? ""];
   const traceSubtopic = topicsMap[trace.metadata.subtopic_id ?? ""];
+
+  const annotations = api.annotation.getByTraceId.useQuery({
+    traceId: trace.trace_id,
+    projectId: project.id,
+  });
+
+  const Annotation = ({ annotations }: { annotations: Annotation[] }) => {
+    const { openDrawer } = useDrawer();
+
+    return (
+      <Tooltip label={`${annotations.length} Annotations`}>
+        <Box
+          right={2}
+          top={2}
+          borderRadius="2xl"
+          borderWidth={1}
+          borderColor="gray.300"
+          paddingY={1}
+          paddingX={2}
+          zIndex="99"
+          onClick={() =>
+            openDrawer("traceDetails", {
+              traceId: trace.trace_id,
+              annotationTab: true,
+            })
+          }
+        >
+          <HStack>
+            <Edit size="20px" />
+            <Text fontSize="sm">
+              {annotations.length} annotation{annotations.length > 1 ? "s" : ""}
+            </Text>
+          </HStack>
+        </Box>
+      </Tooltip>
+    );
+  };
 
   return (
     <VStack alignItems="flex-start" spacing={4} width="fill">
@@ -290,6 +329,9 @@ export function MessageCard({
           </HStack>
         </VStack>
         <Spacer />
+        {annotations.data && annotations.data.length > 0 && (
+          <Annotation annotations={annotations.data} />
+        )}
         {!checksMap && <Skeleton width={100} height="1em" />}
         {checksMap && totalGuardrails > 0 && (
           <Popover trigger="hover">

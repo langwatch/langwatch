@@ -46,6 +46,7 @@ import {
   ChevronLeft,
   ChevronRight,
   List,
+  Edit,
   RefreshCw,
   Shield,
 } from "react-feather";
@@ -104,6 +105,13 @@ export function MessagesTable() {
       group.map((trace) => trace.trace_id)
     ) ?? [];
 
+  const getAnnotations = api.annotation.getByTraceIds.useQuery(
+    { projectId: project?.id ?? "", traceIds },
+    {
+      enabled: project?.id !== undefined,
+    }
+  );
+
   const traceChecksQuery = api.traces.getTraceChecks.useQuery(
     { projectId: project?.id ?? "", traceIds },
     {
@@ -132,6 +140,49 @@ export function MessagesTable() {
     )
   );
 
+  const annotationCount = (traceId: string) => {
+    if (getAnnotations.isLoading) {
+      return;
+    }
+    const annotations = getAnnotations.data?.filter(
+      (annotation) => annotation.traceId === traceId
+    );
+    if (annotations?.length === 0) {
+      return null;
+    }
+    return (
+      <Tooltip label={`${annotations?.length} annotations`}>
+        <HStack
+          marginRight={1}
+          onClick={() =>
+            openDrawer("traceDetails", {
+              traceId: traceId,
+              annotationTab: true,
+            })
+          }
+        >
+          <Edit size="18px" />
+          <Box
+            width="13px"
+            height="13px"
+            borderRadius="12px"
+            background="green.500"
+            position="absolute"
+            top="10px"
+            left="0px"
+            paddingTop="1px"
+            fontSize="9px"
+            color="white"
+            lineHeight="12px"
+            textAlign="center"
+          >
+            {annotations?.length}
+          </Box>
+        </HStack>
+      </Tooltip>
+    );
+  };
+
   const traceSelection = (trace_id: string) => {
     setSelectedTraceIds((prevTraceChecks: string[]) => {
       const index = prevTraceChecks.indexOf(trace_id);
@@ -159,11 +210,15 @@ export function MessagesTable() {
       name: "",
       sortable: false,
       render: (trace, index) => (
-        <Td key={index}>
-          <Checkbox
-            colorScheme="blue"
-            onChange={() => traceSelection(trace.trace_id)}
-          />
+        <Td key={index} textAlign="right">
+          <HStack position="relative" align="right">
+            <Spacer />
+            {annotationCount(trace.trace_id)}
+            <Checkbox
+              colorScheme="blue"
+              onChange={() => traceSelection(trace.trace_id)}
+            />
+          </HStack>
         </Td>
       ),
       value: () => "",
