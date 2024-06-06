@@ -35,7 +35,7 @@ import { useRouter } from "next/router";
 
 interface TraceDetailsDrawerProps {
   traceId: string;
-  annotationTab?: boolean;
+  isAnnotationTab?: boolean;
 }
 
 interface TraceEval {
@@ -48,7 +48,7 @@ export const TraceDetailsDrawer = (props: TraceDetailsDrawerProps) => {
   const { isOpen, onOpen, onClose } = useDisclosure();
   const router = useRouter();
 
-  const annotationTab = router.query["drawer.annotationTab"];
+  const isAnnotationTab = router.query["drawer.annotationTab"];
 
   const [traceView, setTraceView] = useState<"span" | "full">("span");
   const toggleView = () => {
@@ -262,7 +262,7 @@ export const TraceDetailsDrawer = (props: TraceDetailsDrawerProps) => {
           </Flex>
         </DrawerHeader>
         <DrawerBody>
-          <Tabs defaultIndex={annotationTab ? 2 : 0}>
+          <Tabs defaultIndex={isAnnotationTab ? 2 : 0}>
             <TabList>
               <Tab>Details</Tab>
               {anyGuardrails && (
