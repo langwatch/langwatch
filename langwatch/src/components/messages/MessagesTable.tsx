@@ -141,8 +141,6 @@ export function MessagesTable() {
   );
 
   const annotationCount = (traceId: string) => {
-    // if 0 return null
-
     if (getAnnotations.isLoading) {
       return;
     }
