@@ -221,6 +221,10 @@ describe("LangWatch tracer", () => {
         type: "chat_messages",
         value: [choice.message],
       })),
+      metrics: {
+        promptTokens: chatCompletion.usage?.prompt_tokens,
+        completionTokens: chatCompletion.usage?.completion_tokens,
+      },
     });
 
     await trace.sendSpans();
@@ -282,6 +286,10 @@ describe("LangWatch tracer", () => {
         type: "chat_messages",
         value: [choice.message],
       })),
+      metrics: {
+        promptTokens: chatCompletion.usage?.prompt_tokens,
+        completionTokens: chatCompletion.usage?.completion_tokens,
+      },
     });
 
     await trace.sendSpans();
@@ -338,6 +346,10 @@ describe("LangWatch tracer", () => {
           value: convertFromVercelAIMessages(response.responseMessages),
         },
       ],
+      metrics: {
+        promptTokens: response.usage?.promptTokens,
+        completionTokens: response.usage?.completionTokens,
+      },
     });
 
     await trace.sendSpans();
