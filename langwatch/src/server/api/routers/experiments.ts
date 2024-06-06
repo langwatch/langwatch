@@ -58,7 +58,6 @@ export const experimentsRouter = createTRPCRouter({
               ] as QueryDslBoolQuery["must"],
             } as QueryDslBoolQuery,
           },
-          sort: [{ index: "asc" }],
           _source: [
             "run_id",
             "index",
@@ -88,36 +87,40 @@ export const experimentsRouter = createTRPCRouter({
 
           return {
             runId: bucket.key,
-            steps: steps.map((hit) => {
-              const llmCalls = hit._source!.llm_calls ?? [];
+            steps: steps
+              .map((hit) => {
+                const llmCalls = hit._source!.llm_calls ?? [];
 
-              return {
-                run_id: hit._source!.run_id,
-                index: hit._source!.index,
-                score: hit._source!.score,
-                label: hit._source!.label,
-                optimizer: {
-                  name: hit._source!.optimizer.name,
-                },
-                llm_calls_summary: {
-                  total: llmCalls.length,
-                  total_tokens: llmCalls.reduce(
-                    (acc, curr) =>
-                      acc +
-                      (curr.completion_tokens ?? 0) +
-                      (curr.prompt_tokens ?? 0),
-                    0
-                  ),
-                  total_cost: llmCalls.reduce(
-                    (acc, curr) => acc + (curr?.cost ?? 0),
-                    0
-                  ),
-                },
-                timestamps: {
-                  created_at: hit._source!.timestamps.created_at,
-                },
-              } as DSPyStepSummary;
-            }),
+                return {
+                  run_id: hit._source!.run_id,
+                  index: hit._source!.index,
+                  score: hit._source!.score,
+                  label: hit._source!.label,
+                  optimizer: {
+                    name: hit._source!.optimizer.name,
+                  },
+                  llm_calls_summary: {
+                    total: llmCalls.length,
+                    total_tokens: llmCalls.reduce(
+                      (acc, curr) =>
+                        acc +
+                        (curr.completion_tokens ?? 0) +
+                        (curr.prompt_tokens ?? 0),
+                      0
+                    ),
+                    total_cost: llmCalls.reduce(
+                      (acc, curr) => acc + (curr?.cost ?? 0),
+                      0
+                    ),
+                  },
+                  timestamps: {
+                    created_at: hit._source!.timestamps.created_at,
+                  },
+                } as DSPyStepSummary;
+              })
+              .sort(
+                (a, b) => a.timestamps.created_at - b.timestamps.created_at
+              ),
             created_at: Math.min(
               ...steps.map((hit) => hit._source!.timestamps.created_at)
             ),

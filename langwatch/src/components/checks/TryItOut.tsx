@@ -173,7 +173,7 @@ export function TryItOut({
         projectId: project.id,
         evaluatorType: evaluatorType,
         traceId: runningState.nextTraceId,
-        settings,
+        settings: settings ?? {},
       },
       {
         onSuccess: (result) => {

@@ -1,6 +1,7 @@
 import {
   techStackLanguageOptions,
   techStackFrameworkOptions,
+  docsLinks,
 } from "./TechStack";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import {
@@ -11,8 +12,15 @@ import {
   Spacer,
   Spinner,
   Link,
+  Box,
+  Card,
+  CardHeader,
+  CardBody,
 } from "@chakra-ui/react";
 import { DashboardLayout } from "./DashboardLayout";
+import { ExternalLinkIcon } from "@chakra-ui/icons";
+import { APIKeyCopyInput } from "../pages/authorize";
+import type { PropsWithChildren } from "react";
 
 export const ProjectIntegration = () => {
   const { project, isRefetching } = useOrganizationTeamProject({
@@ -29,7 +37,22 @@ export const ProjectIntegration = () => {
     | undefined;
   const framework = frameworkKey && techStackFrameworkOptions[frameworkKey];
 
-  const IntegrationDocs = languageKey && framework?.languages[languageKey];
+  const integrationDocs =
+    (languageKey && framework?.languages[languageKey]) ?? docsLinks.custom_rest;
+
+  const IconWrapper = ({ children }: PropsWithChildren) => {
+    return (
+      <Box
+        width="64px"
+        height="64px"
+        display="flex"
+        alignItems="center"
+        justifyContent="center"
+      >
+        {children}
+      </Box>
+    );
+  };
 
   return (
     <DashboardLayout backgroundColor="white">
@@ -59,11 +82,45 @@ export const ProjectIntegration = () => {
             {isRefetching && <Spinner />}
           </HStack>
           <Text>
-            Follow the instructions to setup your project with LangWatch, this
-            page will update automatically as soon as the first messages arrive.
+            Follow the instructions on our docs to setup your project with
+            LangWatch, this page will update automatically as soon as the first
+            messages arrive.
           </Text>
+          <HStack align="stretch" spacing={6} wrap="wrap">
+            <Card width="450px">
+              <CardHeader>
+                <Heading as="h2" size="md">
+                  API Key
+                </Heading>
+              </CardHeader>
+              <CardBody>
+                <VStack spacing={6}>
+                  <Text>
+                    Copy your LangWatch API key to use for the integration
+                  </Text>
+                  <APIKeyCopyInput />
+                </VStack>
+              </CardBody>
+            </Card>
+            <Card width="450px" minHeight="full">
+              <CardHeader>
+                <Heading as="h2" size="md">
+                  Integration Guide
+                </Heading>
+              </CardHeader>
+              <CardBody>
+                <Link href={integrationDocs.href} isExternal marginLeft="28px">
+                  <HStack align="center" fontSize={18} spacing={4}>
+                    <IconWrapper>{integrationDocs.icon}</IconWrapper>
+                    <Text>Open {integrationDocs.label} Integration Guide</Text>
+                    <ExternalLinkIcon />
+                  </HStack>
+                </Link>
+              </CardBody>
+            </Card>
+          </HStack>
           <Text>
-            You can also view our{" "}
+            You can also open our{" "}
             <Link
               textDecoration="underline"
               href={`https://app.langwatch.ai/${process.env.NEXT_PUBLIC_DEMO_SLUG}`}
@@ -71,17 +128,14 @@ export const ProjectIntegration = () => {
             >
               demo account
             </Link>
-            , where we have setup an automated chat bot.
+            {" "}to look around, we have a sample chatbot integrated there so you can explore.
           </Text>
         </VStack>
-        <div className="markdown">
-          {IntegrationDocs && <IntegrationDocs apiKey={project?.apiKey} />}
-        </div>
         <Text fontSize="14px">
           Having issues? Messages not visible yet? Check out our{" "}
           <Link
             textDecoration="underline"
-            href="https://docs.langwatch.ai/docs/support"
+            href="https://docs.langwatch.ai/troubleshooting"
             target="_blank"
           >
             Troubleshooting & Support

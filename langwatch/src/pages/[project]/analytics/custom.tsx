@@ -114,7 +114,7 @@ import {
 } from "../../../utils/stringCasing";
 import { useRouter } from "next/router";
 import { useFilterParams } from "~/hooks/useFilterParams";
-import { RenderCode } from "~/components/integration-guides/utils/RenderCode";
+import { RenderCode } from "~/components/code/RenderCode";
 
 export interface CustomGraphFormData {
   title?: string;

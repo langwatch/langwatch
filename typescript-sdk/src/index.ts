@@ -1,70 +1,45 @@
-import {
-  type Strict,
-  camelToSnakeCaseNested,
-  type SnakeToCamelCaseNested,
-} from "./helpers";
-import {
-  type Trace,
-  type Span as ServerSpan,
-  type BaseSpan as ServerBaseSpan,
-  type SpanTypes,
-  type LLMSpan as ServerLLMSpan,
-  type RAGSpan as ServerRAGSpan,
-  type CollectorRESTParams,
-  type SpanInputOutput as ServerSpanInputOutput,
-  type ChatMessage as ServerChatMessage,
-} from "./server/types/tracer";
+import EventEmitter from "events";
 import { nanoid } from "nanoid";
+import { ZodError } from "zod";
+import { fromZodError } from "zod-validation-error";
+import { camelToSnakeCaseNested, type Strict } from "./helpers";
+import {
+  type CollectorRESTParams,
+  type Span as ServerSpan,
+  type SpanTypes,
+} from "./server/types/tracer";
 import {
   collectorRESTParamsSchema,
   spanSchema,
 } from "./server/types/tracer.generated";
-import type modelPrices from "llm-cost/model_prices_and_context_window.json";
-import EventEmitter from "events";
-import { ZodError } from "zod";
-import { fromZodError } from "zod-validation-error";
-import type { OpenAI } from "openai";
+import {
+  type BaseSpan,
+  type ChatMessage,
+  type ChatRichContent,
+  type LLMSpan,
+  type Metadata,
+  type PendingBaseSpan,
+  type PendingLLMSpan,
+  type PendingRAGSpan,
+  type RAGSpan,
+  type SpanInputOutput,
+} from "./types";
+import { captureError, convertFromVercelAIMessages } from "./utils";
 
-export type Metadata = SnakeToCamelCaseNested<Trace["metadata"]>;
-
-// Check to see if out ChatMessage type is compatible with OpenAIChatCompletion messages
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-const _ =
-  {} as OpenAI.Chat.ChatCompletionMessageParam satisfies ServerChatMessage;
-
-// Keep the input/output types signatures as snake case to match the official openai nodejs api
-export type SpanInputOutput =
-  | SnakeToCamelCaseNested<Exclude<ServerSpanInputOutput, ServerChatMessage>>
-  | ServerChatMessage;
-
-export type ConvertServerSpan<T extends ServerBaseSpan> =
-  SnakeToCamelCaseNested<
-    Omit<T, "input" | "outputs"> & {
-      input?: SpanInputOutput | null;
-      outputs: SpanInputOutput[];
-    }
-  >;
-
-export type PendingSpan<T extends BaseSpan> = Omit<
-  T,
-  "traceId" | "timestamps"
-> & {
-  timestamps: Omit<T["timestamps"], "finishedAt"> & {
-    finishedAt?: number | null;
-  };
+export type {
+  BaseSpan,
+  ChatMessage as ChatMessage,
+  ChatRichContent,
+  LLMSpan,
+  Metadata,
+  PendingBaseSpan,
+  PendingLLMSpan,
+  PendingRAGSpan,
+  RAGSpan,
+  SpanInputOutput,
 };
 
-export type BaseSpan = ConvertServerSpan<ServerBaseSpan>;
-export type PendingBaseSpan = PendingSpan<BaseSpan>;
-
-// vendor is deprecated, and we try to force the available models here
-export type LLMSpan = ConvertServerSpan<
-  Omit<ServerLLMSpan, "vendor" | "model">
-> & { model: keyof typeof modelPrices | "unknown" };
-export type PendingLLMSpan = PendingSpan<LLMSpan>;
-
-export type RAGSpan = ConvertServerSpan<ServerRAGSpan>;
-export type PendingRAGSpan = PendingSpan<RAGSpan>;
+export { convertFromVercelAIMessages, captureError };
 
 export class LangWatch extends EventEmitter {
   apiKey: string | undefined;
@@ -80,15 +55,19 @@ export class LangWatch extends EventEmitter {
     super();
     const apiKey_ = apiKey ?? process.env.LANGWATCH_API_KEY;
     if (!apiKey_) {
-      console.warn(
-        "[LangWatch] ⚠️ LangWatch API key is not set, please set the LANGWATCH_API_KEY environment variable or pass it in the constructor. Traces will not be captured."
+      const error = new Error(
+        "LangWatch API key is not set, please set the LANGWATCH_API_KEY environment variable or pass it in the constructor. Traces will not be captured."
       );
+      this.emit("error", error);
     }
     this.apiKey = apiKey_;
     this.endpoint = endpoint;
   }
 
-  getTrace(traceId?: string, metadata?: Metadata) {
+  getTrace({
+    traceId,
+    metadata,
+  }: { traceId?: string; metadata?: Metadata } = {}) {
     return new LangWatchTrace({
       client: this,
       traceId: traceId ?? `trace_${nanoid()}`,
@@ -111,6 +90,7 @@ export class LangWatch extends EventEmitter {
         await new Promise((resolve) => setTimeout(resolve, backoffTime));
       }
     }
+    console.warn("[LangWatch] ⚠️ Failed to send trace, giving up");
   }
 
   async _sendTrace(params: CollectorRESTParams) {
@@ -120,10 +100,9 @@ export class LangWatch extends EventEmitter {
 
     if (!this.apiKey) {
       const error = new Error(
-        "[LangWatch] ⚠️ LangWatch API key is not set, LLMs traces will not be sent, go to https://langwatch.ai to set it up"
+        "LangWatch API key is not set, LLMs traces will not be sent, go to https://langwatch.ai to set it up"
       );
       this.emit("error", error);
-      console.warn(error.message);
       return;
     }
 
@@ -138,15 +117,14 @@ export class LangWatch extends EventEmitter {
 
     if (response.status === 429) {
       const error = new Error(
-        "[LangWatch] ⚠️ Rate limit exceeded, dropping message from being sent to LangWatch. Please check your dashboard to upgrade your plan."
+        "Rate limit exceeded, dropping message from being sent to LangWatch. Please check your dashboard to upgrade your plan."
       );
       this.emit("error", error);
-      console.warn(error.message);
       return;
     }
     if (!response.ok) {
       const error = new Error(
-        `[LangWatch] ⚠️ Failed to send trace, status: ${response.status}`
+        `Failed to send trace, status: ${response.status}`
       );
       this.emit("error", error);
       throw error;
@@ -179,6 +157,9 @@ export class LangWatchTrace {
     this.metadata = {
       ...this.metadata,
       ...metadata,
+      ...(typeof metadata.labels !== "undefined"
+        ? { labels: [...(this.metadata?.labels ?? []), ...metadata.labels] }
+        : {}),
     };
   }
 
@@ -232,8 +213,6 @@ export class LangWatchTrace {
       if (error instanceof ZodError) {
         console.warn("[LangWatch] ⚠️ Failed to parse trace");
         console.warn(fromZodError(error).message);
-      } else {
-        console.warn(error);
       }
       this.client.emit("error", error);
     }
@@ -284,6 +263,14 @@ export class LangWatchSpan implements PendingBaseSpan {
   }
 
   update(params: Partial<Omit<PendingBaseSpan, "spanId" | "parentId">>) {
+    if (Object.isFrozen(this)) {
+      const error = new Error(
+        `Tried to update span ${this.spanId}, but the span is already finished, discarding update`
+      );
+      this.trace.client.emit("error", error);
+      return;
+    }
+
     if (params.type) {
       this.type = params.type;
     }
@@ -340,6 +327,8 @@ export class LangWatchSpan implements PendingBaseSpan {
       this.update(params);
     }
 
+    Object.freeze(this);
+
     try {
       const finalSpan = spanSchema.parse(
         camelToSnakeCaseNested({
@@ -350,6 +339,7 @@ export class LangWatchSpan implements PendingBaseSpan {
             ...this.timestamps,
             finishedAt: this.timestamps.finishedAt,
           },
+          ...(this.error && { error: captureError(this.error) }),
         }) as ServerSpan
       );
       this.trace.onEnd(finalSpan);
@@ -357,8 +347,6 @@ export class LangWatchSpan implements PendingBaseSpan {
       if (error instanceof ZodError) {
         console.warn("[LangWatch] ⚠️ Failed to parse span");
         console.warn(fromZodError(error).message);
-      } else {
-        console.warn(error);
       }
       this.trace.client.emit("error", error);
     }
@@ -386,6 +374,10 @@ export class LangWatchLLMSpan extends LangWatchSpan implements PendingLLMSpan {
       this.params = params.params;
     }
   }
+
+  end(params?: Partial<PendingLLMSpan>) {
+    super.end(params);
+  }
 }
 
 export class LangWatchRAGSpan extends LangWatchSpan implements PendingRAGSpan {
@@ -403,5 +395,9 @@ export class LangWatchRAGSpan extends LangWatchSpan implements PendingRAGSpan {
     if (params.contexts) {
       this.contexts = params.contexts;
     }
+  }
+
+  end(params?: Partial<PendingRAGSpan>) {
+    super.end(params);
   }
 }

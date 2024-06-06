@@ -12,6 +12,7 @@ import {
   Text,
   VStack,
   useToast,
+  type InputGroupProps,
 } from "@chakra-ui/react";
 import { Copy } from "react-feather";
 import {
@@ -22,8 +23,6 @@ import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject"
 
 export default function Authorize() {
   const { organizations, project } = useOrganizationTeamProject();
-
-  const toast = useToast();
 
   return (
     <DashboardLayout>
@@ -49,48 +48,58 @@ export default function Authorize() {
                 Copy your LangWatch API key below and paste it into your command
                 line or notebook to authorize it.
               </Text>
-              <InputGroup
-                cursor="pointer"
-                onClick={() => {
-                  if (!navigator.clipboard) {
-                    toast({
-                      title:
-                        "Your browser does not support clipboard access, please copy the key manually",
-                      status: "error",
-                      duration: 2000,
-                      isClosable: true,
-                    });
-                    return;
-                  }
-
-                  void (async () => {
-                    await navigator.clipboard.writeText(project?.apiKey ?? "");
-                    toast({
-                      title: "API key copied to your clipboard",
-                      status: "success",
-                      duration: 2000,
-                      isClosable: true,
-                    });
-                  })();
-                }}
-              >
-                <Input
-                  cursor="pointer"
-                  type="text"
-                  value={project?.apiKey}
-                  isReadOnly
-                  _hover={{
-                    backgroundColor: "gray.50",
-                  }}
-                />
-                <InputRightElement>
-                  <Copy />
-                </InputRightElement>
-              </InputGroup>
+              <APIKeyCopyInput />
             </VStack>
           </CardBody>
         </Card>
       </Container>
     </DashboardLayout>
+  );
+}
+
+export function APIKeyCopyInput(props: InputGroupProps) {
+  const { project } = useOrganizationTeamProject();
+  const toast = useToast();
+
+  return (
+    <InputGroup
+      {...props}
+      cursor="pointer"
+      onClick={() => {
+        if (!navigator.clipboard) {
+          toast({
+            title:
+              "Your browser does not support clipboard access, please copy the key manually",
+            status: "error",
+            duration: 2000,
+            isClosable: true,
+          });
+          return;
+        }
+
+        void (async () => {
+          await navigator.clipboard.writeText(project?.apiKey ?? "");
+          toast({
+            title: "API key copied to your clipboard",
+            status: "success",
+            duration: 2000,
+            isClosable: true,
+          });
+        })();
+      }}
+    >
+      <Input
+        cursor="pointer"
+        type="text"
+        value={project?.apiKey}
+        isReadOnly
+        _hover={{
+          backgroundColor: "gray.50",
+        }}
+      />
+      <InputRightElement>
+        <Copy />
+      </InputRightElement>
+    </InputGroup>
   );
 }

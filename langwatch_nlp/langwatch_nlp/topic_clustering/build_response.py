@@ -1,3 +1,4 @@
+from typing import Optional
 import nanoid
 from langwatch_nlp.topic_clustering.constants import (
     MINIMUM_SUBTOPICS_PER_TOPIC,
@@ -9,8 +10,8 @@ from langwatch_nlp.topic_clustering.types import Subtopic, Topic, Trace, TraceTo
 
 def build_response(
     hierarchy: dict[str, dict[str, list[Trace]]],
-    topic_names: list[str],
-    subtopic_names: list[list[str]],
+    topic_names: list[Optional[str]],
+    subtopic_names: list[list[Optional[str]]],
 ) -> tuple[list[Topic], list[Subtopic], list[TraceTopicMap]]:
     topics: list[Topic] = []
     subtopics: list[Subtopic] = []
@@ -23,12 +24,13 @@ def build_response(
             item for subtopic_samples in topic.values() for item in subtopic_samples
         ]
         unique_values = list(set([item["input"] for item in topic_samples]))
+        topic_name = topic_names[topic_idx]
         if (
             len(topic.values()) >= MINIMUM_SUBTOPICS_PER_TOPIC
             and len(unique_values) >= MINIMUM_TRACES_PER_TOPIC
+            and topic_name is not None
         ):
             topic_id = f"topic_{nanoid.generate()}"
-            topic_name = topic_names[topic_idx]
             topic_centroid, topic_p95_distance = calculate_centroid_and_distance(
                 topic_samples
             )
@@ -46,9 +48,9 @@ def build_response(
             subtopic_id = None
 
             unique_values = list(set([item["input"] for item in subtopic]))
-            if topic_id and len(unique_values) >= MINIMUM_TRACES_PER_TOPIC:
+            subtopic_name = subtopic_names[topic_idx][subtopic_idx]
+            if topic_id and len(unique_values) >= MINIMUM_TRACES_PER_TOPIC and subtopic_name is not None:
                 subtopic_id = f"subtopic_{nanoid.generate()}"
-                subtopic_name = subtopic_names[topic_idx][subtopic_idx]
                 subtopic_centroid, subtopic_p95_distance = (
                     calculate_centroid_and_distance(subtopic)
                 )

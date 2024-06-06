@@ -4,7 +4,7 @@ import {
   FormLabel,
   HStack,
   VStack,
-  useRadioGroup,
+  useRadioGroup
 } from "@chakra-ui/react";
 import type { Project } from "@prisma/client";
 import { type PropsWithChildren } from "react";
@@ -12,16 +12,12 @@ import { Code } from "react-feather";
 import { type UseFormReturn } from "react-hook-form";
 import { RadioCard } from "~/pages/onboarding/[team]/project";
 import { Azure } from "./icons/Azure";
-import { JavaScript } from "./icons/JavaScript";
+import { DSPy } from "./icons/DSPy";
 import { LangChainParrot } from "./icons/LangChainParrot";
 import { OpenAI } from "./icons/OpenAI";
 import { Python } from "./icons/Python";
-import { AzureOpenAIPython } from "./integration-guides/AzureOpenAIPython";
-import { CustomPython } from "./integration-guides/CustomPython";
-import { CustomRest } from "./integration-guides/CustomRest";
-import { LangChainPython } from "./integration-guides/LangChainPython";
-import { OpenAIPython } from "./integration-guides/OpenAIPython";
-import { DSPy } from "./icons/DSPy";
+import { TypeScript } from "./icons/TypeScript";
+import { Vercel } from "./icons/Vercel";
 
 export type ProjectFormData = {
   name: string;
@@ -31,59 +27,107 @@ export type ProjectFormData = {
   newTeamName: string;
 };
 
+type DocsLink = {
+  icon: React.ReactNode;
+  label: string;
+  href: string;
+};
+
 export const techStackLanguageOptions = {
   python: {
     label: "Python",
     icon: <Python />,
   },
-  javascript: {
-    label: "JavaScript",
-    icon: <JavaScript />,
+  typescript: {
+    label: "TypeScript",
+    icon: <TypeScript />,
   },
   other: { label: "Other", icon: <Code /> },
 };
+
 type LanguagesMap = {
-  [K in keyof typeof techStackLanguageOptions]?: React.FC<{
-    apiKey?: string;
-  }>;
+  [K in keyof typeof techStackLanguageOptions]?: DocsLink;
 };
+
+export const docsLinks = {
+  python_openai: {
+    label: "Python OpenAI",
+    icon: <Python />,
+    href: "https://docs.langwatch.ai/integration/python/open-ai",
+  },
+  python_azure_openai: {
+    label: "Python Azure OpenAI",
+    icon: <Python />,
+    href: "https://docs.langwatch.ai/integration/python/azure-open-ai",
+  },
+  python_langchain: {
+    label: "Python LangChain",
+    icon: <Python />,
+    href: "https://docs.langwatch.ai/integration/python/langchain",
+  },
+  python_custom: {
+    label: "Python Custom",
+    icon: <Python />,
+    href: "https://docs.langwatch.ai/integration/python/custom",
+  },
+  typescript_guide: {
+    label: "TypeScript",
+    icon: <TypeScript />,
+    href: "https://docs.langwatch.ai/integration/typescript/guide",
+  },
+  custom_rest: {
+    label: "Custom REST",
+    icon: <Code />,
+    href: "https://docs.langwatch.ai/integration/rest-api",
+  },
+} satisfies Record<string, DocsLink>;
 
 export const techStackFrameworkOptions = {
   openai: {
     label: "OpenAI",
     icon: <OpenAI />,
-    languages: { python: OpenAIPython, javascript: CustomRest } as LanguagesMap,
+    languages: {
+      python: docsLinks.python_openai,
+      typescript: docsLinks.typescript_guide,
+    } as LanguagesMap,
   },
   azure_openai: {
     label: "Azure OpenAI",
     icon: <Azure />,
     languages: {
-      python: AzureOpenAIPython,
-      javascript: CustomRest,
+      python: docsLinks.python_azure_openai,
+      typescript: docsLinks.typescript_guide,
+    } as LanguagesMap,
+  },
+  vercel_ai: {
+    label: "Vercel AI SDK",
+    icon: <Vercel />,
+    languages: {
+      typescript: docsLinks.typescript_guide,
     } as LanguagesMap,
   },
   langchain: {
     label: "LangChain",
     icon: <LangChainParrot />,
     languages: {
-      python: LangChainPython,
-      javascript: CustomRest,
+      python: docsLinks.python_langchain,
+      typescript: docsLinks.typescript_guide,
     } as LanguagesMap,
   },
   dspy: {
     label: "DSPy",
     icon: <DSPy />,
     languages: {
-      python: CustomPython,
+      python: docsLinks.python_custom,
     } as LanguagesMap,
   },
   other: {
     label: "Other",
     icon: <Code />,
     languages: {
-      python: CustomPython,
-      javascript: CustomRest,
-      other: CustomRest,
+      python: docsLinks.python_custom,
+      typescript: docsLinks.typescript_guide,
+      other: docsLinks.custom_rest,
     } as LanguagesMap,
   },
 };

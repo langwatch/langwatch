@@ -1,8 +1,9 @@
 {
   "compilerOptions": {
     "target": "es2017",
-    "module": "commonjs",
+    "module": "ESNext",
     "declaration": true,
+    "declarationMap": true,
     "outDir": "./dist",
     "strict": true,
     "esModuleInterop": true,
@@ -16,7 +17,8 @@
     "jsx": "preserve",
     "incremental": true,
     "noUncheckedIndexedAccess": true,
-    "baseUrl": "."
+    "baseUrl": ".",
+    "tsBuildInfoFile": "./tsconfig.tsbuildinfo"
   },
   "include": [
     ".eslintrc.cjs",
@@ -26,5 +28,5 @@
     "**/*.cjs",
     "**/*.mjs"
   ],
-  "exclude": ["node_modules", "./dist/**/*"]
+  "exclude": ["node_modules", "./dist/**/*", "./example/**/*"]
 }
