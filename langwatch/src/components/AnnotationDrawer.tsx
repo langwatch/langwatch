@@ -8,23 +8,23 @@ import {
   HStack,
   Radio,
   RadioGroup,
+  Spinner,
   Text,
   Textarea,
   VStack,
   useDisclosure,
   useToast,
-  Spacer,
 } from "@chakra-ui/react";
 import { ExternalLink, ThumbsDown, ThumbsUp } from "react-feather";
 import { useDrawer } from "~/components/CurrentDrawer";
 import { MetadataTag } from "~/components/MetadataTag";
 
+import { DeleteIcon } from "@chakra-ui/icons";
+import { useRouter } from "next/router";
 import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
-import { DeleteIcon } from "@chakra-ui/icons";
-import { useRouter } from "next/router";
 
 export function AnnotationDrawer({
   traceId,
@@ -112,8 +112,9 @@ export function AnnotationDrawer({
               isClosable: true,
               position: "top-right",
             });
-            reset();
+
             closeDrawer();
+            reset();
             if (listTableView === "list" || listTableView === "table") {
               openDrawer("traceDetails", {
                 traceId: traceId,
@@ -151,8 +152,9 @@ export function AnnotationDrawer({
               isClosable: true,
               position: "top-right",
             });
-            reset();
+
             closeDrawer();
+            reset();
             if (listTableView === "list" || listTableView === "table") {
               openDrawer("traceDetails", {
                 traceId: traceId,
@@ -231,71 +233,75 @@ export function AnnotationDrawer({
         </DrawerHeader>
 
         <DrawerBody>
-          {/* eslint-disable-next-line @typescript-eslint/no-misused-promises */}
-          <form onSubmit={handleSubmit(onSubmit)}>
-            <VStack align="start" spacing={6}>
-              <RadioGroup value={thumbsUpValue}>
-                <HStack spacing={4}>
-                  <VStack align="start">
-                    <Radio
-                      size="md"
-                      value="thumbsUp"
-                      colorScheme="blue"
-                      alignItems="start"
-                      spacing={3}
-                      paddingTop={2}
-                      {...register("isThumbsUp")}
-                    >
-                      <VStack align="start" marginTop={-1}>
-                        <ThumbsUp />
-                      </VStack>
-                    </Radio>
-                  </VStack>
-                  <VStack align="start">
-                    <Radio
-                      size="md"
-                      value="thumbsDown"
-                      colorScheme="blue"
-                      alignItems="start"
-                      spacing={3}
-                      paddingTop={2}
-                      {...register("isThumbsUp")}
-                    >
-                      <VStack align="start" marginTop={-1}>
-                        <ThumbsDown />
-                      </VStack>
-                    </Radio>
-                  </VStack>
-                </HStack>
-              </RadioGroup>
-              <VStack align="start" spacing={4} width="full">
-                <Text>Comments</Text>
-                <Textarea {...register("comment")} />
-              </VStack>
-              <HStack>
-                <Button
-                  colorScheme="blue"
-                  type="submit"
-                  minWidth="fit-content"
-                  isLoading={
-                    createAnnotation.isLoading || updateAnnotation.isLoading
-                  }
-                >
-                  {action === "new" ? "Save" : "Update"}
-                </Button>
-                {action === "edit" && (
+          {getAnnotation.isLoading ? (
+            <Spinner />
+          ) : (
+            /* eslint-disable-next-line @typescript-eslint/no-misused-promises */
+            <form onSubmit={handleSubmit(onSubmit)}>
+              <VStack align="start" spacing={6}>
+                <RadioGroup value={thumbsUpValue}>
+                  <HStack spacing={4}>
+                    <VStack align="start">
+                      <Radio
+                        size="md"
+                        value="thumbsUp"
+                        colorScheme="blue"
+                        alignItems="start"
+                        spacing={3}
+                        paddingTop={2}
+                        {...register("isThumbsUp")}
+                      >
+                        <VStack align="start" marginTop={-1}>
+                          <ThumbsUp />
+                        </VStack>
+                      </Radio>
+                    </VStack>
+                    <VStack align="start">
+                      <Radio
+                        size="md"
+                        value="thumbsDown"
+                        colorScheme="blue"
+                        alignItems="start"
+                        spacing={3}
+                        paddingTop={2}
+                        {...register("isThumbsUp")}
+                      >
+                        <VStack align="start" marginTop={-1}>
+                          <ThumbsDown />
+                        </VStack>
+                      </Radio>
+                    </VStack>
+                  </HStack>
+                </RadioGroup>
+                <VStack align="start" spacing={4} width="full">
+                  <Text>Comments</Text>
+                  <Textarea {...register("comment")} />
+                </VStack>
+                <HStack>
                   <Button
-                    colorScheme="black"
-                    variant="outline"
-                    isLoading={deleteAnnotation.isLoading}
-                    onClick={() => handleDelete()}
+                    colorScheme="blue"
+                    type="submit"
+                    minWidth="fit-content"
+                    isLoading={
+                      createAnnotation.isLoading || updateAnnotation.isLoading
+                    }
                   >
-                    <DeleteIcon />
+                    {action === "new" ? "Save" : "Update"}
                   </Button>
-                )}
-              </HStack>
-            </VStack>
-          </form>
+                  {action === "edit" && (
+                    <Button
+                      colorScheme="black"
+                      variant="outline"
+                      isLoading={deleteAnnotation.isLoading}
+                      onClick={() => handleDelete()}
+                    >
+                      <DeleteIcon />
+                    </Button>
+                  )}
+                </HStack>
+              </VStack>
+            </form>
+          )}
         </DrawerBody>
       </DrawerContent>
     </Drawer>
