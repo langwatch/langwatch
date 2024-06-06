@@ -16,6 +16,7 @@ import {
   type PipelineFields,
   sharedFiltersInputSchema,
 } from "./types";
+import { formatMoney } from "../../utils/formatMoney";
 
 const simpleFieldAnalytics = (
   field: string
@@ -218,7 +219,7 @@ export const analyticsMetrics = {
       ...numericFieldAnalyticsWithPercentiles("trace.metrics.total_cost"),
       label: "Total Cost",
       colorSet: "greenTones",
-      format: "$0.00[0]",
+      format: (amount) => formatMoney({ amount, currency: "USD" }),
       increaseIs: "neutral",
     },
     prompt_tokens: {
