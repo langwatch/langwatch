@@ -8,7 +8,7 @@ import json
 from random import random
 from typing import Iterable, TypeVar, Optional
 
-from tenacity import retry, stop_after_attempt, wait_exponential
+from tenacity import retry, stop_after_attempt, wait_exponential, wait_none
 
 from langwatch_nlp.topic_clustering.types import Money, Trace
 from langchain_community.callbacks.openai_info import get_openai_token_cost_for_model
@@ -47,41 +47,45 @@ def generate_topic_names(
     )
 
     model_name = "gpt-4-1106-preview"
-    response = azure_openai.chat.completions.create(
-        model=model_name,
-        temperature=0.0,
-        messages=[
-            {
-                "role": "system",
-                "content": f'You are a highly knowledgeable assistant tasked with taxonomy for naming topics \
-                    based on a list of examples. Provide a single, descriptive name for each topic. \
-                    Avoid using "and" or "&" in the name, try to summarize it with a single concept. \
-                    Topic names should not be similar to each other, as the data is already organized, \
-                    the disambiguation between two similar topics should be clear from the name alone.\
-                        {existing_message}',
-            },
-            {"role": "user", "content": f"{topic_examples_str}"},
-        ],
-        tools=[
-            {
-                "type": "function",
-                "function": {
-                    "name": "topicNames",
-                    "parameters": {
-                        "type": "object",
-                        "properties": dict(
-                            [
-                                (f"topic_{index}", {"type": "string"})
-                                for index in range(len(topic_examples))
-                            ]
-                        ),
-                    },
-                    "description": 'use this function to name the topics based on the examples provided, avoid using "and" or "&" in the name, try to name it with a single 2-3 words concept.',
+    try:
+        response = azure_openai.chat.completions.create(
+            model=model_name,
+            temperature=0.0,
+            messages=[
+                {
+                    "role": "system",
+                    "content": f'You are a highly knowledgeable assistant tasked with taxonomy for naming topics \
+                        based on a list of examples. Provide a single, descriptive name for each topic. \
+                        Avoid using "and" or "&" in the name, try to summarize it with a single concept. \
+                        Topic names should not be similar to each other, as the data is already organized, \
+                        the disambiguation between two similar topics should be clear from the name alone.\
+                            {existing_message}',
                 },
-            }
-        ],
-        tool_choice={"type": "function", "function": {"name": "topicNames"}},
-    )
+                {"role": "user", "content": f"{topic_examples_str}"},
+            ],
+            tools=[
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "topicNames",
+                        "parameters": {
+                            "type": "object",
+                            "properties": dict(
+                                [
+                                    (f"topic_{index}", {"type": "string"})
+                                    for index in range(len(topic_examples))
+                                ]
+                            ),
+                        },
+                        "description": 'use this function to name the topics based on the examples provided, avoid using "and" or "&" in the name, try to name it with a single 2-3 words concept.',
+                    },
+                }
+            ],
+            tool_choice={"type": "function", "function": {"name": "topicNames"}},
+        )
+    except Exception as e:
+        print(f"Failed to generate topic names for {len(topic_examples)} topics: {e}")
+        raise e
 
     total_cost = 0
     if response.usage:
@@ -115,7 +119,7 @@ def get_subtopic_samples(samples: list[Trace], n=5):
 
 def generate_topic_names_split(
     topic_examples: list[list[str]], existing: Optional[list[str]] = None
-) -> tuple[list[str], Money]:
+) -> tuple[list[Optional[str]], Money]:
     total_samples = sum([len(examples) for examples in topic_examples])
     split_point = min(
         math.ceil(total_samples / max(1, math.ceil(total_samples / 150))), 150
@@ -123,29 +127,35 @@ def generate_topic_names_split(
 
     batch: list[list[str]] = []
 
-    results: list[str] = []
+    results: list[Optional[str]] = []
     cost = Money(amount=0, currency="USD")
     for examples in topic_examples:
         batch.append(examples)
         batch_len = sum([len(examples) for examples in batch])
 
         if batch_len >= split_point:
-            result, cost_ = generate_topic_names(batch, existing)
-            cost["amount"] += cost_["amount"]
-            results += result
+            try:
+                result, cost_ = generate_topic_names(batch, existing)
+                cost["amount"] += cost_["amount"]
+                results += result
+            except Exception as e:
+                results += [None] * len(batch)
             batch = []
 
     if len(batch) > 0:
-        result, cost_ = generate_topic_names(batch, existing)
-        cost["amount"] += cost_["amount"]
-        results += result
+        try:
+            result, cost_ = generate_topic_names(batch, existing)
+            cost["amount"] += cost_["amount"]
+            results += result
+        except Exception as e:
+            results += [None] * len(batch)
 
     return results, cost
 
 
 def generate_topic_names_split_and_improve_similar_names(
     topic_examples: list[list[str]], existing: Optional[list[str]] = None
-) -> tuple[list[str], Money]:
+) -> tuple[list[Optional[str]], Money]:
     topic_names, cost1 = generate_topic_names_split(topic_examples, existing)
     topic_names, cost2 = improve_similar_names(
         topic_names, topic_examples, max_iterations=3
@@ -154,12 +164,12 @@ def generate_topic_names_split_and_improve_similar_names(
 
 
 def improve_similar_names(
-    topic_names: list[str],
+    topic_names: list[Optional[str]],
     topic_examples: list[list[str]],
     cost=Money(amount=0, currency="USD"),
     iteration=0,
     max_iterations=3,
-) -> tuple[list[str], Money]:
+) -> tuple[list[Optional[str]], Money]:
     if len(topic_names) != len(topic_examples):
         raise ValueError("topic_names and topic_examples must have the same length.")
 
@@ -168,7 +178,8 @@ def improve_similar_names(
     )
     # Temporary until text-embedding-3-small is also available on azure: https://learn.microsoft.com/en-us/answers/questions/1531681/openai-new-embeddings-model
     response = openai_client.embeddings.create(
-        input=topic_names, model="text-embedding-3-small"
+        input=[name if name else "" for name in topic_names],
+        model="text-embedding-3-small",
     )
     embeddings = [data.embedding for data in response.data]
 
@@ -177,7 +188,7 @@ def improve_similar_names(
     closest_pair = None
     for i, embedding_a in enumerate(embeddings):
         for j, embedding_b in enumerate(embeddings):
-            if i == j:
+            if i == j or topic_names[i] is None or topic_names[j] is None:
                 continue
             # calculate cosine distance
             distance = 1 - np.dot(embedding_a, embedding_b) / (
@@ -230,11 +241,14 @@ def improve_similar_names(
 
 @retry(wait=wait_exponential(min=12, max=60), stop=stop_after_attempt(4))
 def improve_name_between_two_topics(
-    topic_a_name: str,
-    topic_b_name: str,
+    topic_a_name: Optional[str],
+    topic_b_name: Optional[str],
     topic_a_examples: list[str],
     topic_b_examples: list[str],
-) -> tuple[str, str, Money]:
+) -> tuple[Optional[str], Optional[str], Money]:
+    if topic_a_name is None or topic_b_name is None:
+        return topic_a_name, topic_b_name, Money(amount=0, currency="USD")
+
     model_name = "gpt-4-1106-preview"
 
     topic_examples_str = (
@@ -302,7 +316,7 @@ def generate_topic_and_subtopic_names(
     hierarchy: dict[str, dict[str, list[Trace]]],
     existing: Optional[list[str]] = None,
     skip_topic_names: bool = False,
-):
+) -> tuple[list[Optional[str]], list[list[Optional[str]]], Money]:
     with ThreadPoolExecutor() as executor:
         cost = Money(amount=0, currency="USD")
         topic_examples = [
@@ -316,7 +330,9 @@ def generate_topic_and_subtopic_names(
             for subtopics in hierarchy.values()
         ]
 
-        def noop_topic_names(topic_examples, existing):
+        def noop_topic_names(
+            topic_examples, existing=None
+        ) -> tuple[list[Optional[str]], Money]:
             return list(hierarchy.keys()), Money(amount=0, currency="USD")
 
         topic_future = executor.submit(
@@ -330,7 +346,7 @@ def generate_topic_and_subtopic_names(
         )
 
         subtopic_names = []
-        futures: list[Future[tuple[list[str], Money]]] = []
+        futures: list[Future[tuple[list[Optional[str]], Money]]] = []
 
         for subtopics in hierarchy.values():
             subtopic_samples = [
