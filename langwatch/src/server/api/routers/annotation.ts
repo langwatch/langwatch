@@ -1,5 +1,3 @@
-import { type DatabaseSchema } from "@prisma/client";
-import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
@@ -16,7 +14,7 @@ export const annotationRouter = createTRPCRouter({
         traceId: z.string(),
       })
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.DATASETS_MANAGE))
+    .use(checkUserPermissionForProject(TeamRoleGroup.ANNOTATIONS_MANAGE))
     .mutation(async ({ ctx, input }) => {
       return ctx.prisma.annotation.create({
         data: {
@@ -39,7 +37,7 @@ export const annotationRouter = createTRPCRouter({
         isThumbsUp: z.boolean().optional().nullable(),
       })
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.DATASETS_MANAGE))
+    .use(checkUserPermissionForProject(TeamRoleGroup.ANNOTATIONS_MANAGE))
     .mutation(async ({ ctx, input }) => {
       return ctx.prisma.annotation.update({
         where: {
@@ -60,7 +58,7 @@ export const annotationRouter = createTRPCRouter({
         projectId: z.string(),
       })
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.DATASETS_MANAGE))
+    .use(checkUserPermissionForProject(TeamRoleGroup.ANNOTATIONS_MANAGE))
     .query(async ({ ctx, input }) => {
       return ctx.prisma.annotation.findMany({
         where: {
@@ -82,7 +80,7 @@ export const annotationRouter = createTRPCRouter({
         projectId: z.string(),
       })
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.DATASETS_MANAGE))
+    .use(checkUserPermissionForProject(TeamRoleGroup.ANNOTATIONS_MANAGE))
     .query(async ({ ctx, input }) => {
       return ctx.prisma.annotation.findMany({
         where: {
@@ -101,7 +99,7 @@ export const annotationRouter = createTRPCRouter({
     }),
   getById: protectedProcedure
     .input(z.object({ annotationId: z.string(), projectId: z.string() }))
-    .use(checkUserPermissionForProject(TeamRoleGroup.DATASETS_MANAGE))
+    .use(checkUserPermissionForProject(TeamRoleGroup.ANNOTATIONS_MANAGE))
     .query(async ({ ctx, input }) => {
       return ctx.prisma.annotation.findUnique({
         where: {
@@ -112,7 +110,7 @@ export const annotationRouter = createTRPCRouter({
     }),
   deleteById: protectedProcedure
     .input(z.object({ annotationId: z.string(), projectId: z.string() }))
-    .use(checkUserPermissionForProject(TeamRoleGroup.DATASETS_MANAGE))
+    .use(checkUserPermissionForProject(TeamRoleGroup.ANNOTATIONS_MANAGE))
     .mutation(async ({ ctx, input }) => {
       return ctx.prisma.annotation.delete({
         where: {
