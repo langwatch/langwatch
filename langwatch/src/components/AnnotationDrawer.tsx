@@ -13,14 +13,18 @@ import {
   VStack,
   useDisclosure,
   useToast,
+  Spacer,
 } from "@chakra-ui/react";
-import { ThumbsDown, ThumbsUp } from "react-feather";
+import { ExternalLink, ThumbsDown, ThumbsUp } from "react-feather";
 import { useDrawer } from "~/components/CurrentDrawer";
+import { MetadataTag } from "~/components/MetadataTag";
 
 import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
+import { DeleteIcon } from "@chakra-ui/icons";
+import { useRouter } from "next/router";
 
 export function AnnotationDrawer({
   traceId,
@@ -33,7 +37,11 @@ export function AnnotationDrawer({
 }) {
   const { project } = useOrganizationTeamProject();
   const { onClose } = useDisclosure();
-  const { closeDrawer } = useDrawer();
+  const { closeDrawer, openDrawer } = useDrawer();
+
+  const router = useRouter();
+
+  const listTableView = router.query.view;
 
   const toast = useToast();
 
@@ -71,10 +79,7 @@ export function AnnotationDrawer({
 
   useEffect(() => {
     if (getAnnotation.data) {
-      console.log("test", isThumbsUp);
-
       const thumbValue = isThumbsUp === true ? "thumbsUp" : "thumbsDown";
-      console.log("thumbValue", thumbValue);
       setValue("isThumbsUp", thumbValue);
       setValue("comment", comment);
     }
@@ -86,8 +91,6 @@ export function AnnotationDrawer({
   };
 
   const onSubmit = (data: Annotation) => {
-    console.log("data", data);
-
     const isThumbsUp = data.isThumbsUp === "thumbsUp";
 
     if (action === "edit") {
@@ -111,6 +114,12 @@ export function AnnotationDrawer({
             });
             reset();
             closeDrawer();
+            if (listTableView === "list" || listTableView === "table") {
+              openDrawer("traceDetails", {
+                traceId: traceId,
+                annotationTab: true,
+              });
+            }
           },
           onError: () => {
             toast({
@@ -144,6 +153,12 @@ export function AnnotationDrawer({
             });
             reset();
             closeDrawer();
+            if (listTableView === "list" || listTableView === "table") {
+              openDrawer("traceDetails", {
+                traceId: traceId,
+                annotationTab: true,
+              });
+            }
           },
           onError: () => {
             toast({
@@ -201,7 +216,20 @@ export function AnnotationDrawer({
               Annotate
             </Text>
           </HStack>
+          <Text fontSize="xs" fontWeight="normal" marginTop={2}>
+            <HStack align="center">
+              <MetadataTag label="Trace ID" value={traceId} />{" "}
+              <ExternalLink
+                width={16}
+                cursor="pointer"
+                onClick={() =>
+                  openDrawer("traceDetails", { traceId, annotationTab: true })
+                }
+              />
+            </HStack>
+          </Text>
         </DrawerHeader>
+
         <DrawerBody>
           {/* eslint-disable-next-line @typescript-eslint/no-misused-promises */}
           <form onSubmit={handleSubmit(onSubmit)}>
@@ -257,11 +285,12 @@ export function AnnotationDrawer({
                 </Button>
                 {action === "edit" && (
                   <Button
-                    colorScheme="red"
+                    colorScheme="black"
+                    variant="outline"
                     isLoading={deleteAnnotation.isLoading}
                     onClick={() => handleDelete()}
                   >
-                    Delete
+                    <DeleteIcon />
                   </Button>
                 )}
               </HStack>

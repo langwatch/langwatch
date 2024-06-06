@@ -18,7 +18,6 @@ export const annotationRouter = createTRPCRouter({
     )
     .use(checkUserPermissionForProject(TeamRoleGroup.DATASETS_MANAGE))
     .mutation(async ({ ctx, input }) => {
-      console.log(input);
       return ctx.prisma.annotation.create({
         data: {
           id: nanoid(),
@@ -66,6 +65,30 @@ export const annotationRouter = createTRPCRouter({
       return ctx.prisma.annotation.findMany({
         where: {
           traceId: input.traceId,
+          projectId: input.projectId,
+        },
+        include: {
+          user: true,
+        },
+        orderBy: {
+          createdAt: "asc",
+        },
+      });
+    }),
+  getByTraceIds: protectedProcedure
+    .input(
+      z.object({
+        traceIds: z.array(z.string()),
+        projectId: z.string(),
+      })
+    )
+    .use(checkUserPermissionForProject(TeamRoleGroup.DATASETS_MANAGE))
+    .query(async ({ ctx, input }) => {
+      return ctx.prisma.annotation.findMany({
+        where: {
+          traceId: {
+            in: input.traceIds,
+          },
           projectId: input.projectId,
         },
         include: {

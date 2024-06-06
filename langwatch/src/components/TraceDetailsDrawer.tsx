@@ -21,6 +21,7 @@ import {
 import { useState } from "react";
 import { Maximize2, Minimize2 } from "react-feather";
 import type { TraceCheck } from "~/server/tracer/types";
+import type { Annotation } from "@prisma/client";
 import { CheckPassingDrawer } from "./CheckPassingDrawer";
 import { SpanTree } from "./traces/SpanTree";
 import { TraceSummary } from "./traces/Summary";
@@ -30,9 +31,11 @@ import { api } from "../utils/api";
 import { useDrawer } from "./CurrentDrawer";
 import { AddDatasetRecordDrawerV2 } from "./AddDatasetRecordDrawer";
 import { Annotations } from "./Annotations";
+import { useRouter } from "next/router";
 
 interface TraceDetailsDrawerProps {
   traceId: string;
+  annotationTab?: boolean;
 }
 
 interface TraceEval {
@@ -43,6 +46,9 @@ interface TraceEval {
 export const TraceDetailsDrawer = (props: TraceDetailsDrawerProps) => {
   const { closeDrawer, openDrawer } = useDrawer();
   const { isOpen, onOpen, onClose } = useDisclosure();
+  const router = useRouter();
+
+  const annotationTab = router.query["drawer.annotationTab"];
 
   const [traceView, setTraceView] = useState<"span" | "full">("span");
   const toggleView = () => {
@@ -166,7 +172,6 @@ export const TraceDetailsDrawer = (props: TraceDetailsDrawerProps) => {
   };
 
   const AnnotationMsgs = ({ annotations }: { annotations: Annotation[] }) => {
-    console.log(annotations);
     if (!annotations.length) return null;
 
     return (
@@ -236,7 +241,10 @@ export const TraceDetailsDrawer = (props: TraceDetailsDrawerProps) => {
                 colorScheme="black"
                 variant="outline"
                 onClick={() =>
-                  openDrawer("annotation", { traceId: props.traceId })
+                  openDrawer("annotation", {
+                    traceId: props.traceId,
+                    action: "new",
+                  })
                 }
               >
                 Annotate
@@ -254,7 +262,7 @@ export const TraceDetailsDrawer = (props: TraceDetailsDrawerProps) => {
           </Flex>
         </DrawerHeader>
         <DrawerBody>
-          <Tabs>
+          <Tabs defaultIndex={annotationTab ? 2 : 0}>
             <TabList>
               <Tab>Details</Tab>
               {anyGuardrails && (

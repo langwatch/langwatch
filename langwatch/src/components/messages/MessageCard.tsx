@@ -16,19 +16,17 @@ import {
   Tooltip,
   VStack,
 } from "@chakra-ui/react";
-import type { Project } from "@prisma/client";
+import type { Annotation, Project } from "@prisma/client";
 import { formatDistanceToNow } from "date-fns";
 import NextLink from "next/link";
 import numeral from "numeral";
 import {
   CheckCircle,
   Clock,
+  Edit,
   MinusCircle,
   Shield,
-  ThumbsUp,
   XCircle,
-  ThumbsDown,
-  Edit,
 } from "react-feather";
 import Markdown from "react-markdown";
 import type {
@@ -38,9 +36,10 @@ import type {
 } from "../../server/tracer/types";
 import { api } from "../../utils/api";
 import { formatMilliseconds } from "../../utils/formatMilliseconds";
+import { pluralize } from "../../utils/pluralize";
 import { getColorForString } from "../../utils/rotatingColors";
 import { CheckPassing } from "../CheckPassing";
-import { pluralize } from "../../utils/pluralize";
+import { useDrawer } from "../CurrentDrawer";
 
 export type TraceWithGuardrail = Trace & {
   lastGuardrail: (GuardrailResult & { name?: string }) | undefined;
@@ -103,24 +102,32 @@ export function MessageCard({
     projectId: project.id,
   });
 
-  console.log("annotations", annotations.data);
-
   const Annotation = ({ annotations }: { annotations: Annotation[] }) => {
+    const { openDrawer } = useDrawer();
+
     return (
       <Tooltip label={`${annotations.length} Annotations`}>
         <Box
           right={2}
           top={2}
-          borderRadius="xl"
+          borderRadius="2xl"
           borderWidth={1}
           borderColor="gray.300"
           paddingY={1}
           paddingX={2}
           zIndex="99"
+          onClick={() =>
+            openDrawer("traceDetails", {
+              traceId: trace.trace_id,
+              annotationTab: true,
+            })
+          }
         >
           <HStack>
             <Edit size="20px" />
-            <Text fontSize="sm">{annotations.length} Annotations</Text>
+            <Text fontSize="sm">
+              {annotations.length} annotation{annotations.length > 1 ? "s" : ""}
+            </Text>
           </HStack>
         </Box>
       </Tooltip>
