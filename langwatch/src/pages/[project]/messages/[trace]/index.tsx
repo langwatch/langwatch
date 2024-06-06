@@ -12,11 +12,9 @@ import {
   Tooltip,
   VStack,
 } from "@chakra-ui/react";
-import { format, formatDistanceToNow } from "date-fns";
 import ErrorPage from "next/error";
 import { useRouter } from "next/router";
 import React, {
-  useCallback,
   useEffect,
   useRef,
   useState,
@@ -31,12 +29,11 @@ import type { Trace } from "../../../../server/tracer/types";
 import { api } from "../../../../utils/api";
 import { isNotFound } from "../../../../utils/trpcError";
 
+import { Edit, ThumbsDown, ThumbsUp } from "react-feather";
+import { Annotations } from "../../../../components/Annotations";
 import { useDrawer } from "../../../../components/CurrentDrawer";
 import { getExtractedInput } from "../../../../components/messages/MessageCard";
 import { formatTimeAgo } from "../../../../utils/formatTimeAgo";
-import { ThumbsUp, ThumbsDown, Edit } from "react-feather";
-import { useRequiredSession } from "../../../../hooks/useRequiredSession";
-import { Annotations } from "../../../../components/Annotations";
 
 export default function TraceDetails() {
   const { hasTeamPermission } = useOrganizationTeamProject();
@@ -144,7 +141,6 @@ function Conversation({ threadId }: { threadId?: string }) {
   const { project } = useOrganizationTeamProject();
 
   const currentTraceRef = useRef<HTMLDivElement>(null);
-
   const threadTraces = api.traces.getTracesByThreadId.useQuery(
     {
       projectId: project?.id ?? "",
