@@ -6,16 +6,6 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useRequiredSession } from "~/hooks/useRequiredSession";
 import { useDrawer } from "./CurrentDrawer";
 
-type Annotation = {
-  comment: string;
-  isThumbsUp: boolean;
-  createdAt: Date;
-  id: string;
-  user: {
-    name: string;
-  };
-};
-
 export const Annotations = ({ traceId }: { traceId: string }) => {
   const { data } = useRequiredSession();
   const { isDrawerOpen, openDrawer } = useDrawer();
