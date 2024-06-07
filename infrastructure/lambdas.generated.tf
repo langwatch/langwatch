@@ -1,5 +1,5 @@
 
-resource "aws_api_gateway_resource" "comprehend_pii_detection" {
+resource "aws_api_gateway_resource" "aws-comprehend_pii_detection" {
     rest_api_id = aws_api_gateway_rest_api.langevals.id
     parent_id   = aws_api_gateway_resource.aws.id
     path_part   = "comprehend_pii_detection"
@@ -8,7 +8,7 @@ resource "aws_api_gateway_resource" "comprehend_pii_detection" {
 module "aws-comprehend_pii_detection-api-gw" {
     source                 = "./api-gw-resource"
     apigw_id               = aws_api_gateway_rest_api.langevals.id
-    apigw_root_resource_id = aws_api_gateway_resource.comprehend_pii_detection.id
+    apigw_root_resource_id = aws_api_gateway_resource.aws-comprehend_pii_detection.id
     path                   = "evaluate"
     method                 = "POST"
 
@@ -28,7 +28,7 @@ resource "aws_api_gateway_resource" "aws" {
     path_part   = "aws"
 }
 
-resource "aws_api_gateway_resource" "language_detection" {
+resource "aws_api_gateway_resource" "lingua-language_detection" {
     rest_api_id = aws_api_gateway_rest_api.langevals.id
     parent_id   = aws_api_gateway_resource.lingua.id
     path_part   = "language_detection"
@@ -37,7 +37,7 @@ resource "aws_api_gateway_resource" "language_detection" {
 module "lingua-language_detection-api-gw" {
     source                 = "./api-gw-resource"
     apigw_id               = aws_api_gateway_rest_api.langevals.id
-    apigw_root_resource_id = aws_api_gateway_resource.language_detection.id
+    apigw_root_resource_id = aws_api_gateway_resource.lingua-language_detection.id
     path                   = "evaluate"
     method                 = "POST"
 
@@ -57,7 +57,7 @@ resource "aws_api_gateway_resource" "lingua" {
     path_part   = "lingua"
 }
 
-resource "aws_api_gateway_resource" "content_safety" {
+resource "aws_api_gateway_resource" "azure-content_safety" {
     rest_api_id = aws_api_gateway_rest_api.langevals.id
     parent_id   = aws_api_gateway_resource.azure.id
     path_part   = "content_safety"
@@ -66,14 +66,14 @@ resource "aws_api_gateway_resource" "content_safety" {
 module "azure-content_safety-api-gw" {
     source                 = "./api-gw-resource"
     apigw_id               = aws_api_gateway_rest_api.langevals.id
-    apigw_root_resource_id = aws_api_gateway_resource.content_safety.id
+    apigw_root_resource_id = aws_api_gateway_resource.azure-content_safety.id
     path                   = "evaluate"
     method                 = "POST"
 
     lambda_invoke_arn = module.azure-evaluator.lambda_invoke_arn
 }
 
-resource "aws_api_gateway_resource" "jailbreak" {
+resource "aws_api_gateway_resource" "azure-jailbreak" {
     rest_api_id = aws_api_gateway_rest_api.langevals.id
     parent_id   = aws_api_gateway_resource.azure.id
     path_part   = "jailbreak"
@@ -82,7 +82,7 @@ resource "aws_api_gateway_resource" "jailbreak" {
 module "azure-jailbreak-api-gw" {
     source                 = "./api-gw-resource"
     apigw_id               = aws_api_gateway_rest_api.langevals.id
-    apigw_root_resource_id = aws_api_gateway_resource.jailbreak.id
+    apigw_root_resource_id = aws_api_gateway_resource.azure-jailbreak.id
     path                   = "evaluate"
     method                 = "POST"
 
@@ -102,7 +102,7 @@ resource "aws_api_gateway_resource" "azure" {
     path_part   = "azure"
 }
 
-resource "aws_api_gateway_resource" "answer_relevancy" {
+resource "aws_api_gateway_resource" "ragas-answer_relevancy" {
     rest_api_id = aws_api_gateway_rest_api.langevals.id
     parent_id   = aws_api_gateway_resource.ragas.id
     path_part   = "answer_relevancy"
@@ -111,14 +111,14 @@ resource "aws_api_gateway_resource" "answer_relevancy" {
 module "ragas-answer_relevancy-api-gw" {
     source                 = "./api-gw-resource"
     apigw_id               = aws_api_gateway_rest_api.langevals.id
-    apigw_root_resource_id = aws_api_gateway_resource.answer_relevancy.id
+    apigw_root_resource_id = aws_api_gateway_resource.ragas-answer_relevancy.id
     path                   = "evaluate"
     method                 = "POST"
 
     lambda_invoke_arn = module.ragas-evaluator.lambda_invoke_arn
 }
 
-resource "aws_api_gateway_resource" "context_precision" {
+resource "aws_api_gateway_resource" "ragas-context_precision" {
     rest_api_id = aws_api_gateway_rest_api.langevals.id
     parent_id   = aws_api_gateway_resource.ragas.id
     path_part   = "context_precision"
@@ -127,14 +127,14 @@ resource "aws_api_gateway_resource" "context_precision" {
 module "ragas-context_precision-api-gw" {
     source                 = "./api-gw-resource"
     apigw_id               = aws_api_gateway_rest_api.langevals.id
-    apigw_root_resource_id = aws_api_gateway_resource.context_precision.id
+    apigw_root_resource_id = aws_api_gateway_resource.ragas-context_precision.id
     path                   = "evaluate"
     method                 = "POST"
 
     lambda_invoke_arn = module.ragas-evaluator.lambda_invoke_arn
 }
 
-resource "aws_api_gateway_resource" "context_recall" {
+resource "aws_api_gateway_resource" "ragas-context_recall" {
     rest_api_id = aws_api_gateway_rest_api.langevals.id
     parent_id   = aws_api_gateway_resource.ragas.id
     path_part   = "context_recall"
@@ -143,14 +143,14 @@ resource "aws_api_gateway_resource" "context_recall" {
 module "ragas-context_recall-api-gw" {
     source                 = "./api-gw-resource"
     apigw_id               = aws_api_gateway_rest_api.langevals.id
-    apigw_root_resource_id = aws_api_gateway_resource.context_recall.id
+    apigw_root_resource_id = aws_api_gateway_resource.ragas-context_recall.id
     path                   = "evaluate"
     method                 = "POST"
 
     lambda_invoke_arn = module.ragas-evaluator.lambda_invoke_arn
 }
 
-resource "aws_api_gateway_resource" "context_relevancy" {
+resource "aws_api_gateway_resource" "ragas-context_relevancy" {
     rest_api_id = aws_api_gateway_rest_api.langevals.id
     parent_id   = aws_api_gateway_resource.ragas.id
     path_part   = "context_relevancy"
@@ -159,14 +159,14 @@ resource "aws_api_gateway_resource" "context_relevancy" {
 module "ragas-context_relevancy-api-gw" {
     source                 = "./api-gw-resource"
     apigw_id               = aws_api_gateway_rest_api.langevals.id
-    apigw_root_resource_id = aws_api_gateway_resource.context_relevancy.id
+    apigw_root_resource_id = aws_api_gateway_resource.ragas-context_relevancy.id
     path                   = "evaluate"
     method                 = "POST"
 
     lambda_invoke_arn = module.ragas-evaluator.lambda_invoke_arn
 }
 
-resource "aws_api_gateway_resource" "context_utilization" {
+resource "aws_api_gateway_resource" "ragas-context_utilization" {
     rest_api_id = aws_api_gateway_rest_api.langevals.id
     parent_id   = aws_api_gateway_resource.ragas.id
     path_part   = "context_utilization"
@@ -175,14 +175,14 @@ resource "aws_api_gateway_resource" "context_utilization" {
 module "ragas-context_utilization-api-gw" {
     source                 = "./api-gw-resource"
     apigw_id               = aws_api_gateway_rest_api.langevals.id
-    apigw_root_resource_id = aws_api_gateway_resource.context_utilization.id
+    apigw_root_resource_id = aws_api_gateway_resource.ragas-context_utilization.id
     path                   = "evaluate"
     method                 = "POST"
 
     lambda_invoke_arn = module.ragas-evaluator.lambda_invoke_arn
 }
 
-resource "aws_api_gateway_resource" "faithfulness" {
+resource "aws_api_gateway_resource" "ragas-faithfulness" {
     rest_api_id = aws_api_gateway_rest_api.langevals.id
     parent_id   = aws_api_gateway_resource.ragas.id
     path_part   = "faithfulness"
@@ -191,7 +191,7 @@ resource "aws_api_gateway_resource" "faithfulness" {
 module "ragas-faithfulness-api-gw" {
     source                 = "./api-gw-resource"
     apigw_id               = aws_api_gateway_rest_api.langevals.id
-    apigw_root_resource_id = aws_api_gateway_resource.faithfulness.id
+    apigw_root_resource_id = aws_api_gateway_resource.ragas-faithfulness.id
     path                   = "evaluate"
     method                 = "POST"
 
@@ -211,7 +211,7 @@ resource "aws_api_gateway_resource" "ragas" {
     path_part   = "ragas"
 }
 
-resource "aws_api_gateway_resource" "basic" {
+resource "aws_api_gateway_resource" "langevals-basic" {
     rest_api_id = aws_api_gateway_rest_api.langevals.id
     parent_id   = aws_api_gateway_resource.langevals.id
     path_part   = "basic"
@@ -220,14 +220,14 @@ resource "aws_api_gateway_resource" "basic" {
 module "langevals-basic-api-gw" {
     source                 = "./api-gw-resource"
     apigw_id               = aws_api_gateway_rest_api.langevals.id
-    apigw_root_resource_id = aws_api_gateway_resource.basic.id
+    apigw_root_resource_id = aws_api_gateway_resource.langevals-basic.id
     path                   = "evaluate"
     method                 = "POST"
 
     lambda_invoke_arn = module.langevals-evaluator.lambda_invoke_arn
 }
 
-resource "aws_api_gateway_resource" "competitor_blocklist" {
+resource "aws_api_gateway_resource" "langevals-competitor_blocklist" {
     rest_api_id = aws_api_gateway_rest_api.langevals.id
     parent_id   = aws_api_gateway_resource.langevals.id
     path_part   = "competitor_blocklist"
@@ -236,14 +236,14 @@ resource "aws_api_gateway_resource" "competitor_blocklist" {
 module "langevals-competitor_blocklist-api-gw" {
     source                 = "./api-gw-resource"
     apigw_id               = aws_api_gateway_rest_api.langevals.id
-    apigw_root_resource_id = aws_api_gateway_resource.competitor_blocklist.id
+    apigw_root_resource_id = aws_api_gateway_resource.langevals-competitor_blocklist.id
     path                   = "evaluate"
     method                 = "POST"
 
     lambda_invoke_arn = module.langevals-evaluator.lambda_invoke_arn
 }
 
-resource "aws_api_gateway_resource" "competitor_llm" {
+resource "aws_api_gateway_resource" "langevals-competitor_llm" {
     rest_api_id = aws_api_gateway_rest_api.langevals.id
     parent_id   = aws_api_gateway_resource.langevals.id
     path_part   = "competitor_llm"
@@ -252,14 +252,14 @@ resource "aws_api_gateway_resource" "competitor_llm" {
 module "langevals-competitor_llm-api-gw" {
     source                 = "./api-gw-resource"
     apigw_id               = aws_api_gateway_rest_api.langevals.id
-    apigw_root_resource_id = aws_api_gateway_resource.competitor_llm.id
+    apigw_root_resource_id = aws_api_gateway_resource.langevals-competitor_llm.id
     path                   = "evaluate"
     method                 = "POST"
 
     lambda_invoke_arn = module.langevals-evaluator.lambda_invoke_arn
 }
 
-resource "aws_api_gateway_resource" "llm_boolean" {
+resource "aws_api_gateway_resource" "langevals-llm_boolean" {
     rest_api_id = aws_api_gateway_rest_api.langevals.id
     parent_id   = aws_api_gateway_resource.langevals.id
     path_part   = "llm_boolean"
@@ -268,14 +268,14 @@ resource "aws_api_gateway_resource" "llm_boolean" {
 module "langevals-llm_boolean-api-gw" {
     source                 = "./api-gw-resource"
     apigw_id               = aws_api_gateway_rest_api.langevals.id
-    apigw_root_resource_id = aws_api_gateway_resource.llm_boolean.id
+    apigw_root_resource_id = aws_api_gateway_resource.langevals-llm_boolean.id
     path                   = "evaluate"
     method                 = "POST"
 
     lambda_invoke_arn = module.langevals-evaluator.lambda_invoke_arn
 }
 
-resource "aws_api_gateway_resource" "llm_score" {
+resource "aws_api_gateway_resource" "langevals-llm_score" {
     rest_api_id = aws_api_gateway_rest_api.langevals.id
     parent_id   = aws_api_gateway_resource.langevals.id
     path_part   = "llm_score"
@@ -284,14 +284,14 @@ resource "aws_api_gateway_resource" "llm_score" {
 module "langevals-llm_score-api-gw" {
     source                 = "./api-gw-resource"
     apigw_id               = aws_api_gateway_rest_api.langevals.id
-    apigw_root_resource_id = aws_api_gateway_resource.llm_score.id
+    apigw_root_resource_id = aws_api_gateway_resource.langevals-llm_score.id
     path                   = "evaluate"
     method                 = "POST"
 
     lambda_invoke_arn = module.langevals-evaluator.lambda_invoke_arn
 }
 
-resource "aws_api_gateway_resource" "off_topic" {
+resource "aws_api_gateway_resource" "langevals-off_topic" {
     rest_api_id = aws_api_gateway_rest_api.langevals.id
     parent_id   = aws_api_gateway_resource.langevals.id
     path_part   = "off_topic"
@@ -300,14 +300,14 @@ resource "aws_api_gateway_resource" "off_topic" {
 module "langevals-off_topic-api-gw" {
     source                 = "./api-gw-resource"
     apigw_id               = aws_api_gateway_rest_api.langevals.id
-    apigw_root_resource_id = aws_api_gateway_resource.off_topic.id
+    apigw_root_resource_id = aws_api_gateway_resource.langevals-off_topic.id
     path                   = "evaluate"
     method                 = "POST"
 
     lambda_invoke_arn = module.langevals-evaluator.lambda_invoke_arn
 }
 
-resource "aws_api_gateway_resource" "product_sentiment_polarity" {
+resource "aws_api_gateway_resource" "langevals-product_sentiment_polarity" {
     rest_api_id = aws_api_gateway_rest_api.langevals.id
     parent_id   = aws_api_gateway_resource.langevals.id
     path_part   = "product_sentiment_polarity"
@@ -316,14 +316,14 @@ resource "aws_api_gateway_resource" "product_sentiment_polarity" {
 module "langevals-product_sentiment_polarity-api-gw" {
     source                 = "./api-gw-resource"
     apigw_id               = aws_api_gateway_rest_api.langevals.id
-    apigw_root_resource_id = aws_api_gateway_resource.product_sentiment_polarity.id
+    apigw_root_resource_id = aws_api_gateway_resource.langevals-product_sentiment_polarity.id
     path                   = "evaluate"
     method                 = "POST"
 
     lambda_invoke_arn = module.langevals-evaluator.lambda_invoke_arn
 }
 
-resource "aws_api_gateway_resource" "similarity" {
+resource "aws_api_gateway_resource" "langevals-similarity" {
     rest_api_id = aws_api_gateway_rest_api.langevals.id
     parent_id   = aws_api_gateway_resource.langevals.id
     path_part   = "similarity"
@@ -332,7 +332,7 @@ resource "aws_api_gateway_resource" "similarity" {
 module "langevals-similarity-api-gw" {
     source                 = "./api-gw-resource"
     apigw_id               = aws_api_gateway_rest_api.langevals.id
-    apigw_root_resource_id = aws_api_gateway_resource.similarity.id
+    apigw_root_resource_id = aws_api_gateway_resource.langevals-similarity.id
     path                   = "evaluate"
     method                 = "POST"
 
@@ -352,7 +352,7 @@ resource "aws_api_gateway_resource" "langevals" {
     path_part   = "langevals"
 }
 
-resource "aws_api_gateway_resource" "moderation" {
+resource "aws_api_gateway_resource" "openai-moderation" {
     rest_api_id = aws_api_gateway_rest_api.langevals.id
     parent_id   = aws_api_gateway_resource.openai.id
     path_part   = "moderation"
@@ -361,7 +361,7 @@ resource "aws_api_gateway_resource" "moderation" {
 module "openai-moderation-api-gw" {
     source                 = "./api-gw-resource"
     apigw_id               = aws_api_gateway_rest_api.langevals.id
-    apigw_root_resource_id = aws_api_gateway_resource.moderation.id
+    apigw_root_resource_id = aws_api_gateway_resource.openai-moderation.id
     path                   = "evaluate"
     method                 = "POST"
 
@@ -381,7 +381,7 @@ resource "aws_api_gateway_resource" "openai" {
     path_part   = "openai"
 }
 
-resource "aws_api_gateway_resource" "llama_guard" {
+resource "aws_api_gateway_resource" "huggingface-llama_guard" {
     rest_api_id = aws_api_gateway_rest_api.langevals.id
     parent_id   = aws_api_gateway_resource.huggingface.id
     path_part   = "llama_guard"
@@ -390,7 +390,7 @@ resource "aws_api_gateway_resource" "llama_guard" {
 module "huggingface-llama_guard-api-gw" {
     source                 = "./api-gw-resource"
     apigw_id               = aws_api_gateway_rest_api.langevals.id
-    apigw_root_resource_id = aws_api_gateway_resource.llama_guard.id
+    apigw_root_resource_id = aws_api_gateway_resource.huggingface-llama_guard.id
     path                   = "evaluate"
     method                 = "POST"
 
@@ -410,7 +410,7 @@ resource "aws_api_gateway_resource" "huggingface" {
     path_part   = "huggingface"
 }
 
-resource "aws_api_gateway_resource" "faithfulness" {
+resource "aws_api_gateway_resource" "haystack-faithfulness" {
     rest_api_id = aws_api_gateway_rest_api.langevals.id
     parent_id   = aws_api_gateway_resource.haystack.id
     path_part   = "faithfulness"
@@ -419,7 +419,7 @@ resource "aws_api_gateway_resource" "faithfulness" {
 module "haystack-faithfulness-api-gw" {
     source                 = "./api-gw-resource"
     apigw_id               = aws_api_gateway_rest_api.langevals.id
-    apigw_root_resource_id = aws_api_gateway_resource.faithfulness.id
+    apigw_root_resource_id = aws_api_gateway_resource.haystack-faithfulness.id
     path                   = "evaluate"
     method                 = "POST"
 
@@ -439,7 +439,7 @@ resource "aws_api_gateway_resource" "haystack" {
     path_part   = "haystack"
 }
 
-resource "aws_api_gateway_resource" "dlp_pii_detection" {
+resource "aws_api_gateway_resource" "google_cloud-dlp_pii_detection" {
     rest_api_id = aws_api_gateway_rest_api.langevals.id
     parent_id   = aws_api_gateway_resource.google_cloud.id
     path_part   = "dlp_pii_detection"
@@ -448,7 +448,7 @@ resource "aws_api_gateway_resource" "dlp_pii_detection" {
 module "google_cloud-dlp_pii_detection-api-gw" {
     source                 = "./api-gw-resource"
     apigw_id               = aws_api_gateway_rest_api.langevals.id
-    apigw_root_resource_id = aws_api_gateway_resource.dlp_pii_detection.id
+    apigw_root_resource_id = aws_api_gateway_resource.google_cloud-dlp_pii_detection.id
     path                   = "evaluate"
     method                 = "POST"
 

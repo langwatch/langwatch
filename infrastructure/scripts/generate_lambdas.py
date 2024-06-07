@@ -32,7 +32,7 @@ def main():
             definitions = get_evaluator_definitions(evaluator_cls)
             evaluator_name = definitions.evaluator_name
             lambdas_tf += f"""
-            resource "aws_api_gateway_resource" "{evaluator_name}" {{
+            resource "aws_api_gateway_resource" "{package_name}-{evaluator_name}" {{
                 rest_api_id = aws_api_gateway_rest_api.langevals.id
                 parent_id   = aws_api_gateway_resource.{package_name}.id
                 path_part   = "{evaluator_name}"
@@ -41,7 +41,7 @@ def main():
             module "{package_name}-{evaluator_name}-api-gw" {{
                 source                 = "./api-gw-resource"
                 apigw_id               = aws_api_gateway_rest_api.langevals.id
-                apigw_root_resource_id = aws_api_gateway_resource.{evaluator_name}.id
+                apigw_root_resource_id = aws_api_gateway_resource.{package_name}-{evaluator_name}.id
                 path                   = "evaluate"
                 method                 = "POST"
 
