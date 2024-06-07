@@ -16,7 +16,7 @@ import {
   Tabs,
   Text,
   VStack,
-  useDisclosure
+  useDisclosure,
 } from "@chakra-ui/react";
 import type { Annotation } from "@prisma/client";
 import { useState } from "react";
@@ -205,6 +205,9 @@ export const TraceDetailsDrawer = (props: TraceDetailsDrawerProps) => {
     );
   };
 
+  const annotationTabIndex =
+    props.annotationTab && anyGuardrails ? 3 : props.annotationTab ? 2 : 0;
+
   return (
     <Drawer
       isOpen={true}
@@ -257,7 +260,7 @@ export const TraceDetailsDrawer = (props: TraceDetailsDrawerProps) => {
           </Flex>
         </DrawerHeader>
         <DrawerBody>
-          <Tabs defaultIndex={props.annotationTab ? 2 : 0}>
+          <Tabs defaultIndex={annotationTabIndex}>
             <TabList>
               <Tab>Details</Tab>
               {anyGuardrails && (
