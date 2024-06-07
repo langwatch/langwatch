@@ -251,6 +251,11 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
             2
           );
         }
+
+        if (columns.includes("comments")) {
+          row.comments = "";
+        }
+
         rows.push(row);
       }
     }
@@ -276,6 +281,9 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
             llmEntry.outputs[0]?.type === "chat_messages"
           ) {
             row.expected_llm_output = llmEntry.outputs[0].value;
+          }
+          if (columns.includes("comments")) {
+            row.comments = "";
           }
 
           rows.push(row);
