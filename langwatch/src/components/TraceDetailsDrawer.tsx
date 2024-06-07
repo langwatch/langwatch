@@ -1,13 +1,14 @@
+import { Link } from "@chakra-ui/next-js";
 import {
+  Button,
   Drawer,
   DrawerBody,
-  Flex,
-  Spacer,
-  Button,
   DrawerCloseButton,
   DrawerContent,
   DrawerHeader,
+  Flex,
   HStack,
+  Spacer,
   Tab,
   TabList,
   TabPanel,
@@ -15,27 +16,24 @@ import {
   Tabs,
   Text,
   VStack,
-  useDisclosure,
-  Box,
+  useDisclosure
 } from "@chakra-ui/react";
+import type { Annotation } from "@prisma/client";
 import { useState } from "react";
 import { Maximize2, Minimize2 } from "react-feather";
 import type { TraceCheck } from "~/server/tracer/types";
-import type { Annotation } from "@prisma/client";
-import { CheckPassingDrawer } from "./CheckPassingDrawer";
-import { SpanTree } from "./traces/SpanTree";
-import { TraceSummary } from "./traces/Summary";
-import { Link } from "@chakra-ui/next-js";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import { api } from "../utils/api";
-import { useDrawer } from "./CurrentDrawer";
 import { AddDatasetRecordDrawerV2 } from "./AddDatasetRecordDrawer";
 import { Annotations } from "./Annotations";
-import { useRouter } from "next/router";
+import { CheckPassingDrawer } from "./CheckPassingDrawer";
+import { useDrawer } from "./CurrentDrawer";
+import { SpanTree } from "./traces/SpanTree";
+import { TraceSummary } from "./traces/Summary";
 
 interface TraceDetailsDrawerProps {
   traceId: string;
-  isAnnotationTab?: boolean;
+  annotationTab?: boolean;
 }
 
 interface TraceEval {
@@ -46,9 +44,6 @@ interface TraceEval {
 export const TraceDetailsDrawer = (props: TraceDetailsDrawerProps) => {
   const { closeDrawer, openDrawer } = useDrawer();
   const { isOpen, onOpen, onClose } = useDisclosure();
-  const router = useRouter();
-
-  const isAnnotationTab = router.query["drawer.annotationTab"];
 
   const [traceView, setTraceView] = useState<"span" | "full">("span");
   const toggleView = () => {
@@ -262,7 +257,7 @@ export const TraceDetailsDrawer = (props: TraceDetailsDrawerProps) => {
           </Flex>
         </DrawerHeader>
         <DrawerBody>
-          <Tabs defaultIndex={isAnnotationTab ? 2 : 0}>
+          <Tabs defaultIndex={props.annotationTab ? 2 : 0}>
             <TabList>
               <Tab>Details</Tab>
               {anyGuardrails && (
