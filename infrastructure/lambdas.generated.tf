@@ -13,6 +13,10 @@ module "aws-comprehend_pii_detection-api-gw" {
     method                 = "POST"
 
     lambda_invoke_arn = module.aws-evaluator.lambda_invoke_arn
+
+    depends_on = [
+        aws_api_gateway_resource.aws-comprehend_pii_detection
+    ]
 }
 
 module "aws-evaluator" {
@@ -42,6 +46,10 @@ module "lingua-language_detection-api-gw" {
     method                 = "POST"
 
     lambda_invoke_arn = module.lingua-evaluator.lambda_invoke_arn
+
+    depends_on = [
+        aws_api_gateway_resource.lingua-language_detection
+    ]
 }
 
 module "lingua-evaluator" {
@@ -71,6 +79,10 @@ module "azure-content_safety-api-gw" {
     method                 = "POST"
 
     lambda_invoke_arn = module.azure-evaluator.lambda_invoke_arn
+
+    depends_on = [
+        aws_api_gateway_resource.azure-content_safety
+    ]
 }
 
 resource "aws_api_gateway_resource" "azure-jailbreak" {
@@ -87,6 +99,10 @@ module "azure-jailbreak-api-gw" {
     method                 = "POST"
 
     lambda_invoke_arn = module.azure-evaluator.lambda_invoke_arn
+
+    depends_on = [
+        aws_api_gateway_resource.azure-jailbreak
+    ]
 }
 
 module "azure-evaluator" {
@@ -116,6 +132,10 @@ module "ragas-answer_relevancy-api-gw" {
     method                 = "POST"
 
     lambda_invoke_arn = module.ragas-evaluator.lambda_invoke_arn
+
+    depends_on = [
+        aws_api_gateway_resource.ragas-answer_relevancy
+    ]
 }
 
 resource "aws_api_gateway_resource" "ragas-context_precision" {
@@ -132,6 +152,10 @@ module "ragas-context_precision-api-gw" {
     method                 = "POST"
 
     lambda_invoke_arn = module.ragas-evaluator.lambda_invoke_arn
+
+    depends_on = [
+        aws_api_gateway_resource.ragas-context_precision
+    ]
 }
 
 resource "aws_api_gateway_resource" "ragas-context_recall" {
@@ -148,6 +172,10 @@ module "ragas-context_recall-api-gw" {
     method                 = "POST"
 
     lambda_invoke_arn = module.ragas-evaluator.lambda_invoke_arn
+
+    depends_on = [
+        aws_api_gateway_resource.ragas-context_recall
+    ]
 }
 
 resource "aws_api_gateway_resource" "ragas-context_relevancy" {
@@ -164,6 +192,10 @@ module "ragas-context_relevancy-api-gw" {
     method                 = "POST"
 
     lambda_invoke_arn = module.ragas-evaluator.lambda_invoke_arn
+
+    depends_on = [
+        aws_api_gateway_resource.ragas-context_relevancy
+    ]
 }
 
 resource "aws_api_gateway_resource" "ragas-context_utilization" {
@@ -180,6 +212,10 @@ module "ragas-context_utilization-api-gw" {
     method                 = "POST"
 
     lambda_invoke_arn = module.ragas-evaluator.lambda_invoke_arn
+
+    depends_on = [
+        aws_api_gateway_resource.ragas-context_utilization
+    ]
 }
 
 resource "aws_api_gateway_resource" "ragas-faithfulness" {
@@ -196,6 +232,10 @@ module "ragas-faithfulness-api-gw" {
     method                 = "POST"
 
     lambda_invoke_arn = module.ragas-evaluator.lambda_invoke_arn
+
+    depends_on = [
+        aws_api_gateway_resource.ragas-faithfulness
+    ]
 }
 
 module "ragas-evaluator" {
@@ -225,6 +265,10 @@ module "langevals-basic-api-gw" {
     method                 = "POST"
 
     lambda_invoke_arn = module.langevals-evaluator.lambda_invoke_arn
+
+    depends_on = [
+        aws_api_gateway_resource.langevals-basic
+    ]
 }
 
 resource "aws_api_gateway_resource" "langevals-competitor_blocklist" {
@@ -241,6 +285,10 @@ module "langevals-competitor_blocklist-api-gw" {
     method                 = "POST"
 
     lambda_invoke_arn = module.langevals-evaluator.lambda_invoke_arn
+
+    depends_on = [
+        aws_api_gateway_resource.langevals-competitor_blocklist
+    ]
 }
 
 resource "aws_api_gateway_resource" "langevals-competitor_llm" {
@@ -257,6 +305,10 @@ module "langevals-competitor_llm-api-gw" {
     method                 = "POST"
 
     lambda_invoke_arn = module.langevals-evaluator.lambda_invoke_arn
+
+    depends_on = [
+        aws_api_gateway_resource.langevals-competitor_llm
+    ]
 }
 
 resource "aws_api_gateway_resource" "langevals-llm_boolean" {
@@ -273,6 +325,10 @@ module "langevals-llm_boolean-api-gw" {
     method                 = "POST"
 
     lambda_invoke_arn = module.langevals-evaluator.lambda_invoke_arn
+
+    depends_on = [
+        aws_api_gateway_resource.langevals-llm_boolean
+    ]
 }
 
 resource "aws_api_gateway_resource" "langevals-llm_score" {
@@ -289,6 +345,10 @@ module "langevals-llm_score-api-gw" {
     method                 = "POST"
 
     lambda_invoke_arn = module.langevals-evaluator.lambda_invoke_arn
+
+    depends_on = [
+        aws_api_gateway_resource.langevals-llm_score
+    ]
 }
 
 resource "aws_api_gateway_resource" "langevals-off_topic" {
@@ -305,6 +365,10 @@ module "langevals-off_topic-api-gw" {
     method                 = "POST"
 
     lambda_invoke_arn = module.langevals-evaluator.lambda_invoke_arn
+
+    depends_on = [
+        aws_api_gateway_resource.langevals-off_topic
+    ]
 }
 
 resource "aws_api_gateway_resource" "langevals-product_sentiment_polarity" {
@@ -321,6 +385,10 @@ module "langevals-product_sentiment_polarity-api-gw" {
     method                 = "POST"
 
     lambda_invoke_arn = module.langevals-evaluator.lambda_invoke_arn
+
+    depends_on = [
+        aws_api_gateway_resource.langevals-product_sentiment_polarity
+    ]
 }
 
 resource "aws_api_gateway_resource" "langevals-similarity" {
@@ -337,6 +405,10 @@ module "langevals-similarity-api-gw" {
     method                 = "POST"
 
     lambda_invoke_arn = module.langevals-evaluator.lambda_invoke_arn
+
+    depends_on = [
+        aws_api_gateway_resource.langevals-similarity
+    ]
 }
 
 module "langevals-evaluator" {
@@ -366,6 +438,10 @@ module "openai-moderation-api-gw" {
     method                 = "POST"
 
     lambda_invoke_arn = module.openai-evaluator.lambda_invoke_arn
+
+    depends_on = [
+        aws_api_gateway_resource.openai-moderation
+    ]
 }
 
 module "openai-evaluator" {
@@ -395,6 +471,10 @@ module "huggingface-llama_guard-api-gw" {
     method                 = "POST"
 
     lambda_invoke_arn = module.huggingface-evaluator.lambda_invoke_arn
+
+    depends_on = [
+        aws_api_gateway_resource.huggingface-llama_guard
+    ]
 }
 
 module "huggingface-evaluator" {
@@ -424,6 +504,10 @@ module "haystack-faithfulness-api-gw" {
     method                 = "POST"
 
     lambda_invoke_arn = module.haystack-evaluator.lambda_invoke_arn
+
+    depends_on = [
+        aws_api_gateway_resource.haystack-faithfulness
+    ]
 }
 
 module "haystack-evaluator" {
@@ -453,6 +537,10 @@ module "google_cloud-dlp_pii_detection-api-gw" {
     method                 = "POST"
 
     lambda_invoke_arn = module.google_cloud-evaluator.lambda_invoke_arn
+
+    depends_on = [
+        aws_api_gateway_resource.google_cloud-dlp_pii_detection
+    ]
 }
 
 module "google_cloud-evaluator" {

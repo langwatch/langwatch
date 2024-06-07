@@ -46,6 +46,10 @@ def main():
                 method                 = "POST"
 
                 lambda_invoke_arn = module.{package_name}-evaluator.lambda_invoke_arn
+
+                depends_on = [
+                    aws_api_gateway_resource.{package_name}-{evaluator_name}
+                ]
             }}
             """
             depends_on.append(f"module.{package_name}-{evaluator_name}-api-gw")
