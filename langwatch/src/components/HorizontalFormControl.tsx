@@ -8,7 +8,7 @@ import {
   VStack,
   type StackProps,
 } from "@chakra-ui/react";
-import { type PropsWithChildren } from "react";
+import { type PropsWithChildren, type ReactNode } from "react";
 
 export function HorizontalFormControl({
   label,
@@ -18,7 +18,7 @@ export function HorizontalFormControl({
   align,
   minWidth,
 }: PropsWithChildren<{
-  label: string;
+  label: string | ReactNode;
   helper: string;
   isInvalid?: boolean;
 }> &

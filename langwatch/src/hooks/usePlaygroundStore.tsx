@@ -66,7 +66,7 @@ export const modelOptions: ModelOption[] = Object.entries(models).map(
     label: value.name,
     value: key,
     version: value.version,
-    icon: providerIcons[value.model_provider],
+    icon: providerIcons[value.model_vendor],
   })
 );
 

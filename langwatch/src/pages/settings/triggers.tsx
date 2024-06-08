@@ -27,9 +27,10 @@ import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProje
 import { api } from "../../utils/api";
 import { DeleteIcon } from "@chakra-ui/icons";
 import { Switch } from "@chakra-ui/react";
+import { ProjectSelector } from "../../components/DashboardLayout";
 
 export default function Members() {
-  const { project } = useOrganizationTeamProject();
+  const { project, organizations } = useOrganizationTeamProject();
   const toast = useToast();
 
   const triggers = api.trigger.getTriggers.useQuery(
@@ -137,6 +138,9 @@ export default function Members() {
             Triggers
           </Heading>
           <Spacer />
+          {organizations && project && (
+            <ProjectSelector organizations={organizations} project={project} />
+          )}
         </HStack>
         <Card width="full">
           <CardBody width="full" paddingY={0} paddingX={0}>

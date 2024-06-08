@@ -166,7 +166,8 @@ model Project {
     piiRedactionLevel PIIRedactionLevel @default(ESSENTIAL)
     triggers          Trigger[]
     experiments       Experiment[]
-    Annotation        Annotation[]
+    annotations       Annotation[]
+    modelProviders    ModelProvider[]
 
     @@index([teamId])
 }
@@ -399,4 +400,17 @@ model Annotation {
     @@index([projectId])
     @@index([traceId])
     @@index([userId])
+}
+
+model ModelProvider {
+    id         String   @id @default(nanoid())
+    projectId  String
+    project    Project  @relation(fields: [projectId], references: [id])
+    provider   String
+    enabled    Boolean
+    customKeys Json?
+    createdAt  DateTime @default(now())
+    updatedAt  DateTime @default(now()) @updatedAt
+
+    @@index([projectId])
 }
