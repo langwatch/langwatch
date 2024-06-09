@@ -27,6 +27,7 @@ sentiment_analysis.setup_endpoints(app)
 
 
 async def proxy_startup():
+    os.environ["AZURE_API_VERSION"] = "2024-02-01"
     original_get_available_deployment = Router.async_get_available_deployment
 
     # Patch to be able to replace api_key and api_base on the fly from the parameters comming from langwatch according to user settings
@@ -39,6 +40,8 @@ async def proxy_startup():
         request_kwargs: Optional[Dict] = None,
         **kwargs
     ):
+        self.cache.flush_cache()  # prevents litellm proxing from storing failures and mark the deployment as "unhealthy" for everyone in case a single user's API key is invalid for example
+
         deployment = await original_get_available_deployment(
             self,
             model=model,
@@ -49,15 +52,20 @@ async def proxy_startup():
             **kwargs
         )
         deployment = deployment.copy()
+
+        if "litellm_params" not in deployment:
+            deployment["litellm_params"] = {}
         if request_kwargs is not None and "proxy_server_request" in request_kwargs:
             proxy_server_request = request_kwargs["proxy_server_request"]
             for header, value in proxy_server_request["headers"].items():
                 if header.startswith("x-litellm-"):
                     _, key = header.split("x-litellm-")
                     key = key.replace("-", "_")
-                    if "litellm_params" not in deployment:
-                        deployment["litellm_params"] = {}
                     deployment["litellm_params"][key] = value
+        if "azure/" in model:
+            deployment["litellm_params"]["api_version"] = os.environ[
+                "AZURE_API_VERSION"
+            ]
         self.set_client(model=deployment)
 
         return deployment

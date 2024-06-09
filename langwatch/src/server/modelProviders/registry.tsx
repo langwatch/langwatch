@@ -8,7 +8,9 @@ import type { ModelProvider } from "@prisma/client";
 type ModelProviderDefinition = {
   name: string;
   icon: React.ReactNode;
-  keys: z.AnyZodObject;
+  apiKey: string;
+  endpointKey: string | undefined;
+  keysSchema: z.AnyZodObject;
   enabledSince?: Date;
 };
 
@@ -23,7 +25,9 @@ export const modelProviders = {
   openai: {
     name: "OpenAI",
     icon: <OpenAI />,
-    keys: z.object({
+    apiKey: "OPENAI_API_KEY",
+    endpointKey: "OPENAI_BASE_URL",
+    keysSchema: z.object({
       OPENAI_API_KEY: z.string().min(1),
       OPENAI_BASE_URL: z.string().nullable().optional(),
     }),
@@ -32,7 +36,9 @@ export const modelProviders = {
   azure: {
     name: "Azure OpenAI",
     icon: <Azure />,
-    keys: z.object({
+    apiKey: "AZURE_OPENAI_API_KEY",
+    endpointKey: "AZURE_OPENAI_ENDPOINT",
+    keysSchema: z.object({
       AZURE_OPENAI_API_KEY: z.string().min(1),
       AZURE_OPENAI_ENDPOINT: z.string().min(1),
     }),
@@ -41,7 +47,9 @@ export const modelProviders = {
   anthropic: {
     name: "Anthropic",
     icon: <Anthropic />,
-    keys: z.object({
+    apiKey: "ANTHROPIC_API_KEY",
+    endpointKey: undefined,
+    keysSchema: z.object({
       ANTHROPIC_API_KEY: z.string().min(1),
     }),
     enabledSince: new Date("2023-01-01"),
@@ -49,7 +57,9 @@ export const modelProviders = {
   groq: {
     name: "Groq",
     icon: <Groq />,
-    keys: z.object({
+    apiKey: "GROQ_API_KEY",
+    endpointKey: undefined,
+    keysSchema: z.object({
       GROQ_API_KEY: z.string().min(1),
     }),
     enabledSince: new Date("2023-01-01"),

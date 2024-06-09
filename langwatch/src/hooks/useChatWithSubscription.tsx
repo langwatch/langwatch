@@ -1,7 +1,14 @@
 import { useChat, type Message } from "ai/react";
 import { useCallback, useEffect, useRef, type FormEvent } from "react";
+import { useOrganizationTeamProject } from "./useOrganizationTeamProject";
 
-export const useChatWithSubscription = (id: string, model: string, systemPrompt: string) => {
+export const useChatWithSubscription = (
+  id: string,
+  model: string,
+  systemPrompt: string
+) => {
+  const { project } = useOrganizationTeamProject();
+
   const {
     messages: localMessages,
     setMessages: setLocalMessages,
@@ -9,13 +16,14 @@ export const useChatWithSubscription = (id: string, model: string, systemPrompt:
     handleSubmit,
     error,
     isLoading,
-    stop
+    stop,
   } = useChat({
     id: id,
     api: "/api/playground",
     headers: {
       "X-Model": model ?? "",
       "X-System-Prompt": systemPrompt ?? "",
+      "X-Project-Id": project?.id ?? "",
     },
   });
 
@@ -68,7 +76,7 @@ export const useChatWithSubscription = (id: string, model: string, systemPrompt:
     handleSubmit: handleSubmitWithUpdate,
     stop,
     error,
-    isLoading
+    isLoading,
   };
 };
 

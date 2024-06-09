@@ -1,14 +1,9 @@
 import { create } from "zustand";
 import { temporal } from "zundo";
-import { Anthropic } from "../components/icons/Anthropic";
-import { Azure } from "../components/icons/Azure";
-import { Meta } from "../components/icons/Meta";
-import { Mistral } from "../components/icons/Mistral";
-import { OpenAI } from "../components/icons/OpenAI";
-import models from "../../../models.json";
 import type { Message } from "ai";
 import isDeepEqual from "fast-deep-equal";
 import { nanoid } from "nanoid";
+import { modelSelectorOptions } from "../components/ModelSelector";
 
 interface PlaygroundStore {
   tabs: PlaygroundTabState[];
@@ -21,7 +16,7 @@ interface PlaygroundStore {
   reorderChatWindows: (idsOrder: string[]) => void;
   addNewTab: () => void;
   closeTab: (tabIndex: number) => void;
-  setModel: (windowId: string, model: ModelOption) => void;
+  setModel: (windowId: string, model: string) => void;
   toggleSyncInputs: () => void;
   onChangeInput: (windowId: string, input: string) => void;
   onSubmit: (windowId: string, requestedSubmission: boolean) => void;
@@ -38,7 +33,7 @@ export interface PlaygroundTabState {
 
 export interface ChatWindowState {
   id: string;
-  model: ModelOption;
+  model: string;
   input: string;
   requestedSubmission?: boolean;
   messages: Message[];
@@ -46,34 +41,10 @@ export interface ChatWindowState {
   systemPromptExpanded: boolean;
 }
 
-type ModelOption = {
-  label: string;
-  value: string;
-  version: string;
-  icon: React.ReactNode;
-};
-
-const providerIcons: Record<string, React.ReactNode> = {
-  azure: <Azure />,
-  openai: <OpenAI />,
-  meta: <Meta />,
-  mistral: <Mistral />,
-  anthropic: <Anthropic />,
-};
-
-export const modelOptions: ModelOption[] = Object.entries(models).map(
-  ([key, value]) => ({
-    label: value.name,
-    value: key,
-    version: value.version,
-    icon: providerIcons[value.model_vendor],
-  })
-);
-
 const initialChatWindows: ChatWindowState[] = [
   {
     id: nanoid(),
-    model: modelOptions.find((model) => model.value === "openai/gpt-4o")!,
+    model: "openai/gpt-4o",
     input: "",
     messages: [],
     systemPrompt: "",
@@ -81,9 +52,7 @@ const initialChatWindows: ChatWindowState[] = [
   },
   {
     id: nanoid(),
-    model: modelOptions.find(
-      (model) => model.value === "groq/llama3-70b-8192"
-    )!,
+    model: "groq/llama3-70b-8192",
     input: "",
     messages: [],
     systemPrompt: "",
@@ -91,9 +60,7 @@ const initialChatWindows: ChatWindowState[] = [
   },
   {
     id: nanoid(),
-    model: modelOptions.find(
-      (model) => model.value === "anthropic/claude-3-sonnet-20240229"
-    )!,
+    model: "anthropic/claude-3-sonnet-20240229",
     input: "",
     messages: [],
     systemPrompt: "",
@@ -199,7 +166,7 @@ const store = (
             ...tab.chatWindows.slice(0, currentChatWindowIndex + 1),
             {
               id: nanoid(),
-              model: modelOptions[0]!,
+              model: modelSelectorOptions[0]!.value,
               input: "",
               messages: [],
               // TODO: get from others if in sync

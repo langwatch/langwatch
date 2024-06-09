@@ -12,6 +12,7 @@ import { usePlaygroundStore } from "../../hooks/usePlaygroundStore";
 import { useRequiredSession } from "../../hooks/useRequiredSession";
 import type { ChatRef } from "../../hooks/useChatWithSubscription";
 import { useDebounceValue } from "usehooks-ts";
+import { modelSelectorOptions } from "../ModelSelector";
 
 export function Messages({
   addMessagesListener,
@@ -157,7 +158,10 @@ export function Messages({
           )}
           {message.role === "assistant" && (
             <Box minWidth="22px" height="22px" padding="1px">
-              {model.icon}
+              {
+                modelSelectorOptions.find((option) => option.value === model)
+                  ?.icon
+              }
             </Box>
           )}
           <Text paddingTop="2px" whiteSpace="pre-wrap">
@@ -184,7 +188,10 @@ export function Messages({
               index={messages.length}
             >
               <Box minWidth="22px" height="22px" padding="1px">
-                {model.icon}
+                {
+                  modelSelectorOptions.find((option) => option.value === model)
+                    ?.icon
+                }
               </Box>
               <Text paddingTop="2px">
                 <span
@@ -200,11 +207,12 @@ export function Messages({
               index={messages.length}
             >
               <Box minWidth="22px" height="22px" padding="1px">
-                {model.icon}
+                {
+                  modelSelectorOptions.find((option) => option.value === model)
+                    ?.icon
+                }
               </Box>
-              <Text paddingTop="2px" color="red.500">
-                An error has occured
-              </Text>
+              <ErrorMessage error={error} />
             </MessageBlock>
           )}
         </>
@@ -212,6 +220,25 @@ export function Messages({
       <Box width="full" height="1px" id="messages-end" ref={messagesEndRef} />
     </VStack>
   );
+}
+
+function ErrorMessage({ error }: { error: Error }) {
+  console.log("error", error);
+  try {
+    const json = JSON.parse(error.message);
+    return (
+      <Text paddingTop="2px" color="red.500">
+        {typeof json.error === "string" ? json.error : JSON.stringify(json)}
+      </Text>
+    );
+  } catch {
+    return (
+      <Text paddingTop="2px" color="red.500">
+        {/* An error has occured */}
+        {error.message}
+      </Text>
+    );
+  }
 }
 
 function MessageBlock({

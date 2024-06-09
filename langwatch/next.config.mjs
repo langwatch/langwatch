@@ -49,8 +49,12 @@ const config = {
     config.resolve.alias.react = path.join(__dirname, "node_modules", "react");
 
     if (process.env.EXTRA_INCLUDE) {
+      // @ts-ignore
+      const index = config.module.rules.findIndex((rule) =>
+        rule.oneOf?.[0]?.include?.[0]?.includes("langwatch")
+      );
       // TODO: find a less hacky way to make sure injected src will be compiled as well
-      for (const rule of config.module.rules?.[7].oneOf ?? []) {
+      for (const rule of config.module.rules?.[index].oneOf ?? []) {
         const includeIsArray = Array.isArray(rule.include);
         if (includeIsArray) {
           rule.include.push(process.env.EXTRA_INCLUDE);

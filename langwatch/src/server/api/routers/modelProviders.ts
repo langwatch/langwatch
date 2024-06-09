@@ -36,7 +36,7 @@ export const modelProviderRouter = createTRPCRouter({
       }
 
       const validator =
-        modelProviders[provider as keyof typeof modelProviders]!.keys;
+        modelProviders[provider as keyof typeof modelProviders]!.keysSchema;
       let validatedKeys;
       try {
         validatedKeys = customKeys ? validator.parse(customKeys) : null;
@@ -73,7 +73,7 @@ export const modelProviderRouter = createTRPCRouter({
     }),
 });
 
-const getProjectModelProviders = async (projectId: string) => {
+export const getProjectModelProviders = async (projectId: string) => {
   const project = await prisma.project.findUnique({
     where: { id: projectId },
   });
@@ -116,4 +116,39 @@ const getProjectModelProviders = async (projectId: string) => {
     ...defaultModelProviders,
     ...savedModelProviders,
   };
+};
+
+export const getModelOrDefaultEnvKey = (
+  modelProvider: MaybeStoredModelProvider,
+  envKey: string
+) => {
+  return (
+    (modelProvider.customKeys as Record<string, string>)?.[envKey] ??
+    process.env[envKey]
+  );
+};
+
+export const getModelOrDefaultApiKey = (
+  modelProvider: MaybeStoredModelProvider
+) => {
+  const providerDefinition =
+    modelProviders[modelProvider.provider as keyof typeof modelProviders];
+  if (!providerDefinition) {
+    return undefined;
+  }
+  return getModelOrDefaultEnvKey(modelProvider, providerDefinition.apiKey);
+};
+
+export const getModelOrDefaultEndpointKey = (
+  modelProvider: MaybeStoredModelProvider
+) => {
+  const providerDefinition =
+    modelProviders[modelProvider.provider as keyof typeof modelProviders];
+  if (!providerDefinition) {
+    return undefined;
+  }
+  return (
+    providerDefinition.endpointKey &&
+    getModelOrDefaultEnvKey(modelProvider, providerDefinition.endpointKey)
+  );
 };

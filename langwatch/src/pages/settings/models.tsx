@@ -15,7 +15,7 @@ import {
   Switch,
   Text,
   VStack,
-  useToast
+  useToast,
 } from "@chakra-ui/react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import React, { useCallback } from "react";
@@ -148,7 +148,7 @@ const ModelProviderForm = ({
             provider: z.enum(Object.keys(modelProvidersRegistry) as any),
             enabled: z.boolean(),
             useCustomKeys: z.boolean(),
-            customKeys: providerDefinition.keys.optional().nullable(),
+            customKeys: providerDefinition.keysSchema.optional().nullable(),
           })
         )(data_, ...args);
       },
@@ -235,7 +235,7 @@ const ModelProviderForm = ({
     ]
   );
 
-  const providerKeys = providerDefinition.keys.shape;
+  const providerKeys = providerDefinition.keysSchema.shape;
   const useCustomKeys = watch("useCustomKeys");
 
   return (
@@ -303,8 +303,8 @@ const ModelProviderForm = ({
                         <Input
                           {...register(`customKeys.${key}`)}
                           placeholder={
-                            (providerDefinition.keys.shape as any)[key]._def
-                              .typeName === "ZodOptional"
+                            (providerDefinition.keysSchema.shape as any)[key]
+                              ._def.typeName === "ZodOptional"
                               ? "optional"
                               : undefined
                           }

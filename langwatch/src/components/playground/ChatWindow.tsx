@@ -19,7 +19,7 @@ import React, { useEffect, useRef } from "react";
 import { ChevronDown, MinusCircle, PlusCircle, Send } from "react-feather";
 import { useDebounceValue } from "usehooks-ts";
 import { usePlaygroundStore } from "../../hooks/usePlaygroundStore";
-import { SelectModel } from "./SelectModel";
+import { ModelSelector, modelSelectorOptions } from "../ModelSelector";
 import {
   useChatWithSubscription,
   type ChatRef,
@@ -45,7 +45,7 @@ export const ChatWindowWrapper = React.memo(function ChatWindowWrapper({
     return { id, model, systemPrompt };
   });
 
-  const chat = useChatWithSubscription(id, model.value, systemPrompt);
+  const chat = useChatWithSubscription(id, model, systemPrompt);
   const chatRef = useRef<ChatRef>(chat);
 
   useEffect(() => {
@@ -88,19 +88,25 @@ const ChatWindow = React.memo(function ChatWindow({
   isLoading: boolean;
   windowsCount: number;
 }) {
-  const { chatWindowState, addChatWindow, removeChatWindow, onSubmit } =
-    usePlaygroundStore((state) => {
-      const { id, model, input, requestedSubmission } = state.tabs[
-        tabIndex
-      ]!.chatWindows.find((chatWindow) => chatWindow.id === windowId)!;
+  const {
+    chatWindowState,
+    addChatWindow,
+    removeChatWindow,
+    onSubmit,
+    setModel,
+  } = usePlaygroundStore((state) => {
+    const { id, model, input, requestedSubmission } = state.tabs[
+      tabIndex
+    ]!.chatWindows.find((chatWindow) => chatWindow.id === windowId)!;
 
-      return {
-        chatWindowState: { id, model, input, requestedSubmission },
-        addChatWindow: state.addChatWindow,
-        removeChatWindow: state.removeChatWindow,
-        onSubmit: state.onSubmit,
-      };
-    });
+    return {
+      chatWindowState: { id, model, input, requestedSubmission },
+      addChatWindow: state.addChatWindow,
+      removeChatWindow: state.removeChatWindow,
+      onSubmit: state.onSubmit,
+      setModel: state.setModel,
+    };
+  });
 
   useEffect(() => {
     const simulatedEvent = {
@@ -161,7 +167,11 @@ const ChatWindow = React.memo(function ChatWindow({
           {...listeners}
           cursor="move"
         />
-        <SelectModel tabIndex={tabIndex} windowId={windowId} />
+        <ModelSelector
+          options={modelSelectorOptions.map((option) => option.value)}
+          model={chatWindowState.model}
+          onChange={(model) => setModel(windowId, model)}
+        />
         <Spacer />
         <HStack spacing={0}>
           <Button

@@ -7,11 +7,12 @@ import type {
   NextApiResponse,
 } from "next";
 import type { ProcedureRouterRecord } from "@trpc/server";
+import type { NextRequest } from "next/server";
 
 export interface Dependencies {
   subscriptionHandler: typeof SubscriptionHandler;
   sessionHandler?: (params: {
-    req: NextApiRequest | GetServerSidePropsContext["req"];
+    req: NextApiRequest | GetServerSidePropsContext["req"] | NextRequest;
     session: any;
     user: any;
   }) => Awaitable<DefaultSession | Session | null>;

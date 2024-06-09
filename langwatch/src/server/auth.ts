@@ -10,6 +10,7 @@ import Auth0Provider, { type Auth0Profile } from "next-auth/providers/auth0";
 import { env } from "~/env.mjs";
 import { prisma } from "~/server/db";
 import { dependencies } from "../injection/dependencies.server";
+import type { NextRequest } from "next/server";
 
 /**
  * Module augmentation for `next-auth` types. Allows us to add custom properties to the `session`
@@ -38,7 +39,7 @@ declare module "next-auth" {
  * @see https://next-auth.js.org/configuration/options
  */
 export const authOptions = (
-  req: NextApiRequest | GetServerSidePropsContext["req"]
+  req: NextApiRequest | GetServerSidePropsContext["req"] | NextRequest
 ): NextAuthOptions => ({
   callbacks: {
     session: async ({ session, user }) => {

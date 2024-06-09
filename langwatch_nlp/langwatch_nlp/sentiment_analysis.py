@@ -11,7 +11,7 @@ from tenacity import retry, stop_after_attempt, wait_random_exponential
 azure_client = AzureOpenAI(
     azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT") or "",
     api_key=os.getenv("AZURE_OPENAI_API_KEY"),
-    api_version="2023-07-01-preview",
+    api_version="2024-02-01",
 )
 openai_client = OpenAI(
     api_key=os.getenv("OPENAI_API_KEY"),
