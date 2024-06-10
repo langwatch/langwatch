@@ -28,6 +28,7 @@ import { HorizontalFormControl } from "../HorizontalFormControl";
 import type { CheckConfigFormData } from "./CheckConfigForm";
 import { X } from "react-feather";
 import { SmallLabel } from "../SmallLabel";
+import { ModelSelector } from "../ModelSelector";
 
 const DynamicZodForm = ({
   schema,
@@ -98,6 +99,24 @@ const DynamicZodForm = ({
         </HStack>
       );
     } else if (fieldSchema_ instanceof z.ZodUnion) {
+      if (fieldName === "model") {
+        return (
+          <Controller
+            name={fullPath}
+            control={control}
+            render={({ field }) => (
+              <ModelSelector
+                options={fieldSchema_.options.map(
+                  (option: { value: string }) => option.value
+                )}
+                model={field.value}
+                onChange={(model) => field.onChange(model)}
+              />
+            )}
+          />
+        );
+      }
+
       return (
         <Controller
           name={fullPath}

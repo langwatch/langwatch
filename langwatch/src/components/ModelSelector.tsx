@@ -42,10 +42,12 @@ export const ModelSelector = React.memo(function ModelSelector({
   model,
   options,
   onChange,
+  size = "md",
 }: {
   model: string;
   options: string[];
   onChange: (model: string) => void;
+  size?: "sm" | "md";
 }) {
   const { project } = useOrganizationTeamProject();
 
@@ -61,7 +63,17 @@ export const ModelSelector = React.memo(function ModelSelector({
     .map((model) => {
       const modelOption = modelSelectorOptions.find(
         (option) => option.value === model
-      )!;
+      );
+
+      if (!modelOption) {
+        return {
+          label: model,
+          value: model,
+          version: "",
+          icon: null,
+          isDisabled: true,
+        };
+      }
 
       const provider = model.split("/")[0]!;
       const modelProvider = modelProviders.data?.[provider];
@@ -85,18 +97,18 @@ export const ModelSelector = React.memo(function ModelSelector({
         container: (base) => ({
           ...base,
           background: "white",
-          width: "250px",
+          width: size === "sm" ? "250px" : "auto",
           borderRadius: "5px",
           padding: 0,
         }),
         valueContainer: (base) => ({
           ...base,
-          padding: "0px 8px",
+          padding: size === "sm" ? "0px 8px" : "0px 12px",
         }),
         control: (base) => ({
           ...base,
           minHeight: 0,
-          height: "32px",
+          height: size === "sm" ? "32px" : "40px",
         }),
         dropdownIndicator: (provided) => ({
           ...provided,
@@ -116,10 +128,10 @@ export const ModelSelector = React.memo(function ModelSelector({
           <chakraComponents.Option {...props}>
             <HStack spacing={2} align="center">
               <Box width="14px">{props.data.icon}</Box>
-              <Box fontSize={12} fontFamily="mono">
+              <Box fontSize={size === "sm" ? 12 : 14} fontFamily="mono">
                 {children}
               </Box>
-              <Text fontSize={12} fontFamily="mono" color="gray.400">
+              <Text fontSize={size === "sm" ? 12 : 14} fontFamily="mono" color="gray.400">
                 ({props.data.value ? props.data.version : "disabled"})
               </Text>
             </HStack>
@@ -138,11 +150,11 @@ export const ModelSelector = React.memo(function ModelSelector({
           return (
             <chakraComponents.ValueContainer {...props}>
               <HStack spacing={2} align="center" opacity={isDisabled ? 0.5 : 1}>
-                <Box width="14px">{icon}</Box>
-                <Box fontSize={12} fontFamily="mono">
+                <Box width={size === "sm" ? "14px" : "16px"}>{icon}</Box>
+                <Box fontSize={size === "sm" ? 12 : 14} fontFamily="mono">
                   {children}
                 </Box>
-                <Text fontSize={12} fontFamily="mono" color="gray.400">
+                <Text fontSize={size === "sm" ? 12 : 14} fontFamily="mono" color="gray.400">
                   ({isDisabled ? "disabled" : version})
                 </Text>
               </HStack>

@@ -152,3 +152,17 @@ export const getModelOrDefaultEndpointKey = (
     getModelOrDefaultEnvKey(modelProvider, providerDefinition.endpointKey)
   );
 };
+
+export const prepareEnvKeys = (modelProvider: MaybeStoredModelProvider) => {
+  const providerDefinition =
+    modelProviders[modelProvider.provider as keyof typeof modelProviders];
+  if (!providerDefinition) {
+    return {};
+  }
+
+  return Object.fromEntries(
+    Object.keys(providerDefinition.keysSchema.shape)
+      .map((key) => [key, getModelOrDefaultEnvKey(modelProvider, key)])
+      .filter(([_key, value]) => !!value)
+  );
+};
