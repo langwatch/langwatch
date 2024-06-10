@@ -65,17 +65,17 @@
     "model_vendor": "azure"
   },
   "groq/llama3-70b-8192": {
-    "name": "Llama 3 70B",
+    "name": "Llama 3 70B (Groq)",
     "version": "8192",
     "model_vendor": "meta"
   },
   "groq/llama3-8b-8192": {
-    "name": "Llama 3 8B",
+    "name": "Llama 3 8B (Groq)",
     "version": "8192",
     "model_vendor": "meta"
   },
   "groq/mixtral-8x7b-32768": {
-    "name": "Mixtral 8x7B",
+    "name": "Mixtral 8x7B (Groq)",
     "version": "32k",
     "model_vendor": "mistral"
   },

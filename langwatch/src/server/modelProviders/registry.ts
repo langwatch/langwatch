@@ -1,14 +1,8 @@
 import { z } from "zod";
-import { OpenAI } from "../../components/icons/OpenAI";
-import { Azure } from "../../components/icons/Azure";
-import { Anthropic } from "../../components/icons/Anthropic";
-import { Groq } from "../../components/icons/Groq";
 import type { ModelProvider } from "@prisma/client";
-import { Google } from "../../components/icons/Google";
 
 type ModelProviderDefinition = {
   name: string;
-  icon: React.ReactNode;
   apiKey: string;
   endpointKey: string | undefined;
   keysSchema: z.AnyZodObject;
@@ -25,7 +19,6 @@ export type MaybeStoredModelProvider = Omit<
 export const modelProviders = {
   openai: {
     name: "OpenAI",
-    icon: <OpenAI />,
     apiKey: "OPENAI_API_KEY",
     endpointKey: "OPENAI_BASE_URL",
     keysSchema: z.object({
@@ -36,7 +29,6 @@ export const modelProviders = {
   },
   azure: {
     name: "Azure OpenAI",
-    icon: <Azure />,
     apiKey: "AZURE_OPENAI_API_KEY",
     endpointKey: "AZURE_OPENAI_ENDPOINT",
     keysSchema: z.object({
@@ -47,7 +39,6 @@ export const modelProviders = {
   },
   anthropic: {
     name: "Anthropic",
-    icon: <Anthropic />,
     apiKey: "ANTHROPIC_API_KEY",
     endpointKey: undefined,
     keysSchema: z.object({
@@ -57,7 +48,6 @@ export const modelProviders = {
   },
   groq: {
     name: "Groq",
-    icon: <Groq />,
     apiKey: "GROQ_API_KEY",
     endpointKey: undefined,
     keysSchema: z.object({
@@ -67,7 +57,6 @@ export const modelProviders = {
   },
   vertex_ai: {
     name: "Vertex AI",
-    icon: <Google />,
     apiKey: "GOOGLE_APPLICATION_CREDENTIALS",
     endpointKey: undefined,
     keysSchema: z.object({

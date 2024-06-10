@@ -2,7 +2,7 @@ import type {
   QueryDslBoolQuery,
   QueryDslQueryContainer,
 } from "@elastic/elasticsearch/lib/api/types";
-import { CostReferenceType, CostType } from "@prisma/client";
+import { CostReferenceType, CostType, type Project } from "@prisma/client";
 import { fetch as fetchHTTP2 } from "fetch-h2";
 import { nanoid } from "nanoid";
 import { env } from "../../env.mjs";
@@ -12,19 +12,24 @@ import { prisma } from "../db";
 import { TRACE_INDEX, esClient, traceIndexId } from "../elasticsearch";
 import { DEFAULT_EMBEDDINGS_MODEL } from "../embeddings";
 import type { ElasticSearchTrace, Trace } from "../tracer/types";
-import type {
-  BatchClusteringParams,
-  IncrementalClusteringParams,
-  TopicClusteringResponse,
-  TopicClusteringSubtopic,
-  TopicClusteringTopic,
-  TopicClusteringTrace,
-  TopicClusteringTraceTopicMap,
+import {
+  allowedTopicClusteringModels,
+  type BatchClusteringParams,
+  type IncrementalClusteringParams,
+  type TopicClusteringResponse,
+  type TopicClusteringSubtopic,
+  type TopicClusteringTopic,
+  type TopicClusteringTrace,
+  type TopicClusteringTraceTopicMap,
 } from "./types";
 import {
   getCurrentMonthCost,
   maxMonthlyUsageLimit,
 } from "../api/routers/limits";
+import {
+  getProjectModelProviders,
+  prepareLitellmParams,
+} from "../api/routers/modelProviders";
 
 const debug = getDebugger("langwatch:topicClustering");
 
@@ -215,9 +220,9 @@ export const clusterTopicsForProject = async (
   }
 
   if (isIncrementalProcessing) {
-    await incrementalClustering(projectId, traces);
+    await incrementalClustering(project, traces);
   } else {
-    await batchClusterTraces(projectId, traces);
+    await batchClusterTraces(project, traces);
   }
 
   // If results are not close to empty, schedule the seek for next page
@@ -248,43 +253,64 @@ export const clusterTopicsForProject = async (
   debug("Done! Project", projectId);
 };
 
+const getProjectTopicClusteringModelProvider = async (project: Project) => {
+  const topicClusteringModel =
+    project.topicClusteringModel ?? allowedTopicClusteringModels[0];
+  if (!topicClusteringModel) {
+    throw new Error("Topic clustering model not set");
+  }
+  const provider = topicClusteringModel.split("/")[0];
+  if (!provider) {
+    throw new Error("Topic clustering provider not set");
+  }
+  const modelProvider = (await getProjectModelProviders(project.id))[provider];
+  if (!modelProvider) {
+    throw new Error(`Topic clustering model provider ${provider} not found`);
+  }
+  if (!modelProvider.enabled) {
+    throw new Error(
+      `Topic clustering model provider ${provider} is not enabled`
+    );
+  }
+
+  return { model: topicClusteringModel, modelProvider };
+};
+
 export const batchClusterTraces = async (
-  projectId: string,
+  project: Project,
   traces: TopicClusteringTrace[]
 ) => {
   debug(
     "Batch clustering topics for",
     traces.length,
     "traces on project",
-    projectId
+    project.id
   );
 
-  const clusteringResult = await fetchTopicsBatchClustering(projectId, {
-    model: "azure/gpt-4-1106-preview",
-    litellm_params: {
-      api_key: process.env.AZURE_OPENAI_API_KEY!,
-      api_base: process.env.AZURE_OPENAI_ENDPOINT!,
-    },
+  const topicModel = await getProjectTopicClusteringModelProvider(project);
+  const clusteringResult = await fetchTopicsBatchClustering(project.id, {
+    model: topicModel.model,
+    litellm_params: prepareLitellmParams(topicModel.modelProvider),
     traces,
   });
 
-  await storeResults(projectId, clusteringResult, false);
+  await storeResults(project.id, clusteringResult, false);
 };
 
 export const incrementalClustering = async (
-  projectId: string,
+  project: Project,
   traces: TopicClusteringTrace[]
 ) => {
   debug(
     "Incremental topic clustering for",
     traces.length,
     "traces on project",
-    projectId
+    project.id
   );
 
   const topics: TopicClusteringTopic[] = (
     await prisma.topic.findMany({
-      where: { projectId, parentId: null },
+      where: { projectId: project.id, parentId: null },
       select: { id: true, name: true, centroid: true, p95Distance: true },
     })
   ).map((topic) => ({
@@ -296,7 +322,7 @@ export const incrementalClustering = async (
 
   const subtopics: TopicClusteringSubtopic[] = (
     await prisma.topic.findMany({
-      where: { projectId, parentId: { not: null } },
+      where: { projectId: project.id, parentId: { not: null } },
       select: {
         id: true,
         name: true,
@@ -313,18 +339,16 @@ export const incrementalClustering = async (
     parent_id: topic.parentId!,
   }));
 
-  const clusteringResult = await fetchTopicsIncrementalClustering(projectId, {
-    model: "azure/gpt-4-1106-preview",
-    litellm_params: {
-      api_key: process.env.AZURE_OPENAI_API_KEY!,
-      api_base: process.env.AZURE_OPENAI_ENDPOINT!,
-    },
+  const topicModel = await getProjectTopicClusteringModelProvider(project);
+  const clusteringResult = await fetchTopicsIncrementalClustering(project.id, {
+    model: topicModel.model,
+    litellm_params: prepareLitellmParams(topicModel.modelProvider),
     traces,
     topics,
     subtopics,
   });
 
-  await storeResults(projectId, clusteringResult, true);
+  await storeResults(project.id, clusteringResult, true);
 };
 
 export const storeResults = async (

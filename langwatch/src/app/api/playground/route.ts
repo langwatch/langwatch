@@ -5,14 +5,11 @@ import { NextResponse, type NextRequest } from "next/server";
 import { env } from "../../../env.mjs";
 import { backendHasTeamProjectPermission } from "../../../server/api/permission";
 import {
-  getModelOrDefaultApiKey,
-  getModelOrDefaultEndpointKey,
-  getModelOrDefaultEnvKey,
   getProjectModelProviders,
+  prepareLitellmParams,
 } from "../../../server/api/routers/modelProviders";
 import { authOptions } from "../../../server/auth";
 import { prisma } from "../../../server/db";
-import { type modelProviders } from "../../../server/modelProviders/registry";
 
 export const dynamic = "force-dynamic";
 
@@ -58,16 +55,16 @@ export async function POST(req: NextRequest) {
   }
 
   const providerKey = model.split("/")[0] as keyof typeof modelProviders;
-  const providers = await getProjectModelProviders(projectId);
-  const provider = providers[providerKey];
-  if (!provider) {
+  const modelProviders = await getProjectModelProviders(projectId);
+  const modelProvider = modelProviders[providerKey];
+  if (!modelProvider) {
     return NextResponse.json(
       { error: `Provider not configured: ${providerKey}` },
       { status: 400 }
     );
   }
 
-  if (!provider.enabled) {
+  if (!modelProvider.enabled) {
     return NextResponse.json(
       {
         error: `Provider ${providerKey} is disabled, go to settings to enable it`,
@@ -84,23 +81,12 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  const headers: Record<string, string> = {};
-  const apiKey = getModelOrDefaultApiKey(provider);
-  if (apiKey) {
-    headers["x-litellm-api-key"] = apiKey;
-  }
-  const endpoint = getModelOrDefaultEndpointKey(provider);
-  if (endpoint && providerKey !== "vertex_ai") {
-    headers["x-litellm-api-base"] = endpoint;
-  }
-
-  if (providerKey === "vertex_ai") {
-    headers["x-litellm-vertex-credentials"] = endpoint ?? "invalid";
-    headers["x-litellm-vertex-project"] =
-      getModelOrDefaultEnvKey(provider, "VERTEXAI_PROJECT") ?? "invalid";
-    headers["x-litellm-vertex-location"] =
-      getModelOrDefaultEnvKey(provider, "VERTEXAI_LOCATION") ?? "invalid";
-  }
+  const headers = Object.fromEntries(
+    Object.entries(prepareLitellmParams(modelProvider)).map(([key, value]) => [
+      `x-litellm-${key}`,
+      value,
+    ])
+  );
 
   const vercelProvider = createOpenAI({
     baseURL: `${env.LANGWATCH_NLP_SERVICE}/proxy/v1`,
@@ -113,7 +99,7 @@ export async function POST(req: NextRequest) {
       model: vercelProvider(model),
       system: systemPrompt?.trim() ? systemPrompt : undefined,
       messages,
-      maxRetries: provider.customKeys ? 1 : 3,
+      maxRetries: modelProvider.customKeys ? 1 : 3,
     });
 
     return result.toAIStreamResponse();

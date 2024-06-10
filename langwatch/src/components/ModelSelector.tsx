@@ -1,15 +1,10 @@
 import { Box, HStack, Text } from "@chakra-ui/react";
 import { Select as MultiSelect, chakraComponents } from "chakra-react-select";
 import React from "react";
-import { Anthropic } from "./icons/Anthropic";
-import { Azure } from "./icons/Azure";
-import { Meta } from "./icons/Meta";
-import { Mistral } from "./icons/Mistral";
-import { OpenAI } from "./icons/OpenAI";
-import { api } from "../utils/api";
-import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import models from "../../../models.json";
-import { Google } from "./icons/Google";
+import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
+import { api } from "../utils/api";
+import { vendorIcons } from "../server/modelProviders/iconsMap";
 
 export type ModelOption = {
   label: string;
@@ -17,15 +12,6 @@ export type ModelOption = {
   version: string;
   icon: React.ReactNode;
   isDisabled: boolean;
-};
-
-const vendorIcons: Record<string, React.ReactNode> = {
-  azure: <Azure />,
-  openai: <OpenAI />,
-  meta: <Meta />,
-  mistral: <Mistral />,
-  anthropic: <Anthropic />,
-  google: <Google />,
 };
 
 export const modelSelectorOptions: ModelOption[] = Object.entries(models).map(
@@ -131,7 +117,11 @@ export const ModelSelector = React.memo(function ModelSelector({
               <Box fontSize={size === "sm" ? 12 : 14} fontFamily="mono">
                 {children}
               </Box>
-              <Text fontSize={size === "sm" ? 12 : 14} fontFamily="mono" color="gray.400">
+              <Text
+                fontSize={size === "sm" ? 12 : 14}
+                fontFamily="mono"
+                color="gray.400"
+              >
                 ({props.data.value ? props.data.version : "disabled"})
               </Text>
             </HStack>
@@ -154,7 +144,11 @@ export const ModelSelector = React.memo(function ModelSelector({
                 <Box fontSize={size === "sm" ? 12 : 14} fontFamily="mono">
                   {children}
                 </Box>
-                <Text fontSize={size === "sm" ? 12 : 14} fontFamily="mono" color="gray.400">
+                <Text
+                  fontSize={size === "sm" ? 12 : 14}
+                  fontFamily="mono"
+                  color="gray.400"
+                >
                   ({isDisabled ? "disabled" : version})
                 </Text>
               </HStack>
