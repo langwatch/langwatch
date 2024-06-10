@@ -22,8 +22,13 @@
       "~/server/*": ["./langwatch/langwatch/src/server/*"],
       "~/env.mjs": ["./langwatch/langwatch/src/env.mjs"],
       "~/*": ["./src/*"],
-      "@injected-dependencies.server": ["./src/injection/injection.server.ts"],
-    }
+      "@injected-dependencies.server": ["./src/injection/injection.server.ts"]
+    },
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ]
   },
   "include": [
     ".eslintrc.cjs",
@@ -31,7 +36,8 @@
     "**/*.ts",
     "**/*.tsx",
     "**/*.cjs",
-    "**/*.mjs"
+    "**/*.mjs",
+    ".next-saas/types/**/*.ts"
   ],
   "exclude": ["node_modules", "./langwatch/typescript-sdk/**/*"]
 }

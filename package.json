@@ -18,6 +18,7 @@
     "@hubspot/api-client": "^11.1.0",
     "@prisma/client": "^5.6.0",
     "@slack/webhook": "^7.0.2",
+    "debug": "^4.3.5",
     "dotenv": "^16.3.1",
     "next": "13.5.6",
     "next-auth": "^4.24.5",
@@ -30,6 +31,7 @@
   "devDependencies": {
     "@types/react": "^18.2.45",
     "concurrently": "^8.2.2",
+    "encoding": "^0.1.13",
     "prisma": "^5.6.0",
     "tsx": "^4.7.0"
   }

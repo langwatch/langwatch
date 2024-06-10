@@ -1,4 +1,5 @@
 import type { GetServerSidePropsContext, NextApiRequest } from "next";
+import { NextRequest } from "next/server";
 
 export const isAdmin = (user: { email?: string | null }) => {
   const adminEmails = process.env.ADMIN_EMAILS;
@@ -8,8 +9,15 @@ export const isAdmin = (user: { email?: string | null }) => {
 };
 
 export const getNextAuthSessionToken = (
-  req: NextApiRequest | GetServerSidePropsContext["req"]
+  req: NextApiRequest | GetServerSidePropsContext["req"] | NextRequest
 ) => {
+  if (req instanceof NextRequest) {
+    return (
+      req.cookies.get("next-auth.session-token")?.value ??
+      req.cookies.get("__Secure-next-auth.session-token")?.value
+    );
+  }
+
   return (
     req.cookies["next-auth.session-token"] ??
     req.cookies["__Secure-next-auth.session-token"]
