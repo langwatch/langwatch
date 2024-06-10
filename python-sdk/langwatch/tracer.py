@@ -139,7 +139,7 @@ def create_span(
 
 
 def capture_rag(
-    contexts: List[RAGChunk],
+    contexts: List[RAGChunk] = [],
     input: Optional[str] = None,
     name: str = "RetrievalAugmentedGeneration",
 ):
