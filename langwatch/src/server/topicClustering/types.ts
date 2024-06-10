@@ -26,10 +26,14 @@ export type TopicClusteringTraceTopicMap = {
 };
 
 export type BatchClusteringParams = {
+  model: string;
+  litellm_params: Record<string, string>;
   traces: TopicClusteringTrace[];
 };
 
 export type IncrementalClusteringParams = {
+  model: string;
+  litellm_params: Record<string, string>;
   topics: TopicClusteringTopic[];
   subtopics: TopicClusteringSubtopic[];
   traces: TopicClusteringTrace[];

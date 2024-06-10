@@ -90,11 +90,12 @@ export async function POST(req: NextRequest) {
     headers["x-litellm-api-key"] = apiKey;
   }
   const endpoint = getModelOrDefaultEndpointKey(provider);
-  if (endpoint) {
+  if (endpoint && providerKey !== "vertex_ai") {
     headers["x-litellm-api-base"] = endpoint;
   }
 
   if (providerKey === "vertex_ai") {
+    headers["x-litellm-vertex-credentials"] = endpoint ?? "invalid";
     headers["x-litellm-vertex-project"] =
       getModelOrDefaultEnvKey(provider, "VERTEXAI_PROJECT") ?? "invalid";
     headers["x-litellm-vertex-location"] =

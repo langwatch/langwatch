@@ -1,7 +1,9 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
 from langwatch_nlp.topic_clustering.build_response import build_response
-from langwatch_nlp.topic_clustering.topic_naming import generate_topic_and_subtopic_names
+from langwatch_nlp.topic_clustering.topic_naming import (
+    generate_topic_and_subtopic_names,
+)
 from langwatch_nlp.topic_clustering.utils import calculate_centroid_and_distance
 from langwatch_nlp.topic_clustering.constants import (
     COPHENETIC_DISTANCES_FOR_SUBTOPICS,
@@ -72,6 +74,8 @@ def build_hierarchy(
 
 class BatchClusteringParams(BaseModel):
     traces: list[Trace]
+    model: str
+    litellm_params: dict[str, str]
 
 
 def setup_endpoints(app: FastAPI):
@@ -80,7 +84,11 @@ def setup_endpoints(app: FastAPI):
         params: BatchClusteringParams,
     ) -> TopicClusteringResponse:
         hierarchy = build_hierarchy(params.traces, COPHENETIC_DISTANCES_FOR_TOPICS)
-        topic_names, subtopic_names, cost = generate_topic_and_subtopic_names(hierarchy)
+        topic_names, subtopic_names, cost = generate_topic_and_subtopic_names(
+            model=params.model,
+            litellm_params=params.litellm_params,
+            hierarchy=hierarchy,
+        )
         topics, subtopics, traces_to_assign = build_response(
             hierarchy, topic_names, subtopic_names
         )

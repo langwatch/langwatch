@@ -260,6 +260,11 @@ export const batchClusterTraces = async (
   );
 
   const clusteringResult = await fetchTopicsBatchClustering(projectId, {
+    model: "azure/gpt-4-1106-preview",
+    litellm_params: {
+      api_key: process.env.AZURE_OPENAI_API_KEY!,
+      api_base: process.env.AZURE_OPENAI_ENDPOINT!,
+    },
     traces,
   });
 
@@ -309,6 +314,11 @@ export const incrementalClustering = async (
   }));
 
   const clusteringResult = await fetchTopicsIncrementalClustering(projectId, {
+    model: "azure/gpt-4-1106-preview",
+    litellm_params: {
+      api_key: process.env.AZURE_OPENAI_API_KEY!,
+      api_base: process.env.AZURE_OPENAI_ENDPOINT!,
+    },
     traces,
     topics,
     subtopics,

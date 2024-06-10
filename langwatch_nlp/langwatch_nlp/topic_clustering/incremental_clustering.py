@@ -10,7 +10,9 @@ from langwatch_nlp.topic_clustering.constants import (
     MINIMUM_UNASSIGNED_TRACES_TO_CREATE_NEW_TOPIC,
 )
 from langwatch_nlp.topic_clustering.build_response import build_response
-from langwatch_nlp.topic_clustering.topic_naming import generate_topic_and_subtopic_names
+from langwatch_nlp.topic_clustering.topic_naming import (
+    generate_topic_and_subtopic_names,
+)
 from langwatch_nlp.topic_clustering.batch_clustering import build_hierarchy
 from langwatch_nlp.topic_clustering.types import (
     Money,
@@ -73,7 +75,12 @@ def assign_trace_to_topic(
 
 
 def maybe_create_new_topics(
-    traces: list[Trace], topics: list[U], cophenetic_distances: int, with_subtopics=True
+    model: str,
+    litellm_params: dict[str, str],
+    traces: list[Trace],
+    topics: list[U],
+    cophenetic_distances: int,
+    with_subtopics=True,
 ) -> tuple[list[Topic], list[Subtopic], list[TraceTopicMap], Money]:
     average_p95_distance = np.mean([t["p95_distance"] for t in topics]).astype(float)
 
@@ -91,21 +98,34 @@ def maybe_create_new_topics(
     existing = [t["name"] for t in topics]
     if with_subtopics:
         topic_names, subtopic_names, cost = generate_topic_and_subtopic_names(
-            new_hierarchy, existing=existing
+            model,
+            litellm_params,
+            new_hierarchy,
+            existing=existing,
         )
     else:
         new_hierarchy: dict[str, dict[str, list[Trace]]] = {"New Sub Topics": new_hierarchy}  # type: ignore
         topic_names, subtopic_names, cost = generate_topic_and_subtopic_names(
-            new_hierarchy, existing=existing, skip_topic_names=True
+            model,
+            litellm_params,
+            new_hierarchy,
+            existing=existing,
+            skip_topic_names=True,
         )
 
-    new_topics, new_subtopics, new_traces_to_assign = build_response(new_hierarchy, topic_names, subtopic_names)
+    new_topics, new_subtopics, new_traces_to_assign = build_response(
+        new_hierarchy, topic_names, subtopic_names
+    )
 
     return new_topics, new_subtopics, new_traces_to_assign, cost
 
 
 def maybe_create_new_topics_and_subtopics_from_unassigned_traces(
-    traces: list[Trace], topics: list[Topic], subtopics: list[Subtopic]
+    model: str,
+    litellm_params: dict[str, str],
+    traces: list[Trace],
+    topics: list[Topic],
+    subtopics: list[Subtopic],
 ) -> tuple[list[Topic], list[Subtopic], list[TraceTopicMap], Money]:
     cost = Money(amount=0, currency="USD")
 
@@ -117,8 +137,14 @@ def maybe_create_new_topics_and_subtopics_from_unassigned_traces(
 
     new_topics, new_subtopics, new_traces_to_assign = ([], [], [])
     if len(new_traces_to_assign) > MINIMUM_UNASSIGNED_TRACES_TO_CREATE_NEW_TOPIC:
-        new_topics, new_subtopics, new_traces_to_assign, cost_ = maybe_create_new_topics(
-            new_traces_to_assign, topics, COPHENETIC_DISTANCES_FOR_TOPICS
+        new_topics, new_subtopics, new_traces_to_assign, cost_ = (
+            maybe_create_new_topics(
+                model,
+                litellm_params,
+                new_traces_to_assign,
+                topics,
+                COPHENETIC_DISTANCES_FOR_TOPICS,
+            )
         )
         cost["amount"] += cost_["amount"]
 
@@ -137,6 +163,8 @@ def maybe_create_new_topics_and_subtopics_from_unassigned_traces(
 
         subtopics_ = [t for t in subtopics if t["parent_id"] == topic_id]
         _, new_subtopics_, new_traces_to_assign_, cost_ = maybe_create_new_topics(
+            model,
+            litellm_params,
             traces_,
             subtopics_,
             COPHENETIC_DISTANCES_FOR_SUBTOPICS,
@@ -164,6 +192,8 @@ class IncrementalClusteringParams(BaseModel):
     topics: list[Topic]
     subtopics: list[Subtopic]
     traces: list[Trace]
+    model: str
+    litellm_params: dict[str, str]
 
 
 def setup_endpoints(app: FastAPI):
@@ -181,7 +211,11 @@ def setup_endpoints(app: FastAPI):
 
         new_topics, new_subtopics, traces_from_new_topics_to_assign, cost = (
             maybe_create_new_topics_and_subtopics_from_unassigned_traces(
-                params.traces, params.topics, params.subtopics
+                model=params.model,
+                litellm_params=params.litellm_params,
+                traces=params.traces,
+                topics=params.topics,
+                subtopics=params.subtopics,
             )
         )
 
