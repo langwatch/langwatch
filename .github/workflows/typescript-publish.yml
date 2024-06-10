@@ -1,4 +1,4 @@
-name: Publish TypeScript SDK to npm
+name: Publish TypeScript SDK to NPM
 
 on:
   release:
