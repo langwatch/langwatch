@@ -8,8 +8,8 @@ import type { PIIRedactionLevel } from "@prisma/client";
 const debug = getDebugger("langwatch:trace_checks:piiCheck");
 
 // Instantiates a client using the environment variable
-const credentials = env.GOOGLE_CREDENTIALS_JSON
-  ? JSON.parse(env.GOOGLE_CREDENTIALS_JSON)
+const credentials = env.GOOGLE_APPLICATION_CREDENTIALS
+  ? JSON.parse(env.GOOGLE_APPLICATION_CREDENTIALS)
   : undefined;
 const dlp = new DlpServiceClient({ credentials });
 
@@ -117,11 +117,11 @@ export const cleanupPIIs = async (
   if (!credentials) {
     if (enforced) {
       throw new Error(
-        "GOOGLE_CREDENTIALS_JSON is not set, PII check cannot be performed"
+        "GOOGLE_APPLICATION_CREDENTIALS is not set, PII check cannot be performed"
       );
     }
     console.warn(
-      "WARNING: GOOGLE_CREDENTIALS_JSON is not set, so PII check will not be performed, you are risking storing PII on the database, please set them if you wish to avoid that, this will fail in production by default"
+      "WARNING: GOOGLE_APPLICATION_CREDENTIALS is not set, so PII check will not be performed, you are risking storing PII on the database, please set them if you wish to avoid that, this will fail in production by default"
     );
     return;
   }
