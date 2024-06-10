@@ -4,6 +4,7 @@ import { Azure } from "../../components/icons/Azure";
 import { Anthropic } from "../../components/icons/Anthropic";
 import { Groq } from "../../components/icons/Groq";
 import type { ModelProvider } from "@prisma/client";
+import { Google } from "../../components/icons/Google";
 
 type ModelProviderDefinition = {
   name: string;
@@ -64,4 +65,25 @@ export const modelProviders = {
     }),
     enabledSince: new Date("2023-01-01"),
   },
+  vertex_ai: {
+    name: "Vertex AI",
+    icon: <Google />,
+    apiKey: "GOOGLE_APPLICATION_CREDENTIALS",
+    endpointKey: undefined,
+    keysSchema: z.object({
+      GOOGLE_APPLICATION_CREDENTIALS: z.string().min(1).refine(isValidJson),
+      VERTEXAI_PROJECT: z.string().min(1),
+      VERTEXAI_LOCATION: z.string().min(1),
+    }),
+    enabledSince: new Date("2023-01-01"),
+  },
 } satisfies Record<string, ModelProviderDefinition>;
+
+function isValidJson(value: string) {
+  try {
+    JSON.parse(value);
+    return true;
+  } catch (_) {
+    return false;
+  }
+}

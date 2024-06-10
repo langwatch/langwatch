@@ -83,5 +83,15 @@
     "name": "Claude 3 Opus",
     "version": "20240229",
     "model_vendor": "anthropic"
+  },
+  "vertex_ai/gemini-1.5-flash-001": {
+    "name": "Gemini 1.5 Flash",
+    "version": "001",
+    "model_vendor": "google"
+  },
+  "vertex_ai/gemini-1.5-pro-001": {
+    "name": "Gemini 1.5 Pro",
+    "version": "001",
+    "model_vendor": "google"
   }
 }

@@ -9,6 +9,7 @@ import { OpenAI } from "./icons/OpenAI";
 import { api } from "../utils/api";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import models from "../../../models.json";
+import { Google } from "./icons/Google";
 
 export type ModelOption = {
   label: string;
@@ -24,6 +25,7 @@ const vendorIcons: Record<string, React.ReactNode> = {
   meta: <Meta />,
   mistral: <Mistral />,
   anthropic: <Anthropic />,
+  google: <Google />,
 };
 
 export const modelSelectorOptions: ModelOption[] = Object.entries(models).map(

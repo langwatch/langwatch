@@ -58,9 +58,15 @@ async def proxy_startup():
         if request_kwargs is not None and "proxy_server_request" in request_kwargs:
             proxy_server_request = request_kwargs["proxy_server_request"]
             for header, value in proxy_server_request["headers"].items():
-                if header.startswith("x-litellm-"):
-                    _, key = header.split("x-litellm-")
-                    key = key.replace("-", "_")
+                if not header.startswith("x-litellm-"):
+                    continue
+
+                _, key = header.split("x-litellm-")
+                key = key.replace("-", "_")
+
+                if "vertex_ai/" in model and key == "api_key":
+                    deployment["litellm_params"]["vertex_credentials"] = value
+                else:
                     deployment["litellm_params"][key] = value
         if "azure/" in model:
             deployment["litellm_params"]["api_version"] = os.environ[

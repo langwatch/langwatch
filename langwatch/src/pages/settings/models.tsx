@@ -263,7 +263,6 @@ const ModelProviderForm = ({
             </HStack>
           }
           helper={""}
-          // isInvalid={Object.keys(formState.errors).length > 0}
         >
           <VStack align="start" width="full" spacing={4} paddingRight={4}>
             <HStack spacing={6}>

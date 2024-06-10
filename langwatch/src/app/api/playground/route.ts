@@ -7,7 +7,8 @@ import { backendHasTeamProjectPermission } from "../../../server/api/permission"
 import {
   getModelOrDefaultApiKey,
   getModelOrDefaultEndpointKey,
-  getProjectModelProviders
+  getModelOrDefaultEnvKey,
+  getProjectModelProviders,
 } from "../../../server/api/routers/modelProviders";
 import { authOptions } from "../../../server/auth";
 import { prisma } from "../../../server/db";
@@ -93,21 +94,23 @@ export async function POST(req: NextRequest) {
     headers["x-litellm-api-base"] = endpoint;
   }
 
+  if (providerKey === "vertex_ai") {
+    headers["x-litellm-vertex-project"] =
+      getModelOrDefaultEnvKey(provider, "VERTEXAI_PROJECT") ?? "invalid";
+    headers["x-litellm-vertex-location"] =
+      getModelOrDefaultEnvKey(provider, "VERTEXAI_LOCATION") ?? "invalid";
+  }
+
   const vercelProvider = createOpenAI({
     baseURL: `${env.LANGWATCH_NLP_SERVICE}/proxy/v1`,
     headers,
   });
 
-  console.log(
-    "getModelOrDefaultApiKey(provider)",
-    getModelOrDefaultApiKey(provider)
-  );
-  console.log("endpoint", endpoint);
-
+  const systemPrompt = req.headers.get("x-system-prompt");
   try {
     const result = await streamText({
       model: vercelProvider(model),
-      system: req.headers.get("x-system-prompt") ?? undefined,
+      system: systemPrompt?.trim() ? systemPrompt : undefined,
       messages,
       maxRetries: provider.customKeys ? 1 : 3,
     });
