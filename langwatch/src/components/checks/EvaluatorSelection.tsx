@@ -28,6 +28,15 @@ import { Shield } from "react-feather";
 
 type Category = EvaluatorDefinition<any>["category"];
 
+// Temporary name map before we have support for grouping evaluations together
+export const evaluatorTempNameMap: Record<string, string> = {
+  "Azure Content Safety": "Content Safety",
+  "OpenAI Moderation": "Moderation",
+  "Azure Jailbreak Detection": "Jailbreak Detection",
+  "Google Cloud DLP PII Detection": "PII Detection",
+  "Lingua Language Detection": "Language Detection",
+};
+
 export function EvaluatorSelection({
   form,
 }: {
@@ -117,9 +126,15 @@ export function EvaluatorSelection({
                         </Tooltip>
                       )}
                       <Heading as="h2" size="sm">
-                        {evaluator.name}
+                        {evaluatorTempNameMap[evaluator.name] ?? evaluator.name}
                       </Heading>
-                      <Text>{evaluator.description}</Text>
+                      <Text>
+                        {/* TODO: temporary change for Google DLP PII */}
+                        {evaluator.description.replace(
+                          "Google DLP PII detects",
+                          "Detects"
+                        )}
+                      </Text>
                       <HStack>
                         {evaluator.requiredFields.includes("contexts") && (
                           <Link

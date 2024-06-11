@@ -49,7 +49,7 @@ import { api } from "../../utils/api";
 import { HorizontalFormControl } from "../HorizontalFormControl";
 import { RenderCode } from "../code/RenderCode";
 import DynamicZodForm from "./DynamicZodForm";
-import { EvaluatorSelection } from "./EvaluatorSelection";
+import { EvaluatorSelection, evaluatorTempNameMap } from "./EvaluatorSelection";
 import { PreconditionsField } from "./PreconditionsField";
 import { TryItOut } from "./TryItOut";
 import { GuardrailIntegration } from "./GuardrailIntegration";
@@ -155,9 +155,10 @@ export default function CheckConfigForm({
 
     if (!checkType) return;
 
-    const defaultName = getEvaluatorDefinitions(checkType)?.name;
+    let defaultName = getEvaluatorDefinitions(checkType)?.name;
+    defaultName = evaluatorTempNameMap[defaultName ?? ""] ?? defaultName;
     const allDefaultNames = Object.values(AVAILABLE_EVALUATORS).map(
-      (evaluator) => evaluator.name
+      (evaluator) => evaluatorTempNameMap[evaluator.name] ?? evaluator.name
     );
     if (!nameValue || allDefaultNames.includes(nameValue)) {
       form.setValue(
@@ -218,7 +219,7 @@ export default function CheckConfigForm({
                     helper="Select the evaluation to run"
                     isInvalid={!!errors.checkType}
                   >
-                    {AVAILABLE_EVALUATORS[checkType].name}{" "}
+                    {evaluatorTempNameMap[AVAILABLE_EVALUATORS[checkType].name] ?? AVAILABLE_EVALUATORS[checkType].name}{" "}
                     <Button
                       variant="link"
                       onClick={() => {

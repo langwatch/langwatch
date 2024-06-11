@@ -99,7 +99,7 @@ const DynamicZodForm = ({
         </HStack>
       );
     } else if (fieldSchema_ instanceof z.ZodUnion) {
-      if (fieldName === "model") {
+      if (fieldName === "model" && evaluator?.name !== "OpenAI Moderation") {
         return (
           <Controller
             name={fullPath}
