@@ -48,7 +48,7 @@ export default async function handler(
       const comment = req.body.comment as string;
       const isThumbsUp = req.body.isThumbsUp;
       const annotationId = req.query.id as string;
-      const userEmail = req.body.userEmail as string;
+      const email = req.body.email as string;
 
       if (!comment || typeof comment !== "string") {
         return res.status(400).json({
@@ -70,7 +70,7 @@ export default async function handler(
         data: {
           comment: comment,
           isThumbsUp: isThumbsUp,
-          email: userEmail,
+          email: email,
         },
       });
 
