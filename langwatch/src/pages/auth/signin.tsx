@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { useEffect } from "react";
 
 export default function SignIn({ session }: { session: Session | null }) {
-  const callbackUrl = useSearchParams().get("callbackUrl") ?? undefined;
+  const callbackUrl = useSearchParams()?.get("callbackUrl") ?? undefined;
 
   useEffect(() => {
     if (!session) {

@@ -118,7 +118,7 @@ export const getProjectModelProviders = async (projectId: string) => {
   };
 };
 
-export const getModelOrDefaultEnvKey = (
+const getModelOrDefaultEnvKey = (
   modelProvider: MaybeStoredModelProvider,
   envKey: string
 ) => {
@@ -128,7 +128,7 @@ export const getModelOrDefaultEnvKey = (
   );
 };
 
-export const getModelOrDefaultApiKey = (
+const getModelOrDefaultApiKey = (
   modelProvider: MaybeStoredModelProvider
 ) => {
   const providerDefinition =
@@ -139,7 +139,7 @@ export const getModelOrDefaultApiKey = (
   return getModelOrDefaultEnvKey(modelProvider, providerDefinition.apiKey);
 };
 
-export const getModelOrDefaultEndpointKey = (
+const getModelOrDefaultEndpointKey = (
   modelProvider: MaybeStoredModelProvider
 ) => {
   const providerDefinition =
@@ -151,4 +151,43 @@ export const getModelOrDefaultEndpointKey = (
     providerDefinition.endpointKey &&
     getModelOrDefaultEnvKey(modelProvider, providerDefinition.endpointKey)
   );
+};
+
+export const prepareEnvKeys = (modelProvider: MaybeStoredModelProvider) => {
+  const providerDefinition =
+    modelProviders[modelProvider.provider as keyof typeof modelProviders];
+  if (!providerDefinition) {
+    return {};
+  }
+
+  return Object.fromEntries(
+    Object.keys(providerDefinition.keysSchema.shape)
+      .map((key) => [key, getModelOrDefaultEnvKey(modelProvider, key)])
+      .filter(([_key, value]) => !!value)
+  );
+};
+
+export const prepareLitellmParams = (
+  modelProvider: MaybeStoredModelProvider
+) => {
+  const params: Record<string, string> = {};
+
+  const apiKey = getModelOrDefaultApiKey(modelProvider);
+  if (apiKey && modelProvider.provider !== "vertex_ai") {
+    params.api_key = apiKey;
+  }
+  const endpoint = getModelOrDefaultEndpointKey(modelProvider);
+  if (endpoint) {
+    params.api_base = endpoint;
+  }
+
+  if (modelProvider.provider === "vertex_ai") {
+    params.vertex_credentials = apiKey ?? "invalid";
+    params.vertex_project =
+      getModelOrDefaultEnvKey(modelProvider, "VERTEXAI_PROJECT") ?? "invalid";
+    params.vertex_location =
+      getModelOrDefaultEnvKey(modelProvider, "VERTEXAI_LOCATION") ?? "invalid";
+  }
+
+  return params;
 };

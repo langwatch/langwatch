@@ -6,22 +6,22 @@ import { getDebugger } from "../../../utils/logger";
 
 import { CostReferenceType, CostType } from "@prisma/client";
 import * as Sentry from "@sentry/nextjs";
+import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 import { z } from "zod";
-import { env } from "../../../env.mjs";
 import {
   getCurrentMonthCost,
   maxMonthlyUsageLimit,
 } from "../../../server/api/routers/limits";
+import { runEvaluation } from "../../../server/background/workers/traceChecksWorker";
 import { rAGChunkSchema } from "../../../server/tracer/types.generated";
 import {
   AVAILABLE_EVALUATORS,
-  type BatchEvaluationResult,
   type EvaluationResult,
+  type EvaluatorTypes,
   type SingleEvaluationResult,
 } from "../../../trace_checks/evaluators.generated";
 import { extractChunkTextualContent } from "../collector/rag";
-import { TRPCError } from "@trpc/server";
 
 export const debug = getDebugger("langwatch:guardrail:evaluate");
 
@@ -167,11 +167,12 @@ export default async function handler(
   let result: SingleEvaluationResult;
   try {
     result = await runEvaluation({
+      projectId: project.id,
       input: input ? input : undefined,
       output: output ? output : undefined,
       contexts: contextList,
       expected_output: expected_output ? expected_output : undefined,
-      evaluation: checkType,
+      checkType: checkType as EvaluatorTypes,
       settings: (settings as Record<string, unknown>) ?? {},
     });
   } catch (error) {
@@ -232,48 +233,3 @@ export default async function handler(
 
   return res.status(200).json(result);
 }
-
-const runEvaluation = async ({
-  input,
-  output,
-  contexts,
-  expected_output,
-  evaluation,
-  settings,
-}: {
-  input?: string;
-  output?: string;
-  contexts?: string[];
-  expected_output?: string;
-  evaluation: string;
-  settings?: Record<string, unknown>;
-}) => {
-  const response = await fetch(
-    `${env.LANGEVALS_ENDPOINT}/${evaluation}/evaluate`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        data: [
-          {
-            input,
-            output,
-            contexts,
-            expected_output,
-          },
-        ],
-
-        settings: settings && typeof settings === "object" ? settings : {},
-      }),
-    }
-  );
-
-  const result = ((await response.json()) as BatchEvaluationResult)[0];
-  if (!result) {
-    throw "Unexpected response: empty results";
-  }
-
-  return result;
-};

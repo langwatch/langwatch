@@ -19,6 +19,8 @@ import litellm.proxy.proxy_server as litellm_proxy_server
 
 from litellm.router import Router
 
+os.environ["AZURE_API_VERSION"] = "2024-02-01"
+
 # Config
 app = FastAPI()
 batch_clustering.setup_endpoints(app)
@@ -27,7 +29,6 @@ sentiment_analysis.setup_endpoints(app)
 
 
 async def proxy_startup():
-    os.environ["AZURE_API_VERSION"] = "2024-02-01"
     original_get_available_deployment = Router.async_get_available_deployment
 
     # Patch to be able to replace api_key and api_base on the fly from the parameters comming from langwatch according to user settings
@@ -58,10 +59,13 @@ async def proxy_startup():
         if request_kwargs is not None and "proxy_server_request" in request_kwargs:
             proxy_server_request = request_kwargs["proxy_server_request"]
             for header, value in proxy_server_request["headers"].items():
-                if header.startswith("x-litellm-"):
-                    _, key = header.split("x-litellm-")
-                    key = key.replace("-", "_")
-                    deployment["litellm_params"][key] = value
+                if not header.startswith("x-litellm-"):
+                    continue
+
+                _, key = header.split("x-litellm-")
+                key = key.replace("-", "_")
+
+                deployment["litellm_params"][key] = value
         if "azure/" in model:
             deployment["litellm_params"]["api_version"] = os.environ[
                 "AZURE_API_VERSION"

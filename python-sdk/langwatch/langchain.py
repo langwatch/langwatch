@@ -47,6 +47,7 @@ from langchain.tools import BaseTool
 from langchain_core.documents import Document
 from langchain_core.retrievers import BaseRetriever
 from langchain_core.callbacks.manager import (
+    AsyncCallbackManagerForRetrieverRun,
     CallbackManagerForRetrieverRun,
 )
 
@@ -378,7 +379,6 @@ class WrappedRagTool(BaseTool):
     def _run(self, *args, **kwargs):
         if self.tool is None or self.context_extractor is None:
             raise ValueError("tool or context_extractor is not set")
-        response = self.tool(*args, **kwargs)
 
         input = ""
         try:
@@ -399,11 +399,14 @@ class WrappedRagTool(BaseTool):
             else:
                 input = str(kwargs)
 
-        captured = self.context_extractor(response)
         with langwatch.capture_rag(
             input=input,
-            contexts=captured,
-        ):
+            contexts=[],
+        ) as span:
+            response = self.tool(*args, **kwargs)
+            captured = self.context_extractor(response)
+            span.contexts = captured
+
             return response
 
 
@@ -416,34 +419,34 @@ def capture_rag_from_tool(
 def capture_rag_from_retriever(
     retriever: BaseRetriever, context_extractor: Callable[[Document], RAGChunk]
 ):
-    _orig_get_relevant_documents = retriever._get_relevant_documents
-    _orig_aget_relevant_documents = retriever._aget_relevant_documents
+    if retriever.__class__.__name__ == "LangWatchTrackedRetriever":
+        return retriever
 
-    def _patched_get_relevant_documents(
-        self, query: str, *args, **kwargs
-    ) -> List[Document]:
-        documents = _orig_get_relevant_documents(query, *args, **kwargs)
-        with langwatch.capture_rag(
-            input=query,
-            contexts=[context_extractor(doc) for doc in documents],
-        ):
-            return documents
+    class LangWatchTrackedRetriever(retriever.__class__):
+        async def _aget_relevant_documents(
+            self, query: str, *, run_manager: AsyncCallbackManagerForRetrieverRun
+        ) -> List[Document]:
+            with langwatch.capture_rag(
+                input=query,
+            ) as span:
+                documents = await super()._aget_relevant_documents(
+                    query, run_manager=run_manager
+                )
+                span.contexts = [context_extractor(doc) for doc in documents]
+                return documents
 
-    async def _patched_aget_relevant_documents(
-        self, query: str, *args, **kwargs
-    ) -> List[Document]:
-        documents = await _orig_aget_relevant_documents(query, *args, **kwargs)
-        with langwatch.capture_rag(
-            input=query,
-            contexts=[context_extractor(doc) for doc in documents],
-        ):
-            return documents
+        def _get_relevant_documents(
+            self, query: str, *, run_manager: CallbackManagerForRetrieverRun
+        ) -> List[Document]:
+            with langwatch.capture_rag(
+                input=query,
+            ) as span:
+                documents = super()._get_relevant_documents(
+                    query, run_manager=run_manager
+                )
+                span.contexts = [context_extractor(doc) for doc in documents]
+                return documents
 
-    retriever.__dict__["_get_relevant_documents"] = MethodType(
-        _patched_get_relevant_documents, retriever
-    )
-    retriever.__dict__["_aget_relevant_documents"] = MethodType(
-        _patched_aget_relevant_documents, retriever
-    )
+    object.__setattr__(retriever, "__class__", LangWatchTrackedRetriever)
 
     return retriever

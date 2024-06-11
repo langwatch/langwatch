@@ -1,3 +1,6 @@
+import json
+import os
+import tempfile
 from dotenv import load_dotenv
 
 from langwatch.types import RAGChunk
@@ -21,6 +24,7 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain.tools.retriever import create_retriever_tool
 from langchain.agents import AgentExecutor, create_tool_calling_agent
 from langchain.tools import BaseTool, StructuredTool, tool
+from langchain_google_vertexai import ChatVertexAI, VertexAI
 
 loader = WebBaseLoader("https://docs.langwatch.ai")
 docs = loader.load()
@@ -37,8 +41,7 @@ async def on_chat_start():
         langwatch.langchain.capture_rag_from_retriever(
             retriever,
             lambda document: RAGChunk(
-                document_id=document.metadata["source"],
-                content=document.page_content
+                document_id=document.metadata["source"], content=document.page_content
             ),
         ),
         "langwatch_search",
@@ -50,8 +53,23 @@ async def on_chat_start():
     #     retriever_tool, lambda response: [RAGChunk(content=response)]
     # )
 
+    try:
+        credentials_json = json.loads(os.environ["GOOGLE_APPLICATION_CREDENTIALS"])
+        credentials_file = tempfile.NamedTemporaryFile(mode="w", delete=False)
+        credentials_file.write(json.dumps(credentials_json))
+        credentials_file.close()
+
+        os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = credentials_file.name
+    except:
+        pass
+
     tools = [retriever_tool]
-    model = ChatOpenAI(streaming=True)
+    model = ChatVertexAI(
+        model_name="gemini-1.5-flash-001",
+        project=os.environ["VERTEXAI_PROJECT"],
+        location=os.environ["VERTEXAI_LOCATION"],
+        streaming=True,
+    )
     prompt = ChatPromptTemplate.from_messages(
         [
             (

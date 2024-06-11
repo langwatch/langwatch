@@ -118,6 +118,7 @@ export default async function handler(
   const evaluatorSettingSchema =
     evaluatorsSchema.shape[guardrail.checkType as EvaluatorTypes].shape
       .settings;
+  // eslint-disable-next-line @typescript-eslint/no-redundant-type-constituents
   let settings: z.infer<typeof evaluatorSettingSchema> | undefined = {};
   try {
     if (params.settings) {

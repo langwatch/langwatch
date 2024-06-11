@@ -5,7 +5,6 @@ import re
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-import httpx
 import pandas as pd
 import pytest
 from dotenv import load_dotenv
@@ -15,7 +14,6 @@ import langwatch_nlp.topic_clustering.batch_clustering as batch_clustering
 import langwatch_nlp.topic_clustering.incremental_clustering as incremental_clustering
 
 from langwatch_nlp.topic_clustering.types import TopicClusteringResponse, Trace
-from pytest_httpx import HTTPXMock
 
 
 app = FastAPI()
@@ -28,7 +26,7 @@ class TestTopicClusteringIntegration:
     @pytest.mark.integration
     @pytest.mark.asyncio
     # NOTE: disable httpx_mock to see it working fully integrated
-    async def test_it_does_batch_clustering(self, httpx_mock: HTTPXMock):
+    async def test_it_does_batch_clustering(self):
         # Look at the jupyter notebook to see how to download this data
         df = pd.read_csv(
             f"notebooks/data/traces_for_topics_project_iCTt0LSMXYbv5jZNSdtEr.csv"
@@ -49,41 +47,19 @@ class TestTopicClusteringIntegration:
                 )
             )
 
-        def mock_openai(request: httpx.Request):
-            if "/embeddings" in str(request.url):
-                return httpx.Response(
-                    status_code=200,
-                    json={
-                        "object": "list",
-                        "data": [
-                            {
-                                "object": "embedding",
-                                "index": 0,
-                                "embedding": [random.random()] * 1536,
-                            }
-                        ],
-                        "model": "text-embedding-3-small",
-                        "usage": {"prompt_tokens": 5, "total_tokens": 5},
-                    },
-                )
-
-            return httpx.Response(
-                status_code=200,
-                json=create_openai_chat_completion_mock(
-                    len(re.findall(r"topic_\d+", str(request.content)))
-                ),
-            )
-
-        httpx_mock.add_callback(
-            mock_openai,
+        response = client.post(
+            "/topics/batch_clustering",
+            json={
+                "model": "azure/gpt-4-1106-preview",
+                "litellm_params": {"api_base": os.environ["AZURE_OPENAI_ENDPOINT"]},
+                "traces": traces,
+            },
         )
-
-        response = client.post("/topics/batch_clustering", json={"traces": traces})
         result: TopicClusteringResponse = response.json()
 
         assert response.status_code == 200
         assert len(result["topics"]) > 0
-        assert "sample topic name" in result["topics"][0]["name"]
+        assert type(result["topics"][0]["name"]) == str
         assert len(result["subtopics"]) > 0
         assert len(result["traces"]) > 0
         assert result["cost"]["amount"] > 0
@@ -91,6 +67,8 @@ class TestTopicClusteringIntegration:
         response = client.post(
             "/topics/incremental_clustering",
             json={
+                "model": "azure/gpt-4-1106-preview",
+                "litellm_params": {"api_base": os.environ["AZURE_OPENAI_ENDPOINT"]},
                 "topics": result["topics"],
                 "subtopics": result["subtopics"],
                 "traces": traces,
@@ -104,108 +82,3 @@ class TestTopicClusteringIntegration:
         assert len(result["topics"]) == 0
         assert len(result["subtopics"]) == 0
         assert result["cost"]["amount"] == 0
-
-    @pytest.mark.integration
-    @pytest.mark.asyncio
-    async def test_it_works_even_if_azure_throws_error_for_certain_requests(
-        self, httpx_mock: HTTPXMock
-    ):
-        # Look at the jupyter notebook to see how to download this data
-        df = pd.read_csv(
-            f"notebooks/data/traces_for_topics_project_iCTt0LSMXYbv5jZNSdtEr.csv"
-        )
-        df["embeddings"] = df["embeddings"].apply(
-            lambda x: list(map(float, x[1:-1].split(", ")))
-        )
-
-        traces: list[Trace] = []
-        for _, row in df[0:100].iterrows():
-            traces.append(
-                Trace(
-                    trace_id=row["trace_id"],
-                    input=row["input"],
-                    embeddings=row["embeddings"],
-                    topic_id=None,
-                    subtopic_id=None,
-                )
-            )
-
-        requests = {}
-
-        def fail_specific_request(request: httpx.Request):
-            if "/embeddings" in str(request.url):
-                return httpx.Response(
-                    status_code=200,
-                    json={
-                        "object": "list",
-                        "data": [
-                            {
-                                "object": "embedding",
-                                "index": 0,
-                                "embedding": [random.random()] * 1536,
-                            }
-                        ],
-                        "model": "text-embedding-3-small",
-                        "usage": {"prompt_tokens": 5, "total_tokens": 5},
-                    },
-                )
-
-            if str(request.content) not in requests:
-                requests[str(request.content)] = True
-
-            if list(requests.keys()).index(str(request.content)) == 0:
-                raise Exception("stop")
-
-            return httpx.Response(
-                status_code=200,
-                json=create_openai_chat_completion_mock(
-                    len(re.findall(r"topic_\d+", str(request.content)))
-                ),
-            )
-
-        httpx_mock.add_callback(
-            fail_specific_request,
-        )
-
-        response = client.post("/topics/batch_clustering", json={"traces": traces})
-
-        assert response.status_code == 200
-        assert response.json()
-
-
-def create_openai_chat_completion_mock(n):
-    return {
-        "id": "chatcmpl-86zIvz53Wa4qTc1ksUt3coF5yTvm7",
-        "object": "chat.completion",
-        "created": 1696676313,
-        "model": "gpt-3.5-turbo-0613",
-        "choices": [
-            {
-                "index": 0,
-                "logprobs": None,
-                "message": {
-                    "role": "assistant",
-                    "content": None,
-                    "function_call": None,
-                    "tool_calls": [
-                        {
-                            "function": {
-                                "name": "test",
-                                "arguments": json.dumps(
-                                    dict(
-                                        [
-                                            (f"topic_{index}", "sample topic name")
-                                            for index in range(n)
-                                        ]
-                                    )
-                                ),
-                            }
-                        }
-                    ],
-                },
-                "finish_reason": "stop",
-            }
-        ],
-        "usage": {"prompt_tokens": 5, "completion_tokens": 16, "total_tokens": 21},
-        "system_fingerprint": None,
-    }

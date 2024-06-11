@@ -1,13 +1,8 @@
 import { z } from "zod";
-import { OpenAI } from "../../components/icons/OpenAI";
-import { Azure } from "../../components/icons/Azure";
-import { Anthropic } from "../../components/icons/Anthropic";
-import { Groq } from "../../components/icons/Groq";
 import type { ModelProvider } from "@prisma/client";
 
 type ModelProviderDefinition = {
   name: string;
-  icon: React.ReactNode;
   apiKey: string;
   endpointKey: string | undefined;
   keysSchema: z.AnyZodObject;
@@ -24,7 +19,6 @@ export type MaybeStoredModelProvider = Omit<
 export const modelProviders = {
   openai: {
     name: "OpenAI",
-    icon: <OpenAI />,
     apiKey: "OPENAI_API_KEY",
     endpointKey: "OPENAI_BASE_URL",
     keysSchema: z.object({
@@ -35,7 +29,6 @@ export const modelProviders = {
   },
   azure: {
     name: "Azure OpenAI",
-    icon: <Azure />,
     apiKey: "AZURE_OPENAI_API_KEY",
     endpointKey: "AZURE_OPENAI_ENDPOINT",
     keysSchema: z.object({
@@ -46,7 +39,6 @@ export const modelProviders = {
   },
   anthropic: {
     name: "Anthropic",
-    icon: <Anthropic />,
     apiKey: "ANTHROPIC_API_KEY",
     endpointKey: undefined,
     keysSchema: z.object({
@@ -56,7 +48,6 @@ export const modelProviders = {
   },
   groq: {
     name: "Groq",
-    icon: <Groq />,
     apiKey: "GROQ_API_KEY",
     endpointKey: undefined,
     keysSchema: z.object({
@@ -64,4 +55,24 @@ export const modelProviders = {
     }),
     enabledSince: new Date("2023-01-01"),
   },
+  vertex_ai: {
+    name: "Vertex AI",
+    apiKey: "GOOGLE_APPLICATION_CREDENTIALS",
+    endpointKey: undefined,
+    keysSchema: z.object({
+      GOOGLE_APPLICATION_CREDENTIALS: z.string().min(1).refine(isValidJson),
+      VERTEXAI_PROJECT: z.string().min(1),
+      VERTEXAI_LOCATION: z.string().min(1),
+    }),
+    enabledSince: new Date("2023-01-01"),
+  },
 } satisfies Record<string, ModelProviderDefinition>;
+
+function isValidJson(value: string) {
+  try {
+    JSON.parse(value);
+    return true;
+  } catch (_) {
+    return false;
+  }
+}

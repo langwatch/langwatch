@@ -19,7 +19,7 @@ import {
 } from "@chakra-ui/react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import React, { useCallback } from "react";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
 import { ProjectSelector } from "../../components/DashboardLayout";
 import { HorizontalFormControl } from "../../components/HorizontalFormControl";
@@ -31,6 +31,9 @@ import {
   type MaybeStoredModelProvider,
 } from "../../server/modelProviders/registry";
 import { api } from "../../utils/api";
+import { ModelSelector } from "../../components/ModelSelector";
+import { modelProviderIcons } from "../../server/modelProviders/iconsMap";
+import { allowedTopicClusteringModels } from "../../server/topicClustering/types";
 
 export default function ModelsPage() {
   const { project, organizations } = useOrganizationTeamProject();
@@ -94,6 +97,7 @@ export default function ModelsPage() {
             </VStack>
           </CardBody>
         </Card>
+        <TopicClusteringModel />
       </VStack>
     </SettingsLayout>
   );
@@ -107,7 +111,7 @@ type ModelProviderForm = {
   customKeys?: Record<string, unknown> | null;
 };
 
-const ModelProviderForm = ({
+function ModelProviderForm({
   provider,
   refetch,
   updateMutation,
@@ -115,7 +119,7 @@ const ModelProviderForm = ({
   provider: MaybeStoredModelProvider;
   refetch: () => Promise<any>;
   updateMutation: ReturnType<typeof api.modelProvider.update.useMutation>;
-}) => {
+}) {
   const { project } = useOrganizationTeamProject();
 
   const localUpdateMutation = api.modelProvider.update.useMutation();
@@ -257,13 +261,16 @@ const ModelProviderForm = ({
                 alignItems="center"
                 justifyContent="center"
               >
-                {providerDefinition.icon}
+                {
+                  modelProviderIcons[
+                    provider.provider as keyof typeof modelProviderIcons
+                  ]
+                }
               </Box>
               <Text>{providerDefinition.name}</Text>
             </HStack>
           }
           helper={""}
-          // isInvalid={Object.keys(formState.errors).length > 0}
         >
           <VStack align="start" width="full" spacing={4} paddingRight={4}>
             <HStack spacing={6}>
@@ -332,4 +339,71 @@ const ModelProviderForm = ({
       </form>
     </Box>
   );
+}
+
+type TopicClusteringModelForm = {
+  topicClusteringModel: string;
 };
+
+function TopicClusteringModel() {
+  const { project } = useOrganizationTeamProject();
+  const updateTopicClusteringModel =
+    api.project.updateTopicClusteringModel.useMutation();
+
+  const { register, handleSubmit, control } =
+    useForm<TopicClusteringModelForm>({
+      defaultValues: {
+        topicClusteringModel:
+          project?.topicClusteringModel ?? allowedTopicClusteringModels[0]!,
+      },
+    });
+
+  const topicClusteringModelField = register("topicClusteringModel");
+
+  const onSubmit = useCallback(
+    async (data: TopicClusteringModelForm) => {
+      await updateTopicClusteringModel.mutateAsync({
+        projectId: project?.id ?? "",
+        topicClusteringModel: data.topicClusteringModel,
+      });
+    },
+    [updateTopicClusteringModel, project?.id]
+  );
+
+  return (
+    <>
+      <HStack width="full" marginTop={6}>
+        <Heading size="md" as="h2">
+          Topic Clustering Model
+        </Heading>
+        <Spacer />
+        {updateTopicClusteringModel.isLoading && <Spinner />}
+      </HStack>
+      <Text>
+        Select which model will be used to generate the topic names based on the
+        messages
+      </Text>
+      <Card width="full">
+        <CardBody width="full">
+          <HorizontalFormControl label="Topic Clustering Model" helper="">
+            <Controller
+              name={topicClusteringModelField.name}
+              control={control}
+              render={({ field }) => (
+                <ModelSelector
+                  model={field.value}
+                  options={allowedTopicClusteringModels}
+                  // eslint-disable-next-line @typescript-eslint/no-misused-promises
+                  onChange={(model) => {
+                    field.onChange(model);
+                    void handleSubmit(onSubmit)();
+                  }}
+                />
+              )}
+            />
+          </HorizontalFormControl>
+        </CardBody>
+      </Card>
+    </>
+  );
+}

@@ -15,6 +15,7 @@ import {
 } from "../permission";
 import { getOrganizationProjectsCount } from "./limits";
 import { dependencies } from "../../../injection/dependencies.server";
+import { allowedTopicClusteringModels } from "../../topicClustering/types";
 
 export const projectRouter = createTRPCRouter({
   create: protectedProcedure
@@ -72,7 +73,10 @@ export const projectRouter = createTRPCRouter({
         ctx.session.user
       );
 
-      if (projectCount >= activePlan.maxProjects && !activePlan.overrideAddingLimitations) {
+      if (
+        projectCount >= activePlan.maxProjects &&
+        !activePlan.overrideAddingLimitations
+      ) {
         throw new TRPCError({
           code: "FORBIDDEN",
           message: "You have reached the maximum number of projects",
@@ -195,6 +199,36 @@ export const projectRouter = createTRPCRouter({
           language: input.language,
           framework: input.framework,
           piiRedactionLevel: input.piiRedactionLevel,
+        },
+      });
+
+      return { success: true, projectSlug: updatedProject.slug };
+    }),
+  updateTopicClusteringModel: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        topicClusteringModel: z.enum(allowedTopicClusteringModels as any),
+      })
+    )
+    .use(checkUserPermissionForProject(TeamRoleGroup.SETUP_PROJECT))
+    .mutation(async ({ input, ctx }) => {
+      const prisma = ctx.prisma;
+      const project = await prisma.project.findUnique({
+        where: { id: input.projectId },
+      });
+
+      if (!project) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Project not found",
+        });
+      }
+
+      const updatedProject = await prisma.project.update({
+        where: { id: input.projectId },
+        data: {
+          topicClusteringModel: input.topicClusteringModel,
         },
       });
 

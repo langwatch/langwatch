@@ -1,6 +1,7 @@
 from concurrent.futures import Future, ThreadPoolExecutor
 import math
 from typing import Optional
+import litellm
 import numpy as np
 from openai import AzureOpenAI, OpenAI
 import os
@@ -15,16 +16,15 @@ from langchain_community.callbacks.openai_info import get_openai_token_cost_for_
 
 T = TypeVar("T")
 
-azure_openai = AzureOpenAI(
-    azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT") or "",
-    api_key=os.getenv("AZURE_OPENAI_API_KEY"),
-    api_version="2024-02-01",
-)
+os.environ["AZURE_API_VERSION"] = "2024-02-01"
 
 
 @retry(wait=wait_exponential(min=12, max=60), stop=stop_after_attempt(4))
 def generate_topic_names(
-    topic_examples: list[list[str]], existing: Optional[list[str]] = None
+    model: str,
+    litellm_params: dict[str, str],
+    topic_examples: list[list[str]],
+    existing: Optional[list[str]] = None,
 ) -> tuple[list[str], Money]:
     example_count = sum([len(examples) for examples in topic_examples])
     print(
@@ -46,10 +46,9 @@ def generate_topic_names(
         else ""
     )
 
-    model_name = "gpt-4-1106-preview"
     try:
-        response = azure_openai.chat.completions.create(
-            model=model_name,
+        response = litellm.completion(
+            model=model,
             temperature=0.0,
             messages=[
                 {
@@ -82,23 +81,13 @@ def generate_topic_names(
                 }
             ],
             tool_choice={"type": "function", "function": {"name": "topicNames"}},
+            **litellm_params,  # type: ignore
         )
     except Exception as e:
         print(f"Failed to generate topic names for {len(topic_examples)} topics: {e}")
         raise e
 
-    total_cost = 0
-    if response.usage:
-        # TODO: use litellm here instead
-        prompt_cost = get_openai_token_cost_for_model(
-            model_name.replace("35", "3.5"), response.usage.prompt_tokens
-        )
-        completion_cost = get_openai_token_cost_for_model(
-            model_name.replace("35", "3.5"),
-            response.usage.completion_tokens,
-            is_completion=True,
-        )
-        total_cost = prompt_cost + completion_cost
+    total_cost = litellm.completion_cost(response)
 
     topic_names: list[str] = list(json.loads(response.choices[0].message.tool_calls[0].function.arguments).values())  # type: ignore
     topic_names = topic_names[0 : len(topic_examples)]
@@ -118,7 +107,10 @@ def get_subtopic_samples(samples: list[Trace], n=5):
 
 
 def generate_topic_names_split(
-    topic_examples: list[list[str]], existing: Optional[list[str]] = None
+    model: str,
+    litellm_params: dict[str, str],
+    topic_examples: list[list[str]],
+    existing: Optional[list[str]] = None,
 ) -> tuple[list[Optional[str]], Money]:
     total_samples = sum([len(examples) for examples in topic_examples])
     split_point = min(
@@ -135,7 +127,9 @@ def generate_topic_names_split(
 
         if batch_len >= split_point:
             try:
-                result, cost_ = generate_topic_names(batch, existing)
+                result, cost_ = generate_topic_names(
+                    model, litellm_params, batch, existing
+                )
                 cost["amount"] += cost_["amount"]
                 results += result
             except Exception as e:
@@ -144,7 +138,7 @@ def generate_topic_names_split(
 
     if len(batch) > 0:
         try:
-            result, cost_ = generate_topic_names(batch, existing)
+            result, cost_ = generate_topic_names(model, litellm_params, batch, existing)
             cost["amount"] += cost_["amount"]
             results += result
         except Exception as e:
@@ -154,16 +148,30 @@ def generate_topic_names_split(
 
 
 def generate_topic_names_split_and_improve_similar_names(
-    topic_examples: list[list[str]], existing: Optional[list[str]] = None
+    model: str,
+    litellm_params: dict[str, str],
+    topic_examples: list[list[str]],
+    existing: Optional[list[str]] = None,
 ) -> tuple[list[Optional[str]], Money]:
-    topic_names, cost1 = generate_topic_names_split(topic_examples, existing)
+    topic_names, cost1 = generate_topic_names_split(
+        model,
+        litellm_params,
+        topic_examples=topic_examples,
+        existing=existing,
+    )
     topic_names, cost2 = improve_similar_names(
-        topic_names, topic_examples, max_iterations=3
+        model,
+        litellm_params,
+        topic_names=topic_names,
+        topic_examples=topic_examples,
+        max_iterations=3,
     )
     return topic_names, Money(amount=cost1["amount"] + cost2["amount"], currency="USD")
 
 
 def improve_similar_names(
+    model: str,
+    litellm_params: dict[str, str],
     topic_names: list[Optional[str]],
     topic_examples: list[list[str]],
     cost=Money(amount=0, currency="USD"),
@@ -217,7 +225,12 @@ def improve_similar_names(
     )
 
     new_topic_a_name, new_topic_b_name, cost_ = improve_name_between_two_topics(
-        topic_a_name, topic_b_name, topic_a_examples, topic_b_examples
+        model,
+        litellm_params,
+        topic_a_name,
+        topic_b_name,
+        topic_a_examples,
+        topic_b_examples,
     )
 
     topic_names_ = topic_names.copy()
@@ -229,8 +242,10 @@ def improve_similar_names(
     iteration_ = iteration + 1
     if iteration_ < max_iterations:
         return improve_similar_names(
-            topic_names_,
-            topic_examples,
+            model,
+            litellm_params,
+            topic_names=topic_names_,
+            topic_examples=topic_examples,
             cost=cost__,
             iteration=iteration_,
             max_iterations=max_iterations,
@@ -241,6 +256,8 @@ def improve_similar_names(
 
 @retry(wait=wait_exponential(min=12, max=60), stop=stop_after_attempt(4))
 def improve_name_between_two_topics(
+    model: str,
+    litellm_params: dict[str, str],
     topic_a_name: Optional[str],
     topic_b_name: Optional[str],
     topic_a_examples: list[str],
@@ -249,16 +266,14 @@ def improve_name_between_two_topics(
     if topic_a_name is None or topic_b_name is None:
         return topic_a_name, topic_b_name, Money(amount=0, currency="USD")
 
-    model_name = "gpt-4-1106-preview"
-
     topic_examples_str = (
         (f"# Topic A: {topic_a_name}\n\n" + "\n".join(topic_a_examples))
         + f"\n\n# Topic B: {topic_b_name}\n\n"
         + "\n".join(topic_b_examples)
     )
 
-    response = azure_openai.chat.completions.create(
-        model=model_name,
+    response = litellm.completion(
+        model=model,
         temperature=0.0,
         messages=[
             {
@@ -288,20 +303,10 @@ def improve_name_between_two_topics(
             }
         ],
         tool_choice={"type": "function", "function": {"name": "topicNames"}},
+        **litellm_params,  # type: ignore
     )
 
-    total_cost = 0
-    if response.usage:
-        # TODO: use litellm here instead
-        prompt_cost = get_openai_token_cost_for_model(
-            model_name.replace("35", "3.5"), response.usage.prompt_tokens
-        )
-        completion_cost = get_openai_token_cost_for_model(
-            model_name.replace("35", "3.5"),
-            response.usage.completion_tokens,
-            is_completion=True,
-        )
-        total_cost = prompt_cost + completion_cost
+    total_cost = litellm.completion_cost(response)
 
     arguments = json.loads(response.choices[0].message.tool_calls[0].function.arguments)  # type: ignore
     new_topic_a_name = arguments["topic_a"]
@@ -313,6 +318,8 @@ def improve_name_between_two_topics(
 
 
 def generate_topic_and_subtopic_names(
+    model: str,
+    litellm_params: dict[str, str],
     hierarchy: dict[str, dict[str, list[Trace]]],
     existing: Optional[list[str]] = None,
     skip_topic_names: bool = False,
@@ -331,7 +338,10 @@ def generate_topic_and_subtopic_names(
         ]
 
         def noop_topic_names(
-            topic_examples, existing=None
+            model: str,
+            litellm_params: dict[str, str],
+            topic_examples: list[list[str]],
+            existing: Optional[list[str]] = None,
         ) -> tuple[list[Optional[str]], Money]:
             return list(hierarchy.keys()), Money(amount=0, currency="USD")
 
@@ -341,6 +351,8 @@ def generate_topic_and_subtopic_names(
                 if skip_topic_names
                 else generate_topic_names_split_and_improve_similar_names
             ),
+            model,
+            litellm_params,
             topic_examples,
             existing=existing,
         )
@@ -354,6 +366,8 @@ def generate_topic_and_subtopic_names(
             ]
             future = executor.submit(
                 generate_topic_names_split_and_improve_similar_names,
+                model,
+                litellm_params,
                 subtopic_samples,
                 existing,
             )

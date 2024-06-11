@@ -25,6 +25,10 @@ import {
   getCurrentMonthCost,
   maxMonthlyUsageLimit,
 } from "../../api/routers/limits";
+import {
+  getProjectModelProviders,
+  prepareEnvKeys,
+} from "../../api/routers/modelProviders";
 
 const debug = getDebugger("langwatch:workers:traceChecksWorker");
 
@@ -142,6 +146,20 @@ export const runEvaluation = async ({
     };
   }
 
+  let evaluatorEnv: Record<string, string> = {};
+  if (settings && "model" in settings && typeof settings.model === "string") {
+    const modelProviders = await getProjectModelProviders(projectId);
+    const provider = settings.model.split("/")[0]!;
+    const modelProvider = modelProviders[provider];
+    if (!modelProvider) {
+      throw `Provider ${provider} is not configured`;
+    }
+    if (!modelProvider.enabled) {
+      throw `Provider ${provider} is not enabled`;
+    }
+    evaluatorEnv = prepareEnvKeys(modelProvider);
+  }
+
   const response = await fetch(
     `${env.LANGEVALS_ENDPOINT}/${checkType}/evaluate`,
     {
@@ -159,6 +177,7 @@ export const runEvaluation = async ({
           },
         ],
         settings: settings && typeof settings === "object" ? settings : {},
+        env: evaluatorEnv,
       }),
     }
   );
