@@ -34,11 +34,17 @@ export default async function handler(
       where: { projectId: project.id },
     });
 
+    if (!annotations || annotations.length === 0) {
+      return res
+        .status(404)
+        .json({ status: "error", message: "No annotations found." });
+    }
+
     return res.status(200).json({ data: annotations });
   } catch (e) {
     debug(e);
     return res
       .status(500)
-      .json({ status: "error", message: "No annotations found." });
+      .json({ status: "error", message: "Internal server error." });
   }
 }
