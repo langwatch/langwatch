@@ -21,7 +21,7 @@ import { Inter } from "next/font/google";
 import Head from "next/head";
 import { useRouter } from "next/router";
 import NProgress from "nprogress";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { dependencies } from "../injection/dependencies.client";
 
 const inter = Inter({ subsets: ["latin"] });
@@ -140,23 +140,61 @@ const LangWatch: AppType<{
 }> = ({ Component, pageProps: { session, ...pageProps } }) => {
   const router = useRouter();
 
+  const [previousFeatureFlagQueryParams, setPreviousFeatureFlagQueryParams] =
+    useState<{ key: string; value: string }[]>([]);
+
+  useEffect(() => {
+    const featureFlagQueryParams = Object.entries(router.query ?? {})
+      .filter(
+        ([key]) =>
+          key.startsWith("NEXT_PUBLIC_FEATURE_") &&
+          typeof router.query[key] === "string"
+      )
+      .map(([key, value]) => ({ key, value: value as string }));
+    setPreviousFeatureFlagQueryParams(featureFlagQueryParams);
+  }, [router.query]);
+
+  // Little hack to keep the feature flags on the url the same when navigating to a different page
+  const keepSameFeatureFlags = () => {
+    if (Object.keys(previousFeatureFlagQueryParams).length > 0) {
+      const parsedUrl = new URL(window.location.href);
+      let updated = false;
+      for (const { key, value } of previousFeatureFlagQueryParams) {
+        if (parsedUrl.searchParams.get(key) !== value) {
+          parsedUrl.searchParams.set(key, value);
+          updated = true;
+        }
+      }
+      if (updated) {
+        void router.replace(parsedUrl.toString(), undefined, {
+          shallow: true,
+        });
+      }
+    }
+  };
+
   useEffect(() => {
     NProgress.configure({ showSpinner: false });
     const handleChangeDone = () => {
+      keepSameFeatureFlags();
       handleChangeStart.cancel();
       NProgress.done();
       setTimeout(() => NProgress.done(), 200);
     };
+    const handleChangeStart_ = () => {
+      handleChangeStart();
+    };
 
-    router.events.on("routeChangeStart", handleChangeStart);
+    router.events.on("routeChangeStart", handleChangeStart_);
     router.events.on("routeChangeComplete", handleChangeDone);
     router.events.on("routeChangeError", handleChangeDone);
 
     return () => {
-      router.events.off("routeChangeStart", handleChangeStart);
+      router.events.off("routeChangeStart", handleChangeStart_);
       router.events.off("routeChangeComplete", handleChangeDone);
       router.events.off("routeChangeError", handleChangeDone);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router]);
 
   return (
