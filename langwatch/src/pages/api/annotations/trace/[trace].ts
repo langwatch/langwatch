@@ -53,7 +53,7 @@ export default async function handler(
       const comment = req.body.comment as string;
       const isThumbsUp = req.body.isThumbsUp;
       const trace = req.query.trace as string;
-      const userEmail = req.body.userEmail as string;
+      const email = req.body.email as string;
 
       if (!comment || typeof comment !== "string") {
         return res.status(400).json({
@@ -83,7 +83,7 @@ export default async function handler(
           projectId: project.id,
           isThumbsUp: isThumbsUp,
           traceId: trace,
-          email: userEmail,
+          email: email,
         },
       });
 
