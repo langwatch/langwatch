@@ -25,6 +25,7 @@ import type { UseFormReturn } from "react-hook-form";
 import { useRouter } from "next/router";
 import { titleCase } from "../../utils/stringCasing";
 import { Shield } from "react-feather";
+import { isFeatureEnabled } from "../../utils/featureFlags";
 
 type Category = EvaluatorDefinition<any>["category"];
 
@@ -57,7 +58,7 @@ export function EvaluatorSelection({
 
   const availableEvaluatorsPerCategory: Record<
     string,
-    Array<[string, EvaluatorDefinition<any>]>
+    Array<[string, EvaluatorDefinition<any> & { beta?: boolean }]>
   > = {};
 
   for (const category of categories) {
@@ -66,6 +67,24 @@ export function EvaluatorSelection({
         evaluator.category === category ||
         (evaluator.category === "rag" && category === "quality") // Merge RAG into quality for now
     );
+  }
+
+  if (isFeatureEnabled("NEXT_PUBLIC_FEATURE_BETA_ANNOTATIONS_TRAINED")) {
+    availableEvaluatorsPerCategory.custom!.push([
+      "custom",
+      {
+        name: "Automated Annotations Evaluator",
+        description:
+          "Train your own evaluator, fine-tuned on your project's annotation scores to mimic human review scores and reasoning and automatically evaluate messages just like your team members would",
+        category: "custom",
+        isGuardrail: false,
+        requiredFields: [],
+        optionalFields: [],
+        settings: {},
+        result: {},
+        beta: true,
+      },
+    ]);
   }
 
   return (
@@ -125,9 +144,17 @@ export function EvaluatorSelection({
                           </Box>
                         </Tooltip>
                       )}
-                      <Heading as="h2" size="sm">
-                        {evaluatorTempNameMap[evaluator.name] ?? evaluator.name}
-                      </Heading>
+                      <HStack>
+                        {evaluator.beta && (
+                          <Tag size="sm" colorScheme="pink" paddingX={2} fontSize="14px" marginLeft="-4px">
+                            Beta
+                          </Tag>
+                        )}
+                        <Heading as="h2" size="sm">
+                          {evaluatorTempNameMap[evaluator.name] ??
+                            evaluator.name}
+                        </Heading>
+                      </HStack>
                       <Text>
                         {/* TODO: temporary change for Google DLP PII */}
                         {evaluator.description.replace(
