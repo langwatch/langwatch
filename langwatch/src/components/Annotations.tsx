@@ -25,7 +25,7 @@ export const Annotations = ({ traceId }: { traceId: string }) => {
   return (
     <VStack spacing={2} align="start">
       {annotations.data?.map((annotation) => {
-        const isCurrentUser = data?.user?.id === annotation.user.id;
+        const isCurrentUser = data?.user?.id === annotation.user?.id;
         return (
           <Box
             backgroundColor="gray.100"
@@ -48,7 +48,25 @@ export const Annotations = ({ traceId }: { traceId: string }) => {
             <VStack align="start">
               <HStack width="full" align={"top"}>
                 <VStack align="start" spacing={0}>
-                  <Text fontWeight="bold">{annotation.user.name}</Text>
+                  <Text fontWeight="bold">
+                    {annotation.user?.name ?? (
+                      <HStack marginBottom={2}>
+                        <Box
+                          borderRadius={5}
+                          paddingY={0.5}
+                          paddingX={2}
+                          border="1px solid"
+                          borderColor="gray.500"
+                          fontSize="xs"
+                        >
+                          API
+                        </Box>
+                        <Text color="gray.500" fontSize="sm">
+                          - {annotation.email ? annotation.email : "anonymous"}
+                        </Text>
+                      </HStack>
+                    )}
+                  </Text>
                   <Text fontSize="sm">
                     {annotation.createdAt.toLocaleString()}
                   </Text>

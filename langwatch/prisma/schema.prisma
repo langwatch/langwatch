@@ -393,10 +393,11 @@ model Annotation {
     traceId    String
     comment    String
     isThumbsUp Boolean
-    userId     String
-    user       User     @relation(fields: [userId], references: [id])
+    userId     String?
+    user       User?    @relation(fields: [userId], references: [id])
     createdAt  DateTime @default(now())
     updatedAt  DateTime @default(now()) @updatedAt
+    email      String?
 
     @@index([projectId])
     @@index([traceId])
