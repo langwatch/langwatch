@@ -2,7 +2,6 @@ import { type NextApiRequest, type NextApiResponse } from "next";
 import { prisma } from "../../../server/db";
 
 import { getDebugger } from "../../../utils/logger";
-import { nanoid } from "nanoid";
 
 export const debug = getDebugger("langwatch:analytics");
 
@@ -47,30 +46,53 @@ export default async function handler(
   if (req.method == "PATCH") {
     try {
       const comment = req.body.comment as string;
-      const isThumbsUp = req.body.isThumbsUp === "true";
-      const trace = req.query.trace as string;
+      const isThumbsUp = req.body.isThumbsUp;
+      const annotationId = req.query.id as string;
       const userEmail = req.body.userEmail as string;
 
-      const user = await prisma.user.findUnique({
-        where: { email: userEmail },
-      });
-
-      if (!user) {
-        return res.status(404).json({ message: "User not found." });
+      if (!comment || typeof comment !== "string") {
+        return res.status(400).json({
+          status: "error",
+          message:
+            "[comment] is required in the request body and must be a string.",
+        });
+      }
+      if (isThumbsUp === undefined || typeof isThumbsUp !== "boolean") {
+        return res.status(400).json({
+          status: "error",
+          message:
+            "[isThumbsUp] is required in the request body and must be a boolean.",
+        });
       }
 
-      const addAnnotation = await prisma.annotation.create({
+      const patchAnnotation = await prisma.annotation.update({
+        where: { id: annotationId, projectId: project.id },
         data: {
-          id: nanoid(),
           comment: comment,
-          projectId: project.id,
           isThumbsUp: isThumbsUp,
-          traceId: trace,
-          userId: user.id,
+          email: userEmail,
         },
       });
 
-      return res.status(200).json({ data: addAnnotation });
+      return res.status(200).json({ data: patchAnnotation });
+    } catch (e) {
+      debug(e);
+      return res.status(500).json({ status: "error", message: "Not found" });
+    }
+  }
+
+  if (req.method == "GET") {
+    try {
+      const annotationId = req.query.id as string;
+      const annotation = await prisma.annotation.findUnique({
+        where: { id: annotationId, projectId: project.id },
+      });
+      if (!annotation) {
+        return res
+          .status(404)
+          .json({ status: "error", message: "Annotation not found." });
+      }
+      return res.status(200).json({ data: annotation });
     } catch (e) {
       debug(e);
       return res
@@ -79,5 +101,5 @@ export default async function handler(
     }
   }
 
-  return res.status(405).end(); // Patch and Delete
+  return res.status(405).end(); // Patch and Delete and Get
 }

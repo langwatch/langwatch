@@ -39,6 +39,6 @@ export default async function handler(
     debug(e);
     return res
       .status(500)
-      .json({ status: "error", message: "Internal server error." });
+      .json({ status: "error", message: "No annotations found." });
   }
 }

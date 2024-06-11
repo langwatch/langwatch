@@ -33,6 +33,12 @@ export default async function handler(
         where: { traceId: trace, projectId: project.id },
       });
 
+      if (!annotationsByTrace || annotationsByTrace.length === 0) {
+        return res
+          .status(404)
+          .json({ status: "error", message: "No annotations found." });
+      }
+
       return res.status(200).json({ data: annotationsByTrace });
     } catch (e) {
       debug(e);
@@ -45,16 +51,29 @@ export default async function handler(
   if (req.method == "POST") {
     try {
       const comment = req.body.comment as string;
-      const isThumbsUp = req.body.isThumbsUp === "true";
+      const isThumbsUp = req.body.isThumbsUp;
       const trace = req.query.trace as string;
       const userEmail = req.body.userEmail as string;
 
-      const user = await prisma.user.findUnique({
-        where: { email: userEmail },
-      });
-
-      if (!user) {
-        return res.status(404).json({ message: "User not found." });
+      if (!comment || typeof comment !== "string") {
+        return res.status(400).json({
+          status: "error",
+          message:
+            "[comment] is required in the request body and must be a string.",
+        });
+      }
+      if (isThumbsUp === undefined || typeof isThumbsUp !== "boolean") {
+        return res.status(400).json({
+          status: "error",
+          message:
+            "[isThumbsUp] is required in the request body and must be a boolean.",
+        });
+      }
+      if (!trace || typeof trace !== "string") {
+        return res.status(400).json({
+          status: "error",
+          message: "Trace ID is required and must be a string.",
+        });
       }
 
       const addAnnotation = await prisma.annotation.create({
@@ -64,7 +83,7 @@ export default async function handler(
           projectId: project.id,
           isThumbsUp: isThumbsUp,
           traceId: trace,
-          userId: user.id,
+          email: userEmail,
         },
       });
 
@@ -76,17 +95,6 @@ export default async function handler(
         .json({ status: "error", message: "Internal server error." });
     }
   }
-
-  // if (req.method == "DELETE") {
-  //   try {
-  //     const annotationId = req.query.annotationId as string;
-  //   } catch (e) {
-  //     debug(e);
-  //     return res
-  //       .status(500)
-  //       .json({ status: "error", message: "Internal server error." });
-  //   }
-  // }
 
   return res.status(405).end(); // Only accept GET and POST requests
 }
