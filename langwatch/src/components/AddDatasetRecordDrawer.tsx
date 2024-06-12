@@ -278,9 +278,9 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
           }
           if (
             columns.includes("expected_llm_output") &&
-            llmEntry.outputs[0]?.type === "chat_messages"
+            llmEntry.output?.type === "chat_messages"
           ) {
-            row.expected_llm_output = llmEntry.outputs[0].value;
+            row.expected_llm_output = llmEntry.output.value;
           }
           if (columns.includes("comments")) {
             row.comments = "";

@@ -1,18 +1,11 @@
 import {
-  Box,
   Button,
   Card,
   CardBody,
-  Heading,
   HStack,
   Input,
   Spacer,
   Switch,
-  Tab,
-  TabList,
-  TabPanel,
-  TabPanels,
-  Tabs,
   Text,
   Tooltip,
   VStack,
@@ -32,12 +25,12 @@ import { z } from "zod";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import {
   AVAILABLE_EVALUATORS,
-  type EvaluatorTypes,
   type Evaluators,
+  type EvaluatorTypes,
 } from "../../trace_checks/evaluators.generated";
 import {
-  evaluatorTypesSchema,
   evaluatorsSchema,
+  evaluatorTypesSchema,
 } from "../../trace_checks/evaluators.zod.generated";
 import {
   getEvaluatorDefaultSettings,
@@ -47,12 +40,11 @@ import type { CheckPreconditions } from "../../trace_checks/types";
 import { checkPreconditionsSchema } from "../../trace_checks/types.generated";
 import { api } from "../../utils/api";
 import { HorizontalFormControl } from "../HorizontalFormControl";
-import { RenderCode } from "../code/RenderCode";
 import DynamicZodForm from "./DynamicZodForm";
 import { EvaluatorSelection, evaluatorTempNameMap } from "./EvaluatorSelection";
+import { GuardrailIntegration } from "./GuardrailIntegration";
 import { PreconditionsField } from "./PreconditionsField";
 import { TryItOut } from "./TryItOut";
-import { GuardrailIntegration } from "./GuardrailIntegration";
 
 export interface CheckConfigFormData {
   name: string;
@@ -219,7 +211,9 @@ export default function CheckConfigForm({
                     helper="Select the evaluation to run"
                     isInvalid={!!errors.checkType}
                   >
-                    {evaluatorTempNameMap[AVAILABLE_EVALUATORS[checkType].name] ?? AVAILABLE_EVALUATORS[checkType].name}{" "}
+                    {evaluatorTempNameMap[
+                      AVAILABLE_EVALUATORS[checkType].name
+                    ] ?? AVAILABLE_EVALUATORS[checkType].name}{" "}
                     <Button
                       variant="link"
                       onClick={() => {

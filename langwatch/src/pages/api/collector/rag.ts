@@ -11,7 +11,7 @@ import crypto from "crypto";
 export const addInputAndOutputForRAGs = (spans: Span[]): Span[] => {
   const inputOutputMap: Record<
     string,
-    { input: RAGSpan["input"]; outputs: RAGSpan["outputs"] }
+    { input: RAGSpan["input"]; output: RAGSpan["output"] }
   > = {};
 
   const fillInputOutputMap = (spans: Span[]): Span[] => {
@@ -21,8 +21,8 @@ export const addInputAndOutputForRAGs = (spans: Span[]): Span[] => {
         return span;
       }
 
-      const { input, outputs } = inputOutput;
-      return { ...span, input, outputs };
+      const { input, output } = inputOutput;
+      return { ...span, input, output };
     });
   };
 
@@ -30,7 +30,7 @@ export const addInputAndOutputForRAGs = (spans: Span[]): Span[] => {
     spans.forEach((span) => {
       recursiveExtractInputAndOutput(span.children);
 
-      if (span.type !== "rag" || (span.input && span.outputs.length > 0)) {
+      if (span.type !== "rag" || (span.input && span.output)) {
         return;
       }
 
@@ -42,10 +42,7 @@ export const addInputAndOutputForRAGs = (spans: Span[]): Span[] => {
 
       inputOutputMap[span.span_id] = {
         input: span.input ? span.input : { type: "text", value: input },
-        outputs:
-          span.outputs.length > 0
-            ? span.outputs
-            : [{ type: "text", value: output }],
+        output: span.output ? span.output : { type: "text", value: output },
       };
     });
   };

@@ -63,7 +63,10 @@ export default async function handler(
       .json({ message: "X-Auth-Token header is required." });
   }
 
-  if (req.headers["content-type"] !== "application/json" || typeof req.body !== "object") {
+  if (
+    req.headers["content-type"] !== "application/json" ||
+    typeof req.body !== "object"
+  ) {
     return res.status(400).json({ message: "Invalid body, expecting json" });
   }
 
@@ -152,9 +155,27 @@ export default async function handler(
     if (nullableTraceId && !span.trace_id) {
       span.trace_id = nullableTraceId;
     }
-    // Makes outputs optional, but our system still expects it to be an array
-    if (typeof span.outputs === "undefined") {
-      span.outputs = [];
+    // We changes "outputs" list to "output" single item, so here we keep supporting the old "outputs" for retrocompaibility
+    if (
+      typeof span.output === "undefined" &&
+      "outputs" in span &&
+      typeof span.outputs !== "undefined"
+    ) {
+      //@ts-ignore
+      if (span.outputs.length == 0) {
+        span.output = null;
+        //@ts-ignore
+      } else if (span.outputs.length == 1) {
+        //@ts-ignore
+        span.output = span.outputs[0];
+        //@ts-ignore
+      } else if (span.outputs.length > 1) {
+        span.output = {
+          type: "list",
+          //@ts-ignore
+          value: span.outputs,
+        };
+      }
     }
     if ("contexts" in span) {
       // Keep retrocompatibility of RAG as a simple string list
@@ -253,7 +274,7 @@ export default async function handler(
   const esSpans: ElasticSearchSpan[] = spans.map((span) => ({
     ...span,
     input: span.input ? typedValueToElasticSearch(span.input) : null,
-    outputs: span.outputs.map(typedValueToElasticSearch),
+    output: span.output ? typedValueToElasticSearch(span.output) : null,
     project_id: project.id,
     timestamps: {
       ...span.timestamps,

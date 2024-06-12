@@ -676,16 +676,15 @@ export const getAllForProject = async (
 
         const lastFailedGuardrailResult:
           | (GuardrailResult & { name?: string })
-          | undefined = lastGuardrailSpans?.flatMap(
-          (span) =>
-            span?.outputs
-              .filter((output) => output.type === "guardrail_result")
-              .map(elasticSearchToTypedValue)
-              .map((output) => ({
-                ...((output.value as GuardrailResult) || {}),
-                name: guardrailsSlugToName[span.name ?? ""],
-              }))
-              .filter((output) => !(output as GuardrailResult)?.passed)
+          | undefined = lastGuardrailSpans?.flatMap((span) =>
+          (span?.output ? [span.output] : [])
+            .filter((output) => output.type === "guardrail_result")
+            .map(elasticSearchToTypedValue)
+            .map((output) => ({
+              ...((output.value as GuardrailResult) || {}),
+              name: guardrailsSlugToName[span.name ?? ""],
+            }))
+            .filter((output) => !(output as GuardrailResult)?.passed)
         )[0];
         const trace_ = { ...trace, lastGuardrail: lastFailedGuardrailResult };
         return [trace.trace_id, trace_];

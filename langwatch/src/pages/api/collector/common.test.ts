@@ -12,7 +12,7 @@ describe("Span organizing and flattening tests", () => {
     type: "span" as BaseSpan["type"],
     trace_id: "trace_foo_bar",
     input: { type: "text", value: "random input" } as BaseSpan["input"],
-    outputs: [{ type: "text", value: "random output" }] as BaseSpan["outputs"],
+    output: { type: "text", value: "random output" } as BaseSpan["output"],
   };
 
   const spans: BaseSpan[] = [
@@ -29,7 +29,7 @@ describe("Span organizing and flattening tests", () => {
       span_id: "2",
       parent_id: null,
       timestamps: { started_at: 200, finished_at: 600 },
-      outputs: [{ type: "text", value: "bottommost output" }],
+      output: { type: "text", value: "bottommost output" },
     },
 
     // Children of span 1

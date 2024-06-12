@@ -5,13 +5,11 @@ describe("utils test", () => {
   it("extracts RAG context", async () => {
     const ragInfo = getRAGInfo([
       {
-        outputs: [
-          {
-            type: "chat_messages",
-            value:
-              '[{"role":"assistant","content":"Yes, we offer a custom ChatGPT bot for your website. It\'s easy to set up and requires no training or maintenance. You can automate customer support, resolve repetitive questions, and even escalate to a human agent if needed."}]',
-          },
-        ],
+        output: {
+          type: "chat_messages",
+          value:
+            '[{"role":"assistant","content":"Yes, we offer a custom ChatGPT bot for your website. It\'s easy to set up and requires no training or maintenance. You can automate customer support, resolve repetitive questions, and even escalate to a human agent if needed."}]',
+        },
         input: {
           type: "chat_messages",
           value: '[{"role":"user","content":"Hi I am looking for a chatbot"}]',

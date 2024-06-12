@@ -133,8 +133,7 @@ const spanMapping: ElasticSearchMappingFrom<ElasticSearchSpan> = {
       value: { type: "text" },
     },
   },
-  outputs: {
-    type: "nested",
+  output: {
     properties: {
       type: {
         type: "keyword",

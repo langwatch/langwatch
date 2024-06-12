@@ -160,6 +160,8 @@ describe("Topic Clustering Integration Test", () => {
 
   it("cluster tracers into topics", async () => {
     const result = await fetchTopicsBatchClustering("project_id", {
+      model: "openai/gpt-4o",
+      litellm_params: {},
       traces: traces as Required<TopicClusteringTrace>[],
     });
 

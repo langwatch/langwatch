@@ -8,7 +8,7 @@ import { debug } from "../collector";
 
 export const scheduleTraceChecks = async (trace: Trace, spans: Span[]) => {
   const isOutputEmpty = !trace.output?.value;
-  const lastOutput = spans.reverse()[0]?.outputs[0];
+  const lastOutput = spans.reverse()[0]?.output;
   const blockedByGuardrail =
     isOutputEmpty &&
     lastOutput?.type === "guardrail_result" &&

@@ -461,10 +461,9 @@ export function SpanTree(props: SpanTreeProps) {
                   >
                     Generated
                   </Box>
-                  {span.outputs.length == 0 && <Text>{"<empty>"}</Text>}
-                  {span.outputs.map((output, index) => (
+                  {span.output === undefined && <Text>{"<empty>"}</Text>}
+                  {span.output && (
                     <Box
-                      key={index}
                       as="pre"
                       borderRadius="6px"
                       padding={4}
@@ -473,9 +472,9 @@ export function SpanTree(props: SpanTreeProps) {
                       width="full"
                       whiteSpace="pre-wrap"
                     >
-                      <RenderInputOutput value={output.value} />
+                      <RenderInputOutput value={span.output.value} />
                     </Box>
-                  ))}
+                  )}
                 </VStack>
               )}
             </VStack>

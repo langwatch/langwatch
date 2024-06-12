@@ -33,7 +33,7 @@ const sampleSpan: LLMSpan = {
       { role: "user", content: "hello" },
     ],
   },
-  outputs: [{ type: "text", value: "world" }],
+  output: { type: "text", value: "world" },
   error: null,
   timestamps: {
     started_at: 1706623872769,
@@ -90,6 +90,7 @@ describe("Collector API Endpoint", () => {
       createMocks({
         method: "POST",
         headers: {
+          "Content-Type": "application/json",
           "X-Auth-Token": project?.apiKey,
         },
         body: traceData,
@@ -116,12 +117,10 @@ describe("Collector API Endpoint", () => {
         type: "chat_messages",
         value: JSON.stringify(sampleSpan.input?.value),
       },
-      outputs: [
-        {
-          type: "text",
-          value: '"world"',
-        },
-      ],
+      output: {
+        type: "text",
+        value: '"world"',
+      },
       timestamps: {
         ...sampleSpan.timestamps,
         inserted_at: expect.any(Number),
@@ -210,6 +209,7 @@ describe("Collector API Endpoint", () => {
       createMocks({
         method: "POST",
         headers: {
+          "Content-Type": "application/json",
           "X-Auth-Token": project?.apiKey,
         },
         body: {
@@ -235,7 +235,7 @@ describe("Collector API Endpoint", () => {
           content: "Paris is the capital of France.",
         },
       ],
-      outputs: [],
+      output: null,
       timestamps: sampleSpan.timestamps,
     };
     const llmSpan: LLMSpan = {
@@ -250,14 +250,12 @@ describe("Collector API Endpoint", () => {
           { role: "user", content: "What is the capital of France?" },
         ],
       },
-      outputs: [
-        {
-          type: "chat_messages",
-          value: [
-            { role: "assistant", content: "The capital of France is Paris." },
-          ],
-        },
-      ],
+      output: {
+        type: "chat_messages",
+        value: [
+          { role: "assistant", content: "The capital of France is Paris." },
+        ],
+      },
     };
 
     const traceData: CollectorRESTParams = {
@@ -269,6 +267,7 @@ describe("Collector API Endpoint", () => {
       createMocks({
         method: "POST",
         headers: {
+          "Content-Type": "application/json",
           "X-Auth-Token": project?.apiKey,
         },
         body: traceData,
@@ -294,12 +293,10 @@ describe("Collector API Endpoint", () => {
         type: "text",
         value: '"What is the capital of France?"',
       },
-      outputs: [
-        {
-          type: "text",
-          value: '"The capital of France is Paris."',
-        },
-      ],
+      output: {
+        type: "text",
+        value: '"The capital of France is Paris."',
+      },
       contexts: [
         {
           document_id: "context-1",
@@ -307,6 +304,7 @@ describe("Collector API Endpoint", () => {
         },
         {
           document_id: "context-2",
+          chunk_id: "1",
           content: "Paris is the capital of France.",
         },
       ],
@@ -314,7 +312,7 @@ describe("Collector API Endpoint", () => {
     });
   });
 
-  test("should insert text-only RAG contexts too for backwards-compatibility", async () => {
+  test("should insert text-only RAG contexts too, and outputs as a list, for backwards-compatibility", async () => {
     const traceId = "trace_test-trace_J5m9g-0JDMbcJqLK2";
     const ragSpan: RAGSpan = {
       type: "rag",
@@ -324,8 +322,9 @@ describe("Collector API Endpoint", () => {
         "France is a country in Europe.",
         "Paris is the capital of France.",
       ] as any,
-      outputs: [],
       timestamps: sampleSpan.timestamps,
+      // @ts-ignore
+      outputs: [],
     };
     const llmSpan: LLMSpan = {
       ...sampleSpan,
@@ -339,6 +338,7 @@ describe("Collector API Endpoint", () => {
           { role: "user", content: "What is the capital of France?" },
         ],
       },
+      // @ts-ignore
       outputs: [
         {
           type: "chat_messages",
@@ -358,6 +358,7 @@ describe("Collector API Endpoint", () => {
       createMocks({
         method: "POST",
         headers: {
+          "Content-Type": "application/json",
           "X-Auth-Token": project?.apiKey,
         },
         body: traceData,
@@ -421,6 +422,7 @@ describe("Collector API Endpoint", () => {
       createMocks({
         method: "POST",
         headers: {
+          "Content-Type": "application/json",
           "X-Auth-Token": project?.apiKey,
         },
         body: traceData,

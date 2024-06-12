@@ -33,13 +33,13 @@ export const getLastOutputAsText = (spans: Span[]): string => {
     "inside-out"
   )
     .reverse()
-    .filter((span) => span.outputs.length > 0 && span.type !== "guardrail");
+    .filter((span) => span.output && span.type !== "guardrail");
 
-  const outputs = bottommostOutputs[0]?.outputs;
+  const outputs = bottommostOutputs[0]?.output;
   if (!outputs) {
     return "";
   }
-  const firstOutput = outputs[0];
+  const firstOutput = outputs;
   if (!firstOutput) {
     return "";
   }

@@ -89,7 +89,11 @@ export type SpanInputOutput =
   | TypedValueChatMessages
   | TypedValueGuardrailResult
   | TypedValueJson
-  | TypedValueRaw;
+  | TypedValueRaw
+  | {
+      type: "list";
+      value: SpanInputOutput[];
+    };
 
 export interface ErrorCapture {
   has_error: true;
@@ -135,7 +139,7 @@ export interface BaseSpan {
   type: SpanTypes;
   name?: string | null;
   input?: SpanInputOutput | null;
-  outputs: SpanInputOutput[];
+  output?: SpanInputOutput | null;
   error?: ErrorCapture | null;
   timestamps: SpanTimestamps;
   metrics?: SpanMetrics | null;
@@ -165,12 +169,12 @@ export type Span = LLMSpan | RAGSpan | BaseSpan;
 type SpanInputOutputValidator = SpanInputOutput & { value: any };
 
 export type SpanValidator = (
-  | Omit<LLMSpan, "input" | "outputs">
-  | Omit<RAGSpan, "input" | "outputs">
-  | Omit<BaseSpan, "input" | "outputs">
+  | Omit<LLMSpan, "input" | "output">
+  | Omit<RAGSpan, "input" | "output">
+  | Omit<BaseSpan, "input" | "output">
 ) & {
   input?: SpanInputOutputValidator | null;
-  outputs: SpanInputOutputValidator[];
+  output?: SpanInputOutputValidator | null;
 };
 
 export type ElasticSearchInputOutput = {
@@ -181,22 +185,24 @@ export type ElasticSearchInputOutput = {
 // Zod type will not be generated for this one, check ts-to-zod.config.js
 export type ElasticSearchSpan = Omit<
   BaseSpan & Partial<Omit<RAGSpan, "type">> & Partial<Omit<LLMSpan, "type">>,
-  "input" | "outputs"
+  "input" | "output"
 > & {
   project_id: string;
   input?: ElasticSearchInputOutput | null;
-  outputs: ElasticSearchInputOutput[];
+  output?: ElasticSearchInputOutput | null;
   timestamps: SpanTimestamps & { inserted_at: number; updated_at: number };
 };
 
 export const elasticSearchSpanToSpan = (esSpan: ElasticSearchSpan): Span => {
-  const { input, outputs, ...rest } = esSpan;
+  const { input, output, ...rest } = esSpan;
   const spanInput: SpanInputOutput | null = input
     ? elasticSearchToTypedValue(input)
     : null;
-  const spanOutputs: SpanInputOutput[] = outputs.map(elasticSearchToTypedValue);
+  const spanOutput: SpanInputOutput | null = output
+    ? elasticSearchToTypedValue(output)
+    : null;
 
-  return { ...rest, input: spanInput, outputs: spanOutputs };
+  return { ...rest, input: spanInput, output: spanOutput };
 };
 
 export const elasticSearchToTypedValue = (

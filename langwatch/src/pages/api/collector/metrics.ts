@@ -104,16 +104,14 @@ export const addLLMTokensCount = async (spans: Span[]) => {
         ).inputTokens;
         llmSpan.metrics.tokens_estimated = true;
       }
-      if (llmSpan.outputs.length > 0 && !llmSpan.metrics.completion_tokens) {
+      if (llmSpan.output && !llmSpan.metrics.completion_tokens) {
         let outputTokens = 0;
-        for (const output of llmSpan.outputs) {
-          outputTokens += (
-            await tokenizeAndEstimateCost({
-              model: llmSpan.model,
-              output: typedValueToText(output),
-            })
-          ).outputTokens;
-        }
+        outputTokens += (
+          await tokenizeAndEstimateCost({
+            model: llmSpan.model,
+            output: typedValueToText(llmSpan.output),
+          })
+        ).outputTokens;
         llmSpan.metrics.completion_tokens = outputTokens;
         llmSpan.metrics.tokens_estimated = true;
       }
@@ -130,18 +128,20 @@ export const addLLMTokensCount = async (spans: Span[]) => {
 
 export const addGuardrailCosts = (spans: Span[]) => {
   for (const span of spans) {
-    for (const output of span.outputs) {
-      if (output.type === "guardrail_result" && output.value.cost) {
-        if (output.value.cost.currency !== "USD") {
-          console.warn(
-            `Guardrail cost is in ${output.value.cost.currency}, not USD, which is not supported yet`
-          );
-        }
-        if (!span.metrics) {
-          span.metrics = {};
-        }
-        span.metrics.cost = output.value.cost.amount;
+    if (
+      span.output &&
+      span.output.type === "guardrail_result" &&
+      span.output.value.cost
+    ) {
+      if (span.output.value.cost.currency !== "USD") {
+        console.warn(
+          `Guardrail cost is in ${span.output.value.cost.currency}, not USD, which is not supported yet`
+        );
       }
+      if (!span.metrics) {
+        span.metrics = {};
+      }
+      span.metrics.cost = span.output.value.cost.amount;
     }
   }
   return spans;

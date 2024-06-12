@@ -143,8 +143,8 @@ export const cleanupPIIs = async (
       clearPII(span, ["error", "message"], piiRedactionLevel)
     );
 
-    for (const output of span.outputs) {
-      clearPIIPromises.push(clearPII(output, ["value"], piiRedactionLevel));
+    if (span.output) {
+      clearPIIPromises.push(clearPII(span.output, ["value"], piiRedactionLevel));
     }
 
     for (const context of span.contexts ?? []) {
