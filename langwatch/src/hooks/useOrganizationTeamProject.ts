@@ -137,7 +137,7 @@ export const useOrganizationTeamProject = (
       reservedProjectSlugs.includes(projectQueryParam) &&
       project
     ) {
-      void router.push(`/${project.slug}/${projectQueryParam}`);
+      void router.replace(`/${project.slug}/${projectQueryParam}`);
       return;
     }
 
@@ -167,7 +167,7 @@ export const useOrganizationTeamProject = (
     ) {
       const availableProjectSlug =
         teamsWithProjectsOnAnyOrg[0]!.projects[0]!.slug;
-      void router.push(`/${availableProjectSlug}`);
+      void router.replace(`/${availableProjectSlug}`);
       return;
     }
 
@@ -183,7 +183,7 @@ export const useOrganizationTeamProject = (
       typeof router.query.project == "string" &&
       project.slug !== router.query.project
     ) {
-      void router.push(`/${project.slug}`);
+      void router.replace(`/${project.slug}`);
     }
   }, [
     organization,
