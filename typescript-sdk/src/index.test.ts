@@ -53,14 +53,12 @@ describe("LangWatch tracer", () => {
       },
     });
     span.end({
-      outputs: [
-        {
-          type: "json",
-          value: {
-            weather: "sunny",
-          },
+      output: {
+        type: "json",
+        value: {
+          weather: "sunny",
         },
-      ],
+      },
     });
 
     expect(trace.metadata).toEqual({
@@ -100,17 +98,15 @@ describe("LangWatch tracer", () => {
       },
     });
     llmSpan.end({
-      outputs: [
-        {
-          type: "chat_messages",
-          value: [
-            {
-              role: "assistant",
-              content: "It's cloudy in Tokyo.",
-            },
-          ],
-        },
-      ],
+      output: {
+        type: "chat_messages",
+        value: [
+          {
+            role: "assistant",
+            content: "It's cloudy in Tokyo.",
+          },
+        ],
+      },
     });
 
     ragSpan.end();
@@ -217,10 +213,10 @@ describe("LangWatch tracer", () => {
     });
 
     span.end({
-      outputs: chatCompletion.choices.map((choice) => ({
+      output: {
         type: "chat_messages",
-        value: [choice.message],
-      })),
+        value: [chatCompletion.choices[0]!.message],
+      },
       metrics: {
         promptTokens: chatCompletion.usage?.prompt_tokens,
         completionTokens: chatCompletion.usage?.completion_tokens,
@@ -282,10 +278,10 @@ describe("LangWatch tracer", () => {
     });
 
     span.end({
-      outputs: chatCompletion.choices.map((choice) => ({
+      output: {
         type: "chat_messages",
-        value: [choice.message],
-      })),
+        value: [chatCompletion.choices[0]!.message],
+      },
       metrics: {
         promptTokens: chatCompletion.usage?.prompt_tokens,
         completionTokens: chatCompletion.usage?.completion_tokens,
@@ -340,12 +336,10 @@ describe("LangWatch tracer", () => {
     });
 
     span.end({
-      outputs: [
-        {
-          type: "chat_messages",
-          value: convertFromVercelAIMessages(response.responseMessages),
-        },
-      ],
+      output: {
+        type: "chat_messages",
+        value: convertFromVercelAIMessages(response.responseMessages),
+      },
       metrics: {
         promptTokens: response.usage?.promptTokens,
         completionTokens: response.usage?.completionTokens,

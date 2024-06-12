@@ -230,8 +230,8 @@ export class LangWatchSpan implements PendingBaseSpan {
   parentId?: string | null;
   type: SpanTypes;
   name?: string | null;
-  input: PendingBaseSpan["input"];
-  outputs: PendingBaseSpan["outputs"];
+  input?: PendingBaseSpan["input"];
+  output?: PendingBaseSpan["output"];
   error?: PendingBaseSpan["error"];
   timestamps: PendingBaseSpan["timestamps"];
   metrics: PendingBaseSpan["metrics"];
@@ -243,7 +243,7 @@ export class LangWatchSpan implements PendingBaseSpan {
     type,
     name,
     input,
-    outputs,
+    output,
     error,
     timestamps,
     metrics,
@@ -254,7 +254,7 @@ export class LangWatchSpan implements PendingBaseSpan {
     this.type = type ?? "span";
     this.name = name;
     this.input = input;
-    this.outputs = outputs ?? [];
+    this.output = output;
     this.error = error;
     this.timestamps = timestamps ?? {
       startedAt: Date.now(),
@@ -280,8 +280,8 @@ export class LangWatchSpan implements PendingBaseSpan {
     if ("input" in params) {
       this.input = params.input;
     }
-    if (params.outputs) {
-      this.outputs = params.outputs;
+    if ("output" in params) {
+      this.output = params.output;
     }
     if ("error" in params) {
       this.error = params.error;

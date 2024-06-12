@@ -168,12 +168,10 @@ async function submitUserMessage(content: string) {
     })
 
     span.end({
-      outputs: [
-        {
-          type: 'chat_messages',
-          value: convertFromVercelAIMessages(output)
-        }
-      ]
+      output: {
+        type: 'chat_messages',
+        value: convertFromVercelAIMessages(output)
+      }
     })
   }
 

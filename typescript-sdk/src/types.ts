@@ -31,7 +31,7 @@ export type ChatRichContent = ServerChatRichContent;
 ({}) as {
   type: "chat_messages";
   value: OpenAI.Chat.ChatCompletionMessageParam[];
-}[] satisfies BaseSpan["outputs"];
+} satisfies BaseSpan["output"];
 
 // Keep the input/output types signatures as snake case to match the official openai nodejs api
 export type SpanInputOutput =
@@ -41,9 +41,9 @@ export type SpanInputOutput =
   | (TypedValueChatMessages & { type: ChatMessage });
 
 export type ConvertServerSpan<T extends ServerBaseSpan> =
-  SnakeToCamelCaseNested<Omit<T, "input" | "outputs" | "error">> & {
+  SnakeToCamelCaseNested<Omit<T, "input" | "output" | "error">> & {
     input?: SpanInputOutput | null;
-    outputs: SpanInputOutput[];
+    output?: SpanInputOutput | null;
     error?: T["error"] | NonNullable<unknown>;
   };
 
