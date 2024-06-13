@@ -105,26 +105,28 @@ class ContextSpan:
         )
 
     def __enter__(self):
-        if self.trace:
-            return self
+        current_trace = current_trace_var.get() or self.trace
+        if current_trace:
+            if not self.trace:
+                self.trace = current_trace
 
-        current_tracer = current_trace_var.get()
-        if current_tracer:
-            self.trace = current_tracer
-            if not self.parent and current_tracer.get_current_span():
-                self.parent = current_tracer.get_current_span()
-                self._parent_from_context = True
-            self.context_token = current_tracer._current_span.set(self)
+            if self.trace == current_trace:
+                if not self.parent and current_trace.get_current_span():
+                    self.parent = current_trace.get_current_span()
+                    self._parent_from_context = True
+                self.context_token = current_trace.set_current_span(self)
         else:
             warn("No current trace found, some spans will not be sent to LangWatch")
 
         return self
 
-    def __exit__(self, _exc_type, exc_value: Optional[Exception], _exc_traceback):
+    def __exit__(
+        self, _exc_type=None, exc_value: Optional[Exception] = None, _exc_traceback=None
+    ):
         self.end(error=exc_value)
 
         if self.trace and self.context_token:
-            self.trace._current_span.reset(self.context_token)
+            self.trace.reset_current_span(self.context_token)
 
     def __call__(self, func: T) -> T:
         def capture_name_and_input(*args, **kwargs):
@@ -379,7 +381,7 @@ def get_current_span() -> "ContextSpan":
 
 executor = ThreadPoolExecutor(max_workers=10)
 current_trace_var = contextvars.ContextVar[Optional["ContextTrace"]](
-    "current_tracer", default=None
+    "current_trace", default=None
 )
 
 
@@ -388,6 +390,9 @@ class ContextTrace:
     scheduled_send: Optional[Future[None]] = None
     _current_span = contextvars.ContextVar[Optional[ContextSpan]](
         "current_span", default=None
+    )
+    _current_span_global: Optional[ContextSpan] = (
+        None  # Fallback for backing up edge cases like langchain
     )
     context_token: Optional[contextvars.Token[Optional["ContextTrace"]]] = None
 
@@ -481,8 +486,26 @@ class ContextTrace:
             return current_span.span_id
         return None
 
-    def get_current_span(self):
-        return self._current_span.get()
+    def get_current_span(self) -> Optional[ContextSpan]:
+        return self._current_span.get() or self._current_span_global
+
+    def set_current_span(self, span: ContextSpan):
+        self._current_span.set(span)
+        self._current_span_global = span
+
+    def reset_current_span(self, token: contextvars.Token[Optional["ContextSpan"]]):
+        try:
+            self._current_span.reset(token)
+            self._current_span_global = self._current_span.get()
+
+        # Fallback to manually set the parent back in case the span is ended in a different context and token does not work
+        except ValueError:
+            current_span = self.get_current_span()
+            if current_span and current_span.parent:
+                self.set_current_span.set(current_span.parent)
+            else:
+                self._current_span.set(None)
+                self._current_span_global = None
 
     # Some spans may have their timestamps overwritten, never setting the finished_at, so we do it here as a fallback
     def _add_finished_at_to_missing_spans(self):

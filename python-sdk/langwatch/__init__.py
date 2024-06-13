@@ -36,6 +36,16 @@ if dspy_available:
 
     dspy = langwatch_dspy
 
+langchain_available = False
+try:
+    import langchain
+
+    langchain_available = True
+except ImportError:
+    pass
+
+if langchain_available:
+    import langwatch.langchain as langchain
 
 __all__ = (
     "endpoint",
@@ -46,6 +56,7 @@ __all__ = (
     "get_current_span",
     "create_span",
     "capture_rag",
+    "langchain",
     "dspy",
     "login",
 )

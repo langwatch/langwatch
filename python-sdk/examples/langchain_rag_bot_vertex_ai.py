@@ -80,7 +80,7 @@ async def on_chat_start():
         ]
     )
     agent = create_tool_calling_agent(model, tools, prompt)
-    executor = AgentExecutor(agent=agent, tools=tools, verbose=True)
+    executor = AgentExecutor(agent=agent, tools=tools, verbose=True)  # type: ignore
     cl.user_session.set("agent", executor)
 
 

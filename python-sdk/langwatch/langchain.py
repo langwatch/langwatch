@@ -13,32 +13,30 @@ from langchain.schema import (
     ChatGeneration,
 )
 from langchain.callbacks.base import BaseCallbackHandler
+import nanoid
 import langwatch
 from langwatch.tracer import (
     ContextTrace,
     ContextSpan,
-    current_trace_var,
 )
 from langwatch.types import (
-    BaseSpan,
     ChatMessage,
     ChatRole,
+    LLMSpanParams,
     RAGChunk,
     SpanInputOutput,
     LLMSpanMetrics,
-    SpanParams,
     SpanTimestamps,
-    LLMSpan,
     TraceMetadata,
     TypedValueChatMessages,
     TypedValueJson,
+    TypedValueList,
     TypedValueText,
 )
 
 from langwatch.utils import (
     SerializableAndPydanticEncoder,
     autoconvert_typed_values,
-    capture_exception,
     list_get,
     milliseconds_timestamp,
 )
@@ -79,15 +77,34 @@ def langchain_message_to_chat_message(message: BaseMessage) -> ChatMessage:
     return ChatMessage(role=role, content=message.content)  # type: ignore
 
 
-class LangChainTracer(ContextTrace, BaseCallbackHandler):
-    """Base callback handler that can be used to handle callbacks from langchain."""
+class LangChainTracer(BaseCallbackHandler):
+    """LangWatch callback handler that can be used to handle callbacks from langchain."""
+
+    trace: ContextTrace
+
+    spans: Dict[str, ContextSpan] = {}
 
     def __init__(
         self,
+        trace: Optional[ContextTrace] = None,
+        # Deprecated: mantained for retrocompatibility
         trace_id: Optional[str] = None,
+        # Deprecated: mantained for retrocompatibility
         metadata: Optional[TraceMetadata] = None,
     ) -> None:
-        super().__init__(trace_id, metadata)
+        if trace:
+            self.trace = trace
+        else:
+            self.trace = langwatch.trace(
+                trace_id=trace_id or nanoid.generate(), metadata=metadata
+            )
+
+    def __enter__(self):
+        self.trace.__enter__()
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        self.trace.__exit__(exc_type, exc_value, traceback)
 
     def on_llm_start(
         self,
@@ -138,8 +155,8 @@ class LangChainTracer(ContextTrace, BaseCallbackHandler):
         parent_run_id: Optional[UUID],
         input: SpanInputOutput,
         **kwargs: Any,
-    ):
-        params = SpanParams(
+    ) -> ContextSpan:
+        params = LLMSpanParams(
             stream=kwargs.get("invocation_params", {}).get("stream", False),
             temperature=kwargs.get("invocation_params", {}).get("temperature", None),
         )
@@ -147,27 +164,30 @@ class LangChainTracer(ContextTrace, BaseCallbackHandler):
         if functions:
             params["functions"] = functions
 
-        return LLMSpan(
+        vendor = list_get(serialized.get("id", []), 2, "unknown").lower()
+        model = kwargs.get("invocation_params", {}).get("model_name", "unknown")
+
+        span = langwatch.span(
             type="llm",
             span_id=f"span_{run_id}",
-            parent_id=f"span_{parent_run_id}" if parent_run_id else None,
-            trace_id=self.trace_id,
-            vendor=list_get(serialized.get("id", []), 2, "unknown").lower(),
-            model=kwargs.get("invocation_params", {}).get("model_name", "unknown"),
+            parent=self.spans.get(str(parent_run_id), None) if parent_run_id else None,
+            trace=self.trace,
+            model=(vendor + "/" + model),
             input=input,
             timestamps=SpanTimestamps(started_at=milliseconds_timestamp()),
             params=params,
         )
+        span.__enter__()
+
+        return span
 
     def on_llm_new_token(self, token: str, **kwargs: Any) -> Any:
         pass
 
     def on_llm_end(self, response: LLMResult, *, run_id: UUID, **kwargs: Any) -> Any:
-        span = cast(Optional[LLMSpan], self.spans.get(str(run_id)))
+        span = self.spans.get(str(run_id))
         if span == None:
             return
-        if "timestamps" in span and span["timestamps"]:
-            span["timestamps"]["finished_at"] = milliseconds_timestamp()
 
         outputs: List[SpanInputOutput] = []
         for generations in response.generations:
@@ -188,21 +208,33 @@ class LangChainTracer(ContextTrace, BaseCallbackHandler):
                             value=g.text,
                         )
                     )
-        span["outputs"] = outputs
+        output = (
+            None
+            if len(outputs) == 0
+            else (
+                outputs[0]
+                if len(outputs) == 1
+                else TypedValueList(type="list", value=outputs)
+            )
+        )
+
+        span.update(output=output)
         if response.llm_output and "token_usage" in response.llm_output:
             usage = response.llm_output["token_usage"]
-            span["metrics"] = LLMSpanMetrics(
-                prompt_tokens=usage.get("prompt_tokens"),
-                completion_tokens=usage.get("completion_tokens"),
+            span.update(
+                metrics=LLMSpanMetrics(
+                    prompt_tokens=usage.get("prompt_tokens"),
+                    completion_tokens=usage.get("completion_tokens"),
+                )
             )
+        span.__exit__()
 
-    def on_llm_error(self, error: BaseException, *, run_id: UUID, **kwargs: Any) -> Any:
+    def on_llm_error(self, error: Exception, *, run_id: UUID, **kwargs: Any) -> Any:
         span = self.spans.get(str(run_id))
         if span == None:
             return
-        span["error"] = capture_exception(error)
-        if "timestamps" in span:
-            span["timestamps"]["finished_at"] = milliseconds_timestamp()
+
+        span.__exit__(None, error)
 
     def on_chain_start(
         self,
@@ -227,9 +259,7 @@ class LangChainTracer(ContextTrace, BaseCallbackHandler):
     ) -> Any:
         self._end_base_span(run_id, outputs=[self._autoconvert_typed_values(outputs)])
 
-    def on_chain_error(
-        self, error: BaseException, *, run_id: UUID, **kwargs: Any
-    ) -> Any:
+    def on_chain_error(self, error: Exception, *, run_id: UUID, **kwargs: Any) -> Any:
         self._on_error_base_span(run_id, error)
 
     def on_tool_start(
@@ -251,8 +281,6 @@ class LangChainTracer(ContextTrace, BaseCallbackHandler):
             input=self._autoconvert_typed_values(input_str),
         )
 
-    context_spans: dict[str, ContextSpan] = {}
-
     def _build_base_span(
         self,
         type: Literal["span", "chain", "tool", "agent"],
@@ -260,25 +288,19 @@ class LangChainTracer(ContextTrace, BaseCallbackHandler):
         parent_run_id: Optional[UUID],
         name: Optional[str],
         input: Optional[SpanInputOutput],
-    ) -> BaseSpan:
-        span = BaseSpan(
+    ) -> ContextSpan:
+        span = langwatch.span(
             type=type,
             name=name,
             span_id=f"span_{run_id}",
-            parent_id=f"span_{parent_run_id}" if parent_run_id else None,
-            trace_id=self.trace_id,
+            parent=self.spans.get(str(parent_run_id), None) if parent_run_id else None,
+            trace=self.trace,
             input=input,
-            outputs=[],
+            output=None,
             error=None,
-            metrics=None,
             timestamps=SpanTimestamps(started_at=milliseconds_timestamp()),
         )
-        self.context_spans[str(run_id)] = ContextSpan(
-            span_id=f"span_{run_id}",
-            name=name,
-            type=type,
-            input=input,
-        )
+        span.__enter__()
 
         return span
 
@@ -287,22 +309,23 @@ class LangChainTracer(ContextTrace, BaseCallbackHandler):
         if span == None:
             return
 
-        if "timestamps" in span and span["timestamps"]:
-            span["timestamps"]["finished_at"] = milliseconds_timestamp()
-        span["outputs"] = outputs
+        output = (
+            None
+            if len(outputs) == 0
+            else (
+                outputs[0]
+                if len(outputs) == 1
+                else TypedValueList(type="list", value=outputs)
+            )
+        )
+        span.update(output=output)
+        span.__exit__()
 
-        context_span = self.context_spans.get(str(run_id))
-        current_tracer = current_trace_var.get()
-        if context_span and current_tracer:
-            current_tracer.current_span = context_span.parent
-
-    def _on_error_base_span(self, run_id: UUID, error: BaseException):
+    def _on_error_base_span(self, run_id: UUID, error: Exception):
         span = self.spans.get(str(run_id))
         if span == None:
             return
-        span["error"] = capture_exception(error)
-        if "timestamps" in span:
-            span["timestamps"]["finished_at"] = milliseconds_timestamp()
+        span.__exit__(None, error)
 
     def on_tool_end(
         self,
@@ -313,9 +336,7 @@ class LangChainTracer(ContextTrace, BaseCallbackHandler):
     ) -> Any:
         self._end_base_span(run_id, outputs=[self._autoconvert_typed_values(output)])
 
-    def on_tool_error(
-        self, error: BaseException, *, run_id: UUID, **kwargs: Any
-    ) -> Any:
+    def on_tool_error(self, error: Exception, *, run_id: UUID, **kwargs: Any) -> Any:
         self._on_error_base_span(run_id, error)
 
     def on_text(self, text: str, **kwargs: Any) -> Any:
@@ -330,7 +351,7 @@ class LangChainTracer(ContextTrace, BaseCallbackHandler):
         **kwargs: Any,
     ) -> Any:
         if str(run_id) in self.spans:
-            self.spans[str(run_id)]["type"] = "agent"  # type: ignore
+            self.spans[str(run_id)].update(type="agent")
 
     def on_agent_finish(
         self,
@@ -399,13 +420,14 @@ class WrappedRagTool(BaseTool):
             else:
                 input = str(kwargs)
 
-        with langwatch.capture_rag(
+        with langwatch.span(
+            type="rag",
+            name=self.tool.name,
             input=input,
-            contexts=[],
         ) as span:
             response = self.tool(*args, **kwargs)
             captured = self.context_extractor(response)
-            span.contexts = captured
+            span.update(contexts=captured, output=response)
 
             return response
 
@@ -422,29 +444,47 @@ def capture_rag_from_retriever(
     if retriever.__class__.__name__ == "LangWatchTrackedRetriever":
         return retriever
 
+    retriever_name = retriever.__class__.__name__
+
     class LangWatchTrackedRetriever(retriever.__class__):
         async def _aget_relevant_documents(
             self, query: str, *, run_manager: AsyncCallbackManagerForRetrieverRun
         ) -> List[Document]:
-            with langwatch.capture_rag(
+            with langwatch.span(
+                type="rag",
+                name=retriever_name,
                 input=query,
             ) as span:
                 documents = await super()._aget_relevant_documents(
                     query, run_manager=run_manager
                 )
-                span.contexts = [context_extractor(doc) for doc in documents]
+                span.update(
+                    contexts=[context_extractor(doc) for doc in documents],
+                    output={
+                        "type": "json",
+                        "value": documents,
+                    },
+                )
                 return documents
 
         def _get_relevant_documents(
             self, query: str, *, run_manager: CallbackManagerForRetrieverRun
         ) -> List[Document]:
-            with langwatch.capture_rag(
+            with langwatch.span(
+                type="rag",
+                name=retriever_name,
                 input=query,
             ) as span:
                 documents = super()._get_relevant_documents(
                     query, run_manager=run_manager
                 )
-                span.contexts = [context_extractor(doc) for doc in documents]
+                span.update(
+                    contexts=[context_extractor(doc) for doc in documents],
+                    output={
+                        "type": "json",
+                        "value": documents,
+                    },
+                )
                 return documents
 
     object.__setattr__(retriever, "__class__", LangWatchTrackedRetriever)
