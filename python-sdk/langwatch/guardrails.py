@@ -7,7 +7,7 @@ from pydantic import BaseModel
 
 import langwatch
 import langwatch.tracer
-from langwatch.tracer import ContextSpan, get_current_tracer
+from langwatch.tracer import ContextSpan, get_current_trace
 from langwatch.types import (
     GuardrailResult,
     RAGChunk,
@@ -56,7 +56,7 @@ def evaluate(
 
 @contextmanager
 def _optional_create_span(name: str, type: SpanTypes):
-    current_tracer = get_current_tracer()
+    current_tracer = get_current_trace()
     if current_tracer:
         with langwatch.tracer.create_span(name=name, type=type) as span:
             yield span
@@ -70,7 +70,7 @@ async def async_evaluate(
     output: Optional[str] = None,
     contexts: List[RAGChunk] = [],
 ):
-    current_tracer = get_current_tracer()
+    current_tracer = get_current_trace()
     parent_span = current_tracer.current_span if current_tracer else None
     with langwatch.tracer.create_span(name=slug, type="guardrail") as span:
         # hack: avoid nesting async evaluate spans when they are called in parallel
@@ -102,7 +102,7 @@ def prepare_data(
     contexts: List[RAGChunk],
     span: Optional[ContextSpan],
 ):
-    current_tracer = get_current_tracer()
+    current_tracer = get_current_trace()
     data = {}
     if input:
         data["input"] = input

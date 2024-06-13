@@ -40,17 +40,15 @@ async def main(message: cl.Message):
                         {"role": "user", "content": message.content},
                     ],
                 },
-                outputs=[
-                    {
-                        "type": "chat_messages",
-                        "value": [
-                            {
-                                "role": "assistant",
-                                "content": generated_message,
-                            }
-                        ],
-                    }
-                ],
+                output={
+                    "type": "chat_messages",
+                    "value": [
+                        {
+                            "role": "assistant",
+                            "content": generated_message,
+                        }
+                    ],
+                },
                 timestamps={
                     "started_at": started_at_ts,
                     "finished_at": int(time.time() * 1000),

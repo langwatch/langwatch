@@ -38,6 +38,7 @@ tqdm = "^4.66.2"
 pandas = "^2.2.2"
 coolname = "^2.2.0"
 dspy-ai = { version = "^2.4.9", optional = true }
+deprecated = "^1.2.14"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.4.2"

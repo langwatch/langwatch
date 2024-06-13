@@ -95,7 +95,7 @@ export const addLLMTokensCount = async (spans: Span[]) => {
       if (!llmSpan.metrics) {
         llmSpan.metrics = {};
       }
-      if (llmSpan.input && !llmSpan.metrics.prompt_tokens) {
+      if (llmSpan.input && llmSpan.model && !llmSpan.metrics.prompt_tokens) {
         llmSpan.metrics.prompt_tokens = (
           await tokenizeAndEstimateCost({
             model: llmSpan.model,
@@ -104,7 +104,11 @@ export const addLLMTokensCount = async (spans: Span[]) => {
         ).inputTokens;
         llmSpan.metrics.tokens_estimated = true;
       }
-      if (llmSpan.output && !llmSpan.metrics.completion_tokens) {
+      if (
+        llmSpan.output &&
+        llmSpan.model &&
+        !llmSpan.metrics.completion_tokens
+      ) {
         let outputTokens = 0;
         outputTokens += (
           await tokenizeAndEstimateCost({
@@ -116,11 +120,13 @@ export const addLLMTokensCount = async (spans: Span[]) => {
         llmSpan.metrics.tokens_estimated = true;
       }
 
-      llmSpan.metrics.cost = estimateCost({
-        model: llmSpan.model,
-        inputTokens: llmSpan.metrics.prompt_tokens ?? 0,
-        outputTokens: llmSpan.metrics.completion_tokens ?? 0,
-      });
+      if (llmSpan.model) {
+        llmSpan.metrics.cost = estimateCost({
+          model: llmSpan.model,
+          inputTokens: llmSpan.metrics.prompt_tokens ?? 0,
+          outputTokens: llmSpan.metrics.completion_tokens ?? 0,
+        });
+      }
     }
   }
   return spans;

@@ -7,7 +7,7 @@ from langwatch.types import (
     ChatMessage,
     ErrorCapture,
     SpanInputOutput,
-    SpanMetrics,
+    LLMSpanMetrics,
     TraceMetadata,
     TypedValueChatMessages,
     TypedValueText,
@@ -196,7 +196,7 @@ class OpenAICompletionTracer(BaseContextTracer):
                     TypedValueText(type="text", value=output)
                     for output in text_outputs.values()
                 ],
-                metrics=SpanMetrics(),
+                metrics=LLMSpanMetrics(),
                 timestamps=timestamps,
                 error=None,
                 **kwargs,
@@ -215,7 +215,7 @@ class OpenAICompletionTracer(BaseContextTracer):
                     TypedValueText(type="text", value=output.text)
                     for output in response.choices
                 ],
-                metrics=SpanMetrics(
+                metrics=LLMSpanMetrics(
                     prompt_tokens=safe_get(response, "usage", "prompt_tokens"),
                     completion_tokens=safe_get(response, "usage", "completion_tokens"),
                 ),
@@ -234,7 +234,7 @@ class OpenAICompletionTracer(BaseContextTracer):
         self.append_span(
             self.build_trace(
                 outputs=[],
-                metrics=SpanMetrics(),
+                metrics=LLMSpanMetrics(),
                 timestamps=timestamps,
                 error=capture_exception(err),
                 **kwargs,
@@ -244,7 +244,7 @@ class OpenAICompletionTracer(BaseContextTracer):
     def build_trace(
         self,
         outputs: List[SpanInputOutput],
-        metrics: SpanMetrics,
+        metrics: LLMSpanMetrics,
         timestamps: SpanTimestamps,
         error: Optional[ErrorCapture],
         **kwargs,
@@ -431,7 +431,7 @@ class OpenAIChatCompletionTracer(BaseContextTracer):
                     TypedValueChatMessages(type="chat_messages", value=output)
                     for output in chat_outputs.values()
                 ],
-                metrics=SpanMetrics(),
+                metrics=LLMSpanMetrics(),
                 timestamps=timestamps,
                 error=None,
                 **kwargs,
@@ -453,7 +453,7 @@ class OpenAIChatCompletionTracer(BaseContextTracer):
                     )
                     for output in response.choices
                 ],
-                metrics=SpanMetrics(
+                metrics=LLMSpanMetrics(
                     prompt_tokens=safe_get(response, "usage", "prompt_tokens"),
                     completion_tokens=safe_get(response, "usage", "completion_tokens"),
                 ),
@@ -472,7 +472,7 @@ class OpenAIChatCompletionTracer(BaseContextTracer):
         self.append_span(
             self.build_trace(
                 outputs=[],
-                metrics=SpanMetrics(),
+                metrics=LLMSpanMetrics(),
                 timestamps=timestamps,
                 error=capture_exception(err),
                 **kwargs,
@@ -482,7 +482,7 @@ class OpenAIChatCompletionTracer(BaseContextTracer):
     def build_trace(
         self,
         outputs: List[SpanInputOutput],
-        metrics: SpanMetrics,
+        metrics: LLMSpanMetrics,
         timestamps: SpanTimestamps,
         error: Optional[ErrorCapture],
         **kwargs,

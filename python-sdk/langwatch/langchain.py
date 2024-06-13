@@ -25,7 +25,7 @@ from langwatch.types import (
     ChatRole,
     RAGChunk,
     SpanInputOutput,
-    SpanMetrics,
+    LLMSpanMetrics,
     SpanParams,
     SpanTimestamps,
     LLMSpan,
@@ -191,7 +191,7 @@ class LangChainTracer(BaseContextTracer, BaseCallbackHandler):
         span["outputs"] = outputs
         if response.llm_output and "token_usage" in response.llm_output:
             usage = response.llm_output["token_usage"]
-            span["metrics"] = SpanMetrics(
+            span["metrics"] = LLMSpanMetrics(
                 prompt_tokens=usage.get("prompt_tokens"),
                 completion_tokens=usage.get("completion_tokens"),
             )

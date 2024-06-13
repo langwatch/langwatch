@@ -9,7 +9,15 @@ For LLM and library-specific tracing functions, check out the other files on thi
 
 import os
 
-from langwatch.tracer import span, create_span, capture_rag
+from langwatch.tracer import (
+    span,
+    rag_span,
+    llm_span,
+    get_current_trace,
+    get_current_span,
+    create_span,
+    capture_rag,
+)
 from langwatch.login import login
 
 endpoint = os.environ.get("LANGWATCH_ENDPOINT") or "https://app.langwatch.ai"
@@ -30,4 +38,16 @@ if dspy_available:
     dspy = langwatch_dspy
 
 
-__all__ = ("endpoint", "api_key", "span", "create_span", "capture_rag", "dspy", "login")
+__all__ = (
+    "endpoint",
+    "api_key",
+    "span",
+    "rag_span",
+    "llm_span",
+    "get_current_trace",
+    "get_current_span",
+    "create_span",
+    "capture_rag",
+    "dspy",
+    "login",
+)

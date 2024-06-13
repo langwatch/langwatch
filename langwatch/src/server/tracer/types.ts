@@ -149,8 +149,8 @@ export interface LLMSpan extends BaseSpan {
   type: "llm";
   // TODO: deprecate field, standardize on litellm model names
   vendor?: string | null;
-  model: string;
-  params: SpanParams;
+  model?: string;
+  params?: SpanParams;
 }
 
 export interface RAGChunk {
