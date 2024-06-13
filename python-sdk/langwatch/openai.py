@@ -1,24 +1,22 @@
 from typing import Any, AsyncGenerator, Dict, Generator, List, Optional, Union, cast
+from deprecated import deprecated
 
 import nanoid
-from langwatch.tracer import ContextTrace
+from langwatch.tracer import ContextSpan, ContextTrace, get_current_trace
 
 from langwatch.types import (
     ChatMessage,
-    ErrorCapture,
     SpanInputOutput,
     LLMSpanMetrics,
     TraceMetadata,
     TypedValueChatMessages,
     TypedValueText,
-    SpanParams,
+    LLMSpanParams,
     SpanTimestamps,
-    LLMSpan,
 )
 from langwatch.utils import (
     capture_async_chunks_with_timings_and_reyield,
     capture_chunks_with_timings_and_reyield,
-    capture_exception,
     milliseconds_timestamp,
     safe_get,
 )
@@ -36,40 +34,44 @@ from openai.types import Completion
 from openai.types.chat import ChatCompletion, ChatCompletionChunk
 
 
-class OpenAITracer(ContextTrace):
+class OpenAITracer:
     """
     Tracing for both Completion and ChatCompletion endpoints
     """
 
+    trace: ContextTrace
+
     def __init__(
         self,
-        instance: Union[OpenAI, AsyncOpenAI],
+        client: Union[OpenAI, AsyncOpenAI],
+        trace: Optional[ContextTrace] = None,
+        # Deprecated: mantained for retrocompatibility
         trace_id: Optional[str] = None,
+        # Deprecated: mantained for retrocompatibility
         metadata: Optional[TraceMetadata] = None,
     ):
-        super().__init__(
-            trace_id=trace_id,
-            metadata=metadata,
-        )
-        trace_id = self.trace_id
-        self.completion_tracer = OpenAICompletionTracer(
-            instance=instance, trace_id=trace_id, metadata=metadata
-        )
+        if trace:
+            self.trace = trace
+        else:
+            self.trace = ContextTrace(
+                trace_id=trace_id or nanoid.generate(), metadata=metadata
+            )
+        self.completion_tracer = OpenAICompletionTracer(client=client, trace=self.trace)
         self.chat_completion_tracer = OpenAIChatCompletionTracer(
-            instance=instance, trace_id=trace_id, metadata=metadata
+            client=client, trace=self.trace
         )
 
+    @deprecated(
+        "Using OpenAITracer as a context manager is deprecated. Use `langwatch.get_current_trace().autotrack_openai_calls(client)` instead."
+    )
     def __enter__(self):
-        super().__enter__()
-        self.completion_tracer.__enter__()
-        self.chat_completion_tracer.__enter__()
+        self.trace.__enter__()
 
     def __exit__(self, _type, _value, _traceback):
-        super().__exit__(_type, _value, _traceback)
-        self.completion_tracer.__exit__(_type, _value, _traceback)
-        self.chat_completion_tracer.__exit__(_type, _value, _traceback)
+        self.trace.__exit__(_type, _value, _traceback)
 
 
+# Deprecated: mantained for retrocompatibility
 class AzureOpenAITracer(OpenAITracer):
     """
     Tracing for both Completion and ChatCompletion endpoints
@@ -77,53 +79,77 @@ class AzureOpenAITracer(OpenAITracer):
 
     def __init__(
         self,
-        instance: Union[AzureOpenAI, AsyncAzureOpenAI],
+        client: Union[AzureOpenAI, AsyncAzureOpenAI],
+        trace: Optional[ContextTrace] = None,
+        # Deprecated: mantained for retrocompatibility
         trace_id: Optional[str] = None,
+        # Deprecated: mantained for retrocompatibility
         metadata: Optional[TraceMetadata] = None,
     ):
         super().__init__(
-            instance=instance,
+            client=client,
+            trace=trace,
             trace_id=trace_id,
             metadata=metadata,
         )
 
 
-class OpenAICompletionTracer(ContextTrace):
+class OpenAICompletionTracer:
+    trace: ContextTrace
+
     def __init__(
         self,
-        instance: Union[OpenAI, AsyncOpenAI, AzureOpenAI, AsyncAzureOpenAI],
+        client: Union[OpenAI, AsyncOpenAI, AzureOpenAI, AsyncAzureOpenAI],
+        trace: Optional[ContextTrace] = None,
+        # Deprecated: mantained for retrocompatibility
         trace_id: Optional[str] = None,
+        # Deprecated: mantained for retrocompatibility
         metadata: Optional[TraceMetadata] = None,
     ):
-        self.instance = instance
-        super().__init__(
-            trace_id=trace_id,
-            metadata=metadata,
-        )
-
-    def __enter__(self):
-        super().__enter__()
-        self.instance.completions._original_create = self.instance.completions.create  # type: ignore
-        if isinstance(self.instance, AsyncOpenAI):
-            self.instance.completions.create = self.patched_completion_acreate  # type: ignore
+        self.client = client
+        if trace:
+            self.trace = trace
         else:
-            self.instance.completions.create = self.patched_completion_create  # type: ignore
+            self.trace = ContextTrace(
+                trace_id=trace_id or nanoid.generate(), metadata=metadata
+            )
 
+        if not hasattr(self.client.completions, "_original_create"):
+            self.client.completions._original_create = self.client.completions.create  # type: ignore
+            if isinstance(self.client, AsyncOpenAI):
+                self.client.completions.create = self.patched_completion_acreate  # type: ignore
+            else:
+                self.client.completions.create = self.patched_completion_create  # type: ignore
+
+    @deprecated(
+        "Using OpenAICompletionTracer as a context manager is deprecated. Use `langwatch.get_current_trace().autotrack_openai_calls(client)` instead."
+    )
+    def __enter__(self):
+        self.trace.__enter__()
+
+    # Deprecated: mantained for retrocompatibility
     def __exit__(self, _type, _value, _traceback):
-        super().__exit__(_type, _value, _traceback)
-        self.instance.completions.create = self.instance.completions._original_create  # type: ignore
+        self.trace.__exit__(_type, _value, _traceback)
 
     def patched_completion_create(self, *args, **kwargs):
+        span = get_current_trace().span(
+            type="llm",
+            span_id=f"span_{nanoid.generate()}",
+            parent=get_current_trace().get_current_span(),
+        )
+
         started_at = milliseconds_timestamp()
         try:
             response: Union[Completion, Stream[Completion]] = cast(
-                Any, self.instance.completions
+                Any, self.client.completions
             )._original_create(*args, **kwargs)
 
             if isinstance(response, Stream):
                 return capture_chunks_with_timings_and_reyield(
                     cast(Generator[Completion, Any, Any], response),
-                    lambda chunks, first_token_at, finished_at: self.handle_deltas(
+                    lambda chunks, first_token_at, finished_at: OpenAICompletionTracer.handle_deltas(
+                        self.client,
+                        span,
                         chunks,
                         SpanTimestamps(
                             started_at=started_at,
@@ -135,7 +161,9 @@ class OpenAICompletionTracer(ContextTrace):
                 )
             else:
                 finished_at = milliseconds_timestamp()
-                self.handle_completion(
+                OpenAICompletionTracer.handle_completion(
+                    self.client,
+                    span,
                     response,
                     SpanTimestamps(started_at=started_at, finished_at=finished_at),
                     **kwargs,
@@ -143,7 +171,9 @@ class OpenAICompletionTracer(ContextTrace):
                 return response
         except Exception as err:
             finished_at = milliseconds_timestamp()
-            self.handle_exception(
+            OpenAICompletionTracer.handle_exception(
+                self.client,
+                span,
                 err,
                 SpanTimestamps(started_at=started_at, finished_at=finished_at),
                 **kwargs,
@@ -151,15 +181,23 @@ class OpenAICompletionTracer(ContextTrace):
             raise err
 
     async def patched_completion_acreate(self, *args, **kwargs):
+        span = get_current_trace().span(
+            type="llm",
+            span_id=f"span_{nanoid.generate()}",
+            parent=get_current_trace().get_current_span(),
+        )
+
         started_at = milliseconds_timestamp()
         response: Union[Completion, AsyncStream[Completion]] = await cast(
-            Any, self.instance.completions
+            Any, self.client.completions
         )._original_create(*args, **kwargs)
 
         if isinstance(response, AsyncStream):
             return capture_async_chunks_with_timings_and_reyield(
                 cast(AsyncGenerator[Completion, Any], response),
-                lambda chunks, first_token_at, finished_at: self.handle_deltas(
+                lambda chunks, first_token_at, finished_at: OpenAICompletionTracer.handle_deltas(
+                    self.client,
+                    span,
                     chunks,
                     SpanTimestamps(
                         started_at=started_at,
@@ -171,15 +209,20 @@ class OpenAICompletionTracer(ContextTrace):
             )
         else:
             finished_at = milliseconds_timestamp()
-            self.handle_completion(
+            OpenAICompletionTracer.handle_completion(
+                self.client,
+                span,
                 response,
                 SpanTimestamps(started_at=started_at, finished_at=finished_at),
                 **kwargs,
             )
             return response
 
+    @classmethod
     def handle_deltas(
-        self,
+        cls,
+        client: Union[OpenAI, AsyncOpenAI, AzureOpenAI, AsyncAzureOpenAI],
+        span: ContextSpan,
         deltas: List[Completion],
         timestamps: SpanTimestamps,
         **kwargs,
@@ -190,76 +233,91 @@ class OpenAICompletionTracer(ContextTrace):
                 index = choice.index or 0
                 text_outputs[index] = text_outputs.get(index, "") + (choice.text or "")
 
-        self.append_span(
-            self.build_trace(
-                outputs=[
-                    TypedValueText(type="text", value=output)
-                    for output in text_outputs.values()
-                ],
-                metrics=LLMSpanMetrics(),
-                timestamps=timestamps,
-                error=None,
-                **kwargs,
-            )
+        OpenAICompletionTracer.end_span(
+            client=client,
+            span=span,
+            outputs=[
+                TypedValueText(type="text", value=output)
+                for output in text_outputs.values()
+            ],
+            metrics=LLMSpanMetrics(),
+            timestamps=timestamps,
+            **kwargs,
         )
 
+    @classmethod
     def handle_completion(
-        self,
+        cls,
+        client: Union[OpenAI, AsyncOpenAI, AzureOpenAI, AsyncAzureOpenAI],
+        span: ContextSpan,
         response: Completion,
         timestamps: SpanTimestamps,
         **kwargs,
     ):
-        self.append_span(
-            self.build_trace(
-                outputs=[
-                    TypedValueText(type="text", value=output.text)
-                    for output in response.choices
-                ],
-                metrics=LLMSpanMetrics(
-                    prompt_tokens=safe_get(response, "usage", "prompt_tokens"),
-                    completion_tokens=safe_get(response, "usage", "completion_tokens"),
-                ),
-                timestamps=timestamps,
-                error=None,
-                **kwargs,
-            )
+        OpenAICompletionTracer.end_span(
+            client=client,
+            span=span,
+            outputs=[
+                TypedValueText(type="text", value=output.text)
+                for output in response.choices
+            ],
+            metrics=LLMSpanMetrics(
+                prompt_tokens=safe_get(response, "usage", "prompt_tokens"),
+                completion_tokens=safe_get(response, "usage", "completion_tokens"),
+            ),
+            timestamps=timestamps,
+            **kwargs,
         )
 
+    @classmethod
     def handle_exception(
-        self,
+        cls,
+        client: Union[OpenAI, AsyncOpenAI, AzureOpenAI, AsyncAzureOpenAI],
+        span: ContextSpan,
         err: Exception,
         timestamps: SpanTimestamps,
         **kwargs,
     ):
-        self.append_span(
-            self.build_trace(
-                outputs=[],
-                metrics=LLMSpanMetrics(),
-                timestamps=timestamps,
-                error=capture_exception(err),
-                **kwargs,
-            )
+        OpenAICompletionTracer.end_span(
+            client=client,
+            span=span,
+            outputs=[],
+            metrics=LLMSpanMetrics(),
+            timestamps=timestamps,
+            error=err,
+            **kwargs,
         )
 
-    def build_trace(
-        self,
+    @classmethod
+    def end_span(
+        cls,
+        client: Union[OpenAI, AsyncOpenAI, AzureOpenAI, AsyncAzureOpenAI],
+        span: ContextSpan,
         outputs: List[SpanInputOutput],
         metrics: LLMSpanMetrics,
         timestamps: SpanTimestamps,
-        error: Optional[ErrorCapture],
+        error: Optional[Exception] = None,
         **kwargs,
-    ) -> LLMSpan:
-        return LLMSpan(
-            type="llm",
-            span_id=f"span_{nanoid.generate()}",
-            parent_id=self.get_parent_id(),
-            trace_id=self.trace_id,
-            vendor="openai",
-            model=kwargs.get("model", "unknown"),
+    ):
+        output: Optional[SpanInputOutput] = (
+            None
+            if len(outputs) == 0
+            else outputs[0] if len(outputs) == 1 else {"type": "list", "value": outputs}
+        )
+
+        vendor = (
+            "azure"
+            if issubclass(type(client), AzureOpenAI)
+            or issubclass(type(client), AsyncAzureOpenAI)
+            else "openai"
+        )
+
+        span.end(
+            model=vendor + "/" + kwargs.get("model", "unknown"),
             input=TypedValueText(type="text", value=kwargs.get("prompt", "")).copy(),
-            outputs=outputs,
+            output=output,
             error=error,
-            params=SpanParams(
+            params=LLMSpanParams(
                 temperature=kwargs.get("temperature", 1.0),
                 stream=kwargs.get("stream", False),
             ),
@@ -268,42 +326,61 @@ class OpenAICompletionTracer(ContextTrace):
         )
 
 
-class OpenAIChatCompletionTracer(ContextTrace):
+class OpenAIChatCompletionTracer:
+    trace: ContextTrace
+
     def __init__(
         self,
-        instance: Union[OpenAI, AsyncOpenAI, AzureOpenAI, AsyncAzureOpenAI],
+        client: Union[OpenAI, AsyncOpenAI, AzureOpenAI, AsyncAzureOpenAI],
+        trace: Optional[ContextTrace] = None,
+        # Deprecated: mantained for retrocompatibility
         trace_id: Optional[str] = None,
+        # Deprecated: mantained for retrocompatibility
         metadata: Optional[TraceMetadata] = None,
     ):
-        self.instance = instance
-        super().__init__(
-            trace_id=trace_id,
-            metadata=metadata,
-        )
-
-    def __enter__(self):
-        super().__enter__()
-        self.instance.chat.completions._original_create = self.instance.chat.completions.create  # type: ignore
-        if isinstance(self.instance, AsyncOpenAI):
-            self.instance.chat.completions.create = self.patched_completion_acreate  # type: ignore
+        self.client = client
+        if trace:
+            self.trace = trace
         else:
-            self.instance.chat.completions.create = self.patched_completion_create  # type: ignore
+            self.trace = ContextTrace(
+                trace_id=trace_id or nanoid.generate(), metadata=metadata
+            )
 
+        if not hasattr(self.client.chat.completions, "_original_create"):
+            self.client.chat.completions._original_create = self.client.chat.completions.create  # type: ignore
+        if isinstance(self.client, AsyncOpenAI):
+            self.client.chat.completions.create = self.patched_completion_acreate  # type: ignore
+        else:
+            self.client.chat.completions.create = self.patched_completion_create  # type: ignore
+
+    @deprecated(
+        "Using OpenAIChatCompletionTracer as a context manager is deprecated. Use `langwatch.get_current_trace().autotrack_openai_calls(client)` instead."
+    )
+    def __enter__(self):
+        self.trace.__enter__()
+
+    # Deprecated: mantained for retrocompatibility
     def __exit__(self, _type, _value, _traceback):
-        super().__exit__(_type, _value, _traceback)
-        self.instance.chat.completions.create = self.instance.chat.completions._original_create  # type: ignore
+        self.trace.__exit__(_type, _value, _traceback)
 
     def patched_completion_create(self, *args, **kwargs):
         started_at = milliseconds_timestamp()
+        span = get_current_trace().span(
+            type="llm",
+            span_id=f"span_{nanoid.generate()}",
+            parent=get_current_trace().get_current_span(),
+        )
         try:
             response: Union[ChatCompletion, Stream[ChatCompletionChunk]] = cast(
-                Any, self.instance.chat.completions
+                Any, self.client.chat.completions
             )._original_create(*args, **kwargs)
 
             if isinstance(response, Stream):
                 return capture_chunks_with_timings_and_reyield(
                     cast(Generator[ChatCompletionChunk, Any, Any], response),
-                    lambda chunks, first_token_at, finished_at: self.handle_deltas(
+                    lambda chunks, first_token_at, finished_at: OpenAIChatCompletionTracer.handle_deltas(
+                        self.client,
+                        span,
                         chunks,
                         SpanTimestamps(
                             started_at=started_at,
@@ -315,7 +392,9 @@ class OpenAIChatCompletionTracer(ContextTrace):
                 )
             else:
                 finished_at = milliseconds_timestamp()
-                self.handle_completion(
+                OpenAIChatCompletionTracer.handle_completion(
+                    self.client,
+                    span,
                     response,
                     SpanTimestamps(started_at=started_at, finished_at=finished_at),
                     **kwargs,
@@ -323,7 +402,9 @@ class OpenAIChatCompletionTracer(ContextTrace):
                 return response
         except Exception as err:
             finished_at = milliseconds_timestamp()
-            self.handle_exception(
+            OpenAIChatCompletionTracer.handle_exception(
+                self.client,
+                span,
                 err,
                 SpanTimestamps(started_at=started_at, finished_at=finished_at),
                 **kwargs,
@@ -332,14 +413,22 @@ class OpenAIChatCompletionTracer(ContextTrace):
 
     async def patched_completion_acreate(self, *args, **kwargs):
         started_at = milliseconds_timestamp()
+        span = get_current_trace().span(
+            type="llm",
+            span_id=f"span_{nanoid.generate()}",
+            parent=get_current_trace().get_current_span(),
+        )
+
         response: Union[ChatCompletion, AsyncStream[ChatCompletionChunk]] = await cast(
-            Any, self.instance.chat.completions
+            Any, self.client.chat.completions
         )._original_create(*args, **kwargs)
 
         if isinstance(response, AsyncStream):
             return capture_async_chunks_with_timings_and_reyield(
                 cast(AsyncGenerator[ChatCompletionChunk, Any], response),
-                lambda chunks, first_token_at, finished_at: self.handle_deltas(
+                lambda chunks, first_token_at, finished_at: OpenAIChatCompletionTracer.handle_deltas(
+                    self.client,
+                    span,
                     chunks,
                     SpanTimestamps(
                         started_at=started_at,
@@ -351,15 +440,20 @@ class OpenAIChatCompletionTracer(ContextTrace):
             )
         else:
             finished_at = milliseconds_timestamp()
-            self.handle_completion(
+            OpenAIChatCompletionTracer.handle_completion(
+                self.client,
+                span,
                 response,
                 SpanTimestamps(started_at=started_at, finished_at=finished_at),
                 **kwargs,
             )
             return response
 
+    @classmethod
     def handle_deltas(
-        self,
+        cls,
+        client: Union[OpenAI, AsyncOpenAI, AzureOpenAI, AsyncAzureOpenAI],
+        span: ContextSpan,
         deltas: List[ChatCompletionChunk],
         timestamps: SpanTimestamps,
         **kwargs,
@@ -425,69 +519,81 @@ class OpenAIChatCompletionTracer(ContextTrace):
                         chat_outputs[index][-1].get("content", "") or ""
                     ) + delta.content
 
-        self.append_span(
-            self.build_trace(
-                outputs=[
-                    TypedValueChatMessages(type="chat_messages", value=output)
-                    for output in chat_outputs.values()
-                ],
-                metrics=LLMSpanMetrics(),
-                timestamps=timestamps,
-                error=None,
-                **kwargs,
-            )
+        OpenAIChatCompletionTracer.end_span(
+            client=client,
+            span=span,
+            outputs=[
+                TypedValueChatMessages(type="chat_messages", value=output)
+                for output in chat_outputs.values()
+            ],
+            metrics=LLMSpanMetrics(),
+            timestamps=timestamps,
+            **kwargs,
         )
 
+    @classmethod
     def handle_completion(
-        self,
+        cls,
+        client: Union[OpenAI, AsyncOpenAI, AzureOpenAI, AsyncAzureOpenAI],
+        span: ContextSpan,
         response: ChatCompletion,
         timestamps: SpanTimestamps,
         **kwargs,
     ):
-        self.append_span(
-            self.build_trace(
-                outputs=[
-                    TypedValueChatMessages(
-                        type="chat_messages",
-                        value=[cast(ChatMessage, output.message.model_dump())],
-                    )
-                    for output in response.choices
-                ],
-                metrics=LLMSpanMetrics(
-                    prompt_tokens=safe_get(response, "usage", "prompt_tokens"),
-                    completion_tokens=safe_get(response, "usage", "completion_tokens"),
-                ),
-                timestamps=timestamps,
-                error=None,
-                **kwargs,
-            )
+        OpenAIChatCompletionTracer.end_span(
+            client=client,
+            span=span,
+            outputs=[
+                TypedValueChatMessages(
+                    type="chat_messages",
+                    value=[cast(ChatMessage, output.message.model_dump())],
+                )
+                for output in response.choices
+            ],
+            metrics=LLMSpanMetrics(
+                prompt_tokens=safe_get(response, "usage", "prompt_tokens"),
+                completion_tokens=safe_get(response, "usage", "completion_tokens"),
+            ),
+            timestamps=timestamps,
+            **kwargs,
         )
 
+    @classmethod
     def handle_exception(
-        self,
+        cls,
+        client: Union[OpenAI, AsyncOpenAI, AzureOpenAI, AsyncAzureOpenAI],
+        span: ContextSpan,
         err: Exception,
         timestamps: SpanTimestamps,
         **kwargs,
     ):
-        self.append_span(
-            self.build_trace(
-                outputs=[],
-                metrics=LLMSpanMetrics(),
-                timestamps=timestamps,
-                error=capture_exception(err),
-                **kwargs,
-            )
+        OpenAIChatCompletionTracer.end_span(
+            client=client,
+            span=span,
+            outputs=[],
+            metrics=LLMSpanMetrics(),
+            timestamps=timestamps,
+            error=err,
+            **kwargs,
         )
 
-    def build_trace(
-        self,
+    @classmethod
+    def end_span(
+        cls,
+        client: Union[OpenAI, AsyncOpenAI, AzureOpenAI, AsyncAzureOpenAI],
+        span: ContextSpan,
         outputs: List[SpanInputOutput],
         metrics: LLMSpanMetrics,
         timestamps: SpanTimestamps,
-        error: Optional[ErrorCapture],
+        error: Optional[Exception] = None,
         **kwargs,
-    ) -> LLMSpan:
-        params = SpanParams(
+    ):
+        output: Optional[SpanInputOutput] = (
+            None
+            if len(outputs) == 0
+            else outputs[0] if len(outputs) == 1 else {"type": "list", "value": outputs}
+        )
+        params = LLMSpanParams(
             temperature=kwargs.get("temperature", 1.0),
             stream=kwargs.get("stream", False),
         )
@@ -500,22 +606,20 @@ class OpenAIChatCompletionTracer(ContextTrace):
         tool_choice = kwargs.get("tool_choice", None)
         if tool_choice:
             params["tool_choice"] = tool_choice
-        return LLMSpan(
-            type="llm",
-            span_id=f"span_{nanoid.generate()}",
-            parent_id=self.get_parent_id(),
-            trace_id=self.trace_id,
-            vendor=(
-                "azure"
-                if issubclass(type(self.instance), AzureOpenAI)
-                or issubclass(type(self.instance), AsyncAzureOpenAI)
-                else "openai"
-            ),
-            model=kwargs.get("model", "unknown"),
+
+        vendor = (
+            "azure"
+            if issubclass(type(client), AzureOpenAI)
+            or issubclass(type(client), AsyncAzureOpenAI)
+            else "openai"
+        )
+
+        span.end(
+            model=vendor + "/" + kwargs.get("model", "unknown"),
             input=TypedValueChatMessages(
                 type="chat_messages", value=kwargs.get("messages", []).copy()
             ),
-            outputs=outputs,
+            output=output,
             error=error,
             params=params,
             metrics=metrics,

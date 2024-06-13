@@ -125,7 +125,7 @@ class ContextSpan:
     ):
         self.end(error=exc_value)
 
-        if self.trace and self.context_token:
+        if self.trace:
             self.trace.reset_current_span(self.context_token)
 
     def __call__(self, func: T) -> T:
@@ -510,11 +510,17 @@ class ContextTrace:
         return self._current_span.get() or self._current_span_global
 
     def set_current_span(self, span: ContextSpan):
-        self._current_span.set(span)
+        token = self._current_span.set(span)
         self._current_span_global = span
 
-    def reset_current_span(self, token: contextvars.Token[Optional["ContextSpan"]]):
+        return token
+
+    def reset_current_span(
+        self, token: Optional[contextvars.Token[Optional["ContextSpan"]]]
+    ):
         try:
+            if not token:
+                raise ValueError("No token provided")
             self._current_span.reset(token)
             self._current_span_global = self._current_span.get()
 
@@ -522,7 +528,7 @@ class ContextTrace:
         except ValueError:
             current_span = self.get_current_span()
             if current_span and current_span.parent:
-                self.set_current_span.set(current_span.parent)
+                self.set_current_span(current_span.parent)
             else:
                 self._current_span.set(None)
                 self._current_span_global = None
