@@ -20,7 +20,7 @@ async def main(message: cl.Message):
     )
 
     jailbreak_guardrail = langwatch.guardrails.evaluate(
-        "azure-jailbreak-detection", input=message.content
+        "jailbreak-detection", input=message.content
     )
     if not jailbreak_guardrail.passed:
         await msg.stream_token(f"I'm sorry, I can't help you with that.")

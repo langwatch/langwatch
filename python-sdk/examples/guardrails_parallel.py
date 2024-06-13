@@ -26,7 +26,7 @@ async def main(message: cl.Message):
 
     jailbreak_guardrail = asyncio.create_task(
         langwatch.guardrails.async_evaluate(
-            "azure-jailbreak-detection", input=message.content
+            "jailbreak-detection", input=message.content
         )
     )
     off_topic_guardrail = asyncio.create_task(

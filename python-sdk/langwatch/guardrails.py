@@ -13,6 +13,7 @@ from langwatch.types import (
     RAGChunk,
     SpanTypes,
     TypedValueGuardrailResult,
+    TypedValueJson,
 )
 
 
@@ -56,9 +57,13 @@ def evaluate(
 
 @contextmanager
 def _optional_create_span(name: str, type: SpanTypes):
-    current_tracer = get_current_trace()
-    if current_tracer:
-        with langwatch.tracer.create_span(name=name, type=type) as span:
+    trace = None
+    try:
+        trace = get_current_trace()
+    except:
+        pass
+    if trace:
+        with trace.span(name=name, type=type) as span:
             yield span
     else:
         yield None
@@ -70,29 +75,35 @@ async def async_evaluate(
     output: Optional[str] = None,
     contexts: List[RAGChunk] = [],
 ):
-    current_tracer = get_current_trace()
-    parent_span = current_tracer.current_span if current_tracer else None
-    with langwatch.tracer.create_span(name=slug, type="guardrail") as span:
-        # hack: avoid nesting async evaluate spans when they are called in parallel
-        if current_tracer and parent_span:
-            current_tracer.current_span = parent_span
+    trace = None
+    try:
+        trace = get_current_trace()
+    except:
+        pass
 
-        request_params = prepare_data(slug, input, output, contexts, span=span)
-        try:
-            async with httpx.AsyncClient() as client:
-                response = await client.post(**request_params)
-                response.raise_for_status()
-        except Exception as e:
-            return handle_response(
-                {
-                    "status": "error",
-                    "message": str(e),
-                    "passed": True,
-                },
-                span,
-            )
+    span = trace.span(name=slug, type="guardrail") if trace else None
 
-        return handle_response(response.json(), span)
+    request_params = prepare_data(slug, input, output, contexts, span=span)
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(**request_params)
+            response.raise_for_status()
+    except Exception as e:
+        return handle_response(
+            {
+                "status": "error",
+                "message": str(e),
+                "passed": True,
+            },
+            span,
+        )
+
+    response = handle_response(response.json(), span)
+
+    if span:
+        span.end()
+
+    return response
 
 
 def prepare_data(
@@ -102,7 +113,10 @@ def prepare_data(
     contexts: List[RAGChunk],
     span: Optional[ContextSpan],
 ):
-    current_tracer = get_current_trace()
+    try:
+        trace = get_current_trace()
+    except:
+        trace = None
     data = {}
     if input:
         data["input"] = input
@@ -111,12 +125,12 @@ def prepare_data(
     if contexts and len(contexts) > 0:
         data["contexts"] = contexts
     if span:
-        span.input = data
+        span.update(input=TypedValueJson(type="json", value=data))
 
     return {
         "url": langwatch.endpoint + f"/api/guardrails/{slug}/evaluate",
         "json": {
-            "trace_id": current_tracer.trace_id if current_tracer else None,
+            "trace_id": trace.trace_id if trace else None,
             "data": data,
         },
         "headers": {"X-Auth-Token": str(langwatch.api_key)},
@@ -131,7 +145,10 @@ def handle_response(
     if result.status == "error":
         result.details = response.get("message", "")
     if span:
-        span.output = TypedValueGuardrailResult(
-            type="guardrail_result", value=cast(GuardrailResult, result.model_dump())
+        span.update(
+            output=TypedValueGuardrailResult(
+                type="guardrail_result",
+                value=cast(GuardrailResult, result.model_dump()),
+            )
         )
     return result
