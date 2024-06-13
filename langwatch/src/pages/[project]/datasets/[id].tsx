@@ -21,7 +21,7 @@ import {
   useDisclosure,
   useToast,
 } from "@chakra-ui/react";
-import { type ColDef } from "ag-grid-community";
+import { type ColDef } from "@ag-grid-community/core";
 import { useRouter } from "next/router";
 import Parse from "papaparse";
 import {
@@ -40,7 +40,7 @@ import { api } from "~/utils/api";
 import { schemaDisplayName } from "~/utils/datasets";
 import { DatasetGrid } from "../../../components/datasets/DatasetGrid";
 import { newDatasetEntriesSchema } from "~/server/datasets/types";
-import { datasetSpanSchema } from "~/server/tracer/types.generated";
+import { type datasetSpanSchema } from "~/server/tracer/types.generated";
 
 import { nanoid } from "nanoid";
 import { formatFileSize, useCSVReader } from "react-papaparse";
@@ -139,6 +139,7 @@ function DatasetTable() {
   }, [dataset.data]);
 
   const updateDatasetRecord = api.datasetRecord.update.useMutation();
+  // const deleteDatasetRecord = api.datasetRecord.delete.useMutation();
 
   const toast = useToast();
 

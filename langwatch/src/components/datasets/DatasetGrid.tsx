@@ -1,23 +1,28 @@
+import type { GridOptions } from "@ag-grid-community/core";
 import {
   AgGridReact,
   type AgGridReactProps,
   type CustomCellEditorProps,
-} from "ag-grid-react";
-import { useMemo } from "react";
+} from "@ag-grid-community/react";
+import { Text } from "@chakra-ui/react";
+import { useMemo, useRef, useState } from "react";
 import { MultilineCellEditor } from "./MultilineCellEditor";
-import { Skeleton, Text } from "@chakra-ui/react";
-import type { GridOptions } from "ag-grid-community";
 
-import "ag-grid-community/styles/ag-grid.css";
-import "ag-grid-community/styles/ag-theme-balham.css";
-import { RenderInputOutput } from "../traces/RenderInputOutput";
-import { MultilineJSONCellEditor } from "./MultilineJSONCellEditor";
-import { type ColDef } from "ag-grid-community";
+import { ClientSideRowModelModule } from '@ag-grid-community/client-side-row-model';
+import { ModuleRegistry, type ColDef } from "@ag-grid-community/core";
+import "@ag-grid-community/styles/ag-grid.css";
+import "@ag-grid-community/styles/ag-theme-balham.css";
+import { z } from "zod";
 import {
   chatMessageSchema,
   datasetSpanSchema,
 } from "../../server/tracer/types.generated";
-import { z } from "zod";
+import { RenderInputOutput } from "../traces/RenderInputOutput";
+import { MultilineJSONCellEditor } from "./MultilineJSONCellEditor";
+
+ModuleRegistry.registerModules([
+  ClientSideRowModelModule
+]);
 
 export const JSONCellRenderer = (props: { value: string | undefined }) => {
   return (
@@ -30,6 +35,7 @@ export const JSONCellRenderer = (props: { value: string | undefined }) => {
 };
 
 export function DatasetGrid(props: AgGridReactProps) {
+  const gridRef = useRef<AgGridReact>(null);
   const gridOptions: GridOptions = useMemo(
     () => ({
       rowDragManaged: true,
@@ -50,7 +56,7 @@ export function DatasetGrid(props: AgGridReactProps) {
       contexts: z.array(z.string()),
     };
 
-    return props.columnDefs?.map((column: ColDef) => {
+    return (props.columnDefs as ColDef[])?.map((column: ColDef) => {
       if (Object.keys(jsonFields).includes(column.field ?? "")) {
         return {
           ...column,
@@ -66,6 +72,21 @@ export function DatasetGrid(props: AgGridReactProps) {
       return column;
     });
   }, [props.columnDefs]);
+
+  // const [undoSize, setUndoSize] = useState(0);
+  // const [redoSize, setRedoSize] = useState(0);
+  
+  // const undo = useCallback(() => {
+  //   gridRef.current!.api.undoCellEditing();
+  //   console.log(gridRef.current);
+  //   console.log("hey there!");
+  // }, []);
+
+  // const redo = useCallback(() => {
+  //   gridRef.current!.api.redoCellEditing();
+  //   console.log(gridRef.current);
+  //   console.log("hey here");
+  // }, []);
 
   return (
     <div className="ag-theme-balham">
@@ -110,7 +131,12 @@ export function DatasetGrid(props: AgGridReactProps) {
           min-height: 29px;
         }
       `}</style>
+      {/* <ButtonGroup padding={"4"}>
+        <Button onClick={undo} isDisabled={undoSize < 1}>Undo</Button>
+        <Button onClick={redo} isDisabled={redoSize < 1}>Redo</Button>
+      </ButtonGroup> */}
       <AgGridReact
+        ref={gridRef}
         gridOptions={gridOptions}
         loadingOverlayComponent={() => <Text paddingTop={4}>Loading...</Text>}
         reactiveCustomComponents={true}
@@ -135,7 +161,16 @@ export function DatasetGrid(props: AgGridReactProps) {
           },
         }}
         {...props}
+        // onCellValueChanged={(params: any) => {
+        //   setUndoSize(params.api.getCurrentUndoSize())
+        //   setRedoSize(params.api.getCurrentRedoSize())
+
+        //   if (props.onCellValueChanged) {
+        //     props.onCellValueChanged(params)
+        //   }
+        // }}
         columnDefs={columnDefs_}
+        
       />
     </div>
   );

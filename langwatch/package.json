@@ -20,7 +20,10 @@
     "copy:langevals-types": "cd src/trace_checks && curl -L \"https://raw.githubusercontent.com/langwatch/langevals/main/ts-integration/evaluators.generated.ts?$(date +%s)\" -o evaluators.generated.ts"
   },
   "dependencies": {
+    "@ag-grid-community/client-side-row-model": "^31.3.2",
     "@ag-grid-community/core": "^31.3.2",
+    "@ag-grid-community/react": "^31.3.2",
+    "@ag-grid-community/styles": "^31.3.2",
     "@ai-sdk/openai": "^0.0.9",
     "@azure/openai": "^1.0.0-beta.10",
     "@chakra-ui/icons": "^2.1.1",
@@ -52,7 +55,6 @@
     "@trpc/react-query": "^10.34.0",
     "@trpc/server": "^10.34.0",
     "@vercel/analytics": "^1.1.1",
-    "ag-grid-react": "^31.3.2",
     "ai": "^3.1.1",
     "bullmq": "^4.12.8",
     "chakra-react-select": "^4.7.6",
