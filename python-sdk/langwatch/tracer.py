@@ -2,7 +2,7 @@ import asyncio
 import os
 from concurrent.futures import Future, ThreadPoolExecutor
 import time
-from typing import Any, Dict, List, Optional, TypeVar
+from typing import Any, Callable, Dict, List, Optional, Type, TypeVar, Union, cast
 from warnings import warn
 from deprecated import deprecated
 
@@ -11,6 +11,7 @@ from pydantic import BaseModel
 import requests
 from langwatch.types import (
     BaseSpan,
+    ChatMessage,
     LLMSpan,
     LLMSpanMetrics,
     LLMSpanParams,
@@ -25,6 +26,7 @@ from langwatch.types import (
 )
 from langwatch.utils import (
     SerializableAndPydanticEncoder,
+    autoconvert_rag_contexts,
     autoconvert_typed_values,
     capture_exception,
     milliseconds_timestamp,
@@ -37,12 +39,13 @@ import contextvars  # Import contextvars module
 import functools
 import inspect
 
-T = TypeVar("T")
+T = TypeVar("T", bound=Callable[..., Any])
 
 
 class ContextSpan:
-    trace: Optional["ContextTracer"] = None
+    trace: Optional["ContextTrace"] = None
     context_token: Optional[contextvars.Token[Optional["ContextSpan"]]] = None
+    span: Type["ContextSpan"]
 
     span_id: str
     parent: Optional["ContextSpan"] = None
@@ -51,29 +54,29 @@ class ContextSpan:
     _capture_output: bool = True
     name: Optional[str] = None
     type: SpanTypes = "span"
-    input: Optional[SpanInputOutput] = None
-    output: Optional[SpanInputOutput] = None
+    input: Optional[Union[SpanInputOutput, str, List[ChatMessage]]] = None
+    output: Optional[Union[SpanInputOutput, str, List[ChatMessage]]] = None
     error: Optional[Exception] = None
     timestamps: SpanTimestamps
-    contexts: Optional[List[RAGChunk]] = None
+    contexts: Optional[Union[List[RAGChunk], List[str]]] = None
     model: Optional[str] = None
     params: Optional[LLMSpanParams] = None
     metrics: Optional[LLMSpanMetrics] = None
 
     def __init__(
         self,
-        trace: Optional["ContextTracer"] = None,
+        trace: Optional["ContextTrace"] = None,
         span_id: Optional[str] = None,
         parent: Optional["ContextSpan"] = None,
         capture_input: bool = True,
         capture_output: bool = True,
         name: Optional[str] = None,
         type: SpanTypes = "span",
-        input: Optional[SpanInputOutput] = None,
-        output: Optional[SpanInputOutput] = None,
+        input: Optional[Union[SpanInputOutput, str, List[ChatMessage]]] = None,
+        output: Optional[Union[SpanInputOutput, str, List[ChatMessage]]] = None,
         error: Optional[Exception] = None,
         timestamps: Optional[SpanTimestamps] = None,
-        contexts: Optional[List[RAGChunk]] = None,
+        contexts: Optional[Union[List[RAGChunk], List[str]]] = None,
         model: Optional[str] = None,
         params: Optional[LLMSpanParams] = None,
         metrics: Optional[LLMSpanMetrics] = None,
@@ -96,6 +99,10 @@ class ContextSpan:
             params=params,
             metrics=metrics,
         )
+        self.span = cast(
+            Type["ContextSpan"],
+            lambda **kwargs: ContextSpan(trace=self.trace, parent=self, **kwargs),
+        )
 
     def __enter__(self):
         if self.trace:
@@ -116,20 +123,13 @@ class ContextSpan:
     def __exit__(self, _exc_type, exc_value: Optional[Exception], _exc_traceback):
         self.end(error=exc_value)
 
-        # current_tracer = get_current_trace()
-        # if not current_tracer:
-        #     return
-
-        # current_span = current_tracer.get_current_span()
-        # if current_span and current_span.span_id == self.span_id:
-        #     current_tracer._current_span = (
-        #         self.parent if self._parent_from_context else None
-        #     )
         if self.trace and self.context_token:
             self.trace._current_span.reset(self.context_token)
 
     def __call__(self, func: T) -> T:
-        def capture_input(*args, **kwargs):
+        def capture_name_and_input(*args, **kwargs):
+            if self.type != "llm":
+                self.name = func.__name__
             if self._capture_input:
                 all_args = list(args)
                 if len(all_args) == 1:
@@ -144,15 +144,20 @@ class ContextSpan:
                         all_args.update(kwargs)
                 self.input = autoconvert_typed_values(all_args)
 
+        def capture_output_and_maybe_name(output):
+            if not self.output and self._capture_output:
+                self.output = autoconvert_typed_values(output)
+            if self.type == "llm" and not self.model:
+                self.name = func.__name__
+
         if inspect.iscoroutinefunction(func):
 
             @functools.wraps(func)
             async def async_wrapper(*args, **kwargs):
                 with self:
-                    capture_input(*args, **kwargs)
+                    capture_name_and_input(*args, **kwargs)
                     output = await func(*args, **kwargs)
-                    if self._capture_output:
-                        self.output = autoconvert_typed_values(output)
+                    capture_output_and_maybe_name(output)
                     return output
 
             return async_wrapper  # type: ignore
@@ -161,10 +166,9 @@ class ContextSpan:
             @functools.wraps(func)  # type: ignore
             def sync_wrapper(*args, **kwargs):
                 with self:
-                    capture_input(*args, **kwargs)
+                    capture_name_and_input(*args, **kwargs)
                     output = func(*args, **kwargs)  # type: ignore
-                    if self._capture_output:
-                        self.output = autoconvert_typed_values(output)
+                    capture_output_and_maybe_name(output)
                     return output
 
             return sync_wrapper  # type: ignore
@@ -174,11 +178,11 @@ class ContextSpan:
         span_id: Optional[str] = None,
         name: Optional[str] = None,
         type: Optional[SpanTypes] = None,
-        input: Optional[SpanInputOutput] = None,
-        output: Optional[SpanInputOutput] = None,
+        input: Optional[Union[SpanInputOutput, str, List[ChatMessage]]] = None,
+        output: Optional[Union[SpanInputOutput, str, List[ChatMessage]]] = None,
         error: Optional[Exception] = None,
         timestamps: Optional[SpanTimestamps] = None,
-        contexts: Optional[List[RAGChunk]] = None,
+        contexts: Optional[Union[List[RAGChunk], List[str]]] = None,
         model: Optional[str] = None,
         params: Optional[LLMSpanParams] = None,
         metrics: Optional[LLMSpanMetrics] = None,
@@ -230,11 +234,11 @@ class ContextSpan:
         self,
         name: Optional[str] = None,
         type: Optional[SpanTypes] = None,
-        input: Optional[SpanInputOutput] = None,
-        output: Optional[SpanInputOutput] = None,
+        input: Optional[Union[SpanInputOutput, str, List[ChatMessage]]] = None,
+        output: Optional[Union[SpanInputOutput, str, List[ChatMessage]]] = None,
         error: Optional[Exception] = None,
         timestamps: Optional[SpanTimestamps] = None,
-        contexts: Optional[List[RAGChunk]] = None,
+        contexts: Optional[Union[List[RAGChunk], List[str]]] = None,
         model: Optional[str] = None,
         params: Optional[LLMSpanParams] = None,
         metrics: Optional[LLMSpanMetrics] = None,
@@ -273,11 +277,13 @@ class ContextSpan:
                     span_id=self.span_id,
                     parent_id=self.parent.span_id if self.parent else None,
                     trace_id=self.trace.trace_id,
-                    input=self.input,
-                    output=self.output,
+                    input=autoconvert_typed_values(self.input) if self.input else None,
+                    output=(
+                        autoconvert_typed_values(self.output) if self.output else None
+                    ),
                     error=capture_exception(self.error) if self.error else None,
                     timestamps=self.timestamps,
-                    contexts=self.contexts or [],
+                    contexts=autoconvert_rag_contexts(self.contexts or []),
                 )
             )
         elif self.type == "llm":
@@ -288,8 +294,10 @@ class ContextSpan:
                     span_id=self.span_id,
                     parent_id=self.parent.span_id if self.parent else None,
                     trace_id=self.trace.trace_id,
-                    input=self.input,
-                    output=self.output,
+                    input=autoconvert_typed_values(self.input) if self.input else None,
+                    output=(
+                        autoconvert_typed_values(self.output) if self.output else None
+                    ),
                     error=capture_exception(self.error) if self.error else None,
                     timestamps=self.timestamps,
                     model=self.model,
@@ -305,8 +313,10 @@ class ContextSpan:
                     span_id=self.span_id,
                     parent_id=self.parent.span_id if self.parent else None,
                     trace_id=self.trace.trace_id,
-                    input=self.input,
-                    output=self.output,
+                    input=autoconvert_typed_values(self.input) if self.input else None,
+                    output=(
+                        autoconvert_typed_values(self.output) if self.output else None
+                    ),
                     error=capture_exception(self.error) if self.error else None,
                     timestamps=self.timestamps,
                 )
@@ -344,7 +354,7 @@ def capture_rag(
     )
 
 
-def get_current_trace() -> "ContextTracer":
+def get_current_trace() -> "ContextTrace":
     current_trace = current_trace_var.get()
     if not current_trace:
         raise ValueError(
@@ -368,21 +378,22 @@ def get_current_span() -> "ContextSpan":
 
 
 executor = ThreadPoolExecutor(max_workers=10)
-current_trace_var = contextvars.ContextVar[Optional["ContextTracer"]](
+current_trace_var = contextvars.ContextVar[Optional["ContextTrace"]](
     "current_tracer", default=None
 )
 
 
-class ContextTracer:
+class ContextTrace:
     sent_once = False
     scheduled_send: Optional[Future[None]] = None
     _current_span = contextvars.ContextVar[Optional[ContextSpan]](
         "current_span", default=None
     )
-    context_token: Optional[contextvars.Token[Optional["ContextTracer"]]] = None
+    context_token: Optional[contextvars.Token[Optional["ContextTrace"]]] = None
 
     trace_id: str
     metadata: Optional[TraceMetadata] = None
+    span: Type[ContextSpan]
 
     def __init__(
         self,
@@ -392,6 +403,9 @@ class ContextTracer:
         self.spans: Dict[str, Span] = {}
         self.trace_id = trace_id or f"trace_{nanoid.generate()}"
         self.metadata = metadata
+        self.span = cast(
+            Type[ContextSpan], lambda **kwargs: ContextSpan(trace=self, **kwargs)
+        )
 
     def __enter__(self):
         self.context_token = current_trace_var.set(self)
@@ -510,5 +524,5 @@ def send_spans(data: CollectorRESTParams):
         response.raise_for_status()
 
 
-trace = ContextTracer
+trace = ContextTrace
 span = ContextSpan

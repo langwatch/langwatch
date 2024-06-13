@@ -1,6 +1,5 @@
-from typing import Any, Dict, List, Literal, Optional, TypedDict, Union
-
-from pydantic import BaseModel, Field
+from typing import Any, Dict, List, Literal, Optional, Union
+from typing_extensions import TypedDict
 
 
 ChatRole = Literal[

@@ -8,7 +8,6 @@ import chainlit as cl
 import sys
 
 sys.path.append("..")
-import nanoid
 import langwatch.tracer
 
 
@@ -18,17 +17,15 @@ async def main(message: cl.Message):
         content="",
     )
 
-    with langwatch.tracer.ContextTracer(trace_id=nanoid.generate(), metadata={}):
-        with langwatch.tracer.ContextSpan(
-            span_id=nanoid.generate(),
-            name=None,
+    with langwatch.trace() as trace:
+        with trace.span(
             type="llm",
             input=message.content,
         ) as span:
             time.sleep(1)  # generating the message...
-            generated_message = "Hello there! How can I help?"
+            generated_message = "Hello there! How can I help from context manager?"
 
-            span.output = generated_message
+            span.update(output=generated_message)
 
         await msg.stream_token(generated_message)
 

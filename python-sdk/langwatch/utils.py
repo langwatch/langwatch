@@ -15,11 +15,14 @@ from typing import (
     cast,
 )
 
-from pydantic import BaseModel
+from pydantic import BaseModel, TypeAdapter, ValidationError
 
 from langwatch.types import (
+    ChatMessage,
     ErrorCapture,
+    RAGChunk,
     SpanInputOutput,
+    TypedValueChatMessages,
     TypedValueJson,
     TypedValueRaw,
     TypedValueText,
@@ -92,17 +95,41 @@ def list_get(l, i, default=None):
         return default
 
 
-def autoconvert_typed_values(value: Any) -> SpanInputOutput:
-    if type(value) == dict and "type" in value:
-        return cast(SpanInputOutput, value)
+def validate_safe(type, item: dict):
+    try:
+        TypeAdapter(type).validate_python(item)
+        return True
+    except ValidationError:
+        return False
+
+
+def autoconvert_typed_values(
+    value: Union[SpanInputOutput, ChatMessage, str, dict, list]
+) -> SpanInputOutput:
     if type(value) == str:
         return TypedValueText(type="text", value=value)
+    if type(value) == dict and validate_safe(SpanInputOutput, value):
+        return cast(SpanInputOutput, value)
+    if type(value) == list and all(validate_safe(ChatMessage, item) for item in value):
+        return TypedValueChatMessages(type="chat_messages", value=value)
     else:
         try:
             json_ = json.dumps(value, cls=SerializableAndPydanticEncoder)
             return TypedValueJson(type="json", value=json.loads(json_))
         except:
             return TypedValueRaw(type="raw", value=str(value))
+
+
+def autoconvert_rag_contexts(value: Union[List[RAGChunk], List[str]]) -> List[RAGChunk]:
+    if type(value) == list and all(
+        validate_safe(RAGChunk, cast(dict, item)) for item in value
+    ):
+        return cast(List[RAGChunk], value)
+    if type(value) == list and all(isinstance(item, str) for item in value):
+        return [RAGChunk(content=str(item)) for item in value]
+    raise ValueError(
+        'Invalid RAG contexts, expected list of string or list of {"document_id": Optional[str], "chunk_id": Optional[str], "content": str} dicts'
+    )
 
 
 class SerializableAndPydanticEncoder(json.JSONEncoder):

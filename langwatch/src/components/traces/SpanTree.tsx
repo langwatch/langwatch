@@ -178,10 +178,13 @@ const TreeRenderer: React.FC<{ spans: ElasticSearchSpan[] }> = ({ spans }) => {
   const tree = buildTree(spans);
   let rootSpans = spans.filter((s) => !s.parent_id);
   if (!rootSpans.length) {
-    const spansById = spans.reduce((acc, span) => {
-      acc[span.span_id] = span;
-      return acc;
-    }, {} as Record<string, ElasticSearchSpan>)
+    const spansById = spans.reduce(
+      (acc, span) => {
+        acc[span.span_id] = span;
+        return acc;
+      },
+      {} as Record<string, ElasticSearchSpan>
+    );
     rootSpans = spans.filter((s) => !s.parent_id || !spansById[s.parent_id]);
   }
 
@@ -452,30 +455,33 @@ export function SpanTree(props: SpanTreeProps) {
                   </Box>
                 </VStack>
               ) : (
-                <VStack alignItems="flex-start" spacing={2} width="full">
-                  <Box
-                    fontSize={13}
-                    color="gray.400"
-                    textTransform="uppercase"
-                    fontWeight="bold"
-                  >
-                    Generated
-                  </Box>
-                  {span.output === undefined && <Text>{"<empty>"}</Text>}
-                  {span.output && (
+                span.output !== undefined &&
+                span.output !== null && (
+                  <VStack alignItems="flex-start" spacing={2} width="full">
                     <Box
-                      as="pre"
-                      borderRadius="6px"
-                      padding={4}
-                      borderWidth="1px"
-                      borderColor="gray.300"
-                      width="full"
-                      whiteSpace="pre-wrap"
+                      fontSize={13}
+                      color="gray.400"
+                      textTransform="uppercase"
+                      fontWeight="bold"
                     >
-                      <RenderInputOutput value={span.output.value} />
+                      Generated
                     </Box>
-                  )}
-                </VStack>
+                    {!span.output && <Text>{"<empty>"}</Text>}
+                    {span.output && (
+                      <Box
+                        as="pre"
+                        borderRadius="6px"
+                        padding={4}
+                        borderWidth="1px"
+                        borderColor="gray.300"
+                        width="full"
+                        whiteSpace="pre-wrap"
+                      >
+                        <RenderInputOutput value={span.output.value} />
+                      </Box>
+                    )}
+                  </VStack>
+                )
               )}
             </VStack>
           )}

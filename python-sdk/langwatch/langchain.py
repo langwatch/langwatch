@@ -15,7 +15,7 @@ from langchain.schema import (
 from langchain.callbacks.base import BaseCallbackHandler
 import langwatch
 from langwatch.tracer import (
-    ContextTracer,
+    ContextTrace,
     ContextSpan,
     current_trace_var,
 )
@@ -79,7 +79,7 @@ def langchain_message_to_chat_message(message: BaseMessage) -> ChatMessage:
     return ChatMessage(role=role, content=message.content)  # type: ignore
 
 
-class LangChainTracer(ContextTracer, BaseCallbackHandler):
+class LangChainTracer(ContextTrace, BaseCallbackHandler):
     """Base callback handler that can be used to handle callbacks from langchain."""
 
     def __init__(
