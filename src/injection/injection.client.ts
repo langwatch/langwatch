@@ -3,6 +3,7 @@ import { ImpersonationSwitchBackMenuItem } from "../components/ImpersonationSwit
 import Subscription from "../pages/subscription";
 import Admin from "../pages/admin";
 import { ExtraFooterComponents } from "../components/ExtraFooterComponents";
+import { ExtraFooterComponentsScripts } from "../components/ExtraFooterComponentsScripts";
 
 const dependencies: Dependencies = {
   SubscriptionPage: Subscription,
@@ -11,6 +12,7 @@ const dependencies: Dependencies = {
     "/admin": Admin,
   },
   ExtraFooterComponents,
+  ExtraFooterComponentsScripts,
 };
 
 export default dependencies;
