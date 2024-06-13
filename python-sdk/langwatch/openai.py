@@ -1,7 +1,7 @@
 from typing import Any, AsyncGenerator, Dict, Generator, List, Optional, Union, cast
 
 import nanoid
-from langwatch.tracer import BaseContextTracer
+from langwatch.tracer import ContextTracer
 
 from langwatch.types import (
     ChatMessage,
@@ -36,7 +36,7 @@ from openai.types import Completion
 from openai.types.chat import ChatCompletion, ChatCompletionChunk
 
 
-class OpenAITracer(BaseContextTracer):
+class OpenAITracer(ContextTracer):
     """
     Tracing for both Completion and ChatCompletion endpoints
     """
@@ -88,7 +88,7 @@ class AzureOpenAITracer(OpenAITracer):
         )
 
 
-class OpenAICompletionTracer(BaseContextTracer):
+class OpenAICompletionTracer(ContextTracer):
     def __init__(
         self,
         instance: Union[OpenAI, AsyncOpenAI, AzureOpenAI, AsyncAzureOpenAI],
@@ -268,7 +268,7 @@ class OpenAICompletionTracer(BaseContextTracer):
         )
 
 
-class OpenAIChatCompletionTracer(BaseContextTracer):
+class OpenAIChatCompletionTracer(ContextTracer):
     def __init__(
         self,
         instance: Union[OpenAI, AsyncOpenAI, AzureOpenAI, AsyncAzureOpenAI],

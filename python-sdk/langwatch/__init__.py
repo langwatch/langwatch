@@ -10,9 +10,8 @@ For LLM and library-specific tracing functions, check out the other files on thi
 import os
 
 from langwatch.tracer import (
+    trace,
     span,
-    rag_span,
-    llm_span,
     get_current_trace,
     get_current_span,
     create_span,
@@ -41,9 +40,8 @@ if dspy_available:
 __all__ = (
     "endpoint",
     "api_key",
+    "trace",
     "span",
-    "rag_span",
-    "llm_span",
     "get_current_trace",
     "get_current_span",
     "create_span",

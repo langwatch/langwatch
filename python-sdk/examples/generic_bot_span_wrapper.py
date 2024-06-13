@@ -18,7 +18,7 @@ async def main(message: cl.Message):
         content="",
     )
 
-    with langwatch.tracer.BaseContextTracer(trace_id=nanoid.generate(), metadata={}):
+    with langwatch.tracer.ContextTracer(trace_id=nanoid.generate(), metadata={}):
         with langwatch.tracer.ContextSpan(
             span_id=nanoid.generate(),
             name=None,
