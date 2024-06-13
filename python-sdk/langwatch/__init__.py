@@ -44,6 +44,7 @@ try:
 except ImportError:
     pass
 
+langchain = None
 if langchain_available:
     import langwatch.langchain as langchain
 

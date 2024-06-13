@@ -39,6 +39,16 @@ import contextvars  # Import contextvars module
 import functools
 import inspect
 
+try:
+    from openai import (
+        OpenAI,
+        AsyncOpenAI,
+        AzureOpenAI,
+        AsyncAzureOpenAI,
+    )
+except ImportError:
+    pass
+
 T = TypeVar("T", bound=Callable[..., Any])
 
 
@@ -546,6 +556,13 @@ class ContextTrace:
         import langwatch.langchain  # import dynamically here instead of top-level because users might not have langchain installed
 
         return langwatch.langchain.LangChainTracer(trace=self)
+
+    def autotrack_openai_calls(
+        self, client: Union["OpenAI", "AsyncOpenAI", "AzureOpenAI", "AsyncAzureOpenAI"]
+    ):
+        import langwatch.openai  # import dynamically here instead of top-level because, believe it or not, users might not have openai installed
+
+        langwatch.openai.OpenAITracer(trace=self, client=client)
 
 
 @retry(tries=5, delay=0.5, backoff=3)

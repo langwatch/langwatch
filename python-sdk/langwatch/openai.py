@@ -1,4 +1,14 @@
-from typing import Any, AsyncGenerator, Dict, Generator, List, Optional, Union, cast
+from typing import (
+    Any,
+    AsyncGenerator,
+    Dict,
+    Generator,
+    List,
+    Optional,
+    Set,
+    Union,
+    cast,
+)
 from deprecated import deprecated
 
 import nanoid
@@ -43,7 +53,7 @@ class OpenAITracer:
 
     def __init__(
         self,
-        client: Union[OpenAI, AsyncOpenAI],
+        client: Union[OpenAI, AsyncOpenAI, AzureOpenAI, AsyncAzureOpenAI],
         trace: Optional[ContextTrace] = None,
         # Deprecated: mantained for retrocompatibility
         trace_id: Optional[str] = None,
@@ -96,6 +106,7 @@ class AzureOpenAITracer(OpenAITracer):
 
 class OpenAICompletionTracer:
     trace: ContextTrace
+    tracked_traces: Set[ContextTrace] = set()
 
     def __init__(
         self,
@@ -113,6 +124,7 @@ class OpenAICompletionTracer:
             self.trace = ContextTrace(
                 trace_id=trace_id or nanoid.generate(), metadata=metadata
             )
+        self.tracked_traces.add(self.trace)
 
         if not hasattr(self.client.completions, "_original_create"):
             self.client.completions._original_create = self.client.completions.create  # type: ignore
@@ -132,10 +144,19 @@ class OpenAICompletionTracer:
         self.trace.__exit__(_type, _value, _traceback)
 
     def patched_completion_create(self, *args, **kwargs):
-        span = get_current_trace().span(
+        trace = None
+        try:
+            trace = get_current_trace()
+        except:
+            pass
+
+        if not trace or trace not in self.tracked_traces:
+            return cast(Any, self.client.completions)._original_create(*args, **kwargs)
+
+        span = trace.span(
             type="llm",
             span_id=f"span_{nanoid.generate()}",
-            parent=get_current_trace().get_current_span(),
+            parent=trace.get_current_span(),
         )
 
         started_at = milliseconds_timestamp()
@@ -181,10 +202,21 @@ class OpenAICompletionTracer:
             raise err
 
     async def patched_completion_acreate(self, *args, **kwargs):
-        span = get_current_trace().span(
+        trace = None
+        try:
+            trace = get_current_trace()
+        except:
+            pass
+
+        if not trace or trace not in self.tracked_traces:
+            return await cast(Any, self.client.completions)._original_create(
+                *args, **kwargs
+            )
+
+        span = trace.span(
             type="llm",
             span_id=f"span_{nanoid.generate()}",
-            parent=get_current_trace().get_current_span(),
+            parent=trace.get_current_span(),
         )
 
         started_at = milliseconds_timestamp()
@@ -328,6 +360,7 @@ class OpenAICompletionTracer:
 
 class OpenAIChatCompletionTracer:
     trace: ContextTrace
+    tracked_traces: Set[ContextTrace] = set()
 
     def __init__(
         self,
@@ -345,13 +378,16 @@ class OpenAIChatCompletionTracer:
             self.trace = ContextTrace(
                 trace_id=trace_id or nanoid.generate(), metadata=metadata
             )
+        self.tracked_traces.add(self.trace)
 
         if not hasattr(self.client.chat.completions, "_original_create"):
             self.client.chat.completions._original_create = self.client.chat.completions.create  # type: ignore
-        if isinstance(self.client, AsyncOpenAI):
-            self.client.chat.completions.create = self.patched_completion_acreate  # type: ignore
-        else:
-            self.client.chat.completions.create = self.patched_completion_create  # type: ignore
+            if isinstance(self.client, AsyncOpenAI):
+                self.client.chat.completions.create = self.patched_completion_acreate  # type: ignore
+            elif isinstance(self.client, AsyncAzureOpenAI):
+                self.client.chat.completions.create = self.patched_completion_acreate  # type: ignore
+            else:
+                self.client.chat.completions.create = self.patched_completion_create  # type: ignore
 
     @deprecated(
         "Using OpenAIChatCompletionTracer as a context manager is deprecated. Use `langwatch.get_current_trace().autotrack_openai_calls(client)` instead."
@@ -364,12 +400,24 @@ class OpenAIChatCompletionTracer:
         self.trace.__exit__(_type, _value, _traceback)
 
     def patched_completion_create(self, *args, **kwargs):
-        started_at = milliseconds_timestamp()
-        span = get_current_trace().span(
+        trace = None
+        try:
+            trace = get_current_trace()
+        except:
+            pass
+
+        if not trace or trace not in self.tracked_traces:
+            return cast(Any, self.client.chat.completions)._original_create(
+                *args, **kwargs
+            )
+
+        span = trace.span(
             type="llm",
             span_id=f"span_{nanoid.generate()}",
-            parent=get_current_trace().get_current_span(),
+            parent=trace.get_current_span(),
         )
+
+        started_at = milliseconds_timestamp()
         try:
             response: Union[ChatCompletion, Stream[ChatCompletionChunk]] = cast(
                 Any, self.client.chat.completions
@@ -412,12 +460,24 @@ class OpenAIChatCompletionTracer:
             raise err
 
     async def patched_completion_acreate(self, *args, **kwargs):
-        started_at = milliseconds_timestamp()
-        span = get_current_trace().span(
+        trace = None
+        try:
+            trace = get_current_trace()
+        except:
+            pass
+
+        if not trace or trace not in self.tracked_traces:
+            return await cast(Any, self.client.chat.completions)._original_create(
+                *args, **kwargs
+            )
+
+        span = trace.span(
             type="llm",
             span_id=f"span_{nanoid.generate()}",
-            parent=get_current_trace().get_current_span(),
+            parent=trace.get_current_span(),
         )
+
+        started_at = milliseconds_timestamp()
 
         response: Union[ChatCompletion, AsyncStream[ChatCompletionChunk]] = await cast(
             Any, self.client.chat.completions

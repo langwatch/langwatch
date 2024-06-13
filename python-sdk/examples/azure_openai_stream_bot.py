@@ -1,5 +1,8 @@
 import os
+from typing import Optional
 from dotenv import load_dotenv
+
+from langwatch.types import RAGChunk
 
 load_dotenv()
 
@@ -20,68 +23,77 @@ client = AzureOpenAI(
 langwatch.api_key = os.getenv("LANGWATCH_API_KEY")
 
 
+@langwatch.span(type="rag")
+def retrieve_generate(message: str, query: Optional[str] = None):
+    search_results = [
+        {
+            "id": "result_1",
+            "content": "This is the first result",
+        },
+        {
+            "id": "result_2",
+            "content": "This is the second result",
+        },
+    ]
+
+    langwatch.get_current_span().update(
+        contexts=[
+            RAGChunk(
+                document_id=docs["id"],
+                content=docs["content"],
+            )
+            for docs in search_results
+        ],
+    )
+
+    results = "\n".join([f"{docs['id']}: {docs['content']}" for docs in search_results])
+    return client.chat.completions.create(
+        model="gpt-35-turbo-0613",
+        messages=[
+            {
+                "role": "system",
+                "content": f"""
+                    You are a helpful assistant that only reply in short tweet-like responses, using lots of emojis.
+
+                    We just made a search in the database for {query} and found {len(search_results)} results. Here they are, use that to help answering user:
+
+                    {results}
+                """,
+            },
+            {"role": "user", "content": message},
+        ],
+        stream=True,
+    )
+
+
 @cl.on_message
+@langwatch.trace()
 async def main(message: cl.Message):
+    langwatch.get_current_trace().autotrack_openai_calls(client)
+
     msg = cl.Message(
         content="",
     )
 
-    with langwatch.openai.AzureOpenAITracer(
-        client,
-        trace_id=message.id,  # optional
-        metadata={"user_id": message.author},  # optional
-    ):
-        completion = client.chat.completions.create(
-            model="gpt-35-turbo-0613",
-            messages=[
-                {
-                    "role": "system",
-                    "content": "come up with a query for searching the database based on user question, 3 words max",
-                },
-                {"role": "user", "content": message.content},
-            ],
-        )
+    langwatch.get_current_trace().update(
+        trace_id=message.id,
+        metadata={"user_id": message.author},
+    )
 
-        query = completion.choices[0].message.content
-
-        search_results = [
+    completion = client.chat.completions.create(
+        model="gpt-35-turbo-0613",
+        messages=[
             {
-                "id": "result_1",
-                "content": "This is the first result",
+                "role": "system",
+                "content": "come up with a query for searching the database based on user question, 3 words max",
             },
-            {
-                "id": "result_2",
-                "content": "This is the second result",
-            },
-        ]
+            {"role": "user", "content": message.content},
+        ],
+    )
 
-        with langwatch.capture_rag(
-            input=query,
-            contexts=[
-                {"document_id": docs["id"], "content": docs["content"]}
-                for docs in search_results
-            ],
-        ):
-            results = "\n".join(
-                [f"{docs['id']}: {docs['content']}" for docs in search_results]
-            )
-            completion = client.chat.completions.create(
-                model="gpt-35-turbo-0613",
-                messages=[
-                    {
-                        "role": "system",
-                        "content": f"""
-                            You are a helpful assistant that only reply in short tweet-like responses, using lots of emojis.
+    query = completion.choices[0].message.content
 
-                            We just made a search in the database for {query} and found {len(search_results)} results. Here they are, use that to help answering user:
-
-                            {results}
-                        """,
-                    },
-                    {"role": "user", "content": message.content},
-                ],
-                stream=True,
-            )
+    completion = retrieve_generate(message=message.content, query=query)
 
     for part in completion:
         if len(part.choices) == 0:
