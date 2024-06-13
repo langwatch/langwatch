@@ -5,11 +5,25 @@ import { prisma } from "../../server/db";
 import { sendTriggerEmail } from "~/server/mailer/triggerEmail";
 import { sendSlackWebhook } from "~/server/triggers/sendSlackWebhook";
 import { getLatestUpdatedAt } from "./utils";
+import { trace } from "@sentry/nextjs";
+
+import { type Trace } from "~/server/tracer/types";
+
+interface TraceGroups {
+  groups: Trace[][];
+}
 
 interface ActionParams {
   members?: string[] | null;
   dataset?: string | null;
   slackWebhook?: string | null;
+}
+
+interface TriggerData {
+  input: string;
+  output: string;
+  traceId: string;
+  projectId: string;
 }
 
 export default async function handler(
@@ -47,7 +61,7 @@ export default async function handler(
 
 const getTracesForAlert = async (trigger: Trigger, projects: Project[]) => {
   const {
-    id: alertId,
+    id: triggerId,
     projectId,
     filters,
     lastRunAt,
@@ -68,12 +82,32 @@ const getTracesForAlert = async (trigger: Trigger, projects: Project[]) => {
 
   const traces = await getAllForProject(input);
 
-  if (traces.groups.length > 0) {
-    const triggerData = traces.groups.flatMap((group) =>
+  const getTracesToSend = async (traces: TraceGroups, triggerId: string) => {
+    const tracesToSend = [];
+
+    for (const group of traces.groups) {
+      const results = await Promise.all(
+        group.map((trace) =>
+          hasTriggerSent(triggerId, trace.trace_id, input.projectId)
+        )
+      );
+      if (results.some((sent) => !sent)) {
+        tracesToSend.push(group);
+      }
+    }
+
+    return tracesToSend;
+  };
+
+  const tracesToSend = await getTracesToSend(traces, triggerId);
+
+  if (tracesToSend.length > 0) {
+    const triggerData: TriggerData[] = tracesToSend.flatMap((group) =>
       group.map((trace) => ({
         input: trace.input?.value,
         output: trace.output?.value ?? "",
         traceId: trace.trace_id,
+        projectId: input.projectId,
       }))
     );
 
@@ -94,9 +128,9 @@ const getTracesForAlert = async (trigger: Trigger, projects: Project[]) => {
 
       await sendTriggerEmail(triggerInfo);
       if (project) {
-        void updateAlert(alertId, updatedAt, project.id);
+        void updateAlert(triggerId, updatedAt, project.id);
       } else {
-        throw new Error("Project not found for alertId: " + alertId);
+        throw new Error("Project not found for triggerId: " + triggerId);
       }
     } else if (action === TriggerAction.SEND_SLACK_MESSAGE) {
       triggerInfo = {
@@ -109,25 +143,26 @@ const getTracesForAlert = async (trigger: Trigger, projects: Project[]) => {
       updatedAt = getLatestUpdatedAt(traces);
 
       await sendSlackWebhook(triggerInfo);
+      await addTriggersSent(triggerId, triggerData);
       if (project) {
-        void updateAlert(alertId, updatedAt, project.id);
+        void updateAlert(triggerId, updatedAt, project.id);
       } else {
-        throw new Error("Project not found for alertId: " + alertId);
+        throw new Error("Project not found for triggerId: " + triggerId);
       }
     }
 
     return {
-      alertId,
+      triggerId,
       updatedAt: updatedAt,
       status: "triggered",
-      totalFound: traces.groups.length,
+      totalFound: tracesToSend.length,
       triggerInfo,
-      traces: traces.groups,
+      traces: tracesToSend,
     };
   }
 
   return {
-    alertId,
+    triggerId,
     updatedAt: input.updatedAt,
     status: "not_triggered",
     traces: "null",
@@ -135,12 +170,37 @@ const getTracesForAlert = async (trigger: Trigger, projects: Project[]) => {
 };
 
 const updateAlert = async (
-  alertId: string,
+  triggerId: string,
   updatedAt: number,
   projectId: string
 ) => {
   await prisma.trigger.update({
-    where: { id: alertId, projectId },
+    where: { id: triggerId, projectId },
     data: { lastRunAt: updatedAt },
   });
+};
+
+const addTriggersSent = async (
+  triggerId: string,
+  triggerData: TriggerData[]
+) => {
+  await prisma.triggerSent.createMany({
+    data: triggerData.map((data) => ({
+      triggerId: triggerId,
+      traceId: data.traceId,
+      projectId: data.projectId,
+    })),
+    skipDuplicates: true,
+  });
+};
+
+const hasTriggerSent = async (
+  triggerId: string,
+  traceId: string,
+  projectId: string
+) => {
+  const triggerSent = await prisma.triggerSent.findUnique({
+    where: { triggerId_traceId: { triggerId, traceId }, projectId },
+  });
+  return triggerSent !== null;
 };

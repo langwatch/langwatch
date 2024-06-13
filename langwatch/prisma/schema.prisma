@@ -169,6 +169,7 @@ model Project {
     annotations          Annotation[]
     modelProviders       ModelProvider[]
     topicClusteringModel String?
+    TriggerSent          TriggerSent[]
 
     @@index([teamId])
 }
@@ -363,6 +364,7 @@ model Trigger {
     createdAt    DateTime      @default(now())
     updatedAt    DateTime      @default(now()) @updatedAt
     active       Boolean       @default(true)
+    TriggerSent  TriggerSent[]
 
     @@index([projectId])
 }
@@ -414,5 +416,20 @@ model ModelProvider {
     createdAt  DateTime @default(now())
     updatedAt  DateTime @default(now()) @updatedAt
 
+    @@index([projectId])
+}
+
+model TriggerSent {
+    id        String   @id @default(nanoid())
+    triggerId String
+    traceId   String
+    projectId String
+    project   Project  @relation(fields: [projectId], references: [id])
+    trigger   Trigger  @relation(fields: [triggerId], references: [id])
+    createdAt DateTime @default(now())
+    updatedAt DateTime @default(now()) @updatedAt
+
+    @@unique([triggerId, traceId])
+    @@index([triggerId])
     @@index([projectId])
 }

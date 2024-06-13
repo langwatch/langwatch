@@ -4,6 +4,8 @@ import { env } from "../../env.mjs";
 
 interface TriggerData {
   traceId: string;
+  input: string;
+  output: string;
 }
 
 export const sendSlackWebhook = async ({
@@ -19,10 +21,16 @@ export const sendSlackWebhook = async ({
 }) => {
   const webhook = new IncomingWebhook(triggerWebhook);
 
-  const traceIds = triggerData.map((data) => data.traceId).slice(0, 10);
+  const traceIds = triggerData
+    .map((data) => {
+      return { traceId: data.traceId, input: data.input, output: data.output };
+    })
+    .slice(0, 10);
 
-  const traceLinks = traceIds.map((traceId) => {
-    return `<${env.NEXTAUTH_URL}/${projectSlug}/messages/${traceId}|${traceId}>\n`;
+  const traceLinks = traceIds.map((trace) => {
+    return `\n<${env.NEXTAUTH_URL}/${projectSlug}/messages/${trace.traceId}|${trace.traceId}>
+    \n*Input:* ${trace.input}
+    \n*Output:* ${trace.output}'\n`;
   });
 
   try {
