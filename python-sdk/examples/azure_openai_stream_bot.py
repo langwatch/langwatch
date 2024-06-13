@@ -24,7 +24,7 @@ langwatch.api_key = os.getenv("LANGWATCH_API_KEY")
 
 
 @langwatch.span(type="rag")
-def retrieve_generate(message: str, query: Optional[str] = None):
+def retrieve(query: Optional[str] = None):
     search_results = [
         {
             "id": "result_1",
@@ -46,24 +46,7 @@ def retrieve_generate(message: str, query: Optional[str] = None):
         ],
     )
 
-    results = "\n".join([f"{docs['id']}: {docs['content']}" for docs in search_results])
-    return client.chat.completions.create(
-        model="gpt-35-turbo-0613",
-        messages=[
-            {
-                "role": "system",
-                "content": f"""
-                    You are a helpful assistant that only reply in short tweet-like responses, using lots of emojis.
-
-                    We just made a search in the database for {query} and found {len(search_results)} results. Here they are, use that to help answering user:
-
-                    {results}
-                """,
-            },
-            {"role": "user", "content": message},
-        ],
-        stream=True,
-    )
+    return search_results
 
 
 @cl.on_message
@@ -92,8 +75,26 @@ async def main(message: cl.Message):
     )
 
     query = completion.choices[0].message.content
+    search_results = retrieve(query=query)
+    results = "\n".join([f"{docs['id']}: {docs['content']}" for docs in search_results])
 
-    completion = retrieve_generate(message=message.content, query=query)
+    completion = client.chat.completions.create(
+        model="gpt-35-turbo-0613",
+        messages=[
+            {
+                "role": "system",
+                "content": f"""
+                    You are a helpful assistant that only reply in short tweet-like responses, using lots of emojis.
+
+                    We just made a search in the database for {query} and found {len(search_results)} results. Here they are, use that to help answering user:
+
+                    {results}
+                """,
+            },
+            {"role": "user", "content": message.content},
+        ],
+        stream=True,
+    )
 
     for part in completion:
         if len(part.choices) == 0:
