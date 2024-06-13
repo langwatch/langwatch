@@ -32,20 +32,25 @@ async def on_chat_start():
 
 
 @cl.on_message
+@langwatch.trace()
 async def main(message: cl.Message):
     runnable: Runnable = cl.user_session.get("runnable")  # type: ignore
 
     msg = cl.Message(content="")
 
-    with langwatch.langchain.LangChainTracer(
+    langwatch.get_current_trace().update(
         metadata={"customer_id": "customer_example", "labels": ["v1.0.0"]}
-    ) as langWatchCallback:
-        async for chunk in runnable.astream(
-            {"question": message.content},
-            config=RunnableConfig(
-                callbacks=[cl.LangchainCallbackHandler(), langWatchCallback]
-            ),
-        ):
-            await msg.stream_token(chunk)
+    )
+
+    async for chunk in runnable.astream(
+        {"question": message.content},
+        config=RunnableConfig(
+            callbacks=[
+                cl.LangchainCallbackHandler(),
+                langwatch.get_current_trace().get_langchain_callback(),
+            ]
+        ),
+    ):
+        await msg.stream_token(chunk)
 
     await msg.send()

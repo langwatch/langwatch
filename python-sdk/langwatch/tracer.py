@@ -129,10 +129,28 @@ class ContextSpan:
             self.trace.reset_current_span(self.context_token)
 
     def __call__(self, func: T) -> T:
-        def capture_name_and_input(*args, **kwargs):
-            if self.type != "llm":
-                self.name = func.__name__
-            if self._capture_input:
+        span_kwargs = {
+            "trace": None,
+            "span_id": None,
+            "parent": None,
+            "capture_input": self._capture_input,
+            "capture_output": self._capture_output,
+            "name": self.name,
+            "type": self.type,
+            "input": self.input,
+            "output": self.output,
+            "error": self.error,
+            "timestamps": None,
+            "contexts": self.contexts,
+            "model": self.model,
+            "params": self.params,
+            "metrics": self.metrics,
+        }
+
+        def capture_name_and_input(span, *args, **kwargs):
+            if span.type != "llm":
+                span.name = func.__name__
+            if span._capture_input:
                 all_args = list(args)
                 if len(all_args) == 1:
                     all_args = all_args[0]
@@ -144,22 +162,22 @@ class ContextSpan:
                     )
                     if kwargs:
                         all_args.update(kwargs)
-                self.input = autoconvert_typed_values(all_args)
+                span.input = autoconvert_typed_values(all_args)
 
-        def capture_output_and_maybe_name(output):
-            if not self.output and self._capture_output:
-                self.output = autoconvert_typed_values(output)
-            if self.type == "llm" and not self.model:
-                self.name = func.__name__
+        def capture_output_and_maybe_name(span, output):
+            if not span.output and span._capture_output:
+                span.output = autoconvert_typed_values(output)
+            if span.type == "llm" and not span.model:
+                span.name = func.__name__
 
         if inspect.iscoroutinefunction(func):
 
             @functools.wraps(func)
             async def async_wrapper(*args, **kwargs):
-                with self:
-                    capture_name_and_input(*args, **kwargs)
+                with ContextSpan(**span_kwargs) as span:
+                    capture_name_and_input(span, *args, **kwargs)
                     output = await func(*args, **kwargs)
-                    capture_output_and_maybe_name(output)
+                    capture_output_and_maybe_name(span, output)
                     return output
 
             return async_wrapper  # type: ignore
@@ -167,10 +185,10 @@ class ContextSpan:
 
             @functools.wraps(func)  # type: ignore
             def sync_wrapper(*args, **kwargs):
-                with self:
-                    capture_name_and_input(*args, **kwargs)
+                with ContextSpan(**span_kwargs) as span:
+                    capture_name_and_input(span, *args, **kwargs)
                     output = func(*args, **kwargs)  # type: ignore
-                    capture_output_and_maybe_name(output)
+                    capture_output_and_maybe_name(span, output)
                     return output
 
             return sync_wrapper  # type: ignore
@@ -422,11 +440,13 @@ class ContextTrace:
             current_trace_var.reset(self.context_token)
 
     def __call__(self, func: T) -> T:
+        trace_kwargs = {"trace_id": None, "metadata": self.metadata}
+
         if inspect.iscoroutinefunction(func):
 
             @functools.wraps(func)
             async def async_wrapper(*args, **kwargs):
-                with self:
+                with ContextTrace(**trace_kwargs):
                     return await func(*args, **kwargs)
 
             return async_wrapper  # type: ignore
@@ -434,7 +454,7 @@ class ContextTrace:
 
             @functools.wraps(func)  # type: ignore
             def sync_wrapper(*args, **kwargs):
-                with self:
+                with ContextTrace(**trace_kwargs):
                     return func(*args, **kwargs)  # type: ignore
 
             return sync_wrapper  # type: ignore
@@ -515,6 +535,11 @@ class ContextTrace:
                 or span["timestamps"]["finished_at"] == None
             ):
                 span["timestamps"]["finished_at"] = milliseconds_timestamp()
+
+    def get_langchain_callback(self):
+        import langwatch.langchain  # import dynamically here instead of top-level because users might not have langchain installed
+
+        return langwatch.langchain.LangChainTracer(trace=self)
 
 
 @retry(tries=5, delay=0.5, backoff=3)

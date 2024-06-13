@@ -15,7 +15,7 @@ from langchain.schema.runnable.config import RunnableConfig
 import sys
 
 sys.path.append("..")
-import langwatch.langchain
+import langwatch
 
 from langchain_community.document_loaders import WebBaseLoader
 from langchain_community.vectorstores.faiss import FAISS
@@ -85,30 +85,35 @@ async def on_chat_start():
 
 
 @cl.on_message
+@langwatch.trace()
 async def main(message: cl.Message):
     agent: AgentExecutor = cl.user_session.get("agent")  # type: ignore
 
     msg = cl.Message(content="")
 
-    with langwatch.langchain.LangChainTracer(
+    langwatch.get_current_trace().update(
         metadata={"customer_id": "customer_example", "labels": ["v1.0.0"]}
-    ) as langWatchCallback:
-        async for chunk in agent.astream(
-            {
-                "question": message.content,
-                "messages": [HumanMessage(content="Hoi, dit is een test")],
-            },
-            config=RunnableConfig(
-                callbacks=[cl.LangchainCallbackHandler(), langWatchCallback]
-            ),
-        ):
-            if "output" in chunk:
-                await msg.stream_token(chunk["output"])
-            elif "actions" in chunk:
-                await msg.stream_token(chunk["actions"][0].log)
-            elif "steps" in chunk:
-                await msg.stream_token(chunk["steps"][0].observation + "\n\n")
-            else:
-                await msg.stream_token("<unammaped chunk>")
+    )
+
+    async for chunk in agent.astream(
+        {
+            "question": message.content,
+            "messages": [HumanMessage(content="Hoi, dit is een test")],
+        },
+        config=RunnableConfig(
+            callbacks=[
+                cl.LangchainCallbackHandler(),
+                langwatch.get_current_trace().get_langchain_callback(),
+            ]
+        ),
+    ):
+        if "output" in chunk:
+            await msg.stream_token(chunk["output"])
+        elif "actions" in chunk:
+            await msg.stream_token(chunk["actions"][0].log)
+        elif "steps" in chunk:
+            await msg.stream_token(chunk["steps"][0].observation + "\n\n")
+        else:
+            await msg.stream_token("<unammaped chunk>")
 
     await msg.send()

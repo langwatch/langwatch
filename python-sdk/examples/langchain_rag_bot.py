@@ -37,8 +37,7 @@ async def on_chat_start():
         langwatch.langchain.capture_rag_from_retriever(
             retriever,
             lambda document: RAGChunk(
-                document_id=document.metadata["source"],
-                content=document.page_content
+                document_id=document.metadata["source"], content=document.page_content
             ),
         ),
         "langwatch_search",
@@ -62,35 +61,40 @@ async def on_chat_start():
         ]
     )
     agent = create_tool_calling_agent(model, tools, prompt)
-    executor = AgentExecutor(agent=agent, tools=tools, verbose=True) # type: ignore
+    executor = AgentExecutor(agent=agent, tools=tools, verbose=True)  # type: ignore
     cl.user_session.set("agent", executor)
 
 
 @cl.on_message
+@langwatch.trace()
 async def main(message: cl.Message):
     agent: AgentExecutor = cl.user_session.get("agent")  # type: ignore
 
     msg = cl.Message(content="")
 
-    with langwatch.langchain.LangChainTracer(
+    langwatch.get_current_trace().update(
         metadata={"customer_id": "customer_example", "labels": ["v1.0.0"]}
-    ) as langWatchCallback:
-        async for chunk in agent.astream(
-            {
-                "question": message.content,
-                "messages": [HumanMessage(content="Hoi, dit is een test")],
-            },
-            config=RunnableConfig(
-                callbacks=[cl.LangchainCallbackHandler(), langWatchCallback]
-            ),
-        ):
-            if "output" in chunk:
-                await msg.stream_token(chunk["output"])
-            elif "actions" in chunk:
-                await msg.stream_token(chunk["actions"][0].log)
-            elif "steps" in chunk:
-                await msg.stream_token(chunk["steps"][0].observation + "\n\n")
-            else:
-                await msg.stream_token("<unammaped chunk>")
+    )
+
+    async for chunk in agent.astream(
+        {
+            "question": message.content,
+            "messages": [HumanMessage(content="Hoi, dit is een test")],
+        },
+        config=RunnableConfig(
+            callbacks=[
+                cl.LangchainCallbackHandler(),
+                langwatch.get_current_trace().get_langchain_callback(),
+            ]
+        ),
+    ):
+        if "output" in chunk:
+            await msg.stream_token(chunk["output"])
+        elif "actions" in chunk:
+            await msg.stream_token(chunk["actions"][0].log)
+        elif "steps" in chunk:
+            await msg.stream_token(chunk["steps"][0].observation + "\n\n")
+        else:
+            await msg.stream_token("<unammaped chunk>")
 
     await msg.send()
