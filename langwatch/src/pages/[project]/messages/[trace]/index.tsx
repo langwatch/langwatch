@@ -319,9 +319,9 @@ const TraceMessages = React.forwardRef(function TraceMessages(
         position="relative"
       >
         <Container maxWidth="6xl">
-          <HStack width="full">
+          <HStack>
             <Box
-              width="full"
+              minWidth="65%"
               position="relative"
               borderRight="1px solid"
               borderColor="gray.200"

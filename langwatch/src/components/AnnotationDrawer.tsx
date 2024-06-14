@@ -218,7 +218,7 @@ export function AnnotationDrawer({
               Annotate
             </Text>
           </HStack>
-          <Text fontSize="xs" fontWeight="normal" marginTop={2}>
+          <Text fontSize="sm" fontWeight="normal" marginTop={2}>
             <HStack align="center">
               <MetadataTag label="Trace ID" value={traceId} />{" "}
               <ExternalLink
