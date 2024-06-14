@@ -11,6 +11,8 @@ import {
   Text,
   Tooltip,
   VStack,
+  Grid,
+  GridItem,
 } from "@chakra-ui/react";
 import ErrorPage from "next/error";
 import { useRouter } from "next/router";
@@ -49,24 +51,6 @@ export default function TraceDetails() {
       setThreadId(trace.data.metadata.thread_id);
     }
   }, [trace.data?.metadata.thread_id]);
-
-  const [initialDelay, setInitialDelay] = useState<boolean>(false);
-
-  useEffect(() => {
-    if (!hasTeamPermission(TeamRoleGroup.SPANS_DEBUG) || !traceId) return;
-    setTimeout(
-      () => {
-        const isOpen = (!!threadId || !!trace.data) && !!openTab;
-        openDrawer("traceDetails", {
-          traceId: traceId,
-        });
-
-        if (isOpen) setInitialDelay(true);
-      },
-      initialDelay ? 0 : 400
-    );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [!!openTab, !!trace.data]);
 
   if (isNotFound(trace.error)) {
     return <ErrorPage statusCode={404} />;
@@ -318,69 +302,76 @@ const TraceMessages = React.forwardRef(function TraceMessages(
         onMouseLeave={() => setShowAnnotationHover(false)}
         position="relative"
       >
-        <Container maxWidth="6xl">
-          <HStack>
-            <Box
-              minWidth="65%"
-              position="relative"
-              borderRight="1px solid"
-              borderColor="gray.200"
-              marginRight={10}
-              paddingRight={10}
-            >
-              {showAnnotationHover && <AnnotationHover />}
-              <Message
-                trace={trace}
-                author="Input"
-                avatar={<Avatar size="sm" />}
-                timestamp={trace.timestamps.started_at}
-                paddingTop="20px"
+        <Container maxWidth="5xl">
+          <Grid templateColumns="repeat(4, 1fr)">
+            <GridItem colSpan={3}>
+              <Box
+                minWidth="65%"
+                position="relative"
+                borderRight="1px solid"
+                borderColor="gray.200"
+                marginRight={10}
+                paddingRight={10}
               >
-                <Text paddingY="6px" marginBottom="38px" whiteSpace="pre-wrap">
-                  {getExtractedInput(trace)}
-                </Text>
-              </Message>
-              <Message
-                trace={trace}
-                author={project?.name ?? ""}
-                avatar={
-                  <Avatar
-                    size="sm"
-                    name={project?.name}
-                    background="orange.400"
-                  />
-                }
-                timestamp={
-                  trace.timestamps.started_at +
-                  (trace.metrics.first_token_ms ??
-                    trace.metrics.total_time_ms ??
-                    0)
-                }
-              >
-                {trace.error && !trace.output?.value ? (
-                  <VStack alignItems="flex-start" spacing={2} paddingY={2}>
-                    <Box
-                      fontSize={11}
-                      color="red.400"
-                      textTransform="uppercase"
-                      fontWeight="bold"
-                    >
-                      Exception
-                    </Box>
-                    <Text color="red.900">{trace.error.message}</Text>
-                  </VStack>
-                ) : trace.output?.value ? (
-                  <Markdown className="markdown markdown-conversation-history">
-                    {trace.output.value}
-                  </Markdown>
-                ) : (
-                  <Text paddingY={2}>{"<empty>"}</Text>
-                )}
-              </Message>
+                {showAnnotationHover && <AnnotationHover />}
+                <Message
+                  trace={trace}
+                  author="Input"
+                  avatar={<Avatar size="sm" />}
+                  timestamp={trace.timestamps.started_at}
+                  paddingTop="20px"
+                >
+                  <Text
+                    paddingY="6px"
+                    marginBottom="38px"
+                    whiteSpace="pre-wrap"
+                  >
+                    {getExtractedInput(trace)}
+                  </Text>
+                </Message>
+                <Message
+                  trace={trace}
+                  author={project?.name ?? ""}
+                  avatar={
+                    <Avatar
+                      size="sm"
+                      name={project?.name}
+                      background="orange.400"
+                    />
+                  }
+                  timestamp={
+                    trace.timestamps.started_at +
+                    (trace.metrics.first_token_ms ??
+                      trace.metrics.total_time_ms ??
+                      0)
+                  }
+                >
+                  {trace.error && !trace.output?.value ? (
+                    <VStack alignItems="flex-start" spacing={2} paddingY={2}>
+                      <Box
+                        fontSize={11}
+                        color="red.400"
+                        textTransform="uppercase"
+                        fontWeight="bold"
+                      >
+                        Exception
+                      </Box>
+                      <Text color="red.900">{trace.error.message}</Text>
+                    </VStack>
+                  ) : trace.output?.value ? (
+                    <Markdown className="markdown markdown-conversation-history">
+                      {trace.output.value}
+                    </Markdown>
+                  ) : (
+                    <Text paddingY={2}>{"<empty>"}</Text>
+                  )}
+                </Message>
+              </Box>
+            </GridItem>
+            <Box>
+              <Annotations traceId={trace.trace_id} />
             </Box>
-
-            <Annotations traceId={trace.trace_id} />
-          </HStack>
+          </Grid>
         </Container>
       </Box>
     </VStack>
