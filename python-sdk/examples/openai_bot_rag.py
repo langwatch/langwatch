@@ -16,7 +16,7 @@ import langwatch.openai
 
 
 @langwatch.span(type="rag")
-def retrieve(query: str):
+def rag_retrieval(query: str):
     # the documents you retrieved from your vector database
     search_results = [
         {
@@ -52,7 +52,7 @@ async def main(message: cl.Message):
         content="",
     )
 
-    contexts = retrieve(message.content)
+    contexts = rag_retrieval(message.content)
 
     completion = client.chat.completions.create(
         model="gpt-3.5-turbo",

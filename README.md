@@ -1,6 +1,7 @@
-![PyPI Version](https://img.shields.io/pypi/v/langwatch.svg)
 ![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)
-[![Discord](https://img.shields.io/discord/1227886780536324106?logo=discord&label=Discord)](https://discord.gg/kT4PhDS2gH)
+[![Discord](https://dcbadge.limes.pink/api/server/https://discord.gg/kT4PhDS2gH?style=flat)](https://discord.gg/kT4PhDS2gH)
+[![LangWatch Python SDK version](https://img.shields.io/pypi/v/langwatch?color=007EC6)](https://pypi.org/project/langwatch/)
+[![LangWatch TypeScript SDK version](https://img.shields.io/npm/v/langwatch?color=007EC6)](https://www.npmjs.com/package/langwatch)
 
 # LangWatch
 
@@ -88,7 +89,6 @@ That's it! Now open the link provided when the compilation starts or go to your 
 
 ![DSPy Visualizer](https://github.com/langwatch/langwatch/assets/792201/47312dfe-980f-4c09-9610-67ad064cbe86)
 
-
 ## Local Development
 
 You need to have docker and docker compose installed in your local environment to be able to run LangWatch locally.
@@ -106,8 +106,8 @@ OPENAI_API_KEY=""
 ```
 
 3. Setup an [auth0](auth0.com) account (there should be a free plan and it should be more than enough).
-    Create a simple app (for next.js) and take note of the credentials.
-    You will use these credentials to update these env variables in .env file:
+   Create a simple app (for next.js) and take note of the credentials.
+   You will use these credentials to update these env variables in .env file:
 
 ```
 AUTH0_CLIENT_ID=""

@@ -1,4 +1,3 @@
-import asyncio
 import os
 from concurrent.futures import Future, ThreadPoolExecutor
 import time
@@ -7,7 +6,6 @@ from warnings import warn
 from deprecated import deprecated
 
 import nanoid
-from pydantic import BaseModel
 import requests
 from langwatch.types import (
     BaseSpan,
@@ -428,10 +426,13 @@ class ContextTrace:
     metadata: Optional[TraceMetadata] = None
     span: Type[ContextSpan]
 
+    api_key: Optional[str] = None
+
     def __init__(
         self,
         trace_id: Optional[str] = None,
         metadata: Optional[TraceMetadata] = None,
+        api_key: Optional[str] = None,
     ):
         self.spans: Dict[str, Span] = {}
         self.trace_id = trace_id or f"trace_{nanoid.generate()}"
@@ -439,6 +440,7 @@ class ContextTrace:
         self.span = cast(
             Type[ContextSpan], lambda **kwargs: ContextSpan(trace=self, **kwargs)
         )
+        self.api_key = api_key
 
     def __enter__(self):
         self.context_token = current_trace_var.set(self)
@@ -450,7 +452,11 @@ class ContextTrace:
             current_trace_var.reset(self.context_token)
 
     def __call__(self, func: T) -> T:
-        trace_kwargs = {"trace_id": None, "metadata": self.metadata}
+        trace_kwargs = {
+            "trace_id": None,
+            "metadata": self.metadata,
+            "api_key": self.api_key,
+        }
 
         if inspect.iscoroutinefunction(func):
 
@@ -501,7 +507,8 @@ class ContextTrace:
                 trace_id=self.trace_id,
                 metadata=self.metadata,
                 spans=list(self.spans.values()),
-            )
+            ),
+            api_key=self.api_key,
         )
 
     def append_span(self, span: Span):
@@ -566,7 +573,7 @@ class ContextTrace:
 
 
 @retry(tries=5, delay=0.5, backoff=3)
-def send_spans(data: CollectorRESTParams):
+def send_spans(data: CollectorRESTParams, api_key: Optional[str] = None):
     if len(data["spans"]) == 0:
         return
     if not langwatch.api_key:
@@ -581,7 +588,7 @@ def send_spans(data: CollectorRESTParams):
         langwatch.endpoint + "/api/collector",
         data=json.dumps(data, cls=SerializableAndPydanticEncoder),
         headers={
-            "X-Auth-Token": str(langwatch.api_key),
+            "X-Auth-Token": str(api_key or langwatch.api_key),
             "Content-Type": "application/json",
         },
     )
