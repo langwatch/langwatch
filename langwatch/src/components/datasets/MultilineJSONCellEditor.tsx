@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState, useCallback } from "react";
-import type { CustomCellEditorProps } from "ag-grid-react";
+import type { CustomCellEditorProps } from "@ag-grid-community/react";
 import { Textarea, VStack, Text, Alert, Tooltip } from "@chakra-ui/react";
 import { ZodError, type ZodType } from "zod";
 import { fromZodError } from "zod-validation-error";
@@ -9,9 +9,12 @@ export function MultilineJSONCellEditor(
   props: CustomCellEditorProps & { zodValidator: ZodType }
 ) {
   const { value, onValueChange } = props;
-  const updateValue = useCallback((val: string) => {
-    onValueChange(val === "" ? null : val);
-  }, [onValueChange]);
+  const updateValue = useCallback(
+    (val: string) => {
+      onValueChange(val === "" ? null : val);
+    },
+    [onValueChange]
+  );
 
   useEffect(() => {
     if (typeof value === "string") {

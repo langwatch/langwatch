@@ -55,8 +55,6 @@
     "@trpc/react-query": "^10.34.0",
     "@trpc/server": "^10.34.0",
     "@vercel/analytics": "^1.1.1",
-    "ag-grid-community": "^31.3.2",
-    "ag-grid-react": "^31.3.2",
     "ai": "^3.1.1",
     "bullmq": "^4.12.8",
     "chakra-react-select": "^4.7.6",

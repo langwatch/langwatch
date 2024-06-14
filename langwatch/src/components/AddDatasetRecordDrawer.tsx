@@ -15,8 +15,7 @@ import {
   useDisclosure,
   useToast,
 } from "@chakra-ui/react";
-import { type ColDef } from "ag-grid-community";
-import type { CustomCellRendererProps } from "ag-grid-react";
+import type { CustomCellRendererProps, ColDef } from "@ag-grid-community/react";
 import { nanoid } from "nanoid";
 import NextLink from "next/link";
 import { useEffect, useMemo, useState } from "react";
