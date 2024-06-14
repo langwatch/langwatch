@@ -23,7 +23,7 @@ LangWatch provides a suite of tools to track, visualize, and analyze interaction
 - 🚀 **User Analytics**: Metrics on engagement, user interactions and more insights into users behaviour so you can improve your product.
 - 🛡️ **Guardrails**: Detect PII leak with Google DLP, toxic language with Azure Moderation and many others LangWatch Guardrails available to monitor your LLM outputs and trigger alerts. Build custom Guardrails yourself with semantic matching or another LLM on top evaluating the response.
 
-## Quickstart
+## Quickstart (OpenAI Python)
 
 Install LangWatch library:
 
@@ -31,23 +31,27 @@ Install LangWatch library:
 pip install langwatch
 ```
 
-Then simply wrap your LLM call with LangWatch tracer, no other code changes needed:
+Then add the `@langwatch.trace()` decorator to the function that triggers your llm pipeline:
 
 ```diff
-+ import langwatch.openai
++ import langwatch
 
-+ with langwatch.openai.OpenAITracer(client):
-      completion = client.chat.completions.create(
-          model="gpt-3.5-turbo",
-          messages=[
-              {
-                  "role": "system",
-                  "content": "You are a helpful assistant that only reply in short tweet-like responses, using lots of emojis.",
-              },
-              {"role": "user", "content": message.content},
-          ],
-          stream=True,
-      )
++ @langwatch.trace()
+  def main():
+      client = OpenAI()
+      ...
+```
+
+Now, enable autotracking of OpenAI calls for this trace with `autotrack_openai_calls()`:
+
+```diff
+  import langwatch
+
+  @langwatch.trace()
+  def main():
+      client = OpenAI()
++     langwatch.get_current_trace().autotrack_openai_calls(client)
+
 ```
 
 Next, you need to make sure to have LANGWATCH_API_KEY exported:
@@ -58,7 +62,9 @@ export LANGWATCH_API_KEY='your_api_key_here'
 
 [Set up your project](https://app.langwatch.ai) on LangWatch to generate your API key.
 
-For integration details of other LLMs and frameworks, refer our [documentation](https://docs.langwatch.ai/).
+That's it! All your LLM calls will now be automatically captured on LangWatch, for monitoring, analytics and evaluations.
+
+For more advanced tracking and integration details of other languages like **TypeScript** and frameworks like **LangChain**, refer our [documentation](https://docs.langwatch.ai/).
 
 ## DSPy Visualizer Quickstart
 
