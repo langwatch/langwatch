@@ -20,16 +20,19 @@ import {
   Text,
   Tooltip,
   VStack,
+  Select,
 } from "@chakra-ui/react";
 import type { Project } from "@prisma/client";
 import { useRouter } from "next/router";
 import React, { createRef, useEffect, useRef, useState } from "react";
 import {
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   ChevronUp,
   Layers,
   Maximize2,
-  RefreshCw
+  RefreshCw,
 } from "react-feather";
 import { useFilterParams } from "../../hooks/useFilterParams";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
@@ -50,12 +53,17 @@ export function MessagesList() {
   >();
   const [groupBy] = useGroupBy();
   const { filterParams, queryOpts } = useFilterParams();
+  const [pageOffset, setPageOffset] = useState<number>(0);
+  const [pageSize, setPageSize] = useState<number>(25);
+  const [totalHits, setTotalHits] = useState<number>(0);
 
   const traceGroups = api.traces.getAllForProject.useQuery(
     {
       ...filterParams,
       query: getSingleQueryParam(router.query.query),
       groupBy,
+      pageOffset: pageOffset,
+      pageSize: pageSize,
     },
     queryOpts
   );
@@ -96,6 +104,14 @@ export function MessagesList() {
   }, [traceChecksQuery.data]);
 
   useEffect(() => {
+    if (traceGroups.isFetched) {
+      const totalHits: number = traceGroups.data?.totalHits ?? 0;
+
+      setTotalHits(totalHits);
+    }
+  }, [traceGroups.data?.totalHits, traceGroups.isFetched]);
+
+  useEffect(() => {
     const onFocus = () => {
       setTimeout(() => {
         void traceGroups.refetch();
@@ -104,6 +120,21 @@ export function MessagesList() {
     window.addEventListener("focus", onFocus);
     return () => window.removeEventListener("focus", onFocus);
   }, [traceGroups]);
+
+  const nextPage = () => {
+    setPageOffset(pageOffset + pageSize);
+  };
+
+  const prevPage = () => {
+    if (pageOffset > 0) {
+      setPageOffset(pageOffset - pageSize);
+    }
+  };
+
+  const changePageSize = (size: number) => {
+    setPageSize(size);
+    setPageOffset(0);
+  };
 
   return (
     <Container maxW={"calc(min(1440px, 100vw - 200px))"} padding={6}>
@@ -167,6 +198,52 @@ export function MessagesList() {
               <MessageSkeleton />
             </>
           )}
+          <HStack padding={6}>
+            <Text>Items per page </Text>
+
+            <Select
+              defaultValue={"25"}
+              placeholder=""
+              maxW="70px"
+              size="sm"
+              onChange={(e) => changePageSize(parseInt(e.target.value))}
+              borderColor={"black"}
+              borderRadius={"lg"}
+            >
+              <option value="10">10</option>
+              <option value="25">25</option>
+              <option value="50">50</option>
+              <option value="100">100</option>
+              <option value="250">250</option>
+            </Select>
+
+            <Text marginLeft={"20px"}>
+              {" "}
+              {`${pageOffset + 1}`} -{" "}
+              {`${
+                pageOffset + pageSize > totalHits
+                  ? totalHits
+                  : pageOffset + pageSize
+              }`}{" "}
+              of {`${totalHits}`} items
+            </Text>
+            <Button
+              width={10}
+              padding={0}
+              onClick={prevPage}
+              isDisabled={pageOffset === 0}
+            >
+              <ChevronLeft />
+            </Button>
+            <Button
+              width={10}
+              padding={0}
+              isDisabled={pageOffset + pageSize >= totalHits}
+              onClick={nextPage}
+            >
+              <ChevronRight />
+            </Button>
+          </HStack>
         </VStack>
         <FilterSidebar defaultShowFilters={true} />
       </HStack>
