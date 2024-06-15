@@ -1,6 +1,7 @@
 import {
   type MappingDenseVectorProperty,
   type MappingProperty,
+  type QueryDslBoolQuery,
 } from "@elastic/elasticsearch/lib/api/types";
 import {
   EVENTS_INDEX,
@@ -335,7 +336,7 @@ const tracesPivotMapping: ElasticSearchMappingFrom<
         spanMapping,
         "name",
         "input",
-        "outputs",
+        "output",
         "error",
         "params",
         "contexts"
@@ -511,6 +512,19 @@ async function createPivotTableTransform() {
     body: {
       source: {
         index: [TRACE_INDEX, SPAN_INDEX, TRACE_CHECKS_INDEX, EVENTS_INDEX],
+        query: {
+          bool: {
+            must: [
+              {
+                range: {
+                  "timestamps.updated_at": {
+                    gte: "now-1d",
+                  },
+                },
+              },
+            ] as QueryDslBoolQuery["must"],
+          } as QueryDslBoolQuery,
+        },
       },
       dest: {
         index: TRACES_PIVOT_INDEX,
@@ -613,10 +627,11 @@ async function createPivotTableTransform() {
           },
         },
       },
+      frequency: "5s",
       sync: {
         time: {
           field: "timestamps.updated_at",
-          delay: "60s",
+          delay: "1s",
         },
       },
       settings: {

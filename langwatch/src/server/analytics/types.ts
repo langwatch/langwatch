@@ -133,7 +133,7 @@ export type TracesPivot = {
   > & { input: { satisfaction_score?: number }; has_error: boolean };
   spans?: (Omit<
     ElasticSearchSpan,
-    "name" | "input" | "outputs" | "error" | "params" | "contexts"
+    "name" | "input" | "output" | "error" | "params" | "contexts"
   > & {
     has_error?: boolean;
     params?: { temperature: number; stream: boolean };
