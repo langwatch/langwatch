@@ -224,31 +224,42 @@ class OpenAICompletionTracer:
             Any, self.client.completions
         )._original_create(*args, **kwargs)
 
-        if isinstance(response, AsyncStream):
-            return capture_async_chunks_with_timings_and_reyield(
-                cast(AsyncGenerator[Completion, Any], response),
-                lambda chunks, first_token_at, finished_at: OpenAICompletionTracer.handle_deltas(
+        try:
+            if isinstance(response, AsyncStream):
+                return capture_async_chunks_with_timings_and_reyield(
+                    cast(AsyncGenerator[Completion, Any], response),
+                    lambda chunks, first_token_at, finished_at: OpenAICompletionTracer.handle_deltas(
+                        self.client,
+                        span,
+                        chunks,
+                        SpanTimestamps(
+                            started_at=started_at,
+                            first_token_at=first_token_at,
+                            finished_at=finished_at,
+                        ),
+                        **kwargs,
+                    ),
+                )
+            else:
+                finished_at = milliseconds_timestamp()
+                OpenAICompletionTracer.handle_completion(
                     self.client,
                     span,
-                    chunks,
-                    SpanTimestamps(
-                        started_at=started_at,
-                        first_token_at=first_token_at,
-                        finished_at=finished_at,
-                    ),
+                    response,
+                    SpanTimestamps(started_at=started_at, finished_at=finished_at),
                     **kwargs,
-                ),
-            )
-        else:
+                )
+                return response
+        except Exception as err:
             finished_at = milliseconds_timestamp()
-            OpenAICompletionTracer.handle_completion(
+            OpenAICompletionTracer.handle_exception(
                 self.client,
                 span,
-                response,
+                err,
                 SpanTimestamps(started_at=started_at, finished_at=finished_at),
                 **kwargs,
             )
-            return response
+            raise err
 
     @classmethod
     def handle_deltas(
@@ -483,31 +494,42 @@ class OpenAIChatCompletionTracer:
             Any, self.client.chat.completions
         )._original_create(*args, **kwargs)
 
-        if isinstance(response, AsyncStream):
-            return capture_async_chunks_with_timings_and_reyield(
-                cast(AsyncGenerator[ChatCompletionChunk, Any], response),
-                lambda chunks, first_token_at, finished_at: OpenAIChatCompletionTracer.handle_deltas(
+        try:
+            if isinstance(response, AsyncStream):
+                return capture_async_chunks_with_timings_and_reyield(
+                    cast(AsyncGenerator[ChatCompletionChunk, Any], response),
+                    lambda chunks, first_token_at, finished_at: OpenAIChatCompletionTracer.handle_deltas(
+                        self.client,
+                        span,
+                        chunks,
+                        SpanTimestamps(
+                            started_at=started_at,
+                            first_token_at=first_token_at,
+                            finished_at=finished_at,
+                        ),
+                        **kwargs,
+                    ),
+                )
+            else:
+                finished_at = milliseconds_timestamp()
+                OpenAIChatCompletionTracer.handle_completion(
                     self.client,
                     span,
-                    chunks,
-                    SpanTimestamps(
-                        started_at=started_at,
-                        first_token_at=first_token_at,
-                        finished_at=finished_at,
-                    ),
+                    response,
+                    SpanTimestamps(started_at=started_at, finished_at=finished_at),
                     **kwargs,
-                ),
-            )
-        else:
+                )
+                return response
+        except Exception as err:
             finished_at = milliseconds_timestamp()
-            OpenAIChatCompletionTracer.handle_completion(
+            OpenAIChatCompletionTracer.handle_exception(
                 self.client,
                 span,
-                response,
+                err,
                 SpanTimestamps(started_at=started_at, finished_at=finished_at),
                 **kwargs,
             )
-            return response
+            raise err
 
     @classmethod
     def handle_deltas(

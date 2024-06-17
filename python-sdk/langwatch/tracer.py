@@ -1,6 +1,7 @@
 import os
 from concurrent.futures import Future, ThreadPoolExecutor
 import time
+from types import ModuleType
 from typing import Any, Callable, Dict, List, Optional, Type, TypeVar, Union, cast
 from warnings import warn
 from deprecated import deprecated
@@ -570,6 +571,11 @@ class ContextTrace:
         import langwatch.openai  # import dynamically here instead of top-level because, believe it or not, users might not have openai installed
 
         langwatch.openai.OpenAITracer(trace=self, client=client)
+
+    def autotrack_litellm_calls(self, client: ModuleType):
+        import langwatch.litellm  # import dynamically here instead of top-level because users might not have litellm installed
+
+        langwatch.litellm.LiteLLMPatch(trace=self, client=client)
 
 
 @retry(tries=5, delay=0.5, backoff=3)
