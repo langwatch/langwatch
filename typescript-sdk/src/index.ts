@@ -25,6 +25,7 @@ import {
   type SpanInputOutput,
 } from "./types";
 import { captureError, convertFromVercelAIMessages } from "./utils";
+import { LangWatchCallbackHandler } from "./langchain";
 
 export type {
   BaseSpan,
@@ -185,6 +186,10 @@ export class LangWatchTrace {
       ...params,
     });
     return span;
+  }
+
+  getLangChainCallback() {
+    return new LangWatchCallbackHandler({ trace: this });
   }
 
   onEnd(span: ServerSpan) {

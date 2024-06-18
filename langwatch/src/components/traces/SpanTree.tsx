@@ -361,32 +361,34 @@ export function SpanTree(props: SpanTreeProps) {
                   </Text>
                 )}
               </VStack>
-              <VStack
-                alignItems="flex-start"
-                spacing={2}
-                paddingTop={4}
-                width="full"
-              >
-                <Box
-                  fontSize={13}
-                  color="gray.400"
-                  textTransform="uppercase"
-                  fontWeight="bold"
-                >
-                  Input
-                </Box>
-                <Box
-                  as="pre"
-                  borderRadius="6px"
-                  padding={4}
-                  borderWidth="1px"
-                  borderColor="gray.300"
+              {span.input && (
+                <VStack
+                  alignItems="flex-start"
+                  spacing={2}
+                  paddingTop={4}
                   width="full"
-                  whiteSpace="pre-wrap"
                 >
-                  <RenderInputOutput value={span.input?.value} />
-                </Box>
-              </VStack>
+                  <Box
+                    fontSize={13}
+                    color="gray.400"
+                    textTransform="uppercase"
+                    fontWeight="bold"
+                  >
+                    Input
+                  </Box>
+                  <Box
+                    as="pre"
+                    borderRadius="6px"
+                    padding={4}
+                    borderWidth="1px"
+                    borderColor="gray.300"
+                    width="full"
+                    whiteSpace="pre-wrap"
+                  >
+                    <RenderInputOutput value={span.input?.value} />
+                  </Box>
+                </VStack>
+              )}
               {span.contexts && (
                 <VStack
                   alignItems="flex-start"

@@ -18,22 +18,24 @@ import { Chat, Message } from '@/lib/types'
 import { nanoid } from '@/lib/utils'
 import { LangWatch, convertFromVercelAIMessages } from 'langwatch'
 import { ChatOpenAI } from '@langchain/openai'
+import { ChatPromptTemplate } from '@langchain/core/prompts'
 import {
   HumanMessage,
   SystemMessage,
   AIMessage,
   ToolMessage
 } from '@langchain/core/messages'
+import { StringOutputParser } from '@langchain/core/output_parsers'
 
 async function submitUserMessage(message: string) {
   'use server'
 
-  // const langwatch = new LangWatch()
-  // langwatch.on('error', e => {
-  //   console.log('Error from LangWatch:', e)
-  // })
+  const langwatch = new LangWatch()
+  langwatch.on('error', e => {
+    console.log('Error from LangWatch:', e)
+  })
 
-  // const trace = langwatch.getTrace()
+  const trace = langwatch.getTrace()
 
   const aiState = getMutableAIState<typeof LangChainAI>()
 
@@ -71,8 +73,6 @@ async function submitUserMessage(message: string) {
   //   // })
   // }
 
-  const model = new ChatOpenAI({ model: 'gpt-4' })
-
   const messages = [
     new SystemMessage('Translate the following from English into Italian'),
     ...aiState.get().messages.map(message => {
@@ -92,7 +92,18 @@ async function submitUserMessage(message: string) {
     })
   ]
 
-  const stream = await model.stream(messages)
+  const prompt = ChatPromptTemplate.fromMessages(messages)
+  const model = new ChatOpenAI({ model: 'gpt-3.5-turbo' })
+  const outputParser = new StringOutputParser()
+
+  const chain = prompt.pipe(model).pipe(outputParser)
+
+  const stream = await chain.stream(
+    {},
+    {
+      callbacks: [trace.getLangChainCallback()]
+    }
+  )
 
   let textStream = createStreamableValue('')
   let textNode = <BotMessage content={textStream.value} />
@@ -100,8 +111,8 @@ async function submitUserMessage(message: string) {
 
   setTimeout(async () => {
     for await (const chunk of stream) {
-      textStream.update(chunk.content.toString())
-      content += chunk.content.toString()
+      textStream.update(chunk)
+      content += chunk
     }
 
     textStream?.done()

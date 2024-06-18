@@ -182,6 +182,7 @@ class LangChainTracer(BaseCallbackHandler):
         return span
 
     def on_llm_new_token(self, token: str, **kwargs: Any) -> Any:
+        # TODO: capture first_token_at, copy from TypeScript implementation and test it
         pass
 
     def on_llm_end(self, response: LLMResult, *, run_id: UUID, **kwargs: Any) -> Any:
@@ -257,7 +258,7 @@ class LangChainTracer(BaseCallbackHandler):
     def on_chain_end(
         self, outputs: Dict[str, Any], *, run_id: UUID, **kwargs: Any
     ) -> Any:
-        self._end_base_span(run_id, outputs=[self._autoconvert_typed_values(outputs)])
+        self._end_base_span(run_id, output=self._autoconvert_typed_values(outputs))
 
     def on_chain_error(self, error: Exception, *, run_id: UUID, **kwargs: Any) -> Any:
         self._on_error_base_span(run_id, error)
@@ -304,20 +305,11 @@ class LangChainTracer(BaseCallbackHandler):
 
         return span
 
-    def _end_base_span(self, run_id: UUID, outputs: List[SpanInputOutput]):
+    def _end_base_span(self, run_id: UUID, output: SpanInputOutput):
         span = self.spans.get(str(run_id))
         if span == None:
             return
 
-        output = (
-            None
-            if len(outputs) == 0
-            else (
-                outputs[0]
-                if len(outputs) == 1
-                else TypedValueList(type="list", value=outputs)
-            )
-        )
         span.update(output=output)
         span.__exit__()
 
@@ -334,7 +326,7 @@ class LangChainTracer(BaseCallbackHandler):
         run_id: UUID,
         **kwargs: Any,
     ) -> Any:
-        self._end_base_span(run_id, outputs=[self._autoconvert_typed_values(output)])
+        self._end_base_span(run_id, output=self._autoconvert_typed_values(output))
 
     def on_tool_error(self, error: Exception, *, run_id: UUID, **kwargs: Any) -> Any:
         self._on_error_base_span(run_id, error)
@@ -362,7 +354,7 @@ class LangChainTracer(BaseCallbackHandler):
         **kwargs: Any,
     ) -> Any:
         self._end_base_span(
-            run_id, outputs=[self._autoconvert_typed_values(finish.return_values)]
+            run_id, output=self._autoconvert_typed_values(finish.return_values)
         )
 
     def _autoconvert_typed_values(self, output: Any) -> SpanInputOutput:
