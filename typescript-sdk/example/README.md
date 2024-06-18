@@ -8,3 +8,5 @@ Run it with:
 npm install
 npm run dev
 ```
+
+Go to lib/chat folder to see the example integrations with different frameworks (vercel-ai, langchain.js, etc)

@@ -4,9 +4,10 @@ import { AI } from '@/lib/chat/vercel-ai'
 import { auth } from '@/auth'
 import { Session } from '@/lib/types'
 import { getMissingKeys } from '@/app/actions'
+import { LangChainAI } from '../../lib/chat/langchain'
 
 export const metadata = {
-  title: 'Vercel AI SDK Example'
+  title: 'LangChain.js Example'
 }
 
 export default async function IndexPage() {
@@ -17,11 +18,11 @@ export default async function IndexPage() {
   return (
     <>
       <div className="text-center w-full absolute pt-1">
-        Vercel AI SDK example
+        LangChain.js Example
       </div>
-      <AI initialAIState={{ chatId: id, messages: [] }}>
+      <LangChainAI initialAIState={{ chatId: id, messages: [] }}>
         <Chat id={id} session={session} missingKeys={missingKeys} />
-      </AI>
+      </LangChainAI>
     </>
   )
 }

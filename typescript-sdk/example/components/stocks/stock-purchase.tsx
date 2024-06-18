@@ -4,7 +4,7 @@ import { useId, useState } from 'react'
 import { useActions, useAIState, useUIState } from 'ai/rsc'
 import { formatNumber } from '@/lib/utils'
 
-import type { AI } from '@/lib/chat/actions'
+import type { AI } from '@/lib/chat/vercel-ai'
 
 interface Purchase {
   numberOfShares?: number

@@ -4,7 +4,7 @@ import { notFound, redirect } from 'next/navigation'
 import { auth } from '@/auth'
 import { getChat, getMissingKeys } from '@/app/actions'
 import { Chat } from '@/components/chat'
-import { AI } from '@/lib/chat/actions'
+import { AI } from '@/lib/chat/vercel-ai'
 import { Session } from '@/lib/types'
 
 export interface ChatPageProps {
