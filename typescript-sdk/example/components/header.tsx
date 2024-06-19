@@ -81,6 +81,10 @@ export function Header() {
         <Button variant="link" asChild className="-ml-2">
           <Link href="/langchain">LangChain.js</Link>
         </Button>
+        <IconSeparator className="size-6 text-muted-foreground/50" />
+        <Button variant="link" asChild className="-ml-2">
+          <Link href="/langchain-rag">LangChain.js RAG</Link>
+        </Button>
       </div>
       <div className="flex items-center justify-end space-x-2">
         <a

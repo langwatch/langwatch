@@ -2,7 +2,7 @@ import EventEmitter from "events";
 import { nanoid } from "nanoid";
 import { ZodError } from "zod";
 import { fromZodError } from "zod-validation-error";
-import { camelToSnakeCaseNested, type Strict } from "./helpers";
+import { camelToSnakeCaseNested, type Strict } from "./typeUtils";
 import {
   type CollectorRESTParams,
   type Span as ServerSpan,
@@ -24,7 +24,7 @@ import {
   type RAGSpan,
   type SpanInputOutput,
 } from "./types";
-import { captureError, convertFromVercelAIMessages } from "./utils";
+import { autoconvertTypedValues, captureError, convertFromVercelAIMessages } from "./utils";
 import { LangWatchCallbackHandler } from "./langchain";
 
 export type {
@@ -40,7 +40,7 @@ export type {
   SpanInputOutput,
 };
 
-export { convertFromVercelAIMessages, captureError };
+export { convertFromVercelAIMessages, captureError, autoconvertTypedValues };
 
 export class LangWatch extends EventEmitter {
   apiKey: string | undefined;

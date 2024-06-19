@@ -5,6 +5,12 @@
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    }
+  },
   "repository": {
     "type": "git",
     "url": "https://github.com/langwatch/langwatch.git",
@@ -13,7 +19,7 @@
   "scripts": {
     "prepare": "cp ../langwatch/src/server/tracer/types.ts src/server/types/tracer.ts && ts-to-zod src/server/types/tracer.ts src/server/types/tracer.generated.ts",
     "test": "vitest",
-    "build": "npm run prepare && tsup",
+    "build": "npm run prepare && tsup && esbuild src/index.ts --bundle --platform=node --outfile=dist/index.js",
     "prepublish": "npm run build"
   },
   "author": "",
@@ -28,6 +34,7 @@
     "@types/eslint__js": "^8.42.3",
     "@types/node": "^16.0.0",
     "dotenv": "^16.4.5",
+    "esbuild": "^0.21.5",
     "eslint": "^8.57.0",
     "ts-to-zod": "^3.4.1",
     "tsup": "^8.1.0",

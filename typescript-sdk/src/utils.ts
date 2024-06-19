@@ -1,7 +1,13 @@
 import { convertUint8ArrayToBase64 } from "@ai-sdk/provider-utils";
 import { type ImagePart, type CoreMessage } from "ai";
-import { type ChatMessage } from "./types";
+import { type ChatMessage, type SpanInputOutput } from "./types";
 import { type ErrorCapture } from "./server/types/tracer";
+import {
+  chatMessageSchema,
+  spanInputOutputSchema,
+  typedValueChatMessagesSchema,
+} from "./server/types/tracer.generated";
+import { z } from "zod";
 
 const convertImageToUrl = (
   image: ImagePart["image"],
@@ -175,5 +181,26 @@ export const captureError = (error: unknown): ErrorCapture => {
       message: String(error),
       stacktrace: [],
     };
+  }
+};
+
+export const autoconvertTypedValues = (value: unknown): SpanInputOutput => {
+  if (typeof value === "string") {
+    return { type: "text", value };
+  }
+
+  const chatMessages = z.array(chatMessageSchema).safeParse(value);
+  if (Array.isArray(value) && chatMessages.success) {
+    return {
+      type: "chat_messages",
+      value: chatMessages.data,
+    };
+  }
+
+  try {
+    JSON.stringify(value);
+    return { type: "json", value: value as object };
+  } catch (e) {
+    return { type: "raw", value: value as any };
   }
 };

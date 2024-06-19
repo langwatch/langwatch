@@ -1,6 +1,6 @@
 import type modelPrices from "llm-cost/model_prices_and_context_window.json";
 import type { OpenAI } from "openai";
-import { type SnakeToCamelCaseNested } from "./helpers";
+import { type SnakeToCamelCaseNested } from "./typeUtils";
 import {
   type BaseSpan as ServerBaseSpan,
   type ChatMessage as ServerChatMessage,

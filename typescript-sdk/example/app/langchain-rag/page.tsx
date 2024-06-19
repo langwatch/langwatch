@@ -1,9 +1,10 @@
 import { nanoid } from '@/lib/utils'
 import { Chat } from '@/components/chat'
+import { AI } from '@/lib/chat/vercel-ai'
 import { auth } from '@/auth'
 import { Session } from '@/lib/types'
 import { getMissingKeys } from '@/app/actions'
-import { LangChainAI } from '../../lib/chat/langchain'
+import { LangChainRAGAI } from '../../lib/chat/langchain-rag'
 
 export const metadata = {
   title: 'LangChain.js Example'
@@ -17,11 +18,11 @@ export default async function IndexPage() {
   return (
     <>
       <div className="text-center w-full absolute pt-1">
-        LangChain.js Example
+        LangChain.js RAG Example
       </div>
-      <LangChainAI initialAIState={{ chatId: id, messages: [] }}>
+      <LangChainRAGAI initialAIState={{ chatId: id, messages: [] }}>
         <Chat id={id} session={session} missingKeys={missingKeys} />
-      </LangChainAI>
+      </LangChainRAGAI>
     </>
   )
 }
