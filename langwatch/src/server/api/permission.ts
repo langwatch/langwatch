@@ -17,6 +17,11 @@ export const teamRolePermissionMapping = {
   ANALYTICS_MANAGE: [TeamUserRole.ADMIN, TeamUserRole.MEMBER],
   COST_VIEW: [TeamUserRole.ADMIN, TeamUserRole.MEMBER],
   MESSAGES_VIEW: [TeamUserRole.ADMIN, TeamUserRole.MEMBER, TeamUserRole.VIEWER],
+  ANNOTATIONS_VIEW: [
+    TeamUserRole.ADMIN,
+    TeamUserRole.MEMBER,
+    TeamUserRole.VIEWER,
+  ],
   SPANS_DEBUG: [TeamUserRole.ADMIN, TeamUserRole.MEMBER],
   GUARDRAILS_VIEW: [
     TeamUserRole.ADMIN,
@@ -66,7 +71,8 @@ const isDemoProject = (projectId: string, roleGroup: string): boolean => {
       roleGroup === TeamRoleGroup.ANALYTICS_VIEW ||
       roleGroup === TeamRoleGroup.COST_VIEW ||
       roleGroup === TeamRoleGroup.SPANS_DEBUG ||
-      roleGroup === TeamRoleGroup.GUARDRAILS_VIEW)
+      roleGroup === TeamRoleGroup.GUARDRAILS_VIEW ||
+      roleGroup === TeamRoleGroup.ANNOTATIONS_VIEW)
   ) {
     return true;
   }

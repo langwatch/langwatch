@@ -58,7 +58,7 @@ export const annotationRouter = createTRPCRouter({
         projectId: z.string(),
       })
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.ANNOTATIONS_MANAGE))
+    .use(checkUserPermissionForProject(TeamRoleGroup.ANNOTATIONS_VIEW))
     .query(async ({ ctx, input }) => {
       return ctx.prisma.annotation.findMany({
         where: {
@@ -80,7 +80,7 @@ export const annotationRouter = createTRPCRouter({
         projectId: z.string(),
       })
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.ANNOTATIONS_MANAGE))
+    .use(checkUserPermissionForProject(TeamRoleGroup.ANNOTATIONS_VIEW))
     .query(async ({ ctx, input }) => {
       return ctx.prisma.annotation.findMany({
         where: {
@@ -99,7 +99,7 @@ export const annotationRouter = createTRPCRouter({
     }),
   getById: protectedProcedure
     .input(z.object({ annotationId: z.string(), projectId: z.string() }))
-    .use(checkUserPermissionForProject(TeamRoleGroup.ANNOTATIONS_MANAGE))
+    .use(checkUserPermissionForProject(TeamRoleGroup.ANNOTATIONS_VIEW))
     .query(async ({ ctx, input }) => {
       return ctx.prisma.annotation.findUnique({
         where: {
