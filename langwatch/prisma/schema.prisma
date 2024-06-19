@@ -171,6 +171,7 @@ model Project {
     modelProviders       ModelProvider[]
     topicClusteringModel String?
     TriggerSent          TriggerSent[]
+    AnnotationTag        AnnotationTag[]
 
     @@index([teamId])
 }
@@ -432,5 +433,26 @@ model TriggerSent {
 
     @@unique([triggerId, traceId])
     @@index([triggerId])
+    @@index([projectId])
+}
+
+enum AnnotationTagDataType {
+    CATEGORICAL
+    BOOLEAN
+    LIKERT
+}
+
+model AnnotationScores {
+    id          String                @id @default(nanoid())
+    name        String
+    projectId   String
+    project     Project               @relation(fields: [projectId], references: [id])
+    createdAt   DateTime              @default(now())
+    updatedAt   DateTime              @default(now()) @updatedAt
+    description String?
+    active      Boolean               @default(true)
+    dataType    AnnotationTagDataType
+    options     Json?
+
     @@index([projectId])
 }

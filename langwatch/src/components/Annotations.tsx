@@ -1,4 +1,4 @@
-import { VStack, HStack, Spacer, Box, Text } from "@chakra-ui/react";
+import { VStack, HStack, Spacer, Box, Text, Card } from "@chakra-ui/react";
 import { api } from "~/utils/api";
 import { useEffect } from "react";
 import { Edit, ThumbsUp, ThumbsDown } from "react-feather";
@@ -27,8 +27,7 @@ export const Annotations = ({ traceId }: { traceId: string }) => {
       {annotations.data?.map((annotation) => {
         const isCurrentUser = data?.user?.id === annotation.user?.id;
         return (
-          <Box
-            backgroundColor="gray.100"
+          <Card
             padding={3}
             borderRadius={5}
             width="300px"
@@ -81,7 +80,7 @@ export const Annotations = ({ traceId }: { traceId: string }) => {
               </HStack>
               <Text>{annotation.comment}</Text>
             </VStack>
-          </Box>
+          </Card>
         );
       })}
     </VStack>
