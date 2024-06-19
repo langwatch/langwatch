@@ -72,7 +72,8 @@ const isDemoProject = (projectId: string, roleGroup: string): boolean => {
       roleGroup === TeamRoleGroup.COST_VIEW ||
       roleGroup === TeamRoleGroup.SPANS_DEBUG ||
       roleGroup === TeamRoleGroup.GUARDRAILS_VIEW ||
-      roleGroup === TeamRoleGroup.ANNOTATIONS_VIEW)
+      roleGroup === TeamRoleGroup.ANNOTATIONS_VIEW ||
+      roleGroup === TeamRoleGroup.PLAYGROUND)
   ) {
     return true;
   }
