@@ -139,6 +139,7 @@ export class LangWatchTrace {
   metadata?: Metadata;
   finishedSpans: Record<string, ServerSpan> = {};
   timeoutRef?: NodeJS.Timeout;
+  langchainCallback?: LangWatchCallbackHandler;
 
   constructor({
     client,
@@ -189,7 +190,10 @@ export class LangWatchTrace {
   }
 
   getLangChainCallback() {
-    return new LangWatchCallbackHandler({ trace: this });
+    if (!this.langchainCallback) {
+      this.langchainCallback = new LangWatchCallbackHandler({ trace: this });
+    }
+    return this.langchainCallback;
   }
 
   onEnd(span: ServerSpan) {

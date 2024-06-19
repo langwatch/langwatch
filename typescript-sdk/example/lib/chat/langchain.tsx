@@ -18,14 +18,29 @@ import { Chat, Message } from '@/lib/types'
 import { nanoid } from '@/lib/utils'
 import { LangWatch, convertFromVercelAIMessages } from 'langwatch'
 import { ChatOpenAI } from '@langchain/openai'
-import { ChatPromptTemplate } from '@langchain/core/prompts'
+import {
+  ChatPromptTemplate,
+  PromptTemplateInput
+} from '@langchain/core/prompts'
 import {
   HumanMessage,
   SystemMessage,
   AIMessage,
-  ToolMessage
+  ToolMessage,
+  BaseMessageLike
 } from '@langchain/core/messages'
 import { StringOutputParser } from '@langchain/core/output_parsers'
+import { CallbackManagerForRetrieverRun } from '@langchain/core/callbacks/manager'
+import {
+  BaseRetriever,
+  type BaseRetrieverInput
+} from '@langchain/core/retrievers'
+import { Document } from '@langchain/core/documents'
+import {
+  RunnableLambda,
+  RunnableMap,
+  RunnablePassthrough
+} from '@langchain/core/runnables'
 
 async function submitUserMessage(message: string) {
   'use server'
@@ -39,6 +54,24 @@ async function submitUserMessage(message: string) {
 
   const aiState = getMutableAIState<typeof LangChainAI>()
 
+  const messages: BaseMessageLike[] = [
+    ['system', 'Translate the following from English into Italian'],
+    ...(aiState.get().messages.map(message => {
+      if (message.role === 'system') {
+        return ['system', message.content.toString()]
+      }
+      if (message.role === 'user') {
+        return ['human', message.content.toString()]
+      }
+      if (message.role === 'tool') {
+        return ['tool', message.content.toString()]
+      }
+      return ['ai', message.content.toString()]
+    }) as BaseMessageLike[]),
+    ['ai', 'Retrieved the following context: {context}'],
+    ['human', '{question}']
+  ]
+
   aiState.update({
     ...aiState.get(),
     messages: [
@@ -51,59 +84,28 @@ async function submitUserMessage(message: string) {
     ]
   })
 
-  // const span = trace.startLLMSpan({
-  //   model: 'gpt-3.5-turbo',
-  //   input: {
-  //     type: 'chat_messages',
-  //     value: [
-  //       {
-  //         role: 'system',
-  //         content: system
-  //       },
-  //       ...convertFromVercelAIMessages(aiState.get().messages)
-  //     ]
-  //   }
-  // })
-
-  //   // span.end({
-  //   //   output: {
-  //   //     type: 'chat_messages',
-  //   //     value: convertFromVercelAIMessages(output)
-  //   //   }
-  //   // })
-  // }
-
-  const messages = [
-    new SystemMessage('Translate the following from English into Italian'),
-    ...aiState.get().messages.map(message => {
-      if (message.role === 'system') {
-        return new SystemMessage(message.content)
-      }
-      if (message.role === 'user') {
-        return new HumanMessage(message.content.toString())
-      }
-      if (message.role === 'tool') {
-        return new ToolMessage({
-          content: message.content,
-          tool_call_id: message.content[0]!.toolCallId
-        })
-      }
-      return new AIMessage(message.content.toString())
-    })
-  ]
-
   const prompt = ChatPromptTemplate.fromMessages(messages)
   const model = new ChatOpenAI({ model: 'gpt-3.5-turbo' })
+  const retriever = new CustomRetriever()
   const outputParser = new StringOutputParser()
 
-  const chain = prompt.pipe(model).pipe(outputParser)
+  const setupAndRetrieval = RunnableMap.from({
+    context: new RunnableLambda({
+      func: (input: string) =>
+        retriever
+          .invoke(input, {
+            callbacks: [trace.getLangChainCallback()]
+          })
+          .then(response => response[0].pageContent)
+    }).withConfig({ runName: 'contextRetriever' }),
+    question: new RunnablePassthrough()
+  })
 
-  const stream = await chain.stream(
-    {},
-    {
-      callbacks: [trace.getLangChainCallback()]
-    }
-  )
+  const chain = setupAndRetrieval.pipe(prompt).pipe(model).pipe(outputParser)
+
+  const stream = await chain.stream(message, {
+    callbacks: [trace.getLangChainCallback()]
+  })
 
   let textStream = createStreamableValue('')
   let textNode = <BotMessage content={textStream.value} />
@@ -162,3 +164,28 @@ export const LangChainAI = createAI<AIState, UIState>({
     return
   }
 })
+
+export class CustomRetriever extends BaseRetriever {
+  lc_namespace = ['langchain', 'retrievers']
+
+  constructor(fields?: BaseRetrieverInput) {
+    super(fields)
+  }
+
+  async _getRelevantDocuments(
+    query: string,
+    _runManager?: CallbackManagerForRetrieverRun
+  ): Promise<Document[]> {
+    console.log('query', query)
+    return [
+      new Document({
+        pageContent: `Some document pertaining to ${query}`,
+        metadata: {}
+      }),
+      new Document({
+        pageContent: `Some other document pertaining to ${query}`,
+        metadata: {}
+      })
+    ]
+  }
+}

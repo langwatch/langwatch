@@ -1,5 +1,6 @@
 import type { AgentAction, AgentFinish } from "@langchain/core/agents";
 import { BaseCallbackHandler } from "@langchain/core/callbacks/base";
+import { type DocumentInterface } from "@langchain/core/documents";
 import type { Serialized } from "@langchain/core/load/serializable";
 import {
   AIMessage,
@@ -18,14 +19,19 @@ import {
 } from "@langchain/core/messages";
 import type { ChatGeneration, LLMResult } from "@langchain/core/outputs";
 import type { ChainValues } from "@langchain/core/utils/types";
-import { type LangWatchSpan, type LangWatchTrace } from ".";
+import { stringify } from "javascript-stringify";
 import {
+  type LangWatchRAGSpan,
+  type LangWatchSpan,
+  type LangWatchTrace,
+} from ".";
+import {
+  type RAGSpan,
   type BaseSpan,
   type ChatMessage,
   type ChatRichContent,
   type SpanInputOutput,
 } from "./types";
-import { stringify } from "javascript-stringify";
 
 export class LangWatchCallbackHandler extends BaseCallbackHandler {
   name = "LangWatchCallbackHandler";
@@ -79,8 +85,7 @@ export class LangWatchCallbackHandler extends BaseCallbackHandler {
     name?: string | undefined;
   }) {
     try {
-      const parent =
-        (parentRunId ? this.spans[parentRunId] : this.trace) ?? this.trace;
+      const parent = this.getParent(parentRunId);
 
       const vendor = metadata?.ls_provider ?? llm.id.at(-2)?.toString();
       const model =
@@ -284,6 +289,65 @@ export class LangWatchCallbackHandler extends BaseCallbackHandler {
     this.errorSpan({ runId, error: err });
   }
 
+  async handleRetrieverStart(
+    retriever: Serialized,
+    query: string,
+    runId: string,
+    parentRunId?: string | undefined,
+    _tags?: string[] | undefined,
+    _metadata?: Record<string, unknown> | undefined,
+    name?: string | undefined
+  ) {
+    try {
+      const parent = this.getParent(parentRunId);
+
+      this.spans[runId] = parent.startRAGSpan({
+        spanId: runId,
+        name: name ?? retriever.name ?? retriever.id.at(-1)?.toString(),
+        input: this.autoconvertTypedValues(query),
+      });
+    } catch (e) {
+      this.trace.client.emit("error", e);
+      throw e;
+    }
+  }
+
+  async handleRetrieverEnd(
+    documents: DocumentInterface<Record<string, any>>[],
+    runId: string,
+    _parentRunId?: string | undefined,
+    _tags?: string[] | undefined
+  ) {
+    try {
+      const contexts: RAGSpan["contexts"] = documents.map((doc) => ({
+        content: doc.pageContent,
+        ...(doc.metadata.source ? { documentId: doc.metadata.source } : {}),
+      }));
+
+      const span = this.spans[runId] as LangWatchRAGSpan;
+      if (!span) {
+        return;
+      }
+
+      span.end({
+        contexts,
+        output: this.autoconvertTypedValues(documents),
+      });
+    } catch (e) {
+      this.trace.client.emit("error", e);
+      throw e;
+    }
+  }
+
+  async handleRetrieverError(
+    err: Error,
+    runId: string,
+    _parentRunId?: string | undefined,
+    _tags?: string[] | undefined
+  ) {
+    this.errorSpan({ runId, error: err });
+  }
+
   async handleAgentAction(
     _action: AgentAction,
     runId: string,
@@ -328,8 +392,7 @@ export class LangWatchCallbackHandler extends BaseCallbackHandler {
     name?: string | undefined;
   }) {
     try {
-      const parent =
-        (parentRunId ? this.spans[parentRunId] : this.trace) ?? this.trace;
+      const parent = this.getParent(parentRunId);
 
       const span = parent.startSpan({
         spanId: runId,
@@ -388,6 +451,16 @@ export class LangWatchCallbackHandler extends BaseCallbackHandler {
     } catch (e) {
       return { type: "text", value: stringify(value) ?? value.toString() };
     }
+  }
+
+  private getParent(
+    parentRunId?: string | undefined
+  ): LangWatchSpan | LangWatchTrace {
+    return (
+      (parentRunId
+        ? this.spans[parentRunId]
+        : this.spans[Object.keys(this.spans).at(-1) ?? ""]) ?? this.trace
+    );
   }
 }
 
