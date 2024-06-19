@@ -20,6 +20,9 @@ const guestQueries = [
 const SYSTEM_PROMPT =
   "Imagine you're in a bustling hotel lobby, serving as the knowledgeable and friendly concierge. You're the go-to person for guests seeking recommendations, assistance with reservations, or information about local attractions. How would you welcome guests and ensure their stay is memorable? Think about how you'd provide personalized recommendations, handle inquiries efficiently, and maintain a professional yet friendly demeanor.";
 
+const RAG_SYSTEM_PROMPT =
+  "You are a restaurant expert knowing the best around town.";
+
 const getRadomGuestQuery = () =>
   guestQueries[Math.floor(Math.random() * guestQueries.length)];
 
@@ -37,36 +40,56 @@ export default async function handler(
       .json({ message: "X-Auth-Token header is required." });
   }
 
-  try {
-    const threadId = `thread_${nanoid()}`;
-    const userId = `user_${nanoid()}`;
-    const userInput = (await getInitialMessage()) ?? ""; // Ensure userInput is a string
+  const randomNumberTry = Math.floor(Math.random() * 10);
 
-    const assistantResponse = await firstChatMessage(
-      userInput,
-      threadId,
-      userId,
-      res
-    );
-    const expectedUserResponse = await userResponse(
-      userInput,
-      assistantResponse ?? ""
-    );
-    await secondChatMessage(
-      userInput,
-      assistantResponse ?? "",
-      expectedUserResponse ?? "",
-      threadId,
-      userId,
-      res
-    );
+  if (randomNumberTry % 2 === 0) {
+    return res.status(401).json({ message: "Not this time" });
+  }
 
-    res.status(200).json({ message: "Sent to LangWatch" });
-  } catch (error: any) {
-    res.status(500).json({
-      message: "Error",
-      error: error,
-    });
+  const randomNumber = Math.floor(Math.random() * 10);
+
+  if (randomNumber % 2 === 0) {
+    try {
+      const ragResponse = await ragMessage(res);
+      res.status(200).json({ message: "Sent to LangWatch", ragResponse });
+    } catch (error: any) {
+      res.status(500).json({
+        message: "Error",
+        error: error,
+      });
+    }
+  } else {
+    try {
+      const threadId = `thread_${nanoid()}`;
+      const userId = `user_${nanoid()}`;
+      const userInput = (await getInitialMessage()) ?? ""; // Ensure userInput is a string
+
+      const assistantResponse = await firstChatMessage(
+        userInput,
+        threadId,
+        userId,
+        res
+      );
+      const expectedUserResponse = await userResponse(
+        userInput,
+        assistantResponse ?? ""
+      );
+      await secondChatMessage(
+        userInput,
+        assistantResponse ?? "",
+        expectedUserResponse ?? "",
+        threadId,
+        userId,
+        res
+      );
+
+      res.status(200).json({ message: "Sent to LangWatch" });
+    } catch (error: any) {
+      res.status(500).json({
+        message: "Error",
+        error: error,
+      });
+    }
   }
 }
 
@@ -75,7 +98,9 @@ const langwatchAPI = async (
   input: string,
   res: NextApiResponse,
   threadId: string,
-  userId: string
+  userId: string,
+  type?: string,
+  inputType?: string
 ) => {
   try {
     const langwatchResponse = await fetch(`${env.NEXTAUTH_URL}/api/collector`, {
@@ -88,7 +113,7 @@ const langwatchAPI = async (
         trace_id: `trace_${nanoid()}`,
         spans: [
           {
-            type: "llm",
+            type: type ?? "llm",
             span_id: `span_${nanoid()}`,
             vendor: "openai",
             model: completion.model,
@@ -101,19 +126,17 @@ const langwatchAPI = async (
                 },
               ],
             },
-            outputs: [
-              {
-                type: "chat_messages",
-                value: [
-                  {
-                    role: "assistant",
-                    content: completion.choices[0].message.content,
-                    function_call: null,
-                    tool_calls: [],
-                  },
-                ],
-              },
-            ],
+            output: {
+              type: "chat_messages",
+              value: [
+                {
+                  role: "assistant",
+                  content: completion.choices[0].message.content,
+                  function_call: "",
+                  tool_calls: [],
+                },
+              ],
+            },
             params: {
               temperature: 0.7,
               stream: false,
@@ -127,6 +150,20 @@ const langwatchAPI = async (
               started_at: completion.created * 1000,
               finished_at: new Date().getTime(),
             },
+
+            contexts:
+              type === "rag"
+                ? [
+                    {
+                      documentId: "doc1",
+                      content: "Restaurants in city",
+                    },
+                    {
+                      documentId: "doc2",
+                      content: "Restaurants in suburb",
+                    },
+                  ]
+                : [],
           },
         ],
         metadata: {
@@ -182,11 +219,42 @@ const getInitialMessage = async () => {
       },
       {
         role: "user",
-        content: ` Using a support request such as.. ${randomGuestQuery}. Pretend you are the guest! No explanation needed. Don't put quotes around your message. Write as if you are the guest. Max 2 sentences.`,
+        content: `Using a support request such as.. ${randomGuestQuery}. Pretend you are the guest! No explanation needed. Don't put quotes around your message. Write as if you are the guest. Max 2 sentences.`,
       },
     ],
     model: "gpt-3.5-turbo",
   });
+
+  return completion.choices[0]!.message.content;
+};
+
+const ragMessage = async (res: NextApiResponse) => {
+  const userInput = "What are the 5 best restaurants in the area?";
+  const threadId = `thread_${nanoid()}`;
+  const userId = `user_${nanoid()}`;
+  const completion = await openai.chat.completions.create({
+    messages: [
+      {
+        role: "system",
+        content: RAG_SYSTEM_PROMPT,
+      },
+      {
+        role: "user",
+        content: userInput,
+      },
+    ],
+    model: "gpt-3.5-turbo",
+  });
+
+  await langwatchAPI(
+    completion,
+    userInput ?? "",
+    res,
+    threadId,
+    userId,
+    "rag",
+    "text"
+  );
 
   return completion.choices[0]!.message.content;
 };
