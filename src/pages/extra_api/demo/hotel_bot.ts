@@ -99,8 +99,7 @@ const langwatchAPI = async (
   res: NextApiResponse,
   threadId: string,
   userId: string,
-  type?: string,
-  inputType?: string
+  type?: string
 ) => {
   try {
     const langwatchResponse = await fetch(`${env.NEXTAUTH_URL}/api/collector`, {
@@ -169,6 +168,7 @@ const langwatchAPI = async (
         metadata: {
           thread_id: threadId,
           user_id: userId,
+          labels: type === "rag" ? ["Restaurant API"] : [],
         },
       }),
     });
@@ -246,15 +246,7 @@ const ragMessage = async (res: NextApiResponse) => {
     model: "gpt-3.5-turbo",
   });
 
-  await langwatchAPI(
-    completion,
-    userInput ?? "",
-    res,
-    threadId,
-    userId,
-    "rag",
-    "text"
-  );
+  await langwatchAPI(completion, userInput ?? "", res, threadId, userId, "rag");
 
   return completion.choices[0]!.message.content;
 };
