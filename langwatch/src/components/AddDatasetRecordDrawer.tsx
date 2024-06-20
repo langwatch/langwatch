@@ -462,11 +462,11 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
 const esSpansToDatasetSpans = (spans: ElasticSearchSpan[]): DatasetSpan[] => {
   const newArray = JSON.parse(JSON.stringify(spans));
   for (let i = 0; i < spans.length; i++) {
-    if (newArray[i].outputs[0]?.value) {
-      const outputObj = JSON.parse(newArray[i].outputs[0].value);
-      newArray[i].outputs[0].value = outputObj;
+    if (newArray[i].output?.value) {
+      const outputObj = JSON.parse(newArray[i].output.value);
+      newArray[i].output.value = outputObj;
     } else {
-      newArray[i].outputs.push({ value: "", type: "json" });
+      newArray[i].output = { value: "", type: "json" };
     }
     const inputObj = JSON.parse(newArray[i].input.value);
     newArray[i].input.value = inputObj;
