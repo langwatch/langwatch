@@ -52,6 +52,17 @@ export const typedValueToText = (
   typed: SpanInputOutput,
   last = false
 ): string => {
+  const stringified = (value_: any) => {
+    if (typeof value_ === "string") {
+      return value_;
+    }
+    try {
+      return JSON.stringify(value_);
+    } catch (e) {
+      return value_.toString();
+    }
+  };
+
   if (typed.type == "text") {
     return typed.value;
   } else if (typed.type == "chat_messages") {
@@ -76,27 +87,27 @@ export const typedValueToText = (
       const json = typed.value as any;
       // TODO: test those
       if (json.text !== undefined) {
-        return json.text;
+        return stringified(json.text);
       }
       if (json.input !== undefined) {
-        return json.input;
+        return stringified(json.input);
       }
       if (json.question !== undefined) {
-        return json.question;
+        return stringified(json.question);
       }
       if (json.user_query !== undefined) {
-        return json.user_query;
+        return stringified(json.user_query);
       }
       // TODO: test this happens for finding outputs
       if (json.output !== undefined) {
-        return json.output;
+        return stringified(json.output);
       }
-      return JSON.stringify(typed.value);
+      return stringified(typed.value);
     } catch (_e) {
       return typed.value?.toString() ?? "";
     }
   } else if (typed.type == "raw") {
-    return typed.value;
+    return stringified(typed.value);
   }
 
   return "";
