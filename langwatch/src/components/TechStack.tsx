@@ -53,22 +53,22 @@ export const docsLinks = {
   python_openai: {
     label: "Python OpenAI",
     icon: <Python />,
-    href: "https://docs.langwatch.ai/integration/python/open-ai",
+    href: "https://docs.langwatch.ai/integration/python/guide",
   },
   python_azure_openai: {
     label: "Python Azure OpenAI",
     icon: <Python />,
-    href: "https://docs.langwatch.ai/integration/python/azure-open-ai",
+    href: "https://docs.langwatch.ai/integration/python/guide",
   },
   python_langchain: {
     label: "Python LangChain",
     icon: <Python />,
-    href: "https://docs.langwatch.ai/integration/python/langchain",
+    href: "https://docs.langwatch.ai/integration/python/guide",
   },
   python_custom: {
     label: "Python Custom",
     icon: <Python />,
-    href: "https://docs.langwatch.ai/integration/python/custom",
+    href: "https://docs.langwatch.ai/integration/python/guide",
   },
   typescript_guide: {
     label: "TypeScript",
