@@ -10,9 +10,10 @@ export const env = createEnv({
     NODE_ENV: z.enum(["development", "test", "production"]),
     BASE_HOST: z.string().min(1),
     NEXTAUTH_SECRET:
-      process.env.NODE_ENV === "production"
+      process.env.NODE_ENV === "production" &&
+      !process.env.BASE_HOST?.startsWith("http://localhost")
         ? z.string().min(1)
-        : z.string().min(1).optional(),
+        : z.string().optional(),
     NEXTAUTH_URL: z.preprocess(
       // This makes Vercel deployments not fail if you don't set NEXTAUTH_URL
       // Since NextAuth.js automatically uses the VERCEL_URL if present.
@@ -27,16 +28,16 @@ export const env = createEnv({
     ELASTICSEARCH_NODE_URL: z.string().min(1),
     ELASTICSEARCH_API_KEY: z.string().min(1),
     REDIS_URL: z.string().min(1),
-    GOOGLE_APPLICATION_CREDENTIALS: z.string().min(1).optional(),
-    AZURE_OPENAI_ENDPOINT: z.string().min(1).optional(),
-    AZURE_OPENAI_KEY: z.string().min(1).optional(),
-    OPENAI_API_KEY: z.string().min(1).optional(),
-    SENDGRID_API_KEY: z.string().min(1).optional(),
-    LANGWATCH_NLP_SERVICE: z.string().min(1).optional(),
-    LANGEVALS_ENDPOINT: z.string().min(1).optional(),
-    DEMO_PROJECT_ID: z.string().min(1).optional(),
-    DEMO_PROJECT_USER_ID: z.string().min(1).optional(),
-    DEMO_PROJECT_SLUG: z.string().min(1).optional(),
+    GOOGLE_APPLICATION_CREDENTIALS: z.string().optional(),
+    AZURE_OPENAI_ENDPOINT: z.string().optional(),
+    AZURE_OPENAI_KEY: z.string().optional(),
+    OPENAI_API_KEY: z.string().optional(),
+    SENDGRID_API_KEY: z.string().optional(),
+    LANGWATCH_NLP_SERVICE: z.string().min(1),
+    LANGEVALS_ENDPOINT: z.string().min(1),
+    DEMO_PROJECT_ID: z.string().optional(),
+    DEMO_PROJECT_USER_ID: z.string().optional(),
+    DEMO_PROJECT_SLUG: z.string().optional(),
   },
 
   /**
@@ -55,12 +56,9 @@ export const env = createEnv({
   runtimeEnv: {
     DATABASE_URL: process.env.DATABASE_URL,
     NODE_ENV: process.env.NODE_ENV,
-    BASE_HOST:
-      process.env.NODE_ENV === "production"
-        ? "https://app.langwatch.ai"
-        : "http://localhost:3000",
+    BASE_HOST: process.env.BASE_HOST,
     NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET,
-    NEXTAUTH_URL: process.env.NEXTAUTH_URL,
+    NEXTAUTH_URL: process.env.BASE_HOST, // same as BASE_HOST
     AUTH0_CLIENT_ID: process.env.AUTH0_CLIENT_ID,
     AUTH0_CLIENT_SECRET: process.env.AUTH0_CLIENT_SECRET,
     AUTH0_ISSUER: process.env.AUTH0_ISSUER,

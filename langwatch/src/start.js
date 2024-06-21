@@ -33,9 +33,9 @@ module.exports.startApp = async (dir = path.dirname(__dirname)) => {
     })
     .listen(port, () => {
       console.log(
-        `> Ready on http://${
+        `\n🎉 LangWatch is ready on http://${
           process.env.NODE_ENV === "production" ? hostname : "localhost"
-        }:${port}`
+        }:${port}\n`
       );
     });
 };

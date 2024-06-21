@@ -59,7 +59,7 @@ export async function POST(req: NextRequest) {
   const modelProvider = modelProviders[providerKey];
   if (!modelProvider) {
     return NextResponse.json(
-      { error: `Provider not configured: ${providerKey}` },
+      { error: `Provider not configured: ${providerKey.toString()}` },
       { status: 400 }
     );
   }
@@ -67,7 +67,7 @@ export async function POST(req: NextRequest) {
   if (!modelProvider.enabled) {
     return NextResponse.json(
       {
-        error: `Provider ${providerKey} is disabled, go to settings to enable it`,
+        error: `Provider ${providerKey.toString()} is disabled, go to settings to enable it`,
       },
       { status: 400 }
     );

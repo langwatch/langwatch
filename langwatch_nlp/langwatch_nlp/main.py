@@ -20,6 +20,9 @@ import litellm.proxy.proxy_server as litellm_proxy_server
 from litellm.router import Router
 
 os.environ["AZURE_API_VERSION"] = "2024-02-01"
+if "DATABASE_URL" in os.environ:
+    # we need to delete this otherwise if this is present the proxy server tries to set up a db
+    del os.environ["DATABASE_URL"]
 
 # Config
 app = FastAPI()
@@ -83,12 +86,11 @@ async def proxy_startup():
     await litellm_proxy_server.startup_event()
 
 
-if os.getenv("PROXY_IS_ENABLED") == "1":
-    loop = asyncio.get_event_loop()
-    if not loop.is_running():
-        loop.run_until_complete(proxy_startup())
-    else:
-        asyncio.ensure_future(proxy_startup())
+loop = asyncio.get_event_loop()
+if not loop.is_running():
+    loop.run_until_complete(proxy_startup())
+else:
+    asyncio.ensure_future(proxy_startup())
 
 if __name__ != "__main__":
     handler = Mangum(app, lifespan="off")

@@ -1,0 +1,9 @@
+**/node_modules
+**/.next
+**/.next-saas
+.ipynb_checkpoints
+.pytest_cache
+.venv
+*.generated.*
+.DS_Store
+.github

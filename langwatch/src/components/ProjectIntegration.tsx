@@ -86,6 +86,16 @@ export const ProjectIntegration = () => {
             LangWatch, this page will update automatically as soon as the first
             messages arrive.
           </Text>
+          {typeof window !== "undefined" &&
+            window.location.hostname !== "app.langwatch.ai" && (
+              <Text>
+                Use{" "}
+                <code>
+                  {`LANGWATCH_ENDPOINT="${window.location.protocol}//${window.location.host}"`}
+                </code>{" "}
+                when setting it up to point to this instance
+              </Text>
+            )}
           <HStack align="stretch" spacing={6} wrap="wrap">
             <Card width="450px">
               <CardHeader>
@@ -119,17 +129,20 @@ export const ProjectIntegration = () => {
               </CardBody>
             </Card>
           </HStack>
-          <Text>
-            You can also open our{" "}
-            <Link
-              textDecoration="underline"
-              href={`https://app.langwatch.ai/${process.env.NEXT_PUBLIC_DEMO_SLUG}`}
-              target="_blank"
-            >
-              demo account
-            </Link>
-            {" "}to look around, we have a sample chatbot integrated there so you can explore.
-          </Text>
+          {process.env.NEXT_PUBLIC_DEMO_SLUG && (
+            <Text>
+              You can also open our{" "}
+              <Link
+                textDecoration="underline"
+                href={`https://app.langwatch.ai/${process.env.NEXT_PUBLIC_DEMO_SLUG}`}
+                target="_blank"
+              >
+                demo account
+              </Link>{" "}
+              to look around, we have a sample chatbot integrated there so you
+              can explore.
+            </Text>
+          )}
         </VStack>
         <Text fontSize="14px">
           Having issues? Messages not visible yet? Check out our{" "}

@@ -1,8 +1,7 @@
-version: '3.8'
+version: "3.8"
 
 services:
-  web:
-    container_name: langwatch-web
+  app:
     environment:
       - SKIP_ENV_VALIDATION=true
     env_file:
@@ -19,8 +18,20 @@ services:
       elasticsearch:
         condition: service_healthy
 
+  langwatch_nlp:
+    build:
+      context: ./langwatch_nlp
+    env_file:
+      - langwatch/.env
+    ports:
+      - "8080:8080"
+
+  langevals:
+    image: langwatch/langevals:latest
+    ports:
+      - "8000:8000"
+
   mysql:
-    container_name: watch-db
     image: mysql:8.3
     restart: always
     environment:
@@ -39,7 +50,6 @@ services:
       retries: 5
 
   redis:
-    container_name: watch-redis
     image: redis:alpine
     ports:
       - "6379:6379"
@@ -52,7 +62,6 @@ services:
       retries: 5
 
   elasticsearch:
-    container_name: watch-search
     image: elasticsearch:8.12.0
     environment:
       - discovery.type=single-node
@@ -64,7 +73,11 @@ services:
     volumes:
       - elasticsearch-data:/usr/share/elasticsearch/data
     healthcheck:
-      test: ["CMD-SHELL", "curl --silent --fail localhost:9200/_cluster/health || exit 1"]
+      test:
+        [
+          "CMD-SHELL",
+          "curl --silent --fail localhost:9200/_cluster/health || exit 1",
+        ]
       interval: 20s
       timeout: 10s
       retries: 5
