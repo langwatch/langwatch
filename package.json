@@ -17,7 +17,7 @@
   "dependencies": {
     "@hubspot/api-client": "^11.1.0",
     "@prisma/client": "^5.6.0",
-    "@slack/webhook": "^7.0.2",
+    "@slack/webhook": "7.0.2",
     "debug": "^4.3.5",
     "dotenv": "^16.3.1",
     "next": "13.5.6",
