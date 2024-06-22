@@ -1,5 +1,13 @@
 import { createEnv } from "@t3-oss/env-nextjs";
 import { z } from "zod";
+
+if (
+  process.env.NEXTAUTH_SECRET === "please_please_please_change_me_asap" &&
+  process.env.NODE_ENV === "production"
+) {
+  throw new Error("You must change the NEXTAUTH_SECRET in the .env file");
+}
+
 export const env = createEnv({
   /**
    * Specify your server-side environment variables schema here. This way you can ensure the app
@@ -9,11 +17,7 @@ export const env = createEnv({
     DATABASE_URL: z.string().url(),
     NODE_ENV: z.enum(["development", "test", "production"]),
     BASE_HOST: z.string().min(1),
-    NEXTAUTH_SECRET:
-      process.env.NODE_ENV === "production" &&
-      !process.env.BASE_HOST?.startsWith("http://localhost")
-        ? z.string().min(1)
-        : z.string().optional(),
+    NEXTAUTH_SECRET: z.string().min(1),
     NEXTAUTH_URL: z.preprocess(
       // This makes Vercel deployments not fail if you don't set NEXTAUTH_URL
       // Since NextAuth.js automatically uses the VERCEL_URL if present.
