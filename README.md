@@ -95,49 +95,33 @@ That's it! Now open the link provided when the compilation starts or go to your 
 
 ![DSPy Visualizer](https://github.com/langwatch/langwatch/assets/792201/47312dfe-980f-4c09-9610-67ad064cbe86)
 
-## Local Development
+## Running Locally
 
 You need to have docker and docker compose installed in your local environment to be able to run LangWatch locally.
+Then, it's two simple steps:
 
-1. Duplicate (or rename) [.env.example](./langwatch/.env.example) to .env or .env.local file
+1. Copy the `langwatch/.env.example` file to `langwatch/.env`
 
-2. Add your Open AI key or Azure Open AI key for LLM guardrails capabilities and generating embeddings for the messages
-
-```
-# For embeddings and LLM guardrails, leave empty it if you don't want to use Azure
-AZURE_OPENAI_ENDPOINT=""
-AZURE_OPENAI_KEY=""
-# Set OPENAI_API_KEY if you want to use OpenAI directly instead of Azure
-OPENAI_API_KEY=""
-```
-
-3. Setup an [auth0](auth0.com) account (there should be a free plan and it should be more than enough).
-   Create a simple app (for next.js) and take note of the credentials.
-   You will use these credentials to update these env variables in .env file:
-
-```
-AUTH0_CLIENT_ID=""
-AUTH0_CLIENT_SECRET=""
-AUTH0_ISSUER="https://dev-yourapp.eu.auth0.com"
-```
-
-4. `docker compose up --build` should do the trick and get it working at http://localhost:3000
+2. Run `docker compose up --build` and open LangWatch at http://localhost:3000
 
 ## Documentation
 
 Detailed documentation is available to help you get the most out of LangWatch:
 
-- [Introduction](https://docs.langwatch.ai/docs/intro)
-- [Getting Started](https://docs.langwatch.ai/docs/getting-started)
-- [OpenAI Python Integration](https://docs.langwatch.ai/docs/integration-guides/open-ai)
-- [LangChain Python Integration](https://docs.langwatch.ai/docs/integration-guides/langchain)
-- [Custom REST Integration](https://docs.langwatch.ai/docs/integration-guides/custom-rest)
-- [Concepts](https://docs.langwatch.ai/docs/concepts)
-- [Troubleshooting and Support](https://docs.langwatch.ai/docs/support)
+- [Introduction](https://docs.langwatch.ai/introduction)
+- [Python Integration Guide](https://docs.langwatch.ai/integration/python/guide)
+- [TypeScript Integration Guide](https://docs.langwatch.ai/integration/typescript/guide)
+- [DSPy Visualization](https://docs.langwatch.ai/dspy-visualization/quickstart)
+- [LangEvals Evaluators](https://docs.langwatch.ai/langevals/documentation/evaluators)
+- [Triggers](https://docs.langwatch.ai/features/triggers)
+- [Annotations](https://docs.langwatch.ai/features/annotations)
+- [Datasets](https://docs.langwatch.ai/features/datasets)
+- [Self-Hosting](https://docs.langwatch.ai/self-hosting)
+- [Troubleshooting and Support](https://docs.langwatch.ai/support)
 
 ## Self-Hosting
 
-LangWatch is open-source, self-hosting docs are still comming soon, however if you are interested already, [please reach out to us](mailto:rogerio@langwatch.ai).
+For a more complete guide on how to self-host LangWatch, please refer to the [Self-Hosting](https://docs.langwatch.ai/self-hosting) section of the documentation.
 
 ## Contributing
 
