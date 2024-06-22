@@ -52,6 +52,7 @@ model User {
     name            String?
     email           String?            @unique
     emailVerified   DateTime?
+    password        String? // for email/password auth without auth0
     image           String?            @db.Text
     accounts        Account[]
     sessions        Session[]

@@ -121,7 +121,7 @@ export const cleanupPIIs = async (
       );
     }
     console.warn(
-      "WARNING: GOOGLE_APPLICATION_CREDENTIALS is not set, so PII check will not be performed, you are risking storing PII on the database, please set them if you wish to avoid that, this will fail in production by default"
+      "⚠️  WARNING: GOOGLE_APPLICATION_CREDENTIALS is not set, so PII check will not be performed, you are risking storing PII on the database, please set them if you wish to avoid that, this will fail in production by default"
     );
     return;
   }
@@ -144,7 +144,9 @@ export const cleanupPIIs = async (
     );
 
     if (span.output) {
-      clearPIIPromises.push(clearPII(span.output, ["value"], piiRedactionLevel));
+      clearPIIPromises.push(
+        clearPII(span.output, ["value"], piiRedactionLevel)
+      );
     }
 
     for (const context of span.contexts ?? []) {

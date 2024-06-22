@@ -13,6 +13,12 @@ export const getOpenAIEmbeddings = async (text: string) => {
   const model = DEFAULT_EMBEDDINGS_MODEL;
 
   if (useAzure && env.AZURE_OPENAI_ENDPOINT && env.AZURE_OPENAI_KEY) {
+    if (!env.AZURE_OPENAI_KEY) {
+      console.warn(
+        "⚠️  WARNING: AZURE_OPENAI_KEY is not set, embeddings will not be generated for tracing, limiting semantic search and topic clustering. Please set AZURE_OPENAI_KEY for it to work properly"
+      );
+      return undefined;
+    }
     const openai = new AzureOpenAIClient(
       env.AZURE_OPENAI_ENDPOINT,
       new AzureKeyCredential(env.AZURE_OPENAI_KEY)
@@ -24,6 +30,12 @@ export const getOpenAIEmbeddings = async (text: string) => {
     const embeddings = response.data[0]?.embedding;
     return embeddings ? { model, embeddings } : undefined;
   } else {
+    if (!env.OPENAI_API_KEY) {
+      console.warn(
+        "⚠️  WARNING: OPENAI_API_KEY is not set, embeddings will not be generated for tracing, limiting semantic search and topic clustering. Please set OPENAI_API_KEY for it to work properly"
+      );
+      return undefined;
+    }
     const openai = new OpenAI({
       apiKey: env.OPENAI_API_KEY,
     });

@@ -21,9 +21,9 @@ export const env = createEnv({
       // VERCEL_URL doesn't include `https` so it cant be validated as a URL
       process.env.VERCEL ? z.string().min(1) : z.string().url()
     ),
-    AUTH0_CLIENT_ID: z.string().min(1),
-    AUTH0_CLIENT_SECRET: z.string().min(1),
-    AUTH0_ISSUER: z.string().min(1),
+    AUTH0_CLIENT_ID: z.string().optional(),
+    AUTH0_CLIENT_SECRET: z.string().optional(),
+    AUTH0_ISSUER: z.string().optional(),
     API_TOKEN_JWT_SECRET: z.string().min(1),
     ELASTICSEARCH_NODE_URL: z.string().min(1),
     ELASTICSEARCH_API_KEY: z.string().min(1),
@@ -46,7 +46,7 @@ export const env = createEnv({
    * `NEXT_PUBLIC_`.
    */
   client: {
-    // NEXT_PUBLIC_CLIENTVAR: z.string().min(1),
+    NEXT_PUBLIC_AUTH_PROVIDER: z.enum(["auth0", "email"]),
   },
 
   /**
@@ -59,6 +59,7 @@ export const env = createEnv({
     BASE_HOST: process.env.BASE_HOST,
     NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET,
     NEXTAUTH_URL: process.env.BASE_HOST, // same as BASE_HOST
+    NEXT_PUBLIC_AUTH_PROVIDER: process.env.NEXT_PUBLIC_AUTH_PROVIDER,
     AUTH0_CLIENT_ID: process.env.AUTH0_CLIENT_ID,
     AUTH0_CLIENT_SECRET: process.env.AUTH0_CLIENT_SECRET,
     AUTH0_ISSUER: process.env.AUTH0_ISSUER,

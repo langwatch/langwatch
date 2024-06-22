@@ -14,7 +14,6 @@ import {
   useToast,
 } from "@chakra-ui/react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { type GetServerSidePropsContext } from "next";
 import { type Session } from "next-auth";
 import { getSession, signIn } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
@@ -22,10 +21,12 @@ import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { HorizontalFormControl } from "../../components/HorizontalFormControl";
-import { LogoIcon } from "../../components/icons/LogoIcon";
 import { env } from "../../env.mjs";
+import { api } from "../../utils/api";
+import { LogoIcon } from "../../components/icons/LogoIcon";
+import type { GetServerSidePropsContext } from "next";
 
-export default function SignIn({ session }: { session: Session | null }) {
+export default function SignUp({ session }: { session: Session | null }) {
   const isAuth0 = env.NEXT_PUBLIC_AUTH_PROVIDER === "auth0";
   const callbackUrl = useSearchParams()?.get("callbackUrl") ?? undefined;
 
@@ -38,7 +39,7 @@ export default function SignIn({ session }: { session: Session | null }) {
   return isAuth0 ? (
     <div style={{ padding: "12px" }}>Redirecting to Sign in...</div>
   ) : (
-    <SignInForm />
+    <SignUpForm />
   );
 }
 
@@ -61,24 +62,35 @@ export const getServerSideProps = async (
   };
 };
 
-function SignInForm() {
-  const query = useSearchParams();
-  const error = query?.get("error");
-
-  const schema = z.object({
-    email: z.string().email(),
-    password: z.string(),
-  });
+function SignUpForm() {
+  const schema = z
+    .object({
+      name: z.string().min(1, { message: "Name is required" }),
+      email: z.string().min(1).email(),
+      password: z
+        .string()
+        .min(6, { message: "Password must be at least 6 characters" }),
+      confirmPassword: z
+        .string()
+        .min(6, { message: "Password must be at least 6 characters" }),
+    })
+    .refine((data) => data.password === data.confirmPassword, {
+      message: "Passwords don't match",
+      path: ["confirmPassword"], // Set the path of the error to confirmPassword field
+    });
 
   const form = useForm<z.infer<typeof schema>>({
     resolver: zodResolver(schema),
   });
 
+  const register = api.user.register.useMutation();
   const [signInLoading, setSignInLoading] = useState(false);
   const toast = useToast();
 
   const onSubmit = async (values: z.infer<typeof schema>) => {
     try {
+      await register.mutateAsync(values);
+
       setSignInLoading(true);
       const response: any = await signIn("credentials", {
         email: values.email,
@@ -108,12 +120,19 @@ function SignInForm() {
             <HStack spacing={4}>
               <LogoIcon width={30.69} height={42} />
               <Heading size="lg" as="h1">
-                Sign in
+                Sign up
               </Heading>
             </HStack>
           </CardHeader>
           <CardBody>
             <VStack width="full">
+              <HorizontalFormControl
+                label="Name"
+                helper="Enter your name"
+                isInvalid={form.formState.errors.name?.message !== undefined}
+              >
+                <Input {...form.register("name")} />
+              </HorizontalFormControl>
               <HorizontalFormControl
                 label="Email"
                 helper="Enter your email"
@@ -130,24 +149,29 @@ function SignInForm() {
               >
                 <Input type="password" {...form.register("password")} />
               </HorizontalFormControl>
-              {error && (
-                <Alert status="error">
-                  {error === "CredentialsSignin"
-                    ? "Invalid email or password"
-                    : error}
-                </Alert>
+              <HorizontalFormControl
+                label="Confirm Password"
+                helper="Confirm your password"
+                isInvalid={
+                  form.formState.errors.confirmPassword?.message !== undefined
+                }
+              >
+                <Input type="password" {...form.register("confirmPassword")} />
+              </HorizontalFormControl>
+              {register.error && (
+                <Alert status="error">{register.error.message}</Alert>
               )}
               <HStack width="full" paddingTop={4}>
-                <Link href="/auth/signup" textDecoration="underline">
-                  Register new account
+                <Link href="/auth/signin" textDecoration="underline">
+                  Already have an account?
                 </Link>
                 <Spacer />
                 <Button
                   colorScheme="orange"
                   type="submit"
-                  isLoading={signInLoading}
+                  isLoading={register.isLoading || signInLoading}
                 >
-                  Sign in
+                  Sign up
                 </Button>
               </HStack>
             </VStack>

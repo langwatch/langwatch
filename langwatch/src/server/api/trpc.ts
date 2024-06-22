@@ -117,17 +117,6 @@ const t = initTRPC.context<typeof createTRPCContext>().create({
  */
 export const createTRPCRouter = t.router;
 
-/**
- * Public (unauthenticated) procedure
- *
- * This is the base piece you use to build new queries and mutations on your tRPC API. It does not
- * guarantee that a user querying is authorized, but you can still access user session data if they
- * are logged in.
- *
- * Commented out because we don't have a use case for it yet
- */
-// export const publicProcedure = t.procedure;
-
 /** Reusable middleware that enforces users are logged in before running the procedure. */
 const enforceUserIsAuthed = t.middleware(({ ctx, next }) => {
   if (!ctx.session?.user) {
@@ -213,3 +202,13 @@ const permissionProcedureBuilder = <TParams extends ProcedureParams>(
 export const protectedProcedure = permissionProcedureBuilder(
   authProtectedProcedure
 );
+
+/**
+ * Public (unauthenticated) procedure
+ *
+ * This is the base piece you use to build new queries and mutations on your tRPC API. It does not
+ * guarantee that a user querying is authorized, but you can still access user session data if they
+ * are logged in.
+ *
+ */
+export const publicProcedure = permissionProcedureBuilder(t.procedure);

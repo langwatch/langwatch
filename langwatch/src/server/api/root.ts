@@ -20,6 +20,7 @@ import { triggerRouter } from "./routers/triggers";
 import { experimentsRouter } from "./routers/experiments";
 import { annotationRouter } from "./routers/annotation";
 import { modelProviderRouter } from "./routers/modelProviders";
+import { userRouter } from "./routers/user";
 
 /**
  * This is the primary router for your server.
@@ -47,6 +48,7 @@ export const appRouter = createTRPCRouter({
   experiments: experimentsRouter,
   annotation: annotationRouter,
   modelProvider: modelProviderRouter,
+  user: userRouter,
   ...(dependencies.extraTRPCRoutes?.() ?? {}),
 });
 

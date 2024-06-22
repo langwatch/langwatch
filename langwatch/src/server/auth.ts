@@ -6,6 +6,8 @@ import {
   type NextAuthOptions,
 } from "next-auth";
 import Auth0Provider, { type Auth0Profile } from "next-auth/providers/auth0";
+import CredentialsProvider from "next-auth/providers/credentials";
+import { compare } from "bcrypt";
 
 import { env } from "~/env.mjs";
 import { prisma } from "~/server/db";
@@ -22,15 +24,8 @@ declare module "next-auth" {
   interface Session extends DefaultSession {
     user: DefaultSession["user"] & {
       id: string;
-      // ...other properties
-      // role: UserRole;
     };
   }
-
-  // interface User {
-  //   // ...other properties
-  //   // role: UserRole;
-  // }
 }
 
 /**
@@ -41,6 +36,9 @@ declare module "next-auth" {
 export const authOptions = (
   req: NextApiRequest | GetServerSidePropsContext["req"] | NextRequest
 ): NextAuthOptions => ({
+  session: {
+    strategy: env.NEXT_PUBLIC_AUTH_PROVIDER === "email" ? "jwt" : "database",
+  },
   callbacks: {
     session: async ({ session, user }) => {
       if (dependencies.sessionHandler) {
@@ -50,6 +48,31 @@ export const authOptions = (
           user,
         });
         if (newSession) return newSession;
+      }
+
+      if (
+        !user &&
+        session.user.email &&
+        env.NEXT_PUBLIC_AUTH_PROVIDER === "email"
+      ) {
+        const user_ = await prisma.user.findUnique({
+          where: {
+            email: session.user.email,
+          },
+        });
+
+        if (!user_) {
+          throw new Error("User not found");
+        }
+
+        return {
+          ...session,
+          user: {
+            ...session.user,
+            id: user_.id,
+            email: user_.email,
+          },
+        };
       }
 
       return {
@@ -64,20 +87,48 @@ export const authOptions = (
   },
   adapter: PrismaAdapter(prisma),
   providers: [
-    Auth0Provider({
-      clientId: env.AUTH0_CLIENT_ID,
-      clientSecret: env.AUTH0_CLIENT_SECRET,
-      issuer: env.AUTH0_ISSUER,
-      authorization: { params: { prompt: "login" } },
-      profile(profile: Auth0Profile) {
-        return {
-          id: profile.sub,
-          name: (profile.name as string) ?? profile.nickname,
-          email: profile.email,
-          image: profile.picture,
-        };
-      },
-    }),
+    env.NEXT_PUBLIC_AUTH_PROVIDER === "auth0"
+      ? Auth0Provider({
+          clientId: env.AUTH0_CLIENT_ID ?? "",
+          clientSecret: env.AUTH0_CLIENT_SECRET ?? "",
+          issuer: env.AUTH0_ISSUER ?? "",
+          authorization: { params: { prompt: "login" } },
+          profile(profile: Auth0Profile) {
+            return {
+              id: profile.sub,
+              name: (profile.name as string) ?? profile.nickname,
+              email: profile.email,
+              image: profile.picture,
+            };
+          },
+        })
+      : CredentialsProvider({
+          name: "Credentials",
+          credentials: {
+            email: {},
+            password: {},
+          },
+          async authorize(credentials, _req) {
+            const user = await prisma.user.findUnique({
+              where: {
+                email: credentials?.email,
+              },
+            });
+            if (!user?.password) return null;
+            const passwordMatch = await compare(
+              credentials?.password ?? "",
+              user.password
+            );
+            if (!passwordMatch) return null;
+
+            return {
+              id: user.id,
+              name: user.name,
+              email: user.email,
+              image: user.image,
+            };
+          },
+        }),
     /**
      * ...add more providers here.
      *

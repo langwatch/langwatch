@@ -441,7 +441,7 @@ class ContextTrace:
         self.span = cast(
             Type[ContextSpan], lambda **kwargs: ContextSpan(trace=self, **kwargs)
         )
-        self.api_key = api_key
+        self.api_key = api_key or langwatch.api_key
 
     def __enter__(self):
         self.context_token = current_trace_var.set(self)
@@ -582,7 +582,9 @@ class ContextTrace:
 def send_spans(data: CollectorRESTParams, api_key: Optional[str] = None):
     if len(data["spans"]) == 0:
         return
-    if not langwatch.api_key:
+
+    api_key = api_key or langwatch.api_key
+    if not api_key:
         warn(
             "LANGWATCH_API_KEY is not set, LLMs traces will not be sent, go to https://langwatch.ai to set it up"
         )
@@ -594,7 +596,7 @@ def send_spans(data: CollectorRESTParams, api_key: Optional[str] = None):
         langwatch.endpoint + "/api/collector",
         data=json.dumps(data, cls=SerializableAndPydanticEncoder),
         headers={
-            "X-Auth-Token": str(api_key or langwatch.api_key),
+            "X-Auth-Token": str(api_key),
             "Content-Type": "application/json",
         },
     )

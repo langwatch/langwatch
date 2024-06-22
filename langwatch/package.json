@@ -58,6 +58,7 @@
     "@trpc/server": "^10.34.0",
     "@vercel/analytics": "^1.1.1",
     "ai": "^3.1.1",
+    "bcrypt": "^5.1.1",
     "bullmq": "^4.12.8",
     "chakra-react-select": "^4.7.6",
     "compute-cosine-similarity": "^1.1.0",
@@ -110,6 +111,7 @@
     "zustand": "^4.5.2"
   },
   "devDependencies": {
+    "@types/bcrypt": "^5.0.2",
     "@types/debug": "^4.1.10",
     "@types/eslint": "^8.44.2",
     "@types/jsonwebtoken": "^9.0.3",
