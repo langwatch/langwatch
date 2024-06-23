@@ -8,7 +8,7 @@ import chainlit as cl
 import sys
 
 sys.path.append("..")
-import langwatch.tracer
+import langwatch
 
 
 @cl.on_message

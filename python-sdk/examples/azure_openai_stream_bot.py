@@ -13,7 +13,6 @@ import sys
 
 sys.path.append("..")
 import langwatch
-import langwatch.openai
 
 client = AzureOpenAI(
     api_key=os.getenv("AZURE_OPENAI_API_KEY"),
