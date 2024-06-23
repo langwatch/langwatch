@@ -25,11 +25,13 @@ services:
       - langwatch/.env
     ports:
       - "8080:8080"
+    restart: always
 
   langevals:
     image: langwatch/langevals:latest
     ports:
       - "8000:8000"
+    restart: always
 
   mysql:
     image: mysql:8.3
@@ -67,11 +69,17 @@ services:
       - discovery.type=single-node
       - ELASTICSEARCH_PASSWORD="some-random-password-which-is-greater-than-16-chars-long"
       - xpack.security.enabled=false
+      - bootstrap.memory_lock=true
+      - "ES_JAVA_OPTS=-Xms1024m -Xmx1024m"
     ports:
       - "9200:9200"
       - "9300:9300"
     volumes:
       - elasticsearch-data:/usr/share/elasticsearch/data
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
     healthcheck:
       test:
         [
@@ -81,6 +89,11 @@ services:
       interval: 20s
       timeout: 10s
       retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 2048m
+    restart: always
 
 volumes:
   db-data:
