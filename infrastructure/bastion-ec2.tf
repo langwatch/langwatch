@@ -3,7 +3,7 @@ locals {
 }
 
 resource "aws_instance" "bastion" {
-  count = module.variables.profile == "lw-prod" ? 1 : 1
+  count = module.variables.profile == "lw-prod" ? 1 : 0
 
   ami           = local.aws_linux_ami
   instance_type = "t4g.nano"

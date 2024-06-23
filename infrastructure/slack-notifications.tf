@@ -7,7 +7,7 @@ resource "awscc_chatbot_slack_channel_configuration" "chatbot" {
 
   sns_topic_arns = [
     aws_sns_topic.alarms.arn,
-    aws_sns_topic.langwatch-deploy-notifications.arn
+    aws_sns_topic.langwatch-deploy-notifications[0].arn
   ]
   logging_level = "INFO"
 }
@@ -79,7 +79,8 @@ resource "aws_kms_key" "alarms_sns_topic_key" {
 }
 
 resource "aws_sns_topic" "langwatch-deploy-notifications" {
-  name = "langwatch-deploy-notifications"
+  count = module.variables.profile == "lw-prod" ? 1 : 0
+  name  = "langwatch-deploy-notifications"
 }
 
 resource "awscc_iam_role" "chatbot" {
@@ -101,6 +102,7 @@ resource "awscc_iam_role" "chatbot" {
 }
 
 resource "aws_sns_topic_policy" "alarms_policy" {
+  count = module.variables.profile == "lw-prod" ? 1 : 0
   arn = aws_sns_topic.alarms.arn
   policy = jsonencode({
     Version = "2012-10-17",
@@ -140,7 +142,8 @@ resource "aws_sns_topic_policy" "alarms_policy" {
 }
 
 resource "aws_sns_topic_policy" "deploy_notifications_policy" {
-  arn = aws_sns_topic.langwatch-deploy-notifications.arn
+  count = module.variables.profile == "lw-prod" ? 1 : 0
+  arn   = aws_sns_topic.langwatch-deploy-notifications[0].arn
   policy = jsonencode({
     Version = "2012-10-17",
     Statement = [
@@ -154,7 +157,7 @@ resource "aws_sns_topic_policy" "deploy_notifications_policy" {
           "sns:Subscribe",
           "sns:Receive"
         ],
-        Resource = aws_sns_topic.langwatch-deploy-notifications.arn
+        Resource = aws_sns_topic.langwatch-deploy-notifications[0].arn
       },
       {
         Sid = "AllowCodeDeployPublish"
@@ -163,7 +166,7 @@ resource "aws_sns_topic_policy" "deploy_notifications_policy" {
           "Service" : "codestar-notifications.amazonaws.com"
         },
         "Action" : ["sns:Publish"],
-        "Resource" : aws_sns_topic.langwatch-deploy-notifications.arn
+        "Resource" : aws_sns_topic.langwatch-deploy-notifications[0].arn
       }
     ]
   })

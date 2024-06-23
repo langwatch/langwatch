@@ -2,3 +2,6 @@ node_modules
 .env
 prisma/schema.prisma
 .next*
+
+infrastructure/functions/create_snapshot.zip
+infrastructure/functions/store_snapshot_s3.zip

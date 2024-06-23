@@ -5,5 +5,6 @@ output "region" {
 
 output "profile" {
   description = "profile to be used for AWS"
-  value       = "lw-prod"
+  # WHEN CHANGING TO lw-dev HERE REMEMBER TO SWITCH THE versions.tf FILE AS WELL!
+  value       = "lw-dev"
 }

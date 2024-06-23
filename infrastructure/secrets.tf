@@ -23,9 +23,11 @@ data "aws_secretsmanager_secret_version" "redis" {
 }
 
 data "aws_secretsmanager_secret" "metabase" {
-  name = "metabase"
+  count = module.variables.profile == "lw-prod" ? 1 : 0
+  name  = "metabase"
 }
 
 data "aws_secretsmanager_secret_version" "metabase" {
-  secret_id = data.aws_secretsmanager_secret.metabase.id
+  count     = module.variables.profile == "lw-prod" ? 1 : 0
+  secret_id = data.aws_secretsmanager_secret.metabase[0].id
 }

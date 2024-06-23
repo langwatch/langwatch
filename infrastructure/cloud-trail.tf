@@ -4,13 +4,15 @@ locals {
 }
 
 resource "aws_s3_bucket" "cloudtrail-logs" {
+  count  = module.variables.profile == "lw-prod" ? 1 : 0
   bucket = "langwatch-prod-cloudtrail-logs"
 
   force_destroy = true
 }
 
 resource "aws_s3_bucket_lifecycle_configuration" "cloudtrail-logs" {
-  bucket = aws_s3_bucket.cloudtrail-logs.id
+  count  = module.variables.profile == "lw-prod" ? 1 : 0
+  bucket = aws_s3_bucket.cloudtrail-logs[0].id
 
   rule {
     id = "log"
@@ -36,8 +38,9 @@ resource "aws_s3_bucket_lifecycle_configuration" "cloudtrail-logs" {
 }
 
 resource "aws_cloudtrail" "logs" {
+  count                         = module.variables.profile == "lw-prod" ? 1 : 0
   name                          = local.cloudtrail_name
-  s3_bucket_name                = aws_s3_bucket.cloudtrail-logs.bucket
+  s3_bucket_name                = aws_s3_bucket.cloudtrail-logs[0].bucket
   s3_key_prefix                 = local.cloudtrail_bucket_key_prefix
   include_global_service_events = true
   is_multi_region_trail         = true
@@ -59,15 +62,18 @@ resource "aws_cloudtrail" "logs" {
     }
   }
 
-  depends_on = [aws_s3_bucket_policy.cloudtrail]
+  depends_on = [aws_s3_bucket_policy.cloudtrail[0]]
 }
 
 resource "aws_s3_bucket_policy" "cloudtrail" {
-  bucket = aws_s3_bucket.cloudtrail-logs.bucket
-  policy = data.aws_iam_policy_document.cloudtrail.json
+  count  = module.variables.profile == "lw-prod" ? 1 : 0
+  bucket = aws_s3_bucket.cloudtrail-logs[0].bucket
+  policy = data.aws_iam_policy_document.cloudtrail[0].json
 }
 
 data "aws_iam_policy_document" "cloudtrail" {
+  count = module.variables.profile == "lw-prod" ? 1 : 0
+
   statement {
     sid    = "AWSCloudTrailAclCheck"
     effect = "Allow"
@@ -78,7 +84,7 @@ data "aws_iam_policy_document" "cloudtrail" {
     }
 
     actions   = ["s3:GetBucketAcl"]
-    resources = [aws_s3_bucket.cloudtrail-logs.arn]
+    resources = [aws_s3_bucket.cloudtrail-logs[0].arn]
     condition {
       test     = "StringEquals"
       variable = "aws:SourceArn"
@@ -97,8 +103,8 @@ data "aws_iam_policy_document" "cloudtrail" {
 
     actions = ["s3:PutObject"]
     resources = [
-      "${aws_s3_bucket.cloudtrail-logs.arn}",
-      "${aws_s3_bucket.cloudtrail-logs.arn}/*"
+      "${aws_s3_bucket.cloudtrail-logs[0].arn}",
+      "${aws_s3_bucket.cloudtrail-logs[0].arn}/*"
     ]
 
     condition {

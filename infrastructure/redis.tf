@@ -15,7 +15,7 @@ resource "aws_security_group" "redis" {
     from_port       = 6379
     to_port         = 6379
     protocol        = "tcp"
-    security_groups = [aws_security_group.langwatch[0].id, aws_security_group.bation-ec2.id]
+    security_groups = [aws_security_group.langwatch.id, aws_security_group.bation-ec2.id]
     cidr_blocks     = module.variables.profile == "lw-dev" ? ["0.0.0.0/0"] : []
   }
 
@@ -24,7 +24,7 @@ resource "aws_security_group" "redis" {
     from_port       = 0
     to_port         = 0
     protocol        = "-1" # This signifies all protocols
-    security_groups = [aws_security_group.langwatch[0].id]
+    security_groups = [aws_security_group.langwatch.id]
   }
 
   tags = {

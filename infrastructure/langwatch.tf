@@ -111,7 +111,7 @@ resource "aws_ecs_service" "langwatch_service" {
 
   network_configuration {
     subnets          = [aws_subnet.public_subnet_1.id, aws_subnet.public_subnet_2.id]
-    security_groups  = [aws_security_group.langwatch[0].id]
+    security_groups  = [aws_security_group.langwatch.id]
     assign_public_ip = true
   }
 
@@ -208,7 +208,7 @@ resource "aws_codestarnotifications_notification_rule" "langwatch-deploy" {
   resource = aws_codedeploy_app.langwatch_app[0].arn
 
   target {
-    address = aws_sns_topic.langwatch-deploy-notifications.arn
+    address = aws_sns_topic.langwatch-deploy-notifications[0].arn
   }
 }
 
@@ -266,7 +266,7 @@ resource "aws_alb" "langwatch_alb" {
   name               = "langwatch-alb"
   internal           = false
   load_balancer_type = "application"
-  security_groups    = [aws_security_group.alb_sg[0].id]
+  security_groups    = [aws_security_group.alb_sg.id]
   subnets            = [aws_subnet.public_subnet_1.id, aws_subnet.public_subnet_2.id]
 
   enable_deletion_protection = true
@@ -333,7 +333,6 @@ resource "aws_alb_target_group" "langwatch_green_tg" {
 }
 
 resource "aws_security_group" "langwatch" {
-  count  = module.variables.profile == "lw-prod" ? 1 : 1
   name   = "langwatch-app-sg"
   vpc_id = aws_vpc.main.id
 
@@ -342,7 +341,7 @@ resource "aws_security_group" "langwatch" {
     from_port       = 3000
     to_port         = 3000
     protocol        = "tcp"
-    security_groups = [aws_security_group.alb_sg[0].id, aws_security_group.bation-ec2.id]
+    security_groups = [aws_security_group.alb_sg.id, aws_security_group.bation-ec2.id]
   }
 
   egress {
@@ -360,7 +359,6 @@ resource "aws_security_group" "langwatch" {
 }
 
 resource "aws_security_group" "alb_sg" {
-  count       = module.variables.profile == "lw-prod" ? 1 : 1
   name        = "langwatch-alb-sg"
   description = "Allow web access to alb"
   vpc_id      = aws_vpc.main.id

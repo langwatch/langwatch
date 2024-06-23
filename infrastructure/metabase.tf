@@ -35,8 +35,8 @@ resource "aws_ecs_task_definition" "metabase" {
         { name = "MB_DB_DBNAME", value = "metabaseappdb" },
         { name = "MB_DB_PORT", value = "5432" },
         { name = "MB_DB_USER", value = "metabase" },
-        { name = "MB_DB_PASS", value = jsondecode(data.aws_secretsmanager_secret_version.metabase.secret_string)["MB_DB_PASS"] },
-        { name = "MB_ENCRYPTION_SECRET_KEY", value = jsondecode(data.aws_secretsmanager_secret_version.metabase.secret_string)["MB_ENCRYPTION_SECRET_KEY"] },
+        { name = "MB_DB_PASS", value = jsondecode(data.aws_secretsmanager_secret_version.metabase[0].secret_string)["MB_DB_PASS"] },
+        { name = "MB_ENCRYPTION_SECRET_KEY", value = jsondecode(data.aws_secretsmanager_secret_version.metabase[0].secret_string)["MB_ENCRYPTION_SECRET_KEY"] },
         { name = "MB_DB_HOST", value = aws_db_instance.metabase[0].address }
       ]
       logConfiguration = {
@@ -78,7 +78,7 @@ resource "aws_ecs_service" "metabase" {
 
   network_configuration {
     subnets          = [aws_subnet.public_subnet_1.id, aws_subnet.public_subnet_2.id]
-    security_groups  = [aws_security_group.metabase[0].id]
+    security_groups  = [aws_security_group.metabase.id]
     assign_public_ip = true
   }
 
@@ -122,7 +122,6 @@ resource "aws_lb_listener" "metabase_listener" {
 }
 
 resource "aws_security_group" "metabase" {
-  count  = module.variables.profile == "lw-prod" ? 1 : 0
   name   = "metabase-sg"
   vpc_id = aws_vpc.main.id
 
@@ -184,7 +183,7 @@ resource "aws_db_instance" "metabase" {
   instance_class     = "db.t4g.micro"
   allocated_storage  = 5
   username           = "metabase"
-  password           = jsondecode(data.aws_secretsmanager_secret_version.metabase.secret_string)["MB_DB_PASS"]
+  password           = jsondecode(data.aws_secretsmanager_secret_version.metabase[0].secret_string)["MB_DB_PASS"]
   db_name            = "metabaseappdb"
   backup_window      = "00:00-04:00"
   maintenance_window = "Sun:04:00-Sun:06:00"
@@ -213,7 +212,7 @@ resource "aws_security_group" "metabase-db" {
     from_port       = 5432
     to_port         = 5432
     protocol        = "tcp"
-    security_groups = [aws_security_group.metabase[0].id, aws_security_group.bation-ec2.id]
+    security_groups = [aws_security_group.metabase.id, aws_security_group.bation-ec2.id]
     cidr_blocks     = []
   }
 
