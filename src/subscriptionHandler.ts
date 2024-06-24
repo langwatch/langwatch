@@ -84,7 +84,9 @@ export class SubscriptionHandlerSaas extends SubscriptionHandler {
       organizationId === "organization_NW_jBe8d0CCKSnK8FW8UD" ||
       organizationId === "organization_z0JEOAFun8ldnzTQgFxVA" ||
       organizationId === "organization_3ko1Hf2jnsH8ElKJflyoS" ||
-      organizationId === "organization_GkOKv2yG8QnVk6GLoWYRX"
+      organizationId === "organization_GkOKv2yG8QnVk6GLoWYRX" ||
+      organizationId === "organization_T682QXSkRKv5_mKL2bMgi" ||
+      organizationId === "organization_-jXj8RDPHXCOneoHJCsKF"
     ) {
       return { ...PLAN_LIMITS[PlanTypes.GROWTH], overrideAddingLimitations };
     }
