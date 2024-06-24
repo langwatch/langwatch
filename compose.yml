@@ -45,7 +45,7 @@ services:
     volumes:
       - db-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U prisma"]
+      test: ["CMD-SHELL", "pg_isready -U prisma -d mydb"]
       interval: 10s
       timeout: 5s
       retries: 5
