@@ -11,7 +11,7 @@ services:
     ports:
       - "3000:3000"
     depends_on:
-      mysql:
+      postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
@@ -33,20 +33,19 @@ services:
       - "8000:8000"
     restart: always
 
-  mysql:
-    image: mysql:8.3
+  postgres:
+    image: postgres:16
     restart: always
     environment:
-      MYSQL_ROOT_PASSWORD: rootpassword
-      MYSQL_DATABASE: mydb
-      MYSQL_USER: prisma
-      MYSQL_PASSWORD: prisma
+      POSTGRES_DB: mydb
+      POSTGRES_USER: prisma
+      POSTGRES_PASSWORD: prisma
     ports:
-      - "3306:3306"
+      - "5432:5432"
     volumes:
-      - db-data:/var/lib/mysql
+      - db-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      test: ["CMD-SHELL", "pg_isready -U prisma"]
       interval: 10s
       timeout: 5s
       retries: 5
