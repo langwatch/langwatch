@@ -1,5 +1,6 @@
 node_modules
 .env
+.env.*
 prisma/schema.prisma
 .next*
 
