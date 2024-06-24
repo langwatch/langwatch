@@ -62,7 +62,7 @@ export const env = createEnv({
     NODE_ENV: process.env.NODE_ENV,
     BASE_HOST: process.env.BASE_HOST,
     NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET,
-    NEXTAUTH_URL: process.env.BASE_HOST, // same as BASE_HOST
+    NEXTAUTH_URL: process.env.NEXTAUTH_URL,
     NEXT_PUBLIC_AUTH_PROVIDER: process.env.NEXT_PUBLIC_AUTH_PROVIDER,
     AUTH0_CLIENT_ID: process.env.AUTH0_CLIENT_ID,
     AUTH0_CLIENT_SECRET: process.env.AUTH0_CLIENT_SECRET,
