@@ -6,7 +6,7 @@ resource "aws_db_instance" "langwatch-pg" {
   engine_version              = "16.3"
   instance_class              = "db.t4g.micro"
   parameter_group_name        = "default.postgres16"
-  db_subnet_group_name        = aws_db_subnet_group.langwatch.name
+  db_subnet_group_name        = aws_db_subnet_group.langwatch-pg.name
   vpc_security_group_ids      = [aws_security_group.langwatch-pg.id]
   final_snapshot_identifier   = "langwatch-pg-db-final-snapshot"
   publicly_accessible         = module.variables.profile == "lw-dev" ? true : false

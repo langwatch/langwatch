@@ -118,7 +118,7 @@ resource "aws_cloudwatch_metric_alarm" "rds_cpu_utilization_instance" {
   insufficient_data_actions = [aws_sns_topic.alarms.arn]
 
   dimensions = {
-    DBInstanceIdentifier = aws_db_instance.langwatch.identifier
+    DBInstanceIdentifier = aws_db_instance.langwatch-pg.identifier
   }
 }
 
@@ -139,7 +139,7 @@ resource "aws_cloudwatch_metric_alarm" "rds_freeable_memory_instance" {
   insufficient_data_actions = [aws_sns_topic.alarms.arn]
 
   dimensions = {
-    DBInstanceIdentifier = aws_db_instance.langwatch.identifier
+    DBInstanceIdentifier = aws_db_instance.langwatch-pg.identifier
   }
 }
 
@@ -160,7 +160,7 @@ resource "aws_cloudwatch_metric_alarm" "rds_disk_queue_depth" {
   insufficient_data_actions = [aws_sns_topic.alarms.arn]
 
   dimensions = {
-    DBInstanceIdentifier = aws_db_instance.langwatch.identifier
+    DBInstanceIdentifier = aws_db_instance.langwatch-pg.identifier
   }
 }
 
@@ -181,7 +181,7 @@ resource "aws_cloudwatch_metric_alarm" "rds_read_iops" {
   insufficient_data_actions = [aws_sns_topic.alarms.arn]
 
   dimensions = {
-    DBInstanceIdentifier = aws_db_instance.langwatch.identifier
+    DBInstanceIdentifier = aws_db_instance.langwatch-pg.identifier
   }
 }
 
@@ -202,7 +202,7 @@ resource "aws_cloudwatch_metric_alarm" "rds_write_iops" {
   insufficient_data_actions = [aws_sns_topic.alarms.arn]
 
   dimensions = {
-    DBInstanceIdentifier = aws_db_instance.langwatch.identifier
+    DBInstanceIdentifier = aws_db_instance.langwatch-pg.identifier
   }
 }
 
@@ -223,7 +223,7 @@ resource "aws_cloudwatch_metric_alarm" "rds_free_storage_space" {
   insufficient_data_actions = [aws_sns_topic.alarms.arn]
 
   dimensions = {
-    DBInstanceIdentifier = aws_db_instance.langwatch.identifier
+    DBInstanceIdentifier = aws_db_instance.langwatch-pg.identifier
   }
 }
 
