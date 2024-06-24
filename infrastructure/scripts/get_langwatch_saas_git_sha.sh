@@ -4,7 +4,7 @@ set -e
 
 cd ..
 
-salt="2024-05-14 14"
+salt="2024-06-24"
 files=$(git ls-files -o -c -m --exclude-standard | grep -v ^infrastructure | grep -v ^langwatch | grep -v ^src/pages/api | grep -v ^langevals | grep -v ^.github | grep -v ^.gitmodules | xargs cat)
 # TODO: from some reason this hash still mismatches from mac local to the one in the CI
 current_hash=$(printf "%s%s" "$files" "$salt" | sha256sum | cut -d' ' -f1 | cut -c 1-7)
