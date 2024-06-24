@@ -26,7 +26,7 @@
 3. Run the following cli command in a terminal and keep it open for MySQL (this will create a session with the bastion ec2 instance and port forward to the rds instance)
 
 ```shell
-aws ssm start-session --region eu-central-1 --target i-00a6de26faec3abcd --document-name AWS-StartPortForwardingSessionToRemoteHost --parameters host="langwatch-mysql.cfu2ksege2c2.eu-central-1.rds.amazonaws.com",portNumber="3306",localPortNumber="3306"  --profile lw-prod
+aws ssm start-session --region eu-central-1 --target i-00a6de26faec3abcd --document-name AWS-StartPortForwardingSessionToRemoteHost --parameters host="langwatch-pg.cfu2ksege2c2.eu-central-1.rds.amazonaws.com",portNumber="5432",localPortNumber="5432" --profile lw-prod
 ```
 
 4. Run the following one for redis (we use port 6378 localy to not conflict with the locally running redis):
