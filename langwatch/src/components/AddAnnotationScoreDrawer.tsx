@@ -1,82 +1,48 @@
 import {
   Button,
-  Card,
-  CardBody,
-  HStack,
-  Heading,
-  Menu,
-  MenuButton,
-  MenuItem,
-  MenuList,
-  Spacer,
-  Table,
-  Tbody,
-  Td,
-  Text,
-  Th,
-  Thead,
-  Tooltip,
-  Tr,
-  VStack,
-  useToast,
-  useDisclosure,
-  Modal,
-  ModalContent,
-  ModalHeader,
-  ModalOverlay,
-  ModalBody,
-  ModalCloseButton,
-  FormControl,
-  FormLabel,
-  Input,
-  Select,
-  Textarea,
-  Box,
+  Divider,
   Drawer,
   DrawerBody,
   DrawerCloseButton,
   DrawerContent,
   DrawerHeader,
+  FormControl,
+  FormLabel,
   Grid,
   GridItem,
-  Divider,
+  HStack,
+  Input,
+  Select,
+  Spacer,
+  Text,
+  Textarea,
+  VStack,
+  useToast,
 } from "@chakra-ui/react";
-import type { TriggerAction } from "@prisma/client";
-import { MoreVertical, Plus } from "react-feather";
-import { useForm, type FieldErrors } from "react-hook-form";
+import { useForm } from "react-hook-form";
 
 import { DeleteIcon } from "@chakra-ui/icons";
-import { Switch } from "@chakra-ui/react";
 import { useState } from "react";
-import { useFilterParams } from "~/hooks/useFilterParams";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { api } from "~/utils/api";
 import { useDrawer } from "./CurrentDrawer";
 import { HorizontalFormControl } from "./HorizontalFormControl";
 
+import { AnnotationScoreDataType } from "@prisma/client";
+
 export const AddAnnotationScoreDrawer = () => {
-  //   const { project, organization, team } = useOrganizationTeamProject();
-  //   const { onOpen, onClose, isOpen } = useDisclosure();
+  const { project } = useOrganizationTeamProject();
 
-  //   const toast = useToast();
-  //   const createTrigger = api.trigger.create.useMutation();
-  //   const teamSlug = team?.slug;
+  const toast = useToast();
 
-  //   const teamWithMembers = api.team.getTeamWithMembers.useQuery(
-  //     {
-  //       slug: teamSlug ?? "",
-  //       organizationId: organization?.id ?? "",
-  //     },
-  //     { enabled: typeof teamSlug === "string" && !!organization?.id }
-  //   );
+  const createAnnotationScore = api.annotationScore.create.useMutation();
 
   const { closeDrawer } = useDrawer();
-
-  //   const { filterParams } = useFilterParams();
 
   const {
     register,
     handleSubmit,
     watch,
-    getValues,
     setValue,
     formState: { errors },
     reset,
@@ -85,21 +51,65 @@ export const AddAnnotationScoreDrawer = () => {
       name: "",
       dataType: "boolean",
       description: "",
-      category: ["", "", "", "", ""],
-      categoryExplanation: ["", "", "", "", ""],
+      category: Array(5).fill(""),
+      categoryExplanation: Array(5).fill(""),
+      dataTypeBoolean: {
+        true: "",
+        false: "",
+      },
     },
   });
 
-  const onSubmit = (data) => {
-    console.log(data);
-    reset();
+  type FormData = {
+    name: string;
+    description?: string | null;
+    category?: string[] | null;
+    categoryExplanation?: string[] | null;
+    dataTypeBoolean?: { true: string; false: string } | null;
+    dataType: string;
+  };
+
+  const onSubmit = (data: FormData) => {
+    createAnnotationScore.mutate(
+      {
+        name: data.name,
+        dataType: data.dataType as AnnotationScoreDataType,
+        description: data.description,
+        category: data.category,
+        categoryExplanation: data.categoryExplanation,
+        projectId: project?.id ?? "",
+      },
+      {
+        onSuccess: (data) => {
+          toast({
+            title: "Dataset Created",
+            description: `Successfully created ${data.name} dataset`,
+            status: "success",
+            duration: 5000,
+            isClosable: true,
+            position: "top-right",
+          });
+          closeDrawer();
+          reset();
+        },
+        onError: (error) => {
+          toast({
+            title: "Error creating dataset",
+            description: error.message,
+            status: "error",
+            duration: 5000,
+            isClosable: true,
+            position: "top-right",
+          });
+        },
+      }
+    );
   };
 
   const watchDataType = watch("dataType");
 
   const CategoryInput = () => {
     const [inputs, setInputs] = useState<string[]>([""]);
-    console.log(inputs);
 
     const addInput = () => {
       if (inputs.length < 5) {
@@ -182,6 +192,7 @@ export const AddAnnotationScoreDrawer = () => {
           </HStack>
         </DrawerHeader>
         <DrawerBody>
+          {/* eslint-disable-next-line @typescript-eslint/no-misused-promises */}
           <form onSubmit={handleSubmit(onSubmit)}>
             <VStack spacing={4} align="start">
               <HorizontalFormControl
@@ -190,6 +201,13 @@ export const AddAnnotationScoreDrawer = () => {
                 isInvalid={!!errors.name}
               >
                 <Input {...register("name")} required />
+              </HorizontalFormControl>
+              <HorizontalFormControl
+                label="Description"
+                helper="Provide a description of the score metric"
+                isInvalid={!!errors.description}
+              >
+                <Textarea {...register("description")} required />
               </HorizontalFormControl>
               <HorizontalFormControl
                 label="Data type"
@@ -209,9 +227,15 @@ export const AddAnnotationScoreDrawer = () => {
                   placeholder="Select data type"
                   required
                 >
-                  <option value="BOOLEAN">BOOLEAN</option>
-                  <option value="CATEGORICAL">CATEGORICAL</option>
-                  <option value="LIKERT">LIKERT SCALE</option>
+                  <option value={AnnotationScoreDataType.BOOLEAN}>
+                    BOOLEAN
+                  </option>
+                  <option value={AnnotationScoreDataType.CATEGORICAL}>
+                    CATEGORICAL
+                  </option>
+                  <option value={AnnotationScoreDataType.LIKERT}>
+                    LIKERT SCALE
+                  </option>
                 </Select>
 
                 {watchDataType === "BOOLEAN" && (
@@ -240,17 +264,7 @@ export const AddAnnotationScoreDrawer = () => {
                   </FormControl>
                 )}
               </HorizontalFormControl>
-              <HorizontalFormControl
-                label="Description"
-                helper="Provide a description of the score metric"
-                isInvalid={!!errors.description}
-              >
-                <Textarea
-                  {...register("description")}
-                  placeholder="Provide a description of the score metric"
-                  required
-                />
-              </HorizontalFormControl>
+
               <HStack width="full">
                 <Spacer />
                 <Button
