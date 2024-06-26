@@ -246,6 +246,7 @@ export type Trace = {
   timestamps: { started_at: number; inserted_at: number; updated_at: number };
   input: TraceInput;
   output?: TraceOutput;
+  contexts?: RAGChunk[];
   metrics: {
     first_token_ms?: number | null;
     total_time_ms?: number | null;
