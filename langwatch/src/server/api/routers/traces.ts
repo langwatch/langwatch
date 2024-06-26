@@ -745,36 +745,49 @@ export const getAllForProject = async (
 };
 
 const getSpansForTraceIds = async (projectId: string, traceIds: string[]) => {
-  const spansForEmptyOutputTraces = await esClient.search<ElasticSearchSpan>({
-    index: SPAN_INDEX,
-    body: {
-      size: 10_000,
-      query: {
-        bool: {
-          filter: [
-            { term: { project_id: projectId } },
-            { terms: { trace_id: traceIds } },
-          ] as QueryDslBoolQuery["filter"],
-        } as QueryDslBoolQuery,
+  const BATCH_SIZE = 50; // Define a suitable batch size
+  const searchPromises = [];
+
+  for (let i = 0; i < traceIds.length; i += BATCH_SIZE) {
+    const batchTraceIds = traceIds.slice(i, i + BATCH_SIZE);
+    const searchPromise = esClient.search<ElasticSearchSpan>({
+      index: SPAN_INDEX,
+      body: {
+        size: 10_000,
+        query: {
+          bool: {
+            filter: [
+              { term: { project_id: projectId } },
+              { terms: { trace_id: batchTraceIds } },
+            ] as QueryDslBoolQuery["filter"],
+          } as QueryDslBoolQuery,
+        },
       },
-    },
-    routing: traceIds
-      .map((traceId) => traceIndexId({ traceId, projectId: projectId }))
-      .join(","),
-  });
-  return spansForEmptyOutputTraces.hits.hits
-    .map((hit) => hit._source!)
-    .filter((x) => x)
-    .reduce(
-      (acc, span) => {
+      routing: batchTraceIds
+        .map((traceId) => traceIndexId({ traceId, projectId }))
+        .join(","),
+    });
+    searchPromises.push(searchPromise);
+  }
+
+  const results = await Promise.all(searchPromises);
+  const spansResults = results.flatMap((result) =>
+    result.hits.hits.map((hit) => hit._source).filter((x) => x)
+  );
+
+  return spansResults.reduce(
+    (acc, span) => {
+      if (span?.trace_id) {
         if (!acc[span.trace_id]) {
           acc[span.trace_id] = [];
         }
+
         acc[span.trace_id]!.push(span);
-        return acc;
-      },
-      {} as Record<string, ElasticSearchSpan[]>
-    );
+      }
+      return acc;
+    },
+    {} as Record<string, ElasticSearchSpan[]>
+  );
 };
 
 const getTracesWithSpans = async (projectId: string, traceIds: string[]) => {
