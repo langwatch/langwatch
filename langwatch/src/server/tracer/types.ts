@@ -17,6 +17,11 @@ interface ToolCall {
   function: FunctionCall;
 }
 
+export type Contexts = {
+  traceId: string;
+  contexts: RAGChunk[];
+};
+
 export interface ChatMessage {
   role?: ChatRole;
   content?: string | ChatRichContent[] | null;

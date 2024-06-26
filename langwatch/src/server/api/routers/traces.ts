@@ -15,6 +15,7 @@ import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { evaluatorsSchema } from "../../../trace_checks/evaluators.zod.generated";
 import { evaluatePreconditions } from "../../../trace_checks/preconditions";
 import { checkPreconditionSchema } from "../../../trace_checks/types.generated";
+
 import {
   sharedFiltersInputSchema,
   type TracesPivot,
@@ -33,6 +34,7 @@ import {
   type ElasticSearchSpan,
   type Trace,
   type TraceCheck,
+  type Contexts,
   elasticSearchToTypedValue,
   type GuardrailResult,
 } from "../../tracer/types";
@@ -712,16 +714,19 @@ export const getAllForProject = async (
   const traceIdsArray = traces.map((trace) => trace.trace_id);
 
   const spans = await getSpansForTraceIds(input.projectId, traceIdsArray);
-  const contexts = [];
+
+  const contexts: Contexts[] = [];
   for (const traceId in spans) {
     const spansOfId = spans[traceId];
 
-    for (const span of spansOfId) {
-      if (span.type === "rag") {
-        contexts.push({
-          traceId,
-          contexts: span.contexts,
-        });
+    if (spansOfId) {
+      for (const span of spansOfId) {
+        if (span.type === "rag") {
+          contexts.push({
+            traceId,
+            contexts: span.contexts ?? [],
+          });
+        }
       }
     }
   }
