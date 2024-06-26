@@ -708,7 +708,35 @@ export const getAllForProject = async (
   if (!usePivotIndex) {
     totalHits = (tracesResult.hits?.total as SearchTotalHits)?.value || 0;
   }
-  return { groups, totalHits };
+
+  const traceIdsArray = traces.map((trace) => trace.trace_id);
+
+  const spans = await getSpansForTraceIds(input.projectId, traceIdsArray);
+  const contexts = [];
+  for (const traceId in spans) {
+    const spansOfId = spans[traceId];
+
+    for (const span of spansOfId) {
+      if (span.type === "rag") {
+        contexts.push({
+          traceId,
+          contexts: span.contexts,
+        });
+      }
+    }
+  }
+
+  const mergedGroups = groups.map((group) => {
+    return group.map((trace) => {
+      const context = contexts.find((c) => c.traceId === trace.trace_id);
+      return {
+        ...trace,
+        contexts: context ? context.contexts : [],
+      };
+    });
+  });
+
+  return { groups: mergedGroups, totalHits };
 };
 
 const getSpansForTraceIds = async (projectId: string, traceIds: string[]) => {

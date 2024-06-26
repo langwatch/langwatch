@@ -209,18 +209,20 @@ export function MessagesTable() {
     checked: {
       name: "",
       sortable: false,
-      render: (trace, index) => (
-        <Td key={index} textAlign="right">
-          <HStack position="relative" align="right">
-            <Spacer />
-            {annotationCount(trace.trace_id)}
-            <Checkbox
-              colorScheme="blue"
-              onChange={() => traceSelection(trace.trace_id)}
-            />
-          </HStack>
-        </Td>
-      ),
+      render: (trace, index) => {
+        return (
+          <Td key={index} textAlign="right">
+            <HStack position="relative" align="right">
+              <Spacer />
+              {annotationCount(trace.trace_id)}
+              <Checkbox
+                colorScheme="blue"
+                onChange={() => traceSelection(trace.trace_id)}
+              />
+            </HStack>
+          </Td>
+        );
+      },
       value: () => "",
     },
     "trace.timestamps.started_at": {
@@ -436,6 +438,52 @@ export function MessagesTable() {
       ),
       value: (trace: Trace) =>
         numeral(trace.metrics.total_cost).format("$0.00[000]"),
+    },
+    "trace.metadata": {
+      name: "Metadata",
+      sortable: true,
+      render: (trace, index) => (
+        <Td
+          key={index}
+          onClick={() =>
+            openDrawer("traceDetails", {
+              traceId: trace.trace_id,
+            })
+          }
+        >
+          <Tooltip label={JSON.stringify(trace.metadata)}>
+            <Text noOfLines={1} display="block" maxWidth="300px">
+              {JSON.stringify(trace.metadata) === "{}"
+                ? ""
+                : JSON.stringify(trace.metadata)}
+            </Text>
+          </Tooltip>
+        </Td>
+      ),
+      value: (trace: Trace) => JSON.stringify(trace.metadata),
+    },
+    "trace.contexts": {
+      name: "Contexts",
+      sortable: true,
+      render: (trace, index) => (
+        <Td
+          key={index}
+          onClick={() =>
+            openDrawer("traceDetails", {
+              traceId: trace.trace_id,
+            })
+          }
+        >
+          <Tooltip label={JSON.stringify(trace.contexts)}>
+            <Text noOfLines={1} display="block" maxWidth="300px">
+              {JSON.stringify(trace.contexts) === "[]"
+                ? ""
+                : JSON.stringify(trace.contexts)}
+            </Text>
+          </Tooltip>
+        </Td>
+      ),
+      value: (trace: Trace) => JSON.stringify(trace.contexts),
     },
     ...Object.fromEntries(
       Object.entries(traceCheckColumnsAvailable).map(
