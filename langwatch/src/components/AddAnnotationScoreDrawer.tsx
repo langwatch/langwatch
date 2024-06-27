@@ -32,6 +32,8 @@ import { AnnotationScoreDataType } from "@prisma/client";
 
 export const AddAnnotationScoreDrawer = () => {
   const { project } = useOrganizationTeamProject();
+  // const { onSuccess } = props;
+  // console.log("props", callback);
 
   const toast = useToast();
 
@@ -91,6 +93,7 @@ export const AddAnnotationScoreDrawer = () => {
           });
           closeDrawer();
           reset();
+          //  props.onSuccess();
         },
         onError: (error) => {
           toast({

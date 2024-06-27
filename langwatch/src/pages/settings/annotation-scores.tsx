@@ -37,6 +37,10 @@ const AnnotationScorePage = () => {
 
   const toggleAnnotationScore = api.annotationScore.toggle.useMutation();
 
+  const onSuccess = () => {
+    void getAllAnnotationScores.refetch();
+  };
+
   const handleToggleScore = (scoreId: string, active: boolean) => {
     toggleAnnotationScore.mutate(
       { scoreId, active, projectId: project?.id ?? "" },
@@ -76,7 +80,11 @@ const AnnotationScorePage = () => {
             size="sm"
             colorScheme="orange"
             leftIcon={<Plus size={20} />}
-            onClick={() => openDrawer("addAnnotationScore", undefined)}
+            onClick={() =>
+              openDrawer("addAnnotationScore", {}, () => {
+                void getAllAnnotationScores.refetch();
+              })
+            }
           >
             Add new score metric
           </Button>

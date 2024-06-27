@@ -21,8 +21,8 @@ export const annotationScoreRouter = createTRPCRouter({
     )
     .use(checkUserPermissionForProject(TeamRoleGroup.ANNOTATIONS_MANAGE))
     .mutation(async ({ ctx, input }) => {
-      console.log("yy", input);
-      const options = [];
+      type OptionType = { label: string; value: number | string };
+      const options: OptionType[] = [];
 
       if (
         input.dataType === "CATEGORICAL" &&
@@ -31,8 +31,8 @@ export const annotationScoreRouter = createTRPCRouter({
       ) {
         for (let i = 0; i < input.category.length; i++) {
           options.push({
-            name: input.category[i],
-            explanation: input.categoryExplanation[i],
+            label: input.category[i],
+            value: input.categoryExplanation[i],
           });
         }
       }
@@ -68,6 +68,14 @@ export const annotationScoreRouter = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       return ctx.prisma.annotationScore.findMany({
         where: { projectId: input.projectId },
+      });
+    }),
+  getAllActive: protectedProcedure
+    .input(z.object({ projectId: z.string() }))
+    .use(checkUserPermissionForProject(TeamRoleGroup.DATASETS_VIEW))
+    .query(async ({ ctx, input }) => {
+      return ctx.prisma.annotationScore.findMany({
+        where: { projectId: input.projectId, active: true },
       });
     }),
   toggle: protectedProcedure

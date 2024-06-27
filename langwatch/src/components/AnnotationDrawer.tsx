@@ -21,10 +21,11 @@ import { MetadataTag } from "~/components/MetadataTag";
 
 import { DeleteIcon } from "@chakra-ui/icons";
 import { useRouter } from "next/router";
-import { useEffect } from "react";
+import { cloneElement, useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
+import { Select as MultiSelect, chakraComponents } from "chakra-react-select";
 
 export function AnnotationDrawer({
   traceId,
@@ -48,6 +49,10 @@ export function AnnotationDrawer({
   const createAnnotation = api.annotation.create.useMutation();
   const deleteAnnotation = api.annotation.deleteById.useMutation();
 
+  const getAnnotationScoring = api.annotationScore.getAllActive.useQuery({
+    projectId: project?.id ?? "",
+  });
+
   const getAnnotation = api.annotation.getById.useQuery({
     projectId: project?.id ?? "",
     annotationId: annotationId ?? "",
@@ -59,6 +64,9 @@ export function AnnotationDrawer({
     isThumbsUp: "thumbsUp",
     comment: "",
   };
+  const scoreFields = Object.fromEntries(
+    getAnnotationScoring.data?.map((score) => [score.id, ""]) || []
+  );
 
   const {
     register,
@@ -72,6 +80,7 @@ export function AnnotationDrawer({
     defaultValues: {
       isThumbsUp: "thumbsUp",
       comment: comment,
+      ...scoreFields,
     },
   });
 
@@ -93,88 +102,90 @@ export function AnnotationDrawer({
   const onSubmit = (data: Annotation) => {
     const isThumbsUp = data.isThumbsUp === "thumbsUp";
 
-    if (action === "edit") {
-      updateAnnotation.mutate(
-        {
-          id: id ?? "",
-          projectId: project?.id ?? "",
-          isThumbsUp: isThumbsUp,
-          comment: data.comment,
-          traceId: traceId,
-        },
-        {
-          onSuccess: () => {
-            toast({
-              title: "Annotation Updated",
-              description: `You have successfully updated the annotation`,
-              status: "success",
-              duration: 5000,
-              isClosable: true,
-              position: "top-right",
-            });
+    console.log("data", data);
 
-            closeDrawer();
-            reset();
-            if (listTableView === "list" || listTableView === "table") {
-              openDrawer("traceDetails", {
-                traceId: traceId,
-                annotationTab: true,
-              });
-            }
-          },
-          onError: () => {
-            toast({
-              title: "Error",
-              description: "Error updating annotation",
-              status: "error",
-              duration: 5000,
-              isClosable: true,
-              position: "top-right",
-            });
-          },
-        }
-      );
-    } else {
-      createAnnotation.mutate(
-        {
-          projectId: project?.id ?? "",
-          isThumbsUp: isThumbsUp,
-          comment: data.comment,
-          traceId: traceId,
-        },
-        {
-          onSuccess: () => {
-            toast({
-              title: "Annotation Created",
-              description: `You have successfully created an annotation`,
-              status: "success",
-              duration: 5000,
-              isClosable: true,
-              position: "top-right",
-            });
+    // if (action === "edit") {
+    //   updateAnnotation.mutate(
+    //     {
+    //       id: id ?? "",
+    //       projectId: project?.id ?? "",
+    //       isThumbsUp: isThumbsUp,
+    //       comment: data.comment,
+    //       traceId: traceId,
+    //     },
+    //     {
+    //       onSuccess: () => {
+    //         toast({
+    //           title: "Annotation Updated",
+    //           description: `You have successfully updated the annotation`,
+    //           status: "success",
+    //           duration: 5000,
+    //           isClosable: true,
+    //           position: "top-right",
+    //         });
 
-            closeDrawer();
-            reset();
-            if (listTableView === "list" || listTableView === "table") {
-              openDrawer("traceDetails", {
-                traceId: traceId,
-                annotationTab: true,
-              });
-            }
-          },
-          onError: () => {
-            toast({
-              title: "Error",
-              description: "Error creating trigger",
-              status: "error",
-              duration: 5000,
-              isClosable: true,
-              position: "top-right",
-            });
-          },
-        }
-      );
-    }
+    //         closeDrawer();
+    //         reset();
+    //         if (listTableView === "list" || listTableView === "table") {
+    //           openDrawer("traceDetails", {
+    //             traceId: traceId,
+    //             annotationTab: true,
+    //           });
+    //         }
+    //       },
+    //       onError: () => {
+    //         toast({
+    //           title: "Error",
+    //           description: "Error updating annotation",
+    //           status: "error",
+    //           duration: 5000,
+    //           isClosable: true,
+    //           position: "top-right",
+    //         });
+    //       },
+    //     }
+    //   );
+    // } else {
+    //   createAnnotation.mutate(
+    //     {
+    //       projectId: project?.id ?? "",
+    //       isThumbsUp: isThumbsUp,
+    //       comment: data.comment,
+    //       traceId: traceId,
+    //     },
+    //     {
+    //       onSuccess: () => {
+    //         toast({
+    //           title: "Annotation Created",
+    //           description: `You have successfully created an annotation`,
+    //           status: "success",
+    //           duration: 5000,
+    //           isClosable: true,
+    //           position: "top-right",
+    //         });
+
+    //         closeDrawer();
+    //         reset();
+    //         if (listTableView === "list" || listTableView === "table") {
+    //           openDrawer("traceDetails", {
+    //             traceId: traceId,
+    //             annotationTab: true,
+    //           });
+    //         }
+    //       },
+    //       onError: () => {
+    //         toast({
+    //           title: "Error",
+    //           description: "Error creating trigger",
+    //           status: "error",
+    //           duration: 5000,
+    //           isClosable: true,
+    //           position: "top-right",
+    //         });
+    //       },
+    //     }
+    //   );
+    // }
   };
 
   const handleDelete = () => {
@@ -198,6 +209,47 @@ export function AnnotationDrawer({
         },
       }
     );
+  };
+
+  type AnnotationScoreOption = {
+    label: string;
+    value: number;
+  };
+
+  type AnnotationScore = {
+    id: string;
+    name: string;
+    options: AnnotationScoreOption[];
+  };
+
+  const ScoreBlock = (scoreType: AnnotationScore) => {
+    const [selectedScore, setSelectedScore] = useState<string>("");
+
+    const scoreValue = watch(scoreType.id);
+
+    return (
+      <RadioGroup key={scoreType.id} value={scoreValue}>
+        <Text fontWeight="bold">{scoreType.name}</Text>
+        <Text fontSize="sm" marginBottom={3}>
+          {scoreType.description}
+        </Text>
+        <HStack align="start" spacing={4}>
+          {scoreType.options.map((option) => {
+            return (
+              <Radio
+                value={option.value.toString()}
+                {...register(scoreType.id)}
+                key={option.value}
+                // onChange={(e) => setSelectedScore(e.target.value)}
+              >
+                {option.label}
+              </Radio>
+            );
+          })}
+        </HStack>
+      </RadioGroup>
+    );
+    // });
   };
 
   return (
@@ -273,6 +325,9 @@ export function AnnotationDrawer({
                     </VStack>
                   </HStack>
                 </RadioGroup>
+                {getAnnotationScoring.data?.map((scoreType) => {
+                  return <ScoreBlock key={scoreType.id} {...scoreType} />;
+                })}
                 <VStack align="start" spacing={4} width="full">
                   <Text>Comments</Text>
                   <Textarea {...register("comment")} />
