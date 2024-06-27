@@ -75,7 +75,7 @@ export class SubscriptionHandlerSaas extends SubscriptionHandler {
       user?.impersonator && isAdmin(user?.impersonator);
 
     if (organizationId === "organization_lVWdCVtaqNXSKXtQYwU-y") {
-      return { ...PLAN_LIMITS[PlanTypes.PRO], overrideAddingLimitations };
+      return { ...PLAN_LIMITS[PlanTypes.GROWTH], overrideAddingLimitations };
     }
 
     if (
