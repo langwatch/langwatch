@@ -99,10 +99,14 @@ const langwatchAPI = async (
   res: NextApiResponse,
   threadId: string,
   userId: string,
-  type?: string
+  type?: string,
+  contexts: string[] = []
 ) => {
   try {
-    const langwatchResponse = await fetch(`${env.NEXTAUTH_URL}/api/collector`, {
+    const contentPrefixId = Math.round(Math.random());
+    const ragTime = Math.round(Math.random() * 300);
+
+    const langwatchResponse = await fetch(`${env.BASE_HOST}/api/collector`, {
       method: "POST",
       headers: {
         "X-Auth-Token": authToken as string,
@@ -111,8 +115,29 @@ const langwatchAPI = async (
       body: JSON.stringify({
         trace_id: `trace_${nanoid()}`,
         spans: [
+          ...(type === "rag"
+            ? [
+                {
+                  name: "RestaurantAPI",
+                  type: "rag",
+                  span_id: `span_${nanoid()}`,
+                  input: {
+                    type: "text",
+                    value: input,
+                  },
+                  contexts: contexts.map((context, index) => ({
+                    documentId: `doc_${contentPrefixId}_${index}`,
+                    content: context,
+                  })),
+                  timestamps: {
+                    started_at: completion.created * 1000 - ragTime,
+                    finished_at: completion.created * 1000,
+                  },
+                },
+              ]
+            : []),
           {
-            type: type ?? "llm",
+            type: "llm",
             span_id: `span_${nanoid()}`,
             vendor: "openai",
             model: completion.model,
@@ -131,8 +156,6 @@ const langwatchAPI = async (
                 {
                   role: "assistant",
                   content: completion.choices[0].message.content,
-                  function_call: "",
-                  tool_calls: [],
                 },
               ],
             },
@@ -149,20 +172,6 @@ const langwatchAPI = async (
               started_at: completion.created * 1000,
               finished_at: new Date().getTime(),
             },
-
-            contexts:
-              type === "rag"
-                ? [
-                    {
-                      documentId: "doc1",
-                      content: "Restaurants in city",
-                    },
-                    {
-                      documentId: "doc2",
-                      content: "Restaurants in suburb",
-                    },
-                  ]
-                : [],
           },
         ],
         metadata: {
@@ -246,7 +255,32 @@ const ragMessage = async (res: NextApiResponse) => {
     model: "gpt-3.5-turbo",
   });
 
-  await langwatchAPI(completion, userInput ?? "", res, threadId, userId, "rag");
+  const completions = (
+    await Promise.all(
+      Array.from({ length: 2 + Math.floor(Math.random() * 5) }, () => {
+        return openai.chat.completions.create({
+          model: "gpt-3.5-turbo",
+          messages: [
+            {
+              role: "system",
+              content:
+                "Invent a restaurant name and a short google maps review of it",
+            },
+          ],
+        });
+      })
+    )
+  ).map((completion) => completion.choices[0]!.message.content ?? "");
+
+  await langwatchAPI(
+    completion,
+    userInput ?? "",
+    res,
+    threadId,
+    userId,
+    "rag",
+    completions
+  );
 
   return completion.choices[0]!.message.content;
 };
