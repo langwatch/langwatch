@@ -6,8 +6,10 @@ import {
   DrawerContent,
   DrawerHeader,
   HStack,
+  Input,
   Radio,
   RadioGroup,
+  Spacer,
   Spinner,
   Text,
   Textarea,
@@ -18,14 +20,15 @@ import {
 import { ExternalLink, ThumbsDown, ThumbsUp } from "react-feather";
 import { useDrawer } from "~/components/CurrentDrawer";
 import { MetadataTag } from "~/components/MetadataTag";
+import { SmallLabel } from "~/components/SmallLabel";
 
 import { DeleteIcon } from "@chakra-ui/icons";
 import { useRouter } from "next/router";
-import { cloneElement, useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
-import { Select as MultiSelect, chakraComponents } from "chakra-react-select";
+import { HorizontalFormControl } from "./HorizontalFormControl";
 
 export function AnnotationDrawer({
   traceId,
@@ -60,12 +63,13 @@ export function AnnotationDrawer({
 
   const updateAnnotation = api.annotation.updateByTraceId.useMutation();
 
-  const { isThumbsUp, comment, id } = getAnnotation.data ?? {
+  const { isThumbsUp, comment, id, scoreOptions } = getAnnotation.data ?? {
     isThumbsUp: "thumbsUp",
     comment: "",
+    scoreOptions: {},
   };
   const scoreFields = Object.fromEntries(
-    getAnnotationScoring.data?.map((score) => [score.id, ""]) || []
+    getAnnotationScoring.data?.map((score) => [score.id, ""]) ?? []
   );
 
   const {
@@ -80,7 +84,7 @@ export function AnnotationDrawer({
     defaultValues: {
       isThumbsUp: "thumbsUp",
       comment: comment,
-      ...scoreFields,
+      scoreOptions: { ...scoreFields },
     },
   });
 
@@ -97,95 +101,96 @@ export function AnnotationDrawer({
   type Annotation = {
     isThumbsUp: string;
     comment: string;
+    scoreOptions: Record<string, string>;
   };
 
   const onSubmit = (data: Annotation) => {
     const isThumbsUp = data.isThumbsUp === "thumbsUp";
 
-    console.log("data", data);
+    if (action === "edit") {
+      updateAnnotation.mutate(
+        {
+          id: id ?? "",
+          projectId: project?.id ?? "",
+          isThumbsUp: isThumbsUp,
+          comment: data.comment,
+          traceId: traceId,
+          scoreOptions: data.scoreOptions,
+        },
+        {
+          onSuccess: () => {
+            toast({
+              title: "Annotation Updated",
+              description: `You have successfully updated the annotation`,
+              status: "success",
+              duration: 5000,
+              isClosable: true,
+              position: "top-right",
+            });
 
-    // if (action === "edit") {
-    //   updateAnnotation.mutate(
-    //     {
-    //       id: id ?? "",
-    //       projectId: project?.id ?? "",
-    //       isThumbsUp: isThumbsUp,
-    //       comment: data.comment,
-    //       traceId: traceId,
-    //     },
-    //     {
-    //       onSuccess: () => {
-    //         toast({
-    //           title: "Annotation Updated",
-    //           description: `You have successfully updated the annotation`,
-    //           status: "success",
-    //           duration: 5000,
-    //           isClosable: true,
-    //           position: "top-right",
-    //         });
+            closeDrawer();
+            reset();
+            if (listTableView === "list" || listTableView === "table") {
+              openDrawer("traceDetails", {
+                traceId: traceId,
+                annotationTab: true,
+              });
+            }
+          },
+          onError: () => {
+            toast({
+              title: "Error",
+              description: "Error updating annotation",
+              status: "error",
+              duration: 5000,
+              isClosable: true,
+              position: "top-right",
+            });
+          },
+        }
+      );
+    } else {
+      createAnnotation.mutate(
+        {
+          projectId: project?.id ?? "",
+          isThumbsUp: isThumbsUp,
+          comment: data.comment,
+          traceId: traceId,
+          scoreOptions: data.scoreOptions,
+        },
+        {
+          onSuccess: () => {
+            toast({
+              title: "Annotation Created",
+              description: `You have successfully created an annotation`,
+              status: "success",
+              duration: 5000,
+              isClosable: true,
+              position: "top-right",
+            });
 
-    //         closeDrawer();
-    //         reset();
-    //         if (listTableView === "list" || listTableView === "table") {
-    //           openDrawer("traceDetails", {
-    //             traceId: traceId,
-    //             annotationTab: true,
-    //           });
-    //         }
-    //       },
-    //       onError: () => {
-    //         toast({
-    //           title: "Error",
-    //           description: "Error updating annotation",
-    //           status: "error",
-    //           duration: 5000,
-    //           isClosable: true,
-    //           position: "top-right",
-    //         });
-    //       },
-    //     }
-    //   );
-    // } else {
-    //   createAnnotation.mutate(
-    //     {
-    //       projectId: project?.id ?? "",
-    //       isThumbsUp: isThumbsUp,
-    //       comment: data.comment,
-    //       traceId: traceId,
-    //     },
-    //     {
-    //       onSuccess: () => {
-    //         toast({
-    //           title: "Annotation Created",
-    //           description: `You have successfully created an annotation`,
-    //           status: "success",
-    //           duration: 5000,
-    //           isClosable: true,
-    //           position: "top-right",
-    //         });
-
-    //         closeDrawer();
-    //         reset();
-    //         if (listTableView === "list" || listTableView === "table") {
-    //           openDrawer("traceDetails", {
-    //             traceId: traceId,
-    //             annotationTab: true,
-    //           });
-    //         }
-    //       },
-    //       onError: () => {
-    //         toast({
-    //           title: "Error",
-    //           description: "Error creating trigger",
-    //           status: "error",
-    //           duration: 5000,
-    //           isClosable: true,
-    //           position: "top-right",
-    //         });
-    //       },
-    //     }
-    //   );
-    // }
+            closeDrawer();
+            reset();
+            if (listTableView === "list" || listTableView === "table") {
+              openDrawer("traceDetails", {
+                traceId: traceId,
+                annotationTab: true,
+              });
+            }
+          },
+          onError: () => {
+            toast({
+              title: "Error",
+              description: "Error creating trigger",
+              status: "error",
+              duration: 5000,
+              isClosable: true,
+              position: "top-right",
+            });
+          },
+        }
+      );
+    }
   };
 
   const handleDelete = () => {
@@ -211,46 +216,16 @@ export function AnnotationDrawer({
     );
   };
 
-  type AnnotationScoreOption = {
-    label: string;
-    value: number;
-  };
-
-  type AnnotationScore = {
-    id: string;
-    name: string;
-    options: AnnotationScoreOption[];
-  };
-
-  const ScoreBlock = (scoreType: AnnotationScore) => {
-    const [selectedScore, setSelectedScore] = useState<string>("");
-
-    const scoreValue = watch(scoreType.id);
-
-    return (
-      <RadioGroup key={scoreType.id} value={scoreValue}>
-        <Text fontWeight="bold">{scoreType.name}</Text>
-        <Text fontSize="sm" marginBottom={3}>
-          {scoreType.description}
-        </Text>
-        <HStack align="start" spacing={4}>
-          {scoreType.options.map((option) => {
-            return (
-              <Radio
-                value={option.value.toString()}
-                {...register(scoreType.id)}
-                key={option.value}
-                // onChange={(e) => setSelectedScore(e.target.value)}
-              >
-                {option.label}
-              </Radio>
-            );
-          })}
-        </HStack>
-      </RadioGroup>
-    );
-    // });
-  };
+  useEffect(() => {
+    if (action === "edit") {
+      const safeScoreOptions = scoreOptions ?? {};
+      if (Object.keys(safeScoreOptions).length > 0) {
+        Object.entries(safeScoreOptions).forEach(([key, value]) => {
+          setValue(`scoreOptions.${key}.value`, value);
+        });
+      }
+    }
+  }, [scoreOptions, setValue, action]);
 
   return (
     <Drawer
@@ -290,7 +265,7 @@ export function AnnotationDrawer({
           ) : (
             /* eslint-disable-next-line @typescript-eslint/no-misused-promises */
             <form onSubmit={handleSubmit(onSubmit)}>
-              <VStack align="start" spacing={6}>
+              <VStack align="start" spacing={3}>
                 <RadioGroup value={thumbsUpValue}>
                   <HStack spacing={4}>
                     <VStack align="start">
@@ -326,7 +301,7 @@ export function AnnotationDrawer({
                   </HStack>
                 </RadioGroup>
                 {getAnnotationScoring.data?.map((scoreType) => {
-                  return <ScoreBlock key={scoreType.id} {...scoreType} />;
+                  return ScoreBlock(scoreType, watch, register);
                 })}
                 <VStack align="start" spacing={4} width="full">
                   <Text>Comments</Text>
@@ -362,3 +337,47 @@ export function AnnotationDrawer({
     </Drawer>
   );
 }
+
+type AnnotationScoreOption = {
+  label: string;
+  value: number;
+};
+
+type AnnotationScore = {
+  id: string;
+  name: string;
+  options: AnnotationScoreOption[];
+  description: string;
+};
+
+const ScoreBlock = (scoreType: AnnotationScore, watch: any, register: any) => {
+  const scoreValue = watch(`scoreOptions.${scoreType.id}.value`);
+  const scoreReason = watch(`scoreOptions.${scoreType.id}.reason`);
+
+  return (
+    <HorizontalFormControl
+      label={scoreType.name}
+      helper={scoreType.description}
+      //isInvalid={!!errors.description}
+    >
+      <RadioGroup key={scoreType.id} value={scoreValue} padding={0}>
+        <VStack align="start" spacing={2}>
+          {scoreType.options.map((option) => {
+            return (
+              <Radio
+                value={option.value.toString()}
+                {...register(`scoreOptions.${scoreType.id}.value`)}
+                key={option.value}
+              >
+                {option.label}
+              </Radio>
+            );
+          })}
+          <Spacer />
+          <SmallLabel>Reasoning</SmallLabel>
+          <Input {...register(`scoreOptions.${scoreType.id}.reason`)} />
+        </VStack>
+      </RadioGroup>
+    </HorizontalFormControl>
+  );
+};

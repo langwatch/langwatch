@@ -21,12 +21,13 @@ import { Switch } from "@chakra-ui/react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import SettingsLayout from "../../components/SettingsLayout";
 import { api } from "../../utils/api";
+import { useEffect } from "react";
 
 const AnnotationScorePage = () => {
   const { project } = useOrganizationTeamProject();
   const toast = useToast();
 
-  const { openDrawer } = useDrawer();
+  const { openDrawer, isDrawerOpen } = useDrawer();
 
   const getAllAnnotationScores = api.annotationScore.getAll.useQuery(
     {
@@ -37,9 +38,11 @@ const AnnotationScorePage = () => {
 
   const toggleAnnotationScore = api.annotationScore.toggle.useMutation();
 
-  const onSuccess = () => {
+  const isAnnotationDrawerOpen = isDrawerOpen("addAnnotationScore");
+
+  useEffect(() => {
     void getAllAnnotationScores.refetch();
-  };
+  }, [isAnnotationDrawerOpen]);
 
   const handleToggleScore = (scoreId: string, active: boolean) => {
     toggleAnnotationScore.mutate(

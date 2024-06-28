@@ -16,6 +16,10 @@ export const Annotations = ({ traceId }: { traceId: string }) => {
     traceId: traceId,
   });
 
+  const scoreOptions = api.annotationScore.getAll.useQuery({
+    projectId: project?.id ?? "",
+  });
+
   const isAnnotationDrawerOpen = isDrawerOpen("annotation");
 
   useEffect(() => {
@@ -27,10 +31,11 @@ export const Annotations = ({ traceId }: { traceId: string }) => {
       {annotations.data?.map((annotation) => {
         const isCurrentUser = data?.user?.id === annotation.user?.id;
         return (
-          <Card
-            padding={3}
-            borderRadius={5}
-            width="300px"
+          <Box
+            backgroundColor={"gray.100"}
+            width={"full"}
+            padding={6}
+            borderRadius={"lg"}
             onClick={
               isCurrentUser
                 ? () =>
@@ -79,8 +84,29 @@ export const Annotations = ({ traceId }: { traceId: string }) => {
                 )}
               </HStack>
               <Text>{annotation.comment}</Text>
+              <VStack align="start" spacing={0}>
+                {annotation.scoreOptions &&
+                  typeof annotation.scoreOptions === "object" &&
+                  Object.entries(annotation.scoreOptions).map(
+                    ([key, scoreOption]) => {
+                      return (
+                        <Text key={key} fontSize={"sm"}>
+                          <HStack>
+                            <Text fontWeight="bold">
+                              {scoreOptions.data?.find(
+                                (option) => option.id === key
+                              )?.name ?? "Name not found"}
+                              :
+                            </Text>
+                            <Text key={key}>{scoreOption as string}</Text>
+                          </HStack>
+                        </Text>
+                      );
+                    }
+                  )}
+              </VStack>
             </VStack>
-          </Card>
+          </Box>
         );
       })}
     </VStack>

@@ -21,7 +21,7 @@ export const annotationScoreRouter = createTRPCRouter({
     )
     .use(checkUserPermissionForProject(TeamRoleGroup.ANNOTATIONS_MANAGE))
     .mutation(async ({ ctx, input }) => {
-      type OptionType = { label: string; value: number | string };
+      type OptionType = { label: string; value: string };
       const options: OptionType[] = [];
 
       if (
@@ -31,14 +31,17 @@ export const annotationScoreRouter = createTRPCRouter({
       ) {
         for (let i = 0; i < input.category.length; i++) {
           options.push({
-            label: input.category[i],
-            value: input.categoryExplanation[i],
+            label: input.category[i]!,
+            value: input.categoryExplanation[i]!,
           });
         }
       }
 
       if (input.dataType === "BOOLEAN") {
-        options.push({ label: "true", value: 1 }, { label: "false", value: 0 });
+        options.push(
+          { label: "true", value: "1" },
+          { label: "false", value: "0" }
+        );
       }
       if (input.dataType === "LIKERT") {
         const likertScale = [
@@ -68,6 +71,7 @@ export const annotationScoreRouter = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       return ctx.prisma.annotationScore.findMany({
         where: { projectId: input.projectId },
+        orderBy: { createdAt: "desc" },
       });
     }),
   getAllActive: protectedProcedure
