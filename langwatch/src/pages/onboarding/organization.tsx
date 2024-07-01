@@ -160,7 +160,7 @@ export default function OrganizationOnboarding() {
               <Text fontSize={14}>
                 I agree with LangWatch{" "}
                 <Link
-                  href="https://langwatch.ai/terms"
+                  href="https://langwatch.ai/legal/terms-conditions"
                   textDecoration="underline"
                   isExternal
                   _hover={{
