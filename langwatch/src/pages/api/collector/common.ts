@@ -113,6 +113,15 @@ export const typedValueToText = (
       if (json.output !== undefined) {
         return stringified(json.output);
       }
+
+      if (
+        typeof json === "object" &&
+        !Array.isArray(json) &&
+        Object.keys(json).length === 1
+      ) {
+        return stringified(json[Object.keys(json)[0]!]);
+      }
+
       return stringified(typed.value);
     } catch (_e) {
       return typed.value?.toString() ?? "";

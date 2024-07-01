@@ -160,23 +160,27 @@ class ContextSpan:
             if span.type != "llm":
                 span.name = func.__name__
             if span._capture_input:
-                all_args = list(args)
-
                 sig = inspect.signature(func)
                 parameters = list(sig.parameters.values())
+
+                all_args = {
+                    str(parameter.name): value
+                    for parameter, value in zip(parameters, args)
+                }
                 # Skip self parameters because it doesn't really help with debugging, becomes just noise
-                if parameters and len(parameters) > 0 and parameters[0].name == "self":
-                    all_args = all_args[1:]
+                if (
+                    "self" in all_args
+                    and len(all_args) > 0
+                    and parameters[0].name == "self"
+                ):
+                    del all_args["self"]
 
                 if kwargs and len(kwargs) > 0:
                     if kwargs:
-                        all_args.append(kwargs)
+                        all_args.update(kwargs)
 
                 if len(all_args) == 0:
                     return
-
-                if len(all_args) == 1:
-                    all_args = all_args[0]
 
                 span.input = autoconvert_typed_values(all_args)
 
