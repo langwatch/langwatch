@@ -124,4 +124,15 @@ export const annotationRouter = createTRPCRouter({
         },
       });
     }),
+  getAll: protectedProcedure
+    .input(z.object({ projectId: z.string() }))
+    .use(checkUserPermissionForProject(TeamRoleGroup.ANNOTATIONS_MANAGE))
+    .query(async ({ ctx, input }) => {
+      console.log(input);
+      return ctx.prisma.annotation.findMany({
+        where: {
+          projectId: input.projectId,
+        },
+      });
+    }),
 });
