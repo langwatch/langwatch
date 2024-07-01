@@ -47,3 +47,28 @@ resource "aws_security_group" "langwatch-pg" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 }
+
+resource "null_resource" "langwatch_pg_secret_rotation" {
+  triggers = {
+    secret_id = data.aws_secretsmanager_secret.langwatch-pg.id
+  }
+
+  provisioner "local-exec" {
+    command = <<EOT
+      set -eo pipefail
+
+      aws secretsmanager --profile ${module.variables.profile} --region ${data.aws_region.current.name} cancel-rotate-secret --secret-id ${data.aws_secretsmanager_secret.langwatch-pg.id}
+    EOT
+
+    interpreter = ["/bin/bash", "-c"]
+    on_failure  = fail
+  }
+}
+
+data "aws_secretsmanager_secret" "langwatch-pg" {
+  arn = aws_db_instance.langwatch-pg.master_user_secret[0].secret_arn
+}
+
+data "aws_secretsmanager_secret_version" "langwatch-pg" {
+  secret_id = data.aws_secretsmanager_secret.langwatch-pg.id
+}
