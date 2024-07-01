@@ -311,6 +311,26 @@ module "langevals-competitor_llm-api-gw" {
     ]
 }
 
+resource "aws_api_gateway_resource" "langevals-competitor_llm_function_call" {
+    rest_api_id = aws_api_gateway_rest_api.langevals.id
+    parent_id   = aws_api_gateway_resource.langevals.id
+    path_part   = "competitor_llm_function_call"
+}
+
+module "langevals-competitor_llm_function_call-api-gw" {
+    source                 = "./api-gw-resource"
+    apigw_id               = aws_api_gateway_rest_api.langevals.id
+    apigw_root_resource_id = aws_api_gateway_resource.langevals-competitor_llm_function_call.id
+    path                   = "evaluate"
+    method                 = "POST"
+
+    lambda_invoke_arn = module.langevals-evaluator.lambda_invoke_arn
+
+    depends_on = [
+        aws_api_gateway_resource.langevals-competitor_llm_function_call
+    ]
+}
+
 resource "aws_api_gateway_resource" "langevals-llm_boolean" {
     rest_api_id = aws_api_gateway_rest_api.langevals.id
     parent_id   = aws_api_gateway_resource.langevals.id
@@ -560,11 +580,11 @@ resource "aws_api_gateway_deployment" "this" {
     count = module.variables.profile == "lw-prod" ? 1 : 0
 
     triggers = {
-        redeployment = sha1(jsonencode([module.aws-comprehend_pii_detection-api-gw, module.lingua-language_detection-api-gw, module.azure-content_safety-api-gw, module.azure-jailbreak-api-gw, module.ragas-answer_relevancy-api-gw, module.ragas-context_precision-api-gw, module.ragas-context_recall-api-gw, module.ragas-context_relevancy-api-gw, module.ragas-context_utilization-api-gw, module.ragas-faithfulness-api-gw, module.langevals-basic-api-gw, module.langevals-competitor_blocklist-api-gw, module.langevals-competitor_llm-api-gw, module.langevals-llm_boolean-api-gw, module.langevals-llm_score-api-gw, module.langevals-off_topic-api-gw, module.langevals-product_sentiment_polarity-api-gw, module.langevals-similarity-api-gw, module.openai-moderation-api-gw, module.huggingface-llama_guard-api-gw, module.haystack-faithfulness-api-gw, module.google_cloud-dlp_pii_detection-api-gw]))
+        redeployment = sha1(jsonencode([module.aws-comprehend_pii_detection-api-gw, module.lingua-language_detection-api-gw, module.azure-content_safety-api-gw, module.azure-jailbreak-api-gw, module.ragas-answer_relevancy-api-gw, module.ragas-context_precision-api-gw, module.ragas-context_recall-api-gw, module.ragas-context_relevancy-api-gw, module.ragas-context_utilization-api-gw, module.ragas-faithfulness-api-gw, module.langevals-basic-api-gw, module.langevals-competitor_blocklist-api-gw, module.langevals-competitor_llm-api-gw, module.langevals-competitor_llm_function_call-api-gw, module.langevals-llm_boolean-api-gw, module.langevals-llm_score-api-gw, module.langevals-off_topic-api-gw, module.langevals-product_sentiment_polarity-api-gw, module.langevals-similarity-api-gw, module.openai-moderation-api-gw, module.huggingface-llama_guard-api-gw, module.haystack-faithfulness-api-gw, module.google_cloud-dlp_pii_detection-api-gw]))
     }
 
     depends_on = [
-        module.aws-comprehend_pii_detection-api-gw, module.lingua-language_detection-api-gw, module.azure-content_safety-api-gw, module.azure-jailbreak-api-gw, module.ragas-answer_relevancy-api-gw, module.ragas-context_precision-api-gw, module.ragas-context_recall-api-gw, module.ragas-context_relevancy-api-gw, module.ragas-context_utilization-api-gw, module.ragas-faithfulness-api-gw, module.langevals-basic-api-gw, module.langevals-competitor_blocklist-api-gw, module.langevals-competitor_llm-api-gw, module.langevals-llm_boolean-api-gw, module.langevals-llm_score-api-gw, module.langevals-off_topic-api-gw, module.langevals-product_sentiment_polarity-api-gw, module.langevals-similarity-api-gw, module.openai-moderation-api-gw, module.huggingface-llama_guard-api-gw, module.haystack-faithfulness-api-gw, module.google_cloud-dlp_pii_detection-api-gw
+        module.aws-comprehend_pii_detection-api-gw, module.lingua-language_detection-api-gw, module.azure-content_safety-api-gw, module.azure-jailbreak-api-gw, module.ragas-answer_relevancy-api-gw, module.ragas-context_precision-api-gw, module.ragas-context_recall-api-gw, module.ragas-context_relevancy-api-gw, module.ragas-context_utilization-api-gw, module.ragas-faithfulness-api-gw, module.langevals-basic-api-gw, module.langevals-competitor_blocklist-api-gw, module.langevals-competitor_llm-api-gw, module.langevals-competitor_llm_function_call-api-gw, module.langevals-llm_boolean-api-gw, module.langevals-llm_score-api-gw, module.langevals-off_topic-api-gw, module.langevals-product_sentiment_polarity-api-gw, module.langevals-similarity-api-gw, module.openai-moderation-api-gw, module.huggingface-llama_guard-api-gw, module.haystack-faithfulness-api-gw, module.google_cloud-dlp_pii_detection-api-gw
     ]
 
     rest_api_id = aws_api_gateway_rest_api.langevals.id
