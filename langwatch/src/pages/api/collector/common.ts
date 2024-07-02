@@ -10,7 +10,12 @@ export const getFirstInputAsText = (spans: Span[]): string => {
   const topmostInputs = flattenSpanTree(
     organizeSpansIntoTree(spans),
     "outside-in"
-  ).filter((span) => span.input);
+  ).filter(
+    (span) =>
+      span.input &&
+      span.input.value &&
+      (span.input.type !== "json" || span.input.value !== "null")
+  );
 
   const input = topmostInputs[0]?.input;
   if (!input) {
@@ -33,7 +38,13 @@ export const getLastOutputAsText = (spans: Span[]): string => {
     "inside-out"
   )
     .reverse()
-    .filter((span) => span.output && span.type !== "guardrail");
+    .filter(
+      (span) =>
+        span.output &&
+        span.type !== "guardrail" &&
+        span.output.value &&
+        (span.output.type !== "json" || span.output.value !== "null")
+    );
 
   const outputs = bottommostOutputs[0]?.output;
   if (!outputs) {
@@ -102,6 +113,15 @@ export const typedValueToText = (
       if (json.output !== undefined) {
         return stringified(json.output);
       }
+
+      if (
+        typeof json === "object" &&
+        !Array.isArray(json) &&
+        Object.keys(json).length === 1
+      ) {
+        return stringified(json[Object.keys(json)[0]!]);
+      }
+
       return stringified(typed.value);
     } catch (_e) {
       return typed.value?.toString() ?? "";

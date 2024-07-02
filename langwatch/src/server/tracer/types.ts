@@ -17,6 +17,11 @@ interface ToolCall {
   function: FunctionCall;
 }
 
+export type Contexts = {
+  traceId: string;
+  contexts: RAGChunk[];
+};
+
 export interface ChatMessage {
   role?: ChatRole;
   content?: string | ChatRichContent[] | null;
@@ -246,6 +251,7 @@ export type Trace = {
   timestamps: { started_at: number; inserted_at: number; updated_at: number };
   input: TraceInput;
   output?: TraceOutput;
+  contexts?: RAGChunk[];
   metrics: {
     first_token_ms?: number | null;
     total_time_ms?: number | null;

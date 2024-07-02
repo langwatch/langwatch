@@ -221,6 +221,61 @@ describe("Collector API Endpoint", () => {
     expect(res.statusCode).toBe(400);
   });
 
+  test("should return 400 for invalid span format without timestamps", async () => {
+    const invalidSpan = {
+      metadata: {
+        user_id: "",
+      },
+      spans: [
+        {
+          contexts: [
+            {
+              content: "No documents found.",
+              document_id: "N/A",
+            },
+          ],
+          input: {
+            type: "chat_messages",
+            value: [
+              {
+                content: "hello there",
+                role: "user",
+              },
+            ],
+          },
+          output: {
+            type: "chat_messages",
+            value: [
+              {
+                content: "hi!",
+                role: "assistant",
+              },
+            ],
+          },
+          span_id: "0faa206c-237b-4c5d-bbf9-47e082a77ff3",
+          trace_id: "6e1dd990-6186-4dce-a09a-faaad24d2c7e",
+          type: "rag",
+        },
+      ],
+      trace_id: "6e1dd990-6186-4dce-a09a-faaad24d2c7e",
+    };
+
+    const { req, res }: { req: NextApiRequest; res: NextApiResponse } =
+      createMocks({
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Auth-Token": project?.apiKey,
+        },
+        body: {
+          spans: [invalidSpan],
+        },
+      });
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(400);
+  });
+
   test("should insert RAGs, extracting the input and output from children spans if not available", async () => {
     const traceId = "trace_test-trace_J5m9g-0JDMbcJqLK2";
     const ragSpan: RAGSpan = {

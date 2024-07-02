@@ -117,6 +117,14 @@ const traceMapping: ElasticSearchMappingFrom<ElasticSearchTrace> = {
   indexing_md5s: {
     type: "keyword",
   },
+  contexts: {
+    type: "nested",
+    properties: {
+      document_id: { type: "keyword" },
+      chunk_id: { type: "keyword" },
+      content: { type: "text" },
+    },
+  },
 };
 
 const spanMapping: ElasticSearchMappingFrom<ElasticSearchSpan> = {

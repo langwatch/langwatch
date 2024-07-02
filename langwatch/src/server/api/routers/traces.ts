@@ -15,6 +15,7 @@ import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { evaluatorsSchema } from "../../../trace_checks/evaluators.zod.generated";
 import { evaluatePreconditions } from "../../../trace_checks/preconditions";
 import { checkPreconditionSchema } from "../../../trace_checks/types.generated";
+
 import {
   sharedFiltersInputSchema,
   type TracesPivot,
@@ -33,6 +34,7 @@ import {
   type ElasticSearchSpan,
   type Trace,
   type TraceCheck,
+  type Contexts,
   elasticSearchToTypedValue,
   type GuardrailResult,
 } from "../../tracer/types";
@@ -679,40 +681,84 @@ export const getAllForProject = async (
   if (!usePivotIndex) {
     totalHits = (tracesResult.hits?.total as SearchTotalHits)?.value || 0;
   }
-  return { groups, totalHits, traceChecks };
+
+  const traceIdsArray = traces.map((trace) => trace.trace_id);
+
+  const spans = await getSpansForTraceIds(input.projectId, traceIdsArray);
+
+  const contexts: Contexts[] = [];
+  for (const traceId in spans) {
+    const spansOfId = spans[traceId];
+
+    if (spansOfId) {
+      for (const span of spansOfId) {
+        if (span.type === "rag") {
+          contexts.push({
+            traceId,
+            contexts: span.contexts ?? [],
+          });
+        }
+      }
+    }
+  }
+
+  const mergedGroups = groups.map((group) => {
+    return group.map((trace) => {
+      const context = contexts.find((c) => c.traceId === trace.trace_id);
+      return {
+        ...trace,
+        contexts: context ? context.contexts : [],
+      };
+    });
+  });
+
+  return { groups: mergedGroups, totalHits, traceChecks };
 };
 
 const getSpansForTraceIds = async (projectId: string, traceIds: string[]) => {
-  const spansForEmptyOutputTraces = await esClient.search<ElasticSearchSpan>({
-    index: SPAN_INDEX,
-    body: {
-      size: 10_000,
-      query: {
-        bool: {
-          filter: [
-            { term: { project_id: projectId } },
-            { terms: { trace_id: traceIds } },
-          ] as QueryDslBoolQuery["filter"],
-        } as QueryDslBoolQuery,
+  const BATCH_SIZE = 50; // Define a suitable batch size
+  const searchPromises = [];
+
+  for (let i = 0; i < traceIds.length; i += BATCH_SIZE) {
+    const batchTraceIds = traceIds.slice(i, i + BATCH_SIZE);
+    const searchPromise = esClient.search<ElasticSearchSpan>({
+      index: SPAN_INDEX,
+      body: {
+        size: 10_000,
+        query: {
+          bool: {
+            filter: [
+              { term: { project_id: projectId } },
+              { terms: { trace_id: batchTraceIds } },
+            ] as QueryDslBoolQuery["filter"],
+          } as QueryDslBoolQuery,
+        },
       },
-    },
-    routing: traceIds
-      .map((traceId) => traceIndexId({ traceId, projectId: projectId }))
-      .join(","),
-  });
-  return spansForEmptyOutputTraces.hits.hits
-    .map((hit) => hit._source!)
-    .filter((x) => x)
-    .reduce(
-      (acc, span) => {
+      routing: batchTraceIds
+        .map((traceId) => traceIndexId({ traceId, projectId }))
+        .join(","),
+    });
+    searchPromises.push(searchPromise);
+  }
+
+  const results = await Promise.all(searchPromises);
+  const spansResults = results.flatMap((result) =>
+    result.hits.hits.map((hit) => hit._source).filter((x) => x)
+  );
+
+  return spansResults.reduce(
+    (acc, span) => {
+      if (span?.trace_id) {
         if (!acc[span.trace_id]) {
           acc[span.trace_id] = [];
         }
+
         acc[span.trace_id]!.push(span);
-        return acc;
-      },
-      {} as Record<string, ElasticSearchSpan[]>
-    );
+      }
+      return acc;
+    },
+    {} as Record<string, ElasticSearchSpan[]>
+  );
 };
 
 const getTraceChecks = async (projectId: string, traceIds: string[]) => {
