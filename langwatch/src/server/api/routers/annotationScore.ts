@@ -39,8 +39,8 @@ export const annotationScoreRouter = createTRPCRouter({
 
       if (input.dataType === "BOOLEAN") {
         options.push(
-          { label: "true", value: "1" },
-          { label: "false", value: "0" }
+          { label: "true", value: "true" },
+          { label: "false", value: "false" }
         );
       }
       if (input.dataType === "LIKERT") {

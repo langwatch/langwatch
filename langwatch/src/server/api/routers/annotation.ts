@@ -133,6 +133,9 @@ export const annotationRouter = createTRPCRouter({
         where: {
           projectId: input.projectId,
         },
+        orderBy: {
+          createdAt: "asc",
+        },
       });
     }),
 });

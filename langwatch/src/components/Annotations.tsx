@@ -89,6 +89,7 @@ export const Annotations = ({ traceId }: { traceId: string }) => {
                   typeof annotation.scoreOptions === "object" &&
                   Object.entries(annotation.scoreOptions).map(
                     ([key, scoreOption]) => {
+                      if (!scoreOption) return null;
                       return (
                         <Text key={key} fontSize={"sm"}>
                           <HStack>
@@ -98,7 +99,7 @@ export const Annotations = ({ traceId }: { traceId: string }) => {
                               )?.name ?? "Name not found"}
                               :
                             </Text>
-                            <Text key={key}>{scoreOption as string}</Text>
+                            <Text key={key}>{scoreOption.value}</Text>
                           </HStack>
                         </Text>
                       );

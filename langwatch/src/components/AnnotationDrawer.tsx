@@ -17,6 +17,8 @@ import {
   useDisclosure,
   useToast,
 } from "@chakra-ui/react";
+import { unstable_batchedUpdates } from "react-dom";
+
 import { ExternalLink, ThumbsDown, ThumbsUp } from "react-feather";
 import { useDrawer } from "~/components/CurrentDrawer";
 import { MetadataTag } from "~/components/MetadataTag";
@@ -72,6 +74,8 @@ export function AnnotationDrawer({
     getAnnotationScoring.data?.map((score) => [score.id, ""]) ?? []
   );
 
+  console.log(scoreFields);
+
   const {
     register,
     handleSubmit,
@@ -84,7 +88,7 @@ export function AnnotationDrawer({
     defaultValues: {
       isThumbsUp: "thumbsUp",
       comment: comment,
-      scoreOptions: { ...scoreFields },
+      scoreOptions: getAnnotation.data?.scoreOptions,
     },
   });
 
@@ -92,11 +96,20 @@ export function AnnotationDrawer({
 
   useEffect(() => {
     if (getAnnotation.data) {
+      const { scoreOptions } = getAnnotation.data;
       const thumbValue = isThumbsUp === true ? "thumbsUp" : "thumbsDown";
       setValue("isThumbsUp", thumbValue);
       setValue("comment", comment);
+
+      Object.entries(scoreOptions ?? {}).forEach(([key, value]) => {
+        console.log(value);
+        setValue(`scoreOptions.${key}`, {
+          value: value.value,
+          reason: value.reason,
+        });
+      });
     }
-  }, [getAnnotation.data, setValue, isThumbsUp, comment]);
+  }, [getAnnotation.data, isThumbsUp, comment, setValue]);
 
   type Annotation = {
     isThumbsUp: string;
