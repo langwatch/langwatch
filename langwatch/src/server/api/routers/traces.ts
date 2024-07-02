@@ -148,40 +148,7 @@ export const tracesRouter = createTRPCRouter({
     .query(async ({ input }) => {
       const { projectId, traceIds } = input;
 
-      const checksResult = await esClient.search<TraceCheck>({
-        index: TRACE_CHECKS_INDEX,
-        body: {
-          size: Math.min(traceIds.length * 100, 10_000), // Assuming a maximum of 100 checks per trace
-          query: {
-            //@ts-ignore
-            bool: {
-              filter: [
-                { terms: { trace_id: traceIds } },
-                { term: { project_id: projectId } },
-              ],
-            },
-          },
-        },
-      });
-
-      const traceChecks = checksResult.hits.hits
-        .map((hit) => hit._source!)
-        .filter((x) => x);
-
-      const checksPerTrace = traceChecks.reduce(
-        (acc, check) => {
-          if (check) {
-            if (!acc[check.trace_id]) {
-              acc[check.trace_id] = [];
-            }
-            acc[check.trace_id]!.push(check);
-          }
-          return acc;
-        },
-        {} as Record<string, TraceCheck[]>
-      );
-
-      return checksPerTrace;
+      return getTraceChecks(projectId, traceIds);
     }),
   getTopicCounts: protectedProcedure
     .input(tracesFilterInput)
@@ -697,18 +664,22 @@ export const getAllForProject = async (
 
   const groups = groupTraces(input.groupBy, traces);
 
+  const groupTraceIds = [];
   // Remove embeddings to reduce payload size
   for (const group of groups) {
     for (const trace of group) {
+      groupTraceIds.push(trace.trace_id);
       delete trace.input?.embeddings;
       delete trace.output?.embeddings;
     }
   }
 
+  const traceChecks = await getTraceChecks(input.projectId, groupTraceIds);
+
   if (!usePivotIndex) {
     totalHits = (tracesResult.hits?.total as SearchTotalHits)?.value || 0;
   }
-  return { groups, totalHits };
+  return { groups, totalHits, traceChecks };
 };
 
 const getSpansForTraceIds = async (projectId: string, traceIds: string[]) => {
@@ -742,6 +713,43 @@ const getSpansForTraceIds = async (projectId: string, traceIds: string[]) => {
       },
       {} as Record<string, ElasticSearchSpan[]>
     );
+};
+
+const getTraceChecks = async (projectId: string, traceIds: string[]) => {
+  const checksResult = await esClient.search<TraceCheck>({
+    index: TRACE_CHECKS_INDEX,
+    body: {
+      size: Math.min(traceIds.length * 100, 10_000), // Assuming a maximum of 100 checks per trace
+      query: {
+        //@ts-ignore
+        bool: {
+          filter: [
+            { terms: { trace_id: traceIds } },
+            { term: { project_id: projectId } },
+          ],
+        },
+      },
+    },
+  });
+
+  const traceChecks = checksResult.hits.hits
+    .map((hit) => hit._source!)
+    .filter((x) => x);
+
+  const checksPerTrace = traceChecks.reduce(
+    (acc, check) => {
+      if (check) {
+        if (!acc[check.trace_id]) {
+          acc[check.trace_id] = [];
+        }
+        acc[check.trace_id]!.push(check);
+      }
+      return acc;
+    },
+    {} as Record<string, TraceCheck[]>
+  );
+
+  return checksPerTrace;
 };
 
 const getTracesWithSpans = async (projectId: string, traceIds: string[]) => {
