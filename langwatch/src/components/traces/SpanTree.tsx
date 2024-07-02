@@ -5,6 +5,7 @@ import {
   HStack,
   Heading,
   Skeleton,
+  Spacer,
   Tag,
   Text,
   Tooltip,
@@ -22,6 +23,7 @@ import { isNotFound } from "../../utils/trpcError";
 import { RenderInputOutput } from "./RenderInputOutput";
 import { useTraceDetailsState } from "../../hooks/useTraceDetailsState";
 import { durationColor } from "~/utils/durationColor";
+import { TraceToPlaygroundLink } from "../TraceToPlaygroundLink";
 
 type SpanWithChildren = ElasticSearchSpan & { children: SpanWithChildren[] };
 
@@ -314,11 +316,21 @@ export function SpanTree(props: SpanTreeProps) {
           <TreeRenderer spans={spans.data} />
           {span && (
             <VStack flexGrow={1} spacing={3} align="start">
-              <HStack>
+              <HStack width="full">
                 <SpanTypeTag span={span} />
                 <Heading as="h2" fontSize={22}>
                   {span.name ?? span.model}
                 </Heading>
+                <Spacer />
+                {project && span.type === "llm" && (
+                  <TraceToPlaygroundLink
+                    projectSlug={project.slug}
+                    traceId={traceId}
+                    spanId={span.span_id}
+                    tooltipLabel="Try different prompts and models for this LLM call on the playground"
+                    buttonLabel="Try in Playground"
+                  />
+                )}
               </HStack>
               <VStack align="start" color="gray.500">
                 <HStack>
