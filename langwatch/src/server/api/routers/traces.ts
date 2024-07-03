@@ -532,7 +532,7 @@ export const getAllForProject = async (
     totalHits = (pivotIndexResults.hits?.total as SearchTotalHits)?.value || 0;
 
     if (!traceIds.length) {
-      return { groups: [], totalHits: 0 };
+      return { groups: [], totalHits: 0, traceChecks: {} };
     }
   }
 
@@ -731,6 +731,8 @@ export const getAllForProject = async (
     }
   }
 
+  const traceChecks = await getTraceChecks(input.projectId, traceIdsArray);
+
   const mergedGroups = groups.map((group) => {
     return group.map((trace) => {
       const context = contexts.find((c) => c.traceId === trace.trace_id);
@@ -741,7 +743,7 @@ export const getAllForProject = async (
     });
   });
 
-  return { groups: mergedGroups, totalHits };
+  return { groups: mergedGroups, totalHits, traceChecks };
 };
 
 const getSpansForTraceIds = async (projectId: string, traceIds: string[]) => {
@@ -788,6 +790,46 @@ const getSpansForTraceIds = async (projectId: string, traceIds: string[]) => {
     },
     {} as Record<string, ElasticSearchSpan[]>
   );
+};
+
+const getTraceChecks = async (
+  projectId: string,
+  traceIds: string[]
+): Promise<Record<string, TraceCheck[]>> => {
+  const checksResult = await esClient.search<TraceCheck>({
+    index: TRACE_CHECKS_INDEX,
+    body: {
+      size: Math.min(traceIds.length * 100, 10_000), // Assuming a maximum of 100 checks per trace
+      query: {
+        //@ts-ignore
+        bool: {
+          filter: [
+            { terms: { trace_id: traceIds } },
+            { term: { project_id: projectId } },
+          ],
+        },
+      },
+    },
+  });
+
+  const traceChecks = checksResult.hits.hits
+    .map((hit) => hit._source!)
+    .filter((x) => x);
+
+  const checksPerTrace = traceChecks.reduce(
+    (acc, check) => {
+      if (check) {
+        if (!acc[check.trace_id]) {
+          acc[check.trace_id] = [];
+        }
+        acc[check.trace_id]!.push(check);
+      }
+      return acc;
+    },
+    {} as Record<string, TraceCheck[]>
+  );
+
+  return checksPerTrace;
 };
 
 const getTracesWithSpans = async (projectId: string, traceIds: string[]) => {
