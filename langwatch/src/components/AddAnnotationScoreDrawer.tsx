@@ -88,7 +88,6 @@ export const AddAnnotationScoreDrawer = () => {
           });
           closeDrawer();
           reset();
-          //  props.onSuccess();
         },
         onError: (error) => {
           toast({

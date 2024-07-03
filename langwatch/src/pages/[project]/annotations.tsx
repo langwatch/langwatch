@@ -1,41 +1,32 @@
+import { DownloadIcon } from "@chakra-ui/icons";
 import {
+  Avatar,
   Button,
   Card,
   CardBody,
   Container,
   HStack,
   Heading,
-  Menu,
-  MenuButton,
-  MenuItem,
-  MenuList,
   Skeleton,
   Spacer,
   Table,
   TableContainer,
-  Tag,
   Tbody,
   Td,
   Text,
   Th,
   Thead,
-  Tr,
-  useDisclosure,
-  useToast,
   Tooltip,
+  Tr,
 } from "@chakra-ui/react";
+import Parse from "papaparse";
 
-import { DeleteIcon } from "@chakra-ui/icons";
-import { useRouter } from "next/router";
-import { MoreVertical, Play, ThumbsDown, ThumbsUp } from "react-feather";
-import { AddDatasetDrawer } from "~/components/AddDatasetDrawer";
+import { useEffect } from "react";
+import { HelpCircle, ThumbsDown, ThumbsUp } from "react-feather";
 import { useDrawer } from "~/components/CurrentDrawer";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
-import { schemaDisplayName } from "~/utils/datasets";
-import { HelpCircle } from "react-feather";
-import { useEffect } from "react";
 
 export default function Annotations() {
   const { project } = useOrganizationTeamProject();
@@ -52,6 +43,49 @@ export default function Annotations() {
     projectId: project?.id ?? "",
   });
 
+  const scoreOptionsIDArray = scoreOptions.data?.map(
+    (scoreOption) => scoreOption.id
+  );
+
+  const downloadCSV = () => {
+    const fields = [
+      "User",
+      "Comment",
+      "Trace ID",
+      "Rating",
+      "Scoring",
+      "Created At",
+    ];
+
+    const csv = annotations.data?.map((annotation) => {
+      return [
+        annotation.user?.name,
+        annotation.comment,
+        annotation.traceId,
+        annotation.isThumbsUp ? "Thumbs Up" : "Thumbs Down",
+        JSON.stringify(annotation.scoreOptions),
+        annotation.createdAt.toLocaleString(),
+      ];
+    });
+
+    const csvBlob = Parse.unparse({
+      fields: fields,
+      data: csv ?? [],
+    });
+
+    const url = window.URL.createObjectURL(new Blob([csvBlob]));
+
+    const link = document.createElement("a");
+    link.href = url;
+    const today = new Date();
+    const formattedDate = today.toISOString().split("T")[0];
+    const fileName = `Messages - ${formattedDate}.csv`;
+    link.setAttribute("download", fileName);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  };
+
   const openTraceDrawer = (traceId: string) => {
     openDrawer("traceDetails", {
       traceId: traceId,
@@ -66,20 +100,26 @@ export default function Annotations() {
     void annotations.refetch();
   }, [isAnnotationDrawerOpen, isTraceDrawerOpen]);
 
-  const annotationScoreValues = (scoreOptions: object) => {
-    console.log("uu", scoreOptions);
-    return Object.entries(scoreOptions).map(([key, value]) => (
-      <Td key={key}>
-        <HStack>
-          <Text>{value.value}</Text>
-          {value.reason && (
-            <Tooltip label={value.reason}>
-              <HelpCircle width={16} height={16} />
-            </Tooltip>
-          )}
-        </HStack>
-      </Td>
-    ));
+  interface ScoreOption {
+    value: string;
+    reason?: string;
+  }
+
+  const annotationScoreValues = (scoreOptions: Record<string, ScoreOption>) => {
+    return scoreOptionsIDArray?.map((id) => {
+      return (
+        <Td key={id}>
+          <HStack>
+            <Text>{scoreOptions[id]?.value}</Text>
+            {scoreOptions[id]?.reason && (
+              <Tooltip label={scoreOptions[id]?.reason}>
+                <HelpCircle width={16} height={16} />
+              </Tooltip>
+            )}
+          </HStack>
+        </Td>
+      );
+    });
   };
 
   return (
@@ -89,6 +129,15 @@ export default function Annotations() {
           <Heading as={"h1"} size="lg" paddingBottom={6} paddingTop={1}>
             Annotations
           </Heading>
+          <Spacer />
+          <Button
+            colorScheme="black"
+            minWidth="fit-content"
+            variant="ghost"
+            onClick={() => downloadCSV()}
+          >
+            Export all <DownloadIcon marginLeft={2} />
+          </Button>
         </HStack>
         <Card>
           <CardBody>
@@ -99,6 +148,7 @@ export default function Annotations() {
                 <Table variant="simple">
                   <Thead>
                     <Tr>
+                      <Th>User</Th>
                       <Th>Comment</Th>
                       <Th>Trace ID</Th>
                       <Th>Rating</Th>
@@ -106,6 +156,7 @@ export default function Annotations() {
                       {scoreOptions.data?.map((key) => (
                         <Th key={key.id}>{key.name}</Th>
                       ))}
+                      <Th>Created At</Th>
                     </Tr>
                   </Thead>
                   <Tbody>
@@ -126,6 +177,14 @@ export default function Annotations() {
                             key={annotation.id}
                             onClick={() => openTraceDrawer(annotation.traceId)}
                           >
+                            <Td>
+                              <Avatar
+                                name={annotation.user?.name ?? undefined}
+                                backgroundColor={"orange.400"}
+                                color="white"
+                                size="sm"
+                              />
+                            </Td>
                             <Td>{annotation.comment}</Td>
                             <Td>{annotation.traceId}</Td>
                             <Td>
@@ -135,7 +194,13 @@ export default function Annotations() {
                                 <ThumbsDown />
                               )}
                             </Td>
-                            {annotationScoreValues(annotation.scoreOptions)}
+                            {annotationScoreValues(
+                              annotation.scoreOptions as unknown as Record<
+                                string,
+                                ScoreOption
+                              >
+                            )}
+                            <Td>{annotation.createdAt.toLocaleString()}</Td>
                           </Tr>
                         ))
                       : null}

@@ -41,9 +41,10 @@ import {
   Search,
   Settings,
   Shield,
+  Edit,
   Table,
   TrendingUp,
-  type Icon
+  type Icon,
 } from "react-feather";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import { useRequiredSession } from "../hooks/useRequiredSession";
@@ -115,6 +116,8 @@ const SideMenuLink = ({
       router.pathname.includes("/experiments")) ||
     (path.includes("/playground") && router.pathname.includes("/playground")) ||
     (path === "/[project]" && router.pathname.includes("/analytics")) ||
+    (path.includes("/annotations") &&
+      router.pathname.includes("/annotations")) ||
     (path.includes("/settings") && router.pathname.includes("/settings"));
 
   const viewModeQuery = path.includes("/messages")
@@ -124,7 +127,12 @@ const SideMenuLink = ({
     : "";
 
   return (
-    <Tooltip label={label === "Home" ? "Analytics" : label} hasArrow placement="right" gutter={16}>
+    <Tooltip
+      label={label === "Home" ? "Analytics" : label}
+      hasArrow
+      placement="right"
+      gutter={16}
+    >
       <Link
         href={path.replace("[project]", project.slug) + viewModeQuery}
         aria-label={label}
@@ -389,10 +397,17 @@ export const DashboardLayout = ({
               label={projectRoutes.playground.title}
               project={project}
             />
+
             <SideMenuLink
               path={projectRoutes.datasets.path}
               icon={Table}
               label={projectRoutes.datasets.title}
+              project={project}
+            />
+            <SideMenuLink
+              path={projectRoutes.annotations.path}
+              icon={Edit}
+              label={projectRoutes.annotations.title}
               project={project}
             />
             <SideMenuLink

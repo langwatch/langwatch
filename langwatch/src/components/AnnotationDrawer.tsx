@@ -95,21 +95,22 @@ export function AnnotationDrawer({
   const thumbsUpValue = watch("isThumbsUp");
 
   useEffect(() => {
-    if (getAnnotation.data) {
-      const { scoreOptions } = getAnnotation.data;
+    if (action === "edit") {
       const thumbValue = isThumbsUp === true ? "thumbsUp" : "thumbsDown";
       setValue("isThumbsUp", thumbValue);
       setValue("comment", comment);
 
       Object.entries(scoreOptions ?? {}).forEach(([key, value]) => {
-        console.log(value);
-        setValue(`scoreOptions.${key}`, {
-          value: value.value,
-          reason: value.reason,
+        console.log("value", value);
+        unstable_batchedUpdates(() => {
+          setValue(`scoreOptions.${key}`, {
+            value: value.value,
+            reason: value.reason,
+          });
         });
       });
     }
-  }, [getAnnotation.data, isThumbsUp, comment, setValue]);
+  }, [scoreOptions, setValue, action, isThumbsUp, comment]);
 
   type Annotation = {
     isThumbsUp: string;
@@ -229,17 +230,6 @@ export function AnnotationDrawer({
     );
   };
 
-  useEffect(() => {
-    if (action === "edit") {
-      const safeScoreOptions = scoreOptions ?? {};
-      if (Object.keys(safeScoreOptions).length > 0) {
-        Object.entries(safeScoreOptions).forEach(([key, value]) => {
-          setValue(`scoreOptions.${key}.value`, value);
-        });
-      }
-    }
-  }, [scoreOptions, setValue, action]);
-
   return (
     <Drawer
       isOpen={true}
@@ -314,7 +304,10 @@ export function AnnotationDrawer({
                   </HStack>
                 </RadioGroup>
                 {getAnnotationScoring.data?.map((scoreType) => {
-                  return ScoreBlock(scoreType, watch, register);
+                  const options = Array.isArray(scoreType.options)
+                    ? (scoreType.options as AnnotationScoreOption[])
+                    : [];
+                  return ScoreBlock({ ...scoreType, options }, watch, register);
                 })}
                 <VStack align="start" spacing={4} width="full">
                   <Text>Comments</Text>
@@ -360,7 +353,7 @@ type AnnotationScore = {
   id: string;
   name: string;
   options: AnnotationScoreOption[];
-  description: string;
+  description: string | null;
 };
 
 const ScoreBlock = (scoreType: AnnotationScore, watch: any, register: any) => {
@@ -370,10 +363,10 @@ const ScoreBlock = (scoreType: AnnotationScore, watch: any, register: any) => {
   return (
     <HorizontalFormControl
       label={scoreType.name}
-      helper={scoreType.description}
+      helper={scoreType.description ?? ""}
       //isInvalid={!!errors.description}
     >
-      <RadioGroup key={scoreType.id} value={scoreValue} padding={0}>
+      <RadioGroup key={scoreType.id} value={scoreValue} padding={0} isRequired>
         <VStack align="start" spacing={2}>
           {scoreType.options.map((option) => {
             return (
@@ -381,6 +374,8 @@ const ScoreBlock = (scoreType: AnnotationScore, watch: any, register: any) => {
                 value={option.value.toString()}
                 {...register(`scoreOptions.${scoreType.id}.value`)}
                 key={option.value}
+                required
+                isRequired
               >
                 {option.label}
               </Radio>
