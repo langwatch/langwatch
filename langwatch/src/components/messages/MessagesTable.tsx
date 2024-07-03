@@ -112,18 +112,28 @@ export function MessagesTable() {
     }
   );
 
-  const [previousTraceChecks, setPreviousTraceChecks] = useState<
-    (typeof traceGroups)["data"]["traceChecks"]
-  >(traceGroups.data?.traceChecks);
-  useEffect(() => {
-    if (traceGroups.data?.traceChecks) {
-      setPreviousTraceChecks(traceGroups.data.traceChecks);
+  const traceChecksQuery = api.traces.getTraceChecks.useQuery(
+    { projectId: project?.id ?? "", traceIds },
+    {
+      enabled: traceIds.length > 0,
+      refetchInterval: undefined,
+      refetchOnWindowFocus: false,
     }
-  }, [traceGroups.data]);
+  );
+
+  const [previousTraceChecks, setPreviousTraceChecks] = useState<
+    (typeof traceChecksQuery)["data"]
+  >(traceChecksQuery.data);
+  useEffect(() => {
+    if (traceChecksQuery.data) {
+      setPreviousTraceChecks(traceChecksQuery.data);
+    }
+  }, [traceChecksQuery.data]);
+
   const traceCheckColumnsAvailable = Object.fromEntries(
-    Object.values(traceGroups.data?.traceChecks ?? previousTraceChecks ?? {}).flatMap(
-      (checks: any) =>
-        checks.map((check: any) => [
+    Object.values(traceChecksQuery.data ?? previousTraceChecks ?? {}).flatMap(
+      (checks) =>
+        checks.map((check) => [
           `trace_checks.${check.check_id}`,
           check.check_name,
         ])
@@ -484,7 +494,7 @@ export function MessagesTable() {
             sortable: true,
             render: (trace, index) => {
               const checkId = columnKey.split(".")[1];
-              const traceCheck = traceGroups.data?.traceChecks?.[trace.trace_id]?.find(
+              const traceCheck = traceChecksQuery.data?.[trace.trace_id]?.find(
                 (traceCheck_) => traceCheck_.check_id === checkId
               );
               const evaluator = getEvaluatorDefinitions(
@@ -526,7 +536,7 @@ export function MessagesTable() {
             },
             value: (trace: Trace) => {
               const checkId = columnKey.split(".")[1];
-              const traceCheck = traceGroups.data?.traceChecks?.[trace.trace_id]?.find(
+              const traceCheck = traceChecksQuery.data?.[trace.trace_id]?.find(
                 (traceCheck_) => traceCheck_.check_id === checkId
               );
               return traceCheck?.status === "processed"
@@ -627,8 +637,8 @@ export function MessagesTable() {
 
   useEffect(() => {
     if (
-      traceGroups.isFetched &&
-      !traceGroups.isFetching &&
+      traceChecksQuery.isFetched &&
+      !traceChecksQuery.isFetching &&
       isFirstRender.current
     ) {
       isFirstRender.current = false;
@@ -646,7 +656,7 @@ export function MessagesTable() {
         }));
       }
     }
-  }, [traceGroups, traceCheckColumnsAvailable, localStorageHeaderColumns]);
+  }, [traceChecksQuery, traceCheckColumnsAvailable, localStorageHeaderColumns]);
 
   const { isOpen, onOpen, onClose } = useDisclosure();
   const checkedHeaderColumnsEntries = Object.entries(
@@ -720,7 +730,7 @@ export function MessagesTable() {
                 marginTop={2}
                 onClick={() => {
                   void traceGroups.refetch();
-                  void traceGroups.refetch();
+                  void traceChecksQuery.refetch();
                 }}
               >
                 <RefreshCw
