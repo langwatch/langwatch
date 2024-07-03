@@ -51,7 +51,7 @@ import {
   Shield,
 } from "react-feather";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import type { Trace } from "~/server/tracer/types";
+import type { Trace, TraceCheck } from "~/server/tracer/types";
 import { getEvaluatorDefinitions } from "~/trace_checks/getEvaluator";
 import { api } from "~/utils/api";
 import { durationColor } from "~/utils/durationColor";
@@ -113,8 +113,8 @@ export function MessagesTable() {
   );
 
   const [previousTraceChecks, setPreviousTraceChecks] = useState<
-    (typeof traceGroups)["data"]["traceChecks"]
-  >(traceGroups.data?.traceChecks);
+    Record<string, TraceCheck[]>
+  >(traceGroups.data?.traceChecks ?? {});
   useEffect(() => {
     if (traceGroups.data?.traceChecks) {
       setPreviousTraceChecks(traceGroups.data.traceChecks);

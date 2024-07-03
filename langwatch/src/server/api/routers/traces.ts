@@ -499,7 +499,7 @@ export const getAllForProject = async (
     totalHits = (pivotIndexResults.hits?.total as SearchTotalHits)?.value || 0;
 
     if (!traceIds.length) {
-      return { groups: [], totalHits: 0 };
+      return { groups: [], totalHits: 0, traceChecks: {} };
     }
   }
 
@@ -761,7 +761,10 @@ const getSpansForTraceIds = async (projectId: string, traceIds: string[]) => {
   );
 };
 
-const getTraceChecks = async (projectId: string, traceIds: string[]) => {
+const getTraceChecks = async (
+  projectId: string,
+  traceIds: string[]
+): Promise<Record<string, TraceCheck[]>> => {
   const checksResult = await esClient.search<TraceCheck>({
     index: TRACE_CHECKS_INDEX,
     body: {
