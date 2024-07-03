@@ -364,13 +364,11 @@ type AnnotationScore = {
 
 const ScoreBlock = (scoreType: AnnotationScore, watch: any, register: any) => {
   const scoreValue = watch(`scoreOptions.${scoreType.id}.value`);
-  const scoreReason = watch(`scoreOptions.${scoreType.id}.reason`);
 
   return (
     <HorizontalFormControl
       label={scoreType.name}
       helper={scoreType.description ?? ""}
-      //isInvalid={!!errors.description}
     >
       <RadioGroup key={scoreType.id} value={scoreValue} padding={0}>
         <VStack align="start" spacing={2}>

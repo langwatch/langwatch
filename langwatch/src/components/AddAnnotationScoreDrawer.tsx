@@ -79,8 +79,8 @@ export const AddAnnotationScoreDrawer = () => {
       {
         onSuccess: (data) => {
           toast({
-            title: "Dataset Created",
-            description: `Successfully created ${data.name} dataset`,
+            title: "Annotation Score Created",
+            description: `Successfully created ${data.name} annotation score`,
             status: "success",
             duration: 5000,
             isClosable: true,
@@ -91,7 +91,7 @@ export const AddAnnotationScoreDrawer = () => {
         },
         onError: (error) => {
           toast({
-            title: "Error creating dataset",
+            title: "Error creating annotation score",
             description: error.message,
             status: "error",
             duration: 5000,

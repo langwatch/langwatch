@@ -24,7 +24,6 @@ export const annotationRouter = createTRPCRouter({
     )
     .use(checkUserPermissionForProject(TeamRoleGroup.ANNOTATIONS_MANAGE))
     .mutation(async ({ ctx, input }) => {
-      console.log(input);
       return ctx.prisma.annotation.create({
         data: {
           id: nanoid(),
@@ -135,7 +134,6 @@ export const annotationRouter = createTRPCRouter({
     .input(z.object({ projectId: z.string() }))
     .use(checkUserPermissionForProject(TeamRoleGroup.ANNOTATIONS_MANAGE))
     .query(async ({ ctx, input }) => {
-      console.log(input);
       return ctx.prisma.annotation.findMany({
         where: {
           projectId: input.projectId,
