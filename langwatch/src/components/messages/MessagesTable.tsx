@@ -120,10 +120,11 @@ export function MessagesTable() {
       setPreviousTraceChecks(traceGroups.data.traceChecks);
     }
   }, [traceGroups.data]);
+
   const traceCheckColumnsAvailable = Object.fromEntries(
     Object.values(traceGroups.data?.traceChecks ?? previousTraceChecks ?? {}).flatMap(
-      (checks: any) =>
-        checks.map((check: any) => [
+      (checks) =>
+        checks.map((check:any) => [
           `trace_checks.${check.check_id}`,
           check.check_name,
         ])
@@ -485,7 +486,7 @@ export function MessagesTable() {
             render: (trace, index) => {
               const checkId = columnKey.split(".")[1];
               const traceCheck = traceGroups.data?.traceChecks?.[trace.trace_id]?.find(
-                (traceCheck_) => traceCheck_.check_id === checkId
+                (traceCheck_: TraceCheck) => traceCheck_.check_id === checkId
               );
               const evaluator = getEvaluatorDefinitions(
                 traceCheck?.check_type ?? ""
@@ -527,7 +528,7 @@ export function MessagesTable() {
             value: (trace: Trace) => {
               const checkId = columnKey.split(".")[1];
               const traceCheck = traceGroups.data?.traceChecks?.[trace.trace_id]?.find(
-                (traceCheck_) => traceCheck_.check_id === checkId
+                (traceCheck_: TraceCheck) => traceCheck_.check_id === checkId
               );
               return traceCheck?.status === "processed"
                 ? numeral(traceCheck?.score).format("0.[00]")
@@ -719,7 +720,6 @@ export function MessagesTable() {
                 padding={2}
                 marginTop={2}
                 onClick={() => {
-                  void traceGroups.refetch();
                   void traceGroups.refetch();
                 }}
               >
