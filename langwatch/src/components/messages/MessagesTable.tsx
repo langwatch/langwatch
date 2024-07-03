@@ -112,28 +112,18 @@ export function MessagesTable() {
     }
   );
 
-  const traceChecksQuery = api.traces.getTraceChecks.useQuery(
-    { projectId: project?.id ?? "", traceIds },
-    {
-      enabled: traceIds.length > 0,
-      refetchInterval: undefined,
-      refetchOnWindowFocus: false,
-    }
-  );
-
   const [previousTraceChecks, setPreviousTraceChecks] = useState<
-    (typeof traceChecksQuery)["data"]
-  >(traceChecksQuery.data);
+    (typeof traceGroups)["data"]["traceChecks"]
+  >(traceGroups.data?.traceChecks);
   useEffect(() => {
-    if (traceChecksQuery.data) {
-      setPreviousTraceChecks(traceChecksQuery.data);
+    if (traceGroups.data?.traceChecks) {
+      setPreviousTraceChecks(traceGroups.data.traceChecks);
     }
-  }, [traceChecksQuery.data]);
-
+  }, [traceGroups.data]);
   const traceCheckColumnsAvailable = Object.fromEntries(
-    Object.values(traceChecksQuery.data ?? previousTraceChecks ?? {}).flatMap(
-      (checks) =>
-        checks.map((check) => [
+    Object.values(traceGroups.data?.traceChecks ?? previousTraceChecks ?? {}).flatMap(
+      (checks: any) =>
+        checks.map((check: any) => [
           `trace_checks.${check.check_id}`,
           check.check_name,
         ])
@@ -494,7 +484,7 @@ export function MessagesTable() {
             sortable: true,
             render: (trace, index) => {
               const checkId = columnKey.split(".")[1];
-              const traceCheck = traceChecksQuery.data?.[trace.trace_id]?.find(
+              const traceCheck = traceGroups.data?.traceChecks?.[trace.trace_id]?.find(
                 (traceCheck_) => traceCheck_.check_id === checkId
               );
               const evaluator = getEvaluatorDefinitions(
@@ -536,7 +526,7 @@ export function MessagesTable() {
             },
             value: (trace: Trace) => {
               const checkId = columnKey.split(".")[1];
-              const traceCheck = traceChecksQuery.data?.[trace.trace_id]?.find(
+              const traceCheck = traceGroups.data?.traceChecks?.[trace.trace_id]?.find(
                 (traceCheck_) => traceCheck_.check_id === checkId
               );
               return traceCheck?.status === "processed"
@@ -637,8 +627,8 @@ export function MessagesTable() {
 
   useEffect(() => {
     if (
-      traceChecksQuery.isFetched &&
-      !traceChecksQuery.isFetching &&
+      traceGroups.isFetched &&
+      !traceGroups.isFetching &&
       isFirstRender.current
     ) {
       isFirstRender.current = false;
@@ -656,7 +646,7 @@ export function MessagesTable() {
         }));
       }
     }
-  }, [traceChecksQuery, traceCheckColumnsAvailable, localStorageHeaderColumns]);
+  }, [traceGroups, traceCheckColumnsAvailable, localStorageHeaderColumns]);
 
   const { isOpen, onOpen, onClose } = useDisclosure();
   const checkedHeaderColumnsEntries = Object.entries(
@@ -730,7 +720,7 @@ export function MessagesTable() {
                 marginTop={2}
                 onClick={() => {
                   void traceGroups.refetch();
-                  void traceChecksQuery.refetch();
+                  void traceGroups.refetch();
                 }}
               >
                 <RefreshCw
