@@ -129,7 +129,10 @@ export function AnnotationDrawer({
           isThumbsUp: isThumbsUp,
           comment: data.comment,
           traceId: traceId,
-          scoreOptions: data.scoreOptions,
+          scoreOptions: data.scoreOptions as unknown as Record<
+            string,
+            { value: string; reason: string }
+          >,
         },
         {
           onSuccess: () => {
@@ -170,7 +173,10 @@ export function AnnotationDrawer({
           isThumbsUp: isThumbsUp,
           comment: data.comment,
           traceId: traceId,
-          scoreOptions: data.scoreOptions,
+          scoreOptions: data.scoreOptions as unknown as Record<
+            string,
+            { value: string; reason: string }
+          >,
         },
         {
           onSuccess: () => {
@@ -366,7 +372,7 @@ const ScoreBlock = (scoreType: AnnotationScore, watch: any, register: any) => {
       helper={scoreType.description ?? ""}
       //isInvalid={!!errors.description}
     >
-      <RadioGroup key={scoreType.id} value={scoreValue} padding={0} isRequired>
+      <RadioGroup key={scoreType.id} value={scoreValue} padding={0}>
         <VStack align="start" spacing={2}>
           {scoreType.options.map((option) => {
             return (
