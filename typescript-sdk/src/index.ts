@@ -30,6 +30,7 @@ import {
   convertFromVercelAIMessages,
 } from "./utils";
 import { LangWatchCallbackHandler } from "./langchain";
+import { version } from "../package.json";
 
 export type {
   BaseSpan,
@@ -158,8 +159,8 @@ export class LangWatchTrace {
     this.traceId = traceId;
     this.metadata = {
       ...metadata,
-      sdk_version: require("../../package.json").version,
-      sdk_language: "typescript",
+      sdkVersion: version,
+      sdkLanguage: "typescript",
     };
   }
 
