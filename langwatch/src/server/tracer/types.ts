@@ -247,6 +247,8 @@ export type Trace = {
     labels?: string[];
     topic_id?: string;
     subtopic_id?: string;
+    sdk_version?: string;
+    sdk_language?: string;
   };
   timestamps: { started_at: number; inserted_at: number; updated_at: number };
   input: TraceInput;
