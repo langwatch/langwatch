@@ -1,4 +1,4 @@
-import importlib
+from importlib.metadata import version
 import os
 from concurrent.futures import Future, ThreadPoolExecutor
 import time
@@ -55,8 +55,8 @@ T = TypeVar("T", bound=Callable[..., Any])
 def get_version():
     """Retrieves the version of the current library."""
     try:
-        return importlib.metadata.version("langwatch")
-    except importlib.metadata.PackageNotFoundError:
+        return version("langwatch")
+    except Exception:
         return "unknown"
 
 
