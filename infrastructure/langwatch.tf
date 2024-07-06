@@ -156,6 +156,22 @@ resource "null_resource" "langwatch_docker_image" {
       fi
       secrets=$(aws secretsmanager --profile ${module.variables.profile} --region ${data.aws_region.current.name} get-secret-value --secret-id ${data.aws_secretsmanager_secret.langwatch.id} | jq -r '.SecretString')
 
+      set +e
+      has_dotenvfile=$(ls -A .env 2>/dev/null)
+      set -e
+      if [ -z "$has_dotenvfile" ]; then
+        echo "$secrets" | jq -r "to_entries|map(\"\(.key)='\(.value)'\")|.[]" > .env
+        echo "DATABASE_URL=postgresql://build-only" >> .env
+        output=$(aws secretsmanager --profile ${module.variables.profile} --region ${data.aws_region.current.name} get-secret-value --secret-id ${data.aws_secretsmanager_secret.redis.id})
+        redis_secret=$(echo $output | jq -r '.SecretString' | jq -r '.password' 2>/dev/null)
+        if [[ -z "$redis_secret" || "$redis_secret" == "null" ]]; then
+          echo "Failed to retrieve or parse the redis secret."
+          exit 1
+        fi
+        encoded_redis_password=$(printf %s "$redis_secret" | jq -sRr @uri)
+        redis_url="redis://:$encoded_redis_password@${aws_elasticache_replication_group.redis[0].primary_endpoint_address}:6379"
+        echo "REDIS_URL=$redis_url" >> .env
+      fi
       aws ecr get-login-password --profile ${module.variables.profile} --region ${data.aws_region.current.name} | docker login --username AWS --password-stdin ${data.aws_caller_identity.current.account_id}.dkr.ecr.${data.aws_region.current.name}.amazonaws.com || true
 
       set +e
