@@ -1,13 +1,6 @@
 import { createEnv } from "@t3-oss/env-nextjs";
 import { z } from "zod";
 
-if (
-  process.env.NEXTAUTH_SECRET === "please_please_please_change_me_asap" &&
-  process.env.NODE_ENV === "production"
-) {
-  throw new Error("You must change the NEXTAUTH_SECRET in the .env file");
-}
-
 export const env = createEnv({
   /**
    * Specify your server-side environment variables schema here. This way you can ensure the app
