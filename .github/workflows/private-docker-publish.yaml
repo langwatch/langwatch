@@ -47,14 +47,10 @@ jobs:
           cd langwatch/langwatch_nlp
           make generate_proxy_config
           IMAGE_URI="${{ secrets.LW_PROD_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_DEFAULT_REGION }}.amazonaws.com/onprem_langwatch_nlp"
-          docker buildx build --platform linux/amd64 -t $IMAGE_URI:$VERSION -t $IMAGE_URI:latest .
-          docker push $IMAGE_URI:$VERSION
-          docker push $IMAGE_URI:latest
+          docker buildx build . -f Dockerfile --platform="linux/amd64" -t $IMAGE_URI:$VERSION --push
           cd -
 
       - name: Build and push Docker image
         run: |
           IMAGE_URI="${{ secrets.LW_PROD_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_DEFAULT_REGION }}.amazonaws.com/onprem_langwatch_saas"
-          docker buildx build --platform linux/amd64 -t $IMAGE_URI:$VERSION -t $IMAGE_URI:latest .
-          docker push $IMAGE_URI:$VERSION
-          docker push $IMAGE_URI:latest
+          docker buildx build . -f Dockerfile --platform="linux/amd64" -t $IMAGE_URI:$VERSION --push
