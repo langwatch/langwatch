@@ -26,7 +26,9 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/OrganizationAccountAccessRole
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ASSUMED_ROLE_ACCOUNT_ID }}:role/OrganizationAccountAccessRole
           aws-region: ${{ secrets.AWS_DEFAULT_REGION }}
 
       - name: Log in to Amazon ECR
@@ -43,7 +45,7 @@ jobs:
         run: |
           cd langwatch/langwatch_nlp
           make generate_proxy_config
-          IMAGE_URI="${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_DEFAULT_REGION }}.amazonaws.com/onprem_langwatch_nlp"
+          IMAGE_URI="${{ secrets.AWS_ASSUMED_ROLE_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_DEFAULT_REGION }}.amazonaws.com/onprem_langwatch_nlp"
           docker buildx build --platform linux/amd64 -t $IMAGE_URI:$VERSION -t $IMAGE_URI:latest .
           docker push $IMAGE_URI:$VERSION
           docker push $IMAGE_URI:latest
@@ -51,7 +53,7 @@ jobs:
 
       - name: Build and push Docker image
         run: |
-          IMAGE_URI="${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_DEFAULT_REGION }}.amazonaws.com/onprem_langwatch_saas"
+          IMAGE_URI="${{ secrets.AWS_ASSUMED_ROLE_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_DEFAULT_REGION }}.amazonaws.com/onprem_langwatch_saas"
           docker buildx build --platform linux/amd64 -t $IMAGE_URI:$VERSION -t $IMAGE_URI:latest .
           docker push $IMAGE_URI:$VERSION
           docker push $IMAGE_URI:latest
