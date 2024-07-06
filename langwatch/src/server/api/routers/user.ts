@@ -19,7 +19,7 @@ export const userRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const { name, email, password } = input;
 
-      if (env.NEXT_PUBLIC_AUTH_PROVIDER !== "email") {
+      if (env.NEXTAUTH_PROVIDER !== "email") {
         throw new TRPCError({
           code: "BAD_REQUEST",
           message:

@@ -23,17 +23,26 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { HorizontalFormControl } from "../../components/HorizontalFormControl";
 import { LogoIcon } from "../../components/icons/LogoIcon";
-import { env } from "../../env.mjs";
+import { api } from "../../utils/api";
 
 export default function SignIn({ session }: { session: Session | null }) {
-  const isAuth0 = env.NEXT_PUBLIC_AUTH_PROVIDER === "auth0";
+  const publicEnv = api.publicEnv.useQuery({});
+  const isAuth0 = publicEnv.data?.NEXTAUTH_PROVIDER === "auth0";
   const callbackUrl = useSearchParams()?.get("callbackUrl") ?? undefined;
 
   useEffect(() => {
+    if (!publicEnv.data) {
+      return;
+    }
+
     if (!session && isAuth0) {
       void signIn("auth0", { callbackUrl });
     }
-  }, [session, callbackUrl, isAuth0]);
+  }, [publicEnv.data, session, callbackUrl, isAuth0]);
+
+  if (!publicEnv.data) {
+    return null;
+  }
 
   return isAuth0 ? (
     <div style={{ padding: "12px" }}>Redirecting to Sign in...</div>

@@ -28,8 +28,16 @@ export const useOrganizationTeamProject = (
 ) => {
   useRequiredSession();
   const router = useRouter();
+  const publicEnv = api.publicEnv.useQuery(
+    {},
+    {
+      staleTime: Infinity,
+      refetchOnMount: false,
+      refetchOnWindowFocus: false,
+    }
+  );
 
-  const isDemo = router.query.project === process.env.NEXT_PUBLIC_DEMO_SLUG;
+  const isDemo = router.query.project === publicEnv.data?.DEMO_PROJECT_SLUG;
 
   const organizations = api.organization.getAll.useQuery(
     { isDemo: isDemo },

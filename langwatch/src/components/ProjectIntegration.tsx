@@ -21,8 +21,17 @@ import { DashboardLayout } from "./DashboardLayout";
 import { ExternalLinkIcon } from "@chakra-ui/icons";
 import { APIKeyCopyInput } from "../pages/authorize";
 import type { PropsWithChildren } from "react";
+import { api } from "../utils/api";
 
 export const ProjectIntegration = () => {
+  const publicEnv = api.publicEnv.useQuery(
+    {},
+    {
+      staleTime: Infinity,
+      refetchOnMount: false,
+      refetchOnWindowFocus: false,
+    }
+  );
   const { project, isRefetching } = useOrganizationTeamProject({
     keepFetching: true,
   });
@@ -129,7 +138,7 @@ export const ProjectIntegration = () => {
               </CardBody>
             </Card>
           </HStack>
-          {process.env.NEXT_PUBLIC_DEMO_SLUG && (
+          {publicEnv.data?.DEMO_PROJECT_SLUG && (
             <Text>
               You can also open our{" "}
               <Link

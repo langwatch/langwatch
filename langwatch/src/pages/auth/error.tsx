@@ -1,11 +1,17 @@
 import { type Session } from "next-auth";
 import { useEffect } from "react";
-import { env } from "../../env.mjs";
+
+import { api } from "../../utils/api";
 
 export default function Error({ session }: { session: Session | null }) {
-  const isAuth0 = env.NEXT_PUBLIC_AUTH_PROVIDER === "auth0";
+  const publicEnv = api.publicEnv.useQuery({});
+  const isAuth0 = publicEnv.data?.NEXTAUTH_PROVIDER === "auth0";
 
   useEffect(() => {
+    if (!publicEnv.data) {
+      return;
+    }
+
     if (typeof window !== "undefined" && typeof document !== "undefined") {
       if (isAuth0) {
         const fromReferrer = !!document.referrer;
@@ -21,7 +27,7 @@ export default function Error({ session }: { session: Session | null }) {
         window.location = "/auth/signin";
       }
     }
-  }, [isAuth0, session]);
+  }, [publicEnv.data, isAuth0, session]);
 
   return (
     <div style={{ padding: "12px" }}>
