@@ -211,6 +211,7 @@ export class LangWatchAwsMarketplaceStack extends cdk.Stack {
         <record>
           pod_name \${record['kubernetes']['pod_name']}
         </record>
+        remove_keys kubernetes,docker
       </filter>
 
       <match kubernetes.**>
