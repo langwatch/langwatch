@@ -167,10 +167,6 @@ resource "null_resource" "langwatch_docker_image" {
         aws ecr --profile ${module.variables.profile} --region ${data.aws_region.current.name} put-image --repository-name ${aws_ecr_repository.langwatch.name} --image-tag ${local.git_tag} --image-manifest "$MANIFEST"
         set -e
       fi
-      if [ -z "$has_dotenvfile" ]; then
-        rm -rf .env
-        rm -rf langwatch/langwatch/.env
-      fi
       cd -
     EOT
 
