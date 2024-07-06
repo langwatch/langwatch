@@ -143,7 +143,7 @@ export const ProjectIntegration = () => {
               You can also open our{" "}
               <Link
                 textDecoration="underline"
-                href={`https://app.langwatch.ai/${process.env.NEXT_PUBLIC_DEMO_SLUG}`}
+                href={`https://app.langwatch.ai/${publicEnv.data.DEMO_PROJECT_SLUG}`}
                 target="_blank"
               >
                 demo account
