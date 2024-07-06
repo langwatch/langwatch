@@ -10,6 +10,7 @@ COPY langwatch/ langwatch/
 COPY prisma/ prisma/
 RUN npm run start:prepare
 COPY . .
+RUN cp langwatch/langwatch/.env.example .env
 RUN npm run build
 RUN rm .env
 ENV NODE_ENV=production

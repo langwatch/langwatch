@@ -34,3 +34,17 @@ aws ssm start-session --region eu-central-1 --target i-00a6de26faec3abcd --docum
 ```shell
 aws ssm start-session --region eu-central-1 --target i-00a6de26faec3abcd  --document-name AWS-StartPortForwardingSessionToRemoteHost --parameters host="master.langwatch-redis-replication-group.ulyeig.euc1.cache.amazonaws.com",portNumber="6379",localPortNumber="6378"  --profile lw-prod
 ```
+
+# Cloud Infrastructure
+
+The cloud infrastructure is managed by Terraform, and it lives on the `/infrastructure` directory.
+Docker images are built automatically and deployed on new pushes to main for this repository.
+
+# On Prem Installation
+
+The on prem templates for the marketplaces are located in the `/onprem` directory.
+
+The docker images used by them are built with a github action when a new github release is made with a tag starting with `onprem-`, using the version from the top-level `package.json`, and pushed to a private repository in the clouds. Except langevals, which is fetched from the
+public docker hub.
+
+For AWS, we use CDK for generating the CloudFormation template and deploying, check out the README inside that folder for more details.

@@ -1,0 +1,51 @@
+name: Publish Docker Image to ECR
+
+on:
+  release:
+    types:
+      - published
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-push:
+    if: startsWith(github.event.release.tag_name, 'onprem-') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: "recursive"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Extract version from package.json
+        id: extract_version
+        run: |
+          VERSION=$(jq -r '.version' package.json)
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+
+      - name: Build and push langwatch_nlp Docker image
+        run: |
+          cd langwatch/langwatch_nlp
+          make generate_proxy_config
+          IMAGE_URI="${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/onprem_langwatch_nlp"
+          docker buildx build --platform linux/amd64 -t $IMAGE_URI:$VERSION -t $IMAGE_URI:latest .
+          docker push $IMAGE_URI:$VERSION
+          docker push $IMAGE_URI:latest
+          cd -
+
+      - name: Build and push Docker image
+        run: |
+          IMAGE_URI="${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/onprem_langwatch_saas"
+          docker buildx build --platform linux/amd64 -t $IMAGE_URI:$VERSION -t $IMAGE_URI:latest .
+          docker push $IMAGE_URI:$VERSION
+          docker push $IMAGE_URI:latest
