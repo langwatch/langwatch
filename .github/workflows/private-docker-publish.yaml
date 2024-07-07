@@ -28,8 +28,7 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          role-to-assume: ${{ secrets.LW_PROD_ROLE_ARN }}
-          aws-region: ${{ secrets.AWS_DEFAULT_REGION }}
+          aws-region: us-east-1
           role-skip-session-tagging: true
 
       - name: Log in to Amazon ECR
@@ -44,13 +43,20 @@ jobs:
 
       - name: Build and push langwatch_nlp Docker image
         run: |
-          cd langwatch/langwatch_nlp
-          make generate_proxy_config
-          IMAGE_URI="${{ secrets.LW_PROD_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_DEFAULT_REGION }}.amazonaws.com/onprem_langwatch_nlp"
+          cd langevals
+          IMAGE_URI="709825985650.dkr.ecr.us-east-1.amazonaws.com/langwatch/onprem_langevals"
           docker buildx build . -f Dockerfile --platform="linux/amd64" -t $IMAGE_URI:$VERSION --push
           cd -
 
       - name: Build and push Docker image
         run: |
-          IMAGE_URI="${{ secrets.LW_PROD_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_DEFAULT_REGION }}.amazonaws.com/onprem_langwatch_saas"
+          IMAGE_URI="709825985650.dkr.ecr.us-east-1.amazonaws.com/langwatch/onprem_langwatch_saas"
           docker buildx build . -f Dockerfile --platform="linux/amd64" -t $IMAGE_URI:$VERSION --push
+
+      - name: Build and push langwatch_nlp Docker image
+        run: |
+          cd langwatch/langwatch_nlp
+          make generate_proxy_config
+          IMAGE_URI="709825985650.dkr.ecr.us-east-1.amazonaws.com/langwatch/onprem_langwatch_nlp"
+          docker buildx build . -f Dockerfile --platform="linux/amd64" -t $IMAGE_URI:$VERSION --push
+          cd -
