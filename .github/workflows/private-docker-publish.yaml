@@ -34,6 +34,8 @@ jobs:
       - name: Log in to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
+        with:
+          registries: "709825985650" # Marketplace repository ID
 
       - name: Extract version from package.json
         id: extract_version
