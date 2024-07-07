@@ -1,3 +1,7 @@
+This is the private SaaS version of LangWatch protected by copyright. No copy, modification or reuse without permission is allowed.
+
+## LangWatch SaaS
+
 # Setting up the project locally
 
 1. Find the .env file on 1password and copy it here
