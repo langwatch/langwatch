@@ -1,4 +1,4 @@
-name: Publish Docker Image to ECR
+name: Publish Docker Images to Marketplace ECR
 
 on:
   release:
