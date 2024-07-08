@@ -28,29 +28,7 @@ resource "aws_ram_resource_association" "cert_association" {
   resource_share_arn = aws_ram_resource_share.cert_share.arn
 }
 
-resource "aws_acm_certificate_policy" "wildcard_cert_policy" {
-  certificate_arn = aws_acm_certificate.wildcard_cert.arn
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Sid    = "AllowAllAccountsToUse"
-        Effect = "Allow"
-        Principal = {
-          AWS = "*"
-        }
-        Action = [
-          "acm:DescribeCertificate",
-          "acm:ListTagsForCertificate",
-          "acm:GetCertificate"
-        ]
-        Resource = aws_acm_certificate.wildcard_cert.arn
-      }
-    ]
-  })
-}
-
+# TODO: route53 and lambda for auto registering customers loadbalancers
 
 # Repositories for onprem to store the docker images
 
