@@ -36,6 +36,7 @@ export const evaluatorTempNameMap: Record<string, string> = {
   "Azure Jailbreak Detection": "Jailbreak Detection",
   "Google Cloud DLP PII Detection": "PII Detection",
   "Lingua Language Detection": "Language Detection",
+  "Azure Prompt Shield": "Prompt Injection Detection",
 };
 
 export function EvaluatorSelection({

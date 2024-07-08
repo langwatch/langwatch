@@ -37,7 +37,7 @@ export const authOptions = (
   req: NextApiRequest | GetServerSidePropsContext["req"] | NextRequest
 ): NextAuthOptions => ({
   session: {
-    strategy: env.NEXT_PUBLIC_AUTH_PROVIDER === "email" ? "jwt" : "database",
+    strategy: env.NEXTAUTH_PROVIDER === "email" ? "jwt" : "database",
   },
   callbacks: {
     session: async ({ session, user }) => {
@@ -53,7 +53,7 @@ export const authOptions = (
       if (
         !user &&
         session.user.email &&
-        env.NEXT_PUBLIC_AUTH_PROVIDER === "email"
+        env.NEXTAUTH_PROVIDER === "email"
       ) {
         const user_ = await prisma.user.findUnique({
           where: {
@@ -87,7 +87,7 @@ export const authOptions = (
   },
   adapter: PrismaAdapter(prisma),
   providers: [
-    env.NEXT_PUBLIC_AUTH_PROVIDER === "auth0"
+    env.NEXTAUTH_PROVIDER === "auth0"
       ? Auth0Provider({
           clientId: env.AUTH0_CLIENT_ID ?? "",
           clientSecret: env.AUTH0_CLIENT_SECRET ?? "",

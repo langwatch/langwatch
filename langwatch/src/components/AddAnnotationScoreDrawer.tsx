@@ -50,10 +50,6 @@ export const AddAnnotationScoreDrawer = () => {
       description: "",
       category: Array(5).fill(""),
       categoryExplanation: Array(5).fill(""),
-      dataTypeBoolean: {
-        true: "",
-        false: "",
-      },
     },
   });
 
@@ -62,7 +58,6 @@ export const AddAnnotationScoreDrawer = () => {
     description?: string | null;
     category?: string[] | null;
     categoryExplanation?: string[] | null;
-    dataTypeBoolean?: { true: string; false: string } | null;
     dataType: string;
   };
 

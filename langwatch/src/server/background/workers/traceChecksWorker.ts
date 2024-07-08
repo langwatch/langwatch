@@ -196,7 +196,11 @@ export const runEvaluation = async ({
         retries: retries - 1,
       });
     } else {
-      throw `${response.status} ${response.statusText}`;
+      let statusText = response.statusText;
+      try {
+        statusText = JSON.stringify(await response.json(), undefined, 2);
+      } catch {}
+      throw `${response.status} ${statusText}`;
     }
   }
 

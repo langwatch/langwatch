@@ -326,6 +326,14 @@ export const DashboardLayout = ({
       refetchOnMount: false,
     }
   );
+  const publicEnv = api.publicEnv.useQuery(
+    {},
+    {
+      staleTime: Infinity,
+      refetchOnMount: false,
+      refetchOnWindowFocus: false,
+    }
+  );
 
   const [query, setQuery] = useState("");
 
@@ -578,8 +586,8 @@ export const DashboardLayout = ({
             </Portal>
           </Menu>
         </HStack>
-        {process.env.NEXT_PUBLIC_DEMO_SLUG &&
-          process.env.NEXT_PUBLIC_DEMO_SLUG === router.query.project && (
+        {publicEnv.data?.DEMO_PROJECT_SLUG &&
+          publicEnv.data.DEMO_PROJECT_SLUG === router.query.project && (
             <HStack width={"full"} backgroundColor={"orange.400"} padding={1}>
               <Spacer />
               <Text fontSize={"sm"}>

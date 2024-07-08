@@ -74,8 +74,6 @@ export function AnnotationDrawer({
     getAnnotationScoring.data?.map((score) => [score.id, ""]) ?? []
   );
 
-  console.log(scoreFields);
-
   const {
     register,
     handleSubmit,
@@ -101,12 +99,9 @@ export function AnnotationDrawer({
       setValue("comment", comment);
 
       Object.entries(scoreOptions ?? {}).forEach(([key, value]) => {
-        console.log("value", value);
-        unstable_batchedUpdates(() => {
-          setValue(`scoreOptions.${key}`, {
-            value: value.value,
-            reason: value.reason,
-          });
+        setValue(`scoreOptions.${key}`, {
+          value: value.value,
+          reason: value.reason,
         });
       });
     }

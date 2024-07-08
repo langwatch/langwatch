@@ -67,7 +67,7 @@ export const sendInviteEmail = async ({
   const msg = {
     to: email,
     from: "LangWatch <contact@langwatch.ai>",
-    subject: `You were added to ${organization.name} on Langwatch`,
+    subject: `You were added to ${organization.name} on LangWatch`,
     html: emailHtml,
   };
 

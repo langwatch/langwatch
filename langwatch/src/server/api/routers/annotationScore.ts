@@ -4,8 +4,6 @@ import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { nanoid } from "nanoid";
 import { TeamRoleGroup, checkUserPermissionForProject } from "../permission";
 
-//import { AnnotationScoreDataType } from "@prisma/client";
-
 export const annotationScoreRouter = createTRPCRouter({
   create: protectedProcedure
     .input(

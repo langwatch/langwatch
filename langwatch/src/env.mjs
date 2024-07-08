@@ -1,13 +1,6 @@
 import { createEnv } from "@t3-oss/env-nextjs";
 import { z } from "zod";
 
-if (
-  process.env.NEXTAUTH_SECRET === "please_please_please_change_me_asap" &&
-  process.env.NODE_ENV === "production"
-) {
-  throw new Error("You must change the NEXTAUTH_SECRET in the .env file");
-}
-
 export const env = createEnv({
   /**
    * Specify your server-side environment variables schema here. This way you can ensure the app
@@ -17,6 +10,7 @@ export const env = createEnv({
     DATABASE_URL: z.string().url(),
     NODE_ENV: z.enum(["development", "test", "production"]),
     BASE_HOST: z.string().min(1),
+    NEXTAUTH_PROVIDER: z.enum(["auth0", "email"]),
     NEXTAUTH_SECRET: z.string().min(1),
     NEXTAUTH_URL: z.preprocess(
       // This makes Vercel deployments not fail if you don't set NEXTAUTH_URL
@@ -45,12 +39,12 @@ export const env = createEnv({
   },
 
   /**
-   * Specify your client-side environment variables schema here. This way you can ensure the app
-   * isn't built with invalid env vars. To expose them to the client, prefix them with
-   * `NEXT_PUBLIC_`.
+   * DO NOT USE client-side env vars, they won't work, expose it on `publicEnv.ts` instead
+   * NEXT_PUBLIC_ env vars are injected at build time, but we have to use the same build
+   * for multiple environments before the infra setup, so that won't work.
    */
   client: {
-    NEXT_PUBLIC_AUTH_PROVIDER: z.enum(["auth0", "email"]),
+    // DO NOT USE THIS, use `publicEnv.ts` instead
   },
 
   /**
@@ -61,9 +55,9 @@ export const env = createEnv({
     DATABASE_URL: process.env.DATABASE_URL,
     NODE_ENV: process.env.NODE_ENV,
     BASE_HOST: process.env.BASE_HOST,
+    NEXTAUTH_PROVIDER: process.env.NEXTAUTH_PROVIDER ?? "email",
     NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET,
     NEXTAUTH_URL: process.env.NEXTAUTH_URL,
-    NEXT_PUBLIC_AUTH_PROVIDER: process.env.NEXT_PUBLIC_AUTH_PROVIDER,
     AUTH0_CLIENT_ID: process.env.AUTH0_CLIENT_ID,
     AUTH0_CLIENT_SECRET: process.env.AUTH0_CLIENT_SECRET,
     AUTH0_ISSUER: process.env.AUTH0_ISSUER,
