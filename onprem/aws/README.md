@@ -15,7 +15,7 @@ cdk synth
 To deploy it for a certain profile:
 
 ```
-cdk deploy --profile sf-dev --no-rollback
+cdk deploy --profile sf-dev --no-rollback --parameters="SubDomainName=onprem.langwatch.app"
 ```
 
 # Roles and Debugging

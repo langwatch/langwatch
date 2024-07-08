@@ -1,10 +1,17 @@
 import * as cdk from "aws-cdk-lib";
 import { Construct } from "constructs";
 
+// cloudwatch too for container logs
 import * as eks from "aws-cdk-lib/aws-eks";
 import * as ec2 from "aws-cdk-lib/aws-ec2";
+import * as elasticache from "aws-cdk-lib/aws-elasticache";
+import * as rds from "aws-cdk-lib/aws-rds";
 import { KubectlV30Layer } from "@aws-cdk/lambda-layer-kubectl-v30";
 import * as iam from "aws-cdk-lib/aws-iam";
+import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
+import * as acm from "aws-cdk-lib/aws-certificatemanager";
+
+import langWatchPackageJson from "../../../package.json";
 
 export class LangWatchAwsMarketplaceStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
@@ -21,6 +28,12 @@ export class LangWatchAwsMarketplaceStack extends cdk.Stack {
     // Create a VPC
     const vpc = new ec2.Vpc(this, "LangWatchVPC", {
       maxAzs: 2,
+    });
+
+    const domainParam = new cdk.CfnParameter(this, "SubDomainName", {
+      type: "String",
+      description:
+        "The subdomain name where LangWatch will be hosted (e.g., langwatch.yourdomain.com)",
     });
 
     // Create an EKS cluster
@@ -80,8 +93,252 @@ export class LangWatchAwsMarketplaceStack extends cdk.Stack {
       },
     });
 
-    this.setupLangEvals(cluster);
+    this.setupLangWatchEnv(domainParam, cluster);
+
+    this.setupRedis(vpc, cluster);
+    this.setupPostgres(vpc, cluster);
+
     this.setupFluentd(cluster);
+    this.setupLangEvals(cluster);
+    this.setupLangWatchNLP(cluster);
+    this.setupLangWatch(domainParam, cluster);
+  }
+
+  private setupLangWatchEnv(
+    domainParam: cdk.CfnParameter,
+    cluster: eks.Cluster
+  ): secretsmanager.Secret {
+    const generateSecureString = (name: string, length: number = 32) => {
+      return new secretsmanager.Secret(this, `GeneratedSecret${name}`, {
+        generateSecretString: {
+          excludeCharacters: '"@/\\:?#[]&=+<>{}|^~`,%;',
+          passwordLength: length,
+        },
+      }).secretValue
+        .unsafeUnwrap()
+        .toString();
+    };
+
+    const langwatchEnvSecret = new secretsmanager.Secret(
+      this,
+      "LangWatchEnvSecret",
+      {
+        secretObjectValue: {
+          BASE_HOST: cdk.SecretValue.unsafePlainText(
+            cdk.Fn.join("", ["https://", domainParam.valueAsString])
+          ),
+          NEXTAUTH_URL: cdk.SecretValue.unsafePlainText(
+            cdk.Fn.join("", ["https://", domainParam.valueAsString])
+          ),
+          DEBUG: cdk.SecretValue.unsafePlainText("langwatch:*"),
+          NEXTAUTH_PROVIDER: cdk.SecretValue.unsafePlainText("email"),
+          NEXTAUTH_SECRET: cdk.SecretValue.unsafePlainText(
+            generateSecureString("NextAuthSecret", 32)
+          ),
+          API_TOKEN_JWT_SECRET: cdk.SecretValue.unsafePlainText(
+            generateSecureString("JWTSecret", 32)
+          ),
+          LANGWATCH_NLP_SERVICE: cdk.SecretValue.unsafePlainText(
+            "http://langwatch-nlp-service:8080"
+          ),
+          LANGEVALS_ENDPOINT: cdk.SecretValue.unsafePlainText(
+            "http://langevals-service:8000"
+          ),
+        },
+      }
+    );
+
+    // Grant the EKS cluster permission to read the secret
+    langwatchEnvSecret.grantRead(cluster.adminRole);
+
+    // Create a Kubernetes Secret from the AWS Secret
+    new eks.KubernetesManifest(this, "LangWatchEnvK8sSecret", {
+      cluster,
+      manifest: [
+        {
+          apiVersion: "v1",
+          kind: "Secret",
+          metadata: { name: "langwatch-env" },
+          type: "Opaque",
+          stringData: {
+            BASE_HOST: langwatchEnvSecret
+              .secretValueFromJson("BASE_HOST")
+              .unsafeUnwrap(),
+            NEXTAUTH_URL: langwatchEnvSecret
+              .secretValueFromJson("NEXTAUTH_URL")
+              .unsafeUnwrap(),
+            DEBUG: langwatchEnvSecret
+              .secretValueFromJson("DEBUG")
+              .unsafeUnwrap(),
+            NEXTAUTH_PROVIDER: langwatchEnvSecret
+              .secretValueFromJson("NEXTAUTH_PROVIDER")
+              .unsafeUnwrap(),
+            NEXTAUTH_SECRET: langwatchEnvSecret
+              .secretValueFromJson("NEXTAUTH_SECRET")
+              .unsafeUnwrap(),
+            API_TOKEN_JWT_SECRET: langwatchEnvSecret
+              .secretValueFromJson("API_TOKEN_JWT_SECRET")
+              .unsafeUnwrap(),
+            LANGWATCH_NLP_SERVICE: langwatchEnvSecret
+              .secretValueFromJson("LANGWATCH_NLP_SERVICE")
+              .unsafeUnwrap(),
+            LANGEVALS_ENDPOINT: langwatchEnvSecret
+              .secretValueFromJson("LANGEVALS_ENDPOINT")
+              .unsafeUnwrap(),
+          },
+        },
+      ],
+      overwrite: true,
+      prune: false,
+    });
+
+    return langwatchEnvSecret;
+  }
+
+  setupRedis(vpc: ec2.Vpc, cluster: eks.Cluster) {
+    const redisSecurityGroup = new ec2.SecurityGroup(
+      this,
+      "RedisSecurityGroup",
+      { vpc }
+    );
+
+    redisSecurityGroup.addIngressRule(
+      ec2.Peer.securityGroupId(cluster.clusterSecurityGroupId),
+      ec2.Port.tcp(6379)
+    );
+
+    const redisSubnetGroup = new elasticache.CfnSubnetGroup(
+      this,
+      "RedisSubnetGroup",
+      {
+        description: "Subnet group for Redis ElastiCache",
+        subnetIds: vpc.privateSubnets.map((subnet) => subnet.subnetId),
+      }
+    );
+
+    const redisPassword = new secretsmanager.Secret(this, "RedisPassword", {
+      generateSecretString: {
+        secretStringTemplate: JSON.stringify({ username: "redis" }),
+        generateStringKey: "password",
+        excludePunctuation: true,
+        excludeCharacters: '"@/\\:?#[]&=+<>{}|^~`,%;',
+        passwordLength: 16,
+      },
+    });
+
+    const redis = new elasticache.CfnReplicationGroup(
+      this,
+      "RedisReplicationGroup",
+      {
+        replicationGroupDescription: "Redis cluster for LangWatch",
+        replicationGroupId: "langwatch-redis",
+        engine: "redis",
+        engineVersion: "7.1",
+        cacheParameterGroupName: "default.redis7",
+        port: 6379,
+        // cache.t4g.micro vCPU: 2, Memory: 0.5 GiB, Network Performance: Up to 5 Gigabit =>  13.14 USD/month (on-demand price for 1 instance)
+        cacheNodeType: "cache.t4g.micro",
+        numNodeGroups: 1,
+        replicasPerNodeGroup: 1,
+        cacheSubnetGroupName: redisSubnetGroup.ref,
+        securityGroupIds: [redisSecurityGroup.securityGroupId],
+        atRestEncryptionEnabled: true,
+        transitEncryptionEnabled: true,
+        authToken: redisPassword
+          .secretValueFromJson("password")
+          .unsafeUnwrap()
+          .toString(),
+        multiAzEnabled: true, // Enable Multi-AZ (automatic failover)
+      }
+    );
+
+    // Create a Kubernetes Secret for Redis connection info
+    cluster.addManifest("redis-secret", {
+      apiVersion: "v1",
+      kind: "Secret",
+      metadata: { name: "redis-secret" },
+      type: "Opaque",
+      stringData: {
+        REDIS_URL: cdk.Fn.join("", [
+          "redis://:",
+          redisPassword
+            .secretValueFromJson("password")
+            .unsafeUnwrap()
+            .toString(),
+          "@",
+          redis.attrPrimaryEndPointAddress,
+          ":",
+          redis.attrPrimaryEndPointPort,
+        ]),
+      },
+    });
+  }
+
+  setupPostgres(vpc: ec2.Vpc, cluster: eks.Cluster) {
+    const postgresSecurityGroup = new ec2.SecurityGroup(
+      this,
+      "PostgresSecurityGroup",
+      { vpc }
+    );
+
+    postgresSecurityGroup.addIngressRule(
+      ec2.Peer.securityGroupId(cluster.clusterSecurityGroupId),
+      ec2.Port.tcp(5432)
+    );
+
+    const postgresPassword = new secretsmanager.Secret(
+      this,
+      "PostgresPassword",
+      {
+        generateSecretString: {
+          secretStringTemplate: JSON.stringify({ username: "langwatch_db" }),
+          generateStringKey: "password",
+          excludePunctuation: true,
+          excludeCharacters: '"@/\\:?#[]&=+<>{}|^~`,%;',
+          passwordLength: 16,
+        },
+      }
+    );
+
+    const postgres = new rds.DatabaseInstance(this, "PostgresInstance", {
+      engine: rds.DatabaseInstanceEngine.postgres({
+        version: rds.PostgresEngineVersion.VER_16_3,
+      }),
+      instanceType: ec2.InstanceType.of(
+        ec2.InstanceClass.T4G,
+        ec2.InstanceSize.MICRO
+      ),
+      vpc,
+      vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
+      securityGroups: [postgresSecurityGroup],
+      databaseName: "langwatch_db",
+      deletionProtection: false, // Set to true for production
+      credentials: rds.Credentials.fromSecret(postgresPassword),
+      backupRetention: cdk.Duration.days(7),
+      preferredBackupWindow: "00:00-04:00",
+      storageEncrypted: true,
+    });
+
+    cluster.addManifest("postgres-secret", {
+      apiVersion: "v1",
+      kind: "Secret",
+      metadata: { name: "postgres-secret" },
+      type: "Opaque",
+      stringData: {
+        DATABASE_URL: cdk.Fn.join("", [
+          "postgresql://langwatch_db:",
+          postgresPassword
+            .secretValueFromJson("password")
+            .unsafeUnwrap()
+            .toString(),
+          "@",
+          postgres.dbInstanceEndpointAddress,
+          ":",
+          postgres.dbInstanceEndpointPort,
+          "/langwatch_db?schema=public",
+        ]),
+      },
+    });
   }
 
   setupLangEvals(cluster: eks.Cluster) {
@@ -99,7 +356,7 @@ export class LangWatchAwsMarketplaceStack extends cdk.Stack {
             containers: [
               {
                 name: "langevals",
-                image: "langwatch/langevals:latest",
+                image: `339712859611.dkr.ecr.eu-central-1.amazonaws.com/onprem_langevals:${langWatchPackageJson.version}`,
                 ports: [{ containerPort: 8000 }],
               },
             ],
@@ -116,8 +373,199 @@ export class LangWatchAwsMarketplaceStack extends cdk.Stack {
       spec: {
         selector: { app: "langevals" },
         ports: [{ port: 80, targetPort: 8000 }],
+        type: "ClusterIP",
+      },
+    });
+  }
+
+  setupLangWatchNLP(cluster: eks.Cluster) {
+    cluster.addManifest("langwatch-nlp", {
+      apiVersion: "apps/v1",
+      kind: "Deployment",
+      metadata: { name: "langwatch-nlp" },
+      spec: {
+        replicas: 1,
+        selector: { matchLabels: { app: "langwatch-nlp" } },
+        template: {
+          metadata: { labels: { app: "langwatch-nlp" } },
+          spec: {
+            containers: [
+              {
+                name: "langwatch-nlp",
+                image: `339712859611.dkr.ecr.eu-central-1.amazonaws.com/onprem_langwatch_nlp:${langWatchPackageJson.version}`,
+                ports: [{ containerPort: 8080 }],
+              },
+            ],
+          },
+        },
+      },
+    });
+
+    cluster.addManifest("langwatch-nlp-service", {
+      apiVersion: "v1",
+      kind: "Service",
+      metadata: { name: "langwatch-nlp-service" },
+      spec: {
+        selector: { app: "langwatch-nlp" },
+        ports: [{ port: 80, targetPort: 8080 }],
+        type: "ClusterIP",
+      },
+    });
+  }
+
+  setupLangWatch(domainParam: cdk.CfnParameter, cluster: eks.Cluster) {
+    cluster.addManifest("langwatch", {
+      apiVersion: "apps/v1",
+      kind: "Deployment",
+      metadata: { name: "langwatch" },
+      spec: {
+        replicas: 1,
+        selector: { matchLabels: { app: "langwatch" } },
+        template: {
+          metadata: { labels: { app: "langwatch" } },
+          spec: {
+            containers: [
+              {
+                name: "langwatch",
+                image: `339712859611.dkr.ecr.eu-central-1.amazonaws.com/onprem_langwatch_saas:${langWatchPackageJson.version}`,
+                ports: [{ containerPort: 3000 }],
+                envFrom: [
+                  { secretRef: { name: "redis-secret" } },
+                  { secretRef: { name: "postgres-secret" } },
+                  { secretRef: { name: "langwatch-env" } },
+                ],
+              },
+            ],
+          },
+        },
+      },
+    });
+
+    cluster.addManifest("langwatch-service", {
+      apiVersion: "v1",
+      kind: "Service",
+      metadata: {
+        name: "langwatch-service",
+        annotations: {
+          "external-dns.alpha.kubernetes.io/hostname":
+            domainParam.valueAsString,
+        },
+      },
+      spec: {
+        selector: { app: "langwatch" },
+        ports: [{ port: 80, targetPort: 3000 }],
         type: "LoadBalancer",
       },
+    });
+
+    // Create a certificate
+    const certificate = new acm.Certificate(this, "LangWatchCertificate", {
+      domainName: domainParam.valueAsString,
+      validation: acm.CertificateValidation.fromDns(),
+    });
+
+    // Create IAM policy for the Load Balancer Controller
+    const awsLoadBalancerControllerPolicy = new iam.PolicyStatement({
+      effect: iam.Effect.ALLOW,
+      actions: [
+        "ec2:*",
+        "elasticloadbalancing:*",
+        "iam:CreateServiceLinkedRole",
+        "acm:DescribeCertificate",
+        "acm:ListCertificates",
+        "acm:GetCertificate",
+        "waf-regional:*",
+        "wafv2:*",
+        "shield:*",
+        "cognito-idp:DescribeUserPoolClient",
+        "tag:GetResources",
+        "tag:TagResources",
+        "waf:*",
+      ],
+      resources: ["*"],
+    });
+
+    // Attach the policy to the service account
+    const awsLoadBalancerControllerServiceAccount = cluster.addServiceAccount(
+      "aws-load-balancer-controller",
+      {
+        name: "aws-load-balancer-controller",
+        namespace: "kube-system",
+      }
+    );
+
+    awsLoadBalancerControllerServiceAccount.addToPrincipalPolicy(
+      awsLoadBalancerControllerPolicy
+    );
+
+    // Install the AWS Load Balancer Controller
+    const awsLoadBalancerController = cluster.addHelmChart(
+      "AWSLoadBalancerController",
+      {
+        repository: "https://aws.github.io/eks-charts",
+        chart: "aws-load-balancer-controller",
+        release: "aws-load-balancer-controller",
+        namespace: "kube-system",
+        values: {
+          clusterName: cluster.clusterName,
+          serviceAccount: {
+            create: false,
+            name: awsLoadBalancerControllerServiceAccount.serviceAccountName,
+          },
+        },
+      }
+    );
+
+    awsLoadBalancerController.node.addDependency(
+      awsLoadBalancerControllerServiceAccount
+    );
+
+    // Modify the langwatch service to use an Ingress
+    cluster.addManifest("langwatch-ingress", {
+      apiVersion: "networking.k8s.io/v1",
+      kind: "Ingress",
+      metadata: {
+        name: "langwatch-ingress",
+        annotations: {
+          "kubernetes.io/ingress.class": "alb",
+          "alb.ingress.kubernetes.io/scheme": "internet-facing",
+          "alb.ingress.kubernetes.io/target-type": "ip",
+          "alb.ingress.kubernetes.io/certificate-arn":
+            certificate.certificateArn,
+          "alb.ingress.kubernetes.io/listen-ports": '[{"HTTPS":443}]',
+          "alb.ingress.kubernetes.io/ssl-redirect": "443",
+        },
+      },
+      spec: {
+        rules: [
+          {
+            host: domainParam.valueAsString,
+            http: {
+              paths: [
+                {
+                  path: "/",
+                  pathType: "Prefix",
+                  backend: {
+                    service: {
+                      name: "langwatch-service",
+                      port: { number: 80 },
+                    },
+                  },
+                },
+              ],
+            },
+          },
+        ],
+      },
+    });
+
+    // Output the ALB DNS name
+    new cdk.CfnOutput(this, "LangWatchLoadBalancerDNS", {
+      value: cluster.getIngressLoadBalancerAddress("langwatch-ingress", {
+        timeout: cdk.Duration.minutes(30),
+      }),
+      description:
+        "Application Load Balancer DNS Name. Point your subdomain CNAME record to this value.",
     });
   }
 
