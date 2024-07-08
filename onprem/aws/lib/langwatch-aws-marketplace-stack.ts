@@ -9,7 +9,6 @@ import * as rds from "aws-cdk-lib/aws-rds";
 import { KubectlV30Layer } from "@aws-cdk/lambda-layer-kubectl-v30";
 import * as iam from "aws-cdk-lib/aws-iam";
 import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
-import * as acm from "aws-cdk-lib/aws-certificatemanager";
 
 import langWatchPackageJson from "../../../package.json";
 
@@ -151,45 +150,164 @@ export class LangWatchAwsMarketplaceStack extends cdk.Stack {
     // Grant the EKS cluster permission to read the secret
     langwatchEnvSecret.grantRead(cluster.adminRole);
 
-    // Create a Kubernetes Secret from the AWS Secret
-    new eks.KubernetesManifest(this, "LangWatchEnvK8sSecret", {
-      cluster,
-      manifest: [
+    // Create a ClusterRole
+    const clusterRole = cluster.addManifest("CSIDriverClusterRole", {
+      apiVersion: "rbac.authorization.k8s.io/v1",
+      kind: "ClusterRole",
+      metadata: {
+        name: "secrets-store-csi-driver-cluster-role",
+      },
+      rules: [
         {
-          apiVersion: "v1",
-          kind: "Secret",
-          metadata: { name: "langwatch-env" },
-          type: "Opaque",
-          stringData: {
-            BASE_HOST: langwatchEnvSecret
-              .secretValueFromJson("BASE_HOST")
-              .unsafeUnwrap(),
-            NEXTAUTH_URL: langwatchEnvSecret
-              .secretValueFromJson("NEXTAUTH_URL")
-              .unsafeUnwrap(),
-            DEBUG: langwatchEnvSecret
-              .secretValueFromJson("DEBUG")
-              .unsafeUnwrap(),
-            NEXTAUTH_PROVIDER: langwatchEnvSecret
-              .secretValueFromJson("NEXTAUTH_PROVIDER")
-              .unsafeUnwrap(),
-            NEXTAUTH_SECRET: langwatchEnvSecret
-              .secretValueFromJson("NEXTAUTH_SECRET")
-              .unsafeUnwrap(),
-            API_TOKEN_JWT_SECRET: langwatchEnvSecret
-              .secretValueFromJson("API_TOKEN_JWT_SECRET")
-              .unsafeUnwrap(),
-            LANGWATCH_NLP_SERVICE: langwatchEnvSecret
-              .secretValueFromJson("LANGWATCH_NLP_SERVICE")
-              .unsafeUnwrap(),
-            LANGEVALS_ENDPOINT: langwatchEnvSecret
-              .secretValueFromJson("LANGEVALS_ENDPOINT")
-              .unsafeUnwrap(),
-          },
+          apiGroups: [""],
+          resources: ["secrets"],
+          verbs: ["get", "list", "watch", "create", "update", "delete"],
+        },
+        {
+          apiGroups: [""],
+          resources: ["namespaces"],
+          verbs: ["get", "list", "watch"],
         },
       ],
-      overwrite: true,
-      prune: false,
+    });
+
+    // Create a ClusterRoleBinding
+    const clusterRoleBinding = cluster.addManifest(
+      "CSIDriverClusterRoleBinding",
+      {
+        apiVersion: "rbac.authorization.k8s.io/v1",
+        kind: "ClusterRoleBinding",
+        metadata: {
+          name: "secrets-store-csi-driver-cluster-rolebinding",
+        },
+        roleRef: {
+          apiGroup: "rbac.authorization.k8s.io",
+          kind: "ClusterRole",
+          name: "secrets-store-csi-driver-cluster-role",
+        },
+        subjects: [
+          {
+            kind: "ServiceAccount",
+            name: "secrets-store-csi-driver",
+            namespace: "kube-system",
+          },
+        ],
+      }
+    );
+
+    // Install Secrets Store CSI Driver and ASCP provider
+    const csiDriver = cluster.addHelmChart("SecretsStoreCSIDriver", {
+      chart: "secrets-store-csi-driver",
+      repository:
+        "https://kubernetes-sigs.github.io/secrets-store-csi-driver/charts",
+      namespace: "kube-system",
+      release: "csi-secrets-store",
+      values: {
+        syncSecret: {
+          enabled: true,
+        },
+      },
+    });
+
+    // Ensure the ClusterRole and ClusterRoleBinding are created after the Helm chart
+    clusterRole.node.addDependency(csiDriver);
+    clusterRoleBinding.node.addDependency(csiDriver);
+
+    cluster.addHelmChart("ASCPProvider", {
+      chart: "secrets-store-csi-driver-provider-aws",
+      repository: "https://aws.github.io/secrets-store-csi-driver-provider-aws",
+      namespace: "kube-system",
+      release: "secrets-provider-aws",
+    });
+
+    // TODO: postgres password, redis password
+    cluster.addManifest("LangWatchSecretProviderClass", {
+      apiVersion: "secrets-store.csi.x-k8s.io/v1",
+      kind: "SecretProviderClass",
+      metadata: {
+        name: "langwatch-secret-provider",
+      },
+      spec: {
+        provider: "aws",
+        secretObjects: [
+          {
+            secretName: "langwatch-k8s-secret",
+            type: "Opaque",
+            data: [
+              {
+                objectName: "BASE_HOST",
+                key: "BASE_HOST",
+              },
+              {
+                objectName: "NEXTAUTH_URL",
+                key: "NEXTAUTH_URL",
+              },
+              {
+                objectName: "DEBUG",
+                key: "DEBUG",
+              },
+              {
+                objectName: "NEXTAUTH_PROVIDER",
+                key: "NEXTAUTH_PROVIDER",
+              },
+              {
+                objectName: "NEXTAUTH_SECRET",
+                key: "NEXTAUTH_SECRET",
+              },
+              {
+                objectName: "LANGWATCH_NLP_SERVICE",
+                key: "LANGWATCH_NLP_SERVICE",
+              },
+              {
+                objectName: "LANGEVALS_ENDPOINT",
+                key: "LANGEVALS_ENDPOINT",
+              },
+            ],
+          },
+        ],
+        parameters: {
+          objects: JSON.stringify([
+            {
+              objectName: langwatchEnvSecret.secretName,
+              objectType: "secretsmanager",
+              jmesPath: [
+                {
+                  path: "BASE_HOST",
+                  objectAlias: "BASE_HOST",
+                },
+                {
+                  path: "NEXTAUTH_URL",
+                  objectAlias: "NEXTAUTH_URL",
+                },
+                {
+                  path: "DEBUG",
+                  objectAlias: "DEBUG",
+                },
+                {
+                  path: "NEXTAUTH_PROVIDER",
+                  objectAlias: "NEXTAUTH_PROVIDER",
+                },
+                {
+                  path: "NEXTAUTH_SECRET",
+                  objectAlias: "NEXTAUTH_SECRET",
+                },
+                {
+                  path: "API_TOKEN_JWT_SECRET",
+                  objectAlias: "API_TOKEN_JWT_SECRET",
+                },
+                {
+                  path: "LANGWATCH_NLP_SERVICE",
+                  objectAlias: "LANGWATCH_NLP_SERVICE",
+                },
+                {
+                  path: "LANGEVALS_ENDPOINT",
+                  objectAlias: "LANGEVALS_ENDPOINT",
+                },
+              ],
+            },
+          ]),
+        },
+      },
     });
 
     return langwatchEnvSecret;
@@ -430,10 +548,31 @@ export class LangWatchAwsMarketplaceStack extends cdk.Stack {
                 image: `339712859611.dkr.ecr.eu-central-1.amazonaws.com/onprem_langwatch_saas:${langWatchPackageJson.version}`,
                 ports: [{ containerPort: 3000 }],
                 envFrom: [
-                  { secretRef: { name: "redis-secret" } },
-                  { secretRef: { name: "postgres-secret" } },
-                  { secretRef: { name: "langwatch-env" } },
+                  {
+                    secretRef: {
+                      name: "langwatch-k8s-secret",
+                    },
+                  },
                 ],
+                volumeMounts: [
+                  {
+                    name: "langwatch-secrets",
+                    mountPath: "/mnt/secrets-store",
+                    readOnly: true,
+                  },
+                ],
+              },
+            ],
+            volumes: [
+              {
+                name: "langwatch-secrets",
+                csi: {
+                  driver: "secrets-store.csi.k8s.io",
+                  readOnly: true,
+                  volumeAttributes: {
+                    secretProviderClass: "langwatch-secret-provider",
+                  },
+                },
               },
             ],
           },
@@ -446,10 +585,6 @@ export class LangWatchAwsMarketplaceStack extends cdk.Stack {
       kind: "Service",
       metadata: {
         name: "langwatch-service",
-        annotations: {
-          "external-dns.alpha.kubernetes.io/hostname":
-            domainParam.valueAsString,
-        },
       },
       spec: {
         selector: { app: "langwatch" },
@@ -458,111 +593,10 @@ export class LangWatchAwsMarketplaceStack extends cdk.Stack {
       },
     });
 
-    // Create a certificate
-    const certificate = new acm.Certificate(this, "LangWatchCertificate", {
-      domainName: domainParam.valueAsString,
-      validation: acm.CertificateValidation.fromDns(),
-    });
-
-    // Create IAM policy for the Load Balancer Controller
-    const awsLoadBalancerControllerPolicy = new iam.PolicyStatement({
-      effect: iam.Effect.ALLOW,
-      actions: [
-        "ec2:*",
-        "elasticloadbalancing:*",
-        "iam:CreateServiceLinkedRole",
-        "acm:DescribeCertificate",
-        "acm:ListCertificates",
-        "acm:GetCertificate",
-        "waf-regional:*",
-        "wafv2:*",
-        "shield:*",
-        "cognito-idp:DescribeUserPoolClient",
-        "tag:GetResources",
-        "tag:TagResources",
-        "waf:*",
-      ],
-      resources: ["*"],
-    });
-
-    // Attach the policy to the service account
-    const awsLoadBalancerControllerServiceAccount = cluster.addServiceAccount(
-      "aws-load-balancer-controller",
-      {
-        name: "aws-load-balancer-controller",
-        namespace: "kube-system",
-      }
-    );
-
-    awsLoadBalancerControllerServiceAccount.addToPrincipalPolicy(
-      awsLoadBalancerControllerPolicy
-    );
-
-    // Install the AWS Load Balancer Controller
-    const awsLoadBalancerController = cluster.addHelmChart(
-      "AWSLoadBalancerController",
-      {
-        repository: "https://aws.github.io/eks-charts",
-        chart: "aws-load-balancer-controller",
-        release: "aws-load-balancer-controller",
-        namespace: "kube-system",
-        values: {
-          clusterName: cluster.clusterName,
-          serviceAccount: {
-            create: false,
-            name: awsLoadBalancerControllerServiceAccount.serviceAccountName,
-          },
-        },
-      }
-    );
-
-    awsLoadBalancerController.node.addDependency(
-      awsLoadBalancerControllerServiceAccount
-    );
-
-    // Modify the langwatch service to use an Ingress
-    cluster.addManifest("langwatch-ingress", {
-      apiVersion: "networking.k8s.io/v1",
-      kind: "Ingress",
-      metadata: {
-        name: "langwatch-ingress",
-        annotations: {
-          "kubernetes.io/ingress.class": "alb",
-          "alb.ingress.kubernetes.io/scheme": "internet-facing",
-          "alb.ingress.kubernetes.io/target-type": "ip",
-          "alb.ingress.kubernetes.io/certificate-arn":
-            certificate.certificateArn,
-          "alb.ingress.kubernetes.io/listen-ports": '[{"HTTPS":443}]',
-          "alb.ingress.kubernetes.io/ssl-redirect": "443",
-        },
-      },
-      spec: {
-        rules: [
-          {
-            host: domainParam.valueAsString,
-            http: {
-              paths: [
-                {
-                  path: "/",
-                  pathType: "Prefix",
-                  backend: {
-                    service: {
-                      name: "langwatch-service",
-                      port: { number: 80 },
-                    },
-                  },
-                },
-              ],
-            },
-          },
-        ],
-      },
-    });
-
     // Output the ALB DNS name
     new cdk.CfnOutput(this, "LangWatchLoadBalancerDNS", {
-      value: cluster.getIngressLoadBalancerAddress("langwatch-ingress", {
-        timeout: cdk.Duration.minutes(30),
+      value: cluster.getServiceLoadBalancerAddress("langwatch-service", {
+        timeout: cdk.Duration.minutes(15),
       }),
       description:
         "Application Load Balancer DNS Name. Point your subdomain CNAME record to this value.",
