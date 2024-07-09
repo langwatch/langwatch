@@ -39,9 +39,12 @@ export default function Annotations() {
     }
   );
 
-  const scoreOptions = api.annotationScore.getAll.useQuery({
-    projectId: project?.id ?? "",
-  });
+  const scoreOptions = api.annotationScore.getAll.useQuery(
+    { projectId: project?.id ?? "" },
+    {
+      enabled: !!project,
+    }
+  );
 
   const scoreOptionsIDArray = scoreOptions.data?.map(
     (scoreOption) => scoreOption.id
@@ -141,7 +144,10 @@ export default function Annotations() {
         </HStack>
         <Card>
           <CardBody>
-            {annotations.data && annotations.data.length == 0 ? (
+            {annotations.data &&
+            annotations.data.length == 0 &&
+            scoreOptions.data &&
+            scoreOptions.data.length == 0 ? (
               <Text>No annotations found</Text>
             ) : (
               <TableContainer>
