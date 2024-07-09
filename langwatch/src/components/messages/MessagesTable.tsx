@@ -51,7 +51,7 @@ import {
   Shield,
 } from "react-feather";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import type { Trace } from "~/server/tracer/types";
+import type { Trace, TraceCheck } from "~/server/tracer/types";
 import { getEvaluatorDefinitions } from "~/trace_checks/getEvaluator";
 import { api } from "~/utils/api";
 import { durationColor } from "~/utils/durationColor";
@@ -112,28 +112,19 @@ export function MessagesTable() {
     }
   );
 
-  const traceChecksQuery = api.traces.getTraceChecks.useQuery(
-    { projectId: project?.id ?? "", traceIds },
-    {
-      enabled: traceIds.length > 0,
-      refetchInterval: undefined,
-      refetchOnWindowFocus: false,
-    }
-  );
-
   const [previousTraceChecks, setPreviousTraceChecks] = useState<
-    (typeof traceChecksQuery)["data"]
-  >(traceChecksQuery.data);
+    Record<string, TraceCheck[]>
+  >(traceGroups.data?.traceChecks ?? {});
   useEffect(() => {
-    if (traceChecksQuery.data) {
-      setPreviousTraceChecks(traceChecksQuery.data);
+    if (traceGroups.data?.traceChecks) {
+      setPreviousTraceChecks(traceGroups.data.traceChecks);
     }
-  }, [traceChecksQuery.data]);
+  }, [traceGroups.data]);
 
   const traceCheckColumnsAvailable = Object.fromEntries(
-    Object.values(traceChecksQuery.data ?? previousTraceChecks ?? {}).flatMap(
+    Object.values(traceGroups.data?.traceChecks ?? previousTraceChecks ?? {}).flatMap(
       (checks) =>
-        checks.map((check) => [
+        checks.map((check:any) => [
           `trace_checks.${check.check_id}`,
           check.check_name,
         ])
@@ -209,18 +200,20 @@ export function MessagesTable() {
     checked: {
       name: "",
       sortable: false,
-      render: (trace, index) => (
-        <Td key={index} textAlign="right">
-          <HStack position="relative" align="right">
-            <Spacer />
-            {annotationCount(trace.trace_id)}
-            <Checkbox
-              colorScheme="blue"
-              onChange={() => traceSelection(trace.trace_id)}
-            />
-          </HStack>
-        </Td>
-      ),
+      render: (trace, index) => {
+        return (
+          <Td key={index} textAlign="right">
+            <HStack position="relative" align="right">
+              <Spacer />
+              {annotationCount(trace.trace_id)}
+              <Checkbox
+                colorScheme="blue"
+                onChange={() => traceSelection(trace.trace_id)}
+              />
+            </HStack>
+          </Td>
+        );
+      },
       value: () => "",
     },
     "trace.timestamps.started_at": {
@@ -437,6 +430,52 @@ export function MessagesTable() {
       value: (trace: Trace) =>
         numeral(trace.metrics.total_cost).format("$0.00[000]"),
     },
+    "trace.metadata": {
+      name: "Metadata",
+      sortable: true,
+      render: (trace, index) => (
+        <Td
+          key={index}
+          onClick={() =>
+            openDrawer("traceDetails", {
+              traceId: trace.trace_id,
+            })
+          }
+        >
+          <Tooltip label={JSON.stringify(trace.metadata)}>
+            <Text noOfLines={1} display="block" maxWidth="300px">
+              {JSON.stringify(trace.metadata) === "{}"
+                ? ""
+                : JSON.stringify(trace.metadata)}
+            </Text>
+          </Tooltip>
+        </Td>
+      ),
+      value: (trace: Trace) => JSON.stringify(trace.metadata),
+    },
+    "trace.contexts": {
+      name: "Contexts",
+      sortable: true,
+      render: (trace, index) => (
+        <Td
+          key={index}
+          onClick={() =>
+            openDrawer("traceDetails", {
+              traceId: trace.trace_id,
+            })
+          }
+        >
+          <Tooltip label={JSON.stringify(trace.contexts)}>
+            <Text noOfLines={1} display="block" maxWidth="300px">
+              {JSON.stringify(trace.contexts) === "[]"
+                ? ""
+                : JSON.stringify(trace.contexts)}
+            </Text>
+          </Tooltip>
+        </Td>
+      ),
+      value: (trace: Trace) => JSON.stringify(trace.contexts),
+    },
     ...Object.fromEntries(
       Object.entries(traceCheckColumnsAvailable).map(
         ([columnKey, checkName]) => [
@@ -446,8 +485,8 @@ export function MessagesTable() {
             sortable: true,
             render: (trace, index) => {
               const checkId = columnKey.split(".")[1];
-              const traceCheck = traceChecksQuery.data?.[trace.trace_id]?.find(
-                (traceCheck_) => traceCheck_.check_id === checkId
+              const traceCheck = traceGroups.data?.traceChecks?.[trace.trace_id]?.find(
+                (traceCheck_: TraceCheck) => traceCheck_.check_id === checkId
               );
               const evaluator = getEvaluatorDefinitions(
                 traceCheck?.check_type ?? ""
@@ -488,8 +527,8 @@ export function MessagesTable() {
             },
             value: (trace: Trace) => {
               const checkId = columnKey.split(".")[1];
-              const traceCheck = traceChecksQuery.data?.[trace.trace_id]?.find(
-                (traceCheck_) => traceCheck_.check_id === checkId
+              const traceCheck = traceGroups.data?.traceChecks?.[trace.trace_id]?.find(
+                (traceCheck_: TraceCheck) => traceCheck_.check_id === checkId
               );
               return traceCheck?.status === "processed"
                 ? numeral(traceCheck?.score).format("0.[00]")
@@ -589,8 +628,8 @@ export function MessagesTable() {
 
   useEffect(() => {
     if (
-      traceChecksQuery.isFetched &&
-      !traceChecksQuery.isFetching &&
+      traceGroups.isFetched &&
+      !traceGroups.isFetching &&
       isFirstRender.current
     ) {
       isFirstRender.current = false;
@@ -608,7 +647,7 @@ export function MessagesTable() {
         }));
       }
     }
-  }, [traceChecksQuery, traceCheckColumnsAvailable, localStorageHeaderColumns]);
+  }, [traceGroups, traceCheckColumnsAvailable, localStorageHeaderColumns]);
 
   const { isOpen, onOpen, onClose } = useDisclosure();
   const checkedHeaderColumnsEntries = Object.entries(
@@ -682,7 +721,6 @@ export function MessagesTable() {
                 marginTop={2}
                 onClick={() => {
                   void traceGroups.refetch();
-                  void traceChecksQuery.refetch();
                 }}
               >
                 <RefreshCw

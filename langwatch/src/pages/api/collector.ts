@@ -220,7 +220,7 @@ export default async function handler(
       .json({ message: "All spans must have the same trace id" });
   }
 
-  spans.forEach((span, index) => {
+  for (const [index, span] of spans.entries()) {
     try {
       spanValidatorSchema.parse(span);
     } catch (error) {
@@ -254,7 +254,7 @@ export default async function handler(
           "Timestamps should be in milliseconds not in seconds, please multiply it by 1000",
       });
     }
-  });
+  }
 
   const paramsMD5 = crypto
     .createHash("md5")
