@@ -445,7 +445,7 @@ class ContextTrace:
     context_token: Optional[contextvars.Token[Optional["ContextTrace"]]] = None
 
     trace_id: Union[str, UUID]
-    metadata: Optional[TraceMetadata] = None
+    metadata: TraceMetadata = {}
     span: Type[ContextSpan]
     root_span: ContextSpan
 
@@ -574,7 +574,7 @@ class ContextTrace:
         if trace_id:
             self.trace_id = trace_id
         if metadata:
-            self.metadata = metadata
+            self.metadata.update(metadata)
 
         self.root_span.update(
             span_id=span_id,
