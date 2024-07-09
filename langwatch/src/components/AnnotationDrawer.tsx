@@ -86,7 +86,9 @@ export function AnnotationDrawer({
     defaultValues: {
       isThumbsUp: "thumbsUp",
       comment: comment,
-      scoreOptions: getAnnotation.data?.scoreOptions,
+      scoreOptions: getAnnotation.data?.scoreOptions as
+        | Record<string, { value: string; reason: string }>
+        | undefined,
     },
   });
 
@@ -110,7 +112,7 @@ export function AnnotationDrawer({
   type Annotation = {
     isThumbsUp: string;
     comment: string;
-    scoreOptions: Record<string, string>;
+    scoreOptions: Record<string, { value: string; reason: string }> | undefined;
   };
 
   const onSubmit = (data: Annotation) => {
