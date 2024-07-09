@@ -131,6 +131,8 @@ export default async function handler(
     thread_id: threadId,
     user_id: userId,
     customer_id: customerId,
+    sdk_version: sdkVersion,
+    sdk_language: sdkLanguage,
     labels,
   } = params.metadata ?? {};
 
@@ -302,6 +304,8 @@ export default async function handler(
       user_id: nullToUndefined(userId), // Optional: This will be undefined if not sent
       customer_id: nullToUndefined(customerId),
       labels: nullToUndefined(labels),
+      sdk_version: nullToUndefined(sdkVersion),
+      sdk_language: nullToUndefined(sdkLanguage),
     },
     timestamps: {
       started_at: Math.min(...spans.map((span) => span.timestamps.started_at)),

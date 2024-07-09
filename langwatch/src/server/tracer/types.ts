@@ -247,6 +247,8 @@ export type Trace = {
     labels?: string[];
     topic_id?: string;
     subtopic_id?: string;
+    sdk_version?: string;
+    sdk_language?: string;
   };
   timestamps: { started_at: number; inserted_at: number; updated_at: number };
   input: TraceInput;
@@ -293,6 +295,8 @@ export type TraceCheck = {
     thread_id?: string;
     user_id?: string;
     customer_id?: string;
+    sdk_version?: string;
+    sdk_language?: string;
     labels?: string[];
     topics?: string[];
   };
@@ -312,6 +316,8 @@ export type CollectorRESTParams = {
     customer_id?: string | null | undefined;
     labels?: string[] | null | undefined;
     experiments?: Experiment[] | null | undefined;
+    sdk_version?: string | null | undefined;
+    sdk_language?: string | null | undefined;
   };
 };
 
@@ -332,6 +338,8 @@ export type Event = {
     customer_id?: string;
     labels?: string[];
     topics?: string[];
+    sdk_version?: string | null | undefined;
+    sdk_language?: string | null | undefined;
   };
   timestamps: { started_at: number; inserted_at: number; updated_at: number };
 };

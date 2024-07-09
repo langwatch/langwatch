@@ -11,6 +11,7 @@ import {
 import { openai } from "@ai-sdk/openai";
 import { generateText, type CoreMessage } from "ai";
 import "dotenv/config";
+import { version } from "../package.json";
 
 describe("LangWatch tracer", () => {
   let mockFetch: SpyInstanceFn;
@@ -65,6 +66,8 @@ describe("LangWatch tracer", () => {
       threadId: "123",
       userId: "456",
       labels: ["foo", "bar"],
+      sdkLanguage: "typescript",
+      sdkVersion: version,
     });
     expect(span.timestamps.startedAt).toBeDefined();
     expect(span.timestamps.finishedAt).toBeDefined();
@@ -133,6 +136,8 @@ describe("LangWatch tracer", () => {
       thread_id: "123",
       user_id: "456",
       labels: ["foo", "bar"],
+      sdk_language: "typescript",
+      sdk_version: version,
     });
     expect(requestBody.spans.length).toBe(3);
   });

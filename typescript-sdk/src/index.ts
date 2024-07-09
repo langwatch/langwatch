@@ -24,8 +24,13 @@ import {
   type RAGSpan,
   type SpanInputOutput,
 } from "./types";
-import { autoconvertTypedValues, captureError, convertFromVercelAIMessages } from "./utils";
+import {
+  autoconvertTypedValues,
+  captureError,
+  convertFromVercelAIMessages,
+} from "./utils";
 import { LangWatchCallbackHandler } from "./langchain";
+import { version } from "../package.json";
 
 export type {
   BaseSpan,
@@ -152,7 +157,11 @@ export class LangWatchTrace {
   }) {
     this.client = client;
     this.traceId = traceId;
-    this.metadata = metadata;
+    this.metadata = {
+      ...metadata,
+      sdkVersion: version,
+      sdkLanguage: "typescript",
+    };
   }
 
   update({ metadata }: { metadata: Metadata }) {

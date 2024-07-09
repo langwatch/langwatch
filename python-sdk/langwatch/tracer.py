@@ -1,3 +1,4 @@
+from importlib.metadata import version
 import os
 from concurrent.futures import Future, ThreadPoolExecutor
 import time
@@ -49,6 +50,14 @@ except ImportError:
     pass
 
 T = TypeVar("T", bound=Callable[..., Any])
+
+
+def get_version():
+    """Retrieves the version of the current library."""
+    try:
+        return version("langwatch")
+    except Exception:
+        return "unknown"
 
 
 class ContextSpan:
@@ -448,7 +457,8 @@ class ContextTrace:
     ):
         self.spans: Dict[str, Span] = {}
         self.trace_id = trace_id or f"trace_{nanoid.generate()}"
-        self.metadata = metadata
+        self.metadata = metadata or {}
+        self.metadata.update({"sdk_version": get_version(), "sdk_language": "python"})
         self.span = cast(
             Type[ContextSpan], lambda **kwargs: ContextSpan(trace=self, **kwargs)
         )

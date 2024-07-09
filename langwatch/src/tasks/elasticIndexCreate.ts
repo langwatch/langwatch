@@ -55,6 +55,8 @@ const traceMapping: ElasticSearchMappingFrom<ElasticSearchTrace> = {
       labels: { type: "keyword" },
       topic_id: { type: "keyword" },
       subtopic_id: { type: "keyword" },
+      sdk_version: { type: "keyword" },
+      sdk_language: { type: "keyword" },
     },
   },
   timestamps: {
@@ -228,6 +230,8 @@ const traceChecksMapping: ElasticSearchMappingFrom<TraceCheck> = {
       customer_id: { type: "keyword" },
       labels: { type: "keyword" },
       topics: { type: "keyword" },
+      sdk_version: { type: "keyword" },
+      sdk_language: { type: "keyword" },
     },
   },
 };
@@ -267,6 +271,8 @@ const eventsMapping: ElasticSearchMappingFrom<ElasticSearchEvent> = {
       customer_id: { type: "keyword" },
       labels: { type: "keyword" },
       topics: { type: "keyword" },
+      sdk_version: { type: "keyword" },
+      sdk_language: { type: "keyword" },
     },
   },
 };
