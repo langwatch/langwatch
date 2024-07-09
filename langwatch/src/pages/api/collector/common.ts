@@ -4,6 +4,7 @@ import type {
   RAGSpan,
   Span,
   SpanInputOutput,
+  TypedValueJson,
 } from "../../../server/tracer/types";
 
 export const getFirstInputAsText = (spans: Span[]): string => {
@@ -14,7 +15,7 @@ export const getFirstInputAsText = (spans: Span[]): string => {
     (span) =>
       span.input &&
       span.input.value &&
-      (span.input.type !== "json" || span.input.value !== "null")
+      (span.input.type !== "json" || !isEmptyJson(span.input.value))
   );
 
   const input = topmostInputs[0]?.input;
@@ -32,10 +33,19 @@ export const getFirstInputAsText = (spans: Span[]): string => {
   return text;
 };
 
+export const isEmptyJson = (value: TypedValueJson["value"]): boolean => {
+  return (
+    !value ||
+    value === "null" ||
+    value === "{}" ||
+    (typeof value === "object" && Object.keys(value).length === 0)
+  );
+};
+
 export const getLastOutputAsText = (spans: Span[]): string => {
   const bottommostOutputs = flattenSpanTree(
     organizeSpansIntoTree(spans),
-    "inside-out"
+    "outside-in"
   )
     .reverse()
     .filter(
@@ -43,7 +53,7 @@ export const getLastOutputAsText = (spans: Span[]): string => {
         span.output &&
         span.type !== "guardrail" &&
         span.output.value &&
-        (span.output.type !== "json" || span.output.value !== "null")
+        (span.output.type !== "json" || !isEmptyJson(span.output.value))
     );
 
   const outputs = bottommostOutputs[0]?.output;
@@ -108,6 +118,10 @@ export const typedValueToText = (
       }
       if (json.user_query !== undefined) {
         return stringified(json.user_query);
+      }
+      // Langflow
+      if (json.input_value !== undefined) {
+        return stringified(json.input_value);
       }
       // TODO: test this happens for finding outputs
       if (json.output !== undefined) {

@@ -66,7 +66,7 @@ type JSONSerializable =
   | Record<string, any>
   | any[];
 
-interface TypedValueJson {
+export interface TypedValueJson {
   type: "json";
   value: JSONSerializable;
 }
