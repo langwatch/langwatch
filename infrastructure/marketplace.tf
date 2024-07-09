@@ -1,34 +1,4 @@
-# Certificate for installation subdomains
-
-resource "aws_acm_certificate" "wildcard_cert" {
-  domain_name       = "*.aws.langwatch.ai"
-  validation_method = "DNS"
-
-  lifecycle {
-    create_before_destroy = true
-  }
-
-  tags = {
-    Name = "LangWatch Wildcard Certificate"
-  }
-}
-
-output "certificate_arn" {
-  value       = aws_acm_certificate.wildcard_cert.arn
-  description = "ARN of the wildcard certificate"
-}
-
-resource "aws_ram_resource_share" "cert_share" {
-  name                      = "langwatch-wildcard-cert-share"
-  allow_external_principals = true
-}
-
-resource "aws_ram_resource_association" "cert_association" {
-  resource_arn       = aws_acm_certificate.wildcard_cert.arn
-  resource_share_arn = aws_ram_resource_share.cert_share.arn
-}
-
-# TODO: route53 and lambda for auto registering customers loadbalancers
+# TODO: certificate for installation subdomains, route53 and lambda for auto registering customers loadbalancers
 
 # Repositories for onprem to store the docker images
 
