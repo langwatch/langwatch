@@ -1,4 +1,4 @@
-import { VStack, HStack, Spacer, Box, Text } from "@chakra-ui/react";
+import { VStack, HStack, Spacer, Box, Text, Card } from "@chakra-ui/react";
 import { api } from "~/utils/api";
 import { useEffect } from "react";
 import { Edit, ThumbsUp, ThumbsDown } from "react-feather";
@@ -16,6 +16,10 @@ export const Annotations = ({ traceId }: { traceId: string }) => {
     traceId: traceId,
   });
 
+  const scoreOptions = api.annotationScore.getAll.useQuery({
+    projectId: project?.id ?? "",
+  });
+
   const isAnnotationDrawerOpen = isDrawerOpen("annotation");
 
   useEffect(() => {
@@ -28,10 +32,10 @@ export const Annotations = ({ traceId }: { traceId: string }) => {
         const isCurrentUser = data?.user?.id === annotation.user?.id;
         return (
           <Box
-            backgroundColor="gray.100"
-            padding={3}
-            borderRadius={5}
-            width="300px"
+            backgroundColor={"gray.100"}
+            width={"full"}
+            padding={6}
+            borderRadius={"lg"}
             onClick={
               isCurrentUser
                 ? () =>
@@ -80,6 +84,28 @@ export const Annotations = ({ traceId }: { traceId: string }) => {
                 )}
               </HStack>
               <Text>{annotation.comment}</Text>
+              <VStack align="start" spacing={0}>
+                {annotation.scoreOptions &&
+                  typeof annotation.scoreOptions === "object" &&
+                  Object.entries(annotation.scoreOptions).map(
+                    ([key, scoreOption]) => {
+                      if (!scoreOption) return null;
+                      return (
+                        <Text key={key} fontSize={"sm"}>
+                          <HStack>
+                            <Text fontWeight="bold">
+                              {scoreOptions.data?.find(
+                                (option) => option.id === key
+                              )?.name ?? "Name not found"}
+                              :
+                            </Text>
+                            <Text key={key}>{scoreOption.value}</Text>
+                          </HStack>
+                        </Text>
+                      );
+                    }
+                  )}
+              </VStack>
             </VStack>
           </Box>
         );

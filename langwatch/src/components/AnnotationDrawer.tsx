@@ -6,8 +6,10 @@ import {
   DrawerContent,
   DrawerHeader,
   HStack,
+  Input,
   Radio,
   RadioGroup,
+  Spacer,
   Spinner,
   Text,
   Textarea,
@@ -15,9 +17,12 @@ import {
   useDisclosure,
   useToast,
 } from "@chakra-ui/react";
+import { unstable_batchedUpdates } from "react-dom";
+
 import { ExternalLink, ThumbsDown, ThumbsUp } from "react-feather";
 import { useDrawer } from "~/components/CurrentDrawer";
 import { MetadataTag } from "~/components/MetadataTag";
+import { SmallLabel } from "~/components/SmallLabel";
 
 import { DeleteIcon } from "@chakra-ui/icons";
 import { useRouter } from "next/router";
@@ -25,6 +30,7 @@ import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
+import { HorizontalFormControl } from "./HorizontalFormControl";
 
 export function AnnotationDrawer({
   traceId,
@@ -48,6 +54,10 @@ export function AnnotationDrawer({
   const createAnnotation = api.annotation.create.useMutation();
   const deleteAnnotation = api.annotation.deleteById.useMutation();
 
+  const getAnnotationScoring = api.annotationScore.getAllActive.useQuery({
+    projectId: project?.id ?? "",
+  });
+
   const getAnnotation = api.annotation.getById.useQuery({
     projectId: project?.id ?? "",
     annotationId: annotationId ?? "",
@@ -55,10 +65,14 @@ export function AnnotationDrawer({
 
   const updateAnnotation = api.annotation.updateByTraceId.useMutation();
 
-  const { isThumbsUp, comment, id } = getAnnotation.data ?? {
+  const { isThumbsUp, comment, id, scoreOptions } = getAnnotation.data ?? {
     isThumbsUp: "thumbsUp",
     comment: "",
+    scoreOptions: {},
   };
+  const scoreFields = Object.fromEntries(
+    getAnnotationScoring.data?.map((score) => [score.id, ""]) ?? []
+  );
 
   const {
     register,
@@ -72,22 +86,31 @@ export function AnnotationDrawer({
     defaultValues: {
       isThumbsUp: "thumbsUp",
       comment: comment,
+      scoreOptions: getAnnotation.data?.scoreOptions,
     },
   });
 
   const thumbsUpValue = watch("isThumbsUp");
 
   useEffect(() => {
-    if (getAnnotation.data) {
+    if (action === "edit") {
       const thumbValue = isThumbsUp === true ? "thumbsUp" : "thumbsDown";
       setValue("isThumbsUp", thumbValue);
       setValue("comment", comment);
+
+      Object.entries(scoreOptions ?? {}).forEach(([key, value]) => {
+        setValue(`scoreOptions.${key}`, {
+          value: value.value,
+          reason: value.reason,
+        });
+      });
     }
-  }, [getAnnotation.data, setValue, isThumbsUp, comment]);
+  }, [scoreOptions, setValue, action, isThumbsUp, comment]);
 
   type Annotation = {
     isThumbsUp: string;
     comment: string;
+    scoreOptions: Record<string, string>;
   };
 
   const onSubmit = (data: Annotation) => {
@@ -101,6 +124,10 @@ export function AnnotationDrawer({
           isThumbsUp: isThumbsUp,
           comment: data.comment,
           traceId: traceId,
+          scoreOptions: data.scoreOptions as unknown as Record<
+            string,
+            { value: string; reason: string }
+          >,
         },
         {
           onSuccess: () => {
@@ -141,6 +168,10 @@ export function AnnotationDrawer({
           isThumbsUp: isThumbsUp,
           comment: data.comment,
           traceId: traceId,
+          scoreOptions: data.scoreOptions as unknown as Record<
+            string,
+            { value: string; reason: string }
+          >,
         },
         {
           onSuccess: () => {
@@ -238,7 +269,7 @@ export function AnnotationDrawer({
           ) : (
             /* eslint-disable-next-line @typescript-eslint/no-misused-promises */
             <form onSubmit={handleSubmit(onSubmit)}>
-              <VStack align="start" spacing={6}>
+              <VStack align="start" spacing={3}>
                 <RadioGroup value={thumbsUpValue}>
                   <HStack spacing={4}>
                     <VStack align="start">
@@ -273,6 +304,12 @@ export function AnnotationDrawer({
                     </VStack>
                   </HStack>
                 </RadioGroup>
+                {getAnnotationScoring.data?.map((scoreType) => {
+                  const options = Array.isArray(scoreType.options)
+                    ? (scoreType.options as AnnotationScoreOption[])
+                    : [];
+                  return ScoreBlock({ ...scoreType, options }, watch, register);
+                })}
                 <VStack align="start" spacing={4} width="full">
                   <Text>Comments</Text>
                   <Textarea {...register("comment")} />
@@ -307,3 +344,47 @@ export function AnnotationDrawer({
     </Drawer>
   );
 }
+
+type AnnotationScoreOption = {
+  label: string;
+  value: number;
+};
+
+type AnnotationScore = {
+  id: string;
+  name: string;
+  options: AnnotationScoreOption[];
+  description: string | null;
+};
+
+const ScoreBlock = (scoreType: AnnotationScore, watch: any, register: any) => {
+  const scoreValue = watch(`scoreOptions.${scoreType.id}.value`);
+
+  return (
+    <HorizontalFormControl
+      label={scoreType.name}
+      helper={scoreType.description ?? ""}
+    >
+      <RadioGroup key={scoreType.id} value={scoreValue} padding={0}>
+        <VStack align="start" spacing={2}>
+          {scoreType.options.map((option) => {
+            return (
+              <Radio
+                value={option.value.toString()}
+                {...register(`scoreOptions.${scoreType.id}.value`)}
+                key={option.value}
+                required
+                isRequired
+              >
+                {option.label}
+              </Radio>
+            );
+          })}
+          <Spacer />
+          <SmallLabel>Reasoning</SmallLabel>
+          <Input {...register(`scoreOptions.${scoreType.id}.reason`)} />
+        </VStack>
+      </RadioGroup>
+    </HorizontalFormControl>
+  );
+};

@@ -307,7 +307,10 @@ export const TraceDetailsDrawer = (props: TraceDetailsDrawerProps) => {
                 />
               </TabPanel>
               <TabPanel>
-                {annotationsQuery.data && annotationsQuery.data.length > 0 ? (
+                {annotationsQuery.isLoading ? (
+                  <Text>Loading...</Text>
+                ) : annotationsQuery.data &&
+                  annotationsQuery.data.length > 0 ? (
                   <Annotations traceId={props.traceId} />
                 ) : (
                   <Text>No annotations found</Text>

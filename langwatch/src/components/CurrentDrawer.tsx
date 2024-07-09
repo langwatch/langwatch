@@ -4,6 +4,7 @@ import { TraceDetailsDrawer } from "./TraceDetailsDrawer";
 import { BatchEvaluationDrawer } from "./BatchEvaluationDrawer";
 import { TriggerDrawer } from "./AddTriggerDrawer";
 import { AnnotationDrawer } from "./AnnotationDrawer";
+import { AddAnnotationScoreDrawer } from "./AddAnnotationScoreDrawer";
 
 type DrawerProps = {
   open: string;
@@ -14,6 +15,7 @@ const drawers = {
   batchEvaluation: BatchEvaluationDrawer,
   trigger: TriggerDrawer,
   annotation: AnnotationDrawer,
+  addAnnotationScore: AddAnnotationScoreDrawer,
 } satisfies Record<string, React.FC<any>>;
 
 export function CurrentDrawer() {

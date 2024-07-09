@@ -21,6 +21,7 @@ import { experimentsRouter } from "./routers/experiments";
 import { annotationRouter } from "./routers/annotation";
 import { modelProviderRouter } from "./routers/modelProviders";
 import { userRouter } from "./routers/user";
+import { annotationScoreRouter } from "./routers/annotationScore";
 import { publicEnvRouter } from "./routers/publicEnv";
 
 /**
@@ -50,6 +51,7 @@ export const appRouter = createTRPCRouter({
   annotation: annotationRouter,
   modelProvider: modelProviderRouter,
   user: userRouter,
+  annotationScore: annotationScoreRouter,
   publicEnv: publicEnvRouter,
   ...(dependencies.extraTRPCRoutes?.() ?? {}),
 });

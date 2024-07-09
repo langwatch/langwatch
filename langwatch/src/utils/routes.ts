@@ -80,6 +80,10 @@ export const projectRoutes = {
     title: "Editing Dataset",
     parent: "datasets",
   },
+  annotations: {
+    path: "/[project]/annotations",
+    title: "Annotations",
+  },
 };
 
 export type Route = {

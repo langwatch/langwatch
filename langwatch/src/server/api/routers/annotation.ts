@@ -4,6 +4,13 @@ import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { nanoid } from "nanoid";
 import { TeamRoleGroup, checkUserPermissionForProject } from "../permission";
 
+const scoreOptionSchema = z.object({
+  value: z.string(),
+  reason: z.string(),
+});
+
+const scoreOptions = z.record(z.string(), scoreOptionSchema);
+
 export const annotationRouter = createTRPCRouter({
   create: protectedProcedure
     .input(
@@ -12,6 +19,7 @@ export const annotationRouter = createTRPCRouter({
         comment: z.string().optional().nullable(),
         isThumbsUp: z.boolean().optional().nullable(),
         traceId: z.string(),
+        scoreOptions: scoreOptions,
       })
     )
     .use(checkUserPermissionForProject(TeamRoleGroup.ANNOTATIONS_MANAGE))
@@ -24,6 +32,7 @@ export const annotationRouter = createTRPCRouter({
           isThumbsUp: input.isThumbsUp ?? false,
           traceId: input.traceId,
           userId: ctx.session.user.id,
+          scoreOptions: input.scoreOptions ?? {},
         },
       });
     }),
@@ -35,6 +44,7 @@ export const annotationRouter = createTRPCRouter({
         projectId: z.string(),
         comment: z.string().optional().nullable(),
         isThumbsUp: z.boolean().optional().nullable(),
+        scoreOptions: scoreOptions,
       })
     )
     .use(checkUserPermissionForProject(TeamRoleGroup.ANNOTATIONS_MANAGE))
@@ -48,6 +58,7 @@ export const annotationRouter = createTRPCRouter({
         data: {
           comment: input.comment ?? "",
           isThumbsUp: input.isThumbsUp ?? false,
+          scoreOptions: input.scoreOptions ?? {},
         },
       });
     }),
@@ -116,6 +127,22 @@ export const annotationRouter = createTRPCRouter({
         where: {
           id: input.annotationId,
           projectId: input.projectId,
+        },
+      });
+    }),
+  getAll: protectedProcedure
+    .input(z.object({ projectId: z.string() }))
+    .use(checkUserPermissionForProject(TeamRoleGroup.ANNOTATIONS_MANAGE))
+    .query(async ({ ctx, input }) => {
+      return ctx.prisma.annotation.findMany({
+        where: {
+          projectId: input.projectId,
+        },
+        orderBy: {
+          createdAt: "desc",
+        },
+        include: {
+          user: true,
         },
       });
     }),

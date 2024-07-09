@@ -28,6 +28,9 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
           <MenuLink href="/settings/teams">Teams</MenuLink>
           <MenuLink href="/settings/members">Members</MenuLink>
           <MenuLink href="/settings/triggers">Triggers</MenuLink>
+          <MenuLink href="/settings/annotation-scores">
+            Annotation Scores
+          </MenuLink>
           <MenuLink href="/settings/usage">Usage & Billing</MenuLink>
           <MenuLink href="/settings/subscription">Subscription</MenuLink>
         </VStack>
