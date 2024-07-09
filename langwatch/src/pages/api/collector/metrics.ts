@@ -2,12 +2,16 @@ import { estimateCost, tokenizeAndEstimateCost } from "llm-cost";
 import {
   type LLMSpan,
   type Span,
+  type SpanTimestamps,
   type Trace,
 } from "../../../server/tracer/types";
 import { typedValueToText } from "./common";
 
 // TODO: test
-export const computeTraceMetrics = (spans: Span[]): Trace["metrics"] => {
+export const computeTraceMetrics = (
+  traceTimestamps: SpanTimestamps | null | undefined,
+  spans: Span[]
+): Trace["metrics"] => {
   let earliestStartedAt: number | null = null;
   let latestFirstTokenAt: number | null = null;
   let latestFinishedAt: number | null = null;
@@ -71,15 +75,23 @@ export const computeTraceMetrics = (spans: Span[]): Trace["metrics"] => {
     }
   });
 
+  const firstTokenMsFromSpans =
+    latestFirstTokenAt && earliestStartedAt
+      ? latestFirstTokenAt - earliestStartedAt
+      : null;
+  const totalTimeMsFromSpans =
+    latestFinishedAt && earliestStartedAt
+      ? latestFinishedAt - earliestStartedAt
+      : null;
+
   return {
-    first_token_ms:
-      latestFirstTokenAt && earliestStartedAt
-        ? latestFirstTokenAt - earliestStartedAt
-        : null,
+    first_token_ms: traceTimestamps?.first_token_at
+      ? traceTimestamps.first_token_at
+      : firstTokenMsFromSpans,
     total_time_ms:
-      latestFinishedAt && earliestStartedAt
-        ? latestFinishedAt - earliestStartedAt
-        : null,
+      traceTimestamps?.started_at && traceTimestamps.finished_at
+        ? traceTimestamps.finished_at - traceTimestamps.started_at
+        : totalTimeMsFromSpans,
     prompt_tokens: totalPromptTokens,
     completion_tokens: totalCompletionTokens,
     total_cost: totalCost,

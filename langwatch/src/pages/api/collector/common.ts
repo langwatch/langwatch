@@ -4,19 +4,13 @@ import type {
   RAGSpan,
   Span,
   SpanInputOutput,
-  TypedValueJson,
 } from "../../../server/tracer/types";
 
 export const getFirstInputAsText = (spans: Span[]): string => {
   const topmostInputs = flattenSpanTree(
     organizeSpansIntoTree(spans),
     "outside-in"
-  ).filter(
-    (span) =>
-      span.input &&
-      span.input.value &&
-      (span.input.type !== "json" || !isEmptyJson(span.input.value))
-  );
+  ).filter((span) => !isEmptyValue(span.input));
 
   const input = topmostInputs[0]?.input;
   if (!input) {
@@ -33,7 +27,15 @@ export const getFirstInputAsText = (spans: Span[]): string => {
   return text;
 };
 
-export const isEmptyJson = (value: TypedValueJson["value"]): boolean => {
+export const isEmptyValue = (
+  typedValue: SpanInputOutput | null | undefined
+): boolean => {
+  if (!typedValue) return true;
+  const { type, value } = typedValue;
+  if (!value) return true;
+  if (type !== "json") {
+    return false;
+  }
   return (
     !value ||
     value === "null" ||
@@ -45,15 +47,12 @@ export const isEmptyJson = (value: TypedValueJson["value"]): boolean => {
 export const getLastOutputAsText = (spans: Span[]): string => {
   const bottommostOutputs = flattenSpanTree(
     organizeSpansIntoTree(spans),
-    "outside-in"
+    "inside-out" // ?? outside-in?
   )
     .reverse()
     .filter(
       (span) =>
-        span.output &&
-        span.type !== "guardrail" &&
-        span.output.value &&
-        (span.output.type !== "json" || !isEmptyJson(span.output.value))
+        span.output && span.type !== "guardrail" && !isEmptyValue(span.output)
     );
 
   const outputs = bottommostOutputs[0]?.output;
