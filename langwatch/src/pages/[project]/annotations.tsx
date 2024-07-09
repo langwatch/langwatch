@@ -108,9 +108,13 @@ export default function Annotations() {
     reason?: string;
   }
 
-  const annotationScoreValues = (scoreOptions: Record<string, ScoreOption>) => {
-    return scoreOptionsIDArray.length > 0 ? (
-      scoreOptionsIDArray.map((id) => (
+  const annotationScoreValues = (
+    scoreOptions: Record<string, ScoreOption>,
+    scoreOptionsIDArray: string[]
+  ) => {
+    console.log(scoreOptions, scoreOptionsIDArray);
+    if (scoreOptionsIDArray.length > 0) {
+      return scoreOptionsIDArray.map((id) => (
         <Td key={id}>
           <HStack>
             <Text>{scoreOptions[id]?.value}</Text>
@@ -121,10 +125,10 @@ export default function Annotations() {
             )}
           </HStack>
         </Td>
-      ))
-    ) : (
-      <Td>-</Td>
-    );
+      ));
+    } else {
+      return <Td></Td>;
+    }
   };
 
   return (
@@ -206,7 +210,8 @@ export default function Annotations() {
                               annotation.scoreOptions as unknown as Record<
                                 string,
                                 ScoreOption
-                              >
+                              >,
+                              scoreOptionsIDArray
                             )}
                             <Td>{annotation.createdAt.toLocaleString()}</Td>
                           </Tr>
