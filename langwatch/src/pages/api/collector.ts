@@ -110,10 +110,6 @@ export default async function handler(
     }
   }
 
-  if (req.body.error) {
-    req.body.error.has_error = true;
-  }
-
   let params: CollectorRESTParamsValidator;
   try {
     params = collectorRESTParamsValidatorSchema.parse(req.body);
@@ -130,14 +126,7 @@ export default async function handler(
     return res.status(400).json({ error: validationError.message });
   }
 
-  const {
-    trace_id: nullableTraceId,
-    name: traceName,
-    input: traceInput,
-    output: traceOutput,
-    error: traceError,
-    timestamps: traceTimestamps,
-  } = params;
+  const { trace_id: nullableTraceId } = params;
   const {
     thread_id: threadId,
     user_id: userId,
@@ -249,12 +238,6 @@ export default async function handler(
     }
 
     if (
-      (!!traceTimestamps?.started_at &&
-        traceTimestamps.started_at.toString().length === 10) ||
-      (!!traceTimestamps?.finished_at &&
-        traceTimestamps.finished_at.toString().length === 10) ||
-      (!!traceTimestamps?.first_token_at &&
-        traceTimestamps.first_token_at.toString().length === 10) ||
       (span.timestamps.started_at &&
         span.timestamps.started_at.toString().length === 10) ||
       (span.timestamps.finished_at &&
@@ -303,10 +286,10 @@ export default async function handler(
   }));
 
   const [input, output] = await Promise.all([
-    getTraceInput(traceInput, spans),
-    getTraceOutput(traceOutput, spans),
+    getTraceInput(spans),
+    getTraceOutput(spans),
   ]);
-  const error = traceError ?? getLastOutputError(spans);
+  const error = getLastOutputError(spans);
 
   const nullToUndefined = <T>(value: T | null): T | undefined =>
     // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
@@ -316,7 +299,6 @@ export default async function handler(
   const trace: ElasticSearchTrace = {
     trace_id: traceId,
     project_id: project.id,
-    name: traceName,
     metadata: {
       thread_id: nullToUndefined(threadId), // Optional: This will be undefined if not sent
       user_id: nullToUndefined(userId), // Optional: This will be undefined if not sent
@@ -326,15 +308,13 @@ export default async function handler(
       sdk_language: nullToUndefined(sdkLanguage),
     },
     timestamps: {
-      started_at:
-        traceTimestamps?.started_at ??
-        Math.min(...spans.map((span) => span.timestamps.started_at)),
+      started_at: Math.min(...spans.map((span) => span.timestamps.started_at)),
       inserted_at: Date.now(),
       updated_at: Date.now(),
     },
     input,
     output,
-    metrics: computeTraceMetrics(traceTimestamps, spans),
+    metrics: computeTraceMetrics(spans),
     error,
     indexing_md5s: [...(existingTrace?.indexing_md5s ?? []), paramsMD5],
   };

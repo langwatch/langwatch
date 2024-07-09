@@ -152,7 +152,7 @@ describe("Collector API Endpoint", () => {
       },
       input: {
         value: "hello",
-        // satisfaction_score: expect.any(Number), // only works if langwatch_nlp is also running
+        satisfaction_score: expect.any(Number),
         embeddings: {
           embeddings: expect.any(Array),
           model: DEFAULT_EMBEDDINGS_MODEL,
@@ -174,102 +174,6 @@ describe("Collector API Endpoint", () => {
         tokens_estimated: true,
       },
       error: null,
-      indexing_md5s: expect.any(Array),
-    });
-  });
-
-  test("takes the trace input and output when specified", async () => {
-    const traceId = "trace_test-trace_input_output_J5m9g-0JDMbcJqLK2";
-    const traceData: CollectorRESTParams = {
-      trace_id: traceId,
-      spans: [
-        {
-          ...sampleSpan,
-          trace_id: traceId,
-        },
-      ],
-      input: { type: "text", value: "trace input" },
-      output: { type: "text", value: "trace output" },
-      name: "trace name",
-      error: {
-        message: "trace error",
-        stacktrace: [],
-      } as any,
-      timestamps: {
-        started_at: 1706623872769,
-        finished_at: 1706623872769 + 10,
-      },
-      metadata: {
-        thread_id: "thread_test-thread_1",
-        user_id: "user_test-user_1",
-        customer_id: "customer_test-customer_1",
-        labels: ["test-label-1.0.0"],
-      },
-    };
-
-    const { req, res }: { req: NextApiRequest; res: NextApiResponse } =
-      createMocks({
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Auth-Token": project?.apiKey,
-        },
-        body: traceData,
-      });
-
-    await handler(req, res);
-    expect(res.statusCode).toBe(200);
-
-    const indexedTrace = await esClient.getSource<Trace>({
-      index: TRACE_INDEX,
-      id: traceIndexId({
-        traceId,
-        projectId: project?.id ?? "",
-      }),
-    });
-
-    expect(indexedTrace).toEqual({
-      trace_id: traceId,
-      project_id: project?.id,
-      name: "trace name",
-      metadata: {
-        thread_id: "thread_test-thread_1",
-        user_id: "user_test-user_1",
-        customer_id: "customer_test-customer_1",
-        labels: ["test-label-1.0.0"],
-      },
-      timestamps: {
-        started_at: 1706623872769,
-        inserted_at: expect.any(Number),
-        updated_at: expect.any(Number),
-      },
-      input: {
-        value: "trace input",
-        embeddings: {
-          embeddings: expect.any(Array),
-          model: DEFAULT_EMBEDDINGS_MODEL,
-        },
-      },
-      output: {
-        value: "trace output",
-        embeddings: {
-          embeddings: expect.any(Array),
-          model: DEFAULT_EMBEDDINGS_MODEL,
-        },
-      },
-      error: {
-        has_error: true,
-        message: "trace error",
-        stacktrace: [],
-      },
-      metrics: {
-        first_token_ms: null,
-        total_time_ms: 10,
-        prompt_tokens: 7,
-        completion_tokens: 1,
-        total_cost: 0.0000125,
-        tokens_estimated: true,
-      },
       indexing_md5s: expect.any(Array),
     });
   });

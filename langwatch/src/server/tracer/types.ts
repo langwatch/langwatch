@@ -66,7 +66,7 @@ type JSONSerializable =
   | Record<string, any>
   | any[];
 
-interface TypedValueJson {
+export interface TypedValueJson {
   type: "json";
   value: JSONSerializable;
 }
@@ -121,7 +121,7 @@ interface SpanParams {
   tool_choice?: string;
 }
 
-export interface SpanTimestamps {
+interface SpanTimestamps {
   started_at: number;
   first_token_at?: number | null;
   finished_at: number;
@@ -240,7 +240,6 @@ export type TraceOutput = {
 export type Trace = {
   trace_id: string;
   project_id: string;
-  name?: string | null;
   metadata: {
     thread_id?: string;
     user_id?: string;
@@ -310,11 +309,6 @@ export type Experiment = {
 
 export type CollectorRESTParams = {
   trace_id?: string | null | undefined;
-  name?: string | null;
-  input?: SpanInputOutput | null;
-  output?: SpanInputOutput | null;
-  error?: ErrorCapture | null;
-  timestamps?: SpanTimestamps;
   spans: Span[];
   metadata?: {
     user_id?: string | null | undefined;

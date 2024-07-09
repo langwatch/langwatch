@@ -47,7 +47,6 @@ type ElasticSearchMappingFrom<T> = NonNullable<T> extends (infer U)[]
 const traceMapping: ElasticSearchMappingFrom<ElasticSearchTrace> = {
   trace_id: { type: "keyword" },
   project_id: { type: "keyword" },
-  name: { type: "keyword" },
   metadata: {
     properties: {
       thread_id: { type: "keyword" },
