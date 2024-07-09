@@ -112,12 +112,24 @@ def autoconvert_typed_values(
         return cast(SpanInputOutput, value)
     if type(value) == list and all(validate_safe(ChatMessage, item) for item in value):
         return TypedValueChatMessages(type="chat_messages", value=value)
-    else:
-        try:
-            json_ = json.dumps(value, cls=SerializableAndPydanticEncoder)
-            return TypedValueJson(type="json", value=json.loads(json_))
-        except:
-            return TypedValueRaw(type="raw", value=str(value))
+
+    try:
+        import chainlit as cl
+
+        if type(value) == dict:
+            value_ = value.copy()
+            for key, v in value_.items():
+                if isinstance(v, cl.Message):
+                    value_[key] = cast(cl.Message, v).to_dict()
+            return TypedValueJson(type="json", value=value_)
+    except ImportError:
+        pass
+
+    try:
+        json_ = json.dumps(value, cls=SerializableAndPydanticEncoder)
+        return TypedValueJson(type="json", value=json.loads(json_))
+    except:
+        return TypedValueRaw(type="raw", value=str(value))
 
 
 def autoconvert_rag_contexts(value: Union[List[RAGChunk], List[str]]) -> List[RAGChunk]:
