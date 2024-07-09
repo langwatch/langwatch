@@ -4,6 +4,7 @@ from concurrent.futures import Future, ThreadPoolExecutor
 import time
 from types import ModuleType
 from typing import Any, Callable, Dict, List, Optional, Type, TypeVar, Union, cast
+from uuid import UUID
 from warnings import warn
 from deprecated import deprecated
 
@@ -66,7 +67,7 @@ class ContextSpan:
     context_token: Optional[contextvars.Token[Optional["ContextSpan"]]] = None
     span: Type["ContextSpan"]
 
-    span_id: str
+    span_id: Union[str, UUID]
     parent: Optional["ContextSpan"] = None
     _parent_from_context: bool = False
     _capture_input: bool = True
@@ -85,7 +86,7 @@ class ContextSpan:
     def __init__(
         self,
         trace: Optional["ContextTrace"] = None,
-        span_id: Optional[str] = None,
+        span_id: Optional[Union[str, UUID]] = None,
         parent: Optional["ContextSpan"] = None,
         capture_input: bool = True,
         capture_output: bool = True,
@@ -224,7 +225,7 @@ class ContextSpan:
 
     def update(
         self,
-        span_id: Optional[str] = None,
+        span_id: Optional[Union[str, UUID]] = None,
         name: Optional[str] = None,
         type: Optional[SpanTypes] = None,
         input: Optional[Union[SpanInputOutput, str, List[ChatMessage]]] = None,
@@ -323,9 +324,9 @@ class ContextSpan:
                 RAGSpan(
                     type=self.type,
                     name=self.name,
-                    span_id=self.span_id,
-                    parent_id=self.parent.span_id if self.parent else None,
-                    trace_id=self.trace.trace_id,
+                    span_id=str(self.span_id),
+                    parent_id=str(self.parent.span_id) if self.parent else None,
+                    trace_id=str(self.trace.trace_id),
                     input=autoconvert_typed_values(self.input) if self.input else None,
                     output=(
                         autoconvert_typed_values(self.output) if self.output else None
@@ -340,9 +341,9 @@ class ContextSpan:
                 LLMSpan(
                     type=self.type,
                     name=self.name,
-                    span_id=self.span_id,
-                    parent_id=self.parent.span_id if self.parent else None,
-                    trace_id=self.trace.trace_id,
+                    span_id=str(self.span_id),
+                    parent_id=str(self.parent.span_id) if self.parent else None,
+                    trace_id=str(self.trace.trace_id),
                     input=autoconvert_typed_values(self.input) if self.input else None,
                     output=(
                         autoconvert_typed_values(self.output) if self.output else None
@@ -359,9 +360,9 @@ class ContextSpan:
                 BaseSpan(
                     type=self.type,
                     name=self.name,
-                    span_id=self.span_id,
-                    parent_id=self.parent.span_id if self.parent else None,
-                    trace_id=self.trace.trace_id,
+                    span_id=str(self.span_id),
+                    parent_id=str(self.parent.span_id) if self.parent else None,
+                    trace_id=str(self.trace.trace_id),
                     input=autoconvert_typed_values(self.input) if self.input else None,
                     output=(
                         autoconvert_typed_values(self.output) if self.output else None
@@ -443,7 +444,7 @@ class ContextTrace:
     )
     context_token: Optional[contextvars.Token[Optional["ContextTrace"]]] = None
 
-    trace_id: str
+    trace_id: Union[str, UUID]
     metadata: Optional[TraceMetadata] = None
     span: Type[ContextSpan]
     root_span: ContextSpan
@@ -455,7 +456,7 @@ class ContextTrace:
 
     def __init__(
         self,
-        trace_id: Optional[str] = None,
+        trace_id: Optional[Union[str, UUID]] = None,
         metadata: Optional[TraceMetadata] = None,
         api_key: Optional[str] = None,
         # Span constructor parameters
@@ -555,10 +556,10 @@ class ContextTrace:
 
     def update(
         self,
-        trace_id: Optional[str] = None,
+        trace_id: Optional[Union[str, UUID]] = None,
         metadata: Optional[TraceMetadata] = None,
         # root span update
-        span_id: Optional[str] = None,
+        span_id: Optional[Union[str, UUID]] = None,
         name: Optional[str] = None,
         type: Optional[SpanTypes] = None,
         input: Optional[Union[SpanInputOutput, str, List[ChatMessage]]] = None,
@@ -611,7 +612,7 @@ class ContextTrace:
     def send_spans(self):
         send_spans(
             CollectorRESTParams(
-                trace_id=self.trace_id,
+                trace_id=str(self.trace_id),
                 metadata=self.metadata,
                 spans=list(self.spans.values()),
             ),

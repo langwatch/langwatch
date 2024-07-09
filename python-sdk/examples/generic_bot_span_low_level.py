@@ -1,4 +1,5 @@
 import time
+import uuid
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -17,7 +18,9 @@ async def main(message: cl.Message):
         content="",
     )
 
-    trace = langwatch.trace()
+    trace = langwatch.trace(
+        trace_id=uuid.uuid4(),
+    )
     span = trace.span(
         type="span",
         input=message.content,
