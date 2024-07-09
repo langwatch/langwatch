@@ -112,7 +112,6 @@ export default function Annotations() {
     scoreOptions: Record<string, ScoreOption>,
     scoreOptionsIDArray: string[]
   ) => {
-    console.log(scoreOptions, scoreOptionsIDArray);
     if (scoreOptionsIDArray.length > 0 && scoreOptions) {
       return scoreOptionsIDArray.map((id) => (
         <Td key={id}>
@@ -127,6 +126,9 @@ export default function Annotations() {
         </Td>
       ));
     } else {
+      if (scoreOptionsIDArray.length > 0) {
+        return scoreOptionsIDArray.map((_, i) => <Td key={i}></Td>);
+      }
       return <Td></Td>;
     }
   };

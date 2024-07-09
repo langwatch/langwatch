@@ -126,7 +126,7 @@ export function AnnotationDrawer({
           isThumbsUp: isThumbsUp,
           comment: data.comment,
           traceId: traceId,
-          scoreOptions: data.scoreOptions as unknown as Record<
+          scoreOptions: (data.scoreOptions ?? {}) as Record<
             string,
             { value: string; reason: string }
           >,
@@ -170,7 +170,7 @@ export function AnnotationDrawer({
           isThumbsUp: isThumbsUp,
           comment: data.comment,
           traceId: traceId,
-          scoreOptions: data.scoreOptions as unknown as Record<
+          scoreOptions: (data.scoreOptions ?? {}) as Record<
             string,
             { value: string; reason: string }
           >,
@@ -198,7 +198,7 @@ export function AnnotationDrawer({
           onError: () => {
             toast({
               title: "Error",
-              description: "Error creating trigger",
+              description: "Error creating annotation",
               status: "error",
               duration: 5000,
               isClosable: true,
