@@ -28,10 +28,12 @@ export const annotationScoreRouter = createTRPCRouter({
         input.categoryExplanation
       ) {
         for (let i = 0; i < input.category.length; i++) {
-          options.push({
-            label: input.category[i]!,
-            value: input.categoryExplanation[i]!,
-          });
+          if (input.category[i] !== "") {
+            options.push({
+              label: input.category[i]!,
+              value: input.categoryExplanation[i]!,
+            });
+          }
         }
       }
 
