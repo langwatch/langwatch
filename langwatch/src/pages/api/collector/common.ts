@@ -43,20 +43,30 @@ export const isEmptyJson = (value: TypedValueJson["value"]): boolean => {
 };
 
 export const getLastOutputAsText = (spans: Span[]): string => {
-  const bottommostOutputs = flattenSpanTree(
+  const nonEmptySpan = (span: Span) =>
+    span.output &&
+    span.output.value &&
+    (span.output.type !== "json" || !isEmptyJson(span.output.value));
+
+  // First we try to see if the topLevel node has a valid output, if so, we go with that, so users
+  // can take control of which output to use by controlling the top level one by hand, even if it
+  // doesn't finish last because of some background process span being captured
+  const topLevelNode = flattenSpanTree(
     organizeSpansIntoTree(spans),
     "inside-out"
-  )
-    .reverse()
-    .filter(
-      (span) =>
-        span.output &&
-        span.type !== "guardrail" &&
-        span.output.value &&
-        (span.output.type !== "json" || !isEmptyJson(span.output.value))
-    );
+  ).reverse()[0];
 
-  const outputs = bottommostOutputs[0]?.output;
+  if (topLevelNode?.output && !isEmptyJson(topLevelNode.output.value)) {
+    return typedValueToText(topLevelNode.output, true);
+  }
+
+  // If the top-level node has no output, then for getting the best text that represents the output,
+  // we try to find the last span to finish, this is likely the one that came up with the final answer
+  const spansInFinishOrderDesc = spans
+    .sort((a, b) => b.timestamps.finished_at - a.timestamps.finished_at)
+    .filter(nonEmptySpan);
+
+  const outputs = spansInFinishOrderDesc[0]?.output;
   if (!outputs) {
     return "";
   }
