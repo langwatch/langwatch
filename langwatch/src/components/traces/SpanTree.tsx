@@ -302,6 +302,14 @@ export function SpanTree(props: SpanTreeProps) {
     return <Alert status="error">Trace not found</Alert>;
   }
 
+  const estimatedCost = (
+    <Tooltip label="When `metrics.completion_tokens` and `metrics.prompt_tokens` are not available, they are estimated based on input, output and the model for calculating costs.">
+      <Text as="span" color="gray.400" borderBottom="1px dotted">
+        {" (estimated)"}
+      </Text>
+    </Tooltip>
+  );
+
   return (
     <VStack width="full">
       {spans.data ? (
@@ -346,6 +354,7 @@ export function SpanTree(props: SpanTreeProps) {
                       " prompt + " +
                       (span.metrics?.completion_tokens ?? 0) +
                       " completion"}
+                    {span.metrics?.tokens_estimated && estimatedCost}
                   </Text>
                 )}
                 {(span.vendor !== undefined || span.model !== undefined) && (
@@ -358,6 +367,7 @@ export function SpanTree(props: SpanTreeProps) {
                   <Text>
                     <b>Cost:</b>{" "}
                     {numeral(span.metrics.cost).format("$0.00000a")}
+                    {span.metrics?.tokens_estimated && estimatedCost}
                   </Text>
                 )}
               </VStack>

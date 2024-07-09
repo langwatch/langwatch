@@ -95,7 +95,12 @@ export const addLLMTokensCount = async (spans: Span[]) => {
       if (!llmSpan.metrics) {
         llmSpan.metrics = {};
       }
-      if (llmSpan.input && llmSpan.model && !llmSpan.metrics.prompt_tokens) {
+      if (
+        llmSpan.input &&
+        llmSpan.model &&
+        (llmSpan.metrics.prompt_tokens === undefined ||
+          llmSpan.metrics.prompt_tokens === null)
+      ) {
         llmSpan.metrics.prompt_tokens = (
           await tokenizeAndEstimateCost({
             model: llmSpan.model,
@@ -107,7 +112,8 @@ export const addLLMTokensCount = async (spans: Span[]) => {
       if (
         llmSpan.output &&
         llmSpan.model &&
-        !llmSpan.metrics.completion_tokens
+        (llmSpan.metrics.completion_tokens === undefined ||
+          llmSpan.metrics.completion_tokens === null)
       ) {
         let outputTokens = 0;
         outputTokens += (
