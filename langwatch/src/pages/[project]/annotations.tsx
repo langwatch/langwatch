@@ -112,7 +112,6 @@ export default function Annotations() {
     scoreOptions: Record<string, ScoreOption>,
     scoreOptionsIDArray: string[]
   ) => {
-    console.log(scoreOptions, scoreOptionsIDArray);
     if (scoreOptionsIDArray.length > 0) {
       return scoreOptionsIDArray.map((id) => (
         <Td key={id}>
@@ -165,9 +164,11 @@ export default function Annotations() {
                       <Th>Trace ID</Th>
                       <Th>Rating</Th>
 
-                      {scoreOptions.data?.map((key) => (
-                        <Th key={key.id}>{key.name}</Th>
-                      ))}
+                      {scoreOptions.data &&
+                        scoreOptions.data.length > 0 &&
+                        scoreOptions.data?.map((key) => (
+                          <Th key={key.id}>{key.name}</Th>
+                        ))}
                       <Th>Created At</Th>
                     </Tr>
                   </Thead>
@@ -182,7 +183,7 @@ export default function Annotations() {
                             ))}
                           </Tr>
                         ))
-                      : annotations.data
+                      : annotations.data && annotations.data.length > 0
                       ? annotations.data?.map((annotation) => (
                           <Tr
                             cursor="pointer"
@@ -206,13 +207,15 @@ export default function Annotations() {
                                 <ThumbsDown />
                               )}
                             </Td>
-                            {annotationScoreValues(
-                              annotation.scoreOptions as unknown as Record<
-                                string,
-                                ScoreOption
-                              >,
-                              scoreOptionsIDArray
-                            )}
+                            {scoreOptions.data &&
+                              scoreOptions.data.length > 0 &&
+                              annotationScoreValues(
+                                annotation.scoreOptions as unknown as Record<
+                                  string,
+                                  ScoreOption
+                                >,
+                                scoreOptionsIDArray
+                              )}
                             <Td>{annotation.createdAt.toLocaleString()}</Td>
                           </Tr>
                         ))
