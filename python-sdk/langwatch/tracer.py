@@ -165,6 +165,34 @@ class ContextSpan:
             "metrics": self.metrics,
         }
 
+        def capture_name_and_input(span, *args, **kwargs):
+            if span.type != "llm":
+                span.name = func.__name__
+            if span._capture_input:
+                sig = inspect.signature(func)
+                parameters = list(sig.parameters.values())
+
+                all_args = {
+                    str(parameter.name): value
+                    for parameter, value in zip(parameters, args)
+                }
+                # Skip self parameters because it doesn't really help with debugging, becomes just noise
+                if (
+                    "self" in all_args
+                    and len(all_args) > 0
+                    and parameters[0].name == "self"
+                ):
+                    del all_args["self"]
+
+                if kwargs and len(kwargs) > 0:
+                    if kwargs:
+                        all_args.update(kwargs)
+
+                if len(all_args) == 0:
+                    return
+
+                span.input = autoconvert_typed_values(all_args)
+
         def capture_output_and_maybe_name(span, output):
             if not span.output and span._capture_output:
                 span.output = autoconvert_typed_values(output)
@@ -176,7 +204,7 @@ class ContextSpan:
             @functools.wraps(func)
             async def async_wrapper(*args, **kwargs):
                 with ContextSpan(**span_kwargs) as span:
-                    _capture_name_and_input(func, span, *args, **kwargs)
+                    capture_name_and_input(span, *args, **kwargs)
                     output = await func(*args, **kwargs)
                     capture_output_and_maybe_name(span, output)
                     return output
@@ -187,7 +215,7 @@ class ContextSpan:
             @functools.wraps(func)  # type: ignore
             def sync_wrapper(*args, **kwargs):
                 with ContextSpan(**span_kwargs) as span:
-                    _capture_name_and_input(func, span, *args, **kwargs)
+                    capture_name_and_input(span, *args, **kwargs)
                     output = func(*args, **kwargs)  # type: ignore
                     capture_output_and_maybe_name(span, output)
                     return output
@@ -416,14 +444,7 @@ class ContextTrace:
     context_token: Optional[contextvars.Token[Optional["ContextTrace"]]] = None
 
     trace_id: str
-    _capture_input: bool = True
-    _capture_output: bool = True
-    name: Optional[str] = None
-    input: Optional[Union[SpanInputOutput, str, List[ChatMessage]]] = None
-    output: Optional[Union[SpanInputOutput, str, List[ChatMessage]]] = None
-    error: Optional[Exception] = None
-    timestamps: SpanTimestamps
-    metadata: TraceMetadata = {}
+    metadata: Optional[TraceMetadata] = None
     span: Type[ContextSpan]
 
     api_key: Optional[str] = None
@@ -433,33 +454,11 @@ class ContextTrace:
         trace_id: Optional[str] = None,
         metadata: Optional[TraceMetadata] = None,
         api_key: Optional[str] = None,
-        capture_input: bool = True,
-        capture_output: bool = True,
-        name: Optional[str] = None,
-        input: Optional[Union[SpanInputOutput, str, List[ChatMessage]]] = None,
-        output: Optional[Union[SpanInputOutput, str, List[ChatMessage]]] = None,
-        error: Optional[Exception] = None,
-        timestamps: Optional[SpanTimestamps] = None,
     ):
         self.spans: Dict[str, Span] = {}
         self.trace_id = trace_id or f"trace_{nanoid.generate()}"
-        self._capture_input = capture_input
-        self._capture_output = capture_output
-        self.update(
-            name=name,
-            input=input,
-            output=output,
-            error=error,
-            timestamps=timestamps
-            or SpanTimestamps(started_at=milliseconds_timestamp()),
-            metadata=metadata,
-        )
-        self.update(
-            metadata={
-                "sdk_version": get_version(),
-                "sdk_language": "python",
-            }
-        )
+        self.metadata = metadata or {}
+        self.metadata.update({"sdk_version": get_version(), "sdk_language": "python"})
         self.span = cast(
             Type[ContextSpan], lambda **kwargs: ContextSpan(trace=self, **kwargs)
         )
@@ -470,104 +469,41 @@ class ContextTrace:
         return self
 
     def __exit__(self, _type, _value, _traceback):
-        self.end()
+        self.deferred_send_spans()
         if self.context_token:
             current_trace_var.reset(self.context_token)
 
     def __call__(self, func: T) -> T:
         trace_kwargs = {
             "trace_id": None,
-            "capture_input": self._capture_input,
-            "capture_output": self._capture_output,
-            "name": self.name,
-            "input": self.input,
-            "output": self.output,
-            "error": self.error,
-            "timestamps": None,
             "metadata": self.metadata,
             "api_key": self.api_key,
         }
-
-        def capture_output(trace, output):
-            if not trace.output and trace._capture_output:
-                trace.output = autoconvert_typed_values(output)
 
         if inspect.iscoroutinefunction(func):
 
             @functools.wraps(func)
             async def async_wrapper(*args, **kwargs):
-                with ContextTrace(**trace_kwargs) as trace:
-                    _capture_name_and_input(func, trace, *args, **kwargs)
-                    output = await func(*args, **kwargs)
-                    capture_output(trace, output)
-                    return output
+                with ContextTrace(**trace_kwargs):
+                    return await func(*args, **kwargs)
 
             return async_wrapper  # type: ignore
         else:
 
             @functools.wraps(func)  # type: ignore
             def sync_wrapper(*args, **kwargs):
-                with ContextTrace(**trace_kwargs) as trace:
-                    _capture_name_and_input(func, trace, *args, **kwargs)
-                    output = func(*args, **kwargs)  # type: ignore
-                    capture_output(trace, output)
-                    return output
+                with ContextTrace(**trace_kwargs):
+                    return func(*args, **kwargs)  # type: ignore
 
             return sync_wrapper  # type: ignore
 
     def update(
-        self,
-        trace_id: Optional[str] = None,
-        metadata: Optional[TraceMetadata] = None,
-        name: Optional[str] = None,
-        input: Optional[Union[SpanInputOutput, str, List[ChatMessage]]] = None,
-        output: Optional[Union[SpanInputOutput, str, List[ChatMessage]]] = None,
-        error: Optional[Exception] = None,
-        timestamps: Optional[SpanTimestamps] = None,
+        self, trace_id: Optional[str] = None, metadata: Optional[TraceMetadata] = None
     ):
         if trace_id:
             self.trace_id = trace_id
-        if name:
-            self.name = name
-        if input:
-            self.input = input
-        if output:
-            self.output = output
-        if error:
-            self.error = error
-        if timestamps:
-            self.timestamps = timestamps
         if metadata:
-            self.metadata.update(metadata)
-
-    def end(
-        self,
-        name: Optional[str] = None,
-        input: Optional[Union[SpanInputOutput, str, List[ChatMessage]]] = None,
-        output: Optional[Union[SpanInputOutput, str, List[ChatMessage]]] = None,
-        error: Optional[Exception] = None,
-        timestamps: Optional[SpanTimestamps] = None,
-        metadata: Optional[TraceMetadata] = None,
-    ):
-        finished_at = milliseconds_timestamp()
-
-        self.update(
-            name=name,
-            input=input,
-            output=output,
-            error=error,
-            timestamps=timestamps
-            or SpanTimestamps(
-                started_at=(
-                    self.timestamps["started_at"]
-                    if "started_at" in self.timestamps
-                    else finished_at
-                ),
-                finished_at=finished_at,
-            ),
-            metadata=metadata,
-        )
-        self.deferred_send_spans()
+            self.metadata = metadata
 
     def deferred_send_spans(self):
         self._add_finished_at_to_missing_spans()
@@ -591,11 +527,6 @@ class ContextTrace:
         send_spans(
             CollectorRESTParams(
                 trace_id=self.trace_id,
-                name=self.name,
-                input=autoconvert_typed_values(self.input) if self.input else None,
-                output=autoconvert_typed_values(self.output) if self.output else None,
-                error=capture_exception(self.error) if self.error else None,
-                timestamps=self.timestamps,
                 metadata=self.metadata,
                 spans=list(self.spans.values()),
             ),
@@ -666,32 +597,6 @@ class ContextTrace:
         import langwatch.litellm  # import dynamically here instead of top-level because users might not have litellm installed
 
         langwatch.litellm.LiteLLMPatch(trace=self, client=client)
-
-
-def _capture_name_and_input(
-    func, trace: Union[ContextTrace, ContextSpan], *args, **kwargs
-):
-    if not isinstance(trace, ContextSpan) or trace.type != "llm":
-        trace.name = func.__name__
-    if trace._capture_input:
-        sig = inspect.signature(func)
-        parameters = list(sig.parameters.values())
-
-        all_args = {
-            str(parameter.name): value for parameter, value in zip(parameters, args)
-        }
-        # Skip self parameters because it doesn't really help with debugging, becomes just noise
-        if "self" in all_args and len(all_args) > 0 and parameters[0].name == "self":
-            del all_args["self"]
-
-        if kwargs and len(kwargs) > 0:
-            if kwargs:
-                all_args.update(kwargs)
-
-        if len(all_args) == 0:
-            return
-
-        trace.input = autoconvert_typed_values(all_args)
 
 
 @retry(tries=5, delay=0.5, backoff=3)

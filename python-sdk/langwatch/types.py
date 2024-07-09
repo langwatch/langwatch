@@ -168,10 +168,5 @@ class TraceMetadata(TypedDict, total=False):
 
 class CollectorRESTParams(TypedDict):
     trace_id: str
-    name: Optional[str]
-    input: Optional[SpanInputOutput]
-    output: Optional[SpanInputOutput]
-    error: Optional[ErrorCapture]
-    timestamps: Optional[SpanTimestamps]
     metadata: Optional[TraceMetadata]
     spans: List[Span]
