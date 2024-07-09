@@ -99,7 +99,14 @@ export const Annotations = ({ traceId }: { traceId: string }) => {
                               )?.name ?? "Name not found"}
                               :
                             </Text>
-                            <Text key={key}>{scoreOption.value}</Text>
+                            <Text key={key}>
+                              {typeof scoreOption === "object" &&
+                                "value" in scoreOption && (
+                                  <Text key={key}>
+                                    {String(scoreOption.value)}
+                                  </Text>
+                                )}
+                            </Text>
                           </HStack>
                         </Text>
                       );
