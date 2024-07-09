@@ -46,9 +46,9 @@ export default function Annotations() {
     }
   );
 
-  const scoreOptionsIDArray = scoreOptions.data?.map(
-    (scoreOption) => scoreOption.id
-  );
+  const scoreOptionsIDArray = scoreOptions.data
+    ? scoreOptions.data.map((scoreOption) => scoreOption.id)
+    : [];
 
   const downloadCSV = () => {
     const fields = [
@@ -109,8 +109,8 @@ export default function Annotations() {
   }
 
   const annotationScoreValues = (scoreOptions: Record<string, ScoreOption>) => {
-    return scoreOptionsIDArray?.map((id) => {
-      return (
+    return scoreOptionsIDArray.length > 0 ? (
+      scoreOptionsIDArray.map((id) => (
         <Td key={id}>
           <HStack>
             <Text>{scoreOptions[id]?.value}</Text>
@@ -121,8 +121,10 @@ export default function Annotations() {
             )}
           </HStack>
         </Td>
-      );
-    });
+      ))
+    ) : (
+      <Td>-</Td>
+    );
   };
 
   return (

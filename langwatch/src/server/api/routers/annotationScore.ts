@@ -67,7 +67,7 @@ export const annotationScoreRouter = createTRPCRouter({
     }),
   getAll: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .use(checkUserPermissionForProject(TeamRoleGroup.DATASETS_VIEW))
+    .use(checkUserPermissionForProject(TeamRoleGroup.ANNOTATIONS_VIEW))
     .query(async ({ ctx, input }) => {
       return ctx.prisma.annotationScore.findMany({
         where: { projectId: input.projectId },
@@ -76,7 +76,7 @@ export const annotationScoreRouter = createTRPCRouter({
     }),
   getAllActive: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .use(checkUserPermissionForProject(TeamRoleGroup.DATASETS_VIEW))
+    .use(checkUserPermissionForProject(TeamRoleGroup.ANNOTATIONS_VIEW))
     .query(async ({ ctx, input }) => {
       return ctx.prisma.annotationScore.findMany({
         where: { projectId: input.projectId, active: true },
@@ -90,7 +90,7 @@ export const annotationScoreRouter = createTRPCRouter({
         projectId: z.string(),
       })
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.DATASETS_VIEW))
+    .use(checkUserPermissionForProject(TeamRoleGroup.ANNOTATIONS_MANAGE))
     .mutation(async ({ ctx, input }) => {
       return ctx.prisma.annotationScore.update({
         where: { id: input.scoreId, projectId: input.projectId },
