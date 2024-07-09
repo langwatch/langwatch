@@ -112,7 +112,8 @@ export default function Annotations() {
     scoreOptions: Record<string, ScoreOption>,
     scoreOptionsIDArray: string[]
   ) => {
-    if (scoreOptionsIDArray.length > 0) {
+    console.log(scoreOptions, scoreOptionsIDArray);
+    if (scoreOptionsIDArray.length > 0 && scoreOptions) {
       return scoreOptionsIDArray.map((id) => (
         <Td key={id}>
           <HStack>
