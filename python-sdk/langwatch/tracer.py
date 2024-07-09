@@ -9,6 +9,7 @@ from deprecated import deprecated
 
 import nanoid
 import requests
+from langwatch.logger import get_logger
 from langwatch.types import (
     BaseSpan,
     ChatMessage,
@@ -165,48 +166,14 @@ class ContextSpan:
             "metrics": self.metrics,
         }
 
-        def capture_name_and_input(span, *args, **kwargs):
-            if span.type != "llm":
-                span.name = func.__name__
-            if span._capture_input:
-                sig = inspect.signature(func)
-                parameters = list(sig.parameters.values())
-
-                all_args = {
-                    str(parameter.name): value
-                    for parameter, value in zip(parameters, args)
-                }
-                # Skip self parameters because it doesn't really help with debugging, becomes just noise
-                if (
-                    "self" in all_args
-                    and len(all_args) > 0
-                    and parameters[0].name == "self"
-                ):
-                    del all_args["self"]
-
-                if kwargs and len(kwargs) > 0:
-                    if kwargs:
-                        all_args.update(kwargs)
-
-                if len(all_args) == 0:
-                    return
-
-                span.input = autoconvert_typed_values(all_args)
-
-        def capture_output_and_maybe_name(span, output):
-            if not span.output and span._capture_output:
-                span.output = autoconvert_typed_values(output)
-            if span.type == "llm" and not span.model:
-                span.name = func.__name__
-
         if inspect.iscoroutinefunction(func):
 
             @functools.wraps(func)
             async def async_wrapper(*args, **kwargs):
                 with ContextSpan(**span_kwargs) as span:
-                    capture_name_and_input(span, *args, **kwargs)
+                    span._capture_name_and_input(func, *args, **kwargs)
                     output = await func(*args, **kwargs)
-                    capture_output_and_maybe_name(span, output)
+                    span._capture_output_and_maybe_name(func, output)
                     return output
 
             return async_wrapper  # type: ignore
@@ -215,12 +182,45 @@ class ContextSpan:
             @functools.wraps(func)  # type: ignore
             def sync_wrapper(*args, **kwargs):
                 with ContextSpan(**span_kwargs) as span:
-                    capture_name_and_input(span, *args, **kwargs)
+                    span._capture_name_and_input(func, *args, **kwargs)
                     output = func(*args, **kwargs)  # type: ignore
-                    capture_output_and_maybe_name(span, output)
+                    span._capture_output_and_maybe_name(func, output)
                     return output
 
             return sync_wrapper  # type: ignore
+
+    def _capture_name_and_input(self, func, *args, **kwargs):
+        if self.type != "llm":
+            self.name = func.__name__
+        if self._capture_input:
+            sig = inspect.signature(func)
+            parameters = list(sig.parameters.values())
+
+            all_args = {
+                str(parameter.name): value for parameter, value in zip(parameters, args)
+            }
+            # Skip self parameters because it doesn't really help with debugging, becomes just noise
+            if (
+                "self" in all_args
+                and len(all_args) > 0
+                and parameters[0].name == "self"
+            ):
+                del all_args["self"]
+
+            if kwargs and len(kwargs) > 0:
+                if kwargs:
+                    all_args.update(kwargs)
+
+            if len(all_args) == 0:
+                return
+
+            self.input = autoconvert_typed_values(all_args)
+
+    def _capture_output_and_maybe_name(self, func, output):
+        if not self.output and self._capture_output:
+            self.output = autoconvert_typed_values(output)
+        if self.type == "llm" and not self.model:
+            self.name = func.__name__
 
     def update(
         self,
@@ -446,6 +446,10 @@ class ContextTrace:
     trace_id: str
     metadata: Optional[TraceMetadata] = None
     span: Type[ContextSpan]
+    root_span: ContextSpan
+
+    _capture_input: bool = True
+    _capture_output: bool = True
 
     api_key: Optional[str] = None
 
@@ -454,22 +458,56 @@ class ContextTrace:
         trace_id: Optional[str] = None,
         metadata: Optional[TraceMetadata] = None,
         api_key: Optional[str] = None,
+        # Span constructor parameters
+        span_id: Optional[str] = None,
+        capture_input: bool = True,
+        capture_output: bool = True,
+        name: Optional[str] = None,
+        type: SpanTypes = "span",
+        input: Optional[Union[SpanInputOutput, str, List[ChatMessage]]] = None,
+        output: Optional[Union[SpanInputOutput, str, List[ChatMessage]]] = None,
+        error: Optional[Exception] = None,
+        timestamps: Optional[SpanTimestamps] = None,
+        contexts: Optional[Union[List[RAGChunk], List[str]]] = None,
+        model: Optional[str] = None,
+        params: Optional[LLMSpanParams] = None,
+        metrics: Optional[LLMSpanMetrics] = None,
     ):
+        self.api_key = api_key or langwatch.api_key
         self.spans: Dict[str, Span] = {}
+
+        self._capture_input = capture_input
+        self._capture_output = capture_output
         self.trace_id = trace_id or f"trace_{nanoid.generate()}"
         self.metadata = metadata or {}
         self.metadata.update({"sdk_version": get_version(), "sdk_language": "python"})
         self.span = cast(
             Type[ContextSpan], lambda **kwargs: ContextSpan(trace=self, **kwargs)
         )
-        self.api_key = api_key or langwatch.api_key
+        self.root_span = self.span(
+            span_id=span_id,
+            name=name,
+            type=type,
+            input=input,
+            output=output,
+            error=error,
+            timestamps=timestamps,
+            contexts=contexts,
+            model=model,
+            params=params,
+            metrics=metrics,
+        )
 
     def __enter__(self):
+        get_logger().debug(f"Entered trace {self.trace_id}")
         self.context_token = current_trace_var.set(self)
+        self.root_span.__enter__()
         return self
 
     def __exit__(self, _type, _value, _traceback):
+        get_logger().debug(f"Exiting trace {self.trace_id}")
         self.deferred_send_spans()
+        self.root_span.__exit__(_type, _value, _traceback)
         if self.context_token:
             current_trace_var.reset(self.context_token)
 
@@ -478,14 +516,29 @@ class ContextTrace:
             "trace_id": None,
             "metadata": self.metadata,
             "api_key": self.api_key,
+            # Span constructor parameters
+            "capture_input": self._capture_input,
+            "capture_output": self._capture_output,
+            "name": self.root_span.name,
+            "type": self.root_span.type,
+            "input": self.root_span.input,
+            "output": self.root_span.output,
+            "error": self.root_span.error,
+            "timestamps": None,
+            "contexts": self.root_span.contexts,
+            "model": self.root_span.model,
+            "params": self.root_span.params,
+            "metrics": self.root_span.metrics,
         }
 
         if inspect.iscoroutinefunction(func):
 
             @functools.wraps(func)
             async def async_wrapper(*args, **kwargs):
-                with ContextTrace(**trace_kwargs):
-                    return await func(*args, **kwargs)
+                with ContextTrace(**trace_kwargs) as trace:
+                    trace.root_span._capture_name_and_input(func, *args, **kwargs)
+                    output = await func(*args, **kwargs)
+                    trace.root_span._capture_output_and_maybe_name(func, output)
 
             return async_wrapper  # type: ignore
         else:
@@ -493,19 +546,51 @@ class ContextTrace:
             @functools.wraps(func)  # type: ignore
             def sync_wrapper(*args, **kwargs):
                 with ContextTrace(**trace_kwargs):
-                    return func(*args, **kwargs)  # type: ignore
+                    trace.root_span._capture_name_and_input(func, *args, **kwargs)
+                    output = func(*args, **kwargs)  # type: ignore
+                    trace.root_span._capture_output_and_maybe_name(func, output)
+                    return output
 
             return sync_wrapper  # type: ignore
 
     def update(
-        self, trace_id: Optional[str] = None, metadata: Optional[TraceMetadata] = None
+        self,
+        trace_id: Optional[str] = None,
+        metadata: Optional[TraceMetadata] = None,
+        # root span update
+        span_id: Optional[str] = None,
+        name: Optional[str] = None,
+        type: Optional[SpanTypes] = None,
+        input: Optional[Union[SpanInputOutput, str, List[ChatMessage]]] = None,
+        output: Optional[Union[SpanInputOutput, str, List[ChatMessage]]] = None,
+        error: Optional[Exception] = None,
+        timestamps: Optional[SpanTimestamps] = None,
+        contexts: Optional[Union[List[RAGChunk], List[str]]] = None,
+        model: Optional[str] = None,
+        params: Optional[LLMSpanParams] = None,
+        metrics: Optional[LLMSpanMetrics] = None,
     ):
         if trace_id:
             self.trace_id = trace_id
         if metadata:
             self.metadata = metadata
 
+        self.root_span.update(
+            span_id=span_id,
+            name=name,
+            type=type,
+            input=input,
+            output=output,
+            error=error,
+            timestamps=timestamps,
+            contexts=contexts,
+            model=model,
+            params=params,
+            metrics=metrics,
+        )
+
     def deferred_send_spans(self):
+        get_logger().debug(f"Scheduling for sending trace {self.trace_id} in 1s")
         self._add_finished_at_to_missing_spans()
 
         if "PYTEST_CURRENT_TEST" in os.environ:
@@ -601,8 +686,13 @@ class ContextTrace:
 
 @retry(tries=5, delay=0.5, backoff=3)
 def send_spans(data: CollectorRESTParams, api_key: Optional[str] = None):
+    import json
+
     if len(data["spans"]) == 0:
+        get_logger().debug(f"No spans to send: {data}")
         return
+
+    get_logger().debug(f"Sending trace: {json.dumps(data, indent=2)}")
 
     api_key = api_key or langwatch.api_key
     if not api_key:
@@ -610,7 +700,6 @@ def send_spans(data: CollectorRESTParams, api_key: Optional[str] = None):
             "LANGWATCH_API_KEY is not set, LLMs traces will not be sent, go to https://langwatch.ai to set it up"
         )
         return
-    import json
 
     # TODO: replace this with httpx, don't forget the custom SerializableAndPydanticEncoder encoder
     response = requests.post(

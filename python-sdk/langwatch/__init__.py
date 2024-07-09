@@ -21,6 +21,7 @@ from langwatch.login import login
 
 endpoint = os.environ.get("LANGWATCH_ENDPOINT") or "https://app.langwatch.ai"
 api_key = os.environ.get("LANGWATCH_API_KEY")
+debug = False
 
 dspy_available = False
 try:
