@@ -692,7 +692,9 @@ def send_spans(data: CollectorRESTParams, api_key: Optional[str] = None):
         get_logger().debug(f"No spans to send: {data}")
         return
 
-    get_logger().debug(f"Sending trace: {json.dumps(data, indent=2)}")
+    get_logger().debug(
+        f"Sending trace: {json.dumps(data, cls=SerializableAndPydanticEncoder, indent=2)}"
+    )
 
     api_key = api_key or langwatch.api_key
     if not api_key:

@@ -45,7 +45,7 @@ export const isEmptyJson = (value: TypedValueJson["value"]): boolean => {
 export const getLastOutputAsText = (spans: Span[]): string => {
   const bottommostOutputs = flattenSpanTree(
     organizeSpansIntoTree(spans),
-    "outside-in"
+    "inside-out"
   )
     .reverse()
     .filter(
@@ -104,8 +104,7 @@ export const typedValueToText = (
         .join("");
     }
   } else if (typed.type == "json") {
-    try {
-      const json = typed.value as any;
+    const stringIfSpecialKeys = (json: any) => {
       // TODO: test those
       if (json.text !== undefined) {
         return stringified(json.text);
@@ -127,13 +126,32 @@ export const typedValueToText = (
       if (json.output !== undefined) {
         return stringified(json.output);
       }
+      // Chainlit
+      if (json.content !== undefined) {
+        return stringified(json.content);
+      }
+
+      return undefined;
+    };
+
+    try {
+      const json = typed.value as any;
+
+      const value = stringIfSpecialKeys(json);
+      if (value) {
+        return value;
+      }
 
       if (
         typeof json === "object" &&
         !Array.isArray(json) &&
         Object.keys(json).length === 1
       ) {
-        return stringified(json[Object.keys(json)[0]!]);
+        const firstItem = json[Object.keys(json)[0]!];
+        if (typeof firstItem === "object" && stringIfSpecialKeys(firstItem)) {
+          return stringIfSpecialKeys(firstItem);
+        }
+        return stringified(firstItem);
       }
 
       return stringified(typed.value);
