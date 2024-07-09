@@ -162,6 +162,8 @@ class TraceMetadata(TypedDict, total=False):
     customer_id: Optional[str]
     labels: List[str]
     experiments: List[Experiment]
+    sdk_version: Optional[str]
+    sdk_language: Optional[str]
 
 
 class CollectorRESTParams(TypedDict):
