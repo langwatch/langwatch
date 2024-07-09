@@ -50,13 +50,13 @@ data "aws_ecr_repository" "onprem_langwatch_nlp" {
   name = aws_ecr_repository.onprem_langwatch_nlp.name
 }
 
-resource "aws_ecr_repository" "openprem_langevals" {
-  name                 = "openprem_langevals"
+resource "aws_ecr_repository" "onprem_langevals" {
+  name                 = "onprem_langevals"
   image_tag_mutability = "MUTABLE"
 }
 
-data "aws_ecr_repository" "openprem_langevals" {
-  name = aws_ecr_repository.openprem_langevals.name
+data "aws_ecr_repository" "onprem_langevals" {
+  name = aws_ecr_repository.onprem_langevals.name
 }
 
 resource "aws_ecr_repository_policy" "onprem_langwatch_saas_marketplace_access" {
@@ -120,7 +120,7 @@ resource "aws_ecr_repository_policy" "onprem_langwatch_nlp_marketplace_access" {
 }
 
 resource "aws_ecr_repository_policy" "onprem_langevals_marketplace_access" {
-  repository = aws_ecr_repository.openprem_langevals.name
+  repository = aws_ecr_repository.onprem_langevals.name
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
