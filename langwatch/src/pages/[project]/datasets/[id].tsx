@@ -200,6 +200,7 @@ function DatasetTable() {
     key: string,
     field: string
   ): any => {
+    if (key === "") return;
     const rawValue = safeGetRowValue(row, headers, key);
 
     try {
