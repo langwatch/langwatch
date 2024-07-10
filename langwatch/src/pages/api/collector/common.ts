@@ -136,6 +136,11 @@ export const typedValueToText = (
       if (json.output !== undefined) {
         return stringified(json.output);
       }
+
+      if (json.answer !== undefined) {
+        return stringified(json.answer);
+      }
+
       // Chainlit
       if (json.content !== undefined) {
         return stringified(json.content);
