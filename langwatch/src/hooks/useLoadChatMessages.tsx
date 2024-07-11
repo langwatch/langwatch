@@ -58,6 +58,13 @@ export function useLoadChatMessagesEffect({
 
       const messages = [...inputMessagesArr, ...outputMessagesArr];
 
+      // Generate message id placeholders in case they are missing
+      // because the MessageBlock component uses the id to determine
+      // keys in lists.
+      messages.forEach((message, ix) => {
+        message.id = message.id || `${spanObj?.span_id}_${ix}`;
+      });
+
       const systemMessage = messages.find((m) => m.role === "system");
       const nonSystemMessages = messages.filter((m) => m.role !== "system");
 
