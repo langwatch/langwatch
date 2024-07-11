@@ -2,79 +2,26 @@ import { Link } from "@chakra-ui/next-js";
 import {
   Button,
   Tooltip,
+  Flex,
+  Box,
   type ButtonProps,
   type PlacementWithLogical,
 } from "@chakra-ui/react";
-import { projectRoutes } from "~/utils/routes";
 import { Image as ImageIcon } from "react-feather";
 import React from "react";
-/**
- * Compose the link to the playground with the given project slug, trace ID, and
- * span ID.
- *
- * The playground link is composed of the project slug, trace ID, and span ID in
- * the following format:
- *  /[projectSlug]/playground?traceId=[traceId]&span=[spanId]
- *
- * @param projectSlug - The project slug to link to.
- * @param traceId - The trace ID to load in the playground.
- * @param spanId - The span ID to load in the playground.
- * @returns The link to the playground with the given trace and span.
- */
-function useLinkHref(projectSlug: string, traceId: string, spanId: string) {
-  return React.useMemo(() => {
-    const queryString = new URLSearchParams({
-      traceId,
-      span: spanId,
-    }).toString();
-
-    const path = projectRoutes.playground.path.replace(
-      "[project]",
-      projectSlug
-    );
-
-    return `${path}?${queryString}`;
-  }, [projectSlug, traceId, spanId]);
-}
 
 // eslint-disable-next-line @typescript-eslint/no-namespace
 export namespace TraceToPlaygroundLink {
   export interface Props {
-    /**
-     * Reference to the project the trace belongs to.
-     */
     projectSlug: string;
-    /**
-     * The trace ID to load in the playground.
-     */
     traceId: string;
-    /**
-     * The span ID to load in the playground.
-     */
     spanId: string;
-    /**
-     * The label to display in the tooltip when hovering over the button.
-     */
     tooltipLabel?: string;
-    /**
-     * The label to display on the button.
-     */
     buttonLabel?: string;
-    /**
-     * Adjust the size of the tooltip gutter. (Default: 16)
-     */
     tooltipGutterSize?: number;
-    /**
-     * Adjust the placement of the tooltip. (Default: "right")
-     */
     tooltipPlacement?: PlacementWithLogical;
-    /**
-     * Adjust the variant of the button. (Default: "outline")
-     */
     buttonVariant?: ButtonProps["variant"];
   }
-
-  export type Component = React.FC<Props>;
 }
 
 const DEFAULT_TOOLTIP_GUTTER_SIZE = 16;
@@ -83,11 +30,7 @@ const DEFAULT_TOOLTIP_PLACEMENT: PlacementWithLogical = "right";
 
 const DEFAULT_BUTTON_VARIANT = "outline";
 
-/**
- * Display a button that forwards the user to the playground to load a
- * specific trace and span.
- */
-export const TraceToPlaygroundLink: TraceToPlaygroundLink.Component = ({
+export function TraceToPlaygroundLink({
   projectSlug,
   traceId,
   spanId,
@@ -96,8 +39,11 @@ export const TraceToPlaygroundLink: TraceToPlaygroundLink.Component = ({
   tooltipGutterSize = DEFAULT_TOOLTIP_GUTTER_SIZE,
   tooltipPlacement = DEFAULT_TOOLTIP_PLACEMENT,
   buttonVariant = DEFAULT_BUTTON_VARIANT,
-}) => {
-  const linkHref = useLinkHref(projectSlug, traceId, spanId);
+}: TraceToPlaygroundLink.Props): JSX.Element {
+  const linkHref = `/${projectSlug}/playground?${new URLSearchParams({
+    traceId,
+    span: spanId,
+  }).toString()}`;
 
   return (
     <Tooltip
@@ -106,13 +52,19 @@ export const TraceToPlaygroundLink: TraceToPlaygroundLink.Component = ({
       placement={tooltipPlacement}
       gutter={tooltipGutterSize}
     >
-      <Link href={linkHref} aria-label={tooltipLabel}>
-        <Button leftIcon={<ImageIcon />} variant={buttonVariant}>
+      <Link
+        as={Button}
+        href={linkHref}
+        aria-label={tooltipLabel}
+        variant={buttonVariant}
+      >
+        <Flex align="center" justify="center">
+          <Box mr={2}>
+            <ImageIcon />
+          </Box>
           {buttonLabel}
-        </Button>
+        </Flex>
       </Link>
     </Tooltip>
   );
-};
-
-TraceToPlaygroundLink.displayName = "TraceToPlaygroundLink";
+}
