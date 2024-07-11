@@ -8,6 +8,7 @@ For LLM and library-specific tracing functions, check out the other files on thi
 """
 
 import os
+from warnings import warn
 
 from langwatch.tracer import (
     trace,
@@ -33,9 +34,14 @@ except ImportError:
 
 dspy = None
 if dspy_available:
-    from langwatch.dspy import langwatch_dspy
+    try:
+        from langwatch.dspy import langwatch_dspy
 
-    dspy = langwatch_dspy
+        dspy = langwatch_dspy
+    except ImportError:
+        warn(
+            "DSPy seems to be installed but we couldn't import langwatch.dspy, please check your dspy dependency installation."
+        )
 
 langchain_available = False
 try:
@@ -47,7 +53,12 @@ except ImportError:
 
 langchain = None
 if langchain_available:
-    import langwatch.langchain as langchain
+    try:
+        import langwatch.langchain as langchain
+    except ImportError:
+        warn(
+            "LangChain seems to be installed but we couldn't import langwatch.langchain, please check your langchain dependency installation."
+        )
 
 __all__ = (
     "endpoint",
