@@ -1,5 +1,10 @@
 import { Link } from "@chakra-ui/next-js";
-import { Button, Tooltip } from "@chakra-ui/react";
+import {
+  Button,
+  Tooltip,
+  type ButtonProps,
+  type PlacementWithLogical,
+} from "@chakra-ui/react";
 import { projectRoutes } from "~/utils/routes";
 import { Image as ImageIcon } from "react-feather";
 import React from "react";
@@ -55,10 +60,29 @@ export namespace TraceToPlaygroundLink {
      * The label to display on the button.
      */
     buttonLabel?: string;
+    /**
+     * Adjust the size of the tooltip gutter. (Default: 16)
+     */
+    tooltipGutterSize?: number;
+    /**
+     * Adjust the placement of the tooltip. (Default: "right")
+     */
+    tooltipPlacement?: PlacementWithLogical;
+    /**
+     * Adjust the variant of the button. (Default: "outline")
+     */
+    buttonVariant?: ButtonProps["variant"];
   }
 
   export type Component = React.FC<Props>;
 }
+
+const DEFAULT_TOOLTIP_GUTTER_SIZE = 16;
+
+const DEFAULT_TOOLTIP_PLACEMENT: PlacementWithLogical = "right";
+
+const DEFAULT_BUTTON_VARIANT = "outline";
+
 /**
  * Display a button that forwards the user to the playground to load a
  * specific trace and span.
@@ -69,13 +93,21 @@ export const TraceToPlaygroundLink: TraceToPlaygroundLink.Component = ({
   spanId,
   tooltipLabel,
   buttonLabel,
+  tooltipGutterSize = DEFAULT_TOOLTIP_GUTTER_SIZE,
+  tooltipPlacement = DEFAULT_TOOLTIP_PLACEMENT,
+  buttonVariant = DEFAULT_BUTTON_VARIANT,
 }) => {
   const linkHref = useLinkHref(projectSlug, traceId, spanId);
 
   return (
-    <Tooltip label={tooltipLabel} hasArrow placement="right" gutter={16}>
+    <Tooltip
+      label={tooltipLabel}
+      hasArrow
+      placement={tooltipPlacement}
+      gutter={tooltipGutterSize}
+    >
       <Link href={linkHref} aria-label={tooltipLabel}>
-        <Button leftIcon={<ImageIcon />} variant="outline">
+        <Button leftIcon={<ImageIcon />} variant={buttonVariant}>
           {buttonLabel}
         </Button>
       </Link>

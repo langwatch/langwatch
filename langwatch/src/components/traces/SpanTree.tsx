@@ -322,15 +322,17 @@ export function SpanTree(props: SpanTreeProps) {
                   {span.name ?? span.model}
                 </Heading>
                 <Spacer />
-                {project && span.type === "llm" && (
-                  <TraceToPlaygroundLink
-                    projectSlug={project.slug}
-                    traceId={traceId}
-                    spanId={span.span_id}
-                    tooltipLabel="Try different prompts and models for this LLM call on the playground"
-                    buttonLabel="Try in Playground"
-                  />
-                )}
+                {project &&
+                  span.type === "llm" &&
+                  span.input?.type === "chat_messages" && (
+                    <TraceToPlaygroundLink
+                      projectSlug={project.slug}
+                      traceId={traceId}
+                      spanId={span.span_id}
+                      tooltipLabel="Try different prompts and models for this LLM call on the playground"
+                      buttonLabel="Try in Playground"
+                    />
+                  )}
               </HStack>
               <VStack align="start" color="gray.500">
                 <HStack>

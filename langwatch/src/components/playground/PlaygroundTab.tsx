@@ -28,9 +28,10 @@ import { Plus, RotateCcw, RotateCw, X } from "react-feather";
 import { usePlaygroundStore } from "../../hooks/usePlaygroundStore";
 import { ChatWindowWrapper } from "./ChatWindow";
 import { useRouter } from "next/router";
-import { api } from "~/utils/api";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import React from "react";
+import { useLoadChatMessagesEffect } from "~/hooks/useLoadChatMessages";
+import { useMemoizedChatWindowIds } from "~/hooks/useMemoizedChatWindowIds";
 
 export function PlaygroundTabs() {
   const router = useRouter();
@@ -54,66 +55,19 @@ export function PlaygroundTabs() {
 
   const { project } = useOrganizationTeamProject();
   const { span, traceId } = router.query;
-  const traceIdString = Array.isArray(traceId) ? traceId[0] : traceId;
-
-  const spans = api.spans.getAllForTrace.useQuery(
-    { projectId: project?.id ?? "", traceId: traceIdString ?? "" },
-    {
-      enabled: !!project && !!traceIdString && !!span,
-      refetchOnWindowFocus: false,
-    }
-  );
-
-  const spanObj = span
-    ? spans.data?.find(
-        (span) => span.span_id === router.query.span && span.type === "llm"
-      )
-    : spans.data?.[0];
-
-  React.useEffect(() => {
-    if (spanObj) {
-      console.log(spanObj);
-      const chatWindowIds =
-        state.tabs[state.activeTabIndex]?.chatWindows.map(
-          (chatWindow) => chatWindow.id
-        ) || [];
-      const inputMessages = spanObj?.input
-        ? JSON.parse(spanObj.input.value)
-        : [];
-      const outputMessages = spanObj?.output
-        ? JSON.parse(spanObj.output.value)
-        : [];
-
-      console.log(">> INPUT MESSAGES", inputMessages);
-
-      const messages = [...inputMessages, ...outputMessages];
-      const systemMessage = messages.find((m) => m.role === "system");
-      const nonSystemMessages = messages.filter((m) => m.role !== "system");
-
-      for (let i = 0; i < chatWindowIds.length; i++) {
-        state.setMessages(chatWindowIds[i], nonSystemMessages);
-        if (systemMessage) {
-          console.log(">>> SET SYSTEM PROMPT", systemMessage.content);
-          state.onChangeSystemPrompt(chatWindowIds[i], systemMessage.content);
-        }
-      }
-    }
-  }, [spanObj?.span_id]);
-
-  /*
-  if (spanObj) {
-    const chatWindowIds =
-      state.tabs[state.activeTabIndex]?.chatWindows.map(
-        (chatWindow) => chatWindow.id
-      ) || [];
-    const messages = spanObj?.input ? JSON.parse(spanObj.input.value) : [];
-
-    for (let i = 0; i < chatWindowIds.length; i++) {
-      console.log(">> SETTING MESSAGES", messages);
-      //state.setMessages(chatWindowIds[i], messages);
-    }
-  }
-    */
+  // Memoized chat window IDs to prevent infinite loop in useLoadChatMessagesEffect
+  const memoizedChatWindowIds = useMemoizedChatWindowIds({
+    chatWindows: state.tabs[state.activeTabIndex]?.chatWindows,
+  });
+  // Load chat messages into all tabs.
+  useLoadChatMessagesEffect({
+    spanId: Array.isArray(span) ? span[0] : span ?? "",
+    projectId: project?.id ?? "",
+    traceId: Array.isArray(traceId) ? traceId[0] : traceId ?? "",
+    chatWindowIds: memoizedChatWindowIds,
+    onSetMessages: state.setMessages,
+    onChangeSystemPrompt: state.onChangeSystemPrompt,
+  });
 
   return (
     <>
