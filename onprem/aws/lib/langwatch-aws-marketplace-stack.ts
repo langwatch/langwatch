@@ -9,8 +9,10 @@ import * as rds from "aws-cdk-lib/aws-rds";
 import { KubectlV30Layer } from "@aws-cdk/lambda-layer-kubectl-v30";
 import * as iam from "aws-cdk-lib/aws-iam";
 import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
+import * as cr from "aws-cdk-lib/custom-resources";
 
 import langWatchPackageJson from "../../../package.json";
+import { setupFluentd } from "./fluentd";
 
 export class LangWatchAwsMarketplaceStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
@@ -92,12 +94,17 @@ export class LangWatchAwsMarketplaceStack extends cdk.Stack {
       },
     });
 
-    this.setupLangWatchEnv(domainParam, cluster);
+    const { redis, redisPassword } = this.setupRedis(vpc, cluster);
+    const { postgres, postgresPassword } = this.setupPostgres(vpc, cluster);
 
-    this.setupRedis(vpc, cluster);
-    this.setupPostgres(vpc, cluster);
+    this.setupLangWatchEnv(
+      domainParam,
+      cluster,
+      { redis, redisPassword },
+      { postgres, postgresPassword }
+    );
 
-    this.setupFluentd(cluster);
+    setupFluentd(cluster);
     this.setupLangEvals(cluster);
     this.setupLangWatchNLP(cluster);
     this.setupLangWatch(domainParam, cluster);
@@ -105,7 +112,21 @@ export class LangWatchAwsMarketplaceStack extends cdk.Stack {
 
   private setupLangWatchEnv(
     domainParam: cdk.CfnParameter,
-    cluster: eks.Cluster
+    cluster: eks.Cluster,
+    {
+      redis,
+      redisPassword,
+    }: {
+      redis: elasticache.CfnReplicationGroup;
+      redisPassword: secretsmanager.Secret;
+    },
+    {
+      postgres,
+      postgresPassword,
+    }: {
+      postgres: rds.DatabaseInstance;
+      postgresPassword: secretsmanager.Secret;
+    }
   ): secretsmanager.Secret {
     const generateSecureString = (name: string, length: number = 32) => {
       return new secretsmanager.Secret(this, `GeneratedSecret${name}`, {
@@ -142,6 +163,33 @@ export class LangWatchAwsMarketplaceStack extends cdk.Stack {
           ),
           LANGEVALS_ENDPOINT: cdk.SecretValue.unsafePlainText(
             "http://langevals-service:8000"
+          ),
+          REDIS_URL: cdk.SecretValue.unsafePlainText(
+            cdk.Fn.join("", [
+              "redis://:",
+              redisPassword
+                .secretValueFromJson("password")
+                .unsafeUnwrap()
+                .toString(),
+              "@",
+              redis.attrPrimaryEndPointAddress,
+              ":",
+              redis.attrPrimaryEndPointPort,
+            ])
+          ),
+          DATABASE_URL: cdk.SecretValue.unsafePlainText(
+            cdk.Fn.join("", [
+              "postgresql://langwatch_db:",
+              postgresPassword
+                .secretValueFromJson("password")
+                .unsafeUnwrap()
+                .toString(),
+              "@",
+              postgres.dbInstanceEndpointAddress,
+              ":",
+              postgres.dbInstanceEndpointPort,
+              "/langwatch_db?schema=public",
+            ])
           ),
         },
       }
@@ -262,6 +310,14 @@ export class LangWatchAwsMarketplaceStack extends cdk.Stack {
                 objectName: "LANGEVALS_ENDPOINT",
                 key: "LANGEVALS_ENDPOINT",
               },
+              {
+                objectName: "REDIS_URL",
+                key: "REDIS_URL",
+              },
+              {
+                objectName: "DATABASE_URL",
+                key: "DATABASE_URL",
+              },
             ],
           },
         ],
@@ -303,6 +359,14 @@ export class LangWatchAwsMarketplaceStack extends cdk.Stack {
                   path: "LANGEVALS_ENDPOINT",
                   objectAlias: "LANGEVALS_ENDPOINT",
                 },
+                {
+                  path: "REDIS_URL",
+                  objectAlias: "REDIS_URL",
+                },
+                {
+                  path: "DATABASE_URL",
+                  objectAlias: "DATABASE_URL",
+                },
               ],
             },
           ]),
@@ -318,11 +382,6 @@ export class LangWatchAwsMarketplaceStack extends cdk.Stack {
       this,
       "RedisSecurityGroup",
       { vpc }
-    );
-
-    redisSecurityGroup.addIngressRule(
-      ec2.Peer.securityGroupId(cluster.clusterSecurityGroupId),
-      ec2.Port.tcp(6379)
     );
 
     const redisSubnetGroup = new elasticache.CfnSubnetGroup(
@@ -370,26 +429,41 @@ export class LangWatchAwsMarketplaceStack extends cdk.Stack {
       }
     );
 
-    // Create a Kubernetes Secret for Redis connection info
-    cluster.addManifest("redis-secret", {
-      apiVersion: "v1",
-      kind: "Secret",
-      metadata: { name: "redis-secret" },
-      type: "Opaque",
-      stringData: {
-        REDIS_URL: cdk.Fn.join("", [
-          "redis://:",
-          redisPassword
-            .secretValueFromJson("password")
-            .unsafeUnwrap()
-            .toString(),
-          "@",
-          redis.attrPrimaryEndPointAddress,
-          ":",
-          redis.attrPrimaryEndPointPort,
-        ]),
-      },
-    });
+    const addIngressRule = new cr.AwsCustomResource(
+      this,
+      "AddRedisIngressRule",
+      {
+        onUpdate: {
+          service: "EC2",
+          action: "authorizeSecurityGroupIngress",
+          parameters: {
+            GroupId: redisSecurityGroup.securityGroupId,
+            IpPermissions: [
+              {
+                IpProtocol: "tcp",
+                FromPort: 6379,
+                ToPort: 6379,
+                UserIdGroupPairs: [
+                  {
+                    GroupId: cluster.clusterSecurityGroupId,
+                  },
+                ],
+              },
+            ],
+          },
+          physicalResourceId: cr.PhysicalResourceId.of("RedisIngressRule"),
+        },
+        policy: cr.AwsCustomResourcePolicy.fromSdkCalls({
+          resources: cr.AwsCustomResourcePolicy.ANY_RESOURCE,
+        }),
+      }
+    );
+
+    // Ensure this runs after both Redis and EKS are created
+    addIngressRule.node.addDependency(redis);
+    addIngressRule.node.addDependency(cluster);
+
+    return { redis, redisPassword };
   }
 
   setupPostgres(vpc: ec2.Vpc, cluster: eks.Cluster) {
@@ -397,11 +471,6 @@ export class LangWatchAwsMarketplaceStack extends cdk.Stack {
       this,
       "PostgresSecurityGroup",
       { vpc }
-    );
-
-    postgresSecurityGroup.addIngressRule(
-      ec2.Peer.securityGroupId(cluster.clusterSecurityGroupId),
-      ec2.Port.tcp(5432)
     );
 
     const postgresPassword = new secretsmanager.Secret(
@@ -437,26 +506,41 @@ export class LangWatchAwsMarketplaceStack extends cdk.Stack {
       storageEncrypted: true,
     });
 
-    cluster.addManifest("postgres-secret", {
-      apiVersion: "v1",
-      kind: "Secret",
-      metadata: { name: "postgres-secret" },
-      type: "Opaque",
-      stringData: {
-        DATABASE_URL: cdk.Fn.join("", [
-          "postgresql://langwatch_db:",
-          postgresPassword
-            .secretValueFromJson("password")
-            .unsafeUnwrap()
-            .toString(),
-          "@",
-          postgres.dbInstanceEndpointAddress,
-          ":",
-          postgres.dbInstanceEndpointPort,
-          "/langwatch_db?schema=public",
-        ]),
-      },
-    });
+    const addPostgresIngressRule = new cr.AwsCustomResource(
+      this,
+      "AddPostgresIngressRule",
+      {
+        onUpdate: {
+          service: "EC2",
+          action: "authorizeSecurityGroupIngress",
+          parameters: {
+            GroupId: postgresSecurityGroup.securityGroupId,
+            IpPermissions: [
+              {
+                IpProtocol: "tcp",
+                FromPort: 5432,
+                ToPort: 5432,
+                UserIdGroupPairs: [
+                  {
+                    GroupId: cluster.clusterSecurityGroupId,
+                  },
+                ],
+              },
+            ],
+          },
+          physicalResourceId: cr.PhysicalResourceId.of("PostgresIngressRule"),
+        },
+        policy: cr.AwsCustomResourcePolicy.fromSdkCalls({
+          resources: cr.AwsCustomResourcePolicy.ANY_RESOURCE,
+        }),
+      }
+    );
+
+    // Ensure this runs after both PostgreSQL and EKS are created
+    addPostgresIngressRule.node.addDependency(postgres);
+    addPostgresIngressRule.node.addDependency(cluster);
+
+    return { postgres, postgresPassword };
   }
 
   setupLangEvals(cluster: eks.Cluster) {
@@ -464,7 +548,12 @@ export class LangWatchAwsMarketplaceStack extends cdk.Stack {
     cluster.addManifest("langevals", {
       apiVersion: "apps/v1",
       kind: "Deployment",
-      metadata: { name: "langevals" },
+      metadata: {
+        name: "langevals",
+        annotations: {
+          "deployment-timestamp": new Date().toISOString(),
+        },
+      },
       spec: {
         replicas: 1,
         selector: { matchLabels: { app: "langevals" } },
@@ -487,7 +576,12 @@ export class LangWatchAwsMarketplaceStack extends cdk.Stack {
     cluster.addManifest("langevals-service", {
       apiVersion: "v1",
       kind: "Service",
-      metadata: { name: "langevals-service" },
+      metadata: {
+        name: "langevals-service",
+        annotations: {
+          "deployment-timestamp": new Date().toISOString(),
+        },
+      },
       spec: {
         selector: { app: "langevals" },
         ports: [{ port: 80, targetPort: 8000 }],
@@ -500,7 +594,12 @@ export class LangWatchAwsMarketplaceStack extends cdk.Stack {
     cluster.addManifest("langwatch-nlp", {
       apiVersion: "apps/v1",
       kind: "Deployment",
-      metadata: { name: "langwatch-nlp" },
+      metadata: {
+        name: "langwatch-nlp",
+        annotations: {
+          "deployment-timestamp": new Date().toISOString(),
+        },
+      },
       spec: {
         replicas: 1,
         selector: { matchLabels: { app: "langwatch-nlp" } },
@@ -522,7 +621,12 @@ export class LangWatchAwsMarketplaceStack extends cdk.Stack {
     cluster.addManifest("langwatch-nlp-service", {
       apiVersion: "v1",
       kind: "Service",
-      metadata: { name: "langwatch-nlp-service" },
+      metadata: {
+        name: "langwatch-nlp-service",
+        annotations: {
+          "deployment-timestamp": new Date().toISOString(),
+        },
+      },
       spec: {
         selector: { app: "langwatch-nlp" },
         ports: [{ port: 80, targetPort: 8080 }],
@@ -532,16 +636,38 @@ export class LangWatchAwsMarketplaceStack extends cdk.Stack {
   }
 
   setupLangWatch(domainParam: cdk.CfnParameter, cluster: eks.Cluster) {
+    const langwatchServiceAccount = cluster.addServiceAccount("langwatch-sa", {
+      name: "langwatch-sa",
+    });
+
+    langwatchServiceAccount.addToPrincipalPolicy(
+      new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: [
+          "secretsmanager:GetSecretValue",
+          "secretsmanager:DescribeSecret",
+          "secretsmanager:ListSecrets",
+        ],
+        resources: ["arn:aws:secretsmanager:*:*:secret:*"],
+      })
+    );
+
     cluster.addManifest("langwatch", {
       apiVersion: "apps/v1",
       kind: "Deployment",
-      metadata: { name: "langwatch" },
+      metadata: {
+        name: "langwatch",
+        annotations: {
+          "deployment-timestamp": new Date().toISOString(),
+        },
+      },
       spec: {
         replicas: 1,
         selector: { matchLabels: { app: "langwatch" } },
         template: {
           metadata: { labels: { app: "langwatch" } },
           spec: {
+            serviceAccountName: "langwatch-sa",
             containers: [
               {
                 name: "langwatch",
@@ -585,6 +711,9 @@ export class LangWatchAwsMarketplaceStack extends cdk.Stack {
       kind: "Service",
       metadata: {
         name: "langwatch-service",
+        annotations: {
+          "deployment-timestamp": new Date().toISOString(),
+        },
       },
       spec: {
         selector: { app: "langwatch" },
@@ -600,186 +729,6 @@ export class LangWatchAwsMarketplaceStack extends cdk.Stack {
       }),
       description:
         "Application Load Balancer DNS Name. Point your subdomain CNAME record to this value.",
-    });
-  }
-
-  // To capture logs from the kubernetes containers
-  setupFluentd(cluster: eks.Cluster) {
-    const fluentdServiceAccount = cluster.addServiceAccount("fluentd", {
-      name: "fluentd",
-      namespace: "kube-system",
-    });
-
-    fluentdServiceAccount.addToPrincipalPolicy(
-      new iam.PolicyStatement({
-        effect: iam.Effect.ALLOW,
-        actions: [
-          "logs:CreateLogGroup",
-          "logs:CreateLogStream",
-          "logs:PutLogEvents",
-          "logs:DescribeLogGroups",
-          "logs:DescribeLogStreams",
-        ],
-        resources: ["arn:aws:logs:*:*:*"],
-      })
-    );
-
-    const fluentdClusterRole = cluster.addManifest("fluentd-clusterrole", {
-      apiVersion: "rbac.authorization.k8s.io/v1",
-      kind: "ClusterRole",
-      metadata: { name: "fluentd-clusterrole" },
-      rules: [
-        {
-          apiGroups: [""],
-          resources: ["pods", "namespaces"],
-          verbs: ["get", "list", "watch"],
-        },
-        {
-          apiGroups: [""],
-          resources: ["pods/log"],
-          verbs: ["get", "list", "watch"],
-        },
-      ],
-    });
-
-    const fluentdClusterRoleBinding = cluster.addManifest(
-      "fluentd-clusterrolebinding",
-      {
-        apiVersion: "rbac.authorization.k8s.io/v1",
-        kind: "ClusterRoleBinding",
-        metadata: { name: "fluentd-clusterrolebinding" },
-        subjects: [
-          {
-            kind: "ServiceAccount",
-            name: fluentdServiceAccount.serviceAccountName,
-            namespace: "kube-system",
-          },
-        ],
-        roleRef: {
-          kind: "ClusterRole",
-          name: "fluentd-clusterrole",
-          apiGroup: "rbac.authorization.k8s.io",
-        },
-      }
-    );
-
-    // Ensure the ClusterRoleBinding is created after the ClusterRole
-    fluentdClusterRoleBinding.node.addDependency(fluentdClusterRole);
-
-    // Create a ConfigMap for Fluentd configuration
-    cluster.addManifest("fluentd-config", {
-      apiVersion: "v1",
-      kind: "ConfigMap",
-      metadata: { name: "fluentd-config", namespace: "kube-system" },
-      data: {
-        "fluent.conf": `
-        <source>
-        @type tail
-        path /var/log/containers/*.log
-        pos_file /var/log/fluentd-containers.log.pos
-        tag kubernetes.*
-        <parse>
-          @type none
-        </parse>
-      </source>
-
-      <filter kubernetes.**>
-        @type kubernetes_metadata
-      </filter>
-
-      <filter kubernetes.**>
-        @type record_transformer
-        enable_ruby true
-        <record>
-          pod_name \${record['kubernetes']['pod_name']}
-        </record>
-        remove_keys kubernetes,docker
-      </filter>
-
-      <match kubernetes.**>
-        @type cloudwatch_logs
-        log_group_name /aws/eks/${cluster.clusterName}/cluster
-        log_stream_name_key pod_name
-        auto_create_stream true
-        retention_in_days 7
-        <buffer>
-          @type file
-          path /var/log/fluentd-buffers/kubernetes.*.buffer
-          flush_interval 5s
-          flush_at_shutdown true
-          retry_forever true
-          retry_max_interval 30
-        </buffer>
-      </match>
-        `,
-      },
-    });
-
-    // Create a DaemonSet for Fluentd
-    cluster.addManifest("fluentd-daemonset", {
-      apiVersion: "apps/v1",
-      kind: "DaemonSet",
-      metadata: { name: "fluentd-cloudwatch", namespace: "kube-system" },
-      spec: {
-        selector: { matchLabels: { name: "fluentd-cloudwatch" } },
-        template: {
-          metadata: { labels: { name: "fluentd-cloudwatch" } },
-          spec: {
-            serviceAccountName: "fluentd",
-            tolerations: [
-              { key: "node-role.kubernetes.io/master", effect: "NoSchedule" },
-              {
-                key: "node.kubernetes.io/not-ready",
-                effect: "NoExecute",
-                operator: "Exists",
-              },
-              {
-                key: "node.kubernetes.io/unreachable",
-                effect: "NoExecute",
-                operator: "Exists",
-              },
-            ],
-            containers: [
-              {
-                name: "fluentd-cloudwatch",
-                image:
-                  "fluent/fluentd-kubernetes-daemonset:v1.17.0-debian-cloudwatch-1.0",
-                resources: {
-                  limits: { memory: "200Mi" },
-                  requests: { cpu: "100m", memory: "200Mi" },
-                },
-                env: [
-                  { name: "FLUENT_UID", value: "0" },
-                  { name: "AWS_REGION", value: cdk.Aws.REGION },
-                  { name: "CLUSTER_NAME", value: cluster.clusterName },
-                ],
-                volumeMounts: [
-                  { name: "varlog", mountPath: "/var/log" },
-                  {
-                    name: "varlibdockercontainers",
-                    mountPath: "/var/lib/docker/containers",
-                    readOnly: true,
-                  },
-                  {
-                    name: "fluentdconf",
-                    mountPath: "/fluentd/etc/fluent.conf",
-                    subPath: "fluent.conf",
-                  },
-                ],
-              },
-            ],
-            terminationGracePeriodSeconds: 30,
-            volumes: [
-              { name: "varlog", hostPath: { path: "/var/log" } },
-              {
-                name: "varlibdockercontainers",
-                hostPath: { path: "/var/lib/docker/containers" },
-              },
-              { name: "fluentdconf", configMap: { name: "fluentd-config" } },
-            ],
-          },
-        },
-      },
     });
   }
 }
