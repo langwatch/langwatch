@@ -62,7 +62,6 @@ export function useLoadChatMessagesEffect({
       const nonSystemMessages = messages.filter((m) => m.role !== "system");
 
       for (const chatWindowId of chatWindowIds) {
-        console.log(nonSystemMessages);
         onSetMessages(chatWindowId, nonSystemMessages);
         if (systemMessage) {
           onChangeSystemPrompt(chatWindowId, systemMessage.content);

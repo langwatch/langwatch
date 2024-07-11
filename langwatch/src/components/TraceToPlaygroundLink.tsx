@@ -24,21 +24,12 @@ export namespace TraceToPlaygroundLink {
   }
 }
 
-const DEFAULT_TOOLTIP_GUTTER_SIZE = 16;
-
-const DEFAULT_TOOLTIP_PLACEMENT: PlacementWithLogical = "right";
-
-const DEFAULT_BUTTON_VARIANT = "outline";
-
 export function TraceToPlaygroundLink({
   projectSlug,
   traceId,
   spanId,
   tooltipLabel,
   buttonLabel,
-  tooltipGutterSize = DEFAULT_TOOLTIP_GUTTER_SIZE,
-  tooltipPlacement = DEFAULT_TOOLTIP_PLACEMENT,
-  buttonVariant = DEFAULT_BUTTON_VARIANT,
 }: TraceToPlaygroundLink.Props): JSX.Element {
   const linkHref = `/${projectSlug}/playground?${new URLSearchParams({
     traceId,
@@ -46,17 +37,12 @@ export function TraceToPlaygroundLink({
   }).toString()}`;
 
   return (
-    <Tooltip
-      label={tooltipLabel}
-      hasArrow
-      placement={tooltipPlacement}
-      gutter={tooltipGutterSize}
-    >
+    <Tooltip label={tooltipLabel} hasArrow placement="right" gutter={16}>
       <Link
         as={Button}
         href={linkHref}
         aria-label={tooltipLabel}
-        variant={buttonVariant}
+        variant="outline"
       >
         <Flex align="center" justify="center">
           <Box mr={2}>
