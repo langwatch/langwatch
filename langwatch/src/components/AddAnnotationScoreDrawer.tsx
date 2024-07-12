@@ -124,7 +124,7 @@ export const AddAnnotationScoreDrawer = () => {
                 </GridItem>
                 <GridItem colSpan={2}>
                   <HStack>
-                    <Input {...register(`category.${index}`)} />
+                    <Input isRequired {...register(`category.${index}`)} />
                     <Button
                       size="md"
                       variant="outline"

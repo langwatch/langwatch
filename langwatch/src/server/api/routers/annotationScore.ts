@@ -19,7 +19,7 @@ export const annotationScoreRouter = createTRPCRouter({
     )
     .use(checkUserPermissionForProject(TeamRoleGroup.ANNOTATIONS_MANAGE))
     .mutation(async ({ ctx, input }) => {
-      type OptionType = { label: string; value: string };
+      type OptionType = { label: string; value: string; reason?: string };
       const options: OptionType[] = [];
 
       if (
@@ -31,7 +31,8 @@ export const annotationScoreRouter = createTRPCRouter({
           if (input.category[i] !== "") {
             options.push({
               label: input.category[i]!,
-              value: input.categoryExplanation[i]!,
+              value: input.category[i]!,
+              reason: input.categoryExplanation[i]!,
             });
           }
         }
