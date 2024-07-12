@@ -53,8 +53,8 @@ export const addInputAndOutputForRAGs = (spans: Span[]): Span[] => {
   return fillInputOutputMap(spans);
 };
 
-export const extractRAGTextualContext = (contexts: RAGChunk[]) => {
-  return contexts
+export const extractRAGTextualContext = (contexts?: RAGChunk[]) => {
+  return (contexts ?? [])
     .map((context) => {
       return extractChunkTextualContent(context.content);
     })

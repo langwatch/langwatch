@@ -160,6 +160,8 @@ export const prepareEnvKeys = (modelProvider: MaybeStoredModelProvider) => {
     return {};
   }
 
+  // TODO: add AZURE_DEPLOYMENT_NAME and AZURE_EMBEDDINGS_DEPLOYMENT_NAME for deployment name mapping
+
   return Object.fromEntries(
     Object.keys(providerDefinition.keysSchema.shape)
       .map((key) => [key, getModelOrDefaultEnvKey(modelProvider, key)])

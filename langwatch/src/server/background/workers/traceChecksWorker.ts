@@ -147,9 +147,10 @@ export const runEvaluation = async ({
   }
 
   let evaluatorEnv: Record<string, string> = {};
-  if (settings && "model" in settings && typeof settings.model === "string") {
+
+  const setupEnv = async (model: string) => {
     const modelProviders = await getProjectModelProviders(projectId);
-    const provider = settings.model.split("/")[0]!;
+    const provider = model.split("/")[0]!;
     const modelProvider = modelProviders[provider];
     if (!modelProvider) {
       throw `Provider ${provider} is not configured`;
@@ -157,7 +158,24 @@ export const runEvaluation = async ({
     if (!modelProvider.enabled) {
       throw `Provider ${provider} is not enabled`;
     }
-    evaluatorEnv = prepareEnvKeys(modelProvider);
+    return prepareEnvKeys(modelProvider);
+  };
+
+  if (
+    settings &&
+    "model" in settings &&
+    typeof settings.model === "string" &&
+    checkType !== "openai/moderation"
+  ) {
+    evaluatorEnv = await setupEnv(settings.model);
+  }
+
+  if (
+    settings &&
+    "embeddings_model" in settings &&
+    typeof settings.embeddings_model === "string"
+  ) {
+    evaluatorEnv = await setupEnv(settings.embeddings_model);
   }
 
   const response = await fetch(

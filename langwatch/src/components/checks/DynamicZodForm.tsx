@@ -99,7 +99,10 @@ const DynamicZodForm = ({
         </HStack>
       );
     } else if (fieldSchema_ instanceof z.ZodUnion) {
-      if (fieldName === "model" && evaluator?.name !== "OpenAI Moderation") {
+      if (
+        (fieldName === "model" || fieldName === "embeddings_model") &&
+        evaluator?.name !== "OpenAI Moderation"
+      ) {
         return (
           <Controller
             name={fullPath}
@@ -111,6 +114,7 @@ const DynamicZodForm = ({
                 )}
                 model={field.value}
                 onChange={(model) => field.onChange(model)}
+                mode={fieldName === "embeddings_model" ? "embedding" : "chat"}
               />
             )}
           />
