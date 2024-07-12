@@ -546,7 +546,7 @@ class ContextTrace:
 
             @functools.wraps(func)  # type: ignore
             def sync_wrapper(*args, **kwargs):
-                with ContextTrace(**trace_kwargs):
+                with ContextTrace(**trace_kwargs) as trace:
                     trace.root_span._capture_name_and_input(func, *args, **kwargs)
                     output = func(*args, **kwargs)  # type: ignore
                     trace.root_span._capture_output_and_maybe_name(func, output)
