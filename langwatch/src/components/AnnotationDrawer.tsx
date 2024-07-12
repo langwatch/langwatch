@@ -375,8 +375,6 @@ const ScoreBlock = (scoreType: AnnotationScore, watch: any, register: any) => {
                 value={option.value.toString()}
                 {...register(`scoreOptions.${scoreType.id}.value`)}
                 key={option.value}
-                required
-                isRequired
               >
                 {option.label}
               </Radio>

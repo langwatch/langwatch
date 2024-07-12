@@ -5,8 +5,8 @@ import { nanoid } from "nanoid";
 import { TeamRoleGroup, checkUserPermissionForProject } from "../permission";
 
 const scoreOptionSchema = z.object({
-  value: z.string(),
-  reason: z.string(),
+  value: z.string().optional().nullable(),
+  reason: z.string().optional().nullable(),
 });
 
 const scoreOptions = z.record(z.string(), scoreOptionSchema);
