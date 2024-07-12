@@ -32,6 +32,7 @@ from langwatch.utils import (
     autoconvert_typed_values,
     capture_exception,
     milliseconds_timestamp,
+    reduce_payload_size,
 )
 from retry import retry
 
@@ -327,13 +328,13 @@ class ContextSpan:
                     span_id=str(self.span_id),
                     parent_id=str(self.parent.span_id) if self.parent else None,
                     trace_id=str(self.trace.trace_id),
-                    input=autoconvert_typed_values(self.input) if self.input else None,
+                    input=reduce_payload_size(autoconvert_typed_values(self.input)) if self.input else None,
                     output=(
-                        autoconvert_typed_values(self.output) if self.output else None
+                        reduce_payload_size(autoconvert_typed_values(self.output)) if self.output else None
                     ),
-                    error=capture_exception(self.error) if self.error else None,
+                    error=reduce_payload_size(capture_exception(self.error)) if self.error else None,
                     timestamps=self.timestamps,
-                    contexts=autoconvert_rag_contexts(self.contexts or []),
+                    contexts=reduce_payload_size(autoconvert_rag_contexts(self.contexts or [])),
                 )
             )
         elif self.type == "llm":
@@ -344,11 +345,11 @@ class ContextSpan:
                     span_id=str(self.span_id),
                     parent_id=str(self.parent.span_id) if self.parent else None,
                     trace_id=str(self.trace.trace_id),
-                    input=autoconvert_typed_values(self.input) if self.input else None,
+                    input=reduce_payload_size(autoconvert_typed_values(self.input)) if self.input else None,
                     output=(
-                        autoconvert_typed_values(self.output) if self.output else None
+                        reduce_payload_size(autoconvert_typed_values(self.output)) if self.output else None
                     ),
-                    error=capture_exception(self.error) if self.error else None,
+                    error=reduce_payload_size(capture_exception(self.error)) if self.error else None,
                     timestamps=self.timestamps,
                     model=self.model,
                     params=self.params,
@@ -363,11 +364,11 @@ class ContextSpan:
                     span_id=str(self.span_id),
                     parent_id=str(self.parent.span_id) if self.parent else None,
                     trace_id=str(self.trace.trace_id),
-                    input=autoconvert_typed_values(self.input) if self.input else None,
+                    input=reduce_payload_size(autoconvert_typed_values(self.input)) if self.input else None,
                     output=(
-                        autoconvert_typed_values(self.output) if self.output else None
+                        reduce_payload_size(autoconvert_typed_values(self.output)) if self.output else None
                     ),
-                    error=capture_exception(self.error) if self.error else None,
+                    error=reduce_payload_size(capture_exception(self.error)) if self.error else None,
                     timestamps=self.timestamps,
                 )
             )

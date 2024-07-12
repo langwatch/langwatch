@@ -156,3 +156,57 @@ class SerializableAndPydanticEncoder(json.JSONEncoder):
         if isinstance(o, BaseModel):
             return o.model_dump()
         return super().default(o)
+
+
+def reduce_payload_size(
+    obj: T, max_string_length=5000, max_list_dict_length=50000
+) -> T:
+    if type(obj) == list and all(validate_safe(ChatMessage, item) for item in obj):
+        return obj
+
+    def truncate_string(s):
+        return (
+            s[:max_string_length] + "... (truncated string)"
+            if len(s) > max_string_length
+            else s
+        )
+
+    def process_item(item):
+        if isinstance(item, str):
+            return truncate_string(item)
+        elif isinstance(item, (list, dict)):
+            return reduce_payload_size(item, max_string_length, max_list_dict_length)
+        else:
+            return item
+
+    if isinstance(obj, str):
+        return truncate_string(obj)
+
+    elif isinstance(obj, list):
+        result = []
+        for item in obj:
+            result.append(process_item(item))
+            if (
+                len(json.dumps(result, cls=SerializableAndPydanticEncoder))
+                > max_list_dict_length
+            ):
+                result.pop()
+                result.append("... (truncated list)")
+                break
+        return cast(T, result)
+
+    elif isinstance(obj, dict):
+        result = {}
+        for key, value in obj.items():
+            result[key] = process_item(value)
+            if (
+                len(json.dumps(result, cls=SerializableAndPydanticEncoder))
+                > max_list_dict_length
+            ):
+                del result[key]
+                result["..."] = "(truncated object)"
+                break
+        return cast(T, result)
+
+    else:
+        return obj
