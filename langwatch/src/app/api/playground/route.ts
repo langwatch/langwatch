@@ -82,7 +82,7 @@ export async function POST(req: NextRequest) {
   }
 
   const headers = Object.fromEntries(
-    Object.entries(prepareLitellmParams(modelProvider)).map(([key, value]) => [
+    Object.entries(prepareLitellmParams(model, modelProvider)).map(([key, value]) => [
       `x-litellm-${key}`,
       value,
     ])

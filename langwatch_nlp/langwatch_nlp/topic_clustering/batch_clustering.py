@@ -1,3 +1,4 @@
+from typing import Optional
 from fastapi import FastAPI
 from pydantic import BaseModel
 from langwatch_nlp.topic_clustering.build_response import build_response
@@ -75,6 +76,7 @@ def build_hierarchy(
 class BatchClusteringParams(BaseModel):
     traces: list[Trace]
     model: str
+    deployment_name: Optional[str]
     litellm_params: dict[str, str]
 
 
@@ -83,9 +85,13 @@ def setup_endpoints(app: FastAPI):
     def topics_batch_clustering(
         params: BatchClusteringParams,
     ) -> TopicClusteringResponse:
+        model = params.model
+        if model.startswith("azure/") and params.deployment_name:
+            model = f"azure/{params.deployment_name}"
+
         hierarchy = build_hierarchy(params.traces, COPHENETIC_DISTANCES_FOR_TOPICS)
         topic_names, subtopic_names, cost = generate_topic_and_subtopic_names(
-            model=params.model,
+            model=model,
             litellm_params=params.litellm_params,
             hierarchy=hierarchy,
         )

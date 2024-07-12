@@ -168,6 +168,7 @@ export const prepareEnvKeys = (modelProvider: MaybeStoredModelProvider) => {
 };
 
 export const prepareLitellmParams = (
+  model: string,
   modelProvider: MaybeStoredModelProvider
 ) => {
   const params: Record<string, string> = {};
@@ -188,6 +189,8 @@ export const prepareLitellmParams = (
     params.vertex_location =
       getModelOrDefaultEnvKey(modelProvider, "VERTEXAI_LOCATION") ?? "invalid";
   }
+
+  // TODO: add azure deployment as params.model as azure/<deployment-name>
 
   return params;
 };

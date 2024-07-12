@@ -193,6 +193,7 @@ class IncrementalClusteringParams(BaseModel):
     subtopics: list[Subtopic]
     traces: list[Trace]
     model: str
+    deployment_name: Optional[str]
     litellm_params: dict[str, str]
 
 
@@ -201,6 +202,10 @@ def setup_endpoints(app: FastAPI):
     def topics_incremental_clustering(
         params: IncrementalClusteringParams,
     ) -> TopicClusteringResponse:
+        model = params.model
+        if model.startswith("azure/") and params.deployment_name:
+            model = f"azure/{params.deployment_name}"
+
         traces_to_assign = []
         for trace in params.traces:
             trace_topic_map = assign_trace_to_topic(

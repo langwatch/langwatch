@@ -86,6 +86,12 @@ async def proxy_startup():
     await litellm_proxy_server.startup_event()
 
 
+# Dummy env vars just to get the proxy to start up
+if "OPENAI_API_KEY" not in os.environ:
+    os.environ["OPENAI_API_KEY"] = "dummy"
+if "AZURE_OPENAI_API_KEY" not in os.environ:
+    os.environ["AZURE_OPENAI_API_KEY"] = "dummy"
+
 loop = asyncio.get_event_loop()
 if not loop.is_running():
     loop.run_until_complete(proxy_startup())
