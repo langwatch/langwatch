@@ -16,6 +16,7 @@ from dspy.teleprompt import (
     BootstrapFewShotWithRandomSearch,
     COPRO,
     MIPRO,
+    MIPROv2,
 )
 from dspy.signatures.signature import SignatureMeta
 from dspy.primitives.prediction import Prediction, Completions
@@ -123,11 +124,14 @@ class LangWatchDSPy:
             langwatch.login()
             return
 
-        response = httpx.post(
-            f"{langwatch.endpoint}/api/experiment/init",
-            headers={"X-Auth-Token": langwatch.api_key or ""},
-            json={"experiment_slug": experiment, "experiment_type": "DSPY"},
-        )
+        try:
+            response = httpx.post(
+                f"{langwatch.endpoint}/api/experiment/init",
+                headers={"X-Auth-Token": langwatch.api_key or ""},
+                json={"experiment_slug": experiment, "experiment_type": "DSPY"},
+            )
+        except Exception as e:
+            raise Exception(f"Error initializing LangWatch experiment: {e}")
         if response.status_code == 401:
             langwatch.api_key = None
             raise ValueError(
@@ -161,6 +165,7 @@ class LangWatchDSPy:
             BootstrapFewShotWithRandomSearch: LangWatchTrackedBootstrapFewShotWithRandomSearch,
             COPRO: LangWatchTrackedCOPRO,
             MIPRO: LangWatchTrackedMIPRO,
+            MIPROv2: LangWatchTrackedMIPROv2,
         }
 
         if optimizer.__class__ in METRIC_TRACKING_CLASSMAP:
@@ -496,6 +501,69 @@ class LangWatchTrackedMIPRO(MIPRO):
                         name=MIPRO.__name__,
                         parameters={
                             "num_candidates": this.num_candidates,
+                            "init_temperature": this.init_temperature,
+                        },
+                    ),
+                    index=step_,
+                    score=score,
+                    label="score",
+                    predictors=[
+                        DSPyPredictor(name=name, predictor=predictor)
+                        for name, predictor in program.named_predictors()
+                    ],
+                )
+
+            return score
+
+        Evaluate.__call__ = patched_evaluate_call
+
+        try:
+            yield
+        finally:
+            Evaluate.__call__ = original_evaluate_call
+
+
+class LangWatchTrackedMIPROv2(MIPROv2):
+    def patch(self):
+        self.metric = langwatch_dspy.track_metric(self.metric)
+
+    def compile(self, student, **kwargs):
+        with self._patch_print_and_evaluate():
+            return super().compile(student, **kwargs)
+
+    @contextmanager
+    def _patch_print_and_evaluate(self):
+        original_evaluate_call = Evaluate.__call__
+        step = 0
+        substep = 0
+        scores = []
+
+        this = self
+
+        last_candidate_program: Optional[int] = None
+
+        def patched_evaluate_call(self, program: dspy.Module, *args, **kwargs):
+            nonlocal step, scores, substep, last_candidate_program
+
+            if last_candidate_program != id(program):
+                step += 1
+                substep = 0
+                scores = []
+                last_candidate_program = id(program)
+
+            step_ = str(step) if substep == 0 else f"{step}.{substep}"
+            substep += 1
+
+            score: float = original_evaluate_call(self, program, *args, **kwargs)  # type: ignore
+
+            scores.append(score)
+
+            if max(scores) == score:
+                langwatch_dspy.log_step(
+                    optimizer=DSPyOptimizer(
+                        name=MIPROv2.__name__,
+                        parameters={
+                            "num_candidates": this.n,
                             "init_temperature": this.init_temperature,
                         },
                     ),
