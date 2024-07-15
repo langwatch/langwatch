@@ -93,6 +93,7 @@ export const getProjectModelProviders = async (projectId: string) => {
             provider: providerKey,
             enabled: modelProvider.enabledSince < project.createdAt,
             customKeys: null,
+            deploymentMapping: null,
           };
           return [providerKey, modelProvider_];
         })
