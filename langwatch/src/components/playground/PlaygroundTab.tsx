@@ -27,8 +27,15 @@ import {
 import { Plus, RotateCcw, RotateCw, X } from "react-feather";
 import { usePlaygroundStore } from "../../hooks/usePlaygroundStore";
 import { ChatWindowWrapper } from "./ChatWindow";
+import { useRouter } from "next/router";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import React from "react";
+import { useLoadChatMessagesEffect } from "~/hooks/useLoadChatMessages";
+import { useMemoizedChatWindowIds } from "~/hooks/useMemoizedChatWindowIds";
 
 export function PlaygroundTabs() {
+  const router = useRouter();
+
   const state = usePlaygroundStore((state) => {
     return {
       tabs: state.tabs.map(({ name, chatWindows }) => ({
@@ -39,10 +46,28 @@ export function PlaygroundTabs() {
       addNewTab: state.addNewTab,
       selectTab: state.selectTab,
       closeTab: state.closeTab,
+      setMessages: state.setMessages,
+      onChangeSystemPrompt: state.onChangeSystemPrompt,
     };
   });
   const { undo, redo, pastStates, futureStates } =
     usePlaygroundStore.temporal.getState();
+
+  const { project } = useOrganizationTeamProject();
+  const { span, traceId } = router.query;
+  // Memoized chat window IDs to prevent infinite loop in useLoadChatMessagesEffect
+  const memoizedChatWindowIds = useMemoizedChatWindowIds({
+    chatWindows: state.tabs[state.activeTabIndex]?.chatWindows,
+  });
+  // Load chat messages into all tabs.
+  useLoadChatMessagesEffect({
+    spanId: Array.isArray(span) ? span[0] : span ?? "",
+    projectId: project?.id ?? "",
+    traceId: Array.isArray(traceId) ? traceId[0] : traceId ?? "",
+    chatWindowIds: memoizedChatWindowIds,
+    onSetMessages: state.setMessages,
+    onChangeSystemPrompt: state.onChangeSystemPrompt,
+  });
 
   return (
     <>
