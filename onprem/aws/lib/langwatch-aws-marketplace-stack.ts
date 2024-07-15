@@ -26,15 +26,15 @@ export class LangWatchAwsMarketplaceStack extends cdk.Stack {
       description: "Number of nodes in the Kubernetes EKS cluster",
     });
 
-    // Create a VPC
-    const vpc = new ec2.Vpc(this, "LangWatchVPC", {
-      maxAzs: 2,
-    });
-
     const domainParam = new cdk.CfnParameter(this, "SubDomainName", {
       type: "String",
       description:
         "The subdomain name where LangWatch will be hosted (e.g., langwatch.yourdomain.com)",
+    });
+
+    // Create a VPC
+    const vpc = new ec2.Vpc(this, "LangWatchVPC", {
+      maxAzs: 2,
     });
 
     // Create an EKS cluster
