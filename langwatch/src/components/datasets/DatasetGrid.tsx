@@ -8,7 +8,7 @@ import { Text } from "@chakra-ui/react";
 import { useMemo, useRef, useState } from "react";
 import { MultilineCellEditor } from "./MultilineCellEditor";
 
-import { ClientSideRowModelModule } from '@ag-grid-community/client-side-row-model';
+import { ClientSideRowModelModule } from "@ag-grid-community/client-side-row-model";
 import { ModuleRegistry, type ColDef } from "@ag-grid-community/core";
 import "@ag-grid-community/styles/ag-grid.css";
 import "@ag-grid-community/styles/ag-theme-balham.css";
@@ -16,13 +16,12 @@ import { z } from "zod";
 import {
   chatMessageSchema,
   datasetSpanSchema,
+  rAGChunkSchema,
 } from "../../server/tracer/types.generated";
 import { RenderInputOutput } from "../traces/RenderInputOutput";
 import { MultilineJSONCellEditor } from "./MultilineJSONCellEditor";
 
-ModuleRegistry.registerModules([
-  ClientSideRowModelModule
-]);
+ModuleRegistry.registerModules([ClientSideRowModelModule]);
 
 export const JSONCellRenderer = (props: { value: string | undefined }) => {
   return (
@@ -53,7 +52,7 @@ export function DatasetGrid(props: AgGridReactProps) {
       spans: z.array(datasetSpanSchema),
       llm_input: z.array(chatMessageSchema),
       expected_llm_output: z.array(chatMessageSchema),
-      contexts: z.array(z.string()),
+      contexts: z.union([z.array(rAGChunkSchema), z.array(z.string())]),
     };
 
     return (props.columnDefs as ColDef[])?.map((column: ColDef) => {
@@ -75,7 +74,7 @@ export function DatasetGrid(props: AgGridReactProps) {
 
   // const [undoSize, setUndoSize] = useState(0);
   // const [redoSize, setRedoSize] = useState(0);
-  
+
   // const undo = useCallback(() => {
   //   gridRef.current!.api.undoCellEditing();
   //   console.log(gridRef.current);
@@ -170,7 +169,6 @@ export function DatasetGrid(props: AgGridReactProps) {
         //   }
         // }}
         columnDefs={columnDefs_}
-        
       />
     </div>
   );
