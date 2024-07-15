@@ -24,7 +24,7 @@ import {
   type BackgroundProps,
 } from "@chakra-ui/react";
 import { type Organization, type Project, type Team } from "@prisma/client";
-import { signOut } from "next-auth/react";
+import { signIn, signOut } from "next-auth/react";
 import ErrorPage from "next/error";
 import Head from "next/head";
 import { useRouter } from "next/router";
@@ -95,7 +95,7 @@ const SideMenuLink = ({
   icon: Icon;
   label: string;
   path: string;
-  project: Project;
+  project?: Project;
 }) => {
   const router = useRouter();
   const currentRoute = findCurrentRoute(router.pathname);
@@ -134,7 +134,11 @@ const SideMenuLink = ({
       gutter={16}
     >
       <Link
-        href={path.replace("[project]", project.slug) + viewModeQuery}
+        href={
+          project
+            ? path.replace("[project]", project.slug) + viewModeQuery
+            : "/auth/signin"
+        }
         aria-label={label}
       >
         <VStack>
@@ -302,13 +306,14 @@ export const AddProjectButton = ({
 
 export const DashboardLayout = ({
   children,
+  publicPage = false,
   ...bgProps
-}: PropsWithChildren<BackgroundProps>) => {
+}: { publicPage?: boolean } & PropsWithChildren<BackgroundProps>) => {
   const router = useRouter();
   const theme = useTheme();
   const gray400 = theme.colors.gray["400"];
 
-  const { data: session } = useRequiredSession();
+  const { data: session } = useRequiredSession({ required: !publicPage });
 
   const {
     isLoading,
@@ -342,24 +347,25 @@ export const DashboardLayout = ({
   }
 
   if (
-    !session ||
-    isLoading ||
-    !organization ||
-    !organizations ||
-    !team ||
-    !project
+    !publicPage &&
+    (!session ||
+      isLoading ||
+      !organization ||
+      !organizations ||
+      !team ||
+      !project)
   ) {
     return <LoadingScreen />;
   }
 
-  const user = session.user;
+  const user = session?.user;
   const currentRoute = findCurrentRoute(router.pathname);
 
   return (
     <HStack width="full" minHeight="100vh" alignItems={"stretch"} spacing={0}>
       <Head>
         <title>
-          LangWatch - {project.name}
+          LangWatch{project ? ` - ${project.name}` : ""}
           {currentRoute && currentRoute.title != "Home"
             ? ` - ${currentRoute?.title}`
             : ""}
@@ -374,6 +380,7 @@ export const DashboardLayout = ({
           <Box fontSize={32} fontWeight="bold">
             <LogoIcon width={25} height={34} />
           </Box>
+
           <VStack spacing={8}>
             <SideMenuLink
               path={projectRoutes.home.path}
@@ -515,75 +522,86 @@ export const DashboardLayout = ({
           borderBottomWidth="1px"
           borderBottomColor="gray.300"
         >
-          <ProjectSelector organizations={organizations} project={project} />
+          {organizations && project && (
+            <ProjectSelector organizations={organizations} project={project} />
+          )}
           <Hide below="lg">
             <Breadcrumbs currentRoute={currentRoute} />
           </Hide>
           <Spacer />
-
-          <form
-            action={`${project.slug}/messages`}
-            method="GET"
-            style={{ width: "100%", maxWidth: "600px" }}
-            onSubmit={(e) => {
-              e.preventDefault();
-              if (
-                router.query.view === "list" ||
-                router.query.view === "table"
-              ) {
-                void router.replace({ query: { ...router.query, query } });
-              } else {
-                void router.push(`/${project.slug}/messages?query=${query}`);
-              }
-            }}
-          >
-            <InputGroup borderColor="gray.300">
-              <InputLeftElement
-                paddingY={1.5}
-                height="auto"
-                pointerEvents="none"
-              >
-                <Search color={gray400} width={16} />
-              </InputLeftElement>
-              <Input
-                name="query"
-                type="search"
-                placeholder="Search"
-                _placeholder={{ color: "gray.800" }}
-                fontSize={14}
-                paddingY={1.5}
-                height="auto"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-              />
-            </InputGroup>
-          </form>
+          {project && (
+            <form
+              action={`${project.slug}/messages`}
+              method="GET"
+              style={{ width: "100%", maxWidth: "600px" }}
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (
+                  router.query.view === "list" ||
+                  router.query.view === "table"
+                ) {
+                  void router.replace({ query: { ...router.query, query } });
+                } else {
+                  void router.push(`/${project.slug}/messages?query=${query}`);
+                }
+              }}
+            >
+              <InputGroup borderColor="gray.300">
+                <InputLeftElement
+                  paddingY={1.5}
+                  height="auto"
+                  pointerEvents="none"
+                >
+                  <Search color={gray400} width={16} />
+                </InputLeftElement>
+                <Input
+                  name="query"
+                  type="search"
+                  placeholder="Search"
+                  _placeholder={{ color: "gray.800" }}
+                  fontSize={14}
+                  paddingY={1.5}
+                  height="auto"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                />
+              </InputGroup>
+            </form>
+          )}
           <Spacer />
           <Menu>
-            <MenuButton as={Button} variant="unstyled">
+            <MenuButton
+              as={Button}
+              variant="unstyled"
+              {...(publicPage ? { onClick: () => void signIn("auth0") } : {})}
+            >
               <Avatar
-                name={user.name ?? undefined}
+                name={user?.name ?? undefined}
                 backgroundColor={"orange.400"}
                 color="white"
                 size="sm"
               />
             </MenuButton>
-            <Portal>
-              <MenuList zIndex="popover">
-                {dependencies.ExtraMenuItems && <dependencies.ExtraMenuItems />}
-                <MenuGroup
-                  title={`${session.user.name} (${session.user.email})`}
-                >
-                  <MenuItem
-                    onClick={() =>
-                      void signOut({ callbackUrl: window.location.origin })
-                    }
+            {session && (
+              <Portal>
+                <MenuList zIndex="popover">
+                  {dependencies.ExtraMenuItems && (
+                    <dependencies.ExtraMenuItems />
+                  )}
+                  <MenuGroup
+                    title={`${session.user.name} (${session.user.email})`}
                   >
-                    Logout
-                  </MenuItem>
-                </MenuGroup>
-              </MenuList>
-            </Portal>
+                    <MenuItem
+                      onClick={() =>
+                        void signOut({ callbackUrl: window.location.origin })
+                      }
+                    >
+                      Logout
+                    </MenuItem>
+                  </MenuGroup>
+                </MenuList>
+              </Portal>
+            )}
           </Menu>
         </HStack>
         {publicEnv.data?.DEMO_PROJECT_SLUG &&

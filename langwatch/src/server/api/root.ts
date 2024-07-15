@@ -23,6 +23,7 @@ import { modelProviderRouter } from "./routers/modelProviders";
 import { userRouter } from "./routers/user";
 import { annotationScoreRouter } from "./routers/annotationScore";
 import { publicEnvRouter } from "./routers/publicEnv";
+import { shareRouter } from "./routers/share";
 
 /**
  * This is the primary router for your server.
@@ -53,6 +54,7 @@ export const appRouter = createTRPCRouter({
   user: userRouter,
   annotationScore: annotationScoreRouter,
   publicEnv: publicEnvRouter,
+  share: shareRouter,
   ...(dependencies.extraTRPCRoutes?.() ?? {}),
 });
 

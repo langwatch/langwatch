@@ -17,6 +17,7 @@ export const teamRolePermissionMapping = {
   ANALYTICS_MANAGE: [TeamUserRole.ADMIN, TeamUserRole.MEMBER],
   COST_VIEW: [TeamUserRole.ADMIN, TeamUserRole.MEMBER],
   MESSAGES_VIEW: [TeamUserRole.ADMIN, TeamUserRole.MEMBER, TeamUserRole.VIEWER],
+  MESSAGES_SHARE: [TeamUserRole.ADMIN, TeamUserRole.MEMBER],
   ANNOTATIONS_VIEW: [
     TeamUserRole.ADMIN,
     TeamUserRole.MEMBER,

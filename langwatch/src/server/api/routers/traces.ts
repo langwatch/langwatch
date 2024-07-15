@@ -5,7 +5,7 @@ import type {
   SearchTotalHits,
   Sort,
 } from "@elastic/elasticsearch/lib/api/types";
-import type { PrismaClient } from "@prisma/client";
+import { type PrismaClient } from "@prisma/client";
 import { prisma } from "~/server/db";
 import { TRPCError } from "@trpc/server";
 import similarity from "compute-cosine-similarity";

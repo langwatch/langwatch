@@ -2,7 +2,7 @@ import { useRouter } from "next/router";
 import { useEffect, useMemo } from "react";
 import { useLocalStorage } from "usehooks-ts";
 import { api } from "../utils/api";
-import { useRequiredSession } from "./useRequiredSession";
+import { publicRoutes, useRequiredSession } from "./useRequiredSession";
 import {
   organizationRolePermissionMapping,
   type OrganizationRoleGroup,
@@ -149,6 +149,7 @@ export const useOrganizationTeamProject = (
       return;
     }
 
+    if (publicRoutes.includes(router.route)) return;
     if (!redirectToOnboarding) return;
     if (!organizations.data) return;
 

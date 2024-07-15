@@ -20,6 +20,14 @@ const _guardProjectId = ({ params }: { params: Prisma.MiddlewareParams }) => {
   const action = params.action;
   const model = params.model;
 
+  if (
+    action === "findFirst" &&
+    model === "PublicShare" &&
+    params.args?.where?.id
+  ) {
+    return;
+  }
+
   if (action === "create" || action === "createMany") {
     const data =
       action === "create"

@@ -5,16 +5,11 @@ import {
   Container,
   HStack,
   Heading,
-  Input,
-  InputGroup,
-  InputRightElement,
   Spacer,
   Text,
   VStack,
-  useToast,
-  type InputGroupProps,
 } from "@chakra-ui/react";
-import { Copy } from "react-feather";
+import { CopyInput } from "../components/CopyInput";
 import {
   DashboardLayout,
   ProjectSelector,
@@ -57,49 +52,7 @@ export default function Authorize() {
   );
 }
 
-export function APIKeyCopyInput(props: InputGroupProps) {
+export function APIKeyCopyInput() {
   const { project } = useOrganizationTeamProject();
-  const toast = useToast();
-
-  return (
-    <InputGroup
-      {...props}
-      cursor="pointer"
-      onClick={() => {
-        if (!navigator.clipboard) {
-          toast({
-            title:
-              "Your browser does not support clipboard access, please copy the key manually",
-            status: "error",
-            duration: 2000,
-            isClosable: true,
-          });
-          return;
-        }
-
-        void (async () => {
-          await navigator.clipboard.writeText(project?.apiKey ?? "");
-          toast({
-            title: "API key copied to your clipboard",
-            status: "success",
-            duration: 2000,
-            isClosable: true,
-          });
-        })();
-      }}
-    >
-      <Input
-        cursor="pointer"
-        type="text"
-        value={project?.apiKey}
-        isReadOnly
-        _hover={{
-          backgroundColor: "gray.50",
-        }}
-      />
-      <InputRightElement>
-        <Copy />
-      </InputRightElement>
-    </InputGroup>
-  );
+  return <CopyInput value={project?.apiKey ?? ""} label="API key" />;
 }

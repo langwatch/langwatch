@@ -61,6 +61,7 @@ model User {
     createdAt       DateTime           @default(now())
     updatedAt       DateTime           @default(now()) @updatedAt
     Annotation      Annotation[]
+    publicShares    PublicShare[]
 }
 
 model VerificationToken {
@@ -172,6 +173,7 @@ model Project {
     topicClusteringModel String?
     TriggerSent          TriggerSent[]
     annotationScores     AnnotationScore[]
+    publicShares         PublicShare[]
 
     @@index([teamId])
 }
@@ -457,4 +459,25 @@ model AnnotationScore {
     options     Json?
 
     @@index([projectId])
+}
+
+enum PublicShareResourceTypes {
+    TRACE
+    THREAD
+}
+
+model PublicShare {
+    id           String                   @id @default(nanoid())
+    resourceType PublicShareResourceTypes
+    resourceId   String
+    projectId    String
+    project      Project                  @relation(fields: [projectId], references: [id])
+    userId       String
+    user         User                     @relation(fields: [userId], references: [id])
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @default(now()) @updatedAt
+
+    @@unique([projectId, resourceType, resourceId])
+    @@index([userId])
 }
