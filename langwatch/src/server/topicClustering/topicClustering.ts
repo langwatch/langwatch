@@ -290,7 +290,10 @@ export const batchClusterTraces = async (
   const topicModel = await getProjectTopicClusteringModelProvider(project);
   const clusteringResult = await fetchTopicsBatchClustering(project.id, {
     model: topicModel.model,
-    litellm_params: prepareLitellmParams(topicModel.modelProvider),
+    litellm_params: prepareLitellmParams(
+      topicModel.model,
+      topicModel.modelProvider
+    ),
     traces,
   });
 
@@ -342,7 +345,10 @@ export const incrementalClustering = async (
   const topicModel = await getProjectTopicClusteringModelProvider(project);
   const clusteringResult = await fetchTopicsIncrementalClustering(project.id, {
     model: topicModel.model,
-    litellm_params: prepareLitellmParams(topicModel.modelProvider),
+    litellm_params: prepareLitellmParams(
+      topicModel.model,
+      topicModel.modelProvider
+    ),
     traces,
     topics,
     subtopics,
