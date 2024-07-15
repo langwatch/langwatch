@@ -12,7 +12,7 @@ export type ModelOption = {
   version: string;
   icon: React.ReactNode;
   isDisabled: boolean;
-  mode: "chat" | "embedding";
+  mode?: "chat" | "embedding" | "evaluator" | undefined;
 };
 
 export const modelSelectorOptions: ModelOption[] = Object.entries(models).map(
@@ -22,7 +22,7 @@ export const modelSelectorOptions: ModelOption[] = Object.entries(models).map(
     version: value.version,
     icon: vendorIcons[value.model_vendor],
     isDisabled: false,
-    mode: value.mode as "chat" | "embedding",
+    mode: value.mode as "chat" | "embedding" | "evaluator",
   })
 );
 
@@ -31,13 +31,13 @@ export const ModelSelector = React.memo(function ModelSelector({
   options,
   onChange,
   size = "md",
-  mode = "chat",
+  mode,
 }: {
   model: string;
   options: string[];
   onChange: (model: string) => void;
   size?: "sm" | "md";
-  mode?: "chat" | "embedding";
+  mode?: "chat" | "embedding" | "evaluator";
 }) {
   const { project } = useOrganizationTeamProject();
 
@@ -47,7 +47,7 @@ export const ModelSelector = React.memo(function ModelSelector({
   );
 
   const modelOption = modelSelectorOptions.find(
-    (option) => option.value === model && option.mode === mode
+    (option) => option.value === model && (!mode || option.mode === mode)
   );
   const selectOptions: ModelOption[] = options
     .map((model) => {

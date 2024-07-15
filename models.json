@@ -142,5 +142,11 @@
     "version": "001",
     "model_vendor": "google",
     "mode": "chat"
+  },
+  "cloudflare/thebloke/llamaguard-7b-awq": {
+    "name": "LlamaGuard 7B",
+    "version": "thebloke/llamaguard-7b-awq",
+    "model_vendor": "cloudflare",
+    "mode": "evaluator"
   }
 }

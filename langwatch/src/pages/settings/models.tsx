@@ -398,6 +398,7 @@ function TopicClusteringModel() {
                     field.onChange(model);
                     void handleSubmit(onSubmit)();
                   }}
+                  mode="chat"
                 />
               )}
             />

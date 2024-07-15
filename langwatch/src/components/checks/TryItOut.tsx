@@ -24,6 +24,7 @@ import {
   Tr,
   VStack,
   useTheme,
+  useToast,
 } from "@chakra-ui/react";
 import { useEffect, useState } from "react";
 import { Pause, Play, RefreshCw, Search } from "react-feather";
@@ -35,6 +36,10 @@ import {
   type Evaluators,
   type SingleEvaluationResult,
 } from "../../trace_checks/evaluators.generated";
+import {
+  evaluatorsSchema,
+  evaluatorTypesSchema,
+} from "../../trace_checks/evaluators.zod.generated";
 import { getEvaluatorDefinitions } from "../../trace_checks/getEvaluator";
 import { evaluatePreconditions } from "../../trace_checks/preconditions";
 import { api } from "../../utils/api";
@@ -128,6 +133,8 @@ export function TryItOut({
 
   const runEvaluation = api.evaluations.runEvaluation.useMutation();
 
+  const toast = useToast();
+
   useEffect(() => {
     setRunningResults({});
     setRunningState({ state: "idle" });
@@ -168,12 +175,31 @@ export function TryItOut({
       }));
     };
 
+    let settings_;
+    try {
+      settings_ =
+        evaluatorsSchema.shape[evaluatorType].shape.settings.parse(settings);
+    } catch (e) {
+      if (Object.keys(evaluatorDefinition?.settings ?? {}).length === 0) {
+        settings_ = {};
+      } else {
+        toast({
+          title: "Invalid evaluator settings",
+          description: "Please check your settings and try again.",
+          status: "error",
+          duration: 5000,
+        });
+        console.error(e);
+        return;
+      }
+    }
+
     runEvaluation.mutate(
       {
         projectId: project.id,
         evaluatorType: evaluatorType,
         traceId: runningState.nextTraceId,
-        settings: settings ?? {},
+        settings: settings_,
       },
       {
         onSuccess: (result) => {
@@ -500,7 +526,9 @@ export function TryItOut({
                                 </Td>
                               ) : (
                                 <Td maxWidth="120" color={color}>
-                                  {numeral(runningResult.score).format("0.[00]")}
+                                  {numeral(runningResult.score).format(
+                                    "0.[00]"
+                                  )}
                                 </Td>
                               )
                             ) : i == firstPassingPrecondition ? (

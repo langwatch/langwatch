@@ -66,6 +66,16 @@ export const modelProviders = {
     }),
     enabledSince: new Date("2023-01-01"),
   },
+  cloudflare: {
+    name: "Cloudflare",
+    apiKey: "CLOUDFLARE_API_KEY",
+    endpointKey: undefined,
+    keysSchema: z.object({
+      CLOUDFLARE_ACCOUNT_ID: z.string().min(1),
+      CLOUDFLARE_API_KEY: z.string().min(1),
+    }),
+    enabledSince: new Date("2023-01-01"),
+  },
 } satisfies Record<string, ModelProviderDefinition>;
 
 function isValidJson(value: string) {

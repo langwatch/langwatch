@@ -172,6 +172,7 @@ const ChatWindow = React.memo(function ChatWindow({
           model={chatWindowState.model}
           onChange={(model) => setModel(windowId, model)}
           size="sm"
+          mode="chat"
         />
         <Spacer />
         <HStack spacing={0}>

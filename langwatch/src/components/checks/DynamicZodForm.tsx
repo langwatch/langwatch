@@ -98,7 +98,14 @@ const DynamicZodForm = ({
           </FormLabel>
         </HStack>
       );
-    } else if (fieldSchema_ instanceof z.ZodUnion) {
+    } else if (
+      fieldSchema_ instanceof z.ZodUnion ||
+      fieldSchema_ instanceof z.ZodLiteral
+    ) {
+      const options =
+        fieldSchema_ instanceof z.ZodUnion
+          ? fieldSchema_.options
+          : [{ value: fieldSchema_.value }];
       if (
         (fieldName === "model" || fieldName === "embeddings_model") &&
         evaluator?.name !== "OpenAI Moderation"
@@ -109,12 +116,11 @@ const DynamicZodForm = ({
             control={control}
             render={({ field }) => (
               <ModelSelector
-                options={fieldSchema_.options.map(
+                options={options.map(
                   (option: { value: string }) => option.value
                 )}
                 model={field.value}
                 onChange={(model) => field.onChange(model)}
-                mode={fieldName === "embeddings_model" ? "embedding" : "chat"}
               />
             )}
           />
@@ -129,7 +135,7 @@ const DynamicZodForm = ({
             <Select
               {...field}
               onChange={(e) => {
-                const literalValues = fieldSchema_.options.map(
+                const literalValues = options.map(
                   (option: any) => option.value
                 );
 
@@ -148,13 +154,11 @@ const DynamicZodForm = ({
               {fieldSchema instanceof z.ZodOptional && (
                 <option value=""></option>
               )}
-              {fieldSchema_.options.map(
-                (option: { value: string }, index: number) => (
-                  <option key={index} value={option.value}>
-                    {option.value}
-                  </option>
-                )
-              )}
+              {options.map((option: { value: string }, index: number) => (
+                <option key={index} value={option.value}>
+                  {option.value}
+                </option>
+              ))}
             </Select>
           )}
         />
@@ -262,10 +266,6 @@ const DynamicZodForm = ({
       return Object.keys(schema.shape).map((key) => {
         const field = schema.shape[key];
         const isOptional = field instanceof z.ZodOptional;
-
-        if (evaluatorType === "huggingface/llama_guard" && key === "model") {
-          return null;
-        }
 
         return (
           <React.Fragment key={key}>
