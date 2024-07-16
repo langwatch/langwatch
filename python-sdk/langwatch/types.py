@@ -170,3 +170,4 @@ class CollectorRESTParams(TypedDict):
     trace_id: str
     metadata: Optional[TraceMetadata]
     spans: List[Span]
+    expected_output: Optional[str]

@@ -328,13 +328,25 @@ class ContextSpan:
                     span_id=str(self.span_id),
                     parent_id=str(self.parent.span_id) if self.parent else None,
                     trace_id=str(self.trace.trace_id),
-                    input=reduce_payload_size(autoconvert_typed_values(self.input)) if self.input else None,
-                    output=(
-                        reduce_payload_size(autoconvert_typed_values(self.output)) if self.output else None
+                    input=(
+                        reduce_payload_size(autoconvert_typed_values(self.input))
+                        if self.input
+                        else None
                     ),
-                    error=reduce_payload_size(capture_exception(self.error)) if self.error else None,
+                    output=(
+                        reduce_payload_size(autoconvert_typed_values(self.output))
+                        if self.output
+                        else None
+                    ),
+                    error=(
+                        reduce_payload_size(capture_exception(self.error))
+                        if self.error
+                        else None
+                    ),
                     timestamps=self.timestamps,
-                    contexts=reduce_payload_size(autoconvert_rag_contexts(self.contexts or [])),
+                    contexts=reduce_payload_size(
+                        autoconvert_rag_contexts(self.contexts or [])
+                    ),
                 )
             )
         elif self.type == "llm":
@@ -345,11 +357,21 @@ class ContextSpan:
                     span_id=str(self.span_id),
                     parent_id=str(self.parent.span_id) if self.parent else None,
                     trace_id=str(self.trace.trace_id),
-                    input=reduce_payload_size(autoconvert_typed_values(self.input)) if self.input else None,
-                    output=(
-                        reduce_payload_size(autoconvert_typed_values(self.output)) if self.output else None
+                    input=(
+                        reduce_payload_size(autoconvert_typed_values(self.input))
+                        if self.input
+                        else None
                     ),
-                    error=reduce_payload_size(capture_exception(self.error)) if self.error else None,
+                    output=(
+                        reduce_payload_size(autoconvert_typed_values(self.output))
+                        if self.output
+                        else None
+                    ),
+                    error=(
+                        reduce_payload_size(capture_exception(self.error))
+                        if self.error
+                        else None
+                    ),
                     timestamps=self.timestamps,
                     model=self.model,
                     params=self.params,
@@ -364,11 +386,21 @@ class ContextSpan:
                     span_id=str(self.span_id),
                     parent_id=str(self.parent.span_id) if self.parent else None,
                     trace_id=str(self.trace.trace_id),
-                    input=reduce_payload_size(autoconvert_typed_values(self.input)) if self.input else None,
-                    output=(
-                        reduce_payload_size(autoconvert_typed_values(self.output)) if self.output else None
+                    input=(
+                        reduce_payload_size(autoconvert_typed_values(self.input))
+                        if self.input
+                        else None
                     ),
-                    error=reduce_payload_size(capture_exception(self.error)) if self.error else None,
+                    output=(
+                        reduce_payload_size(autoconvert_typed_values(self.output))
+                        if self.output
+                        else None
+                    ),
+                    error=(
+                        reduce_payload_size(capture_exception(self.error))
+                        if self.error
+                        else None
+                    ),
                     timestamps=self.timestamps,
                 )
             )
@@ -447,6 +479,7 @@ class ContextTrace:
 
     trace_id: Union[str, UUID]
     metadata: TraceMetadata = {}
+    expected_output: Optional[str] = None
     span: Type[ContextSpan]
     root_span: ContextSpan
 
@@ -459,6 +492,7 @@ class ContextTrace:
         self,
         trace_id: Optional[Union[str, UUID]] = None,
         metadata: Optional[TraceMetadata] = None,
+        expected_output: Optional[str] = None,
         api_key: Optional[str] = None,
         # Span constructor parameters
         span_id: Optional[str] = None,
@@ -482,6 +516,7 @@ class ContextTrace:
         self._capture_output = capture_output
         self.trace_id = trace_id or f"trace_{nanoid.generate()}"
         self.metadata = metadata or {}
+        self.expected_output = expected_output
         self.metadata.update({"sdk_version": get_version(), "sdk_language": "python"})
         self.span = cast(
             Type[ContextSpan], lambda **kwargs: ContextSpan(trace=self, **kwargs)
@@ -559,6 +594,7 @@ class ContextTrace:
         self,
         trace_id: Optional[Union[str, UUID]] = None,
         metadata: Optional[TraceMetadata] = None,
+        expected_output: Optional[str] = None,
         # root span update
         span_id: Optional[Union[str, UUID]] = None,
         name: Optional[str] = None,
@@ -576,6 +612,8 @@ class ContextTrace:
             self.trace_id = trace_id
         if metadata:
             self.metadata.update(metadata)
+        if expected_output:
+            self.expected_output = expected_output
 
         self.root_span.update(
             span_id=span_id,
@@ -616,6 +654,7 @@ class ContextTrace:
                 trace_id=str(self.trace_id),
                 metadata=self.metadata,
                 spans=list(self.spans.values()),
+                expected_output=self.expected_output,
             ),
             api_key=self.api_key,
         )

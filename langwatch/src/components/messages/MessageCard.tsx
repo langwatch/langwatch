@@ -1,4 +1,6 @@
 import {
+  Alert,
+  AlertTitle,
   Box,
   HStack,
   LinkOverlay,
@@ -23,6 +25,7 @@ import numeral from "numeral";
 import {
   CheckCircle,
   Clock,
+  CornerDownRight,
   Edit,
   MinusCircle,
   Shield,
@@ -219,6 +222,15 @@ export function MessageCard({
                 <Text>{"<empty>"}</Text>
               )}
             </Box>
+            {trace.expected_output && (
+              <Alert status="warning" fontSize={13}>
+                <Box paddingRight={2}>
+                  <CornerDownRight size="16" />
+                </Box>
+                <AlertTitle>Expected Output:</AlertTitle>
+                <Text>{getSlicedExpectedOutput(trace)}</Text>
+              </Alert>
+            )}
           </VStack>
         )}
       </VStack>
@@ -487,6 +499,15 @@ export const getExtractedInput = (trace: Trace) => {
 
 const getSlicedOutput = (trace: Trace) => {
   const value = trace.output?.value.slice(0, 600);
+
+  return (
+    (value ? value : "<empty>") +
+    (trace.output && trace.output.value.length >= 600 ? "..." : "")
+  );
+};
+
+export const getSlicedExpectedOutput = (trace: Trace) => {
+  const value = trace.expected_output?.value.slice(0, 600);
 
   return (
     (value ? value : "<empty>") +

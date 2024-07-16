@@ -13,6 +13,9 @@ import {
   VStack,
   Grid,
   GridItem,
+  Alert,
+  AlertTitle,
+  AlertIcon,
 } from "@chakra-ui/react";
 import ErrorPage from "next/error";
 import { useRouter } from "next/router";
@@ -31,10 +34,19 @@ import type { Trace } from "../../../../server/tracer/types";
 import { api } from "../../../../utils/api";
 import { isNotFound } from "../../../../utils/trpcError";
 
-import { Edit, ThumbsDown, ThumbsUp } from "react-feather";
+import {
+  CornerDownRight,
+  CornerRightDown,
+  Edit,
+  ThumbsDown,
+  ThumbsUp,
+} from "react-feather";
 import { Annotations } from "../../../../components/Annotations";
 import { useDrawer } from "../../../../components/CurrentDrawer";
-import { getExtractedInput } from "../../../../components/messages/MessageCard";
+import {
+  getExtractedInput,
+  getSlicedExpectedOutput,
+} from "../../../../components/messages/MessageCard";
 import { formatTimeAgo } from "../../../../utils/formatTimeAgo";
 
 export default function TraceDetails() {
@@ -364,6 +376,15 @@ const TraceMessages = React.forwardRef(function TraceMessages(
                     </Markdown>
                   ) : (
                     <Text paddingY={2}>{"<empty>"}</Text>
+                  )}
+                  {trace.expected_output && (
+                    <Alert status="warning">
+                      <Box paddingRight={2}>
+                        <CornerDownRight size="16" />
+                      </Box>
+                      <AlertTitle>Expected Output:</AlertTitle>
+                      <Text>{getSlicedExpectedOutput(trace)}</Text>
+                    </Alert>
                   )}
                 </Message>
               </Box>
