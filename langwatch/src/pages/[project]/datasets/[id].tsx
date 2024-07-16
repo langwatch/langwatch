@@ -40,7 +40,10 @@ import { api } from "~/utils/api";
 import { schemaDisplayName } from "~/utils/datasets";
 import { DatasetGrid } from "../../../components/datasets/DatasetGrid";
 import { newDatasetEntriesSchema } from "~/server/datasets/types";
-import { type datasetSpanSchema } from "~/server/tracer/types.generated";
+import {
+  type datasetSpanSchema,
+  type rAGChunkSchema,
+} from "~/server/tracer/types.generated";
 
 import { nanoid } from "nanoid";
 import { formatFileSize, useCSVReader } from "react-papaparse";
@@ -57,7 +60,7 @@ type RecordEntry = {
   id: string;
   input: string;
   expected_output: string;
-  contexts?: string[];
+  contexts?: string[] | typeof rAGChunkSchema;
   spans?: (typeof datasetSpanSchema)[];
   llm_input?: string;
   expected_llm_output?: string;

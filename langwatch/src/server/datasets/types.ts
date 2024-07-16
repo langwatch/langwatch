@@ -2,6 +2,7 @@ import { z } from "zod";
 import {
   datasetSpanSchema,
   chatMessageSchema,
+  rAGChunkSchema,
 } from "../tracer/types.generated";
 
 export type OneMessagePerRowColumns =
@@ -43,7 +44,9 @@ export const newDatasetEntriesSchema = z.union([
         input: z.string().optional(),
         expected_output: z.string().optional(),
         spans: z.array(datasetSpanSchema).optional(),
-        contexts: z.array(z.string()).optional(),
+        contexts: z
+          .union([z.array(rAGChunkSchema), z.array(z.string())])
+          .optional(),
         comments: z.string().optional(),
       })
     ),
