@@ -50,7 +50,6 @@ export function EvaluatorSelection({
 
   const availableEvaluators = Object.entries(AVAILABLE_EVALUATORS).filter(
     ([key, evaluator]) =>
-      !evaluator.requiredFields.includes("expected_output") &&
       !key.startsWith("example/") &&
       key !== "aws/comprehend_pii_detection"
   );
@@ -163,14 +162,28 @@ export function EvaluatorSelection({
                           "Detects"
                         )}
                       </Text>
-                      <HStack>
+                      <HStack wrap="wrap">
                         {evaluator.requiredFields.includes("contexts") && (
                           <Link
-                            href="https://docs.langwatch.ai/docs/rag/capture_rag"
+                            href="https://docs.langwatch.ai/rags/rags-context-tracking"
                             target="_blank"
                           >
                             <Tooltip label="Only messages with contexts can run this evaluation, click for more info">
-                              <Tag colorScheme="orange">Requires RAG</Tag>
+                              <Tag colorScheme="orange" whiteSpace="nowrap">
+                                Requires RAG
+                              </Tag>
+                            </Tooltip>
+                          </Link>
+                        )}
+                        {evaluator.requiredFields.includes("expected_output") && (
+                          <Link
+                            href="https://docs.langwatch.ai/docs/expected_output"
+                            target="_blank"
+                          >
+                            <Tooltip label="Only messages with expected outputs can run this evaluation, click for more info">
+                              <Tag backgroundColor="blue.50" color="blue.700" whiteSpace="nowrap">
+                                Requires Expected Output
+                              </Tag>
                             </Tooltip>
                           </Link>
                         )}

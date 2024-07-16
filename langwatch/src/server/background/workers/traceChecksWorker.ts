@@ -85,14 +85,13 @@ export const runEvaluationForTrace = async ({
     };
   }
 
-  let input = trace.input.value;
-  let output = trace.output?.value;
-  let contexts = undefined;
+  const input = trace.input.value;
+  const output = trace.output?.value;
+  const expected_output = trace.expected_output?.value;
 
+  let contexts = undefined;
   if (evaluator.requiredFields.includes("contexts")) {
     const ragInfo = getRAGInfo(spans);
-    input = ragInfo.input ?? input;
-    output = ragInfo.output ?? output;
     contexts = ragInfo.contexts;
   }
 
@@ -102,7 +101,7 @@ export const runEvaluationForTrace = async ({
     input,
     output,
     contexts,
-    expected_output: undefined,
+    expected_output,
     settings: settings && typeof settings === "object" ? settings : undefined,
   });
 

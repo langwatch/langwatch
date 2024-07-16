@@ -26,6 +26,12 @@ export function evaluatePreconditions(
     }
   }
 
+  if (evaluator?.requiredFields.includes("expected_output")) {
+    if (!trace.expected_output) {
+      return false;
+    }
+  }
+
   for (const precondition of preconditions) {
     const valueMap = {
       input: trace.input.value,

@@ -117,7 +117,6 @@ export const createShare = async ({
       projectId,
       resourceType,
       resourceId,
-      userId: userId ?? null,
     },
   });
 

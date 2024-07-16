@@ -87,6 +87,23 @@ export const PreconditionsField = ({
             </VStack>
           </Box>
         )}
+        {evaluator?.requiredFields.includes("expected_output") && (
+          <Box borderLeft="4px solid" borderLeftColor="blue.400" width="full">
+            <VStack
+              borderLeftColor="reset"
+              padding={3}
+              width="full"
+              align="start"
+              position="relative"
+            >
+              <Text>Requires an Expected Output</Text>
+              <Text color="gray.500" fontStyle="italic">
+                This precondition is necessary to run this evaluation and cannot
+                be removed
+              </Text>
+            </VStack>
+          </Box>
+        )}
         {fields.map((field, index) => (
           <Box
             key={field.id}
