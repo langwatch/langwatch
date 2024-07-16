@@ -320,7 +320,7 @@ export type CollectorRESTParams = {
     sdk_version?: string | null | undefined;
     sdk_language?: string | null | undefined;
   };
-  expected_output?: string;
+  expected_output?: string | null;
 };
 
 export type CollectorRESTParamsValidator = Omit<CollectorRESTParams, "spans">;

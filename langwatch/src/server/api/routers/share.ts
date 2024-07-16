@@ -88,16 +88,10 @@ export const shareRouter = createTRPCRouter({
       })
     )
     .use(checkUserPermissionForProject(TeamRoleGroup.MESSAGES_SHARE))
-    .mutation(async ({ input, ctx }) => {
+    .mutation(async ({ input }) => {
       const { projectId, resourceType, resourceId } = input;
 
-      await ctx.prisma.publicShare.deleteMany({
-        where: {
-          projectId,
-          resourceType,
-          resourceId,
-        },
-      });
+      await unshareItem({ projectId, resourceType, resourceId });
     }),
 });
 
@@ -132,4 +126,22 @@ export const createShare = async ({
   }
 
   return share;
+};
+
+export const unshareItem = async ({
+  projectId,
+  resourceType,
+  resourceId,
+}: {
+  projectId: string;
+  resourceType: "TRACE" | "THREAD";
+  resourceId: string;
+}) => {
+  await prisma.publicShare.deleteMany({
+    where: {
+      projectId,
+      resourceType,
+      resourceId,
+    },
+  });
 };

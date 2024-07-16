@@ -7,6 +7,7 @@ from typing import Any, Callable, Dict, List, Optional, Type, TypeVar, Union, ca
 from uuid import UUID
 from warnings import warn
 from deprecated import deprecated
+import httpx
 
 import nanoid
 import requests
@@ -723,6 +724,24 @@ class ContextTrace:
         import langwatch.litellm  # import dynamically here instead of top-level because users might not have litellm installed
 
         langwatch.litellm.LiteLLMPatch(trace=self, client=client)
+
+    def share(self):
+        with httpx.Client() as client:
+            response = client.post(
+                f"{langwatch.endpoint}/api/trace/{self.trace_id}/share",
+                headers={"X-Auth-Token": str(self.api_key)},
+            )
+            response.raise_for_status()
+            path = response.json()["path"]
+            return f"{langwatch.endpoint}{path}"
+
+    def unshare(self):
+        with httpx.Client() as client:
+            response = client.post(
+                f"{langwatch.endpoint}/api/trace/{self.trace_id}/unshare",
+                headers={"X-Auth-Token": str(self.api_key)},
+            )
+            response.raise_for_status()
 
 
 @retry(tries=5, delay=0.5, backoff=3)

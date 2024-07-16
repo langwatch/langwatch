@@ -1,6 +1,6 @@
 import { type NextApiRequest, type NextApiResponse } from "next";
 import { prisma } from "~/server/db";
-import { createShare } from "~/server/api/routers/share";
+import { unshareItem } from "~/server/api/routers/share";
 
 export default async function handler(
   req: NextApiRequest,
@@ -27,13 +27,11 @@ export default async function handler(
 
   const traceId = req.query.id as string;
 
-  const share = await createShare({
+  await unshareItem({
     projectId: project.id,
     resourceType: "TRACE",
     resourceId: traceId,
   });
 
-  return res
-    .status(200)
-    .json({ status: "success", path: `/share/${share.id}` });
+  return res.status(200).json({ status: "success" });
 }

@@ -1,4 +1,3 @@
-import time
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -11,45 +10,36 @@ sys.path.append("..")
 import langwatch
 
 
-@langwatch.span(type="llm")
-def generate(contexts: list[str], message: str):
-    time.sleep(1)  # generating the message...
-
-    generated_message = "Hello there! How can I help?"
-
-    langwatch.get_current_span().update(model="custom_model")
-
-    return generated_message
-
-
-@langwatch.span(type="rag")
-def retrieve(message: str):
-    time.sleep(0.5)
-    contexts = ["context1", "context2"]
-
-    langwatch.get_current_span().update(contexts=contexts)
-
-    return contexts
-
-
-@langwatch.span()
-def rag(message: str):
-    contexts = retrieve(message)
-    return generate(contexts, message)
-
-
 @cl.on_message
-@langwatch.trace()
 async def main(message: cl.Message):
     msg = cl.Message(
         content="",
     )
 
-    generated_message = rag(message.content)
+    trace = langwatch.trace()
 
-    langwatch.get_current_trace().update(
+    # Create two spans, one for the RAG, and one for the "LLM call" inside it
+    rag_span = trace.span(type="rag", input=message.content)
+    contexts = ["context1", "context2"]
+    rag_span.update(contexts=contexts)
+
+    llm_span = rag_span.span(type="llm", input=str(contexts) + " " + message.content)
+    generated_message = "Hello there! How can I help?"
+    llm_span.end(output=generated_message)
+    rag_span.end(output=generated_message)
+
+    # Set what is the expected output of the trace, to be used on evaluations like Ragas Correctness
+    trace.update(
         expected_output="Hello there! How can I be helpful?"
     )
+
+    # Send the trace in the background
+    trace.deferred_send_spans()
+    # OR send the trace synchonously to be sure before generating the url, maybe a better option
+    # trace.send_spans()
+
+    public_url = trace.share() # it works even before the trace was fully synced, but users might take a second to see on the UI
+    print("See the trace at:", public_url)
 
     await msg.stream_token(generated_message)
     await msg.update()
