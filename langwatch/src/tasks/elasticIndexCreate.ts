@@ -127,6 +127,11 @@ const traceMapping: ElasticSearchMappingFrom<ElasticSearchTrace> = {
       content: { type: "text" },
     },
   },
+  expected_output: {
+    properties: {
+      value: { type: "text" },
+    },
+  },
 };
 
 const spanMapping: ElasticSearchMappingFrom<ElasticSearchSpan> = {

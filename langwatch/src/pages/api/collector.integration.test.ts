@@ -84,6 +84,7 @@ describe("Collector API Endpoint", () => {
         customer_id: "customer_test-customer_1",
         labels: ["test-label-1.0.0"],
       },
+      expected_output: "world",
     };
 
     const { req, res }: { req: NextApiRequest; res: NextApiResponse } =
@@ -152,7 +153,7 @@ describe("Collector API Endpoint", () => {
       },
       input: {
         value: "hello",
-        satisfaction_score: expect.any(Number),
+        // satisfaction_score: expect.any(Number),
         embeddings: {
           embeddings: expect.any(Array),
           model: DEFAULT_EMBEDDINGS_MODEL,
@@ -173,6 +174,7 @@ describe("Collector API Endpoint", () => {
         total_cost: 0.0000125,
         tokens_estimated: true,
       },
+      expected_output: { value: "world" },
       error: null,
       indexing_md5s: expect.any(Array),
     });
@@ -523,7 +525,7 @@ describe("Collector API Endpoint", () => {
     expect(indexedTrace).toMatchObject({
       input: {
         value: "hey there, my email is [REDACTED], please check it for me",
-        satisfaction_score: expect.any(Number),
+        // satisfaction_score: expect.any(Number), // Fails if langwatch_nlp is off
         embeddings: {
           embeddings: expect.any(Array),
           model: DEFAULT_EMBEDDINGS_MODEL,

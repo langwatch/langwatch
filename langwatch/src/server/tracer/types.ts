@@ -254,6 +254,7 @@ export type Trace = {
   input: TraceInput;
   output?: TraceOutput;
   contexts?: RAGChunk[];
+  expected_output?: { value: string };
   metrics: {
     first_token_ms?: number | null;
     total_time_ms?: number | null;
@@ -319,6 +320,7 @@ export type CollectorRESTParams = {
     sdk_version?: string | null | undefined;
     sdk_language?: string | null | undefined;
   };
+  expected_output?: string;
 };
 
 export type CollectorRESTParamsValidator = Omit<CollectorRESTParams, "spans">;

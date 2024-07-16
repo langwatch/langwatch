@@ -126,7 +126,7 @@ export default async function handler(
     return res.status(400).json({ error: validationError.message });
   }
 
-  const { trace_id: nullableTraceId } = params;
+  const { trace_id: nullableTraceId, expected_output: expectedOutput } = params;
   const {
     thread_id: threadId,
     user_id: userId,
@@ -314,6 +314,7 @@ export default async function handler(
     },
     input,
     output,
+    expected_output: expectedOutput ? { value: expectedOutput } : undefined,
     metrics: computeTraceMetrics(spans),
     error,
     indexing_md5s: [...(existingTrace?.indexing_md5s ?? []), paramsMD5],
