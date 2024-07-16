@@ -26,9 +26,11 @@ import {
   useTheme,
   useToast,
 } from "@chakra-ui/react";
+import numeral from "numeral";
 import { useEffect, useState } from "react";
 import { Pause, Play, RefreshCw, Search } from "react-feather";
 import { type UseFormReturn } from "react-hook-form";
+import { useDebounceValue } from "usehooks-ts";
 import { useFilterParams } from "../../hooks/useFilterParams";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { elasticSearchSpanToSpan } from "../../server/tracer/types";
@@ -37,23 +39,20 @@ import {
   type SingleEvaluationResult,
 } from "../../trace_checks/evaluators.generated";
 import {
-  evaluatorsSchema,
-  evaluatorTypesSchema,
+  evaluatorsSchema
 } from "../../trace_checks/evaluators.zod.generated";
 import { getEvaluatorDefinitions } from "../../trace_checks/getEvaluator";
 import { evaluatePreconditions } from "../../trace_checks/preconditions";
+import type { CheckPreconditions } from "../../trace_checks/types";
 import { api } from "../../utils/api";
+import { formatMoney } from "../../utils/formatMoney";
+import type { Money } from "../../utils/types";
 import { useDrawer } from "../CurrentDrawer";
 import { PeriodSelector, usePeriodSelector } from "../PeriodSelector";
 import { FilterSidebar } from "../filters/FilterSidebar";
 import { FilterToggle } from "../filters/FilterToggle";
 import type { CheckConfigFormData } from "./CheckConfigForm";
 import { checkStatusColorMap } from "./EvaluationStatus";
-import { useDebounceValue } from "usehooks-ts";
-import type { CheckPreconditions } from "../../trace_checks/types";
-import { formatMoney } from "../../utils/formatMoney";
-import type { Money } from "../../utils/types";
-import numeral from "numeral";
 
 export function TryItOut({
   form,
@@ -444,7 +443,7 @@ export function TryItOut({
                               <Tooltip
                                 label={
                                   livePassesPreconditions
-                                    ? trace.input.value
+                                    ? trace.input?.value ?? ""
                                     : undefined
                                 }
                               >
@@ -453,9 +452,7 @@ export function TryItOut({
                                   wordBreak="break-all"
                                   display="block"
                                 >
-                                  {trace.input.value
-                                    ? trace.input.value
-                                    : "<empty>"}
+                                  {trace.input?.value ?? "<empty>"}
                                 </Text>
                               </Tooltip>
                             </Td>

@@ -27,7 +27,7 @@ export const scoreSatisfactionFromInput = async ({
     throw new Error("LANGWATCH_NLP_SERVICE not set");
   }
 
-  if (!input.embeddings) {
+  if (!input?.embeddings) {
     console.warn(
       `Trace ID ${traceId} input does not have embeddings, skipping the job`
     );

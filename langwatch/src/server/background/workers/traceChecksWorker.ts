@@ -85,7 +85,7 @@ export const runEvaluationForTrace = async ({
     };
   }
 
-  const input = trace.input.value;
+  const input = trace.input?.value;
   const output = trace.output?.value;
   const expected_output = trace.expected_output?.value;
 

@@ -1,11 +1,10 @@
+import { TriggerAction, type Project, type Trigger } from "@prisma/client";
 import { type NextApiRequest, type NextApiResponse } from "next";
-import { type Trigger, TriggerAction, type Project } from "@prisma/client";
 import { getAllForProject } from "~/server/api/routers/traces";
-import { prisma } from "../../server/db";
 import { sendTriggerEmail } from "~/server/mailer/triggerEmail";
 import { sendSlackWebhook } from "~/server/triggers/sendSlackWebhook";
+import { prisma } from "../../server/db";
 import { getLatestUpdatedAt } from "./utils";
-import { trace } from "@sentry/nextjs";
 
 import { type Trace } from "~/server/tracer/types";
 
@@ -104,7 +103,7 @@ const getTracesForAlert = async (trigger: Trigger, projects: Project[]) => {
   if (tracesToSend.length > 0) {
     const triggerData: TriggerData[] = tracesToSend.flatMap((group) =>
       group.map((trace) => ({
-        input: trace.input?.value,
+        input: trace.input?.value ?? "",
         output: trace.output?.value ?? "",
         traceId: trace.trace_id,
         projectId: input.projectId,

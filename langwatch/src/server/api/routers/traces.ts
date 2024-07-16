@@ -881,10 +881,17 @@ const groupTraces = <T extends Trace>(
   const matchesGroup = (trace: T, member: T) => {
     if (groupBy === "input") {
       const similarityThreshold = 0.85;
+      if (
+        !trace.input?.embeddings?.embeddings ||
+        !member.input?.embeddings?.embeddings
+      ) {
+        return false;
+      }
+
       return (
         (similarity(
-          trace.input.embeddings!.embeddings,
-          member.input.embeddings!.embeddings
+          trace.input.embeddings.embeddings,
+          member.input.embeddings.embeddings
         ) ?? 0) > similarityThreshold
       );
     }

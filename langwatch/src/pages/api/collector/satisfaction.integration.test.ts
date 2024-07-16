@@ -26,9 +26,11 @@ describe("Satisfaction Scoring Integration Test", () => {
   };
 
   beforeAll(async () => {
-    testTraceData.input.embeddings = await getOpenAIEmbeddings(
-      testTraceData.input.value
-    );
+    if (testTraceData.input) {
+      testTraceData.input.embeddings = await getOpenAIEmbeddings(
+        testTraceData.input.value
+      );
+    }
 
     // Create a trace entry in Elasticsearch for the test
     await esClient.index({
@@ -75,6 +77,6 @@ describe("Satisfaction Scoring Integration Test", () => {
     const updatedTrace = result._source;
     expect(updatedTrace).not.toBeNull();
     expect(updatedTrace?.input).toHaveProperty("satisfaction_score");
-    expect(updatedTrace?.input.satisfaction_score).toBeGreaterThan(0);
+    expect(updatedTrace?.input?.satisfaction_score).toBeGreaterThan(0);
   });
 });

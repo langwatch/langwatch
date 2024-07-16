@@ -251,7 +251,7 @@ export type Trace = {
     sdk_language?: string;
   };
   timestamps: { started_at: number; inserted_at: number; updated_at: number };
-  input: TraceInput;
+  input?: TraceInput;
   output?: TraceOutput;
   contexts?: RAGChunk[];
   expected_output?: { value: string };

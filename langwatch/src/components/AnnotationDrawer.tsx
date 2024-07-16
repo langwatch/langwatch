@@ -80,7 +80,6 @@ export function AnnotationDrawer({
     handleSubmit,
     watch,
     setValue,
-    formState: { errors },
     reset,
   } = useForm({
     defaultValues: {

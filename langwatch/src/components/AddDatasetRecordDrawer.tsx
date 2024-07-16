@@ -230,7 +230,7 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
         };
 
         if (columns.includes("input")) {
-          row.input = trace.input.value;
+          row.input = trace.input?.value ?? "";
         }
         if (columns.includes("expected_output")) {
           row.expected_output = trace.output?.value ?? "";

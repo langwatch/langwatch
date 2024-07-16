@@ -748,10 +748,6 @@ class ContextTrace:
 def send_spans(data: CollectorRESTParams, api_key: Optional[str] = None):
     import json
 
-    if len(data["spans"]) == 0:
-        get_logger().debug(f"No spans to send: {data}")
-        return
-
     get_logger().debug(
         f"Sending trace: {json.dumps(data, cls=SerializableAndPydanticEncoder, indent=2)}"
     )
@@ -772,6 +768,7 @@ def send_spans(data: CollectorRESTParams, api_key: Optional[str] = None):
             "Content-Type": "application/json",
         },
     )
+
     if response.status_code == 429:
         json = response.json()
         if "message" in json and "ERR_PLAN_LIMIT" in json["message"]:
@@ -779,6 +776,16 @@ def send_spans(data: CollectorRESTParams, api_key: Optional[str] = None):
         else:
             warn("Rate limit exceeded, dropping message from being sent to LangWatch")
     else:
+        if response.status_code >= 300 and response.status_code < 500:
+            try:
+                json = response.json()
+                if "message" in json:
+                    message = json["message"]
+                    warn(f"LangWatch returned an error: {message}")
+                else:
+                    warn(f"LangWatch returned an error: {response.content}")
+            except:
+                warn(f"LangWatch returned an error: {response.content}")
         response.raise_for_status()
 
 

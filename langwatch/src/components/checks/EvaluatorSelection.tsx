@@ -2,30 +2,30 @@ import {
   Box,
   Grid,
   GridItem,
-  VStack,
-  Text,
+  HStack,
   Heading,
+  Link,
   Tab,
   TabList,
   TabPanel,
   TabPanels,
   Tabs,
   Tag,
-  HStack,
-  Link,
+  Text,
   Tooltip,
+  VStack,
 } from "@chakra-ui/react";
+import { useRouter } from "next/router";
+import { Shield } from "react-feather";
+import type { UseFormReturn } from "react-hook-form";
 import {
   AVAILABLE_EVALUATORS,
   type EvaluatorDefinition,
   type EvaluatorTypes,
 } from "../../trace_checks/evaluators.generated";
-import type { CheckConfigFormData } from "./CheckConfigForm";
-import type { UseFormReturn } from "react-hook-form";
-import { useRouter } from "next/router";
-import { titleCase } from "../../utils/stringCasing";
-import { Shield } from "react-feather";
 import { isFeatureEnabled } from "../../utils/featureFlags";
+import { titleCase } from "../../utils/stringCasing";
+import type { CheckConfigFormData } from "./CheckConfigForm";
 
 type Category = EvaluatorDefinition<any>["category"];
 

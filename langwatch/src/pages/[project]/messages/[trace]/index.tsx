@@ -1,7 +1,11 @@
 import {
+  Alert,
+  AlertTitle,
   Avatar,
   Box,
   Container,
+  Grid,
+  GridItem,
   HStack,
   Heading,
   Skeleton,
@@ -10,12 +14,7 @@ import {
   Spinner,
   Text,
   Tooltip,
-  VStack,
-  Grid,
-  GridItem,
-  Alert,
-  AlertTitle,
-  AlertIcon,
+  VStack
 } from "@chakra-ui/react";
 import ErrorPage from "next/error";
 import { useRouter } from "next/router";
@@ -29,17 +28,15 @@ import Markdown from "react-markdown";
 import { DashboardLayout } from "../../../../components/DashboardLayout";
 import { useOrganizationTeamProject } from "../../../../hooks/useOrganizationTeamProject";
 import { useTraceDetailsState } from "../../../../hooks/useTraceDetailsState";
-import { TeamRoleGroup } from "../../../../server/api/permission";
 import type { Trace } from "../../../../server/tracer/types";
 import { api } from "../../../../utils/api";
 import { isNotFound } from "../../../../utils/trpcError";
 
 import {
   CornerDownRight,
-  CornerRightDown,
   Edit,
   ThumbsDown,
-  ThumbsUp,
+  ThumbsUp
 } from "react-feather";
 import { Annotations } from "../../../../components/Annotations";
 import { useDrawer } from "../../../../components/CurrentDrawer";

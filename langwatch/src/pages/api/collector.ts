@@ -216,7 +216,7 @@ export default async function handler(
   const traceIds = Array.from(
     new Set(spans.filter((span) => span.trace_id).map((span) => span.trace_id))
   );
-  if (!traceIds[0] || traceIds.length > 1 || traceIds[0] != traceId) {
+  if (traceIds[0] && (traceIds.length > 1 || traceIds[0] != traceId)) {
     return res
       .status(400)
       .json({ message: "All spans must have the same trace id" });
@@ -308,13 +308,19 @@ export default async function handler(
       sdk_language: nullToUndefined(sdkLanguage),
     },
     timestamps: {
-      started_at: Math.min(...spans.map((span) => span.timestamps.started_at)),
-      inserted_at: Date.now(),
+      ...(!existingTrace
+        ? {
+            started_at:
+              Math.min(...spans.map((span) => span.timestamps.started_at)) ??
+              Date.now(),
+            inserted_at: Date.now(),
+          }
+        : {}),
       updated_at: Date.now(),
-    },
-    input,
-    output,
-    expected_output: expectedOutput ? { value: expectedOutput } : undefined,
+    } as ElasticSearchTrace["timestamps"],
+    ...(input?.value ? { input } : {}),
+    ...(output?.value ? { output } : {}),
+    ...(expectedOutput ? { expected_output: { value: expectedOutput } } : {}),
     metrics: computeTraceMetrics(spans),
     error,
     indexing_md5s: [...(existingTrace?.indexing_md5s ?? []), paramsMD5],
@@ -340,10 +346,13 @@ export default async function handler(
     return res.status(500).json({ message: "Something went wrong!" });
   }
 
-  await esClient.index({
+  await esClient.update({
     index: TRACE_INDEX,
     id: traceIndexId({ traceId, projectId: project.id }),
-    body: trace,
+    body: {
+      doc: trace,
+      doc_as_upsert: true,
+    },
   });
 
   // Does not re-schedule trace checks for too old traces being resynced
@@ -351,10 +360,10 @@ export default async function handler(
     void scheduleTraceChecks(trace, spans);
   }
 
-  await markProjectFirstMessage(project);
+  void markProjectFirstMessage(project);
 
   try {
-    await scoreSatisfactionFromInput({
+    void scoreSatisfactionFromInput({
       traceId: trace.trace_id,
       projectId: trace.project_id,
       input: trace.input,

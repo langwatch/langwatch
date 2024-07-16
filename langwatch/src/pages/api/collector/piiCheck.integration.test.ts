@@ -18,7 +18,7 @@ describe("PIICheck", () => {
       },
     };
     await cleanupPIIs(sampleTrace, [], PIIRedactionLevel.ESSENTIAL);
-    expect(sampleTrace.input.value).toEqual("hi there");
+    expect(sampleTrace.input?.value).toEqual("hi there");
 
     const samplePIITrace: Trace = {
       trace_id: "foo",
@@ -36,7 +36,7 @@ describe("PIICheck", () => {
     };
 
     await cleanupPIIs(samplePIITrace, [], PIIRedactionLevel.ESSENTIAL);
-    expect(samplePIITrace.input.value).toEqual(
+    expect(samplePIITrace.input?.value).toEqual(
       "hi there, my credit card number is [REDACTED]"
     );
   });

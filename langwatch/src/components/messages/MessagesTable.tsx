@@ -246,14 +246,14 @@ export function MessagesTable() {
             })
           }
         >
-          <Tooltip label={trace.input.value}>
+          <Tooltip label={trace.input?.value ?? ""}>
             <Text noOfLines={1} wordBreak="break-all" display="block">
-              {trace.input.value}
+              {trace.input?.value ?? ""}
             </Text>
           </Tooltip>
         </Td>
       ),
-      value: (trace: Trace) => trace.input.value,
+      value: (trace: Trace) => trace.input?.value ?? "",
     },
     "trace.output.value": {
       name: "Output",

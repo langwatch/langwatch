@@ -34,7 +34,7 @@ export function evaluatePreconditions(
 
   for (const precondition of preconditions) {
     const valueMap = {
-      input: trace.input.value,
+      input: trace.input?.value ?? "",
       output: trace.output?.value ?? "",
       "metadata.labels": trace.metadata.labels ?? [],
     };
@@ -81,7 +81,7 @@ export function evaluatePreconditions(
         break;
       case "is_similar_to":
         const embeddingsMap = {
-          input: trace.input.embeddings?.embeddings ?? [],
+          input: trace.input?.embeddings?.embeddings ?? [],
           output: trace.output?.embeddings?.embeddings ?? [],
           "metadata.labels": null,
         };

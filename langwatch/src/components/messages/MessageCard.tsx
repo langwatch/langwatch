@@ -480,7 +480,7 @@ export function MessageCard({
 export const getExtractedInput = (trace: Trace) => {
   const input = trace.input;
 
-  let value = input.value;
+  let value = input?.value ?? "";
   try {
     const json: any = JSON.parse(value);
     if (

@@ -190,13 +190,14 @@ export const clusterTopicsForProject = async (
     .map((hit) => hit._source!)
     .filter(
       (trace) =>
-        !!trace?.input.value &&
-        trace?.input.embeddings?.model === DEFAULT_EMBEDDINGS_MODEL
+        !!trace?.input?.value &&
+        !!trace?.input?.embeddings?.embeddings &&
+        trace?.input?.embeddings?.model === DEFAULT_EMBEDDINGS_MODEL
     )
     .map((trace) => ({
       trace_id: trace.trace_id,
-      input: trace.input.value,
-      embeddings: trace.input.embeddings!.embeddings,
+      input: trace.input?.value ?? "",
+      embeddings: trace.input?.embeddings?.embeddings ?? [],
       topic_id:
         trace.metadata?.topic_id && topicIds.includes(trace.metadata.topic_id)
           ? trace.metadata.topic_id
