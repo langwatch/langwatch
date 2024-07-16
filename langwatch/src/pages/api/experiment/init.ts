@@ -8,6 +8,7 @@ import { type ExperimentType, type Project } from "@prisma/client";
 import * as Sentry from "@sentry/nextjs";
 import { z } from "zod";
 import { nanoid } from "nanoid";
+import slugify from "slugify";
 
 export const debug = getDebugger("langwatch:dspy:init");
 
@@ -63,7 +64,9 @@ export default async function handler(
     params.experiment_type
   );
 
-  return res.status(200).json({ path: `/${project.slug}/experiments/${experiment.slug}` });
+  return res
+    .status(200)
+    .json({ path: `/${project.slug}/experiments/${experiment.slug}` });
 }
 
 export const findOrCreateExperiment = async (
@@ -71,14 +74,20 @@ export const findOrCreateExperiment = async (
   experiment_slug: string,
   experiment_type: ExperimentType
 ) => {
+  const slug_ = slugify(experiment_slug.replace(/[:\?&]/g, "-"), {
+    lower: true,
+    strict: true,
+    replacement: "-",
+  });
   let experiment = await prisma.experiment.findUnique({
-    where: { projectId_slug: { projectId: project.id, slug: experiment_slug } },
+    where: { projectId_slug: { projectId: project.id, slug: slug_ } },
   });
   if (!experiment) {
     experiment = await prisma.experiment.create({
       data: {
         id: `experiment_${nanoid()}`,
-        slug: experiment_slug,
+        name: experiment_slug,
+        slug: slug_,
         projectId: project.id,
         type: experiment_type,
       },

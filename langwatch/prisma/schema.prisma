@@ -380,6 +380,7 @@ enum ExperimentType {
 
 model Experiment {
     id               String            @id @default(nanoid())
+    name             String?
     type             ExperimentType
     slug             String
     projectId        String

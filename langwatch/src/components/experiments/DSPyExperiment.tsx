@@ -276,7 +276,7 @@ export function DSPyExperiment({
       >
         <HStack width="full" align="end">
           <Heading as="h1" size="lg">
-            {experiment.slug}
+            {experiment.name ?? experiment.slug}
           </Heading>
           <Spacer />
           <FeedbackLink />

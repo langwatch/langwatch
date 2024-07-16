@@ -92,7 +92,7 @@ export default function Experiments() {
                             }}
                             key={i}
                           >
-                            <Td>{experiment.slug}</Td>
+                            <Td>{experiment.name ?? experiment.slug}</Td>
                             <Td>{experiment.type}</Td>
                             <Td>{experiment.createdAt.toLocaleString()}</Td>
                           </Tr>
