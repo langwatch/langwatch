@@ -6,6 +6,8 @@ import {
   publicProcedure,
 } from "~/server/api/trpc";
 
+import { prisma } from "~/server/db";
+
 import {
   TeamRoleGroup,
   checkPermissionOrPubliclyShared,
@@ -67,29 +69,14 @@ export const shareRouter = createTRPCRouter({
     )
     .use(checkUserPermissionForProject(TeamRoleGroup.MESSAGES_SHARE))
     .mutation(async ({ input, ctx }) => {
-      console.log("input", input);
       const { projectId, resourceType, resourceId } = input;
 
-      let share = await ctx.prisma.publicShare.findFirst({
-        where: {
-          projectId,
-          resourceType,
-          resourceId,
-        },
+      return createShare({
+        projectId,
+        resourceType,
+        resourceId,
+        userId: ctx.session.user.id,
       });
-
-      if (!share) {
-        share = await ctx.prisma.publicShare.create({
-          data: {
-            projectId,
-            resourceType,
-            resourceId,
-            userId: ctx.session.user.id,
-          },
-        });
-      }
-
-      return share;
     }),
 
   unshareItem: protectedProcedure
@@ -113,3 +100,37 @@ export const shareRouter = createTRPCRouter({
       });
     }),
 });
+
+export const createShare = async ({
+  projectId,
+  resourceType,
+  resourceId,
+  userId,
+}: {
+  projectId: string;
+  resourceType: "TRACE" | "THREAD";
+  resourceId: string;
+  userId?: string | null;
+}) => {
+  let share = await prisma.publicShare.findFirst({
+    where: {
+      projectId,
+      resourceType,
+      resourceId,
+      userId: userId ?? null,
+    },
+  });
+
+  if (!share) {
+    share = await prisma.publicShare.create({
+      data: {
+        projectId,
+        resourceType,
+        resourceId,
+        userId: userId ?? null,
+      },
+    });
+  }
+
+  return share;
+};

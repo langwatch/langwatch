@@ -53,8 +53,9 @@ export function AnnotationDrawer({
   const createAnnotation = api.annotation.create.useMutation();
   const deleteAnnotation = api.annotation.deleteById.useMutation();
 
-  const getAnnotationScoring = api.annotationScore.getAllActive.useQuery({
-    projectId: project?.id ?? "",
+  const getAnnotationScoring = api.annotationScore.getAllActive.useQuery(
+    {
+      projectId: project?.id ?? "",
     },
     {
       enabled: !!project?.id && !isPublicRoute,
@@ -73,15 +74,11 @@ export function AnnotationDrawer({
     comment: "",
     scoreOptions: {},
   };
-  const scoreFields = Object.fromEntries(
-    getAnnotationScoring.data?.map((score) => [score.id, ""]) ?? []
-  );
 
   const {
     register,
     handleSubmit,
     watch,
-    getValues,
     setValue,
     formState: { errors },
     reset,

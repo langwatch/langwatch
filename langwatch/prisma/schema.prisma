@@ -472,8 +472,8 @@ model PublicShare {
     resourceId   String
     projectId    String
     project      Project                  @relation(fields: [projectId], references: [id])
-    userId       String
-    user         User                     @relation(fields: [userId], references: [id])
+    userId       String?
+    user         User?                    @relation(fields: [userId], references: [id])
 
     createdAt DateTime @default(now())
     updatedAt DateTime @default(now()) @updatedAt

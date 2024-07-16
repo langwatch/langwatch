@@ -119,34 +119,11 @@ export const tracesRouter = createTRPCRouter({
           TeamRoleGroup.COST_VIEW
         ));
 
-      //@ts-ignore
-      const result = await esClient.search<Trace>({
-        index: TRACE_INDEX,
-        size: 1,
-        _source: {
-          // TODO: do we really need to exclude both keys and nested keys for embeddings?
-          excludes: [
-            "input.embeddings",
-            "input.embeddings.embeddings",
-            "output.embeddings",
-            "output.embeddings.embeddings",
-            ...(canSeeCosts ? [] : ["metrics.total_cost"]),
-          ],
-        },
-        body: {
-          query: {
-            //@ts-ignore
-            bool: {
-              filter: [
-                { term: { trace_id: input.traceId } },
-                { term: { project_id: input.projectId } },
-              ],
-            },
-          },
-        },
+      const trace = await getTraceById({
+        projectId: input.projectId,
+        traceId: input.traceId,
+        canSeeCosts,
       });
-
-      const trace = result.hits.hits[0]?._source;
 
       if (!trace) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Trace not found." });
@@ -997,4 +974,47 @@ export const getEvaluationsMultiple = async (input: {
   );
 
   return checksPerTrace;
+};
+
+export const getTraceById = async ({
+  projectId,
+  traceId,
+  canSeeCosts,
+}: {
+  projectId: string;
+  traceId: string;
+  canSeeCosts?: boolean | undefined | null;
+}) => {
+  //@ts-ignore
+
+  //@ts-ignore
+  const result = await esClient.search<Trace>({
+    index: TRACE_INDEX,
+    size: 1,
+    _source: {
+      // TODO: do we really need to exclude both keys and nested keys for embeddings?
+      excludes: [
+        "input.embeddings",
+        "input.embeddings.embeddings",
+        "output.embeddings",
+        "output.embeddings.embeddings",
+        ...(canSeeCosts ? [] : ["metrics.total_cost"]),
+      ],
+    },
+    body: {
+      query: {
+        //@ts-ignore
+        bool: {
+          filter: [
+            { term: { trace_id: traceId } },
+            { term: { project_id: projectId } },
+          ],
+        },
+      },
+    },
+  });
+
+  const trace = result.hits.hits[0]?._source;
+
+  return trace;
 };
