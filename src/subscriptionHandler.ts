@@ -91,7 +91,11 @@ export class SubscriptionHandlerSaas extends SubscriptionHandler {
       return { ...PLAN_LIMITS[PlanTypes.GROWTH], overrideAddingLimitations };
     }
 
-    if (organizationId === "organization_erk6Bmlfzxw2YMyzWdo8O") {
+    if (
+      organizationId === "organization_erk6Bmlfzxw2YMyzWdo8O" ||
+      organizationId === "organization_Kx6Yhg2CNw7Vvc9XifSf9" || // namastex (langflow)
+      organizationId === "organization_0XObFvKWp0G6-v6fwqphq" // langflow
+    ) {
       return {
         ...PLAN_LIMITS[PlanTypes.ENTERPRISE],
         overrideAddingLimitations,
