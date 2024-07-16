@@ -48,7 +48,7 @@ import { MessageCard, type TraceWithGuardrail } from "./MessageCard";
 export function MessagesList() {
   const { project } = useOrganizationTeamProject();
   const router = useRouter();
-  const [tracesCheckInterval, setTracesCheckInterval] = useState<
+  const [evaluationsCheckInterval, setEvaluationsCheckInterval] = useState<
     number | undefined
   >();
   const [groupBy] = useGroupBy();
@@ -71,11 +71,11 @@ export function MessagesList() {
     traceGroups.data?.groups.flatMap((group) =>
       group.map((trace) => trace.trace_id)
     ) ?? [];
-  const traceChecksQuery = api.traces.getTraceChecks.useQuery(
+  const evaluations = api.traces.getEvaluationsMultiple.useQuery(
     { projectId: project?.id ?? "", traceIds },
     {
       enabled: traceIds.length > 0,
-      refetchInterval: tracesCheckInterval,
+      refetchInterval: evaluationsCheckInterval,
       refetchOnWindowFocus: false,
     }
   );
@@ -86,8 +86,8 @@ export function MessagesList() {
   } = usePeriodSelector();
 
   useEffect(() => {
-    if (traceChecksQuery.data) {
-      const pendingChecks = Object.values(traceChecksQuery.data)
+    if (evaluations.data) {
+      const pendingEvaluations = Object.values(evaluations.data)
         .flatMap((checks) => checks)
         .filter(
           (check) =>
@@ -95,13 +95,13 @@ export function MessagesList() {
             (check.timestamps.inserted_at ?? 0) >
               new Date().getTime() - 1000 * 60 * 60 * 1
         );
-      if (pendingChecks.length > 0) {
-        setTracesCheckInterval(5000);
+      if (pendingEvaluations.length > 0) {
+        setEvaluationsCheckInterval(5000);
       } else {
-        setTracesCheckInterval(undefined);
+        setEvaluationsCheckInterval(undefined);
       }
     }
-  }, [traceChecksQuery.data]);
+  }, [evaluations.data]);
 
   useEffect(() => {
     if (traceGroups.isFetched) {
@@ -153,7 +153,7 @@ export function MessagesList() {
               marginTop={2}
               onClick={() => {
                 void traceGroups.refetch();
-                void traceChecksQuery.refetch();
+                void evaluations.refetch();
               }}
             >
               <RefreshCw
@@ -179,7 +179,7 @@ export function MessagesList() {
             <ExpandableMessages
               project={project}
               traceGroups={traceGroups.data.groups}
-              checksMap={traceChecksQuery.data}
+              checksMap={evaluations.data}
             />
           ) : traceGroups.data ? (
             <Alert status="info">

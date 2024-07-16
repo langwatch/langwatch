@@ -8,6 +8,7 @@ import {
 
 import {
   TeamRoleGroup,
+  checkPermissionOrPubliclyShared,
   checkUserPermissionForProject,
   skipPermissionCheck,
 } from "../permission";
@@ -26,7 +27,7 @@ export const shareRouter = createTRPCRouter({
       return share;
     }),
 
-  getSharedState: protectedProcedure
+  getSharedState: publicProcedure
     .input(
       z.object({
         projectId: z.string(),
@@ -34,13 +35,20 @@ export const shareRouter = createTRPCRouter({
         resourceId: z.string(),
       })
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.MESSAGES_VIEW))
+    .use(
+      checkPermissionOrPubliclyShared(
+        checkUserPermissionForProject(TeamRoleGroup.MESSAGES_VIEW),
+        {
+          resourceType: (input) => input.resourceType,
+          resourceParam: "resourceId",
+        }
+      )
+    )
     .query(async ({ input, ctx }) => {
-      const { projectId, resourceType, resourceId } = input;
+      const { resourceType, resourceId } = input;
 
       const share = await ctx.prisma.publicShare.findFirst({
         where: {
-          projectId,
           resourceType,
           resourceId,
         },

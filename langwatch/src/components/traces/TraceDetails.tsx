@@ -1,10 +1,6 @@
 import { Link } from "@chakra-ui/next-js";
 import {
   Button,
-  DrawerBody,
-  DrawerContent,
-  DrawerHeader,
-  Flex,
   HStack,
   Spacer,
   Tab,
@@ -14,56 +10,77 @@ import {
   Tabs,
   Text,
   VStack,
-  useDisclosure,
 } from "@chakra-ui/react";
-import { type Annotation } from "@prisma/client";
+import { type Annotation, type PublicShare } from "@prisma/client";
 import type { TraceCheck } from "~/server/tracer/types";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
+import { TeamRoleGroup } from "../../server/api/permission";
 import { api } from "../../utils/api";
 import { Annotations } from "../Annotations";
 import { CheckPassingDrawer } from "../CheckPassingDrawer";
+import { useDrawer } from "../CurrentDrawer";
+import { ShareButton } from "./ShareButton";
 import { SpanTree } from "./SpanTree";
 import { TraceSummary } from "./Summary";
-import { AddDatasetRecordDrawerV2 } from "../AddDatasetRecordDrawer";
-import { ShareButton } from "./ShareButton";
-import { useDrawer } from "../CurrentDrawer";
+import { useEffect, useState } from "react";
 
 interface TraceEval {
   traceId: string;
-  traceChecks?: Record<string, TraceCheck[]>;
+  evaluations?: TraceCheck[];
 }
 
 export function TraceDetails(props: {
   traceId: string;
   annotationTab?: boolean;
+  publicShare?: PublicShare;
 }) {
-  const { project } = useOrganizationTeamProject();
+  const { project, hasTeamPermission } = useOrganizationTeamProject();
 
   const { openDrawer } = useDrawer();
-  const { isOpen, onOpen, onClose } = useDisclosure();
 
-  const traceChecksQuery = api.traces.getTraceChecks.useQuery(
-    { projectId: project?.id ?? "", traceIds: [props.traceId] },
+  const [evaluationsCheckInterval, setEvaluationsCheckInterval] = useState<
+    number | undefined
+  >();
+
+  const evaluations = api.traces.getEvaluations.useQuery(
+    { projectId: project?.id ?? "", traceId: props.traceId },
     {
       enabled: !!project,
-      refetchInterval: undefined,
+      refetchInterval: evaluationsCheckInterval,
       refetchOnWindowFocus: false,
     }
   );
 
-  const annotationsQuery = api.annotation.getByTraceId.useQuery({
-    projectId: project?.id ?? "",
-    traceId: props.traceId,
-  });
+  useEffect(() => {
+    if (evaluations.data) {
+      const pendingChecks = evaluations.data.filter(
+        (check) =>
+          (check.status == "scheduled" || check.status == "in_progress") &&
+          (check.timestamps.inserted_at ?? 0) >
+            new Date().getTime() - 1000 * 60 * 60 * 1
+      );
+      if (pendingChecks.length > 0) {
+        setEvaluationsCheckInterval(2000);
+      } else {
+        setEvaluationsCheckInterval(undefined);
+      }
+    }
+  }, [evaluations.data]);
 
-  const anyGuardrails = traceChecksQuery.data?.[props.traceId]?.some(
-    (x) => x.is_guardrail
+  const annotationsQuery = api.annotation.getByTraceId.useQuery(
+    {
+      projectId: project?.id ?? "",
+      traceId: props.traceId,
+    },
+    {
+      enabled: !!project?.id,
+    }
   );
 
+  const anyGuardrails = evaluations.data?.some((x) => x.is_guardrail);
+
   const Evaluations = (trace: TraceEval) => {
-    const evaluations = trace.traceChecks?.[trace.traceId]?.filter(
-      (x) => !x.is_guardrail
-    );
+    const evaluations = trace.evaluations?.filter((x) => !x.is_guardrail);
     const totalChecks = evaluations?.length;
     if (!totalChecks)
       return (
@@ -100,9 +117,7 @@ export function TraceDetails(props: {
   };
 
   const Guardrails = (trace: TraceEval) => {
-    const guardrails = trace.traceChecks?.[trace.traceId]?.filter(
-      (x) => x.is_guardrail
-    );
+    const guardrails = trace.evaluations?.filter((x) => x.is_guardrail);
     const totalChecks = guardrails?.length;
     if (!totalChecks)
       return (
@@ -133,7 +148,7 @@ export function TraceDetails(props: {
 
   const Errors = (trace: TraceEval) => {
     const totalErrors = trace
-      ? trace.traceChecks?.[trace.traceId]?.filter(
+      ? trace.evaluations?.filter(
           (check) =>
             !check.is_guardrail &&
             (check.status === "error" || check.passed === false)
@@ -175,7 +190,7 @@ export function TraceDetails(props: {
 
   const Blocked = (trace: TraceEval) => {
     const totalBlocked = trace
-      ? trace.traceChecks?.[trace.traceId]?.filter(
+      ? trace.evaluations?.filter(
           (check) => check.is_guardrail && check.passed === false
         ).length
       : 0;
@@ -200,7 +215,14 @@ export function TraceDetails(props: {
 
   return (
     <>
-      <VStack align="start" width="full" height="full" background="white" paddingX={6} gap={6}>
+      <VStack
+        align="start"
+        width="full"
+        height="full"
+        background="white"
+        paddingX={6}
+        gap={6}
+      >
         <VStack align="start" width="full">
           <HStack width="full" marginTop={4}>
             <Text paddingTop={5} fontSize="2xl" fontWeight="600">
@@ -208,27 +230,35 @@ export function TraceDetails(props: {
             </Text>
             <Spacer />
             <HStack>
-              <Button
-                colorScheme="black"
-                variant="outline"
-                onClick={() =>
-                  openDrawer("annotation", {
-                    traceId: props.traceId,
-                    action: "new",
-                  })
-                }
-              >
-                Annotate
-              </Button>
-              <Button
-                colorScheme="black"
-                type="submit"
-                variant="outline"
-                minWidth="fit-content"
-                onClick={onOpen}
-              >
-                Add to Dataset
-              </Button>
+              {hasTeamPermission(TeamRoleGroup.ANNOTATIONS_MANAGE) && (
+                <Button
+                  colorScheme="black"
+                  variant="outline"
+                  onClick={() =>
+                    openDrawer("annotation", {
+                      traceId: props.traceId,
+                      action: "new",
+                    })
+                  }
+                >
+                  Annotate
+                </Button>
+              )}
+              {hasTeamPermission(TeamRoleGroup.DATASETS_MANAGE) && (
+                <Button
+                  colorScheme="black"
+                  type="submit"
+                  variant="outline"
+                  minWidth="fit-content"
+                  onClick={() => {
+                    openDrawer("addDatasetRecord", {
+                      traceId: props.traceId,
+                    });
+                  }}
+                >
+                  Add to Dataset
+                </Button>
+              )}
               {project && (
                 <ShareButton project={project} traceId={props.traceId} />
               )}
@@ -244,7 +274,7 @@ export function TraceDetails(props: {
                   Guardrails{" "}
                   <Blocked
                     traceId={props.traceId}
-                    traceChecks={traceChecksQuery.data}
+                    evaluations={evaluations.data}
                   />
                 </Tab>
               )}
@@ -252,7 +282,7 @@ export function TraceDetails(props: {
                 Evaluations{" "}
                 <Errors
                   traceId={props.traceId}
-                  traceChecks={traceChecksQuery.data}
+                  evaluations={evaluations.data}
                 />
               </Tab>
               <Tab>
@@ -272,14 +302,14 @@ export function TraceDetails(props: {
                 <TabPanel>
                   <Guardrails
                     traceId={props.traceId ?? ""}
-                    traceChecks={traceChecksQuery.data}
+                    evaluations={evaluations.data}
                   />
                 </TabPanel>
               )}
               <TabPanel>
                 <Evaluations
                   traceId={props.traceId ?? ""}
-                  traceChecks={traceChecksQuery.data}
+                  evaluations={evaluations.data}
                 />
               </TabPanel>
               <TabPanel>
@@ -296,11 +326,6 @@ export function TraceDetails(props: {
           </Tabs>
         </VStack>
       </VStack>
-      <AddDatasetRecordDrawerV2
-        isOpen={isOpen}
-        onClose={onClose}
-        traceId={props.traceId ?? ""}
-      />
     </>
   );
 }

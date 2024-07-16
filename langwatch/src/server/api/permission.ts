@@ -1,7 +1,7 @@
 import {
   OrganizationUserRole,
   TeamUserRole,
-  type PrismaClient,
+  type PrismaClient
 } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import type { Session } from "next-auth";
@@ -82,7 +82,12 @@ const isDemoProject = (projectId: string, roleGroup: string): boolean => {
 };
 
 type PermissionMiddlewareParams<InputType> = {
-  ctx: { prisma: PrismaClient; session: Session; permissionChecked: boolean };
+  ctx: {
+    prisma: PrismaClient;
+    session: Session;
+    permissionChecked: boolean;
+    publiclyShared: boolean;
+  };
   input: InputType;
   next: () => any;
 };
@@ -90,6 +95,52 @@ type PermissionMiddlewareParams<InputType> = {
 export type PermissionMiddleware<InputType> = (
   params: PermissionMiddlewareParams<InputType>
 ) => Promise<any>;
+
+type PublicResourceTypes = "TRACE" | "THREAD";
+
+export const checkPermissionOrPubliclyShared =
+  <
+    Key extends keyof InputType,
+    InputType extends { [key in Key]: string } & { projectId: string },
+  >(
+    permissionCheck: PermissionMiddleware<InputType>,
+    {
+      resourceType,
+      resourceParam,
+    }: {
+      resourceType: PublicResourceTypes | ((input: any) => PublicResourceTypes);
+      resourceParam: Key;
+    }
+  ) =>
+  async ({ ctx, input, next }: PermissionMiddlewareParams<InputType>) => {
+    let allowed;
+    try {
+      allowed = await permissionCheck({ ctx, input, next });
+    } catch (e) {
+      if (e instanceof TRPCError && e.code === "UNAUTHORIZED") {
+        allowed = false;
+      }
+    }
+
+    if (!allowed) {
+      const sharedResource = await ctx.prisma.publicShare.findFirst({
+        where: {
+          resourceType:
+            typeof resourceType === "function"
+              ? resourceType(input)
+              : resourceType,
+          resourceId: input[resourceParam],
+        },
+      });
+      if (!sharedResource) {
+        throw new TRPCError({ code: "UNAUTHORIZED" });
+      }
+      ctx.publiclyShared = true;
+    }
+
+    ctx.permissionChecked = true;
+    return next();
+  };
 
 export const checkUserPermissionForProject =
   (roleGroup: keyof typeof TeamRoleGroup) =>
@@ -107,10 +158,14 @@ export const checkUserPermissionForProject =
   };
 
 export const backendHasTeamProjectPermission = async (
-  ctx: { prisma: PrismaClient; session: Session },
+  ctx: { prisma: PrismaClient; session: Session | null },
   input: { projectId: string },
   roleGroup: keyof typeof TeamRoleGroup
 ) => {
+  if (!ctx.session?.user) {
+    return false;
+  }
+
   if (isDemoProject(input.projectId, roleGroup)) {
     return true;
   }
@@ -125,7 +180,7 @@ export const backendHasTeamProjectPermission = async (
   });
 
   const teamMember = projectTeam?.team.members.find(
-    (member) => member.userId === ctx.session.user.id
+    (member) => member.userId === ctx.session?.user.id
   );
 
   return (
@@ -158,6 +213,10 @@ export const backendHasTeamPermission = async (
   input: { teamId: string },
   roleGroup: keyof typeof TeamRoleGroup
 ) => {
+  if (!ctx.session?.user) {
+    return false;
+  }
+
   const team = await ctx.prisma.team.findUnique({
     where: { id: input.teamId },
   });
@@ -213,6 +272,10 @@ export const backendHasOrganizationPermission = async (
   input: { organizationId: string },
   roleGroup: keyof typeof OrganizationRoleGroup
 ) => {
+  if (!ctx.session?.user) {
+    return false;
+  }
+
   const organizationUser = await ctx.prisma.organizationUser.findFirst({
     where: {
       userId: ctx.session.user.id,

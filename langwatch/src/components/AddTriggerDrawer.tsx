@@ -193,7 +193,7 @@ export function TriggerDrawer() {
       placement="right"
       size={"xl"}
       onClose={closeDrawer}
-      onOverlayClick={onClose}
+      onOverlayClick={closeDrawer}
     >
       <DrawerContent>
         <DrawerHeader>

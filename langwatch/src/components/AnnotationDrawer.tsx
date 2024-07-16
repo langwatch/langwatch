@@ -17,7 +17,6 @@ import {
   useDisclosure,
   useToast,
 } from "@chakra-ui/react";
-import { unstable_batchedUpdates } from "react-dom";
 
 import { ExternalLink, ThumbsDown, ThumbsUp } from "react-feather";
 import { useDrawer } from "~/components/CurrentDrawer";
@@ -41,7 +40,7 @@ export function AnnotationDrawer({
   action: "new" | "edit";
   annotationId?: string;
 }) {
-  const { project } = useOrganizationTeamProject();
+  const { project, isPublicRoute } = useOrganizationTeamProject();
   const { onClose } = useDisclosure();
   const { closeDrawer, openDrawer } = useDrawer();
 
@@ -56,7 +55,11 @@ export function AnnotationDrawer({
 
   const getAnnotationScoring = api.annotationScore.getAllActive.useQuery({
     projectId: project?.id ?? "",
-  });
+    },
+    {
+      enabled: !!project?.id && !isPublicRoute,
+    }
+  );
 
   const getAnnotation = api.annotation.getById.useQuery({
     projectId: project?.id ?? "",

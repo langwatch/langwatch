@@ -17,6 +17,8 @@ import { useCallback, useState } from "react";
 import { Globe, Share } from "react-feather";
 import { CopyInput } from "../CopyInput";
 import { api } from "../../utils/api";
+import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
+import { TeamRoleGroup } from "../../server/api/permission";
 
 export function ShareButton({
   project,
@@ -25,6 +27,7 @@ export function ShareButton({
   project: Project;
   traceId: string;
 }) {
+  const { hasTeamPermission } = useOrganizationTeamProject();
   const { isOpen, onOpen, onClose } = useDisclosure();
   const shareState = api.share.getSharedState.useQuery(
     {
@@ -41,11 +44,16 @@ export function ShareButton({
   const unshareItemMutation = api.share.unshareItem.useMutation();
   const toast = useToast();
   const [disableClose, setDisableClose] = useState(false); // bugfix for modal closing when starting the mutation
+  const hasSharePermission = hasTeamPermission(TeamRoleGroup.MESSAGES_SHARE);
 
   const onClose_ = useCallback(() => {
     if (disableClose) return;
     onClose();
   }, [disableClose, onClose]);
+
+  if (!hasSharePermission && !shareState.data?.id) {
+    return null;
+  }
 
   return (
     <Popover
@@ -67,7 +75,7 @@ export function ShareButton({
       </PopoverTrigger>
       <PopoverContent fontSize={16} minWidth="400px">
         <PopoverArrow />
-        <PopoverHeader>Share Trace</PopoverHeader>
+        <PopoverHeader fontWeight={600}>Share Trace</PopoverHeader>
         <PopoverBody>
           <VStack align="start" fontWeight="normal" spacing={4}>
             {shareState.data?.id ? (
@@ -76,70 +84,72 @@ export function ShareButton({
                   Anyone with the link below can view this trace, the
                   evaluations and the annotations associated with it
                 </Text>
-                <HStack>
+                <HStack width="full">
                   <CopyInput
                     value={`${window.location.origin}/share/${shareState.data?.id}`}
                     label="Public Trace URL"
                   />
-                  <Button
-                    colorScheme="gray"
-                    isLoading={
-                      unshareItemMutation.isLoading || shareState.isRefetching
-                    }
-                    onClick={() => {
-                      setDisableClose(true);
+                  {hasSharePermission && (
+                    <Button
+                      colorScheme="gray"
+                      isLoading={
+                        unshareItemMutation.isLoading || shareState.isRefetching
+                      }
+                      onClick={() => {
+                        setDisableClose(true);
 
-                      unshareItemMutation.mutate(
-                        {
-                          projectId: project.id,
-                          resourceType: PublicShareResourceTypes.TRACE,
-                          resourceId: traceId,
-                        },
-                        {
-                          onSuccess: () => {
-                            setDisableClose(false);
-                            shareState
-                              .refetch()
-                              .then((shareState) => {
-                                if (!shareState.data?.id) {
+                        unshareItemMutation.mutate(
+                          {
+                            projectId: project.id,
+                            resourceType: PublicShareResourceTypes.TRACE,
+                            resourceId: traceId,
+                          },
+                          {
+                            onSuccess: () => {
+                              setDisableClose(false);
+                              onClose();
+                              shareState
+                                .refetch()
+                                .then((shareState) => {
+                                  if (!shareState.data?.id) {
+                                    toast({
+                                      title: "Shared link removed",
+                                      description: "Trace is no longer public",
+                                      status: "success",
+                                      duration: 5000,
+                                      isClosable: true,
+                                    });
+                                  }
+                                })
+                                .catch(() => {
                                   toast({
-                                    title: "Shared link removed",
-                                    description: "Trace is no longer public",
-                                    status: "success",
+                                    title: "Failed to fetch trace shared state",
+                                    description:
+                                      "Something went wrong, please try again.",
+                                    status: "error",
                                     duration: 5000,
                                     isClosable: true,
                                   });
-                                  onClose();
-                                }
-                              })
-                              .catch(() => {
-                                toast({
-                                  title: "Failed to fetch trace shared state",
-                                  description:
-                                    "Something went wrong, please try again.",
-                                  status: "error",
-                                  duration: 5000,
-                                  isClosable: true,
                                 });
+                            },
+                            onError: () => {
+                              setDisableClose(false);
+                              toast({
+                                title: "Failed to unshare trace",
+                                description:
+                                  "Something went wrong, please try again.",
+                                status: "error",
+                                duration: 5000,
+                                isClosable: true,
                               });
-                          },
-                          onError: () => {
-                            setDisableClose(false);
-                            toast({
-                              title: "Failed to unshare trace",
-                              description:
-                                "Something went wrong, please try again.",
-                              status: "error",
-                              duration: 5000,
-                              isClosable: true,
-                            });
-                          },
-                        }
-                      );
-                    }}
-                  >
-                    Unshare
-                  </Button>
+                            },
+                          }
+                        );
+                      }}
+                    >
+                      Unshare
+                    </Button>
+                  )}
                 </HStack>
               </>
             ) : (

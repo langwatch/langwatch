@@ -1,13 +1,22 @@
+import { PublicShareResourceTypes } from "@prisma/client";
 import { z } from "zod";
-import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
+import { createTRPCRouter, publicProcedure } from "~/server/api/trpc";
 import { SPAN_INDEX, esClient } from "../../elasticsearch";
 import type { ElasticSearchSpan } from "../../tracer/types";
-import { TeamRoleGroup, checkUserPermissionForProject } from "../permission";
+import { TeamRoleGroup, checkPermissionOrPubliclyShared, checkUserPermissionForProject } from "../permission";
 
 export const spansRouter = createTRPCRouter({
-  getAllForTrace: protectedProcedure
+  getAllForTrace: publicProcedure
     .input(z.object({ projectId: z.string(), traceId: z.string() }))
-    .use(checkUserPermissionForProject(TeamRoleGroup.SPANS_DEBUG))
+    .use(
+      checkPermissionOrPubliclyShared(
+        checkUserPermissionForProject(TeamRoleGroup.SPANS_DEBUG),
+        {
+          resourceType: PublicShareResourceTypes.TRACE,
+          resourceParam: "traceId",
+        }
+      )
+    )
     .query(async ({ input }) => {
       const result = await esClient.search<ElasticSearchSpan>({
         index: SPAN_INDEX,

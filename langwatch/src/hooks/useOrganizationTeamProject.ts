@@ -26,7 +26,8 @@ export const useOrganizationTeamProject = (
     keepFetching: false,
   }
 ) => {
-  useRequiredSession();
+  const session = useRequiredSession();
+
   const router = useRouter();
   const publicEnv = api.publicEnv.useQuery(
     {},
@@ -37,11 +38,26 @@ export const useOrganizationTeamProject = (
     }
   );
 
+  const isPublicRoute = publicRoutes.includes(router.route);
+  const shareId = typeof router.query.id === "string" ? router.query.id : "";
+  const publicShare = api.share.getShared.useQuery(
+    { id: shareId },
+    { enabled: !!shareId && !!isPublicRoute }
+  );
+  const publicShareProject = api.project.publicGetById.useQuery(
+    {
+      id: publicShare.data?.projectId ?? "",
+      shareId: publicShare.data?.id ?? "",
+    },
+    { enabled: !!publicShare.data?.projectId && !!publicShare.data?.id }
+  );
+
   const isDemo = router.query.project === publicEnv.data?.DEMO_PROJECT_SLUG;
 
   const organizations = api.organization.getAll.useQuery(
     { isDemo: isDemo },
     {
+      enabled: !!session.data || !isPublicRoute,
       staleTime: keepFetching ? undefined : Infinity,
       refetchInterval: keepFetching ? 5_000 : undefined,
     }
@@ -209,8 +225,10 @@ export const useOrganizationTeamProject = (
   if (organizations.isLoading && !organizations.isFetched) {
     return {
       isLoading: true,
+      project: publicShareProject.data,
       hasTeamPermission: () => false,
       hasOrganizationPermission: () => false,
+      isPublicRoute,
     };
   }
 
@@ -246,8 +264,9 @@ export const useOrganizationTeamProject = (
     organizations: organizations.data,
     organization,
     team,
-    project,
+    project: publicShareProject.data ?? project,
     hasOrganizationPermission,
     hasTeamPermission,
+    isPublicRoute,
   };
 };

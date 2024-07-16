@@ -1,7 +1,11 @@
 import { TRPCError } from "@trpc/server";
 import slugify from "slugify";
 import { z } from "zod";
-import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
+import {
+  createTRPCRouter,
+  protectedProcedure,
+  publicProcedure,
+} from "~/server/api/trpc";
 import { env } from "../../../env.mjs";
 import jwt from "jsonwebtoken";
 import { nanoid } from "nanoid";
@@ -16,8 +20,52 @@ import {
 import { getOrganizationProjectsCount } from "./limits";
 import { dependencies } from "../../../injection/dependencies.server";
 import { allowedTopicClusteringModels } from "../../topicClustering/types";
+import type { Project } from "@prisma/client";
 
 export const projectRouter = createTRPCRouter({
+  publicGetById: publicProcedure
+    .input(z.object({ id: z.string(), shareId: z.string() }))
+    .use(skipPermissionCheck)
+    .query(async ({ input, ctx }) => {
+      const prisma = ctx.prisma;
+
+      const publicShare = await prisma.publicShare.findUnique({
+        where: { id: input.shareId, projectId: input.id },
+      });
+
+      if (!publicShare) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Public share not found",
+        });
+      }
+
+      const project = await prisma.project.findUnique({
+        where: { id: input.id },
+      });
+
+      if (!project) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Project not found",
+        });
+      }
+
+      return {
+        id: project.id,
+        name: project.name,
+        slug: project.slug,
+        language: project.language,
+        framework: project.framework,
+        firstMessage: true,
+        topicClusteringModel: null,
+        apiKey: "",
+        teamId: "",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        piiRedactionLevel: "STRICT",
+      } as Project;
+    }),
   create: protectedProcedure
     .input(
       z.object({

@@ -45,8 +45,8 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
-  List,
   Edit,
+  List,
   RefreshCw,
   Shield,
 } from "react-feather";
@@ -60,15 +60,14 @@ import { useFilterParams } from "../../hooks/useFilterParams";
 
 import Parse from "papaparse";
 import { useLocalStorage } from "usehooks-ts";
+import { titleCase } from "../../utils/stringCasing";
+import { useDrawer } from "../CurrentDrawer";
+import { PeriodSelector, usePeriodSelector } from "../PeriodSelector";
 import { checkStatusColorMap } from "../checks/EvaluationStatus";
 import { FilterSidebar } from "../filters/FilterSidebar";
-import { usePeriodSelector, PeriodSelector } from "../PeriodSelector";
 import { FilterToggle } from "../filters/FilterToggle";
 import { ToggleAnalytics, ToggleTableView } from "./HeaderButtons";
-import { useDrawer } from "../CurrentDrawer";
 import type { TraceWithGuardrail } from "./MessageCard";
-import { titleCase } from "../../utils/stringCasing";
-import { AddDatasetRecordDrawerV2 } from "../AddDatasetRecordDrawer";
 
 export function MessagesTable() {
   const router = useRouter();
@@ -79,8 +78,6 @@ export function MessagesTable() {
   const [pageSize, setPageSize] = useState<number>(25);
   const { filterParams, queryOpts } = useFilterParams();
   const [selectedTraceIds, setSelectedTraceIds] = useState<string[]>([]);
-
-  const addDatasetModal = useDisclosure();
 
   const {
     period: { startDate, endDate },
@@ -122,12 +119,13 @@ export function MessagesTable() {
   }, [traceGroups.data]);
 
   const traceCheckColumnsAvailable = Object.fromEntries(
-    Object.values(traceGroups.data?.traceChecks ?? previousTraceChecks ?? {}).flatMap(
-      (checks) =>
-        checks.map((check:any) => [
-          `trace_checks.${check.check_id}`,
-          check.check_name,
-        ])
+    Object.values(
+      traceGroups.data?.traceChecks ?? previousTraceChecks ?? {}
+    ).flatMap((checks) =>
+      checks.map((check: any) => [
+        `trace_checks.${check.check_id}`,
+        check.check_name,
+      ])
     )
   );
 
@@ -485,7 +483,9 @@ export function MessagesTable() {
             sortable: true,
             render: (trace, index) => {
               const checkId = columnKey.split(".")[1];
-              const traceCheck = traceGroups.data?.traceChecks?.[trace.trace_id]?.find(
+              const traceCheck = traceGroups.data?.traceChecks?.[
+                trace.trace_id
+              ]?.find(
                 (traceCheck_: TraceCheck) => traceCheck_.check_id === checkId
               );
               const evaluator = getEvaluatorDefinitions(
@@ -527,7 +527,9 @@ export function MessagesTable() {
             },
             value: (trace: Trace) => {
               const checkId = columnKey.split(".")[1];
-              const traceCheck = traceGroups.data?.traceChecks?.[trace.trace_id]?.find(
+              const traceCheck = traceGroups.data?.traceChecks?.[
+                trace.trace_id
+              ]?.find(
                 (traceCheck_: TraceCheck) => traceCheck_.check_id === checkId
               );
               return traceCheck?.status === "processed"
@@ -943,18 +945,17 @@ export function MessagesTable() {
               type="submit"
               variant="outline"
               minWidth="fit-content"
-              onClick={addDatasetModal.onOpen}
+              onClick={() => {
+                openDrawer("addDatasetRecord", {
+                  selectedTraceIds,
+                });
+              }}
             >
               Add to Dataset
             </Button>
           </HStack>
         </Box>
       )}
-      <AddDatasetRecordDrawerV2
-        isOpen={addDatasetModal.isOpen}
-        onClose={addDatasetModal.onClose}
-        selectedTraceIds={selectedTraceIds}
-      />
     </>
   );
 }

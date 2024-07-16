@@ -36,14 +36,13 @@ import { getRAGInfo } from "../server/tracer/utils";
 import { AddDatasetDrawer } from "./AddDatasetDrawer";
 import { HorizontalFormControl } from "./HorizontalFormControl";
 import { DatasetGrid } from "./datasets/DatasetGrid";
+import { useDrawer } from "./CurrentDrawer";
 
 type FormValues = {
   datasetId: string;
 };
 
 interface AddDatasetDrawerProps {
-  isOpen: boolean;
-  onClose: () => void;
   onSuccess?: () => void;
   traceId?: string;
   selectedTraceIds?: string[];
@@ -54,6 +53,7 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
   const createDatasetRecord = api.datasetRecord.create.useMutation();
   const toast = useToast();
   const { onOpen, onClose, isOpen } = useDisclosure();
+  const { closeDrawer } = useDrawer();
 
   const [localStorageDatasetId, setLocalStorageDatasetId] =
     useLocalStorage<string>("selectedDatasetId", "");
@@ -108,7 +108,7 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
   }, [datasetId, datasets.data, setValue]);
 
   const onCreateDatasetSuccess = (datasetId: string) => {
-    onClose();
+    closeDrawer();
     void datasets.refetch().then(() => {
       setTimeout(() => {
         setValue("datasetId", datasetId);
@@ -117,7 +117,7 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
   };
 
   const handleOnClose = () => {
-    props.onClose();
+    closeDrawer();
     reset({
       datasetId,
     });
@@ -180,7 +180,7 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
       },
       {
         onSuccess: () => {
-          props.onClose();
+          closeDrawer();
           toast({
             duration: 3000,
             isClosable: true,
@@ -349,7 +349,7 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
 
   return (
     <Drawer
-      isOpen={props.isOpen}
+      isOpen={true}
       placement="right"
       size="xl"
       onClose={handleOnClose}

@@ -5,13 +5,17 @@ import type {
   SearchTotalHits,
   Sort,
 } from "@elastic/elasticsearch/lib/api/types";
-import { type PrismaClient } from "@prisma/client";
+import { PublicShareResourceTypes, type PrismaClient } from "@prisma/client";
 import { prisma } from "~/server/db";
 import { TRPCError } from "@trpc/server";
 import similarity from "compute-cosine-similarity";
 import shuffle from "lodash/shuffle";
 import type { Session } from "next-auth";
-import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
+import {
+  createTRPCRouter,
+  protectedProcedure,
+  publicProcedure,
+} from "~/server/api/trpc";
 import { evaluatorsSchema } from "../../../trace_checks/evaluators.zod.generated";
 import { evaluatePreconditions } from "../../../trace_checks/preconditions";
 import { checkPreconditionSchema } from "../../../trace_checks/types.generated";
@@ -41,6 +45,7 @@ import {
 import {
   TeamRoleGroup,
   backendHasTeamProjectPermission,
+  checkPermissionOrPubliclyShared,
   checkUserPermissionForProject,
 } from "../permission";
 import { generateTracesPivotQueryConditions } from "./analytics/common";
@@ -94,15 +99,25 @@ export const tracesRouter = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       return await getAllForProject(input, ctx);
     }),
-  getById: protectedProcedure
+  getById: publicProcedure
     .input(z.object({ projectId: z.string(), traceId: z.string() }))
-    .use(checkUserPermissionForProject(TeamRoleGroup.MESSAGES_VIEW))
+    .use(
+      checkPermissionOrPubliclyShared(
+        checkUserPermissionForProject(TeamRoleGroup.MESSAGES_VIEW),
+        {
+          resourceType: PublicShareResourceTypes.TRACE,
+          resourceParam: "traceId",
+        }
+      )
+    )
     .query(async ({ ctx, input }) => {
-      const canSeeCosts = await backendHasTeamProjectPermission(
-        ctx,
-        input,
-        TeamRoleGroup.COST_VIEW
-      );
+      const canSeeCosts =
+        ctx.publiclyShared ||
+        (await backendHasTeamProjectPermission(
+          ctx,
+          input,
+          TeamRoleGroup.COST_VIEW
+        ));
 
       //@ts-ignore
       const result = await esClient.search<Trace>({
@@ -139,7 +154,26 @@ export const tracesRouter = createTRPCRouter({
 
       return trace;
     }),
-  getTraceChecks: protectedProcedure
+  getEvaluations: publicProcedure
+    .input(z.object({ projectId: z.string(), traceId: z.string() }))
+    .use(
+      checkPermissionOrPubliclyShared(
+        checkUserPermissionForProject(TeamRoleGroup.MESSAGES_VIEW),
+        {
+          resourceType: PublicShareResourceTypes.TRACE,
+          resourceParam: "traceId",
+        }
+      )
+    )
+    .query(async ({ input }) => {
+      return (
+        await getEvaluationsMultiple({
+          projectId: input.projectId,
+          traceIds: [input.traceId],
+        })
+      )[input.traceId];
+    }),
+  getEvaluationsMultiple: protectedProcedure
     .input(
       z.object({
         projectId: z.string(),
@@ -148,42 +182,7 @@ export const tracesRouter = createTRPCRouter({
     )
     .use(checkUserPermissionForProject(TeamRoleGroup.MESSAGES_VIEW))
     .query(async ({ input }) => {
-      const { projectId, traceIds } = input;
-
-      const checksResult = await esClient.search<TraceCheck>({
-        index: TRACE_CHECKS_INDEX,
-        body: {
-          size: Math.min(traceIds.length * 100, 10_000), // Assuming a maximum of 100 checks per trace
-          query: {
-            //@ts-ignore
-            bool: {
-              filter: [
-                { terms: { trace_id: traceIds } },
-                { term: { project_id: projectId } },
-              ],
-            },
-          },
-        },
-      });
-
-      const traceChecks = checksResult.hits.hits
-        .map((hit) => hit._source!)
-        .filter((x) => x);
-
-      const checksPerTrace = traceChecks.reduce(
-        (acc, check) => {
-          if (check) {
-            if (!acc[check.trace_id]) {
-              acc[check.trace_id] = [];
-            }
-            acc[check.trace_id]!.push(check);
-          }
-          return acc;
-        },
-        {} as Record<string, TraceCheck[]>
-      );
-
-      return checksPerTrace;
+      return getEvaluationsMultiple(input);
     }),
   getTopicCounts: protectedProcedure
     .input(tracesFilterInput)
@@ -956,4 +955,46 @@ const groupTraces = <T extends Trace>(
   }
 
   return groups;
+};
+
+export const getEvaluationsMultiple = async (input: {
+  projectId: string;
+  traceIds: string[];
+}) => {
+  const { projectId, traceIds } = input;
+
+  const checksResult = await esClient.search<TraceCheck>({
+    index: TRACE_CHECKS_INDEX,
+    body: {
+      size: Math.min(traceIds.length * 100, 10_000), // Assuming a maximum of 100 checks per trace
+      query: {
+        //@ts-ignore
+        bool: {
+          filter: [
+            { terms: { trace_id: traceIds } },
+            { term: { project_id: projectId } },
+          ],
+        },
+      },
+    },
+  });
+
+  const traceChecks = checksResult.hits.hits
+    .map((hit) => hit._source!)
+    .filter((x) => x);
+
+  const checksPerTrace = traceChecks.reduce(
+    (acc, check) => {
+      if (check) {
+        if (!acc[check.trace_id]) {
+          acc[check.trace_id] = [];
+        }
+        acc[check.trace_id]!.push(check);
+      }
+      return acc;
+    },
+    {} as Record<string, TraceCheck[]>
+  );
+
+  return checksPerTrace;
 };

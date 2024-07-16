@@ -1,8 +1,13 @@
 import { z } from "zod";
-import { createTRPCRouter, protectedProcedure } from "../trpc";
+import { createTRPCRouter, protectedProcedure, publicProcedure } from "../trpc";
 
 import { nanoid } from "nanoid";
-import { TeamRoleGroup, checkUserPermissionForProject } from "../permission";
+import {
+  TeamRoleGroup,
+  checkPermissionOrPubliclyShared,
+  checkUserPermissionForProject,
+} from "../permission";
+import { PublicShareResourceTypes } from "@prisma/client";
 
 const scoreOptionSchema = z.object({
   value: z.string().optional().nullable(),
@@ -62,14 +67,22 @@ export const annotationRouter = createTRPCRouter({
         },
       });
     }),
-  getByTraceId: protectedProcedure
+  getByTraceId: publicProcedure
     .input(
       z.object({
         traceId: z.string(),
         projectId: z.string(),
       })
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.ANNOTATIONS_VIEW))
+    .use(
+      checkPermissionOrPubliclyShared(
+        checkUserPermissionForProject(TeamRoleGroup.ANNOTATIONS_VIEW),
+        {
+          resourceType: PublicShareResourceTypes.TRACE,
+          resourceParam: "traceId",
+        }
+      )
+    )
     .query(async ({ ctx, input }) => {
       return ctx.prisma.annotation.findMany({
         where: {

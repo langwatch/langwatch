@@ -39,6 +39,7 @@ interface CreateContextOptions {
   res?: NextApiResponse;
   session: Session | null;
   permissionChecked?: boolean;
+  publiclyShared?: boolean;
 }
 
 /**
@@ -58,6 +59,7 @@ export const createInnerTRPCContext = (opts: CreateContextOptions) => {
     res: opts.res,
     prisma,
     permissionChecked: opts.permissionChecked ?? false,
+    publiclyShared: opts.publiclyShared ?? false,
   };
 };
 
@@ -78,6 +80,7 @@ export const createTRPCContext = async (opts: CreateNextContextOptions) => {
     res,
     session,
     permissionChecked: false,
+    publiclyShared: false,
   });
 };
 

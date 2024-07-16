@@ -1,29 +1,40 @@
-import { VStack, HStack, Spacer, Box, Text, Card } from "@chakra-ui/react";
-import { api } from "~/utils/api";
+import { Box, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
 import { useEffect } from "react";
-import { Edit, ThumbsUp, ThumbsDown } from "react-feather";
+import { Edit, ThumbsDown, ThumbsUp } from "react-feather";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useRequiredSession } from "~/hooks/useRequiredSession";
+import { api } from "~/utils/api";
 import { useDrawer } from "./CurrentDrawer";
 
 export const Annotations = ({ traceId }: { traceId: string }) => {
   const { data } = useRequiredSession();
   const { isDrawerOpen, openDrawer } = useDrawer();
-  const { project } = useOrganizationTeamProject();
+  const { project, isPublicRoute } = useOrganizationTeamProject();
 
-  const annotations = api.annotation.getByTraceId.useQuery({
-    projectId: project?.id ?? "",
-    traceId: traceId,
-  });
+  const annotations = api.annotation.getByTraceId.useQuery(
+    {
+      projectId: project?.id ?? "",
+      traceId: traceId,
+    },
+    {
+      enabled: !!project?.id,
+    }
+  );
 
-  const scoreOptions = api.annotationScore.getAll.useQuery({
-    projectId: project?.id ?? "",
-  });
+  const scoreOptions = api.annotationScore.getAll.useQuery(
+    {
+      projectId: project?.id ?? "",
+    },
+    {
+      enabled: !!project?.id && !isPublicRoute,
+    }
+  );
 
   const isAnnotationDrawerOpen = isDrawerOpen("annotation");
 
   useEffect(() => {
     void annotations.refetch();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAnnotationDrawerOpen]);
 
   return (
@@ -90,25 +101,26 @@ export const Annotations = ({ traceId }: { traceId: string }) => {
                   Object.entries(annotation.scoreOptions).map(
                     ([key, scoreOption]) => {
                       if (!scoreOption) return null;
+                      const name = scoreOptions.data?.find(
+                        (option) => option.id === key
+                      )?.name;
+
                       return (
-                        <Text key={key} fontSize={"sm"}>
-                          <HStack>
-                            <Text fontWeight="bold">
-                              {scoreOptions.data?.find(
-                                (option) => option.id === key
-                              )?.name ?? "Name not found"}
-                              :
-                            </Text>
-                            <Text key={key}>
-                              {typeof scoreOption === "object" &&
-                                "value" in scoreOption && (
-                                  <Text key={key}>
-                                    {String(scoreOption.value)}
-                                  </Text>
-                                )}
-                            </Text>
-                          </HStack>
-                        </Text>
+                        name && (
+                          <Text key={key} fontSize={"sm"}>
+                            <HStack>
+                              <Text fontWeight="bold">{name}:</Text>
+                              <Text key={key}>
+                                {typeof scoreOption === "object" &&
+                                  "value" in scoreOption && (
+                                    <Text key={key}>
+                                      {String(scoreOption.value)}
+                                    </Text>
+                                  )}
+                              </Text>
+                            </HStack>
+                          </Text>
+                        )
                       );
                     }
                   )}

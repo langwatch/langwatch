@@ -322,6 +322,7 @@ export const DashboardLayout = ({
     team,
     project,
     hasOrganizationPermission,
+    isPublicRoute,
   } = useOrganizationTeamProject();
   const usage = api.limits.getUsage.useQuery(
     { organizationId: organization?.id ?? "" },
@@ -438,9 +439,10 @@ export const DashboardLayout = ({
               label={projectRoutes.prompts.title}
               project={project}
             /> */}
-            {hasOrganizationPermission(
+            {(!!hasOrganizationPermission(
               OrganizationRoleGroup.ORGANIZATION_VIEW
-            ) && (
+            ) ||
+              isPublicRoute) && (
               <SideMenuLink
                 path={projectRoutes.settings.path}
                 icon={Settings}
@@ -524,6 +526,14 @@ export const DashboardLayout = ({
         >
           {organizations && project && (
             <ProjectSelector organizations={organizations} project={project} />
+          )}
+          {!project && (
+            <Text paddingLeft={2}>
+              <Link href="/auth/signin" color="orange.600" fontWeight="600">
+                Sign in
+              </Link>{" "}
+              to LangWatch to monitor your projects
+            </Text>
           )}
           <Hide below="lg">
             <Breadcrumbs currentRoute={currentRoute} />
