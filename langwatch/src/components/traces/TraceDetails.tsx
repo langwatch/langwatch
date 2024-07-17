@@ -11,7 +11,11 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { type Annotation, type PublicShare } from "@prisma/client";
+import {
+  type Annotation,
+  type Project,
+  type PublicShare,
+} from "@prisma/client";
 import type { TraceCheck } from "~/server/tracer/types";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { TeamRoleGroup } from "../../server/api/permission";
@@ -25,6 +29,7 @@ import { TraceSummary } from "./Summary";
 import { useEffect, useState } from "react";
 
 interface TraceEval {
+  project?: Project;
   traceId: string;
   evaluations?: TraceCheck[];
 }
@@ -77,138 +82,7 @@ export function TraceDetails(props: {
     }
   );
 
-  const anyGuardrails = evaluations.data?.some((x) => x.is_guardrail);
-
-  const Evaluations = (trace: TraceEval) => {
-    const evaluations = trace.evaluations?.filter((x) => !x.is_guardrail);
-    const totalChecks = evaluations?.length;
-    if (!totalChecks)
-      return (
-        <Text>
-          No evaluations ran for this message.
-          {anyGuardrails ? (
-            " Evaluations are skipped if guardrails completely blocked the message."
-          ) : (
-            <>
-              Setup evaluations{" "}
-              <Link
-                href={`/${project?.slug}/evaluations`}
-                textDecoration="underline"
-              >
-                here
-              </Link>
-              .
-            </>
-          )}
-        </Text>
-      );
-    return (
-      <VStack align="start" spacing={2}>
-        <>
-          {evaluations?.map((check) => (
-            <CheckPassingDrawer
-              key={check.trace_id + "/" + check.check_id}
-              check={check}
-            />
-          ))}
-        </>
-      </VStack>
-    );
-  };
-
-  const Guardrails = (trace: TraceEval) => {
-    const guardrails = trace.evaluations?.filter((x) => x.is_guardrail);
-    const totalChecks = guardrails?.length;
-    if (!totalChecks)
-      return (
-        <Text>
-          No guardrails ran for this message. Setup guardrails{" "}
-          <Link
-            href={`/${project?.slug}/evaluations`}
-            textDecoration="underline"
-          >
-            here
-          </Link>
-          .
-        </Text>
-      );
-    return (
-      <VStack align="start" spacing={2}>
-        <>
-          {guardrails?.map((check) => (
-            <CheckPassingDrawer
-              key={check.trace_id + "/" + check.check_id}
-              check={check}
-            />
-          ))}
-        </>
-      </VStack>
-    );
-  };
-
-  const Errors = (trace: TraceEval) => {
-    const totalErrors = trace
-      ? trace.evaluations?.filter(
-          (check) =>
-            !check.is_guardrail &&
-            (check.status === "error" || check.passed === false)
-        ).length
-      : 0;
-
-    if (totalErrors === 0 || !totalErrors) return null;
-
-    return (
-      <Text
-        marginLeft={3}
-        borderRadius={"md"}
-        paddingX={2}
-        backgroundColor={"red.500"}
-        color={"white"}
-        fontSize={"sm"}
-      >
-        {totalErrors} failed
-      </Text>
-    );
-  };
-
-  const AnnotationMsgs = ({ annotations }: { annotations: Annotation[] }) => {
-    if (!annotations.length) return null;
-
-    return (
-      <Text
-        marginLeft={3}
-        borderRadius={"md"}
-        paddingX={2}
-        backgroundColor={"green.500"}
-        color={"white"}
-        fontSize={"sm"}
-      >
-        {annotations.length}
-      </Text>
-    );
-  };
-
-  const Blocked = (trace: TraceEval) => {
-    const totalBlocked = trace
-      ? trace.evaluations?.filter(
-          (check) => check.is_guardrail && check.passed === false
-        ).length
-      : 0;
-
-    if (totalBlocked === 0 || !totalBlocked) return null;
-
-    return (
-      <Text
-        marginLeft={3}
-        borderRadius={"md"}
-        paddingX={2}
-        backgroundColor={"blue.100"}
-        fontSize={"sm"}
-      >
-        {totalBlocked} blocked
-      </Text>
-    );
-  };
+  const anyGuardrails = !!evaluations.data?.some((x) => x.is_guardrail);
 
   const annotationTabIndex =
     props.annotationTab && anyGuardrails ? 3 : props.annotationTab ? 2 : 0;
@@ -273,6 +147,7 @@ export function TraceDetails(props: {
                 <Tab>
                   Guardrails{" "}
                   <Blocked
+                    project={project}
                     traceId={props.traceId}
                     evaluations={evaluations.data}
                   />
@@ -280,7 +155,8 @@ export function TraceDetails(props: {
               )}
               <Tab>
                 Evaluations{" "}
-                <Errors
+                <EvaluationsCount
+                  project={project}
                   traceId={props.traceId}
                   evaluations={evaluations.data}
                 />
@@ -301,6 +177,7 @@ export function TraceDetails(props: {
               {anyGuardrails && (
                 <TabPanel>
                   <Guardrails
+                    project={project}
                     traceId={props.traceId ?? ""}
                     evaluations={evaluations.data}
                   />
@@ -308,8 +185,10 @@ export function TraceDetails(props: {
               )}
               <TabPanel>
                 <Evaluations
+                  project={project}
                   traceId={props.traceId ?? ""}
                   evaluations={evaluations.data}
+                  anyGuardrails={anyGuardrails}
                 />
               </TabPanel>
               <TabPanel>
@@ -329,3 +208,151 @@ export function TraceDetails(props: {
     </>
   );
 }
+
+const Evaluations = (trace: TraceEval & { anyGuardrails: boolean }) => {
+  const evaluations = trace.evaluations?.filter((x) => !x.is_guardrail);
+  const totalChecks = evaluations?.length;
+  if (!totalChecks)
+    return (
+      <Text>
+        No evaluations ran for this message.
+        {trace.anyGuardrails ? (
+          " Evaluations are skipped if guardrails completely blocked the message."
+        ) : (
+          <>
+            Setup evaluations{" "}
+            <Link
+              href={`/${trace.project?.slug}/evaluations`}
+              textDecoration="underline"
+            >
+              here
+            </Link>
+            .
+          </>
+        )}
+      </Text>
+    );
+  return (
+    <VStack align="start" spacing={2}>
+      <>
+        {evaluations?.map((check) => (
+          <CheckPassingDrawer
+            key={check.trace_id + "/" + check.check_id}
+            check={check}
+          />
+        ))}
+      </>
+    </VStack>
+  );
+};
+
+const Guardrails = (trace: TraceEval) => {
+  const guardrails = trace.evaluations?.filter((x) => x.is_guardrail);
+  const totalChecks = guardrails?.length;
+  if (!totalChecks)
+    return (
+      <Text>
+        No guardrails ran for this message. Setup guardrails{" "}
+        <Link
+          href={`/${trace.project?.slug}/evaluations`}
+          textDecoration="underline"
+        >
+          here
+        </Link>
+        .
+      </Text>
+    );
+  return (
+    <VStack align="start" spacing={2}>
+      <>
+        {guardrails?.map((check) => (
+          <CheckPassingDrawer
+            key={check.trace_id + "/" + check.check_id}
+            check={check}
+          />
+        ))}
+      </>
+    </VStack>
+  );
+};
+
+const EvaluationsCount = (trace: TraceEval) => {
+  const totalErrors =
+    trace.evaluations?.filter(
+      (check) => check.status === "error" || check.passed === false
+    ).length ?? 0;
+
+  if (totalErrors > 0) {
+    return (
+      <Text
+        marginLeft={3}
+        borderRadius={"md"}
+        paddingX={2}
+        backgroundColor={"red.500"}
+        color={"white"}
+        fontSize={"sm"}
+      >
+        {totalErrors} failed
+      </Text>
+    );
+  }
+
+  const totalProcessed =
+    trace.evaluations?.filter((check) => check.status === "processed").length ??
+    0;
+  const total = trace.evaluations?.length ?? 0;
+
+  if (total === 0) return null;
+
+  return (
+    <Text
+      marginLeft={3}
+      borderRadius={"md"}
+      paddingX={2}
+      backgroundColor={totalProcessed > 0 ? "green.500" : "yellow.500"}
+      color={"white"}
+      fontSize={"sm"}
+    >
+      {totalProcessed > 0 ? totalProcessed : total}
+    </Text>
+  );
+};
+
+const AnnotationMsgs = ({ annotations }: { annotations: Annotation[] }) => {
+  if (!annotations.length) return null;
+
+  return (
+    <Text
+      marginLeft={3}
+      borderRadius={"md"}
+      paddingX={2}
+      backgroundColor={"green.500"}
+      color={"white"}
+      fontSize={"sm"}
+    >
+      {annotations.length}
+    </Text>
+  );
+};
+
+const Blocked = (trace: TraceEval) => {
+  const totalBlocked = trace
+    ? trace.evaluations?.filter(
+        (check) => check.is_guardrail && check.passed === false
+      ).length
+    : 0;
+
+  if (totalBlocked === 0 || !totalBlocked) return null;
+
+  return (
+    <Text
+      marginLeft={3}
+      borderRadius={"md"}
+      paddingX={2}
+      backgroundColor={"blue.100"}
+      fontSize={"sm"}
+    >
+      {totalBlocked} blocked
+    </Text>
+  );
+};
