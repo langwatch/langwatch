@@ -22,6 +22,13 @@ describe("Data For Filter Integration Tests", () => {
           labels: ["test-messages"],
           thread_id: "test-thread-id",
           topic_id: "greetings",
+          all_keys: [
+            "user_id",
+            "customer_id",
+            "labels",
+            "thread_id",
+            "topic_id",
+          ],
         },
         timestamps: {
           inserted_at: new Date().getTime(),
@@ -78,6 +85,13 @@ describe("Data For Filter Integration Tests", () => {
           labels: ["test-messages"],
           thread_id: "test-thread-id-2",
           topic_id: "greetings",
+          all_keys: [
+            "user_id",
+            "customer_id",
+            "labels",
+            "thread_id",
+            "topic_id",
+          ],
         },
         timestamps: {
           inserted_at: new Date().getTime(),
@@ -148,6 +162,13 @@ describe("Data For Filter Integration Tests", () => {
           labels: ["test-messages"],
           thread_id: "test-thread-id-3",
           topic_id: "poems",
+          all_keys: [
+            "user_id",
+            "customer_id",
+            "labels",
+            "thread_id",
+            "topic_id",
+          ],
         },
         timestamps: {
           inserted_at: new Date().getTime(),

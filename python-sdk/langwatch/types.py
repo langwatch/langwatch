@@ -151,21 +151,16 @@ class RAGSpan(TypedDict, total=False):
 Span = Union[LLMSpan, RAGSpan, BaseSpan]
 
 
-class Experiment(TypedDict):
-    experiment_id: str
-    variant: int
-
-
 PrimitiveType = Union[str, int, float, bool, None]
 
-ExtraType = Union[
+MetadataValue = Union[
     PrimitiveType,
     List[PrimitiveType],
     Dict[str, PrimitiveType],
     Dict[str, Dict[str, PrimitiveType]],  # Allow up to 2 levels of nesting
 ]
 
-TraceMetadata = Dict[str, ExtraType]
+TraceMetadata = Dict[str, MetadataValue]
 
 
 class CollectorRESTParams(TypedDict):

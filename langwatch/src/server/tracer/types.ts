@@ -237,19 +237,33 @@ export type TraceOutput = {
   embeddings?: { model: string; embeddings: number[] };
 };
 
+type PrimitiveType = string | number | boolean | null | undefined;
+
+export type ReservedTraceMetadata = {
+  thread_id?: string;
+  user_id?: string;
+  customer_id?: string;
+  labels?: string[];
+  topic_id?: string;
+  subtopic_id?: string;
+  sdk_version?: string;
+  sdk_language?: string;
+};
+
+export type CustomMetadata = Record<
+  string,
+  | PrimitiveType
+  | PrimitiveType[]
+  | Record<string, PrimitiveType>
+  | Record<string, Record<string, PrimitiveType>>
+>;
+
+export type TraceMetadata = ReservedTraceMetadata & CustomMetadata;
+
 export type Trace = {
   trace_id: string;
   project_id: string;
-  metadata: {
-    thread_id?: string;
-    user_id?: string;
-    customer_id?: string;
-    labels?: string[];
-    topic_id?: string;
-    subtopic_id?: string;
-    sdk_version?: string;
-    sdk_language?: string;
-  };
+  metadata: TraceMetadata;
   timestamps: { started_at: number; inserted_at: number; updated_at: number };
   input?: TraceInput;
   output?: TraceOutput;
@@ -267,7 +281,11 @@ export type Trace = {
   indexing_md5s?: string[];
 };
 
-export type ElasticSearchTrace = Trace & {
+export type ElasticSearchTrace = Omit<Trace, "metadata" | "timestamps"> & {
+  metadata: ReservedTraceMetadata & {
+    custom?: CustomMetadata;
+    all_keys: string[];
+  };
   timestamps: Trace["timestamps"] & {
     updated_at: number;
   };
@@ -303,11 +321,6 @@ export type TraceCheck = {
   };
 };
 
-export type Experiment = {
-  experiment_id: string;
-  variant: number;
-};
-
 export type CollectorRESTParams = {
   trace_id?: string | null | undefined;
   spans: Span[];
@@ -316,10 +329,9 @@ export type CollectorRESTParams = {
     thread_id?: string | null | undefined;
     customer_id?: string | null | undefined;
     labels?: string[] | null | undefined;
-    experiments?: Experiment[] | null | undefined;
     sdk_version?: string | null | undefined;
     sdk_language?: string | null | undefined;
-  };
+  } & CustomMetadata;
   expected_output?: string | null;
 };
 

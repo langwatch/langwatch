@@ -18,9 +18,10 @@ import React, {
 import { HelpCircle } from "react-feather";
 import { getTotalTokensDisplay } from "~/utils/getTotalTokensDisplay";
 import { useTraceDetailsState } from "../../hooks/useTraceDetailsState";
-import type { Trace } from "../../server/tracer/types";
+import type { ElasticSearchTrace, Trace } from "../../server/tracer/types";
 import { formatMilliseconds } from "../../utils/formatMilliseconds";
 import { MetadataTag } from "../MetadataTag";
+import { reservedTraceMetadataSchema } from "../../server/tracer/types.generated";
 
 const SummaryItem = ({
   label,
@@ -91,9 +92,16 @@ export function TraceSummary(props: TraceSummaryProps) {
 }
 
 const TraceSummaryValues = React.forwardRef(function TraceSummaryValues(
-  { trace }: { trace: Trace },
+  { trace }: { trace: ElasticSearchTrace },
   ref
 ) {
+  const reservedMetadata = Object.fromEntries(
+    Object.entries(trace.metadata ?? {}).filter(
+      ([key]) => key in reservedTraceMetadataSchema.shape
+    )
+  );
+  const customMetadata = trace.metadata?.custom ?? {};
+
   return (
     <>
       <HStack
@@ -148,27 +156,31 @@ const TraceSummaryValues = React.forwardRef(function TraceSummaryValues(
       </HStack>
 
       <HStack gap={3} marginY={8} wrap={"wrap"}>
-        {Object.entries({ trace_id: trace.trace_id, ...trace.metadata }).map(
-          ([key, value], i) => {
-            let renderValue = value;
+        {Object.entries({
+          trace_id: trace.trace_id,
+          ...reservedMetadata,
+          ...customMetadata,
+        }).map(([key, value], i) => {
+          let renderValue = value;
 
-            if (Array.isArray(value) && value.length === 0) {
-              renderValue = "";
-            } else if (Array.isArray(value) && value.length > 0) {
-              renderValue = value.join(", ");
-            }
-
-            return (
-              renderValue && (
-                <MetadataTag
-                  key={i}
-                  label={key}
-                  value={renderValue as string}
-                />
-              )
-            );
+          if (Array.isArray(value) && value.length === 0) {
+            renderValue = "";
+          } else if (Array.isArray(value) && value.length > 0) {
+            renderValue = value.join(", ");
+          } else if (typeof value === "object" && value !== null) {
+            renderValue = JSON.stringify(value);
+          } else if (renderValue === "") {
+            renderValue = '""';
+          } else if (typeof value !== "string") {
+            renderValue = `${value as any}`;
           }
-        )}
+
+          return (
+            renderValue && (
+              <MetadataTag key={i} label={key} value={renderValue} />
+            )
+          );
+        })}
       </HStack>
     </>
   );

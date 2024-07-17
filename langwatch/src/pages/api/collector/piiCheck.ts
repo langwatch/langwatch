@@ -1,6 +1,6 @@
 import type { google } from "@google-cloud/dlp/build/protos/protos";
 import { env } from "../../../env.mjs";
-import type { ElasticSearchSpan, Trace } from "../../../server/tracer/types";
+import type { ElasticSearchSpan, ElasticSearchTrace, Trace } from "../../../server/tracer/types";
 import { getDebugger } from "../../../utils/logger";
 import { DlpServiceClient } from "@google-cloud/dlp";
 import type { PIIRedactionLevel } from "@prisma/client";
@@ -109,7 +109,7 @@ const clearPII = async (
 };
 
 export const cleanupPIIs = async (
-  trace: Trace,
+  trace: Trace | ElasticSearchTrace,
   spans: ElasticSearchSpan[],
   piiRedactionLevel: PIIRedactionLevel,
   enforced = true

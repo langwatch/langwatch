@@ -30,7 +30,7 @@ async def main(message: cl.Message):
     )
 
     langwatch.get_current_trace().update(
-        metadata={"user_id": "123", "question_id": "456"}
+        metadata={"user_id": "123", "question_id": "456", "labels": ["some-label"]}
     )
 
     generated_message = generate(message.content)
