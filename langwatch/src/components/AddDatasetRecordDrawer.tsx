@@ -81,6 +81,32 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
     }
   );
 
+  const annotationScores = api.annotation.getByTraceId.useQuery(
+    { projectId: project?.id ?? "", traceId: props.traceId ?? "" },
+    { enabled: !!project, refetchOnWindowFocus: false }
+  );
+
+  console.log(annotationScores.data);
+
+  const getAnnotationScoreOptions = api.annotationScore.getAllActive.useQuery(
+    {
+      projectId: project?.id ?? "",
+    },
+    {
+      enabled: !!project?.id,
+    }
+  );
+
+  const idNameMap = getAnnotationScoreOptions?.data?.reduce(
+    (map, obj) => {
+      map[obj.id] = obj.name;
+      return map;
+    },
+    {} as Record<string, string>
+  );
+
+  console.log(getAnnotationScoreOptions.data);
+
   const datasets = api.dataset.getAll.useQuery(
     { projectId: project?.id ?? "" },
     { enabled: !!project, refetchOnWindowFocus: false }
@@ -148,6 +174,7 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
                   ? JSON.parse(row.contexts)
                   : undefined,
               comments: row.comments,
+              annotation_scores: row.annotation_scores,
             })),
           }
         : selectedDataset.schema === "ONE_LLM_CALL_PER_ROW"
@@ -164,6 +191,7 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
                   ? JSON.parse(row.expected_llm_output)
                   : undefined,
               comments: row.comments,
+              annotation_scores: row.annotation_scores,
             })),
           }
         : undefined;
@@ -256,6 +284,27 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
           row.comments = "";
         }
 
+        if (columns.includes("annotation_scores")) {
+          const annotationScoresArray = annotationScores.data?.[0]?.scoreOptions
+            ? Object.entries(annotationScores.data[0].scoreOptions).map(
+                ([key, { value, reason }]) => ({
+                  value,
+                  reason,
+                  name: idNameMap?.[key] ?? "",
+                })
+              )
+            : [];
+          // const annotationScoresArray = Object.values(
+          //   annotationScores.data?.[0]?.scoreOptions ?? {}
+          // );
+
+          // const annotationScoresArray = Object.entries(
+          //   annotationScores.data?.[0]?.scoreOptions ?? {}
+          // ).map(([key, value]) => ({ key, value }));
+
+          row.annotation_scores = JSON.stringify(annotationScoresArray);
+        }
+
         rows.push(row);
       }
     }
@@ -286,13 +335,21 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
             row.comments = "";
           }
 
+          if (columns.includes("annotation_scores")) {
+            const annotationScoresArray = Object.values(
+              annotationScores.data?.[0]?.scoreOptions ?? {}
+            );
+
+            row.annotation_scores = JSON.stringify(annotationScoresArray);
+          }
+
           rows.push(row);
         }
       }
     }
 
     return rows;
-  }, [selectedDataset, tracesWithSpans.data]);
+  }, [selectedDataset, tracesWithSpans.data, annotationScores.data]);
 
   useEffect(() => {
     if (!rowDataFromDataset) return;

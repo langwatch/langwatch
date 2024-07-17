@@ -117,6 +117,52 @@ export const AddDatasetDrawer = (props: AddDatasetDrawerProps) => {
     );
   };
 
+  const AnnotationScores = () => {
+    return (
+      <Checkbox
+        value="annotation_scores"
+        {...register("columns")}
+        alignItems="start"
+        paddingTop={2}
+      >
+        <VStack align="start" marginTop={-1}>
+          <HStack>
+            <Text fontWeight="500">Annotation Scores</Text>
+            <Text fontSize={13} color="gray.500">
+              (optional)
+            </Text>
+          </HStack>
+          <Text fontSize={13}>
+            A JSON with all the scores for the annotations on the given trace.
+          </Text>
+        </VStack>
+      </Checkbox>
+    );
+  };
+
+  const Evaluations = () => {
+    return (
+      <Checkbox
+        value="evaluations"
+        {...register("columns")}
+        alignItems="start"
+        paddingTop={2}
+      >
+        <VStack align="start" marginTop={-1}>
+          <HStack>
+            <Text fontWeight="500">Evaluations</Text>
+            <Text fontSize={13} color="gray.500">
+              (optional)
+            </Text>
+          </HStack>
+          <Text fontSize={13}>
+            A JSON with all the evaluations for the given trace.
+          </Text>
+        </VStack>
+      </Checkbox>
+    );
+  };
+
   return (
     <Drawer
       isOpen={props.isOpen}
@@ -297,6 +343,8 @@ export const AddDatasetDrawer = (props: AddDatasetDrawerProps) => {
                         </Text>
                       </VStack>
                     </Checkbox>
+                    <AnnotationScores />
+                    <Evaluations />
                   </CheckboxGroup>
                 )}
 
@@ -363,6 +411,8 @@ export const AddDatasetDrawer = (props: AddDatasetDrawerProps) => {
                         </Text>
                       </VStack>
                     </Checkbox>
+                    <AnnotationScores />
+                    <Evaluations />
                   </CheckboxGroup>
                 )}
               </VStack>
