@@ -4,7 +4,6 @@ import {
   Box,
   HStack,
   Skeleton,
-  Text,
   Tooltip,
   VStack,
 } from "@chakra-ui/react";
@@ -18,10 +17,10 @@ import React, {
 import { HelpCircle } from "react-feather";
 import { getTotalTokensDisplay } from "~/utils/getTotalTokensDisplay";
 import { useTraceDetailsState } from "../../hooks/useTraceDetailsState";
-import type { ElasticSearchTrace, Trace } from "../../server/tracer/types";
+import type { ElasticSearchTrace } from "../../server/tracer/types";
+import { reservedTraceMetadataSchema } from "../../server/tracer/types.generated";
 import { formatMilliseconds } from "../../utils/formatMilliseconds";
 import { MetadataTag } from "../MetadataTag";
-import { reservedTraceMetadataSchema } from "../../server/tracer/types.generated";
 
 const SummaryItem = ({
   label,

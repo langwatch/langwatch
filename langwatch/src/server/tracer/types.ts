@@ -284,7 +284,7 @@ export type Trace = {
 export type ElasticSearchTrace = Omit<Trace, "metadata" | "timestamps"> & {
   metadata: ReservedTraceMetadata & {
     custom?: CustomMetadata;
-    all_keys: string[];
+    all_keys?: string[];
   };
   timestamps: Trace["timestamps"] & {
     updated_at: number;
