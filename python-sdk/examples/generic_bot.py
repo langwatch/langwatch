@@ -29,6 +29,10 @@ async def main(message: cl.Message):
         content="",
     )
 
+    langwatch.get_current_trace().update(
+        metadata={"user_id": "123", "question_id": "456"}
+    )
+
     generated_message = generate(message.content)
 
     await msg.stream_token(generated_message)

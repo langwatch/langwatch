@@ -156,14 +156,16 @@ class Experiment(TypedDict):
     variant: int
 
 
-class TraceMetadata(TypedDict, total=False):
-    user_id: Optional[str]
-    thread_id: Optional[str]
-    customer_id: Optional[str]
-    labels: List[str]
-    experiments: List[Experiment]
-    sdk_version: Optional[str]
-    sdk_language: Optional[str]
+PrimitiveType = Union[str, int, float, bool, None]
+
+ExtraType = Union[
+    PrimitiveType,
+    List[PrimitiveType],
+    Dict[str, PrimitiveType],
+    Dict[str, Dict[str, PrimitiveType]],  # Allow up to 2 levels of nesting
+]
+
+TraceMetadata = Dict[str, ExtraType]
 
 
 class CollectorRESTParams(TypedDict):
