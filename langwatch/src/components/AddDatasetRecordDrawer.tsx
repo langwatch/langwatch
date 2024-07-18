@@ -287,25 +287,16 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
         }
 
         if (columns.includes("annotation_scores")) {
-          //const annotationScoresArray = annotationScores.data?.[0]?.scoreOptions
           const annotationScoresArray = annotationScores.data
             ? annotationScores.data.flatMap((score) =>
-                Object.entries(score.scoreOptions ?? {}).map(
-                  ([key, option]) => ({
+                Object.entries(score.scoreOptions ?? {})
+                  .filter(([, option]) => option.value !== null)
+                  .map(([key, option]) => ({
                     ...option,
                     name: idNameMap?.[key] ?? "",
-                  })
-                )
+                  }))
               )
             : [];
-
-          // const annotationScoresArray = Object.values(
-          //   annotationScores.data?.[0]?.scoreOptions ?? {}
-          // );
-
-          // const annotationScoresArray = Object.entries(
-          //   annotationScores.data?.[0]?.scoreOptions ?? {}
-          // ).map(([key, value]) => ({ key, value }));
 
           row.annotation_scores = JSON.stringify(annotationScoresArray);
         }
@@ -343,12 +334,12 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
           if (columns.includes("annotation_scores")) {
             const annotationScoresArray = annotationScores.data
               ? annotationScores.data.flatMap((score) =>
-                  Object.entries(score.scoreOptions ?? {}).map(
-                    ([key, option]) => ({
+                  Object.entries(score.scoreOptions ?? {})
+                    .filter(([, option]) => option.value !== null)
+                    .map(([key, option]) => ({
                       ...option,
                       name: idNameMap?.[key] ?? "",
-                    })
-                  )
+                    }))
                 )
               : [];
 

@@ -40,10 +40,10 @@ export type DatasetRecordForm = {
 );
 
 export const annotationScoreSchema = z.object({
-  label: z.string().optional().nullable(),
-  value: z.string().optional().nullable(),
-  reason: z.string().optional().nullable(),
-  name: z.string().optional().nullable(),
+  label: z.string().optional(),
+  value: z.string().optional(),
+  reason: z.string().optional(),
+  name: z.string().optional(),
 });
 
 export const evaluationsSchema = z.object({
