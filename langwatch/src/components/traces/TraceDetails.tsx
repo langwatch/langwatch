@@ -295,7 +295,7 @@ export function TraceDetails(props: {
 
             <TabPanels>
               <TabPanel>
-                <TraceSummary traceId={props.traceId} />
+                {/* <TraceSummary traceId={props.traceId} /> */}
                 <SpanTree traceId={props.traceId} />
               </TabPanel>
               {anyGuardrails && (
