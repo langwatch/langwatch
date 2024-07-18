@@ -51,7 +51,7 @@ import {
   Shield,
 } from "react-feather";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import type { Trace, TraceCheck } from "~/server/tracer/types";
+import type { ElasticSearchTrace, TraceCheck } from "~/server/tracer/types";
 import { getEvaluatorDefinitions } from "~/trace_checks/getEvaluator";
 import { api } from "~/utils/api";
 import { durationColor } from "~/utils/durationColor";
@@ -217,7 +217,7 @@ export function MessagesTable() {
     "trace.timestamps.started_at": {
       name: "Timestamp",
       sortable: true,
-      render: (trace: Trace, index: number) => (
+      render: (trace: ElasticSearchTrace, index: number) => (
         <Td
           key={index}
           onClick={() =>
@@ -229,7 +229,7 @@ export function MessagesTable() {
           {new Date(trace.timestamps.started_at).toLocaleString()}
         </Td>
       ),
-      value: (trace: Trace) =>
+      value: (trace: ElasticSearchTrace) =>
         new Date(trace.timestamps.started_at).toLocaleString(),
     },
     "trace.input.value": {
@@ -253,7 +253,7 @@ export function MessagesTable() {
           </Tooltip>
         </Td>
       ),
-      value: (trace: Trace) => trace.input?.value ?? "",
+      value: (trace: ElasticSearchTrace) => trace.input?.value ?? "",
     },
     "trace.output.value": {
       name: "Output",
@@ -313,7 +313,7 @@ export function MessagesTable() {
             </Tooltip>
           </Td>
         ),
-      value: (trace: Trace) => trace.output?.value ?? "",
+      value: (trace: ElasticSearchTrace) => trace.output?.value ?? "",
     },
     "trace.metrics.first_token_ms": {
       name: "First Token",
@@ -338,7 +338,7 @@ export function MessagesTable() {
           </Text>
         </Td>
       ),
-      value: (trace: Trace) => {
+      value: (trace: ElasticSearchTrace) => {
         return trace.metrics.first_token_ms
           ? numeral(trace.metrics.first_token_ms / 1000).format("0.[0]") + "s"
           : "-";
@@ -367,7 +367,7 @@ export function MessagesTable() {
           </Text>
         </Td>
       ),
-      value: (trace: Trace) => {
+      value: (trace: ElasticSearchTrace) => {
         return trace.metrics.total_time_ms
           ? numeral(trace.metrics.total_time_ms / 1000).format("0.[0]") + "s"
           : "-";
@@ -389,7 +389,7 @@ export function MessagesTable() {
           {trace.metrics.completion_tokens}
         </Td>
       ),
-      value: (trace: Trace) => trace.metrics.completion_tokens ?? 0,
+      value: (trace: ElasticSearchTrace) => trace.metrics.completion_tokens ?? 0,
     },
     "trace.metrics.prompt_tokens": {
       name: "Prompt Tokens",
@@ -407,7 +407,7 @@ export function MessagesTable() {
           {trace.metrics.prompt_tokens}
         </Td>
       ),
-      value: (trace: Trace) => trace.metrics.prompt_tokens ?? 0,
+      value: (trace: ElasticSearchTrace) => trace.metrics.prompt_tokens ?? 0,
     },
     "trace.metrics.total_cost": {
       name: "Total Cost",
@@ -425,7 +425,7 @@ export function MessagesTable() {
           <Text>{numeral(trace.metrics.total_cost).format("$0.00[000]")}</Text>
         </Td>
       ),
-      value: (trace: Trace) =>
+      value: (trace: ElasticSearchTrace) =>
         numeral(trace.metrics.total_cost).format("$0.00[000]"),
     },
     "trace.metadata": {
@@ -449,7 +449,7 @@ export function MessagesTable() {
           </Tooltip>
         </Td>
       ),
-      value: (trace: Trace) => JSON.stringify(trace.metadata),
+      value: (trace: ElasticSearchTrace) => JSON.stringify(trace.metadata),
     },
     "trace.contexts": {
       name: "Contexts",
@@ -472,7 +472,7 @@ export function MessagesTable() {
           </Tooltip>
         </Td>
       ),
-      value: (trace: Trace) => JSON.stringify(trace.contexts),
+      value: (trace: ElasticSearchTrace) => JSON.stringify(trace.contexts),
     },
     ...Object.fromEntries(
       Object.entries(traceCheckColumnsAvailable).map(
@@ -525,7 +525,7 @@ export function MessagesTable() {
                 </Td>
               );
             },
-            value: (trace: Trace) => {
+            value: (trace: ElasticSearchTrace) => {
               const checkId = columnKey.split(".")[1];
               const traceCheck = traceGroups.data?.traceChecks?.[
                 trace.trace_id

@@ -4,12 +4,11 @@ import { getAllForProject } from "~/server/api/routers/traces";
 import { sendTriggerEmail } from "~/server/mailer/triggerEmail";
 import { sendSlackWebhook } from "~/server/triggers/sendSlackWebhook";
 import { prisma } from "../../server/db";
-import { getLatestUpdatedAt } from "./utils";
 
-import { type Trace } from "~/server/tracer/types";
+import { type ElasticSearchTrace } from "~/server/tracer/types";
 
 interface TraceGroups {
-  groups: Trace[][];
+  groups: ElasticSearchTrace[][];
 }
 
 interface ActionParams {
@@ -202,4 +201,18 @@ const hasTriggerSent = async (
     where: { triggerId_traceId: { triggerId, traceId }, projectId },
   });
   return triggerSent !== null;
+};
+
+interface TraceGroups {
+  groups: ElasticSearchTrace[][];
+}
+
+export const getLatestUpdatedAt = (traces: TraceGroups) => {
+  const updatedTimes = traces.groups
+    .flatMap((group: any) =>
+      group.map((item: any) => item.timestamps.updated_at)
+    )
+    .sort((a: number, b: number) => b - a);
+
+  return updatedTimes[0];
 };

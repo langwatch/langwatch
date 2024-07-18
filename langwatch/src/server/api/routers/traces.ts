@@ -41,6 +41,7 @@ import {
   type Contexts,
   elasticSearchToTypedValue,
   type GuardrailResult,
+  type ElasticSearchTrace,
 } from "../../tracer/types";
 import {
   TeamRoleGroup,
@@ -294,7 +295,7 @@ export const tracesRouter = createTRPCRouter({
     .query(async ({ input }) => {
       const { projectId, threadId } = input;
 
-      const tracesResult = await esClient.search<Trace>({
+      const tracesResult = await esClient.search<ElasticSearchTrace>({
         index: TRACE_INDEX,
         body: {
           query: {
@@ -539,7 +540,7 @@ export const getAllForProject = async (
   }
 
   //@ts-ignore
-  const tracesResult = await esClient.search<Trace>({
+  const tracesResult = await esClient.search<ElasticSearchTrace>({
     index: TRACE_INDEX,
     from: !usePivotIndex || input.query ? pageOffset : 0,
     size: !usePivotIndex || input.query ? pageSize : traceIds.length,
@@ -855,7 +856,7 @@ const getTracesWithSpans = async (projectId: string, traceIds: string[]) => {
   return tracesWithSpans;
 };
 
-const groupTraces = <T extends Trace>(
+const groupTraces = <T extends ElasticSearchTrace>(
   groupBy: string | undefined,
   traces: T[]
 ) => {
@@ -992,10 +993,7 @@ export const getTraceById = async ({
   traceId: string;
   canSeeCosts?: boolean | undefined | null;
 }) => {
-  //@ts-ignore
-
-  //@ts-ignore
-  const result = await esClient.search<Trace>({
+  const result = await esClient.search<ElasticSearchTrace>({
     index: TRACE_INDEX,
     size: 1,
     _source: {
@@ -1016,7 +1014,7 @@ export const getTraceById = async ({
             { term: { trace_id: traceId } },
             { term: { project_id: projectId } },
           ],
-        },
+        } as QueryDslBoolQuery,
       },
     },
   });

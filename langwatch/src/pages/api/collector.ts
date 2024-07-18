@@ -11,16 +11,20 @@ import {
 } from "../../server/elasticsearch";
 import {
   type CollectorRESTParamsValidator,
+  type CustomMetadata,
   type ElasticSearchInputOutput,
   type ElasticSearchSpan,
   type ElasticSearchTrace,
   type ErrorCapture,
+  type ReservedTraceMetadata,
   type Span,
   type SpanInputOutput,
   type Trace,
 } from "../../server/tracer/types";
 import {
   collectorRESTParamsValidatorSchema,
+  customMetadataSchema,
+  reservedTraceMetadataSchema,
   spanSchema,
   spanValidatorSchema,
 } from "../../server/tracer/types.generated";
@@ -105,9 +109,21 @@ export default async function handler(
     if ("customer_id" in req.body) {
       req.body.metadata.customer_id = req.body.customer_id;
     }
-    if ("labels" in req.body) {
+    if ("labels" in req.body && req.body.labels) {
       req.body.metadata.labels = req.body.labels;
     }
+  }
+
+  // Allow objects and simple strings to be sent as labels as well
+  if (req.body.metadata?.labels) {
+    req.body.metadata.labels =
+      typeof req.body.metadata.labels === "string"
+        ? [req.body.metadata.labels]
+        : Array.isArray(req.body.metadata.labels)
+        ? req.body.metadata.labels
+        : Object.entries(req.body.metadata.labels).map(
+            ([key, value]) => `${key}: ${value as string}`
+          );
   }
 
   let params: CollectorRESTParamsValidator;
@@ -127,14 +143,6 @@ export default async function handler(
   }
 
   const { trace_id: nullableTraceId, expected_output: expectedOutput } = params;
-  const {
-    thread_id: threadId,
-    user_id: userId,
-    customer_id: customerId,
-    sdk_version: sdkVersion,
-    sdk_language: sdkLanguage,
-    labels,
-  } = params.metadata ?? {};
 
   if (!req.body.spans) {
     return res.status(400).json({ message: "Missing 'spans' field" });
@@ -143,6 +151,27 @@ export default async function handler(
     return res
       .status(400)
       .json({ message: "Invalid 'spans' field, expecting array" });
+  }
+
+  let reservedTraceMetadata: ReservedTraceMetadata = {};
+  let customMetadata: CustomMetadata = {};
+  try {
+    if (params.metadata) {
+      reservedTraceMetadata = Object.fromEntries(
+        Object.entries(
+          reservedTraceMetadataSchema.parse(params.metadata)
+        ).filter(([_key, value]) => value !== null && value !== undefined)
+      );
+      const remainingMetadata = Object.fromEntries(
+        Object.entries(params.metadata).filter(
+          ([key]) => !(key in reservedTraceMetadataSchema.shape)
+        )
+      );
+      customMetadata = customMetadataSchema.parse(remainingMetadata);
+    }
+  } catch (error) {
+    const validationError = fromZodError(error as ZodError);
+    return res.status(400).json({ error: validationError.message });
   }
 
   const spanFields = spanSchema.options.flatMap((option) =>
@@ -291,21 +320,20 @@ export default async function handler(
   ]);
   const error = getLastOutputError(spans);
 
-  const nullToUndefined = <T>(value: T | null): T | undefined =>
-    // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
-    value === null ? undefined : value;
-
   // Create the trace
   const trace: ElasticSearchTrace = {
     trace_id: traceId,
     project_id: project.id,
     metadata: {
-      thread_id: nullToUndefined(threadId), // Optional: This will be undefined if not sent
-      user_id: nullToUndefined(userId), // Optional: This will be undefined if not sent
-      customer_id: nullToUndefined(customerId),
-      labels: nullToUndefined(labels),
-      sdk_version: nullToUndefined(sdkVersion),
-      sdk_language: nullToUndefined(sdkLanguage),
+      ...reservedTraceMetadata,
+      ...(Object.keys(customMetadata).length > 0
+        ? { custom: customMetadata }
+        : {}),
+      all_keys: [
+        ...(existingTrace?.all_keys ?? []),
+        ...Object.keys(reservedTraceMetadata),
+        ...Object.keys(customMetadata),
+      ],
     },
     timestamps: {
       ...(!existingTrace
@@ -408,9 +436,14 @@ const fetchExistingMD5s = async (
   traceId: string,
   projectId: string
 ): Promise<
-  { indexing_md5s: Trace["indexing_md5s"]; inserted_at: number } | undefined
+  | {
+      indexing_md5s: Trace["indexing_md5s"];
+      inserted_at: number;
+      all_keys: string[] | undefined;
+    }
+  | undefined
 > => {
-  const existingTraceResponse = await esClient.search<Trace>({
+  const existingTraceResponse = await esClient.search<ElasticSearchTrace>({
     index: TRACE_INDEX,
     body: {
       size: 1,
@@ -423,7 +456,7 @@ const fetchExistingMD5s = async (
           ],
         },
       },
-      _source: ["indexing_md5s", "timestamps.inserted_at"],
+      _source: ["indexing_md5s", "timestamps.inserted_at", "metadata.all_keys"],
     },
   });
 
@@ -435,5 +468,6 @@ const fetchExistingMD5s = async (
   return {
     indexing_md5s: existingTrace.indexing_md5s,
     inserted_at: existingTrace.timestamps.inserted_at,
+    all_keys: existingTrace.metadata?.all_keys,
   };
 };

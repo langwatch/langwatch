@@ -57,6 +57,9 @@ const traceMapping: ElasticSearchMappingFrom<ElasticSearchTrace> = {
       subtopic_id: { type: "keyword" },
       sdk_version: { type: "keyword" },
       sdk_language: { type: "keyword" },
+
+      custom: { type: "flattened" } as any,
+      all_keys: { type: "keyword" }
     },
   },
   timestamps: {

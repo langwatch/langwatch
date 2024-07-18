@@ -1,12 +1,18 @@
 import { scheduleTraceCheck } from "../../../server/background/queues/traceChecksQueue";
 import { prisma } from "../../../server/db";
-import { type Span, type Trace } from "../../../server/tracer/types";
+import {
+  type ElasticSearchTrace,
+  type Span
+} from "../../../server/tracer/types";
 import type { EvaluatorTypes } from "../../../trace_checks/evaluators.generated";
 import { evaluatePreconditions } from "../../../trace_checks/preconditions";
 import type { CheckPreconditions } from "../../../trace_checks/types";
 import { debug } from "../collector";
 
-export const scheduleTraceChecks = async (trace: Trace, spans: Span[]) => {
+export const scheduleTraceChecks = async (
+  trace: ElasticSearchTrace,
+  spans: Span[]
+) => {
   const isOutputEmpty = !trace.output?.value;
   const lastOutput = spans.reverse()[0]?.output;
   const blockedByGuardrail =

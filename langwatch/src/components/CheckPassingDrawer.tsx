@@ -82,9 +82,9 @@ export function CheckPassingDrawer({ check }: { check: TraceCheck }) {
                   </Text>
                 </HStack>
               ) : check.status == "in_progress" ? (
-                <Text>Processing</Text>
+                <Text color={color}>Processing</Text>
               ) : check.status === "scheduled" ? (
-                <Text>Scheduled</Text>
+                <Text color={color}>Scheduled</Text>
               ) : (
                 <Text>unknown</Text>
               )}

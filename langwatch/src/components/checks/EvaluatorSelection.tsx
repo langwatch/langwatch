@@ -49,7 +49,7 @@ export function EvaluatorSelection({
   const tab = (router.query.tab as Category | undefined) ?? "safety";
 
   const availableEvaluators = Object.entries(AVAILABLE_EVALUATORS).filter(
-    ([key, evaluator]) =>
+    ([key, _evaluator]) =>
       !key.startsWith("example/") &&
       key !== "aws/comprehend_pii_detection"
   );

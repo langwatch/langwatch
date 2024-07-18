@@ -14,7 +14,7 @@ import {
   Spinner,
   Text,
   Tooltip,
-  VStack
+  VStack,
 } from "@chakra-ui/react";
 import ErrorPage from "next/error";
 import { useRouter } from "next/router";
@@ -28,16 +28,13 @@ import Markdown from "react-markdown";
 import { DashboardLayout } from "../../../../components/DashboardLayout";
 import { useOrganizationTeamProject } from "../../../../hooks/useOrganizationTeamProject";
 import { useTraceDetailsState } from "../../../../hooks/useTraceDetailsState";
-import type { Trace } from "../../../../server/tracer/types";
+import type {
+  ElasticSearchTrace,
+} from "../../../../server/tracer/types";
 import { api } from "../../../../utils/api";
 import { isNotFound } from "../../../../utils/trpcError";
 
-import {
-  CornerDownRight,
-  Edit,
-  ThumbsDown,
-  ThumbsUp
-} from "react-feather";
+import { CornerDownRight, Edit, ThumbsDown, ThumbsUp } from "react-feather";
 import { Annotations } from "../../../../components/Annotations";
 import { useDrawer } from "../../../../components/CurrentDrawer";
 import {
@@ -47,13 +44,11 @@ import {
 import { formatTimeAgo } from "../../../../utils/formatTimeAgo";
 
 export default function TraceDetails() {
-  const { hasTeamPermission } = useOrganizationTeamProject();
   const router = useRouter();
-  const { traceId, trace, openTab } = useTraceDetailsState(
+  const { traceId, trace } = useTraceDetailsState(
     (router.query.trace as string) ?? ""
   );
   const [threadId, setThreadId] = useState<string | undefined>(undefined);
-  const { openDrawer } = useDrawer();
 
   useEffect(() => {
     if (trace.data?.metadata.thread_id) {
@@ -251,7 +246,7 @@ const TraceMessages = React.forwardRef(function TraceMessages(
     trace,
     highlighted,
   }: {
-    trace: Trace;
+    trace: ElasticSearchTrace;
     highlighted?: boolean;
   },
   ref
@@ -404,7 +399,7 @@ function Message({
   paddingTop,
   children,
 }: PropsWithChildren<{
-  trace?: Trace;
+  trace?: ElasticSearchTrace;
   author: string;
   avatar: React.ReactNode;
   timestamp?: number;

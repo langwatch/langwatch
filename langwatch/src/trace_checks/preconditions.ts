@@ -1,5 +1,10 @@
 import similarity from "compute-cosine-similarity";
-import { type RAGSpan, type Span, type Trace } from "../server/tracer/types";
+import {
+  type ElasticSearchTrace,
+  type RAGSpan,
+  type Span,
+  type Trace,
+} from "../server/tracer/types";
 import { getEvaluatorDefinitions } from "../trace_checks/getEvaluator";
 import type { CheckPreconditions } from "../trace_checks/types";
 import { extractRAGTextualContext } from "../pages/api/collector/rag";
@@ -7,7 +12,7 @@ import { extractRAGTextualContext } from "../pages/api/collector/rag";
 // TODO: write tests
 export function evaluatePreconditions(
   evaluatorType: string,
-  trace: Trace,
+  trace: Trace | ElasticSearchTrace,
   spans: Span[],
   preconditions: CheckPreconditions
 ): boolean {

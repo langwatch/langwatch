@@ -83,6 +83,7 @@ describe("Collector API Endpoint", () => {
         user_id: "user_test-user_1",
         customer_id: "customer_test-customer_1",
         labels: ["test-label-1.0.0"],
+        my_custom_key: "my_custom_value",
       },
       expected_output: "world",
     };
@@ -145,6 +146,16 @@ describe("Collector API Endpoint", () => {
         user_id: "user_test-user_1",
         customer_id: "customer_test-customer_1",
         labels: ["test-label-1.0.0"],
+        custom: {
+          my_custom_key: "my_custom_value",
+        },
+        all_keys: expect.arrayContaining([
+          "user_id",
+          "thread_id",
+          "customer_id",
+          "labels",
+          "my_custom_key",
+        ]),
       },
       timestamps: {
         started_at: expect.any(Number),
