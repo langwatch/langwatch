@@ -47,8 +47,10 @@ export const annotationScoreSchema = z.object({
 });
 
 export const evaluationsSchema = z.object({
-  name: z.string().optional(),
-  value: z.union([z.string(), z.number()]).optional(),
+  evaluation_name: z.string(),
+  evaluation_type: z.string(),
+  passed: z.boolean().nullable(),
+  score: z.number().nullable(),
 });
 
 export const newDatasetEntriesSchema = z.union([

@@ -30,6 +30,7 @@ import { schemaDisplayName } from "~/utils/datasets";
 import type {
   FlattenStringifiedDatasetEntry,
   newDatasetEntriesSchema,
+  annotationScoreSchema,
 } from "../server/datasets/types";
 import type { DatasetSpan, ElasticSearchSpan } from "../server/tracer/types";
 import { getRAGInfo } from "../server/tracer/utils";
@@ -75,6 +76,14 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
       projectId: project?.id ?? "",
       traceIds: props?.selectedTraceIds ?? [props?.traceId ?? ""],
     },
+    {
+      enabled: !!project,
+      refetchOnWindowFocus: false,
+    }
+  );
+
+  const evaluations = api.traces.getEvaluations.useQuery(
+    { projectId: project?.id ?? "", traceId: props.traceId ?? "" },
     {
       enabled: !!project,
       refetchOnWindowFocus: false,
@@ -174,6 +183,10 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
                 row.annotation_scores !== undefined
                   ? JSON.parse(row.annotation_scores)
                   : undefined,
+              evaluations:
+                row.evaluations !== undefined
+                  ? JSON.parse(row.evaluations)
+                  : undefined,
             })),
           }
         : selectedDataset.schema === "ONE_LLM_CALL_PER_ROW"
@@ -193,6 +206,10 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
               annotation_scores:
                 row.annotation_scores !== undefined
                   ? JSON.parse(row.annotation_scores)
+                  : undefined,
+              evaluations:
+                row.evaluations !== undefined
+                  ? JSON.parse(row.evaluations)
                   : undefined,
             })),
           }
@@ -244,6 +261,39 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
     );
   };
 
+  const getEvaluationArray = (data: any[]) => {
+    return data
+      .filter((item: { status: string }) => item.status === "processed")
+      .map(
+        (item: {
+          check_name: string;
+          check_type: string;
+          passed: boolean | null;
+          score: number;
+        }) => ({
+          evaluation_name: item.check_name,
+          evaluation_type: item.check_type,
+          passed: item.passed,
+          score: item.score,
+        })
+      );
+  };
+
+  const getAnnotationScoresArray = (
+    data: z.infer<typeof annotationScoreSchema>[],
+    idNameMap: Record<string, string>
+  ) => {
+    return data.flatMap((score) => {
+      if (!("scoreOptions" in score)) return []; // Type guard
+      return Object.entries(score.scoreOptions ?? {})
+        .filter(([, option]) => option.value !== null)
+        .map(([key, option]) => ({
+          ...option,
+          name: idNameMap?.[key] ?? "",
+        }));
+    });
+  };
+
   const rowDataFromDataset = useMemo(() => {
     if (!selectedDataset || !tracesWithSpans.data) {
       return;
@@ -288,17 +338,20 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
 
         if (columns.includes("annotation_scores")) {
           const annotationScoresArray = annotationScores.data
-            ? annotationScores.data.flatMap((score) =>
-                Object.entries(score.scoreOptions ?? {})
-                  .filter(([, option]) => option.value !== null)
-                  .map(([key, option]) => ({
-                    ...option,
-                    name: idNameMap?.[key] ?? "",
-                  }))
+            ? getAnnotationScoresArray(
+                annotationScores.data as z.infer<
+                  typeof annotationScoreSchema
+                >[],
+                idNameMap ?? {}
               )
             : [];
-
           row.annotation_scores = JSON.stringify(annotationScoresArray);
+        }
+
+        if (columns.includes("evaluations")) {
+          row.evaluations = JSON.stringify(
+            getEvaluationArray(evaluations.data ?? [])
+          );
         }
 
         rows.push(row);
@@ -333,17 +386,20 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
 
           if (columns.includes("annotation_scores")) {
             const annotationScoresArray = annotationScores.data
-              ? annotationScores.data.flatMap((score) =>
-                  Object.entries(score.scoreOptions ?? {})
-                    .filter(([, option]) => option.value !== null)
-                    .map(([key, option]) => ({
-                      ...option,
-                      name: idNameMap?.[key] ?? "",
-                    }))
+              ? getAnnotationScoresArray(
+                  annotationScores.data as z.infer<
+                    typeof annotationScoreSchema
+                  >[],
+                  idNameMap ?? {}
                 )
               : [];
-
             row.annotation_scores = JSON.stringify(annotationScoresArray);
+          }
+
+          if (columns.includes("evaluations")) {
+            row.evaluations = JSON.stringify(
+              getEvaluationArray(evaluations.data ?? [])
+            );
           }
 
           rows.push(row);
