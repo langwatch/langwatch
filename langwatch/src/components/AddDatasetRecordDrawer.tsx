@@ -427,6 +427,7 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
       expected_llm_output: "Expected LLM Output",
       comments: "Comments",
       annotation_scores: "Annotation Scores",
+      evaluations: "Evaluations",
     };
 
     const headers: ColDef[] = selectedDataset.columns
