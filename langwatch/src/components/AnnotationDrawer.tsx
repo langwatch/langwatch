@@ -75,13 +75,7 @@ export function AnnotationDrawer({
     scoreOptions: {},
   };
 
-  const {
-    register,
-    handleSubmit,
-    watch,
-    setValue,
-    reset,
-  } = useForm({
+  const { register, handleSubmit, watch, setValue, reset } = useForm({
     defaultValues: {
       isThumbsUp: "thumbsUp",
       comment: comment,

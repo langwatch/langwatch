@@ -30,8 +30,13 @@ import { schemaDisplayName } from "~/utils/datasets";
 import type {
   FlattenStringifiedDatasetEntry,
   newDatasetEntriesSchema,
+  annotationScoreSchema,
 } from "../server/datasets/types";
-import type { DatasetSpan, ElasticSearchSpan } from "../server/tracer/types";
+import type {
+  DatasetSpan,
+  ElasticSearchSpan,
+  TraceCheck,
+} from "../server/tracer/types";
 import { getRAGInfo } from "../server/tracer/utils";
 import { AddDatasetDrawer } from "./AddDatasetDrawer";
 import { HorizontalFormControl } from "./HorizontalFormControl";
@@ -79,6 +84,36 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
       enabled: !!project,
       refetchOnWindowFocus: false,
     }
+  );
+
+  const evaluations = api.traces.getEvaluations.useQuery(
+    { projectId: project?.id ?? "", traceId: props.traceId ?? "" },
+    {
+      enabled: !!project,
+      refetchOnWindowFocus: false,
+    }
+  );
+
+  const annotationScores = api.annotation.getByTraceId.useQuery(
+    { projectId: project?.id ?? "", traceId: props.traceId ?? "" },
+    { enabled: !!project, refetchOnWindowFocus: false }
+  );
+
+  const getAnnotationScoreOptions = api.annotationScore.getAllActive.useQuery(
+    {
+      projectId: project?.id ?? "",
+    },
+    {
+      enabled: !!project?.id,
+    }
+  );
+
+  const idNameMap = getAnnotationScoreOptions?.data?.reduce(
+    (map, obj) => {
+      map[obj.id] = obj.name;
+      return map;
+    },
+    {} as Record<string, string>
   );
 
   const datasets = api.dataset.getAll.useQuery(
@@ -148,6 +183,14 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
                   ? JSON.parse(row.contexts)
                   : undefined,
               comments: row.comments,
+              annotation_scores:
+                row.annotation_scores !== undefined
+                  ? JSON.parse(row.annotation_scores)
+                  : undefined,
+              evaluations:
+                row.evaluations !== undefined
+                  ? JSON.parse(row.evaluations)
+                  : undefined,
             })),
           }
         : selectedDataset.schema === "ONE_LLM_CALL_PER_ROW"
@@ -164,6 +207,14 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
                   ? JSON.parse(row.expected_llm_output)
                   : undefined,
               comments: row.comments,
+              annotation_scores:
+                row.annotation_scores !== undefined
+                  ? JSON.parse(row.annotation_scores)
+                  : undefined,
+              evaluations:
+                row.evaluations !== undefined
+                  ? JSON.parse(row.evaluations)
+                  : undefined,
             })),
           }
         : undefined;
@@ -214,6 +265,32 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
     );
   };
 
+  const getEvaluationArray = (data: TraceCheck[]) => {
+    return data
+      .filter((item) => item.status === "processed")
+      .map((item) => ({
+        evaluation_name: item.check_name,
+        evaluation_type: item.check_type,
+        passed: item.passed,
+        score: item.score,
+      }));
+  };
+
+  const getAnnotationScoresArray = (
+    data: z.infer<typeof annotationScoreSchema>[],
+    idNameMap: Record<string, string>
+  ) => {
+    return data.flatMap((score) => {
+      if (!("scoreOptions" in score)) return []; // Type guard
+      return Object.entries(score.scoreOptions ?? {})
+        .filter(([, option]) => option.value !== null)
+        .map(([key, option]) => ({
+          ...option,
+          name: idNameMap?.[key] ?? "",
+        }));
+    });
+  };
+
   const rowDataFromDataset = useMemo(() => {
     if (!selectedDataset || !tracesWithSpans.data) {
       return;
@@ -256,6 +333,24 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
           row.comments = "";
         }
 
+        if (columns.includes("annotation_scores")) {
+          const annotationScoresArray = annotationScores.data
+            ? getAnnotationScoresArray(
+                annotationScores.data as z.infer<
+                  typeof annotationScoreSchema
+                >[],
+                idNameMap ?? {}
+              )
+            : [];
+          row.annotation_scores = JSON.stringify(annotationScoresArray);
+        }
+
+        if (columns.includes("evaluations")) {
+          row.evaluations = JSON.stringify(
+            getEvaluationArray(evaluations.data ?? [])
+          );
+        }
+
         rows.push(row);
       }
     }
@@ -286,13 +381,31 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
             row.comments = "";
           }
 
+          if (columns.includes("annotation_scores")) {
+            const annotationScoresArray = annotationScores.data
+              ? getAnnotationScoresArray(
+                  annotationScores.data as z.infer<
+                    typeof annotationScoreSchema
+                  >[],
+                  idNameMap ?? {}
+                )
+              : [];
+            row.annotation_scores = JSON.stringify(annotationScoresArray);
+          }
+
+          if (columns.includes("evaluations")) {
+            row.evaluations = JSON.stringify(
+              getEvaluationArray(evaluations.data ?? [])
+            );
+          }
+
           rows.push(row);
         }
       }
     }
 
     return rows;
-  }, [selectedDataset, tracesWithSpans.data]);
+  }, [selectedDataset, tracesWithSpans.data, annotationScores.data]);
 
   useEffect(() => {
     if (!rowDataFromDataset) return;
@@ -313,6 +426,8 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
       llm_input: "LLM Input",
       expected_llm_output: "Expected LLM Output",
       comments: "Comments",
+      annotation_scores: "Annotation Scores",
+      evaluations: "Evaluations",
     };
 
     const headers: ColDef[] = selectedDataset.columns

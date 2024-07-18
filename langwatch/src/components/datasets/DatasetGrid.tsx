@@ -18,6 +18,10 @@ import {
   datasetSpanSchema,
   rAGChunkSchema,
 } from "../../server/tracer/types.generated";
+import {
+  annotationScoreSchema,
+  evaluationsSchema,
+} from "../../server/datasets/types";
 import { RenderInputOutput } from "../traces/RenderInputOutput";
 import { MultilineJSONCellEditor } from "./MultilineJSONCellEditor";
 
@@ -53,6 +57,8 @@ export function DatasetGrid(props: AgGridReactProps) {
       llm_input: z.array(chatMessageSchema),
       expected_llm_output: z.array(chatMessageSchema),
       contexts: z.union([z.array(rAGChunkSchema), z.array(z.string())]),
+      annotation_scores: z.array(annotationScoreSchema),
+      evaluations: z.array(evaluationsSchema),
     };
 
     return (props.columnDefs as ColDef[])?.map((column: ColDef) => {
