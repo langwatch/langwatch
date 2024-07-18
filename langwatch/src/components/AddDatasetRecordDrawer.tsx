@@ -86,8 +86,6 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
     { enabled: !!project, refetchOnWindowFocus: false }
   );
 
-  console.log(annotationScores.data);
-
   const getAnnotationScoreOptions = api.annotationScore.getAllActive.useQuery(
     {
       projectId: project?.id ?? "",
@@ -104,8 +102,6 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
     },
     {} as Record<string, string>
   );
-
-  console.log(getAnnotationScoreOptions.data);
 
   const datasets = api.dataset.getAll.useQuery(
     { projectId: project?.id ?? "" },
@@ -174,7 +170,10 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
                   ? JSON.parse(row.contexts)
                   : undefined,
               comments: row.comments,
-              annotation_scores: row.annotation_scores,
+              annotation_scores:
+                row.annotation_scores !== undefined
+                  ? JSON.parse(row.annotation_scores)
+                  : undefined,
             })),
           }
         : selectedDataset.schema === "ONE_LLM_CALL_PER_ROW"
@@ -191,7 +190,10 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
                   ? JSON.parse(row.expected_llm_output)
                   : undefined,
               comments: row.comments,
-              annotation_scores: row.annotation_scores,
+              annotation_scores:
+                row.annotation_scores !== undefined
+                  ? JSON.parse(row.annotation_scores)
+                  : undefined,
             })),
           }
         : undefined;
@@ -285,15 +287,18 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
         }
 
         if (columns.includes("annotation_scores")) {
-          const annotationScoresArray = annotationScores.data?.[0]?.scoreOptions
-            ? Object.entries(annotationScores.data[0].scoreOptions).map(
-                ([key, { value, reason }]) => ({
-                  value,
-                  reason,
-                  name: idNameMap?.[key] ?? "",
-                })
+          //const annotationScoresArray = annotationScores.data?.[0]?.scoreOptions
+          const annotationScoresArray = annotationScores.data
+            ? annotationScores.data.flatMap((score) =>
+                Object.entries(score.scoreOptions ?? {}).map(
+                  ([key, option]) => ({
+                    ...option,
+                    name: idNameMap?.[key] ?? "",
+                  })
+                )
               )
             : [];
+
           // const annotationScoresArray = Object.values(
           //   annotationScores.data?.[0]?.scoreOptions ?? {}
           // );
@@ -336,9 +341,16 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
           }
 
           if (columns.includes("annotation_scores")) {
-            const annotationScoresArray = Object.values(
-              annotationScores.data?.[0]?.scoreOptions ?? {}
-            );
+            const annotationScoresArray = annotationScores.data
+              ? annotationScores.data.flatMap((score) =>
+                  Object.entries(score.scoreOptions ?? {}).map(
+                    ([key, option]) => ({
+                      ...option,
+                      name: idNameMap?.[key] ?? "",
+                    })
+                  )
+                )
+              : [];
 
             row.annotation_scores = JSON.stringify(annotationScoresArray);
           }
@@ -370,6 +382,7 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
       llm_input: "LLM Input",
       expected_llm_output: "Expected LLM Output",
       comments: "Comments",
+      annotation_scores: "Annotation Scores",
     };
 
     const headers: ColDef[] = selectedDataset.columns

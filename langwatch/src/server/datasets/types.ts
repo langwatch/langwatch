@@ -40,15 +40,15 @@ export type DatasetRecordForm = {
 );
 
 export const annotationScoreSchema = z.object({
-  label: z.string(),
-  value: z.string(),
-  reason: z.string().optional(),
-  name: z.string().optional(),
+  label: z.string().optional().nullable(),
+  value: z.string().optional().nullable(),
+  reason: z.string().optional().nullable(),
+  name: z.string().optional().nullable(),
 });
 
 export const evaluationsSchema = z.object({
-  name: z.string(),
-  value: z.union([z.string(), z.number()]),
+  name: z.string().optional(),
+  value: z.union([z.string(), z.number()]).optional(),
 });
 
 export const newDatasetEntriesSchema = z.union([
