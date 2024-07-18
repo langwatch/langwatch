@@ -32,7 +32,11 @@ import type {
   newDatasetEntriesSchema,
   annotationScoreSchema,
 } from "../server/datasets/types";
-import type { DatasetSpan, ElasticSearchSpan } from "../server/tracer/types";
+import type {
+  DatasetSpan,
+  ElasticSearchSpan,
+  TraceCheck,
+} from "../server/tracer/types";
 import { getRAGInfo } from "../server/tracer/utils";
 import { AddDatasetDrawer } from "./AddDatasetDrawer";
 import { HorizontalFormControl } from "./HorizontalFormControl";
@@ -261,22 +265,15 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
     );
   };
 
-  const getEvaluationArray = (data: any[]) => {
+  const getEvaluationArray = (data: TraceCheck[]) => {
     return data
-      .filter((item: { status: string }) => item.status === "processed")
-      .map(
-        (item: {
-          check_name: string;
-          check_type: string;
-          passed: boolean | null;
-          score: number;
-        }) => ({
-          evaluation_name: item.check_name,
-          evaluation_type: item.check_type,
-          passed: item.passed,
-          score: item.score,
-        })
-      );
+      .filter((item) => item.status === "processed")
+      .map((item) => ({
+        evaluation_name: item.check_name,
+        evaluation_type: item.check_type,
+        passed: item.passed,
+        score: item.score,
+      }));
   };
 
   const getAnnotationScoresArray = (
