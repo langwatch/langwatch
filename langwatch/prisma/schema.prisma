@@ -60,6 +60,7 @@ model User {
     orgMemberships  OrganizationUser[]
     createdAt       DateTime           @default(now())
     updatedAt       DateTime           @default(now()) @updatedAt
+    lastLoginAt     DateTime?
     Annotation      Annotation[]
     publicShares    PublicShare[]
 }
