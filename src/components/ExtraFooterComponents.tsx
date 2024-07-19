@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { useOrganizationTeamProject } from "../../langwatch/langwatch/src/hooks/useOrganizationTeamProject";
 import { useRequiredSession } from "../../langwatch/langwatch/src/hooks/useRequiredSession";
 import Script from "next/script";
+import { api } from "../../langwatch/langwatch/src/utils/api";
 
 export function ExtraFooterComponents() {
   const session = useRequiredSession({
@@ -31,6 +32,8 @@ export function ExtraFooterComponents() {
 }
 
 export function SignedInExtraFooterComponents() {
+  const user = api.user.updateLastLogin.useMutation();
+
   const session = useRequiredSession();
   const { organization, project } = useOrganizationTeamProject({
     redirectToOnboarding: false,
@@ -39,6 +42,10 @@ export function SignedInExtraFooterComponents() {
   useEffect(() => {
     const gtag = (window as any).gtag;
     if (!session.data?.user || !organization || !project || !gtag) return;
+
+    void user.mutate({
+      userId: session.data.user.id,
+    });
 
     gtag("event", "open_dashboard", {
       organization_id: organization.id,
