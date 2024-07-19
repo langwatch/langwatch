@@ -5,6 +5,7 @@ import {
   type Trace,
 } from "../../../server/tracer/types";
 import { typedValueToText } from "./common";
+import modelPrices from "llm-cost/model_prices_and_context_window.json";
 
 // TODO: test
 export const computeTraceMetrics = (spans: Span[]): Trace["metrics"] => {
@@ -92,18 +93,25 @@ export const addLLMTokensCount = async (spans: Span[]) => {
   for (const span of spans) {
     if (span.type == "llm") {
       const llmSpan = span as LLMSpan;
+      const model =
+        llmSpan.model && llmSpan.model in modelPrices
+          ? llmSpan.model
+          : llmSpan.model?.includes("/")
+          ? llmSpan.model.split("/")[1]
+          : undefined;
+
       if (!llmSpan.metrics) {
         llmSpan.metrics = {};
       }
       if (
         llmSpan.input &&
-        llmSpan.model &&
+        model &&
         (llmSpan.metrics.prompt_tokens === undefined ||
           llmSpan.metrics.prompt_tokens === null)
       ) {
         llmSpan.metrics.prompt_tokens = (
           await tokenizeAndEstimateCost({
-            model: llmSpan.model,
+            model,
             input: typedValueToText(llmSpan.input),
           })
         ).inputTokens;
@@ -111,14 +119,14 @@ export const addLLMTokensCount = async (spans: Span[]) => {
       }
       if (
         llmSpan.output &&
-        llmSpan.model &&
+        model &&
         (llmSpan.metrics.completion_tokens === undefined ||
           llmSpan.metrics.completion_tokens === null)
       ) {
         let outputTokens = 0;
         outputTokens += (
           await tokenizeAndEstimateCost({
-            model: llmSpan.model,
+            model,
             output: typedValueToText(llmSpan.output),
           })
         ).outputTokens;
@@ -126,9 +134,9 @@ export const addLLMTokensCount = async (spans: Span[]) => {
         llmSpan.metrics.tokens_estimated = true;
       }
 
-      if (llmSpan.model) {
+      if (model) {
         llmSpan.metrics.cost = estimateCost({
-          model: llmSpan.model,
+          model,
           inputTokens: llmSpan.metrics.prompt_tokens ?? 0,
           outputTokens: llmSpan.metrics.completion_tokens ?? 0,
         });
