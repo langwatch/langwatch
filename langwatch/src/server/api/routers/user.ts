@@ -52,4 +52,21 @@ export const userRouter = createTRPCRouter({
 
       return { id: newUser.id };
     }),
+  updateLastLogin: publicProcedure
+    .input(
+      z.object({
+        userId: z.string(),
+      })
+    )
+    .use(skipPermissionCheck)
+    .mutation(async ({ ctx, input }) => {
+      await ctx.prisma.user.update({
+        where: {
+          id: input.userId,
+        },
+        data: {
+          lastLoginAt: new Date(),
+        },
+      });
+    }),
 });

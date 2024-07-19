@@ -28,17 +28,6 @@ declare module "next-auth" {
   }
 }
 
-const setLastLogin = async (userId: string) => {
-  await prisma.user.update({
-    where: {
-      id: userId,
-    },
-    data: {
-      lastLogin: new Date(),
-    },
-  });
-};
-
 /**
  * Options for NextAuth.js used to configure adapters, providers, callbacks, etc.
  *
@@ -72,8 +61,6 @@ export const authOptions = (
           throw new Error("User not found");
         }
 
-        console.log("asdadas", user_.id);
-
         return {
           ...session,
           user: {
@@ -83,8 +70,6 @@ export const authOptions = (
           },
         };
       }
-
-      console.log("asdadas", user.id);
 
       return {
         ...session,
