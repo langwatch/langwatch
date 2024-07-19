@@ -49,16 +49,29 @@ function buildTree(
 interface SpanNodeProps {
   span: SpanWithChildren;
   level: number;
-  lastChild: boolean;
 }
 
-const SpanNode: React.FC<SpanNodeProps> = ({ span, level, lastChild }) => {
+const SpanNode: React.FC<SpanNodeProps> = ({ span, level }) => {
   const router = useRouter();
   const currentSpanId =
     typeof router.query.span === "string" ? router.query.span : undefined;
   const { project } = useOrganizationTeamProject();
 
   if (!project) return null;
+
+  const countAllNestedChildren = (node: {
+    children: SpanWithChildren[];
+  }): number => {
+    return node.children.reduce((count, child) => {
+      return count + 1 + countAllNestedChildren(child);
+    }, 0);
+  };
+  const childrenInTheMiddleCount =
+    countAllNestedChildren({
+      children: span.children.slice(0, span.children.length - 1),
+    }) + Math.min(span.children.length, 1);
+
+  const lineHeight = `calc(100% - ${childrenInTheMiddleCount * 80}px - 14px)`;
 
   return (
     <VStack
@@ -72,7 +85,7 @@ const SpanNode: React.FC<SpanNodeProps> = ({ span, level, lastChild }) => {
         position="absolute"
         top="27px"
         marginLeft={level == 0 ? "21px" : "37px"}
-        bottom={lastChild ? "56px" : level == 0 ? "-37px" : "56px"}
+        bottom={lineHeight}
         width="1px"
         bgColor="gray.400"
         _before={
@@ -138,6 +151,7 @@ const SpanNode: React.FC<SpanNodeProps> = ({ span, level, lastChild }) => {
         <VStack align="start">
           <Text>
             {span.name ?? span.model ?? <Text color="gray.400">(unnamed)</Text>}
+            {childrenInTheMiddleCount}
           </Text>
           <HStack fontSize={13} color="gray.500">
             <SpanDuration span={span} />
@@ -165,12 +179,7 @@ const SpanNode: React.FC<SpanNodeProps> = ({ span, level, lastChild }) => {
         </VStack>
       </HStack>
       {span.children.map((childSpan, index) => (
-        <SpanNode
-          key={childSpan.span_id}
-          span={childSpan}
-          level={level + 1}
-          lastChild={index == span.children.length - 1}
-        />
+        <SpanNode key={childSpan.span_id} span={childSpan} level={level + 1} />
       ))}
     </VStack>
   );
@@ -195,14 +204,7 @@ const TreeRenderer: React.FC<{ spans: ElasticSearchSpan[] }> = ({ spans }) => {
       {rootSpans.map((rootSpan, index) => {
         const span = tree[rootSpan.span_id];
         if (!span) return null;
-        return (
-          <SpanNode
-            key={rootSpan.span_id}
-            span={span}
-            level={0}
-            lastChild={index == rootSpans.length - 1}
-          />
-        );
+        return <SpanNode key={rootSpan.span_id} span={span} level={0} />;
       })}
     </VStack>
   );
