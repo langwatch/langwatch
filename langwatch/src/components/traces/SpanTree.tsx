@@ -151,7 +151,6 @@ const SpanNode: React.FC<SpanNodeProps> = ({ span, level }) => {
         <VStack align="start">
           <Text>
             {span.name ?? span.model ?? <Text color="gray.400">(unnamed)</Text>}
-            {childrenInTheMiddleCount}
           </Text>
           <HStack fontSize={13} color="gray.500">
             <SpanDuration span={span} />
