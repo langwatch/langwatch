@@ -177,7 +177,7 @@ const SpanNode: React.FC<SpanNodeProps> = ({ span, level }) => {
           </HStack>
         </VStack>
       </HStack>
-      {span.children.map((childSpan, index) => (
+      {span.children.map((childSpan) => (
         <SpanNode key={childSpan.span_id} span={childSpan} level={level + 1} />
       ))}
     </VStack>
@@ -200,7 +200,7 @@ const TreeRenderer: React.FC<{ spans: ElasticSearchSpan[] }> = ({ spans }) => {
 
   return (
     <VStack align="start" flexShrink={0} spacing={6}>
-      {rootSpans.map((rootSpan, index) => {
+      {rootSpans.map((rootSpan) => {
         const span = tree[rootSpan.span_id];
         if (!span) return null;
         return <SpanNode key={rootSpan.span_id} span={span} level={0} />;
