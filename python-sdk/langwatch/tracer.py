@@ -74,6 +74,7 @@ class ContextSpan:
     _parent_from_context: bool = False
     _capture_input: bool = True
     _capture_output: bool = True
+    _ignore_missing_trace_warning: bool = False
     name: Optional[str] = None
     type: SpanTypes = "span"
     input: Optional[Union[SpanInputOutput, str, List[ChatMessage]]] = None
@@ -102,11 +103,13 @@ class ContextSpan:
         model: Optional[str] = None,
         params: Optional[LLMSpanParams] = None,
         metrics: Optional[LLMSpanMetrics] = None,
+        ignore_missing_trace_warning: bool = False,
     ) -> None:
         self.trace = trace
         self.parent = parent
         self._capture_input = capture_input
         self._capture_output = capture_output
+        self._ignore_missing_trace_warning = ignore_missing_trace_warning
         self.update(
             span_id=span_id or f"span_{nanoid.generate()}",
             name=name,
@@ -137,7 +140,7 @@ class ContextSpan:
                     self.parent = current_trace.get_current_span()
                     self._parent_from_context = True
                 self.context_token = current_trace.set_current_span(self)
-        else:
+        elif not self._ignore_missing_trace_warning:
             warn("No current trace found, some spans will not be sent to LangWatch")
 
         return self
@@ -208,6 +211,11 @@ class ContextSpan:
                 and len(all_args) > 0
                 and parameters[0].name == "self"
             ):
+                self_ = all_args["self"]
+                try:
+                    self.name = f"{self_.__class__.__name__}.{func.__name__}"
+                except:
+                    pass
                 del all_args["self"]
 
             if kwargs and len(kwargs) > 0:
@@ -724,6 +732,9 @@ class ContextTrace:
         import langwatch.litellm  # import dynamically here instead of top-level because users might not have litellm installed
 
         langwatch.litellm.LiteLLMPatch(trace=self, client=client)
+
+    def autotrack_dspy(self):
+        langwatch.dspy.tracer(trace=self)
 
     def share(self):
         with httpx.Client() as client:
