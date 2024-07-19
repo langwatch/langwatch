@@ -1,6 +1,6 @@
-import type { ElasticSearchTrace } from "../server/tracer/types";
+import type { Trace } from "../server/tracer/types";
 
-export const getTotalTokensDisplay = (trace: ElasticSearchTrace) =>
+export const getTotalTokensDisplay = (trace: Trace) =>
   (trace.metrics.completion_tokens ?? 0) +
   (trace.metrics.prompt_tokens ?? 0) +
   " tokens" +

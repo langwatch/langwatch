@@ -5,10 +5,16 @@ import {
 } from "../../pages/api/collector/common";
 import { extractRAGTextualContext } from "../../pages/api/collector/rag";
 import {
-  elasticSearchToTypedValue,
+  type ElasticSearchInputOutput,
   type ElasticSearchSpan,
+  type ElasticSearchTrace,
+  type ReservedTraceMetadata,
   type Span,
+  type SpanInputOutput,
+  type Trace,
+  type TraceCheck,
 } from "./types";
+import { reservedTraceMetadataSchema } from "./types.generated";
 
 export const getRAGInfo = (
   spans: ElasticSearchSpan[]
@@ -59,4 +65,79 @@ export const getRAGInfo = (
   } catch (e) {}
 
   return { input, output, contexts };
+};
+
+export const elasticSearchTraceToTrace = (
+  elasticSearchTrace: ElasticSearchTrace
+): Trace => {
+  const metadata = elasticSearchTrace.metadata ?? {};
+
+  const reservedMetadata = Object.fromEntries(
+    Object.entries(metadata).filter(
+      ([key]) => key in reservedTraceMetadataSchema.shape
+    )
+  ) as ReservedTraceMetadata;
+  const customMetadata = metadata.custom ?? {};
+
+  return {
+    ...elasticSearchTrace,
+    metadata: {
+      ...reservedMetadata,
+      ...customMetadata,
+    },
+  };
+};
+
+export const elasticSearchSpanToSpan = (esSpan: ElasticSearchSpan): Span => {
+  const { input, output, ...rest } = esSpan;
+  const spanInput: SpanInputOutput | null = input
+    ? elasticSearchToTypedValue(input)
+    : null;
+  const spanOutput: SpanInputOutput | null = output
+    ? elasticSearchToTypedValue(output)
+    : null;
+
+  return { ...rest, input: spanInput, output: spanOutput };
+};
+
+export const elasticSearchToTypedValue = (
+  typed: ElasticSearchInputOutput
+): SpanInputOutput => {
+  try {
+    return {
+      type: typed.type,
+      value: JSON.parse(typed.value),
+    } as any;
+  } catch (e) {
+    return {
+      type: "raw",
+      value: typed.value,
+    };
+  }
+};
+
+export const elasticSearchTraceCheckToUserInterfaceEvaluation = (
+  traceCheck: TraceCheck
+) => {
+  const traceCheck_: Omit<
+    TraceCheck,
+    "check_id" | "check_name" | "check_type"
+  > = {
+    ...traceCheck,
+  };
+  // @ts-ignore
+  delete traceCheck_.id;
+  // @ts-ignore
+  delete traceCheck_.check_id;
+  // @ts-ignore
+  delete traceCheck_.check_name;
+  // @ts-ignore
+  delete traceCheck_.check_type;
+
+  return {
+    evaluation_id: traceCheck.check_id,
+    evaluation_name: traceCheck.check_name,
+    evaluation_type: traceCheck.check_type,
+    ...traceCheck_,
+  };
 };

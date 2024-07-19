@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { getLatestUpdatedAt } from "./triggers";
-import type { ElasticSearchTrace } from "../../server/tracer/types";
+import type { Trace } from "../../server/tracer/types";
 
 describe("utils test", () => {
   it("gets the latest updated at time", async () => {
@@ -11,7 +11,7 @@ describe("utils test", () => {
   });
 });
 
-const traces: { groups: ElasticSearchTrace[][] } = {
+const traces: { groups: Trace[][] } = {
   groups: [
     [
       {

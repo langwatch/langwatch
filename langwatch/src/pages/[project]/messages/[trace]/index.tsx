@@ -29,7 +29,7 @@ import { DashboardLayout } from "../../../../components/DashboardLayout";
 import { useOrganizationTeamProject } from "../../../../hooks/useOrganizationTeamProject";
 import { useTraceDetailsState } from "../../../../hooks/useTraceDetailsState";
 import type {
-  ElasticSearchTrace,
+  Trace
 } from "../../../../server/tracer/types";
 import { api } from "../../../../utils/api";
 import { isNotFound } from "../../../../utils/trpcError";
@@ -246,7 +246,7 @@ const TraceMessages = React.forwardRef(function TraceMessages(
     trace,
     highlighted,
   }: {
-    trace: ElasticSearchTrace;
+    trace: Trace;
     highlighted?: boolean;
   },
   ref
@@ -399,7 +399,7 @@ function Message({
   paddingTop,
   children,
 }: PropsWithChildren<{
-  trace?: ElasticSearchTrace;
+  trace?: Trace;
   author: string;
   avatar: React.ReactNode;
   timestamp?: number;

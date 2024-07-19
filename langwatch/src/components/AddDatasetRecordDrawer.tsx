@@ -42,6 +42,7 @@ import { AddDatasetDrawer } from "./AddDatasetDrawer";
 import { HorizontalFormControl } from "./HorizontalFormControl";
 import { DatasetGrid } from "./datasets/DatasetGrid";
 import { useDrawer } from "./CurrentDrawer";
+import { elasticSearchTraceCheckToUserInterfaceEvaluation } from "../server/tracer/utils";
 
 type FormValues = {
   datasetId: string;
@@ -268,12 +269,17 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
   const getEvaluationArray = (data: TraceCheck[]) => {
     return data
       .filter((item) => item.status === "processed")
-      .map((item) => ({
-        evaluation_name: item.check_name,
-        evaluation_type: item.check_type,
-        passed: item.passed,
-        score: item.score,
-      }));
+      .map((item) => {
+        const evaluation =
+          elasticSearchTraceCheckToUserInterfaceEvaluation(item);
+
+        return {
+          evaluation_name: evaluation.evaluation_name,
+          evaluation_type: evaluation.evaluation_type,
+          passed: evaluation.passed,
+          score: evaluation.score,
+        };
+      });
   };
 
   const getAnnotationScoresArray = (

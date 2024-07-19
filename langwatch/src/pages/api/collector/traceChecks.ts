@@ -2,7 +2,7 @@ import { scheduleTraceCheck } from "../../../server/background/queues/traceCheck
 import { prisma } from "../../../server/db";
 import {
   type ElasticSearchTrace,
-  type Span
+  type Span,
 } from "../../../server/tracer/types";
 import type { EvaluatorTypes } from "../../../trace_checks/evaluators.generated";
 import { evaluatePreconditions } from "../../../trace_checks/preconditions";
