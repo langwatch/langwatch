@@ -214,6 +214,22 @@ export function MessagesTable() {
       },
       value: () => "",
     },
+    "trace.trace_id": {
+      name: "ID",
+      sortable: true,
+      render: (trace: Trace, index: number) => (
+        <Td
+          key={index}
+          onClick={() =>
+            openDrawer("traceDetails", {
+              traceId: trace.trace_id,
+            })
+          }
+        >
+          {trace.trace_id}
+        </Td>
+      ),
+    },
     "trace.timestamps.started_at": {
       name: "Timestamp",
       sortable: true,
@@ -554,7 +570,10 @@ export function MessagesTable() {
     localStorageHeaderColumns
       ? localStorageHeaderColumns
       : Object.fromEntries(
-          Object.keys(headerColumns).map((column) => [column, true])
+          Object.keys(headerColumns).map((column) => [
+            column,
+            column !== "trace.trace_id",
+          ])
         )
   );
 

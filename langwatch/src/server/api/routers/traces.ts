@@ -256,7 +256,7 @@ export const tracesRouter = createTRPCRouter({
     )
     .use(checkUserPermissionForProject(TeamRoleGroup.MESSAGES_VIEW))
     .query(async ({ input }) => {
-      const customersLabelsResult = await esClient.search<Trace>({
+      const customersLabelsResult = await esClient.search<ElasticSearchTrace>({
         index: TRACE_INDEX,
         size: 0, // We don't need the actual documents, just the aggregation results
         body: {
@@ -298,35 +298,7 @@ export const tracesRouter = createTRPCRouter({
     .query(async ({ input }) => {
       const { projectId, threadId } = input;
 
-      const tracesResult = await esClient.search<ElasticSearchTrace>({
-        index: TRACE_INDEX,
-        body: {
-          query: {
-            //@ts-ignore
-            bool: {
-              filter: [
-                { term: { project_id: projectId } },
-                { term: { "metadata.thread_id": threadId } },
-              ],
-            },
-          },
-          sort: [
-            {
-              "timestamps.started_at": {
-                order: "asc",
-              },
-            },
-          ],
-          size: 1000,
-        },
-      });
-
-      const traces = tracesResult.hits.hits
-        .map((hit) => hit._source!)
-        .filter((x) => x)
-        .map(elasticSearchTraceToTrace);
-
-      return traces;
+      return getTracesByThreadId({ projectId, threadId });
     }),
 
   getTracesWithSpans: protectedProcedure
@@ -820,7 +792,7 @@ const getTraceChecks = async (
 };
 
 const getTracesWithSpans = async (projectId: string, traceIds: string[]) => {
-  const tracesResult = await esClient.search<Trace>({
+  const tracesResult = await esClient.search<ElasticSearchTrace>({
     index: TRACE_INDEX,
     body: {
       query: {
@@ -840,12 +812,22 @@ const getTracesWithSpans = async (projectId: string, traceIds: string[]) => {
         },
       ],
       size: 1000,
+      // Remove embeddings to reduce payload size
+      _source: {
+        excludes: [
+          "input.embeddings",
+          "input.embeddings.embeddings",
+          "output.embeddings",
+          "output.embeddings.embeddings",
+        ],
+      },
     },
   });
 
   const traces = tracesResult.hits.hits
     .map((hit) => hit._source!)
-    .filter((x) => x);
+    .filter((x) => x)
+    .map(elasticSearchTraceToTrace);
 
   const spansByTraceId = await Promise.all(
     traces.map((trace) =>
@@ -1032,4 +1014,51 @@ export const getTraceById = async ({
   const trace = result.hits.hits[0]?._source;
 
   return trace ? elasticSearchTraceToTrace(trace) : undefined;
+};
+
+export const getTracesByThreadId = async ({
+  projectId,
+  threadId,
+}: {
+  projectId: string;
+  threadId: string;
+}) => {
+  const tracesResult = await esClient.search<ElasticSearchTrace>({
+    index: TRACE_INDEX,
+    body: {
+      query: {
+        //@ts-ignore
+        bool: {
+          filter: [
+            { term: { project_id: projectId } },
+            { term: { "metadata.thread_id": threadId } },
+          ],
+        },
+      },
+      sort: [
+        {
+          "timestamps.started_at": {
+            order: "asc",
+          },
+        },
+      ],
+      // Remove embeddings to reduce payload size
+      _source: {
+        excludes: [
+          "input.embeddings",
+          "input.embeddings.embeddings",
+          "output.embeddings",
+          "output.embeddings.embeddings",
+        ],
+      },
+      size: 1000,
+    },
+  });
+
+  const traces = tracesResult.hits.hits
+    .map((hit) => hit._source!)
+    .filter((x) => x)
+    .map(elasticSearchTraceToTrace);
+
+  return traces;
 };
