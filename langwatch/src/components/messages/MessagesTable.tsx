@@ -192,7 +192,7 @@ export function MessagesTable() {
       sortable: boolean;
       width?: number;
       render: (trace: TraceWithGuardrail, index: number) => React.ReactNode;
-      value?: (trace: TraceWithGuardrail) => string | number | Date;
+      value: (trace: TraceWithGuardrail) => string | number | Date;
     }
   > = {
     checked: {
@@ -229,6 +229,7 @@ export function MessagesTable() {
           {trace.trace_id}
         </Td>
       ),
+      value: (trace: Trace) => trace.trace_id,
     },
     "trace.timestamps.started_at": {
       name: "Timestamp",

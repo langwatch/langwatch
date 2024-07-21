@@ -35,7 +35,6 @@ import {
 import { getOpenAIEmbeddings } from "../../embeddings";
 import {
   type ElasticSearchSpan,
-  type Trace,
   type TraceCheck,
   type Contexts,
   type GuardrailResult,
