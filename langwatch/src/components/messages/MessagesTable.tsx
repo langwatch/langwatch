@@ -676,15 +676,18 @@ export function MessagesTable() {
   ).filter(([_, checked]) => checked);
 
   const downloadCSV = (selection = false) => {
-    let csv;
+    const checkedHeaderColumnsEntries_ = checkedHeaderColumnsEntries.filter(
+      ([column, _]) => column !== "checked"
+    );
 
+    let csv;
     if (selection) {
       csv = traceGroups.data?.groups
         .flatMap((traceGroup) =>
           traceGroup
             .filter((trace) => selectedTraceIds.includes(trace.trace_id))
             .map((trace) =>
-              checkedHeaderColumnsEntries.map(
+              checkedHeaderColumnsEntries_.map(
                 ([column, _]) => headerColumns[column]?.value?.(trace) ?? ""
               )
             )
@@ -693,14 +696,14 @@ export function MessagesTable() {
     } else {
       csv = traceGroups.data?.groups.flatMap((traceGroup) =>
         traceGroup.map((trace) =>
-          checkedHeaderColumnsEntries.map(
-            ([column, _]) => headerColumns[column]?.value?.(trace) ?? ""
-          )
+          checkedHeaderColumnsEntries_
+            .filter(([column, _]) => column !== "checked")
+            .map(([column, _]) => headerColumns[column]?.value?.(trace) ?? "")
         )
       );
     }
 
-    const fields = checkedHeaderColumnsEntries
+    const fields = checkedHeaderColumnsEntries_
       .map(([columnKey, _]) => {
         return headerColumns[columnKey]?.name;
       })
