@@ -106,7 +106,9 @@ export default function ModelsPage() {
           </CardBody>
         </Card>
         <TopicClusteringModel />
-        <LmmModelCost projectId={project?.id} />
+        {process.env.NEXT_PUBLIC_FEATURE_LLM_MODEL_COST && (
+          <LmmModelCost projectId={project?.id} />
+        )}
       </VStack>
     </SettingsLayout>
   );
@@ -370,7 +372,7 @@ function TopicClusteringModel() {
 
   const topicClusteringModelField = register("topicClusteringModel");
 
-  const onSubmit = useCallback(
+  const onUpdateSubmit = useCallback(
     async (data: TopicClusteringModelForm) => {
       await updateTopicClusteringModel.mutateAsync({
         projectId: project?.id ?? "",
@@ -406,7 +408,7 @@ function TopicClusteringModel() {
                   // eslint-disable-next-line @typescript-eslint/no-misused-promises
                   onChange={(model) => {
                     field.onChange(model);
-                    void handleSubmit(onSubmit)();
+                    void handleSubmit(onUpdateSubmit)();
                   }}
                   mode="chat"
                 />
@@ -420,6 +422,102 @@ function TopicClusteringModel() {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-namespace
+declare namespace NewLmmModelCostForm {
+  export interface Props {
+    projectId: string;
+    onNewModel: (model: {
+      model: string;
+      regex: string;
+      inputCostPerToken: number;
+      outputCostPerToken: number;
+    }) => Promise<void>;
+  }
+}
+
+function NewLmmModelCostForm({
+  projectId,
+  onNewModel,
+}: NewLmmModelCostForm.Props) {
+  const [newModel, setNewModel] = React.useState({
+    model: "",
+    regex: "",
+    inputCostPerToken: 0,
+    outputCostPerToken: 0,
+  });
+  const createModel = api.llmModelCost.createModel.useMutation();
+
+  const handleCreateModel = React.useCallback(async () => {
+    // eslint-disable-next-line @typescript-eslint/await-thenable
+    await createModel.mutate({
+      projectId: projectId,
+      model: newModel.model,
+      regex: newModel.regex,
+      inputCostPerToken: newModel.inputCostPerToken,
+      outputCostPerToken: newModel.outputCostPerToken,
+    });
+    await onNewModel(newModel);
+  }, [createModel, newModel, projectId, onNewModel]);
+
+  return (
+    <Tr>
+      <Td>
+        <Input
+          placeholder="model name"
+          defaultValue={newModel.model}
+          onChange={(e) =>
+            setNewModel((prev) => ({
+              ...prev,
+              model: e.target.value,
+            }))
+          }
+        />
+      </Td>
+      <Td>
+        <Input
+          placeholder="match rule"
+          defaultValue={newModel.regex}
+          onChange={(e) =>
+            setNewModel((prev) => ({
+              ...prev,
+              regex: e.target.value,
+            }))
+          }
+        />
+      </Td>
+      <Td>
+        <Input
+          placeholder="input cost"
+          defaultValue={newModel.inputCostPerToken}
+          onChange={(e) =>
+            setNewModel((prev) => ({
+              ...prev,
+              inputCostPerToken: Number(e.target.value),
+            }))
+          }
+        />
+      </Td>
+      <Td>
+        <Input
+          placeholder="output cost"
+          defaultValue={newModel.outputCostPerToken}
+          onChange={(e) =>
+            setNewModel((prev) => ({
+              ...prev,
+              outputCostPerToken: Number(e.target.value),
+            }))
+          }
+        />
+      </Td>
+      <Td>
+        <Button onClick={() => handleCreateModel()}>
+          <Check />
+        </Button>
+      </Td>
+    </Tr>
+  );
+}
+
+// eslint-disable-next-line @typescript-eslint/no-namespace
 declare namespace LmmModelCost {
   export interface Props {
     projectId?: string;
@@ -427,19 +525,13 @@ declare namespace LmmModelCost {
 }
 
 function LmmModelCost(props: LmmModelCost.Props) {
-  const [showNewRow, setShoeNewRow] = React.useState(false);
-  const [newModel, setNewModel] = React.useState({
-    model: "",
-    regex: "",
-    inputCostPerToken: 0,
-    outputCostPerToken: 0,
-  });
+  const [showNewRow, setShowNewRow] = React.useState(false);
+
   const model = api.llmModelCost.getAllForProject.useQuery(
     { projectId: props.projectId ?? "" },
     { enabled: !!props.projectId }
   );
   const updateField = api.llmModelCost.updateField.useMutation();
-
   const handleUpdateField = useCallback(
     (event: EditableField.SubmitEvent<any>) => {
       updateField.mutate({
@@ -451,10 +543,14 @@ function LmmModelCost(props: LmmModelCost.Props) {
             ? String(event.value)
             : Number(event.value),
       });
-      console.log("SUBMIT", event);
     },
     [props.projectId, updateField]
   );
+
+  const handleNewModel = useCallback(async () => {
+    await model.refetch();
+    setShowNewRow(false);
+  }, [model, setShowNewRow]);
 
   return (
     <>
@@ -471,7 +567,7 @@ function LmmModelCost(props: LmmModelCost.Props) {
             <Text fontSize="sm" color="gray.500">
               {model.data?.length} models
             </Text>
-            <Button onClick={() => setShoeNewRow(!showNewRow)}>+</Button>
+            <Button onClick={() => setShowNewRow(!showNewRow)}>+</Button>
           </HStack>
           <Table variant="simple" width="full">
             <Thead width="full">
@@ -485,66 +581,19 @@ function LmmModelCost(props: LmmModelCost.Props) {
             </Thead>
             <Tbody width="full">
               {showNewRow && (
-                <Tr>
-                  <Td>
-                    <Input
-                      placeholder="model name"
-                      defaultValue={newModel.model}
-                      onChange={(e) =>
-                        setNewModel((prev) => ({
-                          ...prev,
-                          model: e.target.value,
-                        }))
-                      }
-                    />
-                  </Td>
-                  <Td>
-                    <Input
-                      placeholder="match rule"
-                      defaultValue={newModel.regex}
-                      onChange={(e) =>
-                        setNewModel((prev) => ({
-                          ...prev,
-                          regex: e.target.value,
-                        }))
-                      }
-                    />
-                  </Td>
-                  <Td>
-                    <Input
-                      placeholder="input cost"
-                      defaultValue={newModel.inputCostPerToken}
-                      onChange={(e) =>
-                        setNewModel((prev) => ({
-                          ...prev,
-                          inputCostPerToken: Number(e.target.value),
-                        }))
-                      }
-                    />
-                  </Td>
-                  <Td>
-                    <Input
-                      placeholder="output cost"
-                      defaultValue={newModel.outputCostPerToken}
-                      onChange={(e) =>
-                        setNewModel((prev) => ({
-                          ...prev,
-                          outputCostPerToken: Number(e.target.value),
-                        }))
-                      }
-                    />
-                  </Td>
-                  <Td>
-                    <Button>
-                      <Check />
-                    </Button>
-                  </Td>
-                </Tr>
+                <NewLmmModelCostForm
+                  projectId={props.projectId!}
+                  onNewModel={handleNewModel}
+                />
               )}
               {model.data?.map((row) => (
                 <Tr key={row.model} width="full">
                   <Td>
-                    <Text isTruncated maxWidth="250px">
+                    <Text
+                      isTruncated
+                      maxWidth="250px"
+                      color={!!row.updatedAt ? "green.500" : void 0}
+                    >
                       {row.model}
                     </Text>
                   </Td>
@@ -555,7 +604,11 @@ function LmmModelCost(props: LmmModelCost.Props) {
                       value={String(row.regex)}
                       name="regex"
                       renderValue={(value) => (
-                        <Code isTruncated maxWidth="250px">
+                        <Code
+                          isTruncated
+                          maxWidth="250px"
+                          color={!!row.updatedAt ? "green.500" : void 0}
+                        >
                           {value}
                         </Code>
                       )}
@@ -567,7 +620,11 @@ function LmmModelCost(props: LmmModelCost.Props) {
                       model={row.model}
                       name="inputCostPerToken"
                       value={row.inputCostPerToken}
-                      renderValue={(value) => <Text>{value}</Text>}
+                      renderValue={(value) => (
+                        <Text color={!!row.updatedAt ? "green.500" : void 0}>
+                          {value}
+                        </Text>
+                      )}
                     />
                   </Td>
                   <Td p={0}>
@@ -576,7 +633,11 @@ function LmmModelCost(props: LmmModelCost.Props) {
                       model={row.model}
                       name="outputCostPerToken"
                       value={row.outputCostPerToken}
-                      renderValue={(value) => <Text>{value}</Text>}
+                      renderValue={(value) => (
+                        <Text color={!!row.updatedAt ? "green.500" : void 0}>
+                          {value}
+                        </Text>
+                      )}
                     />
                   </Td>
                   <Td></Td>
@@ -608,9 +669,15 @@ declare namespace EditableField {
   export type State = "viewing" | "editing" | "saving";
 }
 
-function EditableField<V>(props: EditableField.Props<V>) {
+function EditableField<V>({
+  value,
+  onSubmit,
+  name,
+  model,
+  renderValue,
+}: EditableField.Props<V>) {
   const [state, setState] = React.useState<EditableField.State>("viewing");
-  const [valueState, setValueState] = React.useState<V>(props.value);
+  const [valueState, setValueState] = React.useState<V>(value);
 
   const isEditing = state === "editing";
   const isViewing = state === "viewing";
@@ -639,26 +706,19 @@ function EditableField<V>(props: EditableField.Props<V>) {
     (e: React.KeyboardEvent<HTMLInputElement>) => {
       if (e.key === "Enter") {
         setState("viewing");
-        if (props.onSubmit && valueState !== props.value) {
-          props.onSubmit({
+        if (onSubmit && valueState !== value) {
+          onSubmit({
             value: valueState,
-            fieldName: props.name,
-            model: props.model,
+            fieldName: name,
+            model: model,
           });
         }
       } else if (e.key === "Escape") {
-        setValueState(props.value);
+        setValueState(value);
         setState("viewing");
       }
     },
-    [
-      valueState,
-      setState,
-      setValueState,
-      props.onSubmit,
-      props.value,
-      props.model,
-    ]
+    [valueState, setState, setValueState, onSubmit, value, model, name]
   );
 
   return (
@@ -675,15 +735,15 @@ function EditableField<V>(props: EditableField.Props<V>) {
     >
       {isEditing && (
         <Input
-          name={props.name}
+          name={name}
           autoFocus={true}
-          defaultValue={valueState}
+          defaultValue={valueState !== undefined ? String(valueState) : ""}
           onBlur={handleBlur}
           onChange={handleInputValueChange}
           onKeyDown={handleKeyDown}
         />
       )}
-      {isViewing && props.renderValue(valueState)}
+      {isViewing && renderValue(valueState)}
       {isViewing && (
         <Box
           visibility="hidden"
