@@ -10,12 +10,16 @@ export type OneMessagePerRowColumns =
   | "expected_output"
   | "contexts"
   | "spans"
-  | "comments";
+  | "comments"
+  | "annotation_scores"
+  | "evaluations";
 
 export type OneLLMCallPerRowColumns =
   | "llm_input"
   | "expected_llm_output"
-  | "comments";
+  | "comments"
+  | "annotation_scores"
+  | "evaluations";
 
 export type DatasetColumns = OneMessagePerRowColumns & OneLLMCallPerRowColumns;
 
@@ -35,6 +39,20 @@ export type DatasetRecordForm = {
     }
 );
 
+export const annotationScoreSchema = z.object({
+  label: z.string().optional(),
+  value: z.string().optional(),
+  reason: z.string().optional(),
+  name: z.string().optional(),
+});
+
+export const evaluationsSchema = z.object({
+  evaluation_name: z.string(),
+  evaluation_type: z.string(),
+  passed: z.boolean().nullable(),
+  score: z.number().nullable(),
+});
+
 export const newDatasetEntriesSchema = z.union([
   z.object({
     schema: z.literal("ONE_MESSAGE_PER_ROW"),
@@ -48,6 +66,8 @@ export const newDatasetEntriesSchema = z.union([
           .union([z.array(rAGChunkSchema), z.array(z.string())])
           .optional(),
         comments: z.string().optional(),
+        annotation_scores: z.array(annotationScoreSchema).optional(),
+        evaluations: z.array(evaluationsSchema).optional(),
       })
     ),
   }),
@@ -59,6 +79,8 @@ export const newDatasetEntriesSchema = z.union([
         llm_input: z.array(chatMessageSchema).optional(),
         expected_llm_output: z.array(chatMessageSchema).optional(),
         comments: z.string().optional(),
+        annotation_scores: z.array(annotationScoreSchema).optional(),
+        evaluations: z.array(evaluationsSchema).optional(),
       })
     ),
   }),
@@ -74,4 +96,6 @@ export type FlattenStringifiedDatasetEntry = {
   llm_input?: string;
   expected_llm_output?: string;
   comments?: string;
+  annotation_scores?: string;
+  evaluations?: string;
 };

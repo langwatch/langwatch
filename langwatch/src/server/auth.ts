@@ -50,11 +50,7 @@ export const authOptions = (
         if (newSession) return newSession;
       }
 
-      if (
-        !user &&
-        session.user.email &&
-        env.NEXTAUTH_PROVIDER === "email"
-      ) {
+      if (!user && session.user.email && env.NEXTAUTH_PROVIDER === "email") {
         const user_ = await prisma.user.findUnique({
           where: {
             email: session.user.email,

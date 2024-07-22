@@ -223,7 +223,6 @@ export function Messages({
 }
 
 function ErrorMessage({ error }: { error: Error }) {
-  console.log("error", error);
   try {
     const json = JSON.parse(error.message);
     return (

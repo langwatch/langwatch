@@ -5,7 +5,7 @@ import dynamic from "next/dynamic";
 export function RenderInputOutput(
   props: Partial<ReactJsonViewProps> & { value: string | undefined }
 ) {
-  const { value } = props;
+  let { value } = props;
   const ReactJson = dynamic(() => import("@microlink/react-json-view"), {
     loading: () => <div />,
   });
@@ -16,6 +16,9 @@ export function RenderInputOutput(
       const json_ = JSON.parse(value);
       if (typeof json_ === "object") {
         json = json_;
+      }
+      if (typeof json_ === "string") {
+        value = json_;
       }
     }
   } catch (e) {}
@@ -36,7 +39,7 @@ export function RenderInputOutput(
       {...propsWithoutValue}
     />
   ) : (
-    <Text>
+    <Text fontFamily="mono" fontSize="14px">
       {value
         ? typeof value === "string"
           ? value

@@ -4,7 +4,7 @@ import {
   FormLabel,
   HStack,
   VStack,
-  useRadioGroup
+  useRadioGroup,
 } from "@chakra-ui/react";
 import type { Project } from "@prisma/client";
 import { type PropsWithChildren } from "react";
@@ -65,6 +65,11 @@ export const docsLinks = {
     icon: <Python />,
     href: "https://docs.langwatch.ai/integration/python/guide",
   },
+  python_dspy: {
+    label: "Python DSPy",
+    icon: <Python />,
+    href: "https://docs.langwatch.ai/integration/python/guide",
+  },
   python_custom: {
     label: "Python Custom",
     icon: <Python />,
@@ -118,7 +123,7 @@ export const techStackFrameworkOptions = {
     label: "DSPy",
     icon: <DSPy />,
     languages: {
-      python: docsLinks.python_custom,
+      python: docsLinks.python_dspy,
     } as LanguagesMap,
   },
   other: {

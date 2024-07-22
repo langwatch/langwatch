@@ -33,8 +33,8 @@ import {
 } from "react-feather";
 import Markdown from "react-markdown";
 import type {
-  ElasticSearchTrace,
   GuardrailResult,
+  Trace,
   TraceCheck,
 } from "../../server/tracer/types";
 import { api } from "../../utils/api";
@@ -44,7 +44,7 @@ import { getColorForString } from "../../utils/rotatingColors";
 import { CheckPassing } from "../CheckPassing";
 import { useDrawer } from "../CurrentDrawer";
 
-export type TraceWithGuardrail = ElasticSearchTrace & {
+export type TraceWithGuardrail = Trace & {
   lastGuardrail: (GuardrailResult & { name?: string }) | undefined;
 };
 
@@ -477,7 +477,7 @@ export function MessageCard({
   );
 }
 
-export const getExtractedInput = (trace: ElasticSearchTrace) => {
+export const getExtractedInput = (trace: Trace) => {
   const input = trace.input;
 
   let value = input?.value ?? "";
@@ -497,7 +497,7 @@ export const getExtractedInput = (trace: ElasticSearchTrace) => {
   return value ? value : "<empty>";
 };
 
-const getSlicedOutput = (trace: ElasticSearchTrace) => {
+const getSlicedOutput = (trace: Trace) => {
   const value = trace.output?.value.slice(0, 600);
 
   return (
@@ -506,7 +506,7 @@ const getSlicedOutput = (trace: ElasticSearchTrace) => {
   );
 };
 
-export const getSlicedExpectedOutput = (trace: ElasticSearchTrace) => {
+export const getSlicedExpectedOutput = (trace: Trace) => {
   const value = trace.expected_output?.value.slice(0, 600);
 
   return (

@@ -104,6 +104,8 @@ function DatasetTable() {
       llm_input: "LLM Input",
       expected_llm_output: "Expected LLM Output",
       comments: "Comments",
+      annotation_scores: "Annotation Scores",
+      evaluations: "Evaluations",
     };
 
     const headers: ColDef[] = dataset.data.columns.split(",").map((field) => ({

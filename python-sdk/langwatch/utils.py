@@ -106,27 +106,19 @@ def validate_safe(type, item: dict):
 def autoconvert_typed_values(
     value: Union[SpanInputOutput, ChatMessage, str, dict, list]
 ) -> SpanInputOutput:
-    if type(value) == str:
-        return TypedValueText(type="text", value=value)
-    if type(value) == dict and validate_safe(SpanInputOutput, value):
-        return cast(SpanInputOutput, value)
-    if type(value) == list and all(validate_safe(ChatMessage, item) for item in value):
-        return TypedValueChatMessages(type="chat_messages", value=value)
+    value_ = value
+
+    if type(value_) == str:
+        return TypedValueText(type="text", value=value_)
+    if type(value_) == dict and validate_safe(SpanInputOutput, value_):
+        return cast(SpanInputOutput, value_)
+    if type(value_) == list and all(
+        validate_safe(ChatMessage, item) for item in value_
+    ):
+        return TypedValueChatMessages(type="chat_messages", value=value_)
 
     try:
-        import chainlit as cl
-
-        if type(value) == dict:
-            value_ = value.copy()
-            for key, v in value_.items():
-                if isinstance(v, cl.Message):
-                    value_[key] = cast(cl.Message, v).to_dict()
-            return TypedValueJson(type="json", value=value_)
-    except ImportError:
-        pass
-
-    try:
-        json_ = json.dumps(value, cls=SerializableAndPydanticEncoder)
+        json_ = json.dumps(value, cls=SerializableWithStringFallback)
         return TypedValueJson(type="json", value=json.loads(json_))
     except:
         return TypedValueRaw(type="raw", value=str(value))
@@ -153,9 +145,26 @@ class SerializableAndPydanticEncoder(json.JSONEncoder):
                 return o.__repr__()
         except ImportError:
             pass
+
+        try:
+            import chainlit as cl
+
+            if isinstance(o, cl.Message):
+                return o.to_dict()
+        except ImportError:
+            pass
+
         if isinstance(o, BaseModel):
             return o.model_dump()
         return super().default(o)
+
+
+class SerializableWithStringFallback(SerializableAndPydanticEncoder):
+    def default(self, o):
+        try:
+            return super().default(o)
+        except:
+            return str(o)
 
 
 def reduce_payload_size(

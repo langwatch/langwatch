@@ -1,14 +1,14 @@
 import { TriggerAction, type Project, type Trigger } from "@prisma/client";
 import { type NextApiRequest, type NextApiResponse } from "next";
-import { getAllForProject } from "~/server/api/routers/traces";
+import { getAllTracesForProject } from "~/server/api/routers/traces";
 import { sendTriggerEmail } from "~/server/mailer/triggerEmail";
 import { sendSlackWebhook } from "~/server/triggers/sendSlackWebhook";
 import { prisma } from "../../server/db";
 
-import { type ElasticSearchTrace } from "~/server/tracer/types";
+import { type Trace } from "~/server/tracer/types";
 
 interface TraceGroups {
-  groups: ElasticSearchTrace[][];
+  groups: Trace[][];
 }
 
 interface ActionParams {
@@ -78,7 +78,7 @@ const getTracesForAlert = async (trigger: Trigger, projects: Project[]) => {
     endDate: new Date().getTime(),
   };
 
-  const traces = await getAllForProject(input);
+  const traces = await getAllTracesForProject(input);
 
   const getTracesToSend = async (traces: TraceGroups, triggerId: string) => {
     const tracesToSend = [];
@@ -204,7 +204,7 @@ const hasTriggerSent = async (
 };
 
 interface TraceGroups {
-  groups: ElasticSearchTrace[][];
+  groups: Trace[][];
 }
 
 export const getLatestUpdatedAt = (traces: TraceGroups) => {

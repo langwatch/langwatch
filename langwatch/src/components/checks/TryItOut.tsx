@@ -33,7 +33,6 @@ import { type UseFormReturn } from "react-hook-form";
 import { useDebounceValue } from "usehooks-ts";
 import { useFilterParams } from "../../hooks/useFilterParams";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import { elasticSearchSpanToSpan } from "../../server/tracer/types";
 import {
   type Evaluators,
   type SingleEvaluationResult,
@@ -53,6 +52,7 @@ import { FilterSidebar } from "../filters/FilterSidebar";
 import { FilterToggle } from "../filters/FilterToggle";
 import type { CheckConfigFormData } from "./CheckConfigForm";
 import { checkStatusColorMap } from "./EvaluationStatus";
+import { elasticSearchSpanToSpan } from "../../server/tracer/utils";
 
 export function TryItOut({
   form,

@@ -51,7 +51,7 @@ import {
   Shield,
 } from "react-feather";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import type { ElasticSearchTrace, TraceCheck } from "~/server/tracer/types";
+import type { Trace, TraceCheck } from "~/server/tracer/types";
 import { getEvaluatorDefinitions } from "~/trace_checks/getEvaluator";
 import { api } from "~/utils/api";
 import { durationColor } from "~/utils/durationColor";
@@ -192,7 +192,7 @@ export function MessagesTable() {
       sortable: boolean;
       width?: number;
       render: (trace: TraceWithGuardrail, index: number) => React.ReactNode;
-      value?: (trace: TraceWithGuardrail) => string | number | Date;
+      value: (trace: TraceWithGuardrail) => string | number | Date;
     }
   > = {
     checked: {
@@ -214,10 +214,27 @@ export function MessagesTable() {
       },
       value: () => "",
     },
+    "trace.trace_id": {
+      name: "ID",
+      sortable: true,
+      render: (trace: Trace, index: number) => (
+        <Td
+          key={index}
+          onClick={() =>
+            openDrawer("traceDetails", {
+              traceId: trace.trace_id,
+            })
+          }
+        >
+          {trace.trace_id}
+        </Td>
+      ),
+      value: (trace: Trace) => trace.trace_id,
+    },
     "trace.timestamps.started_at": {
       name: "Timestamp",
       sortable: true,
-      render: (trace: ElasticSearchTrace, index: number) => (
+      render: (trace: Trace, index: number) => (
         <Td
           key={index}
           onClick={() =>
@@ -229,7 +246,7 @@ export function MessagesTable() {
           {new Date(trace.timestamps.started_at).toLocaleString()}
         </Td>
       ),
-      value: (trace: ElasticSearchTrace) =>
+      value: (trace: Trace) =>
         new Date(trace.timestamps.started_at).toLocaleString(),
     },
     "trace.input.value": {
@@ -253,7 +270,7 @@ export function MessagesTable() {
           </Tooltip>
         </Td>
       ),
-      value: (trace: ElasticSearchTrace) => trace.input?.value ?? "",
+      value: (trace: Trace) => trace.input?.value ?? "",
     },
     "trace.output.value": {
       name: "Output",
@@ -313,7 +330,7 @@ export function MessagesTable() {
             </Tooltip>
           </Td>
         ),
-      value: (trace: ElasticSearchTrace) => trace.output?.value ?? "",
+      value: (trace: Trace) => trace.output?.value ?? "",
     },
     "trace.metrics.first_token_ms": {
       name: "First Token",
@@ -338,7 +355,7 @@ export function MessagesTable() {
           </Text>
         </Td>
       ),
-      value: (trace: ElasticSearchTrace) => {
+      value: (trace: Trace) => {
         return trace.metrics.first_token_ms
           ? numeral(trace.metrics.first_token_ms / 1000).format("0.[0]") + "s"
           : "-";
@@ -367,7 +384,7 @@ export function MessagesTable() {
           </Text>
         </Td>
       ),
-      value: (trace: ElasticSearchTrace) => {
+      value: (trace: Trace) => {
         return trace.metrics.total_time_ms
           ? numeral(trace.metrics.total_time_ms / 1000).format("0.[0]") + "s"
           : "-";
@@ -389,7 +406,7 @@ export function MessagesTable() {
           {trace.metrics.completion_tokens}
         </Td>
       ),
-      value: (trace: ElasticSearchTrace) => trace.metrics.completion_tokens ?? 0,
+      value: (trace: Trace) => trace.metrics.completion_tokens ?? 0,
     },
     "trace.metrics.prompt_tokens": {
       name: "Prompt Tokens",
@@ -407,7 +424,7 @@ export function MessagesTable() {
           {trace.metrics.prompt_tokens}
         </Td>
       ),
-      value: (trace: ElasticSearchTrace) => trace.metrics.prompt_tokens ?? 0,
+      value: (trace: Trace) => trace.metrics.prompt_tokens ?? 0,
     },
     "trace.metrics.total_cost": {
       name: "Total Cost",
@@ -425,7 +442,7 @@ export function MessagesTable() {
           <Text>{numeral(trace.metrics.total_cost).format("$0.00[000]")}</Text>
         </Td>
       ),
-      value: (trace: ElasticSearchTrace) =>
+      value: (trace: Trace) =>
         numeral(trace.metrics.total_cost).format("$0.00[000]"),
     },
     "trace.metadata": {
@@ -449,7 +466,7 @@ export function MessagesTable() {
           </Tooltip>
         </Td>
       ),
-      value: (trace: ElasticSearchTrace) => JSON.stringify(trace.metadata),
+      value: (trace: Trace) => JSON.stringify(trace.metadata),
     },
     "trace.contexts": {
       name: "Contexts",
@@ -472,7 +489,7 @@ export function MessagesTable() {
           </Tooltip>
         </Td>
       ),
-      value: (trace: ElasticSearchTrace) => JSON.stringify(trace.contexts),
+      value: (trace: Trace) => JSON.stringify(trace.contexts),
     },
     ...Object.fromEntries(
       Object.entries(traceCheckColumnsAvailable).map(
@@ -525,7 +542,7 @@ export function MessagesTable() {
                 </Td>
               );
             },
-            value: (trace: ElasticSearchTrace) => {
+            value: (trace: Trace) => {
               const checkId = columnKey.split(".")[1];
               const traceCheck = traceGroups.data?.traceChecks?.[
                 trace.trace_id
@@ -554,7 +571,10 @@ export function MessagesTable() {
     localStorageHeaderColumns
       ? localStorageHeaderColumns
       : Object.fromEntries(
-          Object.keys(headerColumns).map((column) => [column, true])
+          Object.keys(headerColumns).map((column) => [
+            column,
+            column !== "trace.trace_id",
+          ])
         )
   );
 
@@ -657,15 +677,18 @@ export function MessagesTable() {
   ).filter(([_, checked]) => checked);
 
   const downloadCSV = (selection = false) => {
-    let csv;
+    const checkedHeaderColumnsEntries_ = checkedHeaderColumnsEntries.filter(
+      ([column, _]) => column !== "checked"
+    );
 
+    let csv;
     if (selection) {
       csv = traceGroups.data?.groups
         .flatMap((traceGroup) =>
           traceGroup
             .filter((trace) => selectedTraceIds.includes(trace.trace_id))
             .map((trace) =>
-              checkedHeaderColumnsEntries.map(
+              checkedHeaderColumnsEntries_.map(
                 ([column, _]) => headerColumns[column]?.value?.(trace) ?? ""
               )
             )
@@ -674,14 +697,14 @@ export function MessagesTable() {
     } else {
       csv = traceGroups.data?.groups.flatMap((traceGroup) =>
         traceGroup.map((trace) =>
-          checkedHeaderColumnsEntries.map(
-            ([column, _]) => headerColumns[column]?.value?.(trace) ?? ""
-          )
+          checkedHeaderColumnsEntries_
+            .filter(([column, _]) => column !== "checked")
+            .map(([column, _]) => headerColumns[column]?.value?.(trace) ?? "")
         )
       );
     }
 
-    const fields = checkedHeaderColumnsEntries
+    const fields = checkedHeaderColumnsEntries_
       .map(([columnKey, _]) => {
         return headerColumns[columnKey]?.name;
       })

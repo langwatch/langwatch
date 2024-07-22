@@ -34,14 +34,12 @@ import {
 } from "../../elasticsearch";
 import { getOpenAIEmbeddings } from "../../embeddings";
 import {
-  elasticSearchSpanToSpan,
   type ElasticSearchSpan,
-  type Trace,
   type TraceCheck,
   type Contexts,
-  elasticSearchToTypedValue,
   type GuardrailResult,
   type ElasticSearchTrace,
+  type Span,
 } from "../../tracer/types";
 import {
   TeamRoleGroup,
@@ -50,6 +48,10 @@ import {
   checkUserPermissionForProject,
 } from "../permission";
 import { generateTracesPivotQueryConditions } from "./analytics/common";
+import {
+  elasticSearchSpanToSpan,
+  elasticSearchTraceToTrace,
+} from "../../tracer/utils";
 
 const tracesFilterInput = sharedFiltersInputSchema.extend({
   pageOffset: z.number().optional(),
@@ -98,7 +100,7 @@ export const tracesRouter = createTRPCRouter({
     .input(getAllForProjectInput)
     .use(checkUserPermissionForProject(TeamRoleGroup.MESSAGES_VIEW))
     .query(async ({ ctx, input }) => {
-      return await getAllForProject(input, ctx);
+      return await getAllTracesForProject(input, ctx);
     }),
   getById: publicProcedure
     .input(z.object({ projectId: z.string(), traceId: z.string() }))
@@ -253,7 +255,7 @@ export const tracesRouter = createTRPCRouter({
     )
     .use(checkUserPermissionForProject(TeamRoleGroup.MESSAGES_VIEW))
     .query(async ({ input }) => {
-      const customersLabelsResult = await esClient.search<Trace>({
+      const customersLabelsResult = await esClient.search<ElasticSearchTrace>({
         index: TRACE_INDEX,
         size: 0, // We don't need the actual documents, just the aggregation results
         body: {
@@ -295,34 +297,7 @@ export const tracesRouter = createTRPCRouter({
     .query(async ({ input }) => {
       const { projectId, threadId } = input;
 
-      const tracesResult = await esClient.search<ElasticSearchTrace>({
-        index: TRACE_INDEX,
-        body: {
-          query: {
-            //@ts-ignore
-            bool: {
-              filter: [
-                { term: { project_id: projectId } },
-                { term: { "metadata.thread_id": threadId } },
-              ],
-            },
-          },
-          sort: [
-            {
-              "timestamps.started_at": {
-                order: "asc",
-              },
-            },
-          ],
-          size: 1000,
-        },
-      });
-
-      const traces = tracesResult.hits.hits
-        .map((hit) => hit._source!)
-        .filter((x) => x);
-
-      return traces;
+      return getTracesByThreadId({ projectId, threadId });
     }),
 
   getTracesWithSpans: protectedProcedure
@@ -346,7 +321,7 @@ export const tracesRouter = createTRPCRouter({
     )
     .use(checkUserPermissionForProject(TeamRoleGroup.MESSAGES_VIEW))
     .query(async ({ ctx, input }) => {
-      const { groups } = await getAllForProject(
+      const { groups } = await getAllTracesForProject(
         {
           ...input,
           groupBy: "none",
@@ -400,7 +375,7 @@ export const tracesRouter = createTRPCRouter({
     }),
 });
 
-export const getAllForProject = async (
+export const getAllTracesForProject = async (
   input: z.infer<typeof getAllForProjectInput>,
   ctx?: { prisma: PrismaClient; session: Session }
 ) => {
@@ -644,6 +619,7 @@ export const getAllForProject = async (
     tracesResult.hits.hits
       .map((hit) => hit._source!)
       .filter((x) => x)
+      .map(elasticSearchTraceToTrace)
       .map((trace) => {
         const lastSpans = spansByTraceId[trace.trace_id]?.reverse();
         const lastNonGuardrailSpanIndex =
@@ -658,7 +634,6 @@ export const getAllForProject = async (
           | undefined = lastGuardrailSpans?.flatMap((span) =>
           (span?.output ? [span.output] : [])
             .filter((output) => output.type === "guardrail_result")
-            .map(elasticSearchToTypedValue)
             .map((output) => ({
               ...((output.value as GuardrailResult) || {}),
               name: guardrailsSlugToName[span.name ?? ""],
@@ -701,7 +676,7 @@ export const getAllForProject = async (
         if (span.type === "rag") {
           contexts.push({
             traceId,
-            contexts: span.contexts ?? [],
+            contexts: "contexts" in span && span.contexts ? span.contexts : [],
           });
         }
       }
@@ -723,7 +698,10 @@ export const getAllForProject = async (
   return { groups: mergedGroups, totalHits, traceChecks };
 };
 
-const getSpansForTraceIds = async (projectId: string, traceIds: string[]) => {
+export const getSpansForTraceIds = async (
+  projectId: string,
+  traceIds: string[]
+) => {
   const BATCH_SIZE = 50; // Define a suitable batch size
   const searchPromises = [];
 
@@ -751,7 +729,10 @@ const getSpansForTraceIds = async (projectId: string, traceIds: string[]) => {
 
   const results = await Promise.all(searchPromises);
   const spansResults = results.flatMap((result) =>
-    result.hits.hits.map((hit) => hit._source).filter((x) => x)
+    result.hits.hits
+      .map((hit) => hit._source!)
+      .filter((x) => x)
+      .map(elasticSearchSpanToSpan)
   );
 
   return spansResults.reduce(
@@ -765,7 +746,7 @@ const getSpansForTraceIds = async (projectId: string, traceIds: string[]) => {
       }
       return acc;
     },
-    {} as Record<string, ElasticSearchSpan[]>
+    {} as Record<string, Span[]>
   );
 };
 
@@ -810,7 +791,7 @@ const getTraceChecks = async (
 };
 
 const getTracesWithSpans = async (projectId: string, traceIds: string[]) => {
-  const tracesResult = await esClient.search<Trace>({
+  const tracesResult = await esClient.search<ElasticSearchTrace>({
     index: TRACE_INDEX,
     body: {
       query: {
@@ -830,12 +811,22 @@ const getTracesWithSpans = async (projectId: string, traceIds: string[]) => {
         },
       ],
       size: 1000,
+      // Remove embeddings to reduce payload size
+      _source: {
+        excludes: [
+          "input.embeddings",
+          "input.embeddings.embeddings",
+          "output.embeddings",
+          "output.embeddings.embeddings",
+        ],
+      },
     },
   });
 
   const traces = tracesResult.hits.hits
     .map((hit) => hit._source!)
-    .filter((x) => x);
+    .filter((x) => x)
+    .map(elasticSearchTraceToTrace);
 
   const spansByTraceId = await Promise.all(
     traces.map((trace) =>
@@ -1021,5 +1012,52 @@ export const getTraceById = async ({
 
   const trace = result.hits.hits[0]?._source;
 
-  return trace;
+  return trace ? elasticSearchTraceToTrace(trace) : undefined;
+};
+
+export const getTracesByThreadId = async ({
+  projectId,
+  threadId,
+}: {
+  projectId: string;
+  threadId: string;
+}) => {
+  const tracesResult = await esClient.search<ElasticSearchTrace>({
+    index: TRACE_INDEX,
+    body: {
+      query: {
+        //@ts-ignore
+        bool: {
+          filter: [
+            { term: { project_id: projectId } },
+            { term: { "metadata.thread_id": threadId } },
+          ],
+        },
+      },
+      sort: [
+        {
+          "timestamps.started_at": {
+            order: "asc",
+          },
+        },
+      ],
+      // Remove embeddings to reduce payload size
+      _source: {
+        excludes: [
+          "input.embeddings",
+          "input.embeddings.embeddings",
+          "output.embeddings",
+          "output.embeddings.embeddings",
+        ],
+      },
+      size: 1000,
+    },
+  });
+
+  const traces = tracesResult.hits.hits
+    .map((hit) => hit._source!)
+    .filter((x) => x)
+    .map(elasticSearchTraceToTrace);
+
+  return traces;
 };

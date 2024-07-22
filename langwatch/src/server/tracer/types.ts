@@ -198,34 +198,6 @@ export type ElasticSearchSpan = Omit<
   timestamps: SpanTimestamps & { inserted_at: number; updated_at: number };
 };
 
-export const elasticSearchSpanToSpan = (esSpan: ElasticSearchSpan): Span => {
-  const { input, output, ...rest } = esSpan;
-  const spanInput: SpanInputOutput | null = input
-    ? elasticSearchToTypedValue(input)
-    : null;
-  const spanOutput: SpanInputOutput | null = output
-    ? elasticSearchToTypedValue(output)
-    : null;
-
-  return { ...rest, input: spanInput, output: spanOutput };
-};
-
-export const elasticSearchToTypedValue = (
-  typed: ElasticSearchInputOutput
-): SpanInputOutput => {
-  try {
-    return {
-      type: typed.type,
-      value: JSON.parse(typed.value),
-    } as any;
-  } catch (e) {
-    return {
-      type: "raw",
-      value: typed.value,
-    };
-  }
-};
-
 export type TraceInput = {
   value: string;
   embeddings?: { model: string; embeddings: number[] };

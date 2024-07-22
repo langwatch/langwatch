@@ -3,7 +3,7 @@ import random
 import re
 import time
 import dspy
-from typing import Callable, List, Optional, Any, Union
+from typing import Callable, List, Optional, Any, Type, Union
 from typing_extensions import TypedDict
 import langwatch
 import httpx
@@ -25,6 +25,8 @@ from pydantic.fields import FieldInfo
 from coolname import generate_slug
 from retry import retry
 from dspy.evaluate.evaluate import Evaluate
+
+from langwatch.tracer import ContextTrace
 
 
 class SerializableAndPydanticEncoder(json.JSONEncoder):
@@ -264,6 +266,9 @@ class LangWatchDSPy:
         )
         response.raise_for_status()
         self.steps_buffer = []
+
+    def tracer(self, trace: ContextTrace):
+        return DSPyTracer(trace=trace)
 
 
 langwatch_dspy = LangWatchDSPy()
@@ -584,3 +589,161 @@ class LangWatchTrackedMIPROv2(MIPROv2):
             yield
         finally:
             Evaluate.__call__ = original_evaluate_call
+
+
+# === Tracer ===#
+
+
+class DSPyTracer:
+    def __init__(self, trace: ContextTrace):
+        self.trace = trace
+
+        if not hasattr(dspy.Module, "__original_call__"):
+            dspy.Module.__original_call__ = dspy.Module.__call__  # type: ignore
+            dspy.Module.__call__ = self.patched_module_call()
+
+        if not hasattr(dspy.Predict, "__original_forward__"):
+            dspy.Predict.__original_forward__ = dspy.Predict.forward  # type: ignore
+            dspy.Predict.forward = self.patched_predict_forward()
+
+        language_model_classes = dspy.LM.__subclasses__()
+        for lm in language_model_classes:
+            if not hasattr(lm, "__original_basic_request__"):
+                lm.__original_basic_request__ = lm.basic_request  # type: ignore
+                lm.basic_request = self.patched_language_model_request()
+
+        retrieve_classes = dspy.Retrieve.__subclasses__()
+        for retrieve in retrieve_classes:
+            if not hasattr(retrieve, "__original_forward__"):
+                retrieve.__original_forward__ = retrieve.forward  # type: ignore
+                retrieve.forward = self.patched_retrieve_forward(cls=retrieve)
+
+        if not hasattr(dspy.Retrieve, "__original_forward__"):
+            dspy.Retrieve.__original_forward__ = dspy.Retrieve.forward  # type: ignore
+            dspy.Retrieve.forward = self.patched_retrieve_forward(cls=dspy.Retrieve)
+
+    def safe_get_current_span(self):
+        try:
+            return langwatch.get_current_span()
+        except:
+            return None
+
+    def patched_module_call(self):
+        self_ = self
+
+        @langwatch.span(ignore_missing_trace_warning=True, type="chain")
+        def __call__(self: dspy.Module, *args, **kwargs):
+            span = self_.safe_get_current_span()
+            signature = (
+                self.__getattribute__("signature")
+                if hasattr(self, "signature")
+                else None
+            )
+
+            if span and signature:
+                span.update(name=f"{self.__class__.__name__}({signature.__name__})")
+            elif span:
+                span.update(name=f"{self.__class__.__name__}.forward")
+
+            prediction = self.__class__.__original_call__(self, *args, **kwargs)  # type: ignore
+
+            if span and isinstance(prediction, dspy.Prediction):
+                span.update(output=prediction._store)  # type: ignore
+
+            return prediction
+
+        return __call__
+
+    def patched_predict_forward(self):
+        self_ = self
+
+        @langwatch.span(ignore_missing_trace_warning=True, type="chain")
+        def forward(self: dspy.Predict, **kwargs):
+            span = self_.safe_get_current_span()
+            signature = kwargs.get("signature", self.signature)
+
+            if span and signature:
+                span.update(name=f"{self.__class__.__name__}({signature.__name__})")
+
+            prediction = self.__class__.__original_forward__(self, **kwargs)  # type: ignore
+
+            if span and isinstance(prediction, dspy.Prediction):
+                span.update(output=prediction._store)  # type: ignore
+
+            return prediction
+
+        return forward
+
+    def patched_language_model_request(self):
+        self_ = self
+
+        @langwatch.span(ignore_missing_trace_warning=True, type="llm")
+        def basic_request(self: dspy.LM, prompt, **kwargs):
+            all_kwargs = self.kwargs | kwargs
+            model = all_kwargs.get("model", None)
+            temperature = all_kwargs.get("temperature", None)
+
+            span = self_.safe_get_current_span()
+            if span:
+                span.update(
+                    name=self.__class__.__name__,
+                    model=model,
+                    input=prompt,
+                    params=({"temperature": temperature} if temperature else None),
+                )
+
+            result = self.__class__.__original_basic_request__(self, prompt, **kwargs)  # type: ignore
+
+            if (
+                span
+                and "choices" in result
+                and len(result["choices"]) == 1
+                and "message" in result["choices"][0]
+            ):
+                span.update(output=[result["choices"][0]["message"]])
+
+            if (
+                span
+                and "usage" in result
+                and "completion_tokens" in result["usage"]
+                and "prompt_tokens" in result["usage"]
+            ):
+                span.update(
+                    metrics={
+                        "completion_tokens": result["usage"]["completion_tokens"],
+                        "prompt_tokens": result["usage"]["prompt_tokens"],
+                    }
+                )
+
+            return result
+
+        return basic_request
+
+    def patched_retrieve_forward(self, cls: Type[dspy.Retrieve]):
+        self_ = self
+
+        def forward(self: dspy.Retrieve, *args, **kwargs):
+            # Prevent duplicate instrumentation
+            if self.__class__ is not cls and getattr(
+                cls, "forward", None
+            ) is not getattr(dspy.Retrieve, "forward", None):
+                return self.__class__.__original_forward__(self, *args, **kwargs)  # type: ignore
+
+            @langwatch.span(ignore_missing_trace_warning=True, type="rag")
+            def forward(self, *args, **kwargs):
+                result = self.__class__.__original_forward__(self, *args, **kwargs)  # type: ignore
+
+                span = self_.safe_get_current_span()
+
+                passages = result.get("passages", None)
+                if span and passages and type(passages) == list:
+                    span.update(contexts=passages)
+
+                if span and isinstance(result, dspy.Prediction):
+                    span.update(output=result._store)  # type: ignore
+
+                return result
+
+            return forward(self, *args, **kwargs)
+
+        return forward

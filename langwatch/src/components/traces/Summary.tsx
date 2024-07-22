@@ -17,8 +17,7 @@ import React, {
 import { HelpCircle } from "react-feather";
 import { getTotalTokensDisplay } from "~/utils/getTotalTokensDisplay";
 import { useTraceDetailsState } from "../../hooks/useTraceDetailsState";
-import type { ElasticSearchTrace } from "../../server/tracer/types";
-import { reservedTraceMetadataSchema } from "../../server/tracer/types.generated";
+import type { Trace } from "../../server/tracer/types";
 import { formatMilliseconds } from "../../utils/formatMilliseconds";
 import { MetadataTag } from "../MetadataTag";
 
@@ -91,16 +90,9 @@ export function TraceSummary(props: TraceSummaryProps) {
 }
 
 const TraceSummaryValues = React.forwardRef(function TraceSummaryValues(
-  { trace }: { trace: ElasticSearchTrace },
+  { trace }: { trace: Trace },
   ref
 ) {
-  const reservedMetadata = Object.fromEntries(
-    Object.entries(trace.metadata ?? {}).filter(
-      ([key]) => key in reservedTraceMetadataSchema.shape
-    )
-  );
-  const customMetadata = trace.metadata?.custom ?? {};
-
   return (
     <>
       <HStack
@@ -157,8 +149,7 @@ const TraceSummaryValues = React.forwardRef(function TraceSummaryValues(
       <HStack gap={3} marginY={8} wrap={"wrap"}>
         {Object.entries({
           trace_id: trace.trace_id,
-          ...reservedMetadata,
-          ...customMetadata,
+          ...trace.metadata,
         }).map(([key, value], i) => {
           let renderValue = value;
 
@@ -176,7 +167,7 @@ const TraceSummaryValues = React.forwardRef(function TraceSummaryValues(
 
           return (
             renderValue && (
-              <MetadataTag key={i} label={key} value={renderValue} />
+              <MetadataTag key={i} label={key} value={renderValue as string} />
             )
           );
         })}
