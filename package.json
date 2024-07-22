@@ -6,11 +6,14 @@
   "scripts": {
     "dev": "NODE_ENV=development DEBUG=langwatch:* DEBUG_HIDE_DATE=true DEBUG_COLORS=true concurrently 'node server.js' 'npm run start:workers'",
     "build": "export DEPENDENCY_INJECTION_DIR=$(pwd)/src/injection/; export EXTRA_INCLUDE=$(pwd)/src; cp .env langwatch/langwatch/; cd langwatch/langwatch; npm run build",
-    "start": "NODE_ENV=production DEBUG=langwatch:* DEBUG_COLORS=true NEXTJS_DIST_DIR=.next node server.js",
+    "start": "npm run prepare:production && NODE_ENV=production DEBUG=langwatch:* DEBUG_COLORS=true NEXTJS_DIST_DIR=.next node server.js",
     "start:workers": "tsx src/workers.ts",
     "start:prepare": "cp .env langwatch/langwatch/; cd langwatch/langwatch; npm install && npm run start:prepare:files && cd ../../ && npm run prisma:db:generate",
     "prisma:db:generate": "node prisma/generate-schema.js && npx prisma generate && cp -R node_modules/.prisma/* langwatch/langwatch/node_modules/.prisma/",
-    "prisma:db:push": "npx prisma db push"
+    "prisma:db:push": "npx prisma db push",
+    "prepare:production": "npm run prisma:db:generate && npm run prisma:db:push && npm run elastic:index:create",
+    "task": "DEBUG=langwatch:* tsx --tsconfig langwatch/langwatch/tsconfig.workers.json langwatch/langwatch/src/task.ts",
+    "elastic:index:create": "npm run task -- elasticIndexCreate"
   },
   "author": "",
   "license": "ISC",

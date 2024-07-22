@@ -96,12 +96,14 @@ export class LangWatchAwsMarketplaceStack extends cdk.Stack {
 
     const { redis, redisPassword } = this.setupRedis(vpc, cluster);
     const { postgres, postgresPassword } = this.setupPostgres(vpc, cluster);
+    const { elasticPassword } = this.setupElasticsearch(vpc, cluster);
 
     this.setupLangWatchEnv(
       domainParam,
       cluster,
       { redis, redisPassword },
-      { postgres, postgresPassword }
+      { postgres, postgresPassword },
+      { elasticPassword }
     );
 
     setupFluentd(cluster);
@@ -126,12 +128,17 @@ export class LangWatchAwsMarketplaceStack extends cdk.Stack {
     }: {
       postgres: rds.DatabaseInstance;
       postgresPassword: secretsmanager.Secret;
+    },
+    {
+      elasticPassword,
+    }: {
+      elasticPassword: secretsmanager.Secret;
     }
   ): secretsmanager.Secret {
     const generateSecureString = (name: string, length: number = 32) => {
       return new secretsmanager.Secret(this, `GeneratedSecret${name}`, {
         generateSecretString: {
-          excludeCharacters: '"@/\\:?#[]&=+<>{}|^~`,%;',
+          excludeCharacters: "'\"@/\\:?#[]&=+<>{}|^~`,%;",
           passwordLength: length,
         },
       }).secretValue
@@ -189,6 +196,13 @@ export class LangWatchAwsMarketplaceStack extends cdk.Stack {
               ":",
               postgres.dbInstanceEndpointPort,
               "/langwatch_db?schema=public",
+            ])
+          ),
+          ELASTICSEARCH_NODE_URL: cdk.SecretValue.unsafePlainText(
+            cdk.Fn.join("", [
+              "https://elastic:",
+              elasticPassword.secretValue.unsafeUnwrap().toString(),
+              "@elasticsearch-master:9200",
             ])
           ),
         },
@@ -318,6 +332,10 @@ export class LangWatchAwsMarketplaceStack extends cdk.Stack {
                 objectName: "DATABASE_URL",
                 key: "DATABASE_URL",
               },
+              {
+                objectName: "ELASTICSEARCH_NODE_URL",
+                key: "ELASTICSEARCH_NODE_URL",
+              },
             ],
           },
         ],
@@ -367,6 +385,10 @@ export class LangWatchAwsMarketplaceStack extends cdk.Stack {
                   path: "DATABASE_URL",
                   objectAlias: "DATABASE_URL",
                 },
+                {
+                  path: "ELASTICSEARCH_NODE_URL",
+                  objectAlias: "ELASTICSEARCH_NODE_URL",
+                },
               ],
             },
           ]),
@@ -398,7 +420,7 @@ export class LangWatchAwsMarketplaceStack extends cdk.Stack {
         secretStringTemplate: JSON.stringify({ username: "redis" }),
         generateStringKey: "password",
         excludePunctuation: true,
-        excludeCharacters: '"@/\\:?#[]&=+<>{}|^~`,%;',
+        excludeCharacters: "'\"@/\\:?#[]&=+<>{}|^~`,%;",
         passwordLength: 16,
       },
     });
@@ -481,7 +503,7 @@ export class LangWatchAwsMarketplaceStack extends cdk.Stack {
           secretStringTemplate: JSON.stringify({ username: "langwatch_db" }),
           generateStringKey: "password",
           excludePunctuation: true,
-          excludeCharacters: '"@/\\:?#[]&=+<>{}|^~`,%;',
+          excludeCharacters: "\"'@/\\:?#[]&=+<>{}|^~`,%;",
           passwordLength: 16,
         },
       }
@@ -541,6 +563,56 @@ export class LangWatchAwsMarketplaceStack extends cdk.Stack {
     addPostgresIngressRule.node.addDependency(cluster);
 
     return { postgres, postgresPassword };
+  }
+
+  setupElasticsearch(vpc: ec2.Vpc, cluster: eks.Cluster) {
+    const elasticPassword = new secretsmanager.Secret(
+      this,
+      "ElasticsearchPassword",
+      {
+        generateSecretString: {
+          excludeCharacters: "'\"@/\\:?#[]&=+<>{}|^~`,%;",
+          passwordLength: 32,
+        },
+      }
+    );
+
+    new eks.HelmChart(this, "ElasticsearchChart", {
+      cluster,
+      chart: "elasticsearch",
+      repository: "https://helm.elastic.co",
+      namespace: "elasticsearch",
+      release: "elasticsearch",
+      values: {
+        antiAffinity: "soft",
+        esJavaOpts: "-Xmx2g -Xms2g",
+        resources: {
+          requests: {
+            cpu: "500m",
+            memory: "2Gi",
+          },
+          limits: {
+            cpu: "1000m",
+            memory: "4Gi",
+          },
+        },
+        volumeClaimTemplate: {
+          accessModes: ["ReadWriteOnce"],
+          resources: {
+            requests: {
+              storage: "5Gi",
+            },
+          },
+        },
+        security: {
+          enabled: true,
+          password: elasticPassword.secretValue.unsafeUnwrap().toString(),
+        },
+      },
+      timeout: cdk.Duration.minutes(15),
+    });
+
+    return { elasticPassword };
   }
 
   setupLangEvals(cluster: eks.Cluster) {
