@@ -482,3 +482,16 @@ model PublicShare {
     @@unique([projectId, resourceType, resourceId])
     @@index([userId])
 }
+
+
+model CustomLLMModelCost {
+  projectId             String
+  model                 String
+  regex                 String?
+  inputCostPerToken     Float?
+  outputCostPerToken    Float?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @default(now()) @updatedAt
+
+  @@id([projectId, model])
+}

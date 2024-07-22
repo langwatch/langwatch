@@ -4,3 +4,5 @@
 *.generated.ts
 traceDir
 node_modules
+
+llm-model-costs.json
