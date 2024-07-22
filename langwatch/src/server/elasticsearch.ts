@@ -19,9 +19,13 @@ export const OPENAI_EMBEDDING_DIMENSION = 1536;
 
 export const esClient = new Client({
   node: env.ELASTICSEARCH_NODE_URL,
-  auth: {
-    apiKey: env.ELASTICSEARCH_API_KEY,
-  },
+  ...(env.ELASTICSEARCH_API_KEY
+    ? {
+        auth: {
+          apiKey: env.ELASTICSEARCH_API_KEY,
+        },
+      }
+    : {}),
 });
 
 export const traceIndexId = ({
