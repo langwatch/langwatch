@@ -34,6 +34,15 @@ export const guardrailInputSchema = z.object({
       .optional()
       .nullable(),
     expected_output: z.string().optional().nullable(),
+    conversation: z
+      .array(
+        z.object({
+          input: z.string().optional().nullable(),
+          output: z.string().optional().nullable(),
+        })
+      )
+      .optional()
+      .nullable(),
   }),
   settings: z.object({}).passthrough().optional().nullable(),
 });
@@ -146,7 +155,7 @@ export default async function handler(
     }
   }
 
-  const { input, output, contexts, expected_output } = params.data;
+  const { input, output, contexts, expected_output, conversation } = params.data;
   const contextList = contexts
     ?.map((context) => {
       if (typeof context === "string") {
@@ -166,6 +175,10 @@ export default async function handler(
       output: output ? output : undefined,
       contexts: contextList,
       expected_output: expected_output ? expected_output : undefined,
+      conversation: conversation?.map((message) => ({
+        input: message.input ?? undefined,
+        output: message.output ?? undefined,
+      })) ?? [],
       settings: {
         ...((guardrail.parameters as object) ?? {}),
         ...(settings ?? {}),

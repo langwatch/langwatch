@@ -53,6 +53,12 @@
     "model_vendor": "openai",
     "mode": "chat"
   },
+  "openai/gpt-4o-mini": {
+    "name": "GPT 4o mini",
+    "version": "latest",
+    "model_vendor": "openai",
+    "mode": "chat"
+  },
   "openai/gpt-4-0125-preview": {
     "name": "GPT 4 Turbo",
     "version": "0125",
