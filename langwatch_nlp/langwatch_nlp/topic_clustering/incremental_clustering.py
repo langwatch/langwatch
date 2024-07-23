@@ -193,7 +193,7 @@ class IncrementalClusteringParams(BaseModel):
     subtopics: list[Subtopic]
     traces: list[Trace]
     model: str
-    deployment_name: Optional[str]
+    deployment_name: Optional[str] = None
     litellm_params: dict[str, str]
 
 
