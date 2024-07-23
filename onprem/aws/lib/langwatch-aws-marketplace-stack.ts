@@ -107,8 +107,8 @@ export class LangWatchAwsMarketplaceStack extends cdk.Stack {
     );
 
     setupFluentd(cluster);
-    // this.setupLangEvals(cluster);
-    // this.setupLangWatchNLP(cluster);
+    this.setupLangEvals(cluster);
+    this.setupLangWatchNLP(cluster);
     this.setupLangWatch(domainParam, cluster);
   }
 
