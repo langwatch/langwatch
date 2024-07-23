@@ -317,6 +317,10 @@ export class LangWatchAwsMarketplaceStack extends cdk.Stack {
                 key: "NEXTAUTH_SECRET",
               },
               {
+                objectName: "API_TOKEN_JWT_SECRET",
+                key: "API_TOKEN_JWT_SECRET",
+              },
+              {
                 objectName: "LANGWATCH_NLP_SERVICE",
                 key: "LANGWATCH_NLP_SERVICE",
               },
