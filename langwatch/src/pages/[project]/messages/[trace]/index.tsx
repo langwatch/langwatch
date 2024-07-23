@@ -430,7 +430,7 @@ function Message({
       }}
     >
       {avatar}
-      <VStack align="start" spacing={0} width="full" className="content-hover">
+      <VStack align="start" spacing={0} width="full" className="content-hover" wordBreak="break-all">
         <HStack width="full">
           <Text fontWeight="bold">{author}</Text>
           <Spacer />
