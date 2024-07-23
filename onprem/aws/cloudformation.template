@@ -1,0 +1,2101 @@
+Parameters:
+  KubernetesNodeCount:
+    Type: Number
+    Default: 1
+    Description: Number of nodes in the Kubernetes EKS cluster
+    MaxValue: 10
+    MinValue: 1
+  SubDomainName:
+    Type: String
+    Description: The subdomain name where LangWatch will be hosted (e.g., langwatch.yourdomain.com)
+  BootstrapVersion:
+    Type: AWS::SSM::Parameter::Value<String>
+    Default: /cdk-bootstrap/hnb659fds/version
+    Description: Version of the CDK Bootstrap resources in this environment, automatically retrieved from SSM Parameter Store. [cdk:skip]
+Resources:
+  LangWatchVPC32D90DB9:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.0.0.0/16
+      EnableDnsHostnames: true
+      EnableDnsSupport: true
+      InstanceTenancy: default
+      Tags:
+        - Key: Name
+          Value: LangWatchAwsMarketplaceStack/LangWatchVPC
+    Metadata:
+      aws:cdk:path: LangWatchAwsMarketplaceStack/LangWatchVPC/Resource
+  LangWatchVPCPublicSubnet1SubnetE41DB836:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone:
+        Fn::Select:
+          - 0
+          - Fn::GetAZs: ""
+      CidrBlock: 10.0.0.0/18
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: aws-cdk:subnet-name
+          Value: Public
+        - Key: aws-cdk:subnet-type
+          Value: Public
+        - Key: kubernetes.io/role/elb
+          Value: "1"
+        - Key: Name
+          Value: LangWatchAwsMarketplaceStack/LangWatchVPC/PublicSubnet1
+      VpcId:
+        Ref: LangWatchVPC32D90DB9
+    Metadata:
+      aws:cdk:path: LangWatchAwsMarketplaceStack/LangWatchVPC/PublicSubnet1/Subnet
+  LangWatchVPCPublicSubnet1RouteTable1DCFB9BC:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      Tags:
+        - Key: kubernetes.io/role/elb
+          Value: "1"
+        - Key: Name
+          Value: LangWatchAwsMarketplaceStack/LangWatchVPC/PublicSubnet1
+      VpcId:
+        Ref: LangWatchVPC32D90DB9
+    Metadata:
+      aws:cdk:path: LangWatchAwsMarketplaceStack/LangWatchVPC/PublicSubnet1/RouteTable
+  LangWatchVPCPublicSubnet1RouteTableAssociation33552444:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId:
+        Ref: LangWatchVPCPublicSubnet1RouteTable1DCFB9BC
+      SubnetId:
+        Ref: LangWatchVPCPublicSubnet1SubnetE41DB836
+    Metadata:
+      aws:cdk:path: LangWatchAwsMarketplaceStack/LangWatchVPC/PublicSubnet1/RouteTableAssociation
+  LangWatchVPCPublicSubnet1DefaultRoute9A0C40FA:
+    Type: AWS::EC2::Route
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId:
+        Ref: LangWatchVPCIGWA63484B1
+      RouteTableId:
+        Ref: LangWatchVPCPublicSubnet1RouteTable1DCFB9BC
+    DependsOn:
+      - LangWatchVPCVPCGWC14B3153
+    Metadata:
+      aws:cdk:path: LangWatchAwsMarketplaceStack/LangWatchVPC/PublicSubnet1/DefaultRoute
+  LangWatchVPCPublicSubnet1EIP8F2CCE64:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+      Tags:
+        - Key: kubernetes.io/role/elb
+          Value: "1"
+        - Key: Name
+          Value: LangWatchAwsMarketplaceStack/LangWatchVPC/PublicSubnet1
+    Metadata:
+      aws:cdk:path: LangWatchAwsMarketplaceStack/LangWatchVPC/PublicSubnet1/EIP
+  LangWatchVPCPublicSubnet1NATGateway8D911E74:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId:
+        Fn::GetAtt:
+          - LangWatchVPCPublicSubnet1EIP8F2CCE64
+          - AllocationId
+      SubnetId:
+        Ref: LangWatchVPCPublicSubnet1SubnetE41DB836
+      Tags:
+        - Key: kubernetes.io/role/elb
+          Value: "1"
+        - Key: Name
+          Value: LangWatchAwsMarketplaceStack/LangWatchVPC/PublicSubnet1
+    DependsOn:
+      - LangWatchVPCPublicSubnet1DefaultRoute9A0C40FA
+      - LangWatchVPCPublicSubnet1RouteTableAssociation33552444
+    Metadata:
+      aws:cdk:path: LangWatchAwsMarketplaceStack/LangWatchVPC/PublicSubnet1/NATGateway
+  LangWatchVPCPublicSubnet2SubnetE82C0C9C:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone:
+        Fn::Select:
+          - 1
+          - Fn::GetAZs: ""
+      CidrBlock: 10.0.64.0/18
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: aws-cdk:subnet-name
+          Value: Public
+        - Key: aws-cdk:subnet-type
+          Value: Public
+        - Key: kubernetes.io/role/elb
+          Value: "1"
+        - Key: Name
+          Value: LangWatchAwsMarketplaceStack/LangWatchVPC/PublicSubnet2
+      VpcId:
+        Ref: LangWatchVPC32D90DB9
+    Metadata:
+      aws:cdk:path: LangWatchAwsMarketplaceStack/LangWatchVPC/PublicSubnet2/Subnet
+  LangWatchVPCPublicSubnet2RouteTableD0CFAEBB:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      Tags:
+        - Key: kubernetes.io/role/elb
+          Value: "1"
+        - Key: Name
+          Value: LangWatchAwsMarketplaceStack/LangWatchVPC/PublicSubnet2
+      VpcId:
+        Ref: LangWatchVPC32D90DB9
+    Metadata:
+      aws:cdk:path: LangWatchAwsMarketplaceStack/LangWatchVPC/PublicSubnet2/RouteTable
+  LangWatchVPCPublicSubnet2RouteTableAssociationD518E1C5:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId:
+        Ref: LangWatchVPCPublicSubnet2RouteTableD0CFAEBB
+      SubnetId:
+        Ref: LangWatchVPCPublicSubnet2SubnetE82C0C9C
+    Metadata:
+      aws:cdk:path: LangWatchAwsMarketplaceStack/LangWatchVPC/PublicSubnet2/RouteTableAssociation
+  LangWatchVPCPublicSubnet2DefaultRouteFF3D9BB1:
+    Type: AWS::EC2::Route
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId:
+        Ref: LangWatchVPCIGWA63484B1
+      RouteTableId:
+        Ref: LangWatchVPCPublicSubnet2RouteTableD0CFAEBB
+    DependsOn:
+      - LangWatchVPCVPCGWC14B3153
+    Metadata:
+      aws:cdk:path: LangWatchAwsMarketplaceStack/LangWatchVPC/PublicSubnet2/DefaultRoute
+  LangWatchVPCPublicSubnet2EIP08F7B2F9:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+      Tags:
+        - Key: kubernetes.io/role/elb
+          Value: "1"
+        - Key: Name
+          Value: LangWatchAwsMarketplaceStack/LangWatchVPC/PublicSubnet2
+    Metadata:
+      aws:cdk:path: LangWatchAwsMarketplaceStack/LangWatchVPC/PublicSubnet2/EIP
+  LangWatchVPCPublicSubnet2NATGatewayDCE78CF6:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId:
+        Fn::GetAtt:
+          - LangWatchVPCPublicSubnet2EIP08F7B2F9
+          - AllocationId
+      SubnetId:
+        Ref: LangWatchVPCPublicSubnet2SubnetE82C0C9C
+      Tags:
+        - Key: kubernetes.io/role/elb
+          Value: "1"
+        - Key: Name
+          Value: LangWatchAwsMarketplaceStack/LangWatchVPC/PublicSubnet2
+    DependsOn:
+      - LangWatchVPCPublicSubnet2DefaultRouteFF3D9BB1
+      - LangWatchVPCPublicSubnet2RouteTableAssociationD518E1C5
+    Metadata:
+      aws:cdk:path: LangWatchAwsMarketplaceStack/LangWatchVPC/PublicSubnet2/NATGateway
+  LangWatchVPCPrivateSubnet1Subnet73888C1E:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone:
+        Fn::Select:
+          - 0
+          - Fn::GetAZs: ""
+      CidrBlock: 10.0.128.0/18
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: aws-cdk:subnet-name
+          Value: Private
+        - Key: aws-cdk:subnet-type
+          Value: Private
+        - Key: kubernetes.io/role/internal-elb
+          Value: "1"
+        - Key: Name
+          Value: LangWatchAwsMarketplaceStack/LangWatchVPC/PrivateSubnet1
+      VpcId:
+        Ref: LangWatchVPC32D90DB9
+    Metadata:
+      aws:cdk:path: LangWatchAwsMarketplaceStack/LangWatchVPC/PrivateSubnet1/Subnet
+  LangWatchVPCPrivateSubnet1RouteTableBA4C1049:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      Tags:
+        - Key: kubernetes.io/role/internal-elb
+          Value: "1"
+        - Key: Name
+          Value: LangWatchAwsMarketplaceStack/LangWatchVPC/PrivateSubnet1
+      VpcId:
+        Ref: LangWatchVPC32D90DB9
+    Metadata:
+      aws:cdk:path: LangWatchAwsMarketplaceStack/LangWatchVPC/PrivateSubnet1/RouteTable
+  LangWatchVPCPrivateSubnet1RouteTableAssociation29CCC6E0:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId:
+        Ref: LangWatchVPCPrivateSubnet1RouteTableBA4C1049
+      SubnetId:
+        Ref: LangWatchVPCPrivateSubnet1Subnet73888C1E
+    Metadata:
+      aws:cdk:path: LangWatchAwsMarketplaceStack/LangWatchVPC/PrivateSubnet1/RouteTableAssociation
+  LangWatchVPCPrivateSubnet1DefaultRouteFDBA5637:
+    Type: AWS::EC2::Route
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId:
+        Ref: LangWatchVPCPublicSubnet1NATGateway8D911E74
+      RouteTableId:
+        Ref: LangWatchVPCPrivateSubnet1RouteTableBA4C1049
+    Metadata:
+      aws:cdk:path: LangWatchAwsMarketplaceStack/LangWatchVPC/PrivateSubnet1/DefaultRoute
+  LangWatchVPCPrivateSubnet2SubnetB0177CD7:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone:
+        Fn::Select:
+          - 1
+          - Fn::GetAZs: ""
+      CidrBlock: 10.0.192.0/18
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: aws-cdk:subnet-name
+          Value: Private
+        - Key: aws-cdk:subnet-type
+          Value: Private
+        - Key: kubernetes.io/role/internal-elb
+          Value: "1"
+        - Key: Name
+          Value: LangWatchAwsMarketplaceStack/LangWatchVPC/PrivateSubnet2
+      VpcId:
+        Ref: LangWatchVPC32D90DB9
+    Metadata:
+      aws:cdk:path: LangWatchAwsMarketplaceStack/LangWatchVPC/PrivateSubnet2/Subnet
+  LangWatchVPCPrivateSubnet2RouteTable9726981A:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      Tags:
+        - Key: kubernetes.io/role/internal-elb
+          Value: "1"
+        - Key: Name
+          Value: LangWatchAwsMarketplaceStack/LangWatchVPC/PrivateSubnet2
+      VpcId:
+        Ref: LangWatchVPC32D90DB9
+    Metadata:
+      aws:cdk:path: LangWatchAwsMarketplaceStack/LangWatchVPC/PrivateSubnet2/RouteTable
+  LangWatchVPCPrivateSubnet2RouteTableAssociationB636BF78:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId:
+        Ref: LangWatchVPCPrivateSubnet2RouteTable9726981A
+      SubnetId:
+        Ref: LangWatchVPCPrivateSubnet2SubnetB0177CD7
+    Metadata:
+      aws:cdk:path: LangWatchAwsMarketplaceStack/LangWatchVPC/PrivateSubnet2/RouteTableAssociation
+  LangWatchVPCPrivateSubnet2DefaultRouteBA8571B8:
+    Type: AWS::EC2::Route
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId:
+        Ref: LangWatchVPCPublicSubnet2NATGatewayDCE78CF6
+      RouteTableId:
+        Ref: LangWatchVPCPrivateSubnet2RouteTable9726981A
+    Metadata:
+      aws:cdk:path: LangWatchAwsMarketplaceStack/LangWatchVPC/PrivateSubnet2/DefaultRoute
+  LangWatchVPCIGWA63484B1:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: LangWatchAwsMarketplaceStack/LangWatchVPC
+    Metadata:
+      aws:cdk:path: LangWatchAwsMarketplaceStack/LangWatchVPC/IGW
+  LangWatchVPCVPCGWC14B3153:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId:
+        Ref: LangWatchVPCIGWA63484B1
+      VpcId:
+        Ref: LangWatchVPC32D90DB9
+    Metadata:
+      aws:cdk:path: LangWatchAwsMarketplaceStack/LangWatchVPC/VPCGW
+  LangWatchVPCRestrictDefaultSecurityGroupCustomResource41E88F63:
+    Type: Custom::VpcRestrictDefaultSG
+    Properties:
+      ServiceToken:
+        Fn::GetAtt:
+          - CustomVpcRestrictDefaultSGCustomResourceProviderHandlerDC833E5E
+          - Arn
+      DefaultSecurityGroupId:
+        Fn::GetAtt:
+          - LangWatchVPC32D90DB9
+          - DefaultSecurityGroup
+      Account:
+        Ref: AWS::AccountId
+    UpdateReplacePolicy: Delete
+    DeletionPolicy: Delete
+    Metadata:
+      aws:cdk:path: LangWatchAwsMarketplaceStack/LangWatchVPC/RestrictDefaultSecurityGroupCustomResource/Default
+  CustomVpcRestrictDefaultSGCustomResourceProviderRole26592FE0:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+      ManagedPolicyArns:
+        - Fn::Sub: arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: Inline
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ec2:AuthorizeSecurityGroupIngress
+                  - ec2:AuthorizeSecurityGroupEgress
+                  - ec2:RevokeSecurityGroupIngress
+                  - ec2:RevokeSecurityGroupEgress
+                Resource:
+                  - Fn::Join:
+                      - ""
+                      - - "arn:aws:ec2:eu-central-1:"
+                        - Ref: AWS::AccountId
+                        - :security-group/
+                        - Fn::GetAtt:
+                            - LangWatchVPC32D90DB9
+                            - DefaultSecurityGroup
+    Metadata:
+      aws:cdk:path: LangWatchAwsMarketplaceStack/Custom::VpcRestrictDefaultSGCustomResourceProvider/Role
+  CustomVpcRestrictDefaultSGCustomResourceProviderHandlerDC833E5E:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        S3Bucket:
+          Fn::Sub: cdk-hnb659fds-assets-${AWS::AccountId}-eu-central-1
+        S3Key: ee7de53d64cc9d6248fa6aa550f92358f6c907b5efd6f3298aeab1b5e7ea358a.zip
+      Timeout: 900
+      MemorySize: 128
+      Handler: __entrypoint__.handler
+      Role:
+        Fn::GetAtt:
+          - CustomVpcRestrictDefaultSGCustomResourceProviderRole26592FE0
+          - Arn
+      Runtime: nodejs20.x
+      Description: Lambda function for removing all inbound/outbound rules from the VPC default security group
+    DependsOn:
+      - CustomVpcRestrictDefaultSGCustomResourceProviderRole26592FE0
+    Metadata:
+      aws:cdk:path: LangWatchAwsMarketplaceStack/Custom::VpcRestrictDefaultSGCustomResourceProvider/Handler
+      aws:asset:path: asset.ee7de53d64cc9d6248fa6aa550f92358f6c907b5efd6f3298aeab1b5e7ea358a
+      aws:asset:property: Code
+  KubectlLayer600207B5:
+    Type: AWS::Lambda::LayerVersion
+    Properties:
+      Content:
+        S3Bucket:
+          Fn::Sub: cdk-hnb659fds-assets-${AWS::AccountId}-eu-central-1
+        S3Key: bfbdea4d45250c8162c204fe0687cb775e24d61c895ad89e4ca6e9a7fc90b0f0.zip
+      Description: /opt/kubectl/kubectl 1.30; /opt/helm/helm 3.15
+      LicenseInfo: Apache-2.0
+    Metadata:
+      aws:cdk:path: LangWatchAwsMarketplaceStack/KubectlLayer/Resource
+      aws:asset:path: asset.bfbdea4d45250c8162c204fe0687cb775e24d61c895ad89e4ca6e9a7fc90b0f0.zip
+      aws:asset:is-bundled: false
+      aws:asset:property: Content
+  LangWatchClusterKubectlHandlerRole5D8BE59D:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+        Version: "2012-10-17"
+      ManagedPolicyArns:
+        - Fn::Join:
+            - ""
+            - - "arn:"
+              - Ref: AWS::Partition
+              - :iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        - Fn::Join:
+            - ""
+            - - "arn:"
+              - Ref: AWS::Partition
+              - :iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole
+        - Fn::Join:
+            - ""
+            - - "arn:"
+              - Ref: AWS::Partition
+              - :iam::aws:policy/AmazonEC2ContainerRegistryReadOnly
+        - Fn::If:
+            - LangWatchClusterHasEcrPublicBC6C88EA
+            - Fn::Join:
+                - ""
+                - - "arn:"
+                  - Ref: AWS::Partition
+                  - :iam::aws:policy/AmazonElasticContainerRegistryPublicReadOnly
+            - Ref: AWS::NoValue
+    Metadata:
+      aws:cdk:path: LangWatchAwsMarketplaceStack/LangWatchCluster/KubectlHandlerRole/Resource
+  LangWatchClusterKubectlHandlerRoleDefaultPolicy759A73CC:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyDocument:
+        Statement:
+          - Action: eks:DescribeCluster
+            Effect: Allow
+            Resource:
+              Fn::GetAtt:
+                - LangWatchCluster914B7009
+                - Arn
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Resource:
+              Fn::GetAtt:
+                - LangWatchClusterCreationRole2CE467D3
+                - Arn
+        Version: "2012-10-17"
+      PolicyName: LangWatchClusterKubectlHandlerRoleDefaultPolicy759A73CC
+      Roles:
+        - Ref: LangWatchClusterKubectlHandlerRole5D8BE59D
+    Metadata:
+      aws:cdk:path: LangWatchAwsMarketplaceStack/LangWatchCluster/KubectlHandlerRole/DefaultPolicy/Resource
+  LangWatchClusterRole2C66581A:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: eks.amazonaws.com
+        Version: "2012-10-17"
+      ManagedPolicyArns:
+        - Fn::Join:
+            - ""
+            - - "arn:"
+              - Ref: AWS::Partition
+              - :iam::aws:policy/AmazonEKSClusterPolicy
+    Metadata:
+      aws:cdk:path: LangWatchAwsMarketplaceStack/LangWatchCluster/Role/Resource
+  LangWatchClusterControlPlaneSecurityGroup9AEC2E28:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: EKS Control Plane Security Group
+      SecurityGroupEgress:
+        - CidrIp: 0.0.0.0/0
+          Description: Allow all outbound traffic by default
+          IpProtocol: "-1"
+      VpcId:
+        Ref: LangWatchVPC32D90DB9
+    Metadata:
+      aws:cdk:path: LangWatchAwsMarketplaceStack/LangWatchCluster/ControlPlaneSecurityGroup/Resource
+  LangWatchClusterCreationRole2CE467D3:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              AWS:
+                - Fn::GetAtt:
+                    - LangWatchClusterKubectlHandlerRole5D8BE59D
+                    - Arn
+                - Fn::GetAtt:
+                    - awscdkawseksClusterResourceProviderNestedStackawscdkawseksClusterResourceProviderNestedStackResource9827C454
+                    - Outputs.LangWatchAwsMarketplaceStackawscdkawseksClusterResourceProviderIsCompleteHandlerServiceRole4D346D3FArn
+                - Fn::GetAtt:
+                    - awscdkawseksClusterResourceProviderNestedStackawscdkawseksClusterResourceProviderNestedStackResource9827C454
+                    - Outputs.LangWatchAwsMarketplaceStackawscdkawseksClusterResourceProviderOnEventHandlerServiceRoleDF26E547Arn
+        Version: "2012-10-17"
+    DependsOn:
+      - LangWatchVPCIGWA63484B1
+      - LangWatchVPCPrivateSubnet1DefaultRouteFDBA5637
+      - LangWatchVPCPrivateSubnet1RouteTableBA4C1049
+      - LangWatchVPCPrivateSubnet1RouteTableAssociation29CCC6E0
+      - LangWatchVPCPrivateSubnet1Subnet73888C1E
+      - LangWatchVPCPrivateSubnet2DefaultRouteBA8571B8
+      - LangWatchVPCPrivateSubnet2RouteTable9726981A
+      - LangWatchVPCPrivateSubnet2RouteTableAssociationB636BF78
+      - LangWatchVPCPrivateSubnet2SubnetB0177CD7
+      - LangWatchVPCPublicSubnet1DefaultRoute9A0C40FA
+      - LangWatchVPCPublicSubnet1EIP8F2CCE64
+      - LangWatchVPCPublicSubnet1NATGateway8D911E74
+      - LangWatchVPCPublicSubnet1RouteTable1DCFB9BC
+      - LangWatchVPCPublicSubnet1RouteTableAssociation33552444
+      - LangWatchVPCPublicSubnet1SubnetE41DB836
+      - LangWatchVPCPublicSubnet2DefaultRouteFF3D9BB1
+      - LangWatchVPCPublicSubnet2EIP08F7B2F9
+      - LangWatchVPCPublicSubnet2NATGatewayDCE78CF6
+      - LangWatchVPCPublicSubnet2RouteTableD0CFAEBB
+      - LangWatchVPCPublicSubnet2RouteTableAssociationD518E1C5
+      - LangWatchVPCPublicSubnet2SubnetE82C0C9C
+      - LangWatchVPC32D90DB9
+      - LangWatchVPCRestrictDefaultSecurityGroupCustomResource41E88F63
+      - LangWatchVPCVPCGWC14B3153
+    Metadata:
+      aws:cdk:path: LangWatchAwsMarketplaceStack/LangWatchCluster/Resource/CreationRole/Resource
+  LangWatchClusterCreationRoleDefaultPolicy6F8C3DDE:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyDocument:
+        Statement:
+          - Action: iam:PassRole
+            Effect: Allow
+            Resource:
+              Fn::GetAtt:
+                - LangWatchClusterRole2C66581A
+                - Arn
+          - Action:
+              - eks:CreateCluster
+              - eks:CreateFargateProfile
+              - eks:DeleteCluster
+              - eks:DescribeCluster
+              - eks:DescribeUpdate
+              - eks:TagResource
+              - eks:UntagResource
+              - eks:UpdateClusterConfig
+              - eks:UpdateClusterVersion
+            Effect: Allow
+            Resource: "*"
+          - Action:
+              - eks:DeleteFargateProfile
+              - eks:DescribeFargateProfile
+            Effect: Allow
+            Resource: "*"
+          - Action:
+              - ec2:DescribeDhcpOptions
+              - ec2:DescribeInstances
+              - ec2:DescribeNetworkInterfaces
+              - ec2:DescribeRouteTables
+              - ec2:DescribeSecurityGroups
+              - ec2:DescribeSubnets
+              - ec2:DescribeVpcs
+              - iam:CreateServiceLinkedRole
+              - iam:GetRole
+              - iam:listAttachedRolePolicies
+            Effect: Allow
+            Resource: "*"
+          - Action:
+              - secretsmanager:DescribeSecret
+              - secretsmanager:GetSecretValue
+            Effect: Allow
+            Resource:
+              Ref: LangWatchEnvSecretFC595938
+        Version: "2012-10-17"
+      PolicyName: LangWatchClusterCreationRoleDefaultPolicy6F8C3DDE
+      Roles:
+        - Ref: LangWatchClusterCreationRole2CE467D3
+    DependsOn:
+      - LangWatchVPCIGWA63484B1
+      - LangWatchVPCPrivateSubnet1DefaultRouteFDBA5637
+      - LangWatchVPCPrivateSubnet1RouteTableBA4C1049
+      - LangWatchVPCPrivateSubnet1RouteTableAssociation29CCC6E0
+      - LangWatchVPCPrivateSubnet1Subnet73888C1E
+      - LangWatchVPCPrivateSubnet2DefaultRouteBA8571B8
+      - LangWatchVPCPrivateSubnet2RouteTable9726981A
+      - LangWatchVPCPrivateSubnet2RouteTableAssociationB636BF78
+      - LangWatchVPCPrivateSubnet2SubnetB0177CD7
+      - LangWatchVPCPublicSubnet1DefaultRoute9A0C40FA
+      - LangWatchVPCPublicSubnet1EIP8F2CCE64
+      - LangWatchVPCPublicSubnet1NATGateway8D911E74
+      - LangWatchVPCPublicSubnet1RouteTable1DCFB9BC
+      - LangWatchVPCPublicSubnet1RouteTableAssociation33552444
+      - LangWatchVPCPublicSubnet1SubnetE41DB836
+      - LangWatchVPCPublicSubnet2DefaultRouteFF3D9BB1
+      - LangWatchVPCPublicSubnet2EIP08F7B2F9
+      - LangWatchVPCPublicSubnet2NATGatewayDCE78CF6
+      - LangWatchVPCPublicSubnet2RouteTableD0CFAEBB
+      - LangWatchVPCPublicSubnet2RouteTableAssociationD518E1C5
+      - LangWatchVPCPublicSubnet2SubnetE82C0C9C
+      - LangWatchVPC32D90DB9
+      - LangWatchVPCRestrictDefaultSecurityGroupCustomResource41E88F63
+      - LangWatchVPCVPCGWC14B3153
+    Metadata:
+      aws:cdk:path: LangWatchAwsMarketplaceStack/LangWatchCluster/Resource/CreationRole/DefaultPolicy/Resource
+  LangWatchCluster914B7009:
+    Type: Custom::AWSCDK-EKS-Cluster
+    Properties:
+      ServiceToken:
+        Fn::GetAtt:
+          - awscdkawseksClusterResourceProviderNestedStackawscdkawseksClusterResourceProviderNestedStackResource9827C454
+          - Outputs.LangWatchAwsMarketplaceStackawscdkawseksClusterResourceProviderframeworkonEvent3C7169B9Arn
+      Config:
+        version: "1.30"
+        roleArn:
+          Fn::GetAtt:
+            - LangWatchClusterRole2C66581A
+            - Arn
+        kubernetesNetworkConfig:
+          ipFamily: ipv4
+        resourcesVpcConfig:
+          subnetIds:
+            - Ref: LangWatchVPCPublicSubnet1SubnetE41DB836
+            - Ref: LangWatchVPCPublicSubnet2SubnetE82C0C9C
+            - Ref: LangWatchVPCPrivateSubnet1Subnet73888C1E
+            - Ref: LangWatchVPCPrivateSubnet2SubnetB0177CD7
+          securityGroupIds:
+            - Fn::GetAtt:
+                - LangWatchClusterControlPlaneSecurityGroup9AEC2E28
+                - GroupId
+          endpointPublicAccess: true
+          endpointPrivateAccess: true
+        accessConfig: {}
+      AssumeRoleArn:
+        Fn::GetAtt:
+          - LangWatchClusterCreationRole2CE467D3
+          - Arn
+      AttributesRevision: 3
+    DependsOn:
+      - LangWatchClusterCreationRoleDefaultPolicy6F8C3DDE
+      - LangWatchClusterCreationRole2CE467D3
+      - LangWatchVPCIGWA63484B1
+      - LangWatchVPCPrivateSubnet1DefaultRouteFDBA5637
+      - LangWatchVPCPrivateSubnet1RouteTableBA4C1049
+      - LangWatchVPCPrivateSubnet1RouteTableAssociation29CCC6E0
+      - LangWatchVPCPrivateSubnet1Subnet73888C1E
+      - LangWatchVPCPrivateSubnet2DefaultRouteBA8571B8
+      - LangWatchVPCPrivateSubnet2RouteTable9726981A
+      - LangWatchVPCPrivateSubnet2RouteTableAssociationB636BF78
+      - LangWatchVPCPrivateSubnet2SubnetB0177CD7
+      - LangWatchVPCPublicSubnet1DefaultRoute9A0C40FA
+      - LangWatchVPCPublicSubnet1EIP8F2CCE64
+      - LangWatchVPCPublicSubnet1NATGateway8D911E74
+      - LangWatchVPCPublicSubnet1RouteTable1DCFB9BC
+      - LangWatchVPCPublicSubnet1RouteTableAssociation33552444
+      - LangWatchVPCPublicSubnet1SubnetE41DB836
+      - LangWatchVPCPublicSubnet2DefaultRouteFF3D9BB1
+      - LangWatchVPCPublicSubnet2EIP08F7B2F9
+      - LangWatchVPCPublicSubnet2NATGatewayDCE78CF6
+      - LangWatchVPCPublicSubnet2RouteTableD0CFAEBB
+      - LangWatchVPCPublicSubnet2RouteTableAssociationD518E1C5
+      - LangWatchVPCPublicSubnet2SubnetE82C0C9C
+      - LangWatchVPC32D90DB9
+      - LangWatchVPCRestrictDefaultSecurityGroupCustomResource41E88F63
+      - LangWatchVPCVPCGWC14B3153
+    UpdateReplacePolicy: Delete
+    DeletionPolicy: Delete
+    Metadata:
+      aws:cdk:path: LangWatchAwsMarketplaceStack/LangWatchCluster/Resource/Resource/Default
+  LangWatchClusterKubectlReadyBarrier3056B7E3:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Type: String
+      Value: aws:cdk:eks:kubectl-ready
+    DependsOn:
+      - LangWatchClusterCreationRoleDefaultPolicy6F8C3DDE
+      - LangWatchClusterCreationRole2CE467D3
+      - LangWatchCluster914B7009
+    Metadata:
+      aws:cdk:path: LangWatchAwsMarketplaceStack/LangWatchCluster/KubectlReadyBarrier
+  LangWatchClusterNodegroupManagedNodesNodeGroupRole5C9EF25C:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+        Version: "2012-10-17"
+      ManagedPolicyArns:
+        - Fn::Join:
+            - ""
+            - - "arn:"
+              - Ref: AWS::Partition
+              - :iam::aws:policy/AmazonEKSWorkerNodePolicy
+        - Fn::Join:
+            - ""
+            - - "arn:"
+              - Ref: AWS::Partition
+              - :iam::aws:policy/AmazonEKS_CNI_Policy
+        - Fn::Join:
+            - ""
+            - - "arn:"
+              - Ref: AWS::Partition
+              - :iam::aws:policy/AmazonEC2ContainerRegistryReadOnly
+    Metadata:
+      aws:cdk:path: LangWatchAwsMarketplaceStack/LangWatchCluster/NodegroupManagedNodes/NodeGroupRole/Resource
+  LangWatchClusterNodegroupManagedNodes43430C18:
+    Type: AWS::EKS::Nodegroup
+    Properties:
+      AmiType: AL2_x86_64
+      ClusterName:
+        Ref: LangWatchCluster914B7009
+      ForceUpdateEnabled: true
+      InstanceTypes:
+        - m5.large
+      NodeRole:
+        Fn::GetAtt:
+          - LangWatchClusterNodegroupManagedNodesNodeGroupRole5C9EF25C
+          - Arn
+      ScalingConfig:
+        DesiredSize:
+          Ref: KubernetesNodeCount
+        MaxSize:
+          Ref: KubernetesNodeCount
+        MinSize:
+          Ref: KubernetesNodeCount
+      Subnets:
+        - Ref: LangWatchVPCPrivateSubnet1Subnet73888C1E
+        - Ref: LangWatchVPCPrivateSubnet2SubnetB0177CD7
+    Metadata:
+      aws:cdk:path: LangWatchAwsMarketplaceStack/LangWatchCluster/NodegroupManagedNodes/Resource
+  LangWatchClusterAwsAuthmanifestD343EB52:
+    Type: Custom::AWSCDK-EKS-KubernetesResource
+    Properties:
+      ServiceToken:
+        Fn::GetAtt:
+          - awscdkawseksKubectlProviderNestedStackawscdkawseksKubectlProviderNestedStackResourceA7AEBA6B
+          - Outputs.LangWatchAwsMarketplaceStackawscdkawseksKubectlProviderframeworkonEvent04D927B6Arn
+      Manifest:
+        Fn::Join:
+          - ""
+          - - '[{"apiVersion":"v1","kind":"ConfigMap","metadata":{"name":"aws-auth","namespace":"kube-system","labels":{"aws.cdk.eks/prune-c811f17710bdc1fef0c9bc08a57e2094eadf54c374":""}},"data":{"mapRoles":"[{\"rolearn\":\"'
+            - Fn::GetAtt:
+                - LangWatchClusterNodegroupManagedNodesNodeGroupRole5C9EF25C
+                - Arn
+            - \",\"username\":\"system:node:{{EC2PrivateDNSName}}\",\"groups\":[\"system:bootstrappers\",\"system:nodes\"]}]","mapUsers":"[]","mapAccounts":"[]"}}]
+      ClusterName:
+        Ref: LangWatchCluster914B7009
+      RoleArn:
+        Fn::GetAtt:
+          - LangWatchClusterCreationRole2CE467D3
+          - Arn
+      PruneLabel: aws.cdk.eks/prune-c811f17710bdc1fef0c9bc08a57e2094eadf54c374
+      Overwrite: true
+    DependsOn:
+      - LangWatchClusterKubectlReadyBarrier3056B7E3
+    UpdateReplacePolicy: Delete
+    DeletionPolicy: Delete
+    Metadata:
+      aws:cdk:path: LangWatchAwsMarketplaceStack/LangWatchCluster/AwsAuth/manifest/Resource/Default
+  LangWatchClustermanifestkubeapiserverkubeletclientbinding09E1D018:
+    Type: Custom::AWSCDK-EKS-KubernetesResource
+    Properties:
+      ServiceToken:
+        Fn::GetAtt:
+          - awscdkawseksKubectlProviderNestedStackawscdkawseksKubectlProviderNestedStackResourceA7AEBA6B
+          - Outputs.LangWatchAwsMarketplaceStackawscdkawseksKubectlProviderframeworkonEvent04D927B6Arn
+      Manifest: '[{"apiVersion":"rbac.authorization.k8s.io/v1","kind":"ClusterRoleBinding","metadata":{"name":"kube-apiserver-kubelet-client-binding","labels":{"aws.cdk.eks/prune-c89beb1b62522d92faeadfea73caef5877a334b407":""}},"subjects":[{"kind":"User","name":"kube-apiserver-kubelet-client","apiGroup":"rbac.authorization.k8s.io"}],"roleRef":{"kind":"ClusterRole","name":"system:masters","apiGroup":"rbac.authorization.k8s.io"}}]'
+      ClusterName:
+        Ref: LangWatchCluster914B7009
+      RoleArn:
+        Fn::GetAtt:
+          - LangWatchClusterCreationRole2CE467D3
+          - Arn
+      PruneLabel: aws.cdk.eks/prune-c89beb1b62522d92faeadfea73caef5877a334b407
+    DependsOn:
+      - LangWatchClusterKubectlReadyBarrier3056B7E3
+    UpdateReplacePolicy: Delete
+    DeletionPolicy: Delete
+    Metadata:
+      aws:cdk:path: LangWatchAwsMarketplaceStack/LangWatchCluster/manifest-kube-apiserver-kubelet-client-binding/Resource/Default
+  LangWatchClustermanifestCSIDriverClusterRole43123684:
+    Type: Custom::AWSCDK-EKS-KubernetesResource
+    Properties:
+      ServiceToken:
+        Fn::GetAtt:
+          - awscdkawseksKubectlProviderNestedStackawscdkawseksKubectlProviderNestedStackResourceA7AEBA6B
+          - Outputs.LangWatchAwsMarketplaceStackawscdkawseksKubectlProviderframeworkonEvent04D927B6Arn
+      Manifest: '[{"apiVersion":"rbac.authorization.k8s.io/v1","kind":"ClusterRole","metadata":{"name":"secrets-store-csi-driver-cluster-role","labels":{"aws.cdk.eks/prune-c8aaeb7c3ca134c4ad07a93e9cb606064dc9b9d95d":""}},"rules":[{"apiGroups":[""],"resources":["secrets"],"verbs":["get","list","watch","create","update","delete"]},{"apiGroups":[""],"resources":["namespaces"],"verbs":["get","list","watch"]}]}]'
+      ClusterName:
+        Ref: LangWatchCluster914B7009
+      RoleArn:
+        Fn::GetAtt:
+          - LangWatchClusterCreationRole2CE467D3
+          - Arn
+      PruneLabel: aws.cdk.eks/prune-c8aaeb7c3ca134c4ad07a93e9cb606064dc9b9d95d
+    DependsOn:
+      - LangWatchClusterchartSecretsStoreCSIDriver12F66008
+      - LangWatchClusterKubectlReadyBarrier3056B7E3
+    UpdateReplacePolicy: Delete
+    DeletionPolicy: Delete
+    Metadata:
+      aws:cdk:path: LangWatchAwsMarketplaceStack/LangWatchCluster/manifest-CSIDriverClusterRole/Resource/Default
+  LangWatchClustermanifestCSIDriverClusterRoleBinding0D0F06CF:
+    Type: Custom::AWSCDK-EKS-KubernetesResource
+    Properties:
+      ServiceToken:
+        Fn::GetAtt:
+          - awscdkawseksKubectlProviderNestedStackawscdkawseksKubectlProviderNestedStackResourceA7AEBA6B
+          - Outputs.LangWatchAwsMarketplaceStackawscdkawseksKubectlProviderframeworkonEvent04D927B6Arn
+      Manifest: '[{"apiVersion":"rbac.authorization.k8s.io/v1","kind":"ClusterRoleBinding","metadata":{"name":"secrets-store-csi-driver-cluster-rolebinding","labels":{"aws.cdk.eks/prune-c8719576b3dda54a56068c2210607dd6b4a0979ff6":""}},"roleRef":{"apiGroup":"rbac.authorization.k8s.io","kind":"ClusterRole","name":"secrets-store-csi-driver-cluster-role"},"subjects":[{"kind":"ServiceAccount","name":"secrets-store-csi-driver","namespace":"kube-system"}]}]'
+      ClusterName:
+        Ref: LangWatchCluster914B7009
+      RoleArn:
+        Fn::GetAtt:
+          - LangWatchClusterCreationRole2CE467D3
+          - Arn
+      PruneLabel: aws.cdk.eks/prune-c8719576b3dda54a56068c2210607dd6b4a0979ff6
+    DependsOn:
+      - LangWatchClusterchartSecretsStoreCSIDriver12F66008
+      - LangWatchClusterKubectlReadyBarrier3056B7E3
+    UpdateReplacePolicy: Delete
+    DeletionPolicy: Delete
+    Metadata:
+      aws:cdk:path: LangWatchAwsMarketplaceStack/LangWatchCluster/manifest-CSIDriverClusterRoleBinding/Resource/Default
+  LangWatchClusterchartSecretsStoreCSIDriver12F66008:
+    Type: Custom::AWSCDK-EKS-HelmChart
+    Properties:
+      ServiceToken:
+        Fn::GetAtt:
+          - awscdkawseksKubectlProviderNestedStackawscdkawseksKubectlProviderNestedStackResourceA7AEBA6B
+          - Outputs.LangWatchAwsMarketplaceStackawscdkawseksKubectlProviderframeworkonEvent04D927B6Arn
+      ClusterName:
+        Ref: LangWatchCluster914B7009
+      RoleArn:
+        Fn::GetAtt:
+          - LangWatchClusterCreationRole2CE467D3
+          - Arn
+      Release: csi-secrets-store
+      Chart: secrets-store-csi-driver
+      Values: '{"syncSecret":{"enabled":true}}'
+      Namespace: kube-system
+      Repository: https://kubernetes-sigs.github.io/secrets-store-csi-driver/charts
+      CreateNamespace: true
+    DependsOn:
+      - LangWatchClusterKubectlReadyBarrier3056B7E3
+    UpdateReplacePolicy: Delete
+    DeletionPolicy: Delete
+    Metadata:
+      aws:cdk:path: LangWatchAwsMarketplaceStack/LangWatchCluster/chart-SecretsStoreCSIDriver/Resource/Default
+  LangWatchClusterchartASCPProvider584D0BB8:
+    Type: Custom::AWSCDK-EKS-HelmChart
+    Properties:
+      ServiceToken:
+        Fn::GetAtt:
+          - awscdkawseksKubectlProviderNestedStackawscdkawseksKubectlProviderNestedStackResourceA7AEBA6B
+          - Outputs.LangWatchAwsMarketplaceStackawscdkawseksKubectlProviderframeworkonEvent04D927B6Arn
+      ClusterName:
+        Ref: LangWatchCluster914B7009
+      RoleArn:
+        Fn::GetAtt:
+          - LangWatchClusterCreationRole2CE467D3
+          - Arn
+      Release: secrets-provider-aws
+      Chart: secrets-store-csi-driver-provider-aws
+      Namespace: kube-system
+      Repository: https://aws.github.io/secrets-store-csi-driver-provider-aws
+      CreateNamespace: true
+    DependsOn:
+      - LangWatchClusterKubectlReadyBarrier3056B7E3
+    UpdateReplacePolicy: Delete
+    DeletionPolicy: Delete
+    Metadata:
+      aws:cdk:path: LangWatchAwsMarketplaceStack/LangWatchCluster/chart-ASCPProvider/Resource/Default
+  LangWatchClustermanifestLangWatchSecretProviderClass0AAB1013:
+    Type: Custom::AWSCDK-EKS-KubernetesResource
+    Properties:
+      ServiceToken:
+        Fn::GetAtt:
+          - awscdkawseksKubectlProviderNestedStackawscdkawseksKubectlProviderNestedStackResourceA7AEBA6B
+          - Outputs.LangWatchAwsMarketplaceStackawscdkawseksKubectlProviderframeworkonEvent04D927B6Arn
+      Manifest:
+        Fn::Join:
+          - ""
+          - - '[{"apiVersion":"secrets-store.csi.x-k8s.io/v1","kind":"SecretProviderClass","metadata":{"name":"langwatch-secret-provider","labels":{"aws.cdk.eks/prune-c83f37b79c2076be3c87b49ee5880a256af8e0c79d":""}},"spec":{"provider":"aws","secretObjects":[{"secretName":"langwatch-k8s-secret","type":"Opaque","data":[{"objectName":"BASE_HOST","key":"BASE_HOST"},{"objectName":"NEXTAUTH_URL","key":"NEXTAUTH_URL"},{"objectName":"DEBUG","key":"DEBUG"},{"objectName":"NEXTAUTH_PROVIDER","key":"NEXTAUTH_PROVIDER"},{"objectName":"NEXTAUTH_SECRET","key":"NEXTAUTH_SECRET"},{"objectName":"LANGWATCH_NLP_SERVICE","key":"LANGWATCH_NLP_SERVICE"},{"objectName":"LANGEVALS_ENDPOINT","key":"LANGEVALS_ENDPOINT"},{"objectName":"REDIS_URL","key":"REDIS_URL"},{"objectName":"DATABASE_URL","key":"DATABASE_URL"},{"objectName":"ELASTICSEARCH_NODE_URL","key":"ELASTICSEARCH_NODE_URL"}]}],"parameters":{"objects":"[{\"objectName\":\"'
+            - Fn::Join:
+                - "-"
+                - - Fn::Select:
+                      - 0
+                      - Fn::Split:
+                          - "-"
+                          - Fn::Select:
+                              - 6
+                              - Fn::Split:
+                                  - ":"
+                                  - Ref: LangWatchEnvSecretFC595938
+                  - Fn::Select:
+                      - 1
+                      - Fn::Split:
+                          - "-"
+                          - Fn::Select:
+                              - 6
+                              - Fn::Split:
+                                  - ":"
+                                  - Ref: LangWatchEnvSecretFC595938
+            - \",\"objectType\":\"secretsmanager\",\"jmesPath\":[{\"path\":\"BASE_HOST\",\"objectAlias\":\"BASE_HOST\"},{\"path\":\"NEXTAUTH_URL\",\"objectAlias\":\"NEXTAUTH_URL\"},{\"path\":\"DEBUG\",\"objectAlias\":\"DEBUG\"},{\"path\":\"NEXTAUTH_PROVIDER\",\"objectAlias\":\"NEXTAUTH_PROVIDER\"},{\"path\":\"NEXTAUTH_SECRET\",\"objectAlias\":\"NEXTAUTH_SECRET\"},{\"path\":\"API_TOKEN_JWT_SECRET\",\"objectAlias\":\"API_TOKEN_JWT_SECRET\"},{\"path\":\"LANGWATCH_NLP_SERVICE\",\"objectAlias\":\"LANGWATCH_NLP_SERVICE\"},{\"path\":\"LANGEVALS_ENDPOINT\",\"objectAlias\":\"LANGEVALS_ENDPOINT\"},{\"path\":\"REDIS_URL\",\"objectAlias\":\"REDIS_URL\"},{\"path\":\"DATABASE_URL\",\"objectAlias\":\"DATABASE_URL\"},{\"path\":\"ELASTICSEARCH_NODE_URL\",\"objectAlias\":\"ELASTICSEARCH_NODE_URL\"}]}]"}}}]
+      ClusterName:
+        Ref: LangWatchCluster914B7009
+      RoleArn:
+        Fn::GetAtt:
+          - LangWatchClusterCreationRole2CE467D3
+          - Arn
+      PruneLabel: aws.cdk.eks/prune-c83f37b79c2076be3c87b49ee5880a256af8e0c79d
+    DependsOn:
+      - LangWatchClusterKubectlReadyBarrier3056B7E3
+    UpdateReplacePolicy: Delete
+    DeletionPolicy: Delete
+    Metadata:
+      aws:cdk:path: LangWatchAwsMarketplaceStack/LangWatchCluster/manifest-LangWatchSecretProviderClass/Resource/Default
+  LangWatchClusterfluentdConditionJson6FDD32AC:
+    Type: Custom::AWSCDKCfnJson
+    Properties:
+      ServiceToken:
+        Fn::GetAtt:
+          - AWSCDKCfnUtilsProviderCustomResourceProviderHandlerCF82AA57
+          - Arn
+      Value:
+        Fn::Join:
+          - ""
+          - - '{"'
+            - Fn::Select:
+                - 1
+                - Fn::Split:
+                    - :oidc-provider/
+                    - Ref: LangWatchClusterOpenIdConnectProvider92F61D91
+            - :aud":"sts.amazonaws.com","
+            - Fn::Select:
+                - 1
+                - Fn::Split:
+                    - :oidc-provider/
+                    - Ref: LangWatchClusterOpenIdConnectProvider92F61D91
+            - :sub":"system:serviceaccount:kube-system:fluentd"}
+    UpdateReplacePolicy: Delete
+    DeletionPolicy: Delete
+    Metadata:
+      aws:cdk:path: LangWatchAwsMarketplaceStack/LangWatchCluster/fluentd/ConditionJson/Resource/Default
+  LangWatchClusterfluentdRole0BB36723:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                Fn::GetAtt:
+                  - LangWatchClusterfluentdConditionJson6FDD32AC
+                  - Value
+            Effect: Allow
+            Principal:
+              Federated:
+                Ref: LangWatchClusterOpenIdConnectProvider92F61D91
+        Version: "2012-10-17"
+    Metadata:
+      aws:cdk:path: LangWatchAwsMarketplaceStack/LangWatchCluster/fluentd/Role/Resource
+  LangWatchClusterfluentdRoleDefaultPolicyDE734FD0:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyDocument:
+        Statement:
+          - Action:
+              - logs:CreateLogGroup
+              - logs:CreateLogStream
+              - logs:DescribeLogGroups
+              - logs:DescribeLogStreams
+              - logs:PutLogEvents
+            Effect: Allow
+            Resource: arn:aws:logs:*:*:*
+        Version: "2012-10-17"
+      PolicyName: LangWatchClusterfluentdRoleDefaultPolicyDE734FD0
+      Roles:
+        - Ref: LangWatchClusterfluentdRole0BB36723
+    Metadata:
+      aws:cdk:path: LangWatchAwsMarketplaceStack/LangWatchCluster/fluentd/Role/DefaultPolicy/Resource
+  LangWatchClusterfluentdmanifestfluentdServiceAccountResourceAAEDE6D1:
+    Type: Custom::AWSCDK-EKS-KubernetesResource
+    Properties:
+      ServiceToken:
+        Fn::GetAtt:
+          - awscdkawseksKubectlProviderNestedStackawscdkawseksKubectlProviderNestedStackResourceA7AEBA6B
+          - Outputs.LangWatchAwsMarketplaceStackawscdkawseksKubectlProviderframeworkonEvent04D927B6Arn
+      Manifest:
+        Fn::Join:
+          - ""
+          - - '[{"apiVersion":"v1","kind":"ServiceAccount","metadata":{"name":"fluentd","namespace":"kube-system","labels":{"aws.cdk.eks/prune-c8cc0a778055632447984e6d4d75902f3af65deeb7":"","app.kubernetes.io/name":"fluentd"},"annotations":{"eks.amazonaws.com/role-arn":"'
+            - Fn::GetAtt:
+                - LangWatchClusterfluentdRole0BB36723
+                - Arn
+            - '"}}}]'
+      ClusterName:
+        Ref: LangWatchCluster914B7009
+      RoleArn:
+        Fn::GetAtt:
+          - LangWatchClusterCreationRole2CE467D3
+          - Arn
+      PruneLabel: aws.cdk.eks/prune-c8cc0a778055632447984e6d4d75902f3af65deeb7
+    DependsOn:
+      - LangWatchClusterKubectlReadyBarrier3056B7E3
+    UpdateReplacePolicy: Delete
+    DeletionPolicy: Delete
+    Metadata:
+      aws:cdk:path: LangWatchAwsMarketplaceStack/LangWatchCluster/fluentd/manifest-fluentdServiceAccountResource/Resource/Default
+  LangWatchClusterOpenIdConnectProvider92F61D91:
+    Type: Custom::AWSCDKOpenIdConnectProvider
+    Properties:
+      ServiceToken:
+        Fn::GetAtt:
+          - CustomAWSCDKOpenIdConnectProviderCustomResourceProviderHandlerF2C543E0
+          - Arn
+      ClientIDList:
+        - sts.amazonaws.com
+      Url:
+        Fn::GetAtt:
+          - LangWatchCluster914B7009
+          - OpenIdConnectIssuerUrl
+      CodeHash: 977fc1649d2dbcce16e23f6332faef6fa0f48aa74a0afe35f4a3467754e20cd8
+    UpdateReplacePolicy: Delete
+    DeletionPolicy: Delete
+    Metadata:
+      aws:cdk:path: LangWatchAwsMarketplaceStack/LangWatchCluster/OpenIdConnectProvider/Resource/Default
+  LangWatchClustermanifestfluentdclusterrole27EE2797:
+    Type: Custom::AWSCDK-EKS-KubernetesResource
+    Properties:
+      ServiceToken:
+        Fn::GetAtt:
+          - awscdkawseksKubectlProviderNestedStackawscdkawseksKubectlProviderNestedStackResourceA7AEBA6B
+          - Outputs.LangWatchAwsMarketplaceStackawscdkawseksKubectlProviderframeworkonEvent04D927B6Arn
+      Manifest: '[{"apiVersion":"rbac.authorization.k8s.io/v1","kind":"ClusterRole","metadata":{"name":"fluentd-clusterrole","labels":{"aws.cdk.eks/prune-c84818cf08df7698a7486fd3fc778b479449b12a69":""}},"rules":[{"apiGroups":[""],"resources":["pods","namespaces"],"verbs":["get","list","watch"]},{"apiGroups":[""],"resources":["pods/log"],"verbs":["get","list","watch"]}]}]'
+      ClusterName:
+        Ref: LangWatchCluster914B7009
+      RoleArn:
+        Fn::GetAtt:
+          - LangWatchClusterCreationRole2CE467D3
+          - Arn
+      PruneLabel: aws.cdk.eks/prune-c84818cf08df7698a7486fd3fc778b479449b12a69
+    DependsOn:
+      - LangWatchClusterKubectlReadyBarrier3056B7E3
+    UpdateReplacePolicy: Delete
+    DeletionPolicy: Delete
+    Metadata:
+      aws:cdk:path: LangWatchAwsMarketplaceStack/LangWatchCluster/manifest-fluentd-clusterrole/Resource/Default
+  LangWatchClustermanifestfluentdclusterrolebinding2D0FD13F:
+    Type: Custom::AWSCDK-EKS-KubernetesResource
+    Properties:
+      ServiceToken:
+        Fn::GetAtt:
+          - awscdkawseksKubectlProviderNestedStackawscdkawseksKubectlProviderNestedStackResourceA7AEBA6B
+          - Outputs.LangWatchAwsMarketplaceStackawscdkawseksKubectlProviderframeworkonEvent04D927B6Arn
+      Manifest: '[{"apiVersion":"rbac.authorization.k8s.io/v1","kind":"ClusterRoleBinding","metadata":{"name":"fluentd-clusterrolebinding","labels":{"aws.cdk.eks/prune-c8ccb560be7c26614920933aa0e0360c2bbb0893a9":""}},"subjects":[{"kind":"ServiceAccount","name":"fluentd","namespace":"kube-system"}],"roleRef":{"kind":"ClusterRole","name":"fluentd-clusterrole","apiGroup":"rbac.authorization.k8s.io"}}]'
+      ClusterName:
+        Ref: LangWatchCluster914B7009
+      RoleArn:
+        Fn::GetAtt:
+          - LangWatchClusterCreationRole2CE467D3
+          - Arn
+      PruneLabel: aws.cdk.eks/prune-c8ccb560be7c26614920933aa0e0360c2bbb0893a9
+    DependsOn:
+      - LangWatchClusterKubectlReadyBarrier3056B7E3
+      - LangWatchClustermanifestfluentdclusterrole27EE2797
+    UpdateReplacePolicy: Delete
+    DeletionPolicy: Delete
+    Metadata:
+      aws:cdk:path: LangWatchAwsMarketplaceStack/LangWatchCluster/manifest-fluentd-clusterrolebinding/Resource/Default
+  LangWatchClustermanifestfluentdconfig824881A9:
+    Type: Custom::AWSCDK-EKS-KubernetesResource
+    Properties:
+      ServiceToken:
+        Fn::GetAtt:
+          - awscdkawseksKubectlProviderNestedStackawscdkawseksKubectlProviderNestedStackResourceA7AEBA6B
+          - Outputs.LangWatchAwsMarketplaceStackawscdkawseksKubectlProviderframeworkonEvent04D927B6Arn
+      Manifest:
+        Fn::Join:
+          - ""
+          - - "[{\"apiVersion\":\"v1\",\"kind\":\"ConfigMap\",\"metadata\":{\"name\":\"fluentd-config\",\"namespace\":\"kube-system\",\"labels\":{\"aws.cdk.eks/prune-c8f519ceeea1e731f1c623cb7edafc211c92fdf51d\":\"\"}},\"data\":{\"fluent.conf\":\"\\n      <source>\\n      @type tail\\n      path /var/log/containers/*.log\\n      pos_file /var/log/fluentd-containers.log.pos\\n      tag kubernetes.*\\n      <parse>\\n        @type none\\n      </parse>\\n    </source>\\n\\n    <filter kubernetes.**>\\n      @type kubernetes_metadata\\n    </filter>\\n\\n    <filter kubernetes.**>\\n      @type record_transformer\\n      enable_ruby true\\n      <record>\\n        pod_name ${record['kubernetes']['pod_name']}\\n      </record>\\n      remove_keys kubernetes,docker\\n    </filter>\\n\\n    <match kubernetes.**>\\n      @type cloudwatch_logs\\n      log_group_name /aws/eks/"
+            - Ref: LangWatchCluster914B7009
+            - /cluster\n      log_stream_name_key pod_name\n      auto_create_stream true\n      retention_in_days 7\n      <buffer>\n        @type file\n        path /var/log/fluentd-buffers/kubernetes.*.buffer\n        flush_interval 5s\n        flush_at_shutdown true\n        retry_forever true\n        retry_max_interval 30\n      </buffer>\n    </match>\n      "}}]
+      ClusterName:
+        Ref: LangWatchCluster914B7009
+      RoleArn:
+        Fn::GetAtt:
+          - LangWatchClusterCreationRole2CE467D3
+          - Arn
+      PruneLabel: aws.cdk.eks/prune-c8f519ceeea1e731f1c623cb7edafc211c92fdf51d
+    DependsOn:
+      - LangWatchClusterKubectlReadyBarrier3056B7E3
+    UpdateReplacePolicy: Delete
+    DeletionPolicy: Delete
+    Metadata:
+      aws:cdk:path: LangWatchAwsMarketplaceStack/LangWatchCluster/manifest-fluentd-config/Resource/Default
+  LangWatchClustermanifestfluentddaemonsetAA4F7F54:
+    Type: Custom::AWSCDK-EKS-KubernetesResource
+    Properties:
+      ServiceToken:
+        Fn::GetAtt:
+          - awscdkawseksKubectlProviderNestedStackawscdkawseksKubectlProviderNestedStackResourceA7AEBA6B
+          - Outputs.LangWatchAwsMarketplaceStackawscdkawseksKubectlProviderframeworkonEvent04D927B6Arn
+      Manifest:
+        Fn::Join:
+          - ""
+          - - '[{"apiVersion":"apps/v1","kind":"DaemonSet","metadata":{"name":"fluentd-cloudwatch","namespace":"kube-system","labels":{"aws.cdk.eks/prune-c852d20e101d88a47d75343d4f4e933eaff6e8738d":""}},"spec":{"selector":{"matchLabels":{"name":"fluentd-cloudwatch"}},"template":{"metadata":{"labels":{"name":"fluentd-cloudwatch"}},"spec":{"serviceAccountName":"fluentd","tolerations":[{"key":"node-role.kubernetes.io/master","effect":"NoSchedule"},{"key":"node.kubernetes.io/not-ready","effect":"NoExecute","operator":"Exists"},{"key":"node.kubernetes.io/unreachable","effect":"NoExecute","operator":"Exists"}],"containers":[{"name":"fluentd-cloudwatch","image":"fluent/fluentd-kubernetes-daemonset:v1.17.0-debian-cloudwatch-1.0","resources":{"limits":{"memory":"200Mi"},"requests":{"cpu":"100m","memory":"200Mi"}},"env":[{"name":"FLUENT_UID","value":"0"},{"name":"AWS_REGION","value":"'
+            - Ref: AWS::Region
+            - '"},{"name":"CLUSTER_NAME","value":"'
+            - Ref: LangWatchCluster914B7009
+            - '"}],"volumeMounts":[{"name":"varlog","mountPath":"/var/log"},{"name":"varlibdockercontainers","mountPath":"/var/lib/docker/containers","readOnly":true},{"name":"fluentdconf","mountPath":"/fluentd/etc/fluent.conf","subPath":"fluent.conf"}]}],"terminationGracePeriodSeconds":30,"volumes":[{"name":"varlog","hostPath":{"path":"/var/log"}},{"name":"varlibdockercontainers","hostPath":{"path":"/var/lib/docker/containers"}},{"name":"fluentdconf","configMap":{"name":"fluentd-config"}}]}}}}]'
+      ClusterName:
+        Ref: LangWatchCluster914B7009
+      RoleArn:
+        Fn::GetAtt:
+          - LangWatchClusterCreationRole2CE467D3
+          - Arn
+      PruneLabel: aws.cdk.eks/prune-c852d20e101d88a47d75343d4f4e933eaff6e8738d
+    DependsOn:
+      - LangWatchClusterKubectlReadyBarrier3056B7E3
+    UpdateReplacePolicy: Delete
+    DeletionPolicy: Delete
+    Metadata:
+      aws:cdk:path: LangWatchAwsMarketplaceStack/LangWatchCluster/manifest-fluentd-daemonset/Resource/Default
+  LangWatchClustermanifestlangevals69987427:
+    Type: Custom::AWSCDK-EKS-KubernetesResource
+    Properties:
+      ServiceToken:
+        Fn::GetAtt:
+          - awscdkawseksKubectlProviderNestedStackawscdkawseksKubectlProviderNestedStackResourceA7AEBA6B
+          - Outputs.LangWatchAwsMarketplaceStackawscdkawseksKubectlProviderframeworkonEvent04D927B6Arn
+      Manifest: '[{"apiVersion":"apps/v1","kind":"Deployment","metadata":{"name":"langevals","annotations":{"deployment-timestamp":"2024-07-22T11:38:30.556Z"},"labels":{"aws.cdk.eks/prune-c8971c52af1c4bbf33b9517414518184865c60a698":""}},"spec":{"replicas":1,"selector":{"matchLabels":{"app":"langevals"}},"template":{"metadata":{"labels":{"app":"langevals"}},"spec":{"containers":[{"name":"langevals","image":"339712859611.dkr.ecr.eu-central-1.amazonaws.com/onprem_langevals:1.0.1","ports":[{"containerPort":8000}]}]}}}}]'
+      ClusterName:
+        Ref: LangWatchCluster914B7009
+      RoleArn:
+        Fn::GetAtt:
+          - LangWatchClusterCreationRole2CE467D3
+          - Arn
+      PruneLabel: aws.cdk.eks/prune-c8971c52af1c4bbf33b9517414518184865c60a698
+    DependsOn:
+      - LangWatchClusterKubectlReadyBarrier3056B7E3
+    UpdateReplacePolicy: Delete
+    DeletionPolicy: Delete
+    Metadata:
+      aws:cdk:path: LangWatchAwsMarketplaceStack/LangWatchCluster/manifest-langevals/Resource/Default
+  LangWatchClustermanifestlangevalsservice3291BD64:
+    Type: Custom::AWSCDK-EKS-KubernetesResource
+    Properties:
+      ServiceToken:
+        Fn::GetAtt:
+          - awscdkawseksKubectlProviderNestedStackawscdkawseksKubectlProviderNestedStackResourceA7AEBA6B
+          - Outputs.LangWatchAwsMarketplaceStackawscdkawseksKubectlProviderframeworkonEvent04D927B6Arn
+      Manifest: '[{"apiVersion":"v1","kind":"Service","metadata":{"name":"langevals-service","annotations":{"deployment-timestamp":"2024-07-22T11:38:30.556Z"},"labels":{"aws.cdk.eks/prune-c8f36909b360e37e191f05651f50032c93fa4676ea":""}},"spec":{"selector":{"app":"langevals"},"ports":[{"port":80,"targetPort":8000}],"type":"ClusterIP"}}]'
+      ClusterName:
+        Ref: LangWatchCluster914B7009
+      RoleArn:
+        Fn::GetAtt:
+          - LangWatchClusterCreationRole2CE467D3
+          - Arn
+      PruneLabel: aws.cdk.eks/prune-c8f36909b360e37e191f05651f50032c93fa4676ea
+    DependsOn:
+      - LangWatchClusterKubectlReadyBarrier3056B7E3
+    UpdateReplacePolicy: Delete
+    DeletionPolicy: Delete
+    Metadata:
+      aws:cdk:path: LangWatchAwsMarketplaceStack/LangWatchCluster/manifest-langevals-service/Resource/Default
+  LangWatchClustermanifestlangwatchnlpF132A27F:
+    Type: Custom::AWSCDK-EKS-KubernetesResource
+    Properties:
+      ServiceToken:
+        Fn::GetAtt:
+          - awscdkawseksKubectlProviderNestedStackawscdkawseksKubectlProviderNestedStackResourceA7AEBA6B
+          - Outputs.LangWatchAwsMarketplaceStackawscdkawseksKubectlProviderframeworkonEvent04D927B6Arn
+      Manifest: '[{"apiVersion":"apps/v1","kind":"Deployment","metadata":{"name":"langwatch-nlp","annotations":{"deployment-timestamp":"2024-07-22T11:38:30.557Z"},"labels":{"aws.cdk.eks/prune-c8ed6b00bdf1e1622fb409eba09ba25b28783860f5":""}},"spec":{"replicas":1,"selector":{"matchLabels":{"app":"langwatch-nlp"}},"template":{"metadata":{"labels":{"app":"langwatch-nlp"}},"spec":{"containers":[{"name":"langwatch-nlp","image":"339712859611.dkr.ecr.eu-central-1.amazonaws.com/onprem_langwatch_nlp:1.0.1","ports":[{"containerPort":8080}]}]}}}}]'
+      ClusterName:
+        Ref: LangWatchCluster914B7009
+      RoleArn:
+        Fn::GetAtt:
+          - LangWatchClusterCreationRole2CE467D3
+          - Arn
+      PruneLabel: aws.cdk.eks/prune-c8ed6b00bdf1e1622fb409eba09ba25b28783860f5
+    DependsOn:
+      - LangWatchClusterKubectlReadyBarrier3056B7E3
+    UpdateReplacePolicy: Delete
+    DeletionPolicy: Delete
+    Metadata:
+      aws:cdk:path: LangWatchAwsMarketplaceStack/LangWatchCluster/manifest-langwatch-nlp/Resource/Default
+  LangWatchClustermanifestlangwatchnlpservice3C4DE318:
+    Type: Custom::AWSCDK-EKS-KubernetesResource
+    Properties:
+      ServiceToken:
+        Fn::GetAtt:
+          - awscdkawseksKubectlProviderNestedStackawscdkawseksKubectlProviderNestedStackResourceA7AEBA6B
+          - Outputs.LangWatchAwsMarketplaceStackawscdkawseksKubectlProviderframeworkonEvent04D927B6Arn
+      Manifest: '[{"apiVersion":"v1","kind":"Service","metadata":{"name":"langwatch-nlp-service","annotations":{"deployment-timestamp":"2024-07-22T11:38:30.557Z"},"labels":{"aws.cdk.eks/prune-c8a5d2dd748f183c6f8578f7eaf681f97f67186965":""}},"spec":{"selector":{"app":"langwatch-nlp"},"ports":[{"port":80,"targetPort":8080}],"type":"ClusterIP"}}]'
+      ClusterName:
+        Ref: LangWatchCluster914B7009
+      RoleArn:
+        Fn::GetAtt:
+          - LangWatchClusterCreationRole2CE467D3
+          - Arn
+      PruneLabel: aws.cdk.eks/prune-c8a5d2dd748f183c6f8578f7eaf681f97f67186965
+    DependsOn:
+      - LangWatchClusterKubectlReadyBarrier3056B7E3
+    UpdateReplacePolicy: Delete
+    DeletionPolicy: Delete
+    Metadata:
+      aws:cdk:path: LangWatchAwsMarketplaceStack/LangWatchCluster/manifest-langwatch-nlp-service/Resource/Default
+  LangWatchClusterlangwatchsaConditionJsonE67429E1:
+    Type: Custom::AWSCDKCfnJson
+    Properties:
+      ServiceToken:
+        Fn::GetAtt:
+          - AWSCDKCfnUtilsProviderCustomResourceProviderHandlerCF82AA57
+          - Arn
+      Value:
+        Fn::Join:
+          - ""
+          - - '{"'
+            - Fn::Select:
+                - 1
+                - Fn::Split:
+                    - :oidc-provider/
+                    - Ref: LangWatchClusterOpenIdConnectProvider92F61D91
+            - :aud":"sts.amazonaws.com","
+            - Fn::Select:
+                - 1
+                - Fn::Split:
+                    - :oidc-provider/
+                    - Ref: LangWatchClusterOpenIdConnectProvider92F61D91
+            - :sub":"system:serviceaccount:default:langwatch-sa"}
+    UpdateReplacePolicy: Delete
+    DeletionPolicy: Delete
+    Metadata:
+      aws:cdk:path: LangWatchAwsMarketplaceStack/LangWatchCluster/langwatch-sa/ConditionJson/Resource/Default
+  LangWatchClusterlangwatchsaRole8F5FC1A9:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                Fn::GetAtt:
+                  - LangWatchClusterlangwatchsaConditionJsonE67429E1
+                  - Value
+            Effect: Allow
+            Principal:
+              Federated:
+                Ref: LangWatchClusterOpenIdConnectProvider92F61D91
+        Version: "2012-10-17"
+    Metadata:
+      aws:cdk:path: LangWatchAwsMarketplaceStack/LangWatchCluster/langwatch-sa/Role/Resource
+  LangWatchClusterlangwatchsaRoleDefaultPolicy52AD3AA1:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyDocument:
+        Statement:
+          - Action:
+              - secretsmanager:DescribeSecret
+              - secretsmanager:GetSecretValue
+              - secretsmanager:ListSecrets
+            Effect: Allow
+            Resource: arn:aws:secretsmanager:*:*:secret:*
+        Version: "2012-10-17"
+      PolicyName: LangWatchClusterlangwatchsaRoleDefaultPolicy52AD3AA1
+      Roles:
+        - Ref: LangWatchClusterlangwatchsaRole8F5FC1A9
+    Metadata:
+      aws:cdk:path: LangWatchAwsMarketplaceStack/LangWatchCluster/langwatch-sa/Role/DefaultPolicy/Resource
+  LangWatchClusterlangwatchsamanifestlangwatchsaServiceAccountResource0438CE66:
+    Type: Custom::AWSCDK-EKS-KubernetesResource
+    Properties:
+      ServiceToken:
+        Fn::GetAtt:
+          - awscdkawseksKubectlProviderNestedStackawscdkawseksKubectlProviderNestedStackResourceA7AEBA6B
+          - Outputs.LangWatchAwsMarketplaceStackawscdkawseksKubectlProviderframeworkonEvent04D927B6Arn
+      Manifest:
+        Fn::Join:
+          - ""
+          - - '[{"apiVersion":"v1","kind":"ServiceAccount","metadata":{"name":"langwatch-sa","namespace":"default","labels":{"aws.cdk.eks/prune-c894748c1f732e47121ea049b0e9338954957a5c51":"","app.kubernetes.io/name":"langwatch-sa"},"annotations":{"eks.amazonaws.com/role-arn":"'
+            - Fn::GetAtt:
+                - LangWatchClusterlangwatchsaRole8F5FC1A9
+                - Arn
+            - '"}}}]'
+      ClusterName:
+        Ref: LangWatchCluster914B7009
+      RoleArn:
+        Fn::GetAtt:
+          - LangWatchClusterCreationRole2CE467D3
+          - Arn
+      PruneLabel: aws.cdk.eks/prune-c894748c1f732e47121ea049b0e9338954957a5c51
+    DependsOn:
+      - LangWatchClusterKubectlReadyBarrier3056B7E3
+    UpdateReplacePolicy: Delete
+    DeletionPolicy: Delete
+    Metadata:
+      aws:cdk:path: LangWatchAwsMarketplaceStack/LangWatchCluster/langwatch-sa/manifest-langwatch-saServiceAccountResource/Resource/Default
+  LangWatchClustermanifestlangwatch40299E6A:
+    Type: Custom::AWSCDK-EKS-KubernetesResource
+    Properties:
+      ServiceToken:
+        Fn::GetAtt:
+          - awscdkawseksKubectlProviderNestedStackawscdkawseksKubectlProviderNestedStackResourceA7AEBA6B
+          - Outputs.LangWatchAwsMarketplaceStackawscdkawseksKubectlProviderframeworkonEvent04D927B6Arn
+      Manifest: '[{"apiVersion":"apps/v1","kind":"Deployment","metadata":{"name":"langwatch","annotations":{"deployment-timestamp":"2024-07-22T11:38:30.561Z"},"labels":{"aws.cdk.eks/prune-c8df6ea04e45af8c248765035ffc1b4d2cc1dd63ee":""}},"spec":{"replicas":1,"selector":{"matchLabels":{"app":"langwatch"}},"template":{"metadata":{"labels":{"app":"langwatch"}},"spec":{"serviceAccountName":"langwatch-sa","containers":[{"name":"langwatch","image":"339712859611.dkr.ecr.eu-central-1.amazonaws.com/onprem_langwatch_saas:1.0.1","ports":[{"containerPort":3000}],"envFrom":[{"secretRef":{"name":"langwatch-k8s-secret"}}],"volumeMounts":[{"name":"langwatch-secrets","mountPath":"/mnt/secrets-store","readOnly":true}]}],"volumes":[{"name":"langwatch-secrets","csi":{"driver":"secrets-store.csi.k8s.io","readOnly":true,"volumeAttributes":{"secretProviderClass":"langwatch-secret-provider"}}}]}}}}]'
+      ClusterName:
+        Ref: LangWatchCluster914B7009
+      RoleArn:
+        Fn::GetAtt:
+          - LangWatchClusterCreationRole2CE467D3
+          - Arn
+      PruneLabel: aws.cdk.eks/prune-c8df6ea04e45af8c248765035ffc1b4d2cc1dd63ee
+    DependsOn:
+      - LangWatchClusterKubectlReadyBarrier3056B7E3
+    UpdateReplacePolicy: Delete
+    DeletionPolicy: Delete
+    Metadata:
+      aws:cdk:path: LangWatchAwsMarketplaceStack/LangWatchCluster/manifest-langwatch/Resource/Default
+  LangWatchClustermanifestlangwatchservice97F1449F:
+    Type: Custom::AWSCDK-EKS-KubernetesResource
+    Properties:
+      ServiceToken:
+        Fn::GetAtt:
+          - awscdkawseksKubectlProviderNestedStackawscdkawseksKubectlProviderNestedStackResourceA7AEBA6B
+          - Outputs.LangWatchAwsMarketplaceStackawscdkawseksKubectlProviderframeworkonEvent04D927B6Arn
+      Manifest: '[{"apiVersion":"v1","kind":"Service","metadata":{"name":"langwatch-service","annotations":{"deployment-timestamp":"2024-07-22T11:38:30.874Z"},"labels":{"aws.cdk.eks/prune-c86f35a9df1069a8253cc6776ed213b9f30b81bce3":""}},"spec":{"selector":{"app":"langwatch"},"ports":[{"port":80,"targetPort":3000}],"type":"LoadBalancer"}}]'
+      ClusterName:
+        Ref: LangWatchCluster914B7009
+      RoleArn:
+        Fn::GetAtt:
+          - LangWatchClusterCreationRole2CE467D3
+          - Arn
+      PruneLabel: aws.cdk.eks/prune-c86f35a9df1069a8253cc6776ed213b9f30b81bce3
+    DependsOn:
+      - LangWatchClusterKubectlReadyBarrier3056B7E3
+    UpdateReplacePolicy: Delete
+    DeletionPolicy: Delete
+    Metadata:
+      aws:cdk:path: LangWatchAwsMarketplaceStack/LangWatchCluster/manifest-langwatch-service/Resource/Default
+  LangWatchClusterlangwatchserviceLoadBalancerAddressE72135C8:
+    Type: Custom::AWSCDK-EKS-KubernetesObjectValue
+    Properties:
+      ServiceToken:
+        Fn::GetAtt:
+          - awscdkawseksKubectlProviderNestedStackawscdkawseksKubectlProviderNestedStackResourceA7AEBA6B
+          - Outputs.LangWatchAwsMarketplaceStackawscdkawseksKubectlProviderframeworkonEvent04D927B6Arn
+      ClusterName:
+        Ref: LangWatchCluster914B7009
+      RoleArn:
+        Fn::GetAtt:
+          - LangWatchClusterCreationRole2CE467D3
+          - Arn
+      ObjectType: service
+      ObjectName: langwatch-service
+      ObjectNamespace: default
+      JsonPath: .status.loadBalancer.ingress[0].hostname
+      TimeoutSeconds: 900
+    DependsOn:
+      - LangWatchClusterKubectlReadyBarrier3056B7E3
+    UpdateReplacePolicy: Delete
+    DeletionPolicy: Delete
+    Metadata:
+      aws:cdk:path: LangWatchAwsMarketplaceStack/LangWatchCluster/langwatch-serviceLoadBalancerAddress/Resource/Default
+  awscdkawseksClusterResourceProviderNestedStackawscdkawseksClusterResourceProviderNestedStackResource9827C454:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL:
+        Fn::Join:
+          - ""
+          - - https://s3.eu-central-1.
+            - Ref: AWS::URLSuffix
+            - /
+            - Fn::Sub: cdk-hnb659fds-assets-${AWS::AccountId}-eu-central-1
+            - /df9c1fbfbdd0d57a5f5508bf8bb29084b5abd3adbdc961fd516e7a87822dc077.json
+    UpdateReplacePolicy: Delete
+    DeletionPolicy: Delete
+    Metadata:
+      aws:cdk:path: LangWatchAwsMarketplaceStack/@aws-cdk--aws-eks.ClusterResourceProvider.NestedStack/@aws-cdk--aws-eks.ClusterResourceProvider.NestedStackResource
+      aws:asset:path: LangWatchAwsMarketplaceStackawscdkawseksClusterResourceProvider02EB25D1.nested.template.json
+      aws:asset:property: TemplateURL
+  awscdkawseksKubectlProviderNestedStackawscdkawseksKubectlProviderNestedStackResourceA7AEBA6B:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      Parameters:
+        referencetoLangWatchAwsMarketplaceStackKubectlLayer8390447FRef:
+          Ref: KubectlLayer600207B5
+        referencetoLangWatchAwsMarketplaceStackLangWatchClusterKubectlHandlerRole6B1464AFArn:
+          Fn::GetAtt:
+            - LangWatchClusterKubectlHandlerRole5D8BE59D
+            - Arn
+        referencetoLangWatchAwsMarketplaceStackLangWatchVPCPrivateSubnet1Subnet6D0EEF00Ref:
+          Ref: LangWatchVPCPrivateSubnet1Subnet73888C1E
+        referencetoLangWatchAwsMarketplaceStackLangWatchVPCPrivateSubnet2SubnetDD388EE3Ref:
+          Ref: LangWatchVPCPrivateSubnet2SubnetB0177CD7
+        referencetoLangWatchAwsMarketplaceStackLangWatchClusterC95C27D3ClusterSecurityGroupId:
+          Fn::GetAtt:
+            - LangWatchCluster914B7009
+            - ClusterSecurityGroupId
+      TemplateURL:
+        Fn::Join:
+          - ""
+          - - https://s3.eu-central-1.
+            - Ref: AWS::URLSuffix
+            - /
+            - Fn::Sub: cdk-hnb659fds-assets-${AWS::AccountId}-eu-central-1
+            - /523e6899f542c60c7c487eb579c6c4c075d3c0e7279835c042973c2fc9383df6.json
+    DependsOn:
+      - LangWatchClusterKubectlHandlerRoleDefaultPolicy759A73CC
+      - LangWatchClusterKubectlHandlerRole5D8BE59D
+      - LangWatchVPCPrivateSubnet1DefaultRouteFDBA5637
+      - LangWatchVPCPrivateSubnet1RouteTableAssociation29CCC6E0
+      - LangWatchVPCPrivateSubnet2DefaultRouteBA8571B8
+      - LangWatchVPCPrivateSubnet2RouteTableAssociationB636BF78
+    UpdateReplacePolicy: Delete
+    DeletionPolicy: Delete
+    Metadata:
+      aws:cdk:path: LangWatchAwsMarketplaceStack/@aws-cdk--aws-eks.KubectlProvider.NestedStack/@aws-cdk--aws-eks.KubectlProvider.NestedStackResource
+      aws:asset:path: LangWatchAwsMarketplaceStackawscdkawseksKubectlProvider2A9CC5D9.nested.template.json
+      aws:asset:property: TemplateURL
+  AwsAuthmanifest00905E16:
+    Type: Custom::AWSCDK-EKS-KubernetesResource
+    Properties:
+      ServiceToken:
+        Fn::GetAtt:
+          - awscdkawseksKubectlProviderNestedStackawscdkawseksKubectlProviderNestedStackResourceA7AEBA6B
+          - Outputs.LangWatchAwsMarketplaceStackawscdkawseksKubectlProviderframeworkonEvent04D927B6Arn
+      Manifest:
+        Fn::Join:
+          - ""
+          - - '[{"apiVersion":"v1","kind":"ConfigMap","metadata":{"name":"aws-auth","namespace":"kube-system","labels":{"aws.cdk.eks/prune-c829177029bc3a5650d916d85d3f8d657481bacc53":""}},"data":{"mapRoles":"[{\"rolearn\":\"arn:aws:iam::'
+            - Ref: AWS::AccountId
+            - ':role/OrganizationAccountAccessRole\",\"username\":\"arn:aws:iam::'
+            - Ref: AWS::AccountId
+            - :role/OrganizationAccountAccessRole\",\"groups\":[\"system:masters\"]},{\"rolearn\":\"
+            - Fn::GetAtt:
+                - LangWatchClusterNodegroupManagedNodesNodeGroupRole5C9EF25C
+                - Arn
+            - \",\"username\":\"system:node:{{EC2PrivateDNSName}}\",\"groups\":[\"system:bootstrappers\",\"system:nodes\"]}]","mapUsers":"[]","mapAccounts":"[]"}}]
+      ClusterName:
+        Ref: LangWatchCluster914B7009
+      RoleArn:
+        Fn::GetAtt:
+          - LangWatchClusterCreationRole2CE467D3
+          - Arn
+      PruneLabel: aws.cdk.eks/prune-c829177029bc3a5650d916d85d3f8d657481bacc53
+      Overwrite: true
+    DependsOn:
+      - LangWatchClusterKubectlReadyBarrier3056B7E3
+    UpdateReplacePolicy: Delete
+    DeletionPolicy: Delete
+    Metadata:
+      aws:cdk:path: LangWatchAwsMarketplaceStack/AwsAuth/manifest/Resource/Default
+  RedisSecurityGroupB05951F6:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: LangWatchAwsMarketplaceStack/RedisSecurityGroup
+      SecurityGroupEgress:
+        - CidrIp: 0.0.0.0/0
+          Description: Allow all outbound traffic by default
+          IpProtocol: "-1"
+      VpcId:
+        Ref: LangWatchVPC32D90DB9
+    Metadata:
+      aws:cdk:path: LangWatchAwsMarketplaceStack/RedisSecurityGroup/Resource
+  RedisSubnetGroup:
+    Type: AWS::ElastiCache::SubnetGroup
+    Properties:
+      Description: Subnet group for Redis ElastiCache
+      SubnetIds:
+        - Ref: LangWatchVPCPrivateSubnet1Subnet73888C1E
+        - Ref: LangWatchVPCPrivateSubnet2SubnetB0177CD7
+    Metadata:
+      aws:cdk:path: LangWatchAwsMarketplaceStack/RedisSubnetGroup
+  RedisPasswordED621C10:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      GenerateSecretString:
+        ExcludeCharacters: "'\"@/\\:?#[]&=+<>{}|^~`,%;"
+        ExcludePunctuation: true
+        GenerateStringKey: password
+        PasswordLength: 16
+        SecretStringTemplate: '{"username":"redis"}'
+    UpdateReplacePolicy: Delete
+    DeletionPolicy: Delete
+    Metadata:
+      aws:cdk:path: LangWatchAwsMarketplaceStack/RedisPassword/Resource
+  RedisReplicationGroup:
+    Type: AWS::ElastiCache::ReplicationGroup
+    Properties:
+      AtRestEncryptionEnabled: true
+      AuthToken:
+        Fn::Join:
+          - ""
+          - - "{{resolve:secretsmanager:"
+            - Ref: RedisPasswordED621C10
+            - :SecretString:password::}}
+      CacheNodeType: cache.t4g.micro
+      CacheParameterGroupName: default.redis7
+      CacheSubnetGroupName:
+        Ref: RedisSubnetGroup
+      Engine: redis
+      EngineVersion: "7.1"
+      MultiAZEnabled: true
+      NumNodeGroups: 1
+      Port: 6379
+      ReplicasPerNodeGroup: 1
+      ReplicationGroupDescription: Redis cluster for LangWatch
+      ReplicationGroupId: langwatch-redis
+      SecurityGroupIds:
+        - Fn::GetAtt:
+            - RedisSecurityGroupB05951F6
+            - GroupId
+      TransitEncryptionEnabled: true
+    Metadata:
+      aws:cdk:path: LangWatchAwsMarketplaceStack/RedisReplicationGroup
+  AddRedisIngressRuleD19F37C4:
+    Type: Custom::AWS
+    Properties:
+      ServiceToken:
+        Fn::GetAtt:
+          - AWS679f53fac002430cb0da5b7982bd22872D164C4C
+          - Arn
+      Create:
+        Fn::Join:
+          - ""
+          - - '{"service":"EC2","action":"authorizeSecurityGroupIngress","parameters":{"GroupId":"'
+            - Fn::GetAtt:
+                - RedisSecurityGroupB05951F6
+                - GroupId
+            - '","IpPermissions":[{"IpProtocol":"tcp","FromPort":6379,"ToPort":6379,"UserIdGroupPairs":[{"GroupId":"'
+            - Fn::GetAtt:
+                - LangWatchCluster914B7009
+                - ClusterSecurityGroupId
+            - '"}]}]},"physicalResourceId":{"id":"RedisIngressRule"}}'
+      Update:
+        Fn::Join:
+          - ""
+          - - '{"service":"EC2","action":"authorizeSecurityGroupIngress","parameters":{"GroupId":"'
+            - Fn::GetAtt:
+                - RedisSecurityGroupB05951F6
+                - GroupId
+            - '","IpPermissions":[{"IpProtocol":"tcp","FromPort":6379,"ToPort":6379,"UserIdGroupPairs":[{"GroupId":"'
+            - Fn::GetAtt:
+                - LangWatchCluster914B7009
+                - ClusterSecurityGroupId
+            - '"}]}]},"physicalResourceId":{"id":"RedisIngressRule"}}'
+      InstallLatestAwsSdk: false
+    DependsOn:
+      - AddRedisIngressRuleCustomResourcePolicyD782A7C5
+      - LangWatchClusterAwsAuthmanifestD343EB52
+      - LangWatchClusterchartASCPProvider584D0BB8
+      - LangWatchClusterchartSecretsStoreCSIDriver12F66008
+      - LangWatchClusterControlPlaneSecurityGroup9AEC2E28
+      - LangWatchClusterfluentdConditionJson6FDD32AC
+      - LangWatchClusterfluentdmanifestfluentdServiceAccountResourceAAEDE6D1
+      - LangWatchClusterfluentdRoleDefaultPolicyDE734FD0
+      - LangWatchClusterfluentdRole0BB36723
+      - LangWatchClusterKubectlHandlerRoleDefaultPolicy759A73CC
+      - LangWatchClusterKubectlHandlerRole5D8BE59D
+      - LangWatchClusterKubectlReadyBarrier3056B7E3
+      - LangWatchClusterlangwatchsaConditionJsonE67429E1
+      - LangWatchClusterlangwatchsamanifestlangwatchsaServiceAccountResource0438CE66
+      - LangWatchClusterlangwatchsaRoleDefaultPolicy52AD3AA1
+      - LangWatchClusterlangwatchsaRole8F5FC1A9
+      - LangWatchClusterlangwatchserviceLoadBalancerAddressE72135C8
+      - LangWatchClustermanifestCSIDriverClusterRole43123684
+      - LangWatchClustermanifestCSIDriverClusterRoleBinding0D0F06CF
+      - LangWatchClustermanifestfluentdclusterrole27EE2797
+      - LangWatchClustermanifestfluentdclusterrolebinding2D0FD13F
+      - LangWatchClustermanifestfluentdconfig824881A9
+      - LangWatchClustermanifestfluentddaemonsetAA4F7F54
+      - LangWatchClustermanifestkubeapiserverkubeletclientbinding09E1D018
+      - LangWatchClustermanifestlangevalsservice3291BD64
+      - LangWatchClustermanifestlangevals69987427
+      - LangWatchClustermanifestlangwatchnlpservice3C4DE318
+      - LangWatchClustermanifestlangwatchnlpF132A27F
+      - LangWatchClustermanifestlangwatchservice97F1449F
+      - LangWatchClustermanifestlangwatch40299E6A
+      - LangWatchClustermanifestLangWatchSecretProviderClass0AAB1013
+      - LangWatchClusterNodegroupManagedNodesNodeGroupRole5C9EF25C
+      - LangWatchClusterNodegroupManagedNodes43430C18
+      - LangWatchClusterOpenIdConnectProvider92F61D91
+      - LangWatchClusterCreationRoleDefaultPolicy6F8C3DDE
+      - LangWatchClusterCreationRole2CE467D3
+      - LangWatchCluster914B7009
+      - LangWatchClusterRole2C66581A
+      - RedisReplicationGroup
+    UpdateReplacePolicy: Delete
+    DeletionPolicy: Delete
+    Metadata:
+      aws:cdk:path: LangWatchAwsMarketplaceStack/AddRedisIngressRule/Resource/Default
+  AddRedisIngressRuleCustomResourcePolicyD782A7C5:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyDocument:
+        Statement:
+          - Action: ec2:AuthorizeSecurityGroupIngress
+            Effect: Allow
+            Resource: "*"
+        Version: "2012-10-17"
+      PolicyName: AddRedisIngressRuleCustomResourcePolicyD782A7C5
+      Roles:
+        - Ref: AWS679f53fac002430cb0da5b7982bd2287ServiceRoleC1EA0FF2
+    DependsOn:
+      - LangWatchClusterAwsAuthmanifestD343EB52
+      - LangWatchClusterchartASCPProvider584D0BB8
+      - LangWatchClusterchartSecretsStoreCSIDriver12F66008
+      - LangWatchClusterControlPlaneSecurityGroup9AEC2E28
+      - LangWatchClusterfluentdConditionJson6FDD32AC
+      - LangWatchClusterfluentdmanifestfluentdServiceAccountResourceAAEDE6D1
+      - LangWatchClusterfluentdRoleDefaultPolicyDE734FD0
+      - LangWatchClusterfluentdRole0BB36723
+      - LangWatchClusterKubectlHandlerRoleDefaultPolicy759A73CC
+      - LangWatchClusterKubectlHandlerRole5D8BE59D
+      - LangWatchClusterKubectlReadyBarrier3056B7E3
+      - LangWatchClusterlangwatchsaConditionJsonE67429E1
+      - LangWatchClusterlangwatchsamanifestlangwatchsaServiceAccountResource0438CE66
+      - LangWatchClusterlangwatchsaRoleDefaultPolicy52AD3AA1
+      - LangWatchClusterlangwatchsaRole8F5FC1A9
+      - LangWatchClusterlangwatchserviceLoadBalancerAddressE72135C8
+      - LangWatchClustermanifestCSIDriverClusterRole43123684
+      - LangWatchClustermanifestCSIDriverClusterRoleBinding0D0F06CF
+      - LangWatchClustermanifestfluentdclusterrole27EE2797
+      - LangWatchClustermanifestfluentdclusterrolebinding2D0FD13F
+      - LangWatchClustermanifestfluentdconfig824881A9
+      - LangWatchClustermanifestfluentddaemonsetAA4F7F54
+      - LangWatchClustermanifestkubeapiserverkubeletclientbinding09E1D018
+      - LangWatchClustermanifestlangevalsservice3291BD64
+      - LangWatchClustermanifestlangevals69987427
+      - LangWatchClustermanifestlangwatchnlpservice3C4DE318
+      - LangWatchClustermanifestlangwatchnlpF132A27F
+      - LangWatchClustermanifestlangwatchservice97F1449F
+      - LangWatchClustermanifestlangwatch40299E6A
+      - LangWatchClustermanifestLangWatchSecretProviderClass0AAB1013
+      - LangWatchClusterNodegroupManagedNodesNodeGroupRole5C9EF25C
+      - LangWatchClusterNodegroupManagedNodes43430C18
+      - LangWatchClusterOpenIdConnectProvider92F61D91
+      - LangWatchClusterCreationRoleDefaultPolicy6F8C3DDE
+      - LangWatchClusterCreationRole2CE467D3
+      - LangWatchCluster914B7009
+      - LangWatchClusterRole2C66581A
+      - RedisReplicationGroup
+    Metadata:
+      aws:cdk:path: LangWatchAwsMarketplaceStack/AddRedisIngressRule/CustomResourcePolicy/Resource
+  AWS679f53fac002430cb0da5b7982bd2287ServiceRoleC1EA0FF2:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+        Version: "2012-10-17"
+      ManagedPolicyArns:
+        - Fn::Join:
+            - ""
+            - - "arn:"
+              - Ref: AWS::Partition
+              - :iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+    Metadata:
+      aws:cdk:path: LangWatchAwsMarketplaceStack/AWS679f53fac002430cb0da5b7982bd2287/ServiceRole/Resource
+  AWS679f53fac002430cb0da5b7982bd22872D164C4C:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        S3Bucket:
+          Fn::Sub: cdk-hnb659fds-assets-${AWS::AccountId}-eu-central-1
+        S3Key: 97f30e67419a1676a2215492723e5add1aa491caf0cbe2dd878fc4fab0468cd4.zip
+      Handler: index.handler
+      Role:
+        Fn::GetAtt:
+          - AWS679f53fac002430cb0da5b7982bd2287ServiceRoleC1EA0FF2
+          - Arn
+      Runtime: nodejs20.x
+      Timeout: 120
+    DependsOn:
+      - AWS679f53fac002430cb0da5b7982bd2287ServiceRoleC1EA0FF2
+    Metadata:
+      aws:cdk:path: LangWatchAwsMarketplaceStack/AWS679f53fac002430cb0da5b7982bd2287/Resource
+      aws:asset:path: asset.97f30e67419a1676a2215492723e5add1aa491caf0cbe2dd878fc4fab0468cd4
+      aws:asset:is-bundled: false
+      aws:asset:property: Code
+  PostgresSecurityGroupEA9E32B6:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: LangWatchAwsMarketplaceStack/PostgresSecurityGroup
+      SecurityGroupEgress:
+        - CidrIp: 0.0.0.0/0
+          Description: Allow all outbound traffic by default
+          IpProtocol: "-1"
+      VpcId:
+        Ref: LangWatchVPC32D90DB9
+    Metadata:
+      aws:cdk:path: LangWatchAwsMarketplaceStack/PostgresSecurityGroup/Resource
+  PostgresPassword16E090A7:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      GenerateSecretString:
+        ExcludeCharacters: "\"'@/\\:?#[]&=+<>{}|^~`,%;"
+        ExcludePunctuation: true
+        GenerateStringKey: password
+        PasswordLength: 16
+        SecretStringTemplate: '{"username":"langwatch_db"}'
+    UpdateReplacePolicy: Delete
+    DeletionPolicy: Delete
+    Metadata:
+      aws:cdk:path: LangWatchAwsMarketplaceStack/PostgresPassword/Resource
+  PostgresPasswordAttachment0E097A47:
+    Type: AWS::SecretsManager::SecretTargetAttachment
+    Properties:
+      SecretId:
+        Ref: PostgresPassword16E090A7
+      TargetId:
+        Ref: PostgresInstance19CDD68A
+      TargetType: AWS::RDS::DBInstance
+    Metadata:
+      aws:cdk:path: LangWatchAwsMarketplaceStack/PostgresPassword/Attachment/Resource
+  PostgresInstanceSubnetGroup84F90C7C:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: Subnet group for PostgresInstance database
+      SubnetIds:
+        - Ref: LangWatchVPCPrivateSubnet1Subnet73888C1E
+        - Ref: LangWatchVPCPrivateSubnet2SubnetB0177CD7
+    Metadata:
+      aws:cdk:path: LangWatchAwsMarketplaceStack/PostgresInstance/SubnetGroup/Default
+  PostgresInstance19CDD68A:
+    Type: AWS::RDS::DBInstance
+    Properties:
+      AllocatedStorage: "100"
+      BackupRetentionPeriod: 7
+      CopyTagsToSnapshot: true
+      DBInstanceClass: db.t4g.micro
+      DBName: langwatch_db
+      DBSubnetGroupName:
+        Ref: PostgresInstanceSubnetGroup84F90C7C
+      DeletionProtection: false
+      Engine: postgres
+      EngineVersion: "16.3"
+      MasterUserPassword:
+        Fn::Join:
+          - ""
+          - - "{{resolve:secretsmanager:"
+            - Ref: PostgresPassword16E090A7
+            - :SecretString:password::}}
+      MasterUsername:
+        Fn::Join:
+          - ""
+          - - "{{resolve:secretsmanager:"
+            - Ref: PostgresPassword16E090A7
+            - :SecretString:username::}}
+      PreferredBackupWindow: 00:00-04:00
+      PubliclyAccessible: false
+      StorageEncrypted: true
+      StorageType: gp2
+      VPCSecurityGroups:
+        - Fn::GetAtt:
+            - PostgresSecurityGroupEA9E32B6
+            - GroupId
+    UpdateReplacePolicy: Snapshot
+    DeletionPolicy: Snapshot
+    Metadata:
+      aws:cdk:path: LangWatchAwsMarketplaceStack/PostgresInstance/Resource
+  AddPostgresIngressRule3C83DAE0:
+    Type: Custom::AWS
+    Properties:
+      ServiceToken:
+        Fn::GetAtt:
+          - AWS679f53fac002430cb0da5b7982bd22872D164C4C
+          - Arn
+      Create:
+        Fn::Join:
+          - ""
+          - - '{"service":"EC2","action":"authorizeSecurityGroupIngress","parameters":{"GroupId":"'
+            - Fn::GetAtt:
+                - PostgresSecurityGroupEA9E32B6
+                - GroupId
+            - '","IpPermissions":[{"IpProtocol":"tcp","FromPort":5432,"ToPort":5432,"UserIdGroupPairs":[{"GroupId":"'
+            - Fn::GetAtt:
+                - LangWatchCluster914B7009
+                - ClusterSecurityGroupId
+            - '"}]}]},"physicalResourceId":{"id":"PostgresIngressRule"}}'
+      Update:
+        Fn::Join:
+          - ""
+          - - '{"service":"EC2","action":"authorizeSecurityGroupIngress","parameters":{"GroupId":"'
+            - Fn::GetAtt:
+                - PostgresSecurityGroupEA9E32B6
+                - GroupId
+            - '","IpPermissions":[{"IpProtocol":"tcp","FromPort":5432,"ToPort":5432,"UserIdGroupPairs":[{"GroupId":"'
+            - Fn::GetAtt:
+                - LangWatchCluster914B7009
+                - ClusterSecurityGroupId
+            - '"}]}]},"physicalResourceId":{"id":"PostgresIngressRule"}}'
+      InstallLatestAwsSdk: false
+    DependsOn:
+      - AddPostgresIngressRuleCustomResourcePolicy52ADC86F
+      - LangWatchClusterAwsAuthmanifestD343EB52
+      - LangWatchClusterchartASCPProvider584D0BB8
+      - LangWatchClusterchartSecretsStoreCSIDriver12F66008
+      - LangWatchClusterControlPlaneSecurityGroup9AEC2E28
+      - LangWatchClusterfluentdConditionJson6FDD32AC
+      - LangWatchClusterfluentdmanifestfluentdServiceAccountResourceAAEDE6D1
+      - LangWatchClusterfluentdRoleDefaultPolicyDE734FD0
+      - LangWatchClusterfluentdRole0BB36723
+      - LangWatchClusterKubectlHandlerRoleDefaultPolicy759A73CC
+      - LangWatchClusterKubectlHandlerRole5D8BE59D
+      - LangWatchClusterKubectlReadyBarrier3056B7E3
+      - LangWatchClusterlangwatchsaConditionJsonE67429E1
+      - LangWatchClusterlangwatchsamanifestlangwatchsaServiceAccountResource0438CE66
+      - LangWatchClusterlangwatchsaRoleDefaultPolicy52AD3AA1
+      - LangWatchClusterlangwatchsaRole8F5FC1A9
+      - LangWatchClusterlangwatchserviceLoadBalancerAddressE72135C8
+      - LangWatchClustermanifestCSIDriverClusterRole43123684
+      - LangWatchClustermanifestCSIDriverClusterRoleBinding0D0F06CF
+      - LangWatchClustermanifestfluentdclusterrole27EE2797
+      - LangWatchClustermanifestfluentdclusterrolebinding2D0FD13F
+      - LangWatchClustermanifestfluentdconfig824881A9
+      - LangWatchClustermanifestfluentddaemonsetAA4F7F54
+      - LangWatchClustermanifestkubeapiserverkubeletclientbinding09E1D018
+      - LangWatchClustermanifestlangevalsservice3291BD64
+      - LangWatchClustermanifestlangevals69987427
+      - LangWatchClustermanifestlangwatchnlpservice3C4DE318
+      - LangWatchClustermanifestlangwatchnlpF132A27F
+      - LangWatchClustermanifestlangwatchservice97F1449F
+      - LangWatchClustermanifestlangwatch40299E6A
+      - LangWatchClustermanifestLangWatchSecretProviderClass0AAB1013
+      - LangWatchClusterNodegroupManagedNodesNodeGroupRole5C9EF25C
+      - LangWatchClusterNodegroupManagedNodes43430C18
+      - LangWatchClusterOpenIdConnectProvider92F61D91
+      - LangWatchClusterCreationRoleDefaultPolicy6F8C3DDE
+      - LangWatchClusterCreationRole2CE467D3
+      - LangWatchCluster914B7009
+      - LangWatchClusterRole2C66581A
+      - PostgresInstance19CDD68A
+      - PostgresInstanceSubnetGroup84F90C7C
+    UpdateReplacePolicy: Delete
+    DeletionPolicy: Delete
+    Metadata:
+      aws:cdk:path: LangWatchAwsMarketplaceStack/AddPostgresIngressRule/Resource/Default
+  AddPostgresIngressRuleCustomResourcePolicy52ADC86F:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyDocument:
+        Statement:
+          - Action: ec2:AuthorizeSecurityGroupIngress
+            Effect: Allow
+            Resource: "*"
+        Version: "2012-10-17"
+      PolicyName: AddPostgresIngressRuleCustomResourcePolicy52ADC86F
+      Roles:
+        - Ref: AWS679f53fac002430cb0da5b7982bd2287ServiceRoleC1EA0FF2
+    DependsOn:
+      - LangWatchClusterAwsAuthmanifestD343EB52
+      - LangWatchClusterchartASCPProvider584D0BB8
+      - LangWatchClusterchartSecretsStoreCSIDriver12F66008
+      - LangWatchClusterControlPlaneSecurityGroup9AEC2E28
+      - LangWatchClusterfluentdConditionJson6FDD32AC
+      - LangWatchClusterfluentdmanifestfluentdServiceAccountResourceAAEDE6D1
+      - LangWatchClusterfluentdRoleDefaultPolicyDE734FD0
+      - LangWatchClusterfluentdRole0BB36723
+      - LangWatchClusterKubectlHandlerRoleDefaultPolicy759A73CC
+      - LangWatchClusterKubectlHandlerRole5D8BE59D
+      - LangWatchClusterKubectlReadyBarrier3056B7E3
+      - LangWatchClusterlangwatchsaConditionJsonE67429E1
+      - LangWatchClusterlangwatchsamanifestlangwatchsaServiceAccountResource0438CE66
+      - LangWatchClusterlangwatchsaRoleDefaultPolicy52AD3AA1
+      - LangWatchClusterlangwatchsaRole8F5FC1A9
+      - LangWatchClusterlangwatchserviceLoadBalancerAddressE72135C8
+      - LangWatchClustermanifestCSIDriverClusterRole43123684
+      - LangWatchClustermanifestCSIDriverClusterRoleBinding0D0F06CF
+      - LangWatchClustermanifestfluentdclusterrole27EE2797
+      - LangWatchClustermanifestfluentdclusterrolebinding2D0FD13F
+      - LangWatchClustermanifestfluentdconfig824881A9
+      - LangWatchClustermanifestfluentddaemonsetAA4F7F54
+      - LangWatchClustermanifestkubeapiserverkubeletclientbinding09E1D018
+      - LangWatchClustermanifestlangevalsservice3291BD64
+      - LangWatchClustermanifestlangevals69987427
+      - LangWatchClustermanifestlangwatchnlpservice3C4DE318
+      - LangWatchClustermanifestlangwatchnlpF132A27F
+      - LangWatchClustermanifestlangwatchservice97F1449F
+      - LangWatchClustermanifestlangwatch40299E6A
+      - LangWatchClustermanifestLangWatchSecretProviderClass0AAB1013
+      - LangWatchClusterNodegroupManagedNodesNodeGroupRole5C9EF25C
+      - LangWatchClusterNodegroupManagedNodes43430C18
+      - LangWatchClusterOpenIdConnectProvider92F61D91
+      - LangWatchClusterCreationRoleDefaultPolicy6F8C3DDE
+      - LangWatchClusterCreationRole2CE467D3
+      - LangWatchCluster914B7009
+      - LangWatchClusterRole2C66581A
+      - PostgresInstance19CDD68A
+      - PostgresInstanceSubnetGroup84F90C7C
+    Metadata:
+      aws:cdk:path: LangWatchAwsMarketplaceStack/AddPostgresIngressRule/CustomResourcePolicy/Resource
+  ElasticsearchPasswordAA70AA0E:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      GenerateSecretString:
+        ExcludeCharacters: "'\"@/\\:?#[]&=+<>{}|^~`,%;"
+        PasswordLength: 32
+    UpdateReplacePolicy: Delete
+    DeletionPolicy: Delete
+    Metadata:
+      aws:cdk:path: LangWatchAwsMarketplaceStack/ElasticsearchPassword/Resource
+  GeneratedSecretNextAuthSecret5B47A38B:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      GenerateSecretString:
+        ExcludeCharacters: "'\"@/\\:?#[]&=+<>{}|^~`,%;"
+        PasswordLength: 32
+    UpdateReplacePolicy: Delete
+    DeletionPolicy: Delete
+    Metadata:
+      aws:cdk:path: LangWatchAwsMarketplaceStack/GeneratedSecretNextAuthSecret/Resource
+  GeneratedSecretJWTSecret1ED7BA16:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      GenerateSecretString:
+        ExcludeCharacters: "'\"@/\\:?#[]&=+<>{}|^~`,%;"
+        PasswordLength: 32
+    UpdateReplacePolicy: Delete
+    DeletionPolicy: Delete
+    Metadata:
+      aws:cdk:path: LangWatchAwsMarketplaceStack/GeneratedSecretJWTSecret/Resource
+  LangWatchEnvSecretFC595938:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      SecretString:
+        Fn::Join:
+          - ""
+          - - '{"BASE_HOST":"https://'
+            - Ref: SubDomainName
+            - '","NEXTAUTH_URL":"https://'
+            - Ref: SubDomainName
+            - '","DEBUG":"langwatch:*","NEXTAUTH_PROVIDER":"email","NEXTAUTH_SECRET":"{{resolve:secretsmanager:'
+            - Ref: GeneratedSecretNextAuthSecret5B47A38B
+            - ':SecretString:::}}","API_TOKEN_JWT_SECRET":"{{resolve:secretsmanager:'
+            - Ref: GeneratedSecretJWTSecret1ED7BA16
+            - ':SecretString:::}}","LANGWATCH_NLP_SERVICE":"http://langwatch-nlp-service:8080","LANGEVALS_ENDPOINT":"http://langevals-service:8000","REDIS_URL":"redis://:{{resolve:secretsmanager:'
+            - Ref: RedisPasswordED621C10
+            - :SecretString:password::}}@
+            - Fn::GetAtt:
+                - RedisReplicationGroup
+                - PrimaryEndPoint.Address
+            - ":"
+            - Fn::GetAtt:
+                - RedisReplicationGroup
+                - PrimaryEndPoint.Port
+            - '","DATABASE_URL":"postgresql://langwatch_db:{{resolve:secretsmanager:'
+            - Ref: PostgresPassword16E090A7
+            - :SecretString:password::}}@
+            - Fn::GetAtt:
+                - PostgresInstance19CDD68A
+                - Endpoint.Address
+            - ":"
+            - Fn::GetAtt:
+                - PostgresInstance19CDD68A
+                - Endpoint.Port
+            - '/langwatch_db?schema=public","ELASTICSEARCH_NODE_URL":"https://elastic:{{resolve:secretsmanager:'
+            - Ref: ElasticsearchPasswordAA70AA0E
+            - :SecretString:::}}@elasticsearch-master:9200"}
+    UpdateReplacePolicy: Delete
+    DeletionPolicy: Delete
+    Metadata:
+      aws:cdk:path: LangWatchAwsMarketplaceStack/LangWatchEnvSecret/Resource
+  CustomAWSCDKOpenIdConnectProviderCustomResourceProviderRole517FED65:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+      ManagedPolicyArns:
+        - Fn::Sub: arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: Inline
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Resource: "*"
+                Action:
+                  - iam:CreateOpenIDConnectProvider
+                  - iam:DeleteOpenIDConnectProvider
+                  - iam:UpdateOpenIDConnectProviderThumbprint
+                  - iam:AddClientIDToOpenIDConnectProvider
+                  - iam:RemoveClientIDFromOpenIDConnectProvider
+    Metadata:
+      aws:cdk:path: LangWatchAwsMarketplaceStack/Custom::AWSCDKOpenIdConnectProviderCustomResourceProvider/Role
+  CustomAWSCDKOpenIdConnectProviderCustomResourceProviderHandlerF2C543E0:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        S3Bucket:
+          Fn::Sub: cdk-hnb659fds-assets-${AWS::AccountId}-eu-central-1
+        S3Key: 977fc1649d2dbcce16e23f6332faef6fa0f48aa74a0afe35f4a3467754e20cd8.zip
+      Timeout: 900
+      MemorySize: 128
+      Handler: __entrypoint__.handler
+      Role:
+        Fn::GetAtt:
+          - CustomAWSCDKOpenIdConnectProviderCustomResourceProviderRole517FED65
+          - Arn
+      Runtime: nodejs20.x
+    DependsOn:
+      - CustomAWSCDKOpenIdConnectProviderCustomResourceProviderRole517FED65
+    Metadata:
+      aws:cdk:path: LangWatchAwsMarketplaceStack/Custom::AWSCDKOpenIdConnectProviderCustomResourceProvider/Handler
+      aws:asset:path: asset.977fc1649d2dbcce16e23f6332faef6fa0f48aa74a0afe35f4a3467754e20cd8
+      aws:asset:property: Code
+  AWSCDKCfnUtilsProviderCustomResourceProviderRoleFE0EE867:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+      ManagedPolicyArns:
+        - Fn::Sub: arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+    Metadata:
+      aws:cdk:path: LangWatchAwsMarketplaceStack/AWSCDKCfnUtilsProviderCustomResourceProvider/Role
+  AWSCDKCfnUtilsProviderCustomResourceProviderHandlerCF82AA57:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        S3Bucket:
+          Fn::Sub: cdk-hnb659fds-assets-${AWS::AccountId}-eu-central-1
+        S3Key: 70dc346d78f37c98f818c01173252d7441864d42268efd4ee44769cbd6f31d24.zip
+      Timeout: 900
+      MemorySize: 128
+      Handler: __entrypoint__.handler
+      Role:
+        Fn::GetAtt:
+          - AWSCDKCfnUtilsProviderCustomResourceProviderRoleFE0EE867
+          - Arn
+      Runtime: nodejs20.x
+    DependsOn:
+      - AWSCDKCfnUtilsProviderCustomResourceProviderRoleFE0EE867
+    Metadata:
+      aws:cdk:path: LangWatchAwsMarketplaceStack/AWSCDKCfnUtilsProviderCustomResourceProvider/Handler
+      aws:asset:path: asset.70dc346d78f37c98f818c01173252d7441864d42268efd4ee44769cbd6f31d24
+      aws:asset:property: Code
+  CDKMetadata:
+    Type: AWS::CDK::Metadata
+    Properties:
+      Analytics: v2:deflate64:H4sIAAAAAAAA/21TbW/aMBD+LXx3XAqTto9L6daxbiWCiq/o4lzB4NjILyAU5b/v7BBStZMi3XMvdu6eezzhzf2Xr3w6grPLRHXIlCx5s/IgDmz2pguwUKNHyyi/aVBMeLM+iphaFzNWhFJJsQqlRh9jA1qa4PEVSoVDfIjlzhkhwUujb8UR/JgX0byAfwKPZ7iwwsoTweHiuaZuCPcFXSdXL/fU+K5G7dkKRbDSX56sCcfUw/tAy9x0A86hdzyPhnz+EMQB/QM4ZArqsgLe0Lk/cEG7Rutisyuptwq90T+DFqn9G6DSHrcMD44Oq+AidS+mwm3fxuDkZ5cHv2PPoUwTofsLWr6h8+wXqnq2AxvHsCcpMBfCBJpqcUQ9r2ZGaxS+sOYkK/rBcMOi3FNiDSpgyyTUvFmabgXJFobWlTjrEDWqwHkpiDVM03ZE30hb4pHq0qJ63lBYYq0GDVu0JJXkXwmOqDOvYLfo3+3jVvAx0zJbEVmP4KEk6ufaedAC2YdOHh8+BfrStmVLdCZYOjUjyk09uHGE/6Z68tK6kwRI9FtabzxDBFey3+pv19nuUYh0y8ZeryH5nN3nny6CPwYabczHo+/Xp3XXiSpTUVDZgXYmvMpO0zF/7vB6Ok5ia5kmkfC9uzvdf+P0TUZ7J2VmSQGyRr7s7D9mj1HsuwMAAA==
+    Metadata:
+      aws:cdk:path: LangWatchAwsMarketplaceStack/CDKMetadata/Default
+Conditions:
+  LangWatchClusterHasEcrPublicBC6C88EA:
+    Fn::Equals:
+      - Ref: AWS::Partition
+      - aws
+Outputs:
+  LangWatchLoadBalancerDNS:
+    Description: Application Load Balancer DNS Name. Point your subdomain CNAME record to this value.
+    Value:
+      Fn::GetAtt:
+        - LangWatchClusterlangwatchserviceLoadBalancerAddressE72135C8
+        - Value
+Rules:
+  CheckBootstrapVersion:
+    Assertions:
+      - Assert:
+          Fn::Not:
+            - Fn::Contains:
+                - - "1"
+                  - "2"
+                  - "3"
+                  - "4"
+                  - "5"
+                - Ref: BootstrapVersion
+        AssertDescription: CDK bootstrap stack version 6 required. Please run 'cdk bootstrap' with a recent version of the CDK CLI.
+

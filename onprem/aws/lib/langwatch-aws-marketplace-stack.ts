@@ -107,8 +107,8 @@ export class LangWatchAwsMarketplaceStack extends cdk.Stack {
     );
 
     setupFluentd(cluster);
-    this.setupLangEvals(cluster);
-    this.setupLangWatchNLP(cluster);
+    // this.setupLangEvals(cluster);
+    // this.setupLangWatchNLP(cluster);
     this.setupLangWatch(domainParam, cluster);
   }
 
@@ -315,6 +315,10 @@ export class LangWatchAwsMarketplaceStack extends cdk.Stack {
               {
                 objectName: "NEXTAUTH_SECRET",
                 key: "NEXTAUTH_SECRET",
+              },
+              {
+                objectName: "API_TOKEN_JWT_SECRET",
+                key: "API_TOKEN_JWT_SECRET",
               },
               {
                 objectName: "LANGWATCH_NLP_SERVICE",
