@@ -588,7 +588,11 @@ function LmmModelCost(props: LmmModelCost.Props) {
     { projectId: props.projectId ?? "" },
     { enabled: !!props.projectId }
   );
-  const updateField = api.llmModelCost.updateField.useMutation();
+  const updateField = api.llmModelCost.updateField.useMutation({
+    onSuccess: async () => {
+      await model.refetch();
+    },
+  });
   const handleUpdateField = useCallback(
     (event: EditableField.SubmitEvent<any>) => {
       updateField.mutate({
