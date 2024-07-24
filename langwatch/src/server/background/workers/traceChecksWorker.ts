@@ -18,7 +18,7 @@ import {
   type SingleEvaluationResult,
 } from "../../../trace_checks/evaluators.generated";
 import { TRACE_INDEX, esClient, traceIndexId } from "../../elasticsearch";
-import type { ElasticSearchTrace, Trace } from "../../tracer/types";
+import type { ElasticSearchTrace } from "../../tracer/types";
 import {
   esGetSpansByTraceId,
   getTracesByThreadId,

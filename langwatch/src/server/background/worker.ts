@@ -3,6 +3,7 @@ import type {
   CollectorJob,
   TopicClusteringJob,
   TraceCheckJob,
+  TrackEventJob,
 } from "~/server/background/types";
 import type {
   EvaluatorTypes,
