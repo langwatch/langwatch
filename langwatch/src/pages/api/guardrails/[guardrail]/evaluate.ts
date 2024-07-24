@@ -18,7 +18,7 @@ import type {
 } from "../../../../trace_checks/evaluators.generated";
 import { evaluatorsSchema } from "../../../../trace_checks/evaluators.zod.generated";
 import { getEvaluatorDefinitions } from "../../../../trace_checks/getEvaluator";
-import { extractChunkTextualContent } from "../../collector/rag";
+import { extractChunkTextualContent } from "../../../../server/background/workers/collector/rag";
 import * as Sentry from "@sentry/nextjs";
 import { runEvaluation } from "../../../../server/background/workers/traceChecksWorker";
 

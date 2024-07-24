@@ -1,10 +1,10 @@
-import { env } from "../../../env.mjs";
+import { env } from "../../../../env.mjs";
 import {
   TRACE_INDEX,
   esClient,
   traceIndexId,
-} from "../../../server/elasticsearch";
-import type { Trace } from "../../../server/tracer/types";
+} from "../../../elasticsearch";
+import type { Trace } from "../../../tracer/types";
 
 type SatisfactionScoreResult = {
   score_normalized: number;
@@ -34,22 +34,19 @@ export const scoreSatisfactionFromInput = async ({
     return;
   }
 
-  const response = await fetch(
-    `${env.LANGWATCH_NLP_SERVICE}/sentiment`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        vector: input.embeddings.embeddings,
-      }),
-    }
-  );
+  const response = await fetch(`${env.LANGWATCH_NLP_SERVICE}/sentiment`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      vector: input.embeddings.embeddings,
+    }),
+  });
 
   if (!response.ok) {
     throw new Error(
-      `Inconsistency check API returned an error: ${response.statusText}`
+      `Score satisfaction check API returned an error: ${await response.text()}`
     );
   }
 

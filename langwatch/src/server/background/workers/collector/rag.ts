@@ -1,4 +1,4 @@
-import type { RAGChunk, RAGSpan, Span } from "../../../server/tracer/types";
+import type { RAGChunk, RAGSpan, Span } from "../../../tracer/types";
 import {
   flattenSpanTree,
   getFirstInputAsText,

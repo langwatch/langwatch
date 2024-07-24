@@ -1,12 +1,12 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { scoreSatisfactionFromInput } from "./satisfaction";
-import { getOpenAIEmbeddings } from "../../../server/embeddings";
+import { getOpenAIEmbeddings } from "../../../embeddings";
 import {
   TRACE_INDEX,
   esClient,
   traceIndexId,
-} from "../../../server/elasticsearch";
-import type { Trace } from "../../../server/tracer/types";
+} from "../../../elasticsearch";
+import type { Trace } from "../../../tracer/types";
 
 describe("Satisfaction Scoring Integration Test", () => {
   const testTraceId = "test-trace-satisfaction";

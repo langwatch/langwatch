@@ -21,7 +21,7 @@ import {
   type EvaluatorTypes,
   type SingleEvaluationResult,
 } from "../../../trace_checks/evaluators.generated";
-import { extractChunkTextualContent } from "../collector/rag";
+import { extractChunkTextualContent } from "../../../server/background/workers/collector/rag";
 
 export const debug = getDebugger("langwatch:guardrail:evaluate");
 

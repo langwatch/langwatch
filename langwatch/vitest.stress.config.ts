@@ -4,13 +4,10 @@ import { configDefaults, defineConfig } from "vitest/config";
 export default defineConfig({
   test: {
     setupFiles: ["./test-setup.ts"],
-    exclude: [
-      ...configDefaults.exclude,
-      "**/*.integration.test.ts",
-      "**/*.stress.test.ts",
-      ".next/**/*",
-      ".next-saas/**/*",
-    ],
+    include: ["**/*.stress.{test,spec}.?(c|m)[jt]s?(x)"],
+    exclude: [...configDefaults.exclude, ".next/**/*", ".next-saas/**/*"],
+    testTimeout: 300_000,
+    hookTimeout: 30_000,
   },
   resolve: {
     alias: {

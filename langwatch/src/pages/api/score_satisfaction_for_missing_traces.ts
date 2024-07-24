@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { TRACE_INDEX, esClient } from "../../server/elasticsearch";
 import type { Trace } from "../../server/tracer/types";
-import { scoreSatisfactionFromInput } from "./collector/satisfaction";
+import { scoreSatisfactionFromInput } from "../../server/background/workers/collector/satisfaction";
 
 export default async function handler(
   _req: NextApiRequest,

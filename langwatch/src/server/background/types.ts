@@ -1,5 +1,10 @@
 import type { EvaluatorTypes } from "../../trace_checks/evaluators.generated";
-import type { TrackEventRESTParamsValidator } from "../tracer/types";
+import type {
+  CustomMetadata,
+  ReservedTraceMetadata,
+  Span,
+  TrackEventRESTParamsValidator,
+} from "../tracer/types";
 
 export type TraceCheckJob = {
   check: {
@@ -29,4 +34,20 @@ export type TrackEventJob = {
     event_id: string;
     timestamp: number;
   };
+};
+
+export type CollectorJob = {
+  spans: Span[];
+  traceId: string;
+  projectId: string;
+  expectedOutput: string | null | undefined;
+  reservedTraceMetadata: ReservedTraceMetadata;
+  customMetadata: CustomMetadata;
+
+  existingTrace?: {
+    inserted_at: number;
+    indexing_md5s?: string[];
+    all_keys?: string[];
+  };
+  paramsMD5: string;
 };

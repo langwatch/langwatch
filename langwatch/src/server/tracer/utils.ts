@@ -2,8 +2,8 @@ import {
   flattenSpanTree,
   organizeSpansIntoTree,
   typedValueToText,
-} from "../../pages/api/collector/common";
-import { extractRAGTextualContext } from "../../pages/api/collector/rag";
+} from "../background/workers/collector/common";
+import { extractRAGTextualContext } from "../background/workers/collector/rag";
 import {
   type ElasticSearchInputOutput,
   type ElasticSearchSpan,
