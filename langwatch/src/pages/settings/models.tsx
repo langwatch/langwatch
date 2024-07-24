@@ -438,25 +438,82 @@ function NewLmmModelCostForm({
   projectId,
   onNewModel,
 }: NewLmmModelCostForm.Props) {
+  const toast = useToast();
   const [newModel, setNewModel] = React.useState({
     model: "",
     regex: "",
     inputCostPerToken: 0,
     outputCostPerToken: 0,
   });
-  const createModel = api.llmModelCost.createModel.useMutation();
+  const createModel = api.llmModelCost.createModel.useMutation({
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to create Custom LLM model.",
+        status: "error",
+        duration: 9000,
+        isClosable: true,
+      });
+    },
+    onSuccess: async () => {
+      toast({
+        title: "Success",
+        description: `Model ${newModel.model} created successfully.`,
+        status: "success",
+        duration: 5000,
+        isClosable: true,
+      });
+      await onNewModel(newModel);
+    },
+  });
 
-  const handleCreateModel = React.useCallback(async () => {
-    // eslint-disable-next-line @typescript-eslint/await-thenable
-    await createModel.mutate({
-      projectId: projectId,
-      model: newModel.model,
-      regex: newModel.regex,
-      inputCostPerToken: newModel.inputCostPerToken,
-      outputCostPerToken: newModel.outputCostPerToken,
-    });
-    await onNewModel(newModel);
-  }, [createModel, newModel, projectId, onNewModel]);
+  const handleCreateModel = React.useCallback(() => {
+    if (!newModel.model) {
+      toast({
+        title: "Error",
+        description: "Model name is required.",
+        status: "error",
+        duration: 9000,
+        isClosable: true,
+      });
+      return;
+    } else if (!newModel.regex) {
+      toast({
+        title: "Error",
+        description: "Match rule is required.",
+        status: "error",
+        duration: 9000,
+        isClosable: true,
+      });
+      return;
+    } else if (newModel.inputCostPerToken < 0) {
+      toast({
+        title: "Error",
+        description: "Input cost must be a positive number.",
+        status: "error",
+        duration: 9000,
+        isClosable: true,
+      });
+      return;
+    } else if (newModel.outputCostPerToken < 0) {
+      toast({
+        title: "Error",
+        description: "Output cost must be a positive number.",
+        status: "error",
+        duration: 9000,
+        isClosable: true,
+      });
+      return;
+    } else {
+      createModel.mutate({
+        projectId: projectId,
+        model: newModel.model,
+        regex: newModel.regex,
+        inputCostPerToken: newModel.inputCostPerToken,
+        outputCostPerToken: newModel.outputCostPerToken,
+      });
+    }
+  }, [createModel, newModel, projectId, toast]);
 
   return (
     <Tr>
@@ -509,8 +566,8 @@ function NewLmmModelCostForm({
         />
       </Td>
       <Td>
-        <Button onClick={() => handleCreateModel()}>
-          <Check />
+        <Button onClick={() => handleCreateModel()} colorScheme="orange">
+          Save
         </Button>
       </Td>
     </Tr>
@@ -567,7 +624,12 @@ function LmmModelCost(props: LmmModelCost.Props) {
             <Text fontSize="sm" color="gray.500">
               {model.data?.length} models
             </Text>
-            <Button onClick={() => setShowNewRow(!showNewRow)}>+</Button>
+            <Button
+              colorScheme="orange"
+              onClick={() => setShowNewRow(!showNewRow)}
+            >
+              +
+            </Button>
           </HStack>
           <Table variant="simple" width="full">
             <Thead width="full">
@@ -591,7 +653,7 @@ function LmmModelCost(props: LmmModelCost.Props) {
                   <Td>
                     <Text
                       isTruncated
-                      maxWidth="250px"
+                      maxWidth="220px"
                       color={!!row.updatedAt ? "green.500" : void 0}
                     >
                       {row.model}
@@ -606,7 +668,7 @@ function LmmModelCost(props: LmmModelCost.Props) {
                       renderValue={(value) => (
                         <Code
                           isTruncated
-                          maxWidth="250px"
+                          maxWidth="220px"
                           color={!!row.updatedAt ? "green.500" : void 0}
                         >
                           {value}
@@ -640,7 +702,7 @@ function LmmModelCost(props: LmmModelCost.Props) {
                       )}
                     />
                   </Td>
-                  <Td></Td>
+                  <Td width={64}></Td>
                 </Tr>
               ))}
             </Tbody>
