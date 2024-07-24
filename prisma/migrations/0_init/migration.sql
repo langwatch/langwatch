@@ -1,1 +1,1 @@
-/Users/richardhuth/Development/langwatch-sass/langwatch/langwatch/prisma/migrations/0_init/migration.sql
+../../../langwatch/langwatch/prisma/migrations/0_init/migration.sql
