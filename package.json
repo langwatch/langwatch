@@ -9,9 +9,9 @@
     "start": "npm run prepare:production && NODE_ENV=production DEBUG=langwatch:* DEBUG_COLORS=true NEXTJS_DIST_DIR=.next node server.js",
     "start:workers": "tsx src/workers.ts",
     "start:prepare": "cp .env langwatch/langwatch/; cd langwatch/langwatch; npm install && npm run start:prepare:files && cd ../../ && npm run prisma:db:generate",
-    "prisma:db:generate": "node prisma/generate-schema.js && npx prisma generate && cp -R node_modules/.prisma/* langwatch/langwatch/node_modules/.prisma/",
-    "prisma:db:push": "npx prisma db push",
-    "prepare:production": "npm run prisma:db:generate && npm run prisma:db:push && npm run elastic:index:create",
+    "prisma:db:generate": "node prisma/generate-schema.js && npx prisma generate && npx prisma migrate dev --create-only && cp -R node_modules/.prisma/* langwatch/langwatch/node_modules/.prisma/",
+    "prisma:db:migrate": "npx prisma migrate deploy",
+    "prepare:production": "npm run prisma:db:generate && npm run prisma:db:migrate && npm run elastic:index:create",
     "task": "DEBUG=langwatch:* tsx --tsconfig langwatch/langwatch/tsconfig.workers.json langwatch/langwatch/src/task.ts",
     "elastic:index:create": "npm run task -- elasticIndexCreate"
   },
