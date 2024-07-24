@@ -8,10 +8,10 @@ This is the private SaaS version of LangWatch protected by copyright. No copy, m
 
 2. Install redis and start it up:
 
-    ```
-    brew install redis
-    brew services start redis
-    ```
+   ```
+   brew install redis
+   brew services start redis
+   ```
 
 3. Clone the git submodules `git submodule update --init`
 
@@ -52,3 +52,7 @@ The docker images used by them are built with a github action when a new github 
 public docker hub.
 
 For AWS, we use CDK for generating the CloudFormation template and deploying, check out the README inside that folder for more details.
+
+# Schema changes
+
+If you would like to make schema changes, you will need to setup a local postgres DB running on `postgresql://postgres@localhost:5432` (for running the open-source repo migrations first), once you have done this you can run `npm run prisma:generate:migration` from the top-level langwatch-saas folder to generate a new migration file.
