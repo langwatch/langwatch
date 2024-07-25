@@ -735,7 +735,7 @@ class DSPyTracer:
 
                 span = self_.safe_get_current_span()
 
-                passages = result.get("passages", None)
+                passages = result if isinstance(result, list) else result.get("passages", None)
                 if span and passages and type(passages) == list:
                     span.update(contexts=passages)
 
