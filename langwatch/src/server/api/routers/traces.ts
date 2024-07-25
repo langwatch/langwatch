@@ -672,7 +672,10 @@ export const getAllTracesForProject = async (
 
   const traceIdsArray = traces.map((trace) => trace.trace_id);
 
-  const spans = await getSpansForTraceIds(input.projectId, traceIdsArray);
+  const [spans, evaluations] = await Promise.all([
+    getSpansForTraceIds(input.projectId, traceIdsArray, true),
+    getTraceChecks(input.projectId, traceIdsArray),
+  ]);
 
   const contexts: Contexts[] = [];
   for (const traceId in spans) {
@@ -680,7 +683,7 @@ export const getAllTracesForProject = async (
 
     if (spansOfId) {
       for (const span of spansOfId) {
-        if (span.type === "rag") {
+        if ("contexts" in span && Array.isArray(span.contexts)) {
           contexts.push({
             traceId,
             contexts: "contexts" in span && span.contexts ? span.contexts : [],
@@ -689,8 +692,6 @@ export const getAllTracesForProject = async (
       }
     }
   }
-
-  const traceChecks = await getTraceChecks(input.projectId, traceIdsArray);
 
   const mergedGroups = groups.map((group) => {
     return group.map((trace) => {
@@ -702,14 +703,15 @@ export const getAllTracesForProject = async (
     });
   });
 
-  return { groups: mergedGroups, totalHits, traceChecks };
+  return { groups: mergedGroups, totalHits, traceChecks: evaluations };
 };
 
 export const getSpansForTraceIds = async (
   projectId: string,
-  traceIds: string[]
+  traceIds: string[],
+  contextsOnly = false
 ) => {
-  const BATCH_SIZE = 50; // Define a suitable batch size
+  const BATCH_SIZE = 300; // Around the maximum IDs that ES supports without blowing up
   const searchPromises = [];
 
   for (let i = 0; i < traceIds.length; i += BATCH_SIZE) {
@@ -723,13 +725,19 @@ export const getSpansForTraceIds = async (
             filter: [
               { term: { project_id: projectId } },
               { terms: { trace_id: batchTraceIds } },
+              ...(contextsOnly ? [{ exists: { field: "contexts" } }] : []),
             ] as QueryDslBoolQuery["filter"],
           } as QueryDslBoolQuery,
         },
       },
-      routing: batchTraceIds
-        .map((traceId) => traceIndexId({ traceId, projectId }))
-        .join(","),
+      // Skip routing for big batches so query doesn't blow up
+      ...(batchTraceIds.length <= 50
+        ? {
+            routing: batchTraceIds
+              .map((traceId) => traceIndexId({ traceId, projectId }))
+              .join(","),
+          }
+        : {}),
     });
     searchPromises.push(searchPromise);
   }
@@ -761,25 +769,34 @@ const getTraceChecks = async (
   projectId: string,
   traceIds: string[]
 ): Promise<Record<string, TraceCheck[]>> => {
-  const checksResult = await esClient.search<TraceCheck>({
-    index: TRACE_CHECKS_INDEX,
-    body: {
-      size: Math.min(traceIds.length * 100, 10_000), // Assuming a maximum of 100 checks per trace
-      query: {
-        //@ts-ignore
-        bool: {
-          filter: [
-            { terms: { trace_id: traceIds } },
-            { term: { project_id: projectId } },
-          ],
+  const batchSize = 300; // Around the maximum IDs that ES supports without blowing up
+  const searchPromises = [];
+
+  for (let i = 0; i < traceIds.length; i += batchSize) {
+    const batchTraceIds = traceIds.slice(i, i + batchSize);
+
+    const searchPromise = esClient.search<TraceCheck>({
+      index: TRACE_CHECKS_INDEX,
+      body: {
+        size: 10_000,
+        query: {
+          //@ts-ignore
+          bool: {
+            filter: [
+              { terms: { trace_id: batchTraceIds } },
+              { term: { project_id: projectId } },
+            ],
+          },
         },
       },
-    },
-  });
+    });
+    searchPromises.push(searchPromise);
+  }
 
-  const traceChecks = checksResult.hits.hits
-    .map((hit) => hit._source!)
-    .filter((x) => x);
+  const results = await Promise.all(searchPromises);
+  const traceChecks = results.flatMap((result) =>
+    result.hits.hits.map((hit) => hit._source!).filter((x) => x)
+  );
 
   const checksPerTrace = traceChecks.reduce(
     (acc, check) => {
