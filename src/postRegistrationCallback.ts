@@ -2,6 +2,18 @@ import { IncomingWebhook } from "@slack/webhook";
 import { Client } from "@hubspot/api-client";
 import * as Sentry from "../langwatch/langwatch/node_modules/@sentry/nextjs";
 
+function getFirstAndLastName(fullName: string) {
+  let nameParts = fullName.trim().split(/\s+/);
+
+  let firstname = nameParts[0];
+  let lastname = nameParts.length > 1 ? nameParts[nameParts.length - 1] : "";
+
+  return {
+    firstname,
+    lastname,
+  };
+}
+
 const sendSlackNotification = async (user: any, org: any) => {
   const url = process.env.SLACK_CHANNEL_SIGNUPS!;
   const webhook = new IncomingWebhook(url);
@@ -38,6 +50,8 @@ const createLeadInHubSpot = async (user: any, org: any) => {
 
 const submitLeadFormInHubSpot = async (user: any, org: any) => {
   const currentTimestamp = new Date().getTime();
+  const { firstname, lastname } = getFirstAndLastName(user.name);
+
   const formData = {
     submittedAt: currentTimestamp,
     fields: [
@@ -49,7 +63,12 @@ const submitLeadFormInHubSpot = async (user: any, org: any) => {
       {
         objectTypeId: "0-1",
         name: "firstname",
-        value: user.name,
+        value: firstname,
+      },
+      {
+        objectTypeId: "0-1",
+        name: "lastname",
+        value: lastname,
       },
       {
         objectTypeId: "0-1",
@@ -96,7 +115,7 @@ export const PostRegistrationCallback = async (user: any, org: any) => {
 
   // Keeping this, as we might want to use it again.
   //const hubSpotPromise = createLeadInHubSpot(user, org);
-  //const hubSpotFormPromise = submitLeadFormInHubSpot(user, org);
+  const hubSpotFormPromise = submitLeadFormInHubSpot(user, org);
 
   try {
     await Promise.all([slackNotificationPromise]);
