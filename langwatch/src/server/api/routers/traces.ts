@@ -373,6 +373,13 @@ export const tracesRouter = createTRPCRouter({
 
       return samples;
     }),
+
+  getAllForDownload: protectedProcedure
+    .input(getAllForProjectInput)
+    .use(checkUserPermissionForProject(TeamRoleGroup.MESSAGES_VIEW))
+    .mutation(async ({ ctx, input }) => {
+      return await getAllTracesForProject({ ...input, pageSize: 10_000 }, ctx);
+    }),
 });
 
 export const getAllTracesForProject = async (
