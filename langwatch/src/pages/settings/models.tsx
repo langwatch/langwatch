@@ -4,6 +4,7 @@ import {
   Card,
   CardBody,
   Checkbox,
+  Code,
   Grid,
   GridItem,
   HStack,
@@ -13,10 +14,17 @@ import {
   Spacer,
   Spinner,
   Switch,
+  Table,
   Text,
   VStack,
   useToast,
+  Thead,
+  Tr,
+  Th,
+  Tbody,
+  Td,
 } from "@chakra-ui/react";
+import { Edit2, Check } from "react-feather";
 import { zodResolver } from "@hookform/resolvers/zod";
 import React, { useCallback } from "react";
 import { Controller, useForm } from "react-hook-form";
@@ -98,6 +106,9 @@ export default function ModelsPage() {
           </CardBody>
         </Card>
         <TopicClusteringModel />
+        {process.env.NEXT_PUBLIC_FEATURE_LLM_MODEL_COST && (
+          <LmmModelCost projectId={project?.id} />
+        )}
       </VStack>
     </SettingsLayout>
   );
@@ -350,17 +361,18 @@ function TopicClusteringModel() {
   const updateTopicClusteringModel =
     api.project.updateTopicClusteringModel.useMutation();
 
-  const { register, handleSubmit, control } =
-    useForm<TopicClusteringModelForm>({
+  const { register, handleSubmit, control } = useForm<TopicClusteringModelForm>(
+    {
       defaultValues: {
         topicClusteringModel:
           project?.topicClusteringModel ?? allowedTopicClusteringModels[0]!,
       },
-    });
+    }
+  );
 
   const topicClusteringModelField = register("topicClusteringModel");
 
-  const onSubmit = useCallback(
+  const onUpdateSubmit = useCallback(
     async (data: TopicClusteringModelForm) => {
       await updateTopicClusteringModel.mutateAsync({
         projectId: project?.id ?? "",
@@ -396,7 +408,7 @@ function TopicClusteringModel() {
                   // eslint-disable-next-line @typescript-eslint/no-misused-promises
                   onChange={(model) => {
                     field.onChange(model);
-                    void handleSubmit(onSubmit)();
+                    void handleSubmit(onUpdateSubmit)();
                   }}
                   mode="chat"
                 />
@@ -406,5 +418,410 @@ function TopicClusteringModel() {
         </CardBody>
       </Card>
     </>
+  );
+}
+
+// eslint-disable-next-line @typescript-eslint/no-namespace
+declare namespace NewLmmModelCostForm {
+  export interface Props {
+    projectId: string;
+    onNewModel: (model: {
+      model: string;
+      regex: string;
+      inputCostPerToken: number;
+      outputCostPerToken: number;
+    }) => Promise<void>;
+  }
+}
+
+function NewLmmModelCostForm({
+  projectId,
+  onNewModel,
+}: NewLmmModelCostForm.Props) {
+  const toast = useToast();
+  const [newModel, setNewModel] = React.useState({
+    model: "",
+    regex: "",
+    inputCostPerToken: 0,
+    outputCostPerToken: 0,
+  });
+  const createModel = api.llmModelCost.createModel.useMutation({
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to create Custom LLM model.",
+        status: "error",
+        duration: 9000,
+        isClosable: true,
+      });
+    },
+    onSuccess: async () => {
+      toast({
+        title: "Success",
+        description: `Model ${newModel.model} created successfully.`,
+        status: "success",
+        duration: 5000,
+        isClosable: true,
+      });
+      await onNewModel(newModel);
+    },
+  });
+
+  const handleCreateModel = React.useCallback(() => {
+    if (!newModel.model) {
+      toast({
+        title: "Error",
+        description: "Model name is required.",
+        status: "error",
+        duration: 9000,
+        isClosable: true,
+      });
+      return;
+    } else if (!newModel.regex) {
+      toast({
+        title: "Error",
+        description: "Match rule is required.",
+        status: "error",
+        duration: 9000,
+        isClosable: true,
+      });
+      return;
+    } else if (newModel.inputCostPerToken < 0) {
+      toast({
+        title: "Error",
+        description: "Input cost must be a positive number.",
+        status: "error",
+        duration: 9000,
+        isClosable: true,
+      });
+      return;
+    } else if (newModel.outputCostPerToken < 0) {
+      toast({
+        title: "Error",
+        description: "Output cost must be a positive number.",
+        status: "error",
+        duration: 9000,
+        isClosable: true,
+      });
+      return;
+    } else {
+      createModel.mutate({
+        projectId: projectId,
+        model: newModel.model,
+        regex: newModel.regex,
+        inputCostPerToken: newModel.inputCostPerToken,
+        outputCostPerToken: newModel.outputCostPerToken,
+      });
+    }
+  }, [createModel, newModel, projectId, toast]);
+
+  return (
+    <Tr>
+      <Td>
+        <Input
+          placeholder="model name"
+          defaultValue={newModel.model}
+          onChange={(e) =>
+            setNewModel((prev) => ({
+              ...prev,
+              model: e.target.value,
+            }))
+          }
+        />
+      </Td>
+      <Td>
+        <Input
+          placeholder="match rule"
+          defaultValue={newModel.regex}
+          onChange={(e) =>
+            setNewModel((prev) => ({
+              ...prev,
+              regex: e.target.value,
+            }))
+          }
+        />
+      </Td>
+      <Td>
+        <Input
+          placeholder="input cost"
+          defaultValue={newModel.inputCostPerToken}
+          onChange={(e) =>
+            setNewModel((prev) => ({
+              ...prev,
+              inputCostPerToken: Number(e.target.value),
+            }))
+          }
+        />
+      </Td>
+      <Td>
+        <Input
+          placeholder="output cost"
+          defaultValue={newModel.outputCostPerToken}
+          onChange={(e) =>
+            setNewModel((prev) => ({
+              ...prev,
+              outputCostPerToken: Number(e.target.value),
+            }))
+          }
+        />
+      </Td>
+      <Td>
+        <Button onClick={() => handleCreateModel()} colorScheme="orange">
+          Save
+        </Button>
+      </Td>
+    </Tr>
+  );
+}
+
+// eslint-disable-next-line @typescript-eslint/no-namespace
+declare namespace LmmModelCost {
+  export interface Props {
+    projectId?: string;
+  }
+}
+
+function LmmModelCost(props: LmmModelCost.Props) {
+  const [showNewRow, setShowNewRow] = React.useState(false);
+
+  const model = api.llmModelCost.getAllForProject.useQuery(
+    { projectId: props.projectId ?? "" },
+    { enabled: !!props.projectId }
+  );
+  const updateField = api.llmModelCost.updateField.useMutation({
+    onSuccess: async () => {
+      await model.refetch();
+    },
+  });
+  const handleUpdateField = useCallback(
+    (event: EditableField.SubmitEvent<any>) => {
+      updateField.mutate({
+        projectId: props.projectId ?? "",
+        model: event.model,
+        field: event.fieldName as any,
+        value:
+          event.fieldName === "regex"
+            ? String(event.value)
+            : Number(event.value),
+      });
+    },
+    [props.projectId, updateField]
+  );
+
+  const handleNewModel = useCallback(async () => {
+    await model.refetch();
+    setShowNewRow(false);
+  }, [model, setShowNewRow]);
+
+  return (
+    <>
+      <HStack width="full" marginTop={6}>
+        <Heading size="md" as="h2">
+          LMM Model Cost
+        </Heading>
+        <Spacer />
+      </HStack>
+      <Text>Define LLM model usage cost per token</Text>
+      <Card width="full">
+        <CardBody width="full" paddingY={0} paddingX={0}>
+          <HStack width="full" paddingY={4} paddingX={4}>
+            <Text fontSize="sm" color="gray.500">
+              {model.data?.length} models
+            </Text>
+            <Button
+              colorScheme="orange"
+              onClick={() => setShowNewRow(!showNewRow)}
+            >
+              +
+            </Button>
+          </HStack>
+          <Table variant="simple" width="full">
+            <Thead width="full">
+              <Tr width="full">
+                <Th>Model name</Th>
+                <Th>Match rule</Th>
+                <Th>Input cost</Th>
+                <Th>Output cost</Th>
+                <Th></Th>
+              </Tr>
+            </Thead>
+            <Tbody width="full">
+              {showNewRow && (
+                <NewLmmModelCostForm
+                  projectId={props.projectId!}
+                  onNewModel={handleNewModel}
+                />
+              )}
+              {model.data?.map((row) => (
+                <Tr key={row.model} width="full">
+                  <Td>
+                    <Text
+                      isTruncated
+                      maxWidth="220px"
+                      color={!!row.updatedAt ? "green.500" : void 0}
+                    >
+                      {row.model}
+                    </Text>
+                  </Td>
+                  <Td p={0}>
+                    <EditableField
+                      onSubmit={handleUpdateField}
+                      model={row.model}
+                      value={String(row.regex)}
+                      name="regex"
+                      renderValue={(value) => (
+                        <Code
+                          isTruncated
+                          maxWidth="220px"
+                          color={!!row.updatedAt ? "green.500" : void 0}
+                        >
+                          {value}
+                        </Code>
+                      )}
+                    />
+                  </Td>
+                  <Td p={0}>
+                    <EditableField
+                      onSubmit={handleUpdateField}
+                      model={row.model}
+                      name="inputCostPerToken"
+                      value={row.inputCostPerToken}
+                      renderValue={(value) => (
+                        <Text color={!!row.updatedAt ? "green.500" : void 0}>
+                          {value}
+                        </Text>
+                      )}
+                    />
+                  </Td>
+                  <Td p={0}>
+                    <EditableField
+                      onSubmit={handleUpdateField}
+                      model={row.model}
+                      name="outputCostPerToken"
+                      value={row.outputCostPerToken}
+                      renderValue={(value) => (
+                        <Text color={!!row.updatedAt ? "green.500" : void 0}>
+                          {value}
+                        </Text>
+                      )}
+                    />
+                  </Td>
+                  <Td width={64}></Td>
+                </Tr>
+              ))}
+            </Tbody>
+          </Table>
+        </CardBody>
+      </Card>
+    </>
+  );
+}
+
+// eslint-disable-next-line @typescript-eslint/no-namespace
+declare namespace EditableField {
+  export interface SubmitEvent<V> {
+    value: V;
+    fieldName: string;
+    model: string;
+  }
+  export interface Props<V> {
+    value: V;
+    name: string;
+    model: string;
+    renderValue: (value: V) => React.ReactNode;
+    onSubmit?: (event: SubmitEvent<V>) => void;
+  }
+
+  export type State = "viewing" | "editing" | "saving";
+}
+
+function EditableField<V>({
+  value,
+  onSubmit,
+  name,
+  model,
+  renderValue,
+}: EditableField.Props<V>) {
+  const [state, setState] = React.useState<EditableField.State>("viewing");
+  const [valueState, setValueState] = React.useState<V>(value);
+
+  const isEditing = state === "editing";
+  const isViewing = state === "viewing";
+
+  const handleState = React.useCallback(() => {
+    setState((prevState) => {
+      if (prevState === "viewing") {
+        return "editing";
+      }
+      return "viewing";
+    });
+  }, [setState]);
+
+  const handleBlur = React.useCallback(() => {
+    setState("viewing");
+  }, [setState]);
+
+  const handleInputValueChange = React.useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      setValueState(e.target.value as any);
+    },
+    [setValueState]
+  );
+
+  const handleKeyDown = React.useCallback(
+    (e: React.KeyboardEvent<HTMLInputElement>) => {
+      if (e.key === "Enter") {
+        setState("viewing");
+        if (onSubmit && valueState !== value) {
+          onSubmit({
+            value: valueState,
+            fieldName: name,
+            model: model,
+          });
+        }
+      } else if (e.key === "Escape") {
+        setValueState(value);
+        setState("viewing");
+      }
+    },
+    [valueState, setState, setValueState, onSubmit, value, model, name]
+  );
+
+  return (
+    <HStack
+      justifyContent="space-between"
+      className="editable"
+      sx={{
+        ":hover": {
+          bg: "gray.50",
+        },
+        lineHeight: "42px",
+      }}
+      onClick={handleState}
+    >
+      {isEditing && (
+        <Input
+          name={name}
+          autoFocus={true}
+          defaultValue={valueState !== undefined ? String(valueState) : ""}
+          onBlur={handleBlur}
+          onChange={handleInputValueChange}
+          onKeyDown={handleKeyDown}
+        />
+      )}
+      {isViewing && renderValue(valueState)}
+      {isViewing && (
+        <Box
+          visibility="hidden"
+          sx={{
+            ".editable:hover & ": {
+              visibility: "visible",
+            },
+          }}
+        >
+          <Edit2 size={16} />
+        </Box>
+      )}
+    </HStack>
   );
 }
