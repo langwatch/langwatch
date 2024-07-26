@@ -5,7 +5,7 @@ import {
   getFirstInputAsText,
   getLastOutputAsText,
 } from "./common"; // replace with your actual module path
-import type { BaseSpan } from "../../../server/tracer/types";
+import type { BaseSpan } from "../../../tracer/types";
 
 describe("Span organizing and flattening tests", () => {
   const commonSpanProps = {

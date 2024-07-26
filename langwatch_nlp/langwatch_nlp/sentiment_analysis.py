@@ -50,7 +50,10 @@ def get_embedding(
 
     response = litellm.embedding(model=model, input=[text], **kwargs)
 
-    return response.data[0].embedding  # type: ignore
+    data = response.data
+    if data is None:
+        raise ValueError("No data returned from the embedding model")
+    return data[0]["embedding"]
 
 
 class Embedding(BaseModel):

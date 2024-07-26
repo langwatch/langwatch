@@ -1,7 +1,7 @@
 import * as Sentry from "@sentry/nextjs";
 import { nanoid } from "nanoid";
 import { type NextApiRequest, type NextApiResponse } from "next";
-import { ZodError, z } from "zod";
+import { type ZodError, z } from "zod";
 import { trackEventsQueue } from "../../server/background/queues/trackEventsQueue";
 import { prisma } from "../../server/db"; // Adjust the import based on your setup
 import { type TrackEventRESTParamsValidator } from "../../server/tracer/types";
@@ -125,6 +125,12 @@ export default async function handler(
       // Add a delay to track events to possibly wait for trace data to be available for the grouping keys
       delay: process.env.VITEST_MODE ? 0 : 5000,
       attempts: 3,
+      removeOnComplete: {
+        age: 60 * 60 * 24 * 3, // 3 days
+      },
+      removeOnFail: {
+        age: 60 * 60 * 24 * 3, // 3 days
+      },
     }
   );
 

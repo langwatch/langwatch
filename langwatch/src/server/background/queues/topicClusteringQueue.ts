@@ -42,6 +42,12 @@ export const scheduleTopicClustering = async () => {
         delay:
           distributionHour * 60 * 60 * 1000 + distributionMinute * 60 * 1000,
         attempts: 3,
+        removeOnComplete: {
+          age: 60 * 60 * 24 * 3, // 3 days
+        },
+        removeOnFail: {
+          age: 60 * 60 * 24 * 3, // 3 days
+        },
       },
     };
   });
@@ -64,6 +70,12 @@ export const scheduleTopicClusteringNextPage = async (
       )}`,
       delay: 1000,
       attempts: 3,
+      removeOnComplete: {
+        age: 60 * 60 * 24 * 3, // 3 days
+      },
+      removeOnFail: {
+        age: 60 * 60 * 24 * 3, // 3 days
+      },
     }
   );
 };

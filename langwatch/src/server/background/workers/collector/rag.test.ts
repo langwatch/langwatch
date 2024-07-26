@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { RAGChunk } from "../../../server/tracer/types";
+import type { RAGChunk } from "../../../tracer/types";
 import { extractRAGTextualContext, maybeAddIdsToContextList } from "./rag";
 
 describe("RAG", () => {

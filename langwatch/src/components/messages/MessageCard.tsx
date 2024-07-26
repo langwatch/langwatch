@@ -185,7 +185,7 @@ export function MessageCard({
             >
               Generated
             </Box>
-            <Box>
+            <Box wordBreak="break-all">
               {trace.output?.value ? (
                 <Markdown className="markdown">
                   {getSlicedOutput(trace)}

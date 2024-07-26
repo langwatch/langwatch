@@ -6,6 +6,7 @@ dist
 examples/.chainlit
 examples/chainlit.md
 examples/.ipynb_checkpoints
+optimized_rag.json
 repl.ipynb
 chainlit.md
 .env

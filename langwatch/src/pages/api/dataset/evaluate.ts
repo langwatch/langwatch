@@ -21,7 +21,7 @@ import {
   type EvaluatorTypes,
   type SingleEvaluationResult,
 } from "../../../trace_checks/evaluators.generated";
-import { extractChunkTextualContent } from "../collector/rag";
+import { extractChunkTextualContent } from "../../../server/background/workers/collector/rag";
 
 export const debug = getDebugger("langwatch:guardrail:evaluate");
 
@@ -38,6 +38,15 @@ export const evaluationInputSchema = z.object({
       .optional()
       .nullable(),
     expected_output: z.string().optional().nullable(),
+    conversation: z
+      .array(
+        z.object({
+          input: z.string().optional().nullable(),
+          output: z.string().optional().nullable(),
+        })
+      )
+      .optional()
+      .nullable(),
   }),
   settings: z.object({}).passthrough().optional().nullable(),
 });
@@ -101,7 +110,8 @@ export default async function handler(
     });
   }
 
-  const { input, output, contexts, expected_output } = params.data;
+  const { input, output, contexts, expected_output, conversation } =
+    params.data;
   const { datasetSlug } = params;
   const experimentSlug = params.experimentSlug ?? params.batchId ?? nanoid(); // backwards compatibility
   const evaluation = params.evaluation;
@@ -172,6 +182,11 @@ export default async function handler(
       output: output ? output : undefined,
       contexts: contextList,
       expected_output: expected_output ? expected_output : undefined,
+      conversation:
+        conversation?.map((message) => ({
+          input: message.input ?? undefined,
+          output: message.output ?? undefined,
+        })) ?? [],
       checkType: checkType as EvaluatorTypes,
       settings: (settings as Record<string, unknown>) ?? {},
     });

@@ -129,8 +129,12 @@ export type TracesPivotFilterQuery = {
 export type TracesPivot = {
   trace?: Omit<
     ElasticSearchTrace,
-    "input" | "output" | "error" | "indexing_md5s"
-  > & { input: { satisfaction_score?: number }; has_error: boolean };
+    "input" | "output" | "error" | "indexing_md5s" | "expected_output" | "metadata"
+  > & {
+    input: { satisfaction_score?: number };
+    has_error: boolean;
+    metadata: Omit<ElasticSearchTrace["metadata"], "custom">;
+  };
   spans?: (Omit<
     ElasticSearchSpan,
     "name" | "input" | "output" | "error" | "params" | "contexts"

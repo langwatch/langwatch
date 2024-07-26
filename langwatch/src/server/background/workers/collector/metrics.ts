@@ -3,7 +3,7 @@ import {
   type LLMSpan,
   type Span,
   type Trace,
-} from "../../../server/tracer/types";
+} from "../../../tracer/types";
 import { typedValueToText } from "./common";
 import modelPrices from "llm-cost/model_prices_and_context_window.json";
 

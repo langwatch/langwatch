@@ -7,7 +7,7 @@ import {
 } from "../server/tracer/types";
 import { getEvaluatorDefinitions } from "../trace_checks/getEvaluator";
 import type { CheckPreconditions } from "../trace_checks/types";
-import { extractRAGTextualContext } from "../pages/api/collector/rag";
+import { extractRAGTextualContext } from "../server/background/workers/collector/rag";
 
 // TODO: write tests
 export function evaluatePreconditions(

@@ -53,6 +53,12 @@
     "model_vendor": "openai",
     "mode": "chat"
   },
+  "openai/gpt-4o-mini": {
+    "name": "GPT 4o mini",
+    "version": "latest",
+    "model_vendor": "openai",
+    "mode": "chat"
+  },
   "openai/gpt-4-0125-preview": {
     "name": "GPT 4 Turbo",
     "version": "0125",
@@ -86,6 +92,12 @@
   "azure/gpt-4-1106-preview": {
     "name": "GPT 4 Turbo",
     "version": "1106",
+    "model_vendor": "azure",
+    "mode": "chat"
+  },
+  "azure/gpt-4o": {
+    "name": "GPT 4o",
+    "version": "latest",
     "model_vendor": "azure",
     "mode": "chat"
   },

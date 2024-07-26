@@ -1,6 +1,7 @@
 import { loadEnvConfig } from "@next/env";
 import { getDebugger } from "./utils/logger";
 import fs from "fs";
+import path from "path";
 
 loadEnvConfig(process.cwd());
 
@@ -10,7 +11,7 @@ const { connection: redis } = require("./server/redis");
 const debug = getDebugger("langwatch:task");
 
 const TASKS: Record<string, { default: (...args: any[]) => void }> = {};
-const files = fs.readdirSync("./src/tasks");
+const files = fs.readdirSync(path.join(__dirname, "./tasks"));
 for (const file of files) {
   if (file.endsWith(".ts")) {
     const taskName = file.replace(".ts", "");

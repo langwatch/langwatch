@@ -71,6 +71,12 @@ export const scheduleTraceCheck = async ({
         jobId,
         delay: delay ?? 5000,
         attempts: 3,
+        removeOnComplete: {
+          age: 60 * 60 * 24 * 3, // 3 days
+        },
+        removeOnFail: {
+          age: 60 * 60 * 24 * 3, // 3 days
+        },
       }
     );
   }

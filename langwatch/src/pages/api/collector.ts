@@ -1,24 +1,20 @@
-import type { Project } from "@prisma/client";
 import * as Sentry from "@sentry/nextjs";
+import crypto from "crypto";
 import { type NextApiRequest, type NextApiResponse } from "next";
+import type { ZodError } from "zod";
+import { fromZodError } from "zod-validation-error";
+import { dependencies } from "../../injection/dependencies.server";
+import { getCurrentMonthMessagesCount } from "../../server/api/routers/limits";
+import { collectorQueue } from "../../server/background/queues/collectorQueue";
+import { maybeAddIdsToContextList } from "../../server/background/workers/collector/rag";
 import { prisma } from "../../server/db"; // Adjust the import based on your setup
-import {
-  SPAN_INDEX,
-  TRACE_INDEX,
-  esClient,
-  spanIndexId,
-  traceIndexId,
-} from "../../server/elasticsearch";
+import { TRACE_INDEX, esClient } from "../../server/elasticsearch";
 import {
   type CollectorRESTParamsValidator,
   type CustomMetadata,
-  type ElasticSearchInputOutput,
-  type ElasticSearchSpan,
   type ElasticSearchTrace,
-  type ErrorCapture,
   type ReservedTraceMetadata,
   type Span,
-  type SpanInputOutput,
   type Trace,
 } from "../../server/tracer/types";
 import {
@@ -29,25 +25,6 @@ import {
   spanValidatorSchema,
 } from "../../server/tracer/types.generated";
 import { getDebugger } from "../../utils/logger";
-import {
-  addInputAndOutputForRAGs,
-  maybeAddIdsToContextList,
-} from "./collector/rag";
-import { getTraceInput, getTraceOutput } from "./collector/trace";
-import {
-  addGuardrailCosts,
-  addLLMTokensCount,
-  computeTraceMetrics,
-} from "./collector/metrics";
-import { scheduleTraceChecks } from "./collector/traceChecks";
-import { scoreSatisfactionFromInput } from "./collector/satisfaction";
-import crypto from "crypto";
-import type { ZodError } from "zod";
-import { fromZodError } from "zod-validation-error";
-import { env } from "../../env.mjs";
-import { cleanupPIIs } from "./collector/piiCheck";
-import { getCurrentMonthMessagesCount } from "../../server/api/routers/limits";
-import { dependencies } from "../../injection/dependencies.server";
 
 export const debug = getDebugger("langwatch:collector");
 
@@ -177,7 +154,7 @@ export default async function handler(
   const spanFields = spanSchema.options.flatMap((option) =>
     Object.keys(option.shape)
   );
-  let spans = (req.body as Record<string, any>).spans as Span[];
+  const spans = (req.body as Record<string, any>).spans as Span[];
   spans.forEach((span) => {
     // We changed "id" to "span_id", but we still want to support "id" for retrocompatibility for a while
     if ("id" in span) {
@@ -298,139 +275,37 @@ export default async function handler(
 
   debug(`collecting traceId ${traceId}`);
 
-  spans = addInputAndOutputForRAGs(
-    await addLLMTokensCount(addGuardrailCosts(spans))
-  );
-
-  const esSpans: ElasticSearchSpan[] = spans.map((span) => ({
-    ...span,
-    input: span.input ? typedValueToElasticSearch(span.input) : null,
-    output: span.output ? typedValueToElasticSearch(span.output) : null,
-    project_id: project.id,
-    timestamps: {
-      ...span.timestamps,
-      inserted_at: Date.now(),
-      updated_at: Date.now(),
+  await collectorQueue.add(
+    "collector",
+    {
+      projectId: project.id,
+      traceId,
+      spans,
+      reservedTraceMetadata,
+      customMetadata,
+      expectedOutput,
+      existingTrace,
+      paramsMD5,
     },
-  }));
-
-  const [input, output] = await Promise.all([
-    getTraceInput(spans),
-    getTraceOutput(spans),
-  ]);
-  const error = getLastOutputError(spans);
-
-  // Create the trace
-  const trace: ElasticSearchTrace = {
-    trace_id: traceId,
-    project_id: project.id,
-    metadata: {
-      ...reservedTraceMetadata,
-      ...(Object.keys(customMetadata).length > 0
-        ? { custom: customMetadata }
-        : {}),
-      all_keys: [
-        ...(existingTrace?.all_keys ?? []),
-        ...Object.keys(reservedTraceMetadata),
-        ...Object.keys(customMetadata),
-      ],
-    },
-    timestamps: {
-      ...(!existingTrace
-        ? {
-            started_at:
-              Math.min(...spans.map((span) => span.timestamps.started_at)) ??
-              Date.now(),
-            inserted_at: Date.now(),
-          }
-        : {}),
-      updated_at: Date.now(),
-    } as ElasticSearchTrace["timestamps"],
-    ...(input?.value ? { input } : {}),
-    ...(output?.value ? { output } : {}),
-    ...(expectedOutput ? { expected_output: { value: expectedOutput } } : {}),
-    metrics: computeTraceMetrics(spans),
-    error,
-    indexing_md5s: [...(existingTrace?.indexing_md5s ?? []), paramsMD5],
-  };
-
-  const piiEnforced = env.NODE_ENV === "production";
-  await cleanupPIIs(trace, esSpans, project.piiRedactionLevel, piiEnforced);
-
-  const result = await esClient.helpers.bulk({
-    datasource: esSpans,
-    pipeline: "ent-search-generic-ingestion",
-    onDocument: (doc) => ({
-      index: {
-        _index: SPAN_INDEX,
-        _id: spanIndexId({ spanId: doc.span_id, projectId: project.id }),
-        routing: traceIndexId({ traceId, projectId: project.id }),
+    {
+      jobId: `collector_${traceId}_md5:${paramsMD5}`,
+      delay: 0,
+      attempts: 18, // with exponential backoff the very last attempt will happen in 3 days
+      backoff: {
+        type: "exponential",
+        delay: 1000,
       },
-    }),
-  });
-
-  if (result.failed > 0) {
-    console.error("Failed to insert to elasticsearch", result);
-    return res.status(500).json({ message: "Something went wrong!" });
-  }
-
-  await esClient.update({
-    index: TRACE_INDEX,
-    id: traceIndexId({ traceId, projectId: project.id }),
-    body: {
-      doc: trace,
-      doc_as_upsert: true,
-    },
-  });
-
-  // Does not re-schedule trace checks for too old traces being resynced
-  if (!existingTrace || existingTrace.inserted_at > Date.now() - 30 * 1000) {
-    void scheduleTraceChecks(trace, spans);
-  }
-
-  void markProjectFirstMessage(project);
-
-  try {
-    void scoreSatisfactionFromInput({
-      traceId: trace.trace_id,
-      projectId: trace.project_id,
-      input: trace.input,
-    });
-  } catch {
-    console.warn("Failed to score satisfaction for", trace.trace_id);
-  }
+      removeOnComplete: {
+        age: 60 * 60 * 24 * 3, // 3 days
+      },
+      removeOnFail: {
+        age: 60 * 60 * 24 * 3, // 3 days
+      },
+    }
+  );
 
   return res.status(200).json({ message: "Trace received successfully." });
 }
-
-const typedValueToElasticSearch = (
-  typed: SpanInputOutput
-): ElasticSearchInputOutput => {
-  return {
-    type: typed.type,
-    value: JSON.stringify(typed.value),
-  };
-};
-
-// TODO: test, move to common, and fix this sorting on the TODO right below
-const getLastOutputError = (spans: Span[]): ErrorCapture | null => {
-  // TODO: shouldn't it be sorted by parent-child?
-  const errorSpans = spans.filter((span) => span.error);
-  const lastError = errorSpans[errorSpans.length - 1];
-  if (!lastError) {
-    return null;
-  }
-  return lastError.error ?? null;
-};
-
-const markProjectFirstMessage = async (project: Project) => {
-  if (!project.firstMessage) {
-    await prisma.project.update({
-      where: { id: project.id },
-      data: { firstMessage: true },
-    });
-  }
-};
 
 const fetchExistingMD5s = async (
   traceId: string,

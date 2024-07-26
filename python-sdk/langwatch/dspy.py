@@ -2,6 +2,7 @@ from contextlib import contextmanager
 import random
 import re
 import time
+import warnings
 import dspy
 from typing import Callable, List, Optional, Any, Type, Union
 from typing_extensions import TypedDict
@@ -735,7 +736,17 @@ class DSPyTracer:
 
                 span = self_.safe_get_current_span()
 
-                passages = result.get("passages", None)
+                passages = result
+                try:
+                    passages = (
+                        result
+                        if isinstance(result, list)
+                        else result.get("passages", None)
+                    )
+                except:
+                    warnings.warn(
+                        f"LangWatch DSPy tracing: passages could not be extracted from the result for {self.__class__.__name__}, please report it at https://github.com/langwatch/langwatch/issues"
+                    )
                 if span and passages and type(passages) == list:
                     span.update(contexts=passages)
 

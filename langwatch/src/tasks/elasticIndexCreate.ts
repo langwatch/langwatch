@@ -59,7 +59,7 @@ const traceMapping: ElasticSearchMappingFrom<ElasticSearchTrace> = {
       sdk_language: { type: "keyword" },
 
       custom: { type: "flattened" } as any,
-      all_keys: { type: "keyword" }
+      all_keys: { type: "keyword" },
     },
   },
   timestamps: {
@@ -182,9 +182,14 @@ const spanMapping: ElasticSearchMappingFrom<ElasticSearchSpan> = {
     properties: {
       temperature: { type: "float" },
       stream: { type: "boolean" },
-      functions: { type: "nested" } as any, // TODO: change to flattened
-      // tools: { type: "flattened" } as any, // TODO implement
-      // tool_choice: { type: "keyword" }, // TODO implement
+      functions: { type: "flattened" } as any, // TODO: change to flattened
+      tools: { type: "flattened" } as any, // TODO implement
+      tool_choice: { type: "keyword" }, // TODO implement
+      max_tokens: { type: "long" }, // TODO implement
+      n: { type: "integer" }, // TODO implement
+      top_p: { type: "float" }, // TODO implement
+      frequency_penalty: { type: "float" }, // TODO implement
+      presence_penalty: { type: "float" }, // TODO implement
     } as any, // TODO: remove this any
   },
   metrics: {
@@ -344,10 +349,21 @@ const tracesPivotMapping: ElasticSearchMappingFrom<
   },
   trace: {
     properties: {
-      ...omit(traceMapping, "input", "output", "error", "indexing_md5s"),
+      ...omit(
+        traceMapping,
+        "input",
+        "output",
+        "error",
+        "indexing_md5s",
+        "expected_output",
+        "metadata"
+      ),
       input: { properties: { satisfaction_score: { type: "float" } } },
       has_error: {
         type: "boolean",
+      },
+      metadata: {
+        properties: omit(traceMapping.metadata.properties, "custom"),
       },
     },
   },

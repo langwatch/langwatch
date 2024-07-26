@@ -1,7 +1,9 @@
 import { type Job, type Worker } from "bullmq";
 import type {
+  CollectorJob,
   TopicClusteringJob,
   TraceCheckJob,
+  TrackEventJob,
 } from "~/server/background/types";
 import type {
   EvaluatorTypes,
@@ -14,6 +16,7 @@ import {
   startTraceChecksWorker,
 } from "./workers/traceChecksWorker";
 import { startTrackEventsWorker } from "./workers/trackEventsWorker";
+import { startCollectorWorker } from "./workers/collectorWorker";
 
 const debug = getDebugger("langwatch:workers");
 
@@ -26,13 +29,18 @@ export const start = (
   maxRuntimeMs: number | undefined = undefined
 ): Promise<
   | {
+      collectorWorker: Worker<CollectorJob, void, string>;
       traceChecksWorker: Worker<TraceCheckJob, any, EvaluatorTypes>;
       topicClusteringWorker: Worker<TopicClusteringJob, void, string>;
+      trackEventsWorker: Worker<TrackEventJob, void, string>;
     }
   | undefined
 > => {
   return new Promise((resolve) => {
-    const traceChecksWorker = startTraceChecksWorker(runEvaluationMock ?? runEvaluationJob);
+    const collectorWorker = startCollectorWorker();
+    const traceChecksWorker = startTraceChecksWorker(
+      runEvaluationMock ?? runEvaluationJob
+    );
     const topicClusteringWorker = startTopicClusteringWorker();
     const trackEventsWorker = startTrackEventsWorker();
 
@@ -41,6 +49,7 @@ export const start = (
         debug("Max runtime reached, closing worker");
         void (async () => {
           await Promise.all([
+            collectorWorker.close(),
             traceChecksWorker.close(),
             topicClusteringWorker.close(),
             trackEventsWorker.close(),
@@ -49,7 +58,12 @@ export const start = (
         })();
       }, maxRuntimeMs);
     } else {
-      resolve({ traceChecksWorker, topicClusteringWorker });
+      resolve({
+        collectorWorker,
+        traceChecksWorker,
+        topicClusteringWorker,
+        trackEventsWorker,
+      });
     }
   });
 };

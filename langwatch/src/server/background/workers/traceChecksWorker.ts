@@ -18,8 +18,11 @@ import {
   type SingleEvaluationResult,
 } from "../../../trace_checks/evaluators.generated";
 import { TRACE_INDEX, esClient, traceIndexId } from "../../elasticsearch";
-import type { Trace } from "../../tracer/types";
-import { esGetSpansByTraceId } from "../../api/routers/traces";
+import type { ElasticSearchTrace } from "../../tracer/types";
+import {
+  esGetSpansByTraceId,
+  getTracesByThreadId,
+} from "../../api/routers/traces";
 import { getRAGInfo } from "../../tracer/utils";
 import {
   getCurrentMonthCost,
@@ -50,6 +53,11 @@ export const runEvaluationJob = async (
   });
 };
 
+type Conversation = {
+  input?: string;
+  output?: string;
+}[];
+
 export const runEvaluationForTrace = async ({
   projectId,
   traceId,
@@ -63,7 +71,7 @@ export const runEvaluationForTrace = async ({
 }): Promise<SingleEvaluationResult> => {
   const evaluator = AVAILABLE_EVALUATORS[evaluatorType];
 
-  const trace = await esClient.getSource<Trace>({
+  const trace = await esClient.getSource<ElasticSearchTrace>({
     index: TRACE_INDEX,
     id: traceIndexId({
       traceId: traceId,
@@ -95,6 +103,28 @@ export const runEvaluationForTrace = async ({
     contexts = ragInfo.contexts;
   }
 
+  const threadId = trace.metadata.thread_id;
+  const fullThread = threadId
+    ? await getTracesByThreadId({
+        threadId: threadId,
+        projectId: projectId,
+      })
+    : undefined;
+  const currentMessageIndex = fullThread?.findIndex(
+    (message) => message.trace_id === trace.trace_id
+  );
+  const conversation: Conversation = fullThread
+    ?.slice(0, currentMessageIndex)
+    .map((message) => ({
+      input: message.input?.value,
+      output: message.output?.value,
+    })) ?? [
+    {
+      input: trace.input?.value,
+      output: trace.output?.value,
+    },
+  ];
+
   const result = await runEvaluation({
     projectId,
     checkType: evaluatorType,
@@ -102,6 +132,7 @@ export const runEvaluationForTrace = async ({
     output,
     contexts,
     expected_output,
+    conversation,
     settings: settings && typeof settings === "object" ? settings : undefined,
   });
 
@@ -116,6 +147,7 @@ export const runEvaluation = async ({
   contexts,
   expected_output,
   settings,
+  conversation,
   retries = 1,
 }: {
   projectId: string;
@@ -124,6 +156,7 @@ export const runEvaluation = async ({
   output?: string;
   contexts?: string[];
   expected_output?: string;
+  conversation?: Conversation;
   settings?: Record<string, unknown>;
   retries?: number;
 }): Promise<SingleEvaluationResult> => {
@@ -191,6 +224,7 @@ export const runEvaluation = async ({
             output,
             contexts,
             expected_output,
+            conversation,
           },
         ],
         settings: settings && typeof settings === "object" ? settings : {},
@@ -209,6 +243,7 @@ export const runEvaluation = async ({
         output,
         contexts,
         expected_output,
+        conversation,
         settings,
         retries: retries - 1,
       });

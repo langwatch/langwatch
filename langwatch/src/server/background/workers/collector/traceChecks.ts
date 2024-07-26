@@ -1,13 +1,13 @@
-import { scheduleTraceCheck } from "../../../server/background/queues/traceChecksQueue";
-import { prisma } from "../../../server/db";
+import { scheduleTraceCheck } from "../../queues/traceChecksQueue";
+import { prisma } from "../../../db";
 import {
   type ElasticSearchTrace,
   type Span,
-} from "../../../server/tracer/types";
-import type { EvaluatorTypes } from "../../../trace_checks/evaluators.generated";
-import { evaluatePreconditions } from "../../../trace_checks/preconditions";
-import type { CheckPreconditions } from "../../../trace_checks/types";
-import { debug } from "../collector";
+} from "../../../tracer/types";
+import type { EvaluatorTypes } from "../../../../trace_checks/evaluators.generated";
+import { evaluatePreconditions } from "../../../../trace_checks/preconditions";
+import type { CheckPreconditions } from "../../../../trace_checks/types";
+import { debug } from "../../../../pages/api/collector";
 
 export const scheduleTraceChecks = async (
   trace: ElasticSearchTrace,

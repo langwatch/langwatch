@@ -1,6 +1,6 @@
 import { type NextApiRequest, type NextApiResponse } from "next";
 import { createMocks } from "node-mocks-http";
-import { beforeAll, describe, expect, test } from "vitest";
+import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import {
   SPAN_INDEX,
   TRACE_INDEX,
@@ -19,13 +19,17 @@ import handler from "./collector";
 import { type Project } from "@prisma/client";
 import { DEFAULT_EMBEDDINGS_MODEL } from "../../server/embeddings";
 import { getTestProject } from "../../utils/testUtils";
+import { nanoid } from "nanoid";
+import { startCollectorWorker } from "../../server/background/workers/collectorWorker";
+import type { CollectorJob } from "../../server/background/types";
+import type { Worker } from "bullmq";
 
 const sampleSpan: LLMSpan = {
   type: "llm",
   name: "sample-span",
-  span_id: "span_V1StGXR8_Z5jdHi6B-myB",
+  span_id: `span_${nanoid()}`,
   parent_id: null,
-  trace_id: "trace_test-trace_J5m9g-0JDMbcJqLK",
+  trace_id: `trace_${nanoid()}`,
   input: {
     type: "chat_messages",
     value: [
@@ -46,7 +50,7 @@ const sampleSpan: LLMSpan = {
 };
 
 describe("Collector API Endpoint", () => {
-  // TODO: add project id
+  let worker: Worker<CollectorJob, void, string> | undefined;
   let project: Project | undefined;
 
   beforeAll(async () => {
@@ -72,6 +76,13 @@ describe("Collector API Endpoint", () => {
         },
       },
     });
+
+    worker = startCollectorWorker();
+    await worker?.waitUntilReady();
+  });
+
+  afterAll(async () => {
+    await worker?.close();
   });
 
   test("should insert spans into Elasticsearch", async () => {
@@ -101,17 +112,19 @@ describe("Collector API Endpoint", () => {
     await handler(req, res);
     expect(res.statusCode).toBe(200);
 
-    const indexedSpan = await esClient.getSource<ElasticSearchSpan>({
-      index: SPAN_INDEX,
-      id: spanIndexId({
-        spanId: sampleSpan.span_id,
-        projectId: project?.id ?? "",
-      }),
-      routing: traceIndexId({
-        traceId: sampleSpan.trace_id,
-        projectId: project?.id ?? "",
-      }),
-    });
+    const indexedSpan = await waitForResult(() =>
+      esClient.getSource<ElasticSearchSpan>({
+        index: SPAN_INDEX,
+        id: spanIndexId({
+          spanId: sampleSpan.span_id,
+          projectId: project?.id ?? "",
+        }),
+        routing: traceIndexId({
+          traceId: sampleSpan.trace_id,
+          projectId: project?.id ?? "",
+        }),
+      })
+    );
 
     expect(indexedSpan).toMatchObject({
       ...sampleSpan,
@@ -130,13 +143,15 @@ describe("Collector API Endpoint", () => {
       project_id: project?.id,
     });
 
-    const indexedTrace = await esClient.getSource<Trace>({
-      index: TRACE_INDEX,
-      id: traceIndexId({
-        traceId: sampleSpan.trace_id,
-        projectId: project?.id ?? "",
-      }),
-    });
+    const indexedTrace = await waitForResult(() =>
+      esClient.getSource<Trace>({
+        index: TRACE_INDEX,
+        id: traceIndexId({
+          traceId: sampleSpan.trace_id,
+          projectId: project?.id ?? "",
+        }),
+      })
+    );
 
     expect(indexedTrace).toEqual({
       trace_id: sampleSpan.trace_id,
@@ -162,14 +177,13 @@ describe("Collector API Endpoint", () => {
         inserted_at: expect.any(Number),
         updated_at: expect.any(Number),
       },
-      input: {
+      input: expect.objectContaining({
         value: "hello",
-        // satisfaction_score: expect.any(Number),
         embeddings: {
           embeddings: expect.any(Array),
           model: DEFAULT_EMBEDDINGS_MODEL,
         },
-      },
+      }),
       output: {
         value: "world",
         embeddings: {
@@ -290,10 +304,10 @@ describe("Collector API Endpoint", () => {
   });
 
   test("should insert RAGs, extracting the input and output from children spans if not available", async () => {
-    const traceId = "trace_test-trace_J5m9g-0JDMbcJqLK2";
+    const traceId = `trace_test-${nanoid()}`;
     const ragSpan: RAGSpan = {
       type: "rag",
-      span_id: "span_V1StGXR8_Z5jdHi6B-myE",
+      span_id: `span_${nanoid()}`,
       trace_id: traceId,
       contexts: [
         { document_id: "context-1", content: "France is a country in Europe." },
@@ -308,7 +322,7 @@ describe("Collector API Endpoint", () => {
     };
     const llmSpan: LLMSpan = {
       ...sampleSpan,
-      span_id: "span_V1StGXR8_Z5jdHi6B-myF",
+      span_id: `span_${nanoid()}`,
       parent_id: ragSpan.span_id,
       trace_id: traceId,
       input: {
@@ -344,17 +358,19 @@ describe("Collector API Endpoint", () => {
     await handler(req, res);
     expect(res.statusCode).toBe(200);
 
-    const indexedRagSpan = await esClient.getSource<ElasticSearchSpan>({
-      index: SPAN_INDEX,
-      id: spanIndexId({
-        spanId: ragSpan.span_id,
-        projectId: project?.id ?? "",
-      }),
-      routing: traceIndexId({
-        traceId,
-        projectId: project?.id ?? "",
-      }),
-    });
+    const indexedRagSpan = await waitForResult(() =>
+      esClient.getSource<ElasticSearchSpan>({
+        index: SPAN_INDEX,
+        id: spanIndexId({
+          spanId: ragSpan.span_id,
+          projectId: project?.id ?? "",
+        }),
+        routing: traceIndexId({
+          traceId,
+          projectId: project?.id ?? "",
+        }),
+      })
+    );
 
     expect(indexedRagSpan).toMatchObject({
       input: {
@@ -381,10 +397,10 @@ describe("Collector API Endpoint", () => {
   });
 
   test("should insert text-only RAG contexts too, and outputs as a list, for backwards-compatibility", async () => {
-    const traceId = "trace_test-trace_J5m9g-0JDMbcJqLK2";
+    const traceId = `trace_test-${nanoid()}`;
     const ragSpan: RAGSpan = {
       type: "rag",
-      span_id: "span_V1StGXR8_Z5jdHi6B-myE",
+      span_id: `span_${nanoid()}`,
       trace_id: traceId,
       contexts: [
         "France is a country in Europe.",
@@ -396,7 +412,7 @@ describe("Collector API Endpoint", () => {
     };
     const llmSpan: LLMSpan = {
       ...sampleSpan,
-      span_id: "span_V1StGXR8_Z5jdHi6B-myF",
+      span_id: `span_${nanoid()}`,
       parent_id: ragSpan.span_id,
       trace_id: traceId,
       input: {
@@ -435,17 +451,19 @@ describe("Collector API Endpoint", () => {
     await handler(req, res);
     expect(res.statusCode).toBe(200);
 
-    const indexedRagSpan = await esClient.getSource<ElasticSearchSpan>({
-      index: SPAN_INDEX,
-      id: spanIndexId({
-        spanId: ragSpan.span_id,
-        projectId: project?.id ?? "",
-      }),
-      routing: traceIndexId({
-        traceId,
-        projectId: project?.id ?? "",
-      }),
-    });
+    const indexedRagSpan = await waitForResult(() =>
+      esClient.getSource<ElasticSearchSpan>({
+        index: SPAN_INDEX,
+        id: spanIndexId({
+          spanId: ragSpan.span_id,
+          projectId: project?.id ?? "",
+        }),
+        routing: traceIndexId({
+          traceId,
+          projectId: project?.id ?? "",
+        }),
+      })
+    );
 
     expect(indexedRagSpan.contexts).toMatchObject([
       {
@@ -460,11 +478,14 @@ describe("Collector API Endpoint", () => {
   });
 
   test("cleans up PII", async () => {
+    const traceId = `trace_test-${nanoid()}`;
     const traceData: CollectorRESTParams = {
-      trace_id: sampleSpan.trace_id,
+      trace_id: traceId,
       spans: [
         {
           ...sampleSpan,
+          trace_id: traceId,
+          span_id: `span_${nanoid()}`,
           input: {
             type: "chat_messages",
             value: [
@@ -499,17 +520,19 @@ describe("Collector API Endpoint", () => {
     await handler(req, res);
     expect(res.statusCode).toBe(200);
 
-    const indexedSpan = await esClient.getSource<ElasticSearchSpan>({
-      index: SPAN_INDEX,
-      id: spanIndexId({
-        spanId: sampleSpan.span_id,
-        projectId: project?.id ?? "",
-      }),
-      routing: traceIndexId({
-        traceId: sampleSpan.trace_id,
-        projectId: project?.id ?? "",
-      }),
-    });
+    const indexedSpan = await waitForResult(() =>
+      esClient.getSource<ElasticSearchSpan>({
+        index: SPAN_INDEX,
+        id: spanIndexId({
+          spanId: traceData.spans[0]!.span_id,
+          projectId: project?.id ?? "",
+        }),
+        routing: traceIndexId({
+          traceId,
+          projectId: project?.id ?? "",
+        }),
+      })
+    );
 
     expect(indexedSpan).toMatchObject({
       input: {
@@ -525,13 +548,15 @@ describe("Collector API Endpoint", () => {
       },
     });
 
-    const indexedTrace = await esClient.getSource<Trace>({
-      index: TRACE_INDEX,
-      id: traceIndexId({
-        traceId: sampleSpan.trace_id,
-        projectId: project?.id ?? "",
-      }),
-    });
+    const indexedTrace = await waitForResult(() =>
+      esClient.getSource<Trace>({
+        index: TRACE_INDEX,
+        id: traceIndexId({
+          traceId,
+          projectId: project?.id ?? "",
+        }),
+      })
+    );
 
     expect(indexedTrace).toMatchObject({
       input: {
@@ -545,3 +570,23 @@ describe("Collector API Endpoint", () => {
     });
   });
 });
+
+const waitForResult = async <T>(
+  queryFn: () => Promise<T | null>,
+  maxRetries = 10,
+  retryDelay = 1000
+): Promise<T> => {
+  let lastError: Error | null = null;
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      const result = await queryFn();
+      if (result !== null) return result;
+    } catch (e) {
+      lastError = e as Error;
+    }
+    await new Promise((resolve) => setTimeout(resolve, retryDelay));
+  }
+  throw new Error(
+    `Result not found after multiple retries. Last error: ${lastError?.message}`
+  );
+};

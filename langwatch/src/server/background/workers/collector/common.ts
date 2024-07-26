@@ -5,7 +5,7 @@ import type {
   Span,
   SpanInputOutput,
   TypedValueJson,
-} from "../../../server/tracer/types";
+} from "../../../tracer/types";
 
 export const getFirstInputAsText = (spans: Span[]): string => {
   const topmostInputs = flattenSpanTree(

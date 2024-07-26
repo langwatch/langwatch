@@ -1,5 +1,5 @@
-import { getOpenAIEmbeddings } from "../../../server/embeddings";
-import type { Span, Trace } from "../../../server/tracer/types";
+import { getOpenAIEmbeddings } from "../../../embeddings";
+import type { Span, Trace } from "../../../tracer/types";
 import { getFirstInputAsText, getLastOutputAsText } from "./common";
 
 export const getTraceInput = async (spans: Span[]): Promise<Trace["input"]> => {

@@ -24,7 +24,7 @@ export const env = createEnv({
     AUTH0_ISSUER: z.string().optional(),
     API_TOKEN_JWT_SECRET: z.string().min(1),
     ELASTICSEARCH_NODE_URL: z.string().min(1),
-    ELASTICSEARCH_API_KEY: z.string().min(1),
+    ELASTICSEARCH_API_KEY: z.string().optional(),
     REDIS_URL: z.string().min(1),
     GOOGLE_APPLICATION_CREDENTIALS: z.string().optional(),
     AZURE_OPENAI_ENDPOINT: z.string().optional(),

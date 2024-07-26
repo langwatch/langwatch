@@ -97,6 +97,8 @@ export function MessagesTable() {
     queryOpts
   );
 
+  const downloadTraces = api.traces.getAllForDownload.useMutation();
+
   const traceIds =
     traceGroups.data?.groups.flatMap((group) =>
       group.map((trace) => trace.trace_id)
@@ -192,7 +194,10 @@ export function MessagesTable() {
       sortable: boolean;
       width?: number;
       render: (trace: TraceWithGuardrail, index: number) => React.ReactNode;
-      value: (trace: TraceWithGuardrail) => string | number | Date;
+      value: (
+        trace: TraceWithGuardrail,
+        evaluations: TraceCheck[]
+      ) => string | number | Date;
     }
   > = {
     checked: {
@@ -542,12 +547,10 @@ export function MessagesTable() {
                 </Td>
               );
             },
-            value: (trace: Trace) => {
+            value: (_trace: Trace, evaluations: TraceCheck[]) => {
               const checkId = columnKey.split(".")[1];
-              const traceCheck = traceGroups.data?.traceChecks?.[
-                trace.trace_id
-              ]?.find(
-                (traceCheck_: TraceCheck) => traceCheck_.check_id === checkId
+              const traceCheck = evaluations.find(
+                (evaluation) => evaluation.check_id === checkId
               );
               return traceCheck?.status === "processed"
                 ? numeral(traceCheck?.score).format("0.[00]")
@@ -676,30 +679,57 @@ export function MessagesTable() {
     selectedHeaderColumns
   ).filter(([_, checked]) => checked);
 
-  const downloadCSV = (selection = false) => {
+  const downloadCSV = async (selection = false) => {
+    const traceGroups_ = selection
+      ? traceGroups.data ?? {
+          groups: [],
+          traceChecks: {} as Record<string, TraceCheck[]>,
+        }
+      : await downloadTraces.mutateAsync({
+          ...filterParams,
+          query: getSingleQueryParam(router.query.query),
+          groupBy: "none",
+          pageOffset: pageOffset,
+          pageSize: pageSize,
+          sortBy: getSingleQueryParam(router.query.sortBy),
+          sortDirection: getSingleQueryParam(router.query.orderBy),
+        });
+
     const checkedHeaderColumnsEntries_ = checkedHeaderColumnsEntries.filter(
       ([column, _]) => column !== "checked"
     );
 
+    const evaluations = traceGroups_.traceChecks;
+
     let csv;
     if (selection) {
-      csv = traceGroups.data?.groups
+      csv = traceGroups_.groups
         .flatMap((traceGroup) =>
           traceGroup
             .filter((trace) => selectedTraceIds.includes(trace.trace_id))
             .map((trace) =>
               checkedHeaderColumnsEntries_.map(
-                ([column, _]) => headerColumns[column]?.value?.(trace) ?? ""
+                ([column, _]) =>
+                  headerColumns[column]?.value?.(
+                    trace,
+                    evaluations[trace.trace_id] ?? []
+                  ) ?? ""
               )
             )
         )
         .filter((row) => row.some((cell) => cell !== ""));
     } else {
-      csv = traceGroups.data?.groups.flatMap((traceGroup) =>
+      csv = traceGroups_.groups.flatMap((traceGroup) =>
         traceGroup.map((trace) =>
           checkedHeaderColumnsEntries_
             .filter(([column, _]) => column !== "checked")
-            .map(([column, _]) => headerColumns[column]?.value?.(trace) ?? "")
+            .map(
+              ([column, _]) =>
+                headerColumns[column]?.value?.(
+                  trace,
+                  evaluations[trace.trace_id] ?? []
+                ) ?? ""
+            )
         )
       );
     }
@@ -760,14 +790,18 @@ export function MessagesTable() {
             </Tooltip>
           </HStack>
           <Spacer />
-          <Button
-            colorScheme="black"
-            minWidth="fit-content"
-            variant="ghost"
-            onClick={() => downloadCSV()}
-          >
-            Export all <DownloadIcon marginLeft={2} />
-          </Button>
+          <Tooltip label={totalHits > 10_000 ? "Up to 10.000 items" : ""}>
+            <Button
+              colorScheme="black"
+              minWidth="fit-content"
+              variant={downloadTraces.isLoading ? "outline" : "ghost"}
+              onClick={() => void downloadCSV()}
+              isLoading={downloadTraces.isLoading}
+              loadingText="Downloading..."
+            >
+              Export all <DownloadIcon marginLeft={2} />
+            </Button>
+          </Tooltip>
           <ToggleTableView />
 
           <Popover isOpen={isOpen} onClose={onClose} placement="bottom-end">
@@ -957,7 +991,7 @@ export function MessagesTable() {
               colorScheme="black"
               minWidth="fit-content"
               variant="outline"
-              onClick={() => downloadCSV(true)}
+              onClick={() => void downloadCSV(true)}
             >
               Export <DownloadIcon marginLeft={2} />
             </Button>
