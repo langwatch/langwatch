@@ -8,7 +8,6 @@ import {
   DrawerHeader,
   FormErrorMessage,
   HStack,
-  Link,
   Select,
   Tag,
   Text,
@@ -18,7 +17,6 @@ import {
 import { type ColDef } from "@ag-grid-community/core";
 import type { CustomCellRendererProps } from "@ag-grid-community/react";
 import { nanoid } from "nanoid";
-import NextLink from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useForm, type SubmitHandler } from "react-hook-form";
 import { useLocalStorage } from "usehooks-ts";
@@ -43,6 +41,7 @@ import { HorizontalFormControl } from "./HorizontalFormControl";
 import { DatasetGrid } from "./datasets/DatasetGrid";
 import { useDrawer } from "./CurrentDrawer";
 import { elasticSearchTraceCheckToUserInterfaceEvaluation } from "../server/tracer/utils";
+import { Link } from "@chakra-ui/next-js";
 
 type FormValues = {
   datasetId: string;
@@ -241,7 +240,6 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
             status: "success",
             description: (
               <Link
-                as={NextLink}
                 colorScheme="white"
                 textDecoration={"underline"}
                 href={`/${project?.slug}/datasets/${datasetId}`}

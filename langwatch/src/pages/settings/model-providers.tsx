@@ -34,7 +34,6 @@ import { api } from "../../utils/api";
 import { ModelSelector } from "../../components/ModelSelector";
 import { modelProviderIcons } from "../../server/modelProviders/iconsMap";
 import { allowedTopicClusteringModels } from "../../server/topicClustering/types";
-import { LLMModelCost } from "../../components/settings/LLMModelCost";
 
 export default function ModelsPage() {
   const { project, organizations } = useOrganizationTeamProject();
@@ -49,69 +48,57 @@ export default function ModelsPage() {
       <VStack
         spacing={6}
         width="full"
+        maxWidth="920px"
         align="start"
         paddingY={6}
         paddingBottom={12}
+        paddingX={4}
       >
-        <VStack
-          paddingX={4}
-          spacing={6}
-          width="full"
-          maxWidth="920px"
-          align="start"
-        >
-          <HStack width="full" marginTop={6}>
-            <Heading size="lg" as="h1">
-              Model Providers
-            </Heading>
-            <Spacer />
-            {updateMutation.isLoading && <Spinner />}
-            {organizations && project && (
-              <ProjectSelector
-                organizations={organizations}
-                project={project}
-              />
-            )}
-          </HStack>
-          <Text>
-            Define which models are allowed to be used on LangWatch for this
-            project. <br />
-            You can also use your own API keys.
-          </Text>
-          <Card width="full">
-            <CardBody width="full" paddingY={4}>
-              <VStack spacing={0} width="full">
-                {modelProviders.isLoading &&
-                  Array.from({
-                    length: Object.keys(modelProvidersRegistry).length,
-                  }).map((_, index) => (
-                    <Box
-                      key={index}
-                      width="full"
-                      borderBottomWidth="1px"
-                      _last={{ border: "none" }}
-                      paddingY={6}
-                    >
-                      <Skeleton width="full" height="28px" />
-                    </Box>
-                  ))}
-                {modelProviders.data &&
-                  Object.values(modelProviders.data).map((provider, index) => (
-                    <ModelProviderForm
-                      key={index}
-                      provider={provider}
-                      refetch={modelProviders.refetch}
-                      updateMutation={updateMutation}
-                    />
-                  ))}
-              </VStack>
-            </CardBody>
-          </Card>
-          <TopicClusteringModel />
-        </VStack>
-        <VStack paddingX={4} width="full" align="start" spacing={6}>
-          <LLMModelCost projectId={project?.id} />
-        </VStack>
+        <HStack width="full" marginTop={6}>
+          <Heading size="lg" as="h1">
+            Model Providers
+          </Heading>
+          <Spacer />
+          {updateMutation.isLoading && <Spinner />}
+          {organizations && project && (
+            <ProjectSelector organizations={organizations} project={project} />
+          )}
+        </HStack>
+        <Text>
+          Define which models are allowed to be used on LangWatch for this
+          project. <br />
+          You can also use your own API keys.
+        </Text>
+        <Card width="full">
+          <CardBody width="full" paddingY={4}>
+            <VStack spacing={0} width="full">
+              {modelProviders.isLoading &&
+                Array.from({
+                  length: Object.keys(modelProvidersRegistry).length,
+                }).map((_, index) => (
+                  <Box
+                    key={index}
+                    width="full"
+                    borderBottomWidth="1px"
+                    _last={{ border: "none" }}
+                    paddingY={6}
+                  >
+                    <Skeleton width="full" height="28px" />
+                  </Box>
+                ))}
+              {modelProviders.data &&
+                Object.values(modelProviders.data).map((provider, index) => (
+                  <ModelProviderForm
+                    key={index}
+                    provider={provider}
+                    refetch={modelProviders.refetch}
+                    updateMutation={updateMutation}
+                  />
+                ))}
+            </VStack>
+          </CardBody>
+        </Card>
+        <TopicClusteringModel />
       </VStack>
     </SettingsLayout>
   );

@@ -55,7 +55,7 @@ export const processCollectorJob = async (
   });
 
   spans = addInputAndOutputForRAGs(
-    await addLLMTokensCount(addGuardrailCosts(spans))
+    await addLLMTokensCount(projectId, addGuardrailCosts(spans))
   );
 
   const esSpans: ElasticSearchSpan[] = spans.map((span) => ({

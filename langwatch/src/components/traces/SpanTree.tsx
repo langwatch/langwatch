@@ -14,7 +14,7 @@ import {
 import { useRouter } from "next/router";
 import numeral from "numeral";
 import { useEffect } from "react";
-import { Clock } from "react-feather";
+import { Clock, Settings } from "react-feather";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import type { ElasticSearchSpan } from "../../server/tracer/types";
 import { api } from "../../utils/api";
@@ -24,6 +24,7 @@ import { RenderInputOutput } from "./RenderInputOutput";
 import { useTraceDetailsState } from "../../hooks/useTraceDetailsState";
 import { durationColor } from "~/utils/durationColor";
 import { TraceToPlaygroundLink } from "../TraceToPlaygroundLink";
+import { Link } from "@chakra-ui/next-js";
 
 type SpanWithChildren = ElasticSearchSpan & { children: SpanWithChildren[] };
 
@@ -379,11 +380,21 @@ export function SpanTree(props: SpanTreeProps) {
                   </Text>
                 )}
                 {span.metrics?.cost !== undefined && (
-                  <Text>
-                    <b>Cost:</b>{" "}
-                    {numeral(span.metrics.cost).format("$0.00000a")}
-                    {span.metrics?.tokens_estimated && estimatedCost}
-                  </Text>
+                  <HStack>
+                    <Text>
+                      <b>Cost:</b>{" "}
+                      {numeral(span.metrics.cost).format("$0.00000a")}
+                      {span.metrics?.tokens_estimated && estimatedCost}
+                    </Text>
+                    <Tooltip label="Edit model costs">
+                      <Link
+                        target="_blank"
+                        href={`/settings/model-costs`}
+                      >
+                        <Settings size={14} />
+                      </Link>
+                    </Tooltip>
+                  </HStack>
                 )}
               </VStack>
               {span.input && (

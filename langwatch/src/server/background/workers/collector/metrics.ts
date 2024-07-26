@@ -1,11 +1,11 @@
-import { estimateCost, tokenizeAndEstimateCost } from "llm-cost";
-import {
-  type LLMSpan,
-  type Span,
-  type Trace,
-} from "../../../tracer/types";
+import { getLLMModelCosts } from "../../../modelProviders/llmModelCost";
+import { type LLMSpan, type Span, type Trace } from "../../../tracer/types";
 import { typedValueToText } from "./common";
-import modelPrices from "llm-cost/model_prices_and_context_window.json";
+import {
+  estimateCost,
+  matchingLLMModelCost,
+  tokenizeAndEstimateCost,
+} from "./cost";
 
 // TODO: test
 export const computeTraceMetrics = (spans: Span[]): Trace["metrics"] => {
@@ -89,29 +89,27 @@ export const computeTraceMetrics = (spans: Span[]): Trace["metrics"] => {
 };
 
 // TODO: test
-export const addLLMTokensCount = async (spans: Span[]) => {
+export const addLLMTokensCount = async (projectId: string, spans: Span[]) => {
+  const llmModelCosts = await getLLMModelCosts({ projectId });
+
   for (const span of spans) {
     if (span.type == "llm") {
       const llmSpan = span as LLMSpan;
-      const model =
-        llmSpan.model && llmSpan.model in modelPrices
-          ? llmSpan.model
-          : llmSpan.model?.includes("/")
-          ? llmSpan.model.split("/")[1]
-          : undefined;
+      const llmModelCost =
+        llmSpan.model && matchingLLMModelCost(llmSpan.model, llmModelCosts);
 
       if (!llmSpan.metrics) {
         llmSpan.metrics = {};
       }
       if (
         llmSpan.input &&
-        model &&
+        llmModelCost &&
         (llmSpan.metrics.prompt_tokens === undefined ||
           llmSpan.metrics.prompt_tokens === null)
       ) {
         llmSpan.metrics.prompt_tokens = (
           await tokenizeAndEstimateCost({
-            model,
+            llmModelCost,
             input: typedValueToText(llmSpan.input),
           })
         ).inputTokens;
@@ -119,14 +117,14 @@ export const addLLMTokensCount = async (spans: Span[]) => {
       }
       if (
         llmSpan.output &&
-        model &&
+        llmModelCost &&
         (llmSpan.metrics.completion_tokens === undefined ||
           llmSpan.metrics.completion_tokens === null)
       ) {
         let outputTokens = 0;
         outputTokens += (
           await tokenizeAndEstimateCost({
-            model,
+            llmModelCost,
             output: typedValueToText(llmSpan.output),
           })
         ).outputTokens;
@@ -134,9 +132,9 @@ export const addLLMTokensCount = async (spans: Span[]) => {
         llmSpan.metrics.tokens_estimated = true;
       }
 
-      if (model) {
+      if (llmModelCost) {
         llmSpan.metrics.cost = estimateCost({
-          model,
+          llmModelCost,
           inputTokens: llmSpan.metrics.prompt_tokens ?? 0,
           outputTokens: llmSpan.metrics.completion_tokens ?? 0,
         });

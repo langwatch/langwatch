@@ -23,7 +23,8 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
         >
           <MenuLink href="/settings">General Settings</MenuLink>
           <MenuLink href={`/${project?.slug}/setup`}>Setup</MenuLink>
-          <MenuLink href="/settings/models">Models</MenuLink>
+          <MenuLink href="/settings/model-providers">Model Providers</MenuLink>
+          <MenuLink href="/settings/model-costs">Model Costs</MenuLink>
           <MenuLink href="/settings/projects">Projects</MenuLink>
           <MenuLink href="/settings/teams">Teams</MenuLink>
           <MenuLink href="/settings/members">Members</MenuLink>

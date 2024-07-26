@@ -23,7 +23,7 @@ import {
   useDisclosure,
   useToast,
 } from "@chakra-ui/react";
-import { TriggerAction, type Trigger } from "@prisma/client";
+import { TriggerAction } from "@prisma/client";
 import { useDrawer } from "~/components/CurrentDrawer";
 
 import { HorizontalFormControl } from "./HorizontalFormControl";
@@ -58,7 +58,6 @@ export function TriggerDrawer() {
     register,
     handleSubmit,
     watch,
-    getValues,
     formState: { errors },
     reset,
   } = useForm({

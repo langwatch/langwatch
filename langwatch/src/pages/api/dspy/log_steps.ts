@@ -7,8 +7,11 @@ import { getDebugger } from "../../../utils/logger";
 import { ExperimentType, type Project } from "@prisma/client";
 import * as Sentry from "@sentry/nextjs";
 import crypto from "crypto";
-import { estimateCost } from "llm-cost";
 import { z } from "zod";
+import {
+  estimateCost,
+  matchingLLMModelCost,
+} from "../../../server/background/workers/collector/cost";
 import {
   DSPY_STEPS_INDEX,
   dspyStepIndexId,
@@ -24,6 +27,10 @@ import {
   dSPyStepSchema,
 } from "../../../server/experiments/types.generated";
 import { findOrCreateExperiment } from "../experiment/init";
+import {
+  getLLMModelCosts,
+  type MaybeStoredLLMModelCost,
+} from "../../../server/modelProviders/llmModelCost";
 
 export const debug = getDebugger("langwatch:dspy:log_steps");
 
@@ -132,6 +139,8 @@ const processDSPyStep = async (project: Project, param: DSPyStepRESTParams) => {
     index,
   });
 
+  const llmModelCosts = await getLLMModelCosts({ projectId: project.id });
+
   const dspyStep: DSPyStep = {
     ...param,
     experiment_id: experiment.id,
@@ -150,7 +159,7 @@ const processDSPyStep = async (project: Project, param: DSPyStepRESTParams) => {
         ...call,
         hash: generateHash(call),
       }))
-      .map(extractLLMCallInfo),
+      .map(extractLLMCallInfo(llmModelCosts)),
   };
 
   // To guarantee no extra keys
@@ -216,29 +225,35 @@ const generateHash = (data: object) => {
   return crypto.createHash("md5").update(JSON.stringify(data)).digest("hex");
 };
 
-const extractLLMCallInfo = (call: DSPyLLMCall): DSPyLLMCall => {
-  if (
-    call.__class__ === "dsp.modules.gpt3.GPT3" ||
-    call.response?.object === "chat.completion"
-  ) {
-    const model = call.response?.model;
-    const promptTokens = call.response?.usage?.prompt_tokens;
-    const completionTokens = call.response?.usage?.completion_tokens;
+const extractLLMCallInfo =
+  (llmModelCosts: MaybeStoredLLMModelCost[]) =>
+  (call: DSPyLLMCall): DSPyLLMCall => {
+    if (
+      call.__class__ === "dsp.modules.gpt3.GPT3" ||
+      call.response?.object === "chat.completion"
+    ) {
+      const model = call.response?.model;
+      const llmModelCost =
+        model && matchingLLMModelCost(call.response.model, llmModelCosts);
+      const promptTokens = call.response?.usage?.prompt_tokens;
+      const completionTokens = call.response?.usage?.completion_tokens;
 
-    const cost = estimateCost({
-      model,
-      inputTokens: promptTokens ?? 0,
-      outputTokens: completionTokens ?? 0,
-    });
+      const cost =
+        llmModelCost &&
+        estimateCost({
+          llmModelCost,
+          inputTokens: promptTokens ?? 0,
+          outputTokens: completionTokens ?? 0,
+        });
 
-    return {
-      ...call,
-      model,
-      prompt_tokens: promptTokens,
-      completion_tokens: completionTokens,
-      cost,
-    };
-  }
+      return {
+        ...call,
+        model,
+        prompt_tokens: promptTokens,
+        completion_tokens: completionTokens,
+        cost,
+      };
+    }
 
-  return call;
-};
+    return call;
+  };

@@ -6,6 +6,7 @@ import { TriggerDrawer } from "./AddTriggerDrawer";
 import { AnnotationDrawer } from "./AnnotationDrawer";
 import { AddAnnotationScoreDrawer } from "./AddAnnotationScoreDrawer";
 import { AddDatasetRecordDrawerV2 } from "./AddDatasetRecordDrawer";
+import { LLMModelCostDrawer } from "./settings/LLMModelCostDrawer";
 
 type DrawerProps = {
   open: string;
@@ -17,7 +18,8 @@ const drawers = {
   trigger: TriggerDrawer,
   annotation: AnnotationDrawer,
   addAnnotationScore: AddAnnotationScoreDrawer,
-  addDatasetRecord: AddDatasetRecordDrawerV2
+  addDatasetRecord: AddDatasetRecordDrawerV2,
+  llmModelCost: LLMModelCostDrawer,
 } satisfies Record<string, React.FC<any>>;
 
 export function CurrentDrawer() {

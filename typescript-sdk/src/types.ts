@@ -1,4 +1,3 @@
-import type modelPrices from "llm-cost/model_prices_and_context_window.json";
 import type { OpenAI } from "openai";
 import { type SnakeToCamelCaseNested } from "./typeUtils";
 import {
@@ -63,7 +62,7 @@ export type PendingBaseSpan = PendingSpan<BaseSpan>;
 // vendor is deprecated, and we try to force the available models here
 export type LLMSpan = ConvertServerSpan<
   Omit<ServerLLMSpan, "vendor" | "model">
-> & { model: keyof typeof modelPrices | (string & NonNullable<unknown>) };
+> & { model: string };
 export type PendingLLMSpan = PendingSpan<LLMSpan>;
 
 export type RAGSpan = ConvertServerSpan<ServerRAGSpan>;

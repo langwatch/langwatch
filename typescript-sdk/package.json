@@ -46,7 +46,6 @@
     "@langchain/core": "^0.2.7",
     "ai": "^3.1.23",
     "javascript-stringify": "^2.1.0",
-    "llm-cost": "^1.0.4",
     "nanoid": "^5.0.7",
     "openai": "^4.47.3",
     "zod": "^3.22.4",
