@@ -16,6 +16,7 @@ import {
   VStack,
   useDisclosure,
   useToast,
+  Divider,
 } from "@chakra-ui/react";
 
 import { ExternalLink, ThumbsDown, ThumbsUp } from "react-feather";
@@ -30,6 +31,7 @@ import { useForm } from "react-hook-form";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { HorizontalFormControl } from "./HorizontalFormControl";
+import Link from "next/link";
 
 export function AnnotationDrawer({
   traceId,
@@ -331,6 +333,25 @@ export function AnnotationDrawer({
                     </Button>
                   )}
                 </HStack>
+
+                {getAnnotationScoring.data?.length === 0 && (
+                  <>
+                    <Divider />
+                    <Text>
+                      Scoring metrics are currently disabled. Enable them to add
+                      more data to your annotations.
+                    </Text>
+                    <Link href={"/settings/annotation-scores"}>
+                      <Button
+                        colorScheme="blue"
+                        minWidth="fit-content"
+                        size="sm"
+                      >
+                        Enable scoring metrics
+                      </Button>
+                    </Link>
+                  </>
+                )}
               </VStack>
             </form>
           )}
