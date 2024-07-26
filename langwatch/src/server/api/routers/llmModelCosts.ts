@@ -3,12 +3,14 @@ import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { z } from "zod";
 import * as llmModelCosts from "./llmModelCosts.json";
 import { prisma } from "~/server/db";
+import escapeStringRegexp from "escape-string-regexp";
 
 const getAllForProjectInput = z.object({
   projectId: z.string(),
 });
 
 const updateFieldInput = z.object({
+  id: z.string(),
   projectId: z.string(),
   model: z.string(),
   field: z.enum(["inputCostPerToken", "outputCostPerToken", "regex"]),
@@ -20,7 +22,7 @@ const createModelInput = z.object({
   model: z.string(),
   inputCostPerToken: z.number().optional(),
   outputCostPerToken: z.number().optional(),
-  regex: z.string().optional(),
+  regex: z.string(),
 });
 
 export const llmModelCostsRouter = createTRPCRouter({
@@ -46,51 +48,130 @@ export const llmModelCostsRouter = createTRPCRouter({
     }),
 });
 
+export const getImportedModelCosts = () => {
+  type ImportedLLMModelCost =
+    (typeof llmModelCosts)[keyof typeof llmModelCosts];
+
+  const models: Record<string, ImportedLLMModelCost> = llmModelCosts;
+
+  // Filter only models based on input and output costs per token
+  const tokenModels: Record<
+    string,
+    {
+      inputCostPerToken: number;
+      outputCostPerToken: number;
+    }
+  > = Object.fromEntries(
+    Object.entries(models)
+      .filter(
+        ([_, model]) =>
+          "input_cost_per_token" in model &&
+          "output_cost_per_token" in model &&
+          typeof model.input_cost_per_token === "number" &&
+          typeof model.output_cost_per_token === "number"
+      )
+      .map(([model_name, model]) => {
+        const model_ = model as {
+          input_cost_per_token: number;
+          output_cost_per_token: number;
+        };
+
+        return [
+          model_name,
+          {
+            inputCostPerToken: model_.input_cost_per_token,
+            outputCostPerToken: model_.output_cost_per_token,
+          },
+        ];
+      })
+  );
+
+  // Exclude models with : after it if there is already the same model there without the :
+  const mergedModels = Object.entries(tokenModels)
+    .filter(([model_name, _]) => {
+      if (
+        model_name.includes(":") &&
+        model_name.split(":")[0]! in tokenModels
+      ) {
+        return false;
+      }
+      return true;
+    })
+    .map(([model_name, model]) => {
+      return {
+        model: model_name,
+        inputCostPerToken: model.inputCostPerToken,
+        outputCostPerToken: model.outputCostPerToken,
+      };
+    });
+
+  // Exclude models with no costs
+  const paidModels = mergedModels.filter(
+    (model) => !!model.inputCostPerToken || !!model.outputCostPerToken
+  );
+
+  // Exclude some vendors
+  const relevantModels = paidModels.filter(
+    (model) => !model.model.includes("openrouter/")
+  );
+
+  return Object.fromEntries(
+    relevantModels.map((model) => [model.model, model])
+  );
+};
+
+export type MaybeStoredLLMModelCost = {
+  id?: string;
+  projectId: string;
+  model: string;
+  regex: string;
+  inputCostPerToken?: number;
+  outputCostPerToken?: number;
+  updatedAt?: Date;
+  createdAt?: Date;
+};
+
 export const getAllForProject = async (
   input: z.infer<typeof getAllForProjectInput>
-) => {
-  const importedData: Record<string, any> = llmModelCosts;
+): Promise<MaybeStoredLLMModelCost[]> => {
+  const importedData = getImportedModelCosts();
   const llmModelCostsCustomData = await prisma.customLLMModelCost.findMany({
     where: { projectId: input.projectId },
   });
-  const customDataMap = llmModelCostsCustomData.reduce(
-    (acc, curr) => {
-      acc[curr.model] = curr;
-      return acc;
-    },
-    {} as Record<string, any>
-  );
+  // const customDataMap = llmModelCostsCustomData.reduce(
+  //   (acc, curr) => {
+  //     acc[curr.model] = curr;
+  //     return acc;
+  //   },
+  //   {} as Record<string, CustomLLMModelCost>
+  // );
   const ownModels = llmModelCostsCustomData.filter(
-    (record: any) => !Reflect.has(llmModelCosts, record.model)
+    (record) => !importedData[record.model]
   );
 
-  const data = Object.keys(llmModelCosts)
-    .filter(
-      (key: string) =>
-        Reflect.has(importedData[key], "input_cost_per_token") &&
-        Reflect.has(importedData[key], "output_cost_per_token")
+  const data = ownModels
+    .map(
+      (record) =>
+        ({
+          id: record.id,
+          projectId: input.projectId,
+          model: record.model,
+          regex: record.regex,
+          inputCostPerToken: record.inputCostPerToken ?? undefined,
+          outputCostPerToken: record.outputCostPerToken ?? undefined,
+          updatedAt: record.updatedAt,
+          createdAt: record.createdAt,
+        }) as MaybeStoredLLMModelCost
     )
-    .map((key) => ({
-      projectId: input.projectId,
-      model: key,
-      regex: customDataMap[key]?.regex || new RegExp(key),
-      inputCostPerToken:
-        customDataMap[key]?.inputCostPerToken ||
-        importedData[key].input_cost_per_token,
-      outputCostPerToken:
-        customDataMap[key]?.outputCostPerToken ||
-        importedData[key].output_cost_per_token,
-      updatedAt: customDataMap[key]?.updatedAt,
-    }))
     .concat(
-      ownModels.map((record: any) => ({
+      Object.entries(importedData).map(([key, value]) => ({
         projectId: input.projectId,
-        model: record.model,
-        regex: record.regex,
-        inputCostPerToken: record.inputCostPerToken,
-        outputCostPerToken: record.outputCostPerToken,
-        updatedAt: record.updatedAt,
-        createdAt: record.createdAt,
+        model: key,
+        regex: escapeStringRegexp(key)
+          .replaceAll("\\x2d", "-")
+          .replaceAll("/", "\\/"),
+        inputCostPerToken: value.inputCostPerToken,
+        outputCostPerToken: value.outputCostPerToken,
       }))
     )
     .sort((a, b) => a.model.localeCompare(b.model));
@@ -103,12 +184,8 @@ export const updateField = async (input: z.infer<typeof updateFieldInput>) => {
 
   const exists = await prisma.customLLMModelCost.findUnique({
     where: {
-      projectId_model: {
-        projectId,
-        model,
-      },
+      id: input.id,
       projectId,
-      model,
     },
   });
 
@@ -123,12 +200,8 @@ export const updateField = async (input: z.infer<typeof updateFieldInput>) => {
 
   await prisma.customLLMModelCost.update({
     where: {
-      projectId_model: {
-        projectId,
-        model,
-      },
+      id: input.id,
       projectId,
-      model,
     },
     data: {
       [field]: value,

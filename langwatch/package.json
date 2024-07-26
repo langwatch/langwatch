@@ -70,6 +70,7 @@
     "date-fns": "^2.30.0",
     "debug": "^4.3.5",
     "dotenv": "^16.3.1",
+    "escape-string-regexp": "^5.0.0",
     "fast-deep-equal": "^3.1.3",
     "fetch-h2": "^3.0.2",
     "framer-motion": "^10.16.4",
