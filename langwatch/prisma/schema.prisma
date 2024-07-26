@@ -488,7 +488,7 @@ model PublicShare {
 model CustomLLMModelCost {
   projectId             String
   model                 String
-  regex                 String?
+  regex                 String
   inputCostPerToken     Float?
   outputCostPerToken    Float?
   createdAt             DateTime @default(now())
