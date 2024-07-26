@@ -9,6 +9,7 @@ import {
   MenuButton,
   MenuItem,
   MenuList,
+  Skeleton,
   Spacer,
   Table,
   TableContainer,
@@ -37,10 +38,14 @@ export function LLMModelCost(props: { projectId?: string }) {
         <Heading size="lg" as="h1" marginTop="-2px">
           LLM Model Costs
         </Heading>
-        <Text fontSize="md">·</Text>
-        <Text fontSize="md" color="gray.500">
-          {llmModelCosts.data?.length} models
-        </Text>
+        {llmModelCosts.data && (
+          <>
+            <Text fontSize="md">·</Text>
+            <Text fontSize="md" color="gray.500">
+              {llmModelCosts.data?.length} models
+            </Text>
+          </>
+        )}
         <Spacer />
         <Button
           size="md"
@@ -78,6 +83,17 @@ export function LLMModelCost(props: { projectId?: string }) {
                 </Tr>
               </Thead>
               <Tbody width="full">
+                {llmModelCosts.isLoading &&
+                  Array.from({ length: 3 }).map((_, index) => (
+                    <Tr key={index}>
+                      {Array.from({ length: 4 }).map((_, index) => (
+                        <Td key={index}>
+                          <Skeleton height="20px" />
+                        </Td>
+                      ))}
+                      <Td padding={1}></Td>
+                    </Tr>
+                  ))}
                 {llmModelCosts.data?.map((row) => (
                   <Tr key={row.model} width="full">
                     <Td>
