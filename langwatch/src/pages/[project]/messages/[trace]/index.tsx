@@ -15,6 +15,8 @@ import {
   Text,
   Tooltip,
   VStack,
+  Image,
+  useToast,
 } from "@chakra-ui/react";
 import ErrorPage from "next/error";
 import { useRouter } from "next/router";
@@ -28,9 +30,7 @@ import Markdown from "react-markdown";
 import { DashboardLayout } from "../../../../components/DashboardLayout";
 import { useOrganizationTeamProject } from "../../../../hooks/useOrganizationTeamProject";
 import { useTraceDetailsState } from "../../../../hooks/useTraceDetailsState";
-import type {
-  Trace
-} from "../../../../server/tracer/types";
+import type { Trace } from "../../../../server/tracer/types";
 import { api } from "../../../../utils/api";
 import { isNotFound } from "../../../../utils/trpcError";
 
@@ -253,36 +253,108 @@ const TraceMessages = React.forwardRef(function TraceMessages(
 ) {
   const { project } = useOrganizationTeamProject();
   const { openDrawer } = useDrawer();
+  const toast = useToast();
+
+  const translateAPI = api.translate.translate.useMutation();
+  const [translatedTextInput, setTranslatedTextInput] = useState<string | null>(
+    null
+  );
+  const [translatedTextOutput, setTranslatedTextOutput] = useState<
+    string | null
+  >(null);
+
+  const [translationActive, setTranslationActive] = useState(false);
 
   const [showAnnotationHover, setShowAnnotationHover] = useState(false);
 
+  const translate = () => {
+    setTranslationActive(!translationActive);
+
+    if (translatedTextInput && translationActive) return;
+    const inputTranslation = translateAPI.mutateAsync({
+      projectId: project?.id ?? "",
+      textToTranslate: getExtractedInput(trace),
+    });
+
+    const outputTranslation = translateAPI.mutateAsync({
+      projectId: project?.id ?? "",
+      textToTranslate: trace.output?.value ?? "",
+    });
+
+    Promise.all([inputTranslation, outputTranslation])
+      .then(([inputData, outputData]) => {
+        setTranslatedTextInput(inputData.translation);
+        setTranslatedTextOutput(outputData.translation);
+      })
+      .catch(() => {
+        toast({
+          title: "Error translating",
+          description: error.message,
+          status: "error",
+          duration: 5000,
+          isClosable: true,
+          position: "top-right",
+        });
+      });
+  };
+
   const AnnotationHover = () => {
     return (
-      <Box
-        position="absolute"
-        right={-5}
-        paddingY={3}
-        paddingX={2}
-        top={"50%"}
-        marginTop={"-48px"}
-        borderRadius={"3xl"}
-        border="1px solid"
-        borderColor="gray.200"
-        backgroundColor="white"
-        onClick={() =>
-          openDrawer("annotation", {
-            traceId: trace.trace_id,
-            action: "new",
-          })
-        }
-        cursor="pointer"
-      >
-        <VStack>
-          <ThumbsUp size={"20px"} />
-          <ThumbsDown size={"20px"} />
-          <Edit size={"20px"} />
-        </VStack>
-      </Box>
+      <VStack>
+        <Box
+          position="absolute"
+          right={-5}
+          paddingY={2}
+          paddingX={2}
+          top={"50%"}
+          marginTop={"-70px"}
+          borderRadius={"50%"}
+          border="1px solid"
+          borderColor="gray.200"
+          backgroundColor="white"
+          onClick={() => translate()}
+          cursor="pointer"
+        >
+          <VStack>
+            {translateAPI.isLoading ? (
+              <Spinner size="sm" />
+            ) : translationActive ? (
+              <Image
+                src="/images/translate-active.svg"
+                alt="Translate"
+                width="20px"
+              />
+            ) : (
+              <Image src="/images/translate.svg" alt="Translate" width="20px" />
+            )}
+          </VStack>
+        </Box>
+        <Box
+          position="absolute"
+          right={-5}
+          paddingY={3}
+          paddingX={2}
+          top={"50%"}
+          marginTop={"-28px"}
+          borderRadius={"3xl"}
+          border="1px solid"
+          borderColor="gray.200"
+          backgroundColor="white"
+          onClick={() =>
+            openDrawer("annotation", {
+              traceId: trace.trace_id,
+              action: "new",
+            })
+          }
+          cursor="pointer"
+        >
+          <VStack>
+            <ThumbsUp size={"20px"} />
+            <ThumbsDown size={"20px"} />
+            <Edit size={"20px"} />
+          </VStack>
+        </Box>
+      </VStack>
     );
   };
 
@@ -330,7 +402,7 @@ const TraceMessages = React.forwardRef(function TraceMessages(
                     marginBottom="38px"
                     whiteSpace="pre-wrap"
                   >
-                    {getExtractedInput(trace)}
+                    {translatedTextInput ?? getExtractedInput(trace)}
                   </Text>
                 </Message>
                 <Message
@@ -364,7 +436,9 @@ const TraceMessages = React.forwardRef(function TraceMessages(
                     </VStack>
                   ) : trace.output?.value ? (
                     <Markdown className="markdown markdown-conversation-history">
-                      {trace.output.value}
+                      {translatedTextOutput && translationActive
+                        ? translatedTextOutput
+                        : trace.output.value}
                     </Markdown>
                   ) : (
                     <Text paddingY={2}>{"<empty>"}</Text>
@@ -375,7 +449,11 @@ const TraceMessages = React.forwardRef(function TraceMessages(
                         <CornerDownRight size="16" />
                       </Box>
                       <AlertTitle>Expected Output:</AlertTitle>
-                      <Text>{getSlicedExpectedOutput(trace)}</Text>
+                      <Text>
+                        {translatedTextOutput && translationActive
+                          ? translatedTextOutput
+                          : getSlicedExpectedOutput(trace)}
+                      </Text>
                     </Alert>
                   )}
                 </Message>
@@ -430,7 +508,13 @@ function Message({
       }}
     >
       {avatar}
-      <VStack align="start" spacing={0} width="full" className="content-hover" wordBreak="break-all">
+      <VStack
+        align="start"
+        spacing={0}
+        width="full"
+        className="content-hover"
+        wordBreak="break-all"
+      >
         <HStack width="full">
           <Text fontWeight="bold">{author}</Text>
           <Spacer />
