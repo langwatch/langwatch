@@ -25,6 +25,7 @@ import { annotationScoreRouter } from "./routers/annotationScore";
 import { publicEnvRouter } from "./routers/publicEnv";
 import { shareRouter } from "./routers/share";
 import { llmModelCostsRouter } from "./routers/llmModelCosts";
+import { translateRouter } from "./routers/translate";
 
 /**
  * This is the primary router for your server.
@@ -57,6 +58,7 @@ export const appRouter = createTRPCRouter({
   annotationScore: annotationScoreRouter,
   publicEnv: publicEnvRouter,
   share: shareRouter,
+  translate: translateRouter,
   ...(dependencies.extraTRPCRoutes?.() ?? {}),
 });
 
