@@ -289,7 +289,8 @@ const TraceMessages = React.forwardRef(function TraceMessages(
       .catch(() => {
         toast({
           title: "Error translating",
-          description: error.message,
+          description:
+            "There was an error translating the message, please try again.",
           status: "error",
           duration: 5000,
           isClosable: true,
