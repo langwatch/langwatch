@@ -13,6 +13,13 @@ export const trackEventsQueue = new Queue<TrackEventJob, void, string>(
         type: "exponential",
         delay: 5000,
       },
+      attempts: 3,
+      removeOnComplete: {
+        age: 0, // immediately remove completed jobs
+      },
+      removeOnFail: {
+        age: 60 * 60 * 24 * 3, // 3 days
+      },
     },
   }
 );

@@ -124,13 +124,6 @@ export default async function handler(
       jobId: `track_event_${eventId}`,
       // Add a delay to track events to possibly wait for trace data to be available for the grouping keys
       delay: process.env.VITEST_MODE ? 0 : 5000,
-      attempts: 3,
-      removeOnComplete: {
-        age: 60 * 60 * 24 * 3, // 3 days
-      },
-      removeOnFail: {
-        age: 60 * 60 * 24 * 3, // 3 days
-      },
     }
   );
 

@@ -15,6 +15,13 @@ const topicClusteringQueue = new Queue<TopicClusteringJob, void, string>(
         type: "exponential",
         delay: 5000,
       },
+      attempts: 3,
+      removeOnComplete: {
+        age: 0, // immediately remove completed jobs
+      },
+      removeOnFail: {
+        age: 60 * 60 * 24 * 3, // 3 days
+      },
     },
   }
 );
@@ -41,13 +48,6 @@ export const scheduleTopicClustering = async () => {
         jobId: `topic_clustering_${project.id}_${yyyymmdd}`,
         delay:
           distributionHour * 60 * 60 * 1000 + distributionMinute * 60 * 1000,
-        attempts: 3,
-        removeOnComplete: {
-          age: 60 * 60 * 24 * 3, // 3 days
-        },
-        removeOnFail: {
-          age: 60 * 60 * 24 * 3, // 3 days
-        },
       },
     };
   });
@@ -69,13 +69,6 @@ export const scheduleTopicClusteringNextPage = async (
         "_"
       )}`,
       delay: 1000,
-      attempts: 3,
-      removeOnComplete: {
-        age: 60 * 60 * 24 * 3, // 3 days
-      },
-      removeOnFail: {
-        age: 60 * 60 * 24 * 3, // 3 days
-      },
     }
   );
 };

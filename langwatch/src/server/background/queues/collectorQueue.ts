@@ -9,9 +9,17 @@ export const collectorQueue = new Queue<CollectorJob, void, string>(
   {
     connection,
     defaultJobOptions: {
+      delay: 0,
+      attempts: 18, // with exponential backoff the very last attempt will happen in 3 days
       backoff: {
         type: "exponential",
-        delay: 5000,
+        delay: 1000,
+      },
+      removeOnComplete: {
+        age: 0, // immediately remove completed jobs
+      },
+      removeOnFail: {
+        age: 60 * 60 * 24 * 3, // 3 days left for debugging
       },
     },
   }

@@ -289,18 +289,6 @@ export default async function handler(
     },
     {
       jobId: `collector_${traceId}_md5:${paramsMD5}`,
-      delay: 0,
-      attempts: 18, // with exponential backoff the very last attempt will happen in 3 days
-      backoff: {
-        type: "exponential",
-        delay: 1000,
-      },
-      removeOnComplete: {
-        age: 60 * 60 * 24 * 3, // 3 days
-      },
-      removeOnFail: {
-        age: 60 * 60 * 24 * 3, // 3 days
-      },
     }
   );
 

@@ -17,6 +17,13 @@ export const traceChecksQueue = new Queue<TraceCheckJob, any, string>(
         type: "exponential",
         delay: 1000,
       },
+      attempts: 3,
+      removeOnComplete: {
+        age: 0, // immediately remove completed jobs
+      },
+      removeOnFail: {
+        age: 60 * 60 * 24 * 3, // 3 days
+      },
     },
   }
 );
@@ -70,13 +77,6 @@ export const scheduleTraceCheck = async ({
       {
         jobId,
         delay: delay ?? 5000,
-        attempts: 3,
-        removeOnComplete: {
-          age: 60 * 60 * 24 * 3, // 3 days
-        },
-        removeOnFail: {
-          age: 60 * 60 * 24 * 3, // 3 days
-        },
       }
     );
   }
