@@ -1,25 +1,15 @@
-import type { GetResponse } from "@elastic/elasticsearch/lib/api/types";
 import * as Sentry from "@sentry/nextjs";
 import { Worker } from "bullmq";
 import type { TrackEventJob } from "~/server/background/types";
 import {
   type ElasticSearchEvent,
-  type Trace,
+  type ElasticSearchTrace,
 } from "../../../server/tracer/types";
 import { getDebugger } from "../../../utils/logger";
-import {
-  EVENTS_INDEX,
-  TRACE_INDEX,
-  esClient,
-  eventIndexId,
-  traceIndexId,
-} from "../../elasticsearch";
+import { TRACE_INDEX, esClient, traceIndexId } from "../../elasticsearch";
 import { connection } from "../../redis";
 import { elasticSearchEventSchema } from "../../tracer/types.generated";
-import {
-  TRACK_EVENTS_QUEUE_NAME,
-  trackEventsQueue,
-} from "../queues/trackEventsQueue";
+import { TRACK_EVENTS_QUEUE_NAME } from "../queues/trackEventsQueue";
 
 const debug = getDebugger("langwatch:workers:trackEventWorker");
 
@@ -46,53 +36,58 @@ export const startTrackEventsWorker = () => {
           inserted_at: Date.now(),
           updated_at: Date.now(),
         },
-        trace_metadata: {}
       };
       // use zod to remove any other keys that may be present but not allowed
       event = elasticSearchEventSchema.parse(event);
 
-      // Try to copy grouping keys from trace if event is connected to one
-      if (event.trace_id) {
-        let traceResult: GetResponse<Trace> | undefined = undefined;
-        try {
-          traceResult = await esClient.get<Trace>({
-            index: TRACE_INDEX,
-            id: traceIndexId({
-              traceId: event.trace_id,
-              projectId: job.data.project_id,
-            }),
-          });
-        } catch {}
+      const trace: Partial<ElasticSearchTrace> = {
+        trace_id: event.trace_id,
+        project_id: event.project_id,
+        events: [event],
+      };
 
-        const trace = traceResult?._source;
-        if (trace) {
-          event = {
-            ...event,
-            trace_metadata: {
-              ...trace.metadata,
-            }
-          };
-        } else if (job.data.postpone_count < 3) {
-          const delay = 5 * Math.pow(2, job.data.postpone_count);
-          await trackEventsQueue.add(
-            "track_event",
-            { ...job.data, postpone_count: job.data.postpone_count + 1 },
-            {
-              jobId: `track_event_${event.event_id}_${job.data.postpone_count}`,
-              delay: delay * 1000,
-            }
-          );
-          return;
-        }
-      }
-
-      await esClient.index({
-        index: EVENTS_INDEX,
-        id: eventIndexId({
-          eventId: event.event_id,
+      await esClient.update({
+        index: TRACE_INDEX,
+        id: traceIndexId({
+          traceId: event.trace_id,
           projectId: event.project_id,
         }),
-        body: event,
+        retry_on_conflict: 5,
+        body: {
+          script: {
+            source: `
+              if (ctx._source.events == null) {
+                ctx._source.events = [];
+              }
+              def newEvent = params.newEvent;
+              def found = false;
+              for (int i = 0; i < ctx._source.events.size(); i++) {
+                if (ctx._source.events[i].event_id == newEvent.event_id) {
+                  ctx._source.events[i] = newEvent;
+                  found = true;
+                  break;
+                }
+              }
+              if (!found) {
+                if (newEvent.timestamps == null) {
+                  newEvent.timestamps = new HashMap();
+                }
+                newEvent.timestamps.inserted_at = System.currentTimeMillis();
+                ctx._source.events.add(newEvent);
+              }
+            `,
+            lang: "painless",
+            params: {
+              newEvent: event,
+            },
+          },
+          upsert: {
+            trace_id: trace.trace_id,
+            project_id: trace.project_id,
+            events: [event],
+          },
+        },
+        refresh: true,
       });
     },
     {

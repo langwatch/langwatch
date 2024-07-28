@@ -1,6 +1,6 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { TRACES_PIVOT_INDEX, esClient } from "../../../elasticsearch";
+import { esClient, TRACE_INDEX } from "../../../elasticsearch";
 import { filterFieldsEnum } from "../../../filters/types";
 import { TeamRoleGroup, checkUserPermissionForProject } from "../../permission";
 import { protectedProcedure } from "../../trpc";
@@ -45,7 +45,7 @@ export const dataForFilter = protectedProcedure
     });
 
     const response = await esClient.search({
-      index: TRACES_PIVOT_INDEX, // Adjust the index based on the field
+      index: TRACE_INDEX,
       body: {
         size: 0,
         query: pivotIndexConditions,

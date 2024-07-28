@@ -16,7 +16,7 @@ import {
   type SeriesInputType,
 } from "./registry";
 import { prisma } from "../db";
-import { TRACES_PIVOT_INDEX, esClient } from "../elasticsearch";
+import { esClient, TRACE_INDEX } from "../elasticsearch";
 import {
   currentVsPreviousDates,
   generateTracesPivotQueryConditions,
@@ -143,7 +143,7 @@ export const timeseries = async (input: TimeseriesInputType) => {
         ? {
             previous_vs_current: {
               range: {
-                field: "trace.timestamps.started_at",
+                field: "timestamps.started_at",
                 ranges: [
                   {
                     key: "previous",
@@ -163,7 +163,7 @@ export const timeseries = async (input: TimeseriesInputType) => {
         : ({
             traces_per_day: {
               date_histogram: {
-                field: "trace.timestamps.started_at",
+                field: "timestamps.started_at",
                 fixed_interval: input.timeScale ? `${input.timeScale}d` : "1d",
                 min_doc_count: 0,
                 extended_bounds: {
@@ -177,7 +177,7 @@ export const timeseries = async (input: TimeseriesInputType) => {
   };
 
   const result = (await esClient.search({
-    index: TRACES_PIVOT_INDEX,
+    index: TRACE_INDEX,
     body: queryBody,
   })) as any;
 

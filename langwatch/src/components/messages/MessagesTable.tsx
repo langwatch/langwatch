@@ -125,7 +125,7 @@ export function MessagesTable() {
       traceGroups.data?.traceChecks ?? previousTraceChecks ?? {}
     ).flatMap((checks) =>
       checks.map((check: any) => [
-        `trace_checks.${check.check_id}`,
+        `evaluations.${check.check_id}`,
         check.check_name,
       ])
     )

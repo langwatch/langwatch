@@ -1,4 +1,4 @@
-import { TRACES_PIVOT_INDEX, esClient } from "../../../elasticsearch";
+import { esClient, TRACE_INDEX } from "../../../elasticsearch";
 import { TeamRoleGroup, checkUserPermissionForProject } from "../../permission";
 import { protectedProcedure } from "../../trpc";
 import {
@@ -15,24 +15,24 @@ export const sessionsVsPreviousPeriod = protectedProcedure
 
     const sessionsQuery = (startDate: number, endDate: number) =>
       esClient.search({
-        index: TRACES_PIVOT_INDEX,
+        index: TRACE_INDEX,
         body: {
           aggs: {
             user_sessions: {
               terms: {
-                field: "trace.metadata.user_id",
+                field: "metadata.user_id",
                 size: 10000, // Adjust based on expected number of unique users
               },
               aggs: {
                 session_windows: {
                   date_histogram: {
-                    field: "trace.timestamps.started_at",
+                    field: "timestamps.started_at",
                     calendar_interval: "hour", // Group by hour
                   },
                   aggs: {
                     distinct_threads: {
                       cardinality: {
-                        field: "trace.metadata.thread_id",
+                        field: "metadata.thread_id",
                       },
                     },
                     session_duration: {
@@ -102,7 +102,7 @@ export const sessionsVsPreviousPeriod = protectedProcedure
             },
             total_users: {
               cardinality: {
-                field: "trace.metadata.user_id",
+                field: "metadata.user_id",
               },
             },
             total_sessions: {

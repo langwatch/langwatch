@@ -3,14 +3,8 @@ import type {
   MappingRuntimeField,
 } from "@elastic/elasticsearch/lib/api/types";
 import { z } from "zod";
-import type {
-  ElasticSearchSpan,
-  ElasticSearchTrace,
-  Event,
-  TraceCheck,
-} from "../tracer/types";
-import type { DeepRequired, Unpacked } from "../../utils/types";
 import type { RotatingColorSet } from "../../utils/rotatingColors";
+import type { DeepRequired, Unpacked } from "../../utils/types";
 import { filterFieldsEnum, type FilterField } from "../filters/types";
 
 export type AnalyticsMetric = {
@@ -124,33 +118,4 @@ export type TracesPivotFilters = DeepRequired<
 export type TracesPivotFilterQuery = {
   name: string;
   field: string;
-};
-
-export type TracesPivot = {
-  trace?: Omit<
-    ElasticSearchTrace,
-    "input" | "output" | "error" | "indexing_md5s" | "expected_output" | "metadata"
-  > & {
-    input: { satisfaction_score?: number };
-    has_error: boolean;
-    metadata: Omit<ElasticSearchTrace["metadata"], "custom">;
-  };
-  spans?: (Omit<
-    ElasticSearchSpan,
-    "name" | "input" | "output" | "error" | "params" | "contexts"
-  > & {
-    has_error?: boolean;
-    params?: { temperature: number; stream: boolean };
-  })[];
-  contexts?: {
-    document_id?: string;
-    chunk_id?: string;
-  }[];
-  trace_checks?: (Omit<TraceCheck, "error" | "trace_metadata" | "details"> & {
-    has_error?: boolean;
-  })[];
-  events?: (Omit<Event, "trace_metadata" | "metrics" | "event_details"> & {
-    metrics: { key: string; value: number }[];
-    event_details: { key: string; value: string }[];
-  })[];
 };

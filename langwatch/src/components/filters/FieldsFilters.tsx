@@ -52,13 +52,13 @@ export function FieldsFilters() {
   const filterKeys: FilterField[] = [
     "spans.model",
     "metadata.labels",
-    "trace_checks.passed",
-    "trace_checks.score",
+    "evaluations.passed",
+    "evaluations.score",
     "events.metrics.value",
     "metadata.user_id",
     "metadata.thread_id",
     "metadata.customer_id",
-    "trace_checks.state",
+    "evaluations.state",
     "traces.error",
   ];
 

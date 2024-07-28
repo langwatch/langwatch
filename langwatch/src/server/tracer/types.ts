@@ -261,6 +261,10 @@ export type ElasticSearchTrace = Omit<Trace, "metadata" | "timestamps"> & {
   timestamps: Trace["timestamps"] & {
     updated_at: number;
   };
+
+  spans?: ElasticSearchSpan[];
+  evaluations?: TraceCheck[];
+  events?: ElasticSearchEvent[];
 };
 
 export type TraceCheck = {
@@ -281,15 +285,6 @@ export type TraceCheck = {
     started_at?: number;
     finished_at?: number;
     updated_at: number;
-  };
-  trace_metadata: {
-    thread_id?: string;
-    user_id?: string;
-    customer_id?: string;
-    sdk_version?: string;
-    sdk_language?: string;
-    labels?: string[];
-    topics?: string[];
   };
 };
 
@@ -316,17 +311,7 @@ export type Event = {
   metrics: Record<string, number>;
   event_details: Record<string, string>;
 
-  trace_id?: string;
-  // TODO: need a form to reconcile those with their traces if a trace_id is available
-  trace_metadata: {
-    thread_id?: string;
-    user_id?: string;
-    customer_id?: string;
-    labels?: string[];
-    topics?: string[];
-    sdk_version?: string | null | undefined;
-    sdk_language?: string | null | undefined;
-  };
+  trace_id: string;
   timestamps: { started_at: number; inserted_at: number; updated_at: number };
 };
 
@@ -337,7 +322,7 @@ export type ElasticSearchEvent = Omit<Event, "metrics" | "event_details"> & {
 
 export type TrackEventRESTParamsValidator = Omit<
   Event,
-  "event_id" | "project_id" | "timestamps" | "event_details" | "trace_metadata"
+  "event_id" | "project_id" | "timestamps" | "event_details"
 > & {
   event_id?: string; // auto generated unless you want to guarantee idempotency
   event_details?: Record<string, string>;

@@ -1,12 +1,16 @@
 import { Queue } from "bullmq";
-import { connection } from "../../redis";
-import { captureError } from "../../../utils/captureError";
-import { esClient, TRACE_CHECKS_INDEX } from "../../elasticsearch";
-import type { TraceCheck } from "../../tracer/types";
 import type { TraceCheckJob } from "~/server/background/types";
 import { traceCheckIndexId } from "~/server/elasticsearch";
+import { captureError } from "../../../utils/captureError";
+import {
+  esClient,
+  TRACE_INDEX,
+  traceIndexId
+} from "../../elasticsearch";
+import { connection } from "../../redis";
+import type { TraceCheck } from "../../tracer/types";
 
-export const TRACE_CHECKS_QUEUE_NAME = "trace_checks";
+export const TRACE_CHECKS_QUEUE_NAME = "evaluations";
 
 export const traceChecksQueue = new Queue<TraceCheckJob, any, string>(
   TRACE_CHECKS_QUEUE_NAME,
@@ -103,12 +107,7 @@ export const updateCheckStatusInES = async ({
   retries?: number;
   is_guardrail?: boolean;
 }) => {
-  const traceCheck: TraceCheck = {
-    id: traceCheckIndexId({
-      traceId: trace.trace_id,
-      checkId: check.id,
-      projectId: trace.project_id,
-    }),
+  const evaluation: TraceCheck = {
     trace_id: trace.trace_id,
     project_id: trace.project_id,
     thread_id: trace.thread_id,
@@ -135,20 +134,44 @@ export const updateCheckStatusInES = async ({
   };
 
   await esClient.update({
-    index: TRACE_CHECKS_INDEX,
-    id: traceCheckIndexId({
+    index: TRACE_INDEX,
+    id: traceIndexId({
       traceId: trace.trace_id,
-      checkId: check.id,
       projectId: trace.project_id,
     }),
+    retry_on_conflict: 5,
     body: {
-      doc: traceCheck,
-      upsert: {
-        ...traceCheck,
-        timestamps: {
-          ...traceCheck.timestamps,
-          inserted_at: Date.now(),
+      script: {
+        source: `
+          if (ctx._source.evaluations == null) {
+            ctx._source.evaluations = [];
+          }
+          def newEvaluation = params.newEvaluation;
+          def found = false;
+          for (int i = 0; i < ctx._source.evaluations.size(); i++) {
+            if (ctx._source.evaluations[i].check_id == newEvaluation.check_id) {
+              ctx._source.evaluations[i] = newEvaluation;
+              found = true;
+              break;
+            }
+          }
+          if (!found) {
+            if (newEvaluation.timestamps == null) {
+              newEvaluation.timestamps = new HashMap();
+            }
+            newEvaluation.timestamps.inserted_at = System.currentTimeMillis();
+            ctx._source.evaluations.add(newEvaluation);
+          }
+        `,
+        lang: "painless",
+        params: {
+          newEvaluation: evaluation,
         },
+      },
+      upsert: {
+        trace_id: trace.trace_id,
+        project_id: trace.project_id,
+        evaluations: [evaluation],
       },
     },
     refresh: true,

@@ -73,19 +73,19 @@ const percentileToPercent: Record<PercentileAggregationTypes, number> = {
 export const analyticsMetrics = {
   metadata: {
     trace_id: {
-      ...simpleFieldAnalytics("trace.trace_id"),
+      ...simpleFieldAnalytics("trace_id"),
       label: "Messages",
       colorSet: "orangeTones",
       allowedAggregations: ["cardinality"],
     },
     user_id: {
-      ...simpleFieldAnalytics("trace.metadata.user_id"),
+      ...simpleFieldAnalytics("metadata.user_id"),
       label: "Users",
       colorSet: "blueTones",
       allowedAggregations: ["cardinality"],
     },
     thread_id: {
-      ...simpleFieldAnalytics("trace.metadata.thread_id"),
+      ...simpleFieldAnalytics("metadata.thread_id"),
       label: "Threads",
       colorSet: "greenTones",
       allowedAggregations: ["cardinality"],
@@ -130,7 +130,7 @@ export const analyticsMetrics = {
   },
   sentiment: {
     input_sentiment: {
-      ...numericFieldAnalyticsWithPercentiles("trace.input.satisfaction_score"),
+      ...numericFieldAnalyticsWithPercentiles("input.satisfaction_score"),
       label: "Input Sentiment Score",
       colorSet: "yellowTones",
       format: "0.00%",
@@ -202,35 +202,35 @@ export const analyticsMetrics = {
   },
   performance: {
     completion_time: {
-      ...numericFieldAnalyticsWithPercentiles("trace.metrics.total_time_ms"),
+      ...numericFieldAnalyticsWithPercentiles("metrics.total_time_ms"),
       label: "Completion Time",
       colorSet: "greenTones",
       format: formatMilliseconds,
       increaseIs: "bad",
     },
     first_token: {
-      ...numericFieldAnalyticsWithPercentiles("trace.metrics.first_token_ms"),
+      ...numericFieldAnalyticsWithPercentiles("metrics.first_token_ms"),
       label: "Time to First Token",
       colorSet: "cyanTones",
       format: formatMilliseconds,
       increaseIs: "bad",
     },
     total_cost: {
-      ...numericFieldAnalyticsWithPercentiles("trace.metrics.total_cost"),
+      ...numericFieldAnalyticsWithPercentiles("metrics.total_cost"),
       label: "Total Cost",
       colorSet: "greenTones",
       format: (amount) => formatMoney({ amount, currency: "USD" }),
       increaseIs: "neutral",
     },
     prompt_tokens: {
-      ...numericFieldAnalyticsWithPercentiles("trace.metrics.prompt_tokens"),
+      ...numericFieldAnalyticsWithPercentiles("metrics.prompt_tokens"),
       label: "Prompt Tokens",
       colorSet: "blueTones",
       increaseIs: "neutral",
     },
     completion_tokens: {
       ...numericFieldAnalyticsWithPercentiles(
-        "trace.metrics.completion_tokens"
+        "metrics.completion_tokens"
       ),
       label: "Completion Tokens",
       colorSet: "orangeTones",
@@ -249,13 +249,13 @@ export const analyticsMetrics = {
             long completionTokens = 0;
 
             try {
-              promptTokens = doc['trace.metrics.prompt_tokens'].size() > 0 ? doc['trace.metrics.prompt_tokens'].value : 0;
+              promptTokens = doc['metrics.prompt_tokens'].size() > 0 ? doc['metrics.prompt_tokens'].value : 0;
             } catch (Exception e) {
               // ignore
             }
 
             try {
-              completionTokens = doc['trace.metrics.completion_tokens'].size() > 0 ? doc['trace.metrics.completion_tokens'].value : 0;
+              completionTokens = doc['metrics.completion_tokens'].size() > 0 ? doc['metrics.completion_tokens'].value : 0;
             } catch (Exception e) {
               // ignore
             }
@@ -445,25 +445,25 @@ export const analyticsMetrics = {
         (agg) => agg != "cardinality"
       ),
       requiresKey: {
-        filter: "trace_checks.check_id",
+        filter: "evaluations.check_id",
       },
       aggregation: (aggregation, key) => {
         return {
           [`evaluation_score_${aggregation}_${key}`]: {
             nested: {
-              path: "trace_checks",
+              path: "evaluations",
             },
             aggs: {
               child: {
                 filter: {
                   bool: {
-                    must: [{ term: { "trace_checks.check_id": key } }],
+                    must: [{ term: { "evaluations.check_id": key } }],
                   } as any,
                 },
                 aggs: {
                   child: {
                     [aggregation]: {
-                      field: "trace_checks.score",
+                      field: "evaluations.score",
                     },
                   },
                 },
@@ -483,20 +483,20 @@ export const analyticsMetrics = {
       increaseIs: "neutral",
       allowedAggregations: ["cardinality"],
       requiresKey: {
-        filter: "trace_checks.check_id",
+        filter: "evaluations.check_id",
         optional: true,
       },
       runtimeMappings: {
         trace_id_and_check_id: {
           type: "keyword",
           script:
-            "emit(doc['trace_checks.trace_id'].value + ' ' + doc['trace_checks.check_id'].value)",
+            "emit(doc['evaluations.trace_id'].value + ' ' + doc['evaluations.check_id'].value)",
         },
       },
       aggregation: (aggregation, key) => ({
         [`checks_${aggregation}`]: {
           nested: {
-            path: "trace_checks",
+            path: "evaluations",
           },
           aggs: {
             child: {
@@ -504,7 +504,7 @@ export const analyticsMetrics = {
                 bool: {
                   must: [
                     key
-                      ? { term: { "trace_checks.check_id": key } }
+                      ? { term: { "evaluations.check_id": key } }
                       : { match_all: {} },
                   ],
                 } as any,
@@ -545,19 +545,19 @@ export const analyticsPipelines: {
 } = {
   trace_id: {
     label: "per message",
-    field: "trace.trace_id",
+    field: "trace_id",
   },
   user_id: {
     label: "per user",
-    field: "trace.metadata.user_id",
+    field: "metadata.user_id",
   },
   thread_id: {
     label: "per thread",
-    field: "trace.metadata.thread_id",
+    field: "metadata.thread_id",
   },
   customer_id: {
     label: "per customer",
-    field: "trace.metadata.customer_id",
+    field: "metadata.customer_id",
   },
 };
 
@@ -606,19 +606,19 @@ const simpleFieldGroupping = (name: string, field: string): AnalyticsGroup => ({
 
 export const analyticsGroups = {
   topics: {
-    topics: simpleFieldGroupping("Topic", "trace.metadata.topic_id"),
+    topics: simpleFieldGroupping("Topic", "metadata.topic_id"),
   },
   metadata: {
-    user_id: simpleFieldGroupping("User", "trace.metadata.user_id"),
+    user_id: simpleFieldGroupping("User", "metadata.user_id"),
 
-    thread_id: simpleFieldGroupping("Thread", "trace.metadata.thread_id"),
+    thread_id: simpleFieldGroupping("Thread", "metadata.thread_id"),
 
     customer_id: simpleFieldGroupping(
       "Customer ID",
-      "trace.metadata.customer_id"
+      "metadata.customer_id"
     ),
 
-    labels: simpleFieldGroupping("Label", "trace.metadata.labels"),
+    labels: simpleFieldGroupping("Label", "metadata.labels"),
 
     model: {
       label: "Model",
@@ -692,7 +692,7 @@ export const analyticsGroups = {
                 script: {
                   script: {
                     source:
-                      "doc['trace.input.satisfaction_score'].size() == 0 ? false : doc['trace.input.satisfaction_score'].value >= 0.1",
+                      "doc['input.satisfaction_score'].size() == 0 ? false : doc['input.satisfaction_score'].value >= 0.1",
                     lang: "painless",
                   },
                 },
@@ -701,7 +701,7 @@ export const analyticsGroups = {
                 script: {
                   script: {
                     source:
-                      "doc['trace.input.satisfaction_score'].size() == 0 ? false : doc['trace.input.satisfaction_score'].value <= -0.1",
+                      "doc['input.satisfaction_score'].size() == 0 ? false : doc['input.satisfaction_score'].value <= -0.1",
                     lang: "painless",
                   },
                 },
@@ -710,7 +710,7 @@ export const analyticsGroups = {
                 script: {
                   script: {
                     source:
-                      "doc['trace.input.satisfaction_score'].size() == 0 ? false : (doc['trace.input.satisfaction_score'].value < 0.1 && doc['trace.input.satisfaction_score'].value > -0.1)",
+                      "doc['input.satisfaction_score'].size() == 0 ? false : (doc['input.satisfaction_score'].value < 0.1 && doc['input.satisfaction_score'].value > -0.1)",
                     lang: "painless",
                   },
                 },
@@ -830,12 +830,12 @@ export const analyticsGroups = {
       aggregation: (aggToGroup) => ({
         check_state_group: {
           nested: {
-            path: "trace_checks",
+            path: "evaluations",
           },
           aggs: {
             child: {
               terms: {
-                field: "trace_checks.passed",
+                field: "evaluations.passed",
                 size: 50,
               },
               aggs: {
@@ -855,12 +855,12 @@ export const analyticsGroups = {
       aggregation: (aggToGroup) => ({
         check_state_group: {
           nested: {
-            path: "trace_checks",
+            path: "evaluations",
           },
           aggs: {
             child: {
               terms: {
-                field: "trace_checks.status",
+                field: "evaluations.status",
                 size: 50,
                 missing: "unknown",
               },

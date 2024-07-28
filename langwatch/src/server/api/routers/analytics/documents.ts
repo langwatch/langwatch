@@ -1,9 +1,4 @@
-import {
-  SPAN_INDEX,
-  TRACES_PIVOT_INDEX,
-  esClient,
-  traceIndexId,
-} from "../../../elasticsearch";
+import { TRACE_INDEX, esClient } from "../../../elasticsearch";
 import { TeamRoleGroup, checkUserPermissionForProject } from "../../permission";
 import { protectedProcedure } from "../../trpc";
 import { generateTracesPivotQueryConditions } from "./common";
@@ -12,6 +7,7 @@ import type {
   QueryDslBoolQuery,
   QueryDslQueryContainer,
 } from "@elastic/elasticsearch/lib/api/types";
+import type { ElasticSearchTrace } from "../../../tracer/types";
 
 export const topUsedDocuments = protectedProcedure
   .input(sharedFiltersInputSchema)
@@ -19,25 +15,25 @@ export const topUsedDocuments = protectedProcedure
   .query(async ({ input }) => {
     const { pivotIndexConditions } = generateTracesPivotQueryConditions(input);
 
-    const result = (await esClient.search({
-      index: TRACES_PIVOT_INDEX,
+    const result = (await esClient.search<ElasticSearchTrace>({
+      index: TRACE_INDEX,
       size: 0,
       body: {
         query: pivotIndexConditions,
         aggs: {
           nested: {
             nested: {
-              path: "contexts",
+              path: "spans",
             },
             aggs: {
               total_unique_documents: {
                 cardinality: {
-                  field: "contexts.document_id",
+                  field: "spans.contexts.document_id",
                 },
               },
               top_documents: {
                 terms: {
-                  field: "contexts.document_id",
+                  field: "spans.contexts.document_id",
                   size: 10,
                 },
                 aggs: {
@@ -48,7 +44,7 @@ export const topUsedDocuments = protectedProcedure
                         top_hits: {
                           size: 1,
                           _source: {
-                            includes: ["trace.trace_id"],
+                            includes: ["trace_id"],
                           },
                         },
                       },
@@ -68,7 +64,7 @@ export const topUsedDocuments = protectedProcedure
           documentId: bucket.key,
           count: bucket.doc_count,
           traceId:
-            bucket.back_to_root.top_content.hits.hits[0]._source.trace.trace_id,
+            bucket.back_to_root.top_content.hits.hits[0]._source.trace_id,
         })
       ) as { documentId: string; count: number; traceId: string }[];
 
@@ -76,16 +72,23 @@ export const topUsedDocuments = protectedProcedure
       ?.total_unique_documents?.value as number;
 
     // we now need to query spans to get the actual documents content
-    const documents = (await esClient.search({
-      index: SPAN_INDEX,
+    const documents = await esClient.search<ElasticSearchTrace>({
+      index: TRACE_INDEX,
       size: topDocuments.reduce((acc, d) => acc + d.count, 0),
       body: {
         query: {
           bool: {
             must: [
               {
-                terms: {
-                  "contexts.document_id": topDocuments.map((d) => d.documentId),
+                nested: {
+                  path: "spans",
+                  query: {
+                    terms: {
+                      "spans.contexts.document_id": topDocuments.map(
+                        (d) => d.documentId
+                      ),
+                    },
+                  },
                 },
               },
               {
@@ -93,27 +96,25 @@ export const topUsedDocuments = protectedProcedure
                   trace_id: topDocuments.map((d) => d.traceId),
                 },
               },
-              {
-                terms: {
-                  _routing: topDocuments.map((d) =>
-                    traceIndexId({
-                      traceId: d.traceId,
-                      projectId: input.projectId,
-                    })
-                  ),
-                },
-              },
             ] as QueryDslQueryContainer[],
           } as QueryDslBoolQuery,
         },
-        _source: ["contexts.document_id", "contexts.content"],
+        _source: ["spans.contexts.document_id", "spans.contexts.content"],
       },
-    })) as any;
+    });
 
     const documentIdToContent: Record<string, string> = {};
     for (const hit of documents.hits.hits) {
-      for (const context of hit._source.contexts) {
-        documentIdToContent[context.document_id] = context.content;
+      for (const span of hit._source!.spans ?? []) {
+        for (const context of span.contexts ?? []) {
+          const documentId = context.document_id;
+          if (typeof documentId === "string") {
+            documentIdToContent[documentId] =
+              typeof context.content === "string"
+                ? context.content
+                : JSON.stringify(context.content);
+          }
+        }
       }
     }
 

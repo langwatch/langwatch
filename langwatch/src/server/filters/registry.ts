@@ -13,7 +13,7 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
     name: "Topic",
     urlKey: "topics",
     query: (values) => ({
-      terms: { "trace.metadata.topic_id": values },
+      terms: { "metadata.topic_id": values },
     }),
     listMatch: {
       aggregation: (query) => ({
@@ -21,7 +21,7 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
           filter: query
             ? {
                 prefix: {
-                  "trace.metadata.topic_id": {
+                  "metadata.topic_id": {
                     value: query,
                     case_insensitive: true,
                   },
@@ -33,7 +33,7 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
           aggs: {
             child: {
               terms: {
-                field: "trace.metadata.topic_id",
+                field: "metadata.topic_id",
                 size: 100,
                 order: { _key: "asc" },
               },
@@ -56,7 +56,7 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
     name: "Subtopic",
     urlKey: "subtopics",
     query: (values) => ({
-      terms: { "trace.metadata.subtopic_id": values },
+      terms: { "metadata.subtopic_id": values },
     }),
     listMatch: {
       aggregation: (query) => ({
@@ -64,7 +64,7 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
           filter: query
             ? {
                 prefix: {
-                  "trace.metadata.subtopic_id": {
+                  "metadata.subtopic_id": {
                     value: query,
                     case_insensitive: true,
                   },
@@ -76,7 +76,7 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
           aggs: {
             child: {
               terms: {
-                field: "trace.metadata.subtopic_id",
+                field: "metadata.subtopic_id",
                 size: 100,
                 order: { _key: "asc" },
               },
@@ -99,7 +99,7 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
     name: "User ID",
     urlKey: "user_id",
     query: (values) => ({
-      terms: { "trace.metadata.user_id": values },
+      terms: { "metadata.user_id": values },
     }),
     listMatch: {
       aggregation: (query) => ({
@@ -107,7 +107,7 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
           filter: query
             ? {
                 prefix: {
-                  "trace.metadata.user_id": {
+                  "metadata.user_id": {
                     value: query,
                     case_insensitive: true,
                   },
@@ -119,7 +119,7 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
           aggs: {
             child: {
               terms: {
-                field: "trace.metadata.user_id",
+                field: "metadata.user_id",
                 size: 100,
                 order: { _key: "asc" },
               },
@@ -142,7 +142,7 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
     name: "Thread ID",
     urlKey: "thread_id",
     query: (values) => ({
-      terms: { "trace.metadata.thread_id": values },
+      terms: { "metadata.thread_id": values },
     }),
     listMatch: {
       aggregation: (query) => ({
@@ -150,7 +150,7 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
           filter: query
             ? {
                 prefix: {
-                  "trace.metadata.thread_id": {
+                  "metadata.thread_id": {
                     value: query,
                     case_insensitive: true,
                   },
@@ -162,7 +162,7 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
           aggs: {
             child: {
               terms: {
-                field: "trace.metadata.thread_id",
+                field: "metadata.thread_id",
                 size: 100,
                 order: { _key: "asc" },
               },
@@ -185,7 +185,7 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
     name: "Customer ID",
     urlKey: "customer_id",
     query: (values) => ({
-      terms: { "trace.metadata.customer_id": values },
+      terms: { "metadata.customer_id": values },
     }),
     listMatch: {
       aggregation: (query) => ({
@@ -193,7 +193,7 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
           filter: query
             ? {
                 prefix: {
-                  "trace.metadata.customer_id": {
+                  "metadata.customer_id": {
                     value: query,
                     case_insensitive: true,
                   },
@@ -205,7 +205,7 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
           aggs: {
             child: {
               terms: {
-                field: "trace.metadata.customer_id",
+                field: "metadata.customer_id",
                 size: 100,
                 order: { _key: "asc" },
               },
@@ -228,7 +228,7 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
     name: "Label",
     urlKey: "labels",
     query: (values) => ({
-      terms: { "trace.metadata.labels": values },
+      terms: { "metadata.labels": values },
     }),
     listMatch: {
       aggregation: (query) => ({
@@ -236,7 +236,7 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
           filter: query
             ? {
                 prefix: {
-                  "trace.metadata.labels": {
+                  "metadata.labels": {
                     value: query,
                     case_insensitive: true,
                   },
@@ -264,7 +264,7 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
                         },
                       },
                     }
-                  : { field: "trace.metadata.labels" }),
+                  : { field: "metadata.labels" }),
                 size: 100,
                 order: { _key: "asc" },
               },
@@ -290,7 +290,7 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
       if (values.includes("true") && !values.includes("false")) {
         return {
           term: {
-            "trace.has_error": true,
+            "error.has_error": true,
           },
         };
       } else if (values.includes("false") && !values.includes("true")) {
@@ -298,7 +298,7 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
           bool: {
             must_not: {
               term: {
-                "trace.has_error": true,
+                "error.has_error": true,
               },
             } as QueryDslQueryContainer,
           } as QueryDslBoolQuery,
@@ -313,7 +313,7 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
       aggregation: (_query) => ({
         unique_values: {
           terms: {
-            field: "trace.has_error",
+            field: "error.has_error",
             size: 2,
             order: { _key: "asc" },
             missing: false,
@@ -439,25 +439,25 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
       },
     },
   },
-  "trace_checks.check_id": {
+  "evaluations.check_id": {
     name: "Contains Evaluation",
     urlKey: "check_id",
     query: (values) => ({
       nested: {
-        path: "trace_checks",
+        path: "evaluations",
         query: {
-          terms: { "trace_checks.check_id": values },
+          terms: { "evaluations.check_id": values },
         },
       },
     }),
     listMatch: {
       aggregation: (query) => ({
         unique_check_ids: {
-          nested: { path: "trace_checks" },
+          nested: { path: "evaluations" },
           aggs: {
             child: {
               terms: {
-                field: "trace_checks.check_id",
+                field: "evaluations.check_id",
                 size: 100,
                 order: { _key: "asc" },
               },
@@ -466,7 +466,7 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
                   filter: query
                     ? {
                         prefix: {
-                          "trace_checks.check_name": {
+                          "evaluations.check_name": {
                             value: query,
                             case_insensitive: true,
                           },
@@ -478,13 +478,13 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
                   aggs: {
                     name: {
                       terms: {
-                        field: "trace_checks.check_name",
+                        field: "evaluations.check_name",
                         size: 1,
                       },
                     },
                     type: {
                       terms: {
-                        field: "trace_checks.check_type",
+                        field: "evaluations.check_type",
                         size: 1,
                       },
                     },
@@ -518,25 +518,25 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
       },
     },
   },
-  "trace_checks.check_id.guardrails_only": {
+  "evaluations.check_id.guardrails_only": {
     name: "Contains Evaluation (guardrails only)",
     urlKey: "guardrail_check_id",
     query: (values) => ({
       nested: {
-        path: "trace_checks",
+        path: "evaluations",
         query: {
-          terms: { "trace_checks.check_id": values },
+          terms: { "evaluations.check_id": values },
         },
       },
     }),
     listMatch: {
       aggregation: (query) => ({
         unique_check_ids: {
-          nested: { path: "trace_checks" },
+          nested: { path: "evaluations" },
           aggs: {
             child: {
               terms: {
-                field: "trace_checks.check_id",
+                field: "evaluations.check_id",
                 size: 100,
                 order: { _key: "asc" },
               },
@@ -545,7 +545,7 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
                   filter: query
                     ? {
                         prefix: {
-                          "trace_checks.check_name": {
+                          "evaluations.check_name": {
                             value: query,
                             case_insensitive: true,
                           },
@@ -557,13 +557,13 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
                   aggs: {
                     name: {
                       terms: {
-                        field: "trace_checks.check_name",
+                        field: "evaluations.check_name",
                         size: 1,
                       },
                     },
                     type: {
                       terms: {
-                        field: "trace_checks.check_type",
+                        field: "evaluations.check_type",
                         size: 1,
                       },
                     },
@@ -598,27 +598,27 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
       },
     },
   },
-  "trace_checks.passed": {
+  "evaluations.passed": {
     name: "Evaluation Passed",
     urlKey: "evaluation_passed",
     single: true,
     requiresKey: {
-      filter: "trace_checks.check_id.guardrails_only",
+      filter: "evaluations.check_id.guardrails_only",
     },
     query: (values, key) => ({
       nested: {
-        path: "trace_checks",
+        path: "evaluations",
         query: {
           bool: {
             must: [
               {
                 term: {
-                  "trace_checks.check_id": key,
+                  "evaluations.check_id": key,
                 },
               },
               {
                 terms: {
-                  "trace_checks.passed": values.map(
+                  "evaluations.passed": values.map(
                     (value) => value === "true" || value === "1"
                   ),
                 },
@@ -631,23 +631,23 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
     listMatch: {
       aggregation: (query, key) => ({
         unique_values: {
-          nested: { path: "trace_checks" },
+          nested: { path: "evaluations" },
           aggs: {
             child: {
               filter: {
-                term: { "trace_checks.check_id": key },
+                term: { "evaluations.check_id": key },
               },
               aggs: {
                 child: {
                   terms: {
-                    field: "trace_checks.passed",
+                    field: "evaluations.passed",
                   },
                   aggs: {
                     child: {
                       filter: query
                         ? {
                             term: {
-                              "trace_checks.passed": query === "true",
+                              "evaluations.passed": query === "true",
                             },
                           }
                         : {
@@ -672,28 +672,28 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
       },
     },
   },
-  "trace_checks.score": {
+  "evaluations.score": {
     name: "Evaluation Score",
     urlKey: "evaluation_score",
     type: "numeric",
     single: true,
     requiresKey: {
-      filter: "trace_checks.check_id",
+      filter: "evaluations.check_id",
     },
     query: (values, key) => ({
       nested: {
-        path: "trace_checks",
+        path: "evaluations",
         query: {
           bool: {
             must: [
               {
                 term: {
-                  "trace_checks.check_id": key,
+                  "evaluations.check_id": key,
                 },
               },
               {
                 range: {
-                  "trace_checks.score": {
+                  "evaluations.score": {
                     gte: values[0],
                     lte: values[1],
                   },
@@ -707,16 +707,16 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
     listMatch: {
       aggregation: (query, key) => ({
         unique_values: {
-          nested: { path: "trace_checks" },
+          nested: { path: "evaluations" },
           aggs: {
             child: {
               filter: {
-                term: { "trace_checks.check_id": key },
+                term: { "evaluations.check_id": key },
               },
               aggs: {
                 child: {
                   stats: {
-                    field: "trace_checks.score",
+                    field: "evaluations.score",
                   },
                 },
               },
@@ -740,26 +740,26 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
       },
     },
   },
-  "trace_checks.state": {
+  "evaluations.state": {
     name: "Evaluation Execution State",
     urlKey: "evaluation_state",
     requiresKey: {
-      filter: "trace_checks.check_id",
+      filter: "evaluations.check_id",
     },
     query: (values, key) => ({
       nested: {
-        path: "trace_checks",
+        path: "evaluations",
         query: {
           bool: {
             must: [
               {
                 term: {
-                  "trace_checks.check_id": key,
+                  "evaluations.check_id": key,
                 },
               },
               {
                 terms: {
-                  "trace_checks.status": values,
+                  "evaluations.status": values,
                 },
               },
             ] as QueryDslQueryContainer[],
@@ -770,23 +770,23 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
     listMatch: {
       aggregation: (query, key) => ({
         unique_values: {
-          nested: { path: "trace_checks" },
+          nested: { path: "evaluations" },
           aggs: {
             child: {
               filter: {
-                term: { "trace_checks.check_id": key },
+                term: { "evaluations.check_id": key },
               },
               aggs: {
                 child: {
                   terms: {
-                    field: "trace_checks.status",
+                    field: "evaluations.status",
                   },
                   aggs: {
                     child: {
                       filter: query
                         ? {
                             term: {
-                              "trace_checks.status": query,
+                              "evaluations.status": query,
                             },
                           }
                         : {

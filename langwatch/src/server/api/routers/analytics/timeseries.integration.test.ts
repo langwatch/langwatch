@@ -1,47 +1,42 @@
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import type { TracesPivot } from "../../../analytics/types";
 import { nanoid } from "nanoid";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { getTestUser } from "../../../../utils/testUtils";
+import { prisma } from "../../../db";
 import {
   esClient,
   traceIndexId,
   TRACES_PIVOT_INDEX,
 } from "../../../elasticsearch";
-import { getTestUser } from "../../../../utils/testUtils";
+import type { ElasticSearchTrace } from "../../../tracer/types";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
-import { prisma } from "../../../db";
 
 describe("Timeseries Graph Integration Tests", () => {
-  const pivotEntries: TracesPivot[] = [
+  const traceId = `test-trace-id-${nanoid()}`;
+  const traceId2 = `test-trace-id-${nanoid()}`;
+  const traceId3 = `test-trace-id-${nanoid()}`;
+
+  const traceEntries: ElasticSearchTrace[] = [
     {
-      trace: {
-        trace_id: `test-trace-id-${nanoid()}`,
-        project_id: "test-project-id",
-        metadata: {
-          user_id: "test-user-id",
-          customer_id: "customer-id-1",
-          labels: ["test-messages"],
-          thread_id: "test-thread-id",
-          topic_id: "topic_id_greetings",
-          all_keys: [
-            "user_id",
-            "customer_id",
-            "labels",
-            "thread_id",
-            "topic_id",
-          ],
-        },
-        timestamps: {
-          inserted_at: new Date().getTime(),
-          started_at: new Date().getTime(),
-          updated_at: new Date().getTime(),
-        },
-        metrics: {},
-        input: {},
-        has_error: false,
+      trace_id: traceId,
+      project_id: "test-project-id",
+      metadata: {
+        user_id: "test-user-id",
+        customer_id: "customer-id-1",
+        labels: ["test-messages"],
+        thread_id: "test-thread-id",
+        topic_id: "topic_id_greetings",
+        all_keys: ["user_id", "customer_id", "labels", "thread_id", "topic_id"],
       },
+      timestamps: {
+        inserted_at: new Date().getTime(),
+        started_at: new Date().getTime(),
+        updated_at: new Date().getTime(),
+      },
+      metrics: {},
       events: [
         {
+          trace_id: traceId,
           event_id: `test-event-id-${nanoid()}`,
           event_type: "thumbs_up_down",
           metrics: [
@@ -61,34 +56,25 @@ describe("Timeseries Graph Integration Tests", () => {
       ],
     },
     {
-      trace: {
-        trace_id: `test-trace-id-${nanoid()}`,
-        project_id: "test-project-id",
-        metadata: {
-          user_id: "test-user-id-2",
-          customer_id: "customer-id-1",
-          labels: ["test-messages"],
-          thread_id: "test-thread-id-2",
-          topic_id: "topic_id_greetings",
-          all_keys: [
-            "user_id",
-            "customer_id",
-            "labels",
-            "thread_id",
-            "topic_id",
-          ],
-        },
-        timestamps: {
-          inserted_at: new Date().getTime(),
-          started_at: new Date().getTime(),
-          updated_at: new Date().getTime(),
-        },
-        metrics: {},
-        input: {},
-        has_error: false,
+      trace_id: traceId2,
+      project_id: "test-project-id",
+      metadata: {
+        user_id: "test-user-id-2",
+        customer_id: "customer-id-1",
+        labels: ["test-messages"],
+        thread_id: "test-thread-id-2",
+        topic_id: "topic_id_greetings",
+        all_keys: ["user_id", "customer_id", "labels", "thread_id", "topic_id"],
       },
+      timestamps: {
+        inserted_at: new Date().getTime(),
+        started_at: new Date().getTime(),
+        updated_at: new Date().getTime(),
+      },
+      metrics: {},
       events: [
         {
+          trace_id: traceId2,
           event_id: `test-event-id-${nanoid()}`,
           event_type: "thumbs_up_down",
           metrics: [
@@ -108,34 +94,25 @@ describe("Timeseries Graph Integration Tests", () => {
       ],
     },
     {
-      trace: {
-        trace_id: `test-trace-id-${nanoid()}`,
-        project_id: "test-project-id",
-        metadata: {
-          user_id: "test-user-id-2",
-          customer_id: "customer-id-1",
-          labels: ["test-messages"],
-          thread_id: "test-thread-id-3",
-          topic_id: "topic_id_poems",
-          all_keys: [
-            "user_id",
-            "customer_id",
-            "labels",
-            "thread_id",
-            "topic_id",
-          ],
-        },
-        timestamps: {
-          inserted_at: new Date().getTime(),
-          started_at: new Date().getTime(),
-          updated_at: new Date().getTime(),
-        },
-        metrics: {},
-        input: {},
-        has_error: false,
+      trace_id: traceId3,
+      project_id: "test-project-id",
+      metadata: {
+        user_id: "test-user-id-2",
+        customer_id: "customer-id-1",
+        labels: ["test-messages"],
+        thread_id: "test-thread-id-3",
+        topic_id: "topic_id_poems",
+        all_keys: ["user_id", "customer_id", "labels", "thread_id", "topic_id"],
       },
+      timestamps: {
+        inserted_at: new Date().getTime(),
+        started_at: new Date().getTime(),
+        updated_at: new Date().getTime(),
+      },
+      metrics: {},
       events: [
         {
+          trace_id: traceId3,
           event_id: `test-event-id-${nanoid()}`,
           event_type: "thumbs_up_down",
           metrics: [
@@ -156,32 +133,22 @@ describe("Timeseries Graph Integration Tests", () => {
     },
     // older message
     {
-      trace: {
-        trace_id: `test-trace-id-${nanoid()}`,
-        project_id: "test-project-id",
-        metadata: {
-          user_id: "test-user-id",
-          customer_id: "customer-id-1",
-          labels: ["test-messages"],
-          thread_id: "test-thread-id",
-          topic_id: "greetings",
-          all_keys: [
-            "user_id",
-            "customer_id",
-            "labels",
-            "thread_id",
-            "topic_id",
-          ],
-        },
-        timestamps: {
-          inserted_at: new Date().getTime() - 24 * 60 * 60 * 1000 * 2,
-          started_at: new Date().getTime() - 24 * 60 * 60 * 1000 * 2,
-          updated_at: new Date().getTime() - 24 * 60 * 60 * 1000 * 2,
-        },
-        metrics: {},
-        input: {},
-        has_error: false,
+      trace_id: `test-trace-id-${nanoid()}`,
+      project_id: "test-project-id",
+      metadata: {
+        user_id: "test-user-id",
+        customer_id: "customer-id-1",
+        labels: ["test-messages"],
+        thread_id: "test-thread-id",
+        topic_id: "greetings",
+        all_keys: ["user_id", "customer_id", "labels", "thread_id", "topic_id"],
       },
+      timestamps: {
+        inserted_at: new Date().getTime() - 24 * 60 * 60 * 1000 * 2,
+        started_at: new Date().getTime() - 24 * 60 * 60 * 1000 * 2,
+        updated_at: new Date().getTime() - 24 * 60 * 60 * 1000 * 2,
+      },
+      metrics: {},
     },
   ];
 
@@ -210,16 +177,16 @@ describe("Timeseries Graph Integration Tests", () => {
 
     await esClient.bulk({
       index: TRACES_PIVOT_INDEX,
-      body: pivotEntries.flatMap((pivot) => [
+      body: traceEntries.flatMap((trace) => [
         {
           index: {
             _id: traceIndexId({
-              traceId: pivot.trace?.trace_id ?? "",
-              projectId: pivot.trace?.project_id ?? "",
+              traceId: trace.trace_id,
+              projectId: trace.project_id,
             }),
           },
         },
-        pivot,
+        trace,
       ]),
       refresh: true,
     });
@@ -231,7 +198,7 @@ describe("Timeseries Graph Integration Tests", () => {
       body: {
         query: {
           terms: {
-            "trace.metadata.labels": ["test-messages"],
+            "metadata.labels": ["test-messages"],
           },
         },
       },

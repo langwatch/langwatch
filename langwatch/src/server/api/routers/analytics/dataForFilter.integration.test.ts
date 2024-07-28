@@ -1,46 +1,45 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import type { TracesPivot } from "../../../analytics/types";
 import { nanoid } from "nanoid";
 import {
   esClient,
+  TRACE_INDEX,
   traceIndexId,
   TRACES_PIVOT_INDEX,
 } from "../../../elasticsearch";
 import { getTestUser } from "../../../../utils/testUtils";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
+import type { ElasticSearchTrace } from "../../../tracer/types";
 
 describe("Data For Filter Integration Tests", () => {
-  const pivotEntries: TracesPivot[] = [
+  const traceId = `test-trace-id-${nanoid()}`;
+  const traceId2 = `test-trace-id-${nanoid()}`;
+  const traceId3 = `test-trace-id-${nanoid()}`;
+
+  const traceEntries: ElasticSearchTrace[] = [
     {
-      trace: {
-        trace_id: `test-trace-id-${nanoid()}`,
-        project_id: "test-project-id",
-        metadata: {
-          user_id: "test-user-id",
-          customer_id: "customer-id-1",
-          labels: ["test-messages"],
-          thread_id: "test-thread-id",
-          topic_id: "greetings",
-          all_keys: [
-            "user_id",
-            "customer_id",
-            "labels",
-            "thread_id",
-            "topic_id",
-          ],
-        },
-        timestamps: {
-          inserted_at: new Date().getTime(),
-          started_at: new Date().getTime(),
-          updated_at: new Date().getTime(),
-        },
-        metrics: {},
-        input: {},
-        has_error: false,
+      trace_id: traceId,
+      project_id: "test-project-id",
+      metadata: {
+        user_id: "test-user-id",
+        customer_id: "customer-id-1",
+        labels: ["test-messages"],
+        thread_id: "test-thread-id",
+        topic_id: "greetings",
+        all_keys: ["user_id", "customer_id", "labels", "thread_id", "topic_id"],
+      },
+      timestamps: {
+        inserted_at: new Date().getTime(),
+        started_at: new Date().getTime(),
+        updated_at: new Date().getTime(),
+      },
+      metrics: {},
+      input: {
+        value: "",
       },
       events: [
         {
+          trace_id: traceId,
           event_id: `test-event-id-${nanoid()}`,
           event_type: "thumbs_up_down",
           metrics: [
@@ -58,7 +57,7 @@ describe("Data For Filter Integration Tests", () => {
           },
         },
       ],
-      trace_checks: [
+      evaluations: [
         {
           trace_id: `test-trace-id-${nanoid()}`,
           project_id: "test-project-id",
@@ -76,34 +75,25 @@ describe("Data For Filter Integration Tests", () => {
       ],
     },
     {
-      trace: {
-        trace_id: `test-trace-id-${nanoid()}`,
-        project_id: "test-project-id",
-        metadata: {
-          user_id: "test-user-id-2",
-          customer_id: "customer-id-1",
-          labels: ["test-messages"],
-          thread_id: "test-thread-id-2",
-          topic_id: "greetings",
-          all_keys: [
-            "user_id",
-            "customer_id",
-            "labels",
-            "thread_id",
-            "topic_id",
-          ],
-        },
-        timestamps: {
-          inserted_at: new Date().getTime(),
-          started_at: new Date().getTime(),
-          updated_at: new Date().getTime(),
-        },
-        metrics: {},
-        input: {},
-        has_error: false,
+      trace_id: traceId2,
+      project_id: "test-project-id",
+      metadata: {
+        user_id: "test-user-id-2",
+        customer_id: "customer-id-1",
+        labels: ["test-messages"],
+        thread_id: "test-thread-id-2",
+        topic_id: "greetings",
+        all_keys: ["user_id", "customer_id", "labels", "thread_id", "topic_id"],
       },
+      timestamps: {
+        inserted_at: new Date().getTime(),
+        started_at: new Date().getTime(),
+        updated_at: new Date().getTime(),
+      },
+      metrics: {},
       events: [
         {
+          trace_id: traceId2,
           event_id: `test-event-id-${nanoid()}`,
           event_type: "thumbs_up_down",
           metrics: [
@@ -121,9 +111,9 @@ describe("Data For Filter Integration Tests", () => {
           },
         },
       ],
-      trace_checks: [
+      evaluations: [
         {
-          trace_id: `test-trace-id-${nanoid()}`,
+          trace_id: traceId2,
           project_id: "test-project-id",
           check_id: `test-check-id-faithfulness`,
           check_type: "faithfulness",
@@ -137,7 +127,7 @@ describe("Data For Filter Integration Tests", () => {
           },
         },
         {
-          trace_id: `test-trace-id-${nanoid()}`,
+          trace_id: traceId2,
           project_id: "test-project-id",
           check_id: `test-check-id-consistency`,
           check_type: "consistency",
@@ -153,34 +143,25 @@ describe("Data For Filter Integration Tests", () => {
       ],
     },
     {
-      trace: {
-        trace_id: `test-trace-id-${nanoid()}`,
-        project_id: "test-project-id",
-        metadata: {
-          user_id: "test-user-id-2",
-          customer_id: "customer-id-1",
-          labels: ["test-messages"],
-          thread_id: "test-thread-id-3",
-          topic_id: "poems",
-          all_keys: [
-            "user_id",
-            "customer_id",
-            "labels",
-            "thread_id",
-            "topic_id",
-          ],
-        },
-        timestamps: {
-          inserted_at: new Date().getTime(),
-          started_at: new Date().getTime(),
-          updated_at: new Date().getTime(),
-        },
-        metrics: {},
-        input: {},
-        has_error: false,
+      trace_id: traceId3,
+      project_id: "test-project-id",
+      metadata: {
+        user_id: "test-user-id-2",
+        customer_id: "customer-id-1",
+        labels: ["test-messages"],
+        thread_id: "test-thread-id-3",
+        topic_id: "poems",
+        all_keys: ["user_id", "customer_id", "labels", "thread_id", "topic_id"],
       },
+      timestamps: {
+        inserted_at: new Date().getTime(),
+        started_at: new Date().getTime(),
+        updated_at: new Date().getTime(),
+      },
+      metrics: {},
       events: [
         {
+          trace_id: traceId3,
           event_id: `test-event-id-${nanoid()}`,
           event_type: "add_to_cart",
           metrics: [
@@ -207,17 +188,17 @@ describe("Data For Filter Integration Tests", () => {
 
   beforeAll(async () => {
     await esClient.bulk({
-      index: TRACES_PIVOT_INDEX,
-      body: pivotEntries.flatMap((pivot) => [
+      index: TRACE_INDEX,
+      body: traceEntries.flatMap((trace) => [
         {
           index: {
             _id: traceIndexId({
-              traceId: pivot.trace?.trace_id ?? "",
-              projectId: pivot.trace?.project_id ?? "",
+              traceId: trace.trace_id,
+              projectId: trace.project_id,
             }),
           },
         },
-        pivot,
+        trace,
       ]),
       refresh: true,
     });
@@ -229,7 +210,7 @@ describe("Data For Filter Integration Tests", () => {
       body: {
         query: {
           terms: {
-            "trace.metadata.labels": ["test-messages"],
+            "metadata.labels": ["test-messages"],
           },
         },
       },
@@ -249,7 +230,7 @@ describe("Data For Filter Integration Tests", () => {
 
     let response = await caller.analytics.dataForFilter({
       projectId: "test-project-id",
-      field: "trace_checks.check_id",
+      field: "evaluations.check_id",
       startDate: new Date().getTime() - 1000 * 60 * 60 * 24 * 7,
       endDate: new Date().getTime(),
       filters: {},
@@ -272,7 +253,7 @@ describe("Data For Filter Integration Tests", () => {
 
     response = await caller.analytics.dataForFilter({
       projectId: "test-project-id",
-      field: "trace_checks.check_id",
+      field: "evaluations.check_id",
       query: "faith",
       startDate: new Date().getTime() - 1000 * 60 * 60 * 24 * 7,
       endDate: new Date().getTime(),

@@ -3,7 +3,7 @@ import type {
   QueryDslQueryContainer,
 } from "@elastic/elasticsearch/lib/api/types";
 import {
-  TRACE_CHECKS_INDEX,
+  // TRACE_CHECKS_INDEX,
   esClient,
   traceCheckIndexId,
 } from "../server/elasticsearch";
@@ -14,6 +14,10 @@ import {
 } from "../server/background/queues/traceChecksQueue";
 import { prisma } from "../server/db";
 import type { EvaluatorTypes } from "../trace_checks/evaluators.generated";
+
+// TODO: update this task to use single traces index now
+
+const TRACE_CHECKS_INDEX = "search-trace-checks";
 
 export default async function execute(checkId: string) {
   const traceChecks = await esClient.search<TraceCheck>({

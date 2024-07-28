@@ -6,10 +6,8 @@ import { env } from "../../../env.mjs";
 import { getDebugger } from "../../../utils/logger";
 import { prisma } from "../../db";
 import {
-  SPAN_INDEX,
   TRACE_INDEX,
   esClient,
-  spanIndexId,
   traceIndexId,
 } from "../../elasticsearch";
 import { connection } from "../../redis";
@@ -36,7 +34,8 @@ import { scheduleTraceChecks } from "./collector/traceChecks";
 const debug = getDebugger("langwatch:workers:collectorWorker");
 
 export const processCollectorJob = async (
-  id: string | undefined, data: CollectorJob
+  id: string | undefined,
+  data: CollectorJob
 ) => {
   debug(`Processing job ${id} with data:`, data);
 
@@ -113,29 +112,53 @@ export const processCollectorJob = async (
   const piiEnforced = env.NODE_ENV === "production";
   await cleanupPIIs(trace, esSpans, project.piiRedactionLevel, piiEnforced);
 
-  const result = await esClient.helpers.bulk({
-    datasource: esSpans,
-    pipeline: "ent-search-generic-ingestion",
-    onDocument: (doc) => ({
-      index: {
-        _index: SPAN_INDEX,
-        _id: spanIndexId({ spanId: doc.span_id, projectId: project.id }),
-        routing: traceIndexId({ traceId, projectId: project.id }),
-      },
-    }),
-  });
-
-  if (result.failed > 0) {
-    throw new Error("Failed to insert to elasticsearch");
-  }
-
   await esClient.update({
     index: TRACE_INDEX,
     id: traceIndexId({ traceId, projectId: project.id }),
+    retry_on_conflict: 5,
     body: {
       doc: trace,
       doc_as_upsert: true,
     },
+  });
+
+  await esClient.update({
+    index: TRACE_INDEX,
+    id: traceIndexId({ traceId, projectId: project.id }),
+    retry_on_conflict: 5,
+    body: {
+      script: {
+        source: `
+          if (ctx._source.spans == null) {
+            ctx._source.spans = [];
+          }
+          def currentTime = System.currentTimeMillis();
+          for (def newSpan : params.newSpans) {
+            def existingSpanIndex = -1;
+            for (int i = 0; i < ctx._source.spans.size(); i++) {
+              if (ctx._source.spans[i].span_id == newSpan.span_id) {
+                existingSpanIndex = i;
+                break;
+              }
+            }
+            if (existingSpanIndex >= 0) {
+              ctx._source.spans[existingSpanIndex] = newSpan;
+            } else {
+              if (newSpan.timestamps == null) {
+                newSpan.timestamps = new HashMap();
+              }
+              newSpan.timestamps.inserted_at = currentTime;
+              ctx._source.spans.add(newSpan);
+            }
+          }
+        `,
+        lang: "painless",
+        params: {
+          newSpans: esSpans,
+        },
+      },
+    },
+    refresh: true,
   });
 
   // Does not re-schedule trace checks for too old traces being resynced

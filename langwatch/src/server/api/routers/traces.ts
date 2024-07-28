@@ -6,7 +6,6 @@ import type {
   Sort,
 } from "@elastic/elasticsearch/lib/api/types";
 import { PublicShareResourceTypes, type PrismaClient } from "@prisma/client";
-import { prisma } from "~/server/db";
 import { TRPCError } from "@trpc/server";
 import similarity from "compute-cosine-similarity";
 import shuffle from "lodash/shuffle";
@@ -16,31 +15,25 @@ import {
   protectedProcedure,
   publicProcedure,
 } from "~/server/api/trpc";
+import { prisma } from "~/server/db";
 import { evaluatorsSchema } from "../../../trace_checks/evaluators.zod.generated";
 import { evaluatePreconditions } from "../../../trace_checks/preconditions";
 import { checkPreconditionSchema } from "../../../trace_checks/types.generated";
 
-import {
-  sharedFiltersInputSchema,
-  type TracesPivot,
-} from "../../analytics/types";
-import {
-  SPAN_INDEX,
-  TRACES_PIVOT_INDEX,
-  TRACE_CHECKS_INDEX,
-  TRACE_INDEX,
-  esClient,
-  traceIndexId,
-} from "../../elasticsearch";
+import { sharedFiltersInputSchema } from "../../analytics/types";
+import { TRACE_INDEX, esClient, traceIndexId } from "../../elasticsearch";
 import { getOpenAIEmbeddings } from "../../embeddings";
 import {
-  type ElasticSearchSpan,
-  type TraceCheck,
   type Contexts,
-  type GuardrailResult,
+  type ElasticSearchSpan,
   type ElasticSearchTrace,
-  type Span,
+  type GuardrailResult,
+  type TraceCheck,
 } from "../../tracer/types";
+import {
+  elasticSearchSpanToSpan,
+  elasticSearchTraceToTrace,
+} from "../../tracer/utils";
 import {
   TeamRoleGroup,
   backendHasTeamProjectPermission,
@@ -48,10 +41,6 @@ import {
   checkUserPermissionForProject,
 } from "../permission";
 import { generateTracesPivotQueryConditions } from "./analytics/common";
-import {
-  elasticSearchSpanToSpan,
-  elasticSearchTraceToTrace,
-} from "../../tracer/utils";
 
 const tracesFilterInput = sharedFiltersInputSchema.extend({
   pageOffset: z.number().optional(),
@@ -73,8 +62,8 @@ export const esGetSpansByTraceId = async ({
   traceId: string;
   projectId: string;
 }): Promise<ElasticSearchSpan[]> => {
-  const result = await esClient.search<ElasticSearchSpan>({
-    index: SPAN_INDEX,
+  const result = await esClient.search<ElasticSearchTrace>({
+    index: TRACE_INDEX,
     body: {
       query: {
         bool: {
@@ -92,7 +81,10 @@ export const esGetSpansByTraceId = async ({
     }),
   });
 
-  return result.hits.hits.map((hit) => hit._source!).filter((hit) => hit);
+  return result.hits.hits
+    .map((hit) => hit._source!)
+    .filter((hit) => hit)
+    .flatMap((hit) => hit.spans ?? []);
 };
 
 export const tracesRouter = createTRPCRouter({
@@ -171,8 +163,8 @@ export const tracesRouter = createTRPCRouter({
       const { pivotIndexConditions } =
         generateTracesPivotQueryConditions(input);
 
-      const topicCountsResult = await esClient.search<TracesPivot>({
-        index: TRACES_PIVOT_INDEX,
+      const topicCountsResult = await esClient.search<ElasticSearchTrace>({
+        index: TRACE_INDEX,
         size: 0, // We do not need the actual documents, just the aggregations
         body: {
           query: {
@@ -183,13 +175,13 @@ export const tracesRouter = createTRPCRouter({
           aggs: {
             topicCounts: {
               terms: {
-                field: "trace.metadata.topic_id",
+                field: "metadata.topic_id",
                 size: 10000,
               },
             },
             subtopicCounts: {
               terms: {
-                field: "trace.metadata.subtopic_id",
+                field: "metadata.subtopic_id",
                 size: 10000,
               },
             },
@@ -413,8 +405,8 @@ export const getAllTracesForProject = async (
   }
   if (isAnyFilterPresent || input.sortBy) {
     usePivotIndex = true;
-    const pivotIndexResults = await esClient.search<TracesPivot>({
-      index: TRACES_PIVOT_INDEX,
+    const pivotIndexResults = await esClient.search<ElasticSearchTrace>({
+      index: TRACE_INDEX,
       body: {
         query: {
           bool: {
@@ -434,7 +426,7 @@ export const getAllTracesForProject = async (
             ],
           } as any,
         },
-        _source: ["trace.trace_id"],
+        _source: ["trace_id"],
         from: input.query ? 0 : pageOffset,
         size: input.query ? 10_000 : pageSize,
         ...(input.sortBy
@@ -450,16 +442,16 @@ export const getAllTracesForProject = async (
                   },
                 } as Sort,
               }
-            : input.sortBy.startsWith("trace_checks.")
+            : input.sortBy.startsWith("evaluations.")
             ? {
                 sort: {
-                  "trace_checks.score": {
+                  "evaluations.score": {
                     order: input.sortDirection ?? "desc",
                     nested: {
-                      path: "trace_checks",
+                      path: "evaluations",
                       filter: {
                         term: {
-                          "trace_checks.check_id": input.sortBy.split(".")[1],
+                          "evaluations.check_id": input.sortBy.split(".")[1],
                         },
                       },
                     },
@@ -475,7 +467,7 @@ export const getAllTracesForProject = async (
               }
           : {
               sort: {
-                "trace.timestamps.started_at": {
+                "timestamps.started_at": {
                   order: "desc",
                 },
               } as Sort,
@@ -484,7 +476,7 @@ export const getAllTracesForProject = async (
     });
 
     traceIds = pivotIndexResults.hits.hits
-      .map((hit) => hit._source?.trace?.trace_id)
+      .map((hit) => hit._source?.trace_id)
       .filter((x) => x)
       .map((x) => x!);
 
@@ -711,57 +703,40 @@ export const getSpansForTraceIds = async (
   traceIds: string[],
   contextsOnly = false
 ) => {
-  const BATCH_SIZE = 300; // Around the maximum IDs that ES supports without blowing up
+  const batchSize = 300; // Around the maximum IDs that ES supports without blowing up
   const searchPromises = [];
 
-  for (let i = 0; i < traceIds.length; i += BATCH_SIZE) {
-    const batchTraceIds = traceIds.slice(i, i + BATCH_SIZE);
-    const searchPromise = esClient.search<ElasticSearchSpan>({
-      index: SPAN_INDEX,
+  for (let i = 0; i < traceIds.length; i += batchSize) {
+    const batchTraceIds = traceIds.slice(i, i + batchSize);
+
+    const searchPromise = esClient.search<ElasticSearchTrace>({
+      index: TRACE_INDEX,
       body: {
         size: 10_000,
+        _source: ["trace_id", "spans"],
         query: {
           bool: {
             filter: [
-              { term: { project_id: projectId } },
               { terms: { trace_id: batchTraceIds } },
-              ...(contextsOnly ? [{ exists: { field: "contexts" } }] : []),
+              { term: { project_id: projectId } },
             ] as QueryDslBoolQuery["filter"],
           } as QueryDslBoolQuery,
         },
       },
-      // Skip routing for big batches so query doesn't blow up
-      ...(batchTraceIds.length <= 50
-        ? {
-            routing: batchTraceIds
-              .map((traceId) => traceIndexId({ traceId, projectId }))
-              .join(","),
-          }
-        : {}),
     });
     searchPromises.push(searchPromise);
   }
-
   const results = await Promise.all(searchPromises);
-  const spansResults = results.flatMap((result) =>
-    result.hits.hits
+
+  return Object.fromEntries(
+    results
+      .flatMap((result) => result.hits.hits)
       .map((hit) => hit._source!)
       .filter((x) => x)
-      .map(elasticSearchSpanToSpan)
-  );
-
-  return spansResults.reduce(
-    (acc, span) => {
-      if (span?.trace_id) {
-        if (!acc[span.trace_id]) {
-          acc[span.trace_id] = [];
-        }
-
-        acc[span.trace_id]!.push(span);
-      }
-      return acc;
-    },
-    {} as Record<string, Span[]>
+      .map((trace) => [
+        trace.trace_id,
+        (trace.spans ?? []).map(elasticSearchSpanToSpan),
+      ])
   );
 };
 
@@ -775,43 +750,32 @@ const getTraceChecks = async (
   for (let i = 0; i < traceIds.length; i += batchSize) {
     const batchTraceIds = traceIds.slice(i, i + batchSize);
 
-    const searchPromise = esClient.search<TraceCheck>({
-      index: TRACE_CHECKS_INDEX,
+    const searchPromise = esClient.search<ElasticSearchTrace>({
+      index: TRACE_INDEX,
       body: {
         size: 10_000,
+        _source: ["trace_id", "evaluations"],
         query: {
-          //@ts-ignore
           bool: {
             filter: [
               { terms: { trace_id: batchTraceIds } },
               { term: { project_id: projectId } },
-            ],
-          },
+            ] as QueryDslBoolQuery["filter"],
+          } as QueryDslBoolQuery,
         },
       },
     });
     searchPromises.push(searchPromise);
   }
-
   const results = await Promise.all(searchPromises);
-  const traceChecks = results.flatMap((result) =>
-    result.hits.hits.map((hit) => hit._source!).filter((x) => x)
-  );
 
-  const checksPerTrace = traceChecks.reduce(
-    (acc, check) => {
-      if (check) {
-        if (!acc[check.trace_id]) {
-          acc[check.trace_id] = [];
-        }
-        acc[check.trace_id]!.push(check);
-      }
-      return acc;
-    },
-    {} as Record<string, TraceCheck[]>
+  return Object.fromEntries(
+    results
+      .flatMap((result) => result.hits.hits)
+      .map((hit) => hit._source!)
+      .filter((x) => x)
+      .map((trace) => [trace.trace_id, trace.evaluations ?? []])
   );
-
-  return checksPerTrace;
 };
 
 const getTracesWithSpans = async (projectId: string, traceIds: string[]) => {
@@ -850,25 +814,15 @@ const getTracesWithSpans = async (projectId: string, traceIds: string[]) => {
   const traces = tracesResult.hits.hits
     .map((hit) => hit._source!)
     .filter((x) => x)
-    .map(elasticSearchTraceToTrace);
+    .map((trace) => {
+      const spans = trace.spans ?? [];
+      return {
+        ...elasticSearchTraceToTrace(trace),
+        spans,
+      };
+    });
 
-  const spansByTraceId = await Promise.all(
-    traces.map((trace) =>
-      esGetSpansByTraceId({ traceId: trace.trace_id, projectId })
-    )
-  );
-
-  const tracesWithSpans = traces.map((trace, i) => ({
-    ...trace,
-    spans: spansByTraceId[i],
-  }));
-
-  for (const tracesWithSpan of tracesWithSpans) {
-    delete tracesWithSpan.input?.embeddings;
-    delete tracesWithSpan.output?.embeddings;
-  }
-
-  return tracesWithSpans;
+  return traces;
 };
 
 const groupTraces = <T extends ElasticSearchTrace>(
@@ -963,40 +917,29 @@ export const getEvaluationsMultiple = async (input: {
 }) => {
   const { projectId, traceIds } = input;
 
-  const checksResult = await esClient.search<TraceCheck>({
-    index: TRACE_CHECKS_INDEX,
+  const checksResult = await esClient.search<ElasticSearchTrace>({
+    index: TRACE_INDEX,
+    _source: ["trace_id", "evaluations"],
     body: {
       size: Math.min(traceIds.length * 100, 10_000), // Assuming a maximum of 100 checks per trace
       query: {
-        //@ts-ignore
         bool: {
           filter: [
             { terms: { trace_id: traceIds } },
             { term: { project_id: projectId } },
-          ],
-        },
+          ] as QueryDslBoolQuery["filter"],
+        } as QueryDslBoolQuery,
       },
     },
   });
 
-  const traceChecks = checksResult.hits.hits
+  const traces = checksResult.hits.hits
     .map((hit) => hit._source!)
     .filter((x) => x);
 
-  const checksPerTrace = traceChecks.reduce(
-    (acc, check) => {
-      if (check) {
-        if (!acc[check.trace_id]) {
-          acc[check.trace_id] = [];
-        }
-        acc[check.trace_id]!.push(check);
-      }
-      return acc;
-    },
-    {} as Record<string, TraceCheck[]>
+  return Object.fromEntries(
+    traces.map((trace) => [trace.trace_id, trace.evaluations ?? []])
   );
-
-  return checksPerTrace;
 };
 
 export const getTraceById = async ({

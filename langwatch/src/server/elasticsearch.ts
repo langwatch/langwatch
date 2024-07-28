@@ -3,17 +3,7 @@ import { env } from "../env.mjs";
 
 export const TRACE_INDEX = "search-traces";
 
-export const SPAN_INDEX = "search-spans";
-
-export const TRACE_CHECKS_INDEX = "search-trace-checks";
-
-export const EVENTS_INDEX = "search-events";
-
 export const DSPY_STEPS_INDEX = "search-dspy-steps";
-
-export const TRACES_PIVOT_INDEX = "search-traces-pivot";
-
-export const TRACES_PIVOT_TRANSFORM = "traces-pivot-transform";
 
 export const OPENAI_EMBEDDING_DIMENSION = 1536;
 

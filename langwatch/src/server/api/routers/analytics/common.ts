@@ -58,11 +58,11 @@ export const generateTracesPivotQueryConditions = ({
       bool: {
         must: [
           {
-            term: { "trace.project_id": projectId },
+            term: { "project_id": projectId },
           },
           {
             range: {
-              "trace.timestamps.started_at": {
+              "timestamps.started_at": {
                 gte: startDate,
                 lte: endDate_,
                 format: "epoch_millis",

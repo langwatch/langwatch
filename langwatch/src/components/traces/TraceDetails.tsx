@@ -215,9 +215,9 @@ const Evaluations = (trace: TraceEval & { anyGuardrails: boolean }) => {
   if (!totalChecks)
     return (
       <Text>
-        No evaluations ran for this message.
+        No evaluations ran for this message.{" "}
         {trace.anyGuardrails ? (
-          " Evaluations are skipped if guardrails completely blocked the message."
+          "Evaluations are skipped if guardrails completely blocked the message."
         ) : (
           <>
             Setup evaluations{" "}
