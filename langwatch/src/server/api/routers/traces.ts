@@ -3,7 +3,6 @@ import { z } from "zod";
 import type {
   QueryDslBoolQuery,
   SearchTotalHits,
-  Sort,
 } from "@elastic/elasticsearch/lib/api/types";
 import { PublicShareResourceTypes, type PrismaClient } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
@@ -24,11 +23,11 @@ import { sharedFiltersInputSchema } from "../../analytics/types";
 import { TRACE_INDEX, esClient, traceIndexId } from "../../elasticsearch";
 import { getOpenAIEmbeddings } from "../../embeddings";
 import {
-  type Contexts,
   type ElasticSearchSpan,
   type ElasticSearchTrace,
   type GuardrailResult,
-  type TraceCheck,
+  type RAGChunk,
+  type Trace,
 } from "../../tracer/types";
 import {
   elasticSearchSpanToSpan,
@@ -367,16 +366,23 @@ export const tracesRouter = createTRPCRouter({
     }),
 
   getAllForDownload: protectedProcedure
-    .input(getAllForProjectInput)
+    .input(getAllForProjectInput.extend({ includeContexts: z.boolean() }))
     .use(checkUserPermissionForProject(TeamRoleGroup.MESSAGES_VIEW))
     .mutation(async ({ ctx, input }) => {
-      return await getAllTracesForProject({ ...input, pageSize: 10_000 }, ctx);
+      return await getAllTracesForProject(
+        { ...input, pageOffset: 0, pageSize: 10_000 },
+        ctx,
+        true,
+        input.includeContexts
+      );
     }),
 });
 
 export const getAllTracesForProject = async (
   input: z.infer<typeof getAllForProjectInput>,
-  ctx?: { prisma: PrismaClient; session: Session }
+  ctx?: { prisma: PrismaClient; session: Session },
+  downloadMode = false,
+  includeContexts = true
 ) => {
   const embeddings = input.query
     ? await getOpenAIEmbeddings(input.query)
@@ -389,119 +395,16 @@ export const getAllTracesForProject = async (
     });
   }
 
-  const { pivotIndexConditions, isAnyFilterPresent, endDateUsedForQuery } =
-    generateTracesPivotQueryConditions(input);
-
-  let traceIds: string[] = [];
+  const { pivotIndexConditions } = generateTracesPivotQueryConditions(input);
 
   let pageSize = input.pageSize ? input.pageSize : 25;
   const pageOffset = input.pageOffset ? input.pageOffset : 0;
 
   let totalHits = 0;
-  let usePivotIndex = false;
 
   if (input.updatedAt !== undefined && input.updatedAt >= 0) {
     pageSize = 10_000;
   }
-  if (isAnyFilterPresent || input.sortBy) {
-    usePivotIndex = true;
-    const pivotIndexResults = await esClient.search<ElasticSearchTrace>({
-      index: TRACE_INDEX,
-      body: {
-        query: {
-          bool: {
-            must: pivotIndexConditions,
-            filter: [
-              ...(input.updatedAt
-                ? [
-                    {
-                      range: {
-                        updated_at: {
-                          gt: input.updatedAt,
-                        },
-                      },
-                    },
-                  ]
-                : []),
-            ],
-          } as any,
-        },
-        _source: ["trace_id"],
-        from: input.query ? 0 : pageOffset,
-        size: input.query ? 10_000 : pageSize,
-        ...(input.sortBy
-          ? input.sortBy.startsWith("random.")
-            ? {
-                sort: {
-                  _script: {
-                    type: "number",
-                    script: {
-                      source: "Math.random()",
-                    },
-                    order: input.sortDirection ?? "desc",
-                  },
-                } as Sort,
-              }
-            : input.sortBy.startsWith("evaluations.")
-            ? {
-                sort: {
-                  "evaluations.score": {
-                    order: input.sortDirection ?? "desc",
-                    nested: {
-                      path: "evaluations",
-                      filter: {
-                        term: {
-                          "evaluations.check_id": input.sortBy.split(".")[1],
-                        },
-                      },
-                    },
-                  },
-                } as Sort,
-              }
-            : {
-                sort: {
-                  [input.sortBy]: {
-                    order: input.sortDirection ?? "desc",
-                  },
-                } as Sort,
-              }
-          : {
-              sort: {
-                "timestamps.started_at": {
-                  order: "desc",
-                },
-              } as Sort,
-            }),
-      },
-    });
-
-    traceIds = pivotIndexResults.hits.hits
-      .map((hit) => hit._source?.trace_id)
-      .filter((x) => x)
-      .map((x) => x!);
-
-    totalHits = (pivotIndexResults.hits?.total as SearchTotalHits)?.value || 0;
-
-    if (!traceIds.length) {
-      return { groups: [], totalHits: 0, traceChecks: {} };
-    }
-  }
-
-  const tracesIndexConditions = [
-    {
-      term: { project_id: input.projectId },
-    },
-    {
-      range: {
-        "timestamps.started_at": {
-          gte: input.startDate,
-          lte: endDateUsedForQuery,
-          format: "epoch_millis",
-        },
-      },
-    },
-    ...(usePivotIndex ? [{ terms: { trace_id: traceIds } }] : []),
-  ];
 
   let canSeeCosts = false;
   if (ctx?.prisma) {
@@ -516,8 +419,8 @@ export const getAllTracesForProject = async (
   //@ts-ignore
   const tracesResult = await esClient.search<ElasticSearchTrace>({
     index: TRACE_INDEX,
-    from: !usePivotIndex || input.query ? pageOffset : 0,
-    size: !usePivotIndex || input.query ? pageSize : traceIds.length,
+    from: pageOffset,
+    size: pageSize,
     _source: {
       excludes: [
         // TODO: do we really need to exclude both keys and nested keys for embeddings?
@@ -528,8 +431,33 @@ export const getAllTracesForProject = async (
           ? ["output.embeddings", "input.embeddings.embeddings"]
           : []),
         ...(canSeeCosts ? [] : ["metrics.total_cost"]),
+        ...(downloadMode ? ["spans"] : ["spans.input.value", "spans.error"]),
       ],
     },
+    ...(downloadMode && includeContexts
+      ? {
+          // Retrieve only contexts for download, ignore guardrails and all other spans
+          script_fields: {
+            context_spans: {
+              script: {
+                lang: "painless",
+                source: `
+                  def spans = [];
+                  for (def span : params._source.spans) {
+                    // if (span.contexts != null && span.contexts.length > 0) {
+                      // spans.add([
+                      //   'contexts': span.contexts
+                      // ]);
+                    // }
+                    spans.add(span)
+                  }
+                  return spans;
+                `,
+              },
+            },
+          },
+        }
+      : {}),
     ...(!input.query
       ? {
           sort: {
@@ -543,7 +471,11 @@ export const getAllTracesForProject = async (
       query: {
         bool: {
           must: [
-            ...tracesIndexConditions,
+            {
+              bool: {
+                must: pivotIndexConditions,
+              },
+            },
             ...(input.query
               ? [
                   {
@@ -580,26 +512,13 @@ export const getAllTracesForProject = async (
             rank: {
               rrf: { window_size: 100 },
             },
+            // Ensures proper filters are applied even with knn
+            post_filter: pivotIndexConditions,
           }
         : {}),
-      // Ensures proper filters are applied even with knn
-      post_filter: {
-        bool: {
-          must: tracesIndexConditions,
-        },
-      },
     },
   });
 
-  // Get the spans only for the empty output traces to check if they were stopped by a guardrail
-  const emptyOutputTraceIds = tracesResult.hits.hits
-    .map((hit) => hit._source!)
-    .filter((trace) => !trace.output?.value)
-    .map((trace) => trace.trace_id);
-  const spansByTraceId = await getSpansForTraceIds(
-    input.projectId,
-    emptyOutputTraceIds
-  );
   const guardrailsSlugToName = Object.fromEntries(
     (
       await prisma.check.findMany({
@@ -614,39 +533,47 @@ export const getAllTracesForProject = async (
     ).map((guardrail) => [guardrail.slug, guardrail.name])
   );
 
-  const tracesById = Object.fromEntries(
-    tracesResult.hits.hits
-      .map((hit) => hit._source!)
-      .filter((x) => x)
-      .map(elasticSearchTraceToTrace)
-      .map((trace) => {
-        const lastSpans = spansByTraceId[trace.trace_id]?.reverse();
-        const lastNonGuardrailSpanIndex =
-          lastSpans?.findIndex((span) => span.type !== "guardrail") ?? -1;
-        const lastGuardrailSpans =
-          lastNonGuardrailSpanIndex > -1
-            ? lastSpans?.slice(0, lastNonGuardrailSpanIndex)
-            : lastSpans;
+  const traces = tracesResult.hits.hits
+    .filter((x) => x._source)
+    .map((hit) => {
+      const trace = hit._source!;
+      const spans =
+        (hit.fields?.context_spans as ElasticSearchSpan[] | undefined) ??
+        trace.spans;
 
-        const lastFailedGuardrailResult:
-          | (GuardrailResult & { name?: string })
-          | undefined = lastGuardrailSpans?.flatMap((span) =>
-          (span?.output ? [span.output] : [])
-            .filter((output) => output.type === "guardrail_result")
-            .map((output) => ({
-              ...((output.value as GuardrailResult) || {}),
-              name: guardrailsSlugToName[span.name ?? ""],
-            }))
-            .filter((output) => !(output as GuardrailResult)?.passed)
-        )[0];
-        const trace_ = { ...trace, lastGuardrail: lastFailedGuardrailResult };
-        return [trace.trace_id, trace_];
-      })
-  );
+      const lastSpans = spans?.reverse();
+      const lastNonGuardrailSpanIndex =
+        lastSpans?.findIndex((span) => span.type !== "guardrail") ?? -1;
+      const lastGuardrailSpans =
+        lastNonGuardrailSpanIndex > -1
+          ? lastSpans?.slice(0, lastNonGuardrailSpanIndex)
+          : lastSpans;
 
-  const traces = usePivotIndex
-    ? traceIds.map((id) => tracesById[id]!).filter((x) => x)
-    : Object.values(tracesById);
+      const lastFailedGuardrailResult:
+        | (GuardrailResult & { name?: string })
+        | undefined = lastGuardrailSpans?.flatMap((span) =>
+        (span?.output ? [span.output] : [])
+          .filter((output) => output.type === "guardrail_result")
+          .map((output) => ({
+            ...((output.value as unknown as GuardrailResult) || {}),
+            name: guardrailsSlugToName[span.name ?? ""],
+          }))
+          .filter((output) => !(output as GuardrailResult)?.passed)
+      )[0];
+
+      let contexts: RAGChunk[] = [];
+      for (const span of spans ?? []) {
+        if ("contexts" in span && Array.isArray(span.contexts)) {
+          contexts = [...contexts, ...span.contexts];
+        }
+      }
+
+      return {
+        ...elasticSearchTraceToTrace(trace),
+        lastGuardrail: lastFailedGuardrailResult,
+        contexts,
+      };
+    });
 
   const groups = groupTraces(input.groupBy, traces);
 
@@ -658,44 +585,16 @@ export const getAllTracesForProject = async (
     }
   }
 
-  if (!usePivotIndex) {
-    totalHits = (tracesResult.hits?.total as SearchTotalHits)?.value || 0;
-  }
+  totalHits = (tracesResult.hits?.total as SearchTotalHits)?.value || 0;
 
-  const traceIdsArray = traces.map((trace) => trace.trace_id);
+  const evaluations = Object.fromEntries(
+    tracesResult.hits.hits
+      .map((hit) => hit._source!)
+      .filter((x) => x)
+      .map((trace) => [trace.trace_id, trace.evaluations ?? []])
+  );
 
-  const [spans, evaluations] = await Promise.all([
-    getSpansForTraceIds(input.projectId, traceIdsArray),
-    getTraceChecks(input.projectId, traceIdsArray),
-  ]);
-
-  const contexts: Contexts[] = [];
-  for (const traceId in spans) {
-    const spansOfId = spans[traceId];
-
-    if (spansOfId) {
-      for (const span of spansOfId) {
-        if ("contexts" in span && Array.isArray(span.contexts)) {
-          contexts.push({
-            traceId,
-            contexts: "contexts" in span && span.contexts ? span.contexts : [],
-          });
-        }
-      }
-    }
-  }
-
-  const mergedGroups = groups.map((group) => {
-    return group.map((trace) => {
-      const context = contexts.find((c) => c.traceId === trace.trace_id);
-      return {
-        ...trace,
-        contexts: context ? context.contexts : [],
-      };
-    });
-  });
-
-  return { groups: mergedGroups, totalHits, traceChecks: evaluations };
+  return { groups, totalHits, traceChecks: evaluations };
 };
 
 export const getSpansForTraceIds = async (
@@ -736,44 +635,6 @@ export const getSpansForTraceIds = async (
         trace.trace_id,
         (trace.spans ?? []).map(elasticSearchSpanToSpan),
       ])
-  );
-};
-
-const getTraceChecks = async (
-  projectId: string,
-  traceIds: string[]
-): Promise<Record<string, TraceCheck[]>> => {
-  const batchSize = 300; // Around the maximum IDs that ES supports without blowing up
-  const searchPromises = [];
-
-  for (let i = 0; i < traceIds.length; i += batchSize) {
-    const batchTraceIds = traceIds.slice(i, i + batchSize);
-
-    const searchPromise = esClient.search<ElasticSearchTrace>({
-      index: TRACE_INDEX,
-      body: {
-        size: 10_000,
-        _source: ["trace_id", "evaluations"],
-        query: {
-          bool: {
-            filter: [
-              { terms: { trace_id: batchTraceIds } },
-              { term: { project_id: projectId } },
-            ] as QueryDslBoolQuery["filter"],
-          } as QueryDslBoolQuery,
-        },
-      },
-    });
-    searchPromises.push(searchPromise);
-  }
-  const results = await Promise.all(searchPromises);
-
-  return Object.fromEntries(
-    results
-      .flatMap((result) => result.hits.hits)
-      .map((hit) => hit._source!)
-      .filter((x) => x)
-      .map((trace) => [trace.trace_id, trace.evaluations ?? []])
   );
 };
 
@@ -824,7 +685,7 @@ const getTracesWithSpans = async (projectId: string, traceIds: string[]) => {
   return traces;
 };
 
-const groupTraces = <T extends ElasticSearchTrace>(
+const groupTraces = <T extends Trace>(
   groupBy: string | undefined,
   traces: T[]
 ) => {

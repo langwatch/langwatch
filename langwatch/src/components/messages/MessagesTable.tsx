@@ -693,6 +693,9 @@ export function MessagesTable() {
           pageSize: pageSize,
           sortBy: getSingleQueryParam(router.query.sortBy),
           sortDirection: getSingleQueryParam(router.query.orderBy),
+          includeContexts: checkedHeaderColumnsEntries.some(
+            ([column, enabled]) => column === "trace.contexts" && enabled
+          ),
         });
 
     const checkedHeaderColumnsEntries_ = checkedHeaderColumnsEntries.filter(
