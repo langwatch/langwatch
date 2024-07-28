@@ -270,7 +270,7 @@ const TraceMessages = React.forwardRef(function TraceMessages(
   const translate = () => {
     setTranslationActive(!translationActive);
 
-    if (translatedTextInput && translationActive) return;
+    if (translatedTextInput) return;
     const inputTranslation = translateAPI.mutateAsync({
       projectId: project?.id ?? "",
       textToTranslate: getExtractedInput(trace),
@@ -302,59 +302,67 @@ const TraceMessages = React.forwardRef(function TraceMessages(
   const AnnotationHover = () => {
     return (
       <VStack>
-        <Box
-          position="absolute"
-          right={-5}
-          paddingY={2}
-          paddingX={2}
-          top={"50%"}
-          marginTop={"-70px"}
-          borderRadius={"50%"}
-          border="1px solid"
-          borderColor="gray.200"
-          backgroundColor="white"
-          onClick={() => translate()}
-          cursor="pointer"
-        >
-          <VStack>
-            {translateAPI.isLoading ? (
-              <Spinner size="sm" />
-            ) : translationActive ? (
-              <Image
-                src="/images/translate-active.svg"
-                alt="Translate"
-                width="20px"
-              />
-            ) : (
-              <Image src="/images/translate.svg" alt="Translate" width="20px" />
-            )}
-          </VStack>
-        </Box>
-        <Box
-          position="absolute"
-          right={-5}
-          paddingY={3}
-          paddingX={2}
-          top={"50%"}
-          marginTop={"-28px"}
-          borderRadius={"3xl"}
-          border="1px solid"
-          borderColor="gray.200"
-          backgroundColor="white"
-          onClick={() =>
-            openDrawer("annotation", {
-              traceId: trace.trace_id,
-              action: "new",
-            })
-          }
-          cursor="pointer"
-        >
-          <VStack>
-            <ThumbsUp size={"20px"} />
-            <ThumbsDown size={"20px"} />
-            <Edit size={"20px"} />
-          </VStack>
-        </Box>
+        <Tooltip label="Translate message to English" hasArrow placement="top">
+          <Box
+            position="absolute"
+            right={-5}
+            paddingY={2}
+            paddingX={2}
+            top={"50%"}
+            marginTop={"-70px"}
+            borderRadius={"50%"}
+            border="1px solid"
+            borderColor="gray.200"
+            backgroundColor="white"
+            onClick={() => translate()}
+            cursor="pointer"
+          >
+            <VStack>
+              {translateAPI.isLoading ? (
+                <Spinner size="sm" />
+              ) : translationActive ? (
+                <Image
+                  src="/images/translate-active.svg"
+                  alt="Translate"
+                  width="20px"
+                />
+              ) : (
+                <Image
+                  src="/images/translate.svg"
+                  alt="Translate"
+                  width="20px"
+                />
+              )}
+            </VStack>
+          </Box>
+        </Tooltip>
+        <Tooltip label="Annotate" hasArrow placement="top">
+          <Box
+            position="absolute"
+            right={-5}
+            paddingY={3}
+            paddingX={2}
+            top={"50%"}
+            marginTop={"-28px"}
+            borderRadius={"3xl"}
+            border="1px solid"
+            borderColor="gray.200"
+            backgroundColor="white"
+            onClick={() =>
+              openDrawer("annotation", {
+                traceId: trace.trace_id,
+                action: "new",
+              })
+            }
+            cursor="pointer"
+          >
+            <VStack>
+              <ThumbsUp size={"20px"} />
+              <ThumbsDown size={"20px"} />
+              <Edit size={"20px"} />
+            </VStack>
+          </Box>
+        </Tooltip>
       </VStack>
     );
   };
@@ -403,7 +411,9 @@ const TraceMessages = React.forwardRef(function TraceMessages(
                     marginBottom="38px"
                     whiteSpace="pre-wrap"
                   >
-                    {translatedTextInput ?? getExtractedInput(trace)}
+                    {translatedTextInput && translationActive
+                      ? translatedTextInput
+                      : getExtractedInput(trace)}
                   </Text>
                 </Message>
                 <Message
