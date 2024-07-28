@@ -4,7 +4,10 @@ import { load } from "tiktoken/load";
 import registry from "tiktoken/registry.json";
 // @ts-ignore
 import models from "tiktoken/model_to_encoding.json";
-import { getLLMModelCosts, type MaybeStoredLLMModelCost } from "../../../modelProviders/llmModelCost";
+import {
+  getLLMModelCosts,
+  type MaybeStoredLLMModelCost,
+} from "../../../modelProviders/llmModelCost";
 
 const cachedModel: Record<
   string,
@@ -19,7 +22,9 @@ const cachedModel: Record<
   }
 > = {};
 
-const initTikToken = async (modelName: string) => {
+const initTikToken = async (
+  modelName: string
+): Promise<{ encoder: Tiktoken } | undefined> => {
   const fallback = "gpt-4";
   const tokenizer =
     modelName in models
@@ -43,17 +48,18 @@ const initTikToken = async (modelName: string) => {
 
 async function countTokens(
   llmModelCost: MaybeStoredLLMModelCost,
-  text: string
-) {
+  text: string | undefined
+): Promise<number | undefined> {
   if (!text) return 0;
 
   const model = llmModelCost.model.includes("/")
     ? llmModelCost.model.split("/")[1]!
     : llmModelCost.model;
 
-  const { encoder } = await initTikToken(model);
+  const tiktoken = await initTikToken(model);
+  if (!tiktoken) return undefined;
 
-  return encoder.encode(text).length;
+  return tiktoken.encoder.encode(text).length;
 }
 
 export async function tokenizeAndEstimateCost({
@@ -69,9 +75,8 @@ export async function tokenizeAndEstimateCost({
   outputTokens: number;
   cost: number | undefined;
 }> {
-  const inputTokens = (input && (await countTokens(llmModelCost, input))) || 0;
-  const outputTokens =
-    (output && (await countTokens(llmModelCost, output))) || 0;
+  const inputTokens = (await countTokens(llmModelCost, input)) ?? 0;
+  const outputTokens = (await countTokens(llmModelCost, output)) ?? 0;
 
   const cost = estimateCost({ llmModelCost, inputTokens, outputTokens });
 
