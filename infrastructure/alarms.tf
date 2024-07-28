@@ -100,7 +100,7 @@ resource "aws_cloudwatch_event_target" "guardduty_to_sns" {
   arn       = aws_sns_topic.alarms.arn
 }
 
-# MySQL RDS CloudWatch alarms
+# Postgres RDS CloudWatch alarms
 resource "aws_cloudwatch_metric_alarm" "rds_cpu_utilization_instance" {
   count                     = module.variables.profile == "lw-prod" ? 1 : 0
   alarm_name                = "rds-cpu-utilization-instance-${count.index}"
@@ -246,5 +246,47 @@ resource "aws_cloudwatch_metric_alarm" "ec2_cpu_utilization_alarm" {
 
   dimensions = {
     InstanceId = aws_instance.bastion[0].id
+  }
+}
+
+resource "aws_cloudwatch_metric_alarm" "redis_capacity_usage" {
+  count                     = module.variables.profile == "lw-prod" ? 1 : 0
+  alarm_name                = "redis-capacity-usage-high"
+  comparison_operator       = "GreaterThanThreshold"
+  evaluation_periods        = "1"
+  metric_name               = "DatabaseCapacityUsagePercentage"
+  namespace                 = "AWS/ElastiCache"
+  period                    = "300" # 5 minutes
+  statistic                 = "Average"
+  threshold                 = 50.0 # Trigger alarm at 50% capacity usage
+  alarm_description         = "Alarm when Redis capacity usage exceeds 50%"
+  actions_enabled           = true
+  alarm_actions             = [aws_sns_topic.alarms.arn]
+  ok_actions                = [aws_sns_topic.alarms.arn]
+  insufficient_data_actions = [aws_sns_topic.alarms.arn]
+
+  dimensions = {
+    ReplicationGroupId = aws_elasticache_replication_group.redis[0].id
+  }
+}
+
+resource "aws_cloudwatch_metric_alarm" "redis_cpu_utilization" {
+  count                     = module.variables.profile == "lw-prod" ? 1 : 0
+  alarm_name                = "redis-cpu-utilization-high"
+  comparison_operator       = "GreaterThanThreshold"
+  evaluation_periods        = "1"
+  metric_name               = "CPUUtilization"
+  namespace                 = "AWS/ElastiCache"
+  period                    = "300" # 5 minutes
+  statistic                 = "Average"
+  threshold                 = 50.0 # Trigger alarm at 50% CPU utilization
+  alarm_description         = "Alarm when Redis CPU utilization exceeds 50%"
+  actions_enabled           = true
+  alarm_actions             = [aws_sns_topic.alarms.arn]
+  ok_actions                = [aws_sns_topic.alarms.arn]
+  insufficient_data_actions = [aws_sns_topic.alarms.arn]
+
+  dimensions = {
+    ReplicationGroupId = aws_elasticache_replication_group.redis[0].id
   }
 }
