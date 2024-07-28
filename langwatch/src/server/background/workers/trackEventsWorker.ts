@@ -84,6 +84,11 @@ export const startTrackEventsWorker = () => {
           upsert: {
             trace_id: trace.trace_id,
             project_id: trace.project_id,
+            timestamps: {
+              inserted_at: Date.now(),
+              started_at: Date.now(),
+              updated_at: Date.now(),
+            },
             events: [event],
           },
         },

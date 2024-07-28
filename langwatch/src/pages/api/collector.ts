@@ -26,6 +26,7 @@ import {
   spanValidatorSchema,
 } from "../../server/tracer/types.generated";
 import { getDebugger } from "../../utils/logger";
+import type { QueryDslBoolQuery } from "@elastic/elasticsearch/lib/api/types";
 
 export const debug = getDebugger("langwatch:collector");
 
@@ -345,7 +346,7 @@ const fetchExistingMD5s = async (
 ): Promise<
   | {
       indexing_md5s: Trace["indexing_md5s"];
-      inserted_at: number;
+      inserted_at: number | undefined;
       all_keys: string[] | undefined;
     }
   | undefined
@@ -355,13 +356,12 @@ const fetchExistingMD5s = async (
     body: {
       size: 1,
       query: {
-        //@ts-ignore
         bool: {
           must: [
             { term: { trace_id: traceId } },
             { term: { project_id: projectId } },
-          ],
-        },
+          ] as QueryDslBoolQuery["must"],
+        } as QueryDslBoolQuery,
       },
       _source: ["indexing_md5s", "timestamps.inserted_at", "metadata.all_keys"],
     },
@@ -374,7 +374,7 @@ const fetchExistingMD5s = async (
 
   return {
     indexing_md5s: existingTrace.indexing_md5s,
-    inserted_at: existingTrace.timestamps.inserted_at,
+    inserted_at: existingTrace.timestamps?.inserted_at,
     all_keys: existingTrace.metadata?.all_keys,
   };
 };

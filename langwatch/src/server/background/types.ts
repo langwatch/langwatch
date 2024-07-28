@@ -45,7 +45,7 @@ export type CollectorJob = {
   customMetadata: CustomMetadata;
 
   existingTrace?: {
-    inserted_at: number;
+    inserted_at?: number;
     indexing_md5s?: string[];
     all_keys?: string[];
   };

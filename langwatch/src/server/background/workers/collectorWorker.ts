@@ -5,11 +5,7 @@ import type { CollectorJob } from "~/server/background/types";
 import { env } from "../../../env.mjs";
 import { getDebugger } from "../../../utils/logger";
 import { prisma } from "../../db";
-import {
-  TRACE_INDEX,
-  esClient,
-  traceIndexId,
-} from "../../elasticsearch";
+import { TRACE_INDEX, esClient, traceIndexId } from "../../elasticsearch";
 import { connection } from "../../redis";
 import {
   type ElasticSearchInputOutput,
@@ -157,12 +153,19 @@ export const processCollectorJob = async (
           newSpans: esSpans,
         },
       },
+      upsert: {
+        ...trace,
+        spans: esSpans,
+      },
     },
     refresh: true,
   });
 
   // Does not re-schedule trace checks for too old traces being resynced
-  if (!existingTrace || existingTrace.inserted_at > Date.now() - 30 * 1000) {
+  if (
+    !existingTrace?.inserted_at ||
+    existingTrace.inserted_at > Date.now() - 30 * 1000
+  ) {
     void scheduleTraceChecks(trace, spans);
   }
 

@@ -2,11 +2,7 @@ import { Queue } from "bullmq";
 import type { TraceCheckJob } from "~/server/background/types";
 import { traceCheckIndexId } from "~/server/elasticsearch";
 import { captureError } from "../../../utils/captureError";
-import {
-  esClient,
-  TRACE_INDEX,
-  traceIndexId
-} from "../../elasticsearch";
+import { esClient, TRACE_INDEX, traceIndexId } from "../../elasticsearch";
 import { connection } from "../../redis";
 import type { TraceCheck } from "../../tracer/types";
 
@@ -171,6 +167,11 @@ export const updateCheckStatusInES = async ({
       upsert: {
         trace_id: trace.trace_id,
         project_id: trace.project_id,
+        timestamps: {
+          inserted_at: Date.now(),
+          started_at: Date.now(),
+          updated_at: Date.now(),
+        },
         evaluations: [evaluation],
       },
     },

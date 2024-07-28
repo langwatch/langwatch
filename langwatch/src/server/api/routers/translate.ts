@@ -16,7 +16,7 @@ export const translateRouter = createTRPCRouter({
       })
     )
     .use(checkUserPermissionForProject(TeamRoleGroup.TRIGGERS_MANAGE))
-    .mutation(async ({ ctx, input }) => {
+    .mutation(async ({ input }) => {
       try {
         const response: { text: string } = await generateText({
           model: openai("gpt-4-turbo"),

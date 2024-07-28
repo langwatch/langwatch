@@ -665,7 +665,7 @@ export const getAllTracesForProject = async (
   const traceIdsArray = traces.map((trace) => trace.trace_id);
 
   const [spans, evaluations] = await Promise.all([
-    getSpansForTraceIds(input.projectId, traceIdsArray, true),
+    getSpansForTraceIds(input.projectId, traceIdsArray),
     getTraceChecks(input.projectId, traceIdsArray),
   ]);
 
@@ -700,8 +700,7 @@ export const getAllTracesForProject = async (
 
 export const getSpansForTraceIds = async (
   projectId: string,
-  traceIds: string[],
-  contextsOnly = false
+  traceIds: string[]
 ) => {
   const batchSize = 300; // Around the maximum IDs that ES supports without blowing up
   const searchPromises = [];
