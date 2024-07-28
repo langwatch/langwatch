@@ -44,7 +44,7 @@ const migrateIndex = async (projectId: string, index: string) => {
             } as QueryDslBoolQuery["must_not"],
           } as QueryDslBoolQuery,
         },
-        size: 300,
+        size: 400,
         sort: ["_doc"],
         ...(searchAfter ? { search_after: searchAfter } : {}),
       },
@@ -93,6 +93,9 @@ const migrateIndex = async (projectId: string, index: string) => {
             if (!acc[span.trace_id]) {
               acc[span.trace_id] = [];
             }
+            if ("id" in span) {
+              delete span.id;
+            }
             acc[span.trace_id]!.push(span);
             return acc;
           },
@@ -131,6 +134,9 @@ const migrateIndex = async (projectId: string, index: string) => {
             if (!acc[event.trace_id]) {
               acc[event.trace_id] = [];
             }
+            if ("id" in event) {
+              delete event.id;
+            }
             acc[event.trace_id]!.push(event);
             return acc;
           },
@@ -168,6 +174,9 @@ const migrateIndex = async (projectId: string, index: string) => {
           (acc, evaluation) => {
             if (!acc[evaluation.trace_id]) {
               acc[evaluation.trace_id] = [];
+            }
+            if ("id" in evaluation) {
+              delete evaluation.id;
             }
             acc[evaluation.trace_id]!.push(evaluation);
             return acc;
@@ -215,6 +224,7 @@ const migrateIndex = async (projectId: string, index: string) => {
     if (bulkActions.length > 0) {
       try {
         await esClient.bulk({ body: bulkActions });
+        bulkActions = [];
       } catch (error) {
         console.error("Error in bulk update:", error);
       }
