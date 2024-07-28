@@ -188,7 +188,7 @@ export const startCollectorWorker = () => {
     (job) => processCollectorJob(job.id, job.data),
     {
       connection,
-      concurrency: 3,
+      concurrency: 20,
     }
   );
 
