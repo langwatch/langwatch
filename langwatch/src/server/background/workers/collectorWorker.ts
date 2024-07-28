@@ -1,6 +1,6 @@
 import type { Project } from "@prisma/client";
 import * as Sentry from "@sentry/nextjs";
-import { type Job, Worker } from "bullmq";
+import { Worker } from "bullmq";
 import type { CollectorJob } from "~/server/background/types";
 import { env } from "../../../env.mjs";
 import { getDebugger } from "../../../utils/logger";
@@ -36,11 +36,11 @@ import { scheduleTraceChecks } from "./collector/traceChecks";
 const debug = getDebugger("langwatch:workers:collectorWorker");
 
 export const processCollectorJob = async (
-  job: Job<CollectorJob, void, string>
+  id: string | undefined, data: CollectorJob
 ) => {
-  debug(`Processing job ${job.id} with data:`, job.data);
+  debug(`Processing job ${id} with data:`, data);
 
-  let spans = job.data.spans;
+  let spans = data.spans;
   const {
     projectId,
     traceId,
@@ -49,7 +49,7 @@ export const processCollectorJob = async (
     expectedOutput,
     existingTrace,
     paramsMD5,
-  } = job.data;
+  } = data;
   const project = await prisma.project.findUniqueOrThrow({
     where: { id: projectId },
   });
@@ -159,7 +159,7 @@ export const processCollectorJob = async (
 export const startCollectorWorker = () => {
   const collectorWorker = new Worker<CollectorJob, void, string>(
     COLLECTOR_QUEUE,
-    processCollectorJob,
+    (job) => processCollectorJob(job.id, job.data),
     {
       connection,
       concurrency: 3,

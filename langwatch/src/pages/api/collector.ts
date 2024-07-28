@@ -7,6 +7,7 @@ import { dependencies } from "../../injection/dependencies.server";
 import { getCurrentMonthMessagesCount } from "../../server/api/routers/limits";
 import { collectorQueue } from "../../server/background/queues/collectorQueue";
 import { maybeAddIdsToContextList } from "../../server/background/workers/collector/rag";
+import { processCollectorJob } from "../../server/background/workers/collectorWorker";
 import { prisma } from "../../server/db"; // Adjust the import based on your setup
 import { TRACE_INDEX, esClient } from "../../server/elasticsearch";
 import {
@@ -275,9 +276,55 @@ export default async function handler(
 
   debug(`collecting traceId ${traceId}`);
 
-  await collectorQueue.add(
-    "collector",
-    {
+  try {
+    const timeoutState = { state: "waiting" };
+    const timeoutPromise = new Promise((resolve, reject) => {
+      setTimeout(() => {
+        if (timeoutState.state === "waiting") {
+          reject(new Error("Timed out after 3s trying to insert on the queue"));
+        } else {
+          resolve(undefined);
+        }
+      }, 3000);
+    });
+
+    await Promise.race([
+      timeoutPromise,
+      collectorQueue
+        .add(
+          "collector",
+          {
+            projectId: project.id,
+            traceId,
+            spans,
+            reservedTraceMetadata,
+            customMetadata,
+            expectedOutput,
+            existingTrace,
+            paramsMD5,
+          },
+          {
+            jobId: `collector_${traceId}_md5:${paramsMD5}`,
+          }
+        )
+        .then(() => {
+          timeoutState.state = "resolved";
+        }),
+    ]);
+  } catch (error) {
+    debug(
+      "Failed sending to redis collector queue inserting trace directly, processing job synchronously",
+      error
+    );
+    Sentry.captureException(error, {
+      extra: {
+        message:
+          "Failed sending to redis collector queue inserting trace directly, processing job synchronously",
+        projectId: project.id,
+      },
+    });
+
+    await processCollectorJob(undefined, {
       projectId: project.id,
       traceId,
       spans,
@@ -286,11 +333,8 @@ export default async function handler(
       expectedOutput,
       existingTrace,
       paramsMD5,
-    },
-    {
-      jobId: `collector_${traceId}_md5:${paramsMD5}`,
-    }
-  );
+    });
+  }
 
   return res.status(200).json({ message: "Trace received successfully." });
 }
