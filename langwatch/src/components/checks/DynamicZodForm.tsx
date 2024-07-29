@@ -1,4 +1,6 @@
 import {
+  Alert,
+  AlertIcon,
   Box,
   Button,
   FormLabel,
@@ -7,6 +9,7 @@ import {
   Select,
   Switch,
   Textarea,
+  Text,
   VStack,
 } from "@chakra-ui/react";
 import React from "react";
@@ -115,13 +118,27 @@ const DynamicZodForm = ({
             name={fullPath}
             control={control}
             render={({ field }) => (
-              <ModelSelector
-                options={options.map(
-                  (option: { value: string }) => option.value
-                )}
-                model={field.value}
-                onChange={(model) => field.onChange(model)}
-              />
+              <>
+                <ModelSelector
+                  options={options.map(
+                    (option: { value: string }) => option.value
+                  )}
+                  model={field.value}
+                  onChange={(model) => field.onChange(model)}
+                />
+                {fieldName == "model" &&
+                  evaluator?.name.toLowerCase().includes("ragas") &&
+                  !field.value.endsWith("16k") && (
+                    <Alert status="warning" marginTop={4}>
+                      <AlertIcon />
+                      <Text>
+                        <b>Heads up:</b> Ragas is built for GPT-3.5 16K
+                        specifically, and might not produce accurate scores with
+                        other models
+                      </Text>
+                    </Alert>
+                  )}
+              </>
             )}
           />
         );

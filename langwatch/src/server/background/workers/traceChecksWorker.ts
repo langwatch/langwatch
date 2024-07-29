@@ -220,11 +220,11 @@ export const runEvaluation = async ({
       body: JSON.stringify({
         data: [
           {
-            input,
-            output,
-            contexts,
-            expected_output,
-            conversation,
+            input: input ?? "",
+            output: output ?? "",
+            contexts: contexts ?? [],
+            expected_output: expected_output ?? "",
+            conversation: conversation ?? [],
           },
         ],
         settings: settings && typeof settings === "object" ? settings : {},

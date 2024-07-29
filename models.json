@@ -143,6 +143,12 @@
     "model_vendor": "anthropic",
     "mode": "chat"
   },
+  "anthropic/claude-3-5-sonnet-20240620": {
+    "name": "Claude 3.5 Sonnet",
+    "version": "20240620",
+    "model_vendor": "anthropic",
+    "mode": "chat"
+  },
   "vertex_ai/gemini-1.5-flash-001": {
     "name": "Gemini 1.5 Flash",
     "version": "001",
