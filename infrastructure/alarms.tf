@@ -266,7 +266,7 @@ resource "aws_cloudwatch_metric_alarm" "redis_capacity_usage" {
   insufficient_data_actions = [aws_sns_topic.alarms.arn]
 
   dimensions = {
-    ReplicationGroupId = aws_elasticache_replication_group.redis[0].id
+    CacheClusterId = "${aws_elasticache_replication_group.redis[0].id}-001"
   }
 }
 
@@ -287,6 +287,6 @@ resource "aws_cloudwatch_metric_alarm" "redis_cpu_utilization" {
   insufficient_data_actions = [aws_sns_topic.alarms.arn]
 
   dimensions = {
-    ReplicationGroupId = aws_elasticache_replication_group.redis[0].id
+    CacheClusterId = "${aws_elasticache_replication_group.redis[0].id}-001"
   }
 }
