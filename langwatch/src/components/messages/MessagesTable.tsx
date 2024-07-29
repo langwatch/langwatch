@@ -793,7 +793,7 @@ export function MessagesTable() {
             </Tooltip>
           </HStack>
           <Spacer />
-          <Tooltip label={totalHits > 10_000 ? "Up to 10.000 items" : ""}>
+          <Tooltip label={totalHits >= 10_000 ? "Up to 10.000 items" : ""}>
             <Button
               colorScheme="black"
               minWidth="fit-content"

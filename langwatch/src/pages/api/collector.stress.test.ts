@@ -1,6 +1,6 @@
 import { nanoid } from "nanoid";
 import { beforeAll, describe, expect, test } from "vitest";
-import { SPAN_INDEX, TRACE_INDEX, esClient } from "../../server/elasticsearch";
+import { TRACE_INDEX, esClient } from "../../server/elasticsearch";
 import { type CollectorRESTParams } from "../../server/tracer/types";
 import { getTestProject } from "../../utils/testUtils";
 import { mean, median, standardDeviation } from "simple-statistics";
@@ -27,16 +27,6 @@ describe("Collector API stress test", () => {
 
       await esClient.deleteByQuery({
         index: TRACE_INDEX,
-        body: {
-          query: {
-            match: {
-              project_id: project.id,
-            },
-          },
-        },
-      });
-      await esClient.deleteByQuery({
-        index: SPAN_INDEX,
         body: {
           query: {
             match: {
