@@ -20,7 +20,7 @@ nanoid = "^2.0.0"
 python-dotenv = "^1.0.1"
 hypercorn = "^0.16.0"
 mangum = "^0.17.0"
-litellm = {extras = ["proxy"], version = "^1.41.28"}
+litellm = {extras = ["proxy"], version = "1.40.7"}
 google-cloud-aiplatform = "^1.54.1"
 
 [tool.poetry.group.dev.dependencies]
