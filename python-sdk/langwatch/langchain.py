@@ -165,7 +165,13 @@ class LangChainTracer(BaseCallbackHandler):
             params["functions"] = functions
 
         vendor = list_get(serialized.get("id", []), 2, "unknown").lower()
-        model = kwargs.get("invocation_params", {}).get("model_name", "unknown")
+        if vendor.startswith("chat"):
+            vendor = vendor.replace("chat", "")
+        model = (
+            kwargs.get("metadata", {}).get("ls_model_name", None)
+            or kwargs.get("invocation_params", {}).get("model_name", None)
+            or kwargs.get("invocation_params", {}).get("model", "unknown")
+        )
 
         span = langwatch.span(
             type="llm",

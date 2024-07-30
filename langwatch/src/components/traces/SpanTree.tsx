@@ -224,6 +224,8 @@ const SpanTypeTag = ({ span }: { span: ElasticSearchSpan }) => {
               span: "gray",
               rag: "red",
               guardrail: "blue",
+              component: "gray",
+              workflow: "purple",
               unknown: "gray",
             }[span.type]
       }
@@ -387,10 +389,7 @@ export function SpanTree(props: SpanTreeProps) {
                       {span.metrics?.tokens_estimated && estimatedCost}
                     </Text>
                     <Tooltip label="Edit model costs">
-                      <Link
-                        target="_blank"
-                        href={`/settings/model-costs`}
-                      >
+                      <Link target="_blank" href={`/settings/model-costs`}>
                         <Settings size={14} />
                       </Link>
                     </Tooltip>

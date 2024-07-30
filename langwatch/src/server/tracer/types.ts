@@ -135,6 +135,8 @@ export type SpanTypes =
   | "agent"
   | "rag"
   | "guardrail"
+  | "workflow"
+  | "component"
   | "unknown";
 
 export interface BaseSpan {

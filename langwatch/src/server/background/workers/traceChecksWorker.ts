@@ -282,12 +282,22 @@ export const startTraceChecksWorker = (
       try {
         debug(`Processing job ${job.id} with data:`, job.data);
 
-        const timeout = setTimeout(() => {
-          throw new Error("Job timed out after 60s");
-        }, 60_000);
+        let processed = false;
+        const timeout = new Promise((resolve, reject) => {
+          setTimeout(() => {
+            if (processed) {
+              resolve(undefined);
+            } else {
+              reject(new Error("Job timed out after 60s"));
+            }
+          }, 60_000);
+        });
 
-        const result = await processFn(job);
-        clearTimeout(timeout);
+        const result = (await Promise.race([
+          processFn(job),
+          timeout,
+        ])) as SingleEvaluationResult;
+        processed = true;
 
         if ("cost" in result && result.cost) {
           await prisma.cost.create({

@@ -86,7 +86,7 @@ class SpanTimestamps(TypedDict, total=False):
     finished_at: int
 
 
-SpanTypes = Literal["span", "llm", "chain", "tool", "agent", "guardrail", "rag"]
+SpanTypes = Literal["span", "llm", "chain", "tool", "agent", "guardrail", "rag", "workflow", "component"]
 
 
 class BaseSpan(TypedDict):
