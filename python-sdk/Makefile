@@ -10,7 +10,12 @@ install:
 	poetry install --all-extras
 
 example:
-	poetry run chainlit run -w $(filter-out $@,$(MAKECMDGOALS))
+	@args="$(filter-out $@,$(MAKECMDGOALS))"; \
+	if echo $$args | grep -q fastapi; then \
+		poetry run python $$args \
+	else \
+		poetry run chainlit run -w $$args; \
+	fi
 
 batch-evaluation-example:
 	poetry run python $(filter-out $@,$(MAKECMDGOALS))
