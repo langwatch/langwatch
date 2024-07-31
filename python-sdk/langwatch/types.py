@@ -23,6 +23,8 @@ class ChatMessage(TypedDict, total=False):
     content: Optional[str]
     function_call: Optional[FunctionCall]
     tool_calls: Optional[List[ToolCall]]
+    tool_call_id: Optional[str]
+    name: Optional[str]
 
 
 class TypedValueChatMessages(TypedDict):

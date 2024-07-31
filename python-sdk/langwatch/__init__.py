@@ -26,9 +26,15 @@ debug = False
 
 dspy_available = False
 try:
+    import pydantic
     import dspy
 
-    dspy_available = True
+    if pydantic.__version__.startswith("1."):
+        warn(
+            "LangWatch detected installed DSPy, however DSPy is not compatible with pydantic 1.x. Please upgrade to pydantic 2.x to use LangWatch DSPy."
+        )
+    else:
+        dspy_available = True
 except ImportError:
     pass
 

@@ -1,4 +1,4 @@
-.PHONY: test install
+.PHONY: test install example
 
 test:
 	LANGWATCH_API_KEY="testkey" PYTHONPATH=$$PYTHONPATH:. poetry run pytest -s -vv -m "not integration" $(filter-out $@,$(MAKECMDGOALS))
@@ -11,8 +11,8 @@ install:
 
 example:
 	@args="$(filter-out $@,$(MAKECMDGOALS))"; \
-	if echo $$args | grep -q fastapi; then \
-		poetry run python $$args \
+	if [[ $$args =~ "fastapi" ]]; then \
+		poetry run python $$args; \
 	else \
 		poetry run chainlit run -w $$args; \
 	fi

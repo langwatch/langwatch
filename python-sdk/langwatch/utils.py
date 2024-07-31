@@ -9,13 +9,12 @@ from typing import (
     Generator,
     List,
     Optional,
-    Tuple,
     TypeVar,
     Union,
     cast,
 )
 
-from pydantic import BaseModel, TypeAdapter, ValidationError
+from pydantic import BaseModel, ValidationError
 
 from langwatch.types import (
     ChatMessage,
@@ -96,11 +95,20 @@ def list_get(l, i, default=None):
 
 
 def validate_safe(type, item: dict):
+    class TempModel(BaseModel):
+        field: type
+
     try:
-        TypeAdapter(type).validate_python(item)
+        TempModel(field=item)
         return True
     except ValidationError:
-        return False
+        try:
+            TempModel(
+                field=json.loads(json.dumps(item, cls=SerializableWithStringFallback))
+            )
+            return True
+        except ValidationError:
+            return False
 
 
 def autoconvert_typed_values(

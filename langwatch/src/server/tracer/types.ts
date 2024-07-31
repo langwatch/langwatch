@@ -28,6 +28,7 @@ export interface ChatMessage {
   function_call?: FunctionCall | null;
   tool_calls?: ToolCall[] | null;
   tool_call_id?: string | null;
+  name?: string | null;
 }
 
 export type ChatRichContent =
