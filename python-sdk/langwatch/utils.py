@@ -94,23 +94,6 @@ def list_get(l, i, default=None):
         return default
 
 
-def validate_safe(type, item: dict):
-    class TempModel(BaseModel):
-        field: type
-
-    try:
-        TempModel(field=item)
-        return True
-    except ValidationError:
-        try:
-            TempModel(
-                field=json.loads(json.dumps(item, cls=SerializableWithStringFallback))
-            )
-            return True
-        except ValidationError:
-            return False
-
-
 def autoconvert_typed_values(
     value: Union[SpanInputOutput, ChatMessage, str, dict, list]
 ) -> SpanInputOutput:
@@ -118,10 +101,10 @@ def autoconvert_typed_values(
 
     if type(value_) == str:
         return TypedValueText(type="text", value=value_)
-    if type(value_) == dict and validate_safe(SpanInputOutput, value_):
+    if type(value_) == dict and validate_safe(SpanInputOutput, value_, "type"):
         return cast(SpanInputOutput, value_)
     if type(value_) == list and all(
-        validate_safe(ChatMessage, item) for item in value_
+        validate_safe(ChatMessage, item, "role") for item in value_
     ):
         return TypedValueChatMessages(type="chat_messages", value=value_)
 
@@ -132,9 +115,32 @@ def autoconvert_typed_values(
         return TypedValueRaw(type="raw", value=str(value))
 
 
+def validate_safe(type_, item: dict, min_required_key_for_pydantic_1: str):
+    import pydantic
+
+    if pydantic.__version__.startswith("1."):
+        if type(item) == dict and min_required_key_for_pydantic_1 in item:
+            return True
+        return False
+    else:
+        from pydantic import TypeAdapter
+
+        try:
+            TypeAdapter(type_).validate_python(item)
+            return True
+        except ValidationError:
+            try:
+                TypeAdapter(type_).validate_json(
+                    json.dumps(item, cls=SerializableWithStringFallback)
+                )
+                return True
+            except ValidationError:
+                return False
+
+
 def autoconvert_rag_contexts(value: Union[List[RAGChunk], List[str]]) -> List[RAGChunk]:
     if type(value) == list and all(
-        validate_safe(RAGChunk, cast(dict, item)) for item in value
+        validate_safe(RAGChunk, cast(dict, item), "content") for item in value
     ):
         return cast(List[RAGChunk], value)
     if type(value) == list and all(isinstance(item, str) for item in value):
@@ -176,9 +182,9 @@ class SerializableWithStringFallback(SerializableAndPydanticEncoder):
 
 
 def reduce_payload_size(
-    obj: T, max_string_length=5000, max_list_dict_length=50000
+    obj: T, max_string_length=5000, max_list_dict_length=50000, depth=0
 ) -> T:
-    if type(obj) == list and all(validate_safe(ChatMessage, item) for item in obj):
+    if type(obj) == list and all(validate_safe(ChatMessage, item, "role") for item in obj):
         return obj
 
     def truncate_string(s):
@@ -192,7 +198,9 @@ def reduce_payload_size(
         if isinstance(item, str):
             return truncate_string(item)
         elif isinstance(item, (list, dict)):
-            return reduce_payload_size(item, max_string_length, max_list_dict_length)
+            return reduce_payload_size(
+                item, max_string_length, max_list_dict_length, depth=depth + 1
+            )
         else:
             return item
 
@@ -217,7 +225,8 @@ def reduce_payload_size(
         for key, value in obj.items():
             result[key] = process_item(value)
             if (
-                len(json.dumps(result, cls=SerializableAndPydanticEncoder))
+                depth > 0
+                and len(json.dumps(result, cls=SerializableAndPydanticEncoder))
                 > max_list_dict_length
             ):
                 del result[key]
