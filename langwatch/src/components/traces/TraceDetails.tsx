@@ -308,8 +308,8 @@ function Events({ traceId }: { traceId: string }) {
             >
               <Thead>
                 <Tr>
-                  <Th>Metric</Th>
-                  <Th>Value</Th>
+                  <Th width="50%">Metric</Th>
+                  <Th width="50%">Value</Th>
                 </Tr>
               </Thead>
               <Tbody>
