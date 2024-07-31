@@ -1,4 +1,5 @@
 import { DownloadIcon } from "@chakra-ui/icons";
+import { Link } from "@chakra-ui/next-js";
 import {
   Avatar,
   Button,
@@ -156,7 +157,17 @@ export default function Annotations() {
             annotations.data.length == 0 &&
             scoreOptions.data &&
             scoreOptions.data.length == 0 ? (
-              <Text>No annotations found</Text>
+              <Text>
+                No annotations found.{" "}
+                <Link
+                  href="https://docs.langwatch.ai/features/annotations"
+                  target="_blank"
+                  textDecoration="underline"
+                >
+                  Get started with annotations
+                </Link>
+                .
+              </Text>
             ) : (
               <TableContainer>
                 <Table variant="simple">

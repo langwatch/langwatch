@@ -822,6 +822,8 @@ export const getTraceById = async ({
         "output.embeddings",
         "output.embeddings.embeddings",
         ...(canSeeCosts ? [] : ["metrics.total_cost"]),
+        "spans",
+        "evaluations",
       ],
     },
     body: {
@@ -838,8 +840,9 @@ export const getTraceById = async ({
   });
 
   const trace = result.hits.hits[0]?._source;
+  const trace_ = trace ? elasticSearchTraceToTrace(trace) : undefined;
 
-  return trace ? elasticSearchTraceToTrace(trace) : undefined;
+  return { ...trace_, events: trace?.events ?? [] };
 };
 
 export const getTracesByThreadId = async ({

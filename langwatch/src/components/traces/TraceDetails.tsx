@@ -1,14 +1,24 @@
 import { Link } from "@chakra-ui/next-js";
 import {
+  Box,
   Button,
+  Heading,
   HStack,
   Spacer,
   Tab,
+  Table,
+  TableCaption,
   TabList,
   TabPanel,
   TabPanels,
   Tabs,
+  Tbody,
+  Td,
   Text,
+  Th,
+  Thead,
+  Tooltip,
+  Tr,
   VStack,
 } from "@chakra-ui/react";
 import {
@@ -27,6 +37,8 @@ import { ShareButton } from "./ShareButton";
 import { SpanTree } from "./SpanTree";
 import { TraceSummary } from "./Summary";
 import { useEffect, useState } from "react";
+import { useTraceDetailsState } from "../../hooks/useTraceDetailsState";
+import { formatTimeAgo } from "../../utils/formatTimeAgo";
 
 interface TraceEval {
   project?: Project;
@@ -86,6 +98,8 @@ export function TraceDetails(props: {
 
   const annotationTabIndex =
     props.annotationTab && anyGuardrails ? 3 : props.annotationTab ? 2 : 0;
+
+  const { trace } = useTraceDetailsState(props.traceId);
 
   return (
     <>
@@ -167,6 +181,21 @@ export function TraceDetails(props: {
                   <AnnotationMsgs annotations={annotationsQuery.data} />
                 )}
               </Tab>
+              <Tab>
+                Events{" "}
+                {trace.data && trace.data.events.length > 0 && (
+                  <Text
+                    marginLeft={3}
+                    borderRadius={"md"}
+                    paddingX={2}
+                    backgroundColor={"green.500"}
+                    color={"white"}
+                    fontSize={"sm"}
+                  >
+                    {trace.data?.events.length}
+                  </Text>
+                )}
+              </Tab>
             </TabList>
 
             <TabPanels>
@@ -198,8 +227,21 @@ export function TraceDetails(props: {
                   annotationsQuery.data.length > 0 ? (
                   <Annotations traceId={props.traceId} />
                 ) : (
-                  <Text>No annotations found</Text>
+                  <Text>
+                    No annotations found.{" "}
+                    <Link
+                      href="https://docs.langwatch.ai/features/annotations"
+                      target="_blank"
+                      textDecoration="underline"
+                    >
+                      Get started with annotations
+                    </Link>
+                    .
+                  </Text>
                 )}
+              </TabPanel>
+              <TabPanel>
+                <Events traceId={props.traceId} />
               </TabPanel>
             </TabPanels>
           </Tabs>
@@ -209,7 +251,98 @@ export function TraceDetails(props: {
   );
 }
 
-const Evaluations = (trace: TraceEval & { anyGuardrails: boolean }) => {
+function Events({ traceId }: { traceId: string }) {
+  const { trace } = useTraceDetailsState(traceId);
+
+  return trace.data?.events.length == 0 ? (
+    <Text>
+      No events found.{" "}
+      <Link
+        href="https://docs.langwatch.ai/user-events/custom"
+        target="_blank"
+        textDecoration="underline"
+      >
+        Get started with events
+      </Link>
+      .
+    </Text>
+  ) : (
+    <VStack align="start">
+      {trace.data?.events.map((event) => (
+        <VStack
+          key={event.event_id}
+          backgroundColor={"gray.100"}
+          width={"full"}
+          padding={6}
+          borderRadius={"lg"}
+          align="start"
+          gap={4}
+        >
+          <HStack width="full">
+            <Heading size="md">{event.event_type}</Heading>
+            <Spacer />
+            {event.timestamps.started_at && (
+              <Tooltip
+                label={new Date(event.timestamps.started_at).toLocaleString()}
+              >
+                <Text
+                  color="gray.400"
+                  borderBottom="1px dashed"
+                >
+                  {formatTimeAgo(event.timestamps.started_at)}
+                </Text>
+              </Tooltip>
+            )}
+          </HStack>
+          <Box
+            borderRadius="6px"
+            border="1px solid"
+            borderColor="gray.400"
+            width="full"
+          >
+            <Table
+              size="sm"
+              background="white"
+              borderRadius="6px"
+              border="none"
+            >
+              <Thead>
+                <Tr>
+                  <Th>Metric</Th>
+                  <Th>Value</Th>
+                </Tr>
+              </Thead>
+              <Tbody>
+                {event.metrics.map((metric) => (
+                  <Tr key={metric.key}>
+                    <Td>{metric.key}</Td>
+                    <Td>{metric.value}</Td>
+                  </Tr>
+                ))}
+              </Tbody>
+              <Thead>
+                <Tr>
+                  <Th>Event Detail</Th>
+                  <Th>Value</Th>
+                </Tr>
+              </Thead>
+              <Tbody>
+                {event.event_details.map((detail) => (
+                  <Tr key={detail.key}>
+                    <Td>{detail.key}</Td>
+                    <Td>{detail.value}</Td>
+                  </Tr>
+                ))}
+              </Tbody>
+            </Table>
+          </Box>
+        </VStack>
+      ))}
+    </VStack>
+  );
+}
+
+function Evaluations(trace: TraceEval & { anyGuardrails: boolean }) {
   const evaluations = trace.evaluations?.filter((x) => !x.is_guardrail);
   const totalChecks = evaluations?.length;
   if (!totalChecks)
@@ -244,7 +377,7 @@ const Evaluations = (trace: TraceEval & { anyGuardrails: boolean }) => {
       </>
     </VStack>
   );
-};
+}
 
 const Guardrails = (trace: TraceEval) => {
   const guardrails = trace.evaluations?.filter((x) => x.is_guardrail);

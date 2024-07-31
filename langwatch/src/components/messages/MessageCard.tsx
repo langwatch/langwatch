@@ -43,6 +43,7 @@ import { pluralize } from "../../utils/pluralize";
 import { getColorForString } from "../../utils/rotatingColors";
 import { CheckPassing } from "../CheckPassing";
 import { useDrawer } from "../CurrentDrawer";
+import { formatTimeAgo } from "../../utils/formatTimeAgo";
 
 export type TraceWithGuardrail = Trace & {
   lastGuardrail: (GuardrailResult & { name?: string }) | undefined;
@@ -289,10 +290,10 @@ export function MessageCard({
                 borderBottomWidth="1px"
                 borderBottomColor="gray.400"
                 borderBottomStyle="dashed"
+                position="relative"
+                zIndex="popover"
               >
-                {formatDistanceToNow(new Date(trace.timestamps.started_at), {
-                  addSuffix: true,
-                })}
+                {formatTimeAgo(trace.timestamps.started_at)}
               </Text>
             </Tooltip>
             {!!trace.metrics.total_cost && (
