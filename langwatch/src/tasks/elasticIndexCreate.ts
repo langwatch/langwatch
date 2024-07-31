@@ -79,17 +79,24 @@ const spanMapping: ElasticSearchMappingFrom<ElasticSearchSpan> = {
   model: { type: "keyword" },
   params: {
     properties: {
-      temperature: { type: "float" },
+      frequency_penalty: { type: "float" },
+      logit_bias: { type: "flattened" } as any,
+      logprobs: { type: "boolean" },
+      top_logprobs: { type: "integer" },
+      max_tokens: { type: "long" },
+      n: { type: "integer" },
+      presence_penalty: { type: "float" },
+      seed: { type: "long" },
+      stop: { type: "flattened" },
       stream: { type: "boolean" },
-      functions: { type: "flattened" } as any, // TODO: change to flattened
-      tools: { type: "flattened" } as any, // TODO implement
-      tool_choice: { type: "flattened" }, // TODO implement
-      max_tokens: { type: "long" }, // TODO implement
-      n: { type: "integer" }, // TODO implement
-      top_p: { type: "float" }, // TODO implement
-      frequency_penalty: { type: "float" }, // TODO implement
-      presence_penalty: { type: "float" }, // TODO implement
-    } as any, // TODO: remove this any
+      temperature: { type: "float" },
+      top_p: { type: "float" },
+      tools: { type: "flattened" } as any,
+      tool_choice: { type: "flattened" },
+      parallel_tool_calls: { type: "boolean" },
+      functions: { type: "flattened" } as any,
+      user: { type: "keyword" },
+    },
   },
   metrics: {
     properties: {

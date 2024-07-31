@@ -88,7 +88,9 @@ class SpanTimestamps(TypedDict, total=False):
     finished_at: int
 
 
-SpanTypes = Literal["span", "llm", "chain", "tool", "agent", "guardrail", "rag", "workflow", "component"]
+SpanTypes = Literal[
+    "span", "llm", "chain", "tool", "agent", "guardrail", "rag", "workflow", "component"
+]
 
 
 class BaseSpan(TypedDict):
@@ -104,11 +106,23 @@ class BaseSpan(TypedDict):
 
 
 class LLMSpanParams(TypedDict, total=False):
-    temperature: float
-    stream: bool
-    functions: Optional[List[Dict[str, Any]]]
+    frequency_penalty: Optional[float]
+    logit_bias: Optional[Dict[str, float]]
+    logprobs: Optional[bool]
+    top_logprobs: Optional[int]
+    max_tokens: Optional[int]
+    n: Optional[int]
+    presence_penalty: Optional[float]
+    seed: Optional[int]
+    stop: Optional[Union[str, List[str]]]
+    stream: Optional[bool]
+    temperature: Optional[float]
+    top_p: Optional[float]
     tools: Optional[List[Dict[str, Any]]]
     tool_choice: Optional[str]
+    parallel_tool_calls: Optional[bool]
+    functions: Optional[List[Dict[str, Any]]]
+    user: Optional[str]
 
 
 class LLMSpanMetrics(TypedDict, total=False):

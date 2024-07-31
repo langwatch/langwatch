@@ -306,19 +306,29 @@ class LiteLLMPatch:
             if len(outputs) == 0
             else outputs[0] if len(outputs) == 1 else {"type": "list", "value": outputs}
         )
-        params = LLMSpanParams(
-            temperature=kwargs.get("temperature", 1.0),
-            stream=kwargs.get("stream", False),
-        )
-        functions = kwargs.get("functions", None)
-        if functions:
-            params["functions"] = functions
-        tools = kwargs.get("tools", None)
-        if tools:
-            params["tools"] = tools
-        tool_choice = kwargs.get("tool_choice", None)
-        if tool_choice:
-            params["tool_choice"] = tool_choice
+        span_params = LLMSpanParams()
+        params = [
+            "frequency_penalty",
+            "logit_bias",
+            "logprobs",
+            "top_logprobs",
+            "max_tokens",
+            "n",
+            "presence_penalty",
+            "seed",
+            "stop",
+            "stream",
+            "temperature",
+            "top_p",
+            "tools",
+            "tool_choice",
+            "parallel_tool_calls",
+            "functions",
+            "user",
+        ]
+        for param in params:
+            if kwargs.get(param):
+                span_params[param] = kwargs.get(param, None)
 
         span.end(
             model=kwargs.get("model", "unknown"),
@@ -327,7 +337,7 @@ class LiteLLMPatch:
             ),
             output=output,
             error=error,
-            params=params,
+            params=span_params,
             metrics=metrics,
             timestamps=timestamps,
         )

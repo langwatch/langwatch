@@ -355,15 +355,36 @@ class OpenAICompletionTracer:
             else "openai"
         )
 
+        span_params = LLMSpanParams()
+        params = [
+            "frequency_penalty",
+            "logit_bias",
+            "logprobs",
+            "top_logprobs",
+            "max_tokens",
+            "n",
+            "presence_penalty",
+            "seed",
+            "stop",
+            "stream",
+            "temperature",
+            "top_p",
+            "tools",
+            "tool_choice",
+            "parallel_tool_calls",
+            "functions",
+            "user",
+        ]
+        for param in params:
+            if kwargs.get(param):
+                span_params[param] = kwargs.get(param, None)
+
         span.end(
             model=vendor + "/" + kwargs.get("model", "unknown"),
             input=TypedValueText(type="text", value=kwargs.get("prompt", "")).copy(),
             output=output,
             error=error,
-            params=LLMSpanParams(
-                temperature=kwargs.get("temperature", 1.0),
-                stream=kwargs.get("stream", False),
-            ),
+            params=span_params,
             metrics=metrics,
             timestamps=timestamps,
         )

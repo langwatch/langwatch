@@ -156,13 +156,31 @@ class LangChainTracer(BaseCallbackHandler):
         input: SpanInputOutput,
         **kwargs: Any,
     ) -> ContextSpan:
-        params = LLMSpanParams(
-            stream=kwargs.get("invocation_params", {}).get("stream", False),
-            temperature=kwargs.get("invocation_params", {}).get("temperature", None),
-        )
-        functions = kwargs.get("invocation_params", {}).get("functions", None)
-        if functions:
-            params["functions"] = functions
+        span_params = LLMSpanParams()
+        params = [
+            "frequency_penalty",
+            "logit_bias",
+            "logprobs",
+            "top_logprobs",
+            "max_tokens",
+            "n",
+            "presence_penalty",
+            "seed",
+            "stop",
+            "stream",
+            "temperature",
+            "top_p",
+            "tools",
+            "tool_choice",
+            "parallel_tool_calls",
+            "functions",
+            "user",
+        ]
+        for param in params:
+            if kwargs.get("invocation_params", {}).get(param):
+                span_params[param] = kwargs.get("invocation_params", {}).get(
+                    param, None
+                )
 
         vendor = list_get(serialized.get("id", []), 2, "unknown").lower()
         if vendor.startswith("chat"):
@@ -181,7 +199,7 @@ class LangChainTracer(BaseCallbackHandler):
             model=(vendor + "/" + model),
             input=input,
             timestamps=SpanTimestamps(started_at=milliseconds_timestamp()),
-            params=params,
+            params=span_params,
         )
         span.__enter__()
 

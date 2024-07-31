@@ -115,11 +115,23 @@ interface SpanMetrics {
 }
 
 interface SpanParams {
-  temperature?: number;
-  stream?: boolean;
-  functions?: Record<string, any>[];
-  tools?: Record<string, any>[];
-  tool_choice?: string;
+  frequency_penalty?: number | null;
+  logit_bias?: Record<string, number> | null;
+  logprobs?: boolean | null;
+  top_logprobs?: number | null;
+  max_tokens?: number | null;
+  n?: number | null;
+  presence_penalty?: number | null;
+  seed?: number | null;
+  stop?: string | string[] | null;
+  stream?: boolean | null;
+  temperature?: number | null;
+  top_p?: number | null;
+  tools?: Record<string, any>[] | null;
+  tool_choice?: string | null;
+  parallel_tool_calls?: boolean | null;
+  functions?: Record<string, any>[] | null;
+  user?: string | null;
 }
 
 interface SpanTimestamps {
