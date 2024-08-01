@@ -11,6 +11,8 @@ COPY prisma/ prisma/
 RUN npm run start:prepare
 COPY . .
 RUN cp langwatch/langwatch/.env.example .env
+ARG SENTRY_AUTH_TOKEN
+ENV SENTRY_AUTH_TOKEN=${SENTRY_AUTH_TOKEN}
 RUN npm run build
 RUN rm .env
 ENV NODE_ENV=production
