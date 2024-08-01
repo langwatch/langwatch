@@ -208,7 +208,11 @@ export const startCollectorWorker = () => {
 
   collectorWorker.on("failed", (job, err) => {
     debug(`Job ${job?.id} failed with error ${err.message}`);
-    Sentry.captureException(err);
+    Sentry.withScope((scope) => {
+      scope.setTag("worker", "collector");
+      scope.setExtra("job", job?.data);
+      Sentry.captureException(err);
+    });
   });
 
   debug("Collector worker registered");

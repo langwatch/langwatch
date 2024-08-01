@@ -375,7 +375,11 @@ export const startTraceChecksWorker = (
 
   traceChecksWorker.on("failed", (job, err) => {
     debug(`Job ${job?.id} failed with error ${err.message}`);
-    Sentry.captureException(err);
+    Sentry.withScope((scope) => {
+      scope.setTag("worker", "traceChecks");
+      scope.setExtra("job", job?.data);
+      Sentry.captureException(err);
+    });
   });
 
   debug("Trace checks worker registered");
