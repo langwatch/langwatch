@@ -56,3 +56,14 @@ For AWS, we use CDK for generating the CloudFormation template and deploying, ch
 # Schema changes
 
 If you would like to make schema changes, you will need to setup a local postgres DB running on `postgresql://postgres@localhost:5432` (for running the open-source repo migrations first), once you have done this you can run `npm run prisma:generate:migration` from the top-level langwatch-saas folder to generate a new migration file.
+
+# Local Terraform Testing
+
+DANGEROUS, be careful when running terraform from your local machine, point to lw-dev first.
+
+First step, init with `-reconfigure` (yes, that's the correct option to not mess up the stored config in S3 bucket)
+
+```
+cd infrastructure
+terraform init -reconfigure
+```
