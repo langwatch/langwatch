@@ -227,14 +227,14 @@ export type TraceOutput = {
 type PrimitiveType = string | number | boolean | null | undefined;
 
 export type ReservedTraceMetadata = {
-  thread_id?: string;
-  user_id?: string;
-  customer_id?: string;
-  labels?: string[];
-  topic_id?: string;
-  subtopic_id?: string;
-  sdk_version?: string;
-  sdk_language?: string;
+  thread_id?: string | null;
+  user_id?: string | null;
+  customer_id?: string | null;
+  labels?: string[] | null;
+  topic_id?: string | null;
+  subtopic_id?: string | null;
+  sdk_version?: string | null;
+  sdk_language?: string | null;
 };
 
 export type CustomMetadata = Record<
