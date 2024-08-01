@@ -1,9 +1,6 @@
 import { scheduleTraceCheck } from "../../queues/traceChecksQueue";
 import { prisma } from "../../../db";
-import {
-  type ElasticSearchTrace,
-  type Span,
-} from "../../../tracer/types";
+import { type ElasticSearchTrace, type Span } from "../../../tracer/types";
 import type { EvaluatorTypes } from "../../../../trace_checks/evaluators.generated";
 import { evaluatePreconditions } from "../../../../trace_checks/preconditions";
 import type { CheckPreconditions } from "../../../../trace_checks/types";
@@ -31,6 +28,7 @@ export const scheduleTraceChecks = async (
     },
   });
 
+  const traceChecksSchedulings = [];
   for (const check of checks) {
     if (Math.random() <= check.sample) {
       const preconditions = (check.preconditions ?? []) as CheckPreconditions;
@@ -44,14 +42,18 @@ export const scheduleTraceChecks = async (
         debug(
           `scheduling ${check.checkType} (checkId: ${check.id}) for trace ${trace.trace_id}`
         );
-        void scheduleTraceCheck({
-          check: {
-            ...check,
-            type: check.checkType as EvaluatorTypes,
-          },
-          trace: trace,
-        });
+        traceChecksSchedulings.push(
+          scheduleTraceCheck({
+            check: {
+              ...check,
+              type: check.checkType as EvaluatorTypes,
+            },
+            trace: trace,
+          })
+        );
       }
     }
   }
+
+  await Promise.all(traceChecksSchedulings);
 };

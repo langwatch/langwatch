@@ -37,6 +37,9 @@ export const scheduleTraceCheck = async ({
   trace: TraceCheckJob["trace"];
   delay?: number;
 }) => {
+  // Random delay to avoid elasticsearch update collisions
+  await new Promise((resolve) => setTimeout(resolve, Math.random() * 1000));
+
   await updateCheckStatusInES({
     check,
     trace: trace,
@@ -76,7 +79,8 @@ export const scheduleTraceCheck = async ({
       },
       {
         jobId,
-        delay: delay ?? 5000,
+        // Add a little delay to wait for the spans to be fully collected
+        delay: delay ?? 4000,
       }
     );
   }
@@ -135,7 +139,7 @@ export const updateCheckStatusInES = async ({
       traceId: trace.trace_id,
       projectId: trace.project_id,
     }),
-    retry_on_conflict: 20,
+    retry_on_conflict: 5,
     body: {
       script: {
         source: `
