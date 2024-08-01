@@ -161,11 +161,6 @@ resource "null_resource" "langwatch_docker_image" {
       image_exists=$(docker manifest inspect ${data.aws_ecr_repository.langwatch.repository_url}:${local.tag} > /dev/null 2>&1 && echo yes)
       set -e
       if [ -z "$image_exists" ]; then
-        echo "SENTRY_AUTH_TOKEN:"
-        echo "$${SENTRY_AUTH_TOKEN}"
-        echo "==="
-        echo "$SENTRY_AUTH_TOKEN"
-        echo "==="
         docker buildx build . --platform="linux/amd64" --build-arg SENTRY_AUTH_TOKEN="$SENTRY_AUTH_TOKEN" --push -t ${data.aws_ecr_repository.langwatch.repository_url}:${local.tag}
         set +e
         MANIFEST=$(aws ecr --profile ${module.variables.profile} --region ${data.aws_region.current.name} batch-get-image --repository-name ${aws_ecr_repository.langwatch.name} --image-ids imageTag=${local.tag} --query 'images[].imageManifest' --output text)
