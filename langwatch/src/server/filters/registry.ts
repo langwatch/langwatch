@@ -1040,12 +1040,12 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
       extract: (result: Record<string, any>) => {
         return [
           {
-            field: result.unique_values?.child?.child?.child?.child?.min,
+            field: Math.ceil(result.unique_values?.child?.child?.child?.child?.min).toString(),
             label: "min",
             count: 0,
           },
           {
-            field: result.unique_values?.child?.child?.child?.child?.max,
+            field: Math.ceil(result.unique_values?.child?.child?.child?.child?.max).toString(),
             label: "max",
             count: 0,
           },

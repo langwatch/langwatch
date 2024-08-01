@@ -266,9 +266,11 @@ export type Trace = {
   };
   error?: ErrorCapture | null;
   indexing_md5s?: string[];
+
+  events?: Event[];
 };
 
-export type ElasticSearchTrace = Omit<Trace, "metadata" | "timestamps"> & {
+export type ElasticSearchTrace = Omit<Trace, "metadata" | "timestamps" | "events"> & {
   metadata: ReservedTraceMetadata & {
     custom?: CustomMetadata;
     all_keys?: string[];

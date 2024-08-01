@@ -7,7 +7,6 @@ import {
   Spacer,
   Tab,
   Table,
-  TableCaption,
   TabList,
   TabPanel,
   TabPanels,
@@ -183,7 +182,7 @@ export function TraceDetails(props: {
               </Tab>
               <Tab>
                 Events{" "}
-                {trace.data && trace.data.events.length > 0 && (
+                {trace.data?.events && trace.data.events.length > 0 && (
                   <Text
                     marginLeft={3}
                     borderRadius={"md"}
@@ -192,7 +191,7 @@ export function TraceDetails(props: {
                     color={"white"}
                     fontSize={"sm"}
                   >
-                    {trace.data?.events.length}
+                    {trace.data.events.length}
                   </Text>
                 )}
               </Tab>
@@ -254,7 +253,7 @@ export function TraceDetails(props: {
 function Events({ traceId }: { traceId: string }) {
   const { trace } = useTraceDetailsState(traceId);
 
-  return trace.data?.events.length == 0 ? (
+  return trace.data?.events?.length == 0 ? (
     <Text>
       No events found.{" "}
       <Link
@@ -268,7 +267,7 @@ function Events({ traceId }: { traceId: string }) {
     </Text>
   ) : (
     <VStack align="start">
-      {trace.data?.events.map((event) => (
+      {trace.data?.events?.map((event) => (
         <VStack
           key={event.event_id}
           backgroundColor={"gray.100"}
@@ -313,10 +312,10 @@ function Events({ traceId }: { traceId: string }) {
                 </Tr>
               </Thead>
               <Tbody>
-                {event.metrics.map((metric) => (
-                  <Tr key={metric.key}>
-                    <Td>{metric.key}</Td>
-                    <Td>{metric.value}</Td>
+                {Object.entries(event.metrics ?? {}).map(([key, value]) => (
+                  <Tr key={key}>
+                    <Td>{key}</Td>
+                    <Td>{value}</Td>
                   </Tr>
                 ))}
               </Tbody>
@@ -327,10 +326,10 @@ function Events({ traceId }: { traceId: string }) {
                 </Tr>
               </Thead>
               <Tbody>
-                {event.event_details.map((detail) => (
-                  <Tr key={detail.key}>
-                    <Td>{detail.key}</Td>
-                    <Td>{detail.value}</Td>
+                {Object.entries(event.event_details ?? {}).map(([key, value]) => (
+                  <Tr key={key}>
+                    <Td>{key}</Td>
+                    <Td>{value}</Td>
                   </Tr>
                 ))}
               </Tbody>

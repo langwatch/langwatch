@@ -11,7 +11,7 @@ export function useTraceDetailsState(traceId: string) {
   const { project } = useOrganizationTeamProject();
   const trace = api.traces.getById.useQuery(
     { projectId: project?.id ?? "", traceId: traceId },
-    { enabled: !!project && !!traceId, refetchOnWindowFocus: false }
+    { enabled: !!project && !!traceId, refetchOnWindowFocus: true }
   );
 
   return { traceId, spanId, trace, openTab };

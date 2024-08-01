@@ -19,7 +19,6 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import type { Annotation, Project } from "@prisma/client";
-import { formatDistanceToNow } from "date-fns";
 import NextLink from "next/link";
 import numeral from "numeral";
 import {
@@ -44,6 +43,7 @@ import { getColorForString } from "../../utils/rotatingColors";
 import { CheckPassing } from "../CheckPassing";
 import { useDrawer } from "../CurrentDrawer";
 import { formatTimeAgo } from "../../utils/formatTimeAgo";
+import { EventsCounter } from "./EventsCounter";
 
 export type TraceWithGuardrail = Trace & {
   lastGuardrail: (GuardrailResult & { name?: string }) | undefined;
@@ -296,6 +296,7 @@ export function MessageCard({
                 {formatTimeAgo(trace.timestamps.started_at)}
               </Text>
             </Tooltip>
+            <EventsCounter trace={trace} />
             {!!trace.metrics.total_cost && (
               <>
                 <Text>·</Text>

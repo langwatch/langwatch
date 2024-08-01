@@ -42,6 +42,7 @@ import {
   getSlicedExpectedOutput,
 } from "../../../../components/messages/MessageCard";
 import { formatTimeAgo } from "../../../../utils/formatTimeAgo";
+import { EventsCounter } from "../../../../components/messages/EventsCounter";
 
 export default function TraceDetails() {
   const router = useRouter();
@@ -467,6 +468,9 @@ const TraceMessages = React.forwardRef(function TraceMessages(
                       </Text>
                     </Alert>
                   )}
+                  <HStack fontSize={13} color="gray.400">
+                    <EventsCounter trace={trace} addDot={false} />
+                  </HStack>
                 </Message>
               </Box>
             </GridItem>

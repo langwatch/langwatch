@@ -1,3 +1,4 @@
+import omit from "lodash.omit";
 import {
   flattenSpanTree,
   organizeSpansIntoTree,
@@ -5,9 +6,11 @@ import {
 } from "../background/workers/collector/common";
 import { extractRAGTextualContext } from "../background/workers/collector/rag";
 import {
+  type ElasticSearchEvent,
   type ElasticSearchInputOutput,
   type ElasticSearchSpan,
   type ElasticSearchTrace,
+  type Event,
   type ReservedTraceMetadata,
   type Span,
   type SpanInputOutput,
@@ -80,11 +83,14 @@ export const elasticSearchTraceToTrace = (
   const customMetadata = metadata.custom ?? {};
 
   return {
-    ...elasticSearchTrace,
+    ...omit(elasticSearchTrace, ["events"]),
     metadata: {
       ...reservedMetadata,
       ...customMetadata,
     },
+    ...(elasticSearchTrace.events
+      ? { events: elasticSearchEventsToEvents(elasticSearchTrace.events) }
+      : {}),
   };
 };
 
@@ -140,4 +146,18 @@ export const elasticSearchTraceCheckToUserInterfaceEvaluation = (
     evaluation_type: traceCheck.check_type,
     ...traceCheck_,
   };
+};
+
+export const elasticSearchEventsToEvents = (
+  elasticSearchEvents: ElasticSearchEvent[]
+): Event[] => {
+  return elasticSearchEvents.map((event) => ({
+    ...event,
+    metrics: Object.fromEntries(
+      event.metrics.map((metric) => [metric.key, metric.value])
+    ),
+    event_details: Object.fromEntries(
+      event.event_details.map((detail) => [detail.key, detail.value])
+    ),
+  }));
 };

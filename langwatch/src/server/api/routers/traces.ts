@@ -840,9 +840,7 @@ export const getTraceById = async ({
   });
 
   const trace = result.hits.hits[0]?._source;
-  const trace_ = trace ? elasticSearchTraceToTrace(trace) : undefined;
-
-  return trace_ ? { ...trace_, events: trace?.events ?? [] } : undefined;
+  return trace ? elasticSearchTraceToTrace(trace) : undefined;
 };
 
 export const getTracesByThreadId = async ({
