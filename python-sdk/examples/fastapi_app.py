@@ -14,8 +14,6 @@ import sys
 sys.path.append("..")
 import langwatch
 
-langwatch.debug = True
-
 app = FastAPI()
 
 
@@ -42,19 +40,18 @@ def fastapi_sample_endpoint(params: EndpointParams):
     return completion.choices[0].message.content
 
 
+def call_fastapi_sample_endpoint(input: str) -> str:
+    test_client = TestClient(app)
+    response = test_client.post("/", json={"input": input})
+
+    return response.json()
+
+
 if __name__ == "__main__":
     import uvicorn
     import os
 
-    # Create a test client
-    test_client = TestClient(app)
-
-    def call_fastapi_sample_endpoint(input: str) -> str:
-        # Create a mock request
-        response = test_client.post("/", json={"input": input})
-
-        return response.json()
-
+    # Test one llm call before starting the server
     print(call_fastapi_sample_endpoint("Hello, world!"))
 
     port = int(os.environ.get("PORT", 8000))

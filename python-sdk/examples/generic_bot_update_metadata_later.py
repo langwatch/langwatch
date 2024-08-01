@@ -16,8 +16,6 @@ async def main(message: cl.Message):
         content="",
     )
 
-    langwatch.debug = True
-
     trace = langwatch.trace()
 
     # Create two spans, one for the RAG, and one for the "LLM call" inside it

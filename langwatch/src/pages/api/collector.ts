@@ -314,7 +314,8 @@ export default async function handler(
     ]);
   } catch (error) {
     debug(
-      "Failed sending to redis collector queue inserting trace directly, processing job synchronously",
+      "Failed sending to redis collector queue inserting trace directly, processing job synchronously.",
+      "Exception:",
       error
     );
     Sentry.captureException(error, {

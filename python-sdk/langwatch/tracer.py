@@ -28,7 +28,7 @@ from langwatch.types import (
     TraceMetadata,
 )
 from langwatch.utils import (
-    SerializableAndPydanticEncoder,
+    SerializableWithStringFallback,
     autoconvert_rag_contexts,
     autoconvert_typed_values,
     capture_exception,
@@ -152,6 +152,7 @@ class ContextSpan:
 
         if self.trace:
             self.trace.reset_current_span(self.context_token)
+            self.context_token = None
 
     def __call__(self, func: T) -> T:
         span_kwargs = {
@@ -556,6 +557,7 @@ class ContextTrace:
         self.root_span.__exit__(_type, _value, _traceback)
         if self.context_token:
             current_trace_var.reset(self.context_token)
+            self.context_token = None
 
     def __call__(self, func: T) -> T:
         trace_kwargs = {
@@ -681,7 +683,7 @@ class ContextTrace:
         return None
 
     def get_current_span(self) -> Optional[ContextSpan]:
-        return self._current_span.get() or self._current_span_global
+        return self._current_span_global or self._current_span.get()
 
     def set_current_span(self, span: ContextSpan):
         token = self._current_span.set(span)
@@ -760,7 +762,7 @@ def send_spans(data: CollectorRESTParams, api_key: Optional[str] = None):
     import json
 
     get_logger().debug(
-        f"Sending trace: {json.dumps(data, cls=SerializableAndPydanticEncoder, indent=2)}"
+        f"Sending trace: {json.dumps(data, cls=SerializableWithStringFallback, indent=2)}"
     )
 
     api_key = api_key or langwatch.api_key
@@ -770,10 +772,10 @@ def send_spans(data: CollectorRESTParams, api_key: Optional[str] = None):
         )
         return
 
-    # TODO: replace this with httpx, don't forget the custom SerializableAndPydanticEncoder encoder
+    # TODO: replace this with httpx, don't forget the custom SerializableWithStringFallback encoder
     response = requests.post(
         langwatch.endpoint + "/api/collector",
-        data=json.dumps(data, cls=SerializableAndPydanticEncoder),
+        data=json.dumps(data, cls=SerializableWithStringFallback),
         headers={
             "X-Auth-Token": str(api_key),
             "Content-Type": "application/json",

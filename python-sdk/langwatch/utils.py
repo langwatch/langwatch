@@ -212,7 +212,7 @@ def reduce_payload_size(
         for item in obj:
             result.append(process_item(item))
             if (
-                len(json.dumps(result, cls=SerializableAndPydanticEncoder))
+                len(json.dumps(result, cls=SerializableWithStringFallback))
                 > max_list_dict_length
             ):
                 result.pop()
@@ -226,7 +226,7 @@ def reduce_payload_size(
             result[key] = process_item(value)
             if (
                 depth > 0
-                and len(json.dumps(result, cls=SerializableAndPydanticEncoder))
+                and len(json.dumps(result, cls=SerializableWithStringFallback))
                 > max_list_dict_length
             ):
                 del result[key]

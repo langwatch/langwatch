@@ -1,6 +1,5 @@
 import json
-from types import MethodType
-from typing import Any, Callable, Dict, List, Literal, Optional, Union, cast
+from typing import Any, Callable, Dict, List, Literal, Optional, Union
 from langchain.schema import (
     LLMResult,
     AgentAction,
@@ -35,7 +34,7 @@ from langwatch.types import (
 )
 
 from langwatch.utils import (
-    SerializableAndPydanticEncoder,
+    SerializableWithStringFallback,
     autoconvert_typed_values,
     list_get,
     milliseconds_timestamp,
@@ -423,11 +422,11 @@ class WrappedRagTool(BaseTool):
                 if type(args[0]) == str:
                     input = args[0]
                 else:
-                    input = json.dumps(args[0], cls=SerializableAndPydanticEncoder)
+                    input = json.dumps(args[0], cls=SerializableWithStringFallback)
             elif len(args) > 0:
-                input = json.dumps(args, cls=SerializableAndPydanticEncoder)
+                input = json.dumps(args, cls=SerializableWithStringFallback)
             else:
-                input = json.dumps(kwargs, cls=SerializableAndPydanticEncoder)
+                input = json.dumps(kwargs, cls=SerializableWithStringFallback)
         except Exception as e:
             if len(args) == 1:
                 input = str(args[0])

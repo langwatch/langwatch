@@ -12,8 +12,6 @@ import sys
 sys.path.append("..")
 import langwatch
 
-langwatch.debug = True
-
 @cl.on_message
 @langwatch.trace()
 async def main(message: cl.Message):
