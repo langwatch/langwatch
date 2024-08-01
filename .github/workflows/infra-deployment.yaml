@@ -66,6 +66,7 @@ jobs:
 
       - name: Deploy Infrastructure
         run: |
+          export SENTRY_AUTH_TOKEN="${{ secrets.SENTRY_AUTH_TOKEN }}"
           make infra-init
           make deploy
         env:

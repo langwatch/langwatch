@@ -74,7 +74,7 @@ jobs:
           jq --version
           cat --version | head -n 1
           /bin/bash --version
-      
+
       - name: Free up Disk Space
         run: |
           sudo apt-get clean || true
@@ -101,12 +101,13 @@ jobs:
 
       - name: Dry Run Deployment
         run: |
+          export SENTRY_AUTH_TOKEN="${{ secrets.SENTRY_AUTH_TOKEN }}"
           make infra-init
           make infra-plan
         env:
           AWS_PROFILE: lw-prod
           AWS_DEFAULT_PROFILE: lw-prod
-      
+
       - name: Dry Run Docker Builds
         run: |
           cd langevals

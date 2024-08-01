@@ -4,16 +4,19 @@ infra-generate:
 	poetry run python ../infrastructure/scripts/generate_lambdas.py
 
 infra-init:
-	@terraform -chdir=infrastructure/ init
+	@terraform -chdir=infrastructure/ init -reconfigure
 
 infra-plan:
 	@terraform -chdir=infrastructure/ plan
 
 # Required dependencies: terraform, aws, git, plus ~/.aws/credentials must be set up
 infra-apply:
+	@terraform -chdir=infrastructure/ apply
+
+infra-apply-approve:
 	@terraform -chdir=infrastructure/ apply -auto-approve
 
-deploy: infra-apply
+deploy: infra-apply-approve
 	@profile=$$(sed -n 's/.*value *= *"\(lw-[^"]*\)".*/\1/p' infrastructure/variables/outputs.tf) && \
 	region=eu-central-1 && \
 	TASK_DEFINITION=$$(aws ecs describe-task-definition --profile $$profile --region $$region --task-definition=langwatch-task) && \

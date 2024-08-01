@@ -59,11 +59,16 @@ If you would like to make schema changes, you will need to setup a local postgre
 
 # Local Terraform Testing
 
-DANGEROUS, be careful when running terraform from your local machine, point to lw-dev first.
+DANGEROUS, be careful when running terraform from your local machine, point to lw-dev first on `variables/outputs.tf` and switch the backend in `versions.tf`.
 
-First step, init with `-reconfigure` (yes, that's the correct option to not mess up the stored config in S3 bucket)
+Then, before starting, init it with make: (please don't init manually with terraform, to not mess up the backend config)
 
 ```
-cd infrastructure
-terraform init -reconfigure
+make infra-init
+```
+
+Then
+
+```
+make infra-apply
 ```
