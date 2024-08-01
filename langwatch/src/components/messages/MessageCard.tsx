@@ -297,7 +297,7 @@ export function MessageCard({
               </Text>
             </Tooltip>
             <EventsCounter trace={trace} />
-            {!!trace.metrics.total_cost && (
+            {!!trace.metrics?.total_cost && (
               <>
                 <Text>·</Text>
                 <Box>
@@ -308,7 +308,7 @@ export function MessageCard({
                 </Box>
               </>
             )}
-            {!!trace.metrics.first_token_ms && (
+            {!!trace.metrics?.first_token_ms && (
               <>
                 <Text>·</Text>
                 <Box>
@@ -317,7 +317,7 @@ export function MessageCard({
                 </Box>
               </>
             )}
-            {!!trace.metrics.total_time_ms && (
+            {!!trace.metrics?.total_time_ms && (
               <>
                 <Text>·</Text>
                 <Box>

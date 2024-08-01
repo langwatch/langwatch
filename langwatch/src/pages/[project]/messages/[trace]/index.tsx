@@ -429,8 +429,8 @@ const TraceMessages = React.forwardRef(function TraceMessages(
                   }
                   timestamp={
                     trace.timestamps.started_at +
-                    (trace.metrics.first_token_ms ??
-                      trace.metrics.total_time_ms ??
+                    (trace.metrics?.first_token_ms ??
+                      trace.metrics?.total_time_ms ??
                       0)
                   }
                 >

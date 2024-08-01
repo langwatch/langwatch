@@ -256,7 +256,7 @@ export type Trace = {
   output?: TraceOutput;
   contexts?: RAGChunk[];
   expected_output?: { value: string };
-  metrics: {
+  metrics?: {
     first_token_ms?: number | null;
     total_time_ms?: number | null;
     prompt_tokens?: number | null;

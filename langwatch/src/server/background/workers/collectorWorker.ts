@@ -63,6 +63,16 @@ export const processCollectorJob = async (
       inserted_at: Date.now(),
       updated_at: Date.now(),
     },
+
+    // Hack to fix the stop param for now
+    ...("params" in span && span.params
+      ? {
+          params: {
+            ...span.params,
+            ...(span.params.stop ? { stop: { _value: span.params.stop } } : {}),
+          },
+        }
+      : {}) as any,
   }));
 
   const [input, output] = await Promise.all([

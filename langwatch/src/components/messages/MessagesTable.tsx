@@ -351,9 +351,9 @@ export function MessagesTable() {
           }
         >
           <Text
-            color={durationColor("first_token", trace.metrics.first_token_ms)}
+            color={durationColor("first_token", trace.metrics?.first_token_ms)}
           >
-            {trace.metrics.first_token_ms
+            {trace.metrics?.first_token_ms
               ? numeral(trace.metrics.first_token_ms / 1000).format("0.[0]") +
                 "s"
               : "-"}
@@ -361,7 +361,7 @@ export function MessagesTable() {
         </Td>
       ),
       value: (trace: Trace) => {
-        return trace.metrics.first_token_ms
+        return trace.metrics?.first_token_ms
           ? numeral(trace.metrics.first_token_ms / 1000).format("0.[0]") + "s"
           : "-";
       },
@@ -380,9 +380,9 @@ export function MessagesTable() {
           }
         >
           <Text
-            color={durationColor("total_time", trace.metrics.total_time_ms)}
+            color={durationColor("total_time", trace.metrics?.total_time_ms)}
           >
-            {trace.metrics.total_time_ms
+            {trace.metrics?.total_time_ms
               ? numeral(trace.metrics.total_time_ms / 1000).format("0.[0]") +
                 "s"
               : "-"}
@@ -390,7 +390,7 @@ export function MessagesTable() {
         </Td>
       ),
       value: (trace: Trace) => {
-        return trace.metrics.total_time_ms
+        return trace.metrics?.total_time_ms
           ? numeral(trace.metrics.total_time_ms / 1000).format("0.[0]") + "s"
           : "-";
       },
@@ -408,10 +408,10 @@ export function MessagesTable() {
             })
           }
         >
-          {trace.metrics.completion_tokens}
+          {trace.metrics?.completion_tokens}
         </Td>
       ),
-      value: (trace: Trace) => trace.metrics.completion_tokens ?? 0,
+      value: (trace: Trace) => trace.metrics?.completion_tokens ?? 0,
     },
     "trace.metrics.prompt_tokens": {
       name: "Prompt Tokens",
@@ -426,10 +426,10 @@ export function MessagesTable() {
             })
           }
         >
-          {trace.metrics.prompt_tokens}
+          {trace.metrics?.prompt_tokens}
         </Td>
       ),
-      value: (trace: Trace) => trace.metrics.prompt_tokens ?? 0,
+      value: (trace: Trace) => trace.metrics?.prompt_tokens ?? 0,
     },
     "trace.metrics.total_cost": {
       name: "Total Cost",
@@ -444,11 +444,11 @@ export function MessagesTable() {
             })
           }
         >
-          <Text>{numeral(trace.metrics.total_cost).format("$0.00[000]")}</Text>
+          <Text>{numeral(trace.metrics?.total_cost).format("$0.00[000]")}</Text>
         </Td>
       ),
       value: (trace: Trace) =>
-        numeral(trace.metrics.total_cost).format("$0.00[000]"),
+        numeral(trace.metrics?.total_cost).format("$0.00[000]"),
     },
     "trace.metadata": {
       name: "Metadata",

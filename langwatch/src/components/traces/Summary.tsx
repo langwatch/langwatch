@@ -104,8 +104,8 @@ const TraceSummaryValues = React.forwardRef(function TraceSummaryValues(
         flexDirection={{ base: "column", lg: "row" }}
         ref={ref as any}
       >
-        {(!!trace.metrics.completion_tokens ||
-          !!trace.metrics.prompt_tokens) && (
+        {(!!trace.metrics?.completion_tokens ||
+          !!trace.metrics?.prompt_tokens) && (
           <SummaryItem
             label="Total Tokens"
             tooltip={
@@ -117,8 +117,8 @@ const TraceSummaryValues = React.forwardRef(function TraceSummaryValues(
             {getTotalTokensDisplay(trace)}
           </SummaryItem>
         )}
-        {trace.metrics.total_cost !== null &&
-          trace.metrics.total_cost !== undefined && (
+        {trace.metrics?.total_cost !== null &&
+          trace.metrics?.total_cost !== undefined && (
             <SummaryItem
               label="Total Cost"
               tooltip={
@@ -128,7 +128,7 @@ const TraceSummaryValues = React.forwardRef(function TraceSummaryValues(
               {numeral(trace.metrics.total_cost).format("$0.00000a")}
             </SummaryItem>
           )}
-        {trace.metrics.first_token_ms && (
+        {trace.metrics?.first_token_ms && (
           <SummaryItem
             label="Time to First Token"
             tooltip="How long did it took for the first token of the last span to arrive, that is, the smallest delay between request and the first output token to appear for the user"
@@ -136,7 +136,7 @@ const TraceSummaryValues = React.forwardRef(function TraceSummaryValues(
             {formatMilliseconds(trace.metrics.first_token_ms)}
           </SummaryItem>
         )}
-        {trace.metrics.total_time_ms && (
+        {trace.metrics?.total_time_ms && (
           <SummaryItem
             label="Total Completion Time"
             tooltip="How long it took for completion output to be fully finished"
