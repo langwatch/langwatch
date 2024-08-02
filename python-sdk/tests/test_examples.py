@@ -35,7 +35,7 @@ def get_example_files():
 
 @pytest.mark.parametrize("example_file", get_example_files())
 @pytest.mark.asyncio
-async def test_example_main_functions(example_file):
+async def test_example(example_file):
     if example_file == "batch_evalutation.py":
         pytest.skip("batch_evalutation.py is not a runnable example")
 
@@ -77,3 +77,21 @@ async def test_example_main_functions(example_file):
         last_trace.send_spans()
         trace_urls[example_file] = last_trace.share()
         print(json.dumps(trace_urls, indent=2))
+
+
+@pytest.mark.asyncio
+async def test_example_legacy_langchain_pydantic_bot():
+    import subprocess
+
+    result = subprocess.run(
+        ["poetry", "run", ".venv/bin/python", "legacy_langchain_pydantic_bot.py"],
+        cwd="examples/legacy",
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    print(result.stdout)
+
+    if result.returncode != 0:
+        pytest.fail(f"Failed to run legacy_langchain_pydantic_bot.py: {result.stderr}")

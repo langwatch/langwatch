@@ -1,5 +1,5 @@
 import json
-from typing import Any, Callable, Dict, List, Literal, Optional, Union
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Literal, Optional, Union
 from langchain.schema import (
     LLMResult,
     AgentAction,
@@ -41,12 +41,14 @@ from langwatch.utils import (
 )
 from uuid import UUID
 from langchain.tools import BaseTool
-from langchain_core.documents import Document
-from langchain_core.retrievers import BaseRetriever
-from langchain_core.callbacks.manager import (
-    AsyncCallbackManagerForRetrieverRun,
-    CallbackManagerForRetrieverRun,
-)
+
+if TYPE_CHECKING:
+    from langchain_core.documents import Document
+    from langchain_core.retrievers import BaseRetriever
+    from langchain_core.callbacks.manager import (
+        AsyncCallbackManagerForRetrieverRun,
+        CallbackManagerForRetrieverRun,
+    )
 
 
 def langchain_messages_to_chat_messages(
@@ -454,7 +456,7 @@ def capture_rag_from_tool(
 
 
 def capture_rag_from_retriever(
-    retriever: BaseRetriever, context_extractor: Callable[[Document], RAGChunk]
+    retriever: "BaseRetriever", context_extractor: Callable[["Document"], RAGChunk]
 ):
     if retriever.__class__.__name__ == "LangWatchTrackedRetriever":
         return retriever
@@ -463,8 +465,8 @@ def capture_rag_from_retriever(
 
     class LangWatchTrackedRetriever(retriever.__class__):
         async def _aget_relevant_documents(
-            self, query: str, *, run_manager: AsyncCallbackManagerForRetrieverRun
-        ) -> List[Document]:
+            self, query: str, *, run_manager: "AsyncCallbackManagerForRetrieverRun"
+        ) -> List["Document"]:
             with langwatch.span(
                 type="rag",
                 name=retriever_name,
@@ -483,8 +485,8 @@ def capture_rag_from_retriever(
                 return documents
 
         def _get_relevant_documents(
-            self, query: str, *, run_manager: CallbackManagerForRetrieverRun
-        ) -> List[Document]:
+            self, query: str, *, run_manager: "CallbackManagerForRetrieverRun"
+        ) -> List["Document"]:
             with langwatch.span(
                 type="rag",
                 name=retriever_name,

@@ -101,10 +101,10 @@ def autoconvert_typed_values(
 
     if type(value_) == str:
         return TypedValueText(type="text", value=value_)
-    if type(value_) == dict and validate_safe(SpanInputOutput, value_, "type"):
+    if type(value_) == dict and validate_safe(SpanInputOutput, value_, ["type", "value"]):
         return cast(SpanInputOutput, value_)
     if type(value_) == list and all(
-        validate_safe(ChatMessage, item, "role") for item in value_
+        validate_safe(ChatMessage, item, ["role"]) for item in value_
     ):
         return TypedValueChatMessages(type="chat_messages", value=value_)
 
@@ -115,11 +115,11 @@ def autoconvert_typed_values(
         return TypedValueRaw(type="raw", value=str(value))
 
 
-def validate_safe(type_, item: dict, min_required_key_for_pydantic_1: str):
+def validate_safe(type_, item: dict, min_required_keys_for_pydantic_1: List[str]):
     import pydantic
 
     if pydantic.__version__.startswith("1."):
-        if type(item) == dict and min_required_key_for_pydantic_1 in item:
+        if type(item) == dict and all(key in item for key in min_required_keys_for_pydantic_1):
             return True
         return False
     else:
@@ -140,7 +140,7 @@ def validate_safe(type_, item: dict, min_required_key_for_pydantic_1: str):
 
 def autoconvert_rag_contexts(value: Union[List[RAGChunk], List[str]]) -> List[RAGChunk]:
     if type(value) == list and all(
-        validate_safe(RAGChunk, cast(dict, item), "content") for item in value
+        validate_safe(RAGChunk, cast(dict, item), ["content"]) for item in value
     ):
         return cast(List[RAGChunk], value)
     if type(value) == list and all(isinstance(item, str) for item in value):
@@ -184,7 +184,7 @@ class SerializableWithStringFallback(SerializableAndPydanticEncoder):
 def reduce_payload_size(
     obj: T, max_string_length=5000, max_list_dict_length=50000, depth=0
 ) -> T:
-    if type(obj) == list and all(validate_safe(ChatMessage, item, "role") for item in obj):
+    if type(obj) == list and all(validate_safe(ChatMessage, item, ["role"]) for item in obj):
         return obj
 
     def truncate_string(s):
