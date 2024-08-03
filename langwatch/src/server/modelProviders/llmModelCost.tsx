@@ -7,7 +7,10 @@ const getImportedModelCosts = () => {
   type ImportedLLMModelCost =
     (typeof llmModelCosts)[keyof typeof llmModelCosts];
 
-  const models: Record<string, ImportedLLMModelCost> = llmModelCosts;
+  const models: Record<string, ImportedLLMModelCost> =
+    "default" in llmModelCosts
+      ? (llmModelCosts.default as typeof llmModelCosts)
+      : llmModelCosts;
 
   // Filter only models based on input and output costs per token
   const tokenModels: Record<
