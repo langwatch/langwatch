@@ -5,6 +5,11 @@ resource "awscc_chatbot_slack_channel_configuration" "chatbot" {
   slack_workspace_id = "T067B8XMC0M" # langwatch
   slack_channel_id   = "C06JQLW1HE2" # #dev
 
+  tags = [{
+    key = "Name"
+    value = "langwatch-chatbot"
+  }]
+
   sns_topic_arns = [
     aws_sns_topic.alarms.arn,
     aws_sns_topic.langwatch-deploy-notifications[0].arn
