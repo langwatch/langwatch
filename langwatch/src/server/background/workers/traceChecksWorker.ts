@@ -21,6 +21,7 @@ import { TRACE_INDEX, esClient, traceIndexId } from "../../elasticsearch";
 import type { ElasticSearchTrace } from "../../tracer/types";
 import {
   esGetSpansByTraceId,
+  getTraceById,
   getTracesByThreadId,
 } from "../../api/routers/traces";
 import { getRAGInfo } from "../../tracer/utils";
@@ -71,12 +72,9 @@ export const runEvaluationForTrace = async ({
 }): Promise<SingleEvaluationResult> => {
   const evaluator = AVAILABLE_EVALUATORS[evaluatorType];
 
-  const trace = await esClient.getSource<ElasticSearchTrace>({
-    index: TRACE_INDEX.read_alias,
-    id: traceIndexId({
-      traceId: traceId,
-      projectId: projectId,
-    }),
+  const trace = await getTraceById({
+    projectId,
+    traceId,
   });
   const spans = await esGetSpansByTraceId({
     traceId: traceId,
