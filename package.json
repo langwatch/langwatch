@@ -13,9 +13,9 @@
     "prisma:generate:typescript": "npm run prisma:generate:prepare && npx prisma generate && cp -R node_modules/.prisma/* langwatch/langwatch/node_modules/.prisma/",
     "prisma:generate:migration": "cd langwatch/langwatch && DATABASE_URL='postgresql://postgres@localhost:5432/?sslmode=allow&schema=langwatch_db' npm run prisma:generate:migration && cd - && npm run prisma:migrate && npm run prisma:generate:prepare && npx prisma migrate dev",
     "prisma:migrate": "npx prisma migrate deploy",
-    "prepare:production": "npm run prisma:generate:typescript && npm run prisma:migrate && npm run elastic:index:create",
+    "prepare:production": "npm run prisma:generate:typescript && npm run prisma:migrate && npm run elastic:migrate",
     "task": "DEBUG=langwatch:* tsx --tsconfig langwatch/langwatch/tsconfig.workers.json langwatch/langwatch/src/task.ts",
-    "elastic:index:create": "npm run task -- elasticIndexCreate"
+    "elastic:migrate": "npm run task elasticIndexMigrate"
   },
   "author": "",
   "license": "ISC",
