@@ -16,7 +16,10 @@ export const recreateIndexAndMigrate = async ({
     mappings: mapping,
   });
 
-  const previousIndex = await getPreviousIndex({ alias: index.alias });
+  const previousIndex = await getPreviousIndex({
+    alias: index.alias,
+    newIndex,
+  });
   await reindexWithAlias({
     alias: index.alias,
     previousIndex,
@@ -24,16 +27,22 @@ export const recreateIndexAndMigrate = async ({
   });
 };
 
-export const getPreviousIndex = async ({ alias }: { alias: string }) => {
-  // Get current indices for the alias
-  const aliasInfo = await esClient.indices.getAlias({ name: alias });
-  const currentWriteIndices = Object.entries(aliasInfo.body?.aliases)
-    .filter(([_indexName, aliasInfo]) => aliasInfo.is_write_index)
-    .map(([indexName]) => indexName)
-    .sort();
+export const getPreviousIndex = async ({
+  alias,
+  newIndex,
+}: {
+  alias: string;
+  newIndex: string;
+}) => {
+  const aliasInfo: Record<string, unknown> = await esClient.indices.getAlias({
+    name: alias,
+  });
+  const currentIndices = Object.keys(aliasInfo).filter(
+    (index) => !index.endsWith("-temp") && index !== newIndex
+  );
 
   // Sort indices and get the most recent one
-  const previousIndex = currentWriteIndices.sort().pop();
+  const previousIndex = currentIndices.sort().pop();
   if (!previousIndex) {
     throw new Error(`No existing write index found for alias ${alias}`);
   }
@@ -78,7 +87,7 @@ export const reindexWithAlias = async ({
   const response = await esClient.reindex({
     wait_for_completion: false,
     slices: "auto",
-    requests_per_second: 2,
+    requests_per_second: 300,
     body: {
       conflicts: "proceed",
       source: { index: previousIndex, size: 300 },
@@ -123,10 +132,12 @@ export const reindexWithAlias = async ({
         )}`
       );
 
-      await new Promise((resolve) => setTimeout(resolve, 10_000));
-
       if (task.completed) {
-        if (task.response && !task.response.timed_out) {
+        if (
+          task.response &&
+          !task.response.timed_out &&
+          !task.response.canceled
+        ) {
           console.log(`Reindex task ${taskId} completed successfully!`);
           break;
         } else {
@@ -136,6 +147,8 @@ export const reindexWithAlias = async ({
             )}`
           );
         }
+      } else {
+        await new Promise((resolve) => setTimeout(resolve, 10_000));
       }
     }
 
@@ -155,7 +168,7 @@ export const reindexWithAlias = async ({
         ],
       },
     });
-    // await esClient.indices.delete({ index: previousIndex });
+    await esClient.indices.delete({ index: previousIndex });
   } catch (error) {
     await esClient.indices.updateAliases({
       body: {

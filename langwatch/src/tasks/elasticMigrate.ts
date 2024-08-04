@@ -35,23 +35,34 @@ export default async function execute() {
   });
   if (!migrationsExists) {
     const lastMigration = Object.keys(migrations).pop();
+    console.log(
+      "\x1b[33m%s\x1b[0m",
+      "Migration index not found, creating Elasticsearch indexes from scratch"
+    );
     await createIndexes(lastMigration);
   }
 
   const migrationsToExecute = await getMigrationsToExecute();
-  console.log('migrationsToExecute', migrationsToExecute);
-  // for (const migration of migrationsToExecute) {
-  //   const migrationId = migration.split("_")[0];
-  //   try {
-  //     await migrations[migration].migrate(migrationId);
-  //     await esClient.index({
-  //       index: MIGRATION_INDEX,
-  //       body: { migration_name: migration, applied_at: Date.now() },
-  //     });
-  //   } catch (error) {
-  //     console.error(`Failed to apply migration: ${migration}`, error);
-  //   }
-  // }
+  if (migrationsToExecute.length === 0) {
+    console.log(
+      "\x1b[32m%s\x1b[0m",
+      "Elasticsearch is up to date, no migrations to execute"
+    );
+    return;
+  }
+  for (const migration of migrationsToExecute) {
+    console.log('Executing migration', migration);
+    const migrationId = migration.split("_")[0];
+    try {
+      await migrations[migration].migrate(migrationId);
+      await esClient.index({
+        index: MIGRATION_INDEX,
+        body: { migration_name: migration, applied_at: Date.now() },
+      });
+    } catch (error) {
+      console.error(`Failed to apply migration: ${migration}`, error);
+    }
+  }
 }
 
 const getLastAppliedMigration = async () => {
@@ -70,14 +81,16 @@ const getLastAppliedMigration = async () => {
 };
 
 const getMigrationsToExecute = async () => {
-  const lastMigration = await getLastAppliedMigration();
+  const lastMigration = await getLastAppliedMigration() ?? "0_";
   return Object.keys(migrations).filter(
     (migration) => migration > lastMigration
   );
 };
 
 const createIndexes = async (lastMigration: string) => {
-  const traceExists = await esClient.indices.exists({ index: TRACE_INDEX.base });
+  const traceExists = await esClient.indices.exists({
+    index: TRACE_INDEX.base,
+  });
   if (!traceExists) {
     await esClient.indices.create({
       index: TRACE_INDEX.base,
