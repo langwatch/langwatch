@@ -63,6 +63,44 @@ export const processCollectorJob = async (
       inserted_at: Date.now(),
       updated_at: Date.now(),
     },
+
+    // Hack to fix the flatenned params for now
+    ...(("params" in span && span.params
+      ? {
+          params: {
+            ...span.params,
+            ...(span.params.stop &&
+            (typeof span.params.stop !== "object" ||
+              Array.isArray(span.params.stop))
+              ? { stop: { _value: span.params.stop } }
+              : {}),
+
+            ...(span.params.tools &&
+            (typeof span.params.tools !== "object" ||
+              Array.isArray(span.params.tools))
+              ? { tools: { _value: span.params.tools } }
+              : {}),
+
+            ...(span.params.tool_choice &&
+            (typeof span.params.tool_choice !== "object" ||
+              Array.isArray(span.params.tool_choice))
+              ? { tool_choice: { _value: span.params.tool_choice } }
+              : {}),
+
+            ...(span.params.functions &&
+            (typeof span.params.functions !== "object" ||
+              Array.isArray(span.params.functions))
+              ? { functions: { _value: span.params.functions } }
+              : {}),
+
+            ...(span.params.logit_bias &&
+            (typeof span.params.logit_bias !== "object" ||
+              Array.isArray(span.params.logit_bias))
+              ? { logit_bias: { _value: span.params.logit_bias } }
+              : {}),
+          },
+        }
+      : {}) as any),
   }));
 
   const [input, output] = await Promise.all([
