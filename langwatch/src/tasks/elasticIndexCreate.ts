@@ -78,26 +78,8 @@ const spanMapping: ElasticSearchMappingFrom<ElasticSearchSpan> = {
   vendor: { type: "keyword" },
   model: { type: "keyword" },
   params: {
-    properties: {
-      frequency_penalty: { type: "float" },
-      logit_bias: { type: "flattened" } as any,
-      logprobs: { type: "boolean" },
-      top_logprobs: { type: "integer" },
-      max_tokens: { type: "long" },
-      n: { type: "integer" },
-      presence_penalty: { type: "float" },
-      seed: { type: "long" },
-      stop: { type: "flattened" },
-      stream: { type: "boolean" },
-      temperature: { type: "float" },
-      top_p: { type: "float" },
-      tools: { type: "flattened" } as any,
-      tool_choice: { type: "flattened" },
-      parallel_tool_calls: { type: "boolean" },
-      functions: { type: "flattened" } as any,
-      user: { type: "keyword" },
-    },
-  },
+    type: "flattened",
+  } as any,
   metrics: {
     properties: {
       prompt_tokens: { type: "integer" },
