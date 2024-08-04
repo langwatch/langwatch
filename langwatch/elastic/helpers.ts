@@ -90,10 +90,10 @@ export const reindexWithAlias = async ({
   const response = await esClient.reindex({
     wait_for_completion: false,
     slices: "auto",
-    requests_per_second: 300,
+    requests_per_second: 200,
     body: {
       conflicts: "proceed",
-      source: { index: previousIndex, size: 300 },
+      source: { index: previousIndex, size: 200 },
       dest: { index: newIndex },
     },
   });
