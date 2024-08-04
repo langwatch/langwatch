@@ -72,7 +72,7 @@ export const runEvaluationForTrace = async ({
   const evaluator = AVAILABLE_EVALUATORS[evaluatorType];
 
   const trace = await esClient.getSource<ElasticSearchTrace>({
-    index: TRACE_INDEX,
+    index: TRACE_INDEX.alias,
     id: traceIndexId({
       traceId: traceId,
       projectId: projectId,

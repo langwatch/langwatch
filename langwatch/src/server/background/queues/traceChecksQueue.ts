@@ -134,7 +134,7 @@ export const updateCheckStatusInES = async ({
   };
 
   await esClient.update({
-    index: TRACE_INDEX,
+    index: TRACE_INDEX.alias,
     id: traceIndexId({
       traceId: trace.trace_id,
       projectId: trace.project_id,

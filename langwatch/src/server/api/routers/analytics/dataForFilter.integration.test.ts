@@ -188,7 +188,7 @@ describe("Data For Filter Integration Tests", () => {
 
   beforeAll(async () => {
     await esClient.bulk({
-      index: TRACE_INDEX,
+      index: TRACE_INDEX.alias,
       body: traceEntries.flatMap((trace) => [
         {
           index: {

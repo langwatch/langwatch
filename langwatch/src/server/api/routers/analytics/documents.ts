@@ -16,7 +16,7 @@ export const topUsedDocuments = protectedProcedure
     const { pivotIndexConditions } = generateTracesPivotQueryConditions(input);
 
     const result = (await esClient.search<ElasticSearchTrace>({
-      index: TRACE_INDEX,
+      index: TRACE_INDEX.alias,
       size: 0,
       body: {
         query: pivotIndexConditions,
@@ -73,7 +73,7 @@ export const topUsedDocuments = protectedProcedure
 
     // we now need to query spans to get the actual documents content
     const documents = await esClient.search<ElasticSearchTrace>({
-      index: TRACE_INDEX,
+      index: TRACE_INDEX.alias,
       size: topDocuments.reduce((acc, d) => acc + d.count, 0),
       body: {
         query: {

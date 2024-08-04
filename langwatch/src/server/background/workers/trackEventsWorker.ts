@@ -47,7 +47,7 @@ export const startTrackEventsWorker = () => {
       };
 
       await esClient.update({
-        index: TRACE_INDEX,
+        index: TRACE_INDEX.alias,
         id: traceIndexId({
           traceId: event.trace_id,
           projectId: event.project_id,

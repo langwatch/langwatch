@@ -1,6 +1,6 @@
 import { PrismaClient } from "@prisma/client";
 
-import { env } from "~/env.mjs";
+import { env } from "../env.mjs";
 import { guardEnMasse } from "../utils/dbMassDeleteProtection";
 import { guardProjectId } from "../utils/dbMultiTenancyProtection";
 import { guardOrganizationId } from "../utils/dbOrganizationIdProtection";

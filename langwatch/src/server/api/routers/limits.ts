@@ -63,7 +63,7 @@ export const getOrganizationProjectsCount = async (organizationId: string) => {
 
 export const getCurrentMonthMessagesCount = async (projectIds: string[]) => {
   const messagesCount = await esClient.count({
-    index: TRACE_INDEX,
+    index: TRACE_INDEX.alias,
     body: {
       query: {
         bool: {

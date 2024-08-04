@@ -15,7 +15,7 @@ export const sessionsVsPreviousPeriod = protectedProcedure
 
     const sessionsQuery = (startDate: number, endDate: number) =>
       esClient.search({
-        index: TRACE_INDEX,
+        index: TRACE_INDEX.alias,
         body: {
           aggs: {
             user_sessions: {

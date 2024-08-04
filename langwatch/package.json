@@ -9,7 +9,7 @@
     "start": "next start",
     "start:docker": "npm run start:prepare:db && NODE_ENV=production DEBUG=langwatch:* DEBUG_HIDE_DATE=true DEBUG_COLORS=true concurrently 'npm run start' 'npm run start:workers'",
     "start:prepare:files": "npm run copy:langevals-types && npm run copy:llm-model-costs && npm run types:zod:generate && npm run prisma:generate:typescript",
-    "start:prepare:db": "npm run prisma:migrate && npm run elastic:index:create",
+    "start:prepare:db": "npm run prisma:migrate && npm run elastic:migrate",
     "start:workers": "tsx --tsconfig tsconfig.workers.json src/workers.ts",
     "test": "npm run test:unit -- --run --bail=1 && npm run test:integration -- --run --bail=1 --single-thread",
     "test:unit": "DEBUG=langwatch:* DEBUG_HIDE_DATE=true DEBUG_COLORS=true vitest",
@@ -19,7 +19,7 @@
     "prisma:generate:typescript": "npx prisma generate",
     "prisma:generate:migration": "npx prisma migrate dev",
     "prisma:migrate": "npx prisma migrate deploy",
-    "elastic:index:create": "npm run task -- elasticIndexCreate",
+    "elastic:migrate": "npm run task elasticIndexMigrate",
     "types:zod:generate": "concurrently -r \"ts-to-zod src/server/tracer/types.ts src/server/tracer/types.generated.ts; if [ '$(uname)' = 'Darwin' ]; then cat src/server/tracer/types.generated.ts | sed -i '' 's/import { SpanInputOutput }/import { type SpanInputOutput }/' src/server/tracer/types.generated.ts; else cat src/server/tracer/types.generated.ts | sed -i 's/import { SpanInputOutput }/import { type SpanInputOutput }/' src/server/tracer/types.generated.ts; fi\" \"ts-to-zod src/trace_checks/types.ts src/trace_checks/types.generated.ts\" \"ts-to-zod src/trace_checks/evaluators.generated.ts src/trace_checks/evaluators.zod.generated.ts\" \"ts-to-zod src/server/datasets/types.ts src/server/datasets/types.generated.ts\" \"ts-to-zod src/server/experiments/types.ts src/server/experiments/types.generated.ts\"",
     "copy:langevals-types": "cd src/trace_checks && curl -L \"https://raw.githubusercontent.com/langwatch/langevals/main/ts-integration/evaluators.generated.ts?$(date +%s)\" -o evaluators.generated.ts",
     "copy:llm-model-costs": "cd src/server/modelProviders && curl -L \"https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json\" -o llmModelCosts.json"

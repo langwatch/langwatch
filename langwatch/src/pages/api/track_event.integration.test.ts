@@ -60,7 +60,7 @@ describe("/api/track_event", () => {
 
     // Clean up the trace
     await esClient.delete({
-      index: TRACE_INDEX,
+      index: TRACE_INDEX.alias,
       id: traceIndexId({ traceId, projectId: project.id }),
       refresh: true,
     });
@@ -126,7 +126,7 @@ describe("/api/track_event", () => {
     };
 
     await esClient.index({
-      index: TRACE_INDEX,
+      index: TRACE_INDEX.alias,
       id: traceIndexId({ traceId, projectId: project.id }),
       document: testTraceData,
       refresh: true,

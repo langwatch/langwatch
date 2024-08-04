@@ -2,19 +2,14 @@ import {
   type MappingDenseVectorProperty,
   type MappingProperty,
 } from "@elastic/elasticsearch/lib/api/types";
-import {
-  DSPY_STEPS_INDEX,
-  esClient,
-  OPENAI_EMBEDDING_DIMENSION,
-  TRACE_INDEX,
-} from "../server/elasticsearch";
-import type { DSPyStep } from "../server/experiments/types";
+import { OPENAI_EMBEDDING_DIMENSION } from "../src/server/elasticsearch";
+import type { DSPyStep } from "../src/server/experiments/types";
 import {
   type ElasticSearchEvent,
   type ElasticSearchSpan,
   type ElasticSearchTrace,
   type TraceCheck,
-} from "../server/tracer/types";
+} from "../src/server/tracer/types";
 
 type NonNestedMappingProperty =
   | Omit<MappingProperty, "properties">
@@ -35,6 +30,17 @@ type ElasticSearchMappingFrom<T> = NonNullable<T> extends (infer U)[]
         ? { properties: ElasticSearchMappingFrom<T[K]> }
         : NonNestedMappingProperty;
     };
+
+export type ElasticSearchMigration = {
+  migration_name: string;
+  applied_at: number;
+};
+
+export const elasticMigrations: ElasticSearchMappingFrom<ElasticSearchMigration> =
+  {
+    migration_name: { type: "keyword" },
+    applied_at: { type: "date" },
+  };
 
 const spanMapping: ElasticSearchMappingFrom<ElasticSearchSpan> = {
   project_id: { type: "keyword" },
@@ -156,7 +162,7 @@ const eventsMapping: ElasticSearchMappingFrom<ElasticSearchEvent> = {
   },
 };
 
-const traceMapping: ElasticSearchMappingFrom<ElasticSearchTrace> = {
+export const traceMapping: ElasticSearchMappingFrom<ElasticSearchTrace> = {
   trace_id: { type: "keyword" },
   project_id: { type: "keyword" },
   metadata: {
@@ -262,7 +268,7 @@ const traceMapping: ElasticSearchMappingFrom<ElasticSearchTrace> = {
   },
 };
 
-const dspyStepsMapping: ElasticSearchMappingFrom<DSPyStep> = {
+export const dspyStepsMapping: ElasticSearchMappingFrom<DSPyStep> = {
   project_id: { type: "keyword" },
   experiment_id: { type: "keyword" },
   run_id: { type: "keyword" },
@@ -312,41 +318,3 @@ const dspyStepsMapping: ElasticSearchMappingFrom<DSPyStep> = {
     },
   },
 };
-
-export const createIndexes = async () => {
-  const traceExists = await esClient.indices.exists({ index: TRACE_INDEX });
-  if (!traceExists) {
-    await esClient.indices.create({
-      index: TRACE_INDEX,
-      settings: {
-        number_of_shards: 1,
-        number_of_replicas: 0,
-      },
-      mappings: { properties: traceMapping as Record<string, MappingProperty> },
-    });
-  }
-  await esClient.indices.putMapping({
-    index: TRACE_INDEX,
-    properties: traceMapping as Record<string, MappingProperty>,
-  });
-
-  const dspyStepExists = await esClient.indices.exists({
-    index: DSPY_STEPS_INDEX,
-  });
-  if (!dspyStepExists) {
-    await esClient.indices.create({
-      index: DSPY_STEPS_INDEX,
-      settings: {
-        number_of_shards: 1,
-        number_of_replicas: 0,
-      },
-      mappings: {
-        properties: dspyStepsMapping as Record<string, MappingProperty>,
-      },
-    });
-  }
-};
-
-export default async function execute() {
-  await createIndexes();
-}

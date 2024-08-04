@@ -47,7 +47,7 @@ export const experimentsRouter = createTRPCRouter({
       );
 
       const dspySteps = await esClient.search<DSPyStep>({
-        index: DSPY_STEPS_INDEX,
+        index: DSPY_STEPS_INDEX.alias,
         size: 10_000,
         body: {
           query: {
@@ -151,7 +151,7 @@ export const experimentsRouter = createTRPCRouter({
       );
 
       const dspyStep = await esClient.search<DSPyStep>({
-        index: DSPY_STEPS_INDEX,
+        index: DSPY_STEPS_INDEX.alias,
         size: 10_000,
         body: {
           query: {
