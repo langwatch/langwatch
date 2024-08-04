@@ -36,7 +36,7 @@ export const getPreviousWriteIndex = async ({
   newIndex: string;
 }) => {
   const aliasInfo: Record<string, unknown> = await esClient.indices.getAlias({
-    name: indexSpec.write_alias,
+    name: indexSpec.alias,
   });
   const currentIndices = Object.keys(aliasInfo).filter(
     (index) => !index.endsWith("-temp") && index !== newIndex
@@ -46,7 +46,7 @@ export const getPreviousWriteIndex = async ({
   const previousIndex = currentIndices.sort().pop();
   if (!previousIndex) {
     throw new Error(
-      `No existing write index found for alias ${indexSpec.write_alias}`
+      `No existing write index found for alias ${indexSpec.alias}`
     );
   }
   return previousIndex;
@@ -111,9 +111,20 @@ export const reindexWithAlias = async ({
   await esClient.indices.updateAliases({
     body: {
       actions: [
-        { add: { index: newIndex, alias: indexSpec.read_alias } },
-        { add: { index: newIndex, alias: indexSpec.write_alias } },
-        { remove: { index: previousIndex, alias: indexSpec.write_alias } },
+        {
+          add: {
+            index: previousIndex,
+            alias: indexSpec.alias,
+            is_write_index: false,
+          },
+        },
+        {
+          add: {
+            index: newIndex,
+            alias: indexSpec.alias,
+            is_write_index: true,
+          },
+        },
       ],
     },
   });
@@ -156,7 +167,7 @@ export const reindexWithAlias = async ({
           {
             remove: {
               index: previousIndex,
-              alias: indexSpec.read_alias,
+              alias: indexSpec.alias,
             },
           },
         ],
@@ -168,15 +179,17 @@ export const reindexWithAlias = async ({
       body: {
         actions: [
           {
-            remove: {
+            add: {
               index: newIndex,
-              alias: indexSpec.write_alias,
+              alias: indexSpec.alias,
+              is_write_index: false,
             },
           },
           {
             add: {
               index: previousIndex,
-              alias: indexSpec.write_alias,
+              alias: indexSpec.alias,
+              is_write_index: true,
             },
           },
         ],

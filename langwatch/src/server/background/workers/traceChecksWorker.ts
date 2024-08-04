@@ -2,29 +2,15 @@ import { CostReferenceType, CostType } from "@prisma/client";
 import * as Sentry from "@sentry/nextjs";
 import { Worker, type Job } from "bullmq";
 import { nanoid } from "nanoid";
-import { env } from "../../../env.mjs";
 import type { TraceCheckJob } from "~/server/background/types";
-import { prisma } from "../../db";
-import { connection } from "../../redis";
-import {
-  TRACE_CHECKS_QUEUE_NAME,
-  updateCheckStatusInES,
-} from "../queues/traceChecksQueue";
-import { getDebugger } from "../../../utils/logger";
+import { env } from "../../../env.mjs";
 import {
   AVAILABLE_EVALUATORS,
   type BatchEvaluationResult,
   type EvaluatorTypes,
   type SingleEvaluationResult,
 } from "../../../trace_checks/evaluators.generated";
-import { TRACE_INDEX, esClient, traceIndexId } from "../../elasticsearch";
-import type { ElasticSearchTrace } from "../../tracer/types";
-import {
-  esGetSpansByTraceId,
-  getTraceById,
-  getTracesByThreadId,
-} from "../../api/routers/traces";
-import { getRAGInfo } from "../../tracer/utils";
+import { getDebugger } from "../../../utils/logger";
 import {
   getCurrentMonthCost,
   maxMonthlyUsageLimit,
@@ -33,6 +19,18 @@ import {
   getProjectModelProviders,
   prepareEnvKeys,
 } from "../../api/routers/modelProviders";
+import {
+  esGetSpansByTraceId,
+  getTraceById,
+  getTracesByThreadId,
+} from "../../api/routers/traces";
+import { prisma } from "../../db";
+import { connection } from "../../redis";
+import { getRAGInfo } from "../../tracer/utils";
+import {
+  TRACE_CHECKS_QUEUE_NAME,
+  updateCheckStatusInES,
+} from "../queues/traceChecksQueue";
 
 const debug = getDebugger("langwatch:workers:traceChecksWorker");
 

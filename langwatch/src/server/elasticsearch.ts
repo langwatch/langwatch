@@ -2,8 +2,7 @@ import { Client } from "@elastic/elasticsearch";
 import { env } from "../env.mjs";
 
 export type IndexSpec = {
-  read_alias: string;
-  write_alias: string;
+  alias: string;
   base: string;
 };
 
@@ -11,14 +10,12 @@ export const MIGRATION_INDEX = "search-elastic-migrations";
 
 export const TRACE_INDEX: IndexSpec = {
   base: "search-traces",
-  read_alias: "search-traces-alias-read",
-  write_alias: "search-traces-alias-write",
+  alias: "search-traces-alias",
 };
 
 export const DSPY_STEPS_INDEX: IndexSpec = {
   base: "search-dspy-steps",
-  read_alias: "search-dspy-steps-alias-read",
-  write_alias: "search-dspy-steps-alias-write",
+  alias: "search-dspy-steps-alias",
 };
 
 export const OPENAI_EMBEDDING_DIMENSION = 1536;

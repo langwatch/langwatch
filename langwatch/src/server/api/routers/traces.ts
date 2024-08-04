@@ -62,7 +62,7 @@ export const esGetSpansByTraceId = async ({
   projectId: string;
 }): Promise<ElasticSearchSpan[]> => {
   const result = await esClient.search<ElasticSearchTrace>({
-    index: TRACE_INDEX.read_alias,
+    index: TRACE_INDEX.alias,
     body: {
       query: {
         bool: {
@@ -163,7 +163,7 @@ export const tracesRouter = createTRPCRouter({
         generateTracesPivotQueryConditions(input);
 
       const topicCountsResult = await esClient.search<ElasticSearchTrace>({
-        index: TRACE_INDEX.read_alias,
+        index: TRACE_INDEX.alias,
         size: 0, // We do not need the actual documents, just the aggregations
         body: {
           query: {
@@ -247,7 +247,7 @@ export const tracesRouter = createTRPCRouter({
     .use(checkUserPermissionForProject(TeamRoleGroup.MESSAGES_VIEW))
     .query(async ({ input }) => {
       const customersLabelsResult = await esClient.search<ElasticSearchTrace>({
-        index: TRACE_INDEX.read_alias,
+        index: TRACE_INDEX.alias,
         size: 0, // We don't need the actual documents, just the aggregation results
         body: {
           query: {
@@ -418,7 +418,7 @@ export const getAllTracesForProject = async (
 
   //@ts-ignore
   const tracesResult = await esClient.search<ElasticSearchTrace>({
-    index: TRACE_INDEX.read_alias,
+    index: TRACE_INDEX.alias,
     from: pageOffset,
     size: pageSize,
     _source: {
@@ -608,7 +608,7 @@ export const getSpansForTraceIds = async (
     const batchTraceIds = traceIds.slice(i, i + batchSize);
 
     const searchPromise = esClient.search<ElasticSearchTrace>({
-      index: TRACE_INDEX.read_alias,
+      index: TRACE_INDEX.alias,
       body: {
         size: 10_000,
         _source: ["trace_id", "spans"],
@@ -640,7 +640,7 @@ export const getSpansForTraceIds = async (
 
 const getTracesWithSpans = async (projectId: string, traceIds: string[]) => {
   const tracesResult = await esClient.search<ElasticSearchTrace>({
-    index: TRACE_INDEX.read_alias,
+    index: TRACE_INDEX.alias,
     body: {
       query: {
         //@ts-ignore
@@ -778,7 +778,7 @@ export const getEvaluationsMultiple = async (input: {
   const { projectId, traceIds } = input;
 
   const checksResult = await esClient.search<ElasticSearchTrace>({
-    index: TRACE_INDEX.read_alias,
+    index: TRACE_INDEX.alias,
     _source: ["trace_id", "evaluations"],
     body: {
       size: Math.min(traceIds.length * 100, 10_000), // Assuming a maximum of 100 checks per trace
@@ -812,7 +812,7 @@ export const getTraceById = async ({
   canSeeCosts?: boolean | undefined | null;
 }) => {
   const result = await esClient.search<ElasticSearchTrace>({
-    index: TRACE_INDEX.read_alias,
+    index: TRACE_INDEX.alias,
     size: 1,
     _source: {
       // TODO: do we really need to exclude both keys and nested keys for embeddings?
@@ -851,7 +851,7 @@ export const getTracesByThreadId = async ({
   threadId: string;
 }) => {
   const tracesResult = await esClient.search<ElasticSearchTrace>({
-    index: TRACE_INDEX.read_alias,
+    index: TRACE_INDEX.alias,
     body: {
       query: {
         //@ts-ignore

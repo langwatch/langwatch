@@ -57,7 +57,7 @@ describe("Collector API Endpoint", () => {
     project = await getTestProject("collect");
 
     await esClient.deleteByQuery({
-      index: TRACE_INDEX.write_alias,
+      index: TRACE_INDEX.alias,
       body: {
         query: {
           match: {
@@ -145,7 +145,7 @@ describe("Collector API Endpoint", () => {
 
     const indexedTrace = await waitForResult(() =>
       esClient.getSource<Trace>({
-        index: TRACE_INDEX.read_alias,
+        index: TRACE_INDEX.alias,
         id: traceIndexId({
           traceId: sampleSpan.trace_id,
           projectId: project?.id ?? "",
@@ -550,7 +550,7 @@ describe("Collector API Endpoint", () => {
 
     const indexedTrace = await waitForResult(() =>
       esClient.getSource<Trace>({
-        index: TRACE_INDEX.read_alias,
+        index: TRACE_INDEX.alias,
         id: traceIndexId({
           traceId,
           projectId: project?.id ?? "",

@@ -3,7 +3,7 @@ import { type Trace } from "../server/tracer/types";
 
 export default async function execute() {
   const result = await esClient.search<Trace>({
-    index: TRACE_INDEX.read_alias,
+    index: TRACE_INDEX.alias,
     body: {
       size: 10_000,
       _source: ["trace_id", "project_id"],
@@ -53,7 +53,7 @@ export default async function execute() {
   }
 
   await esClient.bulk({
-    index: TRACE_INDEX.write_alias,
+    index: TRACE_INDEX.alias,
     body,
     refresh: true,
   });

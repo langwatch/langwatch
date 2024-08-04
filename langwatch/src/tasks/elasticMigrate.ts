@@ -5,7 +5,6 @@ import {
   esClient,
   MIGRATION_INDEX,
   TRACE_INDEX,
-  type IndexSpec,
 } from "../server/elasticsearch";
 import {
   dspyStepsMapping,
@@ -119,11 +118,8 @@ const createIndexes = async (lastMigration: string) => {
   });
   await esClient.indices.putAlias({
     index: traceExists?.index ?? TRACE_INDEX.base,
-    name: TRACE_INDEX.read_alias,
-  });
-  await esClient.indices.putAlias({
-    index: traceExists?.index ?? TRACE_INDEX.base,
-    name: TRACE_INDEX.write_alias,
+    name: TRACE_INDEX.alias,
+    is_write_index: true,
   });
 
   const dspyStepExists = await getLastIndexForBase(DSPY_STEPS_INDEX.base);
@@ -145,11 +141,8 @@ const createIndexes = async (lastMigration: string) => {
   });
   await esClient.indices.putAlias({
     index: dspyStepExists?.index ?? DSPY_STEPS_INDEX.base,
-    name: DSPY_STEPS_INDEX.read_alias,
-  });
-  await esClient.indices.putAlias({
-    index: dspyStepExists?.index ?? DSPY_STEPS_INDEX.base,
-    name: DSPY_STEPS_INDEX.write_alias,
+    name: DSPY_STEPS_INDEX.alias,
+    is_write_index: true,
   });
 
   const migrationsExists = await esClient.indices.exists({

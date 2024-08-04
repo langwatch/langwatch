@@ -353,7 +353,7 @@ const fetchExistingMD5s = async (
   | undefined
 > => {
   const existingTraceResponse = await esClient.search<ElasticSearchTrace>({
-    index: TRACE_INDEX.read_alias,
+    index: TRACE_INDEX.alias,
     body: {
       size: 1,
       query: {

@@ -147,7 +147,7 @@ export const processCollectorJob = async (
   await cleanupPIIs(trace, esSpans, project.piiRedactionLevel, piiEnforced);
 
   await esClient.update({
-    index: TRACE_INDEX.write_alias,
+    index: TRACE_INDEX.alias,
     id: traceIndexId({ traceId, projectId: project.id }),
     retry_on_conflict: 5,
     body: {
@@ -157,7 +157,7 @@ export const processCollectorJob = async (
   });
 
   await esClient.update({
-    index: TRACE_INDEX.write_alias,
+    index: TRACE_INDEX.alias,
     id: traceIndexId({ traceId, projectId: project.id }),
     retry_on_conflict: 5,
     body: {

@@ -45,7 +45,7 @@ export const dataForFilter = protectedProcedure
     });
 
     const response = await esClient.search({
-      index: TRACE_INDEX.read_alias,
+      index: TRACE_INDEX.alias,
       body: {
         size: 0,
         query: pivotIndexConditions,

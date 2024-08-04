@@ -169,5 +169,5 @@ const migrateIndex = async (index: string) => {
 
 export default async function execute() {
   console.log("\nMigrating Traces");
-  await migrateIndex(TRACE_INDEX.write_alias);
+  await migrateIndex(TRACE_INDEX.alias);
 }
