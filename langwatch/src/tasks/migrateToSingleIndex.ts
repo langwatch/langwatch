@@ -238,7 +238,7 @@ export default async function execute() {
   );
   // Search all unique project_ids within traces
   const projectIdsResults = await esClient.search({
-    index: TRACE_INDEX.alias,
+    index: TRACE_INDEX.read_alias,
     body: {
       size: 0,
       aggs: {
@@ -257,6 +257,6 @@ export default async function execute() {
   console.log(projectIds.length, "project ids found");
 
   for (const projectId of projectIds) {
-    await migrateIndex(projectId, TRACE_INDEX.alias);
+    await migrateIndex(projectId, TRACE_INDEX.write_alias);
   }
 }

@@ -9,7 +9,7 @@ export default async function handler(
 ) {
   try {
     const result = await esClient.search<Trace>({
-      index: TRACE_INDEX.alias,
+      index: TRACE_INDEX.read_alias,
       body: {
         size: 1000,
         query: {

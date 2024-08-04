@@ -3,10 +3,10 @@ import { TRACE_INDEX } from "../../src/server/elasticsearch";
 import { recreateIndexAndMigrate } from "../helpers";
 import { traceMapping } from "../schema";
 
-export const migrate = async (migrationId: string) => {
+export const migrate = async (migrationKey: string) => {
   await recreateIndexAndMigrate({
-    index: TRACE_INDEX,
+    indexSpec: TRACE_INDEX,
     mapping: traceMapping as Record<string, MappingProperty>,
-    migrationId,
+    migrationKey,
   });
 };

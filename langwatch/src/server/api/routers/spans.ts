@@ -24,7 +24,7 @@ export const spansRouter = createTRPCRouter({
     )
     .query(async ({ input }) => {
       const result = await esClient.search<ElasticSearchTrace>({
-        index: TRACE_INDEX.alias,
+        index: TRACE_INDEX.read_alias,
         size: 50,
         body: {
           query: {

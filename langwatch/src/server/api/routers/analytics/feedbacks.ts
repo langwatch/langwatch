@@ -19,7 +19,7 @@ export const feedbacks = protectedProcedure
     const { pivotIndexConditions } = generateTracesPivotQueryConditions(input);
 
     const result = await esClient.search<ElasticSearchTrace>({
-      index: TRACE_INDEX.alias,
+      index: TRACE_INDEX.read_alias,
       size: 100,
       body: {
         _source: ["events"],

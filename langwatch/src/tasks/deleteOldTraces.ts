@@ -11,7 +11,7 @@ const deleteOldTraces = async (projectId: string, lt: number) => {
 
   do {
     response = await esClient.search({
-      index: TRACE_INDEX.alias,
+      index: TRACE_INDEX.read_alias,
       _source: {
         includes: ["trace_id"],
       },
@@ -55,7 +55,7 @@ const deleteOldTraces = async (projectId: string, lt: number) => {
 
       bulkActions.push({
         delete: {
-          _index: TRACE_INDEX.alias,
+          _index: TRACE_INDEX.write_alias,
           _id: hit._id,
         },
       });

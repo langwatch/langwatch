@@ -5,6 +5,7 @@ import {
   esClient,
   MIGRATION_INDEX,
   TRACE_INDEX,
+  type IndexSpec,
 } from "../server/elasticsearch";
 import {
   dspyStepsMapping,
@@ -43,6 +44,7 @@ export default async function execute() {
       "Migration index not found, creating Elasticsearch indexes from scratch"
     );
     await createIndexes(lastMigration);
+    await new Promise((resolve) => setTimeout(resolve, 3000));
   }
 
   const migrationsToExecute = await getMigrationsToExecute();
@@ -55,9 +57,9 @@ export default async function execute() {
   }
   for (const migration of migrationsToExecute) {
     console.log("Executing migration", migration);
-    const migrationId = migration.split("_")[0];
+    const migrationKey = migration.split("_")[0];
     try {
-      await migrations[migration].migrate(migrationId);
+      await migrations[migration].migrate(migrationKey);
       await esClient.index({
         index: MIGRATION_INDEX,
         body: { migration_name: migration, applied_at: Date.now() },
@@ -90,10 +92,17 @@ const getMigrationsToExecute = async () => {
   );
 };
 
+const getLastIndexForBase = async (base: string) => {
+  const allIndices = await esClient.cat.indices({ format: "json" });
+  const indices = allIndices
+    .filter((index) => index.index?.startsWith(base))
+    .sort();
+
+  return indices.pop();
+};
+
 const createIndexes = async (lastMigration: string) => {
-  const traceExists = await esClient.indices.exists({
-    index: TRACE_INDEX.base,
-  });
+  const traceExists = await getLastIndexForBase(TRACE_INDEX.base);
   if (!traceExists) {
     await esClient.indices.create({
       index: TRACE_INDEX.base,
@@ -105,17 +114,19 @@ const createIndexes = async (lastMigration: string) => {
     });
   }
   await esClient.indices.putMapping({
-    index: TRACE_INDEX.base,
+    index: traceExists?.index ?? TRACE_INDEX.base,
     properties: traceMapping as Record<string, MappingProperty>,
   });
   await esClient.indices.putAlias({
-    index: TRACE_INDEX.base,
-    name: TRACE_INDEX.alias,
+    index: traceExists?.index ?? TRACE_INDEX.base,
+    name: TRACE_INDEX.read_alias,
+  });
+  await esClient.indices.putAlias({
+    index: traceExists?.index ?? TRACE_INDEX.base,
+    name: TRACE_INDEX.write_alias,
   });
 
-  const dspyStepExists = await esClient.indices.exists({
-    index: DSPY_STEPS_INDEX.base,
-  });
+  const dspyStepExists = await getLastIndexForBase(DSPY_STEPS_INDEX.base);
   if (!dspyStepExists) {
     await esClient.indices.create({
       index: DSPY_STEPS_INDEX.base,
@@ -128,9 +139,17 @@ const createIndexes = async (lastMigration: string) => {
       },
     });
   }
+  await esClient.indices.putMapping({
+    index: dspyStepExists?.index ?? DSPY_STEPS_INDEX.base,
+    properties: dspyStepsMapping as Record<string, MappingProperty>,
+  });
   await esClient.indices.putAlias({
-    index: DSPY_STEPS_INDEX.base,
-    name: DSPY_STEPS_INDEX.alias,
+    index: dspyStepExists?.index ?? DSPY_STEPS_INDEX.base,
+    name: DSPY_STEPS_INDEX.read_alias,
+  });
+  await esClient.indices.putAlias({
+    index: dspyStepExists?.index ?? DSPY_STEPS_INDEX.base,
+    name: DSPY_STEPS_INDEX.write_alias,
   });
 
   const migrationsExists = await esClient.indices.exists({

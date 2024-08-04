@@ -146,7 +146,7 @@ describe("Log Steps API Endpoint", () => {
     });
 
     await esClient.deleteByQuery({
-      index: DSPY_STEPS_INDEX.alias,
+      index: DSPY_STEPS_INDEX.write_alias,
       query: {
         match: {
           project_id: project.id,
@@ -183,7 +183,7 @@ describe("Log Steps API Endpoint", () => {
     expect(experiment).not.toBeNull();
 
     const indexedStep = await esClient.get<DSPyStep>({
-      index: DSPY_STEPS_INDEX.alias,
+      index: DSPY_STEPS_INDEX.read_alias,
       id: dspyStepIndexId({
         projectId: project.id,
         runId: sampleDSPyStep.run_id,

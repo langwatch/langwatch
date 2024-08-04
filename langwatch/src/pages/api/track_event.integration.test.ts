@@ -60,21 +60,9 @@ describe("/api/track_event", () => {
 
     // Clean up the trace
     await esClient.delete({
-      index: TRACE_INDEX.alias,
+      index: TRACE_INDEX.write_alias,
       id: traceIndexId({ traceId, projectId: project.id }),
       refresh: true,
-    });
-
-    // Clean up the events created during the test in Elasticsearch
-    await esClient.deleteByQuery({
-      index: EVENTS_INDEX,
-      body: {
-        query: {
-          match: {
-            project_id: project.id,
-          },
-        },
-      },
     });
   });
 
@@ -126,7 +114,7 @@ describe("/api/track_event", () => {
     };
 
     await esClient.index({
-      index: TRACE_INDEX.alias,
+      index: TRACE_INDEX.write_alias,
       id: traceIndexId({ traceId, projectId: project.id }),
       document: testTraceData,
       refresh: true,

@@ -1,41 +1,42 @@
 import type { MappingProperty } from "@elastic/elasticsearch/lib/api/types";
+import type { IndexSpec } from "../src/server/elasticsearch";
 import { esClient } from "../src/server/elasticsearch";
 
 export const recreateIndexAndMigrate = async ({
-  index,
-  migrationId,
+  indexSpec,
+  migrationKey,
   mapping,
 }: {
-  index: { alias: string; base: string };
-  migrationId: string;
+  indexSpec: IndexSpec;
+  migrationKey: string;
   mapping: Record<string, MappingProperty>;
 }) => {
-  const newIndex = `${index.base}-${migrationId}`;
+  const newIndex = `${indexSpec.base}-${migrationKey}`;
   await createIndex({
     index: newIndex,
     mappings: mapping,
   });
 
-  const previousIndex = await getPreviousIndex({
-    alias: index.alias,
+  const previousIndex = await getPreviousWriteIndex({
+    indexSpec,
     newIndex,
   });
   await reindexWithAlias({
-    alias: index.alias,
+    indexSpec,
     previousIndex,
     newIndex,
   });
 };
 
-export const getPreviousIndex = async ({
-  alias,
+export const getPreviousWriteIndex = async ({
+  indexSpec,
   newIndex,
 }: {
-  alias: string;
+  indexSpec: IndexSpec;
   newIndex: string;
 }) => {
   const aliasInfo: Record<string, unknown> = await esClient.indices.getAlias({
-    name: alias,
+    name: indexSpec.write_alias,
   });
   const currentIndices = Object.keys(aliasInfo).filter(
     (index) => !index.endsWith("-temp") && index !== newIndex
@@ -44,7 +45,9 @@ export const getPreviousIndex = async ({
   // Sort indices and get the most recent one
   const previousIndex = currentIndices.sort().pop();
   if (!previousIndex) {
-    throw new Error(`No existing write index found for alias ${alias}`);
+    throw new Error(
+      `No existing write index found for alias ${indexSpec.write_alias}`
+    );
   }
   return previousIndex;
 };
@@ -74,11 +77,11 @@ export const createIndex = async ({
 };
 
 export const reindexWithAlias = async ({
-  alias,
+  indexSpec,
   previousIndex,
   newIndex,
 }: {
-  alias: string;
+  indexSpec: IndexSpec;
   previousIndex: string;
   newIndex: string;
 }) => {
@@ -108,14 +111,9 @@ export const reindexWithAlias = async ({
   await esClient.indices.updateAliases({
     body: {
       actions: [
-        { add: { index: newIndex, alias: alias, is_write_index: true } },
-        {
-          add: {
-            index: previousIndex,
-            alias: alias,
-            is_write_index: false,
-          },
-        },
+        { add: { index: newIndex, alias: indexSpec.read_alias } },
+        { add: { index: newIndex, alias: indexSpec.write_alias } },
+        { remove: { index: previousIndex, alias: indexSpec.write_alias } },
       ],
     },
   });
@@ -156,35 +154,29 @@ export const reindexWithAlias = async ({
       body: {
         actions: [
           {
-            add: { index: newIndex, alias: alias, is_write_index: true },
-          },
-          {
-            add: {
+            remove: {
               index: previousIndex,
-              alias: alias,
-              is_write_index: false,
+              alias: indexSpec.read_alias,
             },
           },
         ],
       },
     });
-    await esClient.indices.delete({ index: previousIndex });
+    // await esClient.indices.delete({ index: previousIndex });
   } catch (error) {
     await esClient.indices.updateAliases({
       body: {
         actions: [
           {
-            add: {
+            remove: {
               index: newIndex,
-              alias: alias,
-              is_write_index: false,
+              alias: indexSpec.write_alias,
             },
           },
           {
             add: {
               index: previousIndex,
-              alias: alias,
-              is_write_index: true,
+              alias: indexSpec.write_alias,
             },
           },
         ],
