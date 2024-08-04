@@ -35,6 +35,9 @@ export default async function execute() {
   });
   if (!migrationsExists) {
     const lastMigration = Object.keys(migrations).pop();
+    if (!lastMigration) {
+      throw new Error("No migrations found on elastic/migrations/ folder");
+    }
     console.log(
       "\x1b[33m%s\x1b[0m",
       "Migration index not found, creating Elasticsearch indexes from scratch"
@@ -51,7 +54,7 @@ export default async function execute() {
     return;
   }
   for (const migration of migrationsToExecute) {
-    console.log('Executing migration', migration);
+    console.log("Executing migration", migration);
     const migrationId = migration.split("_")[0];
     try {
       await migrations[migration].migrate(migrationId);
@@ -73,15 +76,15 @@ const getLastAppliedMigration = async () => {
     },
   });
 
-  const migrations = allMigrations.hits.hits.map(
-    (hit) => hit._source.migration_name
-  );
+  const migrations = allMigrations.hits.hits
+    .filter((hit) => hit._source)
+    .map((hit) => hit._source!.migration_name);
 
   return migrations.sort().pop();
 };
 
 const getMigrationsToExecute = async () => {
-  const lastMigration = await getLastAppliedMigration() ?? "0_";
+  const lastMigration = (await getLastAppliedMigration()) ?? "0_";
   return Object.keys(migrations).filter(
     (migration) => migration > lastMigration
   );
