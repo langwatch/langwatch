@@ -5,18 +5,17 @@ import type { ZodError } from "zod";
 import { fromZodError } from "zod-validation-error";
 import { dependencies } from "../../injection/dependencies.server";
 import { getCurrentMonthMessagesCount } from "../../server/api/routers/limits";
-import { collectorQueue } from "../../server/background/queues/collectorQueue";
 import { maybeAddIdsToContextList } from "../../server/background/workers/collector/rag";
-import { processCollectorJob } from "../../server/background/workers/collectorWorker";
+import {
+  fetchExistingMD5s,
+  scheduleTraceCollectionWithFallback,
+} from "../../server/background/workers/collectorWorker";
 import { prisma } from "../../server/db"; // Adjust the import based on your setup
-import { TRACE_INDEX, esClient } from "../../server/elasticsearch";
 import {
   type CollectorRESTParamsValidator,
   type CustomMetadata,
-  type ElasticSearchTrace,
   type ReservedTraceMetadata,
   type Span,
-  type Trace,
 } from "../../server/tracer/types";
 import {
   collectorRESTParamsValidatorSchema,
@@ -26,9 +25,8 @@ import {
   spanValidatorSchema,
 } from "../../server/tracer/types.generated";
 import { getDebugger } from "../../utils/logger";
-import type { QueryDslBoolQuery } from "@elastic/elasticsearch/lib/api/types";
 
-export const debug = getDebugger("langwatch:collector");
+const debug = getDebugger("langwatch:collector");
 
 export default async function handler(
   req: NextApiRequest,
@@ -38,12 +36,18 @@ export default async function handler(
     return res.status(405).end(); // Only accept POST requests
   }
 
-  const authToken = req.headers["x-auth-token"];
+  const xAuthToken = req.headers["x-auth-token"];
+  const authHeader = req.headers.authorization;
+
+  const authToken =
+    xAuthToken ??
+    (authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null);
 
   if (!authToken) {
-    return res
-      .status(401)
-      .json({ message: "X-Auth-Token header is required." });
+    return res.status(401).json({
+      message:
+        "Authentication token is required. Use X-Auth-Token header or Authorization: Bearer token.",
+    });
   }
 
   if (
@@ -277,105 +281,16 @@ export default async function handler(
 
   debug(`collecting traceId ${traceId}`);
 
-  try {
-    const timeoutState = { state: "waiting" };
-    const timeoutPromise = new Promise((resolve, reject) => {
-      setTimeout(() => {
-        if (timeoutState.state === "waiting") {
-          reject(new Error("Timed out after 3s trying to insert on the queue"));
-        } else {
-          resolve(undefined);
-        }
-      }, 3000);
-    });
-
-    await Promise.race([
-      timeoutPromise,
-      collectorQueue
-        .add(
-          "collector",
-          {
-            projectId: project.id,
-            traceId,
-            spans,
-            reservedTraceMetadata,
-            customMetadata,
-            expectedOutput,
-            existingTrace,
-            paramsMD5,
-          },
-          {
-            jobId: `collector_${traceId}_md5:${paramsMD5}`,
-          }
-        )
-        .then(() => {
-          timeoutState.state = "resolved";
-        }),
-    ]);
-  } catch (error) {
-    debug(
-      "Failed sending to redis collector queue inserting trace directly, processing job synchronously.",
-      "Exception:",
-      error
-    );
-    Sentry.captureException(error, {
-      extra: {
-        message:
-          "Failed sending to redis collector queue inserting trace directly, processing job synchronously",
-        projectId: project.id,
-      },
-    });
-
-    await processCollectorJob(undefined, {
-      projectId: project.id,
-      traceId,
-      spans,
-      reservedTraceMetadata,
-      customMetadata,
-      expectedOutput,
-      existingTrace,
-      paramsMD5,
-    });
-  }
+  await scheduleTraceCollectionWithFallback({
+    projectId: project.id,
+    traceId,
+    spans,
+    reservedTraceMetadata,
+    customMetadata,
+    expectedOutput,
+    existingTrace,
+    paramsMD5,
+  });
 
   return res.status(200).json({ message: "Trace received successfully." });
 }
-
-const fetchExistingMD5s = async (
-  traceId: string,
-  projectId: string
-): Promise<
-  | {
-      indexing_md5s: Trace["indexing_md5s"];
-      inserted_at: number | undefined;
-      all_keys: string[] | undefined;
-    }
-  | undefined
-> => {
-  const existingTraceResponse = await esClient.search<ElasticSearchTrace>({
-    index: TRACE_INDEX.alias,
-    body: {
-      size: 1,
-      query: {
-        bool: {
-          must: [
-            { term: { trace_id: traceId } },
-            { term: { project_id: projectId } },
-          ] as QueryDslBoolQuery["must"],
-        } as QueryDslBoolQuery,
-      },
-      _source: ["indexing_md5s", "timestamps.inserted_at", "metadata.all_keys"],
-    },
-  });
-
-  const existingTrace = existingTraceResponse.hits.hits[0]?._source;
-  if (!existingTrace) {
-    return undefined;
-  }
-
-  return {
-    indexing_md5s: existingTrace.indexing_md5s,
-    inserted_at: existingTrace.timestamps?.inserted_at,
-    all_keys: existingTrace.metadata?.all_keys,
-  };
-};

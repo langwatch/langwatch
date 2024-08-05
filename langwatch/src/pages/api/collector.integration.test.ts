@@ -2,7 +2,6 @@ import { type NextApiRequest, type NextApiResponse } from "next";
 import { createMocks } from "node-mocks-http";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import {
-  SPAN_INDEX,
   TRACE_INDEX,
   esClient,
   spanIndexId,
@@ -18,7 +17,7 @@ import {
 import handler from "./collector";
 import { type Project } from "@prisma/client";
 import { DEFAULT_EMBEDDINGS_MODEL } from "../../server/embeddings";
-import { getTestProject } from "../../utils/testUtils";
+import { getTestProject, waitForResult } from "../../utils/testUtils";
 import { nanoid } from "nanoid";
 import { startCollectorWorker } from "../../server/background/workers/collectorWorker";
 import type { CollectorJob } from "../../server/background/types";
@@ -58,16 +57,6 @@ describe("Collector API Endpoint", () => {
 
     await esClient.deleteByQuery({
       index: TRACE_INDEX.alias,
-      body: {
-        query: {
-          match: {
-            project_id: project.id,
-          },
-        },
-      },
-    });
-    await esClient.deleteByQuery({
-      index: SPAN_INDEX,
       body: {
         query: {
           match: {
@@ -570,23 +559,3 @@ describe("Collector API Endpoint", () => {
     });
   });
 });
-
-const waitForResult = async <T>(
-  queryFn: () => Promise<T | null>,
-  maxRetries = 10,
-  retryDelay = 1000
-): Promise<T> => {
-  let lastError: Error | null = null;
-  for (let i = 0; i < maxRetries; i++) {
-    try {
-      const result = await queryFn();
-      if (result !== null) return result;
-    } catch (e) {
-      lastError = e as Error;
-    }
-    await new Promise((resolve) => setTimeout(resolve, retryDelay));
-  }
-  throw new Error(
-    `Result not found after multiple retries. Last error: ${lastError?.message}`
-  );
-};

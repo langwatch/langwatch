@@ -15,7 +15,7 @@ import {
   type Span,
   type SpanInputOutput,
 } from "../../tracer/types";
-import { COLLECTOR_QUEUE } from "../queues/collectorQueue";
+import { COLLECTOR_QUEUE, collectorQueue } from "../queues/collectorQueue";
 import {
   addGuardrailCosts,
   addLLMTokensCount,
@@ -26,8 +26,52 @@ import { addInputAndOutputForRAGs } from "./collector/rag";
 import { scoreSatisfactionFromInput } from "./collector/satisfaction";
 import { getTraceInput, getTraceOutput } from "./collector/trace";
 import { scheduleTraceChecks } from "./collector/traceChecks";
+import type { QueryDslBoolQuery } from "@elastic/elasticsearch/lib/api/types";
 
 const debug = getDebugger("langwatch:workers:collectorWorker");
+
+export const scheduleTraceCollectionWithFallback = async (
+  collectorJob: CollectorJob
+) => {
+  try {
+    const timeoutState = { state: "waiting" };
+    const timeoutPromise = new Promise((resolve, reject) => {
+      setTimeout(() => {
+        if (timeoutState.state === "waiting") {
+          reject(new Error("Timed out after 3s trying to insert on the queue"));
+        } else {
+          resolve(undefined);
+        }
+      }, 3000);
+    });
+
+    await Promise.race([
+      timeoutPromise,
+      collectorQueue
+        .add("collector", collectorJob, {
+          jobId: `collector_${collectorJob.traceId}_md5:${collectorJob.paramsMD5}`,
+        })
+        .then(() => {
+          timeoutState.state = "resolved";
+        }),
+    ]);
+  } catch (error) {
+    debug(
+      "Failed sending to redis collector queue inserting trace directly, processing job synchronously.",
+      "Exception:",
+      error
+    );
+    Sentry.captureException(error, {
+      extra: {
+        message:
+          "Failed sending to redis collector queue inserting trace directly, processing job synchronously",
+        projectId: collectorJob.projectId,
+      },
+    });
+
+    await processCollectorJob(undefined, collectorJob);
+  }
+};
 
 export const processCollectorJob = async (
   id: string | undefined,
@@ -236,4 +280,43 @@ const markProjectFirstMessage = async (project: Project) => {
       data: { firstMessage: true },
     });
   }
+};
+
+export const fetchExistingMD5s = async (
+  traceId: string,
+  projectId: string
+): Promise<
+  | {
+      indexing_md5s: ElasticSearchTrace["indexing_md5s"];
+      inserted_at: number | undefined;
+      all_keys: string[] | undefined;
+    }
+  | undefined
+> => {
+  const existingTraceResponse = await esClient.search<ElasticSearchTrace>({
+    index: TRACE_INDEX.alias,
+    body: {
+      size: 1,
+      query: {
+        bool: {
+          must: [
+            { term: { trace_id: traceId } },
+            { term: { project_id: projectId } },
+          ] as QueryDslBoolQuery["must"],
+        } as QueryDslBoolQuery,
+      },
+      _source: ["indexing_md5s", "timestamps.inserted_at", "metadata.all_keys"],
+    },
+  });
+
+  const existingTrace = existingTraceResponse.hits.hits[0]?._source;
+  if (!existingTrace) {
+    return undefined;
+  }
+
+  return {
+    indexing_md5s: existingTrace.indexing_md5s,
+    inserted_at: existingTrace.timestamps?.inserted_at,
+    all_keys: existingTrace.metadata?.all_keys,
+  };
 };

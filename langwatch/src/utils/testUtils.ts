@@ -115,7 +115,7 @@ export async function getTestUser() {
   return user;
 }
 
-export async function getTestProject(namespace: string) : Promise<Project> {
+export async function getTestProject(namespace: string): Promise<Project> {
   let organization = await prisma.organization.findUnique({
     where: { slug: `--test-organization-${namespace}` },
   });
@@ -163,3 +163,23 @@ export async function getTestProject(namespace: string) : Promise<Project> {
 
   return project;
 }
+
+export const waitForResult = async <T>(
+  queryFn: () => Promise<T | null>,
+  maxRetries = 10,
+  retryDelay = 1000
+): Promise<T> => {
+  let lastError: Error | null = null;
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      const result = await queryFn();
+      if (result !== null) return result;
+    } catch (e) {
+      lastError = e as Error;
+    }
+    await new Promise((resolve) => setTimeout(resolve, retryDelay));
+  }
+  throw new Error(
+    `Result not found after multiple retries. Last error: ${lastError?.message}`
+  );
+};

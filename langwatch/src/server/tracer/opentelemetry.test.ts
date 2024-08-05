@@ -91,6 +91,39 @@ const openInferenceOpenAIRequest: IExportTraceServiceRequest = {
                   },
                 },
                 {
+                  key: "session.id",
+                  value: {
+                    stringValue: "my-test-session",
+                  },
+                },
+                {
+                  key: "user.id",
+                  value: {
+                    stringValue: "my-test-user",
+                  },
+                },
+                {
+                  key: "metadata",
+                  value: {
+                    stringValue: '{"foo": "bar"}',
+                  },
+                },
+                {
+                  key: "tag.tags",
+                  value: {
+                    arrayValue: {
+                      values: [
+                        {
+                          stringValue: "tag-1",
+                        },
+                        {
+                          stringValue: "tag-2",
+                        },
+                      ],
+                    },
+                  },
+                },
+                {
                   key: "llm.input_messages.0.message.role",
                   value: {
                     stringValue: "system",
@@ -170,7 +203,7 @@ describe("opentelemetry traces receiver", () => {
       assert.fail(validationError.message);
     }
 
-    expect(trace).toMatchObject({
+    expect(trace).toEqual({
       traceId: "03cb2eb84dd52ac9bc1496a99c733880",
       spans: [
         {
@@ -217,12 +250,17 @@ describe("opentelemetry traces receiver", () => {
           },
         },
       ],
-      reservedTraceMetadata: {},
+      reservedTraceMetadata: {
+        user_id: "my-test-user",
+        thread_id: "my-test-session",
+        labels: ["tag-1", "tag-2"],
+      },
       customMetadata: {
         "telemetry.sdk.language": "python",
         "telemetry.sdk.name": "opentelemetry",
         "telemetry.sdk.version": "1.25.0",
         "service.name": "unknown_service",
+        foo: "bar",
       },
     });
   });

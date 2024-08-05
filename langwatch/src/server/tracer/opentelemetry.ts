@@ -1,6 +1,8 @@
 import {
+  type IAnyValue,
   type IExportTraceServiceRequest,
   type IInstrumentationScope,
+  type IKeyValue,
   type ISpan,
   // @ts-ignore
 } from "@opentelemetry/otlp-transformer";
@@ -67,17 +69,6 @@ const openTelemetryTraceRequestToTraceForCollection = (
 ): TraceForCollection => {
   const otelTrace = cloneDeep(otelTrace_);
 
-  const spans: Span[] = [];
-  for (const resourceSpan of otelTrace.resourceSpans) {
-    for (const scopeSpan of resourceSpan.scopeSpans) {
-      for (const span of scopeSpan.spans) {
-        if (span.traceId === traceId) {
-          spans.push(openTelemetrySpanToSpan(span, scopeSpan.scope));
-        }
-      }
-    }
-  }
-
   const customMetadata = {};
   for (const resourceSpan of otelTrace.resourceSpans) {
     for (const attribute of resourceSpan.resource.attributes) {
@@ -85,20 +76,33 @@ const openTelemetryTraceRequestToTraceForCollection = (
     }
   }
 
-  return {
+  const trace: TraceForCollection = {
     traceId,
-    spans,
+    spans: [],
     reservedTraceMetadata: {},
     customMetadata,
   };
+
+  for (const resourceSpan of otelTrace.resourceSpans) {
+    for (const scopeSpan of resourceSpan.scopeSpans) {
+      for (const span of scopeSpan.spans) {
+        if (span.traceId === traceId) {
+          addOpenTelemetrySpanAsSpan(trace, span, scopeSpan.scope);
+        }
+      }
+    }
+  }
+
+  return trace;
 };
 
 const allowedSpanTypes = spanTypesSchema.options.map((option) => option.value);
 
-const openTelemetrySpanToSpan = (
+const addOpenTelemetrySpanAsSpan = (
+  trace: TraceForCollection,
   otelSpan: ISpan,
   otelScope: IInstrumentationScope | undefined
-): Span => {
+): void => {
   let type: Span["type"] = "span";
   let model: LLMSpan["model"] = null;
   let input: LLMSpan["input"] = null;
@@ -188,6 +192,33 @@ const openTelemetrySpanToSpan = (
   }
   delete attributesMap.output;
 
+  if (attributesMap.user?.id) {
+    trace.reservedTraceMetadata.user_id = attributesMap.user.id;
+    delete attributesMap.user.id;
+  }
+
+  if (attributesMap.session?.id) {
+    trace.reservedTraceMetadata.thread_id = attributesMap.session.id;
+    delete attributesMap.session.id;
+  }
+
+  if (Array.isArray(attributesMap.tag?.tags)) {
+    trace.reservedTraceMetadata.labels = attributesMap.tag.tags;
+    delete attributesMap.tag.tags;
+  }
+
+  if (
+    attributesMap.metadata &&
+    typeof attributesMap.metadata === "object" &&
+    !Array.isArray(attributesMap.metadata)
+  ) {
+    trace.customMetadata = {
+      ...trace.customMetadata,
+      ...attributesMap.metadata,
+    };
+    delete attributesMap.metadata;
+  }
+
   if (attributesMap.llm?.invocation_parameters) {
     params = attributesMap.llm.invocation_parameters;
     delete attributesMap.llm.invocation_parameters;
@@ -215,26 +246,19 @@ const openTelemetrySpanToSpan = (
     },
   };
 
-  return span;
+  trace.spans.push(span);
 };
 
-const keyValueToObject = (
-  attributes: Array<{ key: string; value: { stringValue: string } }>
-): Record<string, any> => {
+const keyValueToObject = (attributes: IKeyValue): Record<string, any> => {
   const result: Record<string, any> = {};
 
-  attributes.forEach(({ key, value }) => {
+  attributes.forEach(({ key, value }: { key: string; value: IAnyValue }) => {
     const keys = key.split(".");
     let current = result;
 
     keys.forEach((k, i) => {
       if (i === keys.length - 1) {
-        // Try to parse JSON if possible
-        try {
-          current[k] = JSON.parse(value.stringValue);
-        } catch {
-          current[k] = value.stringValue;
-        }
+        current[k] = iAnyValueToValue(value);
       } else {
         if (/^\d+$/.test(keys[i + 1])) {
           // Next key is a number, so this should be an array
@@ -263,6 +287,40 @@ const keyValueToObject = (
   return convertToArrays(result);
 };
 
+const iAnyValueToValue = (value: IAnyValue): any => {
+  if (value.stringValue) {
+    // Try to parse JSON if possible
+    try {
+      return JSON.parse(value.stringValue);
+    } catch {
+      return value.stringValue;
+    }
+  }
+  if (value.arrayValue) {
+    return value.arrayValue.values.map((v) => iAnyValueToValue(v));
+  }
+  if (value.boolValue) {
+    return value.boolValue;
+  }
+  if (value.intValue) {
+    return value.intValue;
+  }
+  if (value.doubleValue) {
+    return value.doubleValue;
+  }
+  if (value.bytesValue) {
+    return Buffer.from(value.bytesValue.value).toString("base64");
+  }
+  if (value.kvlistValue) {
+    return Object.fromEntries(
+      value.kvlistValue.values.map((v: IKeyValue) => [
+        v.key,
+        iAnyValueToValue(v),
+      ])
+    );
+  }
+};
+
 const removeEmptyKeys = (obj: Record<string, any>): Record<string, any> => {
   const isEmptyObject = (value: any): boolean =>
     value !== null &&
@@ -279,8 +337,15 @@ const removeEmptyKeys = (obj: Record<string, any>): Record<string, any> => {
     isEmptyObject(value) ||
     isEmptyArray(value);
 
-  const result: Record<string, any> = {};
+  if (!obj) return obj;
 
+  if (typeof obj === "string") return obj;
+
+  if (Array.isArray(obj)) {
+    return obj.map(removeEmptyKeys).filter((v) => !isEmpty(v));
+  }
+
+  const result: Record<string, any> = {};
   for (const [key, value] of Object.entries(obj)) {
     if (typeof value === "object" && value !== null) {
       const cleanedValue = removeEmptyKeys(value as Record<string, any>);
