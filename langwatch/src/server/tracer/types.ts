@@ -114,7 +114,7 @@ interface SpanMetrics {
   cost?: number | null;
 }
 
-interface SpanParams {
+type SpanParams = {
   frequency_penalty?: number | null;
   logit_bias?: Record<string, number> | null;
   logprobs?: boolean | null;
@@ -132,7 +132,7 @@ interface SpanParams {
   parallel_tool_calls?: boolean | null;
   functions?: Record<string, any>[] | null;
   user?: string | null;
-}
+} & Record<string, any>;
 
 interface SpanTimestamps {
   started_at: number;
@@ -163,6 +163,7 @@ export interface BaseSpan {
   error?: ErrorCapture | null;
   timestamps: SpanTimestamps;
   metrics?: SpanMetrics | null;
+  params?: SpanParams;
 }
 
 export interface LLMSpan extends BaseSpan {
@@ -170,7 +171,6 @@ export interface LLMSpan extends BaseSpan {
   // TODO: deprecate field, standardize on litellm model names
   vendor?: string | null;
   model?: string;
-  params?: SpanParams;
 }
 
 export interface RAGChunk {
@@ -268,9 +268,13 @@ export type Trace = {
   indexing_md5s?: string[];
 
   events?: Event[];
+  // TODO: add spans and evaluations here too
 };
 
-export type ElasticSearchTrace = Omit<Trace, "metadata" | "timestamps" | "events"> & {
+export type ElasticSearchTrace = Omit<
+  Trace,
+  "metadata" | "timestamps" | "events"
+> & {
   metadata: ReservedTraceMetadata & {
     custom?: CustomMetadata;
     all_keys?: string[];

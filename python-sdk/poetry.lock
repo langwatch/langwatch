@@ -3016,6 +3016,59 @@ typing-extensions = ">=4.7,<5"
 datalib = ["numpy (>=1)", "pandas (>=1.2.3)", "pandas-stubs (>=1.1.0.11)"]
 
 [[package]]
+name = "openinference-instrumentation"
+version = "0.1.12"
+description = "OpenInference instrumentation utilities"
+optional = false
+python-versions = "<3.13,>=3.8"
+files = [
+    {file = "openinference_instrumentation-0.1.12-py3-none-any.whl", hash = "sha256:75b6d76dcc39340cc027ce517595fabf6a3ae003176559e9c2b9f6256c91af7a"},
+    {file = "openinference_instrumentation-0.1.12.tar.gz", hash = "sha256:fdf7394a22cc367a002ab675d6cd8c33ac5390d050fd6ae89a631e31511c7094"},
+]
+
+[package.dependencies]
+openinference-semantic-conventions = ">=0.1.6"
+opentelemetry-api = "*"
+
+[package.extras]
+test = ["opentelemetry-sdk"]
+
+[[package]]
+name = "openinference-instrumentation-openai"
+version = "0.1.12"
+description = "OpenInference OpenAI Instrumentation"
+optional = false
+python-versions = "<3.13,>=3.8"
+files = [
+    {file = "openinference_instrumentation_openai-0.1.12-py3-none-any.whl", hash = "sha256:6d1dee5bf1efe03a9543fb90450b04d376a9b8817818b90c05c81252cbb4fb64"},
+    {file = "openinference_instrumentation_openai-0.1.12.tar.gz", hash = "sha256:e2bbbf006446b22def884f76c508378e45da092be0c1262c48894d1540c3bf18"},
+]
+
+[package.dependencies]
+openinference-instrumentation = ">=0.1.12"
+openinference-semantic-conventions = ">=0.1.9"
+opentelemetry-api = "*"
+opentelemetry-instrumentation = "*"
+opentelemetry-semantic-conventions = "*"
+typing-extensions = "*"
+wrapt = "*"
+
+[package.extras]
+instruments = ["openai (>=1.0.0)"]
+test = ["numpy", "openai (==1.0.0)", "opentelemetry-instrumentation-httpx", "opentelemetry-sdk", "respx"]
+
+[[package]]
+name = "openinference-semantic-conventions"
+version = "0.1.9"
+description = "OpenInference Semantic Conventions"
+optional = false
+python-versions = ">=3.7"
+files = [
+    {file = "openinference_semantic_conventions-0.1.9-py3-none-any.whl", hash = "sha256:0b0350f4d37d88aead8cce6488327bcbb1243e637c6491e44d104040912611c7"},
+    {file = "openinference_semantic_conventions-0.1.9.tar.gz", hash = "sha256:5d32bf820561f6deed479f56ea780706d2afca6616f5960564fd4c2447ae7c0b"},
+]
+
+[[package]]
 name = "opentelemetry-api"
 version = "1.25.0"
 description = "OpenTelemetry Python API"
@@ -3649,10 +3702,7 @@ files = [
 [package.dependencies]
 annotated-types = ">=0.4.0"
 pydantic-core = "2.20.1"
-typing-extensions = [
-    {version = ">=4.6.1", markers = "python_version < \"3.13\""},
-    {version = ">=4.12.2", markers = "python_version >= \"3.13\""},
-]
+typing-extensions = {version = ">=4.6.1", markers = "python_version < \"3.13\""}
 
 [package.extras]
 email = ["email-validator (>=2.0.0)"]
@@ -5801,5 +5851,5 @@ openai = ["openai"]
 
 [metadata]
 lock-version = "2.0"
-python-versions = "^3.9"
-content-hash = "2cca2ed981d071e48dd2f8caee52cf444433c81349ae350f63e33cefda000ff6"
+python-versions = ">=3.9,<3.13"
+content-hash = "702df06b59d6dcf7ba3a2239ed816036abeba87db5e1e34382bf11dad0be007c"
