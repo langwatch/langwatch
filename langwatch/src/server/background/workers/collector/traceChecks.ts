@@ -4,7 +4,9 @@ import { type ElasticSearchTrace, type Span } from "../../../tracer/types";
 import type { EvaluatorTypes } from "../../../../trace_checks/evaluators.generated";
 import { evaluatePreconditions } from "../../../../trace_checks/preconditions";
 import type { CheckPreconditions } from "../../../../trace_checks/types";
-import { debug } from "../../../../pages/api/collector";
+import { getDebugger } from "../../../../utils/logger";
+
+const debug = getDebugger("langwatch:traceChecks");
 
 export const scheduleTraceChecks = async (
   trace: ElasticSearchTrace,

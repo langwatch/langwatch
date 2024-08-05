@@ -184,8 +184,209 @@ const openInferenceOpenAIRequest: IExportTraceServiceRequest = {
   ],
 };
 
+const openllmetryOpenAIRequest: IExportTraceServiceRequest = {
+  resourceSpans: [
+    {
+      resource: {
+        attributes: [
+          {
+            key: "telemetry.sdk.language",
+            value: {
+              stringValue: "python",
+            },
+          },
+          {
+            key: "telemetry.sdk.name",
+            value: {
+              stringValue: "opentelemetry",
+            },
+          },
+          {
+            key: "telemetry.sdk.version",
+            value: {
+              stringValue: "1.26.0",
+            },
+          },
+          {
+            key: "service.name",
+            value: {
+              stringValue: "unknown_service",
+            },
+          },
+        ],
+      },
+      scopeSpans: [
+        {
+          scope: {
+            name: "opentelemetry.instrumentation.openai.v1",
+            version: "0.26.4",
+          },
+          spans: [
+            {
+              traceId: "hhUJjCxy5yMw6ADvOrHYuA==",
+              spanId: "D2n+rs/O1Jg=",
+              name: "openai.chat",
+              kind: "SPAN_KIND_CLIENT",
+              startTimeUnixNano: "1722866602559872000",
+              endTimeUnixNano: "1722866604545023000",
+              attributes: [
+                {
+                  key: "llm.request.type",
+                  value: {
+                    stringValue: "chat",
+                  },
+                },
+                {
+                  key: "gen_ai.system",
+                  value: {
+                    stringValue: "OpenAI",
+                  },
+                },
+                {
+                  key: "gen_ai.request.model",
+                  value: {
+                    stringValue: "gpt-4o-mini",
+                  },
+                },
+                {
+                  key: "llm.headers",
+                  value: {
+                    stringValue: "None",
+                  },
+                },
+                {
+                  key: "llm.is_streaming",
+                  value: {
+                    boolValue: true,
+                  },
+                },
+                {
+                  key: "gen_ai.openai.api_base",
+                  value: {
+                    stringValue: "https://api.openai.com/v1/",
+                  },
+                },
+                {
+                  key: "gen_ai.prompt.0.role",
+                  value: {
+                    stringValue: "system",
+                  },
+                },
+                {
+                  key: "gen_ai.prompt.0.content",
+                  value: {
+                    stringValue:
+                      "You are a helpful assistant that only reply in short tweet-like responses, using lots of emojis.",
+                  },
+                },
+                {
+                  key: "gen_ai.prompt.1.role",
+                  value: {
+                    stringValue: "user",
+                  },
+                },
+                {
+                  key: "gen_ai.prompt.1.content",
+                  value: {
+                    stringValue: "yous",
+                  },
+                },
+                {
+                  key: "gen_ai.response.model",
+                  value: {
+                    stringValue: "gpt-4o-mini-2024-07-18",
+                  },
+                },
+                {
+                  key: "gen_ai.completion.0.finish_reason",
+                  value: {
+                    stringValue: "stop",
+                  },
+                },
+                {
+                  key: "gen_ai.completion.0.role",
+                  value: {
+                    stringValue: "assistant",
+                  },
+                },
+                {
+                  key: "gen_ai.completion.0.content",
+                  value: {
+                    stringValue: "Hey there! 😊 What’s on your mind? 💬✨",
+                  },
+                },
+              ],
+              events: [
+                {
+                  timeUnixNano: "1722866604464076000",
+                  name: "llm.content.completion.chunk",
+                },
+                {
+                  timeUnixNano: "1722866604487318000",
+                  name: "llm.content.completion.chunk",
+                },
+                {
+                  timeUnixNano: "1722866604493170000",
+                  name: "llm.content.completion.chunk",
+                },
+                {
+                  timeUnixNano: "1722866604496259000",
+                  name: "llm.content.completion.chunk",
+                },
+                {
+                  timeUnixNano: "1722866604498817000",
+                  name: "llm.content.completion.chunk",
+                },
+                {
+                  timeUnixNano: "1722866604501262000",
+                  name: "llm.content.completion.chunk",
+                },
+                {
+                  timeUnixNano: "1722866604503900000",
+                  name: "llm.content.completion.chunk",
+                },
+                {
+                  timeUnixNano: "1722866604506069000",
+                  name: "llm.content.completion.chunk",
+                },
+                {
+                  timeUnixNano: "1722866604513677000",
+                  name: "llm.content.completion.chunk",
+                },
+                {
+                  timeUnixNano: "1722866604519198000",
+                  name: "llm.content.completion.chunk",
+                },
+                {
+                  timeUnixNano: "1722866604524125000",
+                  name: "llm.content.completion.chunk",
+                },
+                {
+                  timeUnixNano: "1722866604527675000",
+                  name: "llm.content.completion.chunk",
+                },
+                {
+                  timeUnixNano: "1722866604530569000",
+                  name: "llm.content.completion.chunk",
+                },
+                {
+                  timeUnixNano: "1722866604540024000",
+                  name: "llm.content.completion.chunk",
+                },
+              ],
+              status: {
+                code: "STATUS_CODE_OK",
+              },
+            },
+          ],
+        },
+      ],
+    },
+  ],
+};
+
 describe("opentelemetry traces receiver", () => {
-  it("receives a basic openai trace", async () => {
+  it("receives a basic openai trace for openinference", async () => {
     const traces = openTelemetryTraceRequestToTracesForCollection(
       openInferenceOpenAIRequest
     );
@@ -259,8 +460,86 @@ describe("opentelemetry traces receiver", () => {
         "telemetry.sdk.language": "python",
         "telemetry.sdk.name": "opentelemetry",
         "telemetry.sdk.version": "1.25.0",
-        "service.name": "unknown_service",
         foo: "bar",
+      },
+    });
+  });
+
+  it("receives a basic openai trace for openllmetry", async () => {
+    const traces = openTelemetryTraceRequestToTracesForCollection(
+      openllmetryOpenAIRequest
+    );
+
+    expect(traces).toHaveLength(1);
+
+    const trace = traces[0];
+
+    try {
+      z.array(spanSchema).parse(trace.spans);
+    } catch (error) {
+      const validationError = fromZodError(error as ZodError);
+      console.log("trace", JSON.stringify(trace, undefined, 2));
+      console.log("validationError", validationError);
+      assert.fail(validationError.message);
+    }
+
+    expect(trace).toEqual({
+      traceId: "8615098c2c72e72330e800ef3ab1d8b8",
+      spans: [
+        {
+          span_id: "0f69feaecfced498",
+          trace_id: "8615098c2c72e72330e800ef3ab1d8b8",
+          name: "openai.chat",
+          type: "llm",
+          model: "gpt-4o-mini-2024-07-18",
+          input: {
+            type: "chat_messages",
+            value: [
+              {
+                role: "system",
+                content:
+                  "You are a helpful assistant that only reply in short tweet-like responses, using lots of emojis.",
+              },
+              {
+                role: "user",
+                content: "yous",
+              },
+            ],
+          },
+          output: {
+            type: "chat_messages",
+            value: [
+              {
+                role: "assistant",
+                content: "Hey there! 😊 What’s on your mind? 💬✨",
+              },
+            ],
+          },
+          params: {
+            stream: true,
+            gen_ai: {
+              system: "OpenAI",
+              openai: {
+                api_base: "https://api.openai.com/v1/",
+              },
+            },
+            scope: {
+              name: "opentelemetry.instrumentation.openai.v1",
+              version: "0.26.4",
+            },
+          },
+          timestamps: {
+            started_at: 1722866602560,
+            finished_at: 1722866604545,
+            first_token_at: 1722866604464,
+          },
+        },
+      ],
+      reservedTraceMetadata: {},
+      customMetadata: {
+        "telemetry.sdk.language": "python",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.26.0",
       },
     });
   });

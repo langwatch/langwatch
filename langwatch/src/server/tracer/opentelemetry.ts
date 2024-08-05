@@ -72,6 +72,12 @@ const openTelemetryTraceRequestToTraceForCollection = (
   const customMetadata = {};
   for (const resourceSpan of otelTrace.resourceSpans) {
     for (const attribute of resourceSpan.resource.attributes) {
+      if (
+        attribute.key === "service.name" &&
+        attribute.value.stringValue === "unknown_service"
+      ) {
+        continue;
+      }
       customMetadata[attribute.key] = attribute.value.stringValue;
     }
   }
@@ -115,15 +121,21 @@ const addOpenTelemetrySpanAsSpan = (
     parseInt(otelSpan.endTimeUnixNano, 10) / 1000 / 1000
   );
 
+  // First token at
   let first_token_at: Span["timestamps"]["first_token_at"] = null;
   for (const event of otelSpan.events) {
-    if (event.name === "First Token Stream Event") {
+    if (
+      event.name === "First Token Stream Event" ||
+      event.name === "llm.content.completion.chunk"
+    ) {
       first_token_at = Math.round(
         parseInt(event.timeUnixNano, 10) / 1000 / 1000
       );
+      break;
     }
   }
 
+  // Type
   const attributesMap = keyValueToObject(otelSpan.attributes);
   if (attributesMap.openinference?.span?.kind) {
     const kind_ = attributesMap.openinference.span.kind.toLowerCase();
@@ -133,11 +145,28 @@ const addOpenTelemetrySpanAsSpan = (
     }
   }
 
+  if (attributesMap.llm?.request?.type === "chat") {
+    type = "llm";
+    delete attributesMap.llm.request.type;
+  }
+
+  // Model
   if (attributesMap.llm?.model_name) {
     model = attributesMap.llm.model_name;
     delete attributesMap.llm.model_name;
   }
 
+  if (attributesMap.gen_ai?.request?.model) {
+    model = attributesMap.gen_ai.request.model;
+    delete attributesMap.gen_ai.request.model;
+  }
+
+  if (attributesMap.gen_ai?.response?.model) {
+    model = attributesMap.gen_ai.response.model;
+    delete attributesMap.gen_ai.response.model;
+  }
+
+  // Input
   if (Array.isArray(attributesMap.llm?.input_messages)) {
     const input_ = typedValueChatMessagesSchema.safeParse({
       type: "chat_messages",
@@ -147,6 +176,18 @@ const addOpenTelemetrySpanAsSpan = (
     if (input_.success) {
       input = input_.data as TypedValueChatMessages;
       delete attributesMap.llm.input_messages;
+    }
+  }
+
+  if (!input && Array.isArray(attributesMap.gen_ai?.prompt)) {
+    const input_ = typedValueChatMessagesSchema.safeParse({
+      type: "chat_messages",
+      value: attributesMap.gen_ai.prompt,
+    });
+
+    if (input_.success) {
+      input = input_.data as TypedValueChatMessages;
+      delete attributesMap.gen_ai.prompt;
     }
   }
 
@@ -164,6 +205,7 @@ const addOpenTelemetrySpanAsSpan = (
   }
   delete attributesMap.input;
 
+  // Output
   if (Array.isArray(attributesMap.llm?.output_messages)) {
     const output_ = typedValueChatMessagesSchema.safeParse({
       type: "chat_messages",
@@ -175,6 +217,18 @@ const addOpenTelemetrySpanAsSpan = (
     if (output_.success) {
       output = output_.data as TypedValueChatMessages;
       delete attributesMap.llm.output_messages;
+    }
+  }
+
+  if (!output && Array.isArray(attributesMap.gen_ai?.completion)) {
+    const output_ = typedValueChatMessagesSchema.safeParse({
+      type: "chat_messages",
+      value: attributesMap.gen_ai.completion,
+    });
+
+    if (output_.success) {
+      output = output_.data as TypedValueChatMessages;
+      delete attributesMap.gen_ai.completion;
     }
   }
 
@@ -192,6 +246,7 @@ const addOpenTelemetrySpanAsSpan = (
   }
   delete attributesMap.output;
 
+  // Metadata
   if (attributesMap.user?.id) {
     trace.reservedTraceMetadata.user_id = attributesMap.user.id;
     delete attributesMap.user.id;
@@ -219,9 +274,21 @@ const addOpenTelemetrySpanAsSpan = (
     delete attributesMap.metadata;
   }
 
+  // Params
   if (attributesMap.llm?.invocation_parameters) {
-    params = attributesMap.llm.invocation_parameters;
+    params = {
+      ...params,
+      ...attributesMap.llm.invocation_parameters,
+    };
     delete attributesMap.llm.invocation_parameters;
+  }
+
+  if (attributesMap.llm?.is_streaming) {
+    params = {
+      ...params,
+      stream: attributesMap.llm.is_streaming,
+    };
+    delete attributesMap.llm.is_streaming;
   }
 
   params = {
@@ -289,6 +356,9 @@ const keyValueToObject = (attributes: IKeyValue): Record<string, any> => {
 
 const iAnyValueToValue = (value: IAnyValue): any => {
   if (value.stringValue) {
+    if (value.stringValue === "None") {
+      return null; // badly parsed python null by openllmetry
+    }
     // Try to parse JSON if possible
     try {
       return JSON.parse(value.stringValue);

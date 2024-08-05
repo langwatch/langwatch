@@ -225,7 +225,6 @@ describe("opentelemetry traces receiver", () => {
       project_id: project?.id,
       metadata: {
         custom: {
-          "service.name": "unknown_service",
           "telemetry.sdk.language": "python",
           "telemetry.sdk.name": "opentelemetry",
           "telemetry.sdk.version": "1.25.0",
@@ -234,7 +233,6 @@ describe("opentelemetry traces receiver", () => {
           "telemetry.sdk.language",
           "telemetry.sdk.name",
           "telemetry.sdk.version",
-          "service.name",
         ]),
       },
       timestamps: {
