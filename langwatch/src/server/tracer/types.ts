@@ -148,8 +148,15 @@ export type SpanTypes =
   | "agent"
   | "rag"
   | "guardrail"
+  // Low-code
   | "workflow"
   | "component"
+  // OpenTelemetry
+  | "server"
+  | "client"
+  | "producer"
+  | "consumer"
+  // Other
   | "unknown";
 
 export interface BaseSpan {

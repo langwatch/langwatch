@@ -1,12 +1,18 @@
 // @ts-ignore
-import { type IExportTraceServiceRequest } from "@opentelemetry/otlp-transformer";
+import {
+  type ESpanKind,
+  type EStatusCode,
+  type IEvent,
+  type IExportTraceServiceRequest,
+} from "@opentelemetry/otlp-transformer";
 import { assert, describe, expect, it } from "vitest";
 import { z, type ZodError } from "zod";
 import { fromZodError } from "zod-validation-error";
+import type { DeepPartial } from "../../utils/types";
 import { openTelemetryTraceRequestToTracesForCollection } from "./opentelemetry";
 import { spanSchema } from "./types.generated";
 
-const openInferenceOpenAIRequest: IExportTraceServiceRequest = {
+const openInferenceOpenAIRequest: DeepPartial<IExportTraceServiceRequest> = {
   resourceSpans: [
     {
       resource: {
@@ -48,7 +54,7 @@ const openInferenceOpenAIRequest: IExportTraceServiceRequest = {
               traceId: "A8suuE3VKsm8FJapnHM4gA==",
               spanId: "m6IZGoTJqJE=",
               name: "ChatCompletion",
-              kind: "SPAN_KIND_INTERNAL",
+              kind: "SPAN_KIND_INTERNAL" as unknown as ESpanKind,
               startTimeUnixNano: "1722809513563529000",
               endTimeUnixNano: "1722809514125001000",
               attributes: [
@@ -172,9 +178,9 @@ const openInferenceOpenAIRequest: IExportTraceServiceRequest = {
                   timeUnixNano: "1722809514030552000",
                   name: "First Token Stream Event",
                 },
-              ],
+              ] as IEvent[],
               status: {
-                code: "STATUS_CODE_OK",
+                code: "STATUS_CODE_OK" as unknown as EStatusCode,
               },
             },
           ],
@@ -184,7 +190,7 @@ const openInferenceOpenAIRequest: IExportTraceServiceRequest = {
   ],
 };
 
-const openllmetryOpenAIRequest: IExportTraceServiceRequest = {
+const openllmetryOpenAIRequest: DeepPartial<IExportTraceServiceRequest> = {
   resourceSpans: [
     {
       resource: {
@@ -226,7 +232,7 @@ const openllmetryOpenAIRequest: IExportTraceServiceRequest = {
               traceId: "hhUJjCxy5yMw6ADvOrHYuA==",
               spanId: "D2n+rs/O1Jg=",
               name: "openai.chat",
-              kind: "SPAN_KIND_CLIENT",
+              kind: "SPAN_KIND_CLIENT" as unknown as ESpanKind,
               startTimeUnixNano: "1722866602559872000",
               endTimeUnixNano: "1722866604545023000",
               attributes: [
@@ -373,10 +379,207 @@ const openllmetryOpenAIRequest: IExportTraceServiceRequest = {
                   timeUnixNano: "1722866604540024000",
                   name: "llm.content.completion.chunk",
                 },
-              ],
+              ] as IEvent[],
               status: {
-                code: "STATUS_CODE_OK",
+                code: "STATUS_CODE_OK" as unknown as EStatusCode,
               },
+            },
+          ],
+        },
+      ],
+    },
+  ],
+};
+
+const fastApiOpenTelemetryRequest: DeepPartial<IExportTraceServiceRequest> = {
+  resourceSpans: [
+    {
+      resource: {
+        attributes: [
+          {
+            key: "telemetry.sdk.language",
+            value: {
+              stringValue: "python",
+            },
+          },
+          {
+            key: "telemetry.sdk.name",
+            value: {
+              stringValue: "opentelemetry",
+            },
+          },
+          {
+            key: "telemetry.sdk.version",
+            value: {
+              stringValue: "1.26.0",
+            },
+          },
+          {
+            key: "service.name",
+            value: {
+              stringValue: "unknown_service",
+            },
+          },
+        ],
+      },
+      scopeSpans: [
+        {
+          scope: {
+            name: "opentelemetry.instrumentation.fastapi",
+            version: "0.47b0",
+          },
+          spans: [
+            {
+              traceId: "mLt2CryyC2bSMDv62DoncQ==",
+              spanId: "hZJ04MHH3MI=",
+              parentSpanId: "ABb1CmFM02M=",
+              name: "POST / http send",
+              kind: "SPAN_KIND_INTERNAL" as unknown as ESpanKind,
+              startTimeUnixNano: "1722946507515216000",
+              endTimeUnixNano: "1722946509073605000",
+              attributes: [
+                {
+                  key: "asgi.event.type",
+                  value: {
+                    stringValue: "http.response.body",
+                  },
+                },
+              ],
+              status: {},
+            },
+          ],
+        },
+      ],
+    },
+    {
+      resource: {
+        attributes: [
+          {
+            key: "telemetry.sdk.language",
+            value: {
+              stringValue: "python",
+            },
+          },
+          {
+            key: "telemetry.sdk.name",
+            value: {
+              stringValue: "opentelemetry",
+            },
+          },
+          {
+            key: "telemetry.sdk.version",
+            value: {
+              stringValue: "1.26.0",
+            },
+          },
+          {
+            key: "service.name",
+            value: {
+              stringValue: "unknown_service",
+            },
+          },
+        ],
+      },
+      scopeSpans: [
+        {
+          scope: {
+            name: "opentelemetry.instrumentation.fastapi",
+            version: "0.47b0",
+          },
+          spans: [
+            {
+              traceId: "mLt2CryyC2bSMDv62DoncQ==",
+              spanId: "ABb1CmFM02M=",
+              name: "POST /",
+              kind: "SPAN_KIND_SERVER" as unknown as ESpanKind,
+              startTimeUnixNano: "1722942373770026000",
+              endTimeUnixNano: "1722942375147931000",
+              attributes: [
+                {
+                  key: "http.scheme",
+                  value: {
+                    stringValue: "http",
+                  },
+                },
+                {
+                  key: "http.host",
+                  value: {
+                    stringValue: "127.0.0.1:8000",
+                  },
+                },
+                {
+                  key: "net.host.port",
+                  value: {
+                    intValue: "8000" as unknown as number,
+                  },
+                },
+                {
+                  key: "http.flavor",
+                  value: {
+                    stringValue: "1.1",
+                  },
+                },
+                {
+                  key: "http.target",
+                  value: {
+                    stringValue: "/",
+                  },
+                },
+                {
+                  key: "http.url",
+                  value: {
+                    stringValue: "http://127.0.0.1:8000/",
+                  },
+                },
+                {
+                  key: "http.method",
+                  value: {
+                    stringValue: "POST",
+                  },
+                },
+                {
+                  key: "http.server_name",
+                  value: {
+                    stringValue: "0.0.0.0:8000",
+                  },
+                },
+                {
+                  key: "http.user_agent",
+                  value: {
+                    stringValue:
+                      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:128.0) Gecko/20100101 Firefox/128.0",
+                  },
+                },
+                {
+                  key: "net.peer.ip",
+                  value: {
+                    stringValue: "127.0.0.1",
+                  },
+                },
+                {
+                  key: "net.peer.port",
+                  value: {
+                    intValue: "63047" as unknown as number,
+                  },
+                },
+                {
+                  key: "http.route",
+                  value: {
+                    stringValue: "/",
+                  },
+                },
+                {
+                  key: "http.status_code",
+                  value: {
+                    intValue: {
+                      low: 404,
+                      high: 0,
+                      unsigned: false,
+                    } as any,
+                  },
+                },
+              ],
+              status: {},
             },
           ],
         },
@@ -396,7 +599,7 @@ describe("opentelemetry traces receiver", () => {
     const trace = traces[0];
 
     try {
-      z.array(spanSchema).parse(trace.spans);
+      z.array(spanSchema).parse(trace!.spans);
     } catch (error) {
       const validationError = fromZodError(error as ZodError);
       console.log("trace", JSON.stringify(trace, undefined, 2));
@@ -457,6 +660,7 @@ describe("opentelemetry traces receiver", () => {
         labels: ["tag-1", "tag-2"],
       },
       customMetadata: {
+        "service.name": "unknown_service",
         "telemetry.sdk.language": "python",
         "telemetry.sdk.name": "opentelemetry",
         "telemetry.sdk.version": "1.25.0",
@@ -475,7 +679,7 @@ describe("opentelemetry traces receiver", () => {
     const trace = traces[0];
 
     try {
-      z.array(spanSchema).parse(trace.spans);
+      z.array(spanSchema).parse(trace!.spans);
     } catch (error) {
       const validationError = fromZodError(error as ZodError);
       console.log("trace", JSON.stringify(trace, undefined, 2));
@@ -537,6 +741,103 @@ describe("opentelemetry traces receiver", () => {
       ],
       reservedTraceMetadata: {},
       customMetadata: {
+        "service.name": "unknown_service",
+        "telemetry.sdk.language": "python",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.26.0",
+      },
+    });
+  });
+
+  it("receives traditional opentelemetry trace for fastapi", async () => {
+    const traces = openTelemetryTraceRequestToTracesForCollection(
+      fastApiOpenTelemetryRequest
+    );
+
+    expect(traces).toHaveLength(1);
+
+    const trace = traces[0];
+
+    try {
+      z.array(spanSchema).parse(trace!.spans);
+    } catch (error) {
+      const validationError = fromZodError(error as ZodError);
+      console.log("trace", JSON.stringify(trace, undefined, 2));
+      console.log("validationError", validationError);
+      assert.fail(validationError.message);
+    }
+
+    expect(trace).toEqual({
+      traceId: "98bb760abcb20b66d2303bfad83a2771",
+      spans: [
+        {
+          span_id: "859274e0c1c7dcc2",
+          trace_id: "98bb760abcb20b66d2303bfad83a2771",
+          parent_id: "0016f50a614cd363",
+          name: "POST / http send",
+          type: "span",
+          input: null,
+          output: null,
+          params: {
+            asgi: {
+              event: {
+                type: "http.response.body",
+              },
+            },
+            scope: {
+              name: "opentelemetry.instrumentation.fastapi",
+              version: "0.47b0",
+            },
+          },
+          timestamps: {
+            started_at: 1722946507515,
+            finished_at: 1722946509074,
+          },
+        },
+        {
+          span_id: "0016f50a614cd363",
+          trace_id: "98bb760abcb20b66d2303bfad83a2771",
+          name: "POST /",
+          type: "server",
+          input: null,
+          output: null,
+          params: {
+            http: {
+              scheme: "http",
+              host: "127.0.0.1:8000",
+              flavor: 1.1,
+              target: "/",
+              url: "http://127.0.0.1:8000/",
+              method: "POST",
+              server_name: "0.0.0.0:8000",
+              user_agent:
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:128.0) Gecko/20100101 Firefox/128.0",
+              route: "/",
+              status_code: 404,
+            },
+            net: {
+              host: {
+                port: "8000",
+              },
+              peer: {
+                ip: "127.0.0.1",
+                port: "63047",
+              },
+            },
+            scope: {
+              name: "opentelemetry.instrumentation.fastapi",
+              version: "0.47b0",
+            },
+          },
+          timestamps: {
+            started_at: 1722942373770,
+            finished_at: 1722942375148,
+          },
+        },
+      ],
+      reservedTraceMetadata: {},
+      customMetadata: {
+        "service.name": "unknown_service",
         "telemetry.sdk.language": "python",
         "telemetry.sdk.name": "opentelemetry",
         "telemetry.sdk.version": "1.26.0",

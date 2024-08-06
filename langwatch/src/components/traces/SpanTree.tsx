@@ -3,28 +3,19 @@ import {
   AlertIcon,
   Box,
   HStack,
-  Heading,
   Skeleton,
-  Spacer,
-  Tag,
   Text,
-  Tooltip,
-  VStack,
+  VStack
 } from "@chakra-ui/react";
 import { useRouter } from "next/router";
 import numeral from "numeral";
 import { useEffect } from "react";
-import { Clock, Settings } from "react-feather";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
+import { useTraceDetailsState } from "../../hooks/useTraceDetailsState";
 import type { ElasticSearchSpan } from "../../server/tracer/types";
 import { api } from "../../utils/api";
-import { formatMilliseconds } from "../../utils/formatMilliseconds";
 import { isNotFound } from "../../utils/trpcError";
-import { RenderInputOutput } from "./RenderInputOutput";
-import { useTraceDetailsState } from "../../hooks/useTraceDetailsState";
-import { durationColor } from "~/utils/durationColor";
-import { TraceToPlaygroundLink } from "../TraceToPlaygroundLink";
-import { Link } from "@chakra-ui/next-js";
+import { SpanDetails, SpanDuration, SpanTypeTag } from "./SpanDetails";
 
 type SpanWithChildren = ElasticSearchSpan & { children: SpanWithChildren[] };
 
@@ -210,56 +201,6 @@ const TreeRenderer: React.FC<{ spans: ElasticSearchSpan[] }> = ({ spans }) => {
   );
 };
 
-const SpanTypeTag = ({ span }: { span: ElasticSearchSpan }) => {
-  return (
-    <Tag
-      colorScheme={
-        span.error
-          ? "red"
-          : {
-              llm: "green",
-              agent: "blue",
-              chain: "blue",
-              tool: "orange",
-              span: "gray",
-              rag: "red",
-              guardrail: "blue",
-              component: "gray",
-              workflow: "purple",
-              unknown: "gray",
-            }[span.type]
-      }
-      fontSize={13}
-    >
-      {span.type.toUpperCase()}
-    </Tag>
-  );
-};
-
-const SpanDuration = ({ span }: { span: ElasticSearchSpan }) => {
-  const duration = span.timestamps.finished_at - span.timestamps.started_at;
-
-  return (
-    <Tooltip
-      label={
-        <>
-          Started at: {new Date(span.timestamps.started_at).toLocaleString()}
-          <br />
-          Finished at: {new Date(span.timestamps.finished_at).toLocaleString()}
-        </>
-      }
-    >
-      <HStack
-        spacing={"6px"}
-        color={span.error ? "red" : durationColor("span", duration)}
-      >
-        <Clock width={12} />
-        <Text>{formatMilliseconds(duration)}</Text>
-      </HStack>
-    </Tooltip>
-  );
-};
-
 const SpanCost = ({ span }: { span: ElasticSearchSpan }) => {
   if (span.metrics?.cost === undefined) return null;
 
@@ -308,14 +249,6 @@ export function SpanTree(props: SpanTreeProps) {
     return <Alert status="error">Trace not found</Alert>;
   }
 
-  const estimatedCost = (
-    <Tooltip label="When `metrics.completion_tokens` and `metrics.prompt_tokens` are not available, they are estimated based on input, output and the model for calculating costs.">
-      <Text as="span" color="gray.400" borderBottom="1px dotted">
-        {" (estimated)"}
-      </Text>
-    </Tooltip>
-  );
-
   return (
     <VStack width="full">
       {spans.data ? (
@@ -326,202 +259,7 @@ export function SpanTree(props: SpanTreeProps) {
           flexDirection={{ base: "column", xl: "row" }}
         >
           <TreeRenderer spans={spans.data} />
-          {span && (
-            <VStack flexGrow={1} spacing={3} align="start">
-              <HStack width="full">
-                <SpanTypeTag span={span} />
-                <Heading as="h2" fontSize={22}>
-                  {span.name ?? span.model}
-                </Heading>
-                <Spacer />
-                {project &&
-                  span.type === "llm" &&
-                  span.input?.type === "chat_messages" && (
-                    <TraceToPlaygroundLink
-                      projectSlug={project.slug}
-                      traceId={traceId}
-                      spanId={span.span_id}
-                      tooltipLabel="Try different prompts and models for this LLM call on the playground"
-                      buttonLabel="Try in Playground"
-                    />
-                  )}
-              </HStack>
-              <VStack align="start" color="gray.500">
-                <HStack>
-                  <Text>
-                    <b>Span ID:</b> <Text as="code">{span.span_id}</Text>
-                  </Text>
-                </HStack>
-                <HStack>
-                  <Text>
-                    <b>Timestamp:</b>{" "}
-                    {new Date(span.timestamps.started_at).toISOString()}
-                  </Text>
-                </HStack>
-                <HStack>
-                  <Text>
-                    <b>Duration:</b>
-                  </Text>
-                  <SpanDuration span={span} />
-                </HStack>
-                {(span.metrics?.prompt_tokens !== undefined ||
-                  span.metrics?.completion_tokens !== undefined) && (
-                  <Text>
-                    <b>Tokens:</b>{" "}
-                    {(span.metrics?.prompt_tokens ?? 0) +
-                      " prompt + " +
-                      (span.metrics?.completion_tokens ?? 0) +
-                      " completion"}
-                    {span.metrics?.tokens_estimated && estimatedCost}
-                  </Text>
-                )}
-                {(span.vendor !== undefined || span.model !== undefined) && (
-                  <Text>
-                    <b>Model:</b>{" "}
-                    {[span.vendor, span.model].filter((x) => x).join("/")}
-                  </Text>
-                )}
-                {span.metrics?.cost !== undefined && (
-                  <HStack>
-                    <Text>
-                      <b>Cost:</b>{" "}
-                      {numeral(span.metrics.cost).format("$0.00000a")}
-                      {span.metrics?.tokens_estimated && estimatedCost}
-                    </Text>
-                    <Tooltip label="Edit model costs">
-                      <Link target="_blank" href={`/settings/model-costs`}>
-                        <Settings size={14} />
-                      </Link>
-                    </Tooltip>
-                  </HStack>
-                )}
-              </VStack>
-              {span.input && (
-                <VStack
-                  alignItems="flex-start"
-                  spacing={2}
-                  paddingTop={4}
-                  width="full"
-                >
-                  <Box
-                    fontSize={13}
-                    color="gray.400"
-                    textTransform="uppercase"
-                    fontWeight="bold"
-                  >
-                    Input
-                  </Box>
-                  <Box
-                    as="pre"
-                    borderRadius="6px"
-                    padding={4}
-                    borderWidth="1px"
-                    borderColor="gray.300"
-                    width="full"
-                    whiteSpace="pre-wrap"
-                  >
-                    <RenderInputOutput value={span.input?.value} />
-                  </Box>
-                </VStack>
-              )}
-              {span.contexts && (
-                <VStack
-                  alignItems="flex-start"
-                  spacing={2}
-                  paddingTop={4}
-                  width="full"
-                >
-                  <Box
-                    fontSize={13}
-                    color="gray.400"
-                    textTransform="uppercase"
-                    fontWeight="bold"
-                  >
-                    Contexts
-                  </Box>
-                  <Box
-                    as="pre"
-                    borderRadius="6px"
-                    padding={4}
-                    borderWidth="1px"
-                    borderColor="gray.300"
-                    width="full"
-                    whiteSpace="pre-wrap"
-                  >
-                    <RenderInputOutput
-                      value={JSON.stringify(
-                        span.contexts.map((context) => {
-                          if (typeof context.content === "string") {
-                            try {
-                              return {
-                                ...context,
-                                content: JSON.parse(context.content),
-                              };
-                            } catch (_) {
-                              return context;
-                            }
-                          }
-                          return context;
-                        })
-                      )}
-                    />
-                  </Box>
-                </VStack>
-              )}
-              {span.error ? (
-                <VStack alignItems="flex-start" spacing={2} width="full">
-                  <Box
-                    fontSize={13}
-                    color="red.400"
-                    textTransform="uppercase"
-                    fontWeight="bold"
-                  >
-                    Exception
-                  </Box>
-                  <Box
-                    as="pre"
-                    borderRadius="6px"
-                    padding={4}
-                    borderWidth="1px"
-                    borderColor="gray.300"
-                    width="full"
-                    whiteSpace="pre-wrap"
-                    color="red.900"
-                  >
-                    {span.error.stacktrace}
-                  </Box>
-                </VStack>
-              ) : (
-                span.output !== undefined &&
-                span.output !== null && (
-                  <VStack alignItems="flex-start" spacing={2} width="full">
-                    <Box
-                      fontSize={13}
-                      color="gray.400"
-                      textTransform="uppercase"
-                      fontWeight="bold"
-                    >
-                      Generated
-                    </Box>
-                    {!span.output && <Text>{"<empty>"}</Text>}
-                    {span.output && (
-                      <Box
-                        as="pre"
-                        borderRadius="6px"
-                        padding={4}
-                        borderWidth="1px"
-                        borderColor="gray.300"
-                        width="full"
-                        whiteSpace="pre-wrap"
-                      >
-                        <RenderInputOutput value={span.output.value} />
-                      </Box>
-                    )}
-                  </VStack>
-                )
-              )}
-            </VStack>
-          )}
+          {project && span && <SpanDetails project={project} span={span} />}
         </HStack>
       ) : spans.isError ? (
         <Alert status="error">

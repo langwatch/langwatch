@@ -96,6 +96,7 @@ export async function POST(req: NextRequest) {
         projectId: project.id,
         existingTrace,
         paramsMD5,
+        expectedOutput: undefined,
       })
     );
   }

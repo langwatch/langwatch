@@ -53,7 +53,7 @@ faiss-cpu = "^1.8.0"
 langchain-google-vertexai = "^1.0.5"
 openinference-instrumentation-openai = "^0.1.12"
 opentelemetry-instrumentation-openai = "^0.26.4"
-traceloop-sdk = "^0.26.4"
+opentelemetry-instrumentation-fastapi = "^0.47b0"
 
 [tool.poetry.group.test.dependencies]
 pytest = "^7.4.2"

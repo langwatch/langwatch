@@ -1,4 +1,6 @@
 import {
+  ESpanKind,
+  type Fixed64,
   type IAnyValue,
   type IExportTraceServiceRequest,
   type IInstrumentationScope,
@@ -6,13 +8,20 @@ import {
   type ISpan,
   // @ts-ignore
 } from "@opentelemetry/otlp-transformer";
-import type { BaseSpan, LLMSpan, Span, TypedValueChatMessages } from "./types";
+import type {
+  BaseSpan,
+  LLMSpan,
+  Span,
+  SpanTypes,
+  TypedValueChatMessages,
+} from "./types";
 import { cloneDeep } from "lodash";
 import {
   spanTypesSchema,
   typedValueChatMessagesSchema,
 } from "./types.generated";
 import type { CollectorJob } from "../background/types";
+import type { DeepPartial } from "../../utils/types";
 
 export type TraceForCollection = Pick<
   CollectorJob,
@@ -20,27 +29,34 @@ export type TraceForCollection = Pick<
 >;
 
 export const openTelemetryTraceRequestToTracesForCollection = (
-  otelTrace: IExportTraceServiceRequest
+  otelTrace: DeepPartial<IExportTraceServiceRequest>
 ): TraceForCollection[] => {
   // A single otelTrace may contain multiple traces with multiple spans each,
   // we need to account for that, that's why it's always one otelTrace to many traces
   decodeOpenTelemetryIds(otelTrace);
 
-  const traceIds =
-    otelTrace.resourceSpans?.flatMap((resourceSpan) => {
-      return (
-        resourceSpan.scopeSpans?.flatMap((scopeSpan) => {
-          return scopeSpan.spans?.flatMap((span) => span.traceId) ?? [];
-        }) ?? []
-      );
-    }) ?? [];
+  const traceIds = Array.from(
+    new Set(
+      otelTrace.resourceSpans?.flatMap((resourceSpan) => {
+        return (
+          resourceSpan?.scopeSpans?.flatMap((scopeSpan) => {
+            return (
+              scopeSpan?.spans?.flatMap((span) => span?.traceId as string) ?? []
+            );
+          }) ?? []
+        );
+      }) ?? []
+    )
+  );
 
   const traces: TraceForCollection[] = traceIds.map((traceId) =>
     openTelemetryTraceRequestToTraceForCollection(traceId, {
-      resourceSpans: otelTrace.resourceSpans?.filter((resourceSpan) =>
-        resourceSpan.scopeSpans.some((scopeSpan) =>
-          scopeSpan.spans.some((span) => span.traceId === traceId)
-        )
+      resourceSpans: otelTrace.resourceSpans?.filter(
+        (resourceSpan) =>
+          resourceSpan?.scopeSpans?.some(
+            (scopeSpan) =>
+              scopeSpan?.spans?.some((span) => span?.traceId === traceId)
+          )
       ),
     })
   );
@@ -48,15 +64,27 @@ export const openTelemetryTraceRequestToTracesForCollection = (
   return traces;
 };
 
-const decodeOpenTelemetryIds = (otelTrace: IExportTraceServiceRequest) => {
-  for (const resourceSpan of otelTrace.resourceSpans) {
-    for (const scopeSpan of resourceSpan.scopeSpans) {
-      for (const span of scopeSpan.spans) {
-        if (span.traceId) {
-          span.traceId = Buffer.from(span.traceId, "base64").toString("hex");
+const decodeOpenTelemetryIds = (
+  otelTrace: DeepPartial<IExportTraceServiceRequest>
+) => {
+  for (const resourceSpan of otelTrace.resourceSpans ?? []) {
+    for (const scopeSpan of resourceSpan?.scopeSpans ?? []) {
+      for (const span of scopeSpan?.spans ?? []) {
+        if (span?.traceId) {
+          span.traceId = Buffer.from(span.traceId as string, "base64").toString(
+            "hex"
+          );
         }
-        if (span.spanId) {
-          span.spanId = Buffer.from(span.spanId, "base64").toString("hex");
+        if (span?.spanId) {
+          span.spanId = Buffer.from(span.spanId as string, "base64").toString(
+            "hex"
+          );
+        }
+        if (span?.parentSpanId) {
+          span.parentSpanId = Buffer.from(
+            span.parentSpanId as string,
+            "base64"
+          ).toString("hex");
         }
       }
     }
@@ -65,20 +93,16 @@ const decodeOpenTelemetryIds = (otelTrace: IExportTraceServiceRequest) => {
 
 const openTelemetryTraceRequestToTraceForCollection = (
   traceId: string,
-  otelTrace_: IExportTraceServiceRequest
+  otelTrace_: DeepPartial<IExportTraceServiceRequest>
 ): TraceForCollection => {
   const otelTrace = cloneDeep(otelTrace_);
 
-  const customMetadata = {};
-  for (const resourceSpan of otelTrace.resourceSpans) {
-    for (const attribute of resourceSpan.resource.attributes) {
-      if (
-        attribute.key === "service.name" &&
-        attribute.value.stringValue === "unknown_service"
-      ) {
-        continue;
+  const customMetadata: Record<string, any> = {};
+  for (const resourceSpan of otelTrace.resourceSpans ?? []) {
+    for (const attribute of resourceSpan?.resource?.attributes ?? []) {
+      if (attribute?.key) {
+        customMetadata[attribute.key] = attribute?.value?.stringValue;
       }
-      customMetadata[attribute.key] = attribute.value.stringValue;
     }
   }
 
@@ -89,11 +113,11 @@ const openTelemetryTraceRequestToTraceForCollection = (
     customMetadata,
   };
 
-  for (const resourceSpan of otelTrace.resourceSpans) {
-    for (const scopeSpan of resourceSpan.scopeSpans) {
-      for (const span of scopeSpan.spans) {
-        if (span.traceId === traceId) {
-          addOpenTelemetrySpanAsSpan(trace, span, scopeSpan.scope);
+  for (const resourceSpan of otelTrace.resourceSpans ?? []) {
+    for (const scopeSpan of resourceSpan?.scopeSpans ?? []) {
+      for (const span of scopeSpan?.spans ?? []) {
+        if (span?.traceId === traceId) {
+          addOpenTelemetrySpanAsSpan(trace, span, scopeSpan?.scope);
         }
       }
     }
@@ -104,43 +128,78 @@ const openTelemetryTraceRequestToTraceForCollection = (
 
 const allowedSpanTypes = spanTypesSchema.options.map((option) => option.value);
 
+const parseTimestamp = (
+  timestamp: DeepPartial<Fixed64> | undefined
+): number | undefined => {
+  const unixNano =
+    typeof timestamp === "number"
+      ? timestamp
+      : typeof timestamp === "string"
+      ? parseInt(timestamp, 10)
+      : maybeConvertLongBits(timestamp);
+
+  return unixNano ? Math.round(unixNano / 1000 / 1000) : undefined;
+};
+
 const addOpenTelemetrySpanAsSpan = (
   trace: TraceForCollection,
-  otelSpan: ISpan,
-  otelScope: IInstrumentationScope | undefined
+  otelSpan: DeepPartial<ISpan>,
+  otelScope: DeepPartial<IInstrumentationScope> | undefined
 ): void => {
   let type: Span["type"] = "span";
-  let model: LLMSpan["model"] = null;
+  let model: LLMSpan["model"] = undefined;
   let input: LLMSpan["input"] = null;
   let output: LLMSpan["output"] = null;
   let params: Span["params"] = {};
-  const started_at: Span["timestamps"]["started_at"] = Math.round(
-    parseInt(otelSpan.startTimeUnixNano, 10) / 1000 / 1000
-  );
-  const finished_at: Span["timestamps"]["finished_at"] = Math.round(
-    parseInt(otelSpan.endTimeUnixNano, 10) / 1000 / 1000
-  );
+  const started_at: Span["timestamps"]["started_at"] | undefined =
+    parseTimestamp(otelSpan.startTimeUnixNano);
+
+  const finished_at: Span["timestamps"]["finished_at"] | undefined =
+    parseTimestamp(otelSpan.endTimeUnixNano);
 
   // First token at
   let first_token_at: Span["timestamps"]["first_token_at"] = null;
-  for (const event of otelSpan.events) {
+  for (const event of otelSpan?.events ?? []) {
     if (
-      event.name === "First Token Stream Event" ||
-      event.name === "llm.content.completion.chunk"
+      event?.name === "First Token Stream Event" ||
+      event?.name === "llm.content.completion.chunk"
     ) {
-      first_token_at = Math.round(
-        parseInt(event.timeUnixNano, 10) / 1000 / 1000
-      );
+      first_token_at = parseTimestamp(event?.timeUnixNano);
       break;
     }
   }
 
   // Type
+  if (
+    (otelSpan.kind as any) === "SPAN_KIND_SERVER" ||
+    otelSpan.kind === ESpanKind.SPAN_KIND_SERVER
+  ) {
+    type = "server";
+  }
+  if (
+    (otelSpan.kind as any) === "SPAN_KIND_CLIENT" ||
+    otelSpan.kind === ESpanKind.SPAN_KIND_CLIENT
+  ) {
+    type = "client";
+  }
+  if (
+    (otelSpan.kind as any) === "SPAN_KIND_PRODUCER" ||
+    otelSpan.kind === ESpanKind.SPAN_KIND_PRODUCER
+  ) {
+    type = "producer";
+  }
+  if (
+    (otelSpan.kind as any) === "SPAN_KIND_CONSUMER" ||
+    otelSpan.kind === ESpanKind.SPAN_KIND_CONSUMER
+  ) {
+    type = "consumer";
+  }
+
   const attributesMap = keyValueToObject(otelSpan.attributes);
   if (attributesMap.openinference?.span?.kind) {
     const kind_ = attributesMap.openinference.span.kind.toLowerCase();
-    if (allowedSpanTypes.includes(kind_)) {
-      type = kind_;
+    if (allowedSpanTypes.includes(kind_ as SpanTypes)) {
+      type = kind_ as SpanTypes;
       delete attributesMap.openinference.span.kind;
     }
   }
@@ -167,10 +226,15 @@ const addOpenTelemetrySpanAsSpan = (
   }
 
   // Input
-  if (Array.isArray(attributesMap.llm?.input_messages)) {
+  if (
+    attributesMap.llm?.input_messages &&
+    Array.isArray(attributesMap.llm.input_messages)
+  ) {
     const input_ = typedValueChatMessagesSchema.safeParse({
       type: "chat_messages",
-      value: attributesMap.llm.input_messages.map((message) => message.message),
+      value: attributesMap.llm.input_messages.map(
+        (message: { message?: string }) => message.message
+      ),
     });
 
     if (input_.success) {
@@ -179,7 +243,7 @@ const addOpenTelemetrySpanAsSpan = (
     }
   }
 
-  if (!input && Array.isArray(attributesMap.gen_ai?.prompt)) {
+  if (!input && attributesMap.gen_ai?.prompt && Array.isArray(attributesMap.gen_ai.prompt)) {
     const input_ = typedValueChatMessagesSchema.safeParse({
       type: "chat_messages",
       value: attributesMap.gen_ai.prompt,
@@ -206,11 +270,14 @@ const addOpenTelemetrySpanAsSpan = (
   delete attributesMap.input;
 
   // Output
-  if (Array.isArray(attributesMap.llm?.output_messages)) {
+  if (
+    attributesMap.llm?.output_messages &&
+    Array.isArray(attributesMap.llm.output_messages)
+  ) {
     const output_ = typedValueChatMessagesSchema.safeParse({
       type: "chat_messages",
       value: attributesMap.llm.output_messages.map(
-        (message) => message.message
+        (message: { message?: string }) => message.message
       ),
     });
 
@@ -220,7 +287,7 @@ const addOpenTelemetrySpanAsSpan = (
     }
   }
 
-  if (!output && Array.isArray(attributesMap.gen_ai?.completion)) {
+  if (!output && attributesMap.gen_ai?.completion && Array.isArray(attributesMap.gen_ai.completion)) {
     const output_ = typedValueChatMessagesSchema.safeParse({
       type: "chat_messages",
       value: attributesMap.gen_ai.completion,
@@ -257,7 +324,7 @@ const addOpenTelemetrySpanAsSpan = (
     delete attributesMap.session.id;
   }
 
-  if (Array.isArray(attributesMap.tag?.tags)) {
+  if (attributesMap.tag?.tags && Array.isArray(attributesMap.tag.tags)) {
     trace.reservedTraceMetadata.labels = attributesMap.tag.tags;
     delete attributesMap.tag.tags;
   }
@@ -269,7 +336,7 @@ const addOpenTelemetrySpanAsSpan = (
   ) {
     trace.customMetadata = {
       ...trace.customMetadata,
-      ...attributesMap.metadata,
+      ...(attributesMap.metadata as Record<string, any>),
     };
     delete attributesMap.metadata;
   }
@@ -278,7 +345,7 @@ const addOpenTelemetrySpanAsSpan = (
   if (attributesMap.llm?.invocation_parameters) {
     params = {
       ...params,
-      ...attributesMap.llm.invocation_parameters,
+      ...(attributesMap.llm.invocation_parameters as Record<string, any>),
     };
     delete attributesMap.llm.invocation_parameters;
   }
@@ -286,7 +353,10 @@ const addOpenTelemetrySpanAsSpan = (
   if (attributesMap.llm?.is_streaming) {
     params = {
       ...params,
-      stream: attributesMap.llm.is_streaming,
+      stream:
+        attributesMap.llm.is_streaming &&
+        attributesMap.llm.is_streaming !== "false" &&
+        attributesMap.llm.is_streaming !== "False",
     };
     delete attributesMap.llm.is_streaming;
   }
@@ -298,8 +368,9 @@ const addOpenTelemetrySpanAsSpan = (
   };
 
   const span: BaseSpan & { model: LLMSpan["model"] } = {
-    span_id: otelSpan.spanId,
-    trace_id: otelSpan.traceId,
+    span_id: otelSpan.spanId as string,
+    trace_id: otelSpan.traceId as string,
+    parent_id: otelSpan.parentSpanId as string,
     name: otelSpan.name,
     type,
     model,
@@ -307,36 +378,49 @@ const addOpenTelemetrySpanAsSpan = (
     output,
     params,
     timestamps: {
-      started_at,
-      finished_at,
+      ...(started_at ? { started_at } : {}),
+      ...(finished_at ? { finished_at } : {}),
       ...(first_token_at ? { first_token_at } : {}),
-    },
+    } as Span["timestamps"],
   };
 
   trace.spans.push(span);
 };
 
-const keyValueToObject = (attributes: IKeyValue): Record<string, any> => {
-  const result: Record<string, any> = {};
+type RecursiveRecord = {
+  [key: string]: (RecursiveRecord & string) | undefined;
+};
 
-  attributes.forEach(({ key, value }: { key: string; value: IAnyValue }) => {
-    const keys = key.split(".");
-    let current = result;
+const keyValueToObject = (
+  attributes: DeepPartial<IKeyValue[]> | undefined
+): RecursiveRecord => {
+  const result: RecursiveRecord = {};
 
-    keys.forEach((k, i) => {
-      if (i === keys.length - 1) {
-        current[k] = iAnyValueToValue(value);
-      } else {
-        if (/^\d+$/.test(keys[i + 1])) {
-          // Next key is a number, so this should be an array
-          current[k] = current[k] || [];
+  attributes?.forEach(
+    (
+      key_value: { key?: string; value?: DeepPartial<IAnyValue> } | undefined
+    ) => {
+      if (!key_value) return;
+      const { key, value } = key_value;
+
+      const keys = key?.split(".");
+      let current = result;
+
+      keys?.forEach((k, i) => {
+        if (i === keys.length - 1) {
+          current[k] = iAnyValueToValue(value);
         } else {
-          current[k] = current[k] || {};
+          if (/^\d+$/.test(keys[i + 1]!)) {
+            // Next key is a number, so this should be an array
+            current[k] = current[k] ?? ([] as any);
+          } else {
+            current[k] = current[k] ?? ({} as any);
+          }
+          current = current[k] as any;
         }
-        current = current[k];
-      }
-    });
-  });
+      });
+    }
+  );
 
   // Convert numbered object keys to arrays
   const convertToArrays = (obj: Record<string, any>): any => {
@@ -354,7 +438,34 @@ const keyValueToObject = (attributes: IKeyValue): Record<string, any> => {
   return convertToArrays(result);
 };
 
-const iAnyValueToValue = (value: IAnyValue): any => {
+const maybeConvertLongBits = (value: any): number => {
+  if (value && typeof value === "object" && "high" in value && "low" in value) {
+    const { high, low, unsigned } = value;
+
+    // Create a BigInt from the high and low bits
+    const result = (BigInt(high) << 32n) | (BigInt(low) & 0xffffffffn);
+
+    // If it's an unsigned long, return it as is
+    if (unsigned) {
+      return Number(result);
+    }
+
+    // For signed longs, we need to handle the two's complement representation
+    const signBit = 1n << 63n;
+    if (result & signBit) {
+      // If the sign bit is set, it's a negative number
+      return Number(-(~result & ((1n << 64n) - 1n)) - 1n);
+    } else {
+      // If the sign bit is not set, it's a positive number
+      return Number(result);
+    }
+  }
+  return value;
+};
+
+const iAnyValueToValue = (value: DeepPartial<IAnyValue> | undefined): any => {
+  if (typeof value === "undefined") return undefined;
+
   if (value.stringValue) {
     if (value.stringValue === "None") {
       return null; // badly parsed python null by openllmetry
@@ -367,26 +478,28 @@ const iAnyValueToValue = (value: IAnyValue): any => {
     }
   }
   if (value.arrayValue) {
-    return value.arrayValue.values.map((v) => iAnyValueToValue(v));
+    return value.arrayValue?.values?.map((v) => iAnyValueToValue(v));
   }
   if (value.boolValue) {
     return value.boolValue;
   }
   if (value.intValue) {
-    return value.intValue;
+    return maybeConvertLongBits(value.intValue);
   }
   if (value.doubleValue) {
-    return value.doubleValue;
+    return maybeConvertLongBits(value.doubleValue);
   }
   if (value.bytesValue) {
-    return Buffer.from(value.bytesValue.value).toString("base64");
+    return Buffer.from(value.bytesValue as Uint8Array).toString("base64");
   }
   if (value.kvlistValue) {
     return Object.fromEntries(
-      value.kvlistValue.values.map((v: IKeyValue) => [
-        v.key,
-        iAnyValueToValue(v),
-      ])
+      value.kvlistValue?.values?.map(
+        (v: DeepPartial<IKeyValue> | undefined) => [
+          v?.key,
+          iAnyValueToValue(v?.value),
+        ]
+      ) ?? []
     );
   }
 };

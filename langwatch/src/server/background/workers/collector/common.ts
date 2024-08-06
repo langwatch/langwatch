@@ -8,10 +8,11 @@ import type {
 } from "../../../tracer/types";
 
 export const getFirstInputAsText = (spans: Span[]): string => {
-  const topmostInputs = flattenSpanTree(
+  const topmostSpans = flattenSpanTree(
     organizeSpansIntoTree(spans),
     "outside-in"
-  ).filter(
+  );
+  const topmostInputs = topmostSpans.filter(
     (span) =>
       span.input &&
       span.input.value &&
@@ -20,7 +21,14 @@ export const getFirstInputAsText = (spans: Span[]): string => {
 
   const input = topmostInputs[0]?.input;
   if (!input) {
-    return "";
+    const topmostSpan = topmostSpans.filter((span) => !span.parent_id)[0];
+    if (
+      topmostSpan?.params?.http?.method &&
+      topmostSpan?.params?.http?.target
+    ) {
+      return `${topmostSpan?.params?.http?.method} ${topmostSpan?.params?.http?.target}`;
+    }
+    return topmostSpan?.name ?? "";
   }
   const text = typedValueToText(input, true);
   if (
@@ -68,6 +76,13 @@ export const getLastOutputAsText = (spans: Span[]): string => {
 
   const outputs = spansInFinishOrderDesc[0]?.output;
   if (!outputs) {
+    const topmostSpan = flattenSpanTree(
+      organizeSpansIntoTree(spans),
+      "outside-in"
+    ).filter((span) => !span.parent_id)[0];
+    if (topmostSpan?.params?.http?.status_code) {
+      return topmostSpan.params.http.status_code.toString();
+    }
     return "";
   }
   const firstOutput = outputs;

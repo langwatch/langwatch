@@ -20,9 +20,17 @@ describe("Span organizing and flattening tests", () => {
     {
       ...commonSpanProps,
       span_id: "1",
+      name: "topmost span",
       parent_id: null,
       timestamps: { started_at: 100, finished_at: 500 },
       input: { type: "text", value: "topmost input" },
+      params: {
+        http: {
+          method: "GET",
+          target: "/ws/socket.io",
+          status_code: 404,
+        },
+      },
     },
     {
       ...commonSpanProps,
@@ -99,5 +107,26 @@ describe("Span organizing and flattening tests", () => {
   it("should get the very last output as text", () => {
     const output = getLastOutputAsText(spans.sort(() => 0.5 - Math.random()));
     expect(output).toBe("bottommost output");
+  });
+
+  it("uses http method and target as input if there are no inputs, for opentelemetry http cases", () => {
+    const input = getFirstInputAsText(
+      spans.map((span) => ({ ...span, input: undefined }))
+    );
+    expect(input).toBe("GET /ws/socket.io");
+  });
+
+  it("uses span name as input if there are no inputs, for non-http opentelemetry cases", () => {
+    const input = getFirstInputAsText(
+      spans.map((span) => ({ ...span, input: undefined, params: undefined }))
+    );
+    expect(input).toBe("topmost span");
+  });
+
+  it("uses http status code as output if there are no outputs, for opentelemetry http cases", () => {
+    const output = getLastOutputAsText(
+      spans.map((span) => ({ ...span, output: undefined }))
+    );
+    expect(output).toBe("404");
   });
 });
