@@ -170,14 +170,14 @@ export interface BaseSpan {
   error?: ErrorCapture | null;
   timestamps: SpanTimestamps;
   metrics?: SpanMetrics | null;
-  params?: SpanParams;
+  params?: SpanParams | null;
 }
 
 export interface LLMSpan extends BaseSpan {
   type: "llm";
   // TODO: deprecate field, standardize on litellm model names
   vendor?: string | null;
-  model?: string;
+  model?: string | null;
 }
 
 export interface RAGChunk {
