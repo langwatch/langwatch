@@ -119,7 +119,9 @@ export default async function handler(
       JSON.stringify(req.body, null, "  "),
       { projectId: project.id }
     );
-    Sentry.captureException(error, { extra: { projectId: project.id } });
+    Sentry.captureException(new Error("ZodError on parsing body"), {
+      extra: { projectId: project.id, body: req.body, zodError: error },
+    });
 
     const validationError = fromZodError(error as ZodError);
     return res.status(400).json({ error: validationError.message });
@@ -154,6 +156,13 @@ export default async function handler(
     }
   } catch (error) {
     const validationError = fromZodError(error as ZodError);
+    Sentry.captureException(new Error("ZodError on parsing metadata"), {
+      extra: {
+        projectId: project.id,
+        metadata: params.metadata,
+        zodError: error,
+      },
+    });
     return res.status(400).json({ error: validationError.message });
   }
 
@@ -241,7 +250,9 @@ export default async function handler(
       debug("Invalid span received", error, JSON.stringify(span, null, "  "), {
         projectId: project.id,
       });
-      Sentry.captureException(error, { extra: { projectId: project.id } });
+      Sentry.captureException(new Error("ZodError on parsing spans"), {
+        extra: { projectId: project.id, span, zodError: error },
+      });
 
       const validationError = fromZodError(error as ZodError);
       return res
