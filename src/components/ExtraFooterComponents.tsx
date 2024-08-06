@@ -43,9 +43,11 @@ export function SignedInExtraFooterComponents() {
     const gtag = (window as any).gtag;
     if (!session.data?.user || !organization || !project || !gtag) return;
 
-    void user.mutate({
-      userId: session.data.user.id,
-    });
+    if (!(session.data.user as any).impersonator) {
+      void user.mutate({
+        userId: session.data.user.id,
+      });
+    }
 
     gtag("event", "open_dashboard", {
       organization_id: organization.id,
