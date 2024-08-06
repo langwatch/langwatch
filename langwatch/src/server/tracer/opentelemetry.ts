@@ -1,5 +1,6 @@
 import {
   ESpanKind,
+  EStatusCode,
   type Fixed64,
   type IAnyValue,
   type IExportTraceServiceRequest,
@@ -153,9 +154,9 @@ const addOpenTelemetrySpanAsSpan = (
   let params: Span["params"] = {};
   const started_at: Span["timestamps"]["started_at"] | undefined =
     parseTimestamp(otelSpan.startTimeUnixNano);
-
   const finished_at: Span["timestamps"]["finished_at"] | undefined =
     parseTimestamp(otelSpan.endTimeUnixNano);
+  let error: Span["error"] = null;
 
   // First token at
   let first_token_at: Span["timestamps"]["first_token_at"] = null;
@@ -243,7 +244,11 @@ const addOpenTelemetrySpanAsSpan = (
     }
   }
 
-  if (!input && attributesMap.gen_ai?.prompt && Array.isArray(attributesMap.gen_ai.prompt)) {
+  if (
+    !input &&
+    attributesMap.gen_ai?.prompt &&
+    Array.isArray(attributesMap.gen_ai.prompt)
+  ) {
     const input_ = typedValueChatMessagesSchema.safeParse({
       type: "chat_messages",
       value: attributesMap.gen_ai.prompt,
@@ -287,7 +292,11 @@ const addOpenTelemetrySpanAsSpan = (
     }
   }
 
-  if (!output && attributesMap.gen_ai?.completion && Array.isArray(attributesMap.gen_ai.completion)) {
+  if (
+    !output &&
+    attributesMap.gen_ai?.completion &&
+    Array.isArray(attributesMap.gen_ai.completion)
+  ) {
     const output_ = typedValueChatMessagesSchema.safeParse({
       type: "chat_messages",
       value: attributesMap.gen_ai.completion,
@@ -367,15 +376,49 @@ const addOpenTelemetrySpanAsSpan = (
     ...(otelScope ? { scope: otelScope } : {}),
   };
 
+  // Exception
+  if (
+    (otelSpan.status?.code as any) === "STATUS_CODE_ERROR" ||
+    (otelSpan.status?.code as any) === 2 // EStatusCode.STATUS_CODE_ERROR
+  ) {
+    error = {
+      has_error: true,
+      message: otelSpan.status?.message ?? "Exception",
+      stacktrace: [],
+    };
+  }
+
+  for (const event of otelSpan?.events ?? []) {
+    if (event?.name === "exception") {
+      const eventAttributes = keyValueToObject(event?.attributes);
+      error = {
+        has_error: true,
+        message:
+          eventAttributes.exception?.message && eventAttributes.exception?.type
+            ? `${eventAttributes.exception.type}: ${eventAttributes.exception.message}`
+            : eventAttributes.exception?.message &&
+              eventAttributes.exception?.type
+            ? `${eventAttributes.exception.type}: ${eventAttributes.exception.message}`
+            : otelSpan.status?.message ?? "Exception",
+        stacktrace: eventAttributes.exception?.stacktrace
+          ? (eventAttributes.exception?.stacktrace as string).split("\n")
+          : [],
+      };
+    }
+  }
+
   const span: BaseSpan & { model: LLMSpan["model"] } = {
     span_id: otelSpan.spanId as string,
     trace_id: otelSpan.traceId as string,
-    parent_id: otelSpan.parentSpanId as string,
+    ...(otelSpan.parentSpanId
+      ? { parent_id: otelSpan.parentSpanId as string }
+      : {}),
     name: otelSpan.name,
     type,
     model,
     input,
     output,
+    ...(error ? { error } : {}),
     params,
     timestamps: {
       ...(started_at ? { started_at } : {}),

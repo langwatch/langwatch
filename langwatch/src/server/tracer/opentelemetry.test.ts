@@ -588,6 +588,153 @@ const fastApiOpenTelemetryRequest: DeepPartial<IExportTraceServiceRequest> = {
   ],
 };
 
+const traceWithException: DeepPartial<IExportTraceServiceRequest> = {
+  resourceSpans: [
+    {
+      resource: {
+        attributes: [
+          {
+            key: "service.name",
+            value: {
+              stringValue: "fastapi_sample_endpoint",
+            },
+          },
+        ],
+      },
+      scopeSpans: [
+        {
+          scope: {
+            name: "opentelemetry.instrumentation.fastapi",
+            version: "0.47b0",
+          },
+          spans: [
+            {
+              traceId: "1SNx9GTvt0O0YyRUSGOwew==",
+              spanId: "7ok1RgTVkrg=",
+              name: "POST /",
+              kind: "SPAN_KIND_SERVER" as unknown as ESpanKind,
+              startTimeUnixNano: "1722958611402254000",
+              endTimeUnixNano: "1722958616308867000",
+              attributes: [
+                {
+                  key: "http.scheme",
+                  value: {
+                    stringValue: "http",
+                  },
+                },
+                {
+                  key: "http.host",
+                  value: {
+                    stringValue: "127.0.0.1:8000",
+                  },
+                },
+                {
+                  key: "net.host.port",
+                  value: {
+                    intValue: 8000,
+                  },
+                },
+                {
+                  key: "http.flavor",
+                  value: {
+                    stringValue: "1.1",
+                  },
+                },
+                {
+                  key: "http.target",
+                  value: {
+                    stringValue: "/",
+                  },
+                },
+                {
+                  key: "http.url",
+                  value: {
+                    stringValue: "http://127.0.0.1:8000/",
+                  },
+                },
+                {
+                  key: "http.method",
+                  value: {
+                    stringValue: "POST",
+                  },
+                },
+                {
+                  key: "http.server_name",
+                  value: {
+                    stringValue: "0.0.0.0:8000",
+                  },
+                },
+                {
+                  key: "http.user_agent",
+                  value: {
+                    stringValue:
+                      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:128.0) Gecko/20100101 Firefox/128.0",
+                  },
+                },
+                {
+                  key: "net.peer.ip",
+                  value: {
+                    stringValue: "127.0.0.1",
+                  },
+                },
+                {
+                  key: "net.peer.port",
+                  value: {
+                    intValue: 55903,
+                  },
+                },
+                {
+                  key: "http.route",
+                  value: {
+                    stringValue: "/",
+                  },
+                },
+              ],
+              events: [
+                {
+                  timeUnixNano: "1722958616308696000",
+                  name: "exception",
+                  attributes: [
+                    {
+                      key: "exception.type",
+                      value: {
+                        stringValue: "Exception",
+                      },
+                    },
+                    {
+                      key: "exception.message",
+                      value: {
+                        stringValue: "BROKEN",
+                      },
+                    },
+                    {
+                      key: "exception.stacktrace",
+                      value: {
+                        stringValue:
+                          'Traceback (most recent call last):\n  File "/Users/rchaves/Projects/langwatch-saas/langwatch/python-sdk/.venv/lib/python3.9/site-packages/opentelemetry/trace/__init__.py", line 583, in use_span\n    yield span\n  File "/Users/rchaves/Projects/langwatch-saas/langwatch/python-sdk/.venv/lib/python3.9/site-packages/opentelemetry/instrumentation/asgi/__init__.py", line 731, in __call__\n    await self.app(scope, otel_receive, otel_send)\n  File "/Users/rchaves/Projects/langwatch-saas/langwatch/python-sdk/.venv/lib/python3.9/site-packages/starlette/middleware/exceptions.py", line 79, in __call__\n    raise exc\n  File "/Users/rchaves/Projects/langwatch-saas/langwatch/python-sdk/.venv/lib/python3.9/site-packages/starlette/middleware/exceptions.py", line 68, in __call__\n    await self.app(scope, receive, sender)\n  File "/Users/rchaves/Projects/langwatch-saas/langwatch/python-sdk/.venv/lib/python3.9/site-packages/fastapi/middleware/asyncexitstack.py", line 20, in __call__\n    raise e\n  File "/Users/rchaves/Projects/langwatch-saas/langwatch/python-sdk/.venv/lib/python3.9/site-packages/fastapi/middleware/asyncexitstack.py", line 17, in __call__\n    await self.app(scope, receive, send)\n  File "/Users/rchaves/Projects/langwatch-saas/langwatch/python-sdk/.venv/lib/python3.9/site-packages/starlette/routing.py", line 718, in __call__\n    await route.handle(scope, receive, send)\n  File "/Users/rchaves/Projects/langwatch-saas/langwatch/python-sdk/.venv/lib/python3.9/site-packages/starlette/routing.py", line 276, in handle\n    await self.app(scope, receive, send)\n  File "/Users/rchaves/Projects/langwatch-saas/langwatch/python-sdk/.venv/lib/python3.9/site-packages/starlette/routing.py", line 66, in app\n    response = await func(request)\n  File "/Users/rchaves/Projects/langwatch-saas/langwatch/python-sdk/.venv/lib/python3.9/site-packages/fastapi/routing.py", line 273, in app\n    raw_response = await run_endpoint_function(\n  File "/Users/rchaves/Projects/langwatch-saas/langwatch/python-sdk/.venv/lib/python3.9/site-packages/fastapi/routing.py", line 192, in run_endpoint_function\n    return await run_in_threadpool(dependant.call, **values)\n  File "/Users/rchaves/Projects/langwatch-saas/langwatch/python-sdk/.venv/lib/python3.9/site-packages/starlette/concurrency.py", line 41, in run_in_threadpool\n    return await anyio.to_thread.run_sync(func, *args)\n  File "/Users/rchaves/Projects/langwatch-saas/langwatch/python-sdk/.venv/lib/python3.9/site-packages/anyio/to_thread.py", line 33, in run_sync\n    return await get_asynclib().run_sync_in_worker_thread(\n  File "/Users/rchaves/Projects/langwatch-saas/langwatch/python-sdk/.venv/lib/python3.9/site-packages/anyio/_backends/_asyncio.py", line 877, in run_sync_in_worker_thread\n    return await future\n  File "/Users/rchaves/Projects/langwatch-saas/langwatch/python-sdk/.venv/lib/python3.9/site-packages/anyio/_backends/_asyncio.py", line 807, in run\n    result = context.run(func, *args)\n  File "/Users/rchaves/Projects/langwatch-saas/langwatch/python-sdk/examples/opentelemetry/traditional_instrumentation_fastapi_app.py", line 50, in fastapi_sample_endpoint\n    raise Exception("BROKEN")\nException: BROKEN\n',
+                      },
+                    },
+                    {
+                      key: "exception.escaped",
+                      value: {
+                        stringValue: "False",
+                      },
+                    },
+                  ],
+                },
+              ],
+              status: {
+                message: "Exception: BROKEN",
+                code: "STATUS_CODE_ERROR" as unknown as EStatusCode,
+              },
+            },
+          ],
+        },
+      ],
+    },
+  ],
+};
+
 describe("opentelemetry traces receiver", () => {
   it("receives a basic openai trace for openinference", async () => {
     const traces = openTelemetryTraceRequestToTracesForCollection(
@@ -841,6 +988,114 @@ describe("opentelemetry traces receiver", () => {
         "telemetry.sdk.language": "python",
         "telemetry.sdk.name": "opentelemetry",
         "telemetry.sdk.version": "1.26.0",
+      },
+    });
+  });
+
+  it("receives a trace with an exception", async () => {
+    const traces =
+      openTelemetryTraceRequestToTracesForCollection(traceWithException);
+
+    expect(traces).toHaveLength(1);
+
+    const trace = traces[0];
+
+    try {
+      z.array(spanSchema).parse(trace!.spans);
+    } catch (error) {
+      const validationError = fromZodError(error as ZodError);
+      console.log("trace", JSON.stringify(trace, undefined, 2));
+      console.log("validationError", validationError);
+      assert.fail(validationError.message);
+    }
+
+    expect(trace).toEqual({
+      traceId: "d52371f464efb743b46324544863b07b",
+      spans: [
+        {
+          span_id: "ee89354604d592b8",
+          trace_id: "d52371f464efb743b46324544863b07b",
+          name: "POST /",
+          type: "server",
+          input: null,
+          output: null,
+          error: {
+            has_error: true,
+            message: "Exception: BROKEN",
+            stacktrace: [
+              "Traceback (most recent call last):",
+              '  File "/Users/rchaves/Projects/langwatch-saas/langwatch/python-sdk/.venv/lib/python3.9/site-packages/opentelemetry/trace/__init__.py", line 583, in use_span',
+              "    yield span",
+              '  File "/Users/rchaves/Projects/langwatch-saas/langwatch/python-sdk/.venv/lib/python3.9/site-packages/opentelemetry/instrumentation/asgi/__init__.py", line 731, in __call__',
+              "    await self.app(scope, otel_receive, otel_send)",
+              '  File "/Users/rchaves/Projects/langwatch-saas/langwatch/python-sdk/.venv/lib/python3.9/site-packages/starlette/middleware/exceptions.py", line 79, in __call__',
+              "    raise exc",
+              '  File "/Users/rchaves/Projects/langwatch-saas/langwatch/python-sdk/.venv/lib/python3.9/site-packages/starlette/middleware/exceptions.py", line 68, in __call__',
+              "    await self.app(scope, receive, sender)",
+              '  File "/Users/rchaves/Projects/langwatch-saas/langwatch/python-sdk/.venv/lib/python3.9/site-packages/fastapi/middleware/asyncexitstack.py", line 20, in __call__',
+              "    raise e",
+              '  File "/Users/rchaves/Projects/langwatch-saas/langwatch/python-sdk/.venv/lib/python3.9/site-packages/fastapi/middleware/asyncexitstack.py", line 17, in __call__',
+              "    await self.app(scope, receive, send)",
+              '  File "/Users/rchaves/Projects/langwatch-saas/langwatch/python-sdk/.venv/lib/python3.9/site-packages/starlette/routing.py", line 718, in __call__',
+              "    await route.handle(scope, receive, send)",
+              '  File "/Users/rchaves/Projects/langwatch-saas/langwatch/python-sdk/.venv/lib/python3.9/site-packages/starlette/routing.py", line 276, in handle',
+              "    await self.app(scope, receive, send)",
+              '  File "/Users/rchaves/Projects/langwatch-saas/langwatch/python-sdk/.venv/lib/python3.9/site-packages/starlette/routing.py", line 66, in app',
+              "    response = await func(request)",
+              '  File "/Users/rchaves/Projects/langwatch-saas/langwatch/python-sdk/.venv/lib/python3.9/site-packages/fastapi/routing.py", line 273, in app',
+              "    raw_response = await run_endpoint_function(",
+              '  File "/Users/rchaves/Projects/langwatch-saas/langwatch/python-sdk/.venv/lib/python3.9/site-packages/fastapi/routing.py", line 192, in run_endpoint_function',
+              "    return await run_in_threadpool(dependant.call, **values)",
+              '  File "/Users/rchaves/Projects/langwatch-saas/langwatch/python-sdk/.venv/lib/python3.9/site-packages/starlette/concurrency.py", line 41, in run_in_threadpool',
+              "    return await anyio.to_thread.run_sync(func, *args)",
+              '  File "/Users/rchaves/Projects/langwatch-saas/langwatch/python-sdk/.venv/lib/python3.9/site-packages/anyio/to_thread.py", line 33, in run_sync',
+              "    return await get_asynclib().run_sync_in_worker_thread(",
+              '  File "/Users/rchaves/Projects/langwatch-saas/langwatch/python-sdk/.venv/lib/python3.9/site-packages/anyio/_backends/_asyncio.py", line 877, in run_sync_in_worker_thread',
+              "    return await future",
+              '  File "/Users/rchaves/Projects/langwatch-saas/langwatch/python-sdk/.venv/lib/python3.9/site-packages/anyio/_backends/_asyncio.py", line 807, in run',
+              "    result = context.run(func, *args)",
+              '  File "/Users/rchaves/Projects/langwatch-saas/langwatch/python-sdk/examples/opentelemetry/traditional_instrumentation_fastapi_app.py", line 50, in fastapi_sample_endpoint',
+              '    raise Exception("BROKEN")',
+              "Exception: BROKEN",
+              "",
+            ],
+          },
+          params: {
+            http: {
+              scheme: "http",
+              host: "127.0.0.1:8000",
+              flavor: 1.1,
+              target: "/",
+              url: "http://127.0.0.1:8000/",
+              method: "POST",
+              server_name: "0.0.0.0:8000",
+              user_agent:
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:128.0) Gecko/20100101 Firefox/128.0",
+              route: "/",
+            },
+            net: {
+              host: {
+                port: 8000,
+              },
+              peer: {
+                ip: "127.0.0.1",
+                port: 55903,
+              },
+            },
+            scope: {
+              name: "opentelemetry.instrumentation.fastapi",
+              version: "0.47b0",
+            },
+          },
+          timestamps: {
+            started_at: 1722958611402,
+            finished_at: 1722958616309,
+          },
+        },
+      ],
+      reservedTraceMetadata: {},
+      customMetadata: {
+        "service.name": "fastapi_sample_endpoint",
       },
     });
   });
