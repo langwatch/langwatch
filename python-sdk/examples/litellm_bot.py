@@ -8,9 +8,6 @@ import litellm
 from litellm import CustomStreamWrapper
 from litellm.types.utils import StreamingChoices
 
-import sys
-
-sys.path.append("..")
 import langwatch
 
 

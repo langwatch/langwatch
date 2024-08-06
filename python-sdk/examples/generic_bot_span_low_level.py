@@ -6,9 +6,6 @@ load_dotenv()
 
 import chainlit as cl
 
-import sys
-
-sys.path.append("..")
 import langwatch
 
 

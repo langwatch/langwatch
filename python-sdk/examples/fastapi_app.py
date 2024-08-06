@@ -9,9 +9,6 @@ from pydantic import BaseModel
 
 client = OpenAI()
 
-import sys
-
-sys.path.append("..")
 import langwatch
 
 app = FastAPI()

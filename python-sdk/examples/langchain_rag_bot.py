@@ -9,9 +9,6 @@ from langchain.prompts import ChatPromptTemplate
 from langchain.schema import HumanMessage
 from langchain.schema.runnable.config import RunnableConfig
 
-import sys
-
-sys.path.append("..")
 import langwatch
 
 from langchain_community.document_loaders import WebBaseLoader

@@ -7,7 +7,6 @@ import asyncio
 import chainlit as cl
 
 from chainlit.context import init_http_context
-import langwatch
 from langwatch.tracer import ContextTrace
 
 

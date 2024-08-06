@@ -9,9 +9,6 @@ from langchain.schema import StrOutputParser
 from langchain.schema.runnable import Runnable
 from langchain.schema.runnable.config import RunnableConfig
 
-import sys
-
-sys.path.append("..")
 import langwatch
 
 

@@ -4,13 +4,10 @@ load_dotenv()
 
 import chainlit as cl
 from openai import OpenAI
+import langwatch
 
 client = OpenAI()
 
-import sys
-
-sys.path.append("..")
-import langwatch
 
 @cl.on_message
 @langwatch.trace()

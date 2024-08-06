@@ -8,9 +8,6 @@ from openai import AsyncOpenAI
 
 client = AsyncOpenAI()
 
-import sys
-
-sys.path.append("..")
 import langwatch.openai
 import langwatch.guardrails
 

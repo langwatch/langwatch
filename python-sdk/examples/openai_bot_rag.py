@@ -9,9 +9,6 @@ from openai import OpenAI
 
 client = OpenAI()
 
-import sys
-
-sys.path.append("..")
 import langwatch.openai
 
 

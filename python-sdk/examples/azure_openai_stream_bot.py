@@ -9,9 +9,6 @@ load_dotenv()
 import chainlit as cl
 from openai import AzureOpenAI
 
-import sys
-
-sys.path.append("..")
 import langwatch
 
 client = AzureOpenAI(
