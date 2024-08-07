@@ -166,6 +166,14 @@ export const typedValueToText = (
         return stringified(json.prompt);
       }
 
+      // Langgraph on Flowise
+      if (json.messages?.[0]?.content !== undefined) {
+        return stringified(json.messages[0].content);
+      }
+      if (json.return_values?.output !== undefined) {
+        return stringified(json.return_values.output);
+      }
+
       return undefined;
     };
 
