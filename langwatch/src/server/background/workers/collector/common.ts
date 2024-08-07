@@ -161,6 +161,11 @@ export const typedValueToText = (
         return stringified(json.content);
       }
 
+      // Haystack
+      if (json.prompt !== undefined) {
+        return stringified(json.prompt);
+      }
+
       return undefined;
     };
 

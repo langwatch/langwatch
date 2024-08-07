@@ -5,7 +5,7 @@ import {
   type IExportTraceServiceRequest,
   type IInstrumentationScope,
   type IKeyValue,
-  type ISpan
+  type ISpan,
 } from "@opentelemetry/otlp-transformer";
 import { cloneDeep } from "lodash";
 import type { DeepPartial } from "../../utils/types";
@@ -211,7 +211,10 @@ const addOpenTelemetrySpanAsSpan = (
     }
   }
 
-  if (attributesMap.llm?.request?.type === "chat") {
+  if (
+    attributesMap.llm?.request?.type === "chat" ||
+    attributesMap.llm?.request?.type === "completion"
+  ) {
     type = "llm";
     delete attributesMap.llm.request.type;
   }
@@ -326,6 +329,20 @@ const addOpenTelemetrySpanAsSpan = (
       output = output_.data as TypedValueChatMessages;
       delete attributesMap.gen_ai.completion;
     }
+  }
+
+  if (!output && attributesMap.llm?.output_messages) {
+    output =
+      typeof attributesMap.llm.output_messages === "string"
+        ? {
+            type: "text",
+            value: attributesMap.llm.output_messages,
+          }
+        : {
+            type: "json",
+            value: attributesMap.llm.output_messages,
+          };
+    delete attributesMap.llm.output_messages;
   }
 
   if (!output && attributesMap.traceloop?.entity?.output) {

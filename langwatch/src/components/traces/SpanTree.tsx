@@ -5,7 +5,7 @@ import {
   HStack,
   Skeleton,
   Text,
-  VStack
+  VStack,
 } from "@chakra-ui/react";
 import { useRouter } from "next/router";
 import numeral from "numeral";
@@ -178,17 +178,17 @@ const SpanNode: React.FC<SpanNodeProps> = ({ span, level }) => {
 
 const TreeRenderer: React.FC<{ spans: ElasticSearchSpan[] }> = ({ spans }) => {
   const tree = buildTree(spans);
-  let rootSpans = spans.filter((s) => !s.parent_id);
-  if (!rootSpans.length) {
-    const spansById = spans.reduce(
-      (acc, span) => {
-        acc[span.span_id] = span;
-        return acc;
-      },
-      {} as Record<string, ElasticSearchSpan>
-    );
-    rootSpans = spans.filter((s) => !s.parent_id || !spansById[s.parent_id]);
-  }
+
+  const spansById = spans.reduce(
+    (acc, span) => {
+      acc[span.span_id] = span;
+      return acc;
+    },
+    {} as Record<string, ElasticSearchSpan>
+  );
+  const rootSpans = spans.filter(
+    (s) => !s.parent_id || !spansById[s.parent_id]
+  );
 
   return (
     <VStack align="start" flexShrink={0} spacing={6}>

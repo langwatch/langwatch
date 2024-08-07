@@ -56,6 +56,11 @@ opentelemetry-instrumentation-openai = "^0.26.4"
 opentelemetry-instrumentation-fastapi = "^0.47b0"
 openinference-instrumentation-langchain = "^0.1.26"
 opentelemetry-instrumentation-langchain = "^0.26.5"
+opentelemetry-instrumentation-anthropic = "^0.26.5"
+openinference-instrumentation-haystack = "^0.1.3"
+openinference-instrumentation-dspy = "^0.1.10"
+opentelemetry-instrumentation-llamaindex = "^0.26.5"
+haystack-ai = "^2.3.1"
 
 [tool.poetry.group.test.dependencies]
 pytest = "^7.4.2"

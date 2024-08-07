@@ -370,7 +370,7 @@ dev = ["freezegun (>=1.0,<2.0)", "pytest (>=6.0)", "pytest-cov"]
 name = "backoff"
 version = "2.2.1"
 description = "Function decoration for backoff and retry"
-optional = true
+optional = false
 python-versions = ">=3.7,<4.0"
 files = [
     {file = "backoff-2.2.1-py3-none-any.whl", hash = "sha256:63579f9a0628e06278f7e47b7d7d5b6ce20dc65c5e96a6f3ca99a6adca0396e8"},
@@ -1703,6 +1703,48 @@ files = [
 ]
 
 [[package]]
+name = "haystack-ai"
+version = "2.3.1"
+description = "LLM framework to build customizable, production-ready LLM applications. Connect components (models, vector DBs, file converters) to pipelines or agents that can interact with your data."
+optional = false
+python-versions = ">=3.8"
+files = [
+    {file = "haystack_ai-2.3.1-py3-none-any.whl", hash = "sha256:578414a2e2bf28d9fb94f743ca6b1a3e70e18dbfca091e3658eaaefaab8c46e5"},
+    {file = "haystack_ai-2.3.1.tar.gz", hash = "sha256:058f61afc7671d4c336ee25dd5ffcc80acffa09ba9c4283a939e971d49b99785"},
+]
+
+[package.dependencies]
+haystack-experimental = "*"
+jinja2 = "*"
+lazy-imports = "*"
+more-itertools = "*"
+networkx = "*"
+numpy = "<2"
+openai = ">=1.1.0"
+pandas = "*"
+posthog = "*"
+python-dateutil = "*"
+pyyaml = "*"
+requests = "*"
+tenacity = "!=8.4.0"
+tqdm = "*"
+typing-extensions = ">=4.7"
+
+[[package]]
+name = "haystack-experimental"
+version = "0.1.1"
+description = "Experimental components and features for the Haystack LLM framework."
+optional = false
+python-versions = ">=3.8"
+files = [
+    {file = "haystack_experimental-0.1.1-py3-none-any.whl", hash = "sha256:c11fa89c0754dafd3ec25220c02e459d784acda7a9c047e3297e1b11f35ebb06"},
+    {file = "haystack_experimental-0.1.1.tar.gz", hash = "sha256:64cc58d54b9cf9a2957616e4cb44a10c12e36ab640ebe0c38e7cc70300cb6726"},
+]
+
+[package.dependencies]
+haystack-ai = "*"
+
+[[package]]
 name = "httpcore"
 version = "1.0.5"
 description = "A minimal low-level HTTP client."
@@ -1810,6 +1852,17 @@ zipp = ">=0.5"
 docs = ["furo", "jaraco.packaging (>=9.3)", "jaraco.tidelift (>=1.4)", "rst.linker (>=1.9)", "sphinx (>=3.5)", "sphinx-lint"]
 perf = ["ipython"]
 testing = ["flufl.flake8", "importlib-resources (>=1.3)", "jaraco.test (>=5.4)", "packaging", "pyfakefs", "pytest (>=6)", "pytest-checkdocs (>=2.4)", "pytest-cov", "pytest-enabler (>=2.2)", "pytest-mypy", "pytest-perf (>=0.9.2)", "pytest-ruff (>=0.2.1)"]
+
+[[package]]
+name = "inflection"
+version = "0.5.1"
+description = "A port of Ruby on Rails inflector to Python"
+optional = false
+python-versions = ">=3.5"
+files = [
+    {file = "inflection-0.5.1-py2.py3-none-any.whl", hash = "sha256:f38b2b640938a4f35ade69ac3d053042959b62a0f1076a5bbaa1b9526605a8a2"},
+    {file = "inflection-0.5.1.tar.gz", hash = "sha256:1a29730d366e996aaacffb2f1f1cb9593dc38e2ddd30c91250c6dde09ea9b417"},
+]
 
 [[package]]
 name = "iniconfig"
@@ -2473,6 +2526,22 @@ files = [
 ]
 
 [[package]]
+name = "lazy-imports"
+version = "0.3.1"
+description = "Tool to support lazy imports"
+optional = false
+python-versions = ">=3.6"
+files = [
+    {file = "lazy_imports-0.3.1-py3-none-any.whl", hash = "sha256:149500cb1015726f5148155989386b30b425dfd7e48fd156385eb1c9e23887dd"},
+    {file = "lazy_imports-0.3.1.tar.gz", hash = "sha256:636624104bf45b09761323e06292927832aca067c3c199e5de483738789aeb21"},
+]
+
+[package.extras]
+all = ["black", "flake8", "isort", "mdformat", "mypy", "packaging", "pydocstyle", "pylint", "pylintfileheader", "pytest"]
+checking = ["black", "flake8", "isort", "mdformat", "mypy", "pydocstyle", "pylint", "pylintfileheader"]
+testing = ["packaging", "pytest"]
+
+[[package]]
 name = "litellm"
 version = "1.41.20"
 description = "Library to easily interface with LLM API providers"
@@ -2644,6 +2713,28 @@ python-versions = ">=3.7"
 files = [
     {file = "mistune-3.0.2-py3-none-any.whl", hash = "sha256:71481854c30fdbc938963d3605b72501f5c10a9320ecd412c121c163a1c7d205"},
     {file = "mistune-3.0.2.tar.gz", hash = "sha256:fc7f93ded930c92394ef2cb6f04a8aabab4117a91449e72dcc8dfa646a508be8"},
+]
+
+[[package]]
+name = "monotonic"
+version = "1.6"
+description = "An implementation of time.monotonic() for Python 2 & < 3.3"
+optional = false
+python-versions = "*"
+files = [
+    {file = "monotonic-1.6-py2.py3-none-any.whl", hash = "sha256:68687e19a14f11f26d140dd5c86f3dba4bf5df58003000ed467e0e2a69bca96c"},
+    {file = "monotonic-1.6.tar.gz", hash = "sha256:3a55207bcfed53ddd5c5bae174524062935efed17792e9de2ad0205ce9ad63f7"},
+]
+
+[[package]]
+name = "more-itertools"
+version = "10.3.0"
+description = "More routines for operating on iterables, beyond itertools"
+optional = false
+python-versions = ">=3.8"
+files = [
+    {file = "more-itertools-10.3.0.tar.gz", hash = "sha256:e5d93ef411224fbcef366a6e8ddc4c5781bc6359d43412a65dd5964e46111463"},
+    {file = "more_itertools-10.3.0-py3-none-any.whl", hash = "sha256:ea6a02e24a9161e51faad17a8782b92a0df82c12c1c8886fec7f0c3fa1a1b320"},
 ]
 
 [[package]]
@@ -2884,6 +2975,24 @@ files = [
 ]
 
 [[package]]
+name = "networkx"
+version = "3.2.1"
+description = "Python package for creating and manipulating graphs and networks"
+optional = false
+python-versions = ">=3.9"
+files = [
+    {file = "networkx-3.2.1-py3-none-any.whl", hash = "sha256:f18c69adc97877c42332c170849c96cefa91881c99a7cb3e95b7c659ebdc1ec2"},
+    {file = "networkx-3.2.1.tar.gz", hash = "sha256:9f1bb5cf3409bf324e0a722c20bdb4c20ee39bf1c30ce8ae499c8502b0b5e0c6"},
+]
+
+[package.extras]
+default = ["matplotlib (>=3.5)", "numpy (>=1.22)", "pandas (>=1.4)", "scipy (>=1.9,!=1.11.0,!=1.11.1)"]
+developer = ["changelist (==0.4)", "mypy (>=1.1)", "pre-commit (>=3.2)", "rtoml"]
+doc = ["nb2plots (>=0.7)", "nbconvert (<7.9)", "numpydoc (>=1.6)", "pillow (>=9.4)", "pydata-sphinx-theme (>=0.14)", "sphinx (>=7)", "sphinx-gallery (>=0.14)", "texext (>=0.6.7)"]
+extra = ["lxml (>=4.6)", "pydot (>=1.4.2)", "pygraphviz (>=1.11)", "sympy (>=1.10)"]
+test = ["pytest (>=7.2)", "pytest-cov (>=4.0)"]
+
+[[package]]
 name = "notebook"
 version = "7.2.1"
 description = "Jupyter Notebook - A web-based notebook environment for interactive computing"
@@ -3051,6 +3160,54 @@ opentelemetry-api = "*"
 test = ["opentelemetry-sdk"]
 
 [[package]]
+name = "openinference-instrumentation-dspy"
+version = "0.1.10"
+description = "OpenInference DSPy Instrumentation"
+optional = false
+python-versions = "<3.13,>=3.9"
+files = [
+    {file = "openinference_instrumentation_dspy-0.1.10-py3-none-any.whl", hash = "sha256:31e46826da54e91654bebcee12b32c27226d78ead21331a611b0ecd53b5e5fca"},
+    {file = "openinference_instrumentation_dspy-0.1.10.tar.gz", hash = "sha256:e57a876d8d1615320c091f199d9567824d2daa09770405ab830f1fe8e9d9b8c7"},
+]
+
+[package.dependencies]
+openinference-instrumentation = ">=0.1.12"
+openinference-semantic-conventions = "*"
+opentelemetry-api = "*"
+opentelemetry-instrumentation = "*"
+opentelemetry-semantic-conventions = "*"
+typing-extensions = "*"
+wrapt = "*"
+
+[package.extras]
+instruments = ["dspy-ai (>=2.3.4)"]
+test = ["dspy-ai (==2.3.4)", "google-generativeai", "opentelemetry-sdk", "responses", "respx (==0.20.2)"]
+
+[[package]]
+name = "openinference-instrumentation-haystack"
+version = "0.1.3"
+description = "OpenInference Haystack Instrumentation"
+optional = false
+python-versions = "<3.13,>=3.8"
+files = [
+    {file = "openinference_instrumentation_haystack-0.1.3-py3-none-any.whl", hash = "sha256:1a1c58bb4cf9cac54b1b7022ae4506b51aa2f047584d776f03c9bf65f1560fa2"},
+    {file = "openinference_instrumentation_haystack-0.1.3.tar.gz", hash = "sha256:6e72becd086d4ead65443f65f2afbad82031ea060fe98ce72e85e7c3b5a52a41"},
+]
+
+[package.dependencies]
+openinference-instrumentation = ">=0.1.7"
+openinference-semantic-conventions = "*"
+opentelemetry-api = "*"
+opentelemetry-instrumentation = "*"
+opentelemetry-semantic-conventions = "*"
+typing-extensions = "*"
+wrapt = "*"
+
+[package.extras]
+instruments = ["haystack-ai (>=2.0.0)"]
+test = ["haystack-ai (>=2.0.0)", "opentelemetry-sdk", "responses"]
+
+[[package]]
 name = "openinference-instrumentation-langchain"
 version = "0.1.26"
 description = "OpenInference LangChain Instrumentation"
@@ -3210,6 +3367,23 @@ setuptools = ">=16.0"
 wrapt = ">=1.0.0,<2.0.0"
 
 [[package]]
+name = "opentelemetry-instrumentation-anthropic"
+version = "0.26.5"
+description = "OpenTelemetry Anthropic instrumentation"
+optional = false
+python-versions = "<4,>=3.9"
+files = [
+    {file = "opentelemetry_instrumentation_anthropic-0.26.5-py3-none-any.whl", hash = "sha256:2ca87f91eeda1f9a39dd0c6a9febc6b50988a6d9faf449c06ac3e502bb449f8a"},
+    {file = "opentelemetry_instrumentation_anthropic-0.26.5.tar.gz", hash = "sha256:d15bf9693de8c469330fe7b49b44735f272a2f139e6cb3821c7521eee16e536c"},
+]
+
+[package.dependencies]
+opentelemetry-api = ">=1.26.0,<2.0.0"
+opentelemetry-instrumentation = ">=0.47b0,<0.48"
+opentelemetry-semantic-conventions = ">=0.47b0,<0.48"
+opentelemetry-semantic-conventions-ai = "0.4.1"
+
+[[package]]
 name = "opentelemetry-instrumentation-asgi"
 version = "0.47b0"
 description = "ASGI instrumentation for OpenTelemetry"
@@ -3263,6 +3437,24 @@ files = [
 ]
 
 [package.dependencies]
+opentelemetry-api = ">=1.26.0,<2.0.0"
+opentelemetry-instrumentation = ">=0.47b0,<0.48"
+opentelemetry-semantic-conventions = ">=0.47b0,<0.48"
+opentelemetry-semantic-conventions-ai = "0.4.1"
+
+[[package]]
+name = "opentelemetry-instrumentation-llamaindex"
+version = "0.26.5"
+description = "OpenTelemetry LlamaIndex instrumentation"
+optional = false
+python-versions = "<4,>=3.9"
+files = [
+    {file = "opentelemetry_instrumentation_llamaindex-0.26.5-py3-none-any.whl", hash = "sha256:6dc4421c4ea420b9835374a3417838efde3e8de3489f67237bcc43a31c385a83"},
+    {file = "opentelemetry_instrumentation_llamaindex-0.26.5.tar.gz", hash = "sha256:7058a7120f54682a39898239ef57509f995ce88a5f778587b921e7077085c251"},
+]
+
+[package.dependencies]
+inflection = ">=0.5.1,<0.6.0"
 opentelemetry-api = ">=1.26.0,<2.0.0"
 opentelemetry-instrumentation = ">=0.47b0,<0.48"
 opentelemetry-semantic-conventions = ">=0.47b0,<0.48"
@@ -3603,6 +3795,29 @@ files = [
 [package.extras]
 dev = ["pre-commit", "tox"]
 testing = ["pytest", "pytest-benchmark"]
+
+[[package]]
+name = "posthog"
+version = "3.5.0"
+description = "Integrate PostHog into any python application."
+optional = false
+python-versions = "*"
+files = [
+    {file = "posthog-3.5.0-py2.py3-none-any.whl", hash = "sha256:3c672be7ba6f95d555ea207d4486c171d06657eb34b3ce25eb043bfe7b6b5b76"},
+    {file = "posthog-3.5.0.tar.gz", hash = "sha256:8f7e3b2c6e8714d0c0c542a2109b83a7549f63b7113a133ab2763a89245ef2ef"},
+]
+
+[package.dependencies]
+backoff = ">=1.10.0"
+monotonic = ">=1.5"
+python-dateutil = ">2.1"
+requests = ">=2.7,<3.0"
+six = ">=1.5"
+
+[package.extras]
+dev = ["black", "flake8", "flake8-print", "isort", "pre-commit"]
+sentry = ["django", "sentry-sdk"]
+test = ["coverage", "flake8", "freezegun (==0.3.15)", "mock (>=2.0.0)", "pylint", "pytest", "pytest-timeout"]
 
 [[package]]
 name = "prometheus-client"
@@ -5993,4 +6208,4 @@ openai = ["openai"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.9,<3.13"
-content-hash = "169ed28a947cd6c4e7a99c1dc7c350315f3290b3030d99f6d7bef3f0cd170964"
+content-hash = "0fd01a828c36cf491a2f48ed9279fcbf45130dc59907b8d7defd088f8024ed34"
