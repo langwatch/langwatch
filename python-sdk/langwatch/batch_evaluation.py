@@ -10,12 +10,15 @@ from typing import (
     Tuple,
     Union,
 )
+from typing_extensions import TypedDict
 from pydantic import BaseModel, Field
 from coolname import generate_slug
 import langwatch
 import httpx
 from tqdm import tqdm
 import pandas as pd
+
+from langwatch.types import RAGChunk
 
 
 class Money(BaseModel):
@@ -50,13 +53,20 @@ SingleEvaluationResult = Union[
 ]
 
 
-class DatasetEntry(BaseModel):
+class ConversationMessage(TypedDict):
     input: str
-    expected_output: str
+    output: str
+
+
+class DatasetEntry(BaseModel):
+    input: Optional[str] = None
+    contexts: Optional[Union[list[RAGChunk], list[str]]] = None
+    expected_output: Optional[str] = None
+    conversation: Optional[list[ConversationMessage]] = None
 
 
 class DatasetEntryWithOutput(DatasetEntry):
-    output: str
+    output: Optional[str] = None
 
 
 class DatasetRecord(BaseModel):
@@ -81,7 +91,7 @@ class BatchEvaluation:
         self,
         dataset: str,
         evaluations: list[str],
-        callback: Callable[[DatasetEntry], Union[str, dict[str, str]]],
+        callback: Callable[[DatasetEntry], Union[str, dict[str, Any]]],
         generations="one-shot",
         max_workers=4,
     ):
@@ -146,9 +156,14 @@ class BatchEvaluation:
         for result in results:
             result_dict: dict[str, Any] = {
                 "input": result.entry.input,
-                "expected_output": result.entry.expected_output,
                 "output": result.entry.output,
             }
+            if result.entry.expected_output is not None:
+                result_dict["expected_output"] = result.entry.expected_output
+            if result.entry.contexts is not None:
+                result_dict["contexts"] = result.entry.contexts
+            if result.entry.conversation is not None:
+                result_dict["conversation"] = result.entry.conversation
             for evaluation_name, evaluation_result in result.results:
                 if evaluation_result.status == "processed":
                     result_dict[evaluation_name] = (
@@ -168,11 +183,28 @@ class BatchEvaluation:
         callbackResponse = self.callback(entry)
         entry_with_output = DatasetEntryWithOutput(
             input=entry.input,
-            expected_output=entry.expected_output,
+            expected_output=(
+                callbackResponse["expected_output"]
+                if not isinstance(callbackResponse, str)
+                and "expected_output" in callbackResponse
+                else entry.expected_output
+            ),
             output=(
                 callbackResponse
                 if isinstance(callbackResponse, str)
                 else callbackResponse["output"]
+            ),
+            contexts=(
+                callbackResponse["contexts"]
+                if not isinstance(callbackResponse, str)
+                and "contexts" in callbackResponse
+                else entry.contexts
+            ),
+            conversation=(
+                callbackResponse["conversation"]
+                if not isinstance(callbackResponse, str)
+                and "conversation" in callbackResponse
+                else entry.conversation
             ),
         )
 

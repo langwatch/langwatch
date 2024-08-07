@@ -134,7 +134,7 @@ export default async function handler(
 
   if (!AVAILABLE_EVALUATORS[checkType as keyof typeof AVAILABLE_EVALUATORS]) {
     return res.status(400).json({
-      error: `Invalid evaluation type: ${checkType}`,
+      error: `Evaluator not found: ${checkType}`,
     });
   }
 
