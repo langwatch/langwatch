@@ -89,7 +89,21 @@ class SpanTimestamps(TypedDict, total=False):
 
 
 SpanTypes = Literal[
-    "span", "llm", "chain", "tool", "agent", "guardrail", "rag", "workflow", "component"
+    "span",
+    "llm",
+    "chain",
+    "tool",
+    "agent",
+    "guardrail",
+    "rag",
+    "workflow",
+    "component",
+    "server",
+    "client",
+    "producer",
+    "consumer",
+    "task",
+    "unknown",
 ]
 
 

@@ -54,6 +54,8 @@ langchain-google-vertexai = "^1.0.5"
 openinference-instrumentation-openai = "^0.1.12"
 opentelemetry-instrumentation-openai = "^0.26.4"
 opentelemetry-instrumentation-fastapi = "^0.47b0"
+openinference-instrumentation-langchain = "^0.1.26"
+opentelemetry-instrumentation-langchain = "^0.26.5"
 
 [tool.poetry.group.test.dependencies]
 pytest = "^7.4.2"

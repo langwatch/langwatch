@@ -225,7 +225,7 @@ export function SpanDetails({
               textTransform="uppercase"
               fontWeight="bold"
             >
-              Generated
+              {span.type === "llm" ? "Generated" : "Output"}
             </Box>
             {!span.output && <Text>{"<empty>"}</Text>}
             {span.output && (
@@ -268,6 +268,7 @@ export const SpanTypeTag = ({ span }: { span: ElasticSearchSpan }) => {
               client: "green",
               producer: "red",
               consumer: "green",
+              task: "orange",
               unknown: "gray",
             }[span.type]
       }

@@ -735,6 +735,88 @@ const traceWithException: DeepPartial<IExportTraceServiceRequest> = {
   ],
 };
 
+const openllmetryLangChainRequest: DeepPartial<IExportTraceServiceRequest> = {
+  resourceSpans: [
+    {
+      resource: {
+        attributes: [
+          {
+            key: "telemetry.sdk.language",
+            value: {
+              stringValue: "python",
+            },
+          },
+          {
+            key: "telemetry.sdk.name",
+            value: {
+              stringValue: "opentelemetry",
+            },
+          },
+          {
+            key: "telemetry.sdk.version",
+            value: {
+              stringValue: "1.26.0",
+            },
+          },
+          {
+            key: "service.name",
+            value: {
+              stringValue: "unknown_service",
+            },
+          },
+        ],
+      },
+      scopeSpans: [
+        {
+          scope: {
+            name: "opentelemetry.instrumentation.langchain",
+            version: "0.26.5",
+          },
+          spans: [
+            {
+              traceId: "4cmJuE+nwC7cmxIAX8430w==",
+              spanId: "S2v3VMCZCUo=",
+              name: "RunnableSequence.workflow",
+              kind: "SPAN_KIND_INTERNAL",
+              startTimeUnixNano: "1723006472661658000",
+              endTimeUnixNano: "1723006473946042000",
+              attributes: [
+                {
+                  key: "traceloop.span.kind",
+                  value: {
+                    stringValue: "workflow",
+                  },
+                },
+                {
+                  key: "traceloop.entity.name",
+                  value: {
+                    stringValue: "RunnableSequence.workflow",
+                  },
+                },
+                {
+                  key: "traceloop.entity.input",
+                  value: {
+                    stringValue:
+                      '{"inputs": {"input": ""}, "tags": [], "metadata": {}, "kwargs": {"run_type": null, "name": "RunnableSequence"}}',
+                  },
+                },
+                {
+                  key: "traceloop.entity.output",
+                  value: {
+                    stringValue:
+                      '{"outputs": "\\ud83d\\udc4b Hi there! How can I help you today?", "kwargs": {"tags": [], "inputs": {"question": "hello"}}}',
+                  },
+                },
+              ],
+              status: {},
+            },
+          ],
+        },
+      ],
+    },
+  ],
+};
+
 describe("opentelemetry traces receiver", () => {
   it("receives a basic openai trace for openinference", async () => {
     const traces = openTelemetryTraceRequestToTracesForCollection(
@@ -1096,6 +1178,85 @@ describe("opentelemetry traces receiver", () => {
       reservedTraceMetadata: {},
       customMetadata: {
         "service.name": "fastapi_sample_endpoint",
+      },
+    });
+  });
+
+  it("receives a langchain openlllmetry trace", async () => {
+    const traces = openTelemetryTraceRequestToTracesForCollection(
+      openllmetryLangChainRequest
+    );
+
+    expect(traces).toHaveLength(1);
+
+    const trace = traces[0];
+
+    try {
+      z.array(spanSchema).parse(trace!.spans);
+    } catch (error) {
+      const validationError = fromZodError(error as ZodError);
+      console.log("trace", JSON.stringify(trace, undefined, 2));
+      console.log("validationError", validationError);
+      assert.fail(validationError.message);
+    }
+
+    expect(trace).toEqual({
+      traceId: "e1c989b84fa7c02edc9b12005fce37d3",
+      spans: [
+        {
+          span_id: "4b6bf754c099094a",
+          trace_id: "e1c989b84fa7c02edc9b12005fce37d3",
+          name: "RunnableSequence.workflow",
+          type: "workflow",
+          input: {
+            type: "json",
+            value: {
+              inputs: {
+                input: "",
+              },
+              tags: [],
+              metadata: [],
+              kwargs: {
+                run_type: null,
+                name: "RunnableSequence",
+              },
+            },
+          },
+          output: {
+            type: "json",
+            value: {
+              outputs: "👋 Hi there! How can I help you today?",
+              kwargs: {
+                tags: [],
+                inputs: {
+                  question: "hello",
+                },
+              },
+            },
+          },
+          params: {
+            traceloop: {
+              entity: {
+                name: "RunnableSequence.workflow",
+              },
+            },
+            scope: {
+              name: "opentelemetry.instrumentation.langchain",
+              version: "0.26.5",
+            },
+          },
+          timestamps: {
+            started_at: 1723006472662,
+            finished_at: 1723006473946,
+          },
+        },
+      ],
+      reservedTraceMetadata: {},
+      customMetadata: {
+        "telemetry.sdk.language": "python",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.26.0",
+        "service.name": "unknown_service",
       },
     });
   });

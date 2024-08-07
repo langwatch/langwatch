@@ -157,6 +157,7 @@ export type SpanTypes =
   | "producer"
   | "consumer"
   // Other
+  | "task" // openllmetry
   | "unknown";
 
 export interface BaseSpan {

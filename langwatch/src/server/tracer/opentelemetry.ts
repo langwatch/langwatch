@@ -1,14 +1,15 @@
 import {
   ESpanKind,
-  EStatusCode,
   type Fixed64,
   type IAnyValue,
   type IExportTraceServiceRequest,
   type IInstrumentationScope,
   type IKeyValue,
-  type ISpan,
-  // @ts-ignore
+  type ISpan
 } from "@opentelemetry/otlp-transformer";
+import { cloneDeep } from "lodash";
+import type { DeepPartial } from "../../utils/types";
+import type { CollectorJob } from "../background/types";
 import type {
   BaseSpan,
   LLMSpan,
@@ -16,13 +17,10 @@ import type {
   SpanTypes,
   TypedValueChatMessages,
 } from "./types";
-import { cloneDeep } from "lodash";
 import {
   spanTypesSchema,
   typedValueChatMessagesSchema,
 } from "./types.generated";
-import type { CollectorJob } from "../background/types";
-import type { DeepPartial } from "../../utils/types";
 
 export type TraceForCollection = Pick<
   CollectorJob,
@@ -205,6 +203,14 @@ const addOpenTelemetrySpanAsSpan = (
     }
   }
 
+  if (attributesMap.traceloop?.span?.kind) {
+    const kind_ = attributesMap.traceloop.span.kind.toLowerCase();
+    if (allowedSpanTypes.includes(kind_ as SpanTypes)) {
+      type = kind_ as SpanTypes;
+      delete attributesMap.traceloop.span.kind;
+    }
+  }
+
   if (attributesMap.llm?.request?.type === "chat") {
     type = "llm";
     delete attributesMap.llm.request.type;
@@ -260,6 +266,20 @@ const addOpenTelemetrySpanAsSpan = (
     }
   }
 
+  if (!input && attributesMap.traceloop?.entity?.input) {
+    input =
+      typeof attributesMap.traceloop.entity.input === "string"
+        ? {
+            type: "text",
+            value: attributesMap.traceloop.entity.input,
+          }
+        : {
+            type: "json",
+            value: attributesMap.traceloop.entity.input,
+          };
+    delete attributesMap.traceloop.entity.input;
+  }
+
   if (!input && attributesMap.input?.value) {
     input =
       typeof attributesMap.input.value === "string"
@@ -306,6 +326,20 @@ const addOpenTelemetrySpanAsSpan = (
       output = output_.data as TypedValueChatMessages;
       delete attributesMap.gen_ai.completion;
     }
+  }
+
+  if (!output && attributesMap.traceloop?.entity?.output) {
+    output =
+      typeof attributesMap.traceloop.entity.output === "string"
+        ? {
+            type: "text",
+            value: attributesMap.traceloop.entity.output,
+          }
+        : {
+            type: "json",
+            value: attributesMap.traceloop.entity.output,
+          };
+    delete attributesMap.traceloop.entity.output;
   }
 
   if (!output && attributesMap.output?.value) {

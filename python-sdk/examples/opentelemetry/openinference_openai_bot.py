@@ -10,6 +10,7 @@ import os
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
 from opentelemetry.sdk import trace as trace_sdk
 from opentelemetry.sdk.trace.export import ConsoleSpanExporter, SimpleSpanProcessor
+
 from openinference.instrumentation.openai import OpenAIInstrumentor
 from openinference.instrumentation import using_attributes
 from openai import OpenAI
