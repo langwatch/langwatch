@@ -119,6 +119,8 @@ Detailed documentation is available to help you get the most out of LangWatch:
 - [Self-Hosting](https://docs.langwatch.ai/self-hosting)
 - [Troubleshooting and Support](https://docs.langwatch.ai/support)
 
+You can find an example of LangWatch and Weaviate [here](https://github.com/weaviate/recipes/blob/main/integrations/observability-and-evaluation/langwatch/weaviate_dspy_visualization.ipynb)!
+
 ## Self-Hosting
 
 For a more complete guide on how to self-host LangWatch, please refer to the [Self-Hosting](https://docs.langwatch.ai/self-hosting) section of the documentation.
