@@ -59,6 +59,7 @@ class ConversationMessage(TypedDict):
 
 
 class DatasetEntry(BaseModel):
+    id: str
     input: Optional[str] = None
     contexts: Optional[Union[list[RAGChunk], list[str]]] = None
     expected_output: Optional[str] = None
@@ -182,6 +183,7 @@ class BatchEvaluation:
 
         callbackResponse = self.callback(entry)
         entry_with_output = DatasetEntryWithOutput(
+            id=record.id,
             input=entry.input,
             expected_output=(
                 callbackResponse["expected_output"]
