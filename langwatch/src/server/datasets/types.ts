@@ -44,6 +44,7 @@ export const annotationScoreSchema = z.object({
   value: z.string().optional(),
   reason: z.string().optional(),
   name: z.string().optional(),
+  traceId: z.string().optional(),
 });
 
 export const evaluationsSchema = z.object({

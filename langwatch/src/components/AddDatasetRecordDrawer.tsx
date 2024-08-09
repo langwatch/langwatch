@@ -292,17 +292,20 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
 
   const getAnnotationScoresArray = (
     data: z.infer<typeof annotationScoreSchema>[],
-    idNameMap: Record<string, string>
+    idNameMap: Record<string, string>,
+    traceId: string
   ) => {
-    return data.flatMap((score) => {
-      if (!("scoreOptions" in score)) return []; // Type guard
-      return Object.entries(score.scoreOptions ?? {})
-        .filter(([, option]) => option.value !== null)
-        .map(([key, option]) => ({
-          ...option,
-          name: idNameMap?.[key] ?? "",
-        }));
-    });
+    return data
+      .filter((score) => score.traceId === traceId) // Filter out entries with matching traceId
+      .flatMap((score) => {
+        if (!("scoreOptions" in score)) return []; // Type guard
+        return Object.entries(score.scoreOptions ?? {})
+          .filter(([, option]) => option.value !== null)
+          .map(([key, option]) => ({
+            ...option,
+            name: idNameMap?.[key] ?? "",
+          }));
+      });
   };
 
   const rowDataFromDataset = useMemo(() => {
@@ -353,7 +356,8 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
                 annotationScores.data as z.infer<
                   typeof annotationScoreSchema
                 >[],
-                idNameMap ?? {}
+                idNameMap ?? {},
+                trace.trace_id
               )
             : [];
           row.annotation_scores = JSON.stringify(annotationScoresArray);
@@ -403,7 +407,8 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
                   annotationScores.data as z.infer<
                     typeof annotationScoreSchema
                   >[],
-                  idNameMap ?? {}
+                  idNameMap ?? {},
+                  trace.trace_id
                 )
               : [];
             row.annotation_scores = JSON.stringify(annotationScoresArray);
