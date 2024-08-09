@@ -75,10 +75,17 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
     },
   });
 
+  const traceIds = [
+    ...(Array.isArray(props.selectedTraceIds)
+      ? props.selectedTraceIds
+      : [props.selectedTraceIds]),
+    props?.traceId ?? "",
+  ].filter(Boolean) as string[];
+
   const tracesWithSpans = api.traces.getTracesWithSpans.useQuery(
     {
       projectId: project?.id ?? "",
-      traceIds: props?.selectedTraceIds ?? [props?.traceId ?? ""],
+      traceIds: traceIds,
     },
     {
       enabled: !!project,
@@ -86,16 +93,16 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
     }
   );
 
-  const evaluations = api.traces.getEvaluations.useQuery(
-    { projectId: project?.id ?? "", traceId: props.traceId ?? "" },
+  const evaluations = api.traces.getEvaluationsMultiple.useQuery(
+    { projectId: project?.id ?? "", traceIds: traceIds },
     {
       enabled: !!project,
       refetchOnWindowFocus: false,
     }
   );
 
-  const annotationScores = api.annotation.getByTraceId.useQuery(
-    { projectId: project?.id ?? "", traceId: props.traceId ?? "" },
+  const annotationScores = api.annotation.getByTraceIds.useQuery(
+    { projectId: project?.id ?? "", traceIds: traceIds },
     { enabled: !!project, refetchOnWindowFocus: false }
   );
 
@@ -265,6 +272,9 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
   };
 
   const getEvaluationArray = (data: TraceCheck[]) => {
+    if (!Array.isArray(data)) {
+      return [];
+    }
     return data
       .filter((item) => item.status === "processed")
       .map((item) => {
@@ -399,7 +409,9 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
 
           if (columns.includes("evaluations")) {
             row.evaluations = JSON.stringify(
-              getEvaluationArray(evaluations.data ?? [])
+              getEvaluationArray(
+                Array.isArray(evaluations.data) ? evaluations.data : []
+              )
             );
           }
 
