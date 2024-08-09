@@ -93,13 +93,15 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
     }
   );
 
-  const evaluations = api.traces.getEvaluationsMultiple.useQuery(
+  const evaluationsObject = api.traces.getEvaluationsMultiple.useQuery(
     { projectId: project?.id ?? "", traceIds: traceIds },
     {
       enabled: !!project,
       refetchOnWindowFocus: false,
     }
   );
+
+  const evaluations = Object.values(evaluationsObject.data ?? {}).flat();
 
   const annotationScores = api.annotation.getByTraceIds.useQuery(
     { projectId: project?.id ?? "", traceIds: traceIds },
@@ -271,12 +273,15 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
     );
   };
 
-  const getEvaluationArray = (data: TraceCheck[]) => {
+  const getEvaluationArray = (data: TraceCheck[], traceId: string) => {
     if (!Array.isArray(data)) {
       return [];
     }
+
     return data
-      .filter((item) => item.status === "processed")
+      .filter(
+        (item) => item.status === "processed" && item.trace_id === traceId
+      )
       .map((item) => {
         const evaluation =
           elasticSearchTraceCheckToUserInterfaceEvaluation(item);
@@ -365,9 +370,7 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
 
         if (columns.includes("evaluations")) {
           row.evaluations = JSON.stringify(
-            getEvaluationArray(
-              Array.isArray(evaluations.data) ? evaluations.data : []
-            )
+            getEvaluationArray(evaluations, trace.trace_id)
           );
         }
 
@@ -416,9 +419,7 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
 
           if (columns.includes("evaluations")) {
             row.evaluations = JSON.stringify(
-              getEvaluationArray(
-                Array.isArray(evaluations.data) ? evaluations.data : []
-              )
+              getEvaluationArray(evaluations, trace.trace_id)
             );
           }
 
