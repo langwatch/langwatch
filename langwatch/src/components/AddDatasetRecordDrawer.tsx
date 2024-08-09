@@ -361,7 +361,9 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
 
         if (columns.includes("evaluations")) {
           row.evaluations = JSON.stringify(
-            getEvaluationArray(evaluations.data ?? [])
+            getEvaluationArray(
+              Array.isArray(evaluations.data) ? evaluations.data : []
+            )
           );
         }
 
