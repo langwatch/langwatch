@@ -18,11 +18,13 @@ export class LangWatchAwsMarketplaceStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
 
+    // const elasticIp = new ec2.CfnEIP(this, "LangWatchElasticIPUnique");
+
     const nodeCountParam = new cdk.CfnParameter(this, "KubernetesNodeCount", {
       type: "Number",
       default: 1,
       minValue: 1,
-      maxValue: 10,
+      maxValue: 20,
       description: "Number of nodes in the Kubernetes EKS cluster",
     });
 
@@ -45,8 +47,15 @@ export class LangWatchAwsMarketplaceStack extends cdk.Stack {
       kubectlLayer: new KubectlV30Layer(this, "KubectlLayer"),
     });
 
+    // Create an EBS volume
+    const ebsVolume = new ec2.CfnVolume(this, "EbsVolume", {
+      availabilityZone: "eu-central-1a", // Replace with your availability zone
+      size: 10, // Size in GiB
+      volumeType: "gp3",
+    });
+
     const nodegroup = cluster.addNodegroupCapacity("ManagedNodes", {
-      instanceTypes: [new ec2.InstanceType("m5.large")],
+      instanceTypes: [new ec2.InstanceType("m5.xlarge")],
       minSize: nodeCountParam.valueAsNumber,
       maxSize: nodeCountParam.valueAsNumber,
       desiredSize: nodeCountParam.valueAsNumber,
@@ -96,7 +105,11 @@ export class LangWatchAwsMarketplaceStack extends cdk.Stack {
 
     const { redis, redisPassword } = this.setupRedis(vpc, cluster);
     const { postgres, postgresPassword } = this.setupPostgres(vpc, cluster);
-    const { elasticPassword } = this.setupElasticsearch(vpc, cluster);
+    const { elasticPassword } = this.setupElasticsearch(
+      vpc,
+      cluster,
+      ebsVolume
+    );
 
     this.setupLangWatchEnv(
       domainParam,
@@ -107,8 +120,9 @@ export class LangWatchAwsMarketplaceStack extends cdk.Stack {
     );
 
     setupFluentd(cluster);
-    this.setupLangEvals(cluster);
-    this.setupLangWatchNLP(cluster);
+
+    //this.setupLangEvals(cluster);
+    //this.setupLangWatchNLP(cluster);
     this.setupLangWatch(domainParam, cluster);
   }
 
@@ -569,7 +583,11 @@ export class LangWatchAwsMarketplaceStack extends cdk.Stack {
     return { postgres, postgresPassword };
   }
 
-  setupElasticsearch(vpc: ec2.Vpc, cluster: eks.Cluster) {
+  setupElasticsearch(
+    vpc: ec2.Vpc,
+    cluster: eks.Cluster,
+    ebsVolume: ec2.CfnVolume
+  ) {
     const elasticPassword = new secretsmanager.Secret(
       this,
       "ElasticsearchPassword",
@@ -581,23 +599,186 @@ export class LangWatchAwsMarketplaceStack extends cdk.Stack {
       }
     );
 
+    const ebsCsiDriver = cluster.addHelmChart("EbsCsiDriver", {
+      chart: "aws-ebs-csi-driver",
+      repository: "https://kubernetes-sigs.github.io/aws-ebs-csi-driver",
+      namespace: "default-test",
+      release: "ebs-csi-driver",
+      values: {
+        image: {
+          repository:
+            "602401143452.dkr.ecr.us-west-2.amazonaws.com/eks/aws-ebs-csi-driver",
+          tag: "v1.3.0",
+        },
+        controller: {
+          replicas: 2,
+          serviceAccount: {
+            create: false,
+            name: "ebs-csi-controller-sa",
+          },
+          resources: {
+            requests: {
+              cpu: "100m",
+              memory: "128Mi",
+            },
+            limits: {
+              cpu: "200m",
+              memory: "256Mi",
+            },
+          },
+          affinity: {
+            nodeAffinity: {
+              requiredDuringSchedulingIgnoredDuringExecution: {
+                nodeSelectorTerms: [
+                  {
+                    matchExpressions: [
+                      {
+                        key: "kubernetes.io/os",
+                        operator: "In",
+                        values: ["linux"],
+                      },
+                    ],
+                  },
+                ],
+              },
+            },
+          },
+        },
+        node: {
+          resources: {
+            requests: {
+              cpu: "100m",
+              memory: "128Mi",
+            },
+            limits: {
+              cpu: "200m",
+              memory: "256Mi",
+            },
+          },
+          affinity: {
+            nodeAffinity: {
+              requiredDuringSchedulingIgnoredDuringExecution: {
+                nodeSelectorTerms: [
+                  {
+                    matchExpressions: [
+                      {
+                        key: "kubernetes.io/os",
+                        operator: "In",
+                        values: ["linux"],
+                      },
+                    ],
+                  },
+                ],
+              },
+            },
+          },
+        },
+
+        enableVolumeScheduling: true,
+        enableVolumeResizing: true,
+        enableVolumeSnapshot: true,
+      },
+    });
+
+    // Ensure the EBS CSI Driver is installed before creating StorageClass
+    const gp3StorageClass = cluster.addManifest("Gp3StorageClass", {
+      apiVersion: "storage.k8s.io/v1",
+      kind: "StorageClass",
+      metadata: {
+        name: "gp3",
+        annotations: {
+          "storageclass.kubernetes.io/is-default-class": "true",
+        },
+      },
+      provisioner: "ebs.csi.aws.com",
+      parameters: {
+        type: "gp3",
+        fsType: "ext4",
+      },
+      volumeBindingMode: "WaitForFirstConsumer",
+      reclaimPolicy: "Delete",
+    });
+
+    gp3StorageClass.node.addDependency(ebsCsiDriver);
+
+    // Create a PersistentVolume
+    const pv = cluster.addManifest("MyPV", {
+      apiVersion: "v1",
+      kind: "PersistentVolume",
+      metadata: {
+        name: "my-pv",
+      },
+      spec: {
+        capacity: {
+          storage: "10Gi",
+        },
+        volumeMode: "Filesystem",
+        accessModes: ["ReadWriteOnce"],
+        persistentVolumeReclaimPolicy: "Retain",
+        storageClassName: "gp3",
+        csi: {
+          driver: "ebs.csi.aws.com",
+          volumeHandle: ebsVolume.ref,
+          fsType: "ext4",
+        },
+        nodeAffinity: {
+          required: {
+            nodeSelectorTerms: [
+              {
+                matchExpressions: [
+                  {
+                    key: "kubernetes.io/hostname",
+                    operator: "In",
+                    values: ["ip-10-0-134-124.eu-central-1.compute.internal"], // Replace with your node's hostname
+                  },
+                ],
+              },
+            ],
+          },
+        },
+      },
+    });
+
+    pv.node.addDependency(gp3StorageClass);
+
+    // Create a PersistentVolumeClaim
+    const pvc = cluster.addManifest("MyPVC", {
+      apiVersion: "v1",
+      kind: "PersistentVolumeClaim",
+      metadata: {
+        name: "my-pvc",
+      },
+      spec: {
+        accessModes: ["ReadWriteOnce"],
+        resources: {
+          requests: {
+            storage: "10Gi",
+          },
+        },
+        storageClassName: "gp3",
+      },
+    });
+
+    pvc.node.addDependency(gp3StorageClass);
+
+    // Deploy Elasticsearch using Helm chart
     new eks.HelmChart(this, "ElasticsearchChart", {
       cluster,
       chart: "elasticsearch",
       repository: "https://helm.elastic.co",
-      namespace: "elasticsearch",
+      namespace: "default-test",
       release: "elasticsearch",
       values: {
         antiAffinity: "soft",
         esJavaOpts: "-Xmx2g -Xms2g",
         resources: {
           requests: {
-            cpu: "500m",
-            memory: "2Gi",
+            cpu: "250m",
+            memory: "1Gi",
           },
           limits: {
-            cpu: "1000m",
-            memory: "4Gi",
+            cpu: "500m",
+            memory: "2Gi",
           },
         },
         volumeClaimTemplate: {
@@ -607,6 +788,13 @@ export class LangWatchAwsMarketplaceStack extends cdk.Stack {
               storage: "5Gi",
             },
           },
+          storageClassName: "gp3",
+        },
+        persistence: {
+          enabled: true,
+          storageClass: "gp3", // Use the gp3 StorageClass
+          accessModes: ["ReadWriteOnce"],
+          size: "5Gi",
         },
         security: {
           enabled: true,
@@ -711,7 +899,11 @@ export class LangWatchAwsMarketplaceStack extends cdk.Stack {
     });
   }
 
-  setupLangWatch(domainParam: cdk.CfnParameter, cluster: eks.Cluster) {
+  setupLangWatch(
+    domainParam: cdk.CfnParameter,
+    cluster: eks.Cluster,
+    elasticIp: ec2.CfnEIP | undefined = undefined
+  ) {
     const langwatchServiceAccount = cluster.addServiceAccount("langwatch-sa", {
       name: "langwatch-sa",
     });
@@ -795,13 +987,20 @@ export class LangWatchAwsMarketplaceStack extends cdk.Stack {
         selector: { app: "langwatch" },
         ports: [{ port: 80, targetPort: 3000 }],
         type: "LoadBalancer",
+        //loadBalancerIP: elasticIp?.ref, // Attach Elastic IP to Load Balancer
       },
     });
+
+    //Output the Elastic IP
+    // new cdk.CfnOutput(this, "LangWatchElasticIP", {
+    //   value: elasticIp!.ref,
+    //   description: "Elastic IP for the Load Balancer",
+    // });
 
     // Output the ALB DNS name
     new cdk.CfnOutput(this, "LangWatchLoadBalancerDNS", {
       value: cluster.getServiceLoadBalancerAddress("langwatch-service", {
-        timeout: cdk.Duration.minutes(15),
+        timeout: cdk.Duration.minutes(30),
       }),
       description:
         "Application Load Balancer DNS Name. Point your subdomain CNAME record to this value.",
