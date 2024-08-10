@@ -59,7 +59,7 @@ class ConversationMessage(TypedDict):
 
 
 class DatasetEntry(BaseModel):
-    id: str
+    id: Optional[str] = None
     input: Optional[str] = None
     contexts: Optional[Union[list[RAGChunk], list[str]]] = None
     expected_output: Optional[str] = None
