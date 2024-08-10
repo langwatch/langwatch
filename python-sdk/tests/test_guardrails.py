@@ -21,7 +21,7 @@ class TestGuardrailsIntegration:
     ):
         requests_mock.post(langwatch.endpoint + "/api/collector", json={})
         requests_mock.post(
-            langwatch.endpoint + "/api/guardrails/azure-jailbreak-detection/evaluate",
+            langwatch.endpoint + "/api/evaluations/azure-jailbreak-detection/evaluate",
             json={"status": "processed", "passed": True},
         )
 

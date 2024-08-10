@@ -128,10 +128,11 @@ def prepare_data(
         span.update(input=TypedValueJson(type="json", value=data))
 
     return {
-        "url": langwatch.endpoint + f"/api/guardrails/{slug}/evaluate",
+        "url": langwatch.endpoint + f"/api/evaluations/{slug}/evaluate",
         "json": {
             "trace_id": trace.trace_id if trace else None,
             "data": data,
+            "as_guardrail": True,
         },
         "headers": {"X-Auth-Token": str(langwatch.api_key)},
     }
