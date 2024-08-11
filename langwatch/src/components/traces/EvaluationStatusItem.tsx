@@ -63,7 +63,7 @@ export function EvaluationStatusItem({
                         <Text>Score:</Text>
                         <Text color={color}>
                           {check.score !== undefined
-                            ? numeral(check.score).format("0.00")
+                            ? numeral(check.score).format("0.[00]")
                             : "N/A"}
                         </Text>
                       </HStack>

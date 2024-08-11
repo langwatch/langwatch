@@ -193,8 +193,28 @@ MetadataValue = Union[
 TraceMetadata = Dict[str, MetadataValue]
 
 
+class EvaluationTimestamps(TypedDict, total=False):
+    started_at: int
+    finished_at: int
+
+
+class Evaluation(TypedDict, total=False):
+    evaluation_id: Optional[str]
+    name: str
+    type: Optional[str]
+    is_guardrail: Optional[bool]
+    status: Literal["processed", "skipped", "error"]
+    passed: Optional[bool]
+    score: Optional[float]
+    label: Optional[str]
+    details: Optional[str]
+    error: Optional[ErrorCapture]
+    timestamps: Optional[EvaluationTimestamps]
+
+
 class CollectorRESTParams(TypedDict):
     trace_id: str
     metadata: Optional[TraceMetadata]
     spans: List[Span]
     expected_output: Optional[str]
+    evaluations: Optional[List[Evaluation]]

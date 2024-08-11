@@ -128,7 +128,7 @@ type SpanParams = {
   temperature?: number | null;
   top_p?: number | null;
   tools?: Record<string, any>[] | null;
-  tool_choice?: string | null;
+  tool_choice?: Record<string, any> | string | null;
   parallel_tool_calls?: boolean | null;
   functions?: Record<string, any>[] | null;
   user?: string | null;
@@ -340,7 +340,7 @@ export type RESTEvaluation = Omit<
   "evaluation_id" | "status" | "timestamps" | "retries"
 > & {
   evaluation_id?: string | null;
-  status?: EvaluationStatus | null;
+  status?: "processed" | "skipped" | "error" | null;
   timestamps?: {
     started_at?: number | null;
     finished_at?: number | null;

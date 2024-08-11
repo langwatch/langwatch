@@ -3,7 +3,18 @@ import os
 from concurrent.futures import Future, ThreadPoolExecutor
 import time
 from types import ModuleType
-from typing import Any, Callable, Dict, List, Optional, Type, TypeVar, Union, cast
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    List,
+    Literal,
+    Optional,
+    Type,
+    TypeVar,
+    Union,
+    cast,
+)
 from uuid import UUID
 from warnings import warn
 from deprecated import deprecated
@@ -15,6 +26,8 @@ from langwatch.logger import get_logger
 from langwatch.types import (
     BaseSpan,
     ChatMessage,
+    Evaluation,
+    EvaluationTimestamps,
     LLMSpan,
     LLMSpanMetrics,
     LLMSpanParams,
@@ -492,6 +505,7 @@ class ContextTrace:
     expected_output: Optional[str] = None
     span: Type[ContextSpan]
     root_span: ContextSpan
+    evaluations: List[Evaluation] = []
 
     _capture_input: bool = True
     _capture_output: bool = True
@@ -518,6 +532,7 @@ class ContextTrace:
         model: Optional[str] = None,
         params: Optional[LLMSpanParams] = None,
         metrics: Optional[LLMSpanMetrics] = None,
+        evaluations: Optional[List[Evaluation]] = None,
     ):
         self.api_key = api_key or langwatch.api_key
         self.spans: Dict[str, Span] = {}
@@ -528,6 +543,7 @@ class ContextTrace:
         self.metadata = metadata or {}
         self.expected_output = expected_output
         self.metadata.update({"sdk_version": get_version(), "sdk_language": "python"})
+        self.evaluations = evaluations or []
         self.span = cast(
             Type[ContextSpan], lambda **kwargs: ContextSpan(trace=self, **kwargs)
         )
@@ -618,6 +634,7 @@ class ContextTrace:
         model: Optional[str] = None,
         params: Optional[LLMSpanParams] = None,
         metrics: Optional[LLMSpanMetrics] = None,
+        evaluations: Optional[List[Evaluation]] = None,
     ):
         if trace_id:
             self.trace_id = trace_id
@@ -625,6 +642,8 @@ class ContextTrace:
             self.metadata.update(metadata)
         if expected_output:
             self.expected_output = expected_output
+        if evaluations:
+            self.evaluations = evaluations
 
         self.root_span.update(
             span_id=span_id,
@@ -639,6 +658,56 @@ class ContextTrace:
             params=params,
             metrics=metrics,
         )
+
+    def add_evaluation(
+        self,
+        *,
+        evaluation_id: Optional[str] = None,
+        name: str,
+        type: Optional[str] = None,
+        is_guardrail: Optional[bool] = None,
+        status: Literal["processed", "skipped", "error"] = "processed",
+        passed: Optional[bool] = None,
+        score: Optional[float] = None,
+        label: Optional[str] = None,
+        details: Optional[str] = None,
+        error: Optional[Exception] = None,
+        timestamps: Optional[EvaluationTimestamps] = None,
+    ):
+        current_evaluation_index = [
+            i
+            for i, e in enumerate(self.evaluations)
+            if evaluation_id
+            and "evaluation_id" in e
+            and e["evaluation_id"] == evaluation_id
+        ]
+        current_evaluation_index = (
+            current_evaluation_index[0] if len(current_evaluation_index) > 0 else None
+        )
+        current_evaluation = (
+            self.evaluations[current_evaluation_index]
+            if current_evaluation_index
+            else None
+        )
+
+        evaluation = Evaluation(
+            evaluation_id=evaluation_id,
+            name=name,
+            type=type,
+            is_guardrail=is_guardrail,
+            status=status,
+            passed=passed,
+            score=score,
+            label=label,
+            details=details,
+            error=capture_exception(error) if error else None,
+            timestamps=timestamps,
+        )
+
+        if current_evaluation and current_evaluation_index:
+            self.evaluations[current_evaluation_index] = current_evaluation | evaluation
+        else:
+            self.evaluations.append(evaluation)
 
     def deferred_send_spans(self):
         get_logger().debug(f"Scheduling for sending trace {self.trace_id} in 1s")
@@ -666,6 +735,7 @@ class ContextTrace:
                 metadata=self.metadata,
                 spans=list(self.spans.values()),
                 expected_output=self.expected_output,
+                evaluations=self.evaluations,
             ),
             api_key=self.api_key,
         )

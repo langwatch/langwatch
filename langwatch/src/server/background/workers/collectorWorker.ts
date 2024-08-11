@@ -209,7 +209,7 @@ export const processCollectorJob = async (
     refresh: true,
   });
 
-  if (evaluations) {
+  if (evaluations && evaluations.length > 0) {
     await esClient.update({
       index: TRACE_INDEX.alias,
       id: traceIndexId({ traceId, projectId: project.id }),
