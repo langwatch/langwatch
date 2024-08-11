@@ -7,21 +7,24 @@ import {
   Spacer,
   Tooltip,
 } from "@chakra-ui/react";
-import type { ElasticSearchEvaluation } from "../server/tracer/types";
-import { getEvaluatorDefinitions } from "../trace_checks/getEvaluator";
+import type { ElasticSearchEvaluation } from "../../server/tracer/types";
+import { getEvaluatorDefinitions } from "../../trace_checks/getEvaluator";
 import numeral from "numeral";
 import { formatDistanceToNow } from "date-fns";
-import type { EvaluatorTypes } from "../trace_checks/evaluators.generated";
+import type { EvaluatorTypes } from "../../trace_checks/evaluators.generated";
 import {
   CheckStatusIcon,
   checkStatusColorMap,
-} from "./checks/EvaluationStatus";
+} from "../checks/EvaluationStatus";
 
-export function CheckPassingDrawer({ check }: { check: ElasticSearchEvaluation }) {
+export function EvaluationStatusItem({
+  check,
+}: {
+  check: ElasticSearchEvaluation;
+}) {
   const checkType = check.check_type as EvaluatorTypes;
 
   const evaluator = getEvaluatorDefinitions(checkType);
-  if (!evaluator) return null;
 
   const color = checkStatusColorMap(check);
 
@@ -39,29 +42,32 @@ export function CheckPassingDrawer({ check }: { check: ElasticSearchEvaluation }
           </Box>
           <VStack alignItems="start" spacing={1}>
             <Text>
-              <b>{check.check_name || evaluator.name}</b>
+              <b>{check.check_name || evaluator?.name}</b>
             </Text>
-            <Text fontSize={"sm"}>{evaluator.description}</Text>
+            {evaluator && <Text fontSize={"sm"}>{evaluator.description}</Text>}
             <Text fontSize={"sm"}>
               {check.status == "processed" ? (
                 <VStack align="start" spacing={1}>
-                  {evaluator.isGuardrail ? (
+                  {check.passed !== undefined && check.passed !== null && (
                     <HStack>
                       <Text>Result:</Text>
                       <Text color={color}>
                         {check.passed ? "Pass" : "Fail"}
                       </Text>
                     </HStack>
-                  ) : (
-                    <HStack>
-                      <Text>Score:</Text>
-                      <Text color={color}>
-                        {check.score !== undefined
-                          ? numeral(check.score).format("0.00")
-                          : "N/A"}
-                      </Text>
-                    </HStack>
                   )}
+                  {!evaluator?.isGuardrail &&
+                    check.score !== undefined &&
+                    check.score !== null && (
+                      <HStack>
+                        <Text>Score:</Text>
+                        <Text color={color}>
+                          {check.score !== undefined
+                            ? numeral(check.score).format("0.00")
+                            : "N/A"}
+                        </Text>
+                      </HStack>
+                    )}
                   {check.details && (
                     <HStack align="start">
                       <Text>Details:</Text>

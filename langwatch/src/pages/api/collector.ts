@@ -109,6 +109,35 @@ export default async function handler(
           );
   }
 
+  for (const evaluation of req.body.evaluations ?? []) {
+    if (
+      (evaluation.passed === undefined || evaluation.passed === null) &&
+      (evaluation.score === undefined || evaluation.score === null) &&
+      (evaluation.label === undefined || evaluation.label === null)
+    ) {
+      return res.status(400).json({
+        error:
+          "Either `passed`, `score` or `label` field must be defined for evaluations",
+      });
+    }
+
+    if (evaluation.error) {
+      evaluation.error.has_error = true;
+    }
+
+    if (
+      (evaluation.timestamps?.started_at &&
+        evaluation.timestamps.started_at.toString().length !== 13) ||
+      (evaluation.timestamps?.finished_at &&
+        evaluation.timestamps.finished_at.toString().length !== 13)
+    ) {
+      return res.status(400).json({
+        error:
+          "Evaluation timestamps should be in milliseconds not in seconds, please multiply it by 1000",
+      });
+    }
+  }
+
   let params: CollectorRESTParamsValidator;
   try {
     params = collectorRESTParamsValidatorSchema.parse(req.body);
@@ -129,10 +158,7 @@ export default async function handler(
 
   const { trace_id: nullableTraceId, expected_output: expectedOutput } = params;
 
-  if (!req.body.spans) {
-    return res.status(400).json({ message: "Missing 'spans' field" });
-  }
-  if (!Array.isArray(req.body.spans)) {
+  if (req.body.spans && !Array.isArray(req.body.spans)) {
     return res
       .status(400)
       .json({ message: "Invalid 'spans' field, expecting array" });
@@ -169,7 +195,7 @@ export default async function handler(
   const spanFields = spanSchema.options.flatMap((option) =>
     Object.keys(option.shape)
   );
-  const spans = (req.body as Record<string, any>).spans as Span[];
+  const spans = ((req.body as Record<string, any>).spans ?? []) as Span[];
   spans.forEach((span) => {
     // We changed "id" to "span_id", but we still want to support "id" for retrocompatibility for a while
     if ("id" in span) {
@@ -262,11 +288,11 @@ export default async function handler(
 
     if (
       (span.timestamps.started_at &&
-        span.timestamps.started_at.toString().length === 10) ||
+        span.timestamps.started_at.toString().length !== 13) ||
       (span.timestamps.finished_at &&
-        span.timestamps.finished_at.toString().length === 10) ||
+        span.timestamps.finished_at.toString().length !== 13) ||
       (span.timestamps.first_token_at &&
-        span.timestamps.first_token_at.toString().length === 10)
+        span.timestamps.first_token_at.toString().length !== 13)
     ) {
       debug(
         "Timestamps not in milliseconds for",
@@ -277,19 +303,6 @@ export default async function handler(
       return res.status(400).json({
         error:
           "Timestamps should be in milliseconds not in seconds, please multiply it by 1000",
-      });
-    }
-  }
-
-  for (const evaluation of params.evaluations ?? []) {
-    if (
-      (evaluation.passed === undefined || evaluation.passed === null) &&
-      (evaluation.score === undefined || evaluation.score === null) &&
-      (evaluation.label === undefined || evaluation.label === null)
-    ) {
-      return res.status(400).json({
-        error:
-          "Either `passed`, `score` or `label` field must be defined for evaluations",
       });
     }
   }

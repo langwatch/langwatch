@@ -30,7 +30,7 @@ import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProje
 import { TeamRoleGroup } from "../../server/api/permission";
 import { api } from "../../utils/api";
 import { Annotations } from "../Annotations";
-import { CheckPassingDrawer } from "../CheckPassingDrawer";
+import { EvaluationStatusItem } from "./EvaluationStatusItem";
 import { useDrawer } from "../CurrentDrawer";
 import { ShareButton } from "./ShareButton";
 import { SpanTree } from "./SpanTree";
@@ -368,7 +368,7 @@ function Evaluations(trace: TraceEval & { anyGuardrails: boolean }) {
     <VStack align="start" spacing={2}>
       <>
         {evaluations?.map((check) => (
-          <CheckPassingDrawer
+          <EvaluationStatusItem
             key={check.trace_id + "/" + check.check_id}
             check={check}
           />
@@ -398,7 +398,7 @@ const Guardrails = (trace: TraceEval) => {
     <VStack align="start" spacing={2}>
       <>
         {guardrails?.map((check) => (
-          <CheckPassingDrawer
+          <EvaluationStatusItem
             key={check.trace_id + "/" + check.check_id}
             check={check}
           />
