@@ -15,7 +15,8 @@ import {
   type Span,
   type SpanInputOutput,
   type Trace,
-  type TraceCheck,
+  type ElasticSearchEvaluation,
+  type Evaluation,
 } from "./types";
 import { reservedTraceMetadataSchema } from "./types.generated";
 
@@ -83,13 +84,20 @@ export const elasticSearchTraceToTrace = (
   const customMetadata = metadata.custom ?? {};
 
   return {
-    ...omit(elasticSearchTrace, ["events"]),
+    ...omit(elasticSearchTrace, ["events", "evaluations"]),
     metadata: {
       ...reservedMetadata,
       ...customMetadata,
     },
     ...(elasticSearchTrace.events
       ? { events: elasticSearchEventsToEvents(elasticSearchTrace.events) }
+      : {}),
+    ...(elasticSearchTrace.evaluations
+      ? {
+          evaluations: elasticSearchEvaluationsToEvaluations(
+            elasticSearchTrace.evaluations
+          ),
+        }
       : {}),
   };
 };
@@ -122,30 +130,32 @@ export const elasticSearchToTypedValue = (
   }
 };
 
-export const elasticSearchTraceCheckToUserInterfaceEvaluation = (
-  traceCheck: TraceCheck
-) => {
-  const traceCheck_: Omit<
-    TraceCheck,
-    "check_id" | "check_name" | "check_type"
-  > = {
-    ...traceCheck,
-  };
-  // @ts-ignore
-  delete traceCheck_.id;
-  // @ts-ignore
-  delete traceCheck_.check_id;
-  // @ts-ignore
-  delete traceCheck_.check_name;
-  // @ts-ignore
-  delete traceCheck_.check_type;
+export const elasticSearchEvaluationsToEvaluations = (
+  elasticSearchEvaluations: ElasticSearchEvaluation[]
+): Evaluation[] => {
+  return elasticSearchEvaluations.map((evaluation) => {
+    const evaluation_: Omit<
+      ElasticSearchEvaluation,
+      "check_id" | "check_name" | "check_type"
+    > = {
+      ...evaluation,
+    };
+    // @ts-ignore
+    delete evaluation_.id;
+    // @ts-ignore
+    delete evaluation_.check_id;
+    // @ts-ignore
+    delete evaluation_.check_name;
+    // @ts-ignore
+    delete evaluation_.check_type;
 
-  return {
-    evaluation_id: traceCheck.check_id,
-    evaluation_name: traceCheck.check_name,
-    evaluation_type: traceCheck.check_type,
-    ...traceCheck_,
-  };
+    return {
+      evaluation_id: evaluation.check_id,
+      evaluation_name: evaluation.check_name,
+      evaluation_type: evaluation.check_type,
+      ...evaluation_,
+    };
+  });
 };
 
 export const elasticSearchEventsToEvents = (

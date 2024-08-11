@@ -36,7 +36,7 @@ import {
 } from "react-feather";
 import { useFilterParams } from "../../hooks/useFilterParams";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import type { TraceCheck } from "../../server/tracer/types";
+import type { ElasticSearchEvaluation } from "../../server/tracer/types";
 import { api } from "../../utils/api";
 import { getSingleQueryParam } from "../../utils/getSingleQueryParam";
 import { PeriodSelector, usePeriodSelector } from "../PeriodSelector";
@@ -259,7 +259,7 @@ const ExpandableMessages = React.memo(
   }: {
     project: Project;
     traceGroups: TraceWithGuardrail[][];
-    checksMap: Record<string, TraceCheck[]> | undefined;
+    checksMap: Record<string, ElasticSearchEvaluation[]> | undefined;
   }) {
     const [expandedGroups, setExpandedGroups] = useState<
       Record<number, boolean>

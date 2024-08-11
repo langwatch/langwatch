@@ -8,7 +8,7 @@ import {
   type ElasticSearchEvent,
   type ElasticSearchSpan,
   type ElasticSearchTrace,
-  type TraceCheck,
+  type ElasticSearchEvaluation,
 } from "../src/server/tracer/types";
 
 type NonNestedMappingProperty =
@@ -103,7 +103,7 @@ const spanMapping: ElasticSearchMappingFrom<ElasticSearchSpan> = {
   },
 };
 
-const traceChecksMapping: ElasticSearchMappingFrom<TraceCheck> = {
+const traceChecksMapping: ElasticSearchMappingFrom<ElasticSearchEvaluation> = {
   trace_id: { type: "keyword" },
   check_id: { type: "keyword" },
   project_id: { type: "keyword" },

@@ -34,7 +34,7 @@ import Markdown from "react-markdown";
 import type {
   GuardrailResult,
   Trace,
-  TraceCheck,
+  ElasticSearchEvaluation,
 } from "../../server/tracer/types";
 import { api } from "../../utils/api";
 import { formatMilliseconds } from "../../utils/formatMilliseconds";
@@ -58,7 +58,7 @@ export function MessageCard({
   linkActive: boolean;
   project: Project;
   trace: TraceWithGuardrail;
-  checksMap: Record<string, TraceCheck[]> | undefined;
+  checksMap: Record<string, ElasticSearchEvaluation[]> | undefined;
 }) {
   const evaluations = checksMap
     ? checksMap[trace.trace_id]?.filter((x) => !x.is_guardrail) ?? []

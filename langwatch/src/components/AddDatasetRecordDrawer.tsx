@@ -33,14 +33,16 @@ import type {
 import type {
   DatasetSpan,
   ElasticSearchSpan,
-  TraceCheck,
+  ElasticSearchEvaluation,
 } from "../server/tracer/types";
-import { getRAGInfo } from "../server/tracer/utils";
+import {
+  elasticSearchEvaluationsToEvaluations,
+  getRAGInfo,
+} from "../server/tracer/utils";
 import { AddDatasetDrawer } from "./AddDatasetDrawer";
 import { HorizontalFormControl } from "./HorizontalFormControl";
 import { DatasetGrid } from "./datasets/DatasetGrid";
 import { useDrawer } from "./CurrentDrawer";
-import { elasticSearchTraceCheckToUserInterfaceEvaluation } from "../server/tracer/utils";
 import { Link } from "@chakra-ui/next-js";
 
 type FormValues = {
@@ -273,24 +275,24 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
     );
   };
 
-  const getEvaluationArray = (data: TraceCheck[], traceId: string) => {
+  const getEvaluationArray = (
+    data: ElasticSearchEvaluation[],
+    traceId: string
+  ) => {
     if (!Array.isArray(data)) {
       return [];
     }
 
-    return data
+    return elasticSearchEvaluationsToEvaluations(data)
       .filter(
         (item) => item.status === "processed" && item.trace_id === traceId
       )
       .map((item) => {
-        const evaluation =
-          elasticSearchTraceCheckToUserInterfaceEvaluation(item);
-
         return {
-          evaluation_name: evaluation.evaluation_name,
-          evaluation_type: evaluation.evaluation_type,
-          passed: evaluation.passed,
-          score: evaluation.score,
+          evaluation_name: item.evaluation_name,
+          evaluation_type: item.evaluation_type,
+          passed: item.passed,
+          score: item.score,
         };
       });
   };

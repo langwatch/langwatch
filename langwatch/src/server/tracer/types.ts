@@ -276,7 +276,8 @@ export type Trace = {
   indexing_md5s?: string[];
 
   events?: Event[];
-  // TODO: add spans and evaluations here too
+  evaluations?: Evaluation[];
+  // TODO: add spans here too
 };
 
 export type ElasticSearchTrace = Omit<
@@ -292,11 +293,11 @@ export type ElasticSearchTrace = Omit<
   };
 
   spans?: ElasticSearchSpan[];
-  evaluations?: TraceCheck[];
+  evaluations?: ElasticSearchEvaluation[];
   events?: ElasticSearchEvent[];
 };
 
-export type TraceCheck = {
+export type ElasticSearchEvaluation = {
   trace_id: string;
   check_id: string;
   project_id: string;
@@ -315,6 +316,15 @@ export type TraceCheck = {
     finished_at?: number;
     updated_at: number;
   };
+};
+
+export type Evaluation = Omit<
+  ElasticSearchEvaluation,
+  "check_id" | "check_name" | "check_type"
+> & {
+  evaluation_id: string;
+  evaluation_name: string;
+  evaluation_type: string;
 };
 
 export type CollectorRESTParams = {

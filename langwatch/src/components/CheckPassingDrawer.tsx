@@ -7,7 +7,7 @@ import {
   Spacer,
   Tooltip,
 } from "@chakra-ui/react";
-import type { TraceCheck } from "../server/tracer/types";
+import type { ElasticSearchEvaluation } from "../server/tracer/types";
 import { getEvaluatorDefinitions } from "../trace_checks/getEvaluator";
 import numeral from "numeral";
 import { formatDistanceToNow } from "date-fns";
@@ -17,7 +17,7 @@ import {
   checkStatusColorMap,
 } from "./checks/EvaluationStatus";
 
-export function CheckPassingDrawer({ check }: { check: TraceCheck }) {
+export function CheckPassingDrawer({ check }: { check: ElasticSearchEvaluation }) {
   const checkType = check.check_type as EvaluatorTypes;
 
   const evaluator = getEvaluatorDefinitions(checkType);

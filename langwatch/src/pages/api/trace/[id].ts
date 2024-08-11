@@ -6,7 +6,7 @@ import {
   getEvaluationsMultiple,
   getSpansForTraceIds,
 } from "~/server/api/routers/traces";
-import { elasticSearchTraceCheckToUserInterfaceEvaluation } from "../../../server/tracer/utils";
+import { elasticSearchEvaluationsToEvaluations } from "../../../server/tracer/utils";
 
 export default async function handler(
   req: NextApiRequest,
@@ -38,7 +38,9 @@ export default async function handler(
     traceId,
   });
 
-  const spans = Object.values(await getSpansForTraceIds(project?.id, [traceId])).flat();
+  const spans = Object.values(
+    await getSpansForTraceIds(project?.id, [traceId])
+  ).flat();
 
   const evaluations = await getEvaluationsMultiple({
     projectId: project?.id,
@@ -46,11 +48,11 @@ export default async function handler(
   });
   const evaluations_ = Object.values(evaluations ?? {}).flatMap(
     (evaluationList) => {
-      return evaluationList.map((evaluation) => {
-        return elasticSearchTraceCheckToUserInterfaceEvaluation(evaluation);
-      });
+      return elasticSearchEvaluationsToEvaluations(evaluationList);
     }
   );
 
-  return res.status(200).json({ ...traceDetails, spans, evaluations: evaluations_ });
+  return res
+    .status(200)
+    .json({ ...traceDetails, spans, evaluations: evaluations_ });
 }

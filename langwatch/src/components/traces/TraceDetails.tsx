@@ -25,7 +25,7 @@ import {
   type Project,
   type PublicShare,
 } from "@prisma/client";
-import type { TraceCheck } from "~/server/tracer/types";
+import type { ElasticSearchEvaluation } from "~/server/tracer/types";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { TeamRoleGroup } from "../../server/api/permission";
 import { api } from "../../utils/api";
@@ -42,7 +42,7 @@ import { formatTimeAgo } from "../../utils/formatTimeAgo";
 interface TraceEval {
   project?: Project;
   traceId: string;
-  evaluations?: TraceCheck[];
+  evaluations?: ElasticSearchEvaluation[];
 }
 
 export function TraceDetails(props: {

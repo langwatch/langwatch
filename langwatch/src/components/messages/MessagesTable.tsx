@@ -51,7 +51,7 @@ import {
   Shield,
 } from "react-feather";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import type { Trace, TraceCheck } from "~/server/tracer/types";
+import type { Trace, ElasticSearchEvaluation } from "~/server/tracer/types";
 import { getEvaluatorDefinitions } from "~/trace_checks/getEvaluator";
 import { api } from "~/utils/api";
 import { durationColor } from "~/utils/durationColor";
@@ -112,7 +112,7 @@ export function MessagesTable() {
   );
 
   const [previousTraceChecks, setPreviousTraceChecks] = useState<
-    Record<string, TraceCheck[]>
+    Record<string, ElasticSearchEvaluation[]>
   >(traceGroups.data?.traceChecks ?? {});
   useEffect(() => {
     if (traceGroups.data?.traceChecks) {
@@ -196,7 +196,7 @@ export function MessagesTable() {
       render: (trace: TraceWithGuardrail, index: number) => React.ReactNode;
       value: (
         trace: TraceWithGuardrail,
-        evaluations: TraceCheck[]
+        evaluations: ElasticSearchEvaluation[]
       ) => string | number | Date;
     }
   > = {
@@ -508,7 +508,7 @@ export function MessagesTable() {
               const traceCheck = traceGroups.data?.traceChecks?.[
                 trace.trace_id
               ]?.find(
-                (traceCheck_: TraceCheck) => traceCheck_.check_id === checkId
+                (traceCheck_: ElasticSearchEvaluation) => traceCheck_.check_id === checkId
               );
               const evaluator = getEvaluatorDefinitions(
                 traceCheck?.check_type ?? ""
@@ -547,7 +547,7 @@ export function MessagesTable() {
                 </Td>
               );
             },
-            value: (_trace: Trace, evaluations: TraceCheck[]) => {
+            value: (_trace: Trace, evaluations: ElasticSearchEvaluation[]) => {
               const checkId = columnKey.split(".")[1];
               const traceCheck = evaluations.find(
                 (evaluation) => evaluation.check_id === checkId
@@ -683,7 +683,7 @@ export function MessagesTable() {
     const traceGroups_ = selection
       ? traceGroups.data ?? {
           groups: [],
-          traceChecks: {} as Record<string, TraceCheck[]>,
+          traceChecks: {} as Record<string, ElasticSearchEvaluation[]>,
         }
       : await downloadTraces.mutateAsync({
           ...filterParams,

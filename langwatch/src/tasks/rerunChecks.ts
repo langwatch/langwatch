@@ -7,7 +7,7 @@ import {
   esClient,
   traceCheckIndexId,
 } from "../server/elasticsearch";
-import { type TraceCheck } from "../server/tracer/types";
+import { type ElasticSearchEvaluation } from "../server/tracer/types";
 import {
   scheduleTraceCheck,
   traceChecksQueue,
@@ -20,7 +20,7 @@ import type { EvaluatorTypes } from "../trace_checks/evaluators.generated";
 const TRACE_CHECKS_INDEX = "search-trace-checks";
 
 export default async function execute(checkId: string) {
-  const traceChecks = await esClient.search<TraceCheck>({
+  const traceChecks = await esClient.search<ElasticSearchEvaluation>({
     index: TRACE_CHECKS_INDEX,
     size: 100,
     body: {

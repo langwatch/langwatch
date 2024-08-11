@@ -10,7 +10,7 @@ import {
   vi,
 } from "vitest";
 import { TRACE_CHECKS_INDEX, esClient } from "../../elasticsearch";
-import type { TraceCheck } from "../../tracer/types";
+import type { ElasticSearchEvaluation } from "../../tracer/types";
 import {
   scheduleTraceCheck,
   updateCheckStatusInES,
@@ -107,7 +107,7 @@ describe("Check Queue Integration Tests", () => {
     await new Promise((resolve) => setTimeout(resolve, 100));
 
     // Query ES to verify the status is "scheduled"
-    const response = await esClient.search<TraceCheck>({
+    const response = await esClient.search<ElasticSearchEvaluation>({
       index: TRACE_CHECKS_INDEX,
       query: {
         term: { trace_id: trace.trace_id },
@@ -155,7 +155,7 @@ describe("Check Queue Integration Tests", () => {
     );
 
     // Query ES to verify the status is "processed"
-    const response = await esClient.search<TraceCheck>({
+    const response = await esClient.search<ElasticSearchEvaluation>({
       index: TRACE_CHECKS_INDEX,
       query: {
         term: { trace_id: trace.trace_id },
@@ -192,7 +192,7 @@ describe("Check Queue Integration Tests", () => {
     );
 
     // Query ES to verify the status is "processed"
-    const response = await esClient.search<TraceCheck>({
+    const response = await esClient.search<ElasticSearchEvaluation>({
       index: TRACE_CHECKS_INDEX,
       query: {
         term: { trace_id: trace.trace_id },
@@ -220,7 +220,7 @@ describe("Check Queue Integration Tests", () => {
     await new Promise((resolve) => worker?.on("failed", resolve));
 
     // Query ES to verify the status is "processed"
-    const response = await esClient.search<TraceCheck>({
+    const response = await esClient.search<ElasticSearchEvaluation>({
       index: TRACE_CHECKS_INDEX,
       query: {
         term: { trace_id: trace.trace_id },
@@ -255,7 +255,7 @@ describe("Check Queue Integration Tests", () => {
     );
 
     // Query ES to verify the status is "processed"
-    let response = await esClient.search<TraceCheck>({
+    let response = await esClient.search<ElasticSearchEvaluation>({
       index: TRACE_CHECKS_INDEX,
       query: {
         term: { trace_id: trace.trace_id },
@@ -270,7 +270,7 @@ describe("Check Queue Integration Tests", () => {
     await scheduleTraceCheck({ check, trace, delay: 0 });
 
     // Query ES to verify the status is "scheduled"
-    response = await esClient.search<TraceCheck>({
+    response = await esClient.search<ElasticSearchEvaluation>({
       index: TRACE_CHECKS_INDEX,
       query: {
         term: { trace_id: trace.trace_id },
@@ -288,7 +288,7 @@ describe("Check Queue Integration Tests", () => {
     );
 
     // Query ES to verify the status is "processed"
-    response = await esClient.search<TraceCheck>({
+    response = await esClient.search<ElasticSearchEvaluation>({
       index: TRACE_CHECKS_INDEX,
       query: {
         term: { trace_id: trace.trace_id },

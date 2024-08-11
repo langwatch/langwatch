@@ -1,8 +1,8 @@
 import { CheckCircle, Clock, MinusCircle, XCircle } from "react-feather";
-import type { TraceCheck } from "../../server/tracer/types";
+import type { ElasticSearchEvaluation } from "../../server/tracer/types";
 
-export function CheckStatusIcon({ check }: { check: TraceCheck }) {
-  const iconMap: Record<TraceCheck["status"], React.FC> = {
+export function CheckStatusIcon({ check }: { check: ElasticSearchEvaluation }) {
+  const iconMap: Record<ElasticSearchEvaluation["status"], React.FC> = {
     scheduled: Clock,
     in_progress: Clock,
     error: XCircle, // CloseIcon?
@@ -16,10 +16,10 @@ export function CheckStatusIcon({ check }: { check: TraceCheck }) {
 }
 
 export const checkStatusColorMap = (check: {
-  status: TraceCheck["status"];
+  status: ElasticSearchEvaluation["status"];
   passed?: boolean;
 }) => {
-  const colorMap: Record<TraceCheck["status"], string> = {
+  const colorMap: Record<ElasticSearchEvaluation["status"], string> = {
     scheduled: "yellow.600",
     in_progress: "yellow.600",
     error: "red.800",

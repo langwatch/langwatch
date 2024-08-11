@@ -4,7 +4,7 @@ import { traceCheckIndexId } from "~/server/elasticsearch";
 import { captureError } from "../../../utils/captureError";
 import { esClient, TRACE_INDEX, traceIndexId } from "../../elasticsearch";
 import { connection } from "../../redis";
-import type { TraceCheck } from "../../tracer/types";
+import type { ElasticSearchEvaluation } from "../../tracer/types";
 
 export const TRACE_CHECKS_QUEUE_NAME = "evaluations";
 
@@ -99,7 +99,7 @@ export const updateCheckStatusInES = async ({
 }: {
   check: TraceCheckJob["check"];
   trace: TraceCheckJob["trace"];
-  status: TraceCheck["status"];
+  status: ElasticSearchEvaluation["status"];
   error?: any;
   score?: number;
   passed?: boolean;
@@ -107,7 +107,7 @@ export const updateCheckStatusInES = async ({
   retries?: number;
   is_guardrail?: boolean;
 }) => {
-  const evaluation: TraceCheck = {
+  const evaluation: ElasticSearchEvaluation = {
     trace_id: trace.trace_id,
     project_id: trace.project_id,
     thread_id: trace.thread_id,

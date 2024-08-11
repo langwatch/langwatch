@@ -1,5 +1,5 @@
 import { Box, HStack, Text } from "@chakra-ui/react";
-import type { TraceCheck } from "../server/tracer/types";
+import type { ElasticSearchEvaluation } from "../server/tracer/types";
 import { getEvaluatorDefinitions } from "../trace_checks/getEvaluator";
 import type { EvaluatorTypes } from "../trace_checks/evaluators.generated";
 import {
@@ -8,7 +8,7 @@ import {
 } from "./checks/EvaluationStatus";
 import numeral from "numeral";
 
-export function CheckPassing({ check }: { check: TraceCheck }) {
+export function CheckPassing({ check }: { check: ElasticSearchEvaluation }) {
   const checkType = check.check_type as EvaluatorTypes;
 
   const evaluator = getEvaluatorDefinitions(checkType);
