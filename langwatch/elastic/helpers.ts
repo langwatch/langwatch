@@ -17,7 +17,7 @@ export const recreateIndexAndMigrate = async ({
     mappings: mapping,
   });
 
-  const previousIndex = await getPreviousWriteIndex({
+  const previousIndex = await getCurrentWriteIndex({
     indexSpec,
     newIndex,
   });
@@ -28,12 +28,12 @@ export const recreateIndexAndMigrate = async ({
   });
 };
 
-export const getPreviousWriteIndex = async ({
+export const getCurrentWriteIndex = async ({
   indexSpec,
-  newIndex,
+  newIndex = undefined,
 }: {
   indexSpec: IndexSpec;
-  newIndex: string;
+  newIndex?: string;
 }) => {
   const aliasInfo: Record<string, unknown> = await esClient.indices.getAlias({
     name: indexSpec.alias,

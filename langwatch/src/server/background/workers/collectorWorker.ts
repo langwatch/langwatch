@@ -27,6 +27,7 @@ import { scoreSatisfactionFromInput } from "./collector/satisfaction";
 import { getTraceInput, getTraceOutput } from "./collector/trace";
 import { scheduleTraceChecks } from "./collector/traceChecks";
 import type { QueryDslBoolQuery } from "@elastic/elasticsearch/lib/api/types";
+import { mapEvaluations } from "./collector/evaluations";
 
 const debug = getDebugger("langwatch:workers:collectorWorker");
 
@@ -115,6 +116,8 @@ export const processCollectorJob = async (
   ]);
   const error = getLastOutputError(spans);
 
+  const evaluations = mapEvaluations(data);
+
   // Create the trace
   const trace: ElasticSearchTrace = {
     trace_id: traceId,
@@ -182,12 +185,13 @@ export const processCollectorJob = async (
               }
             }
             if (existingSpanIndex >= 0) {
-              ctx._source.spans[existingSpanIndex] = newSpan;
-            } else {
               if (newSpan.timestamps == null) {
                 newSpan.timestamps = new HashMap();
+                newSpan.timestamps.inserted_at = currentTime;
               }
-              newSpan.timestamps.inserted_at = currentTime;
+              newSpan.timestamps.updated_at = currentTime;
+              ctx._source.spans[existingSpanIndex] = newSpan;
+            } else {
               ctx._source.spans.add(newSpan);
             }
           }
@@ -204,6 +208,52 @@ export const processCollectorJob = async (
     },
     refresh: true,
   });
+
+  if (evaluations) {
+    await esClient.update({
+      index: TRACE_INDEX.alias,
+      id: traceIndexId({ traceId, projectId: project.id }),
+      retry_on_conflict: 5,
+      body: {
+        script: {
+          source: `
+            if (ctx._source.evaluations == null) {
+              ctx._source.evaluations = [];
+            }
+            def currentTime = System.currentTimeMillis();
+            for (def newEvaluation : params.newEvaluations) {
+              def existingEvaluationIndex = -1;
+              for (int i = 0; i < ctx._source.evaluations.size(); i++) {
+                if (ctx._source.evaluations[i].check_id == newEvaluation.check_id) {
+                  existingEvaluationIndex = i;
+                  break;
+                }
+              }
+              if (existingEvaluationIndex >= 0) {
+                if (newEvaluation.timestamps == null) {
+                  newEvaluation.timestamps = new HashMap();
+                  newEvaluation.timestamps.inserted_at = currentTime;
+                }
+                newEvaluation.timestamps.updated_at = currentTime;
+                ctx._source.evaluations[existingEvaluationIndex] = newEvaluation;
+              } else {
+                ctx._source.evaluations.add(newEvaluation);
+              }
+            }
+          `,
+          lang: "painless",
+          params: {
+            newEvaluations: evaluations,
+          },
+        },
+        upsert: {
+          ...trace,
+          evaluations,
+        },
+      },
+      refresh: true,
+    });
+  }
 
   // Does not re-schedule trace checks for too old traces being resynced
   if (

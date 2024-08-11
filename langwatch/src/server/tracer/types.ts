@@ -297,34 +297,54 @@ export type ElasticSearchTrace = Omit<
   events?: ElasticSearchEvent[];
 };
 
-export type ElasticSearchEvaluation = {
-  trace_id: string;
-  check_id: string;
-  project_id: string;
-  check_type: string;
-  check_name: string;
-  is_guardrail: boolean;
-  status: "scheduled" | "in_progress" | "error" | "skipped" | "processed";
-  passed?: boolean;
-  score?: number;
-  details?: string;
+type EvaluationStatus =
+  | "scheduled"
+  | "in_progress"
+  | "error"
+  | "skipped"
+  | "processed";
+
+export type Evaluation = {
+  evaluation_id: string;
+  name: string;
+  type?: string | null;
+  is_guardrail?: boolean | null;
+  status: EvaluationStatus;
+  passed?: boolean | null;
+  score?: number | null;
+  label?: string | null;
+  details?: string | null;
   error?: ErrorCapture | null;
-  retries?: number;
+  retries?: number | null;
   timestamps: {
-    inserted_at?: number;
-    started_at?: number;
-    finished_at?: number;
-    updated_at: number;
+    inserted_at?: number | null;
+    started_at?: number | null;
+    finished_at?: number | null;
+    updated_at?: number | null;
   };
 };
 
-export type Evaluation = Omit<
-  ElasticSearchEvaluation,
-  "check_id" | "check_name" | "check_type"
+export type ElasticSearchEvaluation = Omit<
+  Evaluation,
+  "evaluation_id" | "name" | "type"
 > & {
-  evaluation_id: string;
-  evaluation_name: string;
-  evaluation_type: string;
+  trace_id: string;
+  project_id: string;
+  check_id: string;
+  check_type?: string | null;
+  check_name: string;
+};
+
+export type RESTEvaluation = Omit<
+  Evaluation,
+  "evaluation_id" | "status" | "timestamps" | "retries"
+> & {
+  evaluation_id?: string | null;
+  status?: EvaluationStatus | null;
+  timestamps?: {
+    started_at?: number | null;
+    finished_at?: number | null;
+  } | null;
 };
 
 export type CollectorRESTParams = {
@@ -339,7 +359,7 @@ export type CollectorRESTParams = {
     sdk_language?: string | null | undefined;
   } & CustomMetadata;
   expected_output?: string | null;
-  evaluations?: Evaluation[];
+  evaluations?: RESTEvaluation[];
 };
 
 export type CollectorRESTParamsValidator = Omit<CollectorRESTParams, "spans">;

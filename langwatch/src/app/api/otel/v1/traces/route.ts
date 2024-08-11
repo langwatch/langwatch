@@ -97,6 +97,7 @@ export async function POST(req: NextRequest) {
         existingTrace,
         paramsMD5,
         expectedOutput: undefined,
+        evaluations: undefined,
       })
     );
   }

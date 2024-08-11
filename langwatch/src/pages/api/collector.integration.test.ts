@@ -542,4 +542,86 @@ describe("Collector API Endpoint", () => {
       ],
     });
   });
+
+  test("should insert custom evaluation results as well", async () => {
+    const traceId = `trace_test-${nanoid()}`;
+    const llmSpan: LLMSpan = {
+      ...sampleSpan,
+      trace_id: traceId,
+      span_id: `span_${nanoid()}`,
+    };
+
+    const builtInEvaluationId = `eval_${nanoid()}`;
+    const traceData: CollectorRESTParams = {
+      trace_id: traceId,
+      spans: [llmSpan],
+      evaluations: [
+        {
+          name: "custom evaluation",
+          passed: true,
+        },
+        {
+          evaluation_id: builtInEvaluationId,
+          name: "built-in evaluation",
+          type: "ragas/faithfulness",
+          score: 0.5,
+        },
+      ],
+    };
+
+    const { req, res }: { req: NextApiRequest; res: NextApiResponse } =
+      createMocks({
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Auth-Token": project?.apiKey,
+        },
+        body: traceData,
+      });
+
+    await handler(req, res);
+    expect(res.statusCode).toBe(200);
+
+    const indexedTraceWithEvaluations = await waitForResult(async () => {
+      const trace = await esClient.getSource<ElasticSearchTrace>({
+        index: TRACE_INDEX.alias,
+        id: traceIndexId({
+          traceId,
+          projectId: project?.id ?? "",
+        }),
+      });
+
+      expect(trace.evaluations).toBeDefined();
+
+      return trace;
+    });
+
+    expect(indexedTraceWithEvaluations.evaluations).toMatchObject([
+      {
+        check_id: expect.any(String),
+        trace_id: traceId,
+        project_id: project?.id,
+        check_name: "custom evaluation",
+        passed: true,
+        status: "processed",
+        timestamps: {
+          inserted_at: expect.any(Number),
+          updated_at: expect.any(Number),
+        },
+      },
+      {
+        check_id: builtInEvaluationId,
+        trace_id: traceId,
+        project_id: project?.id,
+        check_name: "built-in evaluation",
+        check_type: "ragas/faithfulness",
+        score: 0.5,
+        status: "processed",
+        timestamps: {
+          inserted_at: expect.any(Number),
+          updated_at: expect.any(Number),
+        },
+      },
+    ]);
+  });
 });

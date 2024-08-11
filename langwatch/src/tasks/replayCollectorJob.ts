@@ -5,6 +5,7 @@ import { processCollectorJob } from "../server/background/workers/collectorWorke
 const jobData: CollectorJob = {
   projectId: "EEisP6epvj-no_veGiHTQ",
   traceId: "YV8LVKtcS72wYq4IUlCsl",
+  evaluations: [],
   spans: [],
   reservedTraceMetadata: {
     thread_id: "66ab681faadf42f6940f64d3",

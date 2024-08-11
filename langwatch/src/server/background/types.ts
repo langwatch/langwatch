@@ -2,6 +2,7 @@ import type { EvaluatorTypes } from "../../trace_checks/evaluators.generated";
 import type {
   CustomMetadata,
   ReservedTraceMetadata,
+  RESTEvaluation,
   Span,
   TrackEventRESTParamsValidator,
 } from "../tracer/types";
@@ -38,6 +39,7 @@ export type TrackEventJob = {
 
 export type CollectorJob = {
   spans: Span[];
+  evaluations: RESTEvaluation[] | undefined;
   traceId: string;
   projectId: string;
   expectedOutput: string | null | undefined;

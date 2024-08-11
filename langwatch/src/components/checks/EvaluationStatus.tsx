@@ -17,7 +17,7 @@ export function CheckStatusIcon({ check }: { check: ElasticSearchEvaluation }) {
 
 export const checkStatusColorMap = (check: {
   status: ElasticSearchEvaluation["status"];
-  passed?: boolean;
+  passed?: boolean | null;
 }) => {
   const colorMap: Record<ElasticSearchEvaluation["status"], string> = {
     scheduled: "yellow.600",

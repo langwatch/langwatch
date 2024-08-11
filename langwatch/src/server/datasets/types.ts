@@ -48,9 +48,9 @@ export const annotationScoreSchema = z.object({
 });
 
 export const evaluationsSchema = z.object({
-  evaluation_name: z.string(),
-  evaluation_type: z.string(),
-  passed: z.boolean().nullable(),
+  name: z.string(),
+  type: z.string().optional().nullable(),
+  passed: z.boolean().optional().nullable(),
   score: z.number().nullable(),
 });
 

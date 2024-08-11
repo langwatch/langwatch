@@ -285,12 +285,14 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
 
     return elasticSearchEvaluationsToEvaluations(data)
       .filter(
-        (item) => item.status === "processed" && item.trace_id === traceId
+        // TODO: fix this type assertion, evaluations should be included in the traces now, no need for trace_id
+        (item) =>
+          item.status === "processed" && (item as any).trace_id === traceId
       )
       .map((item) => {
         return {
-          evaluation_name: item.evaluation_name,
-          evaluation_type: item.evaluation_type,
+          name: item.name,
+          type: item.type,
           passed: item.passed,
           score: item.score,
         };

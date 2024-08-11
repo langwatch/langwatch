@@ -151,8 +151,8 @@ export const elasticSearchEvaluationsToEvaluations = (
 
     return {
       evaluation_id: evaluation.check_id,
-      evaluation_name: evaluation.check_name,
-      evaluation_type: evaluation.check_type,
+      name: evaluation.check_name,
+      type: evaluation.check_type,
       ...evaluation_,
     };
   });

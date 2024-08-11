@@ -281,6 +281,19 @@ export default async function handler(
     }
   }
 
+  for (const evaluation of params.evaluations ?? []) {
+    if (
+      (evaluation.passed === undefined || evaluation.passed === null) &&
+      (evaluation.score === undefined || evaluation.score === null) &&
+      (evaluation.label === undefined || evaluation.label === null)
+    ) {
+      return res.status(400).json({
+        error:
+          "Either `passed`, `score` or `label` field must be defined for evaluations",
+      });
+    }
+  }
+
   const paramsMD5 = crypto
     .createHash("md5")
     .update(JSON.stringify({ ...params, spans }))
@@ -296,6 +309,7 @@ export default async function handler(
     projectId: project.id,
     traceId,
     spans,
+    evaluations: params.evaluations,
     reservedTraceMetadata,
     customMetadata,
     expectedOutput,

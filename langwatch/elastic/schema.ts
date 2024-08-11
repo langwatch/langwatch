@@ -103,7 +103,7 @@ const spanMapping: ElasticSearchMappingFrom<ElasticSearchSpan> = {
   },
 };
 
-const traceChecksMapping: ElasticSearchMappingFrom<ElasticSearchEvaluation> = {
+const evaluationsMapping: ElasticSearchMappingFrom<ElasticSearchEvaluation> = {
   trace_id: { type: "keyword" },
   check_id: { type: "keyword" },
   project_id: { type: "keyword" },
@@ -114,6 +114,7 @@ const traceChecksMapping: ElasticSearchMappingFrom<ElasticSearchEvaluation> = {
   passed: { type: "boolean" },
   score: { type: "float" },
   details: { type: "text" },
+  label: { type: "keyword" },
   error: {
     properties: {
       has_error: { type: "boolean" }, // workaround to make has_error available on pivot index since text fields are not
@@ -260,7 +261,7 @@ export const traceMapping: ElasticSearchMappingFrom<ElasticSearchTrace> = {
   },
   evaluations: {
     type: "nested",
-    properties: traceChecksMapping,
+    properties: evaluationsMapping,
   },
   events: {
     type: "nested",
