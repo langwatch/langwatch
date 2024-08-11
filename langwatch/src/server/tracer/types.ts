@@ -197,12 +197,13 @@ export type Span = LLMSpan | RAGSpan | BaseSpan;
 type SpanInputOutputValidator = SpanInputOutput & { value: any };
 
 export type SpanValidator = (
-  | Omit<LLMSpan, "input" | "output">
-  | Omit<RAGSpan, "input" | "output">
-  | Omit<BaseSpan, "input" | "output">
+  | Omit<LLMSpan, "input" | "output" | "params">
+  | Omit<RAGSpan, "input" | "output" | "params">
+  | Omit<BaseSpan, "input" | "output" | "params">
 ) & {
   input?: SpanInputOutputValidator | null;
   output?: SpanInputOutputValidator | null;
+  params?: Record<string, any> | null;
 };
 
 export type ElasticSearchInputOutput = {
