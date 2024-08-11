@@ -339,6 +339,7 @@ export type CollectorRESTParams = {
     sdk_language?: string | null | undefined;
   } & CustomMetadata;
   expected_output?: string | null;
+  evaluations?: Evaluation[];
 };
 
 export type CollectorRESTParamsValidator = Omit<CollectorRESTParams, "spans">;

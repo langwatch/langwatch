@@ -1,27 +1,25 @@
+import { type Project } from "@prisma/client";
+import type { Worker } from "bullmq";
+import { nanoid } from "nanoid";
 import { type NextApiRequest, type NextApiResponse } from "next";
 import { createMocks } from "node-mocks-http";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
+import type { CollectorJob } from "../../server/background/types";
+import { startCollectorWorker } from "../../server/background/workers/collectorWorker";
 import {
   TRACE_INDEX,
   esClient,
-  spanIndexId,
   traceIndexId,
 } from "../../server/elasticsearch";
+import { DEFAULT_EMBEDDINGS_MODEL } from "../../server/embeddings";
 import {
-  type Trace,
-  type ElasticSearchSpan,
+  type CollectorRESTParams,
+  type ElasticSearchTrace,
   type LLMSpan,
   type RAGSpan,
-  type CollectorRESTParams,
 } from "../../server/tracer/types";
-import handler from "./collector";
-import { type Project } from "@prisma/client";
-import { DEFAULT_EMBEDDINGS_MODEL } from "../../server/embeddings";
 import { getTestProject, waitForResult } from "../../utils/testUtils";
-import { nanoid } from "nanoid";
-import { startCollectorWorker } from "../../server/background/workers/collectorWorker";
-import type { CollectorJob } from "../../server/background/types";
-import type { Worker } from "bullmq";
+import handler from "./collector";
 
 const sampleSpan: LLMSpan = {
   type: "llm",
@@ -101,46 +99,19 @@ describe("Collector API Endpoint", () => {
     await handler(req, res);
     expect(res.statusCode).toBe(200);
 
-    const indexedSpan = await waitForResult(() =>
-      esClient.getSource<ElasticSearchSpan>({
-        index: SPAN_INDEX,
-        id: spanIndexId({
-          spanId: sampleSpan.span_id,
-          projectId: project?.id ?? "",
-        }),
-        routing: traceIndexId({
-          traceId: sampleSpan.trace_id,
-          projectId: project?.id ?? "",
-        }),
-      })
-    );
-
-    expect(indexedSpan).toMatchObject({
-      ...sampleSpan,
-      input: {
-        type: "chat_messages",
-        value: JSON.stringify(sampleSpan.input?.value),
-      },
-      output: {
-        type: "text",
-        value: '"world"',
-      },
-      timestamps: {
-        ...sampleSpan.timestamps,
-        inserted_at: expect.any(Number),
-      },
-      project_id: project?.id,
-    });
-
-    const indexedTrace = await waitForResult(() =>
-      esClient.getSource<Trace>({
+    const indexedTrace = await waitForResult(async () => {
+      const trace = await esClient.getSource<ElasticSearchTrace>({
         index: TRACE_INDEX.alias,
         id: traceIndexId({
           traceId: sampleSpan.trace_id,
           projectId: project?.id ?? "",
         }),
-      })
-    );
+      });
+
+      expect(trace.spans).toBeDefined();
+
+      return trace;
+    });
 
     expect(indexedTrace).toEqual({
       trace_id: sampleSpan.trace_id,
@@ -191,6 +162,32 @@ describe("Collector API Endpoint", () => {
       expected_output: { value: "world" },
       error: null,
       indexing_md5s: expect.any(Array),
+
+      spans: [
+        {
+          ...sampleSpan,
+          metrics: {
+            completion_tokens: 1,
+            cost: 0.0000125,
+            prompt_tokens: 7,
+            tokens_estimated: true,
+          },
+          input: {
+            type: "chat_messages",
+            value: JSON.stringify(sampleSpan.input?.value),
+          },
+          output: {
+            type: "text",
+            value: '"world"',
+          },
+          timestamps: {
+            ...sampleSpan.timestamps,
+            inserted_at: expect.any(Number),
+            updated_at: expect.any(Number),
+          },
+          project_id: project?.id,
+        },
+      ],
     });
   });
 
@@ -347,21 +344,21 @@ describe("Collector API Endpoint", () => {
     await handler(req, res);
     expect(res.statusCode).toBe(200);
 
-    const indexedRagSpan = await waitForResult(() =>
-      esClient.getSource<ElasticSearchSpan>({
-        index: SPAN_INDEX,
-        id: spanIndexId({
-          spanId: ragSpan.span_id,
-          projectId: project?.id ?? "",
-        }),
-        routing: traceIndexId({
+    const indexedRagTrace = await waitForResult(async () => {
+      const trace = await esClient.getSource<ElasticSearchTrace>({
+        index: TRACE_INDEX.alias,
+        id: traceIndexId({
           traceId,
           projectId: project?.id ?? "",
         }),
-      })
-    );
+      });
 
-    expect(indexedRagSpan).toMatchObject({
+      expect(trace.spans).toBeDefined();
+
+      return trace;
+    });
+
+    expect(indexedRagTrace.spans![1]).toMatchObject({
       input: {
         type: "text",
         value: '"What is the capital of France?"',
@@ -440,21 +437,21 @@ describe("Collector API Endpoint", () => {
     await handler(req, res);
     expect(res.statusCode).toBe(200);
 
-    const indexedRagSpan = await waitForResult(() =>
-      esClient.getSource<ElasticSearchSpan>({
-        index: SPAN_INDEX,
-        id: spanIndexId({
-          spanId: ragSpan.span_id,
-          projectId: project?.id ?? "",
-        }),
-        routing: traceIndexId({
+    const indexedRagTrace = await waitForResult(async () => {
+      const trace = await esClient.getSource<ElasticSearchTrace>({
+        index: TRACE_INDEX.alias,
+        id: traceIndexId({
           traceId,
           projectId: project?.id ?? "",
         }),
-      })
-    );
+      });
 
-    expect(indexedRagSpan.contexts).toMatchObject([
+      expect(trace.spans).toBeDefined();
+
+      return trace;
+    });
+
+    expect(indexedRagTrace.spans![1]!.contexts).toMatchObject([
       {
         document_id: expect.any(String),
         content: "France is a country in Europe.",
@@ -509,36 +506,8 @@ describe("Collector API Endpoint", () => {
     await handler(req, res);
     expect(res.statusCode).toBe(200);
 
-    const indexedSpan = await waitForResult(() =>
-      esClient.getSource<ElasticSearchSpan>({
-        index: SPAN_INDEX,
-        id: spanIndexId({
-          spanId: traceData.spans[0]!.span_id,
-          projectId: project?.id ?? "",
-        }),
-        routing: traceIndexId({
-          traceId,
-          projectId: project?.id ?? "",
-        }),
-      })
-    );
-
-    expect(indexedSpan).toMatchObject({
-      input: {
-        type: "chat_messages",
-        value: JSON.stringify([
-          { role: "system", content: "you are a helpful assistant" },
-          {
-            role: "user",
-            content:
-              "hey there, my email is [REDACTED], please check it for me",
-          },
-        ]),
-      },
-    });
-
     const indexedTrace = await waitForResult(() =>
-      esClient.getSource<Trace>({
+      esClient.getSource<ElasticSearchTrace>({
         index: TRACE_INDEX.alias,
         id: traceIndexId({
           traceId,
@@ -556,6 +525,21 @@ describe("Collector API Endpoint", () => {
           model: DEFAULT_EMBEDDINGS_MODEL,
         },
       },
+      spans: [
+        {
+          input: {
+            type: "chat_messages",
+            value: JSON.stringify([
+              { role: "system", content: "you are a helpful assistant" },
+              {
+                role: "user",
+                content:
+                  "hey there, my email is [REDACTED], please check it for me",
+              },
+            ]),
+          },
+        },
+      ],
     });
   });
 });
