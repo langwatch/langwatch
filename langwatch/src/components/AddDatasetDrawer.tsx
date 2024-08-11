@@ -324,6 +324,9 @@ export const AddDatasetDrawer = (props: AddDatasetDrawerProps) => {
                         </Text>
                       </VStack>
                     </Checkbox>
+
+                    <AnnotationScores />
+                    <Evaluations />
                     <Checkbox
                       value="comments"
                       {...register("columns")}
@@ -343,8 +346,6 @@ export const AddDatasetDrawer = (props: AddDatasetDrawerProps) => {
                         </Text>
                       </VStack>
                     </Checkbox>
-                    <AnnotationScores />
-                    <Evaluations />
                   </CheckboxGroup>
                 )}
 
@@ -392,6 +393,9 @@ export const AddDatasetDrawer = (props: AddDatasetDrawerProps) => {
                         </Text>
                       </VStack>
                     </Checkbox>
+
+                    <AnnotationScores />
+                    <Evaluations />
                     <Checkbox
                       value="comments"
                       {...register("columns")}
@@ -411,8 +415,6 @@ export const AddDatasetDrawer = (props: AddDatasetDrawerProps) => {
                         </Text>
                       </VStack>
                     </Checkbox>
-                    <AnnotationScores />
-                    <Evaluations />
                   </CheckboxGroup>
                 )}
               </VStack>
