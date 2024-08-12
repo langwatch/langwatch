@@ -602,7 +602,7 @@ export class LangWatchAwsMarketplaceStack extends cdk.Stack {
     const ebsCsiDriver = cluster.addHelmChart("EbsCsiDriver", {
       chart: "aws-ebs-csi-driver",
       repository: "https://kubernetes-sigs.github.io/aws-ebs-csi-driver",
-      namespace: "default-test",
+      namespace: "kube-system",
       release: "ebs-csi-driver",
       values: {
         image: {
@@ -701,45 +701,45 @@ export class LangWatchAwsMarketplaceStack extends cdk.Stack {
 
     gp3StorageClass.node.addDependency(ebsCsiDriver);
 
-    // Create a PersistentVolume
-    const pv = cluster.addManifest("MyPV", {
-      apiVersion: "v1",
-      kind: "PersistentVolume",
-      metadata: {
-        name: "my-pv",
-      },
-      spec: {
-        capacity: {
-          storage: "10Gi",
-        },
-        volumeMode: "Filesystem",
-        accessModes: ["ReadWriteOnce"],
-        persistentVolumeReclaimPolicy: "Retain",
-        storageClassName: "gp3",
-        csi: {
-          driver: "ebs.csi.aws.com",
-          volumeHandle: ebsVolume.ref,
-          fsType: "ext4",
-        },
-        nodeAffinity: {
-          required: {
-            nodeSelectorTerms: [
-              {
-                matchExpressions: [
-                  {
-                    key: "kubernetes.io/hostname",
-                    operator: "In",
-                    values: ["ip-10-0-134-124.eu-central-1.compute.internal"], // Replace with your node's hostname
-                  },
-                ],
-              },
-            ],
-          },
-        },
-      },
-    });
+    // // Create a PersistentVolume
+    // const pv = cluster.addManifest("MyPV", {
+    //   apiVersion: "v1",
+    //   kind: "PersistentVolume",
+    //   metadata: {
+    //     name: "my-pv",
+    //   },
+    //   spec: {
+    //     capacity: {
+    //       storage: "10Gi",
+    //     },
+    //     volumeMode: "Filesystem",
+    //     accessModes: ["ReadWriteOnce"],
+    //     persistentVolumeReclaimPolicy: "Retain",
+    //     storageClassName: "gp3",
+    //     csi: {
+    //       driver: "ebs.csi.aws.com",
+    //       volumeHandle: ebsVolume.ref,
+    //       fsType: "ext4",
+    //     },
+    //     nodeAffinity: {
+    //       required: {
+    //         nodeSelectorTerms: [
+    //           {
+    //             matchExpressions: [
+    //               {
+    //                 key: "kubernetes.io/hostname",
+    //                 operator: "In",
+    //                 values: ["ip-10-0-134-124.eu-central-1.compute.internal"], // Replace with your node's hostname
+    //               },
+    //             ],
+    //           },
+    //         ],
+    //       },
+    //     },
+    //   },
+    // });
 
-    pv.node.addDependency(gp3StorageClass);
+    // pv.node.addDependency(gp3StorageClass);
 
     // Create a PersistentVolumeClaim
     const pvc = cluster.addManifest("MyPVC", {
@@ -752,7 +752,7 @@ export class LangWatchAwsMarketplaceStack extends cdk.Stack {
         accessModes: ["ReadWriteOnce"],
         resources: {
           requests: {
-            storage: "10Gi",
+            storage: "5Gi",
           },
         },
         storageClassName: "gp3",
@@ -766,7 +766,7 @@ export class LangWatchAwsMarketplaceStack extends cdk.Stack {
       cluster,
       chart: "elasticsearch",
       repository: "https://helm.elastic.co",
-      namespace: "default-test",
+      namespace: "default",
       release: "elasticsearch",
       values: {
         antiAffinity: "soft",
