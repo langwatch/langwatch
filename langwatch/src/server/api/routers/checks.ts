@@ -10,6 +10,7 @@ import {
   AVAILABLE_EVALUATORS,
   type EvaluatorTypes,
 } from "../../../trace_checks/evaluators.generated";
+import { EvaluationExecutionMode } from "@prisma/client";
 
 export const checksRouter = createTRPCRouter({
   getAllForProject: protectedProcedure
@@ -51,7 +52,11 @@ export const checksRouter = createTRPCRouter({
         preconditions: checkPreconditionsSchema,
         settings: z.object({}).passthrough(),
         sample: z.number().min(0).max(1),
-        isGuardrail: z.boolean().optional(),
+        executionMode: z.enum([
+          EvaluationExecutionMode.ON_MESSAGE,
+          EvaluationExecutionMode.AS_GUARDRAIL,
+          EvaluationExecutionMode.MANUALLY,
+        ]),
       })
     )
     .use(checkUserPermissionForProject(TeamRoleGroup.GUARDRAILS_MANAGE))
@@ -63,7 +68,7 @@ export const checksRouter = createTRPCRouter({
         preconditions,
         settings: parameters,
         sample,
-        isGuardrail,
+        executionMode,
       } = input;
       const prisma = ctx.prisma;
       const slug = slugify(name, { lower: true, strict: true });
@@ -81,7 +86,7 @@ export const checksRouter = createTRPCRouter({
           parameters,
           sample,
           enabled: true,
-          isGuardrail,
+          executionMode,
         },
       });
 
@@ -98,7 +103,11 @@ export const checksRouter = createTRPCRouter({
         settings: z.object({}).passthrough(),
         sample: z.number().min(0).max(1),
         enabled: z.boolean().optional(),
-        isGuardrail: z.boolean().optional(),
+        executionMode: z.enum([
+          EvaluationExecutionMode.ON_MESSAGE,
+          EvaluationExecutionMode.AS_GUARDRAIL,
+          EvaluationExecutionMode.MANUALLY,
+        ]),
       })
     )
     .use(checkUserPermissionForProject(TeamRoleGroup.GUARDRAILS_MANAGE))
@@ -112,7 +121,7 @@ export const checksRouter = createTRPCRouter({
         settings: parameters,
         sample,
         enabled,
-        isGuardrail,
+        executionMode,
       } = input;
       const prisma = ctx.prisma;
       const slug = slugify(name, { lower: true, strict: true });
@@ -129,7 +138,7 @@ export const checksRouter = createTRPCRouter({
           parameters,
           sample,
           ...(enabled !== undefined && { enabled }),
-          isGuardrail,
+          executionMode,
         },
       });
 

@@ -29,7 +29,10 @@ import {
   AVAILABLE_EVALUATORS,
   type EvaluatorTypes,
 } from "../../trace_checks/evaluators.generated";
-import type { Check } from "@prisma/client";
+import {
+  EvaluationExecutionMode,
+  type Check,
+} from "@prisma/client";
 
 export default function Checks() {
   const { project, hasTeamPermission } = useOrganizationTeamProject();
@@ -93,8 +96,12 @@ export default function Checks() {
     );
   };
 
-  const evaluations = checks.data?.filter((check) => !check.isGuardrail);
-  const guardrails = checks.data?.filter((check) => check.isGuardrail);
+  const evaluations = checks.data?.filter(
+    (check) => check.executionMode !== EvaluationExecutionMode.AS_GUARDRAIL
+  );
+  const guardrails = checks.data?.filter(
+    (check) => check.executionMode === EvaluationExecutionMode.AS_GUARDRAIL
+  );
 
   const renderEvaluation = (check: Check) => {
     const preconditions = check.preconditions as CheckPreconditions | undefined;

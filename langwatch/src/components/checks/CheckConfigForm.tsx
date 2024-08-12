@@ -4,8 +4,8 @@ import {
   CardBody,
   HStack,
   Input,
+  Select,
   Spacer,
-  Switch,
   Text,
   Tooltip,
   VStack,
@@ -42,9 +42,10 @@ import { api } from "../../utils/api";
 import { HorizontalFormControl } from "../HorizontalFormControl";
 import DynamicZodForm from "./DynamicZodForm";
 import { EvaluatorSelection, evaluatorTempNameMap } from "./EvaluatorSelection";
-import { GuardrailIntegration } from "./GuardrailIntegration";
+import { EvaluationManualIntegration } from "./EvaluationManualIntegration";
 import { PreconditionsField } from "./PreconditionsField";
 import { TryItOut } from "./TryItOut";
+import { EvaluationExecutionMode } from "@prisma/client";
 
 export interface CheckConfigFormData {
   name: string;
@@ -52,7 +53,8 @@ export interface CheckConfigFormData {
   sample: number;
   preconditions: CheckPreconditions;
   settings: Evaluators[EvaluatorTypes]["settings"];
-  isGuardrail: boolean;
+  executionMode: EvaluationExecutionMode;
+  storeSettingsOnCode: boolean;
 }
 
 interface CheckConfigFormProps {
@@ -96,7 +98,13 @@ export default function CheckConfigForm({
           settings:
             evaluatorsSchema.shape[data.checkType ?? "langevals/basic"].shape
               .settings,
-          isGuardrail: z.boolean().optional(),
+          executionMode: z
+            .enum([
+              EvaluationExecutionMode.ON_MESSAGE,
+              EvaluationExecutionMode.AS_GUARDRAIL,
+              EvaluationExecutionMode.MANUALLY,
+            ])
+            .optional(),
         })
       )({ ...data, settings: data.settings || {} }, ...args);
     },
@@ -114,7 +122,8 @@ export default function CheckConfigForm({
   const preconditions = watch("preconditions");
   const nameValue = watch("name");
   const sample = watch("sample");
-  const isGuardrail = watch("isGuardrail");
+  const executionMode = watch("executionMode");
+  const storeSettingsOnCode = watch("storeSettingsOnCode");
   const {
     fields: fieldsPrecondition,
     append: appendPrecondition,
@@ -262,80 +271,90 @@ export default function CheckConfigForm({
                       errors={errors.settings}
                     />
                   )}
-                  <PreconditionsField
-                    runOn={
-                      preconditions?.length === 0 &&
-                      !evaluatorDefinition?.requiredFields.includes(
-                        "contexts"
-                      ) ? (
-                        sample == 1 ? (
-                          runOn
-                        ) : (
-                          <Text color="gray.500" fontStyle="italic">
-                            No preconditions defined
-                          </Text>
-                        )
-                      ) : null
-                    }
-                    append={appendPrecondition}
-                    remove={removePrecondition}
-                    fields={fieldsPrecondition}
-                  />
+
                   <HorizontalFormControl
-                    label="Sampling"
-                    helper="Run this check only on a sample of messages (min 0.01, max 1.0)"
-                    isInvalid={!!errors.sample}
+                    label="Execution Mode"
+                    helper="Configure when this evaluation is executed"
+                    isInvalid={!!errors.executionMode}
                     align="start"
                   >
-                    <Controller
-                      control={control}
-                      name="sample"
-                      render={({ field }) => (
-                        <VStack align="start">
-                          <HStack>
-                            <Input
-                              width="110px"
-                              type="number"
-                              min="0"
-                              max="1"
-                              step="0.1"
-                              placeholder="0.0"
-                              {...field}
-                              onChange={(e) => field.onChange(+e.target.value)}
-                            />
-                            <Tooltip label="You can use this to save costs on expensive checks if you have too many messages incomming. From 0.01 to run on 1% of the messages to 1.0 to run on 100% of the messages">
-                              <HelpCircle width="14px" />
-                            </Tooltip>
-                          </HStack>
-                          {runOn}
-                        </VStack>
+                    <Select {...register("executionMode")} required>
+                      <option value={EvaluationExecutionMode.ON_MESSAGE}>
+                        When message arrives
+                      </option>
+                      {evaluatorDefinition?.isGuardrail && (
+                        <option value={EvaluationExecutionMode.AS_GUARDRAIL}>
+                          As a Guardrail
+                        </option>
                       )}
-                    />
+                      <option value={EvaluationExecutionMode.MANUALLY}>
+                        Manually
+                      </option>
+                    </Select>
                   </HorizontalFormControl>
 
-                  {evaluatorDefinition?.isGuardrail && (
-                    <HorizontalFormControl
-                      label="Use it as Guardrail"
-                      helper="Block messages that don't pass this evaluation of going through"
-                      isInvalid={!!errors.isGuardrail}
-                      align="start"
-                    >
-                      <VStack spacing={2} align="start">
-                        <Switch
-                          id="isGuardrail"
-                          size="lg"
-                          {...register("isGuardrail", {
-                            required: true,
-                          })}
+                  {executionMode === EvaluationExecutionMode.ON_MESSAGE && (
+                    <>
+                      <PreconditionsField
+                        runOn={
+                          preconditions?.length === 0 &&
+                          !evaluatorDefinition?.requiredFields.includes(
+                            "contexts"
+                          ) ? (
+                            sample == 1 ? (
+                              runOn
+                            ) : (
+                              <Text color="gray.500" fontStyle="italic">
+                                No preconditions defined
+                              </Text>
+                            )
+                          ) : null
+                        }
+                        append={appendPrecondition}
+                        remove={removePrecondition}
+                        fields={fieldsPrecondition}
+                      />
+                      <HorizontalFormControl
+                        label="Sampling"
+                        helper="Run this check only on a sample of messages (min 0.01, max 1.0)"
+                        isInvalid={!!errors.sample}
+                        align="start"
+                      >
+                        <Controller
+                          control={control}
+                          name="sample"
+                          render={({ field }) => (
+                            <VStack align="start">
+                              <HStack>
+                                <Input
+                                  width="110px"
+                                  type="number"
+                                  min="0"
+                                  max="1"
+                                  step="0.1"
+                                  placeholder="0.0"
+                                  {...field}
+                                  onChange={(e) =>
+                                    field.onChange(+e.target.value)
+                                  }
+                                />
+                                <Tooltip label="You can use this to save costs on expensive checks if you have too many messages incomming. From 0.01 to run on 1% of the messages to 1.0 to run on 100% of the messages">
+                                  <HelpCircle width="14px" />
+                                </Tooltip>
+                              </HStack>
+                              {runOn}
+                            </VStack>
+                          )}
                         />
-                      </VStack>
-                    </HorizontalFormControl>
+                      </HorizontalFormControl>
+                    </>
                   )}
 
-                  {isGuardrail && (
-                    <GuardrailIntegration
+                  {executionMode !== EvaluationExecutionMode.ON_MESSAGE && (
+                    <EvaluationManualIntegration
                       slug={slug}
                       evaluatorDefinition={evaluatorDefinition!}
+                      form={form}
                     />
                   )}
                 </VStack>
@@ -343,14 +362,23 @@ export default function CheckConfigForm({
             </Card>
             <HStack width="full">
               <Spacer />
-              <Button
-                colorScheme="orange"
-                type="submit"
-                minWidth="92px"
-                isLoading={isLoading}
+              <Tooltip
+                label={
+                  storeSettingsOnCode
+                    ? 'You checked the "Store the settings on code" option, so the evaluation is configured directly on your codebase, saving is disabled'
+                    : undefined
+                }
               >
-                Save
-              </Button>
+                <Button
+                  colorScheme="orange"
+                  type="submit"
+                  minWidth="92px"
+                  isLoading={isLoading}
+                  isDisabled={storeSettingsOnCode}
+                >
+                  Save
+                </Button>
+              </Tooltip>
             </HStack>
             <TryItOut form={form} />
           </VStack>

@@ -1,5 +1,6 @@
 import {
   Box,
+  Checkbox,
   HStack,
   Heading,
   Tab,
@@ -9,6 +10,7 @@ import {
   Tabs,
   Tag,
   Text,
+  Tooltip,
   VStack,
 } from "@chakra-ui/react";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
@@ -16,14 +18,27 @@ import type { AVAILABLE_EVALUATORS } from "../../trace_checks/evaluators.generat
 import { api } from "../../utils/api";
 import { RenderCode } from "../code/RenderCode";
 import { langwatchEndpoint } from "../code/langwatchEndpointEnv";
+import { EvaluationExecutionMode } from "@prisma/client";
+import type { UseFormReturn } from "react-hook-form";
+import type { CheckConfigFormData } from "./CheckConfigForm";
+import { Info } from "react-feather";
 
-export function GuardrailIntegration({
+export function EvaluationManualIntegration({
   slug,
   evaluatorDefinition,
+  form,
 }: {
   slug: string;
   evaluatorDefinition: (typeof AVAILABLE_EVALUATORS)[keyof typeof AVAILABLE_EVALUATORS];
+  form: UseFormReturn<CheckConfigFormData>;
 }) {
+  const checkType = form.watch("checkType");
+  const executionMode = form.watch("executionMode");
+  const isGuardrail = executionMode === EvaluationExecutionMode.AS_GUARDRAIL;
+  const settings = form.watch("settings");
+  const storeSettingsOnCode = form.watch("storeSettingsOnCode");
+  const checkSlug = storeSettingsOnCode ? checkType : slug;
+
   const { project } = useOrganizationTeamProject();
   const isOutputMandatory =
     evaluatorDefinition.requiredFields.includes("output");
@@ -51,6 +66,19 @@ export function GuardrailIntegration({
       : evaluatorDefinition.optionalFields.includes("input")
       ? `\n    input=user_input, # optional`
       : "";
+    const outputParams = evaluatorDefinition.requiredFields.includes("output")
+      ? `\n    output=generated_response,`
+      : evaluatorDefinition.optionalFields.includes("output")
+      ? `\n    output=generated_response, # optional`
+      : "";
+    const settingsParams = storeSettingsOnCode
+      ? `\n    settings=${JSON.stringify(settings, null, 2)
+          .replace(/true/g, "True")
+          .replace(/false/g, "False")
+          .split("\n")
+          .map((line, index) => (index === 0 ? line : "    " + line))
+          .join("\n")},`
+      : "";
 
     return (
       <VStack align="start" width="full" spacing={3}>
@@ -58,78 +86,110 @@ export function GuardrailIntegration({
           Add this import at the top of the file where the LLM call happens:
         </Text>
         <Box className="markdown" width="full">
-          <RenderCode code={`import langwatch.guardrails `} language="python" />
+          <RenderCode code={`import langwatch`} language="python" />
         </Box>
-        {!isOutputMandatory && (
+        {(!isOutputMandatory || !isGuardrail) && (
           <>
             <Text fontSize={14}>
-              Then, right before calling your LLM, check for the guardrail:
+              {isGuardrail
+                ? "Then, right before calling your LLM, check for the guardrail:"
+                : "Then, pass in the message data to get the result of the evaluator:"}
             </Text>
             <Box className="markdown" width="full">
               <RenderCode
-                code={`guardrail = ${
+                code={`${isGuardrail ? "guardrail" : "result"} = ${
                   async
-                    ? "await langwatch.guardrails.async_evaluate"
-                    : "langwatch.guardrails.evaluate"
+                    ? `await langwatch.${
+                        isGuardrail ? "guardrails" : "evaluations"
+                      }.async_evaluate`
+                    : `langwatch.${
+                        isGuardrail ? "guardrails" : "evaluations"
+                      }.evaluate`
                 }(
-    "${slug}",
-    input=user_input,${contextsParams}
+    "${checkSlug}",${
+      isGuardrail ? "input=user_input," : inputParams
+    }${outputParams}${contextsParams}${settingsParams}
 )
+${
+  isGuardrail
+    ? `
 if not guardrail.passed:
     # handle the guardrail here
-    return "I'm sorry, I can't do that."`}
+    return "I'm sorry, I can't do that."`
+    : `
+print(result)`
+}`}
                 language="python"
               />
             </Box>
           </>
         )}
-        {isOutputMandatory && (
-          <Text fontSize={14}>
-            Then, after generating the response from the LLM, check for the
-            guardrail:
-          </Text>
-        )}
-        {isOutputOptional && (
-          <Text fontSize={14}>
-            (Optional) You can instead check for the guardrail <i>after</i>{" "}
-            generating the response from the LLM, to validate the output:
-          </Text>
-        )}
-        {(isOutputMandatory || isOutputOptional) && (
-          <Box className="markdown" width="full">
-            <RenderCode
-              code={`result = completion.choices[0].message
+        {isGuardrail && (
+          <>
+            {isOutputMandatory && (
+              <Text fontSize={14}>
+                Then, after generating the response from the LLM, check for the
+                guardrail:
+              </Text>
+            )}
+            {isOutputOptional && (
+              <Text fontSize={14}>
+                (Optional) You can instead check for the guardrail <i>after</i>{" "}
+                generating the response from the LLM, to validate the output:
+              </Text>
+            )}
+            {(isOutputMandatory || isOutputOptional) && (
+              <Box className="markdown" width="full">
+                <RenderCode
+                  code={`result = completion.choices[0].message
 
 guardrail = ${
-                async
-                  ? "await langwatch.guardrails.async_evaluate"
-                  : "langwatch.guardrails.evaluate"
-              }(
-    "${slug}",${inputParams}
-    output=result,${contextsParams}
+                    async
+                      ? "await langwatch.guardrails.async_evaluate"
+                      : "langwatch.guardrails.evaluate"
+                  }(
+    "${checkSlug}",${inputParams}
+    output=result,${contextsParams}${settingsParams}
 )
 if not guardrail.passed:
     # handle the guardrail here
     return "I'm sorry, I can't do that."`}
-              language="python"
-            />
-          </Box>
+                  language="python"
+                />
+              </Box>
+            )}
+          </>
         )}
       </VStack>
     );
   };
 
+  const settingsParamsCurl = storeSettingsOnCode
+    ? `,\n  "settings": ${JSON.stringify(settings, null, 2)
+        .split("\n")
+        .map((line, index) => (index === 0 ? line : "  " + line))
+        .join("\n")}`
+    : "";
+
   return (
     <VStack spacing={4} align="start" width="full">
       <Heading as="h4" fontSize={16} fontWeight={500} paddingTop={4}>
-        Guardrail Integration
+        {executionMode === EvaluationExecutionMode.MANUALLY
+          ? "Manual Integration"
+          : "Guardrail Integration"}
       </Heading>
       <HStack>
-        <Text fontSize={14}>This guardrail requires:</Text>
+        <Text fontSize={14}>
+          This{" "}
+          {executionMode === EvaluationExecutionMode.MANUALLY
+            ? "evaluator"
+            : "guardrail"}{" "}
+          uses:
+        </Text>
         {evaluatorDefinition.requiredFields
           .map((field) => (
             <Tag key={field} colorScheme="blue">
-              {field}
+              {field} (required)
             </Tag>
           ))
           .concat(
@@ -139,9 +199,18 @@ if not guardrail.passed:
           )}
       </HStack>
       <Text fontSize={14}>
-        Follow the code example below to integrate this guardrail in your LLM
-        pipeline, save changes first for the guardrail to work.
+        Follow the code example below to integrate this{" "}
+        {isGuardrail ? "guardrail" : "evaluator"} in your LLM pipeline, save
+        changes first for the {isGuardrail ? "guardrail" : "evaluator"} to work.
       </Text>
+      <HStack>
+        <Checkbox {...form.register("storeSettingsOnCode")}>
+          Store settings on code
+        </Checkbox>
+        <Tooltip label="Store the settings on the code to keep it versioned on your side instead of on LangWatch dashboard.">
+          <Info size={16} />
+        </Tooltip>
+      </HStack>
       <Tabs width="full">
         <TabList marginBottom={4}>
           <Tab>Python</Tab>
@@ -164,7 +233,7 @@ if not guardrail.passed:
 API_KEY="${projectAPIKey.data?.apiKey ?? "your_langwatch_api_key"}"
 
 # Use curl to send the POST request, e.g.:
-curl -X POST "${langwatchEndpoint()}/api/guardrails/${slug}/evaluate" \\
+curl -X POST "${langwatchEndpoint()}/api/evaluations/${checkSlug}/evaluate" \\
      -H "X-Auth-Token: $API_KEY" \\
      -H "Content-Type: application/json" \\
      -d @- <<EOF
@@ -179,7 +248,7 @@ curl -X POST "${langwatchEndpoint()}/api/guardrails/${slug}/evaluate" \\
         )
       )
       .join(",\n    ")}
-  }
+  }${isGuardrail ? `,\n  "as_guardrail": true` : ""}${settingsParamsCurl}
 }
 EOF`}
                   language="bash"

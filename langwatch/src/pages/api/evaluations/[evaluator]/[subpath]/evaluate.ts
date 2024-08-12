@@ -4,7 +4,11 @@ import { prisma } from "../../../../../server/db"; // Adjust the import based on
 
 import { getDebugger } from "../../../../../utils/logger";
 
-import { CostReferenceType, CostType } from "@prisma/client";
+import {
+  CostReferenceType,
+  CostType,
+  EvaluationExecutionMode,
+} from "@prisma/client";
 import { nanoid } from "nanoid";
 import { z } from "zod";
 import { updateCheckStatusInES } from "../../../../../server/background/queues/traceChecksQueue";
@@ -152,7 +156,9 @@ export async function handleEvaluatorCall(
 
   if (
     storedEvaluator &&
-    (!storedEvaluator.enabled || (isGuardrail && !storedEvaluator.isGuardrail))
+    (!storedEvaluator.enabled ||
+      (isGuardrail &&
+        storedEvaluator.executionMode !== EvaluationExecutionMode.AS_GUARDRAIL))
   ) {
     return res.status(200).json({
       status: "skipped",
@@ -244,7 +250,7 @@ export async function handleEvaluatorCall(
     // Retry once in case of timeout error
     if (
       result.status === "error" &&
-      result.message.toLowerCase().includes("timeout")
+      result.message.toLowerCase().includes("timed out")
     ) {
       result = await runEval();
     }

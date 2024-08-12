@@ -5,6 +5,7 @@ import type { EvaluatorTypes } from "../../../../trace_checks/evaluators.generat
 import { evaluatePreconditions } from "../../../../trace_checks/preconditions";
 import type { CheckPreconditions } from "../../../../trace_checks/types";
 import { getDebugger } from "../../../../utils/logger";
+import { EvaluationExecutionMode } from "@prisma/client";
 
 const debug = getDebugger("langwatch:traceChecks");
 
@@ -26,7 +27,7 @@ export const scheduleTraceChecks = async (
     where: {
       projectId: trace.project_id,
       enabled: true,
-      isGuardrail: false,
+      executionMode: EvaluationExecutionMode.ON_MESSAGE,
     },
   });
 

@@ -38,7 +38,7 @@ async def main(message: cl.Message):
             await msg.stream_token(token)
 
     answer_relevancy = langwatch.evaluations.evaluate(
-        "answer-relevancy",
+        "ragas/answer_relevancy",
         input=message.content,
         output=full_response,
         settings={

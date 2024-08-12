@@ -38,7 +38,7 @@ import { useDrawer } from "~/components/CurrentDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { AVAILABLE_EVALUATORS } from "~/trace_checks/evaluators.generated";
 import { api } from "~/utils/api";
-import { type Check } from "@prisma/client";
+import { EvaluationExecutionMode, type Check } from "@prisma/client";
 import type { JsonObject } from "@prisma/client/runtime/library";
 import { RenderCode } from "~/components/code/RenderCode";
 
@@ -359,7 +359,10 @@ export function BatchEvaluationDrawer(props: BatchEvaluatioProps) {
                               </Alert>
                             ) : checksData.length ? (
                               checksData.map((check, index) => {
-                                if (check.isGuardrail) {
+                                if (
+                                  check.executionMode ===
+                                  EvaluationExecutionMode.AS_GUARDRAIL
+                                ) {
                                   return null;
                                 }
                                 return (
@@ -461,7 +464,10 @@ export function BatchEvaluationDrawer(props: BatchEvaluatioProps) {
                               </Alert>
                             ) : checksData.length ? (
                               checksData.map((check, index) => {
-                                if (!check.isGuardrail) {
+                                if (
+                                  check.executionMode !==
+                                  EvaluationExecutionMode.AS_GUARDRAIL
+                                ) {
                                   return null;
                                 }
                                 return (
