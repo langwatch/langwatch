@@ -16,10 +16,17 @@ def evaluate(
     input: Optional[str] = None,
     output: Optional[str] = None,
     contexts: List[RAGChunk] = [],
+    settings: Optional[dict] = None,
 ):
     with _optional_create_span(name=slug, type="guardrail") as span:
         request_params = prepare_data(
-            slug, input, output, contexts, span=span, as_guardrail=True
+            slug,
+            input,
+            output,
+            contexts,
+            settings=settings,
+            span=span,
+            as_guardrail=True,
         )
         try:
             with httpx.Client() as client:
@@ -57,6 +64,7 @@ async def async_evaluate(
     input: Optional[str] = None,
     output: Optional[str] = None,
     contexts: List[RAGChunk] = [],
+    settings: Optional[dict] = None,
 ):
     trace = None
     try:
@@ -67,7 +75,7 @@ async def async_evaluate(
     span = trace.span(name=slug, type="guardrail") if trace else None
 
     request_params = prepare_data(
-        slug, input, output, contexts, span=span, as_guardrail=True
+        slug, input, output, contexts, settings=settings, span=span, as_guardrail=True
     )
     try:
         async with httpx.AsyncClient() as client:

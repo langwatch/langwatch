@@ -41,10 +41,13 @@ async def main(message: cl.Message):
         "answer-relevancy",
         input=message.content,
         output=full_response,
+        settings={
+            "max_tokens": 512,
+        },
     )
 
     await msg.stream_token(
-        f"Answer Relevancy: {answer_relevancy.score}"
+        f"Answer Relevancy: {answer_relevancy.score} {answer_relevancy.details if answer_relevancy.details else ''}"
     )
 
     await msg.update()

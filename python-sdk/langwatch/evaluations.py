@@ -38,8 +38,9 @@ def evaluate(
     output: Optional[str] = None,
     contexts: List[RAGChunk] = [],
     conversation: Conversation = [],
+    settings: Optional[dict] = None,
 ):
-    request_params = prepare_data(slug, input, output, contexts, conversation)
+    request_params = prepare_data(slug, input, output, contexts, conversation, settings)
     try:
         with httpx.Client() as client:
             response = client.post(**request_params)
@@ -61,8 +62,9 @@ async def async_evaluate(
     output: Optional[str] = None,
     contexts: List[RAGChunk] = [],
     conversation: Conversation = [],
+    settings: Optional[dict] = None,
 ):
-    request_params = prepare_data(slug, input, output, contexts, conversation)
+    request_params = prepare_data(slug, input, output, contexts, conversation, settings)
     try:
         async with httpx.AsyncClient() as client:
             response = await client.post(**request_params)
@@ -84,6 +86,7 @@ def prepare_data(
     output: Optional[str],
     contexts: List[RAGChunk],
     conversation: Conversation = [],
+    settings: Optional[dict] = None,
     span: Optional[ContextSpan] = None,
     as_guardrail: bool = False,
 ):
@@ -108,6 +111,7 @@ def prepare_data(
         "json": {
             "trace_id": trace.trace_id if trace else None,
             "data": data,
+            "settings": settings,
             "as_guardrail": as_guardrail,
         },
         "headers": {"X-Auth-Token": str(langwatch.api_key)},
