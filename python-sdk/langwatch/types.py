@@ -42,16 +42,25 @@ class TypedValueList(TypedDict):
     value: List["SpanInputOutput"]
 
 
-class GuardrailResult(TypedDict, total=False):
+class EvaluationResult(TypedDict, total=False):
     status: Literal["processed", "skipped", "error"]
-    passed: bool
+    passed: Optional[bool]
     score: Optional[float]
     details: Optional[str]
+    label: Optional[str]
+
+
+class ConversationEntry(TypedDict):
+    input: str
+    output: str
+
+
+Conversation = List[ConversationEntry]
 
 
 class TypedValueGuardrailResult(TypedDict):
     type: Literal["guardrail_result"]
-    value: GuardrailResult
+    value: EvaluationResult
 
 
 class TypedValueRaw(TypedDict):

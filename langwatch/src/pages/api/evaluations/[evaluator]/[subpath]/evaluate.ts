@@ -221,8 +221,9 @@ export async function handleEvaluatorCall(
     .filter((x) => x);
 
   let result: SingleEvaluationResult;
-  try {
-    result = await runEvaluation({
+
+  const runEval = () =>
+    runEvaluation({
       projectId: project.id,
       checkType: checkType as EvaluatorTypes,
       input: input ? input : undefined,
@@ -236,6 +237,17 @@ export async function handleEvaluatorCall(
         })) ?? [],
       settings,
     });
+
+  try {
+    result = await runEval();
+
+    // Retry once in case of timeout error
+    if (
+      result.status === "error" &&
+      result.message.toLowerCase().includes("timeout")
+    ) {
+      result = await runEval();
+    }
   } catch (error) {
     Sentry.captureException(error, {
       extra: {

@@ -37,9 +37,6 @@ export const scheduleTraceCheck = async ({
   trace: TraceCheckJob["trace"];
   delay?: number;
 }) => {
-  // Random delay to avoid elasticsearch update collisions
-  await new Promise((resolve) => setTimeout(resolve, Math.random() * 1000));
-
   await updateCheckStatusInES({
     check,
     trace: trace,
@@ -132,6 +129,9 @@ export const updateCheckStatusInES = async ({
       updated_at: Date.now(),
     },
   };
+
+  // Random delay to avoid elasticsearch update collisions
+  await new Promise((resolve) => setTimeout(resolve, Math.random() * 1000));
 
   await esClient.update({
     index: TRACE_INDEX.alias,

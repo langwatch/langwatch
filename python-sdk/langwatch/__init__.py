@@ -19,6 +19,8 @@ from langwatch.tracer import (
     capture_rag,
 )
 from langwatch.login import login
+import langwatch.evaluations as evaluations
+import langwatch.guardrails as guardrails
 
 endpoint = os.environ.get("LANGWATCH_ENDPOINT") or "https://app.langwatch.ai"
 api_key = os.environ.get("LANGWATCH_API_KEY")
@@ -81,4 +83,6 @@ __all__ = (
     "langchain",
     "dspy",
     "login",
+    "evaluations",
+    "guardrails",
 )
