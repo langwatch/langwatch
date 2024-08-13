@@ -43,6 +43,7 @@
     "@hookform/resolvers": "^3.3.2",
     "@microlink/react-json-view": "^1.23.0",
     "@next-auth/prisma-adapter": "^1.0.7",
+    "@opensearch-project/opensearch": "^2.11.0",
     "@opentelemetry/exporter-trace-otlp-proto": "^0.52.1",
     "@opentelemetry/otlp-transformer": "^0.52.1",
     "@prisma/client": "^5.6.0",
