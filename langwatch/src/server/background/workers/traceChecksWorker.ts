@@ -344,8 +344,17 @@ export const startTraceChecksWorker = (
         debug("Failed to process job:", job.id, error);
 
         if (
-          "message" in (error as any) &&
-          (error as any).message.includes("504 Gateway Timeout")
+          typeof error === "object" &&
+          (error as any).message?.includes("504 Gateway Timeout")
+        ) {
+          throw error;
+        }
+
+        if (
+          (typeof (error as any).status === "number" &&
+            (error as any).status >= 400 &&
+            (error as any).status < 500) ||
+          (error as any).toString().startsWith("422")
         ) {
           throw error;
         }
