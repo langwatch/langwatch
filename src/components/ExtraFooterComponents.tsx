@@ -16,6 +16,10 @@ export function ExtraFooterComponents() {
     redirectToOnboarding: !isAdmin,
   });
 
+  if (!session.data || !organization || !project) {
+    return null;
+  }
+
   return (
     <>
       <Script
@@ -33,9 +37,8 @@ export function ExtraFooterComponents() {
       <Script id="crisp">
         {`window.$crisp=[];window.CRISP_WEBSITE_ID="cca9eacd-c4d6-4258-a7fc-9606be6fd012";(function(){d=document;s=d.createElement("script");s.src="https://client.crisp.chat/l.js";s.async=1;d.getElementsByTagName("head")[0].appendChild(s);})();`}
       </Script>
-      {session.data?.user ? (
-        <Script id="pendo">
-          {`(function(apiKey){
+      <Script id="pendo">
+        {`(function(apiKey){
     (function(p,e,n,d,o){var v,w,x,y,z;o=p[d]=p[d]||{};o._q=o._q||[];
     v=['initialize','identify','updateOptions','pageLoad','track'];for(w=0,x=v.length;w<x;++w)(function(m){
         o[m]=o[m]||function(){o._q[m===v[0]?'unshift':'push']([m].concat([].slice.call(arguments,0)));};})(v[w]);
@@ -44,9 +47,9 @@ export function ExtraFooterComponents() {
 
     pendo.initialize({
         visitor: {
-            id: "${session.data.user.id || ""}",
-            email: "${session.data.user.email || ""}",
-            name: "${session.data.user.name || ""}"
+            id: "${session.data.user?.id || ""}",
+            email: "${session.data.user?.email || ""}",
+            name: "${session.data.user?.name || ""}"
         },
         account: {
             id: "${organization?.id || ""}",
@@ -55,8 +58,7 @@ export function ExtraFooterComponents() {
         }
     });
 })('18f008fe-1a55-4b22-70d9-964d6e98b130');`}
-        </Script>
-      ) : null}
+      </Script>
       {session.data?.user ? <SignedInExtraFooterComponents /> : null}
     </>
   );
