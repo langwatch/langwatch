@@ -2,7 +2,10 @@ import {
   type MappingDenseVectorProperty,
   type MappingProperty,
 } from "@elastic/elasticsearch/lib/api/types";
-import { OPENAI_EMBEDDING_DIMENSION } from "../src/server/elasticsearch";
+import {
+  FLATENNED_TYPE,
+  OPENAI_EMBEDDING_DIMENSION,
+} from "../src/server/elasticsearch";
 import type { DSPyStep } from "../src/server/experiments/types";
 import {
   type ElasticSearchEvent,
@@ -84,7 +87,7 @@ const spanMapping: ElasticSearchMappingFrom<ElasticSearchSpan> = {
   vendor: { type: "keyword" },
   model: { type: "keyword" },
   params: {
-    type: "flattened",
+    type: FLATENNED_TYPE,
   } as any,
   metrics: {
     properties: {
@@ -177,7 +180,7 @@ export const traceMapping: ElasticSearchMappingFrom<ElasticSearchTrace> = {
       sdk_version: { type: "keyword" },
       sdk_language: { type: "keyword" },
 
-      custom: { type: "flattened" } as any,
+      custom: { type: FLATENNED_TYPE } as any,
       all_keys: { type: "keyword" },
     },
   },
@@ -195,12 +198,17 @@ export const traceMapping: ElasticSearchMappingFrom<ElasticSearchTrace> = {
       embeddings: {
         properties: {
           model: { type: "keyword" },
-          embeddings: {
-            index: true,
-            type: "dense_vector",
-            dims: OPENAI_EMBEDDING_DIMENSION,
-            similarity: "cosine",
-          },
+          embeddings: process.env.IS_OPENSEARCH
+            ? {
+                type: "knn_vector",
+                dimension: OPENAI_EMBEDDING_DIMENSION,
+              }
+            : {
+                index: true,
+                type: "dense_vector",
+                dims: OPENAI_EMBEDDING_DIMENSION,
+                similarity: "cosine",
+              },
         },
       },
     },
@@ -211,12 +219,17 @@ export const traceMapping: ElasticSearchMappingFrom<ElasticSearchTrace> = {
       embeddings: {
         properties: {
           model: { type: "keyword" },
-          embeddings: {
-            index: true,
-            type: "dense_vector",
-            dims: OPENAI_EMBEDDING_DIMENSION,
-            similarity: "cosine",
-          },
+          embeddings: process.env.IS_OPENSEARCH
+            ? {
+                type: "knn_vector",
+                dimension: OPENAI_EMBEDDING_DIMENSION,
+              }
+            : {
+                index: true,
+                type: "dense_vector",
+                dims: OPENAI_EMBEDDING_DIMENSION,
+                similarity: "cosine",
+              },
         },
       },
     },
@@ -279,22 +292,22 @@ export const dspyStepsMapping: ElasticSearchMappingFrom<DSPyStep> = {
   optimizer: {
     properties: {
       name: { type: "keyword" },
-      parameters: { type: "flattened" } as any,
+      parameters: { type: FLATENNED_TYPE } as any,
     },
   },
   predictors: {
     type: "nested",
     properties: {
       name: { type: "keyword" },
-      predictor: { type: "flattened" } as any,
+      predictor: { type: FLATENNED_TYPE } as any,
     },
   },
   examples: {
     type: "nested",
     properties: {
       hash: { type: "keyword" },
-      example: { type: "flattened" } as any,
-      pred: { type: "flattened" } as any,
+      example: { type: FLATENNED_TYPE } as any,
+      pred: { type: FLATENNED_TYPE } as any,
       score: { type: "float" },
       trace: { type: "nested" } as any,
     },
@@ -308,7 +321,7 @@ export const dspyStepsMapping: ElasticSearchMappingFrom<DSPyStep> = {
       prompt_tokens: { type: "integer" },
       completion_tokens: { type: "integer" },
       cost: { type: "float" },
-      response: { type: "flattened" } as any,
+      response: { type: FLATENNED_TYPE } as any,
     },
   },
   timestamps: {

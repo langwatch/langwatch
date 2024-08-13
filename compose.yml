@@ -15,7 +15,7 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-      elasticsearch:
+      opensearch:
         condition: service_healthy
 
   langwatch_nlp:
@@ -62,39 +62,36 @@ services:
       timeout: 5s
       retries: 5
 
-  elasticsearch:
-    image: elasticsearch:8.12.0
+  opensearch:
+    image: opensearchproject/opensearch:latest
     environment:
       - discovery.type=single-node
-      - ELASTICSEARCH_PASSWORD="some-random-password-which-is-greater-than-16-chars-long"
-      - xpack.security.enabled=false
-      - bootstrap.memory_lock=true
-      - "ES_JAVA_OPTS=-Xms1024m -Xmx1024m"
+      - DISABLE_INSTALL_DEMO_CONFIG=true
+      - DISABLE_SECURITY_PLUGIN=true
+      - "OPENSEARCH_JAVA_OPTS=-Xms2048m -Xmx2048m -Djava.util.logging.config.file=logging.properties -Dlog4j2.formatMsgNoLookups=true"
+      - OPENSEARCH_INITIAL_ADMIN_PASSWORD=some-random-password-which-is-greater-than-16-chars-long
     ports:
       - "9200:9200"
-      - "9300:9300"
+      - "9600:9600"
     volumes:
-      - elasticsearch-data:/usr/share/elasticsearch/data
+      - opensearch-data:/usr/share/opensearch/data
     ulimits:
       memlock:
         soft: -1
         hard: -1
     healthcheck:
-      test:
-        [
-          "CMD-SHELL",
-          "curl --silent --fail localhost:9200/_cluster/health || exit 1",
-        ]
-      interval: 20s
-      timeout: 10s
-      retries: 5
+      test: ["CMD-SHELL", "curl -s http://localhost:9200 || exit 1"]
+      interval: 30s
+      timeout: 30s
+      retries: 3
+      start_period: 40s
     deploy:
       resources:
         limits:
-          memory: 2048m
+          memory: 4096m
     restart: always
 
 volumes:
   db-data:
   redis-data:
-  elasticsearch-data:
+  opensearch-data:
