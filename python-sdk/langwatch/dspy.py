@@ -214,8 +214,8 @@ class LangWatchDSPy:
 
             self.examples_buffer.append(
                 DSPyExample(
-                    example=example._store,
-                    pred=pred._store,
+                    example=example._store if hasattr(example, "_store") else example,
+                    pred=pred._store if hasattr(pred, "_store") else pred,
                     score=float(score),
                     trace=(
                         [DSPyTrace(input=t[1], pred=t[2]) for t in trace]
@@ -650,6 +650,8 @@ class DSPyTracer:
 
             if span and isinstance(prediction, dspy.Prediction):
                 span.update(output=prediction._store)  # type: ignore
+            elif span:
+                span.update(output=prediction)  # type: ignore
 
             return prediction
 
@@ -670,6 +672,8 @@ class DSPyTracer:
 
             if span and isinstance(prediction, dspy.Prediction):
                 span.update(output=prediction._store)  # type: ignore
+            elif span:
+                span.update(output=prediction)  # type: ignore
 
             return prediction
 
@@ -752,6 +756,8 @@ class DSPyTracer:
 
                 if span and isinstance(result, dspy.Prediction):
                     span.update(output=result._store)  # type: ignore
+                elif span:
+                    span.update(output=result)
 
                 return result
 
