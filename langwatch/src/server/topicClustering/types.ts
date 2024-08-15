@@ -8,6 +8,8 @@ export const allowedTopicClusteringModels = [
   "groq/llama3-70b-8192",
 ];
 
+export const allowedEmbeddingsModels = ["openai/text-embedding-3-small"];
+
 export type TopicClusteringTrace = {
   trace_id: string;
   input: string;

@@ -385,7 +385,7 @@ export const getAllTracesForProject = async (
   includeContexts = true
 ) => {
   const embeddings = input.query
-    ? await getOpenAIEmbeddings(input.query)
+    ? await getOpenAIEmbeddings(input.query, input.projectId)
     : undefined;
 
   if (input.query && !embeddings) {

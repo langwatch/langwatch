@@ -4,13 +4,29 @@ import {
   AzureKeyCredential,
 } from "@azure/openai";
 import { env } from "../env.mjs";
+import { prisma } from "./db";
 
 export const DEFAULT_EMBEDDINGS_MODEL = "text-embedding-3-small";
 
-export const getOpenAIEmbeddings = async (text: string) => {
+export const getEmbeddingsModel = async (projectId: string) => {
+  const project = await prisma.project.findUnique({
+    where: { id: projectId },
+  });
+  if (!project) {
+    throw new Error("Project not found");
+  }
+  return project.embeddingsModel?.split("/")[1] ?? DEFAULT_EMBEDDINGS_MODEL;
+};
+
+export const getOpenAIEmbeddings = async (text: string, projectId?: string) => {
   // Temporary until text-embedding-3-small is also available on azure: https://learn.microsoft.com/en-us/answers/questions/1531681/openai-new-embeddings-model
   const useAzure = false;
-  const model = DEFAULT_EMBEDDINGS_MODEL;
+  let model;
+  if (!projectId) {
+    model = DEFAULT_EMBEDDINGS_MODEL;
+  } else {
+    model = await getEmbeddingsModel(projectId);
+  }
 
   if (useAzure && env.AZURE_OPENAI_ENDPOINT && env.AZURE_OPENAI_KEY) {
     if (!env.AZURE_OPENAI_KEY) {

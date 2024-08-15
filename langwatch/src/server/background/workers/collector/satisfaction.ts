@@ -1,9 +1,5 @@
 import { env } from "../../../../env.mjs";
-import {
-  TRACE_INDEX,
-  esClient,
-  traceIndexId,
-} from "../../../elasticsearch";
+import { TRACE_INDEX, esClient, traceIndexId } from "../../../elasticsearch";
 import type { Trace } from "../../../tracer/types";
 
 type SatisfactionScoreResult = {
