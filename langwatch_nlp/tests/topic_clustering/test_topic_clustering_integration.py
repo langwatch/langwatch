@@ -28,9 +28,7 @@ class TestTopicClusteringIntegration:
     # NOTE: disable httpx_mock to see it working fully integrated
     async def test_it_does_batch_clustering(self):
         # Look at the jupyter notebook to see how to download this data
-        df = pd.read_csv(
-            f"notebooks/data/traces_for_topics_project_iCTt0LSMXYbv5jZNSdtEr.csv"
-        )
+        df = pd.read_csv(f"notebooks/data/traces_for_topics_KAXYxPR8MUgTcP8CF193y.csv")
         df["embeddings"] = df["embeddings"].apply(
             lambda x: list(map(float, x[1:-1].split(", ")))
         )
@@ -52,6 +50,10 @@ class TestTopicClusteringIntegration:
             json={
                 "model": "azure/gpt-4-1106-preview",
                 "litellm_params": {"api_base": os.environ["AZURE_OPENAI_ENDPOINT"]},
+                "embeddings_litellm_params": {
+                    "api_key": os.environ["OPENAI_API_KEY"],
+                    "model": "openai/text-embedding-3-small",
+                },
                 "traces": traces,
             },
         )
@@ -69,6 +71,10 @@ class TestTopicClusteringIntegration:
             json={
                 "model": "azure/gpt-4-1106-preview",
                 "litellm_params": {"api_base": os.environ["AZURE_OPENAI_ENDPOINT"]},
+                "embeddings_litellm_params": {
+                    "api_key": os.environ["OPENAI_API_KEY"],
+                    "model": "openai/text-embedding-3-small",
+                },
                 "topics": result["topics"],
                 "subtopics": result["subtopics"],
                 "traces": traces,
