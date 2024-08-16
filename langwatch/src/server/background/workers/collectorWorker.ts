@@ -111,8 +111,8 @@ export const processCollectorJob = async (
   }));
 
   const [input, output] = await Promise.all([
-    getTraceInput(spans),
-    getTraceOutput(spans),
+    getTraceInput(spans, project.id),
+    getTraceOutput(spans, project.id),
   ]);
   const error = getLastOutputError(spans);
 

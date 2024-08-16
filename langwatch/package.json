@@ -30,7 +30,6 @@
     "@ag-grid-community/react": "^31.3.2",
     "@ag-grid-community/styles": "^31.3.2",
     "@ai-sdk/openai": "^0.0.9",
-    "@azure/openai": "^1.0.0-beta.10",
     "@chakra-ui/icons": "^2.1.1",
     "@chakra-ui/next-js": "^2.1.5",
     "@chakra-ui/react": "^2.8.2",

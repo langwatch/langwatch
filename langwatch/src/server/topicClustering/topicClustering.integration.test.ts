@@ -100,7 +100,7 @@ describe("Topic Clustering Integration Test", () => {
     const project = await getTestProject("clustering");
     testProjectId = project.id;
     const allEmbeddings = await Promise.all(
-      traces.map((trace) => getOpenAIEmbeddings(trace.input!))
+      traces.map((trace) => getOpenAIEmbeddings(trace.input!, project.id))
     );
     traces.forEach((trace, i) => {
       const embeddings = allEmbeddings[i];
@@ -162,6 +162,10 @@ describe("Topic Clustering Integration Test", () => {
     const result = await fetchTopicsBatchClustering("project_id", {
       model: "openai/gpt-4o",
       litellm_params: {},
+      embeddings_litellm_params: {
+        model: "openai/text-embedding-3-small",
+        api_key: process.env.OPENAI_API_KEY!,
+      },
       traces: traces as Required<TopicClusteringTrace>[],
     });
 

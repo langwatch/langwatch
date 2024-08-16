@@ -1,66 +1,58 @@
 import { OpenAI } from "openai";
-import {
-  OpenAIClient as AzureOpenAIClient,
-  AzureKeyCredential,
-} from "@azure/openai";
 import { env } from "../env.mjs";
 import { prisma } from "./db";
+import { getProjectModelProviders } from "./api/routers/modelProviders";
 
-export const DEFAULT_EMBEDDINGS_MODEL = "text-embedding-3-small";
+export const DEFAULT_EMBEDDINGS_MODEL = "openai/text-embedding-3-small";
 
-export const getEmbeddingsModel = async (projectId: string) => {
+export const getProjectEmbeddingsModel = async (projectId: string) => {
   const project = await prisma.project.findUnique({
     where: { id: projectId },
   });
   if (!project) {
     throw new Error("Project not found");
   }
-  return project.embeddingsModel?.split("/")[1] ?? DEFAULT_EMBEDDINGS_MODEL;
+  const embeddingsModel = project.embeddingsModel ?? DEFAULT_EMBEDDINGS_MODEL;
+  if (!embeddingsModel) {
+    throw new Error("Topic clustering model not set");
+  }
+  const provider = embeddingsModel.split("/")[0];
+  if (!provider) {
+    throw new Error("Topic clustering provider not set");
+  }
+  const modelProvider = (await getProjectModelProviders(project.id))[provider];
+  if (!modelProvider) {
+    throw new Error(`Topic clustering model provider ${provider} not found`);
+  }
+  if (!modelProvider.enabled) {
+    throw new Error(
+      `Topic clustering model provider ${provider} is not enabled`
+    );
+  }
+
+  return { model: embeddingsModel, modelProvider };
 };
 
-export const getOpenAIEmbeddings = async (text: string, projectId?: string) => {
-  // Temporary until text-embedding-3-small is also available on azure: https://learn.microsoft.com/en-us/answers/questions/1531681/openai-new-embeddings-model
-  const useAzure = false;
-  let model;
-  if (!projectId) {
-    model = DEFAULT_EMBEDDINGS_MODEL;
-  } else {
-    model = await getEmbeddingsModel(projectId);
+export const getOpenAIEmbeddings = async (text: string, projectId: string) => {
+  const { model } = await getProjectEmbeddingsModel(projectId);
+  if (!model.startsWith("openai/")) {
+    throw new Error("Only OpenAI models are supported for embeddings for now");
   }
 
-  if (useAzure && env.AZURE_OPENAI_ENDPOINT && env.AZURE_OPENAI_KEY) {
-    if (!env.AZURE_OPENAI_KEY) {
-      console.warn(
-        "⚠️  WARNING: AZURE_OPENAI_KEY is not set, embeddings will not be generated for tracing, limiting semantic search and topic clustering. Please set AZURE_OPENAI_KEY for it to work properly"
-      );
-      return undefined;
-    }
-    const openai = new AzureOpenAIClient(
-      env.AZURE_OPENAI_ENDPOINT,
-      new AzureKeyCredential(env.AZURE_OPENAI_KEY)
+  if (!env.OPENAI_API_KEY) {
+    console.warn(
+      "⚠️  WARNING: OPENAI_API_KEY is not set, embeddings will not be generated for tracing, limiting semantic search and topic clustering. Please set OPENAI_API_KEY for it to work properly"
     );
-
-    const response = await openai.getEmbeddings(model, [
-      text.slice(0, 8192 * 4),
-    ]);
-    const embeddings = response.data[0]?.embedding;
-    return embeddings ? { model, embeddings } : undefined;
-  } else {
-    if (!env.OPENAI_API_KEY) {
-      console.warn(
-        "⚠️  WARNING: OPENAI_API_KEY is not set, embeddings will not be generated for tracing, limiting semantic search and topic clustering. Please set OPENAI_API_KEY for it to work properly"
-      );
-      return undefined;
-    }
-    const openai = new OpenAI({
-      apiKey: env.OPENAI_API_KEY,
-    });
-
-    const response = await openai.embeddings.create({
-      model: model,
-      input: text.slice(0, 8192 * 2),
-    });
-    const embeddings = response.data[0]?.embedding;
-    return embeddings ? { model, embeddings } : undefined;
+    return undefined;
   }
+  const openai = new OpenAI({
+    apiKey: env.OPENAI_API_KEY,
+  });
+
+  const response = await openai.embeddings.create({
+    model: model.replace("openai/", ""),
+    input: text.slice(0, 8192 * 2),
+  });
+  const embeddings = response.data[0]?.embedding;
+  return embeddings ? { model, embeddings } : undefined;
 };

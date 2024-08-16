@@ -1,6 +1,8 @@
+import { getProjectEmbeddingsModel } from "~/server/embeddings";
 import { env } from "../../../../env.mjs";
 import { TRACE_INDEX, esClient, traceIndexId } from "../../../elasticsearch";
 import type { Trace } from "../../../tracer/types";
+import { prepareLitellmParams } from "~/server/api/routers/modelProviders";
 
 type SatisfactionScoreResult = {
   score_normalized: number;
@@ -30,6 +32,7 @@ export const scoreSatisfactionFromInput = async ({
     return;
   }
 
+  const embeddingsModel = await getProjectEmbeddingsModel(projectId);
   const response = await fetch(`${env.LANGWATCH_NLP_SERVICE}/sentiment`, {
     method: "POST",
     headers: {
@@ -37,6 +40,10 @@ export const scoreSatisfactionFromInput = async ({
     },
     body: JSON.stringify({
       vector: input.embeddings.embeddings,
+      embeddings_litellm_params: prepareLitellmParams(
+        embeddingsModel.model,
+        embeddingsModel.modelProvider
+      ),
     }),
   });
 
