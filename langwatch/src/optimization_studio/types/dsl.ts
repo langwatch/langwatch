@@ -58,8 +58,8 @@ type Signature = BaseComponent & {
 
 type Module = BaseComponent & {
   type: "module";
-  components?: Workflow["nodes"];
-  forward_pass?: Workflow["edges"] | { code: string };
+  components?: Flow["nodes"];
+  forward_pass?: Flow["edges"] | { code: string };
 };
 
 type Retriever = BaseComponent & {
@@ -110,14 +110,14 @@ type Edge = {
   };
 };
 
-type Workflow = {
+type Flow = {
   nodes: Component[];
   edges: Edge[];
 };
 
 type ExecutionState = "idle" | "running" | "completed" | "failed";
 
-type Program = {
+type Workflow = {
   spec_version: string;
 
   name: string;
@@ -126,7 +126,7 @@ type Program = {
 
   default_llm?: string;
 
-  workflow: Workflow;
+  workflow: Flow;
 
   state?: {
     execution: {
@@ -158,7 +158,7 @@ type Program = {
   };
 };
 
-const LLMSignatureFlow: Workflow = {
+const LLMSignatureFlow: Flow = {
   nodes: [
     {
       id: "entry",
@@ -282,7 +282,7 @@ const LLMSignatureFlow: Workflow = {
   ],
 };
 
-const LLMRAGModuleFlow: Workflow = {
+const LLMRAGModuleFlow: Flow = {
   nodes: [
     {
       id: "entry",
