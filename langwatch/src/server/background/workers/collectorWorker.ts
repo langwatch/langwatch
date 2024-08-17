@@ -32,8 +32,15 @@ import { mapEvaluations } from "./collector/evaluations";
 const debug = getDebugger("langwatch:workers:collectorWorker");
 
 export const scheduleTraceCollectionWithFallback = async (
-  collectorJob: CollectorJob
+  collectorJob: CollectorJob,
+  forceSync = false
 ) => {
+  if (forceSync) {
+    debug("Force sync enabled, processing job synchronously.");
+    await processCollectorJob(undefined, collectorJob);
+    return;
+  }
+
   try {
     const timeoutState = { state: "waiting" };
     const timeoutPromise = new Promise((resolve, reject) => {
