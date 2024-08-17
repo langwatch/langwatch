@@ -12,10 +12,11 @@ import {
   Button,
   FunctionField,
   TextInput,
-} from "react-admin";
+} from "../../langwatch/langwatch/node_modules/react-admin";
 import { dataProvider } from "ra-data-simple-prisma";
 import type { User } from "@prisma/client";
-import { useState } from "react";
+// @ts-ignore
+import { useState } from "../../langwatch/langwatch/node_modules/react";
 
 const AdminApp = () => {
   const [loadingImpersonation, setLoadingImpersonation] = useState<

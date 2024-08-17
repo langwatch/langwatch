@@ -1,4 +1,5 @@
-import { useEffect } from "react";
+// @ts-ignore
+import { useEffect } from "../../langwatch/langwatch/node_modules/react";
 import { useOrganizationTeamProject } from "../../langwatch/langwatch/src/hooks/useOrganizationTeamProject";
 import { useRequiredSession } from "../../langwatch/langwatch/src/hooks/useRequiredSession";
 import Script from "next/script";
