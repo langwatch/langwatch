@@ -46,7 +46,6 @@ const config = {
       aliasPath,
       "injection.server.ts"
     );
-    config.resolve.alias.react = path.join(__dirname, "node_modules", "react");
 
     if (process.env.EXTRA_INCLUDE) {
       // @ts-ignore
