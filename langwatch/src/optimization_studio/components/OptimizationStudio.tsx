@@ -1,43 +1,20 @@
+import { Box, HStack, Text, useTheme, VStack } from "@chakra-ui/react";
 import {
-  useStyles,
-  useTheme,
-  Box,
-  VStack,
-  HStack,
-  Text,
-} from "@chakra-ui/react";
-import {
-  addEdge,
   Background,
   BackgroundVariant,
   Controls,
   MiniMap,
   ReactFlow,
-  useEdgesState,
-  useNodesState,
-  type Connection,
 } from "@xyflow/react";
 
 import { Handle, Position } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { useCallback, useMemo, type CSSProperties } from "react";
+import { useMemo } from "react";
+import { useShallow } from "zustand/react/shallow";
 import { FunctionIcon } from "../../components/icons/FunctionIcon";
-
-const initialNodes = [
-  {
-    id: "1",
-    type: "component",
-    position: { x: 0, y: 0 },
-    data: { label: "1" },
-  },
-  {
-    id: "2",
-    type: "component",
-    position: { x: 0, y: 100 },
-    data: { label: "2" },
-  },
-];
-const initialEdges = [{ id: "e1-2", source: "1", target: "2" }];
+import { LogoIcon } from "../../components/icons/LogoIcon";
+import { useWorkflowStore } from "../hooks/useWorkflowStore";
+import { UndoRedo } from "./UndoRedo";
 
 export default function OptimizationStudio() {
   const nodeTypes = useMemo(() => ({ component: Component }), []);
@@ -45,34 +22,64 @@ export default function OptimizationStudio() {
   const gray100 = theme.colors.gray["100"];
   const gray300 = theme.colors.gray["300"];
 
-  const [nodes, _setNodes, onNodesChange] = useNodesState(initialNodes);
-  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
-
-  const onConnect = useCallback(
-    (params: Connection) => setEdges((eds) => addEdge(params, eds)),
-    [setEdges]
-  );
+  const { nodes, edges, onNodesChange, onEdgesChange, onConnect } =
+    useWorkflowStore(
+      useShallow((state) => {
+        if (typeof window !== "undefined") {
+          window.state = state;
+        }
+        return {
+          nodes: state.nodes,
+          edges: state.edges,
+          onNodesChange: state.onNodesChange,
+          onEdgesChange: state.onEdgesChange,
+          onConnect: state.onConnect,
+        };
+      })
+    );
 
   return (
     <div style={{ width: "100vw", height: "100vh" }}>
-      <ReactFlow
-        nodeTypes={nodeTypes}
-        nodes={nodes}
-        edges={edges}
-        onNodesChange={onNodesChange}
-        onEdgesChange={onEdgesChange}
-        onConnect={onConnect}
-      >
-        <Controls />
-        <MiniMap />
-        <Background
-          variant={BackgroundVariant.Dots}
-          gap={12}
-          size={2}
-          bgColor={gray100}
-          color={gray300}
-        />
-      </ReactFlow>
+      <VStack width="full" height="full" spacing={0}>
+        <HStack
+          width="full"
+          background="white"
+          padding={2}
+          borderBottom="1px solid"
+          borderColor="gray.350"
+        >
+          <HStack width="full">
+            <LogoIcon width={24} height={24} />
+          </HStack>
+          <HStack width="full" justify="center">
+            <Text>Optimization Studio</Text>
+          </HStack>
+          <HStack width="full" justify="end">
+            <UndoRedo />
+          </HStack>
+        </HStack>
+        <Box width="full" height="full">
+          <ReactFlow
+            nodeTypes={nodeTypes}
+            nodes={nodes}
+            edges={edges}
+            onNodesChange={onNodesChange}
+            onEdgesChange={onEdgesChange}
+            onConnect={onConnect}
+            style={{ width: "100%", height: "100%" }}
+          >
+            <Controls />
+            <MiniMap />
+            <Background
+              variant={BackgroundVariant.Dots}
+              gap={12}
+              size={2}
+              bgColor={gray100}
+              color={gray300}
+            />
+          </ReactFlow>
+        </Box>
+      </VStack>
     </div>
   );
 }
