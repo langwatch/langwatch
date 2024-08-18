@@ -42,11 +42,6 @@ type BaseComponent = {
     parameters?: Record<string, string>;
     inputs?: Record<string, string>;
     outputs?: Record<string, string>;
-    position?: {
-      x: number;
-      y: number;
-    };
-    selected?: boolean;
   };
 };
 
