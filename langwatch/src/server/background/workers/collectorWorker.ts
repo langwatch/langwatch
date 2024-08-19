@@ -145,11 +145,13 @@ export const processCollectorJob = async (
             custom: customMetadata,
           }
         : {}),
-      all_keys: [
-        ...existingAllKeys,
-        ...Object.keys(reservedTraceMetadata),
-        ...Object.keys(customMetadata),
-      ],
+      all_keys: Array.from(
+        new Set([
+          ...existingAllKeys,
+          ...Object.keys(reservedTraceMetadata),
+          ...Object.keys(customMetadata),
+        ])
+      ),
     },
     timestamps: {
       ...(!existingTrace
