@@ -293,6 +293,9 @@ export const batchClusterTraces = async (
   );
 
   const topicModel = await getProjectTopicClusteringModelProvider(project);
+  if (!topicModel) {
+    return;
+  }
   const embeddingsModel = await getProjectEmbeddingsModel(project.id);
   const clusteringResult = await fetchTopicsBatchClustering(project.id, {
     model: topicModel.model,
