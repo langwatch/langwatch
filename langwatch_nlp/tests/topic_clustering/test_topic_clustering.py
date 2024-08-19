@@ -1,4 +1,5 @@
 import json
+import os
 import random
 import re
 import pytest
@@ -27,9 +28,7 @@ class TestTopicClusteringIntegration:
     @pytest.mark.asyncio
     async def test_it_does_batch_clustering(self, httpx_mock: HTTPXMock):
         # Look at the jupyter notebook to see how to download this data
-        df = pd.read_csv(
-            f"notebooks/data/traces_for_topics_project_iCTt0LSMXYbv5jZNSdtEr.csv"
-        )
+        df = pd.read_csv(f"notebooks/data/traces_for_topics_KAXYxPR8MUgTcP8CF193y.csv")
         df["embeddings"] = df["embeddings"].apply(
             lambda x: list(map(float, x[1:-1].split(", ")))
         )
@@ -77,7 +76,15 @@ class TestTopicClusteringIntegration:
 
         response = client.post(
             "/topics/batch_clustering",
-            json={"model": "openai/gpt-4o", "litellm_params": {}, "traces": traces},
+            json={
+                "model": "openai/gpt-4o",
+                "litellm_params": {},
+                "embeddings_litellm_params": {
+                    "model": "openai/text-embedding-3-small",
+                    "api_key": os.environ["OPENAI_API_KEY"],
+                },
+                "traces": traces,
+            },
         )
         result: TopicClusteringResponse = response.json()
 
@@ -93,6 +100,10 @@ class TestTopicClusteringIntegration:
             json={
                 "model": "openai/gpt-4o",
                 "litellm_params": {},
+                "embeddings_litellm_params": {
+                    "model": "openai/text-embedding-3-small",
+                    "api_key": os.environ["OPENAI_API_KEY"],
+                },
                 "topics": result["topics"],
                 "subtopics": result["subtopics"],
                 "traces": traces,
@@ -108,14 +119,12 @@ class TestTopicClusteringIntegration:
         assert result["cost"]["amount"] == 0
 
     @pytest.mark.asyncio
-    @pytest.mark.skip # uncomment to run this test, it intentially throws errors multiple times before succeeding to test retry and error handling
+    @pytest.mark.skip  # uncomment to run this test, it intentionally throws errors multiple times before succeeding to test retry and error handling
     async def test_it_works_even_if_azure_throws_error_for_certain_requests(
         self, httpx_mock: HTTPXMock
     ):
         # Look at the jupyter notebook to see how to download this data
-        df = pd.read_csv(
-            f"notebooks/data/traces_for_topics_project_iCTt0LSMXYbv5jZNSdtEr.csv"
-        )
+        df = pd.read_csv(f"notebooks/data/traces_for_topics_KAXYxPR8MUgTcP8CF193y.csv")
         df["embeddings"] = df["embeddings"].apply(
             lambda x: list(map(float, x[1:-1].split(", ")))
         )
@@ -171,7 +180,15 @@ class TestTopicClusteringIntegration:
 
         response = client.post(
             "/topics/batch_clustering",
-            json={"model": "openai/gpt-4o", "litellm_params": {}, "traces": traces},
+            json={
+                "model": "openai/gpt-4o",
+                "litellm_params": {},
+                "embeddings_litellm_params": {
+                    "model": "openai/text-embedding-3-small",
+                    "api_key": os.environ["OPENAI_API_KEY"],
+                },
+                "traces": traces,
+            },
         )
 
         assert response.status_code == 200

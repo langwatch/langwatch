@@ -16,6 +16,7 @@ import {
   Text,
   VStack,
   useToast,
+  Select,
 } from "@chakra-ui/react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import React, { useCallback } from "react";
@@ -33,7 +34,10 @@ import {
 import { api } from "../../utils/api";
 import { ModelSelector } from "../../components/ModelSelector";
 import { modelProviderIcons } from "../../server/modelProviders/iconsMap";
-import { allowedTopicClusteringModels } from "../../server/topicClustering/types";
+import {
+  allowedTopicClusteringModels,
+  allowedEmbeddingsModels,
+} from "../../server/topicClustering/types";
 
 export default function ModelsPage() {
   const { project, organizations } = useOrganizationTeamProject();
@@ -99,6 +103,7 @@ export default function ModelsPage() {
           </CardBody>
         </Card>
         <TopicClusteringModel />
+        <EmbeddingsModel />
       </VStack>
     </SettingsLayout>
   );
@@ -346,6 +351,10 @@ type TopicClusteringModelForm = {
   topicClusteringModel: string;
 };
 
+type EmbeddingsModelForm = {
+  embeddingsModel: string;
+};
+
 function TopicClusteringModel() {
   const { project } = useOrganizationTeamProject();
   const updateTopicClusteringModel =
@@ -401,6 +410,66 @@ function TopicClusteringModel() {
                     void handleSubmit(onUpdateSubmit)();
                   }}
                   mode="chat"
+                />
+              )}
+            />
+          </HorizontalFormControl>
+        </CardBody>
+      </Card>
+    </>
+  );
+}
+
+function EmbeddingsModel() {
+  const { project } = useOrganizationTeamProject();
+  const updateEmbeddingsModel = api.project.updateEmbeddingsModel.useMutation();
+
+  const { register, handleSubmit, control } = useForm<EmbeddingsModelForm>({
+    defaultValues: {
+      embeddingsModel: project?.embeddingsModel ?? allowedEmbeddingsModels[0]!,
+    },
+  });
+
+  const embeddingsModelField = register("embeddingsModel");
+
+  const onUpdateSubmit = useCallback(
+    async (data: EmbeddingsModelForm) => {
+      await updateEmbeddingsModel.mutateAsync({
+        projectId: project?.id ?? "",
+        embeddingsModel: data.embeddingsModel,
+      });
+    },
+    [updateEmbeddingsModel, project?.id]
+  );
+
+  return (
+    <>
+      <HStack width="full" marginTop={6}>
+        <Heading size="md" as="h2">
+          Embeddings Model
+        </Heading>
+        <Spacer />
+        {updateEmbeddingsModel.isLoading && <Spinner />}
+      </HStack>
+      <Text>
+        Select which model will be used to generate embeddings for the messages
+      </Text>
+      <Card width="full">
+        <CardBody width="full">
+          <HorizontalFormControl label="Embeddings Model" helper="">
+            <Controller
+              name={embeddingsModelField.name}
+              control={control}
+              render={({ field }) => (
+                <ModelSelector
+                  model={field.value}
+                  options={allowedEmbeddingsModels}
+                  // eslint-disable-next-line @typescript-eslint/no-misused-promises
+                  onChange={(model) => {
+                    field.onChange(model);
+                    void handleSubmit(onUpdateSubmit)();
+                  }}
+                  mode="embedding"
                 />
               )}
             />

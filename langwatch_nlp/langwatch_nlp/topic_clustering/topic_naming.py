@@ -48,7 +48,6 @@ def generate_topic_names(
 
     try:
         response = litellm.completion(
-            model=model,
             temperature=0.0,
             messages=[
                 {
@@ -150,6 +149,7 @@ def generate_topic_names_split(
 def generate_topic_names_split_and_improve_similar_names(
     model: str,
     litellm_params: dict[str, str],
+    embeddings_litellm_params: dict[str, str],
     topic_examples: list[list[str]],
     existing: Optional[list[str]] = None,
 ) -> tuple[list[Optional[str]], Money]:
@@ -162,6 +162,7 @@ def generate_topic_names_split_and_improve_similar_names(
     topic_names, cost2 = improve_similar_names(
         model,
         litellm_params,
+        embeddings_litellm_params,
         topic_names=topic_names,
         topic_examples=topic_examples,
         max_iterations=3,
@@ -172,24 +173,23 @@ def generate_topic_names_split_and_improve_similar_names(
 def improve_similar_names(
     model: str,
     litellm_params: dict[str, str],
+    embeddings_litellm_params: dict[str, str],
     topic_names: list[Optional[str]],
     topic_examples: list[list[str]],
     cost=Money(amount=0, currency="USD"),
     iteration=0,
     max_iterations=3,
 ) -> tuple[list[Optional[str]], Money]:
+
     if len(topic_names) != len(topic_examples):
         raise ValueError("topic_names and topic_examples must have the same length.")
 
-    openai_client = OpenAI(
-        api_key=os.getenv("OPENAI_API_KEY"),
-    )
     # Temporary until text-embedding-3-small is also available on azure: https://learn.microsoft.com/en-us/answers/questions/1531681/openai-new-embeddings-model
-    response = openai_client.embeddings.create(
+    response = litellm.embedding(
+        **embeddings_litellm_params,  # type: ignore
         input=[name if name else "" for name in topic_names],
-        model="text-embedding-3-small",
     )
-    embeddings = [data.embedding for data in response.data]
+    embeddings = [data["embedding"] for data in response.data or []]
 
     # find the two closest embeddings
     closest_distance = float("inf")
@@ -244,6 +244,7 @@ def improve_similar_names(
         return improve_similar_names(
             model,
             litellm_params,
+            embeddings_litellm_params,
             topic_names=topic_names_,
             topic_examples=topic_examples,
             cost=cost__,
@@ -273,7 +274,6 @@ def improve_name_between_two_topics(
     )
 
     response = litellm.completion(
-        model=model,
         temperature=0.0,
         messages=[
             {
@@ -320,6 +320,7 @@ def improve_name_between_two_topics(
 def generate_topic_and_subtopic_names(
     model: str,
     litellm_params: dict[str, str],
+    embeddings_litellm_params: dict[str, str],
     hierarchy: dict[str, dict[str, list[Trace]]],
     existing: Optional[list[str]] = None,
     skip_topic_names: bool = False,
@@ -340,6 +341,7 @@ def generate_topic_and_subtopic_names(
         def noop_topic_names(
             model: str,
             litellm_params: dict[str, str],
+            embeddings_litellm_params: dict[str, str],
             topic_examples: list[list[str]],
             existing: Optional[list[str]] = None,
         ) -> tuple[list[Optional[str]], Money]:
@@ -353,6 +355,7 @@ def generate_topic_and_subtopic_names(
             ),
             model,
             litellm_params,
+            embeddings_litellm_params,
             topic_examples,
             existing=existing,
         )
@@ -368,6 +371,7 @@ def generate_topic_and_subtopic_names(
                 generate_topic_names_split_and_improve_similar_names,
                 model,
                 litellm_params,
+                embeddings_litellm_params,
                 subtopic_samples,
                 existing,
             )

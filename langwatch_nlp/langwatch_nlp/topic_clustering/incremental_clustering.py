@@ -77,6 +77,7 @@ def assign_trace_to_topic(
 def maybe_create_new_topics(
     model: str,
     litellm_params: dict[str, str],
+    embeddings_litellm_params: dict[str, str],
     traces: list[Trace],
     topics: list[U],
     cophenetic_distances: int,
@@ -100,6 +101,7 @@ def maybe_create_new_topics(
         topic_names, subtopic_names, cost = generate_topic_and_subtopic_names(
             model,
             litellm_params,
+            embeddings_litellm_params,
             new_hierarchy,
             existing=existing,
         )
@@ -108,6 +110,7 @@ def maybe_create_new_topics(
         topic_names, subtopic_names, cost = generate_topic_and_subtopic_names(
             model,
             litellm_params,
+            embeddings_litellm_params,
             new_hierarchy,
             existing=existing,
             skip_topic_names=True,
@@ -123,6 +126,7 @@ def maybe_create_new_topics(
 def maybe_create_new_topics_and_subtopics_from_unassigned_traces(
     model: str,
     litellm_params: dict[str, str],
+    embeddings_litellm_params: dict[str, str],
     traces: list[Trace],
     topics: list[Topic],
     subtopics: list[Subtopic],
@@ -141,6 +145,7 @@ def maybe_create_new_topics_and_subtopics_from_unassigned_traces(
             maybe_create_new_topics(
                 model,
                 litellm_params,
+                embeddings_litellm_params,
                 new_traces_to_assign,
                 topics,
                 COPHENETIC_DISTANCES_FOR_TOPICS,
@@ -165,6 +170,7 @@ def maybe_create_new_topics_and_subtopics_from_unassigned_traces(
         _, new_subtopics_, new_traces_to_assign_, cost_ = maybe_create_new_topics(
             model,
             litellm_params,
+            embeddings_litellm_params,
             traces_,
             subtopics_,
             COPHENETIC_DISTANCES_FOR_SUBTOPICS,
@@ -195,6 +201,7 @@ class IncrementalClusteringParams(BaseModel):
     model: str
     deployment_name: Optional[str] = None
     litellm_params: dict[str, str]
+    embeddings_litellm_params: dict[str, str]
 
 
 def setup_endpoints(app: FastAPI):
@@ -218,6 +225,7 @@ def setup_endpoints(app: FastAPI):
             maybe_create_new_topics_and_subtopics_from_unassigned_traces(
                 model=params.model,
                 litellm_params=params.litellm_params,
+                embeddings_litellm_params=params.embeddings_litellm_params,
                 traces=params.traces,
                 topics=params.topics,
                 subtopics=params.subtopics,
