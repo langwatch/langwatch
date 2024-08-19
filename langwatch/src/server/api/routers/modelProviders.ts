@@ -129,9 +129,7 @@ const getModelOrDefaultEnvKey = (
   );
 };
 
-const getModelOrDefaultApiKey = (
-  modelProvider: MaybeStoredModelProvider
-) => {
+const getModelOrDefaultApiKey = (modelProvider: MaybeStoredModelProvider) => {
   const providerDefinition =
     modelProviders[modelProvider.provider as keyof typeof modelProviders];
   if (!providerDefinition) {
@@ -192,6 +190,8 @@ export const prepareLitellmParams = (
     params.vertex_location =
       getModelOrDefaultEnvKey(modelProvider, "VERTEXAI_LOCATION") ?? "invalid";
   }
+
+  params.model = model;
 
   // TODO: add azure deployment as params.model as azure/<deployment-name>
 

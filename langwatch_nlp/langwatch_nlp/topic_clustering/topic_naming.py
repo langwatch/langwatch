@@ -48,7 +48,6 @@ def generate_topic_names(
 
     try:
         response = litellm.completion(
-            model=model,
             temperature=0.0,
             messages=[
                 {
@@ -181,6 +180,7 @@ def improve_similar_names(
     iteration=0,
     max_iterations=3,
 ) -> tuple[list[Optional[str]], Money]:
+
     if len(topic_names) != len(topic_examples):
         raise ValueError("topic_names and topic_examples must have the same length.")
 
@@ -274,7 +274,6 @@ def improve_name_between_two_topics(
     )
 
     response = litellm.completion(
-        model=model,
         temperature=0.0,
         messages=[
             {

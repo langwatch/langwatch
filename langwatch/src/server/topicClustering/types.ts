@@ -43,7 +43,6 @@ export type BatchClusteringParams = {
 };
 
 export type IncrementalClusteringParams = {
-  model: string;
   litellm_params: Record<string, string>;
   embeddings_litellm_params: Record<string, string>;
   topics: TopicClusteringTopic[];
