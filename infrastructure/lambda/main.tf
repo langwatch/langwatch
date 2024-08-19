@@ -11,9 +11,9 @@ data "aws_secretsmanager_secret_version" "langevals" {
 }
 
 locals {
-  evaluator_package     = var.evaluator_package
-  tag                   = data.external.docker_tag.result["tag"]
-  git_tag               = data.external.docker_tag.result["git_tag"]
+  evaluator_package = var.evaluator_package
+  tag               = data.external.docker_tag.result["tag"]
+  git_tag           = data.external.docker_tag.result["git_tag"]
 }
 
 data "external" "docker_tag" {
@@ -185,6 +185,13 @@ resource "aws_iam_policy" "lambda" {
           "arn:aws:secretsmanager:*:*:secret:*"
         ]
         Effect = "Allow"
+      },
+      {
+        Action = [
+          "lambda:InvokeFunction"
+        ]
+        Resource = aws_lambda_function.this[0].arn
+        Effect   = "Allow"
       }
     ]
   })
@@ -206,4 +213,45 @@ resource "aws_lambda_permission" "apigw" {
   # The /*/* portion grants access from any method on any resource
   # within the API Gateway "REST API".
   source_arn = "${var.apigw_execution_arn}/*/*"
+}
+
+# Keep lambda warm
+
+resource "aws_cloudwatch_event_rule" "keep_warm" {
+  count               = module.variables.profile == "lw-prod" ? 1 : 0
+  name                = "${local.evaluator_package}-lambda-keep-warm"
+  description         = "Keep ${local.evaluator_package} Lambda function warm"
+  schedule_expression = "rate(1 minute)"
+}
+
+resource "aws_cloudwatch_event_target" "keep_warm" {
+  count     = module.variables.profile == "lw-prod" ? 1 : 0
+  rule      = aws_cloudwatch_event_rule.keep_warm[0].name
+  target_id = "KeepWarmLambda"
+  arn       = aws_lambda_function.this[0].arn
+  input = jsonencode({
+    "version" : "2.0",
+    "routeKey" : "GET /healthcheck",
+    "rawPath" : "/healthcheck",
+    "rawQueryString" : "",
+    "headers" : {
+      "content-type" : "application/json"
+    },
+    "requestContext" : {
+      "http" : {
+        "method" : "GET",
+        "path" : "/healthcheck"
+      }
+    },
+    "isBase64Encoded" : false
+  })
+}
+
+resource "aws_lambda_permission" "allow_cloudwatch" {
+  count         = module.variables.profile == "lw-prod" ? 1 : 0
+  statement_id  = "AllowExecutionFromCloudWatch"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.this[0].function_name
+  principal     = "events.amazonaws.com"
+  source_arn    = aws_cloudwatch_event_rule.keep_warm[0].arn
 }
