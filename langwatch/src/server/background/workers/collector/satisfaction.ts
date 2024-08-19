@@ -55,7 +55,7 @@ export const scoreSatisfactionFromInput = async ({
   await esClient.update({
     index: TRACE_INDEX.alias,
     id: traceIndexId({ traceId: traceId, projectId: projectId }),
-    retry_on_conflict: 5,
+    retry_on_conflict: 10,
     body: {
       doc: {
         input: {

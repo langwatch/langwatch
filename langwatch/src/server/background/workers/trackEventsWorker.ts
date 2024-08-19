@@ -52,7 +52,7 @@ export const startTrackEventsWorker = () => {
           traceId: event.trace_id,
           projectId: event.project_id,
         }),
-        retry_on_conflict: 5,
+        retry_on_conflict: 10,
         body: {
           script: {
             source: `

@@ -165,7 +165,7 @@ export const processCollectorJob = async (
   await esClient.update({
     index: TRACE_INDEX.alias,
     id: traceIndexId({ traceId, projectId: project.id }),
-    retry_on_conflict: 5,
+    retry_on_conflict: 10,
     body: {
       doc: trace,
       doc_as_upsert: true,
@@ -175,7 +175,7 @@ export const processCollectorJob = async (
   await esClient.update({
     index: TRACE_INDEX.alias,
     id: traceIndexId({ traceId, projectId: project.id }),
-    retry_on_conflict: 5,
+    retry_on_conflict: 10,
     body: {
       script: {
         source: `
@@ -220,7 +220,7 @@ export const processCollectorJob = async (
     await esClient.update({
       index: TRACE_INDEX.alias,
       id: traceIndexId({ traceId, projectId: project.id }),
-      retry_on_conflict: 5,
+      retry_on_conflict: 10,
       body: {
         script: {
           source: `
