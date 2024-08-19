@@ -29,7 +29,7 @@ resource "aws_lambda_function" "this" {
   timeout       = 60
 
   # use `/usr/bin/time -alh poetry run python langevals/server.py --only <evaluator>` to get the memory usage (maximum resident set size in bytes)
-  memory_size = local.evaluator_package == "lingua" ? 1896 : local.evaluator_package == "ragas" ? 512 : 256
+  memory_size = local.evaluator_package == "lingua" ? 1896 : local.evaluator_package == "ragas" ? 512 : local.evaluator_package == "langevals" ? 512 : 256
 
   environment {
     variables = jsondecode(data.aws_secretsmanager_secret_version.langevals.secret_string)
