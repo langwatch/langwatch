@@ -279,6 +279,7 @@ model Topic {
     @@index([projectId])
 }
 
+// TODO: rename this from database to dataset
 enum DatabaseSchema {
     FULL_TRACE
     LLM_CHAT_CALL
