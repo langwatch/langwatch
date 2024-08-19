@@ -7,6 +7,7 @@ import { TRPCError } from "@trpc/server";
 import {
   getGroup,
   getMetric,
+  percentileToPercent,
   type TimeseriesInputType,
 } from "~/server/analytics/registry";
 import {
@@ -21,6 +22,10 @@ import {
   currentVsPreviousDates,
   generateTracesPivotQueryConditions,
 } from "../api/routers/analytics/common";
+import {
+  percentileAggregationTypes,
+  type PercentileAggregationTypes,
+} from "./types";
 
 const labelsMapping: Partial<
   Record<
@@ -99,7 +104,15 @@ export const timeseries = async (input: TimeseriesInputType) => {
             },
             [pipelinePath_]: {
               [pipelineAggregationsToElasticSearch[pipeline.aggregation]]: {
-                buckets_path: `${pipelineBucketsPath}>${metricPath}`,
+                buckets_path:
+                  `${pipelineBucketsPath}>${metricPath}` +
+                  (percentileAggregationTypes.includes(aggregation as any)
+                    ? `.${
+                        percentileToPercent[
+                          aggregation as PercentileAggregationTypes
+                        ]
+                      }`
+                    : ""),
                 gap_policy: "insert_zeros",
               },
             },

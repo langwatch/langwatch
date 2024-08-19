@@ -63,7 +63,7 @@ const numericFieldAnalyticsWithPercentiles = (
       : `${field.replaceAll(".", "_")}_${aggregation}`,
 });
 
-const percentileToPercent: Record<PercentileAggregationTypes, number> = {
+export const percentileToPercent: Record<PercentileAggregationTypes, number> = {
   median: 50,
   p99: 99,
   p95: 95,
