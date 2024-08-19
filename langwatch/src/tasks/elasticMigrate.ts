@@ -103,12 +103,21 @@ const getLastIndexForBase = async (base: string) => {
 const createIndexes = async (lastMigration: string) => {
   const traceExists = await getLastIndexForBase(TRACE_INDEX.base);
   if (!traceExists) {
+    const settings: any = {
+      number_of_shards: 1,
+      number_of_replicas: 0,
+    };
+
+    console.log(process.env.IS_OPENSEARCH);
+    if (process.env.IS_OPENSEARCH === "true") {
+      settings.index = {
+        knn: true,
+      };
+    }
+
     await esClient.indices.create({
       index: TRACE_INDEX.base,
-      settings: {
-        number_of_shards: 1,
-        number_of_replicas: 0,
-      },
+      settings: settings,
       mappings: { properties: traceMapping as Record<string, MappingProperty> },
     });
   }

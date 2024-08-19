@@ -44,6 +44,7 @@ export const getOpenAIEmbeddings = async (text: string) => {
       model: model,
       input: text.slice(0, 8192 * 2),
     });
+
     const embeddings = response.data[0]?.embedding;
     return embeddings ? { model, embeddings } : undefined;
   }

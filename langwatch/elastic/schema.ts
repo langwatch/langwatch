@@ -202,6 +202,15 @@ export const traceMapping: ElasticSearchMappingFrom<ElasticSearchTrace> = {
             ? {
                 type: "knn_vector",
                 dimension: OPENAI_EMBEDDING_DIMENSION,
+                method: {
+                  name: "hnsw",
+                  space_type: "l2",
+                  engine: "nmslib",
+                  parameters: {
+                    ef_construction: 128,
+                    m: 24,
+                  },
+                },
               }
             : {
                 index: true,
@@ -223,6 +232,15 @@ export const traceMapping: ElasticSearchMappingFrom<ElasticSearchTrace> = {
             ? {
                 type: "knn_vector",
                 dimension: OPENAI_EMBEDDING_DIMENSION,
+                method: {
+                  name: "hnsw",
+                  space_type: "l2",
+                  engine: "nmslib",
+                  parameters: {
+                    ef_construction: 128,
+                    m: 24,
+                  },
+                },
               }
             : {
                 index: true,
