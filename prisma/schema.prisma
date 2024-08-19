@@ -180,6 +180,7 @@ model Project {
     annotations          Annotation[]
     modelProviders       ModelProvider[]
     topicClusteringModel String?
+    embeddingsModel      String?
     TriggerSent          TriggerSent[]
     annotationScores     AnnotationScore[]
     publicShares         PublicShare[]
