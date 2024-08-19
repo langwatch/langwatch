@@ -21,6 +21,7 @@ import {
   currentVsPreviousDates,
   generateTracesPivotQueryConditions,
 } from "../api/routers/analytics/common";
+import { env } from "../../env.mjs";
 
 const labelsMapping: Partial<
   Record<
@@ -136,7 +137,9 @@ export const timeseries = async (input: TimeseriesInputType) => {
     size: 0,
     query: pivotIndexConditions,
     ...(Object.keys(runtimeMappings).length > 0
-      ? { runtime_mappings: runtimeMappings }
+      ? env.IS_OPENSEARCH
+        ? { derived: runtimeMappings }
+        : { runtime_mappings: runtimeMappings }
       : {}),
     aggs:
       input.timeScale === "full"
@@ -175,6 +178,8 @@ export const timeseries = async (input: TimeseriesInputType) => {
             },
           } as any),
   };
+
+  console.log(JSON.stringify(queryBody, null, 2));
 
   const result = (await esClient.search({
     index: TRACE_INDEX.alias,
