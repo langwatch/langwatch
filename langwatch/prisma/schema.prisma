@@ -172,6 +172,7 @@ model Project {
     annotations          Annotation[]
     modelProviders       ModelProvider[]
     topicClusteringModel String?
+    embeddingsModel      String?
     TriggerSent          TriggerSent[]
     annotationScores     AnnotationScore[]
     publicShares         PublicShare[]
@@ -279,6 +280,7 @@ model Topic {
     @@index([projectId])
 }
 
+// TODO: rename this from database to dataset
 enum DatabaseSchema {
     FULL_TRACE
     LLM_CHAT_CALL

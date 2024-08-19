@@ -1,18 +1,16 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { scoreSatisfactionFromInput } from "./satisfaction";
 import { getOpenAIEmbeddings } from "../../../embeddings";
-import {
-  TRACE_INDEX,
-  esClient,
-  traceIndexId,
-} from "../../../elasticsearch";
+import { TRACE_INDEX, esClient, traceIndexId } from "../../../elasticsearch";
 import type { Trace } from "../../../tracer/types";
+import { getTestProject } from "~/utils/testUtils";
 
 describe("Satisfaction Scoring Integration Test", () => {
+  let project;
   const testTraceId = "test-trace-satisfaction";
   const testTraceData: Trace = {
     trace_id: testTraceId,
-    project_id: "test-project-satisfaction",
+    project_id: "",
     input: {
       value: "I am very happy with the service!",
     },
@@ -26,9 +24,12 @@ describe("Satisfaction Scoring Integration Test", () => {
   };
 
   beforeAll(async () => {
+    project = await getTestProject("satisfaction-scoring-integration-test");
+    testTraceData.project_id = project.id;
     if (testTraceData.input) {
       testTraceData.input.embeddings = await getOpenAIEmbeddings(
-        testTraceData.input.value
+        testTraceData.input.value,
+        project.id
       );
     }
 

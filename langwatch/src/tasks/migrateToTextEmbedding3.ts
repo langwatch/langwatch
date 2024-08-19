@@ -4,6 +4,7 @@ import type {
 } from "@elastic/elasticsearch/lib/api/types";
 import { TRACE_INDEX, esClient } from "../server/elasticsearch";
 import { getOpenAIEmbeddings } from "../server/embeddings";
+import { type ElasticSearchTrace } from "~/server/tracer/types";
 
 const migrateIndex = async (index: string) => {
   let searchAfter: any;
@@ -11,10 +12,10 @@ const migrateIndex = async (index: string) => {
   let bulkActions = [];
 
   do {
-    response = await esClient.search({
+    response = await esClient.search<ElasticSearchTrace>({
       index,
       _source: {
-        includes: ["input.value", "output.value"],
+        includes: ["projectId", "input.value", "output.value"],
       },
       body: {
         query: {
@@ -71,10 +72,19 @@ const migrateIndex = async (index: string) => {
 
       const embeddings = await Promise.all(
         inputs
-          .map((input) => (input ? getOpenAIEmbeddings(input) : undefined))
+          .map((input, index) =>
+            input
+              ? getOpenAIEmbeddings(input, results[index]!._source!.project_id)
+              : undefined
+          )
           .concat(
-            outputs.map((output) =>
-              output ? getOpenAIEmbeddings(output) : undefined
+            outputs.map((output, index) =>
+              output
+                ? getOpenAIEmbeddings(
+                    output,
+                    results[index]!._source!.project_id
+                  )
+                : undefined
             )
           )
       );

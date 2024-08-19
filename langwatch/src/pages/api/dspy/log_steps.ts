@@ -217,7 +217,7 @@ const processDSPyStep = async (project: Project, param: DSPyStepRESTParams) => {
       script,
       upsert: validatedDspyStep,
     },
-    retry_on_conflict: 3,
+    retry_on_conflict: 5,
   });
 };
 

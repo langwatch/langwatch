@@ -10,7 +10,7 @@ import { getDebugger } from "../../utils/logger";
 import { scheduleTopicClusteringNextPage } from "../background/queues/topicClusteringQueue";
 import { prisma } from "../db";
 import { TRACE_INDEX, esClient, traceIndexId } from "../elasticsearch";
-import { DEFAULT_EMBEDDINGS_MODEL } from "../embeddings";
+import { getProjectEmbeddingsModel } from "../embeddings";
 import type { ElasticSearchTrace, Trace } from "../tracer/types";
 import {
   allowedTopicClusteringModels,
@@ -186,13 +186,16 @@ export const clusterTopicsForProject = async (
     },
   });
 
+  const embeddingsModel = await getProjectEmbeddingsModel(projectId);
+
   const traces: TopicClusteringTrace[] = result.hits.hits
     .map((hit) => hit._source!)
     .filter(
       (trace) =>
         !!trace?.input?.value &&
         !!trace?.input?.embeddings?.embeddings &&
-        trace?.input?.embeddings?.model === DEFAULT_EMBEDDINGS_MODEL
+        trace?.input?.embeddings?.model.replace("openai/", "") ===
+          embeddingsModel.model.replace("openai/", "")
     )
     .map((trace) => ({
       trace_id: trace.trace_id,
@@ -269,9 +272,10 @@ const getProjectTopicClusteringModelProvider = async (project: Project) => {
     throw new Error(`Topic clustering model provider ${provider} not found`);
   }
   if (!modelProvider.enabled) {
-    throw new Error(
-      `Topic clustering model provider ${provider} is not enabled`
+    debug(
+      `Topic clustering model provider ${provider} is not enabled, skipping topic clustering`
     );
+    return;
   }
 
   return { model: topicClusteringModel, modelProvider };
@@ -289,11 +293,19 @@ export const batchClusterTraces = async (
   );
 
   const topicModel = await getProjectTopicClusteringModelProvider(project);
+  if (!topicModel) {
+    return;
+  }
+  const embeddingsModel = await getProjectEmbeddingsModel(project.id);
   const clusteringResult = await fetchTopicsBatchClustering(project.id, {
     model: topicModel.model,
     litellm_params: prepareLitellmParams(
       topicModel.model,
       topicModel.modelProvider
+    ),
+    embeddings_litellm_params: prepareLitellmParams(
+      embeddingsModel.model,
+      embeddingsModel.modelProvider
     ),
     traces,
   });
@@ -344,11 +356,18 @@ export const incrementalClustering = async (
   }));
 
   const topicModel = await getProjectTopicClusteringModelProvider(project);
+  if (!topicModel) {
+    return;
+  }
+  const embeddingsModel = await getProjectEmbeddingsModel(project.id);
   const clusteringResult = await fetchTopicsIncrementalClustering(project.id, {
-    model: topicModel.model,
     litellm_params: prepareLitellmParams(
       topicModel.model,
       topicModel.modelProvider
+    ),
+    embeddings_litellm_params: prepareLitellmParams(
+      embeddingsModel.model,
+      embeddingsModel.modelProvider
     ),
     traces,
     topics,
@@ -394,13 +413,15 @@ export const storeResults = async (
     });
   }
 
+  const embeddingsModel = await getProjectEmbeddingsModel(projectId);
+
   if (topics.length > 0) {
     await prisma.topic.createMany({
       data: topics.map((topic) => ({
         id: topic.id,
         projectId,
         name: topic.name,
-        embeddings_model: DEFAULT_EMBEDDINGS_MODEL,
+        embeddings_model: embeddingsModel.model,
         centroid: topic.centroid,
         p95Distance: topic.p95_distance,
         automaticallyGenerated: true,
@@ -414,7 +435,7 @@ export const storeResults = async (
         id: subtopic.id,
         projectId,
         name: subtopic.name,
-        embeddings_model: DEFAULT_EMBEDDINGS_MODEL,
+        embeddings_model: embeddingsModel.model,
         centroid: subtopic.centroid,
         p95Distance: subtopic.p95_distance,
         parentId: subtopic.parent_id,

@@ -78,6 +78,7 @@ class BatchClusteringParams(BaseModel):
     model: str
     deployment_name: Optional[str] = None
     litellm_params: dict[str, str]
+    embeddings_litellm_params: dict[str, str]
 
 
 def setup_endpoints(app: FastAPI):
@@ -93,6 +94,7 @@ def setup_endpoints(app: FastAPI):
         topic_names, subtopic_names, cost = generate_topic_and_subtopic_names(
             model=model,
             litellm_params=params.litellm_params,
+            embeddings_litellm_params=params.embeddings_litellm_params,
             hierarchy=hierarchy,
         )
         topics, subtopics, traces_to_assign = build_response(

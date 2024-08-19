@@ -1,3 +1,4 @@
+import os
 import pytest
 from fastapi.testclient import TestClient
 from langwatch_nlp.main import app
@@ -9,9 +10,24 @@ client = TestClient(app)
 @pytest.mark.integration
 def test_sentiment_analysis():
     text = "no, this is not what I wanted"
-    embedding = get_embedding(text, model="text-embedding-3-small")
+    embedding = get_embedding(
+        text,
+        embeddings_litellm_params={
+            "api_key": os.environ["OPENAI_API_KEY"],
+            "model": "text-embedding-3-small",
+        },
+    )
 
-    response = client.post("/sentiment", json={"vector": embedding})
+    response = client.post(
+        "/sentiment",
+        json={
+            "vector": embedding,
+            "embeddings_litellm_params": {
+                "api_key": os.environ["OPENAI_API_KEY"],
+                "model": "text-embedding-3-small",
+            },
+        },
+    )
 
     assert response.status_code == 200
 

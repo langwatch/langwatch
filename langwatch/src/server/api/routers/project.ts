@@ -19,7 +19,10 @@ import {
 } from "../permission";
 import { getOrganizationProjectsCount } from "./limits";
 import { dependencies } from "../../../injection/dependencies.server";
-import { allowedTopicClusteringModels } from "../../topicClustering/types";
+import {
+  allowedTopicClusteringModels,
+  allowedEmbeddingsModels,
+} from "../../topicClustering/types";
 import type { Project } from "@prisma/client";
 
 export const projectRouter = createTRPCRouter({
@@ -247,6 +250,36 @@ export const projectRouter = createTRPCRouter({
           language: input.language,
           framework: input.framework,
           piiRedactionLevel: input.piiRedactionLevel,
+        },
+      });
+
+      return { success: true, projectSlug: updatedProject.slug };
+    }),
+  updateEmbeddingsModel: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        embeddingsModel: z.enum(allowedEmbeddingsModels as any),
+      })
+    )
+    .use(checkUserPermissionForProject(TeamRoleGroup.SETUP_PROJECT))
+    .mutation(async ({ input, ctx }) => {
+      const prisma = ctx.prisma;
+      const project = await prisma.project.findUnique({
+        where: { id: input.projectId },
+      });
+
+      if (!project) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Project not found",
+        });
+      }
+
+      const updatedProject = await prisma.project.update({
+        where: { id: input.projectId },
+        data: {
+          embeddingsModel: input.embeddingsModel,
         },
       });
 
