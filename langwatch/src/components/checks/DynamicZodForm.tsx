@@ -128,7 +128,7 @@ const DynamicZodForm = ({
                 />
                 {fieldName == "model" &&
                   evaluator?.name.toLowerCase().includes("ragas") &&
-                  !field.value.endsWith("16k") && (
+                  !field.value?.endsWith("16k") && (
                     <Alert status="warning" marginTop={4}>
                       <AlertIcon />
                       <Text>

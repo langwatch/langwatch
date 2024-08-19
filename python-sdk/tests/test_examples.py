@@ -8,6 +8,11 @@ import chainlit as cl
 
 from chainlit.context import init_http_context
 from langwatch.tracer import ContextTrace
+from opentelemetry.sdk.trace.export import (
+    SpanExportResult,
+    SpanExporter,
+    SimpleSpanProcessor,
+)
 
 
 last_trace: Optional[ContextTrace] = None
@@ -20,6 +25,7 @@ original_init = ContextTrace.__init__
 def patched_init(self, *args, **kwargs):
     global last_trace
     last_trace = self
+    self._force_sync = True
 
     return original_init(self, *args, **kwargs)
 
@@ -27,9 +33,23 @@ def patched_init(self, *args, **kwargs):
 ContextTrace.__init__ = patched_init
 
 
+class TraceIdCapturerExporter(SpanExporter):
+    def export(self, spans):
+        global last_trace
+
+        context = spans[0].get_span_context()
+        if context is not None:
+            trace_id = context.trace_id.to_bytes(16, "big").hex()
+            last_trace = ContextTrace(trace_id=trace_id)
+        return SpanExportResult.SUCCESS
+
+
 def get_example_files():
     examples_dir = os.path.join(os.path.dirname(__file__), "..", "examples")
-    return [f for f in os.listdir(examples_dir) if f.endswith(".py")]
+    opentelemetry_dir = os.path.join(examples_dir, "opentelemetry")
+    return [f for f in os.listdir(examples_dir) if f.endswith(".py")] + [
+        "opentelemetry/" + f for f in os.listdir(opentelemetry_dir) if f.endswith(".py")
+    ]
 
 
 @pytest.mark.parametrize("example_file", get_example_files())
@@ -42,7 +62,9 @@ async def test_example(example_file):
     last_trace = None
 
     # Dynamically import the main function from the example file
-    module_name = f"examples.{example_file[:-3]}"  # Remove .py extension
+    module_name = (
+        f"examples.{example_file[:-3].replace('/', '.')}"  # Remove .py extension
+    )
     module = importlib.import_module(module_name)
     init_http_context()
 
@@ -52,6 +74,17 @@ async def test_example(example_file):
         main_func = getattr(module, "call_fastapi_sample_endpoint", None)
     if main_func is None:
         pytest.skip(f"No main function found in {example_file}")
+
+    if "opentelemetry" in example_file:
+        tracer_provider = getattr(module, "tracer_provider")
+        # Remove console printing exporter
+        tracer_provider._active_span_processor._span_processors = (
+            tracer_provider._active_span_processor._span_processors[0],
+        )
+        # Capture trace id
+        tracer_provider.add_span_processor(
+            SimpleSpanProcessor(TraceIdCapturerExporter())
+        )
 
     on_chat_start = getattr(module, "on_chat_start", None)
     if on_chat_start is not None:

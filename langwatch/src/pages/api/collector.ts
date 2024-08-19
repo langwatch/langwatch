@@ -318,17 +318,21 @@ export default async function handler(
 
   debug(`collecting traceId ${traceId}`);
 
-  await scheduleTraceCollectionWithFallback({
-    projectId: project.id,
-    traceId,
-    spans,
-    evaluations: params.evaluations,
-    reservedTraceMetadata,
-    customMetadata,
-    expectedOutput,
-    existingTrace,
-    paramsMD5,
-  });
+  const forceSync = req.query.force_sync === "true";
+  await scheduleTraceCollectionWithFallback(
+    {
+      projectId: project.id,
+      traceId,
+      spans,
+      evaluations: params.evaluations,
+      reservedTraceMetadata,
+      customMetadata,
+      expectedOutput,
+      existingTrace,
+      paramsMD5,
+    },
+    forceSync
+  );
 
   return res.status(200).json({ message: "Trace received successfully." });
 }

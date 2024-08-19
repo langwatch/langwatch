@@ -511,6 +511,7 @@ class ContextTrace:
     _capture_output: bool = True
 
     api_key: Optional[str] = None
+    _force_sync: bool = False
 
     def __init__(
         self,
@@ -738,6 +739,7 @@ class ContextTrace:
                 evaluations=self.evaluations,
             ),
             api_key=self.api_key,
+            force_sync=self._force_sync,
         )
 
     def append_span(self, span: Span):
@@ -828,7 +830,9 @@ class ContextTrace:
 
 
 @retry(tries=5, delay=0.5, backoff=3)
-def send_spans(data: CollectorRESTParams, api_key: Optional[str] = None):
+def send_spans(
+    data: CollectorRESTParams, api_key: Optional[str] = None, force_sync=False
+):
     import json
 
     get_logger().debug(
@@ -842,9 +846,11 @@ def send_spans(data: CollectorRESTParams, api_key: Optional[str] = None):
         )
         return
 
+    force_sync = f"?force_sync=true" if force_sync else ""
+
     # TODO: replace this with httpx, don't forget the custom SerializableWithStringFallback encoder
     response = requests.post(
-        langwatch.endpoint + "/api/collector",
+        f"{langwatch.endpoint}/api/collector{force_sync}",
         data=json.dumps(data, cls=SerializableWithStringFallback),
         headers={
             "X-Auth-Token": str(api_key),

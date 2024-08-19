@@ -272,9 +272,10 @@ const getProjectTopicClusteringModelProvider = async (project: Project) => {
     throw new Error(`Topic clustering model provider ${provider} not found`);
   }
   if (!modelProvider.enabled) {
-    throw new Error(
-      `Topic clustering model provider ${provider} is not enabled`
+    debug(
+      `Topic clustering model provider ${provider} is not enabled, skipping topic clustering`
     );
+    return;
   }
 
   return { model: topicClusteringModel, modelProvider };

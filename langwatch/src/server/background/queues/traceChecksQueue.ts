@@ -139,7 +139,7 @@ export const updateCheckStatusInES = async ({
       traceId: trace.trace_id,
       projectId: trace.project_id,
     }),
-    retry_on_conflict: 5,
+    retry_on_conflict: 10,
     body: {
       script: {
         source: `
