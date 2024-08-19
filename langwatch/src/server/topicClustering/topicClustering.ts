@@ -349,6 +349,9 @@ export const incrementalClustering = async (
   }));
 
   const topicModel = await getProjectTopicClusteringModelProvider(project);
+  if (!topicModel) {
+    return;
+  }
   const clusteringResult = await fetchTopicsIncrementalClustering(project.id, {
     model: topicModel.model,
     litellm_params: prepareLitellmParams(
