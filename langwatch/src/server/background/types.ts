@@ -1,6 +1,7 @@
 import type { EvaluatorTypes } from "../../trace_checks/evaluators.generated";
 import type {
   CustomMetadata,
+  ElasticSearchTrace,
   ReservedTraceMetadata,
   RESTEvaluation,
   Span,
@@ -49,7 +50,7 @@ export type CollectorJob = {
   existingTrace?: {
     inserted_at?: number;
     indexing_md5s?: string[];
-    all_keys?: string[];
+    existing_metadata?: ElasticSearchTrace["metadata"];
   };
   paramsMD5: string;
 };
