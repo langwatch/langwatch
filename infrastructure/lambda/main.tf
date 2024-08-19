@@ -185,13 +185,6 @@ resource "aws_iam_policy" "lambda" {
           "arn:aws:secretsmanager:*:*:secret:*"
         ]
         Effect = "Allow"
-      },
-      {
-        Action = [
-          "lambda:InvokeFunction"
-        ]
-        Resource = aws_lambda_function.this[0].arn
-        Effect   = "Allow"
       }
     ]
   })
