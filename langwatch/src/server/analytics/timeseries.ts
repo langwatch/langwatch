@@ -181,8 +181,6 @@ export const timeseries = async (input: TimeseriesInputType) => {
           } as any),
   };
 
-  console.log(JSON.stringify(queryBody, null, 2));
-
   const result = (await esClient.search({
     index: TRACE_INDEX.alias,
     body: queryBody,
