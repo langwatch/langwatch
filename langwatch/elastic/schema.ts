@@ -16,7 +16,8 @@ import {
 
 type NonNestedMappingProperty =
   | Omit<MappingProperty, "properties">
-  | MappingDenseVectorProperty;
+  | MappingDenseVectorProperty
+  | { type: "knn_vector"; [key: string]: any };
 
 type ElasticSearchMappingFrom<T> = NonNullable<T> extends (infer U)[]
   ? {
