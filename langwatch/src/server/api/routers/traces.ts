@@ -441,9 +441,14 @@ export const getAllTracesForProject = async (
                 source: `
                   def spans = [];
                   for (def span : params._source.spans) {
-                    if (span.contexts != null && span.contexts.length > 0) {
+                    // if (span.contexts != null && span.contexts.length > 0) {
+                    //   def contextMap = new HashMap();
+                    //   contextMap.put('contexts', span.contexts);
+                    //   spans.add(contextMap);
+                    // }
+                    if (span.name == "LangWatch Evaluator" && span.type == "component") {
                       def contextMap = new HashMap();
-                      contextMap.put('contexts', span.contexts);
+                      contextMap.put('output', span.output);
                       spans.add(contextMap);
                     }
                   }
@@ -567,10 +572,17 @@ export const getAllTracesForProject = async (
           .filter((output) => !(output as GuardrailResult)?.passed)
       )[0];
 
-      let contexts: RAGChunk[] = [];
+      let contexts = "";
       for (const span of spans ?? []) {
-        if ("contexts" in span && Array.isArray(span.contexts)) {
-          contexts = [...contexts, ...span.contexts];
+        // if ("contexts" in span && Array.isArray(span.contexts)) {
+        //   contexts = [...contexts, ...span.contexts];
+        // }
+        if (
+          "output" in span &&
+          span.output?.type == "json" &&
+          span.output.value.includes("eval_trace_id")
+        ) {
+          contexts = span.output.value.split("'eval_trace_id': '")[1]!.split("'")[0]!
         }
       }
 

@@ -547,9 +547,7 @@ export function MessagesTable() {
         >
           <Tooltip label={JSON.stringify(trace.contexts)}>
             <Text noOfLines={1} display="block" maxWidth="300px">
-              {JSON.stringify(trace.contexts) === "[]"
-                ? ""
-                : JSON.stringify(trace.contexts)}
+              {JSON.stringify(trace.contexts) === "[]" ? "" : trace.contexts}
             </Text>
           </Tooltip>
         </Td>
@@ -713,6 +711,8 @@ export function MessagesTable() {
       ([column, _]) => column !== "checked"
     );
 
+    console.log("checkedHeaderColumnsEntries", checkedHeaderColumnsEntries);
+
     const evaluations = traceGroups_.traceChecks;
 
     const getValueForColumn = (trace: Trace, column: string, name: string) => {
@@ -756,6 +756,8 @@ export function MessagesTable() {
         return name;
       })
       .filter((field) => field !== undefined);
+
+    console.log('fields', fields);
 
     const csvBlob = Parse.unparse({
       fields: fields,
