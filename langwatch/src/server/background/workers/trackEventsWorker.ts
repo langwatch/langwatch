@@ -14,6 +14,11 @@ import { TRACK_EVENTS_QUEUE_NAME } from "../queues/trackEventsQueue";
 const debug = getDebugger("langwatch:workers:trackEventWorker");
 
 export const startTrackEventsWorker = () => {
+  if (!connection) {
+    debug("No redis connection, skipping track events worker");
+    return;
+  }
+
   const trackEventsWorker = new Worker<TrackEventJob, void, string>(
     TRACK_EVENTS_QUEUE_NAME,
     async (job) => {

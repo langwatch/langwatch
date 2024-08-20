@@ -6,7 +6,7 @@ import { prisma } from "../../db";
 
 export const TOPIC_CLUSTERING_QUEUE_NAME = "topic_clustering";
 
-const topicClusteringQueue = new Queue<TopicClusteringJob, void, string>(
+const topicClusteringQueue = connection && new Queue<TopicClusteringJob, void, string>(
   TOPIC_CLUSTERING_QUEUE_NAME,
   {
     connection,
@@ -52,7 +52,7 @@ export const scheduleTopicClustering = async () => {
     };
   });
 
-  await topicClusteringQueue.addBulk(jobs);
+  await topicClusteringQueue?.addBulk(jobs);
 };
 
 export const scheduleTopicClusteringNextPage = async (
@@ -61,7 +61,7 @@ export const scheduleTopicClusteringNextPage = async (
 ) => {
   const yyyymmdd = new Date().toISOString().split("T")[0];
 
-  await topicClusteringQueue.add(
+  await topicClusteringQueue?.add(
     "topic_clustering",
     { project_id: projectId, search_after: searchAfter },
     {

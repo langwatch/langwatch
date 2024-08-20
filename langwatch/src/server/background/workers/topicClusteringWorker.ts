@@ -9,6 +9,11 @@ import { TOPIC_CLUSTERING_QUEUE_NAME } from "../queues/topicClusteringQueue";
 const debug = getDebugger("langwatch:workers:topicClusteringWorker");
 
 export const startTopicClusteringWorker = () => {
+  if (!connection) {
+    debug("No redis connection, skipping collector worker");
+    return;
+  }
+
   const topicClusteringWorker = new Worker<TopicClusteringJob, void, string>(
     TOPIC_CLUSTERING_QUEUE_NAME,
     async (job) => {

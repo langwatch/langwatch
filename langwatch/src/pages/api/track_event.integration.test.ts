@@ -1,48 +1,36 @@
+import type { Project } from "@prisma/client";
 import type { Worker } from "bullmq";
+import debug from "debug";
+import { nanoid } from "nanoid";
 import { createMocks } from "node-mocks-http";
-import { describe, expect, it, beforeAll, afterAll } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import type { TrackEventJob } from "../../server/background/types";
+import { startTrackEventsWorker } from "../../server/background/workers/trackEventsWorker";
 import { prisma } from "../../server/db";
 import {
-  EVENTS_INDEX,
   TRACE_INDEX,
   esClient,
-  eventIndexId,
   traceIndexId,
 } from "../../server/elasticsearch";
+import type { ElasticSearchTrace, Trace } from "../../server/tracer/types";
+import { getTestProject, waitForResult } from "../../utils/testUtils";
 import handler from "./track_event";
-import type { Project } from "@prisma/client";
-import { startTrackEventsWorker } from "../../server/background/workers/trackEventsWorker";
-import type { TrackEventJob } from "../../server/background/types";
-import type { Trace } from "../../server/tracer/types";
-import { nanoid } from "nanoid";
-import type { GetResponse } from "@elastic/elasticsearch/lib/api/types";
-import debug from "debug";
 
 describe("/api/track_event", () => {
-  let worker: Worker<TrackEventJob, void, string>;
+  let worker: Worker<TrackEventJob, void, string> | undefined;
   let project: Project;
   let traceId: string;
   const eventId = `my_event_id_${nanoid()}`;
 
   beforeAll(async () => {
     worker = startTrackEventsWorker();
-    await worker.waitUntilReady();
+    if (worker) {
+      await worker.waitUntilReady();
+    }
   });
 
   beforeAll(async () => {
-    await prisma.project.deleteMany({
-      where: { slug: "--test-project" },
-    });
-    project = await prisma.project.create({
-      data: {
-        name: "Test Project",
-        slug: "--test-project",
-        language: "python",
-        framework: "openai",
-        apiKey: "test-auth-token",
-        teamId: "some-team",
-      },
-    });
+    project = await getTestProject("track-event-test");
 
     // Create a trace entry in Elasticsearch with grouping keys for the test
     traceId = `test-trace-${nanoid()}`;
@@ -120,6 +108,8 @@ describe("/api/track_event", () => {
       refresh: true,
     });
 
+    console.log("Waiting for job")
+
     // Wait for the job to be completed
     await new Promise<void>(
       (resolve) =>
@@ -128,32 +118,25 @@ describe("/api/track_event", () => {
         })
     );
 
-    const indexEventId = eventIndexId({
-      eventId: eventId,
-      projectId: project.id,
-    });
-    let event: GetResponse<Event>;
-    try {
-      event = await esClient.get<Event>({
-        index: EVENTS_INDEX,
-        id: indexEventId,
-      });
-    } catch {
-      // Wait once more for the job to be completed
-      await new Promise<void>(
-        (resolve) =>
-          worker?.on("completed", (args) => {
-            if (args.data.event.event_id.includes(eventId)) resolve();
-          })
-      );
-      event = await esClient.get<Event>({
-        index: EVENTS_INDEX,
-        id: indexEventId,
-      });
-    }
+    console.log("Event processed")
 
-    expect(event).toBeDefined();
-    expect(event._source).toMatchObject({
+    const trace = await waitForResult(async () => {
+      const trace = await esClient.getSource<ElasticSearchTrace>({
+        index: TRACE_INDEX.alias,
+        id: traceIndexId({
+          traceId,
+          projectId: project?.id ?? "",
+        }),
+      });
+
+      expect(trace.events).toHaveLength(1);
+
+      return trace;
+    });
+
+    const event = trace?.events?.find((e) => e.event_id === eventId);
+
+    expect(event).toMatchObject({
       event_id: eventId,
       project_id: project.id,
       trace_id: traceId,
@@ -163,12 +146,8 @@ describe("/api/track_event", () => {
       timestamps: {
         started_at: expect.any(Number),
         inserted_at: expect.any(Number),
+        updated_at: expect.any(Number),
       },
-      // Grouping keys from the trace even though even was sent earlier
-      thread_id: "test-thread",
-      user_id: "test-user",
-      customer_id: "test-customer",
-      labels: ["test-label"],
     });
   });
 

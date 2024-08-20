@@ -109,7 +109,7 @@ export default async function handler(
 
   const eventId = body.event_id ?? `event_${nanoid()}`;
 
-  await trackEventsQueue.add(
+  await trackEventsQueue?.add(
     "track_event",
     {
       project_id: project.id,

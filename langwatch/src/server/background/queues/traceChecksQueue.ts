@@ -8,7 +8,7 @@ import type { ElasticSearchEvaluation } from "../../tracer/types";
 
 export const TRACE_CHECKS_QUEUE_NAME = "evaluations";
 
-export const traceChecksQueue = new Queue<TraceCheckJob, any, string>(
+export const traceChecksQueue = connection && new Queue<TraceCheckJob, any, string>(
   TRACE_CHECKS_QUEUE_NAME,
   {
     connection,
@@ -48,14 +48,14 @@ export const scheduleTraceCheck = async ({
     checkId: check.id,
     projectId: trace.project_id,
   });
-  const currentJob = await traceChecksQueue.getJob(jobId);
+  const currentJob = await traceChecksQueue?.getJob(jobId);
   if (currentJob) {
     const state = await currentJob.getState();
     if (state == "completed" || state == "failed") {
       await currentJob.retry(state);
     }
   } else {
-    await traceChecksQueue.add(
+    await traceChecksQueue?.add(
       check.type,
       {
         // Recreating the check object to avoid passing the whole check object and making the queue heavy, we pass only the keys we need

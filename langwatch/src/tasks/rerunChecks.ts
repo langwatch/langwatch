@@ -67,7 +67,7 @@ export default async function execute(checkId: string) {
       checkId,
       projectId: traceCheck.project_id,
     });
-    const currentJob = await traceChecksQueue.getJob(jobId);
+    const currentJob = await traceChecksQueue?.getJob(jobId);
     if (currentJob) {
       const state = await currentJob.getState();
       if (state == "completed" || state == "failed") {

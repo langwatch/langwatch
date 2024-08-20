@@ -4,7 +4,7 @@ import { connection } from "../../redis";
 
 export const TRACK_EVENTS_QUEUE_NAME = "track_events";
 
-export const trackEventsQueue = new Queue<TrackEventJob, void, string>(
+export const trackEventsQueue = connection && new Queue<TrackEventJob, void, string>(
   TRACK_EVENTS_QUEUE_NAME,
   {
     connection,

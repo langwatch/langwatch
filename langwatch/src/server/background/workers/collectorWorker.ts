@@ -35,7 +35,7 @@ export const scheduleTraceCollectionWithFallback = async (
   collectorJob: CollectorJob,
   forceSync = false
 ) => {
-  if (forceSync) {
+  if (forceSync || !collectorQueue) {
     debug("Force sync enabled, processing job synchronously.");
     await processCollectorJob(undefined, collectorJob);
     return;
@@ -297,6 +297,11 @@ export const processCollectorJob = async (
 };
 
 export const startCollectorWorker = () => {
+  if (!connection) {
+    debug("No redis connection, skipping collector worker");
+    return;
+  }
+
   const collectorWorker = new Worker<CollectorJob, void, string>(
     COLLECTOR_QUEUE,
     (job) => processCollectorJob(job.id, job.data),

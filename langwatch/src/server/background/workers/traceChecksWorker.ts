@@ -265,6 +265,11 @@ export const startTraceChecksWorker = (
     job: Job<TraceCheckJob, any, EvaluatorTypes>
   ) => Promise<SingleEvaluationResult>
 ) => {
+  if (!connection) {
+    debug("No redis connection, skipping trace checks worker");
+    return;
+  }
+
   const traceChecksWorker = new Worker<TraceCheckJob, any, EvaluatorTypes>(
     TRACE_CHECKS_QUEUE_NAME,
     async (job) => {

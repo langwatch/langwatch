@@ -6,7 +6,7 @@ import { PHASE_PRODUCTION_BUILD } from "next/constants";
 const debug = getDebugger("langwatch:redis");
 
 export const connection =
-  process.env.NEXT_PHASE === PHASE_PRODUCTION_BUILD
+  process.env.NEXT_PHASE === PHASE_PRODUCTION_BUILD || process.env.BUILD_TIME
     ? undefined
     : new IORedis(env.REDIS_URL, {
         maxRetriesPerRequest: null,

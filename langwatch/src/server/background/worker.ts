@@ -21,10 +21,10 @@ import { startCollectorWorker } from "./workers/collectorWorker";
 const debug = getDebugger("langwatch:workers");
 
 type Workers = {
-  collectorWorker: Worker<CollectorJob, void, string>;
-  traceChecksWorker: Worker<TraceCheckJob, any, EvaluatorTypes>;
-  topicClusteringWorker: Worker<TopicClusteringJob, void, string>;
-  trackEventsWorker: Worker<TrackEventJob, void, string>;
+  collectorWorker: Worker<CollectorJob, void, string> | undefined;
+  traceChecksWorker: Worker<TraceCheckJob, any, EvaluatorTypes> | undefined;
+  topicClusteringWorker: Worker<TopicClusteringJob, void, string> | undefined;
+  trackEventsWorker: Worker<TrackEventJob, void, string> | undefined;
 };
 
 export const start = (
@@ -48,10 +48,10 @@ export const start = (
         debug("Max runtime reached, closing worker");
         void (async () => {
           await Promise.all([
-            collectorWorker.close(),
-            traceChecksWorker.close(),
-            topicClusteringWorker.close(),
-            trackEventsWorker.close(),
+            collectorWorker?.close(),
+            traceChecksWorker?.close(),
+            topicClusteringWorker?.close(),
+            trackEventsWorker?.close(),
           ]);
           resolve({
             collectorWorker,

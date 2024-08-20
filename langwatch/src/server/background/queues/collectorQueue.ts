@@ -4,7 +4,7 @@ import { connection } from "../../redis";
 
 export const COLLECTOR_QUEUE = "collector";
 
-export const collectorQueue = new Queue<CollectorJob, void, string>(
+export const collectorQueue = connection && new Queue<CollectorJob, void, string>(
   COLLECTOR_QUEUE,
   {
     connection,
