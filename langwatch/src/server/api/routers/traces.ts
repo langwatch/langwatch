@@ -388,7 +388,6 @@ export const getAllTracesForProject = async (
     ? await getOpenAIEmbeddings(input.query, input.projectId)
     : undefined;
 
-  // console.log(embeddings);
   if (input.query && !embeddings) {
     throw new TRPCError({
       code: "INTERNAL_SERVER_ERROR",
