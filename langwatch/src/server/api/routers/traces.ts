@@ -445,12 +445,11 @@ export const getAllTracesForProject = async (
                 source: `
                   def spans = [];
                   for (def span : params._source.spans) {
-                    // if (span.contexts != null && span.contexts.length > 0) {
-                      // spans.add([
-                      //   'contexts': span.contexts
-                      // ]);
-                    // }
-                    spans.add(span)
+                    if (span.contexts != null && span.contexts.length > 0) {
+                      def contextMap = new HashMap();
+                      contextMap.put('contexts', span.contexts);
+                      spans.add(contextMap);
+                    }
                   }
                   return spans;
                 `,

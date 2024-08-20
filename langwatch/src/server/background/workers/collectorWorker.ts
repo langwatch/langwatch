@@ -125,20 +125,33 @@ export const processCollectorJob = async (
 
   const evaluations = mapEvaluations(data);
 
+  const customExistingMetadata = existingTrace?.existing_metadata?.custom ?? {};
+  const existingAllKeys = existingTrace?.existing_metadata?.all_keys ?? [];
+  if (existingTrace?.existing_metadata) {
+    delete existingTrace?.existing_metadata.custom;
+    delete existingTrace?.existing_metadata.all_keys;
+  }
+
   // Create the trace
   const trace: ElasticSearchTrace = {
     trace_id: traceId,
     project_id: project.id,
     metadata: {
+      ...(existingTrace?.existing_metadata ?? {}),
       ...reservedTraceMetadata,
       ...(Object.keys(customMetadata).length > 0
-        ? { custom: customMetadata }
+        ? {
+            ...customExistingMetadata,
+            custom: customMetadata,
+          }
         : {}),
-      all_keys: [
-        ...(existingTrace?.all_keys ?? []),
-        ...Object.keys(reservedTraceMetadata),
-        ...Object.keys(customMetadata),
-      ],
+      all_keys: Array.from(
+        new Set([
+          ...existingAllKeys,
+          ...Object.keys(reservedTraceMetadata),
+          ...Object.keys(customMetadata),
+        ])
+      ),
     },
     timestamps: {
       ...(!existingTrace
@@ -346,7 +359,7 @@ export const fetchExistingMD5s = async (
   | {
       indexing_md5s: ElasticSearchTrace["indexing_md5s"];
       inserted_at: number | undefined;
-      all_keys: string[] | undefined;
+      existing_metadata: ElasticSearchTrace["metadata"];
     }
   | undefined
 > => {
@@ -362,7 +375,7 @@ export const fetchExistingMD5s = async (
           ] as QueryDslBoolQuery["must"],
         } as QueryDslBoolQuery,
       },
-      _source: ["indexing_md5s", "timestamps.inserted_at", "metadata.all_keys"],
+      _source: ["indexing_md5s", "timestamps.inserted_at", "metadata"],
     },
   });
 
@@ -374,6 +387,6 @@ export const fetchExistingMD5s = async (
   return {
     indexing_md5s: existingTrace.indexing_md5s,
     inserted_at: existingTrace.timestamps?.inserted_at,
-    all_keys: existingTrace.metadata?.all_keys,
+    existing_metadata: existingTrace.metadata,
   };
 };
