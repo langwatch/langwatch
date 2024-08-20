@@ -7,6 +7,7 @@ import { protectedProcedure } from "../../trpc";
 import { availableFilters } from "../../../filters/registry";
 import { sharedFiltersInputSchema } from "../../../analytics/types";
 import { generateTracesPivotQueryConditions } from "./common";
+import type { AggregationsAggregationContainer } from "@elastic/elasticsearch/lib/api/typesWithBodyKey";
 
 export const dataForFilter = protectedProcedure
   .input(
@@ -53,7 +54,7 @@ export const dataForFilter = protectedProcedure
           input.query,
           key,
           subkey
-        ),
+        ) as Record<string, AggregationsAggregationContainer>,
       },
     });
 
