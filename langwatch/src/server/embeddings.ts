@@ -53,6 +53,7 @@ export const getOpenAIEmbeddings = async (text: string, projectId: string) => {
     model: model.replace("openai/", ""),
     input: text.slice(0, 8192 * 1.5),
   });
+
   const embeddings = response.data[0]?.embedding;
   return embeddings ? { model, embeddings } : undefined;
 };

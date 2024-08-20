@@ -63,7 +63,7 @@ const numericFieldAnalyticsWithPercentiles = (
       : `${field.replaceAll(".", "_")}_${aggregation}`,
 });
 
-const percentileToPercent: Record<PercentileAggregationTypes, number> = {
+export const percentileToPercent: Record<PercentileAggregationTypes, number> = {
   median: 50,
   p99: 99,
   p95: 95,
@@ -229,9 +229,7 @@ export const analyticsMetrics = {
       increaseIs: "neutral",
     },
     completion_tokens: {
-      ...numericFieldAnalyticsWithPercentiles(
-        "metrics.completion_tokens"
-      ),
+      ...numericFieldAnalyticsWithPercentiles("metrics.completion_tokens"),
       label: "Completion Tokens",
       colorSet: "orangeTones",
       increaseIs: "neutral",
@@ -241,28 +239,49 @@ export const analyticsMetrics = {
       label: "Total Tokens",
       colorSet: "purpleTones",
       increaseIs: "neutral",
-      runtimeMappings: {
-        total_tokens: {
-          type: "long",
-          script: `
-            long promptTokens = 0;
-            long completionTokens = 0;
-
-            try {
-              promptTokens = doc['metrics.prompt_tokens'].size() > 0 ? doc['metrics.prompt_tokens'].value : 0;
-            } catch (Exception e) {
-              // ignore
-            }
-
-            try {
-              completionTokens = doc['metrics.completion_tokens'].size() > 0 ? doc['metrics.completion_tokens'].value : 0;
-            } catch (Exception e) {
-              // ignore
-            }
-
-            emit(promptTokens + completionTokens);
-          `,
-        },
+      aggregation: (aggregation: AggregationTypes) => {
+        const totalTokensScript = `
+                    long promptTokens = 0;
+                    long completionTokens = 0;
+          
+                    try {
+                      promptTokens = doc['metrics.prompt_tokens'].size() > 0 ? doc['metrics.prompt_tokens'].value : 0;
+                    } catch (Exception e) {
+                      // ignore
+                    }
+          
+                    try {
+                      completionTokens = doc['metrics.completion_tokens'].size() > 0 ? doc['metrics.completion_tokens'].value : 0;
+                    } catch (Exception e) {
+                      // ignore
+                    }
+                      
+                    return promptTokens + completionTokens;
+                  `;
+        return {
+          [`total_tokens_${aggregation}`]: percentileAggregationTypes.includes(
+            aggregation as any
+          )
+            ? {
+                percentiles: {
+                  script: {
+                    source: totalTokensScript,
+                  },
+                  percents: [
+                    percentileToPercent[
+                      aggregation as PercentileAggregationTypes
+                    ],
+                  ],
+                },
+              }
+            : {
+                [aggregation]: {
+                  script: {
+                    source: totalTokensScript,
+                  },
+                },
+              },
+        };
       },
     },
   },
@@ -486,13 +505,6 @@ export const analyticsMetrics = {
         filter: "evaluations.check_id",
         optional: true,
       },
-      runtimeMappings: {
-        trace_id_and_check_id: {
-          type: "keyword",
-          script:
-            "emit(doc['evaluations.trace_id'].value + ' ' + doc['evaluations.check_id'].value)",
-        },
-      },
       aggregation: (aggregation, key) => ({
         [`checks_${aggregation}`]: {
           nested: {
@@ -511,7 +523,11 @@ export const analyticsMetrics = {
               },
               aggs: {
                 cardinality: {
-                  cardinality: { field: "trace_id_and_check_id" },
+                  cardinality: {
+                    script: {
+                      source: `return doc['evaluations.trace_id'].value + ' ' + doc['evaluations.check_id'].value`,
+                    },
+                  },
                 },
               } as any,
             },
@@ -613,10 +629,7 @@ export const analyticsGroups = {
 
     thread_id: simpleFieldGroupping("Thread", "metadata.thread_id"),
 
-    customer_id: simpleFieldGroupping(
-      "Customer ID",
-      "metadata.customer_id"
-    ),
+    customer_id: simpleFieldGroupping("Customer ID", "metadata.customer_id"),
 
     labels: simpleFieldGroupping("Label", "metadata.labels"),
 

@@ -7,6 +7,7 @@ import { TRPCError } from "@trpc/server";
 import {
   getGroup,
   getMetric,
+  percentileToPercent,
   type TimeseriesInputType,
 } from "~/server/analytics/registry";
 import {
@@ -21,6 +22,10 @@ import {
   currentVsPreviousDates,
   generateTracesPivotQueryConditions,
 } from "../api/routers/analytics/common";
+import {
+  percentileAggregationTypes,
+  type PercentileAggregationTypes,
+} from "./types";
 
 const labelsMapping: Partial<
   Record<
@@ -52,7 +57,6 @@ export const timeseries = async (input: TimeseriesInputType) => {
       typeof input.timeScale === "number" ? input.timeScale : undefined
     );
 
-  let runtimeMappings: Record<string, MappingRuntimeField> = {};
   let aggs = Object.fromEntries(
     input.series.flatMap(
       ({ metric, aggregation, pipeline, key, subkey }: SeriesInputType) => {
@@ -80,11 +84,14 @@ export const timeseries = async (input: TimeseriesInputType) => {
         let aggregationQuery: Record<string, AggregationsAggregationContainer> =
           metricAggregations;
         if (pipeline) {
-          const pipelineBucketsPath = `${metric}.${aggregation}.${pipeline.field}`;
+          // Fix needed for OpenSearch, it doesn't support dots in field names when referenced from buckets_path
+          const metricWithoutDots = metric.replace(/\./g, "__");
+          const pipelineBucketsPath = `${metricWithoutDots}__${aggregation}__${pipeline.field}`;
           const metricPath = metric_
             .extractionPath(aggregation, key, subkey)
             // Fix for working with percentiles too
-            .split(">values")[0];
+            .split(">values")[0]
+            ?.replace(/\./g, "__");
           const pipelinePath_ = pipelinePath(metric, aggregation, pipeline);
 
           aggregationQuery = {
@@ -97,17 +104,18 @@ export const timeseries = async (input: TimeseriesInputType) => {
             },
             [pipelinePath_]: {
               [pipelineAggregationsToElasticSearch[pipeline.aggregation]]: {
-                buckets_path: `${pipelineBucketsPath}>${metricPath}`,
+                buckets_path:
+                  `${pipelineBucketsPath}>${metricPath}` +
+                  (percentileAggregationTypes.includes(aggregation as any)
+                    ? `.${
+                        percentileToPercent[
+                          aggregation as PercentileAggregationTypes
+                        ]
+                      }`
+                    : ""),
                 gap_policy: "insert_zeros",
               },
             },
-          };
-        }
-
-        if (metric_.runtimeMappings) {
-          runtimeMappings = {
-            ...runtimeMappings,
-            ...metric_.runtimeMappings,
           };
         }
 
@@ -135,9 +143,6 @@ export const timeseries = async (input: TimeseriesInputType) => {
   const queryBody: SearchRequest["body"] = {
     size: 0,
     query: pivotIndexConditions,
-    ...(Object.keys(runtimeMappings).length > 0
-      ? { runtime_mappings: runtimeMappings }
-      : {}),
     aggs:
       input.timeScale === "full"
         ? {

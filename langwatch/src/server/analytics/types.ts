@@ -19,7 +19,6 @@ export type AnalyticsMetric = {
   requiresSubkey?: {
     filter: FilterField;
   };
-  runtimeMappings?: Record<string, MappingRuntimeField>;
   allowedAggregations: AggregationTypes[];
   aggregation: (
     aggregation: AggregationTypes,
