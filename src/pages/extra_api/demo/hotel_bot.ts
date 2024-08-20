@@ -4,7 +4,9 @@ import { env } from "../../../../langwatch/langwatch/src/env.mjs";
 
 import type { NextApiRequest, NextApiResponse } from "next";
 
-const openai = new OpenAI();
+const openai = new OpenAI({
+  apiKey: env.OPENAI_API_KEY ?? "bogus",
+});
 
 const guestQueries = [
   "Room Assistance",
