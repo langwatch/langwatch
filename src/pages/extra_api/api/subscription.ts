@@ -119,6 +119,7 @@ export const subscriptionRouter = () =>
           const session = await stripe.checkout.sessions.create({
             mode: "subscription",
             customer: customerId,
+            automatic_tax: { enabled: true },
             line_items: [
               {
                 price: prices[input.plan],
@@ -128,6 +129,18 @@ export const subscriptionRouter = () =>
             success_url: `${input.baseUrl}/settings/subscription?success`,
             cancel_url: `${input.baseUrl}/settings/subscription`,
             billing_address_collection: "required",
+
+            custom_fields: [
+              {
+                key: "vat_number",
+                label: {
+                  type: "custom",
+                  custom: "VAT Number (For EU business customers)",
+                },
+                type: "text",
+                optional: true, // Set to false if you want to make it required
+              },
+            ],
             client_reference_id: `subscription_setup_${subscription.id}`,
           });
 
