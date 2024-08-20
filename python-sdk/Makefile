@@ -13,6 +13,8 @@ example:
 	@args="$(filter-out $@,$(MAKECMDGOALS))"; \
 	if [[ $$args =~ "fastapi" ]]; then \
 		poetry run python $$args; \
+	elif [[ $$args =~ "streamlit" ]]; then \
+		poetry run streamlit run $$args; \
 	else \
 		poetry run chainlit run -w $$args; \
 	fi

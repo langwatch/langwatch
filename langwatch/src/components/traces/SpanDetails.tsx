@@ -65,6 +65,14 @@ export function SpanDetails({
             {new Date(span.timestamps.started_at).toISOString()}
           </Text>
         </HStack>
+        {span.timestamps.first_token_at && (
+          <HStack>
+            <Text>
+              <b>Time to first token:</b>{" "}
+            </Text>
+            <SpanDuration span={span} renderFirstTokenDuration />
+          </HStack>
+        )}
         <HStack>
           <Text>
             <b>Duration:</b>
@@ -279,16 +287,27 @@ export const SpanTypeTag = ({ span }: { span: ElasticSearchSpan }) => {
   );
 };
 
-export const SpanDuration = ({ span }: { span: ElasticSearchSpan }) => {
-  const duration = span.timestamps.finished_at - span.timestamps.started_at;
+export const SpanDuration = ({
+  span,
+  renderFirstTokenDuration = false,
+}: {
+  span: ElasticSearchSpan;
+  renderFirstTokenDuration?: boolean;
+}) => {
+  const startedAt = span.timestamps.started_at;
+  const finishedAt = renderFirstTokenDuration
+    ? span.timestamps.first_token_at ?? startedAt
+    : span.timestamps.finished_at;
+  const duration = finishedAt - startedAt;
 
   return (
     <Tooltip
       label={
         <>
-          Started at: {new Date(span.timestamps.started_at).toLocaleString()}
+          Started at: {new Date(startedAt).toLocaleString()}
           <br />
-          Finished at: {new Date(span.timestamps.finished_at).toLocaleString()}
+          {renderFirstTokenDuration ? "First token at" : "Finished at"}:{" "}
+          {new Date(finishedAt).toLocaleString()}
         </>
       }
     >

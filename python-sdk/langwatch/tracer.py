@@ -123,6 +123,7 @@ class ContextSpan:
         self._capture_input = capture_input
         self._capture_output = capture_output
         self._ignore_missing_trace_warning = ignore_missing_trace_warning
+        self.timestamps = SpanTimestamps(started_at=milliseconds_timestamp())
         self.update(
             span_id=span_id or f"span_{nanoid.generate()}",
             name=name,
@@ -130,8 +131,7 @@ class ContextSpan:
             input=input,
             output=output,
             error=error,
-            timestamps=timestamps
-            or SpanTimestamps(started_at=milliseconds_timestamp()),
+            timestamps=timestamps,
             contexts=contexts,
             model=model,
             params=params,
@@ -274,7 +274,10 @@ class ContextSpan:
         if error:
             self.error = error
         if timestamps:
-            self.timestamps = timestamps
+            if self.timestamps:
+                self.timestamps = {**self.timestamps, **timestamps}
+            else:
+                self.timestamps = timestamps
         if contexts:
             if self.type == "rag":
                 self.contexts = contexts
@@ -325,15 +328,10 @@ class ContextSpan:
             input=input,
             output=output,
             error=error,
-            timestamps=timestamps
-            or SpanTimestamps(
-                started_at=(
-                    self.timestamps["started_at"]
-                    if "started_at" in self.timestamps
-                    else finished_at
-                ),
-                finished_at=finished_at,
-            ),
+            timestamps={
+                "finished_at": finished_at,
+                **(timestamps or {}),
+            },
             contexts=contexts,
             model=model,
             params=params,
