@@ -187,19 +187,79 @@ export function MessagesTable() {
     });
   };
 
-  const headerColumns: Record<
-    string,
-    {
-      name: string;
-      sortable: boolean;
-      width?: number;
-      render: (trace: TraceWithGuardrail, index: number) => React.ReactNode;
-      value: (
-        trace: TraceWithGuardrail,
-        evaluations: ElasticSearchEvaluation[]
-      ) => string | number | Date;
-    }
-  > = {
+  type HeaderColumn = {
+    name: string;
+    sortable: boolean;
+    width?: number;
+    render: (trace: TraceWithGuardrail, index: number) => React.ReactNode;
+    value: (
+      trace: TraceWithGuardrail,
+      evaluations: ElasticSearchEvaluation[]
+    ) => string | number | Date;
+  };
+
+  const headerColumnForEvaluation = ({
+    columnKey,
+    checkName,
+  }: {
+    columnKey: string;
+    checkName: string;
+  }): HeaderColumn => {
+    return {
+      name: checkName,
+      sortable: true,
+      render: (trace, index) => {
+        const checkId = columnKey.split(".")[1];
+        const traceCheck = traceGroups.data?.traceChecks?.[
+          trace.trace_id
+        ]?.find(
+          (traceCheck_: ElasticSearchEvaluation) =>
+            traceCheck_.check_id === checkId
+        );
+        const evaluator = getEvaluatorDefinitions(traceCheck?.check_type ?? "");
+
+        return (
+          <Td
+            key={index}
+            onClick={() =>
+              openDrawer("traceDetails", {
+                traceId: trace.trace_id,
+              })
+            }
+          >
+            <Tooltip label={traceCheck?.details}>
+              {traceCheck?.status === "processed" ? (
+                <Text color={checkStatusColorMap(traceCheck)}>
+                  {evaluator?.isGuardrail
+                    ? traceCheck.passed
+                      ? "Passed"
+                      : "Failed"
+                    : traceCheck.score !== undefined
+                    ? numeral(traceCheck.score).format("0.[00]")
+                    : "N/A"}
+                </Text>
+              ) : (
+                <Text color={traceCheck ? checkStatusColorMap(traceCheck) : ""}>
+                  {titleCase(traceCheck?.status ?? "-")}
+                </Text>
+              )}
+            </Tooltip>
+          </Td>
+        );
+      },
+      value: (_trace: Trace, evaluations: ElasticSearchEvaluation[]) => {
+        const checkId = columnKey.split(".")[1];
+        const traceCheck = evaluations.find(
+          (evaluation) => evaluation.check_id === checkId
+        );
+        return traceCheck?.status === "processed"
+          ? numeral(traceCheck?.score).format("0.[00]")
+          : traceCheck?.status ?? "-";
+      },
+    };
+  };
+
+  const headerColumns: Record<string, HeaderColumn> = {
     checked: {
       name: "",
       sortable: false,
@@ -500,83 +560,30 @@ export function MessagesTable() {
       Object.entries(traceCheckColumnsAvailable).map(
         ([columnKey, checkName]) => [
           columnKey,
-          {
-            name: checkName,
-            sortable: true,
-            render: (trace, index) => {
-              const checkId = columnKey.split(".")[1];
-              const traceCheck = traceGroups.data?.traceChecks?.[
-                trace.trace_id
-              ]?.find(
-                (traceCheck_: ElasticSearchEvaluation) => traceCheck_.check_id === checkId
-              );
-              const evaluator = getEvaluatorDefinitions(
-                traceCheck?.check_type ?? ""
-              );
-
-              return (
-                <Td
-                  key={index}
-                  onClick={() =>
-                    openDrawer("traceDetails", {
-                      traceId: trace.trace_id,
-                    })
-                  }
-                >
-                  <Tooltip label={traceCheck?.details}>
-                    {traceCheck?.status === "processed" ? (
-                      <Text color={checkStatusColorMap(traceCheck)}>
-                        {evaluator?.isGuardrail
-                          ? traceCheck.passed
-                            ? "Passed"
-                            : "Failed"
-                          : traceCheck.score !== undefined
-                          ? numeral(traceCheck.score).format("0.[00]")
-                          : "N/A"}
-                      </Text>
-                    ) : (
-                      <Text
-                        color={
-                          traceCheck ? checkStatusColorMap(traceCheck) : ""
-                        }
-                      >
-                        {titleCase(traceCheck?.status ?? "-")}
-                      </Text>
-                    )}
-                  </Tooltip>
-                </Td>
-              );
-            },
-            value: (_trace: Trace, evaluations: ElasticSearchEvaluation[]) => {
-              const checkId = columnKey.split(".")[1];
-              const traceCheck = evaluations.find(
-                (evaluation) => evaluation.check_id === checkId
-              );
-              return traceCheck?.status === "processed"
-                ? numeral(traceCheck?.score).format("0.[00]")
-                : traceCheck?.status ?? "-";
-            },
-          },
+          headerColumnForEvaluation({ columnKey, checkName }),
         ]
       )
     ),
   };
 
   const [localStorageHeaderColumns, setLocalStorageHeaderColumns] =
-    useLocalStorage<Record<keyof typeof headerColumns, boolean> | undefined>(
-      `${project?.id ?? ""}_columns`,
-      undefined
-    );
+    useLocalStorage<
+      | Record<keyof typeof headerColumns, { enabled: boolean; name: string }>
+      | undefined
+    >(`${project?.id ?? ""}_columns.v2`, undefined);
 
   const [selectedHeaderColumns, setSelectedHeaderColumns] = useState<
-    Record<keyof typeof headerColumns, boolean>
+    Record<keyof typeof headerColumns, { enabled: boolean; name: string }>
   >(
     localStorageHeaderColumns
       ? localStorageHeaderColumns
       : Object.fromEntries(
-          Object.keys(headerColumns).map((column) => [
-            column,
-            column !== "trace.trace_id",
+          Object.entries(headerColumns).map(([key, column]) => [
+            key,
+            {
+              enabled: key !== "trace.trace_id",
+              name: column.name,
+            },
           ])
         )
   );
@@ -663,11 +670,11 @@ export function MessagesTable() {
         setSelectedHeaderColumns((prevSelectedHeaderColumns) => ({
           ...prevSelectedHeaderColumns,
           ...Object.fromEntries(
-            Object.keys(traceCheckColumnsAvailable)
+            Object.entries(traceCheckColumnsAvailable)
               .filter(
-                (key) => !Object.keys(prevSelectedHeaderColumns).includes(key)
+                ([key]) => !Object.keys(prevSelectedHeaderColumns).includes(key)
               )
-              .map((column) => [column, true])
+              .map(([key, name]) => [key, { enabled: true, name }])
           ),
         }));
       }
@@ -677,7 +684,7 @@ export function MessagesTable() {
   const { isOpen, onOpen, onClose } = useDisclosure();
   const checkedHeaderColumnsEntries = Object.entries(
     selectedHeaderColumns
-  ).filter(([_, checked]) => checked);
+  ).filter(([_, { enabled }]) => enabled);
 
   const downloadCSV = async (selection = false) => {
     const traceGroups_ = selection
@@ -704,6 +711,19 @@ export function MessagesTable() {
 
     const evaluations = traceGroups_.traceChecks;
 
+    const getValueForColumn = (trace: Trace, column: string, name: string) => {
+      return (
+        headerColumns[column]?.value?.(
+          trace,
+          evaluations[trace.trace_id] ?? []
+        ) ??
+        headerColumnForEvaluation({
+          columnKey: column,
+          checkName: name,
+        }).value(trace, evaluations[trace.trace_id] ?? [])
+      );
+    };
+
     let csv;
     if (selection) {
       csv = traceGroups_.groups
@@ -711,12 +731,8 @@ export function MessagesTable() {
           traceGroup
             .filter((trace) => selectedTraceIds.includes(trace.trace_id))
             .map((trace) =>
-              checkedHeaderColumnsEntries_.map(
-                ([column, _]) =>
-                  headerColumns[column]?.value?.(
-                    trace,
-                    evaluations[trace.trace_id] ?? []
-                  ) ?? ""
+              checkedHeaderColumnsEntries_.map(([column, { name }]) =>
+                getValueForColumn(trace, column, name)
               )
             )
         )
@@ -726,25 +742,19 @@ export function MessagesTable() {
         traceGroup.map((trace) =>
           checkedHeaderColumnsEntries_
             .filter(([column, _]) => column !== "checked")
-            .map(
-              ([column, _]) =>
-                headerColumns[column]?.value?.(
-                  trace,
-                  evaluations[trace.trace_id] ?? []
-                ) ?? ""
-            )
+            .map(([column, { name }]) => getValueForColumn(trace, column, name))
         )
       );
     }
 
     const fields = checkedHeaderColumnsEntries_
-      .map(([columnKey, _]) => {
-        return headerColumns[columnKey]?.name;
+      .map(([_, { name }]) => {
+        return name;
       })
       .filter((field) => field !== undefined);
 
     const csvBlob = Parse.unparse({
-      fields: fields as string[],
+      fields: fields,
       data: csv ?? [],
     });
 
@@ -827,23 +837,34 @@ export function MessagesTable() {
               </PopoverHeader>
               <PopoverBody padding={4}>
                 <VStack align="start" spacing={2}>
-                  {Object.entries(headerColumns).map(([columnKey, column]) => {
+                  {Object.entries({
+                    ...headerColumns,
+                    ...selectedHeaderColumns,
+                  }).map(([columnKey, column]) => {
                     if (columnKey === "checked") {
                       return null;
                     }
                     return (
                       <Checkbox
                         key={columnKey}
-                        isChecked={selectedHeaderColumns[columnKey]}
+                        isChecked={selectedHeaderColumns[columnKey]?.enabled}
                         onChange={() => {
                           setSelectedHeaderColumns({
                             ...selectedHeaderColumns,
-                            [columnKey]: !selectedHeaderColumns[columnKey],
+                            [columnKey]: {
+                              enabled:
+                                !selectedHeaderColumns[columnKey]?.enabled,
+                              name: column.name,
+                            },
                           });
 
                           setLocalStorageHeaderColumns({
                             ...selectedHeaderColumns,
-                            [columnKey]: !selectedHeaderColumns[columnKey],
+                            [columnKey]: {
+                              enabled:
+                                !selectedHeaderColumns[columnKey]?.enabled,
+                              name: column.name,
+                            },
                           });
                         }}
                       >
@@ -873,12 +894,12 @@ export function MessagesTable() {
                   <Thead>
                     <Tr>
                       {checkedHeaderColumnsEntries
-                        .filter(([_, checked]) => checked)
-                        .map(([columnKey, _], index) => (
+                        .filter(([_, { enabled }]) => enabled)
+                        .map(([columnKey, { name }], index) => (
                           <Th key={index}>
                             <HStack spacing={1}>
                               <Text width={headerColumns[columnKey]?.width}>
-                                {headerColumns[columnKey]?.name}
+                                {name}
                               </Text>
                               {headerColumns[columnKey]?.sortable &&
                                 sortButton(columnKey)}
@@ -892,8 +913,12 @@ export function MessagesTable() {
                       traceGroup.map((trace) => (
                         <Tr key={trace.trace_id} role="button" cursor="pointer">
                           {checkedHeaderColumnsEntries.map(
-                            ([column, _], index) =>
-                              headerColumns[column]?.render(trace, index)
+                            ([column, { name }], index) =>
+                              headerColumns[column]?.render(trace, index) ??
+                              headerColumnForEvaluation({
+                                columnKey: column,
+                                checkName: name,
+                              })?.render(trace, index)
                           )}
                         </Tr>
                       ))
