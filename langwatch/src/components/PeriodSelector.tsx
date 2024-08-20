@@ -164,7 +164,9 @@ export function PeriodSelector({
                 <Input
                   type="date"
                   value={format(startDate, "yyyy-MM-dd")}
-                  onChange={(e) => setPeriod(new Date(e.target.value), endDate)}
+                  onChange={(e) =>
+                    setPeriod(startOfDay(new Date(e.target.value)), endDate)
+                  }
                 />
               </FormControl>
               <FormControl>
