@@ -28,6 +28,13 @@ export const esClient = process.env.IS_OPENSEARCH
     }) as unknown as ElasticClient)
   : new ElasticClient({
       node: env.ELASTICSEARCH_NODE_URL,
+      ...(env.ELASTICSEARCH_API_KEY
+        ? {
+            auth: {
+              apiKey: env.ELASTICSEARCH_API_KEY,
+            },
+          }
+        : {}),
     });
 
 export const FLATENNED_TYPE = process.env.IS_OPENSEARCH
