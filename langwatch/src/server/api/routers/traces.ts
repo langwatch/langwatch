@@ -509,7 +509,7 @@ export const getAllTracesForProject = async (
               num_candidates: 100,
             },
             rank: {
-              rrf: { rank_window_size: 100 },
+              rrf: { window_size: 100 },
             },
             // Ensures proper filters are applied even with knn
             post_filter: pivotIndexConditions,

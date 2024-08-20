@@ -27,7 +27,7 @@ export const esClient = env.IS_OPENSEARCH
       node: env.ELASTICSEARCH_NODE_URL,
     }) as unknown as ElasticClient)
   : new ElasticClient({
-      node: env.ELASTICSEARCH_NODE_URL,
+      node: env.ELASTICSEARCH_NODE_URL ?? "http://bogus:9200",
       ...(env.ELASTICSEARCH_API_KEY
         ? {
             auth: {
@@ -41,31 +41,31 @@ export const FLATENNED_TYPE = env.IS_OPENSEARCH ? "flat_object" : "flattened";
 
 // @ts-ignore
 if (process.env.IS_OPENSEARCH) {
-  const originalExists = esClient.indices.exists;
+  const originalExists = esClient.indices.exists.bind(esClient.indices);
   // @ts-ignore
   esClient.indices.exists = async (...params) => {
     // @ts-ignore
-    return (await originalExists.bind(esClient.indices)(...params)).body;
+    return (await originalExists(...params)).body;
   };
 
-  const originalSearch = esClient.search;
+  const originalSearch = esClient.search.bind(esClient);
   // @ts-ignore
   esClient.search = async (...params) => {
     // @ts-ignore
-    return (await originalSearch.bind(esClient)(...params)).body;
+    return (await originalSearch(...params)).body;
   };
 
-  const originalCatIndices = esClient.cat.indices;
+  const originalCatIndices = esClient.cat.indices.bind(esClient.cat);
   // @ts-ignore
   esClient.cat.indices = async (...params) => {
     // @ts-ignore
-    return (await originalCatIndices.bind(esClient.cat)(...params)).body;
+    return (await originalCatIndices(...params)).body;
   };
 
-  const originalIndicesCreate = esClient.indices.create;
+  const originalIndicesCreate = esClient.indices.create.bind(esClient.indices);
   // @ts-ignore
   esClient.indices.create = async (params: any) => {
-    let params_ = { ...params };
+    const params_ = { ...params };
     if (params_.settings) {
       if (!params_.body) {
         params_.body = {};
@@ -81,13 +81,13 @@ if (process.env.IS_OPENSEARCH) {
       delete params_.mappings;
     }
     // @ts-ignore
-    return (await originalIndicesCreate.bind(esClient.indices)(params_)).body;
+    return (await originalIndicesCreate(params_)).body;
   };
 
-  const originalIndicesPutMapping = esClient.indices.putMapping;
+  const originalIndicesPutMapping = esClient.indices.putMapping.bind(esClient.indices);
   // @ts-ignore
   esClient.indices.putMapping = async (params: any) => {
-    let params_ = { ...params };
+    const params_ = { ...params };
     if (params_.properties) {
       if (!params_.body) {
         params_.body = {};
@@ -96,17 +96,15 @@ if (process.env.IS_OPENSEARCH) {
       delete params_.properties;
     }
 
-    const result = await originalIndicesPutMapping.bind(esClient.indices)(
-      params_
-    );
+    const result = await originalIndicesPutMapping(params_);
     // @ts-ignore
     return result.body;
   };
 
-  const originalIndicesPutAlias = esClient.indices.putAlias;
+  const originalIndicesPutAlias = esClient.indices.putAlias.bind(esClient.indices);
   // @ts-ignore
   esClient.indices.putAlias = async (params: any) => {
-    let params_ = { ...params };
+    const params_ = { ...params };
     if (params_.is_write_index) {
       if (!params_.body) {
         params_.body = {};
@@ -116,7 +114,7 @@ if (process.env.IS_OPENSEARCH) {
     }
 
     // @ts-ignore
-    return (await originalIndicesPutAlias.bind(esClient.indices)(params_)).body;
+    return (await originalIndicesPutAlias(params_)).body;
   };
 }
 
