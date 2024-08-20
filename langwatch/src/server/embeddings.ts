@@ -46,7 +46,7 @@ export const getOpenAIEmbeddings = async (text: string, projectId: string) => {
     return undefined;
   }
   const openai = new OpenAI({
-    apiKey: env.OPENAI_API_KEY,
+    apiKey: env.OPENAI_API_KEY ?? "bogus",
   });
 
   const response = await openai.embeddings.create({

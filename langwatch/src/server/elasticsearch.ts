@@ -22,7 +22,7 @@ export const DSPY_STEPS_INDEX: IndexSpec = {
 
 export const OPENAI_EMBEDDING_DIMENSION = 1536;
 
-export const esClient = process.env.IS_OPENSEARCH
+export const esClient = env.IS_OPENSEARCH
   ? (new OpenSearchClient({
       node: env.ELASTICSEARCH_NODE_URL,
     }) as unknown as ElasticClient)
@@ -37,9 +37,7 @@ export const esClient = process.env.IS_OPENSEARCH
         : {}),
     });
 
-export const FLATENNED_TYPE = process.env.IS_OPENSEARCH
-  ? "flat_object"
-  : "flattened";
+export const FLATENNED_TYPE = env.IS_OPENSEARCH ? "flat_object" : "flattened";
 
 // @ts-ignore
 if (process.env.IS_OPENSEARCH) {

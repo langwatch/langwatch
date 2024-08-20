@@ -1,31 +1,38 @@
 import { createEnv } from "@t3-oss/env-nextjs";
 import { z } from "zod";
 
+// @ts-ignore
+const optionalIfBuildTime = (schema) => {
+  return process.env.BUILD_TIME ? schema.optional() : schema;
+};
+
 export const env = createEnv({
   /**
    * Specify your server-side environment variables schema here. This way you can ensure the app
    * isn't built with invalid env vars.
    */
   server: {
-    DATABASE_URL: z.string().url(),
+    DATABASE_URL: optionalIfBuildTime(z.string().url()),
     NODE_ENV: z.enum(["development", "test", "production"]),
-    BASE_HOST: z.string().min(1),
+    BASE_HOST: optionalIfBuildTime(z.string().min(1)),
     NEXTAUTH_PROVIDER: z.enum(["auth0", "email"]),
-    NEXTAUTH_SECRET: z.string().min(1),
-    NEXTAUTH_URL: z.preprocess(
-      // This makes Vercel deployments not fail if you don't set NEXTAUTH_URL
-      // Since NextAuth.js automatically uses the VERCEL_URL if present.
-      (str) => process.env.VERCEL_URL ?? str,
-      // VERCEL_URL doesn't include `https` so it cant be validated as a URL
-      process.env.VERCEL ? z.string().min(1) : z.string().url()
+    NEXTAUTH_SECRET: optionalIfBuildTime(z.string().min(1)),
+    NEXTAUTH_URL: optionalIfBuildTime(
+      z.preprocess(
+        // This makes Vercel deployments not fail if you don't set NEXTAUTH_URL
+        // Since NextAuth.js automatically uses the VERCEL_URL if present.
+        (str) => process.env.VERCEL_URL ?? str,
+        // VERCEL_URL doesn't include `https` so it cant be validated as a URL
+        process.env.VERCEL ? z.string().min(1) : z.string().url()
+      )
     ),
     AUTH0_CLIENT_ID: z.string().optional(),
     AUTH0_CLIENT_SECRET: z.string().optional(),
     AUTH0_ISSUER: z.string().optional(),
-    API_TOKEN_JWT_SECRET: z.string().min(1),
-    ELASTICSEARCH_NODE_URL: z.string().min(1),
+    API_TOKEN_JWT_SECRET: optionalIfBuildTime(z.string().min(1)),
+    ELASTICSEARCH_NODE_URL: optionalIfBuildTime(z.string().min(1)),
     ELASTICSEARCH_API_KEY: z.string().optional(),
-    REDIS_URL: z.string().min(1),
+    REDIS_URL: optionalIfBuildTime(z.string().min(1)),
     GOOGLE_APPLICATION_CREDENTIALS: z.string().optional(),
     AZURE_OPENAI_ENDPOINT: z.string().optional(),
     AZURE_OPENAI_KEY: z.string().optional(),
