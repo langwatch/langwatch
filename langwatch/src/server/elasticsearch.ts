@@ -98,9 +98,11 @@ if (process.env.IS_OPENSEARCH) {
       delete params_.properties;
     }
 
+    const result = await originalIndicesPutMapping.bind(esClient.indices)(
+      params_
+    );
     // @ts-ignore
-    return (await originalIndicesPutMapping.bind(esClient.indices)(params_))
-      .body;
+    return result.body;
   };
 
   const originalIndicesPutAlias = esClient.indices.putAlias;
