@@ -119,7 +119,6 @@ export const subscriptionRouter = () =>
           const session = await stripe.checkout.sessions.create({
             mode: "subscription",
             customer: customerId,
-            automatic_tax: { enabled: true },
             line_items: [
               {
                 price: prices[input.plan],
