@@ -66,7 +66,7 @@ if (process.env.IS_OPENSEARCH) {
 
   const originalIndicesCreate = esClient.indices.create;
   // @ts-ignore
-  esClient.indices.create = async (params) => {
+  esClient.indices.create = async (params: any) => {
     let params_ = { ...params };
     if (params_.settings) {
       if (!params_.body) {
@@ -88,7 +88,7 @@ if (process.env.IS_OPENSEARCH) {
 
   const originalIndicesPutMapping = esClient.indices.putMapping;
   // @ts-ignore
-  esClient.indices.putMapping = async (params) => {
+  esClient.indices.putMapping = async (params: any) => {
     let params_ = { ...params };
     if (params_.properties) {
       if (!params_.body) {
@@ -105,7 +105,7 @@ if (process.env.IS_OPENSEARCH) {
 
   const originalIndicesPutAlias = esClient.indices.putAlias;
   // @ts-ignore
-  esClient.indices.putAlias = async (params) => {
+  esClient.indices.putAlias = async (params: any) => {
     let params_ = { ...params };
     if (params_.is_write_index) {
       if (!params_.body) {
