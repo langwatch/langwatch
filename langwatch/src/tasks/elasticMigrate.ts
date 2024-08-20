@@ -40,7 +40,9 @@ export default async function execute() {
     }
     console.log(
       "\x1b[33m%s\x1b[0m",
-      "Migration index not found, creating Elasticsearch indexes from scratch"
+      `Migration index not found, creating ${
+        process.env.IS_OPENSEARCH ? "OpenSearch" : "Elasticsearch"
+      } indexes from scratch`
     );
     await createIndexes(lastMigration);
     await new Promise((resolve) => setTimeout(resolve, 3000));
@@ -50,7 +52,9 @@ export default async function execute() {
   if (migrationsToExecute.length === 0) {
     console.log(
       "\x1b[32m%s\x1b[0m",
-      "Elasticsearch is up to date, no migrations to execute"
+      `${
+        process.env.IS_OPENSEARCH ? "OpenSearch" : "Elasticsearch"
+      } is up to date, no migrations to execute`
     );
     return;
   }
