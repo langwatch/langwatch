@@ -1,7 +1,4 @@
-import type {
-  AggregationsAggregationContainer,
-  MappingRuntimeField,
-} from "@elastic/elasticsearch/lib/api/types";
+import type { AggregationsAggregationContainer } from "@elastic/elasticsearch/lib/api/types";
 import type { SearchRequest } from "@elastic/elasticsearch/lib/api/typesWithBodyKey";
 import { TRPCError } from "@trpc/server";
 import {
@@ -26,7 +23,6 @@ import {
   percentileAggregationTypes,
   type PercentileAggregationTypes,
 } from "./types";
-import { semanticSearch } from "../api/routers/traces";
 
 const labelsMapping: Partial<
   Record<

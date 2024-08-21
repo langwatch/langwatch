@@ -715,7 +715,7 @@ export function MessagesTable() {
 
     const evaluations = traceGroups_.traceChecks;
 
-    const getValueForColumn = (trace: Trace, column: string, name: string) => {
+    const getValueForColumn = (trace: TraceWithGuardrail, column: string, name: string) => {
       return (
         headerColumns[column]?.value?.(
           trace,

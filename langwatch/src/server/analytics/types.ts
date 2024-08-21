@@ -1,7 +1,4 @@
-import type {
-  AggregationsAggregationContainer,
-  MappingRuntimeField,
-} from "@elastic/elasticsearch/lib/api/types";
+import type { AggregationsAggregationContainer } from "@elastic/elasticsearch/lib/api/types";
 import { z } from "zod";
 import type { RotatingColorSet } from "../../utils/rotatingColors";
 import type { DeepRequired, Unpacked } from "../../utils/types";
