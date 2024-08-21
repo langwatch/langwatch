@@ -41,6 +41,8 @@ import {
   checkUserPermissionForProject,
 } from "../permission";
 import { generateTracesPivotQueryConditions } from "./analytics/common";
+import { env } from "../../../env.mjs";
+import type { QueryDslQueryContainer } from "@opensearch-project/opensearch/api/types";
 
 const tracesFilterInput = sharedFiltersInputSchema.extend({
   pageOffset: z.number().optional(),
@@ -614,12 +616,35 @@ export const semanticSearch = async ({
 
   const embeddings = await getOpenAIEmbeddings(query, projectId);
 
-  if (!embeddings) {
-    throw new TRPCError({
-      code: "INTERNAL_SERVER_ERROR",
-      message: "Failed to get embeddings for query.",
-    });
-  }
+  const filterConditions = {
+    bool: {
+      must: [
+        {
+          bool: {
+            must: pivotIndexConditions,
+          },
+        },
+        {
+          bool: {
+            should: [
+              {
+                match: {
+                  "input.value": query,
+                },
+              },
+              {
+                match: {
+                  "output.value": query,
+                },
+              },
+            ],
+            boost: 100.0,
+            minimum_should_match: 1,
+          },
+        },
+      ],
+    },
+  } as QueryDslQueryContainer;
 
   const semanticSearchResult = await esClient.search<
     Pick<ElasticSearchTrace, "trace_id">
@@ -631,45 +656,30 @@ export const semanticSearch = async ({
       includes: ["trace_id"],
     },
     body: {
-      query: {
-        bool: {
-          must: [
-            {
-              bool: {
-                must: pivotIndexConditions,
-              },
-            },
-            {
-              bool: {
-                should: [
-                  {
-                    match: {
-                      "input.value": query,
-                    },
+      ...(env.IS_OPENSEARCH
+        ? {
+            query: filterConditions,
+          }
+        : !env.IS_OPENSEARCH
+        ? {
+            query: filterConditions,
+            ...(embeddings
+              ? {
+                  knn: {
+                    field: "input.embeddings.embeddings",
+                    query_vector: embeddings?.embeddings,
+                    k: 10,
+                    num_candidates: 100,
                   },
-                  {
-                    match: {
-                      "output.value": query,
-                    },
+                  rank: {
+                    // @ts-ignore
+                    rrf: { window_size: 10_000 },
                   },
-                ],
-                boost: 100.0,
-                minimum_should_match: 1,
-              },
-            },
-          ],
-        },
-      },
-      knn: {
-        field: "input.embeddings.embeddings",
-        query_vector: embeddings?.embeddings,
-        k: 10,
-        num_candidates: 100,
-      },
-      rank: {
-        // @ts-ignore
-        rrf: { window_size: 10_000 },
-      },
+                }
+              : {}),
+          }
+        : {}),
+
       // Ensures proper filters are applied even with knn
       post_filter: pivotIndexConditions,
     },
