@@ -243,19 +243,19 @@ export const analyticsMetrics = {
         const totalTokensScript = `
                     long promptTokens = 0;
                     long completionTokens = 0;
-          
+
                     try {
                       promptTokens = doc['metrics.prompt_tokens'].size() > 0 ? doc['metrics.prompt_tokens'].value : 0;
                     } catch (Exception e) {
                       // ignore
                     }
-          
+
                     try {
                       completionTokens = doc['metrics.completion_tokens'].size() > 0 ? doc['metrics.completion_tokens'].value : 0;
                     } catch (Exception e) {
                       // ignore
                     }
-                      
+
                     return promptTokens + completionTokens;
                   `;
         return {
@@ -942,6 +942,7 @@ export const seriesInput = z.object({
 export type SeriesInputType = z.infer<typeof seriesInput>;
 
 export const timeseriesSeriesInput = z.object({
+  query: z.optional(z.string()),
   series: z.array(seriesInput),
   groupBy: z.optional(z.enum(flattenAnalyticsGroupsEnum)),
   timeScale: z.optional(z.union([z.literal("full"), z.number().int()])),

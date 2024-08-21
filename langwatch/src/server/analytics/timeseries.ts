@@ -26,6 +26,7 @@ import {
   percentileAggregationTypes,
   type PercentileAggregationTypes,
 } from "./types";
+import { semanticSearch } from "../api/routers/traces";
 
 const labelsMapping: Partial<
   Record<
@@ -140,9 +141,17 @@ export const timeseries = async (input: TimeseriesInputType) => {
     startDate: previousPeriodStartDate.getTime(),
   });
 
+  const queryResultIds = await semanticSearch({
+    query: input.query,
+    projectId: input.projectId,
+    pivotIndexConditions,
+  });
+
   const queryBody: SearchRequest["body"] = {
     size: 0,
-    query: pivotIndexConditions,
+    query: queryResultIds
+      ? { terms: { trace_id: queryResultIds } }
+      : pivotIndexConditions,
     aggs:
       input.timeScale === "full"
         ? {

@@ -3,6 +3,7 @@ import { z } from "zod";
 import type {
   QueryDslBoolQuery,
   SearchTotalHits,
+  Sort,
 } from "@elastic/elasticsearch/lib/api/types";
 import { PublicShareResourceTypes, type PrismaClient } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
@@ -384,17 +385,6 @@ export const getAllTracesForProject = async (
   downloadMode = false,
   includeContexts = true
 ) => {
-  const embeddings = input.query
-    ? await getOpenAIEmbeddings(input.query, input.projectId)
-    : undefined;
-
-  if (input.query && !embeddings) {
-    throw new TRPCError({
-      code: "INTERNAL_SERVER_ERROR",
-      message: "Failed to get embeddings for query.",
-    });
-  }
-
   const { pivotIndexConditions } = generateTracesPivotQueryConditions(input);
 
   let pageSize = input.pageSize ? input.pageSize : 25;
@@ -416,7 +406,12 @@ export const getAllTracesForProject = async (
       )) ?? false;
   }
 
-  //@ts-ignore
+  const queryResultIds = await semanticSearch({
+    query: input.query,
+    projectId: input.projectId,
+    pivotIndexConditions,
+  });
+
   const tracesResult = await esClient.search<ElasticSearchTrace>({
     index: TRACE_INDEX.alias,
     from: pageOffset,
@@ -457,15 +452,6 @@ export const getAllTracesForProject = async (
           },
         }
       : {}),
-    ...(!input.query
-      ? {
-          sort: {
-            "timestamps.started_at": {
-              order: "desc",
-            },
-          },
-        }
-      : {}),
     body: {
       query: {
         bool: {
@@ -475,47 +461,66 @@ export const getAllTracesForProject = async (
                 must: pivotIndexConditions,
               },
             },
-            ...(input.query
+            ...(queryResultIds
               ? [
                   {
                     bool: {
-                      should: [
-                        {
-                          match: {
-                            "input.value": input.query,
-                          },
+                      must: {
+                        terms: {
+                          trace_id: queryResultIds,
                         },
-                        {
-                          match: {
-                            "output.value": input.query,
-                          },
-                        },
-                      ],
-                      boost: 100.0,
-                      minimum_should_match: 1,
+                      },
                     },
                   },
                 ]
               : []),
-          ],
-        },
+          ] as QueryDslBoolQuery["must"],
+        } as QueryDslBoolQuery,
       },
-      ...(input.query
-        ? {
-            knn: {
-              field: "input.embeddings.embeddings",
-              query_vector: embeddings?.embeddings,
-              k: 10,
-              num_candidates: 100,
-            },
-            rank: {
-              rrf: { rank_window_size: 100 },
-            },
-            // Ensures proper filters are applied even with knn
-            post_filter: pivotIndexConditions,
-          }
-        : {}),
     },
+    ...(input.sortBy
+      ? input.sortBy.startsWith("random.")
+        ? {
+            sort: {
+              _script: {
+                type: "number",
+                script: {
+                  source: "Math.random()",
+                },
+                order: input.sortDirection ?? "desc",
+              },
+            } as Sort,
+          }
+        : input.sortBy.startsWith("evaluations.")
+        ? {
+            sort: {
+              "evaluations.score": {
+                order: input.sortDirection ?? "desc",
+                nested: {
+                  path: "evaluations",
+                  filter: {
+                    term: {
+                      "evaluations.check_id": input.sortBy.split(".")[1],
+                    },
+                  },
+                },
+              },
+            } as Sort,
+          }
+        : {
+            sort: {
+              [input.sortBy]: {
+                order: input.sortDirection ?? "desc",
+              },
+            } as Sort,
+          }
+      : {
+          sort: {
+            "timestamps.started_at": {
+              order: "desc",
+            },
+          } as Sort,
+        }),
   });
 
   const guardrailsSlugToName = Object.fromEntries(
@@ -594,6 +599,85 @@ export const getAllTracesForProject = async (
   );
 
   return { groups, totalHits, traceChecks: evaluations };
+};
+
+export const semanticSearch = async ({
+  query,
+  projectId,
+  pivotIndexConditions,
+}: {
+  query: string | undefined;
+  projectId: string;
+  pivotIndexConditions: QueryDslBoolQuery["must"];
+}): Promise<string[] | undefined> => {
+  if (!query) return undefined;
+
+  const embeddings = await getOpenAIEmbeddings(query, projectId);
+
+  if (!embeddings) {
+    throw new TRPCError({
+      code: "INTERNAL_SERVER_ERROR",
+      message: "Failed to get embeddings for query.",
+    });
+  }
+
+  const semanticSearchResult = await esClient.search<
+    Pick<ElasticSearchTrace, "trace_id">
+  >({
+    index: TRACE_INDEX.alias,
+    from: 0,
+    size: 10_000,
+    _source: {
+      includes: ["trace_id"],
+    },
+    body: {
+      query: {
+        bool: {
+          must: [
+            {
+              bool: {
+                must: pivotIndexConditions,
+              },
+            },
+            {
+              bool: {
+                should: [
+                  {
+                    match: {
+                      "input.value": query,
+                    },
+                  },
+                  {
+                    match: {
+                      "output.value": query,
+                    },
+                  },
+                ],
+                boost: 100.0,
+                minimum_should_match: 1,
+              },
+            },
+          ],
+        },
+      },
+      knn: {
+        field: "input.embeddings.embeddings",
+        query_vector: embeddings?.embeddings,
+        k: 10,
+        num_candidates: 100,
+      },
+      rank: {
+        // @ts-ignore
+        rrf: { window_size: 10_000 },
+      },
+      // Ensures proper filters are applied even with knn
+      post_filter: pivotIndexConditions,
+    },
+  });
+
+  return semanticSearchResult.hits.hits
+    .map((hit) => hit._source?.trace_id)
+    .filter((id): id is string => id !== undefined);
 };
 
 export const getSpansForTraceIds = async (

@@ -341,7 +341,7 @@ export const DashboardLayout = ({
     }
   );
 
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState(router.query.query as string);
 
   if (typeof router.query.project === "string" && !isLoading && !project) {
     return <ErrorPage statusCode={404} />;

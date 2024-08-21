@@ -119,6 +119,7 @@ export const useFilterParams = () => {
     startDate: startDate.getTime(),
     endDate: endDate.getTime(),
     filters: filters,
+    ...(queryParams.query ? { query: queryParams.query as string } : {}),
   };
 
   const nonEmptyFilters = Object.values(filterParams.filters).filter((f) =>

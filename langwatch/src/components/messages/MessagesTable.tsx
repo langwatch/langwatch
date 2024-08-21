@@ -279,7 +279,7 @@ export function MessagesTable() {
       },
       value: () => "",
     },
-    "trace.trace_id": {
+    trace_id: {
       name: "ID",
       sortable: true,
       render: (trace: Trace, index: number) => (
@@ -296,7 +296,7 @@ export function MessagesTable() {
       ),
       value: (trace: Trace) => trace.trace_id,
     },
-    "trace.timestamps.started_at": {
+    "timestamps.started_at": {
       name: "Timestamp",
       sortable: true,
       render: (trace: Trace, index: number) => (
@@ -314,7 +314,7 @@ export function MessagesTable() {
       value: (trace: Trace) =>
         new Date(trace.timestamps.started_at).toLocaleString(),
     },
-    "trace.input.value": {
+    "input.value": {
       name: "Input",
       sortable: false,
       width: 300,
@@ -337,7 +337,7 @@ export function MessagesTable() {
       ),
       value: (trace: Trace) => trace.input?.value ?? "",
     },
-    "trace.output.value": {
+    "output.value": {
       name: "Output",
       sortable: false,
       width: 300,
@@ -397,7 +397,7 @@ export function MessagesTable() {
         ),
       value: (trace: Trace) => trace.output?.value ?? "",
     },
-    "trace.metrics.first_token_ms": {
+    "metrics.first_token_ms": {
       name: "First Token",
       sortable: true,
       render: (trace, index) => (
@@ -426,7 +426,7 @@ export function MessagesTable() {
           : "-";
       },
     },
-    "trace.metrics.total_time_ms": {
+    "metrics.total_time_ms": {
       name: "Completion Time",
       sortable: true,
       render: (trace, index) => (
@@ -455,7 +455,7 @@ export function MessagesTable() {
           : "-";
       },
     },
-    "trace.metrics.completion_tokens": {
+    "metrics.completion_tokens": {
       name: "Completion Token",
       sortable: true,
       render: (trace, index) => (
@@ -473,7 +473,7 @@ export function MessagesTable() {
       ),
       value: (trace: Trace) => trace.metrics?.completion_tokens ?? 0,
     },
-    "trace.metrics.prompt_tokens": {
+    "metrics.prompt_tokens": {
       name: "Prompt Tokens",
       sortable: true,
       render: (trace, index) => (
@@ -491,7 +491,7 @@ export function MessagesTable() {
       ),
       value: (trace: Trace) => trace.metrics?.prompt_tokens ?? 0,
     },
-    "trace.metrics.total_cost": {
+    "metrics.total_cost": {
       name: "Total Cost",
       sortable: true,
       render: (trace, index) => (
@@ -510,7 +510,7 @@ export function MessagesTable() {
       value: (trace: Trace) =>
         numeral(trace.metrics?.total_cost).format("$0.00[000]"),
     },
-    "trace.metadata": {
+    metadata: {
       name: "Metadata",
       sortable: true,
       render: (trace, index) => (
@@ -533,7 +533,7 @@ export function MessagesTable() {
       ),
       value: (trace: Trace) => JSON.stringify(trace.metadata),
     },
-    "trace.contexts": {
+    contexts: {
       name: "Contexts",
       sortable: true,
       render: (trace, index) => (
@@ -570,7 +570,7 @@ export function MessagesTable() {
     useLocalStorage<
       | Record<keyof typeof headerColumns, { enabled: boolean; name: string }>
       | undefined
-    >(`${project?.id ?? ""}_columns.v2`, undefined);
+    >(`${project?.id ?? ""}_columns.v3`, undefined);
 
   const [selectedHeaderColumns, setSelectedHeaderColumns] = useState<
     Record<keyof typeof headerColumns, { enabled: boolean; name: string }>
@@ -597,6 +597,10 @@ export function MessagesTable() {
       setPageOffset(pageOffset - pageSize);
     }
   };
+
+  useEffect(() => {
+    setPageOffset(0);
+  }, [router.query.query]);
 
   const changePageSize = (size: number) => {
     setPageSize(size);

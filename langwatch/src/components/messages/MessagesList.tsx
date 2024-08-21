@@ -131,6 +131,10 @@ export function MessagesList() {
     }
   };
 
+  useEffect(() => {
+    setPageOffset(0);
+  }, [router.query.query]);
+
   const changePageSize = (size: number) => {
     setPageSize(size);
     setPageOffset(0);
