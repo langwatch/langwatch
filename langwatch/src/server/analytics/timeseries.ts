@@ -141,17 +141,9 @@ export const timeseries = async (input: TimeseriesInputType) => {
     startDate: previousPeriodStartDate.getTime(),
   });
 
-  const queryResultIds = await semanticSearch({
-    query: input.query,
-    projectId: input.projectId,
-    pivotIndexConditions,
-  });
-
   const queryBody: SearchRequest["body"] = {
     size: 0,
-    query: queryResultIds
-      ? { terms: { trace_id: queryResultIds } }
-      : pivotIndexConditions,
+    query: pivotIndexConditions,
     aggs:
       input.timeScale === "full"
         ? {

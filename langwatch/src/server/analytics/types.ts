@@ -98,6 +98,7 @@ export const sharedFiltersInputSchema = z.object({
   projectId: z.string(),
   startDate: z.number(),
   endDate: z.number(),
+  query: z.string().optional(),
   filters: z.record(
     filterFieldsEnum,
     z.union([

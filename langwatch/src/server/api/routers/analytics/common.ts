@@ -31,6 +31,7 @@ export const generateTracesPivotQueryConditions = ({
   startDate,
   endDate,
   filters,
+  query,
 }: z.infer<typeof sharedFiltersInputSchema>): {
   pivotIndexConditions: QueryDslQueryContainer;
   isAnyFilterPresent: boolean;
@@ -58,8 +59,9 @@ export const generateTracesPivotQueryConditions = ({
       bool: {
         must: [
           {
-            term: { "project_id": projectId },
+            term: { project_id: projectId },
           },
+          ...(query ? [{ query_string: { query } }] : []),
           {
             range: {
               "timestamps.started_at": {

@@ -22,7 +22,6 @@ import { checkPreconditionSchema } from "../../../trace_checks/types.generated";
 
 import { sharedFiltersInputSchema } from "../../analytics/types";
 import { TRACE_INDEX, esClient, traceIndexId } from "../../elasticsearch";
-import { getOpenAIEmbeddings } from "../../embeddings";
 import {
   type ElasticSearchSpan,
   type ElasticSearchTrace,
@@ -41,8 +40,6 @@ import {
   checkUserPermissionForProject,
 } from "../permission";
 import { generateTracesPivotQueryConditions } from "./analytics/common";
-import { env } from "../../../env.mjs";
-import type { QueryDslQueryContainer } from "@opensearch-project/opensearch/api/types";
 
 const tracesFilterInput = sharedFiltersInputSchema.extend({
   pageOffset: z.number().optional(),
@@ -50,7 +47,6 @@ const tracesFilterInput = sharedFiltersInputSchema.extend({
 });
 
 const getAllForProjectInput = tracesFilterInput.extend({
-  query: z.string().optional(),
   groupBy: z.string().optional(),
   sortBy: z.string().optional(),
   sortDirection: z.string().optional(),
@@ -408,12 +404,6 @@ export const getAllTracesForProject = async (
       )) ?? false;
   }
 
-  const queryResultIds = await semanticSearch({
-    query: input.query,
-    projectId: input.projectId,
-    pivotIndexConditions,
-  });
-
   const tracesResult = await esClient.search<ElasticSearchTrace>({
     index: TRACE_INDEX.alias,
     from: pageOffset,
@@ -455,30 +445,7 @@ export const getAllTracesForProject = async (
         }
       : {}),
     body: {
-      query: {
-        bool: {
-          must: [
-            {
-              bool: {
-                must: pivotIndexConditions,
-              },
-            },
-            ...(queryResultIds
-              ? [
-                  {
-                    bool: {
-                      must: {
-                        terms: {
-                          trace_id: queryResultIds,
-                        },
-                      },
-                    },
-                  },
-                ]
-              : []),
-          ] as QueryDslBoolQuery["must"],
-        } as QueryDslBoolQuery,
-      },
+      query: pivotIndexConditions,
     },
     ...(input.sortBy
       ? input.sortBy.startsWith("random.")
@@ -601,93 +568,6 @@ export const getAllTracesForProject = async (
   );
 
   return { groups, totalHits, traceChecks: evaluations };
-};
-
-export const semanticSearch = async ({
-  query,
-  projectId,
-  pivotIndexConditions,
-}: {
-  query: string | undefined;
-  projectId: string;
-  pivotIndexConditions: QueryDslBoolQuery["must"];
-}): Promise<string[] | undefined> => {
-  if (!query) return undefined;
-
-  const embeddings = await getOpenAIEmbeddings(query, projectId);
-
-  const filterConditions = {
-    bool: {
-      must: [
-        {
-          bool: {
-            must: pivotIndexConditions,
-          },
-        },
-        {
-          bool: {
-            should: [
-              {
-                match: {
-                  "input.value": query,
-                },
-              },
-              {
-                match: {
-                  "output.value": query,
-                },
-              },
-            ],
-            boost: 100.0,
-            minimum_should_match: 1,
-          },
-        },
-      ],
-    },
-  } as QueryDslQueryContainer;
-
-  const semanticSearchResult = await esClient.search<
-    Pick<ElasticSearchTrace, "trace_id">
-  >({
-    index: TRACE_INDEX.alias,
-    from: 0,
-    size: 10_000,
-    _source: {
-      includes: ["trace_id"],
-    },
-    body: {
-      ...(env.IS_OPENSEARCH
-        ? {
-            query: filterConditions,
-          }
-        : !env.IS_OPENSEARCH
-        ? {
-            query: filterConditions,
-            ...(embeddings
-              ? {
-                  knn: {
-                    field: "input.embeddings.embeddings",
-                    query_vector: embeddings?.embeddings,
-                    k: 10,
-                    num_candidates: 100,
-                  },
-                  rank: {
-                    // @ts-ignore
-                    rrf: { window_size: 10_000 },
-                  },
-                }
-              : {}),
-          }
-        : {}),
-
-      // Ensures proper filters are applied even with knn
-      post_filter: pivotIndexConditions,
-    },
-  });
-
-  return semanticSearchResult.hits.hits
-    .map((hit) => hit._source?.trace_id)
-    .filter((id): id is string => id !== undefined);
 };
 
 export const getSpansForTraceIds = async (

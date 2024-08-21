@@ -705,7 +705,7 @@ export function MessagesTable() {
           sortBy: getSingleQueryParam(router.query.sortBy),
           sortDirection: getSingleQueryParam(router.query.orderBy),
           includeContexts: checkedHeaderColumnsEntries.some(
-            ([column, enabled]) => column === "trace.contexts" && enabled
+            ([column, enabled]) => column === "contexts" && enabled
           ),
         });
 
