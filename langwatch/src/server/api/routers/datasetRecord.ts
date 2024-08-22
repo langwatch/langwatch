@@ -3,7 +3,11 @@ import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { TeamRoleGroup, checkUserPermissionForProject } from "../permission";
 import { type DatasetRecord } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
-import { newDatasetEntriesSchema } from "../../datasets/types";
+import {
+  newDatasetEntriesSchema,
+  type DatasetColumnType,
+  type DatasetColumnTypes,
+} from "../../datasets/types";
 import { nanoid } from "nanoid";
 
 export const datasetRecordRouter = createTRPCRouter({
@@ -61,15 +65,7 @@ export const datasetRecordRouter = createTRPCRouter({
         projectId: z.string(),
         datasetId: z.string(),
         recordId: z.string(),
-        updatedRecord: z.object({
-          input: z.nullable(z.optional(z.string())),
-          expected_output: z.nullable(z.optional(z.string())),
-          spans: z.optional(z.string()),
-          contexts: z.optional(z.string()),
-          llm_input: z.optional(z.string()),
-          expected_llm_output: z.optional(z.string()),
-          comments: z.nullable(z.optional(z.string())),
-        }),
+        updatedRecord: z.record(z.string(), z.any()),
       })
     )
     .use(checkUserPermissionForProject(TeamRoleGroup.DATASETS_MANAGE))
@@ -90,36 +86,45 @@ export const datasetRecordRouter = createTRPCRouter({
 
       const { recordId, updatedRecord } = input;
 
+      const updatedData: any = {};
+      for (const [key, value] of Object.entries(updatedRecord)) {
+        const type_ = (dataset.columnTypes as DatasetColumnTypes)[key];
+        if (type_ === "string") {
+          updatedData[key] = value ?? "";
+        } else {
+          if (typeof value === "string") {
+            try {
+              updatedData[key] = JSON.parse(value);
+            } catch (e) {
+              updatedData[key] = value;
+            }
+          } else {
+            updatedData[key] = value;
+          }
+        }
+      }
+
       const record = await ctx.prisma.datasetRecord.findUnique({
         where: { id: recordId, projectId: dataset.projectId },
       });
 
-      if (!record) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Record not found",
+      if (record) {
+        await ctx.prisma.datasetRecord.update({
+          where: { id: recordId, projectId: dataset.projectId },
+          data: {
+            entry: updatedData,
+          },
+        });
+      } else {
+        await ctx.prisma.datasetRecord.create({
+          data: {
+            id: recordId,
+            entry: updatedData,
+            datasetId: input.datasetId,
+            projectId: input.projectId,
+          },
         });
       }
-
-      const updatedData: any = {};
-      for (const key in updatedRecord) {
-        if (
-          key === "input" ||
-          key === "expected_output" ||
-          key === "comments"
-        ) {
-          updatedData[key] = updatedRecord[key] ?? "";
-        } else if ((updatedRecord as any)[key]) {
-          updatedData[key] = JSON.parse((updatedRecord as any)[key] as string);
-        }
-      }
-
-      await ctx.prisma.datasetRecord.update({
-        where: { id: recordId, projectId: dataset.projectId },
-        data: {
-          entry: updatedData,
-        },
-      });
 
       return { success: true };
     }),
@@ -133,7 +138,7 @@ export const datasetRecordRouter = createTRPCRouter({
         where: { id: input.datasetId, projectId: input.projectId },
         include: {
           datasetRecords: {
-            orderBy: { createdAt: "desc" },
+            orderBy: { createdAt: "asc" },
           },
         },
       });

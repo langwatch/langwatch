@@ -37,12 +37,12 @@ export const JSONCellRenderer = (props: { value: string | undefined }) => {
 export type DatasetColumnDef = ColDef & { type_: DatasetColumnType };
 
 export const DatasetGrid = React.memo(
-  function DatasetGrid(
+  React.forwardRef(function DatasetGrid(
     props: AgGridReactProps & {
       columnDefs: DatasetColumnDef[];
-    }
+    },
+    ref
   ) {
-    const gridRef = useRef<AgGridReact>(null);
     const gridOptions: GridOptions = useMemo(
       () => ({
         rowDragManaged: true,
@@ -126,7 +126,7 @@ export const DatasetGrid = React.memo(
         }
       `}</style>
         <AgGridReact
-          ref={gridRef}
+          ref={ref as React.RefObject<AgGridReact>}
           gridOptions={gridOptions}
           loadingOverlayComponent={() => <Text paddingTop={4}>Loading...</Text>}
           reactiveCustomComponents={true}
@@ -156,7 +156,7 @@ export const DatasetGrid = React.memo(
         />
       </div>
     );
-  },
+  }),
   (prevProps, nextProps) => {
     return (
       JSON.stringify(prevProps.rowData) === JSON.stringify(nextProps.rowData)

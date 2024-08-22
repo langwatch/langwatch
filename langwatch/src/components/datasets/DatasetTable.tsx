@@ -16,7 +16,7 @@ import {
 import { useRouter } from "next/router";
 import Parse from "papaparse";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Play, Upload } from "react-feather";
+import { Play, Plus, Upload } from "react-feather";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
 import { useDrawer } from "../CurrentDrawer";
@@ -26,8 +26,12 @@ import {
   type DatasetColumnDef,
 } from "./DatasetGrid";
 
-import type { CustomCellRendererProps } from "@ag-grid-community/react";
+import type {
+  AgGridReact,
+  CustomCellRendererProps,
+} from "@ag-grid-community/react";
 import { UploadCSVModal } from "./UploadCSVModal";
+import { nanoid } from "nanoid";
 
 export function DatasetTable() {
   const router = useRouter();
@@ -46,6 +50,8 @@ export function DatasetTable() {
     }
   );
   const deleteDatasetRecord = api.datasetRecord.deleteMany.useMutation();
+
+  const gridRef = useRef<AgGridReact>(null);
 
   const columnDefs = useMemo(() => {
     if (!dataset.data) return [];
@@ -101,11 +107,9 @@ export function DatasetTable() {
     []
   );
 
-  const selectedEntryIds = useMemo(() => {
-    return new Set(
-      editableRowData.filter((row) => row.selected).map((row) => row.id)
-    );
-  }, [editableRowData]);
+  const [selectedEntryIds, setSelectedEntryIds] = useState<Set<string>>(
+    new Set()
+  );
 
   const rowData = useMemo(() => {
     if (!dataset.data) return;
@@ -120,7 +124,7 @@ export function DatasetTable() {
       row.selected = selectedEntryIds.has(record.id);
       return row;
     });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dataset.data]);
 
   useEffect(() => {
@@ -179,11 +183,15 @@ export function DatasetTable() {
         (row) => row.id === params.data.id
       );
 
-      setEditableRowData((rows) =>
-        rows.map((row) =>
-          row.id === params.data.id ? { ...row, ...updatedRecord } : row
-        )
-      );
+      setSelectedEntryIds((selectedEntryIds) => {
+        const selectedEntryIds_ = new Set(selectedEntryIds);
+        if (params.data.selected) {
+          selectedEntryIds_.add(params.data.id);
+        } else {
+          selectedEntryIds_.delete(params.data.id);
+        }
+        return selectedEntryIds_;
+      });
 
       if (
         JSON.stringify({ ...params.data, selected: false }) ===
@@ -191,6 +199,12 @@ export function DatasetTable() {
       ) {
         return;
       }
+
+      setEditableRowData((rows) =>
+        rows.map((row) =>
+          row.id === params.data.id ? { ...row, ...updatedRecord } : row
+        )
+      );
 
       setSavingStatus("saving");
       updateDatasetRecord.mutate(
@@ -246,13 +260,21 @@ export function DatasetTable() {
         },
         {
           onSuccess: () => {
+            setSelectedEntryIds(new Set());
             toast({
               title: `${recordIds.length} records deleted`,
               status: "success",
               duration: 5000,
               isClosable: true,
             });
-            void dataset.refetch();
+            dataset
+              .refetch()
+              .then(() => {
+                gridRef.current?.api.refreshCells();
+              })
+              .catch(() => {
+                // ignore
+              });
           },
           onError: () => {
             toast({
@@ -276,22 +298,66 @@ export function DatasetTable() {
     dataset,
   ]);
 
+  const onAddNewRow = useCallback(() => {
+    if (!gridRef.current?.api) return;
+
+    // Create a new empty row
+    const newRow: Record<string, any> = { id: nanoid() };
+    columnDefs.forEach((col) => {
+      if (col.field && col.field !== "selected") {
+        newRow[col.field] = "";
+      }
+    });
+
+    // Add the new row to the grid
+    const result = gridRef.current.api.applyTransaction({ add: [newRow] });
+
+    // Get the index of the newly added row
+    const newRowIndex = result?.add[0]?.rowIndex ?? 0; // editableRowData.length;
+
+    // Find the first editable column
+    const firstEditableColumn = columnDefs.find(
+      (col) => col.editable !== false && col.field !== "selected"
+    );
+
+    setTimeout(() => {
+      if (firstEditableColumn?.field) {
+        // Start editing the first editable cell in the new row
+        gridRef.current?.api.startEditingCell({
+          rowIndex: newRowIndex,
+          colKey: firstEditableColumn.field,
+        });
+      }
+    }, 100);
+  }, [columnDefs, gridRef]);
+
   return (
     <>
-      <Container maxW={"calc(100vw - 200px)"} padding={6} marginTop={8}>
-        <HStack width="full" verticalAlign={"middle"} paddingBottom={6}>
+      <Container
+        maxW={"calc(100vw - 200px)"}
+        padding={6}
+        marginTop={8}
+        paddingBottom="120px"
+      >
+        <HStack
+          width="full"
+          verticalAlign={"middle"}
+          paddingBottom={6}
+          spacing={6}
+        >
           <Heading as={"h1"} size="lg">
             Dataset {`- ${dataset.data?.name ?? ""}`}
           </Heading>
-          <HStack padding={2}>
-            <Text fontSize={"12px"} color="gray.400">
-              {savingStatus === "saving"
-                ? "Saving..."
-                : savingStatus === "saved"
-                ? "Saved"
-                : ""}
-            </Text>
-          </HStack>
+          <Text fontSize={"14px"} color="gray.400">
+            {dataset.data?.datasetRecords.length} records
+          </Text>
+          <Text fontSize={"14px"} color="gray.400">
+            {savingStatus === "saving"
+              ? "Saving..."
+              : savingStatus === "saved"
+              ? "Saved"
+              : ""}
+          </Text>
           <Spacer />
           <Button
             onClick={() => onOpen()}
@@ -321,12 +387,31 @@ export function DatasetTable() {
           </Button>
         </HStack>
         <Card>
-          <CardBody padding={0}>
+          <CardBody padding={0} position="relative">
             <DatasetGrid
               columnDefs={columnDefs}
-              rowData={rowData}
+              rowData={editableRowData}
               onCellValueChanged={onCellValueChanged}
+              ref={gridRef}
             />
+            <Box position="absolute" left="0">
+              <Button
+                position="fixed"
+                bottom={6}
+                marginLeft={6}
+                backgroundColor="#ffffff"
+                padding="8px"
+                paddingX="16px"
+                border="1px solid #ccc"
+                boxShadow="base"
+                borderRadius={"md"}
+                onClick={onAddNewRow}
+                zIndex="popover"
+              >
+                <Plus />
+                <Text>Add new record</Text>
+              </Button>
+            </Box>
           </CardBody>
         </Card>
         <UploadCSVModal

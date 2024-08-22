@@ -18,10 +18,10 @@ export function MultilineJSONCellEditor(
 
   useEffect(() => {
     if (typeof value === "string") {
-      let json = JSON.parse(value);
+      let json = JSON.parse(value || '{}');
       if (typeof json === "string") {
         try {
-          json = JSON.parse(json);
+          json = JSON.parse(json || '{}');
         } catch {
           json = value;
         }
