@@ -23,10 +23,12 @@ export type Field = {
 type ComponentState = "idle" | "running" | "completed" | "failed";
 
 export type ComponentType =
+  | "entry"
   | "signature"
   | "module"
   | "retriever"
-  | "prompting_technique";
+  | "prompting_technique"
+  | "evaluator";
 
 type BaseComponent = {
   _library_ref?: string;
@@ -69,13 +71,16 @@ type Entry = BaseComponent & {
   type: "entry";
   inputs?: never;
   outputs: Field[];
-  dataset?: {
-    ref?: string;
-  };
-
-  state?: BaseComponent["execution_state"] & {
-    dataset?: Record<string, string[]>;
-  };
+  dataset?:
+    | {
+        upload?: {
+          id: string;
+          head: Record<string, string>;
+        };
+      }
+    | {
+        inline: Record<string, string[]>;
+      };
 };
 
 type Evaluator = BaseComponent & {

@@ -2,10 +2,14 @@ import { HStack, Text, VStack } from "@chakra-ui/react";
 
 import { Handle, type Node, type NodeProps, Position } from "@xyflow/react";
 import { type Component, type Field } from "../types/dsl";
-import { SignatureIcon } from "./ColorfulBlockIcons";
+import { EntryIcon, SignatureIcon } from "./ColorfulBlockIcons";
 
 export function SignatureNode(props: NodeProps<Node<Component>>) {
   return <ComponentNode icon={<SignatureIcon />} {...props} />;
+}
+
+export function EntryNode(props: NodeProps<Node<Component>>) {
+  return <ComponentNode icon={<EntryIcon />} {...props} />;
 }
 
 function NodeInputs({

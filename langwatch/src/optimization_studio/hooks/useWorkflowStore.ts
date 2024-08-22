@@ -26,6 +26,26 @@ interface WorkflowStore {
 
 const initialNodes: Node<Component>[] = [
   {
+    id: "0",
+    type: "entry",
+    position: { x: 0, y: 0 },
+    data: {
+      name: "Entry",
+      dataset: {
+        inline: {
+          question: [
+            "What is the capital of the moon?",
+            "What is the capital france?",
+          ],
+          gold_answer: [
+            "The moon is made of cheese",
+            "The capital of france is Paris",
+          ],
+        },
+      },
+    },
+  },
+  {
     id: "1",
     type: "signature",
     position: { x: 300, y: 300 },

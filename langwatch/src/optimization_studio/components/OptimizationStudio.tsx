@@ -12,11 +12,14 @@ import { useMemo } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { LogoIcon } from "../../components/icons/LogoIcon";
 import { useWorkflowStore } from "../hooks/useWorkflowStore";
-import { SignatureNode } from "./Nodes";
+import { EntryNode, SignatureNode } from "./Nodes";
 import { UndoRedo } from "./UndoRedo";
 
 export default function OptimizationStudio() {
-  const nodeTypes = useMemo(() => ({ signature: SignatureNode }), []);
+  const nodeTypes = useMemo(
+    () => ({ entry: EntryNode, signature: SignatureNode }),
+    []
+  );
   const theme = useTheme();
   const gray100 = theme.colors.gray["100"];
   const gray300 = theme.colors.gray["300"];

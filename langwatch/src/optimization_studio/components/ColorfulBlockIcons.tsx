@@ -1,5 +1,6 @@
 import { Box } from "@chakra-ui/react";
 import { FunctionIcon } from "../../components/icons/FunctionIcon";
+import { Home } from "react-feather";
 
 export function ColorfulBlockIcon({
   color,
@@ -31,6 +32,7 @@ export function ColorfulBlockIcon({
       display="flex"
       alignItems="center"
       justifyContent="center"
+      color="white"
     >
       {icon}
     </Box>
@@ -40,5 +42,11 @@ export function ColorfulBlockIcon({
 export function SignatureIcon() {
   return (
     <ColorfulBlockIcon color="green.400" size="md" icon={<FunctionIcon />} />
+  );
+}
+
+export function EntryIcon() {
+  return (
+    <ColorfulBlockIcon color="blue.400" size="md" icon={<Home />} />
   );
 }
