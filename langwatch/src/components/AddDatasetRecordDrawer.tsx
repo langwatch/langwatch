@@ -39,7 +39,7 @@ import {
 } from "../server/tracer/utils";
 import { AddDatasetDrawer } from "./AddDatasetDrawer";
 import { HorizontalFormControl } from "./HorizontalFormControl";
-import { DatasetGrid } from "./datasets/DatasetGrid";
+import { DatasetGrid, HeaderCheckboxComponent } from "./datasets/DatasetGrid";
 import { useDrawer } from "./CurrentDrawer";
 import { Link } from "@chakra-ui/next-js";
 
@@ -541,49 +541,3 @@ const esSpansToDatasetSpans = (spans: ElasticSearchSpan[]): DatasetSpan[] => {
   }
   return z.array(datasetSpanSchema).parse(newArray);
 };
-
-function HeaderCheckboxComponent(props: CustomCellRendererProps) {
-  const [checkboxState, setCheckboxState] = useState<
-    "checked" | "unchecked" | "indeterminate"
-  >("unchecked");
-
-  useEffect(() => {
-    const updateAllChecked = () => {
-      let allChecked = props.api.getDisplayedRowCount() > 0;
-      let allUnchecked = true;
-      props.api.forEachNode((node) => {
-        if (!node.data.selected) {
-          allChecked = false;
-        } else {
-          allUnchecked = false;
-        }
-      });
-      setCheckboxState(
-        allChecked ? "checked" : allUnchecked ? "unchecked" : "indeterminate"
-      );
-    };
-
-    props.api.addEventListener("cellValueChanged", updateAllChecked);
-
-    // Initial check
-    updateAllChecked();
-
-    return () => {
-      props.api.removeEventListener("cellValueChanged", updateAllChecked);
-    };
-  }, [props.api]);
-
-  return (
-    <Checkbox
-      marginLeft="3px"
-      isChecked={checkboxState === "checked"}
-      isIndeterminate={checkboxState === "indeterminate"}
-      onChange={(e) => {
-        const isChecked = e.target.checked;
-        props.api.forEachNode((node) => {
-          node.setDataValue("selected", isChecked);
-        });
-      }}
-    />
-  );
-}

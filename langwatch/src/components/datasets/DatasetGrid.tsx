@@ -3,9 +3,10 @@ import {
   AgGridReact,
   type AgGridReactProps,
   type CustomCellEditorProps,
+  type CustomCellRendererProps,
 } from "@ag-grid-community/react";
-import { Text } from "@chakra-ui/react";
-import { useMemo, useRef } from "react";
+import { Checkbox, Text } from "@chakra-ui/react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { MultilineCellEditor } from "./MultilineCellEditor";
 
 import { ClientSideRowModelModule } from "@ag-grid-community/client-side-row-model";
@@ -89,10 +90,10 @@ export function DatasetGrid(
           line-height: 1.6em;
           border-right: var(--ag-borders-critical) var(--ag-row-border-color);
         }
-        .ag-cell-last-left-pinned .ag-cell-value {
+        .ag-pinned-left-cols-container .ag-cell-value {
           white-space: nowrap;
         }
-        .ag-cell-last-left-pinned {
+        .ag-pinned-left-cols-container .ag-cell {
           background-color: var(--ag-header-background-color);
         }
         .ag-theme-balham .ag-cell .ag-cell-value {
@@ -153,5 +154,51 @@ export function DatasetGrid(
         columnDefs={columnDefs_}
       />
     </div>
+  );
+}
+
+export function HeaderCheckboxComponent(props: CustomCellRendererProps) {
+  const [checkboxState, setCheckboxState] = useState<
+    "checked" | "unchecked" | "indeterminate"
+  >("unchecked");
+
+  useEffect(() => {
+    const updateAllChecked = () => {
+      let allChecked = props.api.getDisplayedRowCount() > 0;
+      let allUnchecked = true;
+      props.api.forEachNode((node) => {
+        if (!node.data.selected) {
+          allChecked = false;
+        } else {
+          allUnchecked = false;
+        }
+      });
+      setCheckboxState(
+        allChecked ? "checked" : allUnchecked ? "unchecked" : "indeterminate"
+      );
+    };
+
+    props.api.addEventListener("cellValueChanged", updateAllChecked);
+
+    // Initial check
+    updateAllChecked();
+
+    return () => {
+      props.api.removeEventListener("cellValueChanged", updateAllChecked);
+    };
+  }, [props.api]);
+
+  return (
+    <Checkbox
+      marginLeft="3px"
+      isChecked={checkboxState === "checked"}
+      isIndeterminate={checkboxState === "indeterminate"}
+      onChange={(e) => {
+        const isChecked = e.target.checked;
+        props.api.forEachNode((node) => {
+          node.setDataValue("selected", isChecked);
+        });
+      }}
+    />
   );
 }
