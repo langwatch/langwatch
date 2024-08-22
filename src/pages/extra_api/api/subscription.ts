@@ -121,9 +121,14 @@ export const subscriptionRouter = () =>
             customer: customerId,
             customer_update: {
               address: "auto",
+              name: "auto",
             },
+
             automatic_tax: { enabled: true },
             billing_address_collection: "required",
+            tax_id_collection: {
+              enabled: true,
+            },
             line_items: [
               {
                 price: prices[input.plan],
@@ -132,17 +137,6 @@ export const subscriptionRouter = () =>
             ],
             success_url: `${input.baseUrl}/settings/subscription?success`,
             cancel_url: `${input.baseUrl}/settings/subscription`,
-            custom_fields: [
-              {
-                key: "vat_number",
-                label: {
-                  type: "custom",
-                  custom: "VAT Number (For EU business customers)",
-                },
-                type: "text",
-                optional: true, // Set to false if you want to make it required
-              },
-            ],
             client_reference_id: `subscription_setup_${subscription.id}`,
           });
 
