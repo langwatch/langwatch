@@ -179,9 +179,6 @@ export function DatasetTable() {
   const onCellValueChanged = useCallback(
     (params: any) => {
       const updatedRecord = params.data;
-      const currentRecord = editableRowData.find(
-        (row) => row.id === params.data.id
-      );
 
       setSelectedEntryIds((selectedEntryIds) => {
         const selectedEntryIds_ = new Set(selectedEntryIds);
@@ -193,18 +190,27 @@ export function DatasetTable() {
         return selectedEntryIds_;
       });
 
+      // Skip updates when just the line selection changes
       if (
-        JSON.stringify({ ...params.data, selected: false }) ===
-        JSON.stringify({ ...currentRecord, selected: false })
+        params.column.colId === "selected" &&
+        params.column.pinned === "left"
       ) {
         return;
       }
 
-      setEditableRowData((rows) =>
-        rows.map((row) =>
-          row.id === params.data.id ? { ...row, ...updatedRecord } : row
-        )
-      );
+      setEditableRowData((rows) => {
+        const currentIndex = rows.findIndex((row) => row.id === params.data.id);
+        if (currentIndex === -1) {
+          return [...rows, updatedRecord];
+        } else {
+          const newRows = [...rows];
+          newRows[currentIndex] = {
+            ...newRows[currentIndex],
+            ...updatedRecord,
+          };
+          return newRows;
+        }
+      });
 
       setSavingStatus("saving");
       updateDatasetRecord.mutate(
@@ -309,18 +315,17 @@ export function DatasetTable() {
       }
     });
 
-    // Add the new row to the grid
+    const firstEditableColumn = columnDefs.find(
+      (col) => col.editable !== false && col.field !== "selected"
+    );
+
     const result = gridRef.current.api.applyTransaction({ add: [newRow] });
 
     // Get the index of the newly added row
     const newRowIndex = result?.add[0]?.rowIndex ?? 0; // editableRowData.length;
 
-    // Find the first editable column
-    const firstEditableColumn = columnDefs.find(
-      (col) => col.editable !== false && col.field !== "selected"
-    );
-
     setTimeout(() => {
+      // Find the first editable column
       if (firstEditableColumn?.field) {
         // Start editing the first editable cell in the new row
         gridRef.current?.api.startEditingCell({
@@ -329,7 +334,7 @@ export function DatasetTable() {
         });
       }
     }, 100);
-  }, [columnDefs, gridRef]);
+  }, [columnDefs]);
 
   return (
     <>
@@ -349,7 +354,7 @@ export function DatasetTable() {
             Dataset {`- ${dataset.data?.name ?? ""}`}
           </Heading>
           <Text fontSize={"14px"} color="gray.400">
-            {dataset.data?.datasetRecords.length} records
+            {editableRowData.length} records
           </Text>
           <Text fontSize={"14px"} color="gray.400">
             {savingStatus === "saving"
@@ -390,7 +395,7 @@ export function DatasetTable() {
           <CardBody padding={0} position="relative">
             <DatasetGrid
               columnDefs={columnDefs}
-              rowData={editableRowData}
+              rowData={rowData}
               onCellValueChanged={onCellValueChanged}
               ref={gridRef}
             />

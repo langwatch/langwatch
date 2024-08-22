@@ -159,7 +159,8 @@ export const DatasetGrid = React.memo(
   }),
   (prevProps, nextProps) => {
     return (
-      JSON.stringify(prevProps.rowData) === JSON.stringify(nextProps.rowData)
+      JSON.stringify(prevProps.rowData) === JSON.stringify(nextProps.rowData) &&
+      prevProps.onCellValueChanged === nextProps.onCellValueChanged
     );
   }
 );
