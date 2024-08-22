@@ -13,7 +13,6 @@ import {
   useDisclosure,
   useToast,
 } from "@chakra-ui/react";
-import { type ColDef } from "@ag-grid-community/core";
 import type { CustomCellRendererProps } from "@ag-grid-community/react";
 import { nanoid } from "nanoid";
 import { useEffect, useMemo, useState } from "react";
@@ -25,7 +24,6 @@ import { datasetSpanSchema } from "~/server/tracer/types.generated";
 import { api } from "~/utils/api";
 import type {
   annotationScoreSchema,
-  DatasetColumnType,
   DatasetColumnTypes,
 } from "../server/datasets/types";
 import type {
@@ -39,7 +37,7 @@ import {
 } from "../server/tracer/utils";
 import { AddDatasetDrawer } from "./AddDatasetDrawer";
 import { HorizontalFormControl } from "./HorizontalFormControl";
-import { DatasetGrid, HeaderCheckboxComponent } from "./datasets/DatasetGrid";
+import { DatasetGrid, HeaderCheckboxComponent, type DatasetColumnDef } from "./datasets/DatasetGrid";
 import { useDrawer } from "./CurrentDrawer";
 import { Link } from "@chakra-ui/next-js";
 
@@ -384,12 +382,12 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
       return [];
     }
 
-    const headers: (ColDef & { type: DatasetColumnType })[] = Object.entries(
+    const headers: DatasetColumnDef[] = Object.entries(
       selectedDataset.columnTypes ?? {}
     ).map(([column, type]) => ({
       headerName: column,
       field: column,
-      type: type,
+      type_: type,
       cellClass: "v-align",
       sortable: false,
     }));
@@ -398,7 +396,7 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
     headers.unshift({
       headerName: " ",
       field: "selected",
-      type: "boolean",
+      type_: "boolean",
       width: 46,
       pinned: "left",
       sortable: false,

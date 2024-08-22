@@ -1,6 +1,6 @@
-import { type ColDef } from "@ag-grid-community/core";
 import { DownloadIcon } from "@chakra-ui/icons";
 import {
+  Box,
   Button,
   Card,
   CardBody,
@@ -15,13 +15,16 @@ import {
 } from "@chakra-ui/react";
 import { useRouter } from "next/router";
 import Parse from "papaparse";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Play, Upload } from "react-feather";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import { type DatasetColumnType } from "../../server/datasets/types";
 import { api } from "../../utils/api";
 import { useDrawer } from "../CurrentDrawer";
-import { DatasetGrid, HeaderCheckboxComponent } from "./DatasetGrid";
+import {
+  DatasetGrid,
+  HeaderCheckboxComponent,
+  type DatasetColumnDef,
+} from "./DatasetGrid";
 
 import type { CustomCellRendererProps } from "@ag-grid-community/react";
 import { UploadCSVModal } from "./UploadCSVModal";
@@ -42,16 +45,17 @@ export function DatasetTable() {
       refetchOnWindowFocus: false,
     }
   );
+  const deleteDatasetRecord = api.datasetRecord.deleteMany.useMutation();
 
   const columnDefs = useMemo(() => {
     if (!dataset.data) return [];
 
-    const headers: (ColDef & { type: DatasetColumnType })[] = Object.entries(
+    const headers: DatasetColumnDef[] = Object.entries(
       dataset.data.columnTypes ?? {}
     ).map(([field, type]) => ({
       headerName: field,
       field,
-      type,
+      type_: type,
       cellClass: "v-align",
       sortable: false,
     }));
@@ -60,7 +64,7 @@ export function DatasetTable() {
     headers.unshift({
       headerName: "#",
       valueGetter: "node.rowIndex + 1",
-      type: "number",
+      type_: "number",
       width: 42,
       pinned: "left",
       sortable: false,
@@ -72,7 +76,7 @@ export function DatasetTable() {
     headers.unshift({
       headerName: "",
       field: "selected",
-      type: "boolean",
+      type_: "boolean",
       width: 46,
       pinned: "left",
       sortable: false,
@@ -93,6 +97,16 @@ export function DatasetTable() {
     return headers;
   }, [dataset.data]);
 
+  const [editableRowData, setEditableRowData] = useState<Record<string, any>[]>(
+    []
+  );
+
+  const selectedEntryIds = useMemo(() => {
+    return new Set(
+      editableRowData.filter((row) => row.selected).map((row) => row.id)
+    );
+  }, [editableRowData]);
+
   const rowData = useMemo(() => {
     if (!dataset.data) return;
 
@@ -103,22 +117,39 @@ export function DatasetTable() {
         const value = (record.entry as any)[col];
         row[col] = typeof value === "object" ? JSON.stringify(value) : value;
       });
+      row.selected = selectedEntryIds.has(record.id);
       return row;
     });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dataset.data]);
 
-  // const deleteDatasetRecord = api.datasetRecord.delete.useMutation();
+  useEffect(() => {
+    if (rowData) {
+      setEditableRowData(
+        rowData.map((row) => ({
+          ...row,
+          selected: selectedEntryIds.has(row.id),
+        }))
+      );
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rowData]);
+
   const toast = useToast();
 
-  const downloadCSV = () => {
+  const downloadCSV = (selectedOnly = false) => {
     const columns = Object.keys(dataset.data?.columnTypes ?? {}) ?? [];
     const csvData =
-      dataset.data?.datasetRecords.map((record) =>
-        columns.map((col) => {
-          const value = (record.entry as any)[col];
-          return typeof value === "object" ? JSON.stringify(value) : value;
-        })
-      ) ?? [];
+      dataset.data?.datasetRecords
+        .filter((record) =>
+          selectedOnly ? selectedEntryIds.has(record.id) : true
+        )
+        .map((record) =>
+          columns.map((col) => {
+            const value = (record.entry as any)[col];
+            return typeof value === "object" ? JSON.stringify(value) : value;
+          })
+        ) ?? [];
 
     const csv = Parse.unparse({
       fields: columns,
@@ -129,7 +160,9 @@ export function DatasetTable() {
 
     const link = document.createElement("a");
     link.href = url;
-    const fileName = `${dataset.data?.name}.csv`;
+    const fileName = `${dataset.data?.name}${
+      selectedOnly ? "_selected" : ""
+    }.csv`;
     link.setAttribute("download", fileName);
     document.body.appendChild(link);
     link.click();
@@ -141,8 +174,25 @@ export function DatasetTable() {
   const updateDatasetRecord = api.datasetRecord.update.useMutation();
   const onCellValueChanged = useCallback(
     (params: any) => {
-      setSavingStatus("saving");
       const updatedRecord = params.data;
+      const currentRecord = editableRowData.find(
+        (row) => row.id === params.data.id
+      );
+
+      setEditableRowData((rows) =>
+        rows.map((row) =>
+          row.id === params.data.id ? { ...row, ...updatedRecord } : row
+        )
+      );
+
+      if (
+        JSON.stringify({ ...params.data, selected: false }) ===
+        JSON.stringify({ ...currentRecord, selected: false })
+      ) {
+        return;
+      }
+
+      setSavingStatus("saving");
       updateDatasetRecord.mutate(
         {
           projectId: project?.id ?? "",
@@ -175,8 +225,56 @@ export function DatasetTable() {
         }
       );
     },
-    [updateDatasetRecord, project?.id, datasetId, toast, dataset]
+    [
+      editableRowData,
+      updateDatasetRecord,
+      project?.id,
+      datasetId,
+      toast,
+      dataset,
+    ]
   );
+
+  const onDelete = useCallback(() => {
+    if (confirm("Are you sure?")) {
+      const recordIds = Array.from(selectedEntryIds);
+      deleteDatasetRecord.mutate(
+        {
+          projectId: project?.id ?? "",
+          datasetId: datasetId as string,
+          recordIds,
+        },
+        {
+          onSuccess: () => {
+            toast({
+              title: `${recordIds.length} records deleted`,
+              status: "success",
+              duration: 5000,
+              isClosable: true,
+            });
+            void dataset.refetch();
+          },
+          onError: () => {
+            toast({
+              title: "Error deleting records.",
+              description: "Changes will be reverted, please try again",
+              status: "error",
+              duration: 5000,
+              isClosable: true,
+            });
+            void dataset.refetch();
+          },
+        }
+      );
+    }
+  }, [
+    selectedEntryIds,
+    deleteDatasetRecord,
+    project?.id,
+    datasetId,
+    toast,
+    dataset,
+  ]);
 
   return (
     <>
@@ -236,6 +334,43 @@ export function DatasetTable() {
           onClose={onClose}
           datasetId={datasetId as string}
         />
+        {selectedEntryIds.size > 0 && (
+          <Box
+            position="fixed"
+            bottom={6}
+            left="50%"
+            transform="translateX(-50%)"
+            backgroundColor="#ffffff"
+            padding="8px"
+            paddingX="16px"
+            border="1px solid #ccc"
+            boxShadow="base"
+            borderRadius={"md"}
+          >
+            <HStack gap={3}>
+              <Text>{selectedEntryIds.size} entries selected</Text>
+              <Button
+                colorScheme="black"
+                minWidth="fit-content"
+                variant="outline"
+                onClick={() => void downloadCSV(true)}
+              >
+                Export <DownloadIcon marginLeft={2} />
+              </Button>
+
+              <Text>or</Text>
+              <Button
+                colorScheme="red"
+                type="submit"
+                variant="outline"
+                minWidth="fit-content"
+                onClick={onDelete}
+              >
+                Delete
+              </Button>
+            </HStack>
+          </Box>
+        )}
       </Container>
     </>
   );

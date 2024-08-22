@@ -140,4 +140,45 @@ export const datasetRecordRouter = createTRPCRouter({
 
       return datasets;
     }),
+  deleteMany: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        datasetId: z.string(),
+        recordIds: z.array(z.string()),
+      })
+    )
+    .use(checkUserPermissionForProject(TeamRoleGroup.DATASETS_MANAGE))
+    .mutation(async ({ ctx, input }) => {
+      const dataset = await ctx.prisma.dataset.findFirst({
+        where: {
+          id: input.datasetId,
+          projectId: input.projectId,
+        },
+      });
+
+      if (!dataset) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Dataset not found",
+        });
+      }
+
+      const { count } = await ctx.prisma.datasetRecord.deleteMany({
+        where: {
+          id: { in: input.recordIds },
+          datasetId: input.datasetId,
+          projectId: input.projectId,
+        },
+      });
+
+      if (count === 0) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "No matching records found to delete",
+        });
+      }
+
+      return { deletedCount: count };
+    }),
 });

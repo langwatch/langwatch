@@ -20,6 +20,7 @@ import {
 } from "../../server/datasets/types";
 import { RenderInputOutput } from "../traces/RenderInputOutput";
 import { MultilineJSONCellEditor } from "./MultilineJSONCellEditor";
+import React from "react";
 
 ModuleRegistry.registerModules([ClientSideRowModelModule]);
 
@@ -33,57 +34,57 @@ export const JSONCellRenderer = (props: { value: string | undefined }) => {
   );
 };
 
-type DatasetColumnDef = ColDef & { type: DatasetColumnType };
+export type DatasetColumnDef = ColDef & { type_: DatasetColumnType };
 
-export function DatasetGrid(
-  props: AgGridReactProps & {
-    columnDefs: DatasetColumnDef[];
-  }
-) {
-  const gridRef = useRef<AgGridReact>(null);
-  const gridOptions: GridOptions = useMemo(
-    () => ({
-      rowDragManaged: true,
-      rowDragMultiRow: true,
-      undoRedoCellEditing: true,
-      undoRedoCellEditingLimit: 50,
-      groupSelectsChildren: true,
-      suppressRowClickSelection: true,
-    }),
-    []
-  );
-
-  const columnDefs_ = useMemo(() => {
-    return (props.columnDefs as DatasetColumnDef[])?.map(
-      (column: DatasetColumnDef) => {
-        const basicTypes = ["string", "number", "boolean", "date"];
-        if (!basicTypes.includes(column.type)) {
-          return {
-            ...column,
-            cellRenderer: JSONCellRenderer,
-            cellEditor: (props: CustomCellEditorProps) => (
-              <MultilineJSONCellEditor
-                zodValidator={
-                  datasetColumnTypeMapping[column.type as DatasetColumnType] ??
-                  z.any()
-                }
-                {...props}
-              />
-            ),
-          };
-        } else {
-          return {
-            ...column,
-            cellDataType: column.type === "string" ? "text" : column.type,
-          };
-        }
-      }
+export const DatasetGrid = React.memo(
+  function DatasetGrid(
+    props: AgGridReactProps & {
+      columnDefs: DatasetColumnDef[];
+    }
+  ) {
+    const gridRef = useRef<AgGridReact>(null);
+    const gridOptions: GridOptions = useMemo(
+      () => ({
+        rowDragManaged: true,
+        rowDragMultiRow: true,
+        undoRedoCellEditing: true,
+        undoRedoCellEditingLimit: 50,
+        groupSelectsChildren: true,
+        suppressRowClickSelection: true,
+      }),
+      []
     );
-  }, [props.columnDefs]);
 
-  return (
-    <div className="ag-theme-balham">
-      <style>{`
+    const columnDefs_ = useMemo(() => {
+      return (props.columnDefs as DatasetColumnDef[])?.map(
+        (column: DatasetColumnDef) => {
+          const basicTypes = ["string", "number", "boolean", "date"];
+          if (!basicTypes.includes(column.type_)) {
+            return {
+              ...column,
+              cellRenderer: JSONCellRenderer,
+              cellEditor: (props: CustomCellEditorProps) => (
+                <MultilineJSONCellEditor
+                  zodValidator={
+                    datasetColumnTypeMapping[column.type_] ?? z.any()
+                  }
+                  {...props}
+                />
+              ),
+            };
+          } else {
+            return {
+              ...column,
+              cellDataType: column.type_ === "string" ? "text" : column.type_,
+            };
+          }
+        }
+      );
+    }, [props.columnDefs]);
+
+    return (
+      <div className="ag-theme-balham">
+        <style>{`
         .ag-theme-balham .ag-cell {
           white-space: pre-wrap; /* Enable word wrapping */
           overflow: visible; /* Ensure the cell expands to fit content */
@@ -124,38 +125,44 @@ export function DatasetGrid(
           min-height: 29px;
         }
       `}</style>
-      <AgGridReact
-        ref={gridRef}
-        gridOptions={gridOptions}
-        loadingOverlayComponent={() => <Text paddingTop={4}>Loading...</Text>}
-        reactiveCustomComponents={true}
-        enableCellEditingOnBackspace={false}
-        stopEditingWhenCellsLoseFocus={true}
-        domLayout="autoHeight"
-        defaultColDef={{
-          flex: 1,
-          minWidth: 10,
-          resizable: true,
-          sortable: true,
-          filter: true,
-          editable: true,
-          autoHeight: true,
-          cellEditor: MultilineCellEditor,
-          enableCellChangeFlash: true,
-          suppressKeyboardEvent: (props) => {
-            if (props.event.key == "Enter" && props.event.shiftKey) {
-              props.event.stopPropagation();
-              return true;
-            }
-            return false;
-          },
-        }}
-        {...props}
-        columnDefs={columnDefs_}
-      />
-    </div>
-  );
-}
+        <AgGridReact
+          ref={gridRef}
+          gridOptions={gridOptions}
+          loadingOverlayComponent={() => <Text paddingTop={4}>Loading...</Text>}
+          reactiveCustomComponents={true}
+          enableCellEditingOnBackspace={false}
+          stopEditingWhenCellsLoseFocus={true}
+          domLayout="autoHeight"
+          defaultColDef={{
+            flex: 1,
+            minWidth: 10,
+            resizable: true,
+            sortable: true,
+            filter: true,
+            editable: true,
+            autoHeight: true,
+            cellEditor: MultilineCellEditor,
+            enableCellChangeFlash: true,
+            suppressKeyboardEvent: (props) => {
+              if (props.event.key == "Enter" && props.event.shiftKey) {
+                props.event.stopPropagation();
+                return true;
+              }
+              return false;
+            },
+          }}
+          {...props}
+          columnDefs={columnDefs_}
+        />
+      </div>
+    );
+  },
+  (prevProps, nextProps) => {
+    return (
+      JSON.stringify(prevProps.rowData) === JSON.stringify(nextProps.rowData)
+    );
+  }
+);
 
 export function HeaderCheckboxComponent(props: CustomCellRendererProps) {
   const [checkboxState, setCheckboxState] = useState<
