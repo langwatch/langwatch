@@ -17,14 +17,16 @@ import {
   VStack,
   useToast,
 } from "@chakra-ui/react";
-import { DatabaseSchema } from "@prisma/client";
-import { useEffect } from "react";
+import { useCallback, useEffect } from "react";
 import { useForm, type FieldErrors } from "react-hook-form";
 import slugify from "slugify";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { HorizontalFormControl } from "./HorizontalFormControl";
-import type { DatasetRecordForm } from "../server/datasets/types";
+import type {
+  DatasetColumnType,
+  DatasetRecordForm,
+} from "../server/datasets/types";
 import { datasetRecordFormSchema } from "../server/datasets/types.generated";
 import { zodResolver } from "@hookform/resolvers/zod";
 
@@ -46,11 +48,18 @@ export const AddDatasetDrawer = (props: AddDatasetDrawerProps) => {
     formState: { errors },
     reset,
     setValue,
-  } = useForm<DatasetRecordForm>({
+  } = useForm<
+    DatasetRecordForm & {
+      schema: "ONE_MESSAGE_PER_ROW" | "ONE_LLM_CALL_PER_ROW";
+    }
+  >({
     defaultValues: {
       name: "",
-      schema: DatabaseSchema.ONE_MESSAGE_PER_ROW,
-      columns: ["input", "expected_output"],
+      schema: "ONE_MESSAGE_PER_ROW",
+      columnTypes: {
+        input: "string",
+        expected_output: "string",
+      },
     },
     resolver: async (data, context, options) => {
       const result = await zodResolver(datasetRecordFormSchema)(
@@ -73,12 +82,19 @@ export const AddDatasetDrawer = (props: AddDatasetDrawerProps) => {
 
   const name = watch("name");
   const slug = slugify(name || "", { lower: true, strict: true });
+  const columnTypes = watch("columnTypes");
 
   useEffect(() => {
-    if (currentSchema === DatabaseSchema.ONE_LLM_CALL_PER_ROW) {
-      setValue("columns", ["llm_input", "expected_llm_output"]);
+    if (currentSchema === "ONE_LLM_CALL_PER_ROW") {
+      setValue("columnTypes", {
+        llm_input: "chat_messages",
+        expected_llm_output: "chat_messages",
+      });
     } else {
-      setValue("columns", ["input", "expected_output"]);
+      setValue("columnTypes", {
+        input: "string",
+        expected_output: "string",
+      });
     }
   }, [currentSchema, setValue]);
 
@@ -87,8 +103,7 @@ export const AddDatasetDrawer = (props: AddDatasetDrawerProps) => {
       {
         projectId: project?.id ?? "",
         name: data.name,
-        schema: data.schema,
-        columns: data.columns,
+        columnTypes: data.columnTypes,
       } as DatasetRecordForm & { projectId: string },
       {
         onSuccess: (data) => {
@@ -117,11 +132,31 @@ export const AddDatasetDrawer = (props: AddDatasetDrawerProps) => {
     );
   };
 
+  const setColumn = useCallback(
+    (columnName: string, columnType: DatasetColumnType) =>
+      (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.checked) {
+          setValue("columnTypes", {
+            ...columnTypes,
+            [columnName]: columnType,
+          });
+        } else {
+          const columnTypes_ = { ...columnTypes };
+          if (columnTypes_?.[columnName]) {
+            delete columnTypes_[columnName];
+          }
+          setValue("columnTypes", columnTypes_);
+        }
+      },
+    [setValue, columnTypes]
+  );
+
   const AnnotationScores = () => {
     return (
       <Checkbox
         value="annotation_scores"
-        {...register("columns")}
+        onChange={setColumn("annotation_scores", "annotations")}
+        isChecked={"annotation_scores" in columnTypes}
         alignItems="start"
         paddingTop={2}
       >
@@ -144,7 +179,8 @@ export const AddDatasetDrawer = (props: AddDatasetDrawerProps) => {
     return (
       <Checkbox
         value="evaluations"
-        {...register("columns")}
+        onChange={setColumn("evaluations", "evaluations")}
+        isChecked={"evaluations" in columnTypes}
         alignItems="start"
         paddingTop={2}
       >
@@ -204,12 +240,12 @@ export const AddDatasetDrawer = (props: AddDatasetDrawerProps) => {
               isInvalid={!!errors.schema}
               minWidth="calc(50% - 16px)"
             >
-              <RadioGroup defaultValue={DatabaseSchema.ONE_MESSAGE_PER_ROW}>
+              <RadioGroup defaultValue="ONE_MESSAGE_PER_ROW">
                 <VStack spacing={4}>
                   <VStack align="start">
                     <Radio
                       size="md"
-                      value={DatabaseSchema.ONE_MESSAGE_PER_ROW}
+                      value="ONE_MESSAGE_PER_ROW"
                       colorScheme="blue"
                       alignItems="start"
                       spacing={3}
@@ -228,7 +264,7 @@ export const AddDatasetDrawer = (props: AddDatasetDrawerProps) => {
                   <VStack align="start">
                     <Radio
                       size="md"
-                      value={DatabaseSchema.ONE_LLM_CALL_PER_ROW}
+                      value="ONE_LLM_CALL_PER_ROW"
                       colorScheme="blue"
                       alignItems="start"
                       spacing={3}
@@ -253,14 +289,15 @@ export const AddDatasetDrawer = (props: AddDatasetDrawerProps) => {
             <HorizontalFormControl
               label="Columns"
               helper="Which columns should be present in the dataset"
-              isInvalid={!!errors.columns}
+              isInvalid={!!errors.columnTypes}
             >
               <VStack align="start">
-                {currentSchema === DatabaseSchema.ONE_MESSAGE_PER_ROW && (
+                {currentSchema === "ONE_MESSAGE_PER_ROW" && (
                   <CheckboxGroup defaultValue={["input", "expected_output"]}>
                     <Checkbox
                       value="input"
-                      {...register("columns")}
+                      onChange={setColumn("input", "string")}
+                      isChecked={"input" in columnTypes}
                       alignItems="start"
                       paddingTop={2}
                       readOnly
@@ -277,7 +314,8 @@ export const AddDatasetDrawer = (props: AddDatasetDrawerProps) => {
                     </Checkbox>
                     <Checkbox
                       value="expected_output"
-                      {...register("columns")}
+                      onChange={setColumn("expected_output", "string")}
+                      isChecked={"expected_output" in columnTypes}
                       alignItems="start"
                       paddingTop={2}
                       readOnly
@@ -297,7 +335,8 @@ export const AddDatasetDrawer = (props: AddDatasetDrawerProps) => {
                     </Checkbox>
                     <Checkbox
                       value="contexts"
-                      {...register("columns")}
+                      onChange={setColumn("contexts", "rag_contexts")}
+                      isChecked={"contexts" in columnTypes}
                       alignItems="start"
                       paddingTop={2}
                     >
@@ -311,7 +350,8 @@ export const AddDatasetDrawer = (props: AddDatasetDrawerProps) => {
                     </Checkbox>
                     <Checkbox
                       value="spans"
-                      {...register("columns")}
+                      onChange={setColumn("spans", "spans")}
+                      isChecked={"spans" in columnTypes}
                       alignItems="start"
                       paddingTop={2}
                     >
@@ -329,7 +369,8 @@ export const AddDatasetDrawer = (props: AddDatasetDrawerProps) => {
                     <Evaluations />
                     <Checkbox
                       value="comments"
-                      {...register("columns")}
+                      onChange={setColumn("comments", "string")}
+                      isChecked={"comments" in columnTypes}
                       alignItems="start"
                       paddingTop={2}
                     >
@@ -349,13 +390,14 @@ export const AddDatasetDrawer = (props: AddDatasetDrawerProps) => {
                   </CheckboxGroup>
                 )}
 
-                {currentSchema === DatabaseSchema.ONE_LLM_CALL_PER_ROW && (
+                {currentSchema === "ONE_LLM_CALL_PER_ROW" && (
                   <CheckboxGroup
                     defaultValue={["llm_input", "expected_llm_output"]}
                   >
                     <Checkbox
                       value="llm_input"
-                      {...register("columns")}
+                      onChange={setColumn("llm_input", "chat_messages")}
+                      isChecked={"llm_input" in columnTypes}
                       alignItems="start"
                       paddingTop={2}
                       readOnly
@@ -375,7 +417,11 @@ export const AddDatasetDrawer = (props: AddDatasetDrawerProps) => {
                     </Checkbox>
                     <Checkbox
                       value="expected_llm_output"
-                      {...register("columns")}
+                      onChange={setColumn(
+                        "expected_llm_output",
+                        "chat_messages"
+                      )}
+                      isChecked={"expected_llm_output" in columnTypes}
                       alignItems="start"
                       paddingTop={2}
                       readOnly
@@ -398,7 +444,8 @@ export const AddDatasetDrawer = (props: AddDatasetDrawerProps) => {
                     <Evaluations />
                     <Checkbox
                       value="comments"
-                      {...register("columns")}
+                      onChange={setColumn("comments", "string")}
+                      isChecked={"comments" in columnTypes}
                       alignItems="start"
                       paddingTop={2}
                     >

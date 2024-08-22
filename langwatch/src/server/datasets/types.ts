@@ -5,39 +5,26 @@ import {
   rAGChunkSchema,
 } from "../tracer/types.generated";
 
-export type OneMessagePerRowColumns =
-  | "input"
-  | "expected_output"
-  | "contexts"
+export type DatasetColumnType =
+  | "string"
+  | "boolean"
+  | "number"
+  | "json"
   | "spans"
-  | "comments"
-  | "annotation_scores"
+  | "rag_contexts"
+  | "chat_messages"
+  | "annotations"
   | "evaluations";
 
-export type OneLLMCallPerRowColumns =
-  | "llm_input"
-  | "expected_llm_output"
-  | "comments"
-  | "annotation_scores"
-  | "evaluations";
-
-export type DatasetColumns = OneMessagePerRowColumns & OneLLMCallPerRowColumns;
+export type DatasetColumnTypes = Record<string, DatasetColumnType>;
 
 export type DatasetRecordForm = {
   /**
    * @minLength 1
    */
   name: string;
-} & (
-  | {
-      schema: "ONE_MESSAGE_PER_ROW";
-      columns: OneMessagePerRowColumns[];
-    }
-  | {
-      schema: "ONE_LLM_CALL_PER_ROW";
-      columns: OneLLMCallPerRowColumns[];
-    }
-);
+  columnTypes: DatasetColumnTypes;
+};
 
 export const annotationScoreSchema = z.object({
   label: z.string().optional(),
@@ -52,51 +39,23 @@ export const evaluationsSchema = z.object({
   type: z.string().optional().nullable(),
   passed: z.boolean().optional().nullable(),
   score: z.number().nullable(),
+  label: z.string().optional().nullable(),
 });
 
-export const newDatasetEntriesSchema = z.union([
-  z.object({
-    schema: z.literal("ONE_MESSAGE_PER_ROW"),
-    entries: z.array(
-      z.object({
-        id: z.string(),
-        input: z.string().optional(),
-        expected_output: z.string().optional(),
-        spans: z.array(datasetSpanSchema).optional(),
-        contexts: z
-          .union([z.array(rAGChunkSchema), z.array(z.string())])
-          .optional(),
-        comments: z.string().optional(),
-        annotation_scores: z.array(annotationScoreSchema).optional(),
-        evaluations: z.array(evaluationsSchema).optional(),
-      })
-    ),
-  }),
-  z.object({
-    schema: z.literal("ONE_LLM_CALL_PER_ROW"),
-    entries: z.array(
-      z.object({
-        id: z.string(),
-        llm_input: z.array(chatMessageSchema).optional(),
-        expected_llm_output: z.array(chatMessageSchema).optional(),
-        comments: z.string().optional(),
-        annotation_scores: z.array(annotationScoreSchema).optional(),
-        evaluations: z.array(evaluationsSchema).optional(),
-      })
-    ),
-  }),
-]);
-
-export type FlattenStringifiedDatasetEntry = {
-  id: string;
-  selected: boolean;
-  input?: string;
-  expected_output?: string;
-  spans?: string;
-  contexts?: string;
-  llm_input?: string;
-  expected_llm_output?: string;
-  comments?: string;
-  annotation_scores?: string;
-  evaluations?: string;
+export const datasetColumnTypeMapping: {
+  [key in DatasetColumnType]: z.ZodType<any>;
+} = {
+  string: z.string().optional().nullable(),
+  boolean: z.boolean().optional().nullable(),
+  number: z.number().optional().nullable(),
+  json: z.any().optional().nullable(),
+  spans: z.array(datasetSpanSchema).optional().nullable(),
+  rag_contexts: z.array(rAGChunkSchema).optional().nullable(),
+  chat_messages: z.array(chatMessageSchema).optional().nullable(),
+  annotations: z.array(annotationScoreSchema).optional().nullable(),
+  evaluations: z.array(evaluationsSchema).optional().nullable(),
 };
+
+export const newDatasetEntriesSchema = z.object({
+  entries: z.array(z.record(z.string(), z.any())),
+});

@@ -4,6 +4,7 @@ import { TeamRoleGroup, checkUserPermissionForProject } from "../permission";
 import { type DatasetRecord } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { newDatasetEntriesSchema } from "../../datasets/types";
+import { nanoid } from "nanoid";
 
 export const datasetRecordRouter = createTRPCRouter({
   create: protectedProcedure
@@ -22,7 +23,6 @@ export const datasetRecordRouter = createTRPCRouter({
         where: {
           id: input.datasetId,
           projectId: input.projectId,
-          schema: input.schema,
         },
       });
 
@@ -36,7 +36,7 @@ export const datasetRecordRouter = createTRPCRouter({
       const recordData: DatasetRecord[] = [];
 
       for (const entry of input.entries) {
-        const id = entry.id;
+        const id = entry.id ?? nanoid();
         const entryWithoutId: Omit<typeof entry, "id"> = { ...entry };
         // @ts-ignore
         delete entryWithoutId.id;

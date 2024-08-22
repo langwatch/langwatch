@@ -1,4 +1,3 @@
-import { type DatabaseSchema } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
@@ -41,9 +40,8 @@ export const datasetRouter = createTRPCRouter({
           id: nanoid(),
           slug,
           name: input.name,
-          schema: input.schema as keyof typeof DatabaseSchema,
           projectId: input.projectId,
-          columns: input.columns.join(","),
+          columnTypes: input.columnTypes,
         },
       });
     }),

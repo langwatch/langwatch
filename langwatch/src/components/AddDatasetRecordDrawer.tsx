@@ -9,7 +9,6 @@ import {
   FormErrorMessage,
   HStack,
   Select,
-  Tag,
   Text,
   useDisclosure,
   useToast,
@@ -24,11 +23,10 @@ import { z } from "zod";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { datasetSpanSchema } from "~/server/tracer/types.generated";
 import { api } from "~/utils/api";
-import { schemaDisplayName } from "~/utils/datasets";
 import type {
-  FlattenStringifiedDatasetEntry,
-  newDatasetEntriesSchema,
   annotationScoreSchema,
+  DatasetColumnType,
+  DatasetColumnTypes,
 } from "../server/datasets/types";
 import type {
   DatasetSpan,
@@ -103,7 +101,10 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
     }
   );
 
-  const evaluations = Object.values(evaluationsObject.data ?? {}).flat();
+  const evaluations = useMemo(
+    () => Object.values(evaluationsObject.data ?? {}).flat(),
+    [evaluationsObject.data]
+  );
 
   const annotationScores = api.annotation.getByTraceIds.useQuery(
     { projectId: project?.id ?? "", traceIds: traceIds },
@@ -111,20 +112,23 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
   );
 
   const getAnnotationScoreOptions = api.annotationScore.getAllActive.useQuery(
-    {
-      projectId: project?.id ?? "",
-    },
+    { projectId: project?.id ?? "" },
     {
       enabled: !!project?.id,
+      refetchOnWindowFocus: false,
     }
   );
 
-  const idNameMap = getAnnotationScoreOptions?.data?.reduce(
-    (map, obj) => {
-      map[obj.id] = obj.name;
-      return map;
-    },
-    {} as Record<string, string>
+  const idNameMap = useMemo(
+    () =>
+      getAnnotationScoreOptions?.data?.reduce(
+        (map, obj) => {
+          map[obj.id] = obj.name;
+          return map;
+        },
+        {} as Record<string, string>
+      ),
+    [getAnnotationScoreOptions.data]
   );
 
   const datasets = api.dataset.getAll.useQuery(
@@ -170,75 +174,36 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
   };
 
   const [editableRowData, setEditableRowData] = useState<
-    FlattenStringifiedDatasetEntry[]
+    Record<string, string | boolean>[]
   >([]);
   const rowsToAdd = editableRowData.filter((row) => row.selected);
+  const columnTypes = selectedDataset?.columnTypes as
+    | DatasetColumnTypes
+    | undefined;
 
   const onSubmit: SubmitHandler<FormValues> = (_data) => {
     if (!selectedDataset || !project) return;
 
-    const schemaAndEntries:
-      | z.infer<typeof newDatasetEntriesSchema>
-      | undefined =
-      selectedDataset.schema === "ONE_MESSAGE_PER_ROW"
-        ? {
-            schema: selectedDataset.schema,
-            entries: rowsToAdd.map((row) => ({
-              id: row.id,
-              input: row.input,
-              expected_output: row.expected_output,
-              spans:
-                row.spans !== undefined ? JSON.parse(row.spans) : undefined,
-              contexts:
-                row.contexts !== undefined
-                  ? JSON.parse(row.contexts)
-                  : undefined,
-              comments: row.comments,
-              annotation_scores:
-                row.annotation_scores !== undefined
-                  ? JSON.parse(row.annotation_scores)
-                  : undefined,
-              evaluations:
-                row.evaluations !== undefined
-                  ? JSON.parse(row.evaluations)
-                  : undefined,
-            })),
-          }
-        : selectedDataset.schema === "ONE_LLM_CALL_PER_ROW"
-        ? {
-            schema: selectedDataset.schema,
-            entries: rowsToAdd.map((row) => ({
-              id: row.id,
-              llm_input:
-                row.llm_input !== undefined
-                  ? JSON.parse(row.llm_input)
-                  : undefined,
-              expected_llm_output:
-                row.expected_llm_output !== undefined
-                  ? JSON.parse(row.expected_llm_output)
-                  : undefined,
-              comments: row.comments,
-              annotation_scores:
-                row.annotation_scores !== undefined
-                  ? JSON.parse(row.annotation_scores)
-                  : undefined,
-              evaluations:
-                row.evaluations !== undefined
-                  ? JSON.parse(row.evaluations)
-                  : undefined,
-            })),
-          }
-        : undefined;
-
-    if (!schemaAndEntries) {
-      return;
-    }
+    const entries = rowsToAdd.map((row) =>
+      Object.fromEntries(
+        Object.entries(row)
+          .filter(([key, _]) => key !== "selected")
+          .map(([key, value]) => {
+            return [
+              key,
+              !columnTypes?.[key] || columnTypes[key] === "string"
+                ? value
+                : JSON.parse(value as string),
+            ];
+          })
+      )
+    );
 
     createDatasetRecord.mutate(
       {
         projectId: project.id ?? "",
         datasetId: datasetId,
-        ...schemaAndEntries,
+        entries,
       },
       {
         onSuccess: () => {
@@ -322,44 +287,35 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
       return;
     }
 
-    const rows: FlattenStringifiedDatasetEntry[] = [];
-    const columns = selectedDataset.columns.split(",");
+    const rows: Record<string, string | boolean>[] = [];
 
-    if (selectedDataset.schema === "ONE_MESSAGE_PER_ROW") {
-      for (const trace of tracesWithSpans.data) {
-        const row: FlattenStringifiedDatasetEntry = {
-          id: nanoid(),
-          selected: true,
-        };
-
-        if (columns.includes("input")) {
-          row.input = trace.input?.value ?? "";
-        }
-        if (columns.includes("expected_output")) {
-          row.expected_output = trace.output?.value ?? "";
-        }
-        if (columns.includes("contexts")) {
+    for (const trace of tracesWithSpans.data) {
+      const row: Record<string, string | boolean> = {
+        id: nanoid(),
+        selected: true,
+      };
+      for (const [column, type] of Object.entries(
+        selectedDataset.columnTypes ?? {}
+      )) {
+        if (column === "input" && type === "string") {
+          row[column] = trace.input?.value ?? "";
+        } else if (column === "expected_output" && type === "string") {
+          row[column] = trace.output?.value ?? "";
+        } else if (type === "rag_contexts") {
           try {
-            row.contexts = JSON.stringify(
+            row[column] = JSON.stringify(
               getRAGInfo(trace.spans ?? []).contexts ?? []
             );
           } catch (e) {
-            row.contexts = JSON.stringify([]);
+            row[column] = JSON.stringify([]);
           }
-        }
-        if (columns.includes("spans")) {
-          row.spans = JSON.stringify(
+        } else if (type === "spans") {
+          row[column] = JSON.stringify(
             esSpansToDatasetSpans(trace.spans ?? []),
             null,
             2
           );
-        }
-
-        if (columns.includes("comments")) {
-          row.comments = "";
-        }
-
-        if (columns.includes("annotation_scores")) {
+        } else if (column === "annotation_scores") {
           const annotationScoresArray = annotationScores.data
             ? getAnnotationScoresArray(
                 annotationScores.data as z.infer<
@@ -369,71 +325,53 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
                 trace.trace_id
               )
             : [];
-          row.annotation_scores = JSON.stringify(annotationScoresArray);
-        }
-
-        if (columns.includes("evaluations")) {
-          row.evaluations = JSON.stringify(
+          row[column] = JSON.stringify(annotationScoresArray);
+        } else if (type === "evaluations") {
+          row[column] = JSON.stringify(
             getEvaluationArray(evaluations, trace.trace_id)
           );
+        } else {
+          row[column] = "";
         }
+      }
 
+      // One row per LLM entry
+      if (
+        Object.values(selectedDataset.columnTypes ?? {}).some(
+          (type) => type === "chat_messages"
+        )
+      ) {
+        const llmEntries = trace.spans?.filter((span) => span.type === "llm");
+        // TODO: disable the row if the llm entry has no chat_message as input/output type
+        for (const llmEntry of llmEntries ?? []) {
+          const row_ = { ...row };
+
+          for (const [column, type] of Object.entries(
+            selectedDataset.columnTypes ?? {}
+          )) {
+            if (column === "expected_llm_output" && type === "chat_messages") {
+              row_[column] = llmEntry.output?.value
+                ? llmEntry.output.value
+                : "";
+            } else if (type === "chat_messages") {
+              row_[column] = llmEntry.input?.value ? llmEntry.input.value : "";
+            }
+          }
+          rows.push(row_);
+        }
+      } else {
         rows.push(row);
       }
     }
 
-    if (selectedDataset.schema === "ONE_LLM_CALL_PER_ROW") {
-      for (const trace of tracesWithSpans.data) {
-        const llmEntries = trace.spans?.filter((span) => span.type === "llm");
-        // TODO: disable the row if the llm entry has no chat_message as input/output type
-        for (const llmEntry of llmEntries ?? []) {
-          const row: FlattenStringifiedDatasetEntry = {
-            id: nanoid(),
-            selected: true,
-          };
-
-          if (
-            columns.includes("llm_input") &&
-            llmEntry.input?.type === "chat_messages"
-          ) {
-            row.llm_input = llmEntry.input.value;
-          }
-          if (
-            columns.includes("expected_llm_output") &&
-            llmEntry.output?.type === "chat_messages"
-          ) {
-            row.expected_llm_output = llmEntry.output.value;
-          }
-          if (columns.includes("comments")) {
-            row.comments = "";
-          }
-
-          if (columns.includes("annotation_scores")) {
-            const annotationScoresArray = annotationScores.data
-              ? getAnnotationScoresArray(
-                  annotationScores.data as z.infer<
-                    typeof annotationScoreSchema
-                  >[],
-                  idNameMap ?? {},
-                  trace.trace_id
-                )
-              : [];
-            row.annotation_scores = JSON.stringify(annotationScoresArray);
-          }
-
-          if (columns.includes("evaluations")) {
-            row.evaluations = JSON.stringify(
-              getEvaluationArray(evaluations, trace.trace_id)
-            );
-          }
-
-          rows.push(row);
-        }
-      }
-    }
-
     return rows;
-  }, [selectedDataset, tracesWithSpans.data, annotationScores.data]);
+  }, [
+    selectedDataset,
+    tracesWithSpans.data,
+    annotationScores.data,
+    idNameMap,
+    evaluations,
+  ]);
 
   useEffect(() => {
     if (!rowDataFromDataset) return;
@@ -446,31 +384,21 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
       return [];
     }
 
-    const fieldToLabelMap: Record<string, string> = {
-      input: "Input",
-      expected_output: "Expected Output",
-      contexts: "Contexts",
-      spans: "Spans",
-      llm_input: "LLM Input",
-      expected_llm_output: "Expected LLM Output",
-      comments: "Comments",
-      annotation_scores: "Annotation Scores",
-      evaluations: "Evaluations",
-    };
-
-    const headers: ColDef[] = selectedDataset.columns
-      .split(",")
-      .map((field) => ({
-        headerName: fieldToLabelMap[field],
-        field,
-        cellClass: "v-align",
-        sortable: false,
-      }));
+    const headers: (ColDef & { type: DatasetColumnType })[] = Object.entries(
+      selectedDataset.columnTypes ?? {}
+    ).map(([column, type]) => ({
+      headerName: column,
+      field: column,
+      type: type,
+      cellClass: "v-align",
+      sortable: false,
+    }));
 
     // Add row number column
     headers.unshift({
       headerName: " ",
       field: "selected",
+      type: "boolean",
       width: 46,
       pinned: "left",
       sortable: false,
@@ -547,13 +475,6 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
               </Button>
             </HorizontalFormControl>
 
-            {selectedDataset?.schema ? (
-              <HStack align={"start"} paddingY={4}>
-                <Text>Dataset Schema:</Text>
-                <Tag>{schemaDisplayName(selectedDataset?.schema)}</Tag>
-              </HStack>
-            ) : null}
-
             {selectedDataset && (
               <DatasetGrid
                 columnDefs={columnDefs}
@@ -561,7 +482,7 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
                 onCellValueChanged={({
                   data,
                 }: {
-                  data: FlattenStringifiedDatasetEntry;
+                  data: Record<string, string | boolean>;
                 }) => {
                   setEditableRowData((rowData) =>
                     rowData.map((row) => (row.id === data.id ? data : row))
@@ -611,8 +532,12 @@ const esSpansToDatasetSpans = (spans: ElasticSearchSpan[]): DatasetSpan[] => {
     } else {
       newArray[i].output = { value: "", type: "json" };
     }
-    const inputObj = JSON.parse(newArray[i].input.value);
-    newArray[i].input.value = inputObj;
+    if (newArray[i].input?.value) {
+      const inputObj = JSON.parse(newArray[i].input.value);
+      newArray[i].input.value = inputObj;
+    } else {
+      newArray[i].input = { value: "", type: "json" };
+    }
   }
   return z.array(datasetSpanSchema).parse(newArray);
 };

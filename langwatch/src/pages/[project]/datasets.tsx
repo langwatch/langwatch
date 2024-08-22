@@ -21,7 +21,7 @@ import {
   Thead,
   Tr,
   useDisclosure,
-  useToast
+  useToast,
 } from "@chakra-ui/react";
 
 import { DeleteIcon } from "@chakra-ui/icons";
@@ -32,7 +32,6 @@ import { useDrawer } from "~/components/CurrentDrawer";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
-import { schemaDisplayName } from "~/utils/datasets";
 
 export default function Datasets() {
   const { isOpen, onOpen, onClose } = useDisclosure();
@@ -167,7 +166,6 @@ export default function Datasets() {
                   <Thead>
                     <Tr>
                       <Th>Name</Th>
-                      <Th>Schema</Th>
                       <Th>Columns</Th>
                       <Th>Entries</Th>
                       <Th width={240}>Last Update</Th>
@@ -193,14 +191,15 @@ export default function Datasets() {
                             key={dataset.id}
                           >
                             <Td>{dataset.name}</Td>
-                            <Td>{schemaDisplayName(dataset.schema)}</Td>
                             <Td maxWidth="250px">
                               <HStack wrap="wrap">
-                                {dataset.columns.split(",").map((column) => (
-                                  <Tag size="sm" key={column}>
-                                    {column}
-                                  </Tag>
-                                ))}
+                                {Object.keys(dataset.columnTypes ?? {}).map(
+                                  (column) => (
+                                    <Tag size="sm" key={column}>
+                                      {column}
+                                    </Tag>
+                                  )
+                                )}
                               </HStack>
                             </Td>
                             <Td>{dataset.datasetRecords.length ?? 0}</Td>

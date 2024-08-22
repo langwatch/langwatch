@@ -37,9 +37,11 @@ import { useDrawer } from "~/components/CurrentDrawer";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
-import { schemaDisplayName } from "~/utils/datasets";
 import { DatasetGrid } from "../../../components/datasets/DatasetGrid";
-import { newDatasetEntriesSchema } from "~/server/datasets/types";
+import {
+  newDatasetEntriesSchema,
+  type DatasetColumnType,
+} from "~/server/datasets/types";
 import {
   type datasetSpanSchema,
   type rAGChunkSchema,
@@ -96,21 +98,12 @@ function DatasetTable() {
   const columnDefs = useMemo(() => {
     if (!dataset.data) return [];
 
-    const fieldToLabelMap: Record<string, string> = {
-      input: "Input",
-      expected_output: "Expected Output",
-      contexts: "Contexts",
-      spans: "Spans",
-      llm_input: "LLM Input",
-      expected_llm_output: "Expected LLM Output",
-      comments: "Comments",
-      annotation_scores: "Annotation Scores",
-      evaluations: "Evaluations",
-    };
-
-    const headers: ColDef[] = dataset.data.columns.split(",").map((field) => ({
-      headerName: fieldToLabelMap[field],
+    const headers: (ColDef & { type: DatasetColumnType })[] = Object.entries(
+      dataset.data.columnTypes ?? {}
+    ).map(([field, type]) => ({
+      headerName: field,
       field,
+      type,
       cellClass: "v-align",
       sortable: false,
     }));
@@ -119,6 +112,7 @@ function DatasetTable() {
     headers.unshift({
       headerName: "#",
       valueGetter: "node.rowIndex + 1",
+      type: "number",
       width: 42,
       pinned: "left",
       sortable: false,
@@ -132,7 +126,7 @@ function DatasetTable() {
   const rowData = useMemo(() => {
     if (!dataset.data) return;
 
-    const columns = dataset.data.columns.split(",");
+    const columns = Object.keys(dataset.data.columnTypes ?? {});
     return dataset.data.datasetRecords.map((record) => {
       const row: Record<string, any> = { id: record.id };
       columns.forEach((col) => {
@@ -269,9 +263,9 @@ function DatasetTable() {
   };
 
   const isMappingsComplete = useCallback(() => {
-    const columns = dataset.data?.columns.split(",") ?? [];
+    const columns = Object.keys(dataset.data?.columnTypes ?? {}) ?? [];
     return columns.every((column) => Object.keys(mapping).includes(column));
-  }, [dataset.data?.columns, mapping]);
+  }, [dataset.data?.columnTypes, mapping]);
 
   useEffect(() => {
     setCanUpload(isMappingsComplete());
@@ -295,14 +289,10 @@ function DatasetTable() {
     try {
       entries = newDatasetEntriesSchema.parse({
         entries: recordEntries,
-        schema: dataset.data?.schema as
-          | "ONE_MESSAGE_PER_ROW"
-          | "ONE_LLM_CALL_PER_ROW",
       });
     } catch (error) {
       toast({
         title: "Error processing CSV",
-        description: "The CSV file does not match the expected format.",
         status: "error",
         duration: 5000,
         isClosable: true,
@@ -345,7 +335,7 @@ function DatasetTable() {
   };
 
   const downloadCSV = () => {
-    const columns = dataset.data?.columns.split(",") ?? [];
+    const columns = Object.keys(dataset.data?.columnTypes ?? {}) ?? [];
     const csvData =
       dataset.data?.datasetRecords.map((record) =>
         columns.map((col) => {
@@ -373,7 +363,7 @@ function DatasetTable() {
   const [zoneHover, setZoneHover] = useState(false);
 
   const selectMappings = useMemo(() => {
-    const columns = dataset.data?.columns.split(",") ?? [];
+    const columns = Object.keys(dataset.data?.columnTypes ?? {}) ?? [];
     return columns.map((col) => ({
       value: col,
     }));
@@ -417,17 +407,6 @@ function DatasetTable() {
           <Heading as={"h1"} size="lg">
             Dataset {`- ${dataset.data?.name ?? ""}`}
           </Heading>
-          <Text
-            whiteSpace="nowrap"
-            bg="gray.200"
-            paddingX="2"
-            paddingY="1"
-            borderRadius="lg"
-            fontSize={12}
-            marginLeft={4}
-          >
-            {dataset.data ? schemaDisplayName(dataset.data?.schema) : ""}
-          </Text>
           <HStack padding={2}>
             <Text fontSize={"12px"} color="gray.400">
               {savingStatus === "saving"
@@ -448,7 +427,7 @@ function DatasetTable() {
             colorScheme="black"
             minWidth="fit-content"
             variant="ghost"
-            onClick={() => dataset.data?.schema && downloadCSV()}
+            onClick={() => dataset.data && downloadCSV()}
           >
             Export <DownloadIcon marginLeft={2} />
           </Button>
