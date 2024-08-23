@@ -5,7 +5,6 @@ import { type DatasetRecord } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import {
   newDatasetEntriesSchema,
-  type DatasetColumnType,
   type DatasetColumnTypes,
 } from "../../datasets/types";
 import { nanoid } from "nanoid";

@@ -45,6 +45,7 @@ export const DatasetGrid = React.memo(
   ) {
     const gridOptions: GridOptions = useMemo(
       () => ({
+        getRowId: (params) => params.data.id,
         rowDragManaged: true,
         rowDragMultiRow: true,
         undoRedoCellEditing: true,
@@ -93,6 +94,7 @@ export const DatasetGrid = React.memo(
         }
         .ag-pinned-left-cols-container .ag-cell-value {
           white-space: nowrap;
+          text-overflow: unset;
         }
         .ag-pinned-left-cols-container .ag-cell {
           background-color: var(--ag-header-background-color);
@@ -187,12 +189,14 @@ export function HeaderCheckboxComponent(props: CustomCellRendererProps) {
     };
 
     props.api.addEventListener("cellValueChanged", updateAllChecked);
+    props.api.addEventListener("rowDataUpdated", updateAllChecked);
 
     // Initial check
     updateAllChecked();
 
     return () => {
       props.api.removeEventListener("cellValueChanged", updateAllChecked);
+      props.api.removeEventListener("rowDataUpdated", updateAllChecked);
     };
   }, [props.api]);
 

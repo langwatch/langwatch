@@ -24,45 +24,41 @@ import {
 } from "react";
 import { ArrowRight } from "react-feather";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import { newDatasetEntriesSchema } from "../../server/datasets/types";
+import {
+  newDatasetEntriesSchema,
+  type DatasetColumnTypes,
+  type DatasetRecordEntry,
+} from "../../server/datasets/types";
 import { api } from "../../utils/api";
 
 import { nanoid } from "nanoid";
 import { formatFileSize, useCSVReader } from "react-papaparse";
-import type { DatasetSpan, RAGChunk } from "../../server/tracer/types";
-
-type RecordEntry = {
-  id: string;
-  input: string;
-  expected_output: string;
-  contexts?: string[] | RAGChunk[];
-  spans?: DatasetSpan[];
-  llm_input?: string;
-  expected_llm_output?: string;
-  comments?: string;
-};
 
 export function UploadCSVModal({
   isOpen,
   onClose,
   datasetId,
+  columnTypes,
+  onUpdateDataset,
 }: {
   isOpen: boolean;
   onClose: () => void;
-  datasetId: string;
+  datasetId?: string;
+  columnTypes: DatasetColumnTypes;
+  onUpdateDataset?: (entries: DatasetRecordEntry[]) => void;
 }) {
   const { project } = useOrganizationTeamProject();
   const dataset = api.datasetRecord.getAll.useQuery(
-    { projectId: project?.id ?? "", datasetId: datasetId },
+    { projectId: project?.id ?? "", datasetId: datasetId ?? "" },
     {
-      enabled: !!project,
+      enabled: !!project && !!datasetId,
       refetchOnWindowFocus: false,
     }
   );
 
   const { CSVReader } = useCSVReader();
   const [zoneHover, setZoneHover] = useState(false);
-  const [recordEntries, setRecordEntries] = useState<RecordEntry[]>([]);
+  const [recordEntries, setRecordEntries] = useState<DatasetRecordEntry[]>([]);
   const [CSVHeaders, setCSVHeaders] = useState([]);
   const [hasErrors, setErrors] = useState<string[]>([]);
   const [csvUploaded, setCSVUploaded] = useState([]);
@@ -111,40 +107,31 @@ export function UploadCSVModal({
   };
 
   const setupRecordsUpload = (mappings: Record<string, string>) => {
-    const records: RecordEntry[] = [];
+    const records: DatasetRecordEntry[] = [];
 
     csvUploaded.slice(1).forEach((row: any) => {
-      const entries: RecordEntry = {
+      const entry: DatasetRecordEntry = {
         id: nanoid(),
-        input: safeGetRowValue(row, CSVHeaders, mappings.input ?? ""),
-        expected_output: safeGetRowValue(
-          row,
-          CSVHeaders,
-          mappings.expected_output ?? ""
-        ),
-        comments: safeGetRowValue(row, CSVHeaders, mappings.comments ?? ""),
-        contexts: parseJSONField(
-          row,
-          CSVHeaders,
-          mappings.contexts ?? "",
-          "contexts"
-        ),
-        spans: parseJSONField(row, CSVHeaders, mappings.spans ?? "", "spans"),
-        llm_input: parseJSONField(
-          row,
-          CSVHeaders,
-          mappings.llm_input ?? "",
-          "llm_input"
-        ),
-        expected_llm_output: parseJSONField(
-          row,
-          CSVHeaders,
-          mappings.expected_llm_output ?? "",
-          "expected_llm_output"
-        ),
       };
 
-      records.push(entries);
+      for (const [column, type] of Object.entries(columnTypes)) {
+        if (type === "string") {
+          entry[column] = safeGetRowValue(
+            row,
+            CSVHeaders,
+            mappings[column] ?? ""
+          );
+        } else {
+          entry[column] = parseJSONField(
+            row,
+            CSVHeaders,
+            mappings[column] ?? "",
+            column
+          );
+        }
+      }
+
+      records.push(entry);
     });
 
     setRecordEntries(records);
@@ -152,9 +139,9 @@ export function UploadCSVModal({
   };
 
   const isMappingsComplete = useCallback(() => {
-    const columns = Object.keys(dataset.data?.columnTypes ?? {}) ?? [];
+    const columns = Object.keys(columnTypes ?? {}) ?? [];
     return columns.every((column) => Object.keys(mapping).includes(column));
-  }, [dataset.data?.columnTypes, mapping]);
+  }, [columnTypes, mapping]);
 
   useEffect(() => {
     setCanUpload(isMappingsComplete());
@@ -190,6 +177,12 @@ export function UploadCSVModal({
       return;
     }
 
+    if (onUpdateDataset) {
+      onUpdateDataset(entries.entries);
+    }
+
+    if (!datasetId) return;
+
     uploadRecords.mutate(
       {
         projectId: project?.id ?? "",
@@ -224,11 +217,11 @@ export function UploadCSVModal({
   };
 
   const selectMappings = useMemo(() => {
-    const columns = Object.keys(dataset.data?.columnTypes ?? {}) ?? [];
+    const columns = Object.keys(columnTypes ?? {}) ?? [];
     return columns.map((col) => ({
       value: col,
     }));
-  }, [dataset.data]);
+  }, [columnTypes]);
 
   const renderMapping = (acceptedFile: boolean) => {
     if (!acceptedFile) return;

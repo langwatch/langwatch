@@ -13,7 +13,6 @@ import {
   useDisclosure,
   useToast,
 } from "@chakra-ui/react";
-import { useRouter } from "next/router";
 import Parse from "papaparse";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Play, Plus, Upload } from "react-feather";
@@ -32,46 +31,68 @@ import type {
 } from "@ag-grid-community/react";
 import { UploadCSVModal } from "./UploadCSVModal";
 import { nanoid } from "nanoid";
+import type {
+  DatasetColumnTypes,
+  DatasetRecordEntry,
+} from "../../server/datasets/types";
 
-export function DatasetTable() {
-  const router = useRouter();
+type InMemoryDataset = {
+  name: string;
+  datasetRecords: DatasetRecordEntry[];
+  columnTypes: DatasetColumnTypes;
+};
+
+export function DatasetTable({
+  datasetId,
+  inMemoryDataset,
+  onUpdateDataset,
+}: {
+  datasetId?: string;
+  inMemoryDataset?: InMemoryDataset;
+  onUpdateDataset?: (dataset: InMemoryDataset) => void;
+}) {
   const { project } = useOrganizationTeamProject();
-  const datasetId = router.query.id;
 
   const { openDrawer } = useDrawer();
   const { isOpen, onOpen, onClose } = useDisclosure();
   const [savingStatus, setSavingStatus] = useState<"saving" | "saved" | "">("");
 
-  const dataset = api.datasetRecord.getAll.useQuery(
-    { projectId: project?.id ?? "", datasetId: datasetId as string },
+  const databaseDataset = api.datasetRecord.getAll.useQuery(
+    { projectId: project?.id ?? "", datasetId: datasetId ?? "" },
     {
-      enabled: !!project,
+      enabled: !!project && !!datasetId,
       refetchOnWindowFocus: false,
     }
+  );
+  const dataset = useMemo(
+    () => databaseDataset.data ?? inMemoryDataset,
+    [databaseDataset.data, inMemoryDataset]
   );
   const deleteDatasetRecord = api.datasetRecord.deleteMany.useMutation();
 
   const gridRef = useRef<AgGridReact>(null);
 
+  const columnTypes = useMemo(
+    () => (dataset?.columnTypes as DatasetColumnTypes) ?? {},
+    [dataset]
+  );
   const columnDefs = useMemo(() => {
-    if (!dataset.data) return [];
-
-    const headers: DatasetColumnDef[] = Object.entries(
-      dataset.data.columnTypes ?? {}
-    ).map(([field, type]) => ({
-      headerName: field,
-      field,
-      type_: type,
-      cellClass: "v-align",
-      sortable: false,
-    }));
+    const headers: DatasetColumnDef[] = Object.entries(columnTypes).map(
+      ([field, type]) => ({
+        headerName: field,
+        field,
+        type_: type,
+        cellClass: "v-align",
+        sortable: false,
+      })
+    );
 
     // Add row number column
     headers.unshift({
       headerName: "#",
       valueGetter: "node.rowIndex + 1",
       type_: "number",
-      width: 42,
+      initialWidth: 48,
       pinned: "left",
       sortable: false,
       filter: false,
@@ -101,9 +122,9 @@ export function DatasetTable() {
     });
 
     return headers;
-  }, [dataset.data]);
+  }, [columnTypes]);
 
-  const [editableRowData, setEditableRowData] = useState<Record<string, any>[]>(
+  const [editableRowData, setEditableRowData] = useState<DatasetRecordEntry[]>(
     []
   );
 
@@ -112,20 +133,20 @@ export function DatasetTable() {
   );
 
   const rowData = useMemo(() => {
-    if (!dataset.data) return;
+    if (!dataset) return;
 
-    const columns = Object.keys(dataset.data.columnTypes ?? {});
-    return dataset.data.datasetRecords.map((record) => {
-      const row: Record<string, any> = { id: record.id };
+    const columns = Object.keys(dataset.columnTypes ?? {});
+    return dataset.datasetRecords.map((record) => {
+      const row: DatasetRecordEntry = { id: record.id };
       columns.forEach((col) => {
-        const value = (record.entry as any)[col];
+        const value = record.entry[col];
         row[col] = typeof value === "object" ? JSON.stringify(value) : value;
       });
       row.selected = selectedEntryIds.has(record.id);
       return row;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dataset.data]);
+  }, [dataset]);
 
   useEffect(() => {
     if (rowData) {
@@ -139,18 +160,29 @@ export function DatasetTable() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rowData]);
 
+  // Sync in-memory updates back to the callback
+  useEffect(() => {
+    if (onUpdateDataset) {
+      onUpdateDataset({
+        name: dataset?.name ?? "",
+        datasetRecords: editableRowData,
+        columnTypes: columnTypes,
+      });
+    }
+  }, [columnTypes, dataset?.name, editableRowData, onUpdateDataset]);
+
   const toast = useToast();
 
   const downloadCSV = (selectedOnly = false) => {
-    const columns = Object.keys(dataset.data?.columnTypes ?? {}) ?? [];
+    const columns = Object.keys(dataset?.columnTypes ?? {}) ?? [];
     const csvData =
-      dataset.data?.datasetRecords
+      dataset?.datasetRecords
         .filter((record) =>
           selectedOnly ? selectedEntryIds.has(record.id) : true
         )
         .map((record) =>
           columns.map((col) => {
-            const value = (record.entry as any)[col];
+            const value = record.entry[col];
             return typeof value === "object" ? JSON.stringify(value) : value;
           })
         ) ?? [];
@@ -164,9 +196,7 @@ export function DatasetTable() {
 
     const link = document.createElement("a");
     link.href = url;
-    const fileName = `${dataset.data?.name}${
-      selectedOnly ? "_selected" : ""
-    }.csv`;
+    const fileName = `${dataset?.name}${selectedOnly ? "_selected" : ""}.csv`;
     link.setAttribute("download", fileName);
     document.body.appendChild(link);
     link.click();
@@ -212,11 +242,13 @@ export function DatasetTable() {
         }
       });
 
+      if (!datasetId) return;
+
       setSavingStatus("saving");
       updateDatasetRecord.mutate(
         {
           projectId: project?.id ?? "",
-          datasetId: datasetId as string,
+          datasetId: datasetId,
           recordId: params.data.id,
           updatedRecord,
         },
@@ -239,29 +271,35 @@ export function DatasetTable() {
               duration: 5000,
               isClosable: true,
             });
-            void dataset.refetch();
+            void databaseDataset.refetch();
             setSavingStatus("");
           },
         }
       );
     },
-    [
-      editableRowData,
-      updateDatasetRecord,
-      project?.id,
-      datasetId,
-      toast,
-      dataset,
-    ]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [project?.id]
   );
 
   const onDelete = useCallback(() => {
     if (confirm("Are you sure?")) {
       const recordIds = Array.from(selectedEntryIds);
+      setEditableRowData((rows) =>
+        rows.filter((row) => !recordIds.includes(row.id))
+      );
+
+      if (gridRef.current?.api) {
+        gridRef.current.api.applyTransaction({
+          remove: recordIds.map((id) => ({ id })),
+        });
+      }
+
+      if (!datasetId) return;
+
       deleteDatasetRecord.mutate(
         {
           projectId: project?.id ?? "",
-          datasetId: datasetId as string,
+          datasetId: datasetId,
           recordIds,
         },
         {
@@ -273,7 +311,7 @@ export function DatasetTable() {
               duration: 5000,
               isClosable: true,
             });
-            dataset
+            databaseDataset
               .refetch()
               .then(() => {
                 gridRef.current?.api.refreshCells();
@@ -290,7 +328,7 @@ export function DatasetTable() {
               duration: 5000,
               isClosable: true,
             });
-            void dataset.refetch();
+            void databaseDataset.refetch();
           },
         }
       );
@@ -301,7 +339,7 @@ export function DatasetTable() {
     project?.id,
     datasetId,
     toast,
-    dataset,
+    databaseDataset,
   ]);
 
   const onAddNewRow = useCallback(() => {
@@ -351,7 +389,7 @@ export function DatasetTable() {
           spacing={6}
         >
           <Heading as={"h1"} size="lg">
-            Dataset {`- ${dataset.data?.name ?? ""}`}
+            Dataset {`- ${dataset?.name ?? ""}`}
           </Heading>
           <Text fontSize={"14px"} color="gray.400">
             {editableRowData.length} records
@@ -374,22 +412,24 @@ export function DatasetTable() {
             colorScheme="black"
             minWidth="fit-content"
             variant="ghost"
-            onClick={() => dataset.data && downloadCSV()}
+            onClick={() => dataset && downloadCSV()}
           >
             Export <DownloadIcon marginLeft={2} />
           </Button>
-          <Button
-            colorScheme="blue"
-            onClick={() => {
-              openDrawer("batchEvaluation", {
-                datasetSlug: dataset.data?.slug,
-              });
-            }}
-            minWidth="fit-content"
-            leftIcon={<Play height={16} />}
-          >
-            Batch Evaluation
-          </Button>
+          {datasetId && (
+            <Button
+              colorScheme="blue"
+              onClick={() => {
+                openDrawer("batchEvaluation", {
+                  datasetSlug: databaseDataset.data?.slug,
+                });
+              }}
+              minWidth="fit-content"
+              leftIcon={<Play height={16} />}
+            >
+              Batch Evaluation
+            </Button>
+          )}
         </HStack>
         <Card>
           <CardBody padding={0} position="relative">
@@ -411,7 +451,7 @@ export function DatasetTable() {
                 boxShadow="base"
                 borderRadius={"md"}
                 onClick={onAddNewRow}
-                zIndex="popover"
+                zIndex="100"
               >
                 <Plus />
                 <Text>Add new record</Text>
@@ -422,7 +462,11 @@ export function DatasetTable() {
         <UploadCSVModal
           isOpen={isOpen}
           onClose={onClose}
-          datasetId={datasetId as string}
+          datasetId={datasetId}
+          columnTypes={columnTypes}
+          onUpdateDataset={(entries) => {
+            setEditableRowData(entries);
+          }}
         />
         {selectedEntryIds.size > 0 && (
           <Box

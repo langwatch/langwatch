@@ -25,6 +25,7 @@ import { api } from "~/utils/api";
 import type {
   annotationScoreSchema,
   DatasetColumnTypes,
+  DatasetRecordEntry,
 } from "../server/datasets/types";
 import type {
   DatasetSpan,
@@ -37,7 +38,11 @@ import {
 } from "../server/tracer/utils";
 import { AddDatasetDrawer } from "./AddDatasetDrawer";
 import { HorizontalFormControl } from "./HorizontalFormControl";
-import { DatasetGrid, HeaderCheckboxComponent, type DatasetColumnDef } from "./datasets/DatasetGrid";
+import {
+  DatasetGrid,
+  HeaderCheckboxComponent,
+  type DatasetColumnDef,
+} from "./datasets/DatasetGrid";
 import { useDrawer } from "./CurrentDrawer";
 import { Link } from "@chakra-ui/next-js";
 
@@ -171,9 +176,9 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
     });
   };
 
-  const [editableRowData, setEditableRowData] = useState<
-    Record<string, string | boolean>[]
-  >([]);
+  const [editableRowData, setEditableRowData] = useState<DatasetRecordEntry[]>(
+    []
+  );
   const rowsToAdd = editableRowData.filter((row) => row.selected);
   const columnTypes = selectedDataset?.columnTypes as
     | DatasetColumnTypes
@@ -182,19 +187,20 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
   const onSubmit: SubmitHandler<FormValues> = (_data) => {
     if (!selectedDataset || !project) return;
 
-    const entries = rowsToAdd.map((row) =>
-      Object.fromEntries(
-        Object.entries(row)
-          .filter(([key, _]) => key !== "selected")
-          .map(([key, value]) => {
-            return [
-              key,
-              !columnTypes?.[key] || columnTypes[key] === "string"
-                ? value
-                : JSON.parse(value as string),
-            ];
-          })
-      )
+    const entries: DatasetRecordEntry[] = rowsToAdd.map(
+      (row) =>
+        Object.fromEntries(
+          Object.entries(row)
+            .filter(([key, _]) => key !== "selected")
+            .map(([key, value]) => {
+              const entry: DatasetRecordEntry =
+                !columnTypes?.[key] || columnTypes[key] === "string"
+                  ? value
+                  : JSON.parse(value as string);
+
+              return [key, entry];
+            })
+        ) as DatasetRecordEntry
     );
 
     createDatasetRecord.mutate(
@@ -285,10 +291,10 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
       return;
     }
 
-    const rows: Record<string, string | boolean>[] = [];
+    const rows: DatasetRecordEntry[] = [];
 
     for (const trace of tracesWithSpans.data) {
-      const row: Record<string, string | boolean> = {
+      const row: DatasetRecordEntry = {
         id: nanoid(),
         selected: true,
       };
@@ -480,7 +486,7 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
                 onCellValueChanged={({
                   data,
                 }: {
-                  data: Record<string, string | boolean>;
+                  data: DatasetRecordEntry;
                 }) => {
                   setEditableRowData((rowData) =>
                     rowData.map((row) => (row.id === data.id ? data : row))

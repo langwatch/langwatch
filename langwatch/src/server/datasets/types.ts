@@ -5,6 +5,8 @@ import {
   rAGChunkSchema,
 } from "../tracer/types.generated";
 
+export type DatasetRecordEntry = { id: string } & Record<string, any>;
+
 export type DatasetColumnType =
   | "string"
   | "boolean"
@@ -57,5 +59,11 @@ export const datasetColumnTypeMapping: {
 };
 
 export const newDatasetEntriesSchema = z.object({
-  entries: z.array(z.record(z.string(), z.any())),
+  entries: z.array(
+    z
+      .object({
+        id: z.string(),
+      })
+      .and(z.record(z.any()))
+  ),
 });
