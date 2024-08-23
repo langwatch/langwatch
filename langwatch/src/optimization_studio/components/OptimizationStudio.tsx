@@ -14,12 +14,14 @@ import { LogoIcon } from "../../components/icons/LogoIcon";
 import { useWorkflowStore } from "../hooks/useWorkflowStore";
 import { EntryNode, SignatureNode } from "./Nodes";
 import { UndoRedo } from "./UndoRedo";
+import DefaultEdge from "./Edge";
 
 export default function OptimizationStudio() {
   const nodeTypes = useMemo(
     () => ({ entry: EntryNode, signature: SignatureNode }),
     []
   );
+  const edgeTypes = useMemo(() => ({ default: DefaultEdge }), []);
   const theme = useTheme();
   const gray100 = theme.colors.gray["100"];
   const gray300 = theme.colors.gray["300"];
@@ -64,6 +66,7 @@ export default function OptimizationStudio() {
         <Box width="full" height="full">
           <ReactFlow
             nodeTypes={nodeTypes}
+            edgeTypes={edgeTypes}
             nodes={nodes}
             edges={edges}
             onNodesChange={onNodesChange}

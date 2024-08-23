@@ -12,17 +12,17 @@ import { temporal } from "zundo";
 import { create } from "zustand";
 import isDeepEqual from "fast-deep-equal";
 import debounce from "lodash.debounce";
-import type { Component, ComponentType } from "../types/dsl";
+import type { Component, ComponentType, Workflow } from "../types/dsl";
 
-interface WorkflowStore {
-  nodes: Node<Component>[];
-  edges: Edge[];
+type WorkflowStore = Workflow & {
+  hoveredNodeId?: string;
   onNodesChange: (changes: NodeChange[]) => void;
   onEdgesChange: (changes: EdgeChange[]) => void;
   onConnect: (connection: Connection) => void;
   setNodes: (nodes: Node[]) => void;
   setEdges: (edges: Edge[]) => void;
-}
+  setHoveredNodeId: (nodeId: string | undefined) => void;
+};
 
 const initialNodes: Node<Component>[] = [
   {
@@ -72,7 +72,10 @@ const initialNodes: Node<Component>[] = [
     },
   },
 ] satisfies (Node<Component> & { type: ComponentType })[];
-const initialEdges: Edge[] = [{ id: "e1-2", source: "1", target: "2" }];
+
+const initialEdges: Edge[] = [
+  { id: "e1-2", source: "1", target: "2", type: "default" },
+] satisfies (Edge & { type: "default" })[];
 
 const store = (
   set: (
@@ -83,9 +86,14 @@ const store = (
     replace?: boolean | undefined
   ) => void,
   get: () => WorkflowStore
-) => ({
+): WorkflowStore => ({
+  spec_version: "1.0",
+  name: "Untitled Workflow",
+  description: "",
+  version: "0.1",
   nodes: initialNodes,
   edges: initialEdges,
+  hoveredNodeId: undefined,
   onNodesChange: (changes: NodeChange[]) => {
     set({
       nodes: applyNodeChanges(changes, get().nodes),
@@ -107,6 +115,9 @@ const store = (
   setEdges: (edges: Edge[]) => {
     set({ edges });
   },
+  setHoveredNodeId: (nodeId: string | undefined) => {
+    set({ hoveredNodeId: nodeId });
+  },
 });
 
 export const useWorkflowStore = create<WorkflowStore>()(
@@ -125,6 +136,7 @@ export const useWorkflowStore = create<WorkflowStore>()(
           return node_;
         }),
       };
+      delete state_.hoveredNodeId;
       return state_;
     },
     handleSet: (handleSet) => {

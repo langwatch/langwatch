@@ -102,7 +102,7 @@ type Flow = {
 
 type ExecutionState = "idle" | "running" | "completed" | "failed";
 
-type Workflow = {
+export type Workflow = {
   spec_version: string;
 
   name: string;
@@ -111,7 +111,8 @@ type Workflow = {
 
   default_llm?: string;
 
-  workflow: Flow;
+  nodes: Node<Component>[];
+  edges: Edge[];
 
   state?: {
     execution: {
