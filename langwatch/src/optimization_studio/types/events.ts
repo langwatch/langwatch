@@ -1,14 +1,11 @@
-type Event =
+import type { BaseComponent, Workflow } from "./dsl";
+
+export type Event =
   | {
       type: "component_state_change";
       payload: {
         component_ref: string;
-        state: ComponentState;
-        error?: string;
-        trace_id?: string;
-        span_id?: string;
-        inputs?: Record<string, string>;
-        outputs?: Record<string, string>;
+        execution_state: BaseComponent["execution_state"];
         timestamps?: {
           started_at?: number;
           finished_at?: number;
@@ -18,10 +15,7 @@ type Event =
   | {
       type: "execution_state_change";
       payload: {
-        state: ExecutionState;
-        error?: string;
-        trace_id?: string;
-        outputs?: Record<string, Record<string, string>>;
+        execution_state: Workflow["state"]["execution"];
         timestamps?: {
           started_at?: number;
           finished_at?: number;

@@ -1,17 +1,20 @@
 import { HStack, Text, VStack } from "@chakra-ui/react";
 
 import { Handle, type Node, type NodeProps, Position } from "@xyflow/react";
-import { type Component, type Field } from "../types/dsl";
-import { EntryIcon, SignatureIcon } from "./ColorfulBlockIcons";
-import { useState } from "react";
+import { type Component, type ComponentType, type Field } from "../types/dsl";
 import { useWorkflowStore } from "../hooks/useWorkflowStore";
+import { ComponentIcon } from "./ColorfulBlockIcons";
 
 export function SignatureNode(props: NodeProps<Node<Component>>) {
-  return <ComponentNode icon={<SignatureIcon />} {...props} />;
+  return <ComponentNode {...props} />;
 }
 
 export function EntryNode(props: NodeProps<Node<Component>>) {
-  return <ComponentNode icon={<EntryIcon />} {...props} />;
+  return <ComponentNode {...props} outputsName="Fields" />;
+}
+
+export function getNodeDisplayName(node: { id: string; data: Component }) {
+  return node.data.name ?? node.data.cls ?? node.id;
 }
 
 function NodeInputs({
@@ -104,7 +107,7 @@ function NodeOutputs({
   );
 }
 
-function TypeLabel({ type }: { type: string }) {
+export function TypeLabel({ type }: { type: string }) {
   return (
     <Text color="cyan.600" fontStyle="italic">
       {type}
@@ -112,10 +115,16 @@ function TypeLabel({ type }: { type: string }) {
   );
 }
 
-function NodeSectionTitle({ children }: { children: React.ReactNode }) {
+export function NodeSectionTitle({
+  fontSize,
+  children,
+}: {
+  fontSize?: number;
+  children: React.ReactNode;
+}) {
   return (
     <Text
-      fontSize={9}
+      fontSize={fontSize ?? 9}
       textTransform="uppercase"
       color="gray.500"
       fontWeight="bold"
@@ -129,8 +138,9 @@ export const selectionColor = "#2F8FFB";
 
 function ComponentNode(
   props: NodeProps<Node<Component>> & {
-    icon: React.ReactNode;
+    icon?: React.ReactNode;
     children?: React.ReactNode;
+    outputsName?: string;
   }
 ) {
   const { hoveredNodeId, setHoveredNodeId } = useWorkflowStore(
@@ -162,9 +172,9 @@ function ComponentNode(
     >
       <HStack spacing="auto">
         <HStack spacing={2}>
-          {props.icon}
-          <Text fontSize={12}>
-            {props.data.name ?? props.data.cls ?? props.id}
+          <ComponentIcon type={props.type as ComponentType} size="md" />
+          <Text fontSize={12} fontWeight={500}>
+            {getNodeDisplayName(props)}
           </Text>
         </HStack>
       </HStack>
@@ -181,7 +191,7 @@ function ComponentNode(
       )}
       {props.data.outputs && (
         <>
-          <NodeSectionTitle>Outputs</NodeSectionTitle>
+          <NodeSectionTitle>{props.outputsName ?? "Outputs"}</NodeSectionTitle>
           <NodeOutputs
             namespace="outputs"
             outputs={props.data.outputs}

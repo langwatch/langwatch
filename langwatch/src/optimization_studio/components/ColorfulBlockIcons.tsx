@@ -1,6 +1,7 @@
 import { Box } from "@chakra-ui/react";
 import { FunctionIcon } from "../../components/icons/FunctionIcon";
 import { Home } from "react-feather";
+import type { ComponentType } from "../types/dsl";
 
 export function ColorfulBlockIcon({
   color,
@@ -39,14 +40,36 @@ export function ColorfulBlockIcon({
   );
 }
 
-export function SignatureIcon() {
-  return (
-    <ColorfulBlockIcon color="green.400" size="md" icon={<FunctionIcon />} />
-  );
-}
+export const ComponentIcon = ({
+  type,
+  size,
+}: {
+  type: ComponentType;
+  size: "sm" | "md" | "lg";
+}) => {
+  const componentIconMap: Record<ComponentType, React.ReactNode> = {
+    signature: <FunctionIcon />,
+    entry: <Home />,
+    module: <Box />,
+    retriever: <Box />,
+    prompting_technique: <Box />,
+    evaluator: <Box />,
+  };
 
-export function EntryIcon() {
+  const componentColorMap: Record<ComponentType, string> = {
+    signature: "green.400",
+    entry: "blue.400",
+    module: "gray.400",
+    retriever: "gray.400",
+    prompting_technique: "gray.400",
+    evaluator: "gray.400",
+  };
+
   return (
-    <ColorfulBlockIcon color="blue.400" size="md" icon={<Home />} />
+    <ColorfulBlockIcon
+      color={componentColorMap[type]}
+      size={size}
+      icon={componentIconMap[type]}
+    />
   );
-}
+};

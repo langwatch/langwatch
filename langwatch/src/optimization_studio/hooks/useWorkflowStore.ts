@@ -22,6 +22,7 @@ type WorkflowStore = Workflow & {
   setNodes: (nodes: Node[]) => void;
   setEdges: (edges: Edge[]) => void;
   setHoveredNodeId: (nodeId: string | undefined) => void;
+  deselectAllNodes: () => void;
 };
 
 const initialNodes: Node<Component>[] = [
@@ -31,6 +32,10 @@ const initialNodes: Node<Component>[] = [
     position: { x: 0, y: 0 },
     data: {
       name: "Entry",
+      outputs: [
+        { identifier: "question", type: "str" },
+        { identifier: "gold_answer", type: "str" },
+      ],
       dataset: {
         inline: {
           question: [
@@ -93,6 +98,8 @@ const store = (
   version: "0.1",
   nodes: initialNodes,
   edges: initialEdges,
+  state: {},
+
   hoveredNodeId: undefined,
   onNodesChange: (changes: NodeChange[]) => {
     set({
@@ -117,6 +124,11 @@ const store = (
   },
   setHoveredNodeId: (nodeId: string | undefined) => {
     set({ hoveredNodeId: nodeId });
+  },
+  deselectAllNodes: () => {
+    set({
+      nodes: get().nodes.map((node) => ({ ...node, selected: false })),
+    });
   },
 });
 

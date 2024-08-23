@@ -15,6 +15,7 @@ import { useWorkflowStore } from "../hooks/useWorkflowStore";
 import { EntryNode, SignatureNode } from "./Nodes";
 import { UndoRedo } from "./UndoRedo";
 import DefaultEdge from "./Edge";
+import { PropertiesPanel } from "./PropertiesPanel";
 
 export default function OptimizationStudio() {
   const nodeTypes = useMemo(
@@ -63,7 +64,7 @@ export default function OptimizationStudio() {
             <UndoRedo />
           </HStack>
         </HStack>
-        <Box width="full" height="full">
+        <Box width="full" height="full" position="relative">
           <ReactFlow
             nodeTypes={nodeTypes}
             edgeTypes={edgeTypes}
@@ -84,6 +85,7 @@ export default function OptimizationStudio() {
               color={gray300}
             />
           </ReactFlow>
+          <PropertiesPanel />
         </Box>
       </VStack>
     </div>

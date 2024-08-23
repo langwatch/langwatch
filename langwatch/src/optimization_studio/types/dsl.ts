@@ -20,7 +20,7 @@ export type Field = {
   hidden?: boolean;
 };
 
-type ComponentState = "idle" | "running" | "completed" | "failed";
+export type ComponentState = "idle" | "running" | "completed" | "failed";
 
 export type ComponentType =
   | "entry"
@@ -30,7 +30,7 @@ export type ComponentType =
   | "prompting_technique"
   | "evaluator";
 
-type BaseComponent = {
+export type BaseComponent = {
   _library_ref?: string;
 
   name?: string;
@@ -67,7 +67,7 @@ type Retriever = BaseComponent;
 
 type PromptingTechnique = BaseComponent;
 
-type Entry = BaseComponent & {
+export type Entry = BaseComponent & {
   type: "entry";
   inputs?: never;
   outputs: Field[];
@@ -100,7 +100,7 @@ type Flow = {
   edges: Edge[];
 };
 
-type ExecutionState = "idle" | "running" | "completed" | "failed";
+export type ExecutionState = "idle" | "running" | "completed" | "failed";
 
 export type Workflow = {
   spec_version: string;
@@ -114,8 +114,8 @@ export type Workflow = {
   nodes: Node<Component>[];
   edges: Edge[];
 
-  state?: {
-    execution: {
+  state: {
+    execution?: {
       state: ExecutionState;
       trace_id?: string;
       last_component_ref?: string;
