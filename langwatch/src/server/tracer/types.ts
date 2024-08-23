@@ -307,6 +307,7 @@ type EvaluationStatus =
 
 export type Evaluation = {
   evaluation_id: string;
+  span_id: string;
   name: string;
   type?: string | null;
   is_guardrail?: boolean | null;

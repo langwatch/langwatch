@@ -51,5 +51,5 @@ if __name__ == "__main__":
     # Test one llm call before starting the server
     print(call_fastapi_sample_endpoint("Hello, world!"))
 
-    port = int(os.environ.get("PORT", 8000))
+    port = int(os.environ.get("PORT", 9000))
     uvicorn.run(app, host="0.0.0.0", port=port)

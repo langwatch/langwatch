@@ -111,6 +111,7 @@ const evaluationsMapping: ElasticSearchMappingFrom<ElasticSearchEvaluation> = {
   trace_id: { type: "keyword" },
   check_id: { type: "keyword" },
   project_id: { type: "keyword" },
+  span_id: { type: "keyword" },
   check_type: { type: "keyword" },
   check_name: { type: "keyword" },
   is_guardrail: { type: "boolean" },

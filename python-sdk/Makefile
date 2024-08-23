@@ -16,7 +16,7 @@ example:
 	elif [[ $$args =~ "streamlit" ]]; then \
 		poetry run streamlit run $$args; \
 	else \
-		poetry run chainlit run -w $$args; \
+		poetry run chainlit run -w --port 9000 $$args; \
 	fi
 
 batch-evaluation-example:

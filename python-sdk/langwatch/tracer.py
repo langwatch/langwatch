@@ -307,6 +307,39 @@ class ContextSpan:
                     "Trying `metrics` on a non-LLM span, this attribute will be ignored for non-LLM spans, please make sure you set the span type to `llm` by using the decorator as @span(type='llm')"
                 )
 
+    def add_evaluation(
+        self,
+        *,
+        evaluation_id: Optional[str] = None,
+        name: str,
+        type: Optional[str] = None,
+        is_guardrail: Optional[bool] = None,
+        status: Literal["processed", "skipped", "error"] = "processed",
+        passed: Optional[bool] = None,
+        score: Optional[float] = None,
+        label: Optional[str] = None,
+        details: Optional[str] = None,
+        error: Optional[Exception] = None,
+        timestamps: Optional[EvaluationTimestamps] = None,
+    ):
+        if not self.trace:
+            raise ValueError("No trace found, could not add evaluation to span")
+
+        self.trace.add_evaluation(
+            evaluation_id=evaluation_id,
+            span_id=str(self.span_id),
+            name=name,
+            type=type,
+            is_guardrail=is_guardrail,
+            status=status,
+            passed=passed,
+            score=score,
+            label=label,
+            details=details,
+            error=error,
+            timestamps=timestamps,
+        )
+
     def end(
         self,
         name: Optional[str] = None,
@@ -662,6 +695,7 @@ class ContextTrace:
         self,
         *,
         evaluation_id: Optional[str] = None,
+        span_id: Optional[str] = None,
         name: str,
         type: Optional[str] = None,
         is_guardrail: Optional[bool] = None,
@@ -690,7 +724,8 @@ class ContextTrace:
         )
 
         evaluation = Evaluation(
-            evaluation_id=evaluation_id,
+            evaluation_id=evaluation_id or f"evaluation_{nanoid.generate()}",
+            span_id=span_id,
             name=name,
             type=type,
             is_guardrail=is_guardrail,
