@@ -42,8 +42,6 @@ export function EvaluationManualIntegration({
   const { project } = useOrganizationTeamProject();
   const isOutputMandatory =
     evaluatorDefinition.requiredFields.includes("output");
-  const isOutputOptional =
-    evaluatorDefinition.optionalFields.includes("output");
   const projectAPIKey = api.project.getProjectAPIKey.useQuery(
     {
       projectId: project?.id ?? "",
