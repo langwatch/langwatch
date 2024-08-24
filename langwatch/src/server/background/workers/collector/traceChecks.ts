@@ -48,8 +48,10 @@ export const scheduleTraceChecks = async (
         traceChecksSchedulings.push(
           scheduleTraceCheck({
             check: {
-              ...check,
+              evaluation_id: check.id, // Keep the same as evaluator id so multiple jobs for this trace will update the same evaluation state
+              evaluator_id: check.id,
               type: check.checkType as EvaluatorTypes,
+              name: check.name,
             },
             trace: trace,
           })

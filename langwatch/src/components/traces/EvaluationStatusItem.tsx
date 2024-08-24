@@ -22,7 +22,7 @@ export function EvaluationStatusItem({
 }: {
   check: ElasticSearchEvaluation;
 }) {
-  const checkType = check.check_type as EvaluatorTypes;
+  const checkType = check.type as EvaluatorTypes;
 
   const evaluator = getEvaluatorDefinitions(checkType);
 
@@ -42,7 +42,7 @@ export function EvaluationStatusItem({
           </Box>
           <VStack alignItems="start" spacing={1}>
             <Text>
-              <b>{check.check_name || evaluator?.name}</b>
+              <b>{check.name || evaluator?.name}</b>
             </Text>
             {evaluator && <Text fontSize={"sm"}>{evaluator.description}</Text>}
             <Text fontSize={"sm"}>

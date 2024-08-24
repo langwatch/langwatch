@@ -469,7 +469,7 @@ export const getAllTracesForProject = async (
                   path: "evaluations",
                   filter: {
                     term: {
-                      "evaluations.check_id": input.sortBy.split(".")[1],
+                      "evaluations.evaluator_id": input.sortBy.split(".")[1],
                     },
                   },
                 },

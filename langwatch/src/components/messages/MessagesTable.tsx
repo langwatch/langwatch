@@ -125,8 +125,8 @@ export function MessagesTable() {
       traceGroups.data?.traceChecks ?? previousTraceChecks ?? {}
     ).flatMap((checks) =>
       checks.map((check: any) => [
-        `evaluations.${check.check_id}`,
-        check.check_name,
+        `evaluations.${check.evaluator_id}`,
+        check.name,
       ])
     )
   );
@@ -214,9 +214,9 @@ export function MessagesTable() {
           trace.trace_id
         ]?.find(
           (traceCheck_: ElasticSearchEvaluation) =>
-            traceCheck_.check_id === checkId
+            traceCheck_.evaluator_id === checkId
         );
-        const evaluator = getEvaluatorDefinitions(traceCheck?.check_type ?? "");
+        const evaluator = getEvaluatorDefinitions(traceCheck?.type ?? "");
 
         return (
           <Td
@@ -250,7 +250,7 @@ export function MessagesTable() {
       value: (_trace: Trace, evaluations: ElasticSearchEvaluation[]) => {
         const checkId = columnKey.split(".")[1];
         const traceCheck = evaluations.find(
-          (evaluation) => evaluation.check_id === checkId
+          (evaluation) => evaluation.evaluator_id === checkId
         );
         return traceCheck?.status === "processed"
           ? numeral(traceCheck?.score).format("0.[00]")
@@ -715,7 +715,11 @@ export function MessagesTable() {
 
     const evaluations = traceGroups_.traceChecks;
 
-    const getValueForColumn = (trace: TraceWithGuardrail, column: string, name: string) => {
+    const getValueForColumn = (
+      trace: TraceWithGuardrail,
+      column: string,
+      name: string
+    ) => {
       return (
         headerColumns[column]?.value?.(
           trace,

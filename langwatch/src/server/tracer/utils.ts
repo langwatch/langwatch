@@ -134,27 +134,7 @@ export const elasticSearchEvaluationsToEvaluations = (
   elasticSearchEvaluations: ElasticSearchEvaluation[]
 ): Evaluation[] => {
   return elasticSearchEvaluations.map((evaluation) => {
-    const evaluation_: Omit<
-      ElasticSearchEvaluation,
-      "check_id" | "check_name" | "check_type"
-    > = {
-      ...evaluation,
-    };
-    // @ts-ignore
-    delete evaluation_.id;
-    // @ts-ignore
-    delete evaluation_.check_id;
-    // @ts-ignore
-    delete evaluation_.check_name;
-    // @ts-ignore
-    delete evaluation_.check_type;
-
-    return {
-      evaluation_id: evaluation.check_id,
-      name: evaluation.check_name,
-      type: evaluation.check_type,
-      ...evaluation_,
-    };
+    return evaluation;
   });
 };
 

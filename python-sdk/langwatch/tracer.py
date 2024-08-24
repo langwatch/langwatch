@@ -724,7 +724,7 @@ class ContextTrace:
         )
 
         evaluation = Evaluation(
-            evaluation_id=evaluation_id or f"evaluation_{nanoid.generate()}",
+            evaluation_id=evaluation_id or f"eval_{nanoid.generate()}",
             span_id=span_id,
             name=name,
             type=type,

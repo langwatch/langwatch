@@ -38,10 +38,13 @@ export const runEvaluationJob = async (
   job: Job<TraceCheckJob, any, EvaluatorTypes>
 ): Promise<SingleEvaluationResult> => {
   const check = await prisma.check.findUnique({
-    where: { id: job.data.check.id, projectId: job.data.trace.project_id },
+    where: {
+      id: job.data.check.evaluator_id,
+      projectId: job.data.trace.project_id,
+    },
   });
   if (!check) {
-    throw `check config ${job.data.check.id} not found`;
+    throw `check config ${job.data.check.evaluator_id} not found`;
   }
 
   return await runEvaluationForTrace({
@@ -308,11 +311,11 @@ export const startTraceChecksWorker = (
               costType: CostType.TRACE_CHECK,
               costName: job.data.check.name,
               referenceType: CostReferenceType.CHECK,
-              referenceId: job.data.check.id,
+              referenceId: job.data.check.evaluator_id,
               amount: result.cost.amount,
               currency: result.cost.currency,
               extraInfo: {
-                trace_check_id: job.id,
+                evaluation_id: job.data.check.evaluation_id,
               },
             },
           });

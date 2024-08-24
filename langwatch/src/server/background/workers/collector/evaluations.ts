@@ -2,6 +2,15 @@ import type { ElasticSearchEvaluation } from "../../../tracer/types";
 import type { CollectorJob } from "../../types";
 import { elasticSearchEvaluationSchema } from "../../../tracer/types.generated";
 import crypto from "crypto";
+import slugify from "slugify";
+
+export const evaluationNameAutoslug = (name: string) => {
+  const autoslug = slugify(name || "unnamed", {
+    lower: true,
+    strict: true,
+  }).replace(/[^a-z0-9]/g, "_");
+  return autoslug;
+};
 
 export const mapEvaluations = (
   data: CollectorJob
@@ -14,11 +23,12 @@ export const mapEvaluations = (
 
     const evaluation_: ElasticSearchEvaluation = {
       ...evaluation,
-      trace_id: data.traceId,
-      project_id: data.projectId,
-      check_id: evaluation.evaluation_id ?? `eval_md5_${evaluationMD5}`,
-      check_type: evaluation.type,
-      check_name: evaluation.name,
+      evaluation_id: evaluation.evaluation_id ?? `eval_md5_${evaluationMD5}`,
+      evaluator_id:
+        evaluation.evaluator_id ??
+        `custom_eval_${evaluationNameAutoslug(evaluation.name)}`,
+      type: evaluation.type,
+      name: evaluation.name,
       status: evaluation.status ?? (evaluation.error ? "error" : "processed"),
       timestamps: {
         ...evaluation.timestamps,
@@ -31,13 +41,16 @@ export const mapEvaluations = (
     return elasticSearchEvaluationSchema.parse(evaluation_);
   });
 
-  const uniqueByCheckIdKeepingLast = evaluations
-    ?.reverse()
-    .filter(
-      (evaluation, index, self) =>
-        index === self.findIndex((t) => t.check_id === evaluation.check_id)
-    )
-    .reverse();
+  const uniqueByCheckIdKeepingLast: ElasticSearchEvaluation[] | undefined =
+    evaluations
+      ?.reverse()
+      .filter(
+        (evaluation, index, self) =>
+          evaluation &&
+          index ===
+            self.findIndex((t) => t.evaluation_id === evaluation.evaluation_id)
+      )
+      .reverse();
 
   return uniqueByCheckIdKeepingLast;
 };

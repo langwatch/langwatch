@@ -464,7 +464,7 @@ export const analyticsMetrics = {
         (agg) => agg != "cardinality"
       ),
       requiresKey: {
-        filter: "evaluations.check_id",
+        filter: "evaluations.evaluator_id",
       },
       aggregation: (aggregation, key) => {
         return {
@@ -476,7 +476,7 @@ export const analyticsMetrics = {
               child: {
                 filter: {
                   bool: {
-                    must: [{ term: { "evaluations.check_id": key } }],
+                    must: [{ term: { "evaluations.evaluator_id": key } }],
                   } as any,
                 },
                 aggs: {
@@ -502,7 +502,7 @@ export const analyticsMetrics = {
       increaseIs: "neutral",
       allowedAggregations: ["cardinality"],
       requiresKey: {
-        filter: "evaluations.check_id",
+        filter: "evaluations.evaluator_id",
         optional: true,
       },
       aggregation: (aggregation, key) => ({
@@ -516,7 +516,7 @@ export const analyticsMetrics = {
                 bool: {
                   must: [
                     key
-                      ? { term: { "evaluations.check_id": key } }
+                      ? { term: { "evaluations.evaluator_id": key } }
                       : { match_all: {} },
                   ],
                 } as any,
@@ -525,7 +525,7 @@ export const analyticsMetrics = {
                 cardinality: {
                   cardinality: {
                     script: {
-                      source: `return doc['evaluations.trace_id'].value + ' ' + doc['evaluations.check_id'].value`,
+                      source: `return doc['evaluations.trace_id'].value + ' ' + doc['evaluations.evaluator_id'].value`,
                     },
                   },
                 },

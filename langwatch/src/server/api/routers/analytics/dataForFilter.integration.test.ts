@@ -61,9 +61,9 @@ describe("Data For Filter Integration Tests", () => {
         {
           trace_id: `test-trace-id-${nanoid()}`,
           project_id: "test-project-id",
-          check_id: `test-check-id-faithfulness`,
-          check_type: "faithfulness",
-          check_name: "Faithfulness",
+          evaluator_id: `test-check-id-faithfulness`,
+          type: "faithfulness",
+          name: "Faithfulness",
           is_guardrail: false,
           status: "processed",
           timestamps: {
@@ -115,9 +115,9 @@ describe("Data For Filter Integration Tests", () => {
         {
           trace_id: traceId2,
           project_id: "test-project-id",
-          check_id: `test-check-id-faithfulness`,
-          check_type: "faithfulness",
-          check_name: "Faithfulness2",
+          evaluator_id: `test-check-id-faithfulness`,
+          type: "faithfulness",
+          name: "Faithfulness2",
           is_guardrail: false,
           status: "processed",
           timestamps: {
@@ -129,9 +129,9 @@ describe("Data For Filter Integration Tests", () => {
         {
           trace_id: traceId2,
           project_id: "test-project-id",
-          check_id: `test-check-id-consistency`,
-          check_type: "consistency",
-          check_name: "Consistency",
+          evaluator_id: `test-check-id-consistency`,
+          type: "consistency",
+          name: "Consistency",
           is_guardrail: false,
           status: "processed",
           timestamps: {
@@ -230,7 +230,7 @@ describe("Data For Filter Integration Tests", () => {
 
     let response = await caller.analytics.dataForFilter({
       projectId: "test-project-id",
-      field: "evaluations.check_id",
+      field: "evaluations.evaluator_id",
       startDate: new Date().getTime() - 1000 * 60 * 60 * 24 * 7,
       endDate: new Date().getTime(),
       filters: {},
@@ -253,7 +253,7 @@ describe("Data For Filter Integration Tests", () => {
 
     response = await caller.analytics.dataForFilter({
       projectId: "test-project-id",
-      field: "evaluations.check_id",
+      field: "evaluations.evaluator_id",
       query: "faith",
       startDate: new Date().getTime() - 1000 * 60 * 60 * 24 * 7,
       endDate: new Date().getTime(),

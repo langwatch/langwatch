@@ -173,7 +173,10 @@ export const reindexWithAlias = async ({
         ],
       },
     });
-    // await esClient.indices.delete({ index: previousIndex });
+    console.log(`Deleting old index in 10 seconds...`);
+    await new Promise((resolve) => setTimeout(resolve, 10_000));
+    await esClient.indices.delete({ index: previousIndex });
+    console.log(`Deleted old index ${previousIndex}`);
   } catch (error) {
     await esClient.indices.updateAliases({
       body: {

@@ -108,12 +108,11 @@ const spanMapping: ElasticSearchMappingFrom<ElasticSearchSpan> = {
 };
 
 const evaluationsMapping: ElasticSearchMappingFrom<ElasticSearchEvaluation> = {
-  trace_id: { type: "keyword" },
-  check_id: { type: "keyword" },
-  project_id: { type: "keyword" },
+  evaluation_id: { type: "keyword" },
+  evaluator_id: { type: "keyword" },
   span_id: { type: "keyword" },
-  check_type: { type: "keyword" },
-  check_name: { type: "keyword" },
+  name: { type: "keyword" },
+  type: { type: "keyword" },
   is_guardrail: { type: "boolean" },
   status: { type: "keyword" },
   passed: { type: "boolean" },

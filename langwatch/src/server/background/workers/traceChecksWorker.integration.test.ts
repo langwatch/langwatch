@@ -120,9 +120,10 @@ describe("Check Queue Integration Tests", () => {
     expect(traceCheck?.status).toBe("scheduled");
 
     expect(traceCheck).toMatchObject({
-      check_id: check.id,
-      check_name: check.name,
-      check_type: check.type,
+      evaluation_id: expect.any(String),
+      evaluator_id: check.id,
+      name: check.name,
+      type: check.type,
       trace_id: trace.trace_id,
       project_id: "test-project-id",
       user_id: "test_user_123",
@@ -338,10 +339,10 @@ describe("updateCheckStatusInES", () => {
     expect((response.hits.total as any).value).toBeGreaterThan(0);
     const traceCheck = response.hits.hits[0]?._source;
     expect(traceCheck).toMatchObject({
-      id: traceCheckIndexId({ traceId, checkId: check.id, projectId }),
-      check_id: check.id,
-      check_name: check.name,
-      check_type: check.type,
+      evaluation_id: expect.any(String),
+      evaluator_id: check.id,
+      name: check.name,
+      type: check.type,
       trace_id: traceId,
       status: "scheduled",
       project_id: projectId,
@@ -373,10 +374,10 @@ describe("updateCheckStatusInES", () => {
     expect((response.hits.total as any).value).toBeGreaterThan(0);
     const traceCheck = response.hits.hits[0]?._source;
     expect(traceCheck).toMatchObject({
-      id: traceCheckIndexId({ traceId, checkId: check.id, projectId }),
-      check_id: check.id,
-      check_name: check.name,
-      check_type: check.type,
+      evaluation_id: expect.any(String),
+      evaluator_id: check.id,
+      name: check.name,
+      type: check.type,
       trace_id: traceId,
       project_id: projectId,
       status: "in_progress",

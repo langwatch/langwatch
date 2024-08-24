@@ -439,25 +439,25 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
       },
     },
   },
-  "evaluations.check_id": {
+  "evaluations.evaluator_id": {
     name: "Contains Evaluation",
-    urlKey: "check_id",
+    urlKey: "evaluator_id",
     query: (values) => ({
       nested: {
         path: "evaluations",
         query: {
-          terms: { "evaluations.check_id": values },
+          terms: { "evaluations.evaluator_id": values },
         },
       },
     }),
     listMatch: {
       aggregation: (query) => ({
-        unique_check_ids: {
+        unique_evaluator_ids: {
           nested: { path: "evaluations" },
           aggs: {
             child: {
               terms: {
-                field: "evaluations.check_id",
+                field: "evaluations.evaluator_id",
                 size: 100,
                 order: { _key: "asc" },
               },
@@ -466,7 +466,7 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
                   filter: query
                     ? {
                         prefix: {
-                          "evaluations.check_name": {
+                          "evaluations.name": {
                             value: query,
                             case_insensitive: true,
                           },
@@ -478,13 +478,13 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
                   aggs: {
                     name: {
                       terms: {
-                        field: "evaluations.check_name",
+                        field: "evaluations.name",
                         size: 1,
                       },
                     },
                     type: {
                       terms: {
-                        field: "evaluations.check_type",
+                        field: "evaluations.type",
                         size: 1,
                       },
                     },
@@ -497,20 +497,20 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
       }),
       extract: (result: Record<string, any>) => {
         return (
-          result.unique_check_ids?.child?.buckets
+          result.unique_evaluator_ids?.child?.buckets
             ?.filter(
               (bucket: any) =>
                 bucket.labels.type.buckets?.[0]?.key !== undefined
             )
             ?.map((bucket: any) => {
-              const checkType: string = bucket.labels.type.buckets?.[0]?.key;
-              const checkName: string = bucket.labels.name.buckets?.[0]?.key;
+              const type: string = bucket.labels.type.buckets?.[0]?.key;
+              const name: string = bucket.labels.name.buckets?.[0]?.key;
               const checkDefinition =
-                AVAILABLE_EVALUATORS[checkType as EvaluatorTypes];
+                AVAILABLE_EVALUATORS[type as EvaluatorTypes];
 
               return {
                 field: bucket.key,
-                label: `[${checkDefinition?.name ?? checkType}] ${checkName}`,
+                label: `[${checkDefinition?.name ?? type ?? "custom"}] ${name}`,
                 count: bucket.doc_count,
               };
             }) ?? []
@@ -518,25 +518,25 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
       },
     },
   },
-  "evaluations.check_id.guardrails_only": {
+  "evaluations.evaluator_id.guardrails_only": {
     name: "Contains Evaluation (guardrails only)",
-    urlKey: "guardrail_check_id",
+    urlKey: "guardrail_evaluator_id",
     query: (values) => ({
       nested: {
         path: "evaluations",
         query: {
-          terms: { "evaluations.check_id": values },
+          terms: { "evaluations.evaluator_id": values },
         },
       },
     }),
     listMatch: {
       aggregation: (query) => ({
-        unique_check_ids: {
+        unique_evaluator_ids: {
           nested: { path: "evaluations" },
           aggs: {
             child: {
               terms: {
-                field: "evaluations.check_id",
+                field: "evaluations.evaluator_id",
                 size: 100,
                 order: { _key: "asc" },
               },
@@ -545,7 +545,7 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
                   filter: query
                     ? {
                         prefix: {
-                          "evaluations.check_name": {
+                          "evaluations.name": {
                             value: query,
                             case_insensitive: true,
                           },
@@ -557,13 +557,13 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
                   aggs: {
                     name: {
                       terms: {
-                        field: "evaluations.check_name",
+                        field: "evaluations.name",
                         size: 1,
                       },
                     },
                     type: {
                       terms: {
-                        field: "evaluations.check_type",
+                        field: "evaluations.type",
                         size: 1,
                       },
                     },
@@ -576,12 +576,12 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
       }),
       extract: (result: Record<string, any>) => {
         return (
-          result.unique_check_ids?.child?.buckets
+          result.unique_evaluator_ids?.child?.buckets
             ?.map((bucket: any) => {
-              const checkType: string = bucket.labels.type.buckets?.[0]?.key;
-              const checkName: string = bucket.labels.name.buckets?.[0]?.key;
+              const type: string = bucket.labels.type.buckets?.[0]?.key;
+              const name: string = bucket.labels.name.buckets?.[0]?.key;
               const checkDefinition =
-                AVAILABLE_EVALUATORS[checkType as EvaluatorTypes];
+                AVAILABLE_EVALUATORS[type as EvaluatorTypes];
 
               if (!checkDefinition?.isGuardrail) {
                 return;
@@ -589,7 +589,7 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
 
               return {
                 field: bucket.key,
-                label: `[${checkDefinition?.name ?? checkType}] ${checkName}`,
+                label: `[${checkDefinition?.name ?? type ?? "custom"}] ${name}`,
                 count: bucket.doc_count,
               };
             })
@@ -603,7 +603,7 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
     urlKey: "evaluation_passed",
     single: true,
     requiresKey: {
-      filter: "evaluations.check_id.guardrails_only",
+      filter: "evaluations.evaluator_id.guardrails_only",
     },
     query: (values, key) => ({
       nested: {
@@ -613,7 +613,7 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
             must: [
               {
                 term: {
-                  "evaluations.check_id": key,
+                  "evaluations.evaluator_id": key,
                 },
               },
               {
@@ -635,7 +635,7 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
           aggs: {
             child: {
               filter: {
-                term: { "evaluations.check_id": key },
+                term: { "evaluations.evaluator_id": key },
               },
               aggs: {
                 child: {
@@ -678,7 +678,7 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
     type: "numeric",
     single: true,
     requiresKey: {
-      filter: "evaluations.check_id",
+      filter: "evaluations.evaluator_id",
     },
     query: (values, key) => ({
       nested: {
@@ -688,7 +688,7 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
             must: [
               {
                 term: {
-                  "evaluations.check_id": key,
+                  "evaluations.evaluator_id": key,
                 },
               },
               {
@@ -711,7 +711,7 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
           aggs: {
             child: {
               filter: {
-                term: { "evaluations.check_id": key },
+                term: { "evaluations.evaluator_id": key },
               },
               aggs: {
                 child: {
@@ -744,7 +744,7 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
     name: "Evaluation Execution State",
     urlKey: "evaluation_state",
     requiresKey: {
-      filter: "evaluations.check_id",
+      filter: "evaluations.evaluator_id",
     },
     query: (values, key) => ({
       nested: {
@@ -754,7 +754,7 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
             must: [
               {
                 term: {
-                  "evaluations.check_id": key,
+                  "evaluations.evaluator_id": key,
                 },
               },
               {
@@ -774,7 +774,7 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
           aggs: {
             child: {
               filter: {
-                term: { "evaluations.check_id": key },
+                term: { "evaluations.evaluator_id": key },
               },
               aggs: {
                 child: {
@@ -1040,12 +1040,16 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
       extract: (result: Record<string, any>) => {
         return [
           {
-            field: Math.ceil(result.unique_values?.child?.child?.child?.child?.min).toString(),
+            field: Math.ceil(
+              result.unique_values?.child?.child?.child?.child?.min
+            ).toString(),
             label: "min",
             count: 0,
           },
           {
-            field: Math.ceil(result.unique_values?.child?.child?.child?.child?.max).toString(),
+            field: Math.ceil(
+              result.unique_values?.child?.child?.child?.child?.max
+            ).toString(),
             label: "max",
             count: 0,
           },

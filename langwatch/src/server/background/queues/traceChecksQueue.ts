@@ -8,9 +8,9 @@ import type { ElasticSearchEvaluation } from "../../tracer/types";
 
 export const TRACE_CHECKS_QUEUE_NAME = "evaluations";
 
-export const traceChecksQueue = connection && new Queue<TraceCheckJob, any, string>(
-  TRACE_CHECKS_QUEUE_NAME,
-  {
+export const traceChecksQueue =
+  connection &&
+  new Queue<TraceCheckJob, any, string>(TRACE_CHECKS_QUEUE_NAME, {
     connection,
     defaultJobOptions: {
       backoff: {
@@ -25,8 +25,7 @@ export const traceChecksQueue = connection && new Queue<TraceCheckJob, any, stri
         age: 60 * 60 * 24 * 3, // 3 days
       },
     },
-  }
-);
+  });
 
 export const scheduleTraceCheck = async ({
   check,
@@ -45,7 +44,7 @@ export const scheduleTraceCheck = async ({
 
   const jobId = traceCheckIndexId({
     traceId: trace.trace_id,
-    checkId: check.id,
+    checkId: check.evaluator_id,
     projectId: trace.project_id,
   });
   const currentJob = await traceChecksQueue?.getJob(jobId);
@@ -60,7 +59,8 @@ export const scheduleTraceCheck = async ({
       {
         // Recreating the check object to avoid passing the whole check object and making the queue heavy, we pass only the keys we need
         check: {
-          id: check.id,
+          evaluation_id: check.evaluation_id,
+          evaluator_id: check.evaluator_id,
           type: check.type,
           name: check.name,
         },
@@ -105,16 +105,15 @@ export const updateCheckStatusInES = async ({
   is_guardrail?: boolean;
 }) => {
   const evaluation: ElasticSearchEvaluation = {
-    trace_id: trace.trace_id,
-    project_id: trace.project_id,
+    evaluation_id: check.evaluation_id ?? (check as any).id,
+    evaluator_id: check.evaluator_id ?? (check as any).id,
     thread_id: trace.thread_id,
     user_id: trace.user_id,
     customer_id: trace.customer_id,
     labels: trace.labels,
-    check_id: check.id,
-    check_type: check.type,
+    type: check.type,
     status,
-    ...(check.name && { check_name: check.name }),
+    ...(check.name && { name: check.name }),
     ...(is_guardrail !== undefined && { is_guardrail }),
     ...(score !== undefined && { score }),
     ...(passed !== undefined && { passed }),
@@ -149,7 +148,7 @@ export const updateCheckStatusInES = async ({
           def newEvaluation = params.newEvaluation;
           def found = false;
           for (int i = 0; i < ctx._source.evaluations.size(); i++) {
-            if (ctx._source.evaluations[i].check_id == newEvaluation.check_id) {
+            if (ctx._source.evaluations[i].evaluation_id == newEvaluation.evaluation_id) {
               ctx._source.evaluations[i] = newEvaluation;
               found = true;
               break;

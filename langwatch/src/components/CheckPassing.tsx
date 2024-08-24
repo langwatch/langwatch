@@ -9,7 +9,7 @@ import {
 import numeral from "numeral";
 
 export function CheckPassing({ check }: { check: ElasticSearchEvaluation }) {
-  const checkType = check.check_type as EvaluatorTypes;
+  const checkType = check.type as EvaluatorTypes;
 
   const evaluator = getEvaluatorDefinitions(checkType);
   if (!evaluator) return null;
@@ -20,7 +20,7 @@ export function CheckPassing({ check }: { check: ElasticSearchEvaluation }) {
         <CheckStatusIcon check={check} />
       </Box>
       <Text whiteSpace="nowrap">
-        <b>{check.check_name || evaluator.name}:</b>
+        <b>{check.name || evaluator.name}:</b>
       </Text>
       {check.status == "processed" ? (
         <Text noOfLines={1} maxWidth="400px">

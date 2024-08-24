@@ -401,10 +401,10 @@ export function MessageCard({
                   <PopoverHeader>Guardrails</PopoverHeader>
                   <PopoverBody>
                     <VStack align="start" spacing={2}>
-                      {guardrails.map((check) => (
+                      {guardrails.map((evaluation) => (
                         <CheckPassing
-                          key={check.trace_id + "/" + check.check_id}
-                          check={check}
+                          key={evaluation.evaluation_id}
+                          check={evaluation}
                         />
                       ))}
                     </VStack>
@@ -461,10 +461,10 @@ export function MessageCard({
                   <PopoverHeader>Evaluations</PopoverHeader>
                   <PopoverBody>
                     <VStack align="start" spacing={2}>
-                      {evaluations.map((check) => (
+                      {evaluations.map((evaluation) => (
                         <CheckPassing
-                          key={check.trace_id + "/" + check.check_id}
-                          check={check}
+                          key={evaluation.evaluation_id}
+                          check={evaluation}
                         />
                       ))}
                     </VStack>

@@ -598,10 +598,9 @@ describe("Collector API Endpoint", () => {
 
     expect(indexedTraceWithEvaluations.evaluations).toMatchObject([
       {
-        check_id: expect.any(String),
-        trace_id: traceId,
-        project_id: project?.id,
-        check_name: "custom evaluation",
+        evaluation_id: expect.any(String),
+        evaluator_id: expect.any(String),
+        name: "custom evaluation",
         passed: true,
         status: "processed",
         timestamps: {
@@ -610,11 +609,10 @@ describe("Collector API Endpoint", () => {
         },
       },
       {
-        check_id: builtInEvaluationId,
-        trace_id: traceId,
-        project_id: project?.id,
-        check_name: "built-in evaluation",
-        check_type: "ragas/faithfulness",
+        evaluation_id: builtInEvaluationId,
+        evaluator_id: expect.any(String),
+        name: "built-in evaluation",
+        type: "ragas/faithfulness",
         score: 0.5,
         status: "processed",
         timestamps: {

@@ -284,10 +284,7 @@ function Events({ traceId }: { traceId: string }) {
               <Tooltip
                 label={new Date(event.timestamps.started_at).toLocaleString()}
               >
-                <Text
-                  color="gray.400"
-                  borderBottom="1px dashed"
-                >
+                <Text color="gray.400" borderBottom="1px dashed">
                   {formatTimeAgo(event.timestamps.started_at)}
                 </Text>
               </Tooltip>
@@ -326,12 +323,14 @@ function Events({ traceId }: { traceId: string }) {
                 </Tr>
               </Thead>
               <Tbody>
-                {Object.entries(event.event_details ?? {}).map(([key, value]) => (
-                  <Tr key={key}>
-                    <Td>{key}</Td>
-                    <Td>{value}</Td>
-                  </Tr>
-                ))}
+                {Object.entries(event.event_details ?? {}).map(
+                  ([key, value]) => (
+                    <Tr key={key}>
+                      <Td>{key}</Td>
+                      <Td>{value}</Td>
+                    </Tr>
+                  )
+                )}
               </Tbody>
             </Table>
           </Box>
@@ -367,10 +366,10 @@ function Evaluations(trace: TraceEval & { anyGuardrails: boolean }) {
   return (
     <VStack align="start" spacing={2}>
       <>
-        {evaluations?.map((check) => (
+        {evaluations?.map((evaluation) => (
           <EvaluationStatusItem
-            key={check.trace_id + "/" + check.check_id}
-            check={check}
+            key={evaluation.evaluation_id}
+            check={evaluation}
           />
         ))}
       </>
@@ -397,10 +396,10 @@ const Guardrails = (trace: TraceEval) => {
   return (
     <VStack align="start" spacing={2}>
       <>
-        {guardrails?.map((check) => (
+        {guardrails?.map((evaluation) => (
           <EvaluationStatusItem
-            key={check.trace_id + "/" + check.check_id}
-            check={check}
+            key={evaluation.evaluation_id}
+            check={evaluation}
           />
         ))}
       </>

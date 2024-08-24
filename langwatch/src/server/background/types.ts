@@ -10,7 +10,8 @@ import type {
 
 export type TraceCheckJob = {
   check: {
-    id: string;
+    evaluation_id: string;
+    evaluator_id: string;
     type: EvaluatorTypes;
     name: string;
   };

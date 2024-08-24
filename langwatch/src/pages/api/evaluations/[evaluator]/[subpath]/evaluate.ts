@@ -29,12 +29,14 @@ import {
 import { extractChunkTextualContent } from "../../../../../server/background/workers/collector/rag";
 import * as Sentry from "@sentry/nextjs";
 import { runEvaluation } from "../../../../../server/background/workers/traceChecksWorker";
+import { evaluationNameAutoslug } from "../../../../../server/background/workers/collector/evaluations";
 
 export const debug = getDebugger("langwatch:evaluations:evaluate");
 
 export const evaluationInputSchema = z.object({
   trace_id: z.string().optional().nullable(),
   evaluation_id: z.string().optional().nullable(),
+  evaluator_id: z.string().optional().nullable(),
   name: z.string().optional().nullable(),
   data: z.object({
     input: z.string().optional().nullable(),
@@ -310,10 +312,12 @@ export async function handleEvaluatorCall(
   if (params.trace_id) {
     await updateCheckStatusInES({
       check: {
-        id:
+        evaluation_id:
+          storedEvaluator?.id ?? params.evaluation_id ?? `eval_${nanoid()}`,
+        evaluator_id:
           storedEvaluator?.id ??
-          params.evaluation_id ??
-          `evaluation_${nanoid()}`,
+          params.evaluator_id ??
+          evaluationNameAutoslug(params.name ?? checkType),
         type: checkType as EvaluatorTypes,
         name: storedEvaluator?.name ?? params.name ?? checkType,
       },

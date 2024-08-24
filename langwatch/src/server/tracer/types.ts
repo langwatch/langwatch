@@ -307,7 +307,8 @@ type EvaluationStatus =
 
 export type Evaluation = {
   evaluation_id: string;
-  span_id: string;
+  evaluator_id: string;
+  span_id?: string | null;
   name: string;
   type?: string | null;
   is_guardrail?: boolean | null;
@@ -326,22 +327,14 @@ export type Evaluation = {
   };
 };
 
-export type ElasticSearchEvaluation = Omit<
-  Evaluation,
-  "evaluation_id" | "name" | "type"
-> & {
-  trace_id: string;
-  project_id: string;
-  check_id: string;
-  check_type?: string | null;
-  check_name: string;
-};
+export type ElasticSearchEvaluation = Evaluation;
 
 export type RESTEvaluation = Omit<
   Evaluation,
-  "evaluation_id" | "status" | "timestamps" | "retries"
+  "evaluation_id" | "evaluator_id" | "status" | "timestamps" | "retries"
 > & {
   evaluation_id?: string | null;
+  evaluator_id?: string | null;
   status?: "processed" | "skipped" | "error" | null;
   timestamps?: {
     started_at?: number | null;

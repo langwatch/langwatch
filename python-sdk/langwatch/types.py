@@ -209,6 +209,7 @@ class EvaluationTimestamps(TypedDict, total=False):
 
 class Evaluation(TypedDict, total=False):
     evaluation_id: Optional[str]
+    evaluator_id: Optional[str]
     span_id: Optional[str]
     name: str
     type: Optional[str]

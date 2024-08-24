@@ -244,7 +244,7 @@ export const processCollectorJob = async (
             for (def newEvaluation : params.newEvaluations) {
               def existingEvaluationIndex = -1;
               for (int i = 0; i < ctx._source.evaluations.size(); i++) {
-                if (ctx._source.evaluations[i].check_id == newEvaluation.check_id) {
+                if (ctx._source.evaluations[i].evaluator_id == newEvaluation.evaluator_id) {
                   existingEvaluationIndex = i;
                   break;
                 }
