@@ -1,12 +1,12 @@
 import { Box, HStack, Text } from "@chakra-ui/react";
 import type { ElasticSearchEvaluation } from "../server/tracer/types";
-import { getEvaluatorDefinitions } from "../trace_checks/getEvaluator";
 import type { EvaluatorTypes } from "../trace_checks/evaluators.generated";
+import { getEvaluatorDefinitions } from "../trace_checks/getEvaluator";
 import {
   CheckStatusIcon,
-  checkStatusColorMap,
+  evaluationStatusColor,
 } from "./checks/EvaluationStatus";
-import numeral from "numeral";
+import { formatEvaluationScore } from "./traces/EvaluationStatusItem";
 
 export function CheckPassing({ check }: { check: ElasticSearchEvaluation }) {
   const checkType = check.type as EvaluatorTypes;
@@ -16,7 +16,7 @@ export function CheckPassing({ check }: { check: ElasticSearchEvaluation }) {
 
   return (
     <HStack align="start" spacing={2}>
-      <Box paddingRight={2} color={checkStatusColorMap(check)}>
+      <Box paddingRight={2} color={evaluationStatusColor(check)}>
         <CheckStatusIcon check={check} />
       </Box>
       <Text whiteSpace="nowrap">
@@ -28,8 +28,7 @@ export function CheckPassing({ check }: { check: ElasticSearchEvaluation }) {
             ? check.passed
               ? "Passed"
               : "Failed"
-            : "Score: " +
-              (check.score !== undefined ? numeral(check.score).format("0.[00]") : "N/A")}
+            : "Score: " + formatEvaluationScore(check.score)}
           {check.details ? `. Details: ${check.details}` : ""}
         </Text>
       ) : check.status == "skipped" ? (

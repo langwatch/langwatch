@@ -17,11 +17,11 @@ from langwatch.tracer import ContextSpan, ContextTrace, get_current_trace
 from langwatch.types import (
     ChatMessage,
     SpanInputOutput,
-    LLMSpanMetrics,
+    SpanMetrics,
     TraceMetadata,
     TypedValueChatMessages,
     TypedValueText,
-    LLMSpanParams,
+    SpanParams,
     SpanTimestamps,
 )
 from langwatch.utils import (
@@ -283,7 +283,7 @@ class OpenAICompletionTracer:
                 TypedValueText(type="text", value=output)
                 for output in text_outputs.values()
             ],
-            metrics=LLMSpanMetrics(),
+            metrics=SpanMetrics(),
             timestamps=timestamps,
             **kwargs,
         )
@@ -304,7 +304,7 @@ class OpenAICompletionTracer:
                 TypedValueText(type="text", value=output.text)
                 for output in response.choices
             ],
-            metrics=LLMSpanMetrics(
+            metrics=SpanMetrics(
                 prompt_tokens=safe_get(response, "usage", "prompt_tokens"),
                 completion_tokens=safe_get(response, "usage", "completion_tokens"),
             ),
@@ -325,7 +325,7 @@ class OpenAICompletionTracer:
             client=client,
             span=span,
             outputs=[],
-            metrics=LLMSpanMetrics(),
+            metrics=SpanMetrics(),
             timestamps=timestamps,
             error=err,
             **kwargs,
@@ -337,7 +337,7 @@ class OpenAICompletionTracer:
         client: Union[OpenAI, AsyncOpenAI, AzureOpenAI, AsyncAzureOpenAI],
         span: ContextSpan,
         outputs: List[SpanInputOutput],
-        metrics: LLMSpanMetrics,
+        metrics: SpanMetrics,
         timestamps: SpanTimestamps,
         error: Optional[Exception] = None,
         **kwargs,
@@ -355,7 +355,7 @@ class OpenAICompletionTracer:
             else "openai"
         )
 
-        span_params = LLMSpanParams()
+        span_params = SpanParams()
         params = [
             "frequency_penalty",
             "logit_bias",
@@ -629,7 +629,7 @@ class OpenAIChatCompletionTracer:
                 TypedValueChatMessages(type="chat_messages", value=output)
                 for output in chat_outputs.values()
             ],
-            metrics=LLMSpanMetrics(),
+            metrics=SpanMetrics(),
             timestamps=timestamps,
             **kwargs,
         )
@@ -649,11 +649,11 @@ class OpenAIChatCompletionTracer:
             outputs=[
                 TypedValueChatMessages(
                     type="chat_messages",
-                    value=[cast(ChatMessage, output.message.model_dump())],
+                    value=[cast(ChatMessage, output.message.model_dump(exclude_unset=True))],
                 )
                 for output in response.choices
             ],
-            metrics=LLMSpanMetrics(
+            metrics=SpanMetrics(
                 prompt_tokens=safe_get(response, "usage", "prompt_tokens"),
                 completion_tokens=safe_get(response, "usage", "completion_tokens"),
             ),
@@ -674,7 +674,7 @@ class OpenAIChatCompletionTracer:
             client=client,
             span=span,
             outputs=[],
-            metrics=LLMSpanMetrics(),
+            metrics=SpanMetrics(),
             timestamps=timestamps,
             error=err,
             **kwargs,
@@ -686,7 +686,7 @@ class OpenAIChatCompletionTracer:
         client: Union[OpenAI, AsyncOpenAI, AzureOpenAI, AsyncAzureOpenAI],
         span: ContextSpan,
         outputs: List[SpanInputOutput],
-        metrics: LLMSpanMetrics,
+        metrics: SpanMetrics,
         timestamps: SpanTimestamps,
         error: Optional[Exception] = None,
         **kwargs,
@@ -696,7 +696,7 @@ class OpenAIChatCompletionTracer:
             if len(outputs) == 0
             else outputs[0] if len(outputs) == 1 else {"type": "list", "value": outputs}
         )
-        params = LLMSpanParams(
+        params = SpanParams(
             temperature=kwargs.get("temperature", 1.0),
             stream=kwargs.get("stream", False),
         )

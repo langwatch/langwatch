@@ -16,6 +16,8 @@ export const getFirstInputAsText = (spans: Span[]): string => {
     (span) =>
       span.input &&
       span.input.value &&
+      span.type !== "evaluation" &&
+      span.type !== "guardrail" &&
       (span.input.type !== "json" || !isEmptyJson(span.input.value))
   );
 
@@ -54,6 +56,8 @@ export const getLastOutputAsText = (spans: Span[]): string => {
   const nonEmptySpan = (span: Span) =>
     span.output &&
     span.output.value &&
+    span.type !== "evaluation" &&
+    span.type !== "guardrail" &&
     (span.output.type !== "json" || !isEmptyJson(span.output.value));
 
   // First we try to see if the topLevel node has a valid output, if so, we go with that, so users

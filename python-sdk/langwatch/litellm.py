@@ -17,9 +17,9 @@ from langwatch.tracer import ContextSpan, ContextTrace, get_current_trace
 from langwatch.types import (
     ChatMessage,
     SpanInputOutput,
-    LLMSpanMetrics,
+    SpanMetrics,
     TypedValueChatMessages,
-    LLMSpanParams,
+    SpanParams,
     SpanTimestamps,
 )
 from langwatch.utils import (
@@ -242,7 +242,7 @@ class LiteLLMPatch:
                 TypedValueChatMessages(type="chat_messages", value=output)
                 for output in chat_outputs.values()
             ],
-            metrics=LLMSpanMetrics(),
+            metrics=SpanMetrics(),
             timestamps=timestamps,
             **kwargs,
         )
@@ -261,12 +261,12 @@ class LiteLLMPatch:
                 TypedValueChatMessages(
                     type="chat_messages",
                     value=[
-                        cast(ChatMessage, cast(Choices, output).message.model_dump())
+                        cast(ChatMessage, cast(Choices, output).message.model_dump(exclude_unset=True))
                     ],
                 )
                 for output in response.choices
             ],
-            metrics=LLMSpanMetrics(
+            metrics=SpanMetrics(
                 prompt_tokens=safe_get(response, "usage", "prompt_tokens"),
                 completion_tokens=safe_get(response, "usage", "completion_tokens"),
             ),
@@ -285,7 +285,7 @@ class LiteLLMPatch:
         LiteLLMPatch.end_span(
             span=span,
             outputs=[],
-            metrics=LLMSpanMetrics(),
+            metrics=SpanMetrics(),
             timestamps=timestamps,
             error=err,
             **kwargs,
@@ -296,7 +296,7 @@ class LiteLLMPatch:
         cls,
         span: ContextSpan,
         outputs: List[SpanInputOutput],
-        metrics: LLMSpanMetrics,
+        metrics: SpanMetrics,
         timestamps: SpanTimestamps,
         error: Optional[Exception] = None,
         **kwargs,
@@ -306,7 +306,7 @@ class LiteLLMPatch:
             if len(outputs) == 0
             else outputs[0] if len(outputs) == 1 else {"type": "list", "value": outputs}
         )
-        span_params = LLMSpanParams()
+        span_params = SpanParams()
         params = [
             "frequency_penalty",
             "logit_bias",

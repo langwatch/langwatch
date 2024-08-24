@@ -238,7 +238,7 @@ async def run_evaluation(
 ) -> Tuple[str, SingleEvaluationResult]:
     try:
         json_data = {
-            "data": data.model_dump(),
+            "data": data.model_dump(exclude_unset=True),
             "evaluation": evaluation,
             "experimentSlug": experiment_slug,
             "datasetSlug": dataset_slug,
@@ -287,7 +287,7 @@ def get_dataset(
         "url": langwatch.endpoint + f"/api/dataset/{slug}",
         "headers": {"X-Auth-Token": str(langwatch.api_key)},
     }
-    with httpx.Client() as client:
+    with httpx.Client(timeout=30) as client:
         response = client.get(**request_params)
         response.raise_for_status()
 

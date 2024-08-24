@@ -22,13 +22,13 @@ async def main(message: cl.Message):
     )
 
     jailbreak_guardrail = asyncio.create_task(
-        langwatch.guardrails.async_evaluate(
-            "jailbreak-detection", input=message.content
+        langwatch.get_current_span().async_evaluate(
+            "jailbreak-detection", as_guardrail=True, input=message.content
         )
     )
     off_topic_guardrail = asyncio.create_task(
-        langwatch.guardrails.async_evaluate(
-            "off-topic-evaluator", input=message.content
+        langwatch.get_current_span().async_evaluate(
+            "off-topic-evaluator", as_guardrail=True, input=message.content
         )
     )
 

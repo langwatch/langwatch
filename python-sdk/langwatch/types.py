@@ -130,19 +130,13 @@ SpanTypes = Literal[
 ]
 
 
-class BaseSpan(TypedDict):
-    type: SpanTypes
-    name: Optional[str]
-    span_id: str
-    parent_id: Optional[str]
-    trace_id: str
-    input: Optional[SpanInputOutput]
-    output: Optional[SpanInputOutput]
-    error: Optional[ErrorCapture]
-    timestamps: SpanTimestamps
+class SpanMetrics(TypedDict, total=False):
+    prompt_tokens: Optional[int]
+    completion_tokens: Optional[int]
+    cost: Optional[float]
 
 
-class LLMSpanParams(TypedDict, total=False):
+class SpanParams(TypedDict, total=False):
     frequency_penalty: Optional[float]
     logit_bias: Optional[Dict[str, float]]
     logprobs: Optional[bool]
@@ -162,9 +156,18 @@ class LLMSpanParams(TypedDict, total=False):
     user: Optional[str]
 
 
-class LLMSpanMetrics(TypedDict, total=False):
-    prompt_tokens: Optional[int]
-    completion_tokens: Optional[int]
+class BaseSpan(TypedDict):
+    type: SpanTypes
+    name: Optional[str]
+    span_id: str
+    parent_id: Optional[str]
+    trace_id: str
+    input: Optional[SpanInputOutput]
+    output: Optional[SpanInputOutput]
+    error: Optional[ErrorCapture]
+    timestamps: SpanTimestamps
+    params: Optional[SpanParams]
+    metrics: Optional[SpanMetrics]
 
 
 class LLMSpan(TypedDict, total=False):
@@ -178,8 +181,8 @@ class LLMSpan(TypedDict, total=False):
     error: Optional[ErrorCapture]
     timestamps: SpanTimestamps
     model: Optional[str]
-    params: Optional[LLMSpanParams]
-    metrics: Optional[LLMSpanMetrics]
+    params: Optional[SpanParams]
+    metrics: Optional[SpanMetrics]
 
 
 class RAGChunk(TypedDict, total=False):
@@ -199,6 +202,8 @@ class RAGSpan(TypedDict, total=False):
     error: Optional[ErrorCapture]
     timestamps: SpanTimestamps
     contexts: List[RAGChunk]
+    params: Optional[SpanParams]
+    metrics: Optional[SpanMetrics]
 
 
 Span = Union[LLMSpan, RAGSpan, BaseSpan]

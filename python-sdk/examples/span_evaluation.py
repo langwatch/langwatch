@@ -13,6 +13,12 @@ from pydantic import BaseModel
 
 client = OpenAI()
 
+user_bios = [
+    "Hello, my name is Richard and I am a software engineer, I'm 30 years old from New York.",
+    "My name is Rogerio, I was born in 1992 in Brazil and I love to play soccer.",
+    "Hi I'm Manouk, I'm Dutch, 25 years old and I love to travel.",
+]
+
 
 class GetBioInfo(BaseModel):
     name: Optional[str] = None
@@ -39,7 +45,20 @@ async def extract_structured_user_bios(user_bios: list[str]) -> GetBioInfoList:
         tool_choice="required",
     )
 
-    return completion.choices[0].message.tool_calls[0].function.parsed_arguments  # type: ignore
+    get_bio_info_list: GetBioInfoList = completion.choices[0].message.tool_calls[0].function.parsed_arguments  # type: ignore
+
+    await langwatch.get_current_span().async_evaluate(
+        "ragas/faithfulness",
+        output=str(get_bio_info_list),
+        contexts=user_bios,
+        settings={
+            "model": "openai/gpt-3.5-turbo-16k",
+            "embeddings_model": "openai/text-embedding-ada-002",
+            "max_tokens": 2048,
+        },
+    )
+
+    return get_bio_info_list
 
 
 class GeneratePythonCode(BaseModel):
@@ -170,12 +189,6 @@ async def main(message: cl.Message):
         content="",
     )
 
-    user_bios = [
-        "Hello, my name is Richard and I am a software engineer, I'm 30 years old from New York.",
-        "My name is Rogerio, I was born in 1992 in Brazil and I love to play soccer.",
-        "Hi I'm Manouk, I'm Dutch, 25 years old and I love to travel.",
-    ]
-
     bio_info_list = await extract_structured_user_bios(user_bios)
 
     await msg.stream_token(f"```python\n{bio_info_list}\n```\n\n")
@@ -185,6 +198,18 @@ async def main(message: cl.Message):
     await msg.stream_token(f"Result:\n```python\n{result}\n```\n\n")
 
     answer = await answer_user(question, code, result)
+
+    await langwatch.get_current_trace().async_evaluate(
+        "ragas/answer_correctness",
+        input=question,
+        output=answer,
+        expected_output="Rogerio",
+        settings={
+            "model": "openai/gpt-3.5-turbo-16k",
+            "embeddings_model": "openai/text-embedding-ada-002",
+            "max_tokens": 2048,
+        },
+    )
 
     await msg.stream_token(answer)
 

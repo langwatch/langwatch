@@ -19,7 +19,7 @@ export function CheckStatusIcon({
   return <Icon />;
 }
 
-export const checkStatusColorMap = (
+export const evaluationStatusColor = (
   check: Pick<ElasticSearchEvaluation, "status" | "passed" | "score">
 ) => {
   const colorMap: Record<ElasticSearchEvaluation["status"], string> = {
@@ -40,8 +40,14 @@ export const evaluationPassed = (
     return undefined;
   }
 
-  return (
-    evaluation.passed !== false &&
-    (!!evaluation.passed || evaluation.score != 0)
-  );
+  if (evaluation.passed !== undefined) {
+    return evaluation.passed;
+  }
+
+  // TODO: replace this heuristic of .score != 0 with proper threshold definitions on the evaluators
+  if (evaluation.score && evaluation.score < 0.3) {
+    return false;
+  }
+
+  return true;
 };

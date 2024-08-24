@@ -34,7 +34,7 @@ class SerializableAndPydanticEncoder(json.JSONEncoder):
     def default(self, o):
         classname = f"{o.__class__.__module__}.{o.__class__.__name__}"
         if isinstance(o, BaseModel):
-            return o.model_dump()
+            return o.model_dump(exclude_unset=True)
         if isinstance(o, FieldInfo):
             return o.__repr__()
         if isinstance(o, set):

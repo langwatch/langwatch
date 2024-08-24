@@ -20,8 +20,8 @@ async def main(message: cl.Message):
         content="",
     )
 
-    jailbreak_guardrail = langwatch.guardrails.evaluate(
-        "jailbreak-detection", input=message.content
+    jailbreak_guardrail = langwatch.get_current_span().evaluate(
+        "jailbreak-detection", as_guardrail=True, input=message.content
     )
     if not jailbreak_guardrail.passed:
         await msg.stream_token(f"I'm sorry, I can't help you with that.")

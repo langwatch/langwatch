@@ -3,14 +3,15 @@ from typing import List, Literal, Optional, Union, cast
 from uuid import UUID
 
 import httpx
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 import langwatch
 import langwatch.tracer
-from langwatch.tracer import ContextSpan, get_current_trace
+from langwatch.tracer import ContextSpan, ContextTrace, get_current_trace
 from langwatch.types import (
     Conversation,
     EvaluationResult,
+    SpanMetrics,
     RAGChunk,
     SpanTypes,
     TypedValueEvaluationResult,
@@ -37,20 +38,27 @@ def evaluate(
     slug: str,
     input: Optional[str] = None,
     output: Optional[str] = None,
-    contexts: List[RAGChunk] = [],
+    expected_output: Optional[str] = None,
+    contexts: Union[List[RAGChunk], List[str]] = [],
     conversation: Conversation = [],
     settings: Optional[dict] = None,
     as_guardrail: bool = False,
+    trace: Optional[ContextTrace] = None,
+    span: Optional[ContextSpan] = None,
 ):
     with _optional_create_span(
-        name=slug, type="guardrail" if as_guardrail else "evaluation"
+        trace=trace,
+        span=span,
+        name=slug,
+        type="guardrail" if as_guardrail else "evaluation",
     ) as span:
         request_params = prepare_data(
-            slug,
-            input,
-            output,
-            contexts,
-            conversation,
+            slug=slug,
+            input=input,
+            output=output,
+            expected_output=expected_output,
+            contexts=contexts,
+            conversation=conversation,
             settings=settings,
             trace_id=span.trace.trace_id if span and span.trace else None,
             span_id=span.span_id if span else None,
@@ -58,7 +66,7 @@ def evaluate(
             as_guardrail=as_guardrail,
         )
         try:
-            with httpx.Client() as client:
+            with httpx.Client(timeout=30) as client:
                 response = client.post(**request_params)
                 response.raise_for_status()
         except Exception as e:
@@ -71,20 +79,27 @@ async def async_evaluate(
     slug: str,
     input: Optional[str] = None,
     output: Optional[str] = None,
-    contexts: List[RAGChunk] = [],
+    expected_output: Optional[str] = None,
+    contexts: Union[List[RAGChunk], List[str]] = [],
     conversation: Conversation = [],
     settings: Optional[dict] = None,
     as_guardrail: bool = False,
+    trace: Optional[ContextTrace] = None,
+    span: Optional[ContextSpan] = None,
 ):
     with _optional_create_span(
-        name=slug, type="guardrail" if as_guardrail else "evaluation"
+        trace=trace,
+        span=span,
+        name=slug,
+        type="guardrail" if as_guardrail else "evaluation",
     ) as span:
         request_params = prepare_data(
-            slug,
-            input,
-            output,
-            contexts,
-            conversation,
+            slug=slug,
+            input=input,
+            output=output,
+            expected_output=expected_output,
+            contexts=contexts,
+            conversation=conversation,
             settings=settings,
             trace_id=span.trace.trace_id if span and span.trace else None,
             span_id=span.span_id if span else None,
@@ -92,7 +107,7 @@ async def async_evaluate(
             as_guardrail=as_guardrail,
         )
         try:
-            async with httpx.AsyncClient() as client:
+            async with httpx.AsyncClient(timeout=30) as client:
                 response = await client.post(**request_params)
                 response.raise_for_status()
         except Exception as e:
@@ -102,14 +117,25 @@ async def async_evaluate(
 
 
 @contextmanager
-def _optional_create_span(name: str, type: SpanTypes):
-    trace = None
-    try:
-        trace = get_current_trace()
-    except:
-        pass
-    if trace:
-        with trace.span(name=name, type=type) as span:
+def _optional_create_span(
+    trace: Optional[ContextTrace],
+    span: Optional[ContextSpan],
+    name: str,
+    type: SpanTypes,
+):
+    trace_or_span = None
+    if span:
+        trace_or_span = span
+    elif trace:
+        trace_or_span = trace
+    else:
+        try:
+            trace_or_span = get_current_trace()
+        except:
+            pass
+
+    if trace_or_span:
+        with trace_or_span.span(name=name, type=type) as span:
             yield span
     else:
         yield None
@@ -119,7 +145,8 @@ def prepare_data(
     slug: str,
     input: Optional[str],
     output: Optional[str],
-    contexts: List[RAGChunk],
+    expected_output: Optional[str],
+    contexts: Union[List[RAGChunk], List[str]] = [],
     conversation: Conversation = [],
     settings: Optional[dict] = None,
     trace_id: Optional[Union[str, UUID]] = None,
@@ -132,12 +159,17 @@ def prepare_data(
         data["input"] = input
     if output:
         data["output"] = output
+    if expected_output:
+        data["expected_output"] = expected_output
     if contexts and len(contexts) > 0:
         data["contexts"] = contexts
     if conversation and len(conversation) > 0:
         data["conversation"] = conversation
     if span:
-        span.update(input=TypedValueJson(type="json", value=data))
+        span.update(
+            input=TypedValueJson(type="json", value=data),
+            params=settings,  # type: ignore
+        )
 
     return {
         "url": langwatch.endpoint + f"/api/evaluations/{slug}/evaluate",
@@ -162,14 +194,30 @@ def handle_response(
         result.details = response.get("message", "")
     if span:
         span.update(
-            output=TypedValueGuardrailResult(
-                type="guardrail_result",
-                value=cast(EvaluationResult, result.model_dump()),
-            ) if as_guardrail else TypedValueEvaluationResult(
-                type="evaluation_result",
-                value=cast(EvaluationResult, result.model_dump()),
+            output=(
+                TypedValueGuardrailResult(
+                    type="guardrail_result",
+                    value=cast(
+                        EvaluationResult,
+                        result.model_dump(exclude_unset=True, exclude_none=True),
+                    ),
+                )
+                if as_guardrail
+                else TypedValueEvaluationResult(
+                    type="evaluation_result",
+                    value=cast(
+                        EvaluationResult,
+                        result.model_dump(exclude_unset=True, exclude_none=True),
+                    ),
+                )
             )
         )
+        if result.cost:
+            span.update(
+                metrics=SpanMetrics(
+                    cost=result.cost.amount,
+                )
+            )
     return result
 
 
@@ -178,7 +226,7 @@ def handle_exception(
 ):
     response: dict = {
         "status": "error",
-        "message": str(e),
+        "message": repr(e),
     }
     if as_guardrail:
         response["passed"] = True

@@ -84,7 +84,7 @@ def capture_exception(err: BaseException):
         )  # type: ignore
     except:  # python 3.10+
         string_stacktrace = traceback.format_exception(err)  # type: ignore
-    return ErrorCapture(message=str(err), stacktrace=string_stacktrace)
+    return ErrorCapture(message=repr(err), stacktrace=string_stacktrace)
 
 
 def list_get(l, i, default=None):
@@ -101,7 +101,9 @@ def autoconvert_typed_values(
 
     if type(value_) == str:
         return TypedValueText(type="text", value=value_)
-    if type(value_) == dict and validate_safe(SpanInputOutput, value_, ["type", "value"]):
+    if type(value_) == dict and validate_safe(
+        SpanInputOutput, value_, ["type", "value"]
+    ):
         return cast(SpanInputOutput, value_)
     if type(value_) == list and all(
         validate_safe(ChatMessage, item, ["role"]) for item in value_
@@ -119,7 +121,9 @@ def validate_safe(type_, item: dict, min_required_keys_for_pydantic_1: List[str]
     import pydantic
 
     if pydantic.__version__.startswith("1."):
-        if type(item) == dict and all(key in item for key in min_required_keys_for_pydantic_1):
+        if type(item) == dict and all(
+            key in item for key in min_required_keys_for_pydantic_1
+        ):
             return True
         return False
     else:
@@ -169,7 +173,7 @@ class SerializableAndPydanticEncoder(json.JSONEncoder):
             pass
 
         if isinstance(o, BaseModel):
-            return o.model_dump()
+            return o.model_dump(exclude_unset=True)
         return super().default(o)
 
 
@@ -184,7 +188,9 @@ class SerializableWithStringFallback(SerializableAndPydanticEncoder):
 def reduce_payload_size(
     obj: T, max_string_length=5000, max_list_dict_length=50000, depth=0
 ) -> T:
-    if type(obj) == list and all(validate_safe(ChatMessage, item, ["role"]) for item in obj):
+    if type(obj) == list and all(
+        validate_safe(ChatMessage, item, ["role"]) for item in obj
+    ):
         return obj
 
     def truncate_string(s):

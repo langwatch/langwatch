@@ -57,26 +57,26 @@ export function EvaluationManualIntegration({
     const contextsParams = evaluatorDefinition.requiredFields.includes(
       "contexts"
     )
-      ? `\n    contexts=["retrieved snippet 1", "retrieved snippet 2"],`
+      ? `\n        contexts=["retrieved snippet 1", "retrieved snippet 2"],`
       : evaluatorDefinition.optionalFields.includes("contexts")
-      ? `\n    contexts=["retrieved snippet 1", "retrieved snippet 2"], # optional`
+      ? `\n        contexts=["retrieved snippet 1", "retrieved snippet 2"], # optional`
       : "";
     const inputParams = evaluatorDefinition.requiredFields.includes("input")
-      ? `\n    input=user_input,`
+      ? `\n        input=user_input,`
       : evaluatorDefinition.optionalFields.includes("input")
-      ? `\n    input=user_input, # optional`
+      ? `\n        input=user_input, # optional`
       : "";
     const outputParams = evaluatorDefinition.requiredFields.includes("output")
-      ? `\n    output=generated_response,`
+      ? `\n        output=generated_response,`
       : evaluatorDefinition.optionalFields.includes("output")
-      ? `\n    output=generated_response, # optional`
+      ? `\n        output=generated_response, # optional`
       : "";
     const settingsParams = storeSettingsOnCode
-      ? `\n    settings=${JSON.stringify(settings, null, 2)
+      ? `\n        settings=${JSON.stringify(settings, null, 2)
           .replace(/true/g, "True")
           .replace(/false/g, "False")
           .split("\n")
-          .map((line, index) => (index === 0 ? line : "    " + line))
+          .map((line, index) => (index === 0 ? line : "        " + line))
           .join("\n")},`
       : "";
 
@@ -92,72 +92,38 @@ export function EvaluationManualIntegration({
           <>
             <Text fontSize={14}>
               {isGuardrail
-                ? "Then, right before calling your LLM, check for the guardrail:"
+                ? isOutputMandatory
+                  ? "Then, after calling your LLM, check for the guardrail:"
+                  : "Then, either before or after calling your LLM, check for the guardrail:"
                 : "Then, pass in the message data to get the result of the evaluator:"}
             </Text>
             <Box className="markdown" width="full">
               <RenderCode
-                code={`${isGuardrail ? "guardrail" : "result"} = ${
-                  async
-                    ? `await langwatch.${
-                        isGuardrail ? "guardrails" : "evaluations"
-                      }.async_evaluate`
-                    : `langwatch.${
-                        isGuardrail ? "guardrails" : "evaluations"
-                      }.evaluate`
-                }(
-    "${checkSlug}",${
-      isGuardrail ? "input=user_input," : inputParams
-    }${outputParams}${contextsParams}${settingsParams}
-)
+                code={`@langwatch.span()
+def llm_step():
+    ... # your existing code
+
+    ${isGuardrail ? "guardrail" : "result"} = ${
+      async
+        ? `await langwatch.get_current_span().async_evaluate`
+        : `langwatch.get_current_span().evaluate`
+    }(
+        "${checkSlug}",${
+          isGuardrail ? "\n        as_guardrail=True,\n        input=user_input," : inputParams
+        }${outputParams}${contextsParams}${settingsParams}
+    )
 ${
   isGuardrail
     ? `
-if not guardrail.passed:
-    # handle the guardrail here
-    return "I'm sorry, I can't do that."`
+    if not guardrail.passed:
+        # handle the guardrail here
+        return "I'm sorry, I can't do that."`
     : `
-print(result)`
+    print(result)`
 }`}
                 language="python"
               />
             </Box>
-          </>
-        )}
-        {isGuardrail && (
-          <>
-            {isOutputMandatory && (
-              <Text fontSize={14}>
-                Then, after generating the response from the LLM, check for the
-                guardrail:
-              </Text>
-            )}
-            {isOutputOptional && (
-              <Text fontSize={14}>
-                (Optional) You can instead check for the guardrail <i>after</i>{" "}
-                generating the response from the LLM, to validate the output:
-              </Text>
-            )}
-            {(isOutputMandatory || isOutputOptional) && (
-              <Box className="markdown" width="full">
-                <RenderCode
-                  code={`result = completion.choices[0].message
-
-guardrail = ${
-                    async
-                      ? "await langwatch.guardrails.async_evaluate"
-                      : "langwatch.guardrails.evaluate"
-                  }(
-    "${checkSlug}",${inputParams}
-    output=result,${contextsParams}${settingsParams}
-)
-if not guardrail.passed:
-    # handle the guardrail here
-    return "I'm sorry, I can't do that."`}
-                  language="python"
-                />
-              </Box>
-            )}
           </>
         )}
       </VStack>

@@ -91,7 +91,11 @@ async def test_example(example_file):
         await on_chat_start()
 
     # Create a mock cl.Message
-    content = "what is LangWatch?" if "rag" in example_file else "hello"
+    content = (
+        "who is the oldest person?"
+        if "span_evaluation" in example_file
+        else "what is LangWatch?" if "rag" in example_file else "hello"
+    )
     mock_message = content if "fastapi" in example_file else cl.Message(content=content)
 
     # Call the main function

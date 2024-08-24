@@ -22,10 +22,11 @@ import {
   SpanTypeTag,
 } from "./SpanDetails";
 import {
-  checkStatusColorMap,
+  evaluationStatusColor,
   CheckStatusIcon,
 } from "../checks/EvaluationStatus";
 import { IconWrapper } from "../IconWrapper";
+import { formatEvaluationScore } from "./EvaluationStatusItem";
 
 type SpanWithChildren = ElasticSearchSpan & { children: SpanWithChildren[] };
 
@@ -74,6 +75,9 @@ const SpanNode: React.FC<SpanNodeProps> = ({ span, level }) => {
     }) + Math.min(span.children.length, 1);
 
   const lineHeight = `calc(100% - ${childrenInTheMiddleCount * 80}px - 14px)`;
+
+  const evaluationResult =
+    span.type === "evaluation" ? getEvaluationResult(span) : undefined;
 
   return (
     <VStack
@@ -152,32 +156,18 @@ const SpanNode: React.FC<SpanNodeProps> = ({ span, level }) => {
         </HStack>
         <VStack align="start">
           <HStack>
-            <Text>
-              {span.name ?? span.model ?? (
-                <Text color="gray.400">(unnamed)</Text>
-              )}
+            <Text color={!span.name && !span.model ? "gray.400" : undefined}>
+              {span.name ?? span.model ?? "(unnamed)"}
             </Text>
-            {(() => {
-              if (span.type !== "evaluation") return null;
-
-              const evaluationResult = getEvaluationResult(span);
-              if (!evaluationResult) return null;
-
-              return (
-                <IconWrapper
-                  width="18px"
-                  height="18px"
-                  color={checkStatusColorMap(evaluationResult)}
-                >
-                  <CheckStatusIcon
-                    check={{
-                      passed: evaluationResult.passed,
-                      status: "processed",
-                    }}
-                  />
-                </IconWrapper>
-              );
-            })()}
+            {evaluationResult && (
+              <IconWrapper
+                width="18px"
+                height="18px"
+                color={evaluationStatusColor(evaluationResult)}
+              >
+                <CheckStatusIcon check={evaluationResult} />
+              </IconWrapper>
+            )}
           </HStack>
           <HStack fontSize={13} color="gray.500">
             <SpanDuration span={span} />
@@ -201,6 +191,22 @@ const SpanNode: React.FC<SpanNodeProps> = ({ span, level }) => {
                   </Text>
                 </>
               )}
+            {(evaluationResult?.score !== undefined ||
+              evaluationResult?.passed !== undefined) && (
+              <>
+                <Text>·</Text>
+                <Text
+                  fontSize={13}
+                  color={evaluationStatusColor(evaluationResult)}
+                >
+                  {evaluationResult.score !== undefined
+                    ? formatEvaluationScore(evaluationResult.score)
+                    : evaluationResult.passed
+                    ? "Pass"
+                    : "Fail"}
+                </Text>
+              </>
+            )}
           </HStack>
         </VStack>
       </HStack>

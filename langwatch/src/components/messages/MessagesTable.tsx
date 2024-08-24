@@ -63,7 +63,7 @@ import { useLocalStorage } from "usehooks-ts";
 import { titleCase } from "../../utils/stringCasing";
 import { useDrawer } from "../CurrentDrawer";
 import { PeriodSelector, usePeriodSelector } from "../PeriodSelector";
-import { checkStatusColorMap } from "../checks/EvaluationStatus";
+import { evaluationStatusColor } from "../checks/EvaluationStatus";
 import { FilterSidebar } from "../filters/FilterSidebar";
 import { FilterToggle } from "../filters/FilterToggle";
 import { ToggleAnalytics, ToggleTableView } from "./HeaderButtons";
@@ -229,7 +229,7 @@ export function MessagesTable() {
           >
             <Tooltip label={traceCheck?.details}>
               {traceCheck?.status === "processed" ? (
-                <Text color={checkStatusColorMap(traceCheck)}>
+                <Text color={evaluationStatusColor(traceCheck)}>
                   {evaluator?.isGuardrail
                     ? traceCheck.passed
                       ? "Passed"
@@ -239,7 +239,7 @@ export function MessagesTable() {
                     : "N/A"}
                 </Text>
               ) : (
-                <Text color={traceCheck ? checkStatusColorMap(traceCheck) : ""}>
+                <Text color={traceCheck ? evaluationStatusColor(traceCheck) : ""}>
                   {titleCase(traceCheck?.status ?? "-")}
                 </Text>
               )}

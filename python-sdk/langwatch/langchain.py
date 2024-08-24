@@ -21,10 +21,10 @@ from langwatch.tracer import (
 from langwatch.types import (
     ChatMessage,
     ChatRole,
-    LLMSpanParams,
+    SpanParams,
     RAGChunk,
     SpanInputOutput,
-    LLMSpanMetrics,
+    SpanMetrics,
     SpanTimestamps,
     TraceMetadata,
     TypedValueChatMessages,
@@ -157,7 +157,7 @@ class LangChainTracer(BaseCallbackHandler):
         input: SpanInputOutput,
         **kwargs: Any,
     ) -> ContextSpan:
-        span_params = LLMSpanParams()
+        span_params = SpanParams()
         params = [
             "frequency_penalty",
             "logit_bias",
@@ -248,7 +248,7 @@ class LangChainTracer(BaseCallbackHandler):
         if response.llm_output and "token_usage" in response.llm_output:
             usage = response.llm_output["token_usage"]
             span.update(
-                metrics=LLMSpanMetrics(
+                metrics=SpanMetrics(
                     prompt_tokens=usage.get("prompt_tokens"),
                     completion_tokens=usage.get("completion_tokens"),
                 )

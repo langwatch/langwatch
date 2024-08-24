@@ -37,20 +37,12 @@ async def main(message: cl.Message):
             final_message += token
             await msg.stream_token(token)
 
-    score, reasoning = useful_message_evaluation(
-        question=message.content, answer=final_message
-    )
-
-    langwatch.get_current_trace().add_evaluation(
-        name="Useful Message Evaluation",
-        passed=score > 50,
-        score=score,
-        details=reasoning,
-    )
+    useful_message_evaluation(question=message.content, answer=final_message)
 
     await msg.update()
 
 
+@langwatch.span(type="evaluation")
 def useful_message_evaluation(question: str, answer: str):
     completion = client.chat.completions.create(
         model="gpt-4o-mini",
@@ -95,4 +87,9 @@ def useful_message_evaluation(question: str, answer: str):
     tool_message = completion.choices[0].message.tool_calls[0]  # type: ignore
     arguments = json.loads(tool_message.function.arguments)
 
-    return arguments["score"], arguments["reasoning"]
+    langwatch.get_current_span().add_evaluation(
+        name="Useful Message Evaluation",
+        passed=arguments["score"] > 50,
+        score=arguments["score"],
+        details=arguments["reasoning"],
+    )

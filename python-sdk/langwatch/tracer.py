@@ -26,12 +26,13 @@ from langwatch.logger import get_logger
 from langwatch.types import (
     BaseSpan,
     ChatMessage,
+    Conversation,
     Evaluation,
     EvaluationResult,
     EvaluationTimestamps,
     LLMSpan,
-    LLMSpanMetrics,
-    LLMSpanParams,
+    SpanMetrics,
+    SpanParams,
     RAGChunk,
     RAGSpan,
     Span,
@@ -98,8 +99,8 @@ class ContextSpan:
     timestamps: SpanTimestamps
     contexts: Optional[Union[List[RAGChunk], List[str]]] = None
     model: Optional[str] = None
-    params: Optional[LLMSpanParams] = None
-    metrics: Optional[LLMSpanMetrics] = None
+    params: Optional[SpanParams] = None
+    metrics: Optional[SpanMetrics] = None
 
     def __init__(
         self,
@@ -116,8 +117,8 @@ class ContextSpan:
         timestamps: Optional[SpanTimestamps] = None,
         contexts: Optional[Union[List[RAGChunk], List[str]]] = None,
         model: Optional[str] = None,
-        params: Optional[LLMSpanParams] = None,
-        metrics: Optional[LLMSpanMetrics] = None,
+        params: Optional[SpanParams] = None,
+        metrics: Optional[SpanMetrics] = None,
         ignore_missing_trace_warning: bool = False,
     ) -> None:
         self.trace = trace
@@ -260,8 +261,8 @@ class ContextSpan:
         timestamps: Optional[SpanTimestamps] = None,
         contexts: Optional[Union[List[RAGChunk], List[str]]] = None,
         model: Optional[str] = None,
-        params: Optional[LLMSpanParams] = None,
-        metrics: Optional[LLMSpanMetrics] = None,
+        params: Optional[SpanParams] = None,
+        metrics: Optional[SpanMetrics] = None,
     ) -> None:
         if span_id:
             self.span_id = span_id
@@ -295,19 +296,9 @@ class ContextSpan:
                     "Trying `model` on a non-LLM span, this attribute will be ignored for non-LLM spans, please make sure you set the span type to `llm` by using the decorator as @span(type='llm')"
                 )
         if params:
-            if self.type == "llm":
-                self.params = params
-            else:
-                warn(
-                    "Trying `params` on a non-LLM span, this attribute will be ignored for non-LLM spans, please make sure you set the span type to `llm` by using the decorator as @span(type='llm')"
-                )
+            self.params = params
         if metrics:
-            if self.type == "llm":
-                self.metrics = metrics
-            else:
-                warn(
-                    "Trying `metrics` on a non-LLM span, this attribute will be ignored for non-LLM spans, please make sure you set the span type to `llm` by using the decorator as @span(type='llm')"
-                )
+            self.metrics = metrics
 
     def add_evaluation(
         self,
@@ -342,6 +333,52 @@ class ContextSpan:
             timestamps=timestamps,
         )
 
+    def evaluate(
+        self,
+        slug: str,
+        input: Optional[str] = None,
+        output: Optional[str] = None,
+        expected_output: Optional[str] = None,
+        contexts: Union[List[RAGChunk], List[str]] = [],
+        conversation: Conversation = [],
+        settings: Optional[dict] = None,
+        as_guardrail: bool = False,
+    ):
+        return langwatch.evaluations.evaluate(
+            span=self,
+            slug=slug,
+            input=input,
+            output=output,
+            expected_output=expected_output,
+            contexts=contexts,
+            conversation=conversation,
+            settings=settings,
+            as_guardrail=as_guardrail,
+        )
+
+    async def async_evaluate(
+        self,
+        slug: str,
+        input: Optional[str] = None,
+        output: Optional[str] = None,
+        expected_output: Optional[str] = None,
+        contexts: Union[List[RAGChunk], List[str]] = [],
+        conversation: Conversation = [],
+        settings: Optional[dict] = None,
+        as_guardrail: bool = False,
+    ):
+        return await langwatch.evaluations.async_evaluate(
+            span=self,
+            slug=slug,
+            input=input,
+            output=output,
+            expected_output=expected_output,
+            contexts=contexts,
+            conversation=conversation,
+            settings=settings,
+            as_guardrail=as_guardrail,
+        )
+
     def end(
         self,
         name: Optional[str] = None,
@@ -352,8 +389,8 @@ class ContextSpan:
         timestamps: Optional[SpanTimestamps] = None,
         contexts: Optional[Union[List[RAGChunk], List[str]]] = None,
         model: Optional[str] = None,
-        params: Optional[LLMSpanParams] = None,
-        metrics: Optional[LLMSpanMetrics] = None,
+        params: Optional[SpanParams] = None,
+        metrics: Optional[SpanMetrics] = None,
     ):
         finished_at = milliseconds_timestamp()
 
@@ -403,6 +440,8 @@ class ContextSpan:
                     contexts=reduce_payload_size(
                         autoconvert_rag_contexts(self.contexts or [])
                     ),
+                    params=self.params,
+                    metrics=self.metrics,
                 )
             )
         elif self.type == "llm":
@@ -458,6 +497,8 @@ class ContextSpan:
                         else None
                     ),
                     timestamps=self.timestamps,
+                    params=self.params,
+                    metrics=self.metrics,
                 )
             )
 
@@ -564,8 +605,8 @@ class ContextTrace:
         timestamps: Optional[SpanTimestamps] = None,
         contexts: Optional[Union[List[RAGChunk], List[str]]] = None,
         model: Optional[str] = None,
-        params: Optional[LLMSpanParams] = None,
-        metrics: Optional[LLMSpanMetrics] = None,
+        params: Optional[SpanParams] = None,
+        metrics: Optional[SpanMetrics] = None,
         evaluations: Optional[List[Evaluation]] = None,
     ):
         self.api_key = api_key or langwatch.api_key
@@ -666,8 +707,8 @@ class ContextTrace:
         timestamps: Optional[SpanTimestamps] = None,
         contexts: Optional[Union[List[RAGChunk], List[str]]] = None,
         model: Optional[str] = None,
-        params: Optional[LLMSpanParams] = None,
-        metrics: Optional[LLMSpanMetrics] = None,
+        params: Optional[SpanParams] = None,
+        metrics: Optional[SpanMetrics] = None,
         evaluations: Optional[List[Evaluation]] = None,
     ):
         if trace_id:
@@ -786,6 +827,52 @@ class ContextTrace:
             self.evaluations[current_evaluation_index] = current_evaluation | evaluation
         else:
             self.evaluations.append(evaluation)
+
+    def evaluate(
+        self,
+        slug: str,
+        input: Optional[str] = None,
+        output: Optional[str] = None,
+        expected_output: Optional[str] = None,
+        contexts: Union[List[RAGChunk], List[str]] = [],
+        conversation: Conversation = [],
+        settings: Optional[dict] = None,
+        as_guardrail: bool = False,
+    ):
+        return langwatch.evaluations.evaluate(
+            trace=self,
+            slug=slug,
+            input=input,
+            output=output,
+            expected_output=expected_output,
+            contexts=contexts,
+            conversation=conversation,
+            settings=settings,
+            as_guardrail=as_guardrail,
+        )
+
+    async def async_evaluate(
+        self,
+        slug: str,
+        input: Optional[str] = None,
+        output: Optional[str] = None,
+        expected_output: Optional[str] = None,
+        contexts: Union[List[RAGChunk], List[str]] = [],
+        conversation: Conversation = [],
+        settings: Optional[dict] = None,
+        as_guardrail: bool = False,
+    ):
+        return await langwatch.evaluations.async_evaluate(
+            trace=self,
+            slug=slug,
+            input=input,
+            output=output,
+            expected_output=expected_output,
+            contexts=contexts,
+            conversation=conversation,
+            settings=settings,
+            as_guardrail=as_guardrail,
+        )
 
     def deferred_send_spans(self):
         get_logger().debug(f"Scheduling for sending trace {self.trace_id} in 1s")

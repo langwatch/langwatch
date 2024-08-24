@@ -51,7 +51,7 @@ import { PeriodSelector, usePeriodSelector } from "../PeriodSelector";
 import { FilterSidebar } from "../filters/FilterSidebar";
 import { FilterToggle } from "../filters/FilterToggle";
 import type { CheckConfigFormData } from "./CheckConfigForm";
-import { checkStatusColorMap } from "./EvaluationStatus";
+import { evaluationStatusColor } from "./EvaluationStatus";
 import { elasticSearchSpanToSpan } from "../../server/tracer/utils";
 
 export function TryItOut({
@@ -379,7 +379,7 @@ export function TryItOut({
                       const runningResult = runningResults[trace.trace_id];
                       const color =
                         runningResult && runningResult.status !== "loading"
-                          ? checkStatusColorMap(runningResult)
+                          ? evaluationStatusColor(runningResult)
                           : undefined;
                       const resultDetails = runningResult
                         ? "details" in runningResult

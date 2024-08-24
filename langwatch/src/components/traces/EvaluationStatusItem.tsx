@@ -14,8 +14,15 @@ import { formatDistanceToNow } from "date-fns";
 import type { EvaluatorTypes } from "../../trace_checks/evaluators.generated";
 import {
   CheckStatusIcon,
-  checkStatusColorMap,
+  evaluationStatusColor,
 } from "../checks/EvaluationStatus";
+
+export function formatEvaluationScore(score: number | null | undefined) {
+  if (score === null || score === undefined) {
+    return "N/A";
+  }
+  return numeral(score).format("0.[00]");
+}
 
 export function EvaluationStatusItem({
   check,
@@ -26,7 +33,7 @@ export function EvaluationStatusItem({
 
   const evaluator = getEvaluatorDefinitions(checkType);
 
-  const color = checkStatusColorMap(check);
+  const color = evaluationStatusColor(check);
 
   return (
     <Box
@@ -62,9 +69,7 @@ export function EvaluationStatusItem({
                       <HStack>
                         <Text>Score:</Text>
                         <Text color={color}>
-                          {check.score !== undefined
-                            ? numeral(check.score).format("0.[00]")
-                            : "N/A"}
+                          {formatEvaluationScore(check.score)}
                         </Text>
                       </HStack>
                     )}

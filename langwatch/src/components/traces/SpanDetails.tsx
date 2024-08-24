@@ -13,11 +13,14 @@ import numeral from "numeral";
 import { Clock, Settings } from "react-feather";
 import { TraceToPlaygroundLink } from "../TraceToPlaygroundLink";
 import { RenderInputOutput } from "./RenderInputOutput";
-import type { ElasticSearchSpan } from "../../server/tracer/types";
+import type { ElasticSearchSpan, EvaluationResult } from "../../server/tracer/types";
 import type { Project } from "@prisma/client";
 import { formatMilliseconds } from "../../utils/formatMilliseconds";
 import { durationColor } from "../../utils/durationColor";
-import { evaluationPassed } from "../checks/EvaluationStatus";
+import {
+  evaluationStatusColor,
+  evaluationPassed,
+} from "../checks/EvaluationStatus";
 
 export function SpanDetails({
   project,
@@ -227,7 +230,12 @@ export function SpanDetails({
       ) : (
         span.output !== undefined &&
         span.output !== null && (
-          <VStack alignItems="flex-start" spacing={2} paddingTop={4} width="full">
+          <VStack
+            alignItems="flex-start"
+            spacing={2}
+            paddingTop={4}
+            width="full"
+          >
             <Box
               fontSize={13}
               color="gray.400"
@@ -257,7 +265,9 @@ export function SpanDetails({
   );
 }
 
-export const getEvaluationResult = (span: ElasticSearchSpan) => {
+export const getEvaluationResult = (
+  span: ElasticSearchSpan
+): EvaluationResult | undefined => {
   if (span.output?.type === "evaluation_result") {
     try {
       return JSON.parse(span.output.value);
@@ -296,7 +306,9 @@ export const SpanTypeTag = ({ span }: { span: ElasticSearchSpan }) => {
               unknown: "gray",
               evaluation:
                 evaluationPassed_ === undefined
-                  ? "gray"
+                  ? evaluationResult
+                    ? evaluationStatusColor(evaluationResult).split(".")[0]
+                    : "gray"
                   : evaluationPassed_
                   ? "green"
                   : "red",
