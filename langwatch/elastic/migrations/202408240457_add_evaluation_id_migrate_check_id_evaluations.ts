@@ -43,13 +43,23 @@ export const migrate = async () => {
       },
       body: {
         query: {
-          bool: {
-            must_not: {
-              exists: {
-                field: "evaluations.evaluation_id",
-              },
-            } as QueryDslQueryContainer,
-          } as QueryDslBoolQuery,
+          nested: {
+            path: "evaluations",
+            query: {
+              bool: {
+                must: {
+                  exists: {
+                    field: "evaluations.check_id",
+                  },
+                },
+                must_not: {
+                  exists: {
+                    field: "evaluations.evaluation_id",
+                  },
+                } as QueryDslQueryContainer,
+              } as QueryDslBoolQuery,
+            },
+          },
         },
         size: 5_000,
         sort: ["_doc"],
