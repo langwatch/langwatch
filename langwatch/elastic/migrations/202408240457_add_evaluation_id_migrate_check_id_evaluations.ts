@@ -58,7 +58,13 @@ export const migrate = async () => {
     });
     const results = response.hits.hits;
     searchAfter = results[results.length - 1]?.sort;
-    process.stdout.write(`\rFetched ${results.length} hits`);
+    const totalHits = (response.hits as any).total.value;
+    process.stdout.write(
+      `\rFetched ${results.length} out of ${totalHits}${
+        totalHits >= 10_000 ? "+" : ""
+      } total hits`
+    );
+    console.log("");
 
     let bulkActions = [];
     for (let i = 0; i < results.length; i++) {
@@ -131,6 +137,6 @@ export const migrate = async () => {
         );
       }
     }
-    console.log("\n");
+    console.log("");
   } while (response.hits.hits.length > 0);
 };
