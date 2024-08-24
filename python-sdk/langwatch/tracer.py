@@ -27,6 +27,7 @@ from langwatch.types import (
     BaseSpan,
     ChatMessage,
     Evaluation,
+    EvaluationResult,
     EvaluationTimestamps,
     LLMSpan,
     LLMSpanMetrics,
@@ -39,6 +40,7 @@ from langwatch.types import (
     SpanTypes,
     CollectorRESTParams,
     TraceMetadata,
+    TypedValueEvaluationResult,
 )
 from langwatch.utils import (
     SerializableWithStringFallback,
@@ -327,7 +329,7 @@ class ContextSpan:
 
         self.trace.add_evaluation(
             evaluation_id=evaluation_id,
-            span_id=str(self.span_id),
+            span=self,
             name=name,
             type=type,
             is_guardrail=is_guardrail,
@@ -695,7 +697,7 @@ class ContextTrace:
         self,
         *,
         evaluation_id: Optional[str] = None,
-        span_id: Optional[str] = None,
+        span: Optional[ContextSpan] = None,
         name: str,
         type: Optional[str] = None,
         is_guardrail: Optional[bool] = None,
@@ -723,9 +725,51 @@ class ContextTrace:
             else None
         )
 
+        evaluation_result = EvaluationResult(
+            status=status,
+        )
+        if passed is not None:
+            evaluation_result["passed"] = passed
+        if score is not None:
+            evaluation_result["score"] = score
+        if label is not None:
+            evaluation_result["label"] = label
+        if details is not None:
+            evaluation_result["details"] = details
+
+        if not span:
+            span = self.span(type="evaluation")
+        if span.type != "evaluation":
+            span = span.span(type="evaluation")
+        span.update(
+            name=name,
+            output=TypedValueEvaluationResult(
+                type="evaluation_result",
+                value=evaluation_result,
+            ),
+            error=error,
+            timestamps=(
+                SpanTimestamps(
+                    started_at=(
+                        timestamps["started_at"]
+                        if "started_at" in timestamps and timestamps["started_at"]
+                        else cast(int, None)
+                    ),
+                    finished_at=(
+                        timestamps["finished_at"]
+                        if "finished_at" in timestamps and timestamps["finished_at"]
+                        else cast(int, None)
+                    ),
+                )
+                if timestamps
+                else None
+            ),
+        )
+        span.end()
+
         evaluation = Evaluation(
             evaluation_id=evaluation_id or f"eval_{nanoid.generate()}",
-            span_id=span_id,
+            span_id=str(span.span_id) if span else None,
             name=name,
             type=type,
             is_guardrail=is_guardrail,

@@ -15,7 +15,17 @@ import { useTraceDetailsState } from "../../hooks/useTraceDetailsState";
 import type { ElasticSearchSpan } from "../../server/tracer/types";
 import { api } from "../../utils/api";
 import { isNotFound } from "../../utils/trpcError";
-import { SpanDetails, SpanDuration, SpanTypeTag } from "./SpanDetails";
+import {
+  getEvaluationResult,
+  SpanDetails,
+  SpanDuration,
+  SpanTypeTag,
+} from "./SpanDetails";
+import {
+  checkStatusColorMap,
+  CheckStatusIcon,
+} from "../checks/EvaluationStatus";
+import { IconWrapper } from "../IconWrapper";
 
 type SpanWithChildren = ElasticSearchSpan & { children: SpanWithChildren[] };
 
@@ -141,9 +151,34 @@ const SpanNode: React.FC<SpanNodeProps> = ({ span, level }) => {
           <SpanTypeTag span={span} />
         </HStack>
         <VStack align="start">
-          <Text>
-            {span.name ?? span.model ?? <Text color="gray.400">(unnamed)</Text>}
-          </Text>
+          <HStack>
+            <Text>
+              {span.name ?? span.model ?? (
+                <Text color="gray.400">(unnamed)</Text>
+              )}
+            </Text>
+            {(() => {
+              if (span.type !== "evaluation") return null;
+
+              const evaluationResult = getEvaluationResult(span);
+              if (!evaluationResult) return null;
+
+              return (
+                <IconWrapper
+                  width="18px"
+                  height="18px"
+                  color={checkStatusColorMap(evaluationResult)}
+                >
+                  <CheckStatusIcon
+                    check={{
+                      passed: evaluationResult.passed,
+                      status: "processed",
+                    }}
+                  />
+                </IconWrapper>
+              );
+            })()}
+          </HStack>
           <HStack fontSize={13} color="gray.500">
             <SpanDuration span={span} />
             {(span.metrics?.prompt_tokens !== undefined ||

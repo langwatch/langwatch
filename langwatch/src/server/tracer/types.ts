@@ -77,23 +77,30 @@ type Money = {
   amount: number;
 };
 
-export interface GuardrailResult {
+export interface EvaluationResult {
   status: "processed" | "skipped" | "error";
-  passed: boolean;
+  passed?: boolean | null;
   score?: number | null;
+  label?: string | null;
   details?: string | null;
   cost?: Money | null;
 }
 
 interface TypedValueGuardrailResult {
   type: "guardrail_result";
-  value: GuardrailResult;
+  value: EvaluationResult;
+}
+
+interface TypedValueEvaluationResult {
+  type: "evaluation_result";
+  value: EvaluationResult;
 }
 
 export type SpanInputOutput =
   | TypedValueText
   | TypedValueChatMessages
   | TypedValueGuardrailResult
+  | TypedValueEvaluationResult
   | TypedValueJson
   | TypedValueRaw
   | {
@@ -148,6 +155,7 @@ export type SpanTypes =
   | "agent"
   | "rag"
   | "guardrail"
+  | "evaluation"
   // Low-code
   | "workflow"
   | "component"

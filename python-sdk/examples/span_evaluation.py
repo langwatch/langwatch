@@ -129,8 +129,7 @@ def execute_code(code: str, bio_info_list: GetBioInfoList) -> str:
 
 
 @langwatch.span()
-async def stream_user_response(
-    msg: cl.Message,
+async def answer_user(
     question: str,
     code: str,
     result: str,
@@ -154,12 +153,9 @@ async def stream_user_response(
             """,
             },
         ],
-        stream=True,
     )
 
-    for part in completion:
-        if token := part.choices[0].delta.content or "":
-            await msg.stream_token(token)
+    return completion.choices[0].message.content or ""
 
 
 @cl.on_message
@@ -175,7 +171,7 @@ async def main(message: cl.Message):
     )
 
     user_bios = [
-        "Hello, my name is John and I am a software engineer, I'm 30 years old from New York.",
+        "Hello, my name is Richard and I am a software engineer, I'm 30 years old from New York.",
         "My name is Rogerio, I was born in 1992 in Brazil and I love to play soccer.",
         "Hi I'm Manouk, I'm Dutch, 25 years old and I love to travel.",
     ]
@@ -188,6 +184,8 @@ async def main(message: cl.Message):
 
     await msg.stream_token(f"Result:\n```python\n{result}\n```\n\n")
 
-    await stream_user_response(msg, question, code, result)
+    answer = await answer_user(question, code, result)
+
+    await msg.stream_token(answer)
 
     await msg.update()

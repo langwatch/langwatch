@@ -20,8 +20,8 @@ import {
 import { DashboardLayout } from "./DashboardLayout";
 import { ExternalLinkIcon } from "@chakra-ui/icons";
 import { APIKeyCopyInput } from "../pages/authorize";
-import type { PropsWithChildren } from "react";
 import { api } from "../utils/api";
+import { IconWrapper } from "./IconWrapper";
 
 export const ProjectIntegration = () => {
   const publicEnv = api.publicEnv.useQuery(
@@ -48,20 +48,6 @@ export const ProjectIntegration = () => {
 
   const integrationDocs =
     (languageKey && framework?.languages[languageKey]) ?? docsLinks.custom_rest;
-
-  const IconWrapper = ({ children }: PropsWithChildren) => {
-    return (
-      <Box
-        width="64px"
-        height="64px"
-        display="flex"
-        alignItems="center"
-        justifyContent="center"
-      >
-        {children}
-      </Box>
-    );
-  };
 
   return (
     <DashboardLayout backgroundColor="white">

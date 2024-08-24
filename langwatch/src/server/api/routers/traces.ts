@@ -25,7 +25,7 @@ import { TRACE_INDEX, esClient, traceIndexId } from "../../elasticsearch";
 import {
   type ElasticSearchSpan,
   type ElasticSearchTrace,
-  type GuardrailResult,
+  type EvaluationResult,
   type RAGChunk,
   type Trace,
 } from "../../tracer/types";
@@ -523,15 +523,15 @@ export const getAllTracesForProject = async (
           : lastSpans;
 
       const lastFailedGuardrailResult:
-        | (GuardrailResult & { name?: string })
+        | (EvaluationResult & { name?: string })
         | undefined = lastGuardrailSpans?.flatMap((span) =>
         (span?.output ? [span.output] : [])
           .filter((output) => output.type === "guardrail_result")
           .map((output) => ({
-            ...((output.value as unknown as GuardrailResult) || {}),
+            ...((output.value as unknown as EvaluationResult) || {}),
             name: guardrailsSlugToName[span.name ?? ""],
           }))
-          .filter((output) => !(output as GuardrailResult)?.passed)
+          .filter((output) => !(output as EvaluationResult)?.passed)
       )[0];
 
       let contexts: RAGChunk[] = [];

@@ -3,7 +3,14 @@ from typing_extensions import TypedDict
 
 
 ChatRole = Literal[
-    "system", "user", "assistant", "function", "tool", "guardrail", "unknown"
+    "system",
+    "user",
+    "assistant",
+    "function",
+    "tool",
+    "guardrail",
+    "evaluation",
+    "unknown",
 ]
 
 
@@ -63,6 +70,11 @@ class TypedValueGuardrailResult(TypedDict):
     value: EvaluationResult
 
 
+class TypedValueEvaluationResult(TypedDict):
+    type: Literal["evaluation_result"]
+    value: EvaluationResult
+
+
 class TypedValueRaw(TypedDict):
     type: Literal["raw"]
     value: str
@@ -86,6 +98,7 @@ SpanInputOutput = Union[
     TypedValueChatMessages,
     TypedValueJson,
     TypedValueGuardrailResult,
+    TypedValueEvaluationResult,
     TypedValueRaw,
     TypedValueList,
 ]
@@ -104,6 +117,7 @@ SpanTypes = Literal[
     "tool",
     "agent",
     "guardrail",
+    "evaluation",
     "rag",
     "workflow",
     "component",

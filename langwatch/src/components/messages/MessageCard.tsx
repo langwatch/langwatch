@@ -32,7 +32,7 @@ import {
 } from "react-feather";
 import Markdown from "react-markdown";
 import type {
-  GuardrailResult,
+  EvaluationResult,
   Trace,
   ElasticSearchEvaluation,
 } from "../../server/tracer/types";
@@ -46,7 +46,7 @@ import { formatTimeAgo } from "../../utils/formatTimeAgo";
 import { EventsCounter } from "./EventsCounter";
 
 export type TraceWithGuardrail = Trace & {
-  lastGuardrail: (GuardrailResult & { name?: string }) | undefined;
+  lastGuardrail: (EvaluationResult & { name?: string }) | undefined;
 };
 
 export function MessageCard({

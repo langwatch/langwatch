@@ -17,6 +17,7 @@ import type { ElasticSearchSpan } from "../../server/tracer/types";
 import type { Project } from "@prisma/client";
 import { formatMilliseconds } from "../../utils/formatMilliseconds";
 import { durationColor } from "../../utils/durationColor";
+import { evaluationPassed } from "../checks/EvaluationStatus";
 
 export function SpanDetails({
   project,
@@ -201,7 +202,7 @@ export function SpanDetails({
         </VStack>
       )}
       {span.error ? (
-        <VStack alignItems="flex-start" spacing={2} width="full">
+        <VStack alignItems="flex-start" spacing={2} paddingTop={4} width="full">
           <Box
             fontSize={13}
             color="red.400"
@@ -226,7 +227,7 @@ export function SpanDetails({
       ) : (
         span.output !== undefined &&
         span.output !== null && (
-          <VStack alignItems="flex-start" spacing={2} width="full">
+          <VStack alignItems="flex-start" spacing={2} paddingTop={4} width="full">
             <Box
               fontSize={13}
               color="gray.400"
@@ -256,7 +257,22 @@ export function SpanDetails({
   );
 }
 
+export const getEvaluationResult = (span: ElasticSearchSpan) => {
+  if (span.output?.type === "evaluation_result") {
+    try {
+      return JSON.parse(span.output.value);
+    } catch (_) {
+      return undefined;
+    }
+  }
+  return undefined;
+};
+
 export const SpanTypeTag = ({ span }: { span: ElasticSearchSpan }) => {
+  const evaluationResult = getEvaluationResult(span);
+  const evaluationPassed_ =
+    evaluationResult && evaluationPassed(evaluationResult);
+
   return (
     <Tag
       colorScheme={
@@ -278,8 +294,15 @@ export const SpanTypeTag = ({ span }: { span: ElasticSearchSpan }) => {
               consumer: "green",
               task: "orange",
               unknown: "gray",
+              evaluation:
+                evaluationPassed_ === undefined
+                  ? "gray"
+                  : evaluationPassed_
+                  ? "green"
+                  : "red",
             }[span.type]
       }
+      backgroundColor={evaluationPassed_ === true ? "#ccf6c6" : undefined}
       fontSize={13}
     >
       {span.type.toUpperCase()}
