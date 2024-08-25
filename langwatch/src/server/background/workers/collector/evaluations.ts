@@ -9,7 +9,7 @@ export const evaluationNameAutoslug = (name: string) => {
     lower: true,
     strict: true,
   }).replace(/[^a-z0-9]/g, "_");
-  return autoslug;
+  return `custom_eval_${autoslug}`;
 };
 
 export const mapEvaluations = (
@@ -25,8 +25,7 @@ export const mapEvaluations = (
       ...evaluation,
       evaluation_id: evaluation.evaluation_id ?? `eval_md5_${evaluationMD5}`,
       evaluator_id:
-        evaluation.evaluator_id ??
-        `custom_eval_${evaluationNameAutoslug(evaluation.name)}`,
+        evaluation.evaluator_id ?? evaluationNameAutoslug(evaluation.name),
       type: evaluation.type,
       name: evaluation.name,
       status: evaluation.status ?? (evaluation.error ? "error" : "processed"),

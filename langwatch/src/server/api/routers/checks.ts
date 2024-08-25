@@ -77,7 +77,7 @@ export const checksRouter = createTRPCRouter({
 
       const newCheck = await prisma.check.create({
         data: {
-          id: `check_${nanoid()}`,
+          id: `eval_${nanoid()}`,
           projectId,
           name,
           checkType,

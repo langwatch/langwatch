@@ -3,7 +3,6 @@ import {
   HStack,
   Text,
   VStack,
-  Flex,
   Spacer,
   Tooltip,
 } from "@chakra-ui/react";
@@ -42,7 +41,7 @@ export function EvaluationStatusItem({
       padding={6}
       borderRadius={"lg"}
     >
-      <Flex>
+      <HStack align="start" spacing={2}>
         <HStack align="start" spacing={1}>
           <Box paddingRight={2} color={color}>
             <CheckStatusIcon check={check} />
@@ -103,6 +102,8 @@ export function EvaluationStatusItem({
           </VStack>
         </HStack>
         <Spacer />
+        <Text fontSize={"sm"} color="gray.400">{check.evaluator_id}</Text>
+        <Text color="gray.400">·</Text>
         <Text fontSize={"sm"}>
           {check.timestamps.finished_at && (
             <Tooltip
@@ -120,7 +121,7 @@ export function EvaluationStatusItem({
             </Tooltip>
           )}
         </Text>
-      </Flex>
+      </HStack>
     </Box>
   );
 }
