@@ -1,5 +1,8 @@
 import {
   Box,
+  Button,
+  Center,
+  HStack,
   Modal,
   ModalBody,
   ModalCloseButton,
@@ -8,15 +11,15 @@ import {
   ModalOverlay,
   Text,
 } from "@chakra-ui/react";
-import type { Node } from "@xyflow/react";
-import type { Component } from "../types/dsl";
+import { nanoid } from "nanoid";
+import { useMemo } from "react";
 import {
   DatasetGrid,
   type DatasetColumnDef,
 } from "../../components/datasets/DatasetGrid";
 import type { DatasetRecordEntry } from "../../server/datasets/types";
-import { nanoid } from "nanoid";
-import { useMemo } from "react";
+import type { Component, Entry } from "../types/dsl";
+import { Edit2 } from "react-feather";
 
 export function DatasetModal({
   isOpen,
@@ -39,30 +42,44 @@ export function DatasetModal({
   );
 }
 
-export function DatasetPreview({ node }: { node: Node<Component> }) {
-  const data: Record<string, string[]> | undefined =
-    "dataset" in node.data &&
-    node.data.dataset &&
-    "inline" in node.data.dataset &&
-    node.data.dataset.inline
-      ? node.data.dataset.inline
+export const getDatasetRows = (data: Component) => {
+  const data_: Record<string, string[]> | undefined =
+    "dataset" in data &&
+    data.dataset &&
+    "inline" in data.dataset &&
+    data.dataset.inline;
+
+  return data_;
+};
+
+export function DatasetPreview({ data }: { data: Entry }) {
+  const data_ = getDatasetRows(data);
+
+  const columns = useMemo(() => {
+    const columns = Object.keys(data_ ?? {}).filter((key) => key !== "id");
+    if (columns.length > 4) {
+      return new Set(columns.slice(0, 4));
+    }
+
+    return new Set(columns);
+  }, [data_]);
+
+  const rowData = useMemo(() => {
+    const rows = data_
+      ? transposeIDlessColumnsFirstToRowsFirstWithId(data_).slice(0, 5)
       : undefined;
 
-  const rowData = useMemo(
-    () =>
-      data
-        ? transposeIDlessColumnsFirstToRowsFirstWithId(data).slice(0, 5)
-        : undefined,
-    [data]
-  );
+    return rows?.map((row) => {
+      const row_ = Object.fromEntries(
+        Object.entries(row).filter(([key]) => key === "id" || columns.has(key))
+      );
 
-  const columns = useMemo(
-    () => Object.keys(data ?? {}).filter((key) => key !== "id"),
-    [data]
-  );
+      return row_;
+    });
+  }, [columns, data_]);
 
   const columnDefs = useMemo(() => {
-    const headers: DatasetColumnDef[] = columns.map((field) => ({
+    const headers: DatasetColumnDef[] = Array.from(columns).map((field) => ({
       headerName: field,
       field,
       type_: "string",
@@ -90,7 +107,42 @@ export function DatasetPreview({ node }: { node: Node<Component> }) {
   }
 
   return (
-    <Box width="100%" maxHeight="200px" overflow="scroll" borderBottom="1px solid #bdc3c7">
+    <Box
+      width="100%"
+      maxHeight="200px"
+      overflow="scroll"
+      borderBottom="1px solid #bdc3c7"
+      className="dataset-preview"
+      position="relative"
+    >
+      <Center
+        position="absolute"
+        top={0}
+        left={0}
+        width="100%"
+        height="100%"
+        background="rgba(0, 0, 0, 0.2)"
+        zIndex={10}
+        opacity={0}
+        cursor="pointer"
+        transition="opacity 0.2s ease-in-out"
+        _hover={{
+          opacity: 1,
+        }}
+      >
+        <HStack
+          spacing={2}
+          fontSize={18}
+          fontWeight="bold"
+          color="white"
+          background="rgba(0, 0, 0, .5)"
+          padding={2}
+          borderRadius="6px"
+        >
+          <Edit2 size={20} />
+          <Text>Edit</Text>
+        </HStack>
+      </Center>
       <DatasetGrid columnDefs={columnDefs} rowData={rowData} />
     </Box>
   );

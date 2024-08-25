@@ -11,7 +11,7 @@ import type { Node } from "@xyflow/react";
 import { ChevronDown, Edit2, X } from "react-feather";
 import { useShallow } from "zustand/react/shallow";
 import { useWorkflowStore } from "../hooks/useWorkflowStore";
-import type { Component, ComponentType, Field } from "../types/dsl";
+import type { Component, ComponentType, Entry, Field } from "../types/dsl";
 import { ComponentIcon } from "./ColorfulBlockIcons";
 import { DatasetPreview } from "./DatasetModal";
 import { getNodeDisplayName, NodeSectionTitle, TypeLabel } from "./Nodes";
@@ -26,7 +26,7 @@ export function EntryPointPropertiesPanel({ node }: { node: Node<Component> }) {
           <Text>Edit</Text>
         </Button>
       </HStack>
-      <DatasetPreview node={node} />
+      <DatasetPreview data={node.data as Entry} />
     </BasePropertiesPanel>
   );
 }
@@ -116,7 +116,9 @@ export function BasePropertiesPanel({
       align="start"
       spacing={6}
       padding={3}
-      minWidth="400px"
+      maxWidth="550px"
+      width="25vw"
+      minWidth="350px"
       height="full"
       background="white"
       borderLeft="1px solid"

@@ -1,16 +1,46 @@
-import { HStack, Text, VStack } from "@chakra-ui/react";
+import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 
 import { Handle, type Node, type NodeProps, Position } from "@xyflow/react";
-import { type Component, type ComponentType, type Field } from "../types/dsl";
+import {
+  type Component,
+  type ComponentType,
+  type Entry,
+  type Field,
+} from "../types/dsl";
 import { useWorkflowStore } from "../hooks/useWorkflowStore";
 import { ComponentIcon } from "./ColorfulBlockIcons";
+import { DatasetPreview, getDatasetRows } from "./DatasetModal";
+import { useState, useEffect } from "react";
 
 export function SignatureNode(props: NodeProps<Node<Component>>) {
   return <ComponentNode {...props} />;
 }
 
 export function EntryNode(props: NodeProps<Node<Component>>) {
-  return <ComponentNode {...props} outputsName="Fields" />;
+  const [rendered, setRendered] = useState(false);
+
+  useEffect(() => {
+    setRendered(true);
+  }, []);
+
+  const dataset = getDatasetRows(props.data) ?? {};
+  const linesCount = Math.max(
+    ...Object.values(dataset).map((row) => row.length)
+  );
+
+  return (
+    <ComponentNode {...props} outputsName="Fields">
+      <NodeSectionTitle>Dataset</NodeSectionTitle>
+      <Box
+        width="200%"
+        transform="scale(0.5)"
+        transformOrigin="top left"
+        height={`${(34 + 28 * linesCount) / 2}px`}
+      >
+        {rendered && <DatasetPreview data={props.data as Entry} />}
+      </Box>
+    </ComponentNode>
+  );
 }
 
 export function getNodeDisplayName(node: { id: string; data: Component }) {
@@ -128,6 +158,7 @@ export function NodeSectionTitle({
       textTransform="uppercase"
       color="gray.500"
       fontWeight="bold"
+      paddingTop={1}
     >
       {children}
     </Text>
@@ -178,7 +209,6 @@ function ComponentNode(
           </Text>
         </HStack>
       </HStack>
-      {props.children}
       {props.data.inputs && (
         <>
           <NodeSectionTitle>Inputs</NodeSectionTitle>
@@ -199,6 +229,7 @@ function ComponentNode(
           />
         </>
       )}
+      {props.children}
     </VStack>
   );
 }

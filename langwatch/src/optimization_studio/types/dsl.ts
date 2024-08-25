@@ -68,7 +68,6 @@ type Retriever = BaseComponent;
 type PromptingTechnique = BaseComponent;
 
 export type Entry = BaseComponent & {
-  type: "entry";
   inputs?: never;
   outputs: Field[];
   dataset?:
