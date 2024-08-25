@@ -40,7 +40,7 @@ export const evaluationPassed = (
     return undefined;
   }
 
-  if (evaluation.passed !== undefined) {
+  if (evaluation.passed !== undefined && evaluation.passed !== null) {
     return evaluation.passed;
   }
 
