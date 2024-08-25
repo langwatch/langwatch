@@ -38,6 +38,7 @@ import { TraceSummary } from "./Summary";
 import { useEffect, useState } from "react";
 import { useTraceDetailsState } from "../../hooks/useTraceDetailsState";
 import { formatTimeAgo } from "../../utils/formatTimeAgo";
+import { evaluationPassed } from "../checks/EvaluationStatus";
 
 interface TraceEval {
   project?: Project;
@@ -410,7 +411,7 @@ const Guardrails = (trace: TraceEval) => {
 const EvaluationsCount = (trace: TraceEval) => {
   const totalErrors =
     trace.evaluations?.filter(
-      (check) => check.status === "error" || check.passed === false
+      (check) => check.status === "error" || evaluationPassed(check) === false
     ).length ?? 0;
 
   if (totalErrors > 0) {

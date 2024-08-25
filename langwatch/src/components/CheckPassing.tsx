@@ -12,7 +12,6 @@ export function CheckPassing({ check }: { check: ElasticSearchEvaluation }) {
   const checkType = check.type as EvaluatorTypes;
 
   const evaluator = getEvaluatorDefinitions(checkType);
-  if (!evaluator) return null;
 
   return (
     <HStack align="start" spacing={2}>
@@ -20,11 +19,14 @@ export function CheckPassing({ check }: { check: ElasticSearchEvaluation }) {
         <CheckStatusIcon check={check} />
       </Box>
       <Text whiteSpace="nowrap">
-        <b>{check.name || evaluator.name}:</b>
+        <b>{check.name || evaluator?.name}:</b>
       </Text>
       {check.status == "processed" ? (
         <Text noOfLines={1} maxWidth="400px">
-          {evaluator.isGuardrail
+          {!!evaluator?.isGuardrail ||
+          (typeof check.score !== "number" &&
+            check.passed !== null &&
+            check.passed !== undefined)
             ? check.passed
               ? "Passed"
               : "Failed"

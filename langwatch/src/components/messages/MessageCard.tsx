@@ -44,6 +44,7 @@ import { CheckPassing } from "../CheckPassing";
 import { useDrawer } from "../CurrentDrawer";
 import { formatTimeAgo } from "../../utils/formatTimeAgo";
 import { EventsCounter } from "./EventsCounter";
+import { evaluationPassed } from "../checks/EvaluationStatus";
 
 export type TraceWithGuardrail = Trace & {
   lastGuardrail: (EvaluationResult & { name?: string }) | undefined;
@@ -74,7 +75,7 @@ export function MessageCard({
   );
   const evaluationsPasses = evaluations.filter(
     (check) =>
-      check.passed !== false &&
+      evaluationPassed(check) !== false &&
       (check.status === "processed" || check.status === "skipped")
   ).length;
   const guardrailsPasses = guardrails.filter(

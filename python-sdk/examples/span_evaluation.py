@@ -49,6 +49,7 @@ async def extract_structured_user_bios(user_bios: list[str]) -> GetBioInfoList:
 
     await langwatch.get_current_span().async_evaluate(
         "ragas/faithfulness",
+        name="Faithfulness",
         output=str(get_bio_info_list),
         contexts=user_bios,
         settings={
@@ -201,6 +202,7 @@ async def main(message: cl.Message):
 
     await langwatch.get_current_trace().async_evaluate(
         "ragas/answer_correctness",
+        name="Answer Correctness",
         input=question,
         output=answer,
         expected_output="Rogerio",

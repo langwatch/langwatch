@@ -71,6 +71,20 @@ export function EvaluationManualIntegration({
       : evaluatorDefinition.optionalFields.includes("output")
       ? `\n        output=generated_response, # optional`
       : "";
+    const expectedOutputParams = evaluatorDefinition.requiredFields.includes(
+      "expected_output"
+    )
+      ? `\n        expected_output=gold_answer,`
+      : evaluatorDefinition.optionalFields.includes("expected_output")
+      ? `\n        expected_output=gold_answer, # optional`
+      : "";
+    const conversationParams = evaluatorDefinition.requiredFields.includes(
+      "conversation"
+    )
+      ? `\n        conversation=conversation_history,`
+      : evaluatorDefinition.optionalFields.includes("conversation")
+      ? `\n        conversation=conversation_history, # optional`
+      : "";
     const settingsParams = storeSettingsOnCode
       ? `\n        settings=${JSON.stringify(settings, null, 2)
           .replace(/true/g, "True")
@@ -114,7 +128,7 @@ def llm_step():
               nameParam +
               "\n        input=user_input,"
             : nameParam + inputParams
-        }${outputParams}${contextsParams}${settingsParams}
+        }${contextsParams}${outputParams}${expectedOutputParams}${conversationParams}${settingsParams}
     )
 ${
   isGuardrail
