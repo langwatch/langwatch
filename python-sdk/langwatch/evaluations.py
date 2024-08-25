@@ -36,6 +36,7 @@ class EvaluationResultModel(BaseModel):
 
 def evaluate(
     slug: str,
+    name: Optional[str] = None,
     input: Optional[str] = None,
     output: Optional[str] = None,
     expected_output: Optional[str] = None,
@@ -49,11 +50,12 @@ def evaluate(
     with _optional_create_span(
         trace=trace,
         span=span,
-        name=slug,
+        name=name or slug,
         type="guardrail" if as_guardrail else "evaluation",
     ) as span:
         request_params = prepare_data(
             slug=slug,
+            name=name,
             input=input,
             output=output,
             expected_output=expected_output,
@@ -77,6 +79,7 @@ def evaluate(
 
 async def async_evaluate(
     slug: str,
+    name: Optional[str] = None,
     input: Optional[str] = None,
     output: Optional[str] = None,
     expected_output: Optional[str] = None,
@@ -90,11 +93,12 @@ async def async_evaluate(
     with _optional_create_span(
         trace=trace,
         span=span,
-        name=slug,
+        name=name or slug,
         type="guardrail" if as_guardrail else "evaluation",
     ) as span:
         request_params = prepare_data(
             slug=slug,
+            name=name,
             input=input,
             output=output,
             expected_output=expected_output,
@@ -143,6 +147,7 @@ def _optional_create_span(
 
 def prepare_data(
     slug: str,
+    name: Optional[str],
     input: Optional[str],
     output: Optional[str],
     expected_output: Optional[str],
@@ -176,6 +181,7 @@ def prepare_data(
         "json": {
             "trace_id": str(trace_id) if trace_id else None,
             "span_id": str(span_id) if span_id else None,
+            "name": name,
             "data": data,
             "settings": settings,
             "as_guardrail": as_guardrail,

@@ -336,6 +336,7 @@ class ContextSpan:
     def evaluate(
         self,
         slug: str,
+        name: Optional[str] = None,
         input: Optional[str] = None,
         output: Optional[str] = None,
         expected_output: Optional[str] = None,
@@ -347,6 +348,7 @@ class ContextSpan:
         return langwatch.evaluations.evaluate(
             span=self,
             slug=slug,
+            name=name,
             input=input,
             output=output,
             expected_output=expected_output,
@@ -359,6 +361,7 @@ class ContextSpan:
     async def async_evaluate(
         self,
         slug: str,
+        name: Optional[str] = None,
         input: Optional[str] = None,
         output: Optional[str] = None,
         expected_output: Optional[str] = None,
@@ -370,6 +373,7 @@ class ContextSpan:
         return await langwatch.evaluations.async_evaluate(
             span=self,
             slug=slug,
+            name=name,
             input=input,
             output=output,
             expected_output=expected_output,
@@ -831,6 +835,7 @@ class ContextTrace:
     def evaluate(
         self,
         slug: str,
+        name: Optional[str] = None,
         input: Optional[str] = None,
         output: Optional[str] = None,
         expected_output: Optional[str] = None,
@@ -842,6 +847,7 @@ class ContextTrace:
         return langwatch.evaluations.evaluate(
             trace=self,
             slug=slug,
+            name=name,
             input=input,
             output=output,
             expected_output=expected_output,
@@ -854,6 +860,7 @@ class ContextTrace:
     async def async_evaluate(
         self,
         slug: str,
+        name: Optional[str] = None,
         input: Optional[str] = None,
         output: Optional[str] = None,
         expected_output: Optional[str] = None,
@@ -865,6 +872,7 @@ class ContextTrace:
         return await langwatch.evaluations.async_evaluate(
             trace=self,
             slug=slug,
+            name=name,
             input=input,
             output=output,
             expected_output=expected_output,

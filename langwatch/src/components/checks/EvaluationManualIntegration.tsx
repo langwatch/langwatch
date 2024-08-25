@@ -33,6 +33,7 @@ export function EvaluationManualIntegration({
   form: UseFormReturn<CheckConfigFormData>;
 }) {
   const checkType = form.watch("checkType");
+  const name = form.watch("name");
   const executionMode = form.watch("executionMode");
   const isGuardrail = executionMode === EvaluationExecutionMode.AS_GUARDRAIL;
   const settings = form.watch("settings");
@@ -52,6 +53,7 @@ export function EvaluationManualIntegration({
   );
 
   const PythonInstructions = ({ async }: { async: boolean }) => {
+    const nameParam = storeSettingsOnCode ? `\n        name="${name}",` : "";
     const contextsParams = evaluatorDefinition.requiredFields.includes(
       "contexts"
     )
@@ -107,7 +109,11 @@ def llm_step():
         : `langwatch.get_current_span().evaluate`
     }(
         "${checkSlug}",${
-          isGuardrail ? "\n        as_guardrail=True,\n        input=user_input," : inputParams
+          isGuardrail
+            ? "\n        as_guardrail=True," +
+              nameParam +
+              "\n        input=user_input,"
+            : nameParam + inputParams
         }${outputParams}${contextsParams}${settingsParams}
     )
 ${
