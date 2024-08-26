@@ -37,6 +37,7 @@ const initialNodes: Node<Component>[] = [
         { identifier: "gold_answer", type: "str" },
       ],
       dataset: {
+        name: "Test Dataset",
         inline: {
           question: [
             "What is the capital of the moon?",

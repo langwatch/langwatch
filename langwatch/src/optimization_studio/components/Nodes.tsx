@@ -1,4 +1,4 @@
-import { Box, HStack, Text, VStack } from "@chakra-ui/react";
+import { Box, HStack, Text, useDisclosure, VStack } from "@chakra-ui/react";
 
 import { Handle, type Node, type NodeProps, Position } from "@xyflow/react";
 import {
@@ -9,7 +9,11 @@ import {
 } from "../types/dsl";
 import { useWorkflowStore } from "../hooks/useWorkflowStore";
 import { ComponentIcon } from "./ColorfulBlockIcons";
-import { DatasetPreview, getDatasetRows } from "./DatasetModal";
+import {
+  DatasetModal,
+  DatasetPreview,
+  useGetDatasetData,
+} from "./DatasetModal";
 import { useState, useEffect } from "react";
 
 export function SignatureNode(props: NodeProps<Node<Component>>) {
@@ -18,15 +22,13 @@ export function SignatureNode(props: NodeProps<Node<Component>>) {
 
 export function EntryNode(props: NodeProps<Node<Component>>) {
   const [rendered, setRendered] = useState(false);
+  const { isOpen, onOpen, onClose } = useDisclosure();
 
   useEffect(() => {
     setRendered(true);
   }, []);
 
-  const dataset = getDatasetRows(props.data) ?? {};
-  const linesCount = Math.max(
-    ...Object.values(dataset).map((row) => row.length)
-  );
+  const { rows } = useGetDatasetData(props.data) ?? {};
 
   return (
     <ComponentNode {...props} outputsName="Fields">
@@ -35,10 +37,13 @@ export function EntryNode(props: NodeProps<Node<Component>>) {
         width="200%"
         transform="scale(0.5)"
         transformOrigin="top left"
-        height={`${(34 + 28 * linesCount) / 2}px`}
+        height={`${(34 + 28 * (rows?.length ?? 0)) / 2}px`}
       >
-        {rendered && <DatasetPreview data={props.data as Entry} />}
+        {rendered && (
+          <DatasetPreview data={props.data as Entry} onClick={onOpen} />
+        )}
       </Box>
+      <DatasetModal isOpen={isOpen} onClose={onClose} node={props} />
     </ComponentNode>
   );
 }

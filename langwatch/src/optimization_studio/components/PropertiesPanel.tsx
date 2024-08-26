@@ -5,6 +5,7 @@ import {
   Select,
   Spacer,
   Text,
+  useDisclosure,
   VStack,
 } from "@chakra-ui/react";
 import type { Node } from "@xyflow/react";
@@ -13,20 +14,28 @@ import { useShallow } from "zustand/react/shallow";
 import { useWorkflowStore } from "../hooks/useWorkflowStore";
 import type { Component, ComponentType, Entry, Field } from "../types/dsl";
 import { ComponentIcon } from "./ColorfulBlockIcons";
-import { DatasetPreview } from "./DatasetModal";
+import { DatasetModal, DatasetPreview } from "./DatasetModal";
 import { getNodeDisplayName, NodeSectionTitle, TypeLabel } from "./Nodes";
 
 export function EntryPointPropertiesPanel({ node }: { node: Node<Component> }) {
+  const { isOpen, onOpen, onClose } = useDisclosure();
+
   return (
     <BasePropertiesPanel node={node}>
       <HStack width="full">
         <PropertySectionTitle>Dataset</PropertySectionTitle>
         <Spacer />
-        <Button size="xs" variant="ghost" leftIcon={<Edit2 size={14} />}>
+        <Button
+          size="xs"
+          variant="ghost"
+          leftIcon={<Edit2 size={14} />}
+          onClick={onOpen}
+        >
           <Text>Edit</Text>
         </Button>
       </HStack>
-      <DatasetPreview data={node.data as Entry} />
+      <DatasetPreview data={node.data as Entry} onClick={onOpen} />
+      <DatasetModal isOpen={isOpen} onClose={onClose} node={node} />
     </BasePropertiesPanel>
   );
 }

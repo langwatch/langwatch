@@ -70,16 +70,11 @@ type PromptingTechnique = BaseComponent;
 export type Entry = BaseComponent & {
   inputs?: never;
   outputs: Field[];
-  dataset?:
-    | {
-        upload?: {
-          id: string;
-          head: Record<string, string>;
-        };
-      }
-    | {
-        inline: Record<string, string[]>;
-      };
+  dataset?: {
+    id?: string;
+    name?: string;
+    inline?: Record<string, string[]>;
+  };
 };
 
 type Evaluator = BaseComponent & {
