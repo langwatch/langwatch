@@ -1020,6 +1020,12 @@ def send_spans(
 
     force_sync = f"?force_sync=true" if force_sync else ""
 
+    if len(data["spans"]) > 256:
+        warn(
+            f"Going over the limit of 256 spans, dropping {len(data['spans']) - 256} spans from being sent to LangWatch"
+        )
+        data["spans"] = data["spans"][:256]
+
     # TODO: replace this with httpx, don't forget the custom SerializableWithStringFallback encoder
     response = requests.post(
         f"{langwatch.endpoint}/api/collector{force_sync}",
