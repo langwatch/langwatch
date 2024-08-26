@@ -125,8 +125,28 @@ export function DatasetTable({
     return headers;
   }, [columnTypes]);
 
-  const [editableRowData, setEditableRowData] = useState<DatasetRecordEntry[]>(
-    []
+  const [editableRowData, setEditableRowData_] = useState<
+    DatasetRecordEntry[] | undefined
+  >();
+
+  // Sync the in-memory dataset with the editable row data
+  const setEditableRowData = useCallback(
+    (
+      callback: (
+        rows: DatasetRecordEntry[] | undefined
+      ) => DatasetRecordEntry[] | undefined
+    ) => {
+      setEditableRowData_((rows) => {
+        const rows_ = callback(rows);
+        onUpdateDataset?.({
+          name: dataset?.name,
+          datasetRecords: rows_ ?? [],
+          columnTypes: columnTypes,
+        });
+        return rows_;
+      });
+    },
+    [columnTypes, dataset?.name, onUpdateDataset]
   );
 
   const [selectedEntryIds, setSelectedEntryIds] = useState<Set<string>>(
@@ -152,27 +172,16 @@ export function DatasetTable({
   }, [dataset]);
 
   useEffect(() => {
-    if (rowData) {
-      setEditableRowData(
-        rowData.map((row) => ({
-          ...row,
-          selected: selectedEntryIds.has(row.id),
-        }))
-      );
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rowData]);
+    if (!rowData) return;
 
-  // Sync in-memory updates back to the callback
-  useEffect(() => {
-    if (onUpdateDataset) {
-      onUpdateDataset({
-        name: dataset?.name,
-        datasetRecords: editableRowData,
-        columnTypes: columnTypes,
-      });
-    }
-  }, [columnTypes, dataset?.name, editableRowData, onUpdateDataset]);
+    setEditableRowData((_) =>
+      rowData.map((row) => ({
+        ...row,
+        selected: selectedEntryIds.has(row.id),
+      }))
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [!!rowData]);
 
   const toast = useToast();
 
@@ -236,11 +245,12 @@ export function DatasetTable({
       }
 
       setEditableRowData((rows) => {
-        const currentIndex = rows.findIndex((row) => row.id === params.data.id);
+        const currentIndex =
+          rows?.findIndex((row) => row.id === params.data.id) ?? -1;
         if (currentIndex === -1) {
-          return [...rows, updatedRecord];
+          return rows ? [...rows, updatedRecord] : [updatedRecord];
         } else {
-          const newRows = [...rows];
+          const newRows = rows ? [...rows] : [];
           newRows[currentIndex] = {
             ...newRows[currentIndex],
             ...updatedRecord,
@@ -291,8 +301,8 @@ export function DatasetTable({
   const onDelete = useCallback(() => {
     if (confirm("Are you sure?")) {
       const recordIds = Array.from(selectedEntryIds);
-      setEditableRowData((rows) =>
-        rows.filter((row) => !recordIds.includes(row.id))
+      setEditableRowData(
+        (rows) => rows?.filter((row) => !recordIds.includes(row.id))
       );
 
       if (gridRef.current?.api) {
@@ -342,9 +352,10 @@ export function DatasetTable({
     }
   }, [
     selectedEntryIds,
+    setEditableRowData,
+    datasetId,
     deleteDatasetRecord,
     project?.id,
-    datasetId,
     toast,
     databaseDataset,
   ]);
@@ -396,7 +407,7 @@ export function DatasetTable({
           }`}
         </Heading>
         <Text fontSize={"14px"} color="gray.400">
-          {editableRowData.length} records
+          {editableRowData?.length} records
         </Text>
         <Text fontSize={"14px"} color="gray.400">
           {savingStatus === "saving"
@@ -469,7 +480,7 @@ export function DatasetTable({
         datasetId={datasetId}
         columnTypes={columnTypes}
         onUpdateDataset={(entries) => {
-          setEditableRowData(entries);
+          setEditableRowData((_) => entries);
         }}
       />
       {selectedEntryIds.size > 0 && (
