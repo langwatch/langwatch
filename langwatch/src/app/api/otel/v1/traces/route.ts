@@ -57,18 +57,32 @@ export async function POST(req: NextRequest) {
   try {
     traceRequest = traceRequestType.decode(new Uint8Array(body));
   } catch (error) {
-    debug("Error parsing traces:", Buffer.from(body).toString("base64"));
-    Sentry.captureException(error, {
-      extra: {
-        projectId: project.id,
-        traceRequest: Buffer.from(body).toString("base64"),
-      },
-    });
+    try {
+      const json = JSON.parse(Buffer.from(body).toString("utf-8"));
+      traceRequest = traceRequestType.decode(
+        new Uint8Array(traceRequestType.encode(json).finish())
+      );
+      if (
+        !traceRequest.resourceSpans ||
+        traceRequest.resourceSpans.length === 0
+      ) {
+        throw new Error("Spans are empty, likely an invalid format");
+      }
+    } catch (jsonError) {
+      debug("Error parsing traces:", Buffer.from(body).toString("base64"));
+      Sentry.captureException(error, {
+        extra: {
+          projectId: project.id,
+          traceRequest: Buffer.from(body).toString("base64"),
+          jsonError,
+        },
+      });
 
-    return NextResponse.json(
-      { error: "Failed to parse traces" },
-      { status: 400 }
-    );
+      return NextResponse.json(
+        { error: "Failed to parse traces" },
+        { status: 400 }
+      );
+    }
   }
 
   const tracesForCollection =
