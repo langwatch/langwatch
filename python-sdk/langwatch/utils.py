@@ -120,13 +120,12 @@ def autoconvert_typed_values(
 def validate_safe(type_, item: dict, min_required_keys_for_pydantic_1: List[str]):
     import pydantic
 
-    if pydantic.__version__.startswith("1."):
-        if type(item) == dict and all(
-            key in item for key in min_required_keys_for_pydantic_1
-        ):
-            return True
+    if type(item) != dict or not all(
+        key in item for key in min_required_keys_for_pydantic_1
+    ):
         return False
-    else:
+
+    if pydantic.__version__.startswith("2."):
         from pydantic import TypeAdapter
 
         try:
@@ -218,7 +217,8 @@ def reduce_payload_size(
         for item in obj:
             result.append(process_item(item))
             if (
-                len(json.dumps(result, cls=SerializableWithStringFallback))
+                max_list_dict_length != -1
+                and len(json.dumps(result, cls=SerializableWithStringFallback))
                 > max_list_dict_length
             ):
                 result.pop()
@@ -232,6 +232,7 @@ def reduce_payload_size(
             result[key] = process_item(value)
             if (
                 depth > 0
+                and max_list_dict_length != -1
                 and len(json.dumps(result, cls=SerializableWithStringFallback))
                 > max_list_dict_length
             ):

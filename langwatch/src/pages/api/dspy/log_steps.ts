@@ -113,10 +113,19 @@ export default async function handler(
           error,
           JSON.stringify(param, null, "  ")
         );
-        Sentry.captureException(error, { extra: { projectId: project.id } });
+        Sentry.captureException(error, { extra: { projectId: project.id, param } });
 
         const validationError = fromZodError(error as ZodError);
         return res.status(400).json({ error: validationError.message });
+      } else {
+        debug(
+          "Internal server error processing DSPy step",
+          error,
+          // JSON.stringify(param, null, "  ")
+        );
+        Sentry.captureException(error, { extra: { projectId: project.id, param } });
+
+        return res.status(500).json({ error: "Internal server error" });
       }
     }
   }

@@ -28,6 +28,7 @@ from retry import retry
 from dspy.evaluate.evaluate import Evaluate
 
 from langwatch.tracer import ContextTrace
+from langwatch.utils import reduce_payload_size
 
 
 class SerializableAndPydanticEncoder(json.JSONEncoder):
@@ -257,13 +258,24 @@ class LangWatchDSPy:
 
     @retry(tries=3, delay=0.5)
     def send_steps(self):
+        data_list = json.loads(
+            json.dumps(self.steps_buffer, cls=SerializableAndPydanticEncoder)
+        )
+        data = [
+            reduce_payload_size(
+                item,
+                max_string_length=5000,
+                max_list_dict_length=-1,
+            )
+            for item in data_list
+        ]
         response = httpx.post(
             f"{langwatch.endpoint}/api/dspy/log_steps",
             headers={
                 "X-Auth-Token": langwatch.api_key or "",
                 "Content-Type": "application/json",
             },
-            data=json.dumps(self.steps_buffer, cls=SerializableAndPydanticEncoder),  # type: ignore
+            data=json.dumps(data),  # type: ignore
         )
         response.raise_for_status()
         self.steps_buffer = []
