@@ -6,6 +6,7 @@ import * as eks from "aws-cdk-lib/aws-eks";
 import * as ec2 from "aws-cdk-lib/aws-ec2";
 import * as elasticache from "aws-cdk-lib/aws-elasticache";
 import * as rds from "aws-cdk-lib/aws-rds";
+import * as openSearch from "aws-cdk-lib/aws-opensearchservice";
 import { KubectlV30Layer } from "@aws-cdk/lambda-layer-kubectl-v30";
 import * as iam from "aws-cdk-lib/aws-iam";
 import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
@@ -105,18 +106,14 @@ export class LangWatchAwsMarketplaceStack extends cdk.Stack {
 
     const { redis, redisPassword } = this.setupRedis(vpc, cluster);
     const { postgres, postgresPassword } = this.setupPostgres(vpc, cluster);
-    const { elasticPassword } = this.setupElasticsearch(
-      vpc,
-      cluster,
-      ebsVolume
-    );
+    const openSearchDomain = this.setupOpenSearch(vpc, cluster);
 
     this.setupLangWatchEnv(
       domainParam,
       cluster,
       { redis, redisPassword },
       { postgres, postgresPassword },
-      { elasticPassword }
+      { openSearchDomain: openSearchDomain.attrDomainEndpoint }
     );
 
     setupFluentd(cluster);
@@ -144,9 +141,9 @@ export class LangWatchAwsMarketplaceStack extends cdk.Stack {
       postgresPassword: secretsmanager.Secret;
     },
     {
-      elasticPassword,
+      openSearchDomain,
     }: {
-      elasticPassword: secretsmanager.Secret;
+      openSearchDomain: string;
     }
   ): secretsmanager.Secret {
     const generateSecureString = (name: string, length: number = 32) => {
@@ -212,12 +209,16 @@ export class LangWatchAwsMarketplaceStack extends cdk.Stack {
               "/langwatch_db?schema=public",
             ])
           ),
+          // ELASTICSEARCH_NODE_URL: cdk.SecretValue.unsafePlainText(
+          //   cdk.Fn.join("", [
+          //     "https://elastic:",
+          //     elasticPassword.secretValue.unsafeUnwrap().toString(),
+          //     "@elasticsearch-master:9200",
+          //   ])
+          // ),
+          IS_OPENSEARCH: cdk.SecretValue.unsafePlainText("true"),
           ELASTICSEARCH_NODE_URL: cdk.SecretValue.unsafePlainText(
-            cdk.Fn.join("", [
-              "https://elastic:",
-              elasticPassword.secretValue.unsafeUnwrap().toString(),
-              "@elasticsearch-master:9200",
-            ])
+            cdk.Fn.join("", ["http://", openSearchDomain, ":9200"])
           ),
         },
       }
@@ -506,6 +507,86 @@ export class LangWatchAwsMarketplaceStack extends cdk.Stack {
     return { redis, redisPassword };
   }
 
+  setupOpenSearch(vpc: ec2.Vpc, cluster: eks.Cluster) {
+    const openSearchSG = new ec2.SecurityGroup(
+      this,
+      "OpenSearchSecurityGroup",
+      {
+        vpc: vpc,
+        description: "Security group for OpenSearch domain",
+        allowAllOutbound: true,
+      }
+    );
+
+    const openSearchDomain = new openSearch.CfnDomain(
+      this,
+      "LangWatchOpenSearchDomain", // New logical ID
+      {
+        engineVersion: "OpenSearch_2.13",
+        clusterConfig: {
+          instanceType: "m5.large.search",
+          instanceCount: 1,
+          dedicatedMasterEnabled: false,
+          zoneAwarenessEnabled: false,
+        },
+        ebsOptions: {
+          ebsEnabled: true,
+          volumeSize: 10,
+          volumeType: "gp2",
+        },
+        encryptionAtRestOptions: {
+          enabled: true,
+        },
+        nodeToNodeEncryptionOptions: {
+          enabled: true,
+        },
+        domainEndpointOptions: {
+          enforceHttps: true,
+        },
+        vpcOptions: {
+          subnetIds: [
+            vpc.selectSubnets({
+              subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS,
+            }).subnetIds[0],
+          ],
+          securityGroupIds: [openSearchSG.securityGroupId],
+        },
+      }
+    );
+    openSearchDomain.applyRemovalPolicy(cdk.RemovalPolicy.RETAIN);
+
+    // Allow traffic from EKS cluster
+    openSearchSG.addIngressRule(
+      ec2.SecurityGroup.fromSecurityGroupId(
+        this,
+        "EksClusterSG",
+        cluster.clusterSecurityGroupId
+      ),
+      ec2.Port.tcp(443),
+      "Allow HTTPS traffic from EKS cluster"
+    );
+
+    // Allow traffic from the entire VPC CIDR
+    openSearchSG.addIngressRule(
+      ec2.Peer.ipv4(vpc.vpcCidrBlock),
+      ec2.Port.tcp(443),
+      "Allow HTTPS traffic from within VPC"
+    );
+
+    // If you still need HTTP access, keep this rule
+    openSearchSG.addIngressRule(
+      ec2.SecurityGroup.fromSecurityGroupId(
+        this,
+        "EksClusterSG9200",
+        cluster.clusterSecurityGroupId
+      ),
+      ec2.Port.tcp(9200),
+      "Allow HTTP traffic from EKS cluster"
+    );
+
+    return openSearchDomain;
+  }
+
   setupPostgres(vpc: ec2.Vpc, cluster: eks.Cluster) {
     const postgresSecurityGroup = new ec2.SecurityGroup(
       this,
@@ -581,230 +662,6 @@ export class LangWatchAwsMarketplaceStack extends cdk.Stack {
     addPostgresIngressRule.node.addDependency(cluster);
 
     return { postgres, postgresPassword };
-  }
-
-  setupElasticsearch(
-    vpc: ec2.Vpc,
-    cluster: eks.Cluster,
-    ebsVolume: ec2.CfnVolume
-  ) {
-    const elasticPassword = new secretsmanager.Secret(
-      this,
-      "ElasticsearchPassword",
-      {
-        generateSecretString: {
-          excludeCharacters: "'\"@/\\:?#[]&=+<>{}|^~`,%;",
-          passwordLength: 32,
-        },
-      }
-    );
-
-    const ebsCsiDriver = cluster.addHelmChart("EbsCsiDriver", {
-      chart: "aws-ebs-csi-driver",
-      repository: "https://kubernetes-sigs.github.io/aws-ebs-csi-driver",
-      namespace: "kube-system",
-      release: "ebs-csi-driver",
-      values: {
-        image: {
-          repository:
-            "602401143452.dkr.ecr.us-west-2.amazonaws.com/eks/aws-ebs-csi-driver",
-          tag: "v1.3.0",
-        },
-        controller: {
-          replicas: 2,
-          serviceAccount: {
-            create: false,
-            name: "ebs-csi-controller-sa",
-          },
-          resources: {
-            requests: {
-              cpu: "100m",
-              memory: "128Mi",
-            },
-            limits: {
-              cpu: "200m",
-              memory: "256Mi",
-            },
-          },
-          affinity: {
-            nodeAffinity: {
-              requiredDuringSchedulingIgnoredDuringExecution: {
-                nodeSelectorTerms: [
-                  {
-                    matchExpressions: [
-                      {
-                        key: "kubernetes.io/os",
-                        operator: "In",
-                        values: ["linux"],
-                      },
-                    ],
-                  },
-                ],
-              },
-            },
-          },
-        },
-        node: {
-          resources: {
-            requests: {
-              cpu: "100m",
-              memory: "128Mi",
-            },
-            limits: {
-              cpu: "200m",
-              memory: "256Mi",
-            },
-          },
-          affinity: {
-            nodeAffinity: {
-              requiredDuringSchedulingIgnoredDuringExecution: {
-                nodeSelectorTerms: [
-                  {
-                    matchExpressions: [
-                      {
-                        key: "kubernetes.io/os",
-                        operator: "In",
-                        values: ["linux"],
-                      },
-                    ],
-                  },
-                ],
-              },
-            },
-          },
-        },
-
-        enableVolumeScheduling: true,
-        enableVolumeResizing: true,
-        enableVolumeSnapshot: true,
-      },
-    });
-
-    // Ensure the EBS CSI Driver is installed before creating StorageClass
-    const gp3StorageClass = cluster.addManifest("Gp3StorageClass", {
-      apiVersion: "storage.k8s.io/v1",
-      kind: "StorageClass",
-      metadata: {
-        name: "gp3",
-        annotations: {
-          "storageclass.kubernetes.io/is-default-class": "true",
-        },
-      },
-      provisioner: "ebs.csi.aws.com",
-      parameters: {
-        type: "gp3",
-        fsType: "ext4",
-      },
-      volumeBindingMode: "WaitForFirstConsumer",
-      reclaimPolicy: "Delete",
-    });
-
-    gp3StorageClass.node.addDependency(ebsCsiDriver);
-
-    // // Create a PersistentVolume
-    // const pv = cluster.addManifest("MyPV", {
-    //   apiVersion: "v1",
-    //   kind: "PersistentVolume",
-    //   metadata: {
-    //     name: "my-pv",
-    //   },
-    //   spec: {
-    //     capacity: {
-    //       storage: "10Gi",
-    //     },
-    //     volumeMode: "Filesystem",
-    //     accessModes: ["ReadWriteOnce"],
-    //     persistentVolumeReclaimPolicy: "Retain",
-    //     storageClassName: "gp3",
-    //     csi: {
-    //       driver: "ebs.csi.aws.com",
-    //       volumeHandle: ebsVolume.ref,
-    //       fsType: "ext4",
-    //     },
-    //     nodeAffinity: {
-    //       required: {
-    //         nodeSelectorTerms: [
-    //           {
-    //             matchExpressions: [
-    //               {
-    //                 key: "kubernetes.io/hostname",
-    //                 operator: "In",
-    //                 values: ["ip-10-0-134-124.eu-central-1.compute.internal"], // Replace with your node's hostname
-    //               },
-    //             ],
-    //           },
-    //         ],
-    //       },
-    //     },
-    //   },
-    // });
-
-    // pv.node.addDependency(gp3StorageClass);
-
-    // Create a PersistentVolumeClaim
-    const pvc = cluster.addManifest("MyPVC", {
-      apiVersion: "v1",
-      kind: "PersistentVolumeClaim",
-      metadata: {
-        name: "my-pvc",
-      },
-      spec: {
-        accessModes: ["ReadWriteOnce"],
-        resources: {
-          requests: {
-            storage: "5Gi",
-          },
-        },
-        storageClassName: "gp3",
-      },
-    });
-
-    pvc.node.addDependency(gp3StorageClass);
-
-    // Deploy Elasticsearch using Helm chart
-    new eks.HelmChart(this, "ElasticsearchChart", {
-      cluster,
-      chart: "elasticsearch",
-      repository: "https://helm.elastic.co",
-      namespace: "default",
-      release: "elasticsearch",
-      values: {
-        antiAffinity: "soft",
-        esJavaOpts: "-Xmx2g -Xms2g",
-        resources: {
-          requests: {
-            cpu: "250m",
-            memory: "1Gi",
-          },
-          limits: {
-            cpu: "500m",
-            memory: "2Gi",
-          },
-        },
-        volumeClaimTemplate: {
-          accessModes: ["ReadWriteOnce"],
-          resources: {
-            requests: {
-              storage: "5Gi",
-            },
-          },
-          storageClassName: "gp3",
-        },
-        persistence: {
-          enabled: true,
-          storageClass: "gp3", // Use the gp3 StorageClass
-          accessModes: ["ReadWriteOnce"],
-          size: "5Gi",
-        },
-        security: {
-          enabled: true,
-          password: elasticPassword.secretValue.unsafeUnwrap().toString(),
-        },
-      },
-      timeout: cdk.Duration.minutes(15),
-    });
-
-    return { elasticPassword };
   }
 
   setupLangEvals(cluster: eks.Cluster) {
