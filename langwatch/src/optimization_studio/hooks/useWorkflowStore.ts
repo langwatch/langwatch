@@ -21,6 +21,7 @@ type WorkflowStore = Workflow & {
   onConnect: (connection: Connection) => void;
   setNodes: (nodes: Node[]) => void;
   setEdges: (edges: Edge[]) => void;
+  setNode: (node: Partial<Node>) => void;
   setHoveredNodeId: (nodeId: string | undefined) => void;
   deselectAllNodes: () => void;
 };
@@ -122,6 +123,11 @@ const store = (
   },
   setEdges: (edges: Edge[]) => {
     set({ edges });
+  },
+  setNode: (node: Partial<Node>) => {
+    set({
+      nodes: get().nodes.map((n) => (n.id === node.id ? { ...n, ...node } : n)),
+    });
   },
   setHoveredNodeId: (nodeId: string | undefined) => {
     set({ hoveredNodeId: nodeId });

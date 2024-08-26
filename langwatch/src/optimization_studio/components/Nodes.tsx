@@ -28,7 +28,7 @@ export function EntryNode(props: NodeProps<Node<Component>>) {
     setRendered(true);
   }, []);
 
-  const { rows } = useGetDatasetData(props.data) ?? {};
+  const { rows } = useGetDatasetData(props.data, 5, 4) ?? {};
 
   return (
     <ComponentNode {...props} outputsName="Fields">

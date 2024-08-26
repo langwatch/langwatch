@@ -3,34 +3,32 @@ import {
   Button,
   Center,
   HStack,
-  Link,
   Modal,
   ModalBody,
   ModalCloseButton,
   ModalContent,
   ModalHeader,
   ModalOverlay,
-  Tab,
-  TabList,
-  TabPanel,
-  TabPanels,
-  Tabs,
   Text,
 } from "@chakra-ui/react";
+import { type Node, type NodeProps } from "@xyflow/react";
 import { nanoid } from "nanoid";
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
+import { ArrowLeft, Edit2 } from "react-feather";
 import {
   DatasetGrid,
   type DatasetColumnDef,
 } from "../../components/datasets/DatasetGrid";
+import {
+  DatasetTable,
+  type InMemoryDataset,
+} from "../../components/datasets/DatasetTable";
 import type {
   DatasetColumnType,
   DatasetRecordEntry,
 } from "../../server/datasets/types";
 import type { Component, Entry, Field } from "../types/dsl";
-import { ArrowLeft, Edit2 } from "react-feather";
-import { DatasetTable } from "../../components/datasets/DatasetTable";
-import { type Node, type NodeProps } from "@xyflow/react";
+import { useWorkflowStore } from "../hooks/useWorkflowStore";
 
 export function DatasetModal({
   isOpen,
@@ -41,7 +39,44 @@ export function DatasetModal({
   onClose: () => void;
   node: NodeProps<Node<Component>> | Node<Component>;
 }) {
-  const { columns, rows } = useGetDatasetData(node.data);
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} size="full">
+      <ModalOverlay />
+      <ModalContent
+        marginX="32px"
+        marginTop="32px"
+        width="calc(100vw - 64px)"
+        minHeight="0"
+        height="calc(100vh - 64px)"
+        borderRadius="8px"
+        overflowY="auto"
+      >
+        <ModalCloseButton />
+        <ModalHeader>
+          <Button
+            fontSize="14px"
+            fontWeight="bold"
+            color="gray.500"
+            variant="link"
+            leftIcon={<ArrowLeft size={16} />}
+          >
+            Datasets
+          </Button>
+        </ModalHeader>
+        <ModalBody paddingBottom="32px">
+          {isOpen && <EditDatasetModalTable node={node} />}
+        </ModalBody>
+      </ModalContent>
+    </Modal>
+  );
+}
+
+export const EditDatasetModalTable = ({
+  node,
+}: {
+  node: NodeProps<Node<Component>> | Node<Component>;
+}) => {
+  const { rows, columns } = useGetDatasetData(node.data);
 
   const columnTypes = useMemo(() => {
     const fields = Object.fromEntries(
@@ -69,62 +104,66 @@ export function DatasetModal({
     );
   }, [columns, node.data.outputs]);
 
-  return (
-    <Modal isOpen={isOpen} onClose={onClose} size="full">
-      <ModalOverlay />
-      <ModalContent
-        marginX="32px"
-        marginTop="32px"
-        width="calc(100vw - 64px)"
-        minHeight="0"
-        height="calc(100vh - 64px)"
-        borderRadius="8px"
-        overflowY="auto"
-      >
-        <ModalCloseButton />
-        <ModalHeader>
-          <Button
-            fontSize="14px"
-            fontWeight="bold"
-            color="gray.500"
-            variant="link"
-            leftIcon={<ArrowLeft size={16} />}
-          >
-            Datasets
-          </Button>
-        </ModalHeader>
-        <ModalBody paddingBottom="32px">
-          <DatasetTable
-            inMemoryDataset={{
-              name:
-                "dataset" in node.data ? node.data.dataset?.name : undefined,
-              datasetRecords: rows ?? [],
-              columnTypes: columnTypes ?? {},
-            }}
-            isEmbedded={true}
-          />
-        </ModalBody>
-      </ModalContent>
-    </Modal>
+  // Only update the datset from parent to child once the modal is open again
+  const inMemoryDataset = useMemo(
+    () => ({
+      name: "dataset" in node.data ? node.data.dataset?.name : undefined,
+      datasetRecords: rows ?? [],
+      columnTypes: columnTypes ?? {},
+    }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    []
   );
-}
 
-export const useGetDatasetData = (data: Component) => {
+  const { setNode } = useWorkflowStore(({ setNode }) => ({ setNode }));
+
+  const onUpdateDataset = useCallback(
+    (dataset: InMemoryDataset) => {
+      setNode({
+        id: node.id,
+        data: {
+          ...(node.data as Entry),
+          dataset: {
+            ...(node.data as Entry).dataset,
+            inline: transpostRowsFirstToColumnsFirstWithoutId(
+              dataset.datasetRecords
+            ),
+          },
+        } as Entry,
+      });
+    },
+    [node.data, node.id, setNode]
+  );
+
+  return (
+    <DatasetTable
+      inMemoryDataset={inMemoryDataset}
+      onUpdateDataset={onUpdateDataset}
+      isEmbedded={true}
+    />
+  );
+};
+
+export const useGetDatasetData = (
+  data: Component,
+  maxLines: number | undefined = undefined,
+  maxColumns: number | undefined = undefined
+) => {
   const data_: Record<string, string[]> | undefined =
     "dataset" in data && data.dataset?.inline ? data.dataset.inline : undefined;
 
   const columns = useMemo(() => {
     const columns = Object.keys(data_ ?? {}).filter((key) => key !== "id");
-    if (columns.length > 4) {
-      return new Set(columns.slice(0, 4));
+    if (maxColumns && columns.length > maxColumns) {
+      return new Set(columns.slice(0, maxColumns));
     }
 
     return new Set(columns);
-  }, [data_]);
+  }, [data_, maxColumns]);
 
   const rows: DatasetRecordEntry[] | undefined = useMemo(() => {
     const rows = data_
-      ? transposeIDlessColumnsFirstToRowsFirstWithId(data_).slice(0, 5)
+      ? transposeIDlessColumnsFirstToRowsFirstWithId(data_).slice(0, maxLines)
       : undefined;
 
     return rows?.map((row) => {
@@ -137,11 +176,11 @@ export const useGetDatasetData = (data: Component) => {
 
       return row_;
     }) as DatasetRecordEntry[];
-  }, [columns, data_]);
+  }, [columns, data_, maxLines]);
 
   return {
-    columns: Array.from(columns),
     rows,
+    columns: Array.from(columns),
   };
 };
 
@@ -152,7 +191,7 @@ export function DatasetPreview({
   data: Entry;
   onClick: () => void;
 }) {
-  const { columns, rows } = useGetDatasetData(data);
+  const { rows, columns } = useGetDatasetData(data, 5, 4);
 
   const columnDefs = useMemo(() => {
     const headers: DatasetColumnDef[] = columns.map((field) => ({
@@ -238,4 +277,20 @@ function transposeIDlessColumnsFirstToRowsFirstWithId(
     });
     return acc;
   }, [] as DatasetRecordEntry[]);
+}
+
+function transpostRowsFirstToColumnsFirstWithoutId(
+  data: DatasetRecordEntry[]
+): Record<string, string[]> {
+  return data.reduce(
+    (acc, row) => {
+      Object.entries(row).forEach(([key, value]) => {
+        if (key === "id" || key === "selected") return;
+        acc[key] = acc[key] ?? [];
+        acc[key].push(value);
+      });
+      return acc;
+    },
+    {} as Record<string, string[]>
+  );
 }
