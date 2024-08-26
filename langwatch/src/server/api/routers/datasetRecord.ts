@@ -108,6 +108,24 @@ export const datasetRecordRouter = createTRPCRouter({
 
       return datasets;
     }),
+  getHead: protectedProcedure
+    .input(z.object({ projectId: z.string(), datasetId: z.string() }))
+    .use(checkUserPermissionForProject(TeamRoleGroup.DATASETS_VIEW))
+    .query(async ({ input, ctx }) => {
+      const prisma = ctx.prisma;
+
+      const datasets = await prisma.dataset.findFirst({
+        where: { id: input.datasetId, projectId: input.projectId },
+        include: {
+          datasetRecords: {
+            orderBy: { createdAt: "asc" },
+            take: 5,
+          },
+        },
+      });
+
+      return datasets;
+    }),
   deleteMany: protectedProcedure
     .input(
       z.object({

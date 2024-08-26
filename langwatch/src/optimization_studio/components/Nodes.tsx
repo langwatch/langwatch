@@ -9,12 +9,10 @@ import {
 } from "../types/dsl";
 import { useWorkflowStore } from "../hooks/useWorkflowStore";
 import { ComponentIcon } from "./ColorfulBlockIcons";
-import {
-  DatasetModal,
-  DatasetPreview,
-  useGetDatasetData,
-} from "./DatasetModal";
 import { useState, useEffect } from "react";
+import { useGetDatasetData } from "../hooks/useGetDatasetData";
+import { DatasetPreview } from "./datasets/DatasetPreview";
+import { DatasetModal } from "./DatasetModal";
 
 export function SignatureNode(props: NodeProps<Node<Component>>) {
   return <ComponentNode {...props} />;
@@ -28,7 +26,7 @@ export function EntryNode(props: NodeProps<Node<Component>>) {
     setRendered(true);
   }, []);
 
-  const { rows } = useGetDatasetData(props.data, 5, 4) ?? {};
+  const { rows } = useGetDatasetData((props.data as Entry).dataset, true) ?? {};
 
   return (
     <ComponentNode {...props} outputsName="Fields">
@@ -40,10 +38,18 @@ export function EntryNode(props: NodeProps<Node<Component>>) {
         height={`${(34 + 28 * (rows?.length ?? 0)) / 2}px`}
       >
         {rendered && (
-          <DatasetPreview data={props.data as Entry} onClick={onOpen} />
+          <DatasetPreview
+            dataset={(props.data as Entry).dataset}
+            onClick={onOpen}
+          />
         )}
       </Box>
-      <DatasetModal isOpen={isOpen} onClose={onClose} node={props} />
+      <DatasetModal
+        isOpen={isOpen}
+        editingDataset={(props.data as Entry).dataset}
+        onClose={onClose}
+        node={props}
+      />
     </ComponentNode>
   );
 }

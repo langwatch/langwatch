@@ -9,16 +9,21 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import type { Node } from "@xyflow/react";
-import { ChevronDown, Edit2, X } from "react-feather";
+import { useState } from "react";
+import { ChevronDown, Folder, X } from "react-feather";
 import { useShallow } from "zustand/react/shallow";
 import { useWorkflowStore } from "../hooks/useWorkflowStore";
 import type { Component, ComponentType, Entry, Field } from "../types/dsl";
 import { ComponentIcon } from "./ColorfulBlockIcons";
-import { DatasetModal, DatasetPreview } from "./DatasetModal";
+import { DatasetModal } from "./DatasetModal";
 import { getNodeDisplayName, NodeSectionTitle, TypeLabel } from "./Nodes";
+import { DatasetPreview } from "./datasets/DatasetPreview";
 
 export function EntryPointPropertiesPanel({ node }: { node: Node<Component> }) {
   const { isOpen, onOpen, onClose } = useDisclosure();
+  const [editingDataset, setEditingDataset] = useState<
+    Entry["dataset"] | undefined
+  >();
 
   return (
     <BasePropertiesPanel node={node}>
@@ -28,14 +33,29 @@ export function EntryPointPropertiesPanel({ node }: { node: Node<Component> }) {
         <Button
           size="xs"
           variant="ghost"
-          leftIcon={<Edit2 size={14} />}
-          onClick={onOpen}
+          marginBottom={-1}
+          leftIcon={<Folder size={14} />}
+          onClick={() => {
+            setEditingDataset(undefined);
+            onOpen();
+          }}
         >
-          <Text>Edit</Text>
+          <Text>Choose...</Text>
         </Button>
       </HStack>
-      <DatasetPreview data={node.data as Entry} onClick={onOpen} />
-      <DatasetModal isOpen={isOpen} onClose={onClose} node={node} />
+      <DatasetPreview
+        dataset={(node.data as Entry).dataset}
+        onClick={() => {
+          setEditingDataset((node.data as Entry).dataset);
+          onOpen();
+        }}
+      />
+      <DatasetModal
+        isOpen={isOpen}
+        onClose={onClose}
+        node={node}
+        editingDataset={editingDataset}
+      />
     </BasePropertiesPanel>
   );
 }
