@@ -259,7 +259,7 @@ export function UploadCSVModal({
     <Modal isOpen={isOpen} onClose={onClose}>
       <ModalOverlay />
       <ModalContent>
-        <ModalHeader>Upload CSV</ModalHeader>
+        <ModalHeader>Add rows from CSV</ModalHeader>
         <ModalCloseButton />
         <ModalBody>
           <CSVReader

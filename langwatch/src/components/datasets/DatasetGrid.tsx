@@ -6,7 +6,7 @@ import {
   type CustomCellRendererProps,
 } from "@ag-grid-community/react";
 import { Checkbox, Text } from "@chakra-ui/react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { MultilineCellEditor } from "./MultilineCellEditor";
 
 import { ClientSideRowModelModule } from "@ag-grid-community/client-side-row-model";

@@ -5,7 +5,6 @@ import {
   Card,
   CardBody,
   Checkbox,
-  Container,
   HStack,
   Heading,
   Spacer,
@@ -29,15 +28,15 @@ import type {
   AgGridReact,
   CustomCellRendererProps,
 } from "@ag-grid-community/react";
-import { UploadCSVModal } from "./UploadCSVModal";
 import { nanoid } from "nanoid";
 import type {
   DatasetColumnTypes,
   DatasetRecordEntry,
 } from "../../server/datasets/types";
+import { UploadCSVModal } from "./UploadCSVModal";
 
-type InMemoryDataset = {
-  name: string;
+export type InMemoryDataset = {
+  name?: string;
   datasetRecords: DatasetRecordEntry[];
   columnTypes: DatasetColumnTypes;
 };
@@ -46,10 +45,12 @@ export function DatasetTable({
   datasetId,
   inMemoryDataset,
   onUpdateDataset,
+  isEmbedded = false,
 }: {
   datasetId?: string;
   inMemoryDataset?: InMemoryDataset;
   onUpdateDataset?: (dataset: InMemoryDataset) => void;
+  isEmbedded?: boolean;
 }) {
   const { project } = useOrganizationTeamProject();
 
@@ -139,7 +140,9 @@ export function DatasetTable({
     return dataset.datasetRecords.map((record) => {
       const row: DatasetRecordEntry = { id: record.id };
       columns.forEach((col) => {
-        const value = record.entry[col];
+        const value = datasetId
+          ? record.entry[col]
+          : (record as DatasetRecordEntry)[col];
         row[col] = typeof value === "object" ? JSON.stringify(value) : value;
       });
       row.selected = selectedEntryIds.has(record.id);
@@ -164,7 +167,7 @@ export function DatasetTable({
   useEffect(() => {
     if (onUpdateDataset) {
       onUpdateDataset({
-        name: dataset?.name ?? "",
+        name: dataset?.name,
         datasetRecords: editableRowData,
         columnTypes: columnTypes,
       });
@@ -182,7 +185,9 @@ export function DatasetTable({
         )
         .map((record) =>
           columns.map((col) => {
-            const value = record.entry[col];
+            const value = datasetId
+              ? record.entry[col]
+              : (record as DatasetRecordEntry)[col];
             return typeof value === "object" ? JSON.stringify(value) : value;
           })
         ) ?? [];
@@ -196,7 +201,9 @@ export function DatasetTable({
 
     const link = document.createElement("a");
     link.href = url;
-    const fileName = `${dataset?.name}${selectedOnly ? "_selected" : ""}.csv`;
+    const fileName = `${
+      dataset?.name?.toLowerCase().replace(/ /g, "_") ?? "draft_dataset"
+    }${selectedOnly ? "_selected" : ""}.csv`;
     link.setAttribute("download", fileName);
     document.body.appendChild(link);
     link.click();
@@ -376,136 +383,132 @@ export function DatasetTable({
 
   return (
     <>
-      <Container
-        maxW={"calc(100vw - 200px)"}
-        padding={6}
-        marginTop={8}
-        paddingBottom="120px"
+      <HStack
+        width="full"
+        verticalAlign={"middle"}
+        paddingBottom={6}
+        spacing={6}
       >
-        <HStack
-          width="full"
-          verticalAlign={"middle"}
-          paddingBottom={6}
-          spacing={6}
+        <Heading as={"h1"} size="lg">
+          {isEmbedded ? "Edit Dataset" : "Dataset"}{" "}
+          {`- ${
+            dataset?.name ? dataset.name : datasetId ? "" : "Draft Dataset"
+          }`}
+        </Heading>
+        <Text fontSize={"14px"} color="gray.400">
+          {editableRowData.length} records
+        </Text>
+        <Text fontSize={"14px"} color="gray.400">
+          {savingStatus === "saving"
+            ? "Saving..."
+            : savingStatus === "saved"
+            ? "Saved"
+            : ""}
+        </Text>
+        <Spacer />
+        <Button
+          onClick={() => onOpen()}
+          rightIcon={<Upload height={17} width={17} strokeWidth={2.5} />}
         >
-          <Heading as={"h1"} size="lg">
-            Dataset {`- ${dataset?.name ?? ""}`}
-          </Heading>
-          <Text fontSize={"14px"} color="gray.400">
-            {editableRowData.length} records
-          </Text>
-          <Text fontSize={"14px"} color="gray.400">
-            {savingStatus === "saving"
-              ? "Saving..."
-              : savingStatus === "saved"
-              ? "Saved"
-              : ""}
-          </Text>
-          <Spacer />
+          Add from CSV
+        </Button>
+        <Button
+          colorScheme="black"
+          minWidth="fit-content"
+          variant="ghost"
+          onClick={() => dataset && downloadCSV()}
+        >
+          Export <DownloadIcon marginLeft={2} />
+        </Button>
+        {datasetId && (
           <Button
-            onClick={() => onOpen()}
-            rightIcon={<Upload height={17} width={17} strokeWidth={2.5} />}
-          >
-            Upload CSV
-          </Button>
-          <Button
-            colorScheme="black"
+            colorScheme="blue"
+            onClick={() => {
+              openDrawer("batchEvaluation", {
+                datasetSlug: databaseDataset.data?.slug,
+              });
+            }}
             minWidth="fit-content"
-            variant="ghost"
-            onClick={() => dataset && downloadCSV()}
+            leftIcon={<Play height={16} />}
           >
-            Export <DownloadIcon marginLeft={2} />
+            Batch Evaluation
           </Button>
-          {datasetId && (
-            <Button
-              colorScheme="blue"
-              onClick={() => {
-                openDrawer("batchEvaluation", {
-                  datasetSlug: databaseDataset.data?.slug,
-                });
-              }}
-              minWidth="fit-content"
-              leftIcon={<Play height={16} />}
-            >
-              Batch Evaluation
-            </Button>
-          )}
-        </HStack>
-        <Card>
-          <CardBody padding={0} position="relative">
-            <DatasetGrid
-              columnDefs={columnDefs}
-              rowData={rowData}
-              onCellValueChanged={onCellValueChanged}
-              ref={gridRef}
-            />
-            <Box position="absolute" left="0">
-              <Button
-                position="fixed"
-                bottom={6}
-                marginLeft={6}
-                backgroundColor="#ffffff"
-                padding="8px"
-                paddingX="16px"
-                border="1px solid #ccc"
-                boxShadow="base"
-                borderRadius={"md"}
-                onClick={onAddNewRow}
-                zIndex="100"
-              >
-                <Plus />
-                <Text>Add new record</Text>
-              </Button>
-            </Box>
-          </CardBody>
-        </Card>
-        <UploadCSVModal
-          isOpen={isOpen}
-          onClose={onClose}
-          datasetId={datasetId}
-          columnTypes={columnTypes}
-          onUpdateDataset={(entries) => {
-            setEditableRowData(entries);
-          }}
-        />
-        {selectedEntryIds.size > 0 && (
-          <Box
-            position="fixed"
-            bottom={6}
-            left="50%"
-            transform="translateX(-50%)"
-            backgroundColor="#ffffff"
-            padding="8px"
-            paddingX="16px"
-            border="1px solid #ccc"
-            boxShadow="base"
-            borderRadius={"md"}
-          >
-            <HStack gap={3}>
-              <Text>{selectedEntryIds.size} entries selected</Text>
-              <Button
-                colorScheme="black"
-                minWidth="fit-content"
-                variant="outline"
-                onClick={() => void downloadCSV(true)}
-              >
-                Export <DownloadIcon marginLeft={2} />
-              </Button>
-
-              <Text>or</Text>
-              <Button
-                colorScheme="red"
-                type="submit"
-                variant="outline"
-                minWidth="fit-content"
-                onClick={onDelete}
-              >
-                Delete
-              </Button>
-            </HStack>
-          </Box>
         )}
-      </Container>
+      </HStack>
+      <Card>
+        <CardBody padding={0} position="relative">
+          <DatasetGrid
+            columnDefs={columnDefs}
+            rowData={rowData}
+            onCellValueChanged={onCellValueChanged}
+            ref={gridRef}
+          />
+        </CardBody>
+      </Card>
+      <Button
+        position="sticky"
+        left="0"
+        bottom={isEmbedded ? "32px" : 6}
+        marginTop={6}
+        marginLeft={6}
+        backgroundColor="#ffffff"
+        padding="8px"
+        paddingX="16px"
+        border="1px solid #ccc"
+        boxShadow="base"
+        borderRadius={"md"}
+        onClick={onAddNewRow}
+        zIndex="100"
+      >
+        <Plus />
+        <Text>Add new record</Text>
+      </Button>
+      <UploadCSVModal
+        isOpen={isOpen}
+        onClose={onClose}
+        datasetId={datasetId}
+        columnTypes={columnTypes}
+        onUpdateDataset={(entries) => {
+          setEditableRowData(entries);
+        }}
+      />
+      {selectedEntryIds.size > 0 && (
+        <Box
+          position="fixed"
+          bottom={6}
+          left="50%"
+          transform="translateX(-50%)"
+          backgroundColor="#ffffff"
+          padding="8px"
+          paddingX="16px"
+          border="1px solid #ccc"
+          boxShadow="base"
+          borderRadius={"md"}
+        >
+          <HStack gap={3}>
+            <Text>{selectedEntryIds.size} entries selected</Text>
+            <Button
+              colorScheme="black"
+              minWidth="fit-content"
+              variant="outline"
+              onClick={() => void downloadCSV(true)}
+            >
+              Export <DownloadIcon marginLeft={2} />
+            </Button>
+
+            <Text>or</Text>
+            <Button
+              colorScheme="red"
+              type="submit"
+              variant="outline"
+              minWidth="fit-content"
+              onClick={onDelete}
+            >
+              Delete
+            </Button>
+          </HStack>
+        </Box>
+      )}
     </>
   );
 }
