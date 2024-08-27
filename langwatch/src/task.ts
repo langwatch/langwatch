@@ -38,7 +38,7 @@ const runAsync = async () => {
     debug(`Done!`);
   } catch (e) {
     debug(`SCRIPT RUNNER: failed to execute ${taskName}`);
-    debug(e);
+    throw e;
   } finally {
     redis.disconnect();
   }
