@@ -84,7 +84,9 @@ if (process.env.IS_OPENSEARCH) {
     return (await originalIndicesCreate(params_)).body;
   };
 
-  const originalIndicesPutMapping = esClient.indices.putMapping.bind(esClient.indices);
+  const originalIndicesPutMapping = esClient.indices.putMapping.bind(
+    esClient.indices
+  );
   // @ts-ignore
   esClient.indices.putMapping = async (params: any) => {
     const params_ = { ...params };
@@ -101,7 +103,9 @@ if (process.env.IS_OPENSEARCH) {
     return result.body;
   };
 
-  const originalIndicesPutAlias = esClient.indices.putAlias.bind(esClient.indices);
+  const originalIndicesPutAlias = esClient.indices.putAlias.bind(
+    esClient.indices
+  );
   // @ts-ignore
   esClient.indices.putAlias = async (params: any) => {
     const params_ = { ...params };
@@ -115,6 +119,16 @@ if (process.env.IS_OPENSEARCH) {
 
     // @ts-ignore
     return (await originalIndicesPutAlias(params_)).body;
+  };
+
+  const originalIndicesGetAlias = esClient.indices.getAlias.bind(
+    esClient.indices
+  );
+  // @ts-ignore
+  esClient.indices.getAlias = async (params: any) => {
+    const params_ = { ...params };
+    // @ts-ignore
+    return (await originalIndicesGetAlias(params_)).body;
   };
 }
 
