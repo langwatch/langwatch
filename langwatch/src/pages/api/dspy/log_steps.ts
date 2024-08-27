@@ -121,7 +121,7 @@ export default async function handler(
         debug(
           "Internal server error processing DSPy step",
           error,
-          // JSON.stringify(param, null, "  ")
+          JSON.stringify(param, null, "  ")
         );
         Sentry.captureException(error, { extra: { projectId: project.id, param } });
 

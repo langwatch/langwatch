@@ -1,4 +1,5 @@
 from dotenv import load_dotenv
+from fastapi.responses import StreamingResponse
 from fastapi.testclient import TestClient
 
 load_dotenv()
@@ -18,30 +19,39 @@ class EndpointParams(BaseModel):
     input: str
 
 
+class CompletionStreaming:
+    @langwatch.trace(name="fastapi_sample_endpoint")
+    async def execute(self, input: str):
+        langwatch.get_current_trace().autotrack_openai_calls(client)
+
+        completion = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {
+                    "role": "system",
+                    "content": "You are a helpful assistant that only reply in short tweet-like responses, using lots of emojis.",
+                },
+                {"role": "user", "content": input},
+            ],
+            stream=True,
+        )
+
+        for chunk in completion:
+            content = chunk.choices[0].delta.content
+            if content is not None:
+                yield content
+
+
 @app.post("/")
-@langwatch.trace(name="fastapi_sample_endpoint")
-def fastapi_sample_endpoint(params: EndpointParams):
-    langwatch.get_current_trace().autotrack_openai_calls(client)
-
-    completion = client.chat.completions.create(
-        model="gpt-4o",
-        messages=[
-            {
-                "role": "system",
-                "content": "You are a helpful assistant that only reply in short tweet-like responses, using lots of emojis.",
-            },
-            {"role": "user", "content": params.input},
-        ],
-    )
-
-    return completion.choices[0].message.content
+async def fastapi_sample_endpoint(params: EndpointParams):
+    return StreamingResponse(CompletionStreaming().execute(params.input))  # type: ignore
 
 
 def call_fastapi_sample_endpoint(input: str) -> str:
     test_client = TestClient(app)
     response = test_client.post("/", json={"input": input})
 
-    return response.json()
+    return response.text
 
 
 if __name__ == "__main__":

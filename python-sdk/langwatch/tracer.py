@@ -189,7 +189,46 @@ class ContextSpan:
             "metrics": self.metrics,
         }
 
-        if inspect.iscoroutinefunction(func):
+        if inspect.isasyncgenfunction(func):
+
+            @functools.wraps(func)
+            async def async_gen_wrapper(*args, **kwargs):
+                with ContextSpan(**span_kwargs) as span:
+                    span._capture_name_and_input(func, *args, **kwargs)
+                    items = []
+                    async for item in func(*args, **kwargs):
+                        items.append(item)
+                        yield item
+
+                    output = (
+                        "".join(items)
+                        if all(isinstance(item, str) for item in items)
+                        else items
+                    )
+                    span._capture_output_and_maybe_name(func, output)
+
+            return async_gen_wrapper  # type: ignore
+        elif inspect.isgeneratorfunction(func):
+
+            @functools.wraps(func)
+            def sync_gen_wrapper(*args, **kwargs):
+                with ContextSpan(**span_kwargs) as span:
+                    span._capture_name_and_input(func, *args, **kwargs)
+                    items = []
+                    for item in func(*args, **kwargs):
+                        items.append(item)
+                        yield item
+
+                    output = (
+                        "".join(items)
+                        if all(isinstance(item, str) for item in items)
+                        else items
+                    )
+                    span._capture_output_and_maybe_name(func, output)
+
+            return sync_gen_wrapper  # type: ignore
+
+        elif inspect.iscoroutinefunction(func):
 
             @functools.wraps(func)
             async def async_wrapper(*args, **kwargs):
@@ -651,7 +690,10 @@ class ContextTrace:
         self.deferred_send_spans()
         self.root_span.__exit__(_type, _value, _traceback)
         if self.context_token:
-            current_trace_var.reset(self.context_token)
+            try:
+                current_trace_var.reset(self.context_token)
+            except ValueError:
+                pass
             self.context_token = None
 
     def __call__(self, func: T) -> T:
@@ -674,7 +716,45 @@ class ContextTrace:
             "metrics": self.root_span.metrics,
         }
 
-        if inspect.iscoroutinefunction(func):
+        if inspect.isasyncgenfunction(func):
+
+            @functools.wraps(func)
+            async def async_gen_wrapper(*args, **kwargs):
+                with ContextTrace(**trace_kwargs) as trace:
+                    trace.root_span._capture_name_and_input(func, *args, **kwargs)
+                    items = []
+                    async for item in func(*args, **kwargs):
+                        items.append(item)
+                        yield item
+
+                    output = (
+                        "".join(items)
+                        if all(isinstance(item, str) for item in items)
+                        else items
+                    )
+                    trace.root_span._capture_output_and_maybe_name(func, output)
+
+            return async_gen_wrapper  # type: ignore
+        elif inspect.isgeneratorfunction(func):
+
+            @functools.wraps(func)
+            def sync_gen_wrapper(*args, **kwargs):
+                with ContextTrace(**trace_kwargs) as trace:
+                    trace.root_span._capture_name_and_input(func, *args, **kwargs)
+                    items = []
+                    for item in func(*args, **kwargs):
+                        items.append(item)
+                        yield item
+
+                    output = (
+                        "".join(items)
+                        if all(isinstance(item, str) for item in items)
+                        else items
+                    )
+                    trace.root_span._capture_output_and_maybe_name(func, output)
+
+            return sync_gen_wrapper  # type: ignore
+        elif inspect.iscoroutinefunction(func):
 
             @functools.wraps(func)
             async def async_wrapper(*args, **kwargs):
@@ -682,6 +762,7 @@ class ContextTrace:
                     trace.root_span._capture_name_and_input(func, *args, **kwargs)
                     output = await func(*args, **kwargs)
                     trace.root_span._capture_output_and_maybe_name(func, output)
+                    return output
 
             return async_wrapper  # type: ignore
         else:
