@@ -20,6 +20,7 @@ import { api } from "../../utils/api";
 import { useDrawer } from "../CurrentDrawer";
 import {
   DatasetGrid,
+  datasetValueToGridValue,
   HeaderCheckboxComponent,
   type DatasetColumnDef,
 } from "./DatasetGrid";
@@ -156,16 +157,13 @@ export function DatasetTable({
   const rowData = useMemo(() => {
     if (!dataset) return;
 
-    const columns = (dataset.columnTypes as DatasetColumns).map(
-      ({ name }) => name
-    );
     return dataset.datasetRecords.map((record) => {
       const row: DatasetRecordEntry = { id: record.id };
-      columns.forEach((col) => {
+      columnTypes.forEach((col) => {
         const value = datasetId
-          ? record.entry[col]
-          : (record as DatasetRecordEntry)[col];
-        row[col] = typeof value === "object" ? JSON.stringify(value) : value;
+          ? record.entry[col.name]
+          : (record as DatasetRecordEntry)[col.name];
+        row[col.name] = datasetValueToGridValue(value, col.type);
       });
       row.selected = selectedEntryIds.has(record.id);
       return row;
@@ -188,25 +186,22 @@ export function DatasetTable({
   const toast = useToast();
 
   const downloadCSV = (selectedOnly = false) => {
-    const columns = ((dataset?.columnTypes as DatasetColumns) ?? []).map(
-      ({ name }) => name
-    );
     const csvData =
       dataset?.datasetRecords
         .filter((record) =>
           selectedOnly ? selectedEntryIds.has(record.id) : true
         )
         .map((record) =>
-          columns.map((col) => {
+          columnTypes.map((col) => {
             const value = datasetId
-              ? record.entry[col]
-              : (record as DatasetRecordEntry)[col];
-            return typeof value === "object" ? JSON.stringify(value) : value;
+              ? record.entry[col.name]
+              : (record as DatasetRecordEntry)[col.name];
+            return datasetValueToGridValue(value, col.type);
           })
         ) ?? [];
 
     const csv = Parse.unparse({
-      fields: columns,
+      fields: columnTypes.map((col) => col.name),
       data: csvData,
     });
 
@@ -428,9 +423,8 @@ export function DatasetTable({
           Add from CSV
         </Button>
         <Button
-          colorScheme="black"
+          colorScheme="gray"
           minWidth="fit-content"
-          variant="ghost"
           onClick={() => dataset && downloadCSV()}
         >
           Export <DownloadIcon marginLeft={2} />

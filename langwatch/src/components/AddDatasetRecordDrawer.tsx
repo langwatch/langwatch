@@ -1,3 +1,5 @@
+import type { CustomCellRendererProps } from "@ag-grid-community/react";
+import { Link } from "@chakra-ui/next-js";
 import {
   Button,
   Checkbox,
@@ -13,7 +15,6 @@ import {
   useDisclosure,
   useToast,
 } from "@chakra-ui/react";
-import type { CustomCellRendererProps } from "@ag-grid-community/react";
 import { nanoid } from "nanoid";
 import { useEffect, useMemo, useState } from "react";
 import { useForm, type SubmitHandler } from "react-hook-form";
@@ -29,22 +30,21 @@ import type {
 } from "../server/datasets/types";
 import type {
   DatasetSpan,
-  ElasticSearchSpan,
   ElasticSearchEvaluation,
+  ElasticSearchSpan,
 } from "../server/tracer/types";
 import {
   elasticSearchEvaluationsToEvaluations,
   getRAGInfo,
 } from "../server/tracer/utils";
 import { AddOrEditDatasetDrawer } from "./AddOrEditDatasetDrawer";
+import { useDrawer } from "./CurrentDrawer";
 import { HorizontalFormControl } from "./HorizontalFormControl";
 import {
   DatasetGrid,
   HeaderCheckboxComponent,
   type DatasetColumnDef,
 } from "./datasets/DatasetGrid";
-import { useDrawer } from "./CurrentDrawer";
-import { Link } from "@chakra-ui/next-js";
 
 type FormValues = {
   datasetId: string;
@@ -193,10 +193,13 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
           Object.entries(row)
             .filter(([key, _]) => key !== "selected")
             .map(([key, value]) => {
-              const entry: DatasetRecordEntry =
-                !columnTypes?.[key] || columnTypes[key] === "string"
-                  ? value
-                  : JSON.parse(value as string);
+              const column = columnTypes?.find((column) => column.name === key);
+              let entry: DatasetRecordEntry = value;
+              if (column?.type !== "string") {
+                try {
+                  entry = JSON.parse(value as string);
+                } catch {}
+              }
 
               return [key, entry];
             })
@@ -349,7 +352,7 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
         const llmEntries = trace.spans?.filter((span) => span.type === "llm");
         // TODO: disable the row if the llm entry has no chat_message as input/output type
         for (const llmEntry of llmEntries ?? []) {
-          const row_ = { ...row };
+          const row_ = { ...row, id: nanoid() };
 
           for (const {
             name,

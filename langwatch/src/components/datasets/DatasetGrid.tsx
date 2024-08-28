@@ -73,10 +73,28 @@ export const DatasetGrid = React.memo(
                 />
               ),
             };
+          } else if (column.type_ === "boolean") {
+            return {
+              ...column,
+              cellDataType: "boolean",
+              cellRenderer: (props: CustomCellRendererProps) => (
+                <Checkbox
+                  marginLeft="3px"
+                  {...props}
+                  isChecked={props.value}
+                  onChange={(e) => props.setValue?.(e.target.checked)}
+                />
+              ),
+            };
           } else {
             return {
               ...column,
-              cellDataType: column.type_ === "string" ? "text" : column.type_,
+              cellDataType:
+                column.type_ === "string"
+                  ? "text"
+                  : column.type_ === "date"
+                  ? "dateString"
+                  : column.type_,
             };
           }
         }
@@ -122,7 +140,6 @@ export const DatasetGrid = React.memo(
           line-height: 19.2px;
           font-feature-settings: "kern";
         }
-
         .ag-layout-auto-height .ag-center-cols-viewport, .ag-layout-auto-height .ag-center-cols-container {
           min-height: 29px;
         }
@@ -162,6 +179,8 @@ export const DatasetGrid = React.memo(
   (prevProps, nextProps) => {
     return (
       JSON.stringify(prevProps.rowData) === JSON.stringify(nextProps.rowData) &&
+      JSON.stringify(prevProps.columnDefs) ===
+        JSON.stringify(nextProps.columnDefs) &&
       prevProps.onCellValueChanged === nextProps.onCellValueChanged
     );
   }
@@ -213,4 +232,8 @@ export function HeaderCheckboxComponent(props: CustomCellRendererProps) {
       }}
     />
   );
+}
+
+export function datasetValueToGridValue(value: any, type: DatasetColumnType) {
+  return typeof value === "object" ? JSON.stringify(value) : value;
 }

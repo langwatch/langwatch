@@ -13,24 +13,25 @@ import {
   Input,
   Radio,
   RadioGroup,
+  Select,
   Text,
   VStack,
   useToast,
-  Select,
 } from "@chakra-ui/react";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { useCallback, useEffect } from "react";
-import { useForm, type FieldErrors, useFieldArray } from "react-hook-form";
+import { Trash2 } from "react-feather";
+import { useFieldArray, useForm, type FieldErrors } from "react-hook-form";
 import slugify from "slugify";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
-import { api } from "../utils/api";
-import { HorizontalFormControl } from "./HorizontalFormControl";
 import type {
   DatasetColumnType,
   DatasetColumns,
   DatasetRecordForm,
 } from "../server/datasets/types";
 import { datasetRecordFormSchema } from "../server/datasets/types.generated";
-import { zodResolver } from "@hookform/resolvers/zod";
+import { api } from "../utils/api";
+import { HorizontalFormControl } from "./HorizontalFormControl";
 
 interface AddDatasetDrawerProps {
   editDataset?: {
@@ -377,7 +378,9 @@ export const AddOrEditDatasetDrawer = (props: AddDatasetDrawerProps) => {
                           <option value="annotations">Annotations</option>
                           <option value="evaluations">Evaluations</option>
                         </Select>
-                        <Button onClick={() => remove(index)}>-</Button>
+                        <Button size="sm" onClick={() => remove(index)}>
+                          <Trash2 size={32} />
+                        </Button>
                       </HStack>
                     ))}
                     <Button
