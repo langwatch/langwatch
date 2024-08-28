@@ -12,23 +12,21 @@ export default function Error({ session }: { session: Session | null }) {
       return;
     }
 
-    setTimeout(() => {
-      if (typeof window !== "undefined" && typeof document !== "undefined") {
-        if (isAuth0) {
-          const fromReferrer = !!document.referrer;
-          if (fromReferrer) {
-            // @ts-ignore
-            window.location = document.referrer;
-          } else {
-            // @ts-ignore
-            window.location = "/";
-          }
+    if (typeof window !== "undefined" && typeof document !== "undefined") {
+      if (isAuth0) {
+        const fromReferrer = !!document.referrer;
+        if (fromReferrer) {
+          // @ts-ignore
+          window.location = document.referrer;
         } else {
           // @ts-ignore
-          window.location = "/auth/signin";
+          window.location = "/";
         }
+      } else {
+        // @ts-ignore
+        window.location = "/auth/signin";
       }
-    }, 3000);
+    }
   }, [publicEnv.data, isAuth0, session]);
 
   return (
