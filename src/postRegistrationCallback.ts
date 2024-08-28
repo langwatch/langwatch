@@ -111,14 +111,17 @@ const submitLeadFormInHubSpot = async (user: any, org: any) => {
 };
 
 export const PostRegistrationCallback = async (user: any, org: any) => {
-  const slackNotificationPromise = sendSlackNotification(user, org);
-
   // Keeping this, as we might want to use it again.
-  //const hubSpotPromise = createLeadInHubSpot(user, org);
-  const hubSpotFormPromise = submitLeadFormInHubSpot(user, org);
+  // createLeadInHubSpot(user, org);
 
   try {
-    await Promise.all([slackNotificationPromise]);
+    void (await sendSlackNotification(user, org));
+  } catch (err) {
+    Sentry.captureException(err);
+  }
+
+  try {
+    void (await submitLeadFormInHubSpot(user, org));
   } catch (err) {
     Sentry.captureException(err);
   }
