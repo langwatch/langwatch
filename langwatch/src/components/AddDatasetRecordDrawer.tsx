@@ -352,7 +352,7 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
         const llmEntries = trace.spans?.filter((span) => span.type === "llm");
         // TODO: disable the row if the llm entry has no chat_message as input/output type
         for (const llmEntry of llmEntries ?? []) {
-          const row_ = { ...row, id: nanoid() };
+          const row_: DatasetRecordEntry = { ...row, id: nanoid() };
 
           for (const {
             name,

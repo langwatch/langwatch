@@ -87,7 +87,9 @@ export const datasetRecordRouter = createTRPCRouter({
 
       const updatedData: any = {};
       for (const [key, value] of Object.entries(updatedRecord)) {
-        const type_ = (dataset.columnTypes as DatasetColumns)[key];
+        const type_ = (dataset.columnTypes as DatasetColumns).find(
+          (col) => col.name === key
+        )?.type;
         if (type_ === "string") {
           updatedData[key] = value ?? "";
         } else {
