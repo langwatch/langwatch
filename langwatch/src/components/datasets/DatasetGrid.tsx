@@ -234,6 +234,6 @@ export function HeaderCheckboxComponent(props: CustomCellRendererProps) {
   );
 }
 
-export function datasetValueToGridValue(value: any, type: DatasetColumnType) {
+export function datasetValueToGridValue(value: any, _type: DatasetColumnType) {
   return typeof value === "object" ? JSON.stringify(value) : value;
 }
