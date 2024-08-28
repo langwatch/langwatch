@@ -48,13 +48,6 @@ export class LangWatchAwsMarketplaceStack extends cdk.Stack {
       kubectlLayer: new KubectlV30Layer(this, "KubectlLayer"),
     });
 
-    // Create an EBS volume
-    const ebsVolume = new ec2.CfnVolume(this, "EbsVolume", {
-      availabilityZone: "eu-central-1a", // Replace with your availability zone
-      size: 10, // Size in GiB
-      volumeType: "gp3",
-    });
-
     const nodegroup = cluster.addNodegroupCapacity("ManagedNodes", {
       instanceTypes: [new ec2.InstanceType("m5.xlarge")],
       minSize: nodeCountParam.valueAsNumber,
