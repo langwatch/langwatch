@@ -5,7 +5,7 @@ import { type DatasetRecord } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import {
   newDatasetEntriesSchema,
-  type DatasetColumnTypes,
+  type DatasetColumns,
 } from "../../datasets/types";
 import { nanoid } from "nanoid";
 
@@ -87,7 +87,7 @@ export const datasetRecordRouter = createTRPCRouter({
 
       const updatedData: any = {};
       for (const [key, value] of Object.entries(updatedRecord)) {
-        const type_ = (dataset.columnTypes as DatasetColumnTypes)[key];
+        const type_ = (dataset.columnTypes as DatasetColumns)[key];
         if (type_ === "string") {
           updatedData[key] = value ?? "";
         } else {

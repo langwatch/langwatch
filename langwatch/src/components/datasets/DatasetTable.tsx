@@ -14,7 +14,7 @@ import {
 } from "@chakra-ui/react";
 import Parse from "papaparse";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Play, Plus, Upload } from "react-feather";
+import { Edit2, Play, Plus, Save, Upload } from "react-feather";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
 import { useDrawer } from "../CurrentDrawer";
@@ -30,15 +30,16 @@ import type {
 } from "@ag-grid-community/react";
 import { nanoid } from "nanoid";
 import type {
-  DatasetColumnTypes,
+  DatasetColumns,
   DatasetRecordEntry,
 } from "../../server/datasets/types";
 import { UploadCSVModal } from "./UploadCSVModal";
+import { AddOrEditDatasetDrawer } from "../AddOrEditDatasetDrawer";
 
 export type InMemoryDataset = {
   name?: string;
   datasetRecords: DatasetRecordEntry[];
-  columnTypes: DatasetColumnTypes;
+  columnTypes: DatasetColumns;
 };
 
 export function DatasetTable({
@@ -49,13 +50,14 @@ export function DatasetTable({
 }: {
   datasetId?: string;
   inMemoryDataset?: InMemoryDataset;
-  onUpdateDataset?: (dataset: InMemoryDataset) => void;
+  onUpdateDataset?: (dataset: InMemoryDataset & { datasetId?: string }) => void;
   isEmbedded?: boolean;
 }) {
   const { project } = useOrganizationTeamProject();
 
   const { openDrawer } = useDrawer();
   const { isOpen, onOpen, onClose } = useDisclosure();
+  const editDataset = useDisclosure();
   const [savingStatus, setSavingStatus] = useState<"saving" | "saved" | "">("");
 
   const databaseDataset = api.datasetRecord.getAll.useQuery(
@@ -74,19 +76,17 @@ export function DatasetTable({
   const gridRef = useRef<AgGridReact>(null);
 
   const columnTypes = useMemo(
-    () => (dataset?.columnTypes as DatasetColumnTypes) ?? {},
+    () => (dataset?.columnTypes as DatasetColumns) ?? [],
     [dataset]
   );
   const columnDefs = useMemo(() => {
-    const headers: DatasetColumnDef[] = Object.entries(columnTypes).map(
-      ([field, type]) => ({
-        headerName: field,
-        field,
-        type_: type,
-        cellClass: "v-align",
-        sortable: false,
-      })
-    );
+    const headers: DatasetColumnDef[] = columnTypes.map(({ name, type }) => ({
+      headerName: name,
+      field: name,
+      type_: type,
+      cellClass: "v-align",
+      sortable: false,
+    }));
 
     // Add row number column
     headers.unshift({
@@ -156,7 +156,9 @@ export function DatasetTable({
   const rowData = useMemo(() => {
     if (!dataset) return;
 
-    const columns = Object.keys(dataset.columnTypes ?? {});
+    const columns = (dataset.columnTypes as DatasetColumns).map(
+      ({ name }) => name
+    );
     return dataset.datasetRecords.map((record) => {
       const row: DatasetRecordEntry = { id: record.id };
       columns.forEach((col) => {
@@ -186,7 +188,9 @@ export function DatasetTable({
   const toast = useToast();
 
   const downloadCSV = (selectedOnly = false) => {
-    const columns = Object.keys(dataset?.columnTypes ?? {}) ?? [];
+    const columns = ((dataset?.columnTypes as DatasetColumns) ?? []).map(
+      ({ name }) => name
+    );
     const csvData =
       dataset?.datasetRecords
         .filter((record) =>
@@ -431,7 +435,26 @@ export function DatasetTable({
         >
           Export <DownloadIcon marginLeft={2} />
         </Button>
-        {datasetId && (
+        {datasetId ? (
+          <Button
+            colorScheme="gray"
+            onClick={() => editDataset.onOpen()}
+            minWidth="fit-content"
+            leftIcon={<Edit2 height={16} />}
+          >
+            Edit Dataset
+          </Button>
+        ) : (
+          <Button
+            colorScheme="blue"
+            onClick={() => editDataset.onOpen()}
+            minWidth="fit-content"
+            leftIcon={<Save height={16} />}
+          >
+            Save
+          </Button>
+        )}
+        {datasetId && !isEmbedded && (
           <Button
             colorScheme="blue"
             onClick={() => {
@@ -519,6 +542,29 @@ export function DatasetTable({
             </Button>
           </HStack>
         </Box>
+      )}
+      {editDataset.isOpen && (
+        <AddOrEditDatasetDrawer
+          editDataset={{
+            datasetId,
+            name: dataset?.name ?? "",
+            columnTypes,
+          }}
+          isOpen={editDataset.isOpen}
+          onClose={editDataset.onClose}
+          onSuccess={(updatedDataset) => {
+            if (dataset?.datasetRecords) {
+              onUpdateDataset?.({
+                datasetId: updatedDataset.datasetId,
+                name: updatedDataset.name,
+                datasetRecords: dataset.datasetRecords,
+                columnTypes: updatedDataset.columnTypes,
+              });
+            }
+            void databaseDataset.refetch();
+            editDataset.onClose();
+          }}
+        />
       )}
     </>
   );

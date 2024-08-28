@@ -11,6 +11,7 @@ export type DatasetColumnType =
   | "string"
   | "boolean"
   | "number"
+  | "date"
   | "json"
   | "spans"
   | "rag_contexts"
@@ -18,14 +19,14 @@ export type DatasetColumnType =
   | "annotations"
   | "evaluations";
 
-export type DatasetColumnTypes = Record<string, DatasetColumnType>;
+export type DatasetColumns = { name: string; type: DatasetColumnType }[];
 
 export type DatasetRecordForm = {
   /**
    * @minLength 1
    */
   name: string;
-  columnTypes: DatasetColumnTypes;
+  columnTypes: DatasetColumns;
 };
 
 export const annotationScoreSchema = z.object({
@@ -50,6 +51,7 @@ export const datasetColumnTypeMapping: {
   string: z.string().optional().nullable(),
   boolean: z.boolean().optional().nullable(),
   number: z.number().optional().nullable(),
+  date: z.date().optional().nullable(),
   json: z.any().optional().nullable(),
   spans: z.array(datasetSpanSchema).optional().nullable(),
   rag_contexts: z.array(rAGChunkSchema).optional().nullable(),

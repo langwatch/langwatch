@@ -24,7 +24,7 @@ import { datasetSpanSchema } from "~/server/tracer/types.generated";
 import { api } from "~/utils/api";
 import type {
   annotationScoreSchema,
-  DatasetColumnTypes,
+  DatasetColumns,
   DatasetRecordEntry,
 } from "../server/datasets/types";
 import type {
@@ -36,7 +36,7 @@ import {
   elasticSearchEvaluationsToEvaluations,
   getRAGInfo,
 } from "../server/tracer/utils";
-import { AddDatasetDrawer } from "./AddDatasetDrawer";
+import { AddOrEditDatasetDrawer } from "./AddOrEditDatasetDrawer";
 import { HorizontalFormControl } from "./HorizontalFormControl";
 import {
   DatasetGrid,
@@ -160,7 +160,7 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
     }
   }, [datasetId, datasets.data, setValue]);
 
-  const onCreateDatasetSuccess = (datasetId: string) => {
+  const onCreateDatasetSuccess = ({ datasetId }: { datasetId: string }) => {
     closeDrawer();
     void datasets.refetch().then(() => {
       setTimeout(() => {
@@ -181,7 +181,7 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
   );
   const rowsToAdd = editableRowData.filter((row) => row.selected);
   const columnTypes = selectedDataset?.columnTypes as
-    | DatasetColumnTypes
+    | DatasetColumns
     | undefined;
 
   const onSubmit: SubmitHandler<FormValues> = (_data) => {
@@ -298,28 +298,29 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
         id: nanoid(),
         selected: true,
       };
-      for (const [column, type] of Object.entries(
-        selectedDataset.columnTypes ?? {}
-      )) {
-        if (column === "input" && type === "string") {
-          row[column] = trace.input?.value ?? "";
-        } else if (column === "expected_output" && type === "string") {
-          row[column] = trace.output?.value ?? "";
+      for (const {
+        name,
+        type,
+      } of (selectedDataset.columnTypes as DatasetColumns) ?? []) {
+        if (name === "input" && type === "string") {
+          row[name] = trace.input?.value ?? "";
+        } else if (name === "expected_output" && type === "string") {
+          row[name] = trace.output?.value ?? "";
         } else if (type === "rag_contexts") {
           try {
-            row[column] = JSON.stringify(
+            row[name] = JSON.stringify(
               getRAGInfo(trace.spans ?? []).contexts ?? []
             );
           } catch (e) {
-            row[column] = JSON.stringify([]);
+            row[name] = JSON.stringify([]);
           }
         } else if (type === "spans") {
-          row[column] = JSON.stringify(
+          row[name] = JSON.stringify(
             esSpansToDatasetSpans(trace.spans ?? []),
             null,
             2
           );
-        } else if (column === "annotation_scores") {
+        } else if (name === "annotation_scores") {
           const annotationScoresArray = annotationScores.data
             ? getAnnotationScoresArray(
                 annotationScores.data as z.infer<
@@ -329,20 +330,20 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
                 trace.trace_id
               )
             : [];
-          row[column] = JSON.stringify(annotationScoresArray);
+          row[name] = JSON.stringify(annotationScoresArray);
         } else if (type === "evaluations") {
-          row[column] = JSON.stringify(
+          row[name] = JSON.stringify(
             getEvaluationArray(evaluations, trace.trace_id)
           );
         } else {
-          row[column] = "";
+          row[name] = "";
         }
       }
 
       // One row per LLM entry
       if (
-        Object.values(selectedDataset.columnTypes ?? {}).some(
-          (type) => type === "chat_messages"
+        ((selectedDataset.columnTypes as DatasetColumns) ?? []).some(
+          ({ type }) => type === "chat_messages"
         )
       ) {
         const llmEntries = trace.spans?.filter((span) => span.type === "llm");
@@ -350,15 +351,14 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
         for (const llmEntry of llmEntries ?? []) {
           const row_ = { ...row };
 
-          for (const [column, type] of Object.entries(
-            selectedDataset.columnTypes ?? {}
-          )) {
-            if (column === "expected_llm_output" && type === "chat_messages") {
-              row_[column] = llmEntry.output?.value
-                ? llmEntry.output.value
-                : "";
+          for (const {
+            name,
+            type,
+          } of (selectedDataset.columnTypes as DatasetColumns) ?? []) {
+            if (name === "expected_llm_output" && type === "chat_messages") {
+              row_[name] = llmEntry.output?.value ? llmEntry.output.value : "";
             } else if (type === "chat_messages") {
-              row_[column] = llmEntry.input?.value ? llmEntry.input.value : "";
+              row_[name] = llmEntry.input?.value ? llmEntry.input.value : "";
             }
           }
           rows.push(row_);
@@ -388,11 +388,11 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
       return [];
     }
 
-    const headers: DatasetColumnDef[] = Object.entries(
-      selectedDataset.columnTypes ?? {}
-    ).map(([column, type]) => ({
-      headerName: column,
-      field: column,
+    const headers: DatasetColumnDef[] = (
+      (selectedDataset.columnTypes as DatasetColumns) ?? []
+    ).map(({ name, type }) => ({
+      headerName: name,
+      field: name,
       type_: type,
       cellClass: "v-align",
       sortable: false,
@@ -518,7 +518,7 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
           </form>
         </DrawerBody>
       </DrawerContent>
-      <AddDatasetDrawer
+      <AddOrEditDatasetDrawer
         isOpen={isOpen}
         onClose={onClose}
         onSuccess={onCreateDatasetSuccess}

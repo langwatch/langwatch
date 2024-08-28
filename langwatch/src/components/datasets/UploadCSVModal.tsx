@@ -26,7 +26,7 @@ import { ArrowRight } from "react-feather";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import {
   newDatasetEntriesSchema,
-  type DatasetColumnTypes,
+  type DatasetColumns,
   type DatasetRecordEntry,
 } from "../../server/datasets/types";
 import { api } from "../../utils/api";
@@ -44,7 +44,7 @@ export function UploadCSVModal({
   isOpen: boolean;
   onClose: () => void;
   datasetId?: string;
-  columnTypes: DatasetColumnTypes;
+  columnTypes: DatasetColumns;
   onUpdateDataset?: (entries: DatasetRecordEntry[]) => void;
 }) {
   const { project } = useOrganizationTeamProject();
@@ -114,19 +114,15 @@ export function UploadCSVModal({
         id: nanoid(),
       };
 
-      for (const [column, type] of Object.entries(columnTypes)) {
+      for (const { name, type } of columnTypes) {
         if (type === "string") {
-          entry[column] = safeGetRowValue(
-            row,
-            CSVHeaders,
-            mappings[column] ?? ""
-          );
+          entry[name] = safeGetRowValue(row, CSVHeaders, mappings[name] ?? "");
         } else {
-          entry[column] = parseJSONField(
+          entry[name] = parseJSONField(
             row,
             CSVHeaders,
-            mappings[column] ?? "",
-            column
+            mappings[name] ?? "",
+            name
           );
         }
       }
@@ -139,7 +135,7 @@ export function UploadCSVModal({
   };
 
   const isMappingsComplete = useCallback(() => {
-    const columns = Object.keys(columnTypes ?? {}) ?? [];
+    const columns = (columnTypes ?? []).map(({ name }) => name);
     return columns.every((column) => Object.keys(mapping).includes(column));
   }, [columnTypes, mapping]);
 
@@ -217,7 +213,7 @@ export function UploadCSVModal({
   };
 
   const selectMappings = useMemo(() => {
-    const columns = Object.keys(columnTypes ?? {}) ?? [];
+    const columns = (columnTypes ?? []).map(({ name }) => name);
     return columns.map((col) => ({
       value: col,
     }));

@@ -27,11 +27,12 @@ import {
 import { DeleteIcon } from "@chakra-ui/icons";
 import { useRouter } from "next/router";
 import { MoreVertical, Play } from "react-feather";
-import { AddDatasetDrawer } from "~/components/AddDatasetDrawer";
-import { useDrawer } from "~/components/CurrentDrawer";
-import { DashboardLayout } from "~/components/DashboardLayout";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { api } from "~/utils/api";
+import { AddOrEditDatasetDrawer } from "../../components/AddOrEditDatasetDrawer";
+import { useDrawer } from "../../components/CurrentDrawer";
+import { DashboardLayout } from "../../components/DashboardLayout";
+import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
+import { api } from "../../utils/api";
+import type { DatasetColumns } from "../../server/datasets/types";
 
 export default function Datasets() {
   const { isOpen, onOpen, onClose } = useDisclosure();
@@ -193,13 +194,13 @@ export default function Datasets() {
                             <Td>{dataset.name}</Td>
                             <Td maxWidth="250px">
                               <HStack wrap="wrap">
-                                {Object.keys(dataset.columnTypes ?? {}).map(
-                                  (column) => (
-                                    <Tag size="sm" key={column}>
-                                      {column}
-                                    </Tag>
-                                  )
-                                )}
+                                {(
+                                  (dataset.columnTypes as DatasetColumns) ?? []
+                                ).map(({ name }) => (
+                                  <Tag size="sm" key={name}>
+                                    {name}
+                                  </Tag>
+                                ))}
                               </HStack>
                             </Td>
                             <Td>{dataset.datasetRecords.length ?? 0}</Td>
@@ -245,7 +246,7 @@ export default function Datasets() {
           </CardBody>
         </Card>
       </Container>
-      <AddDatasetDrawer
+      <AddOrEditDatasetDrawer
         isOpen={isOpen}
         onClose={onClose}
         onSuccess={onSuccess}
