@@ -125,6 +125,7 @@ const getTracesForAlert = async (trigger: Trigger, projects: Project[]) => {
       updatedAt = getLatestUpdatedAt(traces);
 
       await sendTriggerEmail(triggerInfo);
+      await addTriggersSent(triggerId, triggerData);
       if (project) {
         void updateAlert(triggerId, updatedAt, project.id);
       } else {
