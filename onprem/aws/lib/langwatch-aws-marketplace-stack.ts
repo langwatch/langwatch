@@ -106,14 +106,20 @@ export class LangWatchAwsMarketplaceStack extends cdk.Stack {
 
     const { redis, redisPassword } = this.setupRedis(vpc, cluster);
     const { postgres, postgresPassword } = this.setupPostgres(vpc, cluster);
-    const openSearchDomain = this.setupOpenSearch(vpc, cluster);
+    const { openSearchDomain, openSearchPassword } = this.setupOpenSearch(
+      vpc,
+      cluster
+    );
 
     this.setupLangWatchEnv(
       domainParam,
       cluster,
       { redis, redisPassword },
       { postgres, postgresPassword },
-      { openSearchDomain: openSearchDomain.attrDomainEndpoint }
+      {
+        openSearchDomain: openSearchDomain.attrDomainEndpoint,
+        openSearchPassword,
+      }
     );
 
     setupFluentd(cluster);
@@ -142,8 +148,10 @@ export class LangWatchAwsMarketplaceStack extends cdk.Stack {
     },
     {
       openSearchDomain,
+      openSearchPassword,
     }: {
       openSearchDomain: string;
+      openSearchPassword: secretsmanager.Secret;
     }
   ): secretsmanager.Secret {
     const generateSecureString = (name: string, length: number = 32) => {
@@ -218,7 +226,20 @@ export class LangWatchAwsMarketplaceStack extends cdk.Stack {
           // ),
           IS_OPENSEARCH: cdk.SecretValue.unsafePlainText("true"),
           ELASTICSEARCH_NODE_URL: cdk.SecretValue.unsafePlainText(
-            cdk.Fn.join("", ["http://", openSearchDomain, ":9200"])
+            cdk.Fn.join("", [
+              "https://",
+              openSearchPassword
+                .secretValueFromJson("username")
+                .unsafeUnwrap()
+                .toString(),
+              ":",
+              openSearchPassword
+                .secretValueFromJson("password")
+                .unsafeUnwrap()
+                .toString(),
+              "@",
+              openSearchDomain,
+            ])
           ),
         },
       }
@@ -355,6 +376,10 @@ export class LangWatchAwsMarketplaceStack extends cdk.Stack {
                 objectName: "ELASTICSEARCH_NODE_URL",
                 key: "ELASTICSEARCH_NODE_URL",
               },
+              {
+                objectName: "IS_OPENSEARCH",
+                key: "IS_OPENSEARCH",
+              },
             ],
           },
         ],
@@ -407,6 +432,10 @@ export class LangWatchAwsMarketplaceStack extends cdk.Stack {
                 {
                   path: "ELASTICSEARCH_NODE_URL",
                   objectAlias: "ELASTICSEARCH_NODE_URL",
+                },
+                {
+                  path: "IS_OPENSEARCH",
+                  objectAlias: "IS_OPENSEARCH",
                 },
               ],
             },
@@ -508,6 +537,23 @@ export class LangWatchAwsMarketplaceStack extends cdk.Stack {
   }
 
   setupOpenSearch(vpc: ec2.Vpc, cluster: eks.Cluster) {
+    const openSearchPassword = new secretsmanager.Secret(
+      this,
+      "OpenSearchPassword",
+      {
+        generateSecretString: {
+          secretStringTemplate: JSON.stringify({
+            username: "langwatch_opensearch",
+          }),
+          generateStringKey: "password",
+          excludeCharacters: "\"'@/\\:?#[]&=+<>{}|^~`,%;", // Exclude problematic characters
+          includeSpace: false, // Ensure no spaces are included
+          requireEachIncludedType: true, // Ensure the password contains at least one of each type
+          passwordLength: 32,
+        },
+      }
+    );
+
     const openSearchSG = new ec2.SecurityGroup(
       this,
       "OpenSearchSecurityGroup",
@@ -522,6 +568,7 @@ export class LangWatchAwsMarketplaceStack extends cdk.Stack {
       this,
       "LangWatchOpenSearchDomain", // New logical ID
       {
+        domainName: "langwatch-opensearch",
         engineVersion: "OpenSearch_2.13",
         clusterConfig: {
           instanceType: "m5.large.search",
@@ -551,6 +598,33 @@ export class LangWatchAwsMarketplaceStack extends cdk.Stack {
           ],
           securityGroupIds: [openSearchSG.securityGroupId],
         },
+        accessPolicies: {
+          Version: "2012-10-17",
+          Statement: [
+            {
+              Effect: "Allow",
+              Principal: {
+                AWS: "*",
+              },
+              Action: "es:*",
+              Resource: `arn:aws:es:${this.region}:${this.account}:domain/langwatch-opensearch/*`,
+            },
+          ],
+        },
+        advancedSecurityOptions: {
+          enabled: true,
+          internalUserDatabaseEnabled: true,
+          masterUserOptions: {
+            masterUserName: openSearchPassword
+              .secretValueFromJson("username")
+              .unsafeUnwrap()
+              .toString(),
+            masterUserPassword: openSearchPassword
+              .secretValueFromJson("password")
+              .unsafeUnwrap()
+              .toString(),
+          },
+        },
       }
     );
     openSearchDomain.applyRemovalPolicy(cdk.RemovalPolicy.RETAIN);
@@ -573,18 +647,7 @@ export class LangWatchAwsMarketplaceStack extends cdk.Stack {
       "Allow HTTPS traffic from within VPC"
     );
 
-    // If you still need HTTP access, keep this rule
-    openSearchSG.addIngressRule(
-      ec2.SecurityGroup.fromSecurityGroupId(
-        this,
-        "EksClusterSG9200",
-        cluster.clusterSecurityGroupId
-      ),
-      ec2.Port.tcp(9200),
-      "Allow HTTP traffic from EKS cluster"
-    );
-
-    return openSearchDomain;
+    return { openSearchDomain, openSearchPassword };
   }
 
   setupPostgres(vpc: ec2.Vpc, cluster: eks.Cluster) {
