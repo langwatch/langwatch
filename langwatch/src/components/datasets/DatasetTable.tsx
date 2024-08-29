@@ -36,12 +36,15 @@ import type {
 } from "../../server/datasets/types";
 import { UploadCSVModal } from "./UploadCSVModal";
 import { AddOrEditDatasetDrawer } from "../AddOrEditDatasetDrawer";
+import type { Dataset, DatasetRecord } from "@prisma/client";
 
 export type InMemoryDataset = {
   name?: string;
   datasetRecords: DatasetRecordEntry[];
   columnTypes: DatasetColumns;
 };
+
+export const DEFAULT_DATASET_NAME = "Draft Dataset";
 
 export function DatasetTable({
   datasetId,
@@ -69,17 +72,17 @@ export function DatasetTable({
     }
   );
   const dataset = useMemo(
-    () => databaseDataset.data ?? inMemoryDataset,
+    () =>
+      databaseDataset.data
+        ? datasetDatabaseRecordsToInMemoryDataset(databaseDataset.data)
+        : inMemoryDataset,
     [databaseDataset.data, inMemoryDataset]
   );
   const deleteDatasetRecord = api.datasetRecord.deleteMany.useMutation();
 
   const gridRef = useRef<AgGridReact>(null);
 
-  const columnTypes = useMemo(
-    () => (dataset?.columnTypes as DatasetColumns) ?? [],
-    [dataset]
-  );
+  const columnTypes = useMemo(() => dataset?.columnTypes ?? [], [dataset]);
   const columnDefs = useMemo(() => {
     const headers: DatasetColumnDef[] = columnTypes.map(({ name, type }) => ({
       headerName: name,
@@ -160,9 +163,7 @@ export function DatasetTable({
     return dataset.datasetRecords.map((record) => {
       const row: DatasetRecordEntry = { id: record.id };
       columnTypes.forEach((col) => {
-        const value = datasetId
-          ? record.entry[col.name]
-          : (record as DatasetRecordEntry)[col.name];
+        const value = record[col.name];
         row[col.name] = datasetValueToGridValue(value, col.type);
       });
       row.selected = selectedEntryIds.has(record.id);
@@ -193,9 +194,7 @@ export function DatasetTable({
         )
         .map((record) =>
           columnTypes.map((col) => {
-            const value = datasetId
-              ? record.entry[col.name]
-              : (record as DatasetRecordEntry)[col.name];
+            const value = record[col.name];
             return datasetValueToGridValue(value, col.type);
           })
         ) ?? [];
@@ -402,7 +401,7 @@ export function DatasetTable({
         <Heading as={"h1"} size="lg">
           {isEmbedded ? "Edit Dataset" : "Dataset"}{" "}
           {`- ${
-            dataset?.name ? dataset.name : datasetId ? "" : "Draft Dataset"
+            dataset?.name ? dataset.name : datasetId ? "" : DEFAULT_DATASET_NAME
           }`}
         </Heading>
         <Text fontSize={"14px"} color="gray.400">
@@ -563,3 +562,25 @@ export function DatasetTable({
     </>
   );
 }
+
+export const datasetDatabaseRecordsToInMemoryDataset = (
+  dataset: Dataset & { datasetRecords: DatasetRecord[] }
+): InMemoryDataset => {
+  const columns = (dataset.columnTypes ?? []) as DatasetColumns;
+  const datasetRecords = dataset.datasetRecords.map((record) => {
+    const row: DatasetRecordEntry = { id: record.id };
+    columns.forEach((col) => {
+      const value = dataset.id
+        ? (record.entry as Record<string, any>)?.[col.name]
+        : (record as DatasetRecordEntry)[col.name];
+      row[col.name] = typeof value === "object" ? JSON.stringify(value) : value;
+    });
+    return row;
+  });
+
+  return {
+    name: dataset.name,
+    datasetRecords,
+    columnTypes: dataset.columnTypes as DatasetColumns,
+  };
+};
