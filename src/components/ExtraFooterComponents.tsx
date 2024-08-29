@@ -35,10 +35,6 @@ export function SignedInExtraFooterComponents() {
     redirectToOnboarding: false,
   });
 
-  if (!session.data || !organization || !project) {
-    return null;
-  }
-
   useEffect(() => {
     const gtag = (window as any).gtag;
     if (!session.data?.user || !organization || !project || !gtag) return;
@@ -59,6 +55,10 @@ export function SignedInExtraFooterComponents() {
       user_id: session.data.user.id,
     });
   }, [organization?.id, project?.id]);
+
+  if (!session.data || !organization || !project) {
+    return null;
+  }
 
   return (
     <>
