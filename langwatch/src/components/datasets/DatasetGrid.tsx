@@ -16,6 +16,7 @@ import "@ag-grid-community/styles/ag-theme-balham.css";
 import { z } from "zod";
 import {
   datasetColumnTypeMapping,
+  jsonSchema,
   type DatasetColumnType,
 } from "../../server/datasets/types";
 import { RenderInputOutput } from "../traces/RenderInputOutput";
@@ -63,11 +64,12 @@ export const DatasetGrid = React.memo(
           if (!basicTypes.includes(column.type_)) {
             return {
               ...column,
+              cellDataType: "object",
               cellRenderer: JSONCellRenderer,
               cellEditor: (props: CustomCellEditorProps) => (
                 <MultilineJSONCellEditor
                   zodValidator={
-                    datasetColumnTypeMapping[column.type_] ?? z.any()
+                    datasetColumnTypeMapping[column.type_] ?? jsonSchema
                   }
                   {...props}
                 />
