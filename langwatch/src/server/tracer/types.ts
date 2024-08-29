@@ -395,6 +395,15 @@ export type TrackEventRESTParamsValidator = Omit<
 // Dataset Schemas
 
 export type DatasetSpan =
-  | Omit<BaseSpan, "project_id" | "trace_id" | "id" | "timestamps" | "metrics">
-  | Omit<LLMSpan, "project_id" | "trace_id" | "id" | "timestamps" | "metrics">
-  | Omit<RAGSpan, "project_id" | "trace_id" | "id" | "timestamps" | "metrics">;
+  | (Omit<
+      BaseSpan,
+      "project_id" | "trace_id" | "id" | "timestamps" | "metrics" | "params"
+    > & { params: Record<string, any> })
+  | (Omit<
+      LLMSpan,
+      "project_id" | "trace_id" | "id" | "timestamps" | "metrics" | "params"
+    > & { params: Record<string, any> })
+  | (Omit<
+      RAGSpan,
+      "project_id" | "trace_id" | "id" | "timestamps" | "metrics" | "params"
+    > & { params: Record<string, any> });

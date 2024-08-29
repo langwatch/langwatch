@@ -459,7 +459,11 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
                 <option value={""}>Select Dataset</option>
                 {datasets.data
                   ? datasets.data?.map((dataset, index) => (
-                      <option key={index} value={dataset.id}>
+                      <option
+                        key={index}
+                        value={dataset.id}
+                        selected={dataset.id === localStorageDatasetId}
+                      >
                         {dataset.name}
                       </option>
                     ))
@@ -546,5 +550,9 @@ const esSpansToDatasetSpans = (spans: ElasticSearchSpan[]): DatasetSpan[] => {
       newArray[i].input = { value: "", type: "json" };
     }
   }
-  return z.array(datasetSpanSchema).parse(newArray);
+  try {
+    return z.array(datasetSpanSchema).parse(newArray);
+  } catch (e) {
+    return newArray;
+  }
 };
