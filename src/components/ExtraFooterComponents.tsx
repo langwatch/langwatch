@@ -4,40 +4,66 @@ import { useOrganizationTeamProject } from "../../langwatch/langwatch/src/hooks/
 import { useRequiredSession } from "../../langwatch/langwatch/src/hooks/useRequiredSession";
 import Script from "next/script";
 import { api } from "../../langwatch/langwatch/src/utils/api";
-import { useRouter } from "next/router";
 
 export function ExtraFooterComponents() {
+  const session = useRequiredSession({ required: false });
+
+  return (
+    <>
+      <Script
+        async
+        src="https://www.googletagmanager.com/gtag/js?id=G-0VEKZY9DMY"
+      ></Script>
+      <Script id="google-analytics">
+        {`
+          window.dataLayer = window.dataLayer || [];
+          function gtag(){dataLayer.push(arguments);}
+          gtag('js', new Date());
+          gtag('config', 'G-0VEKZY9DMY');
+        `}
+      </Script>
+      {session.data?.user ? <SignedInExtraFooterComponents /> : null}
+    </>
+  );
+}
+
+export function SignedInExtraFooterComponents() {
+  const user = api.user.updateLastLogin.useMutation();
+
   const session = useRequiredSession();
-
-  const router = useRouter();
-  const currentUrl = router.asPath;
-  const isAdmin = currentUrl.includes("/admin");
-
   const { organization, project } = useOrganizationTeamProject({
-    redirectToOnboarding: !isAdmin,
+    redirectToOnboarding: false,
   });
 
   if (!session.data || !organization || !project) {
     return null;
   }
 
+  useEffect(() => {
+    const gtag = (window as any).gtag;
+    if (!session.data?.user || !organization || !project || !gtag) return;
+
+    if (!(session.data.user as any).impersonator) {
+      void user.mutate({
+        userId: session.data.user.id,
+      });
+    }
+
+    gtag("event", "open_dashboard", {
+      organization_id: organization.id,
+      organization_name: organization.name,
+      project_id: project.id,
+      project_name: project.name,
+      environment: process.env.NODE_ENV,
+      user_name: session.data.user.name,
+      user_id: session.data.user.id,
+    });
+  }, [organization?.id, project?.id]);
+
   return (
     <>
-      {(session.data.user as any).impersonator ? null : (
+      {(session.data?.user as any)?.impersonator ? null : (
         <>
-          <Script
-            async
-            src="https://www.googletagmanager.com/gtag/js?id=G-0VEKZY9DMY"
-          ></Script>
-          <Script id="google-analytics">
-            {`
-      window.dataLayer = window.dataLayer || [];
-      function gtag(){dataLayer.push(arguments);}
-      gtag('js', new Date());
-      gtag('config', 'G-0VEKZY9DMY');
-    `}
-          </Script>
-
           <Script id="pendo">
             {`(function(apiKey){
     (function(p,e,n,d,o){var v,w,x,y,z;o=p[d]=p[d]||{};o._q=o._q||[];
@@ -65,39 +91,6 @@ export function ExtraFooterComponents() {
           </Script>
         </>
       )}
-      {session.data?.user ? <SignedInExtraFooterComponents /> : null}
     </>
   );
-}
-
-export function SignedInExtraFooterComponents() {
-  const user = api.user.updateLastLogin.useMutation();
-
-  const session = useRequiredSession();
-  const { organization, project } = useOrganizationTeamProject({
-    redirectToOnboarding: false,
-  });
-
-  useEffect(() => {
-    const gtag = (window as any).gtag;
-    if (!session.data?.user || !organization || !project || !gtag) return;
-
-    if (!(session.data.user as any).impersonator) {
-      void user.mutate({
-        userId: session.data.user.id,
-      });
-    }
-
-    gtag("event", "open_dashboard", {
-      organization_id: organization.id,
-      organization_name: organization.name,
-      project_id: project.id,
-      project_name: project.name,
-      environment: process.env.NODE_ENV,
-      user_name: session.data.user.name,
-      user_id: session.data.user.id,
-    });
-  }, [organization?.id, project?.id]);
-
-  return null;
 }
