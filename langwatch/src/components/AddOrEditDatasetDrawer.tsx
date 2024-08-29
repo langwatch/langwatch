@@ -94,6 +94,17 @@ export const AddOrEditDatasetDrawer = (props: AddDatasetDrawerProps) => {
           message: "Name is required",
         };
       }
+
+      const columnNamesSet = new Set();
+      for (const col of data.columnTypes) {
+        if (columnNamesSet.has(col.name)) {
+          (result.errors as FieldErrors<DatasetRecordForm>).columnTypes = {
+            type: "required",
+            message: `Cannot have multiple columns with the same name: \`${col.name}\``,
+          };
+        }
+        columnNamesSet.add(col.name);
+      }
       return result;
     },
   });
@@ -383,6 +394,9 @@ export const AddOrEditDatasetDrawer = (props: AddDatasetDrawerProps) => {
                         </Button>
                       </HStack>
                     ))}
+                    <FormErrorMessage>
+                      {errors.columnTypes?.message}
+                    </FormErrorMessage>
                     <Button
                       onClick={() => append({ name: "", type: "string" })}
                     >
@@ -390,13 +404,10 @@ export const AddOrEditDatasetDrawer = (props: AddDatasetDrawerProps) => {
                     </Button>
                   </VStack>
                 ) : currentSchema === "ONE_MESSAGE_PER_ROW" ? (
-                  <CheckboxGroup>
+                  <CheckboxGroup value={columnTypes.map((col) => col.name)}>
                     <Checkbox
                       value="input"
                       onChange={setColumn("input", "string")}
-                      isChecked={columnTypes.some(
-                        (col) => col.name === "input"
-                      )}
                       alignItems="start"
                       paddingTop={2}
                       readOnly
@@ -414,9 +425,6 @@ export const AddOrEditDatasetDrawer = (props: AddDatasetDrawerProps) => {
                     <Checkbox
                       value="expected_output"
                       onChange={setColumn("expected_output", "string")}
-                      isChecked={columnTypes.some(
-                        (col) => col.name === "expected_output"
-                      )}
                       alignItems="start"
                       paddingTop={2}
                       readOnly
@@ -496,13 +504,10 @@ export const AddOrEditDatasetDrawer = (props: AddDatasetDrawerProps) => {
                     </Checkbox>
                   </CheckboxGroup>
                 ) : (
-                  <CheckboxGroup>
+                  <CheckboxGroup value={columnTypes.map((col) => col.name)}>
                     <Checkbox
                       value="llm_input"
                       onChange={setColumn("llm_input", "chat_messages")}
-                      isChecked={columnTypes.some(
-                        (col) => col.name === "llm_input"
-                      )}
                       alignItems="start"
                       paddingTop={2}
                       readOnly
@@ -525,9 +530,6 @@ export const AddOrEditDatasetDrawer = (props: AddDatasetDrawerProps) => {
                       onChange={setColumn(
                         "expected_llm_output",
                         "chat_messages"
-                      )}
-                      isChecked={columnTypes.some(
-                        (col) => col.name === "expected_llm_output"
                       )}
                       alignItems="start"
                       paddingTop={2}

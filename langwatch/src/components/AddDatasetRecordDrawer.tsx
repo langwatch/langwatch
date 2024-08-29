@@ -161,7 +161,7 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
   }, [datasetId, datasets.data, setValue]);
 
   const onCreateDatasetSuccess = ({ datasetId }: { datasetId: string }) => {
-    closeDrawer();
+    onClose();
     void datasets.refetch().then(() => {
       setTimeout(() => {
         setValue("datasetId", datasetId);
