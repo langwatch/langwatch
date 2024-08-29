@@ -91,7 +91,7 @@ export async function handleEvaluatorCall(
   }
 
   if (!AVAILABLE_EVALUATORS[checkType as keyof typeof AVAILABLE_EVALUATORS]) {
-    return res.status(400).json({
+    return res.status(404).json({
       error: `Evaluator not found: ${checkType}`,
     });
   }
