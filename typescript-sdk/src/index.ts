@@ -138,6 +138,11 @@ export class LangWatch extends EventEmitter {
   }
 }
 
+type CurrentSpan = {
+  current: LangWatchSpan;
+  previous?: CurrentSpan;
+};
+
 export class LangWatchTrace {
   client: LangWatch;
   traceId: string;
@@ -145,6 +150,7 @@ export class LangWatchTrace {
   finishedSpans: Record<string, ServerSpan> = {};
   timeoutRef?: NodeJS.Timeout;
   langchainCallback?: LangWatchCallbackHandler;
+  currentSpan?: CurrentSpan;
 
   constructor({
     client,
@@ -169,9 +175,25 @@ export class LangWatchTrace {
       ...this.metadata,
       ...metadata,
       ...(typeof metadata.labels !== "undefined"
-        ? { labels: [...(this.metadata?.labels ?? []), ...metadata.labels] }
+        ? {
+            labels: [
+              ...(this.metadata?.labels ?? []),
+              ...(metadata.labels ?? []),
+            ],
+          }
         : {}),
     };
+  }
+
+  setCurrentSpan(span: LangWatchSpan) {
+    this.currentSpan = {
+      current: span,
+      previous: this.currentSpan,
+    };
+  }
+
+  resetCurrentSpan() {
+    this.currentSpan = this.currentSpan?.previous;
   }
 
   startSpan(params: Omit<Partial<PendingBaseSpan>, "parentId">) {
@@ -179,6 +201,7 @@ export class LangWatchTrace {
       trace: this,
       ...params,
     });
+    this.setCurrentSpan(span);
     return span;
   }
 
@@ -187,6 +210,7 @@ export class LangWatchTrace {
       trace: this,
       ...params,
     });
+    this.setCurrentSpan(span);
     return span;
   }
 
@@ -195,6 +219,7 @@ export class LangWatchTrace {
       trace: this,
       ...params,
     });
+    this.setCurrentSpan(span);
     return span;
   }
 
@@ -207,6 +232,7 @@ export class LangWatchTrace {
 
   onEnd(span: ServerSpan) {
     this.finishedSpans[span.span_id] = span;
+    this.resetCurrentSpan();
     this.delayedSendSpans();
   }
 
