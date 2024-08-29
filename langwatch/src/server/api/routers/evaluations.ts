@@ -1,8 +1,8 @@
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { TeamRoleGroup, checkUserPermissionForProject } from "../permission";
-import { evaluatorsSchema } from "../../../trace_checks/evaluators.zod.generated";
-import { runEvaluationForTrace } from "../../background/workers/traceChecksWorker";
+import { evaluatorsSchema } from "../../../evaluations/evaluators.zod.generated";
+import { runEvaluationForTrace } from "../../background/workers/evaluationsWorker";
 
 export const evaluationsRouter = createTRPCRouter({
   runEvaluation: protectedProcedure

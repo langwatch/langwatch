@@ -9,7 +9,7 @@ import {
   type BatchEvaluationResult,
   type EvaluatorTypes,
   type SingleEvaluationResult,
-} from "../../../trace_checks/evaluators.generated";
+} from "../../../evaluations/evaluators.generated";
 import { getDebugger } from "../../../utils/logger";
 import {
   getCurrentMonthCost,
@@ -31,6 +31,7 @@ import {
   TRACE_CHECKS_QUEUE_NAME,
   updateCheckStatusInES,
 } from "../queues/traceChecksQueue";
+import type { Conversation } from "../../../evaluations/types";
 
 const debug = getDebugger("langwatch:workers:traceChecksWorker");
 
@@ -54,11 +55,6 @@ export const runEvaluationJob = async (
     settings: check.parameters,
   });
 };
-
-type Conversation = {
-  input?: string;
-  output?: string;
-}[];
 
 export const runEvaluationForTrace = async ({
   projectId,
@@ -263,7 +259,7 @@ export const runEvaluation = async ({
   return result;
 };
 
-export const startTraceChecksWorker = (
+export const startEvaluationsWorker = (
   processFn: (
     job: Job<TraceCheckJob, any, EvaluatorTypes>
   ) => Promise<SingleEvaluationResult>

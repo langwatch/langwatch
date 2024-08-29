@@ -3,13 +3,13 @@ import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { TeamRoleGroup, checkUserPermissionForProject } from "../permission";
 import slugify from "slugify";
 import { TRPCError } from "@trpc/server";
-import { checkPreconditionsSchema } from "../../../trace_checks/types.generated";
+import { checkPreconditionsSchema } from "../../../evaluations/types.generated";
 import { nanoid } from "nanoid";
-import { evaluatorsSchema } from "../../../trace_checks/evaluators.zod.generated";
+import { evaluatorsSchema } from "../../../evaluations/evaluators.zod.generated";
 import {
   AVAILABLE_EVALUATORS,
   type EvaluatorTypes,
-} from "../../../trace_checks/evaluators.generated";
+} from "../../../evaluations/evaluators.generated";
 import { EvaluationExecutionMode } from "@prisma/client";
 
 export const checksRouter = createTRPCRouter({

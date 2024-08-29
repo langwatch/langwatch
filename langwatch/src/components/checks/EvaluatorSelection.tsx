@@ -22,7 +22,7 @@ import {
   AVAILABLE_EVALUATORS,
   type EvaluatorDefinition,
   type EvaluatorTypes,
-} from "../../trace_checks/evaluators.generated";
+} from "../../evaluations/evaluators.generated";
 import { isFeatureEnabled } from "../../utils/featureFlags";
 import { titleCase } from "../../utils/stringCasing";
 import type { CheckConfigFormData } from "./CheckConfigForm";

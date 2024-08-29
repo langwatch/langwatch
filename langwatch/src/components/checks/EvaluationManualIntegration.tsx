@@ -14,7 +14,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import type { AVAILABLE_EVALUATORS } from "../../trace_checks/evaluators.generated";
+import type { AVAILABLE_EVALUATORS } from "../../evaluations/evaluators.generated";
 import { api } from "../../utils/api";
 import { RenderCode } from "../code/RenderCode";
 import { langwatchEndpoint } from "../code/langwatchEndpointEnv";

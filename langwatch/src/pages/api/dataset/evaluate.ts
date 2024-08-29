@@ -13,19 +13,19 @@ import {
   getCurrentMonthCost,
   maxMonthlyUsageLimit,
 } from "../../../server/api/routers/limits";
-import { runEvaluation } from "../../../server/background/workers/traceChecksWorker";
+import { runEvaluation } from "../../../server/background/workers/evaluationsWorker";
 import { rAGChunkSchema } from "../../../server/tracer/types.generated";
 import {
   AVAILABLE_EVALUATORS,
   type EvaluationResult,
   type EvaluatorTypes,
   type SingleEvaluationResult,
-} from "../../../trace_checks/evaluators.generated";
+} from "../../../evaluations/evaluators.generated";
 import { extractChunkTextualContent } from "../../../server/background/workers/collector/rag";
 
 export const debug = getDebugger("langwatch:guardrail:evaluate");
 
-export const evaluationInputSchema = z.object({
+const batchEvaluationInputSchema = z.object({
   evaluation: z.string(),
   experimentSlug: z.string().optional(),
   batchId: z.string().optional(),
@@ -51,7 +51,9 @@ export const evaluationInputSchema = z.object({
   settings: z.object({}).passthrough().optional().nullable(),
 });
 
-export type EvaluationRESTParams = z.infer<typeof evaluationInputSchema>;
+type BatchEvaluationRESTParams = z.infer<
+  typeof batchEvaluationInputSchema
+>;
 
 export default async function handler(
   req: NextApiRequest,
@@ -82,9 +84,9 @@ export default async function handler(
     return res.status(400).json({ message: "Bad request" });
   }
 
-  let params: EvaluationRESTParams;
+  let params: BatchEvaluationRESTParams;
   try {
-    params = evaluationInputSchema.parse(req.body);
+    params = batchEvaluationInputSchema.parse(req.body);
   } catch (error) {
     debug(
       "Invalid evaluation data received",

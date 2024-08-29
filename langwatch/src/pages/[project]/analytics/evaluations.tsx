@@ -26,7 +26,7 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 
 import { api } from "~/utils/api";
 import { AnalyticsHeader } from "../../../components/analytics/AnalyticsHeader";
-import { getEvaluatorDefinitions } from "../../../trace_checks/getEvaluator";
+import { getEvaluatorDefinitions } from "../../../evaluations/getEvaluator";
 
 const creatChecks = (checks: any) => {
   return checks.map((check: any) => {

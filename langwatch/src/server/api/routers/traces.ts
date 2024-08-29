@@ -16,9 +16,9 @@ import {
   publicProcedure,
 } from "~/server/api/trpc";
 import { prisma } from "~/server/db";
-import { evaluatorsSchema } from "../../../trace_checks/evaluators.zod.generated";
-import { evaluatePreconditions } from "../../../trace_checks/preconditions";
-import { checkPreconditionSchema } from "../../../trace_checks/types.generated";
+import { evaluatorsSchema } from "../../../evaluations/evaluators.zod.generated";
+import { evaluatePreconditions } from "../../../evaluations/preconditions";
+import { checkPreconditionSchema } from "../../../evaluations/types.generated";
 
 import { sharedFiltersInputSchema } from "../../analytics/types";
 import { TRACE_INDEX, esClient, traceIndexId } from "../../elasticsearch";

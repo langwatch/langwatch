@@ -9,66 +9,30 @@ import {
   CostType,
   EvaluationExecutionMode,
 } from "@prisma/client";
+import * as Sentry from "@sentry/nextjs";
 import { nanoid } from "nanoid";
 import { z } from "zod";
 import { updateCheckStatusInES } from "../../../../../server/background/queues/traceChecksQueue";
-import { rAGChunkSchema } from "../../../../../server/tracer/types.generated";
+import { evaluationNameAutoslug } from "../../../../../server/background/workers/collector/evaluations";
+import { extractChunkTextualContent } from "../../../../../server/background/workers/collector/rag";
+import { runEvaluation } from "../../../../../server/background/workers/evaluationsWorker";
 import {
   AVAILABLE_EVALUATORS,
-  type EvaluationResult,
-  type EvaluationResultError,
-  type EvaluationResultSkipped,
   type EvaluatorTypes,
   type SingleEvaluationResult,
-} from "../../../../../trace_checks/evaluators.generated";
-import { evaluatorsSchema } from "../../../../../trace_checks/evaluators.zod.generated";
+} from "../../../../../evaluations/evaluators.generated";
+import { evaluatorsSchema } from "../../../../../evaluations/evaluators.zod.generated";
 import {
   getEvaluatorDefaultSettings,
   getEvaluatorDefinitions,
-} from "../../../../../trace_checks/getEvaluator";
-import { extractChunkTextualContent } from "../../../../../server/background/workers/collector/rag";
-import * as Sentry from "@sentry/nextjs";
-import { runEvaluation } from "../../../../../server/background/workers/traceChecksWorker";
-import { evaluationNameAutoslug } from "../../../../../server/background/workers/collector/evaluations";
+} from "../../../../../evaluations/getEvaluator";
+import {
+  evaluationInputSchema,
+  type EvaluationRESTParams,
+  type EvaluationRESTResult,
+} from "../../../../../evaluations/types";
 
 export const debug = getDebugger("langwatch:evaluations:evaluate");
-
-export const evaluationInputSchema = z.object({
-  trace_id: z.string().optional().nullable(),
-  evaluation_id: z.string().optional().nullable(),
-  evaluator_id: z.string().optional().nullable(),
-  name: z.string().optional().nullable(),
-  data: z.object({
-    input: z.string().optional().nullable(),
-    output: z.string().optional().nullable(),
-    contexts: z
-      .union([z.array(rAGChunkSchema), z.array(z.string())])
-      .optional()
-      .nullable(),
-    expected_output: z.string().optional().nullable(),
-    conversation: z
-      .array(
-        z.object({
-          input: z.string().optional().nullable(),
-          output: z.string().optional().nullable(),
-        })
-      )
-      .optional()
-      .nullable(),
-  }),
-  settings: z.object({}).passthrough().optional().nullable(),
-  as_guardrail: z.boolean().optional().nullable().default(false),
-});
-
-export type EvaluationRESTParams = z.infer<typeof evaluationInputSchema>;
-
-type EvaluationRESTResult = (
-  | EvaluationResult
-  | EvaluationResultSkipped
-  | Omit<EvaluationResultError, "traceback">
-) & {
-  passed?: boolean;
-};
 
 export default async function handler(
   req: NextApiRequest,

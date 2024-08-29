@@ -4,7 +4,7 @@ import { type NextApiRequest, type NextApiResponse } from "next";
 import { createMocks } from "node-mocks-http";
 import { beforeAll, describe, expect, test } from "vitest";
 import { prisma } from "../../../../../server/db";
-import type { EvaluatorTypes } from "../../../../../trace_checks/evaluators.generated";
+import type { EvaluatorTypes } from "../../../../../evaluations/evaluators.generated";
 import handler from "./evaluate";
 import { getTestProject } from "../../../../../utils/testUtils";
 

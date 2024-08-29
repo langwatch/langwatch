@@ -36,13 +36,13 @@ import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProje
 import {
   type Evaluators,
   type SingleEvaluationResult,
-} from "../../trace_checks/evaluators.generated";
+} from "../../evaluations/evaluators.generated";
 import {
   evaluatorsSchema
-} from "../../trace_checks/evaluators.zod.generated";
-import { getEvaluatorDefinitions } from "../../trace_checks/getEvaluator";
-import { evaluatePreconditions } from "../../trace_checks/preconditions";
-import type { CheckPreconditions } from "../../trace_checks/types";
+} from "../../evaluations/evaluators.zod.generated";
+import { getEvaluatorDefinitions } from "../../evaluations/getEvaluator";
+import { evaluatePreconditions } from "../../evaluations/preconditions";
+import type { CheckPreconditions } from "../../evaluations/types";
 import { api } from "../../utils/api";
 import { formatMoney } from "../../utils/formatMoney";
 import type { Money } from "../../utils/types";

@@ -8,13 +8,13 @@ import type {
 import type {
   EvaluatorTypes,
   SingleEvaluationResult,
-} from "../../trace_checks/evaluators.generated";
+} from "../../evaluations/evaluators.generated";
 import { getDebugger } from "../../utils/logger";
 import { startTopicClusteringWorker } from "./workers/topicClusteringWorker";
 import {
   runEvaluationJob,
-  startTraceChecksWorker,
-} from "./workers/traceChecksWorker";
+  startEvaluationsWorker,
+} from "./workers/evaluationsWorker";
 import { startTrackEventsWorker } from "./workers/trackEventsWorker";
 import { startCollectorWorker } from "./workers/collectorWorker";
 
@@ -22,7 +22,7 @@ const debug = getDebugger("langwatch:workers");
 
 type Workers = {
   collectorWorker: Worker<CollectorJob, void, string> | undefined;
-  traceChecksWorker: Worker<TraceCheckJob, any, EvaluatorTypes> | undefined;
+  evaluationsWorker: Worker<TraceCheckJob, any, EvaluatorTypes> | undefined;
   topicClusteringWorker: Worker<TopicClusteringJob, void, string> | undefined;
   trackEventsWorker: Worker<TrackEventJob, void, string> | undefined;
 };
@@ -37,7 +37,7 @@ export const start = (
 ): Promise<Workers | undefined> => {
   return new Promise<Workers | undefined>((resolve) => {
     const collectorWorker = startCollectorWorker();
-    const traceChecksWorker = startTraceChecksWorker(
+    const evaluationsWorker = startEvaluationsWorker(
       runEvaluationMock ?? runEvaluationJob
     );
     const topicClusteringWorker = startTopicClusteringWorker();
@@ -49,13 +49,13 @@ export const start = (
         void (async () => {
           await Promise.all([
             collectorWorker?.close(),
-            traceChecksWorker?.close(),
+            evaluationsWorker?.close(),
             topicClusteringWorker?.close(),
             trackEventsWorker?.close(),
           ]);
           resolve({
             collectorWorker,
-            traceChecksWorker,
+            evaluationsWorker,
             topicClusteringWorker,
             trackEventsWorker,
           });
@@ -64,7 +64,7 @@ export const start = (
     } else {
       resolve({
         collectorWorker,
-        traceChecksWorker,
+        evaluationsWorker,
         topicClusteringWorker,
         trackEventsWorker,
       });

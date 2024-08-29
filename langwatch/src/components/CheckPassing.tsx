@@ -1,7 +1,7 @@
 import { Box, HStack, Text } from "@chakra-ui/react";
 import type { ElasticSearchEvaluation } from "../server/tracer/types";
-import type { EvaluatorTypes } from "../trace_checks/evaluators.generated";
-import { getEvaluatorDefinitions } from "../trace_checks/getEvaluator";
+import type { EvaluatorTypes } from "../evaluations/evaluators.generated";
+import { getEvaluatorDefinitions } from "../evaluations/getEvaluator";
 import {
   CheckStatusIcon,
   evaluationStatusColor,

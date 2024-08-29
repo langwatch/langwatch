@@ -21,7 +21,7 @@ import type { TraceCheckJob } from "~/server/background/types";
 import type {
   EvaluatorTypes,
   SingleEvaluationResult,
-} from "../../../trace_checks/evaluators.generated";
+} from "../../../evaluations/evaluators.generated";
 
 const mocks = vi.hoisted(() => {
   return {
@@ -64,7 +64,7 @@ describe("Check Queue Integration Tests", () => {
 
   beforeAll(async () => {
     const workers = await traceChecksWorker.start(mocks.runEvaluation);
-    worker = workers?.traceChecksWorker;
+    worker = workers?.evaluationsWorker;
     await worker?.waitUntilReady();
   });
 
