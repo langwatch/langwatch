@@ -1,5 +1,3 @@
-import { z } from "zod";
-
 type ChatRole =
   | "system"
   | "user"
@@ -74,7 +72,7 @@ export interface TypedValueJson {
   value: JSONSerializable;
 }
 
-type Money = {
+export type Money = {
   currency: string;
   amount: number;
 };
@@ -88,12 +86,12 @@ export interface EvaluationResult {
   cost?: Money | null;
 }
 
-interface TypedValueGuardrailResult {
+export interface TypedValueGuardrailResult {
   type: "guardrail_result";
   value: EvaluationResult;
 }
 
-interface TypedValueEvaluationResult {
+export interface TypedValueEvaluationResult {
   type: "evaluation_result";
   value: EvaluationResult;
 }
@@ -116,14 +114,14 @@ export interface ErrorCapture {
   stacktrace: string[];
 }
 
-interface SpanMetrics {
+export interface SpanMetrics {
   prompt_tokens?: number | null;
   completion_tokens?: number | null;
   tokens_estimated?: boolean | null;
   cost?: number | null;
 }
 
-type SpanParams = {
+export type ReservedSpanParams = {
   frequency_penalty?: number | null;
   logit_bias?: Record<string, number> | null;
   logprobs?: boolean | null;
@@ -141,9 +139,11 @@ type SpanParams = {
   parallel_tool_calls?: boolean | null;
   functions?: Record<string, any>[] | null;
   user?: string | null;
-} & Record<string, any>;
+};
 
-interface SpanTimestamps {
+export type SpanParams = ReservedSpanParams & Record<string, any>;
+
+export interface SpanTimestamps {
   started_at: number;
   first_token_at?: number | null;
   finished_at: number;

@@ -14,5 +14,7 @@ module.exports = {
       "TraceCheckJob",
       "AnalyticsMetric",
       "NewDatasetEntries",
+      "EvaluationRESTParams",
+      "EvaluationRESTResult",
     ].includes(name),
 };

@@ -2,11 +2,19 @@ import EventEmitter from "events";
 import { nanoid } from "nanoid";
 import { ZodError } from "zod";
 import { fromZodError } from "zod-validation-error";
-import { camelToSnakeCaseNested, type Strict } from "./typeUtils";
+import { version } from "../package.json";
+import {
+  evaluate,
+  type EvaluationParams,
+  type EvaluationResultModel,
+} from "./evaluations";
+import { LangWatchCallbackHandler } from "./langchain";
 import {
   type CollectorRESTParams,
+  type EvaluationResult,
   type Span as ServerSpan,
   type SpanTypes,
+  type TypedValueEvaluationResult,
 } from "./server/types/tracer";
 import {
   collectorRESTParamsSchema,
@@ -22,15 +30,15 @@ import {
   type PendingLLMSpan,
   type PendingRAGSpan,
   type RAGSpan,
+  type RESTEvaluation,
   type SpanInputOutput,
 } from "./types";
+import { camelToSnakeCaseNested, type Strict } from "./typeUtils";
 import {
   autoconvertTypedValues,
   captureError,
   convertFromVercelAIMessages,
 } from "./utils";
-import { LangWatchCallbackHandler } from "./langchain";
-import { version } from "../package.json";
 
 export type {
   BaseSpan,
@@ -45,7 +53,7 @@ export type {
   SpanInputOutput,
 };
 
-export { convertFromVercelAIMessages, captureError, autoconvertTypedValues };
+export { autoconvertTypedValues, captureError, convertFromVercelAIMessages };
 
 export class LangWatch extends EventEmitter {
   apiKey: string | undefined;
@@ -143,14 +151,30 @@ type CurrentSpan = {
   previous?: CurrentSpan;
 };
 
+type AddEvaluationParams = {
+  evaluationId?: string;
+  span?: LangWatchSpan;
+  name: string;
+  type?: string;
+  isGuardrail?: boolean;
+  status?: "processed" | "skipped" | "error";
+  passed?: boolean;
+  score?: number;
+  label?: string;
+  details?: string;
+  error?: Error;
+  timestamps?: RESTEvaluation["timestamps"];
+};
+
 export class LangWatchTrace {
   client: LangWatch;
   traceId: string;
   metadata?: Metadata;
   finishedSpans: Record<string, ServerSpan> = {};
-  timeoutRef?: NodeJS.Timeout;
   langchainCallback?: LangWatchCallbackHandler;
-  currentSpan?: CurrentSpan;
+  evaluations: RESTEvaluation[] = [];
+  private currentSpan?: CurrentSpan;
+  private timeoutRef?: NodeJS.Timeout;
 
   constructor({
     client,
@@ -192,6 +216,10 @@ export class LangWatchTrace {
     };
   }
 
+  getCurrentSpan() {
+    return this.currentSpan?.current;
+  }
+
   resetCurrentSpan() {
     this.currentSpan = this.currentSpan?.previous;
   }
@@ -223,6 +251,99 @@ export class LangWatchTrace {
     return span;
   }
 
+  addEvaluation = ({
+    evaluationId,
+    span,
+    name,
+    type,
+    isGuardrail,
+    status = "processed",
+    passed,
+    score,
+    label,
+    details,
+    error,
+    timestamps,
+  }: AddEvaluationParams): void => {
+    const currentEvaluationIndex = this.evaluations.findIndex(
+      (e) =>
+        evaluationId && "evaluationId" in e && e.evaluationId === evaluationId
+    );
+
+    const currentEvaluation =
+      currentEvaluationIndex !== -1
+        ? this.evaluations[currentEvaluationIndex]
+        : undefined;
+
+    const evaluationResult: EvaluationResult = {
+      status,
+      ...(passed !== undefined && { passed }),
+      ...(score !== undefined && { score }),
+      ...(label !== undefined && { label }),
+      ...(details !== undefined && { details }),
+    };
+
+    let span_ = span;
+    if (!span_) {
+      span_ = this.startSpan({
+        type: "evaluation",
+      });
+    }
+    if (span_.type !== "evaluation") {
+      span_ = span_.startSpan({ type: "evaluation" });
+    }
+
+    span_.update({
+      name,
+      output: {
+        type: "evaluation_result",
+        value: evaluationResult,
+      } as TypedValueEvaluationResult,
+      error,
+      timestamps: timestamps
+        ? {
+            startedAt: timestamps.startedAt ?? span_.timestamps.startedAt,
+            finishedAt: timestamps.finishedAt ?? undefined,
+          }
+        : undefined,
+    });
+    span_.end();
+
+    const evaluation: RESTEvaluation = {
+      evaluationId: evaluationId ?? `eval_${nanoid()}`,
+      spanId: span_.spanId,
+      name,
+      type,
+      isGuardrail,
+      status,
+      passed,
+      score,
+      label,
+      details,
+      error: error ? captureError(error) : undefined,
+      timestamps: timestamps ?? {
+        startedAt: span_.timestamps.startedAt,
+        finishedAt: span_.timestamps.finishedAt,
+      },
+    };
+
+    if (currentEvaluation && currentEvaluationIndex !== -1) {
+      this.evaluations[currentEvaluationIndex] = {
+        ...currentEvaluation,
+        ...evaluation,
+      };
+    } else {
+      this.evaluations.push(evaluation);
+    }
+  };
+
+  async evaluate(params: EvaluationParams): Promise<EvaluationResultModel> {
+    return evaluate({
+      trace: this,
+      ...params,
+    });
+  }
+
   getLangChainCallback() {
     if (!this.langchainCallback) {
       this.langchainCallback = new LangWatchCallbackHandler({ trace: this });
@@ -250,8 +371,9 @@ export class LangWatchTrace {
     try {
       trace = collectorRESTParamsSchema.parse({
         trace_id: this.traceId,
-        metadata: camelToSnakeCaseNested(this.metadata),
+        metadata: camelToSnakeCaseNested(this.metadata, "metadata"),
         spans: Object.values(this.finishedSpans),
+        evaluations: camelToSnakeCaseNested(this.evaluations),
       } as Strict<CollectorRESTParams>);
     } catch (error) {
       if (error instanceof ZodError) {
@@ -344,6 +466,7 @@ export class LangWatchSpan implements PendingBaseSpan {
       parentId: this.spanId,
       ...params,
     });
+    this.trace.setCurrentSpan(span);
     return span;
   }
 
@@ -353,6 +476,7 @@ export class LangWatchSpan implements PendingBaseSpan {
       parentId: this.spanId,
       ...params,
     });
+    this.trace.setCurrentSpan(span);
     return span;
   }
 
@@ -362,7 +486,22 @@ export class LangWatchSpan implements PendingBaseSpan {
       parentId: this.spanId,
       ...params,
     });
+    this.trace.setCurrentSpan(span);
     return span;
+  }
+
+  addEvaluation(params: AddEvaluationParams) {
+    this.trace.addEvaluation({
+      ...params,
+      span: this,
+    });
+  }
+
+  async evaluate(params: EvaluationParams): Promise<EvaluationResultModel> {
+    return evaluate({
+      span: this,
+      ...params,
+    });
   }
 
   end(params?: Partial<Omit<PendingBaseSpan, "spanId" | "parentId">>) {

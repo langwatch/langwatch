@@ -527,10 +527,18 @@ export const getAllTracesForProject = async (
         | undefined = lastGuardrailSpans?.flatMap((span) =>
         (span?.output ? [span.output] : [])
           .filter((output) => output.type === "guardrail_result")
-          .map((output) => ({
-            ...((output.value as unknown as EvaluationResult) || {}),
-            name: guardrailsSlugToName[span.name ?? ""],
-          }))
+          .map((output) => {
+            let value = (output.value as unknown as EvaluationResult) || {};
+            if (typeof value === "string") {
+              try {
+                value = JSON.parse(value);
+              } catch {}
+            }
+            return {
+              ...value,
+              name: guardrailsSlugToName[span.name ?? ""],
+            };
+          })
           .filter((output) => !(output as EvaluationResult)?.passed)
       )[0];
 

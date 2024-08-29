@@ -17,7 +17,7 @@
     "directory": "typescript-sdk"
   },
   "scripts": {
-    "prepare": "cp ../langwatch/src/server/tracer/types.ts src/server/types/tracer.ts && ts-to-zod src/server/types/tracer.ts src/server/types/tracer.generated.ts",
+    "prepare": "./copy-types.sh",
     "test": "vitest",
     "build": "npm run prepare && tsup && esbuild src/index.ts --bundle --platform=node --outfile=dist/index.js",
     "prepublish": "npm run build"

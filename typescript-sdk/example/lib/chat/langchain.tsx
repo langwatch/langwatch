@@ -43,7 +43,7 @@ async function submitUserMessage(message: string) {
     ['system', 'Translate the following from English into Italian'],
     ['human', '{input}']
   ])
-  const model = new ChatOpenAI({ model: 'gpt-3.5-turbo' })
+  const model = new ChatOpenAI({ model: 'gpt-4o-mini' })
   const outputParser = new StringOutputParser()
 
   const chain = prompt.pipe(model).pipe(outputParser)
