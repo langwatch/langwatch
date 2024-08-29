@@ -1,15 +1,15 @@
 import { ZodError, z } from "zod";
-import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
+import { createTRPCRouter, protectedProcedure } from "../../api/trpc";
 import { TeamRoleGroup, checkUserPermissionForProject } from "../permission";
 import slugify from "slugify";
 import { TRPCError } from "@trpc/server";
-import { checkPreconditionsSchema } from "../../../evaluations/types.generated";
+import { checkPreconditionsSchema } from "../../evaluations/types.generated";
 import { nanoid } from "nanoid";
-import { evaluatorsSchema } from "../../../evaluations/evaluators.zod.generated";
+import { evaluatorsSchema } from "../../evaluations/evaluators.zod.generated";
 import {
   AVAILABLE_EVALUATORS,
   type EvaluatorTypes,
-} from "../../../evaluations/evaluators.generated";
+} from "../../../server/evaluations/evaluators.generated";
 import { EvaluationExecutionMode } from "@prisma/client";
 
 export const checksRouter = createTRPCRouter({

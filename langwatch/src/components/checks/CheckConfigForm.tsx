@@ -27,17 +27,17 @@ import {
   AVAILABLE_EVALUATORS,
   type Evaluators,
   type EvaluatorTypes,
-} from "../../evaluations/evaluators.generated";
+} from "../../server/evaluations/evaluators.generated";
 import {
   evaluatorsSchema,
   evaluatorTypesSchema,
-} from "../../evaluations/evaluators.zod.generated";
+} from "../../server/evaluations/evaluators.zod.generated";
 import {
   getEvaluatorDefaultSettings,
   getEvaluatorDefinitions,
-} from "../../evaluations/getEvaluator";
-import type { CheckPreconditions } from "../../evaluations/types";
-import { checkPreconditionsSchema } from "../../evaluations/types.generated";
+} from "../../server/evaluations/getEvaluator";
+import type { CheckPreconditions } from "../../server/evaluations/types";
+import { checkPreconditionsSchema } from "../../server/evaluations/types.generated";
 import { api } from "../../utils/api";
 import { HorizontalFormControl } from "../HorizontalFormControl";
 import DynamicZodForm from "./DynamicZodForm";

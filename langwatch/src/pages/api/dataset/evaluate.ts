@@ -20,7 +20,7 @@ import {
   type EvaluationResult,
   type EvaluatorTypes,
   type SingleEvaluationResult,
-} from "../../../evaluations/evaluators.generated";
+} from "../../../server/evaluations/evaluators.generated";
 import { extractChunkTextualContent } from "../../../server/background/workers/collector/rag";
 
 export const debug = getDebugger("langwatch:guardrail:evaluate");

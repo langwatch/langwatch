@@ -24,8 +24,8 @@ import type {
   EvaluatorDefinition,
   EvaluatorTypes,
   Evaluators,
-} from "../../evaluations/evaluators.generated";
-import { getEvaluatorDefinitions } from "../../evaluations/getEvaluator";
+} from "../../server/evaluations/evaluators.generated";
+import { getEvaluatorDefinitions } from "../../server/evaluations/getEvaluator";
 import { camelCaseToTitleCase, titleCase } from "../../utils/stringCasing";
 import { HorizontalFormControl } from "../HorizontalFormControl";
 import type { CheckConfigFormData } from "./CheckConfigForm";

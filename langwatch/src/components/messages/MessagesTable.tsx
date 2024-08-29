@@ -52,7 +52,7 @@ import {
 } from "react-feather";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { Trace, ElasticSearchEvaluation } from "~/server/tracer/types";
-import { getEvaluatorDefinitions } from "~/evaluations/getEvaluator";
+import { getEvaluatorDefinitions } from "~/server/evaluations/getEvaluator";
 import { api } from "~/utils/api";
 import { durationColor } from "~/utils/durationColor";
 import { getSingleQueryParam } from "~/utils/getSingleQueryParam";

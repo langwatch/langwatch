@@ -9,7 +9,7 @@ import {
   type BatchEvaluationResult,
   type EvaluatorTypes,
   type SingleEvaluationResult,
-} from "../../../evaluations/evaluators.generated";
+} from "../../../server/evaluations/evaluators.generated";
 import { getDebugger } from "../../../utils/logger";
 import {
   getCurrentMonthCost,
@@ -31,7 +31,7 @@ import {
   TRACE_CHECKS_QUEUE_NAME,
   updateCheckStatusInES,
 } from "../queues/traceChecksQueue";
-import type { Conversation } from "../../../evaluations/types";
+import type { Conversation } from "../../../server/evaluations/types";
 
 const debug = getDebugger("langwatch:workers:traceChecksWorker");
 

@@ -1,9 +1,9 @@
 import { EvaluationExecutionMode } from "@prisma/client";
 import crypto from "crypto";
 import slugify from "slugify";
-import type { EvaluatorTypes } from "../../../../evaluations/evaluators.generated";
-import { evaluatePreconditions } from "../../../../evaluations/preconditions";
-import type { CheckPreconditions } from "../../../../evaluations/types";
+import type { EvaluatorTypes } from "../../../../server/evaluations/evaluators.generated";
+import { evaluatePreconditions } from "../../../../server/evaluations/preconditions";
+import type { CheckPreconditions } from "../../../../server/evaluations/types";
 import { getDebugger } from "../../../../utils/logger";
 import { prisma } from "../../../db";
 import type { ElasticSearchEvaluation } from "../../../tracer/types";

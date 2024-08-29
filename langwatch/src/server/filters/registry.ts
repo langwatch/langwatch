@@ -5,7 +5,7 @@ import type {
 import {
   AVAILABLE_EVALUATORS,
   type EvaluatorTypes,
-} from "../../evaluations/evaluators.generated";
+} from "../../server/evaluations/evaluators.generated";
 import type { FilterDefinition, FilterField } from "./types";
 
 export const availableFilters: { [K in FilterField]: FilterDefinition } = {

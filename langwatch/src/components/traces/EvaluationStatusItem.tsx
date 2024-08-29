@@ -7,10 +7,10 @@ import {
   Tooltip,
 } from "@chakra-ui/react";
 import type { ElasticSearchEvaluation } from "../../server/tracer/types";
-import { getEvaluatorDefinitions } from "../../evaluations/getEvaluator";
+import { getEvaluatorDefinitions } from "../../server/evaluations/getEvaluator";
 import numeral from "numeral";
 import { formatDistanceToNow } from "date-fns";
-import type { EvaluatorTypes } from "../../evaluations/evaluators.generated";
+import type { EvaluatorTypes } from "../../server/evaluations/evaluators.generated";
 import {
   CheckStatusIcon,
   evaluationStatusColor,

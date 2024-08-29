@@ -11,7 +11,7 @@ import {
 } from "@prisma/client";
 import * as Sentry from "@sentry/nextjs";
 import { nanoid } from "nanoid";
-import { z } from "zod";
+import { type z } from "zod";
 import { updateCheckStatusInES } from "../../../../../server/background/queues/traceChecksQueue";
 import { evaluationNameAutoslug } from "../../../../../server/background/workers/collector/evaluations";
 import { extractChunkTextualContent } from "../../../../../server/background/workers/collector/rag";
@@ -20,17 +20,17 @@ import {
   AVAILABLE_EVALUATORS,
   type EvaluatorTypes,
   type SingleEvaluationResult,
-} from "../../../../../evaluations/evaluators.generated";
-import { evaluatorsSchema } from "../../../../../evaluations/evaluators.zod.generated";
+} from "../../../../../server/evaluations/evaluators.generated";
+import { evaluatorsSchema } from "../../../../../server/evaluations/evaluators.zod.generated";
 import {
   getEvaluatorDefaultSettings,
   getEvaluatorDefinitions,
-} from "../../../../../evaluations/getEvaluator";
+} from "../../../../../server/evaluations/getEvaluator";
 import {
   evaluationInputSchema,
   type EvaluationRESTParams,
   type EvaluationRESTResult,
-} from "../../../../../evaluations/types";
+} from "../../../../../server/evaluations/types";
 
 export const debug = getDebugger("langwatch:evaluations:evaluate");
 

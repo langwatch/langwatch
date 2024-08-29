@@ -8,7 +8,7 @@ import type {
 import type {
   EvaluatorTypes,
   SingleEvaluationResult,
-} from "../../evaluations/evaluators.generated";
+} from "../../server/evaluations/evaluators.generated";
 import { getDebugger } from "../../utils/logger";
 import { startTopicClusteringWorker } from "./workers/topicClusteringWorker";
 import {

@@ -36,7 +36,7 @@ import { useRouter } from "next/router";
 import { useState } from "react";
 import { useDrawer } from "~/components/CurrentDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { AVAILABLE_EVALUATORS } from "~/evaluations/evaluators.generated";
+import { AVAILABLE_EVALUATORS } from "~/server/evaluations/evaluators.generated";
 import { api } from "~/utils/api";
 import { EvaluationExecutionMode, type Check } from "@prisma/client";
 import type { JsonObject } from "@prisma/client/runtime/library";

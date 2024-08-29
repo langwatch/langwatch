@@ -22,13 +22,13 @@ import { ChevronRight } from "react-feather";
 import { DashboardLayout } from "../../components/DashboardLayout";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
-import type { CheckPreconditions } from "../../evaluations/types";
+import type { CheckPreconditions } from "../../server/evaluations/types";
 import { camelCaseToLowerCase } from "../../utils/stringCasing";
 import { TeamRoleGroup } from "../../server/api/permission";
 import {
   AVAILABLE_EVALUATORS,
   type EvaluatorTypes,
-} from "../../evaluations/evaluators.generated";
+} from "../../server/evaluations/evaluators.generated";
 import {
   EvaluationExecutionMode,
   type Check,
