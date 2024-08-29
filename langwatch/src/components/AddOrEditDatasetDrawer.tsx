@@ -1,4 +1,5 @@
 import {
+  Box,
   Button,
   Checkbox,
   CheckboxGroup,
@@ -10,6 +11,7 @@ import {
   FormErrorMessage,
   FormHelperText,
   HStack,
+  Heading,
   Input,
   Radio,
   RadioGroup,
@@ -27,17 +29,19 @@ import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject"
 import type {
   DatasetColumnType,
   DatasetColumns,
+  DatasetRecordEntry,
   DatasetRecordForm,
 } from "../server/datasets/types";
 import { datasetRecordFormSchema } from "../server/datasets/types.generated";
 import { api } from "../utils/api";
 import { HorizontalFormControl } from "./HorizontalFormControl";
+import type { InMemoryDataset } from "./datasets/DatasetTable";
+import { DatasetPreview } from "./datasets/DatasetPreview";
 
 interface AddDatasetDrawerProps {
-  editDataset?: {
+  datasetToSave?: Omit<InMemoryDataset, "datasetRecords"> & {
     datasetId?: string;
-    name: string;
-    columnTypes: DatasetColumns;
+    datasetRecords?: InMemoryDataset["datasetRecords"];
   };
   isOpen: boolean;
   onClose: () => void;
@@ -74,9 +78,9 @@ export const AddOrEditDatasetDrawer = (props: AddDatasetDrawerProps) => {
     control,
   } = useForm<FormValues>({
     defaultValues: {
-      name: props.editDataset?.name ?? "",
-      schema: props.editDataset ? "CUSTOM" : "ONE_MESSAGE_PER_ROW",
-      columnTypes: props.editDataset?.columnTypes ?? [
+      name: props.datasetToSave?.name ?? "",
+      schema: props.datasetToSave ? "CUSTOM" : "ONE_MESSAGE_PER_ROW",
+      columnTypes: props.datasetToSave?.columnTypes ?? [
         { name: "input", type: "string" },
         { name: "expected_output", type: "string" },
       ],
@@ -97,6 +101,13 @@ export const AddOrEditDatasetDrawer = (props: AddDatasetDrawerProps) => {
 
       const columnNamesSet = new Set();
       for (const col of data.columnTypes) {
+        if (col.name.trim() === "") {
+          (result.errors as FieldErrors<DatasetRecordForm>).columnTypes = {
+            type: "required",
+            message: `Column name cannot be empty`,
+          };
+          break;
+        }
         if (columnNamesSet.has(col.name)) {
           (result.errors as FieldErrors<DatasetRecordForm>).columnTypes = {
             type: "required",
@@ -114,11 +125,25 @@ export const AddOrEditDatasetDrawer = (props: AddDatasetDrawerProps) => {
     name: "columnTypes",
   });
 
-  const currentSchema = watch("schema");
-
   const name = watch("name");
-  const slug = slugify(name || "", { lower: true, strict: true });
+  const slug = slugify((name || "").replace("_", "-"), {
+    lower: true,
+    strict: true,
+  });
+  const currentSchema = watch("schema");
   const columnTypes = watch("columnTypes");
+
+  useEffect(() => {
+    if (props.datasetToSave) {
+      setTimeout(() => {
+        reset({
+          name: props.datasetToSave!.name ?? "",
+          schema: "CUSTOM",
+          columnTypes: props.datasetToSave!.columnTypes,
+        });
+      }, 0);
+    }
+  }, [props.datasetToSave, reset]);
 
   useEffect(() => {
     if (currentSchema === "ONE_LLM_CALL_PER_ROW") {
@@ -143,9 +168,17 @@ export const AddOrEditDatasetDrawer = (props: AddDatasetDrawerProps) => {
     upsertDataset.mutate(
       {
         projectId: project?.id ?? "",
-        datasetId: props.editDataset?.datasetId,
+        datasetId: props.datasetToSave?.datasetId,
         name: data.name,
         columnTypes: data.columnTypes,
+        ...(props.datasetToSave?.datasetRecords
+          ? {
+              datasetRecords: tryToConvertRowsToAppropriateType(
+                props.datasetToSave.datasetRecords,
+                data.columnTypes
+              ),
+            }
+          : {}),
       },
       {
         onSuccess: (data) => {
@@ -155,12 +188,12 @@ export const AddOrEditDatasetDrawer = (props: AddDatasetDrawerProps) => {
             columnTypes: data.columnTypes as DatasetColumns,
           });
           toast({
-            title: props.editDataset?.datasetId
+            title: props.datasetToSave?.datasetId
               ? "Dataset Updated"
-              : props.editDataset
+              : props.datasetToSave
               ? "Dataset Saved"
               : "Dataset Created",
-            description: props.editDataset?.datasetId
+            description: props.datasetToSave?.datasetId
               ? `Successfully updated ${data.name} dataset`
               : `Successfully created ${data.name} dataset`,
             status: "success",
@@ -172,7 +205,7 @@ export const AddOrEditDatasetDrawer = (props: AddDatasetDrawerProps) => {
         },
         onError: (error) => {
           toast({
-            title: props.editDataset?.datasetId
+            title: props.datasetToSave?.datasetId
               ? "Error updating dataset"
               : "Error creating dataset",
             description: error.message,
@@ -266,9 +299,9 @@ export const AddOrEditDatasetDrawer = (props: AddDatasetDrawerProps) => {
           </HStack>
           <HStack>
             <Text paddingTop={5} fontSize="2xl">
-              {props.editDataset?.datasetId
+              {props.datasetToSave?.datasetId
                 ? "Edit Dataset"
-                : props.editDataset
+                : props.datasetToSave
                 ? "Save Dataset"
                 : "New Dataset"}
             </Text>
@@ -291,7 +324,7 @@ export const AddOrEditDatasetDrawer = (props: AddDatasetDrawerProps) => {
               <FormErrorMessage>{errors.name?.message}</FormErrorMessage>
             </HorizontalFormControl>
 
-            {!props.editDataset && (
+            {!props.datasetToSave && (
               <HorizontalFormControl
                 label="Schema"
                 helper="Define the type of structure for this dataset"
@@ -374,7 +407,9 @@ export const AddOrEditDatasetDrawer = (props: AddDatasetDrawerProps) => {
                     {fields.map((field, index) => (
                       <HStack key={field.id} width="full">
                         <Input
-                          {...register(`columnTypes.${index}.name`)}
+                          {...register(`columnTypes.${index}.name`, {
+                            required: "Column name cannot be empty",
+                          })}
                           placeholder="Column name"
                         />
                         <Select {...register(`columnTypes.${index}.type`)}>
@@ -577,17 +612,93 @@ export const AddOrEditDatasetDrawer = (props: AddDatasetDrawerProps) => {
                 )}
               </VStack>
             </HorizontalFormControl>
+            {props.datasetToSave?.datasetRecords && (
+              <VStack align="start" spacing={4} paddingY={6}>
+                <HStack>
+                  <Heading size="md">Preview</Heading>
+                  <Text size="13px" color="gray.500">
+                    {props.datasetToSave.datasetRecords.length} rows,{" "}
+                    {columnTypes.length} columns
+                  </Text>
+                </HStack>
+                <Box width="100%" overflowX="scroll">
+                  <Box width={`${Math.max(20 * columnTypes.length, 100)}%`}>
+                    <DatasetPreview
+                      rows={tryToConvertRowsToAppropriateType(
+                        props.datasetToSave.datasetRecords.slice(0, 5),
+                        columnTypes
+                      )}
+                      columns={columnTypes.slice(0, 50)}
+                    />
+                  </Box>
+                </Box>
+              </VStack>
+            )}
             <Button
               colorScheme="blue"
               type="submit"
               minWidth="fit-content"
               isLoading={upsertDataset.isLoading}
             >
-              {props.editDataset ? "Save" : "Create Dataset"}
+              {props.datasetToSave ? "Save" : "Create Dataset"}
             </Button>
           </form>
         </DrawerBody>
       </DrawerContent>
     </Drawer>
   );
+};
+
+export const tryToConvertRowsToAppropriateType = (
+  datasetRecords: DatasetRecordEntry[],
+  columnTypes: ColumnType[]
+) => {
+  const typeForColumn = Object.fromEntries(
+    columnTypes.map((col) => [col.name, col.type])
+  );
+  return datasetRecords.map((record) => {
+    const convertedRecord = { ...record };
+    for (const [key, value] of Object.entries(record)) {
+      const type = typeForColumn[key];
+      if (type === "number") {
+        if (!value) {
+          convertedRecord[key] = null;
+        } else if (!isNaN(value)) {
+          convertedRecord[key] = parseFloat(value);
+        }
+      } else if (type === "boolean") {
+        if (
+          ["true", "1", "yes", "y", "on", "ok"].includes(
+            (value ?? "").toLowerCase()
+          )
+        ) {
+          convertedRecord[key] = true;
+        } else if (
+          [
+            "false",
+            "0",
+            "null",
+            "undefined",
+            "nan",
+            "inf",
+            "no",
+            "n",
+            "off",
+          ].includes((value ?? "").toLowerCase())
+        ) {
+          convertedRecord[key] = false;
+        }
+      } else if (type === "date") {
+        const dateAttempt = new Date(value);
+        if (dateAttempt.toString() !== "Invalid Date") {
+          convertedRecord[key] = dateAttempt.toISOString().split("T")[0];
+        }
+      } else if (type !== "string") {
+        try {
+          convertedRecord[key] = JSON.parse(value);
+        } catch {}
+      }
+    }
+    return convertedRecord;
+  });
 };

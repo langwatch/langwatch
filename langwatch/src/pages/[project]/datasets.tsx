@@ -26,16 +26,18 @@ import {
 
 import { DeleteIcon } from "@chakra-ui/icons";
 import { useRouter } from "next/router";
-import { MoreVertical, Play } from "react-feather";
+import { MoreVertical, Play, Upload } from "react-feather";
 import { AddOrEditDatasetDrawer } from "../../components/AddOrEditDatasetDrawer";
 import { useDrawer } from "../../components/CurrentDrawer";
 import { DashboardLayout } from "../../components/DashboardLayout";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
 import type { DatasetColumns } from "../../server/datasets/types";
+import { UploadCSVModal } from "../../components/datasets/UploadCSVModal";
 
 export default function Datasets() {
-  const { isOpen, onOpen, onClose } = useDisclosure();
+  const addDatasetDrawer = useDisclosure();
+  const uploadCSVModal = useDisclosure();
   const { project } = useOrganizationTeamProject();
   const router = useRouter();
   const { openDrawer } = useDrawer();
@@ -43,15 +45,8 @@ export default function Datasets() {
 
   const datasets = api.dataset.getAll.useQuery(
     { projectId: project?.id ?? "" },
-    {
-      enabled: !!project,
-    }
+    { enabled: !!project }
   );
-
-  const onSuccess = () => {
-    void datasets.refetch();
-    onClose();
-  };
 
   const datasetDelete = api.dataset.deleteById.useMutation();
 
@@ -88,7 +83,7 @@ export default function Datasets() {
                             isClosable: true,
                             position: "top-right",
                           });
-                          onClose();
+                          addDatasetDrawer.onClose();
                         },
                       }
                     );
@@ -130,11 +125,17 @@ export default function Datasets() {
   return (
     <DashboardLayout>
       <Container maxW={"calc(100vw - 200px)"} padding={6} marginTop={8}>
-        <HStack width="full" align="top">
+        <HStack width="full" align="top" spacing={6}>
           <Heading as={"h1"} size="lg" paddingBottom={6} paddingTop={1}>
             Datasets and Evaluations
           </Heading>
           <Spacer />
+          <Button
+            onClick={() => uploadCSVModal.onOpen()}
+            rightIcon={<Upload height={17} width={17} strokeWidth={2.5} />}
+          >
+            Upload CSV
+          </Button>
           <Button
             colorScheme="blue"
             onClick={() => {
@@ -150,7 +151,7 @@ export default function Datasets() {
           <Button
             colorScheme="blue"
             onClick={() => {
-              onOpen();
+              addDatasetDrawer.onOpen();
             }}
             minWidth="fit-content"
           >
@@ -247,9 +248,20 @@ export default function Datasets() {
         </Card>
       </Container>
       <AddOrEditDatasetDrawer
-        isOpen={isOpen}
-        onClose={onClose}
-        onSuccess={onSuccess}
+        isOpen={addDatasetDrawer.isOpen}
+        onClose={addDatasetDrawer.onClose}
+        onSuccess={() => {
+          void datasets.refetch();
+          addDatasetDrawer.onClose();
+        }}
+      />
+      <UploadCSVModal
+        isOpen={uploadCSVModal.isOpen}
+        onClose={uploadCSVModal.onClose}
+        onSuccess={() => {
+          void datasets.refetch();
+          addDatasetDrawer.onClose();
+        }}
       />
     </DashboardLayout>
   );

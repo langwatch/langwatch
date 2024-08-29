@@ -34,7 +34,7 @@ import type {
   DatasetColumns,
   DatasetRecordEntry,
 } from "../../server/datasets/types";
-import { UploadCSVModal } from "./UploadCSVModal";
+import { AddRowsFromCSVModal } from "./AddRowsFromCSVModal";
 import { AddOrEditDatasetDrawer } from "../AddOrEditDatasetDrawer";
 import type { Dataset, DatasetRecord } from "@prisma/client";
 
@@ -490,7 +490,7 @@ export function DatasetTable({
         <Plus />
         <Text>Add new record</Text>
       </Button>
-      <UploadCSVModal
+      <AddRowsFromCSVModal
         isOpen={isOpen}
         onClose={onClose}
         datasetId={datasetId}
@@ -538,7 +538,7 @@ export function DatasetTable({
       )}
       {editDataset.isOpen && (
         <AddOrEditDatasetDrawer
-          editDataset={{
+          datasetToSave={{
             datasetId,
             name: dataset?.name ?? "",
             columnTypes,

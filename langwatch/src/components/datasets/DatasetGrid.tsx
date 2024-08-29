@@ -1,4 +1,7 @@
-import type { GridOptions } from "@ag-grid-community/core";
+import type {
+  GridOptions,
+  ValueFormatterParams,
+} from "@ag-grid-community/core";
 import {
   AgGridReact,
   type AgGridReactProps,
@@ -13,7 +16,6 @@ import { ClientSideRowModelModule } from "@ag-grid-community/client-side-row-mod
 import { ModuleRegistry, type ColDef } from "@ag-grid-community/core";
 import "@ag-grid-community/styles/ag-grid.css";
 import "@ag-grid-community/styles/ag-theme-balham.css";
-import { z } from "zod";
 import {
   datasetColumnTypeMapping,
   jsonSchema,
@@ -88,6 +90,26 @@ export const DatasetGrid = React.memo(
                 />
               ),
             };
+          } else if (column.type_ === "number") {
+            return {
+              ...column,
+              cellRenderer: (props: CustomCellRendererProps) => {
+                let text = props.value;
+                if (
+                  props.value === null ||
+                  props.value === undefined ||
+                  props.value === ""
+                ) {
+                  text = "";
+                }
+                if (isNaN(props.value)) {
+                  text = "Invalid Number";
+                }
+
+                return <Text {...props}>{text}</Text>;
+              },
+              cellDataType: "number",
+            };
           } else {
             return {
               ...column,
@@ -106,11 +128,17 @@ export const DatasetGrid = React.memo(
     return (
       <div className="ag-theme-balham">
         <style>{`
+        .ag-borderless .ag-root-wrapper {
+          border: none;
+        }
         .ag-theme-balham .ag-cell {
           white-space: pre-wrap; /* Enable word wrapping */
           overflow: visible; /* Ensure the cell expands to fit content */
           line-height: 1.6em;
           border-right: var(--ag-borders-critical) var(--ag-row-border-color);
+        }
+        .dataset-preview .ag-theme-balham .ag-cell {
+          white-space: nowrap;
         }
         .ag-pinned-left-cols-container .ag-cell-value {
           white-space: nowrap;
