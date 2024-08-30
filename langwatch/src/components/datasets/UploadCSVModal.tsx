@@ -22,7 +22,7 @@ import { formatFileSize, useCSVReader } from "react-papaparse";
 import type { InMemoryDataset } from "./DatasetTable";
 import { AddOrEditDatasetDrawer } from "../AddOrEditDatasetDrawer";
 
-const MAX_ROWS_LIMIT = 10_000;
+export const MAX_ROWS_LIMIT = 10_000;
 
 export function UploadCSVModal({
   isOpen,

@@ -65,10 +65,7 @@ const initialNodes: Node<Component>[] = [
     data: {
       name: "GenerateQuery",
       inputs: [{ identifier: "question", type: "str" }],
-      outputs: [
-        { identifier: "question", type: "str" },
-        { identifier: "query", type: "str" },
-      ],
+      outputs: [{ identifier: "query", type: "str" }],
     },
   },
   {
@@ -87,7 +84,14 @@ const initialNodes: Node<Component>[] = [
 ] satisfies (Node<Component> & { type: ComponentType })[];
 
 const initialEdges: Edge[] = [
-  { id: "e1-2", source: "1", target: "2", type: "default" },
+  {
+    id: "e1-2",
+    source: "1",
+    sourceHandle: "outputs.query",
+    target: "2",
+    targetHandle: "inputs.query",
+    type: "default",
+  },
 ] satisfies (Edge & { type: "default" })[];
 
 const store = (

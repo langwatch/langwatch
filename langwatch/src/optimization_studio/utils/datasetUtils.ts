@@ -4,7 +4,8 @@ import type {
   DatasetColumnType,
   DatasetRecordEntry,
 } from "../../server/datasets/types";
-import type { Field } from "../types/dsl";
+import type { Entry, Field } from "../types/dsl";
+import type { InMemoryDataset } from "../../components/datasets/DatasetTable";
 
 export function transposeIDlessColumnsFirstToRowsFirstWithId(
   data: Record<string, string[]>
@@ -73,4 +74,23 @@ export function datasetColumnsToFieldTypes(columns: DatasetColumns): Field[] {
     identifier: column.name,
     type: columnTypeToFieldTypeMap[column.type],
   }));
+}
+
+export function inMemoryDatasetToNodeDataset(
+  dataset: InMemoryDataset
+): Entry["dataset"] {
+  return dataset.datasetId
+    ? {
+        id: dataset.datasetId,
+        name: dataset.name,
+      }
+    : {
+        name: dataset.name,
+        inline: {
+          records: transpostRowsFirstToColumnsFirstWithoutId(
+            dataset.datasetRecords
+          ),
+          columnTypes: dataset.columnTypes,
+        },
+      };
 }

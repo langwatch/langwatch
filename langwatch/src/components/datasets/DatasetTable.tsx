@@ -39,6 +39,7 @@ import { AddOrEditDatasetDrawer } from "../AddOrEditDatasetDrawer";
 import type { Dataset, DatasetRecord } from "@prisma/client";
 
 export type InMemoryDataset = {
+  datasetId?: string;
   name?: string;
   datasetRecords: DatasetRecordEntry[];
   columnTypes: DatasetColumns;

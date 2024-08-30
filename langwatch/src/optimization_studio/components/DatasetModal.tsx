@@ -1,6 +1,5 @@
 import {
   Button,
-  Center,
   Modal,
   ModalBody,
   ModalCloseButton,
@@ -12,13 +11,16 @@ import {
   TabPanel,
   TabPanels,
   Tabs,
-  Text,
 } from "@chakra-ui/react";
 import { type Node, type NodeProps } from "@xyflow/react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ArrowLeft } from "react-feather";
+import type { DatasetColumns } from "../../server/datasets/types";
+import { useWorkflowStore } from "../hooks/useWorkflowStore";
 import type { Component, Entry } from "../types/dsl";
+import { datasetColumnsToFieldTypes } from "../utils/datasetUtils";
 import { DatasetSelection } from "./datasets/DatasetSelection";
+import { DatasetUpload } from "./datasets/DatasetUpload";
 import { EditDataset } from "./datasets/EditDataset";
 
 export function DatasetModal({
@@ -39,6 +41,36 @@ export function DatasetModal({
   useEffect(() => {
     setEditingDataset(editingDataset_);
   }, [editingDataset_]);
+
+  const { setNode } = useWorkflowStore(({ setNode }) => ({ setNode }));
+
+  const setSelectedDataset = useCallback(
+    (
+      dataset: Required<Entry>["dataset"],
+      columnTypes: DatasetColumns,
+      close: boolean
+    ) => {
+      if (close && dataset.id && !(node.data as Entry).dataset?.id) {
+        if (
+          !confirm("The current draft dataset will be discarded. Are you sure?")
+        ) {
+          return;
+        }
+      }
+      setNode({
+        id: node.id,
+        data: {
+          ...node.data,
+          outputs: datasetColumnsToFieldTypes(columnTypes),
+          dataset: dataset,
+        } as Entry,
+      });
+      if (close) {
+        onClose();
+      }
+    },
+    [node.data, node.id, setNode, onClose]
+  );
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} size="full">
@@ -68,7 +100,13 @@ export function DatasetModal({
               </Button>
             </ModalHeader>
             <ModalBody paddingBottom="32px">
-              {isOpen && <EditDataset node={node as Node<Entry>} />}
+              {isOpen && (
+                <EditDataset
+                  editingDataset={editingDataset}
+                  setEditingDataset={setEditingDataset}
+                  setSelectedDataset={setSelectedDataset}
+                />
+              )}
             </ModalBody>
           </>
         ) : (
@@ -89,7 +127,10 @@ export function DatasetModal({
                     />
                   </TabPanel>
                   <TabPanel>
-                    <DatasetUpload node={node} />
+                    <DatasetUpload
+                      node={node}
+                      setIsEditing={setEditingDataset}
+                    />
                   </TabPanel>
                 </TabPanels>
               </ModalBody>
@@ -98,17 +139,5 @@ export function DatasetModal({
         )}
       </ModalContent>
     </Modal>
-  );
-}
-
-export function DatasetUpload({
-  node,
-}: {
-  node: NodeProps<Node<Component>> | Node<Component>;
-}) {
-  return (
-    <Center>
-      <Text>Upload</Text>
-    </Center>
   );
 }

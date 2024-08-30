@@ -1,64 +1,59 @@
-import { type Node, type NodeProps } from "@xyflow/react";
-import { useCallback, useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   DatasetTable,
   type InMemoryDataset,
 } from "../../../components/datasets/DatasetTable";
+import type { DatasetColumns } from "../../../server/datasets/types";
 import { useGetDatasetData } from "../../hooks/useGetDatasetData";
-import { useWorkflowStore } from "../../hooks/useWorkflowStore";
 import type { Entry } from "../../types/dsl";
-import {
-  datasetColumnsToFieldTypes,
-  transpostRowsFirstToColumnsFirstWithoutId,
-} from "../../utils/datasetUtils";
+import { inMemoryDatasetToNodeDataset } from "../../utils/datasetUtils";
+import { Box, Button } from "@chakra-ui/react";
 
 export function EditDataset({
-  node,
+  editingDataset,
+  setEditingDataset,
+  setSelectedDataset,
 }: {
-  node: NodeProps<Node<Entry>> | Node<Entry>;
+  editingDataset: Required<Entry>["dataset"];
+  setEditingDataset: (dataset: Entry["dataset"]) => void;
+  setSelectedDataset: (
+    dataset: Required<Entry>["dataset"],
+    columnTypes: DatasetColumns,
+    close: boolean
+  ) => void;
 }) {
   const { rows, columns, query } = useGetDatasetData({
-    dataset: "dataset" in node.data ? node.data.dataset : undefined,
+    dataset: editingDataset,
     preview: false,
   });
 
   // Only update the datset from parent to child once the modal is open again
   const inMemoryDataset = useMemo(
     () => ({
-      name: "dataset" in node.data ? node.data.dataset?.name : undefined,
+      name: editingDataset?.name,
       datasetRecords: rows ?? [],
       columnTypes: columns ?? [],
     }),
-    [columns, node.data, rows]
+    [columns, editingDataset, rows]
   );
 
-  const { setNode } = useWorkflowStore(({ setNode }) => ({ setNode }));
+  const [columnTypes, setColumnTypes] = useState<DatasetColumns>(columns ?? []);
+
+  useEffect(() => {
+    setColumnTypes(columns);
+  }, [columns]);
 
   const onUpdateDataset = useCallback(
-    (dataset: InMemoryDataset & { datasetId?: string }) => {
-      setNode({
-        id: node.id,
-        data: {
-          ...node.data,
-          outputs: datasetColumnsToFieldTypes(dataset.columnTypes),
-          dataset: dataset.datasetId
-            ? {
-                id: dataset.datasetId,
-                name: dataset.name,
-              }
-            : {
-                name: dataset.name,
-                inline: {
-                  records: transpostRowsFirstToColumnsFirstWithoutId(
-                    dataset.datasetRecords
-                  ),
-                  columnTypes: dataset.columnTypes,
-                },
-              },
-        } as Entry,
-      });
+    (dataset: InMemoryDataset) => {
+      const nodeDataset = inMemoryDatasetToNodeDataset(dataset);
+
+      setColumnTypes(dataset.columnTypes);
+      setEditingDataset(nodeDataset);
+      if (nodeDataset && !editingDataset.id) {
+        setSelectedDataset(nodeDataset, dataset.columnTypes, false);
+      }
     },
-    [node.data, node.id, setNode]
+    [editingDataset.id, setEditingDataset, setSelectedDataset]
   );
 
   useEffect(() => {
@@ -70,11 +65,24 @@ export function EditDataset({
   }, []);
 
   return (
-    <DatasetTable
-      datasetId={node.data.dataset?.id}
-      inMemoryDataset={inMemoryDataset}
-      onUpdateDataset={onUpdateDataset}
-      isEmbedded={true}
-    />
+    <Box position="relative">
+      <DatasetTable
+        datasetId={editingDataset.id}
+        inMemoryDataset={inMemoryDataset}
+        onUpdateDataset={onUpdateDataset}
+        isEmbedded={true}
+      />
+      <Button
+        colorScheme="blue"
+        position="absolute"
+        bottom="0"
+        right="24px"
+        onClick={() => {
+          setSelectedDataset(editingDataset, columnTypes, true);
+        }}
+      >
+        Select Dataset
+      </Button>
+    </Box>
   );
 }
