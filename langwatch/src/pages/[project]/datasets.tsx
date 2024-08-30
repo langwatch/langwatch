@@ -24,7 +24,7 @@ import {
   useToast,
 } from "@chakra-ui/react";
 
-import { DeleteIcon } from "@chakra-ui/icons";
+import { DeleteIcon, EditIcon } from "@chakra-ui/icons";
 import { useRouter } from "next/router";
 import { MoreVertical, Play, Upload } from "react-feather";
 import { AddOrEditDatasetDrawer } from "../../components/AddOrEditDatasetDrawer";
@@ -34,9 +34,10 @@ import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProje
 import { api } from "../../utils/api";
 import type { DatasetColumns } from "../../server/datasets/types";
 import { UploadCSVModal } from "../../components/datasets/UploadCSVModal";
+import { useState } from "react";
 
 export default function Datasets() {
-  const addDatasetDrawer = useDisclosure();
+  const addEditDatasetDrawer = useDisclosure();
   const uploadCSVModal = useDisclosure();
   const { project } = useOrganizationTeamProject();
   const router = useRouter();
@@ -49,6 +50,14 @@ export default function Datasets() {
   );
 
   const datasetDelete = api.dataset.deleteById.useMutation();
+  const [editDataset, setEditDataset] = useState<
+    | {
+        datasetId: string;
+        name: string;
+        columnTypes: DatasetColumns;
+      }
+    | undefined
+  >();
 
   const deleteDataset = (id: string, name: string) => {
     datasetDelete.mutate(
@@ -83,7 +92,7 @@ export default function Datasets() {
                             isClosable: true,
                             position: "top-right",
                           });
-                          addDatasetDrawer.onClose();
+                          addEditDatasetDrawer.onClose();
                         },
                       }
                     );
@@ -151,7 +160,7 @@ export default function Datasets() {
           <Button
             colorScheme="blue"
             onClick={() => {
-              addDatasetDrawer.onOpen();
+              addEditDatasetDrawer.onOpen();
             }}
             minWidth="fit-content"
           >
@@ -221,6 +230,21 @@ export default function Datasets() {
                                 </MenuButton>
                                 <MenuList>
                                   <MenuItem
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      setEditDataset({
+                                        datasetId: dataset.id,
+                                        name: dataset.name,
+                                        columnTypes:
+                                          dataset.columnTypes as DatasetColumns,
+                                      });
+                                      addEditDatasetDrawer.onOpen();
+                                    }}
+                                    icon={<EditIcon />}
+                                  >
+                                    Edit dataset
+                                  </MenuItem>
+                                  <MenuItem
                                     color="red.600"
                                     onClick={(event) => {
                                       event.stopPropagation();
@@ -245,11 +269,16 @@ export default function Datasets() {
         </Card>
       </Container>
       <AddOrEditDatasetDrawer
-        isOpen={addDatasetDrawer.isOpen}
-        onClose={addDatasetDrawer.onClose}
+        isOpen={addEditDatasetDrawer.isOpen}
+        onClose={() => {
+          setEditDataset(undefined);
+          addEditDatasetDrawer.onClose();
+        }}
+        datasetToSave={editDataset}
         onSuccess={() => {
           void datasets.refetch();
-          addDatasetDrawer.onClose();
+          setEditDataset(undefined);
+          addEditDatasetDrawer.onClose();
         }}
       />
       <UploadCSVModal
@@ -257,7 +286,7 @@ export default function Datasets() {
         onClose={uploadCSVModal.onClose}
         onSuccess={() => {
           void datasets.refetch();
-          addDatasetDrawer.onClose();
+          addEditDatasetDrawer.onClose();
         }}
       />
     </DashboardLayout>

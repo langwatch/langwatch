@@ -143,6 +143,15 @@ export const AddOrEditDatasetDrawer = (props: AddDatasetDrawerProps) => {
           columnTypes: props.datasetToSave!.columnTypes,
         });
       }, 0);
+    } else {
+      reset({
+        name: "",
+        schema: "ONE_MESSAGE_PER_ROW",
+        columnTypes: [
+          { name: "input", type: "string" },
+          { name: "expected_output", type: "string" },
+        ],
+      });
     }
   }, [props.datasetToSave, reset]);
 
