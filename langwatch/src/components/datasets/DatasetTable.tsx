@@ -90,6 +90,7 @@ export function DatasetTable({
       type_: type,
       cellClass: "v-align",
       sortable: false,
+      minWidth: 200,
     }));
 
     // Add row number column
@@ -380,13 +381,26 @@ export function DatasetTable({
 
     setTimeout(() => {
       // Find the first editable column
-      if (firstEditableColumn?.field) {
+      if (!firstEditableColumn?.field) return;
+
+      const focus = () => {
         // Start editing the first editable cell in the new row
         gridRef.current?.api.startEditingCell({
           rowIndex: newRowIndex,
-          colKey: firstEditableColumn.field,
+          colKey: firstEditableColumn.field!,
         });
-      }
+      };
+
+      // Focus four times due to auto height adjusting layout reflow
+      setTimeout(() => {
+        focus();
+      }, 500);
+      setTimeout(() => {
+        focus();
+      }, 1500);
+      setTimeout(() => {
+        focus();
+      }, 2000);
     }, 100);
   }, [columnDefs]);
 
@@ -464,12 +478,15 @@ export function DatasetTable({
       </HStack>
       <Card>
         <CardBody padding={0} position="relative">
-          <DatasetGrid
-            columnDefs={columnDefs}
-            rowData={rowData}
-            onCellValueChanged={onCellValueChanged}
-            ref={gridRef}
-          />
+          <Box height="calc(max(100vh - 300px, 500px))">
+            <DatasetGrid
+              columnDefs={columnDefs}
+              rowData={rowData}
+              onCellValueChanged={onCellValueChanged}
+              ref={gridRef}
+              domLayout="normal"
+            />
+          </Box>
         </CardBody>
       </Card>
       <Button

@@ -130,6 +130,7 @@ export const AddOrEditDatasetDrawer = (props: AddDatasetDrawerProps) => {
     lower: true,
     strict: true,
   });
+  const schemaField = register("schema");
   const currentSchema = watch("schema");
   const columnTypes = watch("columnTypes");
 
@@ -145,24 +146,28 @@ export const AddOrEditDatasetDrawer = (props: AddDatasetDrawerProps) => {
     }
   }, [props.datasetToSave, reset]);
 
-  useEffect(() => {
-    if (currentSchema === "ONE_LLM_CALL_PER_ROW") {
-      setValue("columnTypes", [
-        { name: "llm_input", type: "chat_messages" },
-        { name: "expected_llm_output", type: "chat_messages" },
-      ]);
-    } else if (currentSchema === "ONE_MESSAGE_PER_ROW") {
-      setValue("columnTypes", [
-        { name: "input", type: "string" },
-        { name: "expected_output", type: "string" },
-      ]);
-    } else if (currentSchema === "CUSTOM") {
-      setValue("columnTypes", [
-        { name: "input", type: "string" },
-        { name: "expected_output", type: "string" },
-      ]);
-    }
-  }, [currentSchema, setValue]);
+  const setSchema = useCallback(
+    (schema: "ONE_LLM_CALL_PER_ROW" | "ONE_MESSAGE_PER_ROW" | "CUSTOM") => {
+      if (schema === "ONE_LLM_CALL_PER_ROW") {
+        setValue("columnTypes", [
+          { name: "llm_input", type: "chat_messages" },
+          { name: "expected_llm_output", type: "chat_messages" },
+        ]);
+      } else if (schema === "ONE_MESSAGE_PER_ROW") {
+        setValue("columnTypes", [
+          { name: "input", type: "string" },
+          { name: "expected_output", type: "string" },
+        ]);
+      } else if (schema === "CUSTOM") {
+        setValue("columnTypes", [
+          { name: "input", type: "string" },
+          { name: "expected_output", type: "string" },
+        ]);
+      }
+      setValue("schema", schema);
+    },
+    [setValue]
+  );
 
   const onSubmit = (data: DatasetRecordForm) => {
     upsertDataset.mutate(
@@ -341,7 +346,8 @@ export const AddOrEditDatasetDrawer = (props: AddDatasetDrawerProps) => {
                         alignItems="start"
                         spacing={3}
                         paddingTop={2}
-                        {...register("schema")}
+                        {...schemaField}
+                        onChange={() => setSchema("ONE_MESSAGE_PER_ROW")}
                       >
                         <VStack align="start" marginTop={-1}>
                           <Text fontWeight="500">One Message Per Row</Text>
@@ -360,7 +366,8 @@ export const AddOrEditDatasetDrawer = (props: AddDatasetDrawerProps) => {
                         alignItems="start"
                         spacing={3}
                         paddingTop={2}
-                        {...register("schema")}
+                        {...schemaField}
+                        onChange={() => setSchema("ONE_LLM_CALL_PER_ROW")}
                       >
                         <VStack align="start" marginTop={-1}>
                           <Text fontWeight="500">One LLM Call Per Row</Text>
@@ -381,7 +388,8 @@ export const AddOrEditDatasetDrawer = (props: AddDatasetDrawerProps) => {
                         alignItems="start"
                         spacing={3}
                         paddingTop={2}
-                        {...register("schema")}
+                        {...schemaField}
+                        onChange={() => setSchema("CUSTOM")}
                       >
                         <VStack align="start" marginTop={-1}>
                           <Text fontWeight="500">Custom</Text>

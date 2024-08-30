@@ -1,6 +1,4 @@
-import type {
-  GridOptions
-} from "@ag-grid-community/core";
+import type { GridOptions } from "@ag-grid-community/core";
 import {
   AgGridReact,
   type AgGridReactProps,
@@ -125,7 +123,7 @@ export const DatasetGrid = React.memo(
     }, [props.columnDefs]);
 
     return (
-      <div className="ag-theme-balham">
+      <div className="ag-theme-balham" style={{ height: "100%" }}>
         <style>{`
         .ag-borderless .ag-root-wrapper {
           border: none;
@@ -135,6 +133,10 @@ export const DatasetGrid = React.memo(
           overflow: visible; /* Ensure the cell expands to fit content */
           line-height: 1.6em;
           border-right: var(--ag-borders-critical) var(--ag-row-border-color);
+        }
+        .ag-theme-balham .ag-cell-value {
+          max-height: 300px;
+          overflow: auto;
         }
         .dataset-preview .ag-theme-balham .ag-cell {
           white-space: nowrap;

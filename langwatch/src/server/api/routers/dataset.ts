@@ -88,8 +88,8 @@ export const datasetRouter = createTRPCRouter({
         where: { projectId, archivedAt: null },
         orderBy: { createdAt: "desc" },
         include: {
-          datasetRecords: {
-            orderBy: { createdAt: "desc" },
+          _count: {
+            select: { datasetRecords: true },
           },
         },
       });

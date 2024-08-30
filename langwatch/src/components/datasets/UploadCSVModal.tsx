@@ -22,6 +22,8 @@ import { formatFileSize, useCSVReader } from "react-papaparse";
 import type { InMemoryDataset } from "./DatasetTable";
 import { AddOrEditDatasetDrawer } from "../AddOrEditDatasetDrawer";
 
+const MAX_ROWS_LIMIT = 10_000;
+
 export function UploadCSVModal({
   isOpen,
   onClose,
@@ -82,7 +84,18 @@ export function UploadCSVModal({
                   name: acceptedFile.name.split(".")[0],
                 });
               }}
+              onUploadRemoved={() => {
+                setUploadedDataset(undefined);
+              }}
             />
+            {uploadedDataset &&
+              uploadedDataset.datasetRecords.length > MAX_ROWS_LIMIT && (
+                <Text color="red.500" paddingTop={4}>
+                  Sorry, the max number of rows accepted for datasets is
+                  currently {MAX_ROWS_LIMIT} rows. Please reduce the number of
+                  rows or contact support.
+                </Text>
+              )}
           </ModalBody>
 
           <ModalFooter>
@@ -92,7 +105,9 @@ export function UploadCSVModal({
             <Button
               colorScheme="blue"
               isDisabled={
-                !uploadedDataset || uploadedDataset.datasetRecords.length === 0
+                !uploadedDataset ||
+                uploadedDataset.datasetRecords.length === 0 ||
+                uploadedDataset.datasetRecords.length > MAX_ROWS_LIMIT
               }
               onClick={uploadCSVData}
             >
@@ -119,9 +134,11 @@ export function UploadCSVModal({
 
 export function CSVReaderComponent({
   onUploadAccepted,
+  onUploadRemoved,
   children,
 }: {
   onUploadAccepted: (results: { data: string[][]; acceptedFile: File }) => void;
+  onUploadRemoved?: () => void;
   children?: (acceptedFile: boolean) => React.ReactNode;
 }) {
   const { CSVReader } = useCSVReader();
@@ -132,6 +149,8 @@ export function CSVReaderComponent({
   useEffect(() => {
     if (acceptedFile && results) {
       onUploadAccepted({ ...results, acceptedFile });
+    } else if (!acceptedFile) {
+      onUploadRemoved?.();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [acceptedFile, results]);

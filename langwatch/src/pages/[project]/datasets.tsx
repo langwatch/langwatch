@@ -204,12 +204,9 @@ export default function Datasets() {
                                 ))}
                               </HStack>
                             </Td>
-                            <Td>{dataset.datasetRecords.length ?? 0}</Td>
+                            <Td>{dataset._count.datasetRecords ?? 0}</Td>
                             <Td>
-                              {new Date(
-                                dataset.datasetRecords[0]?.createdAt ??
-                                  dataset.createdAt
-                              ).toLocaleString()}
+                              {new Date(dataset.createdAt).toLocaleString()}
                             </Td>
                             <Td>
                               <Menu>
