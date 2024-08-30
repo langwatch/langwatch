@@ -76,13 +76,20 @@ export function DatasetTable({
       databaseDataset.data
         ? datasetDatabaseRecordsToInMemoryDataset(databaseDataset.data)
         : inMemoryDataset,
-    [databaseDataset.data, inMemoryDataset]
+    // Do not update for parent inMemoryDataset updates on purpose, only on network data load, keep local state local and sync manually to avoid rerenders
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [databaseDataset.data]
   );
   const deleteDatasetRecord = api.datasetRecord.deleteMany.useMutation();
 
   const gridRef = useRef<AgGridReact>(null);
 
-  const columnTypes = useMemo(() => dataset?.columnTypes ?? [], [dataset]);
+  const [columnTypes, setColumnTypes] = useState<DatasetColumns>(
+    dataset?.columnTypes ?? []
+  );
+  useEffect(() => {
+    setColumnTypes(dataset?.columnTypes ?? []);
+  }, [dataset?.columnTypes]);
   const columnDefs = useMemo(() => {
     const headers: DatasetColumnDef[] = columnTypes.map(({ name, type }) => ({
       headerName: name,
@@ -130,20 +137,21 @@ export function DatasetTable({
     return headers;
   }, [columnTypes]);
 
-  const [editableRowData, setEditableRowData_] = useState<
+  const [parentRowData, setParentRowData_] = useState<
     DatasetRecordEntry[] | undefined
   >();
 
   // Sync the in-memory dataset with the editable row data
-  const setEditableRowData = useCallback(
+  const setParentRowData = useCallback(
     (
       callback: (
         rows: DatasetRecordEntry[] | undefined
       ) => DatasetRecordEntry[] | undefined
     ) => {
-      setEditableRowData_((rows) => {
+      setParentRowData_((rows) => {
         const rows_ = callback(rows);
         onUpdateDataset?.({
+          datasetId: datasetId,
           name: dataset?.name,
           datasetRecords: rows_ ?? [],
           columnTypes: columnTypes,
@@ -151,20 +159,19 @@ export function DatasetTable({
         return rows_;
       });
     },
-    [columnTypes, dataset?.name, onUpdateDataset]
+    [columnTypes, dataset?.name, datasetId, onUpdateDataset]
   );
 
   const [selectedEntryIds, setSelectedEntryIds] = useState<Set<string>>(
     new Set()
   );
 
-  const [rowData, setRowData] = useState<DatasetRecordEntry[] | undefined>(
-    undefined
-  );
-
+  const [localRowData, setLocalRowData] = useState<
+    DatasetRecordEntry[] | undefined
+  >(undefined);
   useEffect(() => {
-    if (!dataset) {
-      setRowData(undefined);
+    if (!dataset?.datasetRecords) {
+      setLocalRowData(undefined);
       return;
     }
 
@@ -178,21 +185,11 @@ export function DatasetTable({
       return row;
     });
 
-    setRowData(rowData);
+    setLocalRowData(rowData);
+    setParentRowData((_) => rowData);
+    // We disable local row updates for selectedEntryIds and setParentRowData, since we don't want to rerender for a simple callback change nor for selection inside ag-grid
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dataset]);
-
-  useEffect(() => {
-    if (!rowData) return;
-
-    setEditableRowData((_) =>
-      rowData.map((row) => ({
-        ...row,
-        selected: selectedEntryIds.has(row.id),
-      }))
-    );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [!!rowData]);
+  }, [columnTypes, dataset?.datasetRecords]);
 
   const toast = useToast();
 
@@ -252,7 +249,7 @@ export function DatasetTable({
         return;
       }
 
-      setEditableRowData((rows) => {
+      setParentRowData((rows) => {
         const currentIndex =
           rows?.findIndex((row) => row.id === params.data.id) ?? -1;
         if (currentIndex === -1) {
@@ -302,14 +299,20 @@ export function DatasetTable({
         }
       );
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [project?.id]
+    [
+      databaseDataset,
+      datasetId,
+      project?.id,
+      setParentRowData,
+      toast,
+      updateDatasetRecord,
+    ]
   );
 
   const onDelete = useCallback(() => {
     if (confirm("Are you sure?")) {
       const recordIds = Array.from(selectedEntryIds);
-      setEditableRowData(
+      setParentRowData(
         (rows) => rows?.filter((row) => !recordIds.includes(row.id))
       );
 
@@ -360,7 +363,7 @@ export function DatasetTable({
     }
   }, [
     selectedEntryIds,
-    setEditableRowData,
+    setParentRowData,
     datasetId,
     deleteDatasetRecord,
     project?.id,
@@ -400,18 +403,18 @@ export function DatasetTable({
         });
       };
 
-      // Focus four times due to auto height adjusting layout reflow
-      setTimeout(() => {
-        focus();
-      }, 500);
-      setTimeout(() => {
-        focus();
-      }, 1500);
-      setTimeout(() => {
-        focus();
-      }, 2000);
+      // Focus three times due to auto height adjusting layout reflow
+      focus();
+      if (dataset && dataset.datasetRecords.length > 100) {
+        setTimeout(() => {
+          focus();
+        }, 1000);
+        setTimeout(() => {
+          focus();
+        }, 1500);
+      }
     }, 100);
-  }, [columnDefs]);
+  }, [columnDefs, dataset]);
 
   return (
     <>
@@ -428,7 +431,7 @@ export function DatasetTable({
           }`}
         </Heading>
         <Text fontSize={"14px"} color="gray.400">
-          {editableRowData?.length} records
+          {parentRowData?.length} records
         </Text>
         <Text fontSize={"14px"} color="gray.400">
           {savingStatus === "saving"
@@ -490,7 +493,7 @@ export function DatasetTable({
           <Box height="calc(max(100vh - 300px, 500px))">
             <DatasetGrid
               columnDefs={columnDefs}
-              rowData={rowData}
+              rowData={localRowData}
               onCellValueChanged={onCellValueChanged}
               ref={gridRef}
               domLayout="normal"
@@ -522,11 +525,11 @@ export function DatasetTable({
         datasetId={datasetId}
         columnTypes={columnTypes}
         onUpdateDataset={(entries) => {
-          setEditableRowData((currentEntries) => {
+          setParentRowData((currentEntries) => {
             if (!currentEntries) return entries;
             return [...currentEntries, ...entries];
           });
-          setRowData((currentEntries) => {
+          setLocalRowData((currentEntries) => {
             if (!currentEntries) return entries;
             return [...currentEntries, ...entries];
           });
@@ -575,6 +578,7 @@ export function DatasetTable({
           datasetToSave={{
             datasetId,
             name: dataset?.name ?? "",
+            datasetRecords: datasetId ? undefined : parentRowData,
             columnTypes,
           }}
           isOpen={editDataset.isOpen}
@@ -588,6 +592,7 @@ export function DatasetTable({
                 columnTypes: updatedDataset.columnTypes,
               });
             }
+            setColumnTypes(updatedDataset.columnTypes);
             void databaseDataset.refetch();
             editDataset.onClose();
           }}

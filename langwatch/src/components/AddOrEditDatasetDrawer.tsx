@@ -153,7 +153,8 @@ export const AddOrEditDatasetDrawer = (props: AddDatasetDrawerProps) => {
         ],
       });
     }
-  }, [props.datasetToSave, reset]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [!!props.isOpen]);
 
   const setSchema = useCallback(
     (schema: "ONE_LLM_CALL_PER_ROW" | "ONE_MESSAGE_PER_ROW" | "CUSTOM") => {

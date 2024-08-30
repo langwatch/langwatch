@@ -8,6 +8,10 @@ import { transposeIDlessColumnsFirstToRowsFirstWithId } from "../utils/datasetUt
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
 import { datasetDatabaseRecordsToInMemoryDataset } from "../../components/datasets/DatasetTable";
+import type { TRPCClientErrorLike } from "@trpc/client";
+import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
+import type { inferRouterOutputs } from "@trpc/server";
+import type { AppRouter } from "../../server/api/root";
 
 export const useGetDatasetData = ({
   dataset,
@@ -15,7 +19,14 @@ export const useGetDatasetData = ({
 }: {
   dataset: Entry["dataset"];
   preview?: boolean;
-}): { rows: DatasetRecordEntry[]; columns: DatasetColumns } => {
+}): {
+  rows: DatasetRecordEntry[];
+  columns: DatasetColumns;
+  query: UseTRPCQueryResult<
+    inferRouterOutputs<AppRouter>["datasetRecord"]["getHead"],
+    TRPCClientErrorLike<AppRouter>
+  >;
+} => {
   const { project } = useOrganizationTeamProject();
   const databaseDataset = api.datasetRecord.getHead.useQuery(
     { projectId: project?.id ?? "", datasetId: dataset?.id ?? "" },
@@ -80,5 +91,6 @@ export const useGetDatasetData = ({
   return {
     rows,
     columns: data?.columnTypes ?? [],
+    query: databaseDataset,
   };
 };

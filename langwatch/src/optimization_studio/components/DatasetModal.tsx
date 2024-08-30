@@ -68,7 +68,7 @@ export function DatasetModal({
               </Button>
             </ModalHeader>
             <ModalBody paddingBottom="32px">
-              {isOpen && <EditDataset node={node} />}
+              {isOpen && <EditDataset node={node as Node<Entry>} />}
             </ModalBody>
           </>
         ) : (

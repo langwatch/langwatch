@@ -83,6 +83,7 @@ export const DatasetGrid = React.memo(
                   marginLeft="3px"
                   {...props}
                   isChecked={props.value}
+                  readOnly={!column.editable}
                   onChange={(e) => props.setValue?.(e.target.checked)}
                 />
               ),
@@ -98,8 +99,7 @@ export const DatasetGrid = React.memo(
                   props.value === ""
                 ) {
                   text = "";
-                }
-                if (isNaN(props.value)) {
+                } else if (isNaN(props.value)) {
                   text = "Invalid Number";
                 }
 
