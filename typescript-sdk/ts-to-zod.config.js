@@ -16,5 +16,7 @@ module.exports = {
       "NewDatasetEntries",
       "EvaluationRESTParams",
       "EvaluationRESTResult",
+      "Json",
+      "Literal",
     ].includes(name),
 };

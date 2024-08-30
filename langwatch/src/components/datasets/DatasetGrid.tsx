@@ -1,6 +1,5 @@
 import type {
-  GridOptions,
-  ValueFormatterParams,
+  GridOptions
 } from "@ag-grid-community/core";
 import {
   AgGridReact,
@@ -16,6 +15,7 @@ import { ClientSideRowModelModule } from "@ag-grid-community/client-side-row-mod
 import { ModuleRegistry, type ColDef } from "@ag-grid-community/core";
 import "@ag-grid-community/styles/ag-grid.css";
 import "@ag-grid-community/styles/ag-theme-balham.css";
+import React from "react";
 import {
   datasetColumnTypeMapping,
   jsonSchema,
@@ -23,7 +23,6 @@ import {
 } from "../../server/datasets/types";
 import { RenderInputOutput } from "../traces/RenderInputOutput";
 import { MultilineJSONCellEditor } from "./MultilineJSONCellEditor";
-import React from "react";
 
 ModuleRegistry.registerModules([ClientSideRowModelModule]);
 
