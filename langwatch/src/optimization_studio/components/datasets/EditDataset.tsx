@@ -1,56 +1,33 @@
 import { type Node, type NodeProps } from "@xyflow/react";
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, useState } from "react";
 import {
   DatasetTable,
   type InMemoryDataset,
 } from "../../../components/datasets/DatasetTable";
-import type { DatasetColumnType } from "../../../server/datasets/types";
 import { useGetDatasetData } from "../../hooks/useGetDatasetData";
 import { useWorkflowStore } from "../../hooks/useWorkflowStore";
-import type { Component, Entry, Field } from "../../types/dsl";
-import { transpostRowsFirstToColumnsFirstWithoutId } from "../../utils/datasetUtils";
+import type { Component, Entry } from "../../types/dsl";
+import {
+  datasetColumnsToFieldTypes,
+  transpostRowsFirstToColumnsFirstWithoutId,
+} from "../../utils/datasetUtils";
 
 export function EditDataset({
   node,
 }: {
   node: NodeProps<Node<Component>> | Node<Component>;
 }) {
-  const { rows, columns } = useGetDatasetData(
-    "dataset" in node.data ? node.data.dataset : undefined
-  );
-
-  const columnTypes = useMemo(() => {
-    const fields = Object.fromEntries(
-      (node.data.outputs ?? []).map((field) => [field.identifier, field.type])
-    );
-
-    const typeMap: Record<Field["type"], DatasetColumnType> = {
-      str: "string",
-      float: "number",
-      int: "number",
-      bool: "boolean",
-      "list[str]": "json",
-      "list[float]": "json",
-      "list[int]": "json",
-      "list[bool]": "json",
-      signature: "json",
-      llm: "json",
-    };
-
-    return Object.fromEntries(
-      columns.map((column) => [
-        column,
-        (fields[column] ? typeMap[fields[column]] : "string") ?? "string",
-      ])
-    );
-  }, [columns, node.data.outputs]);
+  const { rows, columns } = useGetDatasetData({
+    dataset: "dataset" in node.data ? node.data.dataset : undefined,
+    preview: false,
+  });
 
   // Only update the datset from parent to child once the modal is open again
   const inMemoryDataset = useMemo(
     () => ({
       name: "dataset" in node.data ? node.data.dataset?.name : undefined,
       datasetRecords: rows ?? [],
-      columnTypes: columnTypes ?? {},
+      columnTypes: columns ?? [],
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     []
@@ -64,11 +41,15 @@ export function EditDataset({
         id: node.id,
         data: {
           ...(node.data as Entry),
+          outputs: datasetColumnsToFieldTypes(dataset.columnTypes),
           dataset: {
             ...(node.data as Entry).dataset,
-            inline: transpostRowsFirstToColumnsFirstWithoutId(
-              dataset.datasetRecords
-            ),
+            inline: {
+              records: transpostRowsFirstToColumnsFirstWithoutId(
+                dataset.datasetRecords
+              ),
+              columnTypes: dataset.columnTypes,
+            },
           },
         } as Entry,
       });

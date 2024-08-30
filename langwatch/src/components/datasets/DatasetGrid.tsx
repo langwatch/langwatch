@@ -136,10 +136,13 @@ export const DatasetGrid = React.memo(
         }
         .ag-theme-balham .ag-cell-value {
           max-height: 300px;
-          overflow: auto;
+          overflow-y: auto;
         }
         .dataset-preview .ag-theme-balham .ag-cell {
           white-space: nowrap;
+        }
+        .dataset-preview .ag-theme-balham .ag-cell-value {
+          overflow: hidden;
         }
         .ag-pinned-left-cols-container .ag-cell-value {
           white-space: nowrap;

@@ -4,7 +4,8 @@ import { DEFAULT_DATASET_NAME } from "../../../components/datasets/DatasetTable"
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
 import { api } from "../../../utils/api";
 import type { Component, Entry } from "../../types/dsl";
-import { DatasetPreview } from "./DatasetPreview";
+import { DatasetPreview } from "../../../components/datasets/DatasetPreview";
+import { useGetDatasetData } from "../../hooks/useGetDatasetData";
 
 export function DatasetSelection({
   node,
@@ -63,6 +64,8 @@ export function DatasetSelectionItem({
   dataset: Entry["dataset"];
   onClick: () => void;
 }) {
+  const { rows, columns } = useGetDatasetData({ dataset, preview: true });
+
   return (
     <VStack
       align="start"
@@ -87,7 +90,11 @@ export function DatasetSelectionItem({
       />
       <Box width="100%" height="178px" background="#F5F7F7">
         <DatasetPreview
-          dataset={dataset}
+          rows={rows}
+          columns={columns.map((column) => ({
+            name: column.name,
+            type: "string",
+          }))}
           borderRadius="6px 6px 0 0"
         />
       </Box>

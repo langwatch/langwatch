@@ -17,13 +17,18 @@ import type { Component, ComponentType, Entry, Field } from "../types/dsl";
 import { ComponentIcon } from "./ColorfulBlockIcons";
 import { DatasetModal } from "./DatasetModal";
 import { getNodeDisplayName, NodeSectionTitle, TypeLabel } from "./Nodes";
-import { DatasetPreview } from "./datasets/DatasetPreview";
+import { DatasetPreview } from "../../components/datasets/DatasetPreview";
+import { useGetDatasetData } from "../hooks/useGetDatasetData";
 
 export function EntryPointPropertiesPanel({ node }: { node: Node<Component> }) {
   const { isOpen, onOpen, onClose } = useDisclosure();
   const [editingDataset, setEditingDataset] = useState<
     Entry["dataset"] | undefined
   >();
+  const { rows, columns } = useGetDatasetData({
+    dataset: "dataset" in node.data ? node.data.dataset : undefined,
+    preview: true,
+  });
 
   return (
     <BasePropertiesPanel node={node}>
@@ -44,7 +49,11 @@ export function EntryPointPropertiesPanel({ node }: { node: Node<Component> }) {
         </Button>
       </HStack>
       <DatasetPreview
-        dataset={(node.data as Entry).dataset}
+        rows={rows}
+        columns={columns.map((column) => ({
+          name: column.name,
+          type: "string",
+        }))}
         onClick={() => {
           setEditingDataset((node.data as Entry).dataset);
           onOpen();

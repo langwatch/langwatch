@@ -1,4 +1,5 @@
-import type { Node, Edge } from "@xyflow/react";
+import type { Edge, Node } from "@xyflow/react";
+import type { DatasetColumns } from "../../server/datasets/types";
 
 export type Field = {
   identifier: string;
@@ -11,6 +12,7 @@ export type Field = {
     | "list[float]"
     | "list[int]"
     | "list[bool]"
+    | "dict"
     | "signature"
     | "llm";
   optional?: boolean;
@@ -73,7 +75,10 @@ export type Entry = BaseComponent & {
   dataset?: {
     id?: string;
     name?: string;
-    inline?: Record<string, string[]>;
+    inline?: {
+      records: Record<string, string[]>;
+      columnTypes: DatasetColumns;
+    };
   };
 };
 

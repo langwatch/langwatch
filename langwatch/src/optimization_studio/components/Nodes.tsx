@@ -11,8 +11,8 @@ import { useWorkflowStore } from "../hooks/useWorkflowStore";
 import { ComponentIcon } from "./ColorfulBlockIcons";
 import { useState, useEffect } from "react";
 import { useGetDatasetData } from "../hooks/useGetDatasetData";
-import { DatasetPreview } from "./datasets/DatasetPreview";
 import { DatasetModal } from "./DatasetModal";
+import { DatasetPreview } from "../../components/datasets/DatasetPreview";
 
 export function SignatureNode(props: NodeProps<Node<Component>>) {
   return <ComponentNode {...props} />;
@@ -26,7 +26,10 @@ export function EntryNode(props: NodeProps<Node<Component>>) {
     setRendered(true);
   }, []);
 
-  const { rows } = useGetDatasetData((props.data as Entry).dataset, true) ?? {};
+  const { rows, columns } = useGetDatasetData({
+    dataset: (props.data as Entry).dataset,
+    preview: true,
+  });
 
   return (
     <ComponentNode {...props} outputsName="Fields">
@@ -39,7 +42,11 @@ export function EntryNode(props: NodeProps<Node<Component>>) {
       >
         {rendered && (
           <DatasetPreview
-            dataset={(props.data as Entry).dataset}
+            rows={rows}
+            columns={columns.map((column) => ({
+              name: column.name,
+              type: "string",
+            }))}
             onClick={onOpen}
           />
         )}

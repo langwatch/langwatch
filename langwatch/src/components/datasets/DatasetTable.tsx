@@ -60,7 +60,7 @@ export function DatasetTable({
   const { project } = useOrganizationTeamProject();
 
   const { openDrawer } = useDrawer();
-  const { isOpen, onOpen, onClose } = useDisclosure();
+  const addRowsFromCSVModal = useDisclosure();
   const editDataset = useDisclosure();
   const [savingStatus, setSavingStatus] = useState<"saving" | "saved" | "">("");
 
@@ -158,10 +158,17 @@ export function DatasetTable({
     new Set()
   );
 
-  const rowData = useMemo(() => {
-    if (!dataset) return;
+  const [rowData, setRowData] = useState<DatasetRecordEntry[] | undefined>(
+    undefined
+  );
 
-    return dataset.datasetRecords.map((record) => {
+  useEffect(() => {
+    if (!dataset) {
+      setRowData(undefined);
+      return;
+    }
+
+    const rowData = dataset.datasetRecords.map((record) => {
       const row: DatasetRecordEntry = { id: record.id };
       columnTypes.forEach((col) => {
         const value = record[col.name];
@@ -170,6 +177,8 @@ export function DatasetTable({
       row.selected = selectedEntryIds.has(record.id);
       return row;
     });
+
+    setRowData(rowData);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dataset]);
 
@@ -430,7 +439,7 @@ export function DatasetTable({
         </Text>
         <Spacer />
         <Button
-          onClick={() => onOpen()}
+          onClick={() => addRowsFromCSVModal.onOpen()}
           rightIcon={<Upload height={17} width={17} strokeWidth={2.5} />}
         >
           Add from CSV
@@ -508,12 +517,20 @@ export function DatasetTable({
         <Text>Add new record</Text>
       </Button>
       <AddRowsFromCSVModal
-        isOpen={isOpen}
-        onClose={onClose}
+        isOpen={addRowsFromCSVModal.isOpen}
+        onClose={addRowsFromCSVModal.onClose}
         datasetId={datasetId}
         columnTypes={columnTypes}
         onUpdateDataset={(entries) => {
-          setEditableRowData((_) => entries);
+          setEditableRowData((currentEntries) => {
+            if (!currentEntries) return entries;
+            return [...currentEntries, ...entries];
+          });
+          setRowData((currentEntries) => {
+            if (!currentEntries) return entries;
+            return [...currentEntries, ...entries];
+          });
+          addRowsFromCSVModal.onClose();
         }}
       />
       {selectedEntryIds.size > 0 && (

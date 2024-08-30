@@ -1,5 +1,10 @@
 import { nanoid } from "nanoid";
-import type { DatasetRecordEntry } from "../../server/datasets/types";
+import type {
+  DatasetColumns,
+  DatasetColumnType,
+  DatasetRecordEntry,
+} from "../../server/datasets/types";
+import type { Field } from "../types/dsl";
 
 export function transposeIDlessColumnsFirstToRowsFirstWithId(
   data: Record<string, string[]>
@@ -27,4 +32,45 @@ export function transpostRowsFirstToColumnsFirstWithoutId(
     },
     {} as Record<string, string[]>
   );
+}
+
+const fieldToColumnTypeMap: Record<Field["type"], DatasetColumnType> = {
+  str: "string",
+  float: "number",
+  int: "number",
+  bool: "boolean",
+  "list[str]": "json",
+  "list[float]": "json",
+  "list[int]": "json",
+  "list[bool]": "json",
+  dict: "json",
+  signature: "string",
+  llm: "string",
+};
+
+const columnTypeToFieldTypeMap: Record<DatasetColumnType, Field["type"]> = {
+  string: "str",
+  boolean: "bool",
+  number: "float",
+  date: "str",
+  json: "dict",
+  spans: "dict",
+  rag_contexts: "dict",
+  chat_messages: "dict",
+  annotations: "dict",
+  evaluations: "dict",
+};
+
+export function fieldTypesToDatasetColumns(fields: Field[]): DatasetColumns {
+  return fields.map((field) => ({
+    name: field.identifier,
+    type: fieldToColumnTypeMap[field.type],
+  }));
+}
+
+export function datasetColumnsToFieldTypes(columns: DatasetColumns): Field[] {
+  return columns.map((column) => ({
+    identifier: column.name,
+    type: columnTypeToFieldTypeMap[column.type],
+  }));
 }

@@ -40,13 +40,19 @@ const initialNodes: Node<Component>[] = [
       dataset: {
         name: "Test Dataset",
         inline: {
-          question: [
-            "What is the capital of the moon?",
-            "What is the capital france?",
-          ],
-          gold_answer: [
-            "The moon is made of cheese",
-            "The capital of france is Paris",
+          records: {
+            question: [
+              "What is the capital of the moon?",
+              "What is the capital france?",
+            ],
+            gold_answer: [
+              "The moon is made of cheese",
+              "The capital of france is Paris",
+            ],
+          },
+          columnTypes: [
+            { name: "question", type: "string" },
+            { name: "gold_answer", type: "string" },
           ],
         },
       },
