@@ -83,7 +83,7 @@ export const DatasetGrid = React.memo(
                   marginLeft="3px"
                   {...props}
                   isChecked={props.value}
-                  readOnly={!column.editable}
+                  readOnly={column.editable === false ? true : undefined}
                   onChange={(e) => props.setValue?.(e.target.checked)}
                 />
               ),
