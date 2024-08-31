@@ -62,7 +62,10 @@ export const datasetColumnTypeMapping: {
   date: z.date().optional().nullable(),
   json: jsonSchema.optional().nullable(),
   spans: z.array(datasetSpanSchema).optional().nullable(),
-  rag_contexts: z.array(rAGChunkSchema).optional().nullable(),
+  rag_contexts: z
+    .union([z.array(rAGChunkSchema), z.array(z.string())])
+    .optional()
+    .nullable(),
   chat_messages: z.array(chatMessageSchema).optional().nullable(),
   annotations: z.array(annotationScoreSchema).optional().nullable(),
   evaluations: z.array(evaluationsSchema).optional().nullable(),

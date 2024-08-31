@@ -1,3 +1,4 @@
+import { DeleteIcon } from "@chakra-ui/icons";
 import {
   Box,
   Button,
@@ -11,20 +12,19 @@ import {
   useToast,
   VStack,
 } from "@chakra-ui/react";
-import { type Node, type NodeProps } from "@xyflow/react";
-import { DEFAULT_DATASET_NAME } from "../../../components/datasets/DatasetTable";
-import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
-import { api } from "../../../utils/api";
-import type { Component, Entry } from "../../types/dsl";
-import { DatasetPreview } from "../../../components/datasets/DatasetPreview";
-import { useGetDatasetData } from "../../hooks/useGetDatasetData";
-import { useEffect, useState, useTransition } from "react";
-import { DeleteIcon } from "@chakra-ui/icons";
-import { MoreHorizontal, MoreVertical } from "react-feather";
 import type { TRPCClientErrorLike } from "@trpc/client";
 import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
 import type { inferRouterOutputs } from "@trpc/server";
+import { type Node, type NodeProps } from "@xyflow/react";
+import { useEffect, useState, useTransition } from "react";
+import { MoreHorizontal, Plus } from "react-feather";
+import { DatasetPreview } from "../../../components/datasets/DatasetPreview";
+import { DEFAULT_DATASET_NAME } from "../../../components/datasets/DatasetTable";
+import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
 import type { AppRouter } from "../../../server/api/root";
+import { api } from "../../../utils/api";
+import { useGetDatasetData } from "../../hooks/useGetDatasetData";
+import type { Component, Entry } from "../../types/dsl";
 
 export function DatasetSelection({
   node,
@@ -43,7 +43,41 @@ export function DatasetSelection({
   return (
     <VStack align="start" spacing={12}>
       <VStack align="start" spacing={4}>
-        <Heading size="md">Current Dataset</Heading>
+        <HStack spacing={6}>
+          <Heading size="md">Current Dataset</Heading>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => {
+              if (!(node.data as Entry).dataset?.id) {
+                if (
+                  !confirm(
+                    "This will discard the current draft dataset. Are you sure?"
+                  )
+                ) {
+                  return;
+                }
+              }
+              setIsEditing({
+                name: "",
+                inline: {
+                  records: {
+                    input: ["Hello, world!"],
+                  },
+                  columnTypes: [
+                    {
+                      name: "input",
+                      type: "string",
+                    },
+                  ],
+                },
+              });
+            }}
+            leftIcon={<Plus size={14} />}
+          >
+            New dataset
+          </Button>
+        </HStack>
         <DatasetSelectionItem
           query={datasets}
           dataset={(node.data as Entry).dataset}

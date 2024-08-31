@@ -40,8 +40,11 @@ export function EditDataset({
   const [columnTypes, setColumnTypes] = useState<DatasetColumns>(columns ?? []);
 
   useEffect(() => {
-    setColumnTypes(columns);
-  }, [columns]);
+    if (columns.length > 0) {
+      setColumnTypes(columns);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [JSON.stringify(columns)]);
 
   const onUpdateDataset = useCallback(
     (dataset: InMemoryDataset) => {

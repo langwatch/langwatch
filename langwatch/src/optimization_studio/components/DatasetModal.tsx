@@ -38,8 +38,10 @@ export function DatasetModal({
     Entry["dataset"] | undefined
   >();
 
+  const [rendered, setRendered] = useState(false);
   useEffect(() => {
-    setEditingDataset(editingDataset_);
+    setEditingDataset(isOpen ? editingDataset_ : undefined);
+    setRendered(isOpen);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
 
@@ -86,7 +88,7 @@ export function DatasetModal({
         overflowY="auto"
       >
         <ModalCloseButton zIndex={10} />
-        {editingDataset ? (
+        {rendered && editingDataset ? (
           <>
             <ModalHeader>
               <Button
@@ -110,7 +112,7 @@ export function DatasetModal({
               )}
             </ModalBody>
           </>
-        ) : (
+        ) : rendered ? (
           <>
             <Tabs>
               <ModalHeader>
@@ -128,16 +130,13 @@ export function DatasetModal({
                     />
                   </TabPanel>
                   <TabPanel>
-                    <DatasetUpload
-                      node={node}
-                      setIsEditing={setEditingDataset}
-                    />
+                    <DatasetUpload setIsEditing={setEditingDataset} />
                   </TabPanel>
                 </TabPanels>
               </ModalBody>
             </Tabs>
           </>
-        )}
+        ) : null}
       </ModalContent>
     </Modal>
   );

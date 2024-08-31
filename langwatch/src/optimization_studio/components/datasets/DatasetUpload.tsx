@@ -22,10 +22,8 @@ import { useState } from "react";
 import type { InMemoryDataset } from "../../../components/datasets/DatasetTable";
 
 export function DatasetUpload({
-  node,
   setIsEditing,
 }: {
-  node: NodeProps<Node<Component>> | Node<Component>;
   setIsEditing: (isEditing: Entry["dataset"] | undefined) => void;
 }) {
   const addDatasetDrawer = useDisclosure();

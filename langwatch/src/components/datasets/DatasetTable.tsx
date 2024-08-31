@@ -301,12 +301,12 @@ export function DatasetTable({
       );
     },
     [
-      databaseDataset,
-      datasetId,
-      project?.id,
       setParentRowData,
-      toast,
+      datasetId,
       updateDatasetRecord,
+      project?.id,
+      toast,
+      databaseDataset,
     ]
   );
 
