@@ -1,4 +1,16 @@
-import { Box, Heading, HStack, Text, VStack } from "@chakra-ui/react";
+import {
+  Box,
+  Button,
+  Heading,
+  HStack,
+  Menu,
+  MenuButton,
+  MenuItem,
+  MenuList,
+  Text,
+  useToast,
+  VStack,
+} from "@chakra-ui/react";
 import { type Node, type NodeProps } from "@xyflow/react";
 import { DEFAULT_DATASET_NAME } from "../../../components/datasets/DatasetTable";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
@@ -6,6 +18,13 @@ import { api } from "../../../utils/api";
 import type { Component, Entry } from "../../types/dsl";
 import { DatasetPreview } from "../../../components/datasets/DatasetPreview";
 import { useGetDatasetData } from "../../hooks/useGetDatasetData";
+import { useEffect, useState, useTransition } from "react";
+import { DeleteIcon } from "@chakra-ui/icons";
+import { MoreHorizontal, MoreVertical } from "react-feather";
+import type { TRPCClientErrorLike } from "@trpc/client";
+import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
+import type { inferRouterOutputs } from "@trpc/server";
+import type { AppRouter } from "../../../server/api/root";
 
 export function DatasetSelection({
   node,
@@ -26,6 +45,7 @@ export function DatasetSelection({
       <VStack align="start" spacing={4}>
         <Heading size="md">Current Dataset</Heading>
         <DatasetSelectionItem
+          query={datasets}
           dataset={(node.data as Entry).dataset}
           onClick={() => {
             setIsEditing((node.data as Entry).dataset);
@@ -43,6 +63,7 @@ export function DatasetSelection({
 
             return (
               <DatasetSelectionItem
+                query={datasets}
                 key={dataset.id}
                 dataset={dataset}
                 onClick={() => {
@@ -58,13 +79,105 @@ export function DatasetSelection({
 }
 
 export function DatasetSelectionItem({
+  query,
   dataset,
   onClick,
 }: {
+  query: UseTRPCQueryResult<
+    inferRouterOutputs<AppRouter>["dataset"]["getAll"],
+    TRPCClientErrorLike<AppRouter>
+  >;
   dataset: Entry["dataset"];
   onClick: () => void;
 }) {
   const { rows, columns } = useGetDatasetData({ dataset, preview: true });
+
+  // Add random delay to render the dataset previews because too many of them
+  // at once causes the page to hang, blocking the javascript thread
+  const [rendered, setRendered] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [_, startTransition] = useTransition();
+  useEffect(() => {
+    setTimeout(
+      () => {
+        startTransition(() => {
+          setRendered(true);
+        });
+      },
+      100 + Math.floor(Math.random() * 200)
+    );
+  }, []);
+
+  const { project } = useOrganizationTeamProject();
+  const toast = useToast();
+  const datasetDelete = api.dataset.deleteById.useMutation();
+
+  const deleteDataset = (id: string, name: string) => {
+    datasetDelete.mutate(
+      { projectId: project?.id ?? "", datasetId: id },
+      {
+        onSuccess: () => {
+          void query.refetch();
+          toast({
+            title: `Dataset ${name} deleted`,
+            description: (
+              <HStack>
+                <Button
+                  colorScheme="white"
+                  variant="link"
+                  textDecoration="underline"
+                  onClick={() => {
+                    toast.close(`delete-dataset-${id}`);
+                    setTimeout(() => {
+                      void query.refetch();
+                    }, 1000);
+                    datasetDelete.mutate(
+                      {
+                        projectId: project?.id ?? "",
+                        datasetId: id,
+                        undo: true,
+                      },
+                      {
+                        onSuccess: () => {
+                          void query.refetch();
+                          toast({
+                            title: "Dataset restored",
+                            description: "The dataset has been restored.",
+                            status: "success",
+                            duration: 5000,
+                            isClosable: true,
+                            position: "top-right",
+                          });
+                        },
+                      }
+                    );
+                  }}
+                >
+                  Undo
+                </Button>
+              </HStack>
+            ),
+            id: `delete-dataset-${id}`,
+            status: "success",
+            duration: 10_000,
+            isClosable: true,
+            position: "top-right",
+          });
+        },
+        onError: () => {
+          toast({
+            title: "Failed to delete dataset",
+            description:
+              "There was an error deleting the dataset. Please try again.",
+            status: "error",
+            duration: 5000,
+            isClosable: true,
+            position: "top-right",
+          });
+        },
+      }
+    );
+  };
 
   return (
     <VStack
@@ -77,6 +190,40 @@ export function DatasetSelectionItem({
       className="ag-borderless"
       position="relative"
     >
+      {dataset?.id && (
+        <Box position="absolute" top={0} right={0} zIndex={11}>
+          <Menu>
+            <MenuButton
+              as={Button}
+              paddingX={1}
+              paddingY={1}
+              minHeight="0"
+              height="auto"
+              minWidth="0"
+              // variant={"ghost"}
+              color="gray.400"
+              onClick={(event) => {
+                event.stopPropagation();
+              }}
+            >
+              <MoreHorizontal />
+            </MenuButton>
+            <MenuList>
+              <MenuItem
+                color="red.600"
+                onClick={(event) => {
+                  event.stopPropagation();
+
+                  deleteDataset(dataset?.id ?? "", dataset?.name ?? "");
+                }}
+                icon={<DeleteIcon />}
+              >
+                Delete dataset
+              </MenuItem>
+            </MenuList>
+          </Menu>
+        </Box>
+      )}
       <Box
         position="absolute"
         top={0}
@@ -89,14 +236,16 @@ export function DatasetSelectionItem({
         zIndex={10}
       />
       <Box width="100%" height="178px" background="#F5F7F7">
-        <DatasetPreview
-          rows={rows}
-          columns={columns.map((column) => ({
-            name: column.name,
-            type: "string",
-          }))}
-          borderRadius="6px 6px 0 0"
-        />
+        {rendered && (
+          <DatasetPreview
+            rows={rows}
+            columns={columns.map((column) => ({
+              name: column.name,
+              type: "string",
+            }))}
+            borderRadius="6px 6px 0 0"
+          />
+        )}
       </Box>
       <Text fontSize="14px" fontWeight="bold" padding={4}>
         {dataset?.name ?? DEFAULT_DATASET_NAME}

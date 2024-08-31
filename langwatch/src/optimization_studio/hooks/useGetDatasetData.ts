@@ -35,6 +35,11 @@ export const useGetDatasetData = ({
       refetchOnWindowFocus: false,
       refetchOnMount: false,
       staleTime: 1000 * 60 * 60,
+      trpc: {
+        context: {
+          skipBatch: true,
+        },
+      },
     }
   );
   const databaseDataset_ = databaseDataset.data

@@ -40,7 +40,8 @@ export function DatasetModal({
 
   useEffect(() => {
     setEditingDataset(editingDataset_);
-  }, [editingDataset_]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
 
   const { setNode } = useWorkflowStore(({ setNode }) => ({ setNode }));
 
