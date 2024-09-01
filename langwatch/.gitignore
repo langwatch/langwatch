@@ -19,6 +19,7 @@ next-env.d.ts
 
 # production
 /build
+/build-websocket
 
 # misc
 .DS_Store

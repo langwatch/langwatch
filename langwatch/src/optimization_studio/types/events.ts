@@ -1,6 +1,14 @@
 import type { BaseComponent, Workflow } from "./dsl";
 
-export type Event =
+export type StudioClientEvent =
+  | {
+      type: "execute_component";
+      payload: {
+        component_ref: string;
+      };
+    };
+
+export type StudioServerEvent =
   | {
       type: "component_state_change";
       payload: {
@@ -20,5 +28,11 @@ export type Event =
           started_at?: number;
           finished_at?: number;
         };
+      };
+    }
+  | {
+      type: "debug";
+      payload: {
+        message: string;
       };
     };

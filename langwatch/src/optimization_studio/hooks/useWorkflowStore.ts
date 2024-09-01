@@ -14,8 +14,12 @@ import isDeepEqual from "fast-deep-equal";
 import debounce from "lodash.debounce";
 import type { Component, ComponentType, Workflow } from "../types/dsl";
 
+export type SocketStatus = "disconnected" | "connecting" | "connected";
+
 type WorkflowStore = Workflow & {
   hoveredNodeId?: string;
+  socketStatus: SocketStatus;
+  setSocketStatus: (status: SocketStatus) => void;
   onNodesChange: (changes: NodeChange[]) => void;
   onEdgesChange: (changes: EdgeChange[]) => void;
   onConnect: (connection: Connection) => void;
@@ -113,6 +117,10 @@ const store = (
   state: {},
 
   hoveredNodeId: undefined,
+  socketStatus: "disconnected",
+  setSocketStatus: (status: SocketStatus) => {
+    set({ socketStatus: status });
+  },
   onNodesChange: (changes: NodeChange[]) => {
     set({
       nodes: applyNodeChanges(changes, get().nodes),

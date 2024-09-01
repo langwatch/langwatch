@@ -1,4 +1,4 @@
-import { Box, HStack, Text, useTheme, VStack } from "@chakra-ui/react";
+import { Box, HStack, Text, Tooltip, useTheme, VStack } from "@chakra-ui/react";
 import {
   Background,
   BackgroundVariant,
@@ -8,7 +8,7 @@ import {
 } from "@xyflow/react";
 
 import "@xyflow/react/dist/style.css";
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { LogoIcon } from "../../components/icons/LogoIcon";
 import { useWorkflowStore } from "../hooks/useWorkflowStore";
@@ -16,6 +16,9 @@ import { EntryNode, SignatureNode } from "./Nodes";
 import { UndoRedo } from "./UndoRedo";
 import DefaultEdge from "./Edge";
 import { PropertiesPanel } from "./PropertiesPanel";
+import useStudioSocketConnection from "../hooks/useStudioSocketConnection";
+import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
+import { titleCase } from "../../utils/stringCasing";
 
 export default function OptimizationStudio() {
   const nodeTypes = useMemo(
@@ -44,6 +47,19 @@ export default function OptimizationStudio() {
       })
     );
 
+  const { project } = useOrganizationTeamProject();
+  const { status, connect, disconnect } = useStudioSocketConnection();
+
+  useEffect(() => {
+    if (!project) return;
+
+    connect();
+
+    return () => {
+      disconnect();
+    };
+  }, [project]);
+
   return (
     <div style={{ width: "100vw", height: "100vh" }}>
       <VStack width="full" height="full" spacing={0}>
@@ -59,6 +75,20 @@ export default function OptimizationStudio() {
           </HStack>
           <HStack width="full" justify="center">
             <Text>Optimization Studio</Text>
+            <Tooltip label={titleCase(status)}>
+              <Box
+                width="12px"
+                height="12px"
+                background={
+                  status === "connected"
+                    ? "green.500"
+                    : status === "disconnected"
+                    ? "red.300"
+                    : "yellow.500"
+                }
+                borderRadius="full"
+              ></Box>
+            </Tooltip>
           </HStack>
           <HStack width="full" justify="end">
             <UndoRedo />
