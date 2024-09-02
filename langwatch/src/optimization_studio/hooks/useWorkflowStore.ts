@@ -188,23 +188,6 @@ const store = (
 
 export const useWorkflowStore = create<WorkflowStore>()(
   temporal(store, {
-    partialize: (state) => {
-      const state_ = {
-        ...state,
-        edges: state.edges.map((edge) => {
-          const edge_ = { ...edge };
-          delete edge_.selected;
-          return edge_;
-        }),
-        nodes: state.nodes.map((node) => {
-          const node_ = { ...node };
-          delete node_.selected;
-          return node_;
-        }),
-      };
-      delete state_.hoveredNodeId;
-      return state_;
-    },
     handleSet: (handleSet) => {
       return debounce<typeof handleSet>(
         (pastState) => {
@@ -222,6 +205,28 @@ export const useWorkflowStore = create<WorkflowStore>()(
         { leading: true, trailing: false }
       );
     },
-    equality: (pastState, currentState) => isDeepEqual(pastState, currentState),
+    equality: (pastState, currentState) => {
+      const partialize = (state: WorkflowStore) => {
+        const state_ = {
+          name: state.name,
+          description: state.description,
+          version: state.version,
+          default_llm: state.default_llm,
+          edges: state.edges.map((edge) => {
+            const edge_ = { ...edge };
+            delete edge_.selected;
+            return edge_;
+          }),
+          nodes: state.nodes.map((node) => {
+            const node_ = { ...node, data: { ...node.data } };
+            delete node_.selected;
+            delete node_.data.execution_state;
+            return node_;
+          }),
+        };
+        return state_;
+      };
+      return isDeepEqual(partialize(pastState), partialize(currentState));
+    },
   })
 );
