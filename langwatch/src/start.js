@@ -2,16 +2,22 @@ const { createServer } = require("http");
 const { parse } = require("url");
 const next = require("next");
 const path = require("path");
-const studioSocket = require("../build-websocket/socket");
+let studioSocket = require("../build-websocket/socketServer");
+
+const reloadStudioSocket = () => {
+  delete require.cache[require.resolve("../build-websocket/socketServer")];
+  studioSocket = require("../build-websocket/socketServer");
+  console.log("Reloaded studioSocket module");
+};
 
 if (process.env.NODE_ENV !== "production") {
   const watch = require("watch");
   watch.createMonitor(
-    "./langwatch/langwatch/build-websocket",
+    path.join(__dirname, "../build-websocket"),
     { interval: 1 },
     function (monitor) {
       monitor.on("changed", function () {
-        process.exit(1);
+        reloadStudioSocket();
       });
     }
   );

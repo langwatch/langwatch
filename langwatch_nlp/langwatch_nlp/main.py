@@ -30,6 +30,10 @@ batch_clustering.setup_endpoints(app)
 incremental_clustering.setup_endpoints(app)
 sentiment_analysis.setup_endpoints(app)
 
+from langwatch_nlp.studio.execute import app as studio_app
+
+app.mount("/studio", studio_app)
+
 
 async def proxy_startup():
     original_get_available_deployment = Router.async_get_available_deployment

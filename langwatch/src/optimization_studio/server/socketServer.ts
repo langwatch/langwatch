@@ -30,13 +30,11 @@ const handleConnection = (
 
   ws.on("close", () => {
     console.log(`WebSocket connection closed for project: ${projectId}`);
-    // Perform any cleanup if necessary
   });
 
-  // Send a welcome message to the client
   sendMessageToClient(ws, {
     type: "debug",
-    payload: { message: "Connected to Optimization Studio" },
+    payload: { message: "Connected to Optimization Studio socket" },
   });
 };
 
@@ -45,17 +43,103 @@ const handleClientMessage = async (
   message: StudioClientEvent,
   projectId: string
 ) => {
-  switch (message.type) {
-    case "execute_component":
-      // Fetch and send optimization data
+  try {
+    switch (message.type) {
+      case "execute_component":
+        try {
+          await callPython(ws, message);
+        } catch (error) {
+          sendMessageToClient(ws, {
+            type: "component_state_change",
+            payload: {
+              component_id: message.payload.node.id,
+              execution_state: {
+                state: "error",
+                error: (error as Error).message,
+                timestamps: { finished_at: Date.now() },
+              },
+            },
+          });
+        }
+        break;
+      default:
+        sendErrorToClient(ws, "Unknown message type");
+    }
+  } catch (error) {
+    console.error("Error handling message:", error);
+    sendErrorToClient(ws, (error as Error).message);
+  }
+};
+
+const callPython = async (ws: WebSocket, event: StudioClientEvent) => {
+  let response: Response;
+  try {
+    response = await fetch(
+      `${process.env.LANGWATCH_NLP_SERVICE}/studio/execute`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(event),
+      }
+    );
+  } catch (error) {
+    if ((error as any)?.cause?.code === "ECONNREFUSED") {
       sendMessageToClient(ws, {
-        type: "debug",
-        payload: { message: "Optimization data" },
+        type: "error",
+        payload: { message: "Python backend is unreachable" },
       });
-      break;
-    // Add more message types as needed
-    default:
-      sendErrorToClient(ws, "Unknown message type");
+      throw new Error("Python backend is unreachable");
+    }
+    throw error;
+  }
+
+  const reader = response.body?.getReader();
+  try {
+    if (!reader) {
+      throw new Error("No response body");
+    }
+
+    const decoder = new TextDecoder();
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      const chunk = decoder.decode(value, { stream: true });
+      const events = chunk.split("\n\n").filter(Boolean);
+
+      for (const event of events) {
+        if (event.startsWith("data: ")) {
+          try {
+            const serverEvent: StudioServerEvent = JSON.parse(event.slice(6));
+            sendMessageToClient(ws, serverEvent);
+
+            // Close the connection if we receive a completion event
+            if (serverEvent.type === "done") {
+              return;
+            }
+          } catch (error) {
+            throw new Error(`Failed to parse event: ${event}`);
+          }
+        }
+      }
+    }
+  } catch (error) {
+    console.error("Error reading stream:", error);
+    sendMessageToClient(ws, {
+      type: "component_state_change",
+      payload: {
+        component_id: event.payload.node.id,
+        execution_state: {
+          state: "error",
+          error: (error as Error).message,
+          timestamps: { finished_at: Date.now() },
+        },
+      },
+    });
+  } finally {
+    reader?.releaseLock();
   }
 };
 
@@ -65,7 +149,7 @@ const sendMessageToClient = (ws: WebSocket, message: StudioServerEvent) => {
 
 const sendErrorToClient = (ws: WebSocket, errorMessage: string) => {
   sendMessageToClient(ws, {
-    type: "debug",
+    type: "error",
     payload: { message: errorMessage },
   });
 };

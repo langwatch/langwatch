@@ -1,33 +1,27 @@
-import type { BaseComponent, Workflow } from "./dsl";
+import type { Component, BaseComponent, Workflow } from "./dsl";
+import type { Node } from "@xyflow/react";
 
-export type StudioClientEvent =
-  | {
-      type: "execute_component";
-      payload: {
-        component_ref: string;
-      };
-    };
+export type StudioClientEvent = {
+  type: "execute_component";
+  payload: {
+    trace_id: string;
+    node: Node<Component>;
+    inputs: Record<string, string>;
+  };
+};
 
 export type StudioServerEvent =
   | {
       type: "component_state_change";
       payload: {
-        component_ref: string;
+        component_id: string;
         execution_state: BaseComponent["execution_state"];
-        timestamps?: {
-          started_at?: number;
-          finished_at?: number;
-        };
       };
     }
   | {
       type: "execution_state_change";
       payload: {
         execution_state: Workflow["state"]["execution"];
-        timestamps?: {
-          started_at?: number;
-          finished_at?: number;
-        };
       };
     }
   | {
@@ -35,4 +29,13 @@ export type StudioServerEvent =
       payload: {
         message: string;
       };
+    }
+  | {
+      type: "error";
+      payload: {
+        message: string;
+      };
+    }
+  | {
+      type: "done";
     };

@@ -22,7 +22,12 @@ export type Field = {
   hidden?: boolean;
 };
 
-export type ComponentState = "idle" | "running" | "completed" | "failed";
+export type ComponentState =
+  | "idle"
+  | "waiting"
+  | "running"
+  | "success"
+  | "error";
 
 export type ComponentType =
   | "entry"
@@ -52,6 +57,10 @@ export type BaseComponent = {
     parameters?: Record<string, string>;
     inputs?: Record<string, string>;
     outputs?: Record<string, string>;
+    timestamps?: {
+      started_at?: number;
+      finished_at?: number;
+    };
   };
 };
 
@@ -71,7 +80,6 @@ type PromptingTechnique = BaseComponent;
 
 export type Entry = BaseComponent & {
   inputs?: never;
-  outputs: Field[];
   dataset?: {
     id?: string;
     name?: string;
@@ -99,7 +107,7 @@ type Flow = {
   edges: Edge[];
 };
 
-export type ExecutionState = "idle" | "running" | "completed" | "failed";
+export type ExecutionState = "idle" | "running" | "success" | "error";
 
 export type Workflow = {
   spec_version: string;

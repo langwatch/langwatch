@@ -1,18 +1,32 @@
-import { Box, HStack, Text, useDisclosure, VStack } from "@chakra-ui/react";
+import {
+  Box,
+  Button,
+  Center,
+  HStack,
+  Spacer,
+  Spinner,
+  Text,
+  useDisclosure,
+  VStack,
+} from "@chakra-ui/react";
 
 import { Handle, type Node, type NodeProps, Position } from "@xyflow/react";
+import { useEffect, useState } from "react";
+import { Check, Play, X } from "react-feather";
+import { PulseLoader } from "react-spinners";
+import { DatasetPreview } from "../../components/datasets/DatasetPreview";
+import { useComponentExecution } from "../hooks/useComponentExecution";
+import { useGetDatasetData } from "../hooks/useGetDatasetData";
+import { useWorkflowStore } from "../hooks/useWorkflowStore";
 import {
   type Component,
   type ComponentType,
   type Entry,
   type Field,
 } from "../types/dsl";
-import { useWorkflowStore } from "../hooks/useWorkflowStore";
 import { ComponentIcon } from "./ColorfulBlockIcons";
-import { useState, useEffect } from "react";
-import { useGetDatasetData } from "../hooks/useGetDatasetData";
 import { DatasetModal } from "./DatasetModal";
-import { DatasetPreview } from "../../components/datasets/DatasetPreview";
+import { useDebounceValue } from "usehooks-ts";
 
 export function SignatureNode(props: NodeProps<Node<Component>>) {
   return <ComponentNode {...props} />;
@@ -32,7 +46,7 @@ export function EntryNode(props: NodeProps<Node<Component>>) {
   });
 
   return (
-    <ComponentNode {...props} outputsName="Fields">
+    <ComponentNode {...props} outputsName="Fields" hidePlayButton>
       <NodeSectionTitle>Dataset</NodeSectionTitle>
       <Box
         width="200%"
@@ -190,15 +204,23 @@ function ComponentNode(
     icon?: React.ReactNode;
     children?: React.ReactNode;
     outputsName?: string;
+    hidePlayButton?: boolean;
   }
 ) {
-  const { hoveredNodeId, setHoveredNodeId } = useWorkflowStore(
-    ({ hoveredNodeId, setHoveredNodeId }) => ({
+  const { node, hoveredNodeId, setHoveredNodeId } =
+    useWorkflowStore(({ nodes, hoveredNodeId, setHoveredNodeId }) => ({
+      node: nodes.find((node) => node.id === props.id),
       hoveredNodeId,
       setHoveredNodeId,
-    })
-  );
+    }));
   const isHovered = hoveredNodeId === props.id;
+
+  const { startComponentExecution } = useComponentExecution();
+
+  const [isWaitingLong] = useDebounceValue(
+    node?.data.execution_state?.state === "waiting",
+    300
+  );
 
   return (
     <VStack
@@ -209,7 +231,7 @@ function ComponentNode(
       align="start"
       color="gray.600"
       fontSize={11}
-      minWidth="160px"
+      minWidth="180px"
       boxShadow={`0px 0px 4px 0px rgba(0, 0, 0, ${isHovered ? "0.2" : "0.05"})`}
       border="none"
       outline={!!props.selected || isHovered ? "1.5px solid" : "none"}
@@ -219,13 +241,61 @@ function ComponentNode(
       onMouseEnter={() => setHoveredNodeId(props.id)}
       onMouseLeave={() => setHoveredNodeId(undefined)}
     >
-      <HStack spacing="auto">
-        <HStack spacing={2}>
-          <ComponentIcon type={props.type as ComponentType} size="md" />
-          <Text fontSize={12} fontWeight={500}>
-            {getNodeDisplayName(props)}
-          </Text>
-        </HStack>
+      <HStack spacing={2} width="full">
+        <ComponentIcon type={props.type as ComponentType} size="md" />
+        <Text fontSize={12} fontWeight={500}>
+          {getNodeDisplayName(props)}
+        </Text>
+        <Spacer />
+        <Center
+          minWidth="16px"
+          minHeight="16px"
+          maxWidth="16px"
+          maxHeight="16px"
+        >
+          {isWaitingLong && node?.data.execution_state?.state === "waiting" && (
+            <Box marginLeft="-4px" marginRight="-4px">
+              <PulseLoader size={2} speedMultiplier={0.5} />
+            </Box>
+          )}
+          {((!isWaitingLong &&
+            node?.data.execution_state?.state === "waiting") ||
+            node?.data.execution_state?.state === "running") && (
+            <Spinner size="xs" />
+          )}
+          {node?.data.execution_state?.state === "error" && (
+            <Box color="red.500">
+              <X size={14} />
+            </Box>
+          )}
+          {node?.data.execution_state?.state === "success" && (
+            <Box color="green.500">
+              <Check size={14} />
+            </Box>
+          )}
+        </Center>
+        {!props.hidePlayButton && (
+          <Button
+            variant="ghost"
+            size="xs"
+            paddingX={0}
+            marginRight="-4px"
+            onClick={() => {
+              node &&
+                startComponentExecution({
+                  node,
+                  inputs: Object.fromEntries(
+                    node.data.inputs?.map((input) => [
+                      input.identifier,
+                      "foobar",
+                    ]) ?? []
+                  ),
+                });
+            }}
+          >
+            <Play size={14} />
+          </Button>
+        )}
       </HStack>
       {props.data.inputs && (
         <>

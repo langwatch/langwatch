@@ -12,7 +12,12 @@ import { temporal } from "zundo";
 import { create } from "zustand";
 import isDeepEqual from "fast-deep-equal";
 import debounce from "lodash.debounce";
-import type { Component, ComponentType, Workflow } from "../types/dsl";
+import type {
+  BaseComponent,
+  Component,
+  ComponentType,
+  Workflow,
+} from "../types/dsl";
 
 export type SocketStatus = "disconnected" | "connecting" | "connected";
 
@@ -26,7 +31,12 @@ type WorkflowStore = Workflow & {
   setNodes: (nodes: Node[]) => void;
   setEdges: (edges: Edge[]) => void;
   setNode: (node: Partial<Node>) => void;
+  setComponentExecutionState: (
+    id: string,
+    executionState: BaseComponent["execution_state"]
+  ) => void;
   setHoveredNodeId: (nodeId: string | undefined) => void;
+  selectNode: (nodeId: string) => void;
   deselectAllNodes: () => void;
 };
 
@@ -147,8 +157,27 @@ const store = (
       nodes: get().nodes.map((n) => (n.id === node.id ? { ...n, ...node } : n)),
     });
   },
+  setComponentExecutionState: (
+    id: string,
+    executionState: BaseComponent["execution_state"]
+  ) => {
+    set({
+      nodes: get().nodes.map((node) =>
+        node.id === id
+          ? { ...node, data: { ...node.data, execution_state: executionState } }
+          : node
+      ),
+    });
+  },
   setHoveredNodeId: (nodeId: string | undefined) => {
     set({ hoveredNodeId: nodeId });
+  },
+  selectNode: (nodeId: string) => {
+    set({
+      nodes: get().nodes.map((node) =>
+        node.id === nodeId ? { ...node, selected: true } : node
+      ),
+    });
   },
   deselectAllNodes: () => {
     set({

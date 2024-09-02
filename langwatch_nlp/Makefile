@@ -17,4 +17,5 @@ generate_proxy_config:
 
 start:
 	@echo "Starting the server..."
-	@poetry run hypercorn langwatch_nlp.main:app --bind :8080 $(filter-out $@,$(MAKECMDGOALS))
+	@poetry run watchmedo auto-restart -p 'none' --signal SIGTERM -- \
+		hypercorn -- langwatch_nlp.main:app --bind :8080 --reload $(filter-out $@,$(MAKECMDGOALS))

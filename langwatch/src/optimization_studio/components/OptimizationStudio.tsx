@@ -16,7 +16,7 @@ import { EntryNode, SignatureNode } from "./Nodes";
 import { UndoRedo } from "./UndoRedo";
 import DefaultEdge from "./Edge";
 import { PropertiesPanel } from "./PropertiesPanel";
-import useStudioSocketConnection from "../hooks/useStudioSocketConnection";
+import { useSocketClient } from "../hooks/useSocketClient";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { titleCase } from "../../utils/stringCasing";
 
@@ -48,7 +48,7 @@ export default function OptimizationStudio() {
     );
 
   const { project } = useOrganizationTeamProject();
-  const { status, connect, disconnect } = useStudioSocketConnection();
+  const { socketStatus, connect, disconnect } = useSocketClient();
 
   useEffect(() => {
     if (!project) return;
@@ -58,7 +58,7 @@ export default function OptimizationStudio() {
     return () => {
       disconnect();
     };
-  }, [project]);
+  }, [connect, disconnect, project]);
 
   return (
     <div style={{ width: "100vw", height: "100vh" }}>
@@ -75,14 +75,14 @@ export default function OptimizationStudio() {
           </HStack>
           <HStack width="full" justify="center">
             <Text>Optimization Studio</Text>
-            <Tooltip label={titleCase(status)}>
+            <Tooltip label={titleCase(socketStatus)}>
               <Box
                 width="12px"
                 height="12px"
                 background={
-                  status === "connected"
+                  socketStatus === "connected"
                     ? "green.500"
-                    : status === "disconnected"
+                    : socketStatus === "disconnected"
                     ? "red.300"
                     : "yellow.500"
                 }

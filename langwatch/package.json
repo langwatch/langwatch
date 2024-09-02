@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "build": "npm run build:websocket && BUILD_TIME=1 next build --no-lint",
-    "build:websocket": "esbuild src/optimization_studio/server/socket.ts --bundle --platform=node --outfile=build-websocket/socket.js --packages=external --alias:@injected-dependencies.server=src/injection/injection.server.ts",
+    "build:websocket": "esbuild src/optimization_studio/server/socketServer.ts --bundle --platform=node --outfile=build-websocket/socketServer.js --packages=external --alias:@injected-dependencies.server=src/injection/injection.server.ts",
     "lint": "next lint",
     "dev": "npm run start:prepare:files && npm run start:prepare:db && npm run build:websocket && NODE_ENV=development DEBUG=langwatch:* DEBUG_HIDE_DATE=true DEBUG_COLORS=true concurrently --restart-tries -1 'npm run build:websocket -- --watch' 'node src/server.js' 'npm run start:workers'",
     "start": "next start",
@@ -114,6 +114,7 @@
     "react-international-phone": "^4.2.8",
     "react-markdown": "^9.0.0",
     "react-papaparse": "^4.4.0",
+    "react-spinners": "^0.14.1",
     "recharts": "^2.9.3",
     "sass": "^1.66.1",
     "slugify": "^1.6.6",

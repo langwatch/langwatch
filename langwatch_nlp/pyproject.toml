@@ -29,6 +29,7 @@ pandas = "^2.2.1"
 pytest-httpx = "^0.30.0"
 pytest-asyncio = "^0.23.7"
 ipykernel = "^6.29.5"
+watchdog = "^5.0.0"
 
 [build-system]
 requires = ["poetry-core"]
