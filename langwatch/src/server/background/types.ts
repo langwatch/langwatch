@@ -1,4 +1,4 @@
-import type { EvaluatorTypes } from "../../trace_checks/evaluators.generated";
+import type { EvaluatorTypes } from "../../server/evaluations/evaluators.generated";
 import type {
   CustomMetadata,
   ElasticSearchTrace,

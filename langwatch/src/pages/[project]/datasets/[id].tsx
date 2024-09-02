@@ -14,7 +14,6 @@ export default function Dataset() {
         maxW={"calc(100vw - 200px)"}
         padding={6}
         marginTop={8}
-        paddingBottom="80px"
       >
         <DatasetTable datasetId={datasetId as string} />
       </Container>

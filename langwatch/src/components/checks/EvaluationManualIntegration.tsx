@@ -3,6 +3,7 @@ import {
   Checkbox,
   HStack,
   Heading,
+  Link,
   Tab,
   TabList,
   TabPanel,
@@ -14,7 +15,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import type { AVAILABLE_EVALUATORS } from "../../trace_checks/evaluators.generated";
+import type { AVAILABLE_EVALUATORS } from "../../server/evaluations/evaluators.generated";
 import { api } from "../../utils/api";
 import { RenderCode } from "../code/RenderCode";
 import { langwatchEndpoint } from "../code/langwatchEndpointEnv";
@@ -86,7 +87,7 @@ export function EvaluationManualIntegration({
       ? `\n        conversation=conversation_history, # optional`
       : "";
     const settingsParams = storeSettingsOnCode
-      ? `\n        settings=${JSON.stringify(settings, null, 2)
+      ? `\n        settings=${JSON.stringify(settings ?? {}, null, 2)
           .replace(/true/g, "True")
           .replace(/false/g, "False")
           .split("\n")
@@ -148,8 +149,111 @@ ${
     );
   };
 
+  const TypeScriptInstructions = () => {
+    const nameParam = storeSettingsOnCode ? `\n        name: "${name}",` : "";
+    const contextsParams = evaluatorDefinition.requiredFields.includes(
+      "contexts"
+    )
+      ? `\n        contexts: ["retrieved snippet 1", "retrieved snippet 2"],`
+      : evaluatorDefinition.optionalFields.includes("contexts")
+      ? `\n        contexts: ["retrieved snippet 1", "retrieved snippet 2"], // optional`
+      : "";
+    const inputParams = evaluatorDefinition.requiredFields.includes("input")
+      ? `\n        input: message,`
+      : evaluatorDefinition.optionalFields.includes("input")
+      ? `\n        input: message, // optional`
+      : "";
+    const outputParams = evaluatorDefinition.requiredFields.includes("output")
+      ? `\n        output: generatedResponse,`
+      : evaluatorDefinition.optionalFields.includes("output")
+      ? `\n        output: generatedResponse, // optional`
+      : "";
+    const expectedOutputParams = evaluatorDefinition.requiredFields.includes(
+      "expected_output"
+    )
+      ? `\n        expectedOutput: goldAnswer,`
+      : evaluatorDefinition.optionalFields.includes("expected_output")
+      ? `\n        expectedOutput: goldAnswer, // optional`
+      : "";
+    const conversationParams = evaluatorDefinition.requiredFields.includes(
+      "conversation"
+    )
+      ? `\n        conversation: conversationHistory,`
+      : evaluatorDefinition.optionalFields.includes("conversation")
+      ? `\n        conversation: conversationHistory, // optional`
+      : "";
+    const settingsParams = storeSettingsOnCode
+      ? `\n        settings: ${JSON.stringify(settings ?? {}, null, 2)
+          // remove quotes on json keys that have only safe characters in it
+          .replace(/"(\w+)"\s*:/g, "$1:")
+          .split("\n")
+          .map((line, index) => (index === 0 ? line : "        " + line))
+          .join("\n")},`
+      : "";
+
+    return (
+      <VStack align="start" width="full" spacing={3}>
+        <Text fontSize={14}>
+          First, set up your traces and spans capturing as explained in the{" "}
+          <Link
+            href="https://docs.langwatch.ai/integration/typescript/guide"
+            isExternal
+          >
+            documentation
+          </Link>
+          .
+        </Text>
+        {(!isOutputMandatory || !isGuardrail) && (
+          <>
+            <Text fontSize={14}>
+              {isGuardrail
+                ? isOutputMandatory
+                  ? "Then, after calling your LLM, check for the guardrail:"
+                  : "Then, either before or after calling your LLM, check for the guardrail:"
+                : "Then, pass in the message data to get the result of the evaluator:"}
+            </Text>
+            <Box className="markdown" width="full">
+              <RenderCode
+                code={`import { type LangWatchTrace } from "langwatch";
+
+async function llmStep({ message, trace }: { message: string, trace: LangWatchTrace }): Promise<string> {
+    const span = trace.startLLMSpan({ name: "llmStep" });
+    ${isGuardrail ? "" : "\n    // ... your existing code\n"}
+    // call the ${
+      isGuardrail ? "guardrail" : "evaluator"
+    } either on a span or on a trace
+    const ${isGuardrail ? "guardrail" : "result"} = await span.evaluate({
+        ${storeSettingsOnCode ? "evaluator:" : "slug:"} "${checkSlug}",${
+          isGuardrail
+            ? "\n        asGuardrail: true," +
+              nameParam +
+              "\n        input: message,"
+            : nameParam + inputParams
+        }${contextsParams}${outputParams}${expectedOutputParams}${conversationParams}${settingsParams}
+    })
+${
+  isGuardrail
+    ? `
+    if (!guardrail.passed) {
+        // handle the guardrail here
+        return "I'm sorry, I can't do that.";
+    }
+
+    // ... your existing code`
+    : `
+    console.log(result);`
+}`}
+                language="typescript"
+              />
+            </Box>
+          </>
+        )}
+      </VStack>
+    );
+  };
+
   const settingsParamsCurl = storeSettingsOnCode
-    ? `,\n  "settings": ${JSON.stringify(settings, null, 2)
+    ? `,\n  "settings": ${JSON.stringify(settings ?? {}, null, 2)
         .split("\n")
         .map((line, index) => (index === 0 ? line : "  " + line))
         .join("\n")}`
@@ -199,6 +303,7 @@ ${
         <TabList marginBottom={4}>
           <Tab>Python</Tab>
           <Tab>Python (Async)</Tab>
+          <Tab>TypeScript</Tab>
           <Tab>Curl</Tab>
         </TabList>
 
@@ -208,6 +313,9 @@ ${
           </TabPanel>
           <TabPanel padding={0}>
             <PythonInstructions async={true} />
+          </TabPanel>
+          <TabPanel padding={0}>
+            <TypeScriptInstructions />
           </TabPanel>
           <TabPanel padding={0}>
             <VStack align="start" width="full" spacing={3}>

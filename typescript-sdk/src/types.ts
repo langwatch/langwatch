@@ -9,6 +9,7 @@ import {
   type SpanInputOutput as ServerSpanInputOutput,
   type TypedValueChatMessages,
   type Trace,
+  type RESTEvaluation as ServerRESTEvaluation,
 } from "./server/types/tracer";
 
 export type Metadata = SnakeToCamelCaseNested<Trace["metadata"]>;
@@ -67,3 +68,7 @@ export type PendingLLMSpan = PendingSpan<LLMSpan>;
 
 export type RAGSpan = ConvertServerSpan<ServerRAGSpan>;
 export type PendingRAGSpan = PendingSpan<RAGSpan>;
+
+export type RESTEvaluation = SnakeToCamelCaseNested<
+  Omit<ServerRESTEvaluation, "error">
+> & { error?: ServerRESTEvaluation["error"] };

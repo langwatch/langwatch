@@ -4,8 +4,12 @@ import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 import { nanoid } from "nanoid";
 import slugify from "slugify";
-import { datasetRecordFormSchema } from "../../datasets/types.generated";
+import {
+  datasetRecordEntrySchema,
+  datasetRecordFormSchema,
+} from "../../datasets/types.generated";
 import { TeamRoleGroup, checkUserPermissionForProject } from "../permission";
+import { createManyDatasetRecords } from "./datasetRecord";
 
 export const datasetRouter = createTRPCRouter({
   upsert: protectedProcedure
@@ -14,6 +18,7 @@ export const datasetRouter = createTRPCRouter({
         z.object({
           datasetId: z.string().optional(),
           projectId: z.string(),
+          datasetRecords: z.array(datasetRecordEntrySchema).optional(),
         }),
         datasetRecordFormSchema
       )
@@ -21,7 +26,7 @@ export const datasetRouter = createTRPCRouter({
     .use(checkUserPermissionForProject(TeamRoleGroup.DATASETS_MANAGE))
     .mutation(async ({ ctx, input }) => {
       if (input.datasetId) {
-        return ctx.prisma.dataset.update({
+        return await ctx.prisma.dataset.update({
           where: {
             id: input.datasetId,
             projectId: input.projectId,
@@ -31,33 +36,46 @@ export const datasetRouter = createTRPCRouter({
             columnTypes: input.columnTypes,
           },
         });
-      } else {
-        const slug = slugify(input.name, { lower: true });
+      }
 
-        const existingDataset = await ctx.prisma.dataset.findFirst({
-          where: {
-            slug: slug,
-            projectId: input.projectId,
-          },
-        });
+      const slug = slugify(input.name.replace("_", "-"), {
+        lower: true,
+        strict: true,
+      });
 
-        if (existingDataset) {
-          throw new TRPCError({
-            code: "CONFLICT",
-            message: "A dataset with this name already exists.",
-          });
-        }
+      const existingDataset = await ctx.prisma.dataset.findFirst({
+        where: {
+          slug: slug,
+          projectId: input.projectId,
+        },
+      });
 
-        return ctx.prisma.dataset.create({
-          data: {
-            id: nanoid(),
-            slug,
-            name: input.name,
-            projectId: input.projectId,
-            columnTypes: input.columnTypes,
-          },
+      if (existingDataset) {
+        throw new TRPCError({
+          code: "CONFLICT",
+          message: "A dataset with this name already exists.",
         });
       }
+
+      const dataset = await ctx.prisma.dataset.create({
+        data: {
+          id: nanoid(),
+          slug,
+          name: input.name,
+          projectId: input.projectId,
+          columnTypes: input.columnTypes,
+        },
+      });
+
+      if (input.datasetRecords) {
+        await createManyDatasetRecords({
+          datasetId: dataset.id,
+          projectId: input.projectId,
+          datasetRecords: input.datasetRecords,
+        });
+      }
+
+      return dataset;
     }),
   getAll: protectedProcedure
     .input(z.object({ projectId: z.string() }))
@@ -70,8 +88,8 @@ export const datasetRouter = createTRPCRouter({
         where: { projectId, archivedAt: null },
         orderBy: { createdAt: "desc" },
         include: {
-          datasetRecords: {
-            orderBy: { createdAt: "desc" },
+          _count: {
+            select: { datasetRecords: true },
           },
         },
       });
@@ -98,12 +116,26 @@ export const datasetRouter = createTRPCRouter({
     )
     .use(checkUserPermissionForProject(TeamRoleGroup.DATASETS_MANAGE))
     .mutation(async ({ ctx, input }) => {
+      const datasetName = (
+        await ctx.prisma.dataset.findFirst({
+          where: {
+            id: input.datasetId,
+            projectId: input.projectId,
+          },
+        })
+      )?.name;
+      const slug = slugify(datasetName?.replace("_", "-") ?? "", {
+        lower: true,
+        strict: true,
+      });
+
       await ctx.prisma.dataset.update({
         where: {
           id: input.datasetId,
           projectId: input.projectId,
         },
         data: {
+          slug: input.undo ? slug : `${slug}-archived-${nanoid()}`,
           archivedAt: input.undo ? null : new Date(),
         },
       });

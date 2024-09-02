@@ -25,9 +25,8 @@ import { cleanupPIIs } from "./collector/piiCheck";
 import { addInputAndOutputForRAGs } from "./collector/rag";
 import { scoreSatisfactionFromInput } from "./collector/satisfaction";
 import { getTraceInput, getTraceOutput } from "./collector/trace";
-import { scheduleTraceChecks } from "./collector/traceChecks";
 import type { QueryDslBoolQuery } from "@elastic/elasticsearch/lib/api/types";
-import { mapEvaluations } from "./collector/evaluations";
+import { mapEvaluations, scheduleEvaluations } from "./collector/evaluations";
 
 const debug = getDebugger("langwatch:workers:collectorWorker");
 
@@ -280,7 +279,7 @@ export const processCollectorJob = async (
     !existingTrace?.inserted_at ||
     existingTrace.inserted_at > Date.now() - 30 * 1000
   ) {
-    void scheduleTraceChecks(trace, spans);
+    void scheduleEvaluations(trace, spans);
   }
 
   void markProjectFirstMessage(project);

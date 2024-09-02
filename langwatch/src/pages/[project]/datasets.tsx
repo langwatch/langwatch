@@ -24,18 +24,21 @@ import {
   useToast,
 } from "@chakra-ui/react";
 
-import { DeleteIcon } from "@chakra-ui/icons";
+import { DeleteIcon, EditIcon } from "@chakra-ui/icons";
 import { useRouter } from "next/router";
-import { MoreVertical, Play } from "react-feather";
+import { MoreVertical, Play, Upload } from "react-feather";
 import { AddOrEditDatasetDrawer } from "../../components/AddOrEditDatasetDrawer";
 import { useDrawer } from "../../components/CurrentDrawer";
 import { DashboardLayout } from "../../components/DashboardLayout";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
 import type { DatasetColumns } from "../../server/datasets/types";
+import { UploadCSVModal } from "../../components/datasets/UploadCSVModal";
+import { useState } from "react";
 
 export default function Datasets() {
-  const { isOpen, onOpen, onClose } = useDisclosure();
+  const addEditDatasetDrawer = useDisclosure();
+  const uploadCSVModal = useDisclosure();
   const { project } = useOrganizationTeamProject();
   const router = useRouter();
   const { openDrawer } = useDrawer();
@@ -43,17 +46,18 @@ export default function Datasets() {
 
   const datasets = api.dataset.getAll.useQuery(
     { projectId: project?.id ?? "" },
-    {
-      enabled: !!project,
-    }
+    { enabled: !!project }
   );
 
-  const onSuccess = () => {
-    void datasets.refetch();
-    onClose();
-  };
-
   const datasetDelete = api.dataset.deleteById.useMutation();
+  const [editDataset, setEditDataset] = useState<
+    | {
+        datasetId: string;
+        name: string;
+        columnTypes: DatasetColumns;
+      }
+    | undefined
+  >();
 
   const deleteDataset = (id: string, name: string) => {
     datasetDelete.mutate(
@@ -88,7 +92,7 @@ export default function Datasets() {
                             isClosable: true,
                             position: "top-right",
                           });
-                          onClose();
+                          addEditDatasetDrawer.onClose();
                         },
                       }
                     );
@@ -130,11 +134,17 @@ export default function Datasets() {
   return (
     <DashboardLayout>
       <Container maxW={"calc(100vw - 200px)"} padding={6} marginTop={8}>
-        <HStack width="full" align="top">
+        <HStack width="full" align="top" spacing={6}>
           <Heading as={"h1"} size="lg" paddingBottom={6} paddingTop={1}>
             Datasets and Evaluations
           </Heading>
           <Spacer />
+          <Button
+            onClick={() => uploadCSVModal.onOpen()}
+            rightIcon={<Upload height={17} width={17} strokeWidth={2.5} />}
+          >
+            Upload CSV
+          </Button>
           <Button
             colorScheme="blue"
             onClick={() => {
@@ -150,7 +160,7 @@ export default function Datasets() {
           <Button
             colorScheme="blue"
             onClick={() => {
-              onOpen();
+              addEditDatasetDrawer.onOpen();
             }}
             minWidth="fit-content"
           >
@@ -203,12 +213,9 @@ export default function Datasets() {
                                 ))}
                               </HStack>
                             </Td>
-                            <Td>{dataset.datasetRecords.length ?? 0}</Td>
+                            <Td>{dataset._count.datasetRecords ?? 0}</Td>
                             <Td>
-                              {new Date(
-                                dataset.datasetRecords[0]?.createdAt ??
-                                  dataset.createdAt
-                              ).toLocaleString()}
+                              {new Date(dataset.createdAt).toLocaleString()}
                             </Td>
                             <Td>
                               <Menu>
@@ -222,6 +229,21 @@ export default function Datasets() {
                                   <MoreVertical />
                                 </MenuButton>
                                 <MenuList>
+                                  <MenuItem
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      setEditDataset({
+                                        datasetId: dataset.id,
+                                        name: dataset.name,
+                                        columnTypes:
+                                          dataset.columnTypes as DatasetColumns,
+                                      });
+                                      addEditDatasetDrawer.onOpen();
+                                    }}
+                                    icon={<EditIcon />}
+                                  >
+                                    Edit dataset
+                                  </MenuItem>
                                   <MenuItem
                                     color="red.600"
                                     onClick={(event) => {
@@ -247,9 +269,25 @@ export default function Datasets() {
         </Card>
       </Container>
       <AddOrEditDatasetDrawer
-        isOpen={isOpen}
-        onClose={onClose}
-        onSuccess={onSuccess}
+        isOpen={addEditDatasetDrawer.isOpen}
+        onClose={() => {
+          setEditDataset(undefined);
+          addEditDatasetDrawer.onClose();
+        }}
+        datasetToSave={editDataset}
+        onSuccess={() => {
+          void datasets.refetch();
+          setEditDataset(undefined);
+          addEditDatasetDrawer.onClose();
+        }}
+      />
+      <UploadCSVModal
+        isOpen={uploadCSVModal.isOpen}
+        onClose={uploadCSVModal.onClose}
+        onSuccess={() => {
+          void datasets.refetch();
+          addEditDatasetDrawer.onClose();
+        }}
       />
     </DashboardLayout>
   );

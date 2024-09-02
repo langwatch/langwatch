@@ -148,7 +148,7 @@ async function submitUserMessage(content: string) {
   Besides that, you can also chat with users and do some calculations if needed.`
 
   const span = trace.startLLMSpan({
-    model: 'gpt-3.5-turbo',
+    model: 'gpt-4o-mini',
     input: {
       type: 'chat_messages',
       value: [

@@ -1,3 +1,8 @@
+import {
+  reservedSpanParamsSchema,
+  reservedTraceMetadataSchema
+} from "./server/types/tracer.generated";
+
 export type Strict<T> = T & { [K in Exclude<keyof any, keyof T>]: never };
 
 type SnakeToCamelCase<S extends string> = S extends `${infer T}_${infer U}`
@@ -44,7 +49,10 @@ function camelToSnakeCase(str: string): string {
   return str.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`);
 }
 
-export function camelToSnakeCaseNested<T>(obj: T): CamelToSnakeCaseNested<T> {
+export function camelToSnakeCaseNested<T>(
+  obj: T,
+  parentKey?: string
+): CamelToSnakeCaseNested<T> {
   if (Array.isArray(obj)) {
     return obj.map((item) =>
       camelToSnakeCaseNested(item)
@@ -54,7 +62,17 @@ export function camelToSnakeCaseNested<T>(obj: T): CamelToSnakeCaseNested<T> {
     for (const key in obj) {
       if (obj.hasOwnProperty(key)) {
         const newKey = camelToSnakeCase(key);
-        newObj[newKey] = camelToSnakeCaseNested((obj as any)[key]);
+        // Keep arbitrary keys the same
+        if (
+          (parentKey === "metadata" &&
+            !Object.keys(reservedTraceMetadataSchema.shape).includes(newKey)) ||
+          (parentKey === "params" &&
+            !Object.keys(reservedSpanParamsSchema.shape).includes(newKey))
+        ) {
+          newObj[key] = (obj as any)[key];
+        } else {
+          newObj[newKey] = camelToSnakeCaseNested((obj as any)[key], newKey);
+        }
       }
     }
     return newObj as CamelToSnakeCaseNested<T>;

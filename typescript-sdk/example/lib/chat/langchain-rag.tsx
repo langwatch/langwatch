@@ -85,7 +85,7 @@ async function submitUserMessage(message: string) {
   })
 
   const prompt = ChatPromptTemplate.fromMessages(messages)
-  const model = new ChatOpenAI({ model: 'gpt-3.5-turbo' })
+  const model = new ChatOpenAI({ model: 'gpt-4o-mini' })
   const retriever = new CustomRetriever()
   const outputParser = new StringOutputParser()
 

@@ -4,10 +4,10 @@ import {
   type RAGSpan,
   type Span,
   type Trace,
-} from "../server/tracer/types";
-import { getEvaluatorDefinitions } from "../trace_checks/getEvaluator";
-import type { CheckPreconditions } from "../trace_checks/types";
-import { extractRAGTextualContext } from "../server/background/workers/collector/rag";
+} from "../tracer/types";
+import { getEvaluatorDefinitions } from "./getEvaluator";
+import type { CheckPreconditions } from "./types";
+import { extractRAGTextualContext } from "../background/workers/collector/rag";
 
 // TODO: write tests
 export function evaluatePreconditions(

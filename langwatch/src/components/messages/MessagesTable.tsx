@@ -52,7 +52,7 @@ import {
 } from "react-feather";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { Trace, ElasticSearchEvaluation } from "~/server/tracer/types";
-import { getEvaluatorDefinitions } from "~/trace_checks/getEvaluator";
+import { getEvaluatorDefinitions } from "~/server/evaluations/getEvaluator";
 import { api } from "~/utils/api";
 import { durationColor } from "~/utils/durationColor";
 import { getSingleQueryParam } from "~/utils/getSingleQueryParam";
@@ -239,7 +239,9 @@ export function MessagesTable() {
                     : "N/A"}
                 </Text>
               ) : (
-                <Text color={traceCheck ? evaluationStatusColor(traceCheck) : ""}>
+                <Text
+                  color={traceCheck ? evaluationStatusColor(traceCheck) : ""}
+                >
                   {titleCase(traceCheck?.status ?? "-")}
                 </Text>
               )}
@@ -330,7 +332,7 @@ export function MessagesTable() {
         >
           <Tooltip label={trace.input?.value ?? ""}>
             <Text noOfLines={1} wordBreak="break-all" display="block">
-              {trace.input?.value ?? ""}
+              {trace.input?.value ? trace.input?.value : "<empty>"}
             </Text>
           </Tooltip>
         </Td>
@@ -380,15 +382,15 @@ export function MessagesTable() {
                   : undefined
               }
             >
-              {trace.output?.value ? (
-                <Text noOfLines={1} display="block" maxWidth="300px">
-                  {trace.output?.value}
-                </Text>
-              ) : trace.lastGuardrail ? (
+              {trace.lastGuardrail ? (
                 <Tag colorScheme="blue" paddingLeft={2}>
                   <TagLeftIcon boxSize="16px" as={Shield} />
                   <TagLabel>Blocked by Guardrail</TagLabel>
                 </Tag>
+              ) : trace.output?.value ? (
+                <Text noOfLines={1} display="block" maxWidth="300px">
+                  {trace.output?.value}
+                </Text>
               ) : (
                 <Text>{"<empty>"}</Text>
               )}

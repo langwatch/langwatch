@@ -3,11 +3,9 @@ import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { TeamRoleGroup, checkUserPermissionForProject } from "../permission";
 import { type DatasetRecord } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
-import {
-  newDatasetEntriesSchema,
-  type DatasetColumns,
-} from "../../datasets/types";
+import { newDatasetEntriesSchema, type DatasetRecordEntry } from "../../datasets/types";
 import { nanoid } from "nanoid";
+import { prisma } from "../../db";
 
 export const datasetRecordRouter = createTRPCRouter({
   create: protectedProcedure
@@ -36,26 +34,10 @@ export const datasetRecordRouter = createTRPCRouter({
         });
       }
 
-      const recordData: DatasetRecord[] = [];
-
-      for (const entry of input.entries) {
-        const id = entry.id ?? nanoid();
-        const entryWithoutId: Omit<typeof entry, "id"> = { ...entry };
-        // @ts-ignore
-        delete entryWithoutId.id;
-
-        recordData.push({
-          id,
-          entry: entryWithoutId,
-          datasetId: input.datasetId,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-          projectId: input.projectId,
-        });
-      }
-
-      return ctx.prisma.datasetRecord.createMany({
-        data: recordData as (DatasetRecord & { entry: any })[],
+      return createManyDatasetRecords({
+        datasetId: input.datasetId,
+        projectId: input.projectId,
+        datasetRecords: input.entries,
       });
     }),
   update: protectedProcedure
@@ -85,26 +67,6 @@ export const datasetRecordRouter = createTRPCRouter({
 
       const { recordId, updatedRecord } = input;
 
-      const updatedData: any = {};
-      for (const [key, value] of Object.entries(updatedRecord)) {
-        const type_ = (dataset.columnTypes as DatasetColumns).find(
-          (col) => col.name === key
-        )?.type;
-        if (type_ === "string") {
-          updatedData[key] = value ?? "";
-        } else {
-          if (typeof value === "string") {
-            try {
-              updatedData[key] = JSON.parse(value);
-            } catch (e) {
-              updatedData[key] = value;
-            }
-          } else {
-            updatedData[key] = value;
-          }
-        }
-      }
-
       const record = await ctx.prisma.datasetRecord.findUnique({
         where: { id: recordId, projectId: dataset.projectId },
       });
@@ -113,14 +75,14 @@ export const datasetRecordRouter = createTRPCRouter({
         await ctx.prisma.datasetRecord.update({
           where: { id: recordId, projectId: dataset.projectId },
           data: {
-            entry: updatedData,
+            entry: updatedRecord,
           },
         });
       } else {
         await ctx.prisma.datasetRecord.create({
           data: {
             id: recordId,
-            entry: updatedData,
+            entry: updatedRecord,
             datasetId: input.datasetId,
             projectId: input.projectId,
           },
@@ -188,3 +150,35 @@ export const datasetRecordRouter = createTRPCRouter({
       return { deletedCount: count };
     }),
 });
+
+export const createManyDatasetRecords = async ({
+  datasetId,
+  projectId,
+  datasetRecords,
+}: {
+  datasetId: string;
+  projectId: string;
+  datasetRecords: DatasetRecordEntry[];
+}) => {
+  const recordData: DatasetRecord[] = [];
+
+  for (const entry of datasetRecords) {
+    const id = entry.id ?? nanoid();
+    const entryWithoutId: Omit<typeof entry, "id"> = { ...entry };
+    // @ts-ignore
+    delete entryWithoutId.id;
+
+    recordData.push({
+      id,
+      entry: entryWithoutId,
+      datasetId,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      projectId,
+    });
+  }
+
+  return prisma.datasetRecord.createMany({
+    data: recordData as (DatasetRecord & { entry: any })[],
+  });
+};

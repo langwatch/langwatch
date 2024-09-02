@@ -1,8 +1,18 @@
-import type { ElasticSearchEvaluation } from "../../../tracer/types";
-import type { CollectorJob } from "../../types";
-import { elasticSearchEvaluationSchema } from "../../../tracer/types.generated";
+import { EvaluationExecutionMode } from "@prisma/client";
 import crypto from "crypto";
 import slugify from "slugify";
+import type { EvaluatorTypes } from "../../../../server/evaluations/evaluators.generated";
+import { evaluatePreconditions } from "../../../../server/evaluations/preconditions";
+import type { CheckPreconditions } from "../../../../server/evaluations/types";
+import { getDebugger } from "../../../../utils/logger";
+import { prisma } from "../../../db";
+import type { ElasticSearchEvaluation } from "../../../tracer/types";
+import { type ElasticSearchTrace, type Span } from "../../../tracer/types";
+import { elasticSearchEvaluationSchema } from "../../../tracer/types.generated";
+import { scheduleTraceCheck } from "../../queues/traceChecksQueue";
+import type { CollectorJob } from "../../types";
+
+const debug = getDebugger("langwatch:evaluations");
 
 export const evaluationNameAutoslug = (name: string) => {
   const autoslug = slugify(name || "unnamed", {
@@ -52,4 +62,58 @@ export const mapEvaluations = (
       .reverse();
 
   return uniqueByCheckIdKeepingLast;
+};
+
+export const scheduleEvaluations = async (
+  trace: ElasticSearchTrace,
+  spans: Span[]
+) => {
+  const isOutputEmpty = !trace.output?.value;
+  const lastOutput = spans.reverse()[0]?.output;
+  const blockedByGuardrail =
+    isOutputEmpty &&
+    lastOutput?.type === "guardrail_result" &&
+    lastOutput?.value?.passed === false;
+  if (blockedByGuardrail) {
+    return;
+  }
+
+  const checks = await prisma.check.findMany({
+    where: {
+      projectId: trace.project_id,
+      enabled: true,
+      executionMode: EvaluationExecutionMode.ON_MESSAGE,
+    },
+  });
+
+  const traceChecksSchedulings = [];
+  for (const check of checks) {
+    if (Math.random() <= check.sample) {
+      const preconditions = (check.preconditions ?? []) as CheckPreconditions;
+      const preconditionsMet = evaluatePreconditions(
+        check.checkType,
+        trace,
+        spans,
+        preconditions
+      );
+      if (preconditionsMet) {
+        debug(
+          `scheduling ${check.checkType} (checkId: ${check.id}) for trace ${trace.trace_id}`
+        );
+        traceChecksSchedulings.push(
+          scheduleTraceCheck({
+            check: {
+              evaluation_id: check.id, // Keep the same as evaluator id so multiple jobs for this trace will update the same evaluation state
+              evaluator_id: check.id,
+              type: check.checkType as EvaluatorTypes,
+              name: check.name,
+            },
+            trace: trace,
+          })
+        );
+      }
+    }
+  }
+
+  await Promise.all(traceChecksSchedulings);
 };

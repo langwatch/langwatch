@@ -63,13 +63,17 @@ export const getLastOutputAsText = (spans: Span[]): string => {
   // First we try to see if the topLevel node has a valid output, if so, we go with that, so users
   // can take control of which output to use by controlling the top level one by hand, even if it
   // doesn't finish last because of some background process span being captured
-  const topLevelNode = flattenSpanTree(
+  const topLevelNodes = flattenSpanTree(
     organizeSpansIntoTree(spans),
     "inside-out"
-  ).reverse()[0];
+  )
+    .filter(nonEmptySpan)
+    .reverse();
+  const singleTopLevelNode =
+    topLevelNodes.length === 1 ? topLevelNodes[0] : undefined;
 
-  if (topLevelNode?.output && !isEmptyJson(topLevelNode.output.value)) {
-    return typedValueToText(topLevelNode.output, true);
+  if (singleTopLevelNode?.output) {
+    return typedValueToText(singleTopLevelNode.output, true);
   }
 
   // If the top-level node has no output, then for getting the best text that represents the output,

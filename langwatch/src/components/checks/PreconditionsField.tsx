@@ -12,11 +12,11 @@ import { Controller, useFormContext } from "react-hook-form";
 import type {
   CheckPrecondition,
   CheckPreconditionFields,
-} from "../../trace_checks/types";
+} from "../../server/evaluations/types";
 import { HorizontalFormControl } from "../HorizontalFormControl";
 import { HelpCircle, X } from "react-feather";
 import { SmallLabel } from "../SmallLabel";
-import { getEvaluatorDefinitions } from "../../trace_checks/getEvaluator";
+import { getEvaluatorDefinitions } from "../../server/evaluations/getEvaluator";
 import { useEffect } from "react";
 
 const ruleOptions: Record<CheckPrecondition["rule"], string> = {

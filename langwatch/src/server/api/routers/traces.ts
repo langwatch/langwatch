@@ -16,9 +16,9 @@ import {
   publicProcedure,
 } from "~/server/api/trpc";
 import { prisma } from "~/server/db";
-import { evaluatorsSchema } from "../../../trace_checks/evaluators.zod.generated";
-import { evaluatePreconditions } from "../../../trace_checks/preconditions";
-import { checkPreconditionSchema } from "../../../trace_checks/types.generated";
+import { evaluatorsSchema } from "../../evaluations/evaluators.zod.generated";
+import { evaluatePreconditions } from "../../evaluations/preconditions";
+import { checkPreconditionSchema } from "../../evaluations/types.generated";
 
 import { sharedFiltersInputSchema } from "../../analytics/types";
 import { TRACE_INDEX, esClient, traceIndexId } from "../../elasticsearch";
@@ -527,10 +527,18 @@ export const getAllTracesForProject = async (
         | undefined = lastGuardrailSpans?.flatMap((span) =>
         (span?.output ? [span.output] : [])
           .filter((output) => output.type === "guardrail_result")
-          .map((output) => ({
-            ...((output.value as unknown as EvaluationResult) || {}),
-            name: guardrailsSlugToName[span.name ?? ""],
-          }))
+          .map((output) => {
+            let value = (output.value as unknown as EvaluationResult) || {};
+            if (typeof value === "string") {
+              try {
+                value = JSON.parse(value);
+              } catch {}
+            }
+            return {
+              ...value,
+              name: guardrailsSlugToName[span.name ?? ""],
+            };
+          })
           .filter((output) => !(output as EvaluationResult)?.passed)
       )[0];
 

@@ -13,14 +13,14 @@ import { ClientSideRowModelModule } from "@ag-grid-community/client-side-row-mod
 import { ModuleRegistry, type ColDef } from "@ag-grid-community/core";
 import "@ag-grid-community/styles/ag-grid.css";
 import "@ag-grid-community/styles/ag-theme-balham.css";
-import { z } from "zod";
+import React from "react";
 import {
   datasetColumnTypeMapping,
+  jsonSchema,
   type DatasetColumnType,
 } from "../../server/datasets/types";
 import { RenderInputOutput } from "../traces/RenderInputOutput";
 import { MultilineJSONCellEditor } from "./MultilineJSONCellEditor";
-import React from "react";
 
 ModuleRegistry.registerModules([ClientSideRowModelModule]);
 
@@ -63,11 +63,12 @@ export const DatasetGrid = React.memo(
           if (!basicTypes.includes(column.type_)) {
             return {
               ...column,
+              cellDataType: "object",
               cellRenderer: JSONCellRenderer,
               cellEditor: (props: CustomCellEditorProps) => (
                 <MultilineJSONCellEditor
                   zodValidator={
-                    datasetColumnTypeMapping[column.type_] ?? z.any()
+                    datasetColumnTypeMapping[column.type_] ?? jsonSchema
                   }
                   {...props}
                 />
@@ -86,6 +87,26 @@ export const DatasetGrid = React.memo(
                 />
               ),
             };
+          } else if (column.type_ === "number") {
+            return {
+              ...column,
+              cellRenderer: (props: CustomCellRendererProps) => {
+                let text = props.value;
+                if (
+                  props.value === null ||
+                  props.value === undefined ||
+                  props.value === ""
+                ) {
+                  text = "";
+                }
+                if (isNaN(props.value)) {
+                  text = "Invalid Number";
+                }
+
+                return <Text {...props}>{text}</Text>;
+              },
+              cellDataType: "number",
+            };
           } else {
             return {
               ...column,
@@ -102,13 +123,23 @@ export const DatasetGrid = React.memo(
     }, [props.columnDefs]);
 
     return (
-      <div className="ag-theme-balham">
+      <div className="ag-theme-balham" style={{ height: "100%" }}>
         <style>{`
+        .ag-borderless .ag-root-wrapper {
+          border: none;
+        }
         .ag-theme-balham .ag-cell {
           white-space: pre-wrap; /* Enable word wrapping */
           overflow: visible; /* Ensure the cell expands to fit content */
           line-height: 1.6em;
           border-right: var(--ag-borders-critical) var(--ag-row-border-color);
+        }
+        .ag-theme-balham .ag-cell-value {
+          max-height: 300px;
+          overflow: auto;
+        }
+        .dataset-preview .ag-theme-balham .ag-cell {
+          white-space: nowrap;
         }
         .ag-pinned-left-cols-container .ag-cell-value {
           white-space: nowrap;

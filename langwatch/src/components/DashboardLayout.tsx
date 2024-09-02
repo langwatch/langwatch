@@ -572,7 +572,7 @@ export const DashboardLayout = ({
                   fontSize={14}
                   paddingY={1.5}
                   height="auto"
-                  value={query}
+                  value={query ?? router.query.query}
                   onChange={(e) => setQuery(e.target.value)}
                 />
               </InputGroup>
