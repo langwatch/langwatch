@@ -112,7 +112,6 @@ const createIndexes = async (lastMigration: string) => {
       number_of_replicas: 0,
     };
 
-    console.log(process.env.IS_OPENSEARCH);
     if (process.env.IS_OPENSEARCH === "true") {
       settings.index = {
         knn: true,
