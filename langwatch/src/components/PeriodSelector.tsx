@@ -164,12 +164,12 @@ export function PeriodSelector({
                 <Input
                   type="date"
                   value={format(startDate, "yyyy-MM-dd")}
-                  onChange={(e) => {
+                  onChange={(e) =>
                     setPeriod(
-                      startOfDay(new Date(e.target.value.replace(/-/g, "/"))),
+                      startOfDay(new Date(e.target.value + "T00:00:00")),
                       endDate
-                    );
-                  }}
+                    )
+                  }
                 />
               </FormControl>
               <FormControl>
@@ -180,7 +180,7 @@ export function PeriodSelector({
                   onChange={(e) =>
                     setPeriod(
                       startDate,
-                      endOfDay(new Date(e.target.value.replace(/-/g, "/")))
+                      endOfDay(new Date(e.target.value + "T00:00:00"))
                     )
                   }
                 />
