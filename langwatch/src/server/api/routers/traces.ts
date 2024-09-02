@@ -446,50 +446,50 @@ export const getAllTracesForProject = async (
       : {}),
     body: {
       query: pivotIndexConditions,
-    },
-    ...(input.sortBy
-      ? input.sortBy.startsWith("random.")
-        ? {
-            sort: {
-              _script: {
-                type: "number",
-                script: {
-                  source: "Math.random()",
+      ...(input.sortBy
+        ? input.sortBy.startsWith("random.")
+          ? {
+              sort: {
+                _script: {
+                  type: "number",
+                  script: {
+                    source: "Math.random()",
+                  },
+                  order: input.sortDirection ?? "desc",
                 },
-                order: input.sortDirection ?? "desc",
-              },
-            } as Sort,
-          }
-        : input.sortBy.startsWith("evaluations.")
-        ? {
-            sort: {
-              "evaluations.score": {
-                order: input.sortDirection ?? "desc",
-                nested: {
-                  path: "evaluations",
-                  filter: {
-                    term: {
-                      "evaluations.evaluator_id": input.sortBy.split(".")[1],
+              } as Sort,
+            }
+          : input.sortBy.startsWith("evaluations.")
+          ? {
+              sort: {
+                "evaluations.score": {
+                  order: input.sortDirection ?? "desc",
+                  nested: {
+                    path: "evaluations",
+                    filter: {
+                      term: {
+                        "evaluations.evaluator_id": input.sortBy.split(".")[1],
+                      },
                     },
                   },
                 },
-              },
-            } as Sort,
-          }
+              } as Sort,
+            }
+          : {
+              sort: {
+                [input.sortBy]: {
+                  order: input.sortDirection ?? "desc",
+                },
+              } as Sort,
+            }
         : {
             sort: {
-              [input.sortBy]: {
-                order: input.sortDirection ?? "desc",
+              "timestamps.started_at": {
+                order: "desc",
               },
             } as Sort,
-          }
-      : {
-          sort: {
-            "timestamps.started_at": {
-              order: "desc",
-            },
-          } as Sort,
-        }),
+          }),
+    },
   });
 
   const guardrailsSlugToName = Object.fromEntries(
