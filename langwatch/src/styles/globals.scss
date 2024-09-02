@@ -13,6 +13,11 @@ a {
   box-sizing: border-box;
 }
 
+.fade-in {
+  opacity: 1;
+  animation: fadeIn 0.1s ease-out;
+}
+
 @keyframes fadeIn {
   0% {
     opacity: 0;

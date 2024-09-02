@@ -37,7 +37,7 @@ type WorkflowStore = Workflow & {
     executionState: BaseComponent["execution_state"]
   ) => void;
   setHoveredNodeId: (nodeId: string | undefined) => void;
-  selectNode: (nodeId: string) => void;
+  setSelectedNode: (nodeId: string) => void;
   deselectAllNodes: () => void;
   setPropertiesExpanded: (expanded: boolean) => void;
 };
@@ -165,17 +165,33 @@ const store = (
     executionState: BaseComponent["execution_state"]
   ) => {
     set({
-      nodes: get().nodes.map((node) =>
-        node.id === id
-          ? { ...node, data: { ...node.data, execution_state: executionState } }
-          : node
-      ),
+      nodes: get().nodes.map((node) => {
+        if (node.id === id) {
+          const current_execution_state = node.data.execution_state;
+          const timestamps = current_execution_state?.timestamps;
+          return {
+            ...node,
+            data: {
+              ...node.data,
+              execution_state: {
+                ...(current_execution_state ?? {}),
+                ...executionState,
+                timestamps: {
+                  ...(timestamps ?? {}),
+                  ...(executionState?.timestamps ?? {}),
+                },
+              },
+            },
+          } as Node<Component>;
+        }
+        return node;
+      }),
     });
   },
   setHoveredNodeId: (nodeId: string | undefined) => {
     set({ hoveredNodeId: nodeId });
   },
-  selectNode: (nodeId: string) => {
+  setSelectedNode: (nodeId: string) => {
     set({
       nodes: get().nodes.map((node) =>
         node.id === nodeId ? { ...node, selected: true } : node

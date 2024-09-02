@@ -5,7 +5,11 @@ from fastapi import FastAPI, Response, BackgroundTasks
 from fastapi.responses import StreamingResponse
 import json
 
-from langwatch_nlp.studio.types.dsl import ComponentState, ExecutionState, Timestamps
+from langwatch_nlp.studio.types.dsl import (
+    ComponentExecutionStatus,
+    ExecutionState,
+    Timestamps,
+)
 from .types.events import (
     ComponentStateChange,
     ComponentStateChangePayload,
@@ -25,13 +29,15 @@ app = FastAPI()
 async def execute_component(event: ExecuteComponentPayload):
     yield Debug(payload=DebugPayload(message="executing component"))
 
+    started_at = int(time.time() * 1000)
+
     yield ComponentStateChange(
         payload=ComponentStateChangePayload(
             component_id=event.node.id,
             execution_state=ExecutionState(
-                state=ComponentState.running,
+                status=ComponentExecutionStatus.running,
                 trace_id=event.trace_id,
-                timestamps=Timestamps(started_at=int(time.time() * 1000)),
+                timestamps=Timestamps(started_at=started_at),
             ),
         )
     )
@@ -42,7 +48,7 @@ async def execute_component(event: ExecuteComponentPayload):
         payload=ComponentStateChangePayload(
             component_id=event.node.id,
             execution_state=ExecutionState(
-                state=ComponentState.success,
+                status=ComponentExecutionStatus.success,
                 trace_id=event.trace_id,
                 timestamps=Timestamps(finished_at=int(time.time() * 1000)),
                 outputs={
@@ -70,7 +76,7 @@ async def execute_event(
                         payload=ComponentStateChangePayload(
                             component_id=event.payload.node.id,
                             execution_state=ExecutionState(
-                                state=ComponentState.error,
+                                status=ComponentExecutionStatus.error,
                                 trace_id=event.payload.trace_id,
                                 error=repr(e),
                             ),
@@ -87,7 +93,7 @@ async def execute_event(
 
 async def event_encoder(event_generator: AsyncGenerator[StudioServerEvent, None]):
     async for event in event_generator:
-        yield f"data: {json.dumps(event.model_dump())}\n\n"
+        yield f"data: {json.dumps(event.model_dump(exclude_none=True))}\n\n"
 
 
 @app.post("/execute")

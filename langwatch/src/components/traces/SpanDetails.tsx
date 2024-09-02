@@ -13,7 +13,11 @@ import numeral from "numeral";
 import { Clock, Settings } from "react-feather";
 import { TraceToPlaygroundLink } from "../TraceToPlaygroundLink";
 import { RenderInputOutput } from "./RenderInputOutput";
-import type { ElasticSearchSpan, EvaluationResult } from "../../server/tracer/types";
+import type {
+  ElasticSearchSpan,
+  ErrorCapture,
+  EvaluationResult,
+} from "../../server/tracer/types";
 import type { Project } from "@prisma/client";
 import { formatMilliseconds } from "../../utils/formatMilliseconds";
 import { durationColor } from "../../utils/durationColor";
@@ -326,7 +330,14 @@ export const SpanDuration = ({
   span,
   renderFirstTokenDuration = false,
 }: {
-  span: ElasticSearchSpan;
+  span: {
+    error?: ErrorCapture | string | null;
+    timestamps: {
+      started_at: number;
+      first_token_at?: number | null;
+      finished_at: number;
+    };
+  };
   renderFirstTokenDuration?: boolean;
 }) => {
   const startedAt = span.timestamps.started_at;

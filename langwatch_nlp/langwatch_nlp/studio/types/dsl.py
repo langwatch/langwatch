@@ -29,7 +29,7 @@ class Field(BaseModel):
     hidden: Optional[bool] = None
 
 
-class ComponentState(str, Enum):
+class ComponentExecutionStatus(str, Enum):
     idle = "idle"
     running = "running"
     success = "success"
@@ -51,7 +51,7 @@ class Timestamps(BaseModel):
 
 
 class ExecutionState(BaseModel):
-    state: ComponentState
+    status: ComponentExecutionStatus
     trace_id: Optional[str] = None
     span_id: Optional[str] = None
     error: Optional[str] = None
@@ -144,7 +144,7 @@ class Flow(BaseModel):
     edges: List[Edge]
 
 
-class ExecutionStateEnum(str, Enum):
+class WorkflowExecutionStatus(str, Enum):
     idle = "idle"
     running = "running"
     success = "success"
@@ -157,7 +157,7 @@ class EntryMethod(BaseModel):
 
 
 class WorkflowExecutionState(BaseModel):
-    state: ExecutionStateEnum
+    status: WorkflowExecutionStatus
     trace_id: Optional[str] = None
     last_component_ref: Optional[str] = None
     entry: EntryMethod
@@ -171,7 +171,7 @@ class ExperimentState(BaseModel):
     experiment_id: Optional[str] = None
     run_id: Optional[str] = None
     run_name: Optional[str] = None
-    state: Optional[ExecutionStateEnum] = None
+    state: Optional[WorkflowExecutionStatus] = None
     timestamps: Optional[Timestamps] = None
 
 

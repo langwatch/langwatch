@@ -6,6 +6,7 @@ import {
   Spacer,
   Spinner,
   Text,
+  Tooltip,
   useDisclosure,
   VStack,
   type ButtonProps,
@@ -212,11 +213,25 @@ function ComponentNode(
     hidePlayButton?: boolean;
   }
 ) {
-  const { node, hoveredNodeId, setHoveredNodeId } = useWorkflowStore(
-    ({ nodes, hoveredNodeId, setHoveredNodeId }) => ({
+  const {
+    node,
+    hoveredNodeId,
+    setHoveredNodeId,
+    setSelectedNode,
+    setPropertiesExpanded,
+  } = useWorkflowStore(
+    ({
+      nodes,
+      hoveredNodeId,
+      setHoveredNodeId,
+      setSelectedNode,
+      setPropertiesExpanded,
+    }) => ({
       node: nodes.find((node) => node.id === props.id),
       hoveredNodeId,
       setHoveredNodeId,
+      setSelectedNode,
+      setPropertiesExpanded,
     })
   );
   const isHovered = hoveredNodeId === props.id;
@@ -239,6 +254,12 @@ function ComponentNode(
       }
       onMouseEnter={() => setHoveredNodeId(props.id)}
       onMouseLeave={() => setHoveredNodeId(undefined)}
+      onDoubleClick={() => {
+        setSelectedNode(props.id);
+        if (node && isExecutableComponent(node)) {
+          setPropertiesExpanded(true);
+        }
+      }}
     >
       <HStack spacing={2} width="full">
         <ComponentIcon type={props.type as ComponentType} size="md" />
@@ -290,47 +311,75 @@ export function ComponentExecutionButton({
   const { startComponentExecution } = useComponentExecution();
 
   const [isWaitingLong] = useDebounceValue(
-    node?.data.execution_state?.state === "waiting",
+    node?.data.execution_state?.status === "waiting",
     300
   );
 
+  const { propertiesExpanded, setPropertiesExpanded, setSelectedNode } =
+    useWorkflowStore(
+      ({ propertiesExpanded, setPropertiesExpanded, setSelectedNode }) => ({
+        propertiesExpanded,
+        setPropertiesExpanded,
+        setSelectedNode,
+      })
+    );
+
+  const shouldOpenExecutionResults =
+    node?.data.execution_state && !propertiesExpanded;
+
   return (
     <>
-      <Center minWidth="16px" minHeight="16px" maxWidth="16px" maxHeight="16px">
-        {isWaitingLong && node?.data.execution_state?.state === "waiting" && (
-          <Box marginLeft="-4px" marginRight="-4px">
-            <PulseLoader size={2} speedMultiplier={0.5} />
-          </Box>
-        )}
-        {((!isWaitingLong && node?.data.execution_state?.state === "waiting") ||
-          node?.data.execution_state?.state === "running") && (
-          <Spinner size="xs" />
-        )}
-        {node?.data.execution_state?.state === "error" && (
-          <Box color="red.500">
-            <X size={iconSize} />
-          </Box>
-        )}
-        {node?.data.execution_state?.state === "success" && (
-          <Box color="green.500">
-            <Check size={iconSize} />
-          </Box>
-        )}
-      </Center>
+      <Tooltip
+        label={shouldOpenExecutionResults ? "Execution results" : ""}
+        placement="top"
+        hasArrow
+      >
+        <Center
+          minWidth="24px"
+          minHeight="24px"
+          maxWidth="24px"
+          maxHeight="24px"
+          marginRight="-4px"
+          marginLeft="-4px"
+          role={shouldOpenExecutionResults ? "button" : undefined}
+          cursor={node?.data.execution_state ? "pointer" : undefined}
+          onClick={() => {
+            if (shouldOpenExecutionResults) {
+              setSelectedNode(node.id);
+              setPropertiesExpanded(true);
+            } else {
+              setPropertiesExpanded(false);
+            }
+          }}
+        >
+          {isWaitingLong &&
+            node?.data.execution_state?.status === "waiting" && (
+              <Box marginLeft="-4px" marginRight="-4px">
+                <PulseLoader size={2} speedMultiplier={0.5} />
+              </Box>
+            )}
+          {((!isWaitingLong &&
+            node?.data.execution_state?.status === "waiting") ||
+            node?.data.execution_state?.status === "running") && (
+            <Spinner size="xs" />
+          )}
+          {node?.data.execution_state?.status === "error" && (
+            <Box color="red.500">
+              <X size={iconSize} />
+            </Box>
+          )}
+          {node?.data.execution_state?.status === "success" && (
+            <Box color="green.500">
+              <Check size={iconSize} />
+            </Box>
+          )}
+        </Center>
+      </Tooltip>
       <Button
         variant="ghost"
         size="xs"
         onClick={() => {
-          node &&
-            startComponentExecution({
-              node,
-              inputs: Object.fromEntries(
-                node.data.inputs?.map((input) => [
-                  input.identifier,
-                  "foobar",
-                ]) ?? []
-              ),
-            });
+          node && startComponentExecution({ node });
         }}
         {...props}
       >

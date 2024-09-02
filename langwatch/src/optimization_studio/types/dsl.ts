@@ -22,7 +22,7 @@ export type Field = {
   hidden?: boolean;
 };
 
-export type ComponentState =
+export type ComponentExecutionStatus =
   | "idle"
   | "waiting"
   | "running"
@@ -50,7 +50,7 @@ export type BaseComponent = {
   };
 
   execution_state?: {
-    state: ComponentState;
+    status: ComponentExecutionStatus;
     trace_id?: string;
     span_id?: string;
     error?: string;
@@ -107,7 +107,7 @@ type Flow = {
   edges: Edge[];
 };
 
-export type ExecutionState = "idle" | "running" | "success" | "error";
+export type WorkflowExecutionStatus = "idle" | "running" | "success" | "error";
 
 export type Workflow = {
   spec_version: string;
@@ -123,7 +123,7 @@ export type Workflow = {
 
   state: {
     execution?: {
-      state: ExecutionState;
+      state: WorkflowExecutionStatus;
       trace_id?: string;
       last_component_ref?: string;
       entry:
@@ -142,7 +142,7 @@ export type Workflow = {
       experiment_id?: string;
       run_id?: string;
       run_name?: string;
-      state?: ExecutionState;
+      state?: WorkflowExecutionStatus;
       timestamps?: {
         started_at?: number;
         finished_at?: number;

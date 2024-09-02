@@ -42,7 +42,7 @@ export const useSocketClient = () => {
             data.payload.component_id,
             data.payload.execution_state
           );
-          if (data.payload.execution_state?.state === "error") {
+          if (data.payload.execution_state?.status === "error") {
             alertOnComponent({
               componentId: data.payload.component_id,
               execution_state: data.payload.execution_state,
@@ -61,7 +61,18 @@ export const useSocketClient = () => {
             isClosable: true,
           });
           break;
+        case "debug":
+          break;
         case "done":
+          break;
+        default:
+          toast({
+            title: "Unknown message type",
+            description: data.type,
+            status: "warning",
+            duration: 5000,
+            isClosable: true,
+          });
           break;
       }
     },

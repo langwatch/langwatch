@@ -1,15 +1,18 @@
 import {
   Box,
   Button,
+  Heading,
   HStack,
+  Input,
   Select,
   Spacer,
   Text,
+  Textarea,
   useDisclosure,
   VStack,
 } from "@chakra-ui/react";
 import type { Node } from "@xyflow/react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ChevronDown,
   Columns,
@@ -17,7 +20,9 @@ import {
   Maximize,
   Minimize,
   Minimize2,
+  Play,
   X,
+  Check,
 } from "react-feather";
 import { useShallow } from "zustand/react/shallow";
 import { useWorkflowStore } from "../hooks/useWorkflowStore";
@@ -33,6 +38,16 @@ import {
 } from "./Nodes";
 import { DatasetPreview } from "../../components/datasets/DatasetPreview";
 import { useGetDatasetData } from "../hooks/useGetDatasetData";
+import { motion } from "framer-motion";
+import { useWindowSize } from "usehooks-ts";
+import { HorizontalFormControl } from "../../components/HorizontalFormControl";
+import { SpanDuration } from "../../components/traces/SpanDetails";
+import { RenderInputOutput } from "../../components/traces/RenderInputOutput";
+import { useForm } from "react-hook-form";
+import {
+  getInputsForExecution,
+  useComponentExecution,
+} from "../hooks/useComponentExecution";
 
 export function EntryPointPropertiesPanel({ node }: { node: Node<Component> }) {
   const { isOpen, onOpen, onClose } = useDisclosure();
@@ -175,9 +190,6 @@ export function BasePropertiesPanel({
       width="25vw"
       minWidth="350px"
       height="full"
-      background="white"
-      borderLeft="1px solid"
-      borderColor="gray.350"
     >
       <HStack paddingY={1} paddingLeft={2} width="full" justify="space-between">
         <HStack spacing={3}>
@@ -207,7 +219,13 @@ export function BasePropertiesPanel({
             variant="ghost"
             size="sm"
             color="gray.500"
-            onClick={deselectAllNodes}
+            onClick={() => {
+              if (propertiesExpanded) {
+                setPropertiesExpanded(false);
+              } else {
+                deselectAllNodes();
+              }
+            }}
           >
             <X size={16} />
           </Button>
@@ -243,29 +261,299 @@ export function PropertiesPanel() {
     evaluator: BasePropertiesPanel,
   };
 
+  const { width, height } = useWindowSize();
+
+  const ref = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     if (!selectedNode) {
       setPropertiesExpanded(false);
     }
   }, [selectedNode, setPropertiesExpanded]);
 
-  if (!selectedNode) {
+  if (!selectedNode || !width) {
     return null;
   }
 
   const PropertiesPanel =
     ComponentPropertiesPanelMap[selectedNode.type as ComponentType];
 
+  const panelWidth = ref.current?.offsetWidth ?? 350;
+  const halfPanelWidth = Math.round(panelWidth / 2);
+  const middlePoint = Math.round(width / 2 - halfPanelWidth);
+  const topPanelHeight = 41;
+  const fullPanelHeight = height - topPanelHeight;
+
+  // TODO: close on X if expanded
+
   return (
-    <Box
-      position="absolute"
-      top={0}
-      right={0}
-      // width="full"
-      height="full"
-      zIndex={100}
-    >
-      <PropertiesPanel node={selectedNode} />
+    <Box>
+      <Box
+        as={motion.div}
+        initial={{
+          right: 0,
+          height: `${fullPanelHeight}px`,
+          marginTop: 0,
+          borderRadius: 0,
+          borderTopWidth: 0,
+          borderBottomWidth: 0,
+          borderRightWidth: 0,
+          boxShadow: "0 0 0 rgba(0,0,0,0)",
+        }}
+        animate={{
+          right: propertiesExpanded ? `${middlePoint}px` : 0,
+          height: propertiesExpanded
+            ? `${fullPanelHeight - 40}px`
+            : `${fullPanelHeight}px`,
+          marginTop: propertiesExpanded ? "20px" : 0,
+          borderRadius: propertiesExpanded ? "8px" : 0,
+          borderTopWidth: propertiesExpanded ? "1px" : 0,
+          borderBottomWidth: propertiesExpanded ? "1px" : 0,
+          borderRightWidth: propertiesExpanded ? "1px" : 0,
+          boxShadow: propertiesExpanded
+            ? "0 0 10px rgba(0,0,0,0.1)"
+            : "0 0 0 rgba(0,0,0,0)",
+        }}
+        transition="0.05s ease-out"
+        ref={ref}
+        position="absolute"
+        top={0}
+        right={0}
+        background="white"
+        border="1px solid"
+        borderColor="gray.350"
+        zIndex={100}
+      >
+        <PropertiesPanel node={selectedNode} />
+      </Box>
+      {propertiesExpanded && (
+        <>
+          <Box
+            className="fade-in"
+            position="absolute"
+            top={0}
+            left={0}
+            height="100%"
+            width="100%"
+            background="rgba(0,0,0,0.1)"
+            zIndex={98}
+          />
+          <Box
+            position="absolute"
+            top={0}
+            left={0}
+            height="100%"
+            width={`calc(50% - ${halfPanelWidth}px)`}
+            overflow="hidden"
+            zIndex={99}
+          >
+            <Box
+              as={motion.div}
+              width="100%"
+              height="100%"
+              initial={{ x: "100%" }}
+              animate={{ x: "0%" }}
+              transition="0.1s ease-out 0.05s"
+              paddingY="40px"
+              paddingLeft="40px"
+            >
+              <InputPanel node={selectedNode} />
+            </Box>
+          </Box>
+          <Box
+            position="absolute"
+            top={0}
+            right={0}
+            height="100%"
+            width={`calc(50% - ${halfPanelWidth}px)`}
+            overflow="hidden"
+            zIndex={99}
+          >
+            <Box
+              as={motion.div}
+              width="100%"
+              height="100%"
+              initial={{ x: "-100%" }}
+              animate={{ x: "0%" }}
+              transition="0.1s ease-out 0.05s"
+              paddingY="40px"
+              paddingRight="40px"
+            >
+              <OutputPanel node={selectedNode} />
+            </Box>
+          </Box>
+        </>
+      )}
     </Box>
   );
 }
+
+export const InputPanel = ({ node }: { node: Node<Component> }) => {
+  const { register, handleSubmit } = useForm<Record<string, string>>({
+    defaultValues: getInputsForExecution({
+      node,
+    }).inputs,
+  });
+
+  const { startComponentExecution } = useComponentExecution();
+
+  const onSubmit = useCallback(
+    (data: Record<string, string>) => {
+      startComponentExecution({ node, inputs: data });
+    },
+    [node, startComponentExecution]
+  );
+
+  return (
+    <Box
+      background="white"
+      height="full"
+      padding={6}
+      border="1px solid"
+      borderColor="gray.350"
+      borderRadius="8px 0 0 8px"
+      borderRightWidth={0}
+      boxShadow="0 0 10px rgba(0,0,0,0.05)"
+    >
+      {/* eslint-disable-next-line @typescript-eslint/no-misused-promises */}
+      <form onSubmit={handleSubmit(onSubmit)}>
+        <VStack align="start" spacing={3} width="full">
+          <Heading
+            as="h3"
+            fontSize={16}
+            fontWeight="bold"
+            textTransform="uppercase"
+            color="gray.600"
+            paddingBottom={4}
+          >
+            Inputs
+          </Heading>
+          {node.data.inputs?.map((input) => (
+            <HorizontalFormControl
+              key={input.identifier}
+              label={input.identifier}
+              helper={input.description ?? ""}
+            >
+              <Textarea {...register(input.identifier)} />
+            </HorizontalFormControl>
+          ))}
+          <HStack width="full" justify="end">
+            <Button
+              type="submit"
+              colorScheme="green"
+              rightIcon={<Play size={16} />}
+            >
+              Execute
+            </Button>
+          </HStack>
+        </VStack>
+      </form>
+    </Box>
+  );
+};
+
+export const OutputPanel = ({ node }: { node: Node<Component> }) => {
+  return (
+    <Box
+      background="white"
+      height="full"
+      padding={6}
+      border="1px solid"
+      borderColor="gray.350"
+      borderRadius="0 8px 8px 0"
+      borderLeftWidth={0}
+      boxShadow="0 0 10px rgba(0,0,0,0.05)"
+    >
+      <VStack align="start" spacing={3}>
+        <HStack align="start" width="full">
+          <Heading
+            as="h3"
+            fontSize={16}
+            fontWeight="bold"
+            textTransform="uppercase"
+            color="gray.600"
+            paddingBottom={4}
+          >
+            Outputs
+          </Heading>
+          <Spacer />
+          {node.data.execution_state?.timestamps &&
+          (node.data.execution_state?.status === "success" ||
+            node.data.execution_state?.status === "error") ? (
+            <SpanDuration
+              span={{
+                error: node.data.execution_state.error,
+                timestamps: {
+                  started_at:
+                    node.data.execution_state.timestamps.started_at ?? 0,
+                  finished_at:
+                    node.data.execution_state.timestamps.finished_at ?? 0,
+                },
+              }}
+            />
+          ) : null}
+        </HStack>
+        {node.data.execution_state ? (
+          <>
+            {node.data.execution_state?.status === "waiting" ? (
+              <Text>Waiting for runner</Text>
+            ) : node.data.execution_state?.status === "running" ? (
+              <Text>Running...</Text>
+            ) : null}
+            {node.data.execution_state.status === "error" && (
+              <HStack>
+                <Text>Error:</Text>
+                <OutputBox
+                  value={
+                    node.data.execution_state.error ??
+                    "No error message captured"
+                  }
+                />
+              </HStack>
+            )}
+            {node.data.execution_state.status === "success" &&
+              node.data.execution_state.outputs &&
+              Object.entries(node.data.execution_state.outputs).map(
+                ([identifier, value]) => (
+                  <VStack
+                    width="full"
+                    align="start"
+                    key={identifier}
+                    spacing={3}
+                  >
+                    <Text
+                      fontSize={13}
+                      fontWeight="bold"
+                      textTransform="uppercase"
+                      color="gray.600"
+                    >
+                      {identifier}
+                    </Text>
+                    <OutputBox value={value} />
+                  </VStack>
+                )
+              )}
+          </>
+        ) : (
+          <Text color="gray.500">Waiting for execution</Text>
+        )}
+      </VStack>
+    </Box>
+  );
+};
+
+const OutputBox = ({ value }: { value: any }) => {
+  return (
+    <Box
+      as="pre"
+      borderRadius="6px"
+      padding={4}
+      borderWidth="1px"
+      borderColor="gray.300"
+      width="full"
+      whiteSpace="pre-wrap"
+    >
+      <RenderInputOutput value={value} />
+    </Box>
+  );
+};

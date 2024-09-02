@@ -16,8 +16,8 @@ import { useWorkflowStore } from "./useWorkflowStore";
 export const useAlertOnComponent = () => {
   const toast = useToast();
 
-  const { selectNode } = useWorkflowStore((state) => ({
-    selectNode: state.selectNode,
+  const { setSelectedNode } = useWorkflowStore((state) => ({
+    setSelectedNode: state.setSelectedNode,
   }));
 
   return useCallback(
@@ -51,7 +51,7 @@ export const useAlertOnComponent = () => {
                       variant="link"
                       size="sm"
                       onClick={() => {
-                        selectNode(componentId);
+                        setSelectedNode(componentId);
                         onClose();
                       }}
                     >
@@ -75,6 +75,6 @@ export const useAlertOnComponent = () => {
         isClosable: true,
       });
     },
-    [selectNode, toast]
+    [setSelectedNode, toast]
   );
 };

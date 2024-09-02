@@ -54,7 +54,7 @@ const handleClientMessage = async (
             payload: {
               component_id: message.payload.node.id,
               execution_state: {
-                state: "error",
+                status: "error",
                 error: (error as Error).message,
                 timestamps: { finished_at: Date.now() },
               },
@@ -132,7 +132,7 @@ const callPython = async (ws: WebSocket, event: StudioClientEvent) => {
       payload: {
         component_id: event.payload.node.id,
         execution_state: {
-          state: "error",
+          status: "error",
           error: (error as Error).message,
           timestamps: { finished_at: Date.now() },
         },
