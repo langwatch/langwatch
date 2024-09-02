@@ -45,6 +45,10 @@ async def execute_component(event: ExecuteComponentPayload):
                 state=ComponentState.success,
                 trace_id=event.trace_id,
                 timestamps=Timestamps(finished_at=int(time.time() * 1000)),
+                outputs={
+                    output.identifier: "barbaz"
+                    for output in event.node.data.outputs or []
+                },
             ),
         )
     )

@@ -24,6 +24,7 @@ export type SocketStatus = "disconnected" | "connecting" | "connected";
 type WorkflowStore = Workflow & {
   hoveredNodeId?: string;
   socketStatus: SocketStatus;
+  propertiesExpanded: boolean;
   setSocketStatus: (status: SocketStatus) => void;
   onNodesChange: (changes: NodeChange[]) => void;
   onEdgesChange: (changes: EdgeChange[]) => void;
@@ -38,6 +39,7 @@ type WorkflowStore = Workflow & {
   setHoveredNodeId: (nodeId: string | undefined) => void;
   selectNode: (nodeId: string) => void;
   deselectAllNodes: () => void;
+  setPropertiesExpanded: (expanded: boolean) => void;
 };
 
 const initialNodes: Node<Component>[] = [
@@ -128,6 +130,7 @@ const store = (
 
   hoveredNodeId: undefined,
   socketStatus: "disconnected",
+  propertiesExpanded: false,
   setSocketStatus: (status: SocketStatus) => {
     set({ socketStatus: status });
   },
@@ -183,6 +186,9 @@ const store = (
     set({
       nodes: get().nodes.map((node) => ({ ...node, selected: false })),
     });
+  },
+  setPropertiesExpanded: (expanded: boolean) => {
+    set({ propertiesExpanded: expanded });
   },
 });
 

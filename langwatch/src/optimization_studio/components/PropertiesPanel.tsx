@@ -9,14 +9,28 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import type { Node } from "@xyflow/react";
-import { useState } from "react";
-import { ChevronDown, Folder, X } from "react-feather";
+import { useEffect, useState } from "react";
+import {
+  ChevronDown,
+  Columns,
+  Folder,
+  Maximize,
+  Minimize,
+  Minimize2,
+  X,
+} from "react-feather";
 import { useShallow } from "zustand/react/shallow";
 import { useWorkflowStore } from "../hooks/useWorkflowStore";
 import type { Component, ComponentType, Entry, Field } from "../types/dsl";
 import { ComponentIcon } from "./ColorfulBlockIcons";
 import { DatasetModal } from "./DatasetModal";
-import { getNodeDisplayName, NodeSectionTitle, TypeLabel } from "./Nodes";
+import {
+  ComponentExecutionButton,
+  getNodeDisplayName,
+  isExecutableComponent,
+  NodeSectionTitle,
+  TypeLabel,
+} from "./Nodes";
 import { DatasetPreview } from "../../components/datasets/DatasetPreview";
 import { useGetDatasetData } from "../hooks/useGetDatasetData";
 
@@ -143,11 +157,14 @@ export function BasePropertiesPanel({
   node: Node<Component>;
   children?: React.ReactNode;
 }) {
-  const { deselectAllNodes } = useWorkflowStore(
-    useShallow((state) => ({
-      deselectAllNodes: state.deselectAllNodes,
-    }))
-  );
+  const { deselectAllNodes, propertiesExpanded, setPropertiesExpanded } =
+    useWorkflowStore(
+      useShallow((state) => ({
+        deselectAllNodes: state.deselectAllNodes,
+        propertiesExpanded: state.propertiesExpanded,
+        setPropertiesExpanded: state.setPropertiesExpanded,
+      }))
+    );
 
   return (
     <VStack
@@ -169,14 +186,30 @@ export function BasePropertiesPanel({
             {getNodeDisplayName(node)}
           </Text>
         </HStack>
-        <HStack spacing={3}>
+        <Spacer />
+        <HStack spacing={0} marginRight="-4px">
+          {isExecutableComponent(node) && (
+            <>
+              <HStack spacing={3}>
+                <ComponentExecutionButton node={node} size="sm" iconSize={16} />
+              </HStack>
+              <Button
+                variant="ghost"
+                size="sm"
+                color="gray.500"
+                onClick={() => setPropertiesExpanded(!propertiesExpanded)}
+              >
+                <Columns size={16} />
+              </Button>
+            </>
+          )}
           <Button
             variant="ghost"
-            size="xs"
+            size="sm"
             color="gray.500"
             onClick={deselectAllNodes}
           >
-            <X size={14} />
+            <X size={16} />
           </Button>
         </HStack>
       </HStack>
@@ -189,11 +222,14 @@ export function BasePropertiesPanel({
 }
 
 export function PropertiesPanel() {
-  const { selectedNode } = useWorkflowStore(
-    useShallow((state) => ({
-      selectedNode: state.nodes.find((n) => n.selected),
-    }))
-  );
+  const { selectedNode, propertiesExpanded, setPropertiesExpanded } =
+    useWorkflowStore(
+      useShallow((state) => ({
+        selectedNode: state.nodes.find((n) => n.selected),
+        propertiesExpanded: state.propertiesExpanded,
+        setPropertiesExpanded: state.setPropertiesExpanded,
+      }))
+    );
 
   const ComponentPropertiesPanelMap: Record<
     ComponentType,
@@ -207,6 +243,12 @@ export function PropertiesPanel() {
     evaluator: BasePropertiesPanel,
   };
 
+  useEffect(() => {
+    if (!selectedNode) {
+      setPropertiesExpanded(false);
+    }
+  }, [selectedNode, setPropertiesExpanded]);
+
   if (!selectedNode) {
     return null;
   }
@@ -215,7 +257,14 @@ export function PropertiesPanel() {
     ComponentPropertiesPanelMap[selectedNode.type as ComponentType];
 
   return (
-    <Box position="absolute" top={0} right={0} height="full" zIndex={100}>
+    <Box
+      position="absolute"
+      top={0}
+      right={0}
+      // width="full"
+      height="full"
+      zIndex={100}
+    >
       <PropertiesPanel node={selectedNode} />
     </Box>
   );

@@ -8,6 +8,7 @@ import {
   Text,
   useDisclosure,
   VStack,
+  type ButtonProps,
 } from "@chakra-ui/react";
 
 import { Handle, type Node, type NodeProps, Position } from "@xyflow/react";
@@ -199,6 +200,10 @@ export function NodeSectionTitle({
 
 export const selectionColor = "#2F8FFB";
 
+export const isExecutableComponent = (node: Pick<Node<Component>, "type">) => {
+  return node.type !== "entry" && node.type !== "prompting_technique";
+};
+
 function ComponentNode(
   props: NodeProps<Node<Component>> & {
     icon?: React.ReactNode;
@@ -207,20 +212,14 @@ function ComponentNode(
     hidePlayButton?: boolean;
   }
 ) {
-  const { node, hoveredNodeId, setHoveredNodeId } =
-    useWorkflowStore(({ nodes, hoveredNodeId, setHoveredNodeId }) => ({
+  const { node, hoveredNodeId, setHoveredNodeId } = useWorkflowStore(
+    ({ nodes, hoveredNodeId, setHoveredNodeId }) => ({
       node: nodes.find((node) => node.id === props.id),
       hoveredNodeId,
       setHoveredNodeId,
-    }));
-  const isHovered = hoveredNodeId === props.id;
-
-  const { startComponentExecution } = useComponentExecution();
-
-  const [isWaitingLong] = useDebounceValue(
-    node?.data.execution_state?.state === "waiting",
-    300
+    })
   );
+  const isHovered = hoveredNodeId === props.id;
 
   return (
     <VStack
@@ -247,54 +246,12 @@ function ComponentNode(
           {getNodeDisplayName(props)}
         </Text>
         <Spacer />
-        <Center
-          minWidth="16px"
-          minHeight="16px"
-          maxWidth="16px"
-          maxHeight="16px"
-        >
-          {isWaitingLong && node?.data.execution_state?.state === "waiting" && (
-            <Box marginLeft="-4px" marginRight="-4px">
-              <PulseLoader size={2} speedMultiplier={0.5} />
-            </Box>
-          )}
-          {((!isWaitingLong &&
-            node?.data.execution_state?.state === "waiting") ||
-            node?.data.execution_state?.state === "running") && (
-            <Spinner size="xs" />
-          )}
-          {node?.data.execution_state?.state === "error" && (
-            <Box color="red.500">
-              <X size={14} />
-            </Box>
-          )}
-          {node?.data.execution_state?.state === "success" && (
-            <Box color="green.500">
-              <Check size={14} />
-            </Box>
-          )}
-        </Center>
-        {!props.hidePlayButton && (
-          <Button
-            variant="ghost"
-            size="xs"
-            paddingX={0}
-            marginRight="-4px"
-            onClick={() => {
-              node &&
-                startComponentExecution({
-                  node,
-                  inputs: Object.fromEntries(
-                    node.data.inputs?.map((input) => [
-                      input.identifier,
-                      "foobar",
-                    ]) ?? []
-                  ),
-                });
-            }}
-          >
-            <Play size={14} />
-          </Button>
+        {node && isExecutableComponent(node) && (
+          <ComponentExecutionButton
+            node={node}
+            marginRight="-6px"
+            marginLeft="-4px"
+          />
         )}
       </HStack>
       {props.data.inputs && (
@@ -319,5 +276,66 @@ function ComponentNode(
       )}
       {props.children}
     </VStack>
+  );
+}
+
+export function ComponentExecutionButton({
+  node,
+  iconSize = 14,
+  ...props
+}: {
+  node: Node<Component>;
+  iconSize?: number;
+} & ButtonProps) {
+  const { startComponentExecution } = useComponentExecution();
+
+  const [isWaitingLong] = useDebounceValue(
+    node?.data.execution_state?.state === "waiting",
+    300
+  );
+
+  return (
+    <>
+      <Center minWidth="16px" minHeight="16px" maxWidth="16px" maxHeight="16px">
+        {isWaitingLong && node?.data.execution_state?.state === "waiting" && (
+          <Box marginLeft="-4px" marginRight="-4px">
+            <PulseLoader size={2} speedMultiplier={0.5} />
+          </Box>
+        )}
+        {((!isWaitingLong && node?.data.execution_state?.state === "waiting") ||
+          node?.data.execution_state?.state === "running") && (
+          <Spinner size="xs" />
+        )}
+        {node?.data.execution_state?.state === "error" && (
+          <Box color="red.500">
+            <X size={iconSize} />
+          </Box>
+        )}
+        {node?.data.execution_state?.state === "success" && (
+          <Box color="green.500">
+            <Check size={iconSize} />
+          </Box>
+        )}
+      </Center>
+      <Button
+        variant="ghost"
+        size="xs"
+        onClick={() => {
+          node &&
+            startComponentExecution({
+              node,
+              inputs: Object.fromEntries(
+                node.data.inputs?.map((input) => [
+                  input.identifier,
+                  "foobar",
+                ]) ?? []
+              ),
+            });
+        }}
+        {...props}
+      >
+        <Play size={iconSize} />
+      </Button>
+    </>
   );
 }
