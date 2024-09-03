@@ -318,6 +318,7 @@ export function PropertiesPanel() {
             width="100%"
             background="rgba(0,0,0,0.1)"
             zIndex={98}
+            onClick={() => setPropertiesExpanded(false)}
           />
           <Box
             position="absolute"
@@ -337,6 +338,14 @@ export function PropertiesPanel() {
               transition="0.1s ease-out 0.05s"
               paddingY="40px"
               paddingLeft="40px"
+              className="js-outer-box"
+              onClick={(e) => {
+                if (
+                  (e.target as HTMLElement).classList.contains("js-outer-box")
+                ) {
+                  setPropertiesExpanded(false);
+                }
+              }}
             >
               <InputPanel node={selectedNode} />
             </Box>
@@ -359,6 +368,14 @@ export function PropertiesPanel() {
               transition="0.1s ease-out 0.05s"
               paddingY="40px"
               paddingRight="40px"
+              className="js-outer-box"
+              onClick={(e) => {
+                if (
+                  (e.target as HTMLElement).classList.contains("js-outer-box")
+                ) {
+                  setPropertiesExpanded(false);
+                }
+              }}
             >
               <OutputPanel node={selectedNode} />
             </Box>
