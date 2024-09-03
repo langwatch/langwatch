@@ -8,6 +8,11 @@ from langwatch_nlp.studio.types.dsl import (
 )
 
 
+class IsAlive(BaseModel):
+    type: Literal["is_alive"] = "is_alive"
+    payload: dict = {}
+
+
 class ExecuteComponentPayload(BaseModel):
     trace_id: str
     node: Node
@@ -29,7 +34,11 @@ class StopExecution(BaseModel):
     payload: StopExecutionPayload
 
 
-StudioClientEvent = Union[ExecuteComponent, StopExecution]
+StudioClientEvent = Union[IsAlive, ExecuteComponent, StopExecution]
+
+
+class IsAliveResponse(BaseModel):
+    type: Literal["is_alive_response"] = "is_alive_response"
 
 
 class ComponentStateChangePayload(BaseModel):
@@ -74,5 +83,5 @@ class Done(BaseModel):
 
 
 StudioServerEvent = Union[
-    ComponentStateChange, ExecutionStateChange, Debug, Error, Done
+    IsAliveResponse, ComponentStateChange, ExecutionStateChange, Debug, Error, Done
 ]

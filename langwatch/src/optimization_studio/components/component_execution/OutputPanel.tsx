@@ -45,7 +45,9 @@ export const OutputPanel = ({ node }: { node: Node<Component> }) => {
           <Spacer />
           {node.data.execution_state?.timestamps &&
           (node.data.execution_state?.status === "success" ||
-            node.data.execution_state?.status === "error") ? (
+            node.data.execution_state?.status === "error") &&
+          node.data.execution_state.timestamps.started_at &&
+          node.data.execution_state.timestamps.finished_at ? (
             <SpanDuration
               span={{
                 error: node.data.execution_state.error,

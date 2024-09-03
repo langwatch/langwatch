@@ -16,8 +16,14 @@ if (DEBUGGING_ENABLED) {
 const debug = getDebugger("langwatch:studio:socket");
 
 let socketInstance: WebSocket | null = null;
+let pythonDisconnectedTimeout: NodeJS.Timeout | null = null;
+let instances = 0;
+let lastIsAliveCallTimestamp = 0;
 
 export const useSocketClient = () => {
+  instances++;
+  const instanceId = instances;
+
   const { project } = useOrganizationTeamProject();
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -31,18 +37,38 @@ export const useSocketClient = () => {
   const toast = useToast();
   const alertOnComponent = useAlertOnComponent();
 
+  const checkIfUnreachableErrorMessage = useCallback(
+    (message: string | undefined) => {
+      if (
+        socketStatus === "connected" &&
+        message?.toLowerCase().includes("runtime is unreachable")
+      ) {
+        setSocketStatus("connecting-python");
+      }
+    },
+    [socketStatus, setSocketStatus]
+  );
+
   const handleMessage = useCallback(
     (event: MessageEvent) => {
       const data: StudioServerEvent = JSON.parse(event.data);
       debug(data.type, "payload" in data ? data.payload : undefined);
 
       switch (data.type) {
+        case "is_alive_response":
+          if (pythonDisconnectedTimeout) {
+            clearTimeout(pythonDisconnectedTimeout);
+            pythonDisconnectedTimeout = null;
+          }
+          setSocketStatus("connected");
+          break;
         case "component_state_change":
           setComponentExecutionState(
             data.payload.component_id,
             data.payload.execution_state
           );
           if (data.payload.execution_state?.status === "error") {
+            checkIfUnreachableErrorMessage(data.payload.execution_state.error);
             alertOnComponent({
               componentId: data.payload.component_id,
               execution_state: data.payload.execution_state,
@@ -53,6 +79,7 @@ export const useSocketClient = () => {
           // TODO
           break;
         case "error":
+          checkIfUnreachableErrorMessage(data.payload.message);
           toast({
             title: "Error",
             description: data.payload.message,
@@ -77,7 +104,13 @@ export const useSocketClient = () => {
           break;
       }
     },
-    [alertOnComponent, setComponentExecutionState, toast]
+    [
+      alertOnComponent,
+      checkIfUnreachableErrorMessage,
+      setComponentExecutionState,
+      setSocketStatus,
+      toast,
+    ]
   );
 
   const connect = useCallback(() => {
@@ -85,7 +118,7 @@ export const useSocketClient = () => {
 
     if (socketInstance?.readyState === WebSocket.OPEN) return;
 
-    setSocketStatus("connecting");
+    setSocketStatus("connecting-socket");
     // TODO: ws or wss?
     socketInstance = new WebSocket(
       `ws://${
@@ -94,7 +127,7 @@ export const useSocketClient = () => {
     );
 
     socketInstance.onopen = () => {
-      setSocketStatus("connected");
+      setSocketStatus("connecting-python");
     };
 
     socketInstance.onclose = () => {
@@ -111,12 +144,6 @@ export const useSocketClient = () => {
     socketInstance.onmessage = handleMessage;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [project, setSocketStatus]);
-
-  useEffect(() => {
-    if (socketInstance) {
-      socketInstance.onmessage = handleMessage;
-    }
-  }, [handleMessage]);
 
   const disconnect = useCallback(() => {
     if (socketInstance) {
@@ -145,6 +172,50 @@ export const useSocketClient = () => {
     } else {
       console.error("Cannot send message: WebSocket is not connected");
     }
+  }, []);
+
+  useEffect(() => {
+    if (instanceId !== instances) return;
+    if (socketInstance) {
+      socketInstance.onmessage = handleMessage;
+    }
+  }, [handleMessage, instanceId]);
+
+  useEffect(() => {
+    if (instanceId !== instances) return;
+
+    const isAlive = () => {
+      if (instanceId !== instances || !document.hasFocus()) return;
+      lastIsAliveCallTimestamp = Date.now();
+      sendMessage({ type: "is_alive", payload: {} });
+      if (socketStatus === "connected" && !pythonDisconnectedTimeout) {
+        pythonDisconnectedTimeout = setTimeout(() => {
+          setSocketStatus("connecting-python");
+        }, 10_000);
+      }
+    };
+
+    const interval = setInterval(
+      isAlive,
+      socketStatus === "connecting-python" ? 5_000 : 30_000
+    );
+    // Make the first call
+    if (
+      socketStatus === "connecting-python" &&
+      Date.now() - lastIsAliveCallTimestamp > 5_000
+    ) {
+      isAlive();
+    }
+
+    return () => {
+      clearInterval(interval);
+    };
+  }, [socketStatus, sendMessage, setSocketStatus, instanceId]);
+
+  useEffect(() => {
+    return () => {
+      instances--;
+    };
   }, []);
 
   return {

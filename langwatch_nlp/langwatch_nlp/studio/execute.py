@@ -19,6 +19,7 @@ from .types.events import (
     DebugPayload,
     Done,
     ExecuteComponentPayload,
+    IsAliveResponse,
     StopExecution,
     StudioClientEvent,
     StudioServerEvent,
@@ -70,6 +71,8 @@ async def execute_event(
 
     try:
         match event.type:
+            case "is_alive":
+                yield IsAliveResponse()
             case "execute_component":
                 try:
                     async for event_ in execute_component(event.payload):
@@ -157,9 +160,9 @@ async def execute_event_on_a_subprocess(event: StudioClientEvent):
 
     if (
         hasattr(event.payload, "trace_id")
-        and event.payload.trace_id not in running_processes
+        and event.payload.trace_id not in running_processes  # type: ignore
     ):
-        running_processes[event.payload.trace_id] = RunningProcess(
+        running_processes[event.payload.trace_id] = RunningProcess(  # type: ignore
             process=process, queue=queue
         )
 
@@ -205,9 +208,9 @@ async def execute_event_on_a_subprocess(event: StudioClientEvent):
 
         if (
             hasattr(event.payload, "trace_id")
-            and event.payload.trace_id in running_processes
+            and event.payload.trace_id in running_processes  # type: ignore
         ):
-            del running_processes[event.payload.trace_id]
+            del running_processes[event.payload.trace_id]  # type: ignore
 
 
 async def event_encoder(event_generator: AsyncGenerator[StudioServerEvent, None]):

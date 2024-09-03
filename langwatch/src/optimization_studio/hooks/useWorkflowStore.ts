@@ -19,7 +19,11 @@ import type {
   Workflow,
 } from "../types/dsl";
 
-export type SocketStatus = "disconnected" | "connecting" | "connected";
+export type SocketStatus =
+  | "disconnected"
+  | "connecting-socket"
+  | "connecting-python"
+  | "connected";
 
 type WorkflowStore = Workflow & {
   hoveredNodeId?: string;

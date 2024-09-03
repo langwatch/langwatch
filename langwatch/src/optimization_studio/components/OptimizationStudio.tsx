@@ -75,20 +75,32 @@ export default function OptimizationStudio() {
           </HStack>
           <HStack width="full" justify="center">
             <Text>Optimization Studio</Text>
-            <Tooltip label={titleCase(socketStatus)}>
-              <Box
-                width="12px"
-                height="12px"
-                background={
-                  socketStatus === "connected"
-                    ? "green.500"
-                    : socketStatus === "disconnected"
-                    ? "red.300"
-                    : "yellow.500"
-                }
-                borderRadius="full"
-              ></Box>
-            </Tooltip>
+            <StatusCircle
+              status={socketStatus}
+              tooltip={
+                socketStatus === "connecting-python" ||
+                socketStatus === "connecting-socket" ? (
+                  <VStack align="start" spacing={1} padding={2}>
+                    <HStack>
+                      <StatusCircle
+                        status={
+                          socketStatus === "connecting-python"
+                            ? "connected"
+                            : "connecting"
+                        }
+                      />
+                      <Text>Socket Connection</Text>
+                    </HStack>
+                    <HStack>
+                      <StatusCircle status="connecting" />
+                      <Text>Python Runtime</Text>
+                    </HStack>
+                  </VStack>
+                ) : (
+                  titleCase(socketStatus)
+                )
+              }
+            />
           </HStack>
           <HStack width="full" justify="end">
             <UndoRedo />
@@ -119,5 +131,31 @@ export default function OptimizationStudio() {
         </Box>
       </VStack>
     </div>
+  );
+}
+
+function StatusCircle({
+  status,
+  tooltip,
+}: {
+  status: string;
+  // For some misterious weird bug, we cannot wrap <StatusCircle /> in a <Tooltip />, the tooltip doesn't work, so we need to use it inside and pass the tooltip label as a prop.
+  tooltip?: string | React.ReactNode;
+}) {
+  return (
+    <Tooltip label={tooltip}>
+      <Box
+        width="12px"
+        height="12px"
+        background={
+          status === "connected"
+            ? "green.500"
+            : status === "disconnected"
+            ? "red.300"
+            : "yellow.500"
+        }
+        borderRadius="full"
+      />
+    </Tooltip>
   );
 }

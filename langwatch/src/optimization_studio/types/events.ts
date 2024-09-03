@@ -2,6 +2,7 @@ import type { Component, BaseComponent, Workflow } from "./dsl";
 import type { Node } from "@xyflow/react";
 
 export type StudioClientEvent =
+  | { type: "is_alive"; payload: Record<string, never> }
   | {
       type: "execute_component";
       payload: {
@@ -19,6 +20,9 @@ export type StudioClientEvent =
     };
 
 export type StudioServerEvent =
+  | {
+      type: "is_alive_response";
+    }
   | {
       type: "component_state_change";
       payload: {

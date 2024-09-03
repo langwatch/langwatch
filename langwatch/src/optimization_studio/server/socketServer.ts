@@ -45,6 +45,8 @@ const handleClientMessage = async (
 ) => {
   try {
     switch (message.type) {
+      case "is_alive":
+        await callPython(ws, message);
       case "stop_execution":
       case "execute_component":
         try {
@@ -93,11 +95,7 @@ const callPython = async (ws: WebSocket, event: StudioClientEvent) => {
     );
   } catch (error) {
     if ((error as any)?.cause?.code === "ECONNREFUSED") {
-      sendMessageToClient(ws, {
-        type: "error",
-        payload: { message: "Python backend is unreachable" },
-      });
-      throw new Error("Python backend is unreachable");
+      throw new Error("Python runtime is unreachable");
     }
     throw error;
   }
