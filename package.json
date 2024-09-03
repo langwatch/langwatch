@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "NODE_ENV=development DEBUG=langwatch:* DEBUG_HIDE_DATE=true DEBUG_COLORS=true concurrently --restart-tries -1 'node server.js' 'npm run start:workers'",
     "build": "export DEPENDENCY_INJECTION_DIR=$(pwd)/src/injection/; export EXTRA_INCLUDE=$(pwd)/src; cp .env langwatch/langwatch/; cd langwatch/langwatch; npm run build",
-    "start": "npm run prepare:production && NODE_ENV=production DEBUG=langwatch:* DEBUG_COLORS=true NEXTJS_DIST_DIR=.next node server.js",
+    "start": "npm run prepare:production && NODE_ENV=production DEBUG=langwatch:* DEBUG_COLORS=true NEXTJS_DIST_DIR=.next concurrently 'node server.js' 'npm run start:workers'",
     "start:workers": "tsx src/workers.ts",
     "start:prepare": "cp .env langwatch/langwatch/; cd langwatch/langwatch; npm install && npm run start:prepare:files && cd ../../ && npm run prisma:generate:typescript",
     "prisma:generate:prepare": "node prisma/generate-schema.js && for d in langwatch/langwatch/prisma/migrations/*; do [[ $(basename $d) != 'migration_lock.toml' ]] && mkdir -p prisma/migrations/$(basename $d) && for f in $d/*; do ln -sfn ../../../$f prisma/migrations/$(basename $d)/; done; done; echo 'ok'",
