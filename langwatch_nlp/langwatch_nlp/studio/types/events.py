@@ -19,7 +19,17 @@ class ExecuteComponent(BaseModel):
     payload: ExecuteComponentPayload
 
 
-StudioClientEvent = ExecuteComponent
+class StopExecutionPayload(BaseModel):
+    trace_id: str
+    node_id: Optional[str] = None
+
+
+class StopExecution(BaseModel):
+    type: Literal["stop_execution"] = "stop_execution"
+    payload: StopExecutionPayload
+
+
+StudioClientEvent = Union[ExecuteComponent, StopExecution]
 
 
 class ComponentStateChangePayload(BaseModel):
@@ -63,4 +73,6 @@ class Done(BaseModel):
     type: Literal["done"] = "done"
 
 
-StudioServerEvent = Union[ComponentStateChange, ExecutionStateChange, Debug, Error, Done]
+StudioServerEvent = Union[
+    ComponentStateChange, ExecutionStateChange, Debug, Error, Done
+]

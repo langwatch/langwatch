@@ -2,7 +2,7 @@ import asyncio
 from multiprocessing import Process, Queue
 from queue import Empty
 import time
-from typing import AsyncGenerator, Dict
+from typing import AsyncGenerator, Dict, TypedDict
 from fastapi import FastAPI, Response, BackgroundTasks
 from fastapi.responses import StreamingResponse
 import json
@@ -19,6 +19,7 @@ from .types.events import (
     DebugPayload,
     Done,
     ExecuteComponentPayload,
+    StopExecution,
     StudioClientEvent,
     StudioServerEvent,
     Error,
@@ -74,23 +75,35 @@ async def execute_event(
                     async for event_ in execute_component(event.payload):
                         yield event_
                 except Exception as e:
-                    yield ComponentStateChange(
-                        payload=ComponentStateChangePayload(
-                            component_id=event.payload.node.id,
-                            execution_state=ExecutionState(
-                                status=ComponentExecutionStatus.error,
-                                trace_id=event.payload.trace_id,
-                                error=repr(e),
-                            ),
-                        )
+                    yield component_error_event(
+                        trace_id=event.payload.trace_id,
+                        node_id=event.payload.node.id,
+                        error=repr(e),
                     )
             case _:
-                yield Error(payload=ErrorPayload(message="unknown event type"))
+                yield Error(
+                    payload=ErrorPayload(
+                        message=f"Unknown event type from client: {event.type}"
+                    )
+                )
 
     except Exception as e:
         yield Error(payload=ErrorPayload(message=repr(e)))
 
     yield Done()
+
+
+def component_error_event(trace_id: str, node_id: str, error: str):
+    return ComponentStateChange(
+        payload=ComponentStateChangePayload(
+            component_id=node_id,
+            execution_state=ExecutionState(
+                status=ComponentExecutionStatus.error,
+                error=error,
+                timestamps=Timestamps(finished_at=int(time.time() * 1000)),
+            ),
+        )
+    )
 
 
 def execute_event_to_queue(event: StudioClientEvent, queue: "Queue[StudioServerEvent]"):
@@ -101,7 +114,12 @@ def execute_event_to_queue(event: StudioClientEvent, queue: "Queue[StudioServerE
     asyncio.run(async_execute_event())
 
 
-running_processes: Dict[str, Process] = {}
+class RunningProcess(TypedDict):
+    process: Process
+    queue: "Queue[StudioServerEvent]"
+
+
+running_processes: Dict[str, RunningProcess] = {}
 
 
 # We execute events on a subprocess because each user might execute completely different code,
@@ -111,15 +129,39 @@ running_processes: Dict[str, Process] = {}
 async def execute_event_on_a_subprocess(event: StudioClientEvent):
     queue: "Queue[StudioServerEvent]" = Queue()
 
-    # ctx = multiprocessing.get_context("spawn")
+    if isinstance(event, StopExecution):
+        if event.payload.trace_id in running_processes:
+            queue = running_processes[event.payload.trace_id]["queue"]
+            queue.put(Done())
+
+            await asyncio.sleep(0.2)
+
+            # Check again because the process generally finishes gracefully on its own
+            if event.payload.trace_id in running_processes:
+                process = running_processes[event.payload.trace_id]["process"]
+                process.kill()
+                process.join()
+                del running_processes[event.payload.trace_id]
+            if event.payload.node_id:
+                yield component_error_event(
+                    trace_id=event.payload.trace_id,
+                    node_id=event.payload.node_id,
+                    error="Interrupted",
+                )
+            else:
+                yield Error(payload=ErrorPayload(message="Interrupted"))
+        return
+
     process = Process(target=execute_event_to_queue, args=(event, queue))
-    # process = spawn_process.
     process.start()
+
     if (
         hasattr(event.payload, "trace_id")
         and event.payload.trace_id not in running_processes
     ):
-        running_processes[event.payload.trace_id] = process
+        running_processes[event.payload.trace_id] = RunningProcess(
+            process=process, queue=queue
+        )
 
     timeout_without_messages = 120  # seconds
 

@@ -1,33 +1,26 @@
 import {
   Box,
   Button,
-  Heading,
   HStack,
-  Input,
   Select,
   Spacer,
   Text,
-  Textarea,
   useDisclosure,
   VStack,
 } from "@chakra-ui/react";
 import type { Node } from "@xyflow/react";
-import { useCallback, useEffect, useRef, useState } from "react";
-import {
-  ChevronDown,
-  Columns,
-  Folder,
-  Maximize,
-  Minimize,
-  Minimize2,
-  Play,
-  X,
-  Check,
-} from "react-feather";
+import { motion } from "framer-motion";
+import { useEffect, useRef, useState } from "react";
+import { ChevronDown, Columns, Folder, X } from "react-feather";
+import { useWindowSize } from "usehooks-ts";
 import { useShallow } from "zustand/react/shallow";
+import { DatasetPreview } from "../../components/datasets/DatasetPreview";
+import { useGetDatasetData } from "../hooks/useGetDatasetData";
 import { useWorkflowStore } from "../hooks/useWorkflowStore";
 import type { Component, ComponentType, Entry, Field } from "../types/dsl";
 import { ComponentIcon } from "./ColorfulBlockIcons";
+import { InputPanel } from "./component_execution/InputPanel";
+import { OutputPanel } from "./component_execution/OutputPanel";
 import { DatasetModal } from "./DatasetModal";
 import {
   ComponentExecutionButton,
@@ -36,18 +29,6 @@ import {
   NodeSectionTitle,
   TypeLabel,
 } from "./Nodes";
-import { DatasetPreview } from "../../components/datasets/DatasetPreview";
-import { useGetDatasetData } from "../hooks/useGetDatasetData";
-import { motion } from "framer-motion";
-import { useWindowSize } from "usehooks-ts";
-import { HorizontalFormControl } from "../../components/HorizontalFormControl";
-import { SpanDuration } from "../../components/traces/SpanDetails";
-import { RenderInputOutput } from "../../components/traces/RenderInputOutput";
-import { useForm } from "react-hook-form";
-import {
-  getInputsForExecution,
-  useComponentExecution,
-} from "../hooks/useComponentExecution";
 
 export function EntryPointPropertiesPanel({ node }: { node: Node<Component> }) {
   const { isOpen, onOpen, onClose } = useDisclosure();
@@ -387,173 +368,3 @@ export function PropertiesPanel() {
     </Box>
   );
 }
-
-export const InputPanel = ({ node }: { node: Node<Component> }) => {
-  const { register, handleSubmit } = useForm<Record<string, string>>({
-    defaultValues: getInputsForExecution({
-      node,
-    }).inputs,
-  });
-
-  const { startComponentExecution } = useComponentExecution();
-
-  const onSubmit = useCallback(
-    (data: Record<string, string>) => {
-      startComponentExecution({ node, inputs: data });
-    },
-    [node, startComponentExecution]
-  );
-
-  return (
-    <Box
-      background="white"
-      height="full"
-      padding={6}
-      border="1px solid"
-      borderColor="gray.350"
-      borderRadius="8px 0 0 8px"
-      borderRightWidth={0}
-      boxShadow="0 0 10px rgba(0,0,0,0.05)"
-    >
-      {/* eslint-disable-next-line @typescript-eslint/no-misused-promises */}
-      <form onSubmit={handleSubmit(onSubmit)}>
-        <VStack align="start" spacing={3} width="full">
-          <Heading
-            as="h3"
-            fontSize={16}
-            fontWeight="bold"
-            textTransform="uppercase"
-            color="gray.600"
-            paddingBottom={4}
-          >
-            Inputs
-          </Heading>
-          {node.data.inputs?.map((input) => (
-            <HorizontalFormControl
-              key={input.identifier}
-              label={input.identifier}
-              helper={input.description ?? ""}
-            >
-              <Textarea {...register(input.identifier)} />
-            </HorizontalFormControl>
-          ))}
-          <HStack width="full" justify="end">
-            <Button
-              type="submit"
-              colorScheme="green"
-              rightIcon={<Play size={16} />}
-            >
-              Execute
-            </Button>
-          </HStack>
-        </VStack>
-      </form>
-    </Box>
-  );
-};
-
-export const OutputPanel = ({ node }: { node: Node<Component> }) => {
-  return (
-    <Box
-      background="white"
-      height="full"
-      padding={6}
-      border="1px solid"
-      borderColor="gray.350"
-      borderRadius="0 8px 8px 0"
-      borderLeftWidth={0}
-      boxShadow="0 0 10px rgba(0,0,0,0.05)"
-    >
-      <VStack align="start" spacing={3}>
-        <HStack align="start" width="full">
-          <Heading
-            as="h3"
-            fontSize={16}
-            fontWeight="bold"
-            textTransform="uppercase"
-            color="gray.600"
-            paddingBottom={4}
-          >
-            Outputs
-          </Heading>
-          <Spacer />
-          {node.data.execution_state?.timestamps &&
-          (node.data.execution_state?.status === "success" ||
-            node.data.execution_state?.status === "error") ? (
-            <SpanDuration
-              span={{
-                error: node.data.execution_state.error,
-                timestamps: {
-                  started_at:
-                    node.data.execution_state.timestamps.started_at ?? 0,
-                  finished_at:
-                    node.data.execution_state.timestamps.finished_at ?? 0,
-                },
-              }}
-            />
-          ) : null}
-        </HStack>
-        {node.data.execution_state ? (
-          <>
-            {node.data.execution_state?.status === "waiting" ? (
-              <Text>Waiting for runner</Text>
-            ) : node.data.execution_state?.status === "running" ? (
-              <Text>Running...</Text>
-            ) : null}
-            {node.data.execution_state.status === "error" && (
-              <HStack>
-                <Text>Error:</Text>
-                <OutputBox
-                  value={
-                    node.data.execution_state.error ??
-                    "No error message captured"
-                  }
-                />
-              </HStack>
-            )}
-            {node.data.execution_state.status === "success" &&
-              node.data.execution_state.outputs &&
-              Object.entries(node.data.execution_state.outputs).map(
-                ([identifier, value]) => (
-                  <VStack
-                    width="full"
-                    align="start"
-                    key={identifier}
-                    spacing={3}
-                  >
-                    <Text
-                      fontSize={13}
-                      fontWeight="bold"
-                      textTransform="uppercase"
-                      color="gray.600"
-                    >
-                      {identifier}
-                    </Text>
-                    <OutputBox value={value} />
-                  </VStack>
-                )
-              )}
-          </>
-        ) : (
-          <Text color="gray.500">Waiting for execution</Text>
-        )}
-      </VStack>
-    </Box>
-  );
-};
-
-const OutputBox = ({ value }: { value: any }) => {
-  return (
-    <Box
-      as="pre"
-      borderRadius="6px"
-      padding={4}
-      borderWidth="1px"
-      borderColor="gray.300"
-      width="full"
-      whiteSpace="pre-wrap"
-    >
-      <RenderInputOutput value={value} />
-    </Box>
-  );
-};

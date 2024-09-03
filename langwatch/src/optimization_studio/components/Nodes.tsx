@@ -14,7 +14,7 @@ import {
 
 import { Handle, type Node, type NodeProps, Position } from "@xyflow/react";
 import { useEffect, useState } from "react";
-import { Check, Play, X } from "react-feather";
+import { Check, Play, Square, X } from "react-feather";
 import { PulseLoader } from "react-spinners";
 import { DatasetPreview } from "../../components/datasets/DatasetPreview";
 import { useComponentExecution } from "../hooks/useComponentExecution";
@@ -308,11 +308,12 @@ export function ComponentExecutionButton({
   node: Node<Component>;
   iconSize?: number;
 } & ButtonProps) {
-  const { startComponentExecution } = useComponentExecution();
+  const { startComponentExecution, stopComponentExecution } =
+    useComponentExecution();
 
   const [isWaitingLong] = useDebounceValue(
     node?.data.execution_state?.status === "waiting",
-    300
+    600
   );
 
   const { propertiesExpanded, setPropertiesExpanded, setSelectedNode } =
@@ -375,16 +376,35 @@ export function ComponentExecutionButton({
           )}
         </Center>
       </Tooltip>
-      <Button
-        variant="ghost"
-        size="xs"
-        onClick={() => {
-          node && startComponentExecution({ node });
-        }}
-        {...props}
-      >
-        <Play size={iconSize} />
-      </Button>
+      {node?.data.execution_state?.status === "running" ||
+      node?.data.execution_state?.status === "waiting" ? (
+        <Button
+          variant="ghost"
+          size="xs"
+          onClick={() => {
+            node &&
+              stopComponentExecution({
+                node_id: node.id,
+                trace_id: node.data.execution_state?.trace_id ?? "",
+                current_state: node.data.execution_state,
+              });
+          }}
+          {...props}
+        >
+          <Square size={iconSize} />
+        </Button>
+      ) : (
+        <Button
+          variant="ghost"
+          size="xs"
+          onClick={() => {
+            node && startComponentExecution({ node });
+          }}
+          {...props}
+        >
+          <Play size={iconSize} />
+        </Button>
+      )}
     </>
   );
 }

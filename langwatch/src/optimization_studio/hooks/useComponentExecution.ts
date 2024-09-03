@@ -48,6 +48,19 @@ export const useComponentExecution = () => {
     }
   }, [triggerTimeout, node, setComponentExecutionState, alertOnComponent]);
 
+  const socketAvailable = useCallback(() => {
+    if (socketStatus !== "connected") {
+      toast({
+        title: "Studio is not connected",
+        status: "error",
+        duration: 5000,
+        isClosable: true,
+      });
+      return false;
+    }
+    return true;
+  }, [socketStatus, toast]);
+
   const startComponentExecution = useCallback(
     ({
       node,
@@ -56,13 +69,7 @@ export const useComponentExecution = () => {
       node: Node<Component>;
       inputs?: Record<string, string>;
     }) => {
-      if (socketStatus !== "connected") {
-        toast({
-          title: "Studio is not connected",
-          status: "error",
-          duration: 5000,
-          isClosable: true,
-        });
+      if (!socketAvailable()) {
         return;
       }
 
@@ -95,17 +102,48 @@ export const useComponentExecution = () => {
       }, 10_000);
     },
     [
-      socketStatus,
+      socketAvailable,
       setComponentExecutionState,
       sendMessage,
       setSelectedNode,
       setPropertiesExpanded,
-      toast,
     ]
+  );
+
+  const stopComponentExecution = useCallback(
+    ({
+      trace_id,
+      node_id,
+      current_state,
+    }: {
+      trace_id: string;
+      node_id: string;
+      current_state: BaseComponent["execution_state"];
+    }) => {
+      if (!socketAvailable()) {
+        return;
+      }
+
+      if (current_state?.status === "waiting") {
+        setComponentExecutionState(node_id, {
+          status: "idle",
+          trace_id: undefined,
+        });
+        return;
+      }
+
+      const payload: StudioClientEvent = {
+        type: "stop_execution",
+        payload: { trace_id, node_id },
+      };
+      sendMessage(payload);
+    },
+    [socketAvailable, sendMessage, setComponentExecutionState]
   );
 
   return {
     startComponentExecution,
+    stopComponentExecution,
   };
 };
 

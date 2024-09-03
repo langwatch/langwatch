@@ -67,7 +67,8 @@ export const useSocketClient = () => {
           break;
         default:
           toast({
-            title: "Unknown message type",
+            title: "Unknown message type on client",
+            //@ts-expect-error
             description: data.type,
             status: "warning",
             duration: 5000,

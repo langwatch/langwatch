@@ -1,14 +1,22 @@
 import type { Component, BaseComponent, Workflow } from "./dsl";
 import type { Node } from "@xyflow/react";
 
-export type StudioClientEvent = {
-  type: "execute_component";
-  payload: {
-    trace_id: string;
-    node: Node<Component>;
-    inputs: Record<string, string>;
-  };
-};
+export type StudioClientEvent =
+  | {
+      type: "execute_component";
+      payload: {
+        trace_id: string;
+        node: Node<Component>;
+        inputs: Record<string, string>;
+      };
+    }
+  | {
+      type: "stop_execution";
+      payload: {
+        trace_id: string;
+        node_id?: string;
+      };
+    };
 
 export type StudioServerEvent =
   | {

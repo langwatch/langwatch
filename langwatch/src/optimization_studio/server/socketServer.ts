@@ -45,6 +45,7 @@ const handleClientMessage = async (
 ) => {
   try {
     switch (message.type) {
+      case "stop_execution":
       case "execute_component":
         try {
           await callPython(ws, message);
@@ -52,7 +53,12 @@ const handleClientMessage = async (
           sendMessageToClient(ws, {
             type: "component_state_change",
             payload: {
-              component_id: message.payload.node.id,
+              component_id:
+                "node_id" in message.payload
+                  ? message.payload.node_id
+                  : "node" in message.payload
+                  ? message.payload.node.id
+                  : undefined,
               execution_state: {
                 status: "error",
                 error: (error as Error).message,
@@ -63,7 +69,8 @@ const handleClientMessage = async (
         }
         break;
       default:
-        sendErrorToClient(ws, "Unknown message type");
+        //@ts-expect-error
+        sendErrorToClient(ws, `Unknown event type on server: ${message.type}`);
     }
   } catch (error) {
     console.error("Error handling message:", error);
@@ -127,17 +134,31 @@ const callPython = async (ws: WebSocket, event: StudioClientEvent) => {
     }
   } catch (error) {
     console.error("Error reading stream:", error);
-    sendMessageToClient(ws, {
-      type: "component_state_change",
-      payload: {
-        component_id: event.payload.node.id,
-        execution_state: {
-          status: "error",
-          error: (error as Error).message,
-          timestamps: { finished_at: Date.now() },
+    const node_id =
+      "node_id" in event.payload
+        ? event.payload.node_id
+        : "node" in event.payload
+        ? event.payload.node.id
+        : undefined;
+
+    if (node_id) {
+      sendMessageToClient(ws, {
+        type: "component_state_change",
+        payload: {
+          component_id: node_id,
+          execution_state: {
+            status: "error",
+            error: (error as Error).message,
+            timestamps: { finished_at: Date.now() },
+          },
         },
-      },
-    });
+      });
+    } else {
+      sendMessageToClient(ws, {
+        type: "error",
+        payload: { message: (error as Error).message },
+      });
+    }
   } finally {
     reader?.releaseLock();
   }

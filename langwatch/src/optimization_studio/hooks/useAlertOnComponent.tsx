@@ -16,8 +16,16 @@ import { useWorkflowStore } from "./useWorkflowStore";
 export const useAlertOnComponent = () => {
   const toast = useToast();
 
-  const { setSelectedNode } = useWorkflowStore((state) => ({
+  const {
+    selectedNode,
+    setSelectedNode,
+    propertiesExpanded,
+    setPropertiesExpanded,
+  } = useWorkflowStore((state) => ({
+    selectedNode: state.nodes.find((node) => node.selected),
     setSelectedNode: state.setSelectedNode,
+    propertiesExpanded: state.propertiesExpanded,
+    setPropertiesExpanded: state.setPropertiesExpanded,
   }));
 
   return useCallback(
@@ -28,6 +36,9 @@ export const useAlertOnComponent = () => {
       componentId: string;
       execution_state: BaseComponent["execution_state"];
     }) => {
+      if (componentId === selectedNode?.id && propertiesExpanded) {
+        return;
+      }
       toast({
         title: "Error",
         description: execution_state?.error,
@@ -52,6 +63,7 @@ export const useAlertOnComponent = () => {
                       size="sm"
                       onClick={() => {
                         setSelectedNode(componentId);
+                        setPropertiesExpanded(true);
                         onClose();
                       }}
                     >
@@ -75,6 +87,12 @@ export const useAlertOnComponent = () => {
         isClosable: true,
       });
     },
-    [setSelectedNode, toast]
+    [
+      selectedNode?.id,
+      propertiesExpanded,
+      toast,
+      setSelectedNode,
+      setPropertiesExpanded,
+    ]
   );
 };
