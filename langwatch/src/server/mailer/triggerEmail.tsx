@@ -5,6 +5,7 @@ import { Html } from "@react-email/html";
 import { Img } from "@react-email/img";
 import { render } from "@react-email/render";
 import sgMail from "@sendgrid/mail";
+import { SNSClient, PublishCommand } from "@aws-sdk/client-sns";
 
 import { env } from "../../env.mjs";
 
@@ -23,12 +24,13 @@ export const sendTriggerEmail = async ({
   triggerName: string;
   projectSlug: string;
 }) => {
-  if (!env.SENDGRID_API_KEY) {
-    console.warn("No SENDGRID_API_KEY found, skipping email sending");
+  if (!env.SENDGRID_API_KEY && !(env.USE_AWS_SNS && env.AWS_REGION)) {
+    console.warn("No email sending method available. Skipping email sending.");
+    console.warn(
+      "Please set SENDGRID_API_KEY or both USE_AWS_SNS and AWS_REGION."
+    );
     return;
   }
-
-  sgMail.setApiKey(env.SENDGRID_API_KEY);
 
   const emailHtml = render(
     <Html lang="en" dir="ltr">
@@ -62,14 +64,37 @@ export const sendTriggerEmail = async ({
     </Html>
   );
 
-  const msg = {
-    to: triggerEmails,
-    from: "LangWatch <no-reply@langwatch.ai>",
-    subject: `Trigger - ${triggerName} `,
-    html: emailHtml,
-  };
+  if (env.USE_AWS_SNS && env.AWS_REGION) {
+    const snsClient = new SNSClient({ region: env.AWS_REGION });
+    const params = {
+      Message: JSON.stringify({
+        default: "LangWatch Trigger",
+        email: {
+          subject: `Trigger - ${triggerName}`,
+          html: emailHtml,
+          from: `no-reply@${env.BASE_HOST}`,
+        },
+      }),
+      MessageStructure: "json",
+    };
 
-  await sgMail.send(msg);
+    try {
+      const command = new PublishCommand(params);
+      await snsClient.send(command);
+    } catch (error) {
+      throw error;
+    }
+  } else if (env.SENDGRID_API_KEY) {
+    sgMail.setApiKey(env.SENDGRID_API_KEY);
+    const msg = {
+      to: triggerEmails,
+      from: "LangWatch <no-reply@langwatch.ai>",
+      subject: `Trigger - ${triggerName} `,
+      html: emailHtml,
+    };
+
+    await sgMail.send(msg);
+  }
 };
 
 const TriggerTable = ({

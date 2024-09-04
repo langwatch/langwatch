@@ -18,6 +18,15 @@ import {
 import { startTrackEventsWorker } from "./workers/trackEventsWorker";
 import { startCollectorWorker } from "./workers/collectorWorker";
 
+import * as Sentry from "@sentry/node";
+
+if (process.env.SENTRY_DSN) {
+  Sentry.init({
+    dsn: process.env.SENTRY_DSN,
+    tracesSampleRate: 1.0,
+  });
+}
+
 const debug = getDebugger("langwatch:workers");
 
 type Workers = {
@@ -46,6 +55,12 @@ export const start = (
     if (maxRuntimeMs) {
       setTimeout(() => {
         debug("Max runtime reached, closing worker");
+        if (process.env.SENTRY_DSN) {
+          Sentry.captureException(
+            new Error("Max runtime reached, closing worker")
+          );
+        }
+
         void (async () => {
           await Promise.all([
             collectorWorker?.close(),

@@ -7,6 +7,7 @@ import { Heading } from "@react-email/heading";
 import { Img } from "@react-email/img";
 import { env } from "../../env.mjs";
 import type { Organization } from "@prisma/client";
+import { SNSClient, PublishCommand } from "@aws-sdk/client-sns";
 
 export const sendInviteEmail = async ({
   email,
@@ -17,12 +18,13 @@ export const sendInviteEmail = async ({
   organization: Organization;
   inviteCode: string;
 }) => {
-  if (!env.SENDGRID_API_KEY) {
-    console.warn("No SENDGRID_API_KEY found, skipping email sending");
+  if (!env.SENDGRID_API_KEY && !(env.USE_AWS_SNS && env.AWS_REGION)) {
+    console.warn("No email sending method available. Skipping email sending.");
+    console.warn(
+      "Please set SENDGRID_API_KEY or both USE_AWS_SNS and AWS_REGION."
+    );
     return;
   }
-
-  sgMail.setApiKey(env.SENDGRID_API_KEY);
 
   const acceptInviteUrl = `${env.BASE_HOST}/invite/accept?inviteCode=${inviteCode}`;
 
@@ -64,12 +66,39 @@ export const sendInviteEmail = async ({
     </Html>
   );
 
-  const msg = {
-    to: email,
-    from: "LangWatch <contact@langwatch.ai>",
-    subject: `You were added to ${organization.name} on LangWatch`,
-    html: emailHtml,
-  };
+  if (env.USE_AWS_SNS && env.AWS_REGION) {
+    const snsClient = new SNSClient({ region: env.AWS_REGION });
+    const params = {
+      Message: JSON.stringify({
+        default: "Invite to LangWatch",
+        email: {
+          subject: `You were added to ${organization.name} on LangWatch`,
+          html: emailHtml,
+        },
+      }),
+      MessageStructure: "json",
+    };
 
-  await sgMail.send(msg);
+    try {
+      const command = new PublishCommand(params);
+      await snsClient.send(command);
+    } catch (error) {
+      throw error;
+    }
+  } else if (env.SENDGRID_API_KEY) {
+    sgMail.setApiKey(env.SENDGRID_API_KEY);
+    const msg = {
+      to: email,
+      from: "LangWatch <contact@langwatch.ai>",
+      subject: `You were added to ${organization.name} on LangWatch`,
+      html: emailHtml,
+    };
+
+    try {
+      await sgMail.send(msg);
+      console.log("Email sent");
+    } catch (error) {
+      throw error;
+    }
+  }
 };

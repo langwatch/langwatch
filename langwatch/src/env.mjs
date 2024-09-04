@@ -44,6 +44,9 @@ export const env = createEnv({
     DEMO_PROJECT_USER_ID: z.string().optional(),
     DEMO_PROJECT_SLUG: z.string().optional(),
     IS_OPENSEARCH: z.string().optional(),
+    USE_AWS_SNS: z.string().optional(),
+    AWS_REGION: z.string().optional(),
+    SENTRY_DSN: z.string().optional(),
   },
 
   /**
@@ -84,6 +87,9 @@ export const env = createEnv({
     DEMO_PROJECT_USER_ID: process.env.DEMO_PROJECT_USER_ID,
     DEMO_PROJECT_SLUG: process.env.DEMO_PROJECT_SLUG,
     IS_OPENSEARCH: process.env.IS_OPENSEARCH,
+    USE_AWS_SNS: process.env.USE_AWS_SNS,
+    AWS_REGION: process.env.AWS_REGION,
+    SENTRY_DSN: process.env.SENTRY_DSN,
   },
   /**
    * Run `build` or `dev` with `SKIP_ENV_VALIDATION` to skip env validation.
