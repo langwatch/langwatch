@@ -12,14 +12,24 @@ import * as iam from "aws-cdk-lib/aws-iam";
 import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
 import * as cr from "aws-cdk-lib/custom-resources";
 
+import * as lambda from "aws-cdk-lib/aws-lambda";
+import * as events from "aws-cdk-lib/aws-events";
+import * as targets from "aws-cdk-lib/aws-events-targets";
+import * as sns from "aws-cdk-lib/aws-sns";
+
+import { LangEvalsStack } from "./lang-evals-stack";
+import { LangWatchNLPStack } from "./langwatch-nlp-stack";
+
 import langWatchPackageJson from "../../../package.json";
 import { setupFluentd } from "./fluentd";
 
 export class LangWatchAwsMarketplaceStack extends cdk.Stack {
+  public readonly cluster: eks.Cluster;
+  private readonly domainName: cdk.CfnParameter;
+  private readonly snsTopic: sns.Topic;
+
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
-
-    // const elasticIp = new ec2.CfnEIP(this, "LangWatchElasticIPUnique");
 
     const nodeCountParam = new cdk.CfnParameter(this, "KubernetesNodeCount", {
       type: "Number",
@@ -29,10 +39,14 @@ export class LangWatchAwsMarketplaceStack extends cdk.Stack {
       description: "Number of nodes in the Kubernetes EKS cluster",
     });
 
-    const domainParam = new cdk.CfnParameter(this, "SubDomainName", {
+    this.domainName = new cdk.CfnParameter(this, "SubDomainName", {
       type: "String",
       description:
         "The subdomain name where LangWatch will be hosted (e.g., langwatch.yourdomain.com)",
+    });
+
+    this.snsTopic = new sns.Topic(this, "LangWatchEmailTopic", {
+      topicName: "langwatch-email-topic",
     });
 
     // Create a VPC
@@ -41,18 +55,18 @@ export class LangWatchAwsMarketplaceStack extends cdk.Stack {
     });
 
     // Create an EKS cluster
-    const cluster = new eks.Cluster(this, "LangWatchCluster", {
+    this.cluster = new eks.Cluster(this, "LangWatchCluster", {
       version: eks.KubernetesVersion.V1_30,
       vpc,
       defaultCapacity: 0,
       kubectlLayer: new KubectlV30Layer(this, "KubectlLayer"),
     });
 
-    const nodegroup = cluster.addNodegroupCapacity("ManagedNodes", {
+    const nodegroup = this.cluster.addNodegroupCapacity("ManagedNodes", {
       instanceTypes: [new ec2.InstanceType("m5.xlarge")],
-      minSize: nodeCountParam.valueAsNumber,
-      maxSize: nodeCountParam.valueAsNumber,
-      desiredSize: nodeCountParam.valueAsNumber,
+      minSize: 1,
+      maxSize: 5,
+      desiredSize: 2,
     });
 
     // Use the predefined service-linked role for AWS Marketplace
@@ -66,7 +80,7 @@ export class LangWatchAwsMarketplaceStack extends cdk.Stack {
     );
 
     // Update the aws-auth ConfigMap
-    const awsAuth = new eks.AwsAuth(this, "AwsAuth", { cluster });
+    const awsAuth = new eks.AwsAuth(this, "AwsAuth", { cluster: this.cluster });
     awsAuth.addRoleMapping(currentAccountRole, {
       groups: ["system:masters"],
     });
@@ -77,7 +91,7 @@ export class LangWatchAwsMarketplaceStack extends cdk.Stack {
     });
 
     // Add ClusterRoleBinding for kube-apiserver-kubelet-client
-    cluster.addManifest("kube-apiserver-kubelet-client-binding", {
+    this.cluster.addManifest("kube-apiserver-kubelet-client-binding", {
       apiVersion: "rbac.authorization.k8s.io/v1",
       kind: "ClusterRoleBinding",
       metadata: {
@@ -97,16 +111,19 @@ export class LangWatchAwsMarketplaceStack extends cdk.Stack {
       },
     });
 
-    const { redis, redisPassword } = this.setupRedis(vpc, cluster);
-    const { postgres, postgresPassword } = this.setupPostgres(vpc, cluster);
+    const { redis, redisPassword } = this.setupRedis(vpc, this.cluster);
+    const { postgres, postgresPassword } = this.setupPostgres(
+      vpc,
+      this.cluster
+    );
     const { openSearchDomain, openSearchPassword } = this.setupOpenSearch(
       vpc,
-      cluster
+      this.cluster
     );
 
     this.setupLangWatchEnv(
-      domainParam,
-      cluster,
+      this.domainName,
+      this.cluster,
       { redis, redisPassword },
       { postgres, postgresPassword },
       {
@@ -115,11 +132,17 @@ export class LangWatchAwsMarketplaceStack extends cdk.Stack {
       }
     );
 
-    setupFluentd(cluster);
+    setupFluentd(this.cluster);
 
-    //this.setupLangEvals(cluster);
-    //this.setupLangWatchNLP(cluster);
-    this.setupLangWatch(domainParam, cluster);
+    //Call the setup methods with dependencies
+    this.setupLangWatch(this.cluster);
+
+    // new LangEvalsStack(this, "LangEvalsStack", { cluster: this.cluster });
+    // new LangWatchNLPStack(this, "LangWatchNLPStack", { cluster: this.cluster });
+
+    //this.setupLangEvals(this.cluster);
+
+    this.setupLangWatchNLP(this.cluster);
   }
 
   private setupLangWatchEnv(
@@ -234,6 +257,12 @@ export class LangWatchAwsMarketplaceStack extends cdk.Stack {
               openSearchDomain,
             ])
           ),
+          AWS_REGION: cdk.SecretValue.unsafePlainText(this.region),
+          USE_AWS_SNS: cdk.SecretValue.unsafePlainText("true"),
+          // OPENAI_API_KEY: cdk.SecretValue.unsafePlainText(
+          //   generateSecureString("OPENAI_API_KEY", 32)
+          // ),
+          // GOOGLE_APPLICATION_CREDENTIALS: cdk.SecretValue.unsafePlainText("{}"),
         },
       }
     );
@@ -373,6 +402,18 @@ export class LangWatchAwsMarketplaceStack extends cdk.Stack {
                 objectName: "IS_OPENSEARCH",
                 key: "IS_OPENSEARCH",
               },
+              {
+                objectName: "AWS_REGION",
+                key: "AWS_REGION",
+              },
+              // {
+              //   objectName: "OPENAI_API_KEY",
+              //   key: "OPENAI_API_KEY",
+              // },
+              // {
+              //   objectName: "GOOGLE_APPLICATION_CREDENTIALS",
+              //   key: "GOOGLE_APPLICATION_CREDENTIALS",
+              // },
             ],
           },
         ],
@@ -430,6 +471,18 @@ export class LangWatchAwsMarketplaceStack extends cdk.Stack {
                   path: "IS_OPENSEARCH",
                   objectAlias: "IS_OPENSEARCH",
                 },
+                {
+                  path: "AWS_REGION",
+                  objectAlias: "AWS_REGION",
+                },
+                // {
+                //   path: "OPENAI_API_KEY",
+                //   objectAlias: "OPENAI_API_KEY",
+                // },
+                // {
+                //   path: "GOOGLE_APPLICATION_CREDENTIALS",
+                //   objectAlias: "GOOGLE_APPLICATION_CREDENTIALS",
+                // },
               ],
             },
           ]),
@@ -721,7 +774,6 @@ export class LangWatchAwsMarketplaceStack extends cdk.Stack {
   }
 
   setupLangEvals(cluster: eks.Cluster) {
-    // Add a Kubernetes manifest for the langevals service
     cluster.addManifest("langevals", {
       apiVersion: "apps/v1",
       kind: "Deployment",
@@ -812,14 +864,12 @@ export class LangWatchAwsMarketplaceStack extends cdk.Stack {
     });
   }
 
-  setupLangWatch(
-    domainParam: cdk.CfnParameter,
-    cluster: eks.Cluster,
-    elasticIp: ec2.CfnEIP | undefined = undefined
-  ) {
+  setupLangWatch(cluster: eks.Cluster) {
     const langwatchServiceAccount = cluster.addServiceAccount("langwatch-sa", {
       name: "langwatch-sa",
     });
+
+    this.snsTopic.grantPublish(langwatchServiceAccount);
 
     langwatchServiceAccount.addToPrincipalPolicy(
       new iam.PolicyStatement({
@@ -900,15 +950,51 @@ export class LangWatchAwsMarketplaceStack extends cdk.Stack {
         selector: { app: "langwatch" },
         ports: [{ port: 80, targetPort: 3000 }],
         type: "LoadBalancer",
-        //loadBalancerIP: elasticIp?.ref, // Attach Elastic IP to Load Balancer
       },
     });
 
-    //Output the Elastic IP
-    // new cdk.CfnOutput(this, "LangWatchElasticIP", {
-    //   value: elasticIp!.ref,
-    //   description: "Elastic IP for the Load Balancer",
-    // });
+    // Create a Lambda function for the cron job
+    const cronLambda = new lambda.Function(this, "LangWatchCronLambda", {
+      runtime: lambda.Runtime.NODEJS_18_X,
+      handler: "index.handler",
+      code: lambda.Code.fromAsset("lambda"),
+      environment: {
+        BASE_URL: `http://${this.domainName.valueAsString}`,
+      },
+    });
+
+    // Define your cron jobs
+    const cronJobs = [
+      {
+        name: "TopicClustering",
+        schedule: events.Schedule.cron({ minute: "0", hour: "0" }), // This runs at midnight (00:00) every day
+        endpoint: "/api/schedule_topic_clustering",
+        method: "GET",
+      },
+      {
+        name: "AlertTriggers",
+        schedule: events.Schedule.expression("cron(*/3 * * * ? *)"), // Runs every 3 minutes
+        endpoint: "/api/triggers",
+      },
+    ];
+
+    // Create a rule for each cron job
+    cronJobs.forEach((job, index) => {
+      const rule = new events.Rule(this, `LangWatchCronRule${job.name}`, {
+        schedule: job.schedule,
+      });
+
+      rule.addTarget(
+        new targets.LambdaFunction(cronLambda, {
+          event: events.RuleTargetInput.fromObject({
+            endpoint: job.endpoint,
+          }),
+        })
+      );
+    });
+
+    // Grant the Lambda function permissions to access the EKS cluster if needed
+    cluster.awsAuth.addMastersRole(cronLambda.role!);
 
     // Output the ALB DNS name
     new cdk.CfnOutput(this, "LangWatchLoadBalancerDNS", {
