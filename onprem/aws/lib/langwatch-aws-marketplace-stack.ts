@@ -187,10 +187,10 @@ export class LangWatchAwsMarketplaceStack extends cdk.Stack {
       {
         secretObjectValue: {
           BASE_HOST: cdk.SecretValue.unsafePlainText(
-            cdk.Fn.join("", ["https://", domainParam.valueAsString])
+            cdk.Fn.join("", ["http://", domainParam.valueAsString])
           ),
           NEXTAUTH_URL: cdk.SecretValue.unsafePlainText(
-            cdk.Fn.join("", ["https://", domainParam.valueAsString])
+            cdk.Fn.join("", ["http://", domainParam.valueAsString])
           ),
           DEBUG: cdk.SecretValue.unsafePlainText("langwatch:*"),
           NEXTAUTH_PROVIDER: cdk.SecretValue.unsafePlainText("email"),
