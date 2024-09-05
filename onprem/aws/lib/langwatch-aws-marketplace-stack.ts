@@ -16,6 +16,7 @@ import * as lambda from "aws-cdk-lib/aws-lambda";
 import * as events from "aws-cdk-lib/aws-events";
 import * as targets from "aws-cdk-lib/aws-events-targets";
 import * as sns from "aws-cdk-lib/aws-sns";
+import * as ses from "aws-cdk-lib/aws-ses";
 
 import { LangEvalsStack } from "./lang-evals-stack";
 import { LangWatchNLPStack } from "./langwatch-nlp-stack";
@@ -26,7 +27,8 @@ import { setupFluentd } from "./fluentd";
 export class LangWatchAwsMarketplaceStack extends cdk.Stack {
   public readonly cluster: eks.Cluster;
   private readonly domainName: cdk.CfnParameter;
-  private readonly snsTopic: sns.Topic;
+  // private readonly snsTopic: sns.Topic;
+  private readonly sesIdentity: ses.EmailIdentity;
 
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
@@ -45,8 +47,8 @@ export class LangWatchAwsMarketplaceStack extends cdk.Stack {
         "The subdomain name where LangWatch will be hosted (e.g., langwatch.yourdomain.com)",
     });
 
-    this.snsTopic = new sns.Topic(this, "LangWatchEmailTopic", {
-      topicName: "langwatch-email-topic",
+    this.sesIdentity = new ses.EmailIdentity(this, "LangWatchSESIdentity", {
+      identity: ses.Identity.email(`no-reply@${this.domainName.valueAsString}`),
     });
 
     // Create a VPC
@@ -258,11 +260,9 @@ export class LangWatchAwsMarketplaceStack extends cdk.Stack {
             ])
           ),
           AWS_REGION: cdk.SecretValue.unsafePlainText(this.region),
-          USE_AWS_SNS: cdk.SecretValue.unsafePlainText("true"),
+          USE_AWS_SES: cdk.SecretValue.unsafePlainText("true"),
           IS_ONPREM: cdk.SecretValue.unsafePlainText("true"),
-          AWS_SNS_TOPIC_ARN: cdk.SecretValue.unsafePlainText(
-            this.snsTopic.topicArn
-          ),
+
           // OPENAI_API_KEY: cdk.SecretValue.unsafePlainText(
           //   generateSecureString("OPENAI_API_KEY", 32)
           // ),
@@ -415,13 +415,10 @@ export class LangWatchAwsMarketplaceStack extends cdk.Stack {
                 key: "IS_ONPREM",
               },
               {
-                objectName: "USE_AWS_SNS",
-                key: "USE_AWS_SNS",
+                objectName: "USE_AWS_SES",
+                key: "USE_AWS_SES",
               },
-              {
-                objectName: "AWS_SNS_TOPIC_ARN",
-                key: "AWS_SNS_TOPIC_ARN",
-              },
+
               // {
               //   objectName: "OPENAI_API_KEY",
               //   key: "OPENAI_API_KEY",
@@ -496,12 +493,8 @@ export class LangWatchAwsMarketplaceStack extends cdk.Stack {
                   objectAlias: "IS_ONPREM",
                 },
                 {
-                  path: "USE_AWS_SNS",
-                  objectAlias: "USE_AWS_SNS",
-                },
-                {
-                  path: "AWS_SNS_TOPIC_ARN",
-                  objectAlias: "AWS_SNS_TOPIC_ARN",
+                  path: "USE_AWS_SES",
+                  objectAlias: "USE_AWS_SES",
                 },
                 // {
                 //   path: "OPENAI_API_KEY",
