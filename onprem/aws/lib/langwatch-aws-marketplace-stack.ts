@@ -260,6 +260,9 @@ export class LangWatchAwsMarketplaceStack extends cdk.Stack {
           AWS_REGION: cdk.SecretValue.unsafePlainText(this.region),
           USE_AWS_SNS: cdk.SecretValue.unsafePlainText("true"),
           IS_ONPREM: cdk.SecretValue.unsafePlainText("true"),
+          AWS_SNS_TOPIC_ARN: cdk.SecretValue.unsafePlainText(
+            this.snsTopic.topicArn
+          ),
           // OPENAI_API_KEY: cdk.SecretValue.unsafePlainText(
           //   generateSecureString("OPENAI_API_KEY", 32)
           // ),
@@ -411,6 +414,14 @@ export class LangWatchAwsMarketplaceStack extends cdk.Stack {
                 objectName: "IS_ONPREM",
                 key: "IS_ONPREM",
               },
+              {
+                objectName: "USE_AWS_SNS",
+                key: "USE_AWS_SNS",
+              },
+              {
+                objectName: "AWS_SNS_TOPIC_ARN",
+                key: "AWS_SNS_TOPIC_ARN",
+              },
               // {
               //   objectName: "OPENAI_API_KEY",
               //   key: "OPENAI_API_KEY",
@@ -483,6 +494,14 @@ export class LangWatchAwsMarketplaceStack extends cdk.Stack {
                 {
                   path: "IS_ONPREM",
                   objectAlias: "IS_ONPREM",
+                },
+                {
+                  path: "USE_AWS_SNS",
+                  objectAlias: "USE_AWS_SNS",
+                },
+                {
+                  path: "AWS_SNS_TOPIC_ARN",
+                  objectAlias: "AWS_SNS_TOPIC_ARN",
                 },
                 // {
                 //   path: "OPENAI_API_KEY",
