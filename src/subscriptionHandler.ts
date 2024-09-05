@@ -74,6 +74,13 @@ export class SubscriptionHandlerSaas extends SubscriptionHandler {
     const overrideAddingLimitations =
       user?.impersonator && isAdmin(user?.impersonator);
 
+    if (process.env.IS_ONPREM === "true") {
+      return {
+        ...PLAN_LIMITS[PlanTypes.ENTERPRISE],
+        overrideAddingLimitations,
+      };
+    }
+
     if (organizationId === "organization_lVWdCVtaqNXSKXtQYwU-y") {
       return { ...PLAN_LIMITS[PlanTypes.GROWTH], overrideAddingLimitations };
     }
