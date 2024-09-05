@@ -74,6 +74,7 @@ export const sendInviteEmail = async ({
         email: {
           subject: `You were added to ${organization.name} on LangWatch`,
           html: emailHtml,
+          from: `no-reply@${env.BASE_HOST}`,
         },
       }),
       MessageStructure: "json",
