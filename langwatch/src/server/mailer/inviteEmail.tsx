@@ -18,6 +18,7 @@ export const sendInviteEmail = async ({
   organization: Organization;
   inviteCode: string;
 }) => {
+  console.log("env", env);
   if (!env.SENDGRID_API_KEY && !(env.USE_AWS_SNS && env.AWS_REGION)) {
     console.warn("No email sending method available. Skipping email sending.");
     console.warn(
@@ -67,6 +68,7 @@ export const sendInviteEmail = async ({
   );
 
   if (env.USE_AWS_SNS && env.AWS_REGION) {
+    console.log("Sending email to AWS SNS");
     const snsClient = new SNSClient({ region: env.AWS_REGION });
     const params = {
       Message: JSON.stringify({
@@ -90,7 +92,7 @@ export const sendInviteEmail = async ({
     sgMail.setApiKey(env.SENDGRID_API_KEY);
     const msg = {
       to: email,
-      from: "LangWatch <contact@langwatch.ai>",
+      from: `no-reply@${env.BASE_HOST}`,
       subject: `You were added to ${organization.name} on LangWatch`,
       html: emailHtml,
     };

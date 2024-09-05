@@ -76,6 +76,7 @@ export const sendTriggerEmail = async ({
         },
       }),
       MessageStructure: "json",
+      TopicArn: env.AWS_SNS_TOPIC_ARN,
     };
 
     try {
@@ -88,7 +89,7 @@ export const sendTriggerEmail = async ({
     sgMail.setApiKey(env.SENDGRID_API_KEY);
     const msg = {
       to: triggerEmails,
-      from: "LangWatch <no-reply@langwatch.ai>",
+      from: `no-reply@${env.BASE_HOST}`,
       subject: `Trigger - ${triggerName} `,
       html: emailHtml,
     };
