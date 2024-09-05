@@ -4,8 +4,9 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "dev": "NODE_ENV=development DEBUG=langwatch:* DEBUG_HIDE_DATE=true DEBUG_COLORS=true concurrently --restart-tries -1 'node server.js' 'npm run start:workers'",
-    "build": "export DEPENDENCY_INJECTION_DIR=$(pwd)/src/injection/; export EXTRA_INCLUDE=$(pwd)/src; cp .env langwatch/langwatch/; cd langwatch/langwatch; npm run build",
+    "dev": "npm run build:websocket && NODE_ENV=development DEBUG=langwatch:* DEBUG_HIDE_DATE=true DEBUG_COLORS=true concurrently --restart-tries -1 'npm run build:websocket -- --watch' 'node server.js' 'npm run start:workers'",
+    "build": "npm run build:websocket && export DEPENDENCY_INJECTION_DIR=$(pwd)/src/injection/; export EXTRA_INCLUDE=$(pwd)/src; cp .env langwatch/langwatch/; cd langwatch/langwatch; npm run build",
+    "build:websocket": "NODE_PATH=$(pwd)/node_modules cd langwatch/langwatch; ./node_modules/.bin/esbuild src/optimization_studio/server/socketServer.ts --bundle --platform=node --outfile=build-websocket/socketServer.js --packages=external --alias:@injected-dependencies.server=../../src/injection/injection.server.ts",
     "start": "npm run prepare:production && NODE_ENV=production DEBUG=langwatch:* DEBUG_COLORS=true NEXTJS_DIST_DIR=.next concurrently --restart-tries -1 'node server.js' 'npm run start:workers'",
     "start:workers": "tsx src/workers.ts",
     "start:prepare": "cp .env langwatch/langwatch/; cd langwatch/langwatch; npm install && npm run start:prepare:files && cd ../../ && npm run prisma:generate:typescript",

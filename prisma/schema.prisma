@@ -316,6 +316,7 @@ model DatasetRecord {
 
     @@index([datasetId])
     @@index([projectId])
+    @@index([createdAt])
 }
 
 model CustomGraph {

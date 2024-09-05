@@ -1,4 +1,6 @@
-require("dotenv").config();
+const dotenv = require("dotenv");
+
+dotenv.config();
 
 process.env.NEXTJS_DIST_DIR = process.env.NEXTJS_DIST_DIR || ".next-saas";
 process.env.DEPENDENCY_INJECTION_DIR = `${__dirname}/src/injection/`;
@@ -9,6 +11,6 @@ if (process.env.NODE_ENV === "production") {
   require("events").EventEmitter.defaultMaxListeners = 128;
 }
 
-const { startApp } = require("./langwatch/langwatch/src/start");
+const { startApp } = require("./langwatch/langwatch/src/start.js");
 
 startApp("./langwatch/langwatch");
