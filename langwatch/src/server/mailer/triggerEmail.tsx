@@ -5,7 +5,7 @@ import { Html } from "@react-email/html";
 import { Img } from "@react-email/img";
 import { render } from "@react-email/render";
 import sgMail from "@sendgrid/mail";
-import { SNSClient, PublishCommand } from "@aws-sdk/client-sns";
+import { SESClient, SendEmailCommand } from "@aws-sdk/client-ses";
 
 import { env } from "../../env.mjs";
 
@@ -24,10 +24,10 @@ export const sendTriggerEmail = async ({
   triggerName: string;
   projectSlug: string;
 }) => {
-  if (!env.SENDGRID_API_KEY && !(env.USE_AWS_SNS && env.AWS_REGION)) {
+  if (!env.SENDGRID_API_KEY && !(env.USE_AWS_SES && env.AWS_REGION)) {
     console.warn("No email sending method available. Skipping email sending.");
     console.warn(
-      "Please set SENDGRID_API_KEY or both USE_AWS_SNS and AWS_REGION."
+      "Please set SENDGRID_API_KEY or both USE_AWS_SES and AWS_REGION."
     );
     return;
   }
@@ -64,25 +64,34 @@ export const sendTriggerEmail = async ({
     </Html>
   );
 
-  if (env.USE_AWS_SNS && env.AWS_REGION) {
-    const snsClient = new SNSClient({ region: env.AWS_REGION });
+  if (env.USE_AWS_SES && env.AWS_REGION) {
+    const sesClient = new SESClient({ region: env.AWS_REGION });
+
     const params = {
-      Message: JSON.stringify({
-        default: "LangWatch Trigger",
-        email: {
-          subject: `Trigger - ${triggerName}`,
-          html: emailHtml,
-          from: `no-reply@${env.BASE_HOST}`,
+      Destination: {
+        ToAddresses: triggerEmails,
+      },
+      Message: {
+        Body: {
+          Html: {
+            Charset: "UTF-8",
+            Data: emailHtml,
+          },
         },
-      }),
-      MessageStructure: "json",
-      TopicArn: env.AWS_SNS_TOPIC_ARN,
+        Subject: {
+          Charset: "UTF-8",
+          Data: `Trigger - ${triggerName}`,
+        },
+      },
+      Source: `no-reply@${env.BASE_HOST}`,
     };
 
     try {
-      const command = new PublishCommand(params);
-      await snsClient.send(command);
+      const command = new SendEmailCommand(params);
+      const data = await sesClient.send(command);
+      console.log("Email sent successfully:", data);
     } catch (error) {
+      console.error("Error sending email:", error);
       throw error;
     }
   } else if (env.SENDGRID_API_KEY) {

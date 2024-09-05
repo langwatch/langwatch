@@ -31,6 +31,7 @@
     "@ag-grid-community/react": "^31.3.2",
     "@ag-grid-community/styles": "^31.3.2",
     "@ai-sdk/openai": "^0.0.9",
+    "@aws-sdk/client-ses": "^3.645.0",
     "@aws-sdk/client-sns": "^3.637.0",
     "@chakra-ui/icons": "^2.1.1",
     "@chakra-ui/next-js": "^2.1.5",

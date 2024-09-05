@@ -7,7 +7,7 @@ import { Heading } from "@react-email/heading";
 import { Img } from "@react-email/img";
 import { env } from "../../env.mjs";
 import type { Organization } from "@prisma/client";
-import { SNSClient, PublishCommand } from "@aws-sdk/client-sns";
+import { SESClient, SendEmailCommand } from "@aws-sdk/client-ses";
 
 export const sendInviteEmail = async ({
   email,
@@ -18,10 +18,10 @@ export const sendInviteEmail = async ({
   organization: Organization;
   inviteCode: string;
 }) => {
-  if (!env.SENDGRID_API_KEY && !(env.USE_AWS_SNS && env.AWS_REGION)) {
+  if (!env.SENDGRID_API_KEY && !(env.USE_AWS_SES && env.AWS_REGION)) {
     console.warn("No email sending method available. Skipping email sending.");
     console.warn(
-      "Please set SENDGRID_API_KEY or both USE_AWS_SNS and AWS_REGION."
+      "Please set SENDGRID_API_KEY or both USE_AWS_SES and AWS_REGION."
     );
     return;
   }
@@ -66,25 +66,34 @@ export const sendInviteEmail = async ({
     </Html>
   );
 
-  if (env.USE_AWS_SNS && env.AWS_REGION) {
-    const snsClient = new SNSClient({ region: env.AWS_REGION });
-    const params = {
-      Message: JSON.stringify({
-        default: "Invite to LangWatch",
-        email: {
-          subject: `You were added to ${organization.name} on LangWatch`,
-          html: emailHtml,
-          from: `no-reply@${env.BASE_HOST}`,
-        },
-      }),
-      MessageStructure: "json",
-      TopicArn: env.AWS_SNS_TOPIC_ARN,
-    };
+  if (env.USE_AWS_SES && env.AWS_REGION) {
+    console.log("Sending email using AWS SES");
+    const sesClient = new SESClient({ region: env.AWS_REGION });
 
+    const params = {
+      Destination: {
+        ToAddresses: [email],
+      },
+      Message: {
+        Body: {
+          Html: {
+            Charset: "UTF-8",
+            Data: emailHtml,
+          },
+        },
+        Subject: {
+          Charset: "UTF-8",
+          Data: `You were added to ${organization.name} on LangWatch`,
+        },
+      },
+      Source: `no-reply@${env.BASE_HOST}`,
+    };
     try {
-      const command = new PublishCommand(params);
-      await snsClient.send(command);
+      const command = new SendEmailCommand(params);
+      const data = await sesClient.send(command);
+      console.log("Email sent successfully:", data);
     } catch (error) {
+      console.error("Error sending email:", error);
       throw error;
     }
   } else if (env.SENDGRID_API_KEY) {
