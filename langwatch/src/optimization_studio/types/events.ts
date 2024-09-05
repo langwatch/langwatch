@@ -1,5 +1,4 @@
-import type { Component, BaseComponent, Workflow } from "./dsl";
-import type { Node } from "@xyflow/react";
+import type { BaseComponent, Workflow } from "./dsl";
 
 export type StudioClientEvent =
   | { type: "is_alive"; payload: Record<string, never> }
@@ -7,7 +6,8 @@ export type StudioClientEvent =
       type: "execute_component";
       payload: {
         trace_id: string;
-        node: Node<Component>;
+        workflow: Workflow;
+        node_id: string;
         inputs: Record<string, string>;
       };
     }

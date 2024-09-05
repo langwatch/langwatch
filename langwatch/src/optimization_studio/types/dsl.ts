@@ -107,7 +107,12 @@ type Flow = {
   edges: Edge[];
 };
 
-export type WorkflowExecutionStatus = "idle" | "running" | "success" | "error";
+export type WorkflowExecutionStatus =
+  | "idle"
+  | "waiting"
+  | "running"
+  | "success"
+  | "error";
 
 export type Workflow = {
   spec_version: string;

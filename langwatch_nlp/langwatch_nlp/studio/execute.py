@@ -37,7 +37,7 @@ async def execute_component(event: ExecuteComponentPayload):
 
     yield ComponentStateChange(
         payload=ComponentStateChangePayload(
-            component_id=event.node.id,
+            component_id=event.node_id,
             execution_state=ExecutionState(
                 status=ComponentExecutionStatus.running,
                 trace_id=event.trace_id,
@@ -46,18 +46,19 @@ async def execute_component(event: ExecuteComponentPayload):
         )
     )
 
+    node = [node for node in event.workflow.nodes if node.id == event.node_id][0]
+
     await asyncio.sleep(3)
 
     yield ComponentStateChange(
         payload=ComponentStateChangePayload(
-            component_id=event.node.id,
+            component_id=event.node_id,
             execution_state=ExecutionState(
                 status=ComponentExecutionStatus.success,
                 trace_id=event.trace_id,
                 timestamps=Timestamps(finished_at=int(time.time() * 1000)),
                 outputs={
-                    output.identifier: "barbaz"
-                    for output in event.node.data.outputs or []
+                    output.identifier: "barbaz" for output in node.data.outputs or []
                 },
             ),
         )
@@ -80,7 +81,7 @@ async def execute_event(
                 except Exception as e:
                     yield component_error_event(
                         trace_id=event.payload.trace_id,
-                        node_id=event.payload.node.id,
+                        node_id=event.payload.node_id,
                         error=repr(e),
                     )
             case _:

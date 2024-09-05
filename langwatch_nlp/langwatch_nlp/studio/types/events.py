@@ -3,7 +3,7 @@ from pydantic import BaseModel
 from typing_extensions import Literal
 from langwatch_nlp.studio.types.dsl import (
     ExecutionState,
-    Node,
+    Workflow,
     WorkflowExecutionState,
 )
 
@@ -15,7 +15,8 @@ class IsAlive(BaseModel):
 
 class ExecuteComponentPayload(BaseModel):
     trace_id: str
-    node: Node
+    workflow: Workflow
+    node_id: str
     inputs: Dict[str, str]
 
 

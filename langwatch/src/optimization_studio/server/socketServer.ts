@@ -57,9 +57,7 @@ const handleClientMessage = async (
             payload: {
               component_id:
                 "node_id" in message.payload
-                  ? (message.payload.node_id ?? "")
-                  : "node" in message.payload
-                  ? message.payload.node.id
+                  ? message.payload.node_id ?? ""
                   : "",
               execution_state: {
                 status: "error",
@@ -93,6 +91,17 @@ const callPython = async (ws: WebSocket, event: StudioClientEvent) => {
         body: JSON.stringify(event),
       }
     );
+    if (!response.ok) {
+      let body = "";
+      try {
+        body = JSON.stringify(await response.json(), null, 2);
+      } catch (error) {
+        body = await response.text();
+      }
+      throw new Error(
+        `Failed to call Python: ${response.statusText}\n\n${body}`
+      );
+    }
   } catch (error) {
     if ((error as any)?.cause?.code === "ECONNREFUSED") {
       throw new Error("Python runtime is unreachable");
@@ -133,11 +142,7 @@ const callPython = async (ws: WebSocket, event: StudioClientEvent) => {
   } catch (error) {
     console.error("Error reading stream:", error);
     const node_id =
-      "node_id" in event.payload
-        ? event.payload.node_id
-        : "node" in event.payload
-        ? event.payload.node.id
-        : undefined;
+      "node_id" in event.payload ? event.payload.node_id : undefined;
 
     if (node_id) {
       sendMessageToClient(ws, {

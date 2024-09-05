@@ -29,6 +29,7 @@ export const OutputPanel = ({ node }: { node: Node<Component> }) => {
       borderRadius="0 8px 8px 0"
       borderLeftWidth={0}
       boxShadow="0 0 10px rgba(0,0,0,0.05)"
+      overflowY="auto"
     >
       <VStack align="start" spacing={3}>
         <HStack align="start" width="full">

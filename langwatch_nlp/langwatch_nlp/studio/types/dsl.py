@@ -31,6 +31,7 @@ class Field(BaseModel):
 
 class ComponentExecutionStatus(str, Enum):
     idle = "idle"
+    waiting = "waiting"
     running = "running"
     success = "success"
     error = "error"
@@ -146,6 +147,7 @@ class Flow(BaseModel):
 
 class WorkflowExecutionStatus(str, Enum):
     idle = "idle"
+    waiting = "waiting"
     running = "running"
     success = "success"
     error = "error"

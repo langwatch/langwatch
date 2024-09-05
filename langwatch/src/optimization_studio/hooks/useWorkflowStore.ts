@@ -30,6 +30,7 @@ type WorkflowStore = Workflow & {
   socketStatus: SocketStatus;
   propertiesExpanded: boolean;
   triggerValidation: boolean;
+  getWorkflow: () => Workflow;
   setSocketStatus: (status: SocketStatus) => void;
   onNodesChange: (changes: NodeChange[]) => void;
   onEdgesChange: (changes: EdgeChange[]) => void;
@@ -138,6 +139,21 @@ const store = (
   socketStatus: "disconnected",
   propertiesExpanded: false,
   triggerValidation: false,
+  getWorkflow: () => {
+    const state = get();
+
+    // Keep only the keys present on Workflow type
+    return {
+      spec_version: state.spec_version,
+      name: state.name,
+      description: state.description,
+      version: state.version,
+      default_llm: state.default_llm,
+      nodes: state.nodes,
+      edges: state.edges,
+      state: state.state,
+    };
+  },
   setSocketStatus: (status: SocketStatus) => {
     set({ socketStatus: status });
   },

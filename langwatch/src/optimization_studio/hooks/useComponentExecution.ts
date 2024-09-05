@@ -19,15 +19,19 @@ export const useComponentExecution = () => {
     trace_id: string;
   } | null>(null);
 
-  const { node, setSelectedNode, setPropertiesExpanded, setTriggerValidation } =
-    useWorkflowStore((state) => ({
-      node: state.nodes.find(
-        (node) => node.id === triggerTimeout?.component_id
-      ),
-      setSelectedNode: state.setSelectedNode,
-      setPropertiesExpanded: state.setPropertiesExpanded,
-      setTriggerValidation: state.setTriggerValidation,
-    }));
+  const {
+    node,
+    setSelectedNode,
+    setPropertiesExpanded,
+    setTriggerValidation,
+    getWorkflow,
+  } = useWorkflowStore((state) => ({
+    node: state.nodes.find((node) => node.id === triggerTimeout?.component_id),
+    setSelectedNode: state.setSelectedNode,
+    setPropertiesExpanded: state.setPropertiesExpanded,
+    setTriggerValidation: state.setTriggerValidation,
+    getWorkflow: state.getWorkflow,
+  }));
 
   const alertOnComponent = useAlertOnComponent();
 
@@ -94,7 +98,12 @@ export const useComponentExecution = () => {
 
       const payload: StudioClientEvent = {
         type: "execute_component",
-        payload: { trace_id, node, inputs: inputs_ },
+        payload: {
+          trace_id,
+          workflow: getWorkflow(),
+          node_id: node.id,
+          inputs: inputs_,
+        },
       };
       sendMessage(payload);
 
@@ -105,6 +114,7 @@ export const useComponentExecution = () => {
     [
       socketAvailable,
       setComponentExecutionState,
+      getWorkflow,
       sendMessage,
       setSelectedNode,
       setPropertiesExpanded,
