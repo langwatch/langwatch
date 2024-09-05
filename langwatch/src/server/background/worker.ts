@@ -56,7 +56,9 @@ export const start = (
       setTimeout(() => {
         debug("Max runtime reached, closing worker");
         if (process.env.SENTRY_DSN) {
-          Sentry.captureMessage("Max runtime reached, closing worker", "info");
+          Sentry.captureException(
+            new Error("Max runtime reached, closing worker")
+          );
         }
 
         void (async () => {
@@ -66,12 +68,10 @@ export const start = (
             topicClusteringWorker?.close(),
             trackEventsWorker?.close(),
           ]);
-          resolve({
-            collectorWorker,
-            evaluationsWorker,
-            topicClusteringWorker,
-            trackEventsWorker,
-          });
+
+          setTimeout(() => {
+            throw new Error("Max runtime reached, restarting worker");
+          }, 0);
         })();
       }, maxRuntimeMs);
     } else {
