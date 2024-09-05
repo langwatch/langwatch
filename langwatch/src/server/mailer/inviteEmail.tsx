@@ -80,6 +80,7 @@ export const sendInviteEmail = async ({
         },
       }),
       MessageStructure: "json",
+      TopicArn: env.AWS_SNS_TOPIC_ARN,
     };
 
     try {
