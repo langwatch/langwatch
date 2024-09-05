@@ -3,7 +3,7 @@ import { useSocketClient } from "./useSocketClient";
 import { useWorkflowStore } from "./useWorkflowStore";
 import type { StudioClientEvent } from "../types/events";
 import type { Node } from "@xyflow/react";
-import type { BaseComponent, Component } from "../types/dsl";
+import type { BaseComponent, Component, Field } from "../types/dsl";
 import { nanoid } from "nanoid";
 import { useToast } from "@chakra-ui/react";
 import { useAlertOnComponent } from "./useAlertOnComponent";
@@ -19,15 +19,15 @@ export const useComponentExecution = () => {
     trace_id: string;
   } | null>(null);
 
-  const { node, setSelectedNode, setPropertiesExpanded } = useWorkflowStore(
-    (state) => ({
+  const { node, setSelectedNode, setPropertiesExpanded, setTriggerValidation } =
+    useWorkflowStore((state) => ({
       node: state.nodes.find(
         (node) => node.id === triggerTimeout?.component_id
       ),
       setSelectedNode: state.setSelectedNode,
       setPropertiesExpanded: state.setPropertiesExpanded,
-    })
-  );
+      setTriggerValidation: state.setTriggerValidation,
+    }));
 
   const alertOnComponent = useAlertOnComponent();
 
@@ -77,9 +77,10 @@ export const useComponentExecution = () => {
         node,
         inputs,
       });
-      if (missingFields) {
+      if (missingFields.length > 0) {
         setSelectedNode(node.id);
         setPropertiesExpanded(true);
+        setTriggerValidation(true);
         return;
       }
 
@@ -107,6 +108,7 @@ export const useComponentExecution = () => {
       sendMessage,
       setSelectedNode,
       setPropertiesExpanded,
+      setTriggerValidation,
     ]
   );
 
@@ -153,7 +155,7 @@ export function getInputsForExecution({
 }: {
   node: Node<Component>;
   inputs?: Record<string, string>;
-}): { missingFields: boolean; inputs: Record<string, string> } {
+}): { missingFields: Field[]; inputs: Record<string, string> } {
   const allFields = new Set(
     node.data.inputs?.map((field) => field.identifier) ?? []
   );
@@ -177,8 +179,11 @@ export function getInputsForExecution({
     }).filter(([key]) => allFields.has(key))
   );
 
-  const missingFields = requiredFields.some(
-    (field) => !(field.identifier in inputs_)
+  const missingFields = requiredFields.filter(
+    (field) =>
+      !(field.identifier in inputs_) ||
+      inputs_[field.identifier] === undefined ||
+      inputs_[field.identifier] === ""
   );
 
   return { missingFields, inputs: inputs_ };

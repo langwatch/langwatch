@@ -29,6 +29,7 @@ type WorkflowStore = Workflow & {
   hoveredNodeId?: string;
   socketStatus: SocketStatus;
   propertiesExpanded: boolean;
+  triggerValidation: boolean;
   setSocketStatus: (status: SocketStatus) => void;
   onNodesChange: (changes: NodeChange[]) => void;
   onEdgesChange: (changes: EdgeChange[]) => void;
@@ -44,6 +45,7 @@ type WorkflowStore = Workflow & {
   setSelectedNode: (nodeId: string) => void;
   deselectAllNodes: () => void;
   setPropertiesExpanded: (expanded: boolean) => void;
+  setTriggerValidation: (triggerValidation: boolean) => void;
 };
 
 const initialNodes: Node<Component>[] = [
@@ -135,6 +137,7 @@ const store = (
   hoveredNodeId: undefined,
   socketStatus: "disconnected",
   propertiesExpanded: false,
+  triggerValidation: false,
   setSocketStatus: (status: SocketStatus) => {
     set({ socketStatus: status });
   },
@@ -209,6 +212,9 @@ const store = (
   },
   setPropertiesExpanded: (expanded: boolean) => {
     set({ propertiesExpanded: expanded });
+  },
+  setTriggerValidation: (triggerValidation: boolean) => {
+    set({ triggerValidation });
   },
 });
 

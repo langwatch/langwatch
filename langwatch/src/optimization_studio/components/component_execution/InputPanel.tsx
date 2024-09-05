@@ -1,30 +1,58 @@
 import {
   Box,
   Button,
+  FormErrorMessage,
   Heading,
   HStack,
   Textarea,
-  VStack
+  VStack,
 } from "@chakra-ui/react";
 import type { Node } from "@xyflow/react";
-import { useCallback } from "react";
-import {
-  Play
-} from "react-feather";
-import { useForm } from "react-hook-form";
+import { useCallback, useEffect, useState } from "react";
+import { Play } from "react-feather";
+import { useForm, type FieldError } from "react-hook-form";
 import { HorizontalFormControl } from "../../../components/HorizontalFormControl";
 import {
   getInputsForExecution,
   useComponentExecution,
 } from "../../hooks/useComponentExecution";
 import type { Component } from "../../types/dsl";
+import { useWorkflowStore } from "../../hooks/useWorkflowStore";
 
 export const InputPanel = ({ node }: { node: Node<Component> }) => {
-  const { register, handleSubmit } = useForm<Record<string, string>>({
-    defaultValues: getInputsForExecution({
-      node,
-    }).inputs,
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<Record<string, string>>({
+    defaultValues: getInputsForExecution({ node }).inputs,
+    resolver: (values) => {
+      const { missingFields } = getInputsForExecution({ node, inputs: values });
+
+      const response: {
+        values: Record<string, string>;
+        errors: Record<string, FieldError>;
+      } = {
+        values,
+        errors: {},
+      };
+      for (const missingField of missingFields) {
+        response.errors[missingField.identifier] = {
+          type: "required",
+          message: "This field is required",
+        };
+      }
+
+      return response;
+    },
   });
+
+  const { triggerValidation, setTriggerValidation } = useWorkflowStore(
+    (state) => ({
+      triggerValidation: state.triggerValidation,
+      setTriggerValidation: state.setTriggerValidation,
+    })
+  );
 
   const { startComponentExecution } = useComponentExecution();
 
@@ -34,6 +62,33 @@ export const InputPanel = ({ node }: { node: Node<Component> }) => {
     },
     [node, startComponentExecution]
   );
+
+  const [animationFinished, setAnimationFinished] = useState(false);
+
+  useEffect(() => {
+    setTimeout(() => {
+      setAnimationFinished(true);
+    }, 700);
+  }, []);
+
+  useEffect(() => {
+    if (triggerValidation) {
+      setTimeout(
+        () => {
+          void handleSubmit(onSubmit)();
+        },
+        animationFinished ? 0 : 700
+      );
+      setTriggerValidation(false);
+    }
+  }, [
+    animationFinished,
+    handleSubmit,
+    node,
+    onSubmit,
+    setTriggerValidation,
+    triggerValidation,
+  ]);
 
   return (
     <Box
@@ -64,8 +119,12 @@ export const InputPanel = ({ node }: { node: Node<Component> }) => {
               key={input.identifier}
               label={input.identifier}
               helper={input.description ?? ""}
+              isInvalid={!!errors[input.identifier]}
             >
               <Textarea {...register(input.identifier)} />
+              <FormErrorMessage>
+                {errors[input.identifier]?.message}
+              </FormErrorMessage>
             </HorizontalFormControl>
           ))}
           <HStack width="full" justify="end">

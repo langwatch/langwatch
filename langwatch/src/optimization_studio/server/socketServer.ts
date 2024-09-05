@@ -57,10 +57,10 @@ const handleClientMessage = async (
             payload: {
               component_id:
                 "node_id" in message.payload
-                  ? message.payload.node_id
+                  ? (message.payload.node_id ?? "")
                   : "node" in message.payload
                   ? message.payload.node.id
-                  : undefined,
+                  : "",
               execution_state: {
                 status: "error",
                 error: (error as Error).message,
