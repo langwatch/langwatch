@@ -13,6 +13,7 @@ export function transposeIDlessColumnsFirstToRowsFirstWithId(
   return Object.entries(data).reduce((acc, [column, values]) => {
     values.forEach((value, index) => {
       acc[index] = acc[index] ?? { id: nanoid() };
+      // @ts-ignore
       acc[index][column] = value;
     });
     return acc;
@@ -27,6 +28,7 @@ export function transpostRowsFirstToColumnsFirstWithoutId(
       Object.entries(row).forEach(([key, value]) => {
         if (key === "id" || key === "selected") return;
         acc[key] = acc[key] ?? [];
+        // @ts-ignore
         acc[key].push(value);
       });
       return acc;
