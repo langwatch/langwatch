@@ -121,7 +121,6 @@ class Entry(BaseComponent):
 
 
 class Evaluator(BaseComponent):
-    type: Literal["evaluator"] = "evaluator"
     inputs: List[
         Union[
             Dict[Literal["identifier", "type"], Literal["score", "float"]],
@@ -135,9 +134,32 @@ class Evaluator(BaseComponent):
 Component = Union[BaseComponent, Entry, Signature, Module, Evaluator]
 
 
-class Node(BaseModel):
+class BaseNode(BaseModel):
     id: str
-    data: Component
+    data: BaseComponent
+
+
+class SignatureNode(BaseNode):
+    type: Literal["signature"] = "signature"
+    data: Signature
+
+
+class ModuleNode(BaseNode):
+    type: Literal["module"] = "module"
+    data: Module
+
+
+class EntryNode(BaseNode):
+    type: Literal["entry"] = "entry"
+    data: Entry
+
+
+class EvaluatorNode(BaseNode):
+    type: Literal["evaluator"] = "evaluator"
+    data: Evaluator
+
+
+Node = Union[SignatureNode, ModuleNode, EntryNode, EvaluatorNode]
 
 
 class Flow(BaseModel):
