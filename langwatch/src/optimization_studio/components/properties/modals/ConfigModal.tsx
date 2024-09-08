@@ -2,11 +2,14 @@ import {
   Box,
   Button,
   HStack,
-  Portal,
+  Popover,
+  PopoverAnchor,
+  PopoverContent,
   Spacer,
   Text,
   VStack,
 } from "@chakra-ui/react";
+import { useState, useEffect } from "react";
 import { X } from "react-feather";
 
 export function ConfigModal({
@@ -20,34 +23,42 @@ export function ConfigModal({
   title: string;
   children: React.ReactNode;
 }) {
-  if (!isOpen) {
+  const [localIsOpen, setLocalIsOpen] = useState(isOpen);
+
+  useEffect(() => {
+    setLocalIsOpen(isOpen);
+  }, [isOpen]);
+
+  if (!localIsOpen) {
     return null;
   }
 
   return (
-    <>
-      <Portal>
+    <Popover
+      isOpen={localIsOpen}
+      onClose={() => {
+        setLocalIsOpen(false);
+        // To fix issue of popover reopening immediately on the trigger button
+        setTimeout(onClose, 300);
+      }}
+      placement="auto-start"
+    >
+      <PopoverAnchor>
         <Box
           position="absolute"
-          zIndex={99}
-          top={0}
           left={0}
-          width="full"
-          height="full"
-          onClick={onClose}
+          width="100%"
+          height="80px"
+          zIndex={-1}
         />
-      </Portal>
-      <VStack
+      </PopoverAnchor>
+      <PopoverContent
         borderRadius="2px"
         border="1px solid"
         borderColor="gray.200"
         background="white"
-        position="absolute"
-        zIndex={100}
         minWidth="600px"
-        transform="translateX(-100%)"
-        left="-12px"
-        spacing={0}
+        gap={0}
         boxShadow="0px 0px 10px rgba(0, 0, 0, 0.1)"
       >
         <HStack
@@ -69,7 +80,7 @@ export function ConfigModal({
         <VStack paddingY={2} paddingX={4} width="full" align="start">
           {children}
         </VStack>
-      </VStack>
-    </>
+      </PopoverContent>
+    </Popover>
   );
 }
