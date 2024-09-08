@@ -26,29 +26,21 @@ export const modelSelectorOptions: ModelOption[] = Object.entries(models).map(
   })
 );
 
-export const ModelSelector = React.memo(function ModelSelector({
-  model,
-  options,
-  onChange,
-  size = "md",
-  mode,
-}: {
-  model: string;
-  options: string[];
-  onChange: (model: string) => void;
-  size?: "sm" | "md";
-  mode?: "chat" | "embedding" | "evaluator";
-}) {
-  const { project } = useOrganizationTeamProject();
+export const allModelOptions = modelSelectorOptions.map(
+  (option) => option.value
+);
 
+export const useModelSelectionOptions = (
+  options: string[],
+  model: string,
+  mode: "chat" | "embedding" | "evaluator" = "chat"
+) => {
+  const { project } = useOrganizationTeamProject();
   const modelProviders = api.modelProvider.getAllForProject.useQuery(
     { projectId: project?.id ?? "" },
     { enabled: !!project?.id }
   );
 
-  const modelOption = modelSelectorOptions.find(
-    (option) => option.value === model && (!mode || option.mode === mode)
-  );
   const selectOptions: ModelOption[] = options
     .map((model) => {
       const modelOption = modelSelectorOptions.find(
@@ -75,7 +67,31 @@ export const ModelSelector = React.memo(function ModelSelector({
         isDisabled: !modelProvider?.enabled,
       };
     })
-    .filter((x) => x);
+    .filter((x) => x && (!mode || x.mode === mode));
+
+  const modelOption = selectOptions.find((option) => option.value === model);
+
+  return { modelOption, selectOptions };
+};
+
+export const ModelSelector = React.memo(function ModelSelector({
+  model,
+  options,
+  onChange,
+  size = "md",
+  mode,
+}: {
+  model: string;
+  options: string[];
+  onChange: (model: string) => void;
+  size?: "sm" | "md" | "full";
+  mode?: "chat" | "embedding" | "evaluator";
+}) {
+  const { modelOption, selectOptions } = useModelSelectionOptions(
+    options,
+    model,
+    mode
+  );
 
   return (
     <MultiSelect
@@ -88,7 +104,7 @@ export const ModelSelector = React.memo(function ModelSelector({
         container: (base) => ({
           ...base,
           background: "white",
-          width: size === "sm" ? "250px" : "auto",
+          width: size === "sm" ? "250px" : size === "full" ? "100%" : "auto",
           borderRadius: "5px",
           padding: 0,
         }),

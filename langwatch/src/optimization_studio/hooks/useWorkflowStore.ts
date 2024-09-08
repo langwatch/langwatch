@@ -16,6 +16,7 @@ import type {
   BaseComponent,
   Component,
   ComponentType,
+  LLMConfig,
   Workflow,
 } from "../types/dsl";
 
@@ -30,7 +31,9 @@ type WorkflowStore = Workflow & {
   socketStatus: SocketStatus;
   propertiesExpanded: boolean;
   triggerValidation: boolean;
+  workflowSelected: boolean;
   getWorkflow: () => Workflow;
+  setWorkflow: (workflow: Partial<Workflow>) => void;
   setSocketStatus: (status: SocketStatus) => void;
   onNodesChange: (changes: NodeChange[]) => void;
   onEdgesChange: (changes: EdgeChange[]) => void;
@@ -47,6 +50,7 @@ type WorkflowStore = Workflow & {
   deselectAllNodes: () => void;
   setPropertiesExpanded: (expanded: boolean) => void;
   setTriggerValidation: (triggerValidation: boolean) => void;
+  setWorkflowSelected: (selected: boolean) => void;
 };
 
 const initialNodes: Node<Component>[] = [
@@ -117,6 +121,12 @@ const initialEdges: Edge[] = [
   },
 ] satisfies (Edge & { type: "default" })[];
 
+const DEFAULT_LLM_CONFIG: LLMConfig = {
+  model: "openai/gpt-4o-mini",
+  temperature: 0,
+  max_tokens: 2048,
+};
+
 const store = (
   set: (
     partial:
@@ -133,12 +143,14 @@ const store = (
   version: "0.1",
   nodes: initialNodes,
   edges: initialEdges,
+  default_llm: DEFAULT_LLM_CONFIG,
   state: {},
 
   hoveredNodeId: undefined,
   socketStatus: "disconnected",
   propertiesExpanded: false,
   triggerValidation: false,
+  workflowSelected: false,
   getWorkflow: () => {
     const state = get();
 
@@ -153,6 +165,9 @@ const store = (
       edges: state.edges,
       state: state.state,
     };
+  },
+  setWorkflow: (workflow: Partial<Workflow>) => {
+    set(workflow);
   },
   setSocketStatus: (status: SocketStatus) => {
     set({ socketStatus: status });
@@ -224,6 +239,7 @@ const store = (
   deselectAllNodes: () => {
     set({
       nodes: get().nodes.map((node) => ({ ...node, selected: false })),
+      workflowSelected: false,
     });
   },
   setPropertiesExpanded: (expanded: boolean) => {
@@ -231,6 +247,9 @@ const store = (
   },
   setTriggerValidation: (triggerValidation: boolean) => {
     set({ triggerValidation });
+  },
+  setWorkflowSelected: (selected: boolean) => {
+    set({ workflowSelected: selected });
   },
 });
 

@@ -77,9 +77,16 @@ class BaseComponent(BaseModel):
     execution_state: Optional[ExecutionState] = None
 
 
+class LLMConfig(BaseModel):
+    model: Optional[str] = None
+    temperature: Optional[float] = None
+    max_tokens: Optional[int] = None
+    litellm_params: Optional[Dict[str, str]] = None
+
+
 class Signature(BaseComponent):
     prompt: Optional[str] = None
-    llm: Optional[str] = None
+    llm: Optional[LLMConfig] = None
 
 
 class Edge(BaseModel):
@@ -209,7 +216,7 @@ class Workflow(BaseModel):
     name: str
     description: str
     version: str
-    default_llm: Optional[str] = None
+    default_llm: Optional[LLMConfig] = None
     nodes: List[Node]
     edges: List[Edge]
     state: WorkflowState

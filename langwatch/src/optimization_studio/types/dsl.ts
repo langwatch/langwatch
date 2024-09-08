@@ -64,9 +64,16 @@ export type BaseComponent = {
   };
 };
 
+export type LLMConfig = {
+  model: string;
+  temperature?: number;
+  max_tokens?: number;
+  litellm_params?: Record<string, string>;
+};
+
 type Signature = BaseComponent & {
   prompt?: string;
-  llm?: string;
+  llm?: LLMConfig;
 };
 
 type Module = BaseComponent & {
@@ -121,7 +128,7 @@ export type Workflow = {
   description: string;
   version: string;
 
-  default_llm?: string;
+  default_llm: LLMConfig;
 
   nodes: Node<Component>[];
   edges: Edge[];
