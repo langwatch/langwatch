@@ -6,17 +6,20 @@ import os
 from queue import Empty
 import queue
 import time
-from typing import AsyncGenerator, Dict, TypedDict
+from typing import AsyncGenerator, Dict, TypedDict, cast
 from fastapi import FastAPI, Response, BackgroundTasks
 from fastapi.responses import StreamingResponse
 import json
 import dspy
 
+from langwatch_nlp.studio.dspy.lite_llm import DSPyLiteLLM
 from langwatch_nlp.studio.parser import parse_component
 from langwatch_nlp.studio.process_pool import IsolatedProcessPool
 from langwatch_nlp.studio.types.dsl import (
     ComponentExecutionStatus,
     ExecutionState,
+    LLMConfig,
+    Signature,
     Timestamps,
 )
 from langwatch_nlp.studio.utils import disable_dsp_caching
@@ -77,7 +80,17 @@ async def execute_component(event: ExecuteComponentPayload):
         else component()
     )
 
-    lm = dspy.OpenAI(model="gpt-4o-mini", max_tokens=2048)
+    llm_config = (
+        cast(LLMConfig, cast(Signature, node.data).llm)
+        if hasattr(node.data, "llm") and cast(Signature, node.data).llm
+        else event.workflow.default_llm
+    )
+
+    lm = DSPyLiteLLM(
+        max_tokens=llm_config.max_tokens or 2048,
+        temperature=llm_config.temperature or 0,
+        **(llm_config.litellm_params or {}),
+    )
     dspy.settings.configure(experimental=True)
     disable_dsp_caching()
     module.set_lm(lm=lm)

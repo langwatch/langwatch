@@ -154,7 +154,9 @@ export function LLMConfigField({
         ) : null}
         <Spacer />
         <Button size="sm" variant="ghost" onClick={onToggle}>
-          <Sliders2 size={16} />
+          <Box minWidth="16px">
+            <Sliders2 size={16} />
+          </Box>
         </Button>
       </HStack>
     </>

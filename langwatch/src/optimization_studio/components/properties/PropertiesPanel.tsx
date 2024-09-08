@@ -50,6 +50,22 @@ export function PropertiesPanel() {
     }
   }, [selectedNode, setPropertiesExpanded]);
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const isPopoverOpen = document.querySelector(".chakra-popover__popper") !== null;
+      if (e.key === "Escape" && propertiesExpanded && !isPopoverOpen) {
+        setPropertiesExpanded(false);
+        e.stopPropagation();
+        e.preventDefault();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [propertiesExpanded, setPropertiesExpanded]);
+
   if (!selectedNode && workflowSelected) {
     return (
       <Box

@@ -37,7 +37,7 @@ export function ConfigModal({
     <Popover
       isOpen={localIsOpen}
       onClose={() => {
-        setLocalIsOpen(false);
+        setTimeout(() => setLocalIsOpen(false), 10);
         // To fix issue of popover reopening immediately on the trigger button
         setTimeout(onClose, 300);
       }}

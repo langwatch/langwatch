@@ -216,7 +216,7 @@ class Workflow(BaseModel):
     name: str
     description: str
     version: str
-    default_llm: Optional[LLMConfig] = None
+    default_llm: LLMConfig
     nodes: List[Node]
     edges: List[Edge]
     state: WorkflowState
