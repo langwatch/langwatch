@@ -1,5 +1,14 @@
-import { Button, HStack, Input, Spacer, Text, VStack } from "@chakra-ui/react";
-import { X } from "react-feather";
+import {
+  Button,
+  HStack,
+  Input,
+  Link,
+  Spacer,
+  Text,
+  Tooltip,
+  VStack,
+} from "@chakra-ui/react";
+import { Settings, X } from "react-feather";
 import { HorizontalFormControl } from "../../../components/HorizontalFormControl";
 import {
   allModelOptions,
@@ -25,13 +34,26 @@ export function LLMConfigModal({
         helper={"The LLM model to use"}
         inputWidth="55%"
       >
-        <ModelSelector
-          model={llmConfig.model ?? ""}
-          options={allModelOptions}
-          onChange={(model) => onChange({ ...llmConfig, model })}
-          mode="chat"
-          size="full"
-        />
+        <HStack width="full" spacing={2}>
+          <ModelSelector
+            model={llmConfig.model ?? ""}
+            options={allModelOptions}
+            onChange={(model) => onChange({ ...llmConfig, model })}
+            mode="chat"
+            size="full"
+          />
+          <Tooltip label="Configure available models" placement="top" hasArrow>
+            <Button
+              as={Link}
+              size="sm"
+              variant="ghost"
+              href="/settings/model-providers"
+              target="_blank"
+            >
+              <Settings size={16} />
+            </Button>
+          </Tooltip>
+        </HStack>
       </HorizontalFormControl>
       <HorizontalFormControl
         label="Temperature"
