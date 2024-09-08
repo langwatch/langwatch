@@ -1,6 +1,6 @@
 import { BaseEdge, type EdgeProps, getBezierPath } from "@xyflow/react";
 import { useWorkflowStore } from "../hooks/useWorkflowStore";
-import { selectionColor } from "./Nodes";
+import { selectionColor } from "./nodes/Nodes";
 import { useTheme } from "@chakra-ui/react";
 
 export default function DefaultEdge(props: EdgeProps) {

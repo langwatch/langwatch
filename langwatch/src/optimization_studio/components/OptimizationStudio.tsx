@@ -12,7 +12,6 @@ import { useEffect, useMemo } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { LogoIcon } from "../../components/icons/LogoIcon";
 import { useWorkflowStore } from "../hooks/useWorkflowStore";
-import { EntryNode, SignatureNode } from "./Nodes";
 import { UndoRedo } from "./UndoRedo";
 import DefaultEdge from "./Edge";
 import { PropertiesPanel } from "./properties/PropertiesPanel";
@@ -20,6 +19,8 @@ import { useSocketClient } from "../hooks/useSocketClient";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { titleCase } from "../../utils/stringCasing";
 import Head from "next/head";
+import { EntryNode } from "./nodes/EntryNode";
+import { SignatureNode } from "./nodes/SignatureNode";
 
 export default function OptimizationStudio() {
   const nodeTypes = useMemo(

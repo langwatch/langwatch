@@ -1,19 +1,7 @@
-import {
-  Box,
-  Button,
-  HStack,
-  Spacer,
-  Text,
-  useDisclosure,
-} from "@chakra-ui/react";
-import { Sliders2 } from "../../../components/icons/Sliders2";
-import {
-  modelSelectorOptions,
-  useModelSelectionOptions,
-} from "../../../components/ModelSelector";
+import { Box, Text } from "@chakra-ui/react";
 import { useWorkflowStore } from "../../hooks/useWorkflowStore";
 import { BasePropertiesPanel, PropertyField } from "./BasePropertiesPanel";
-import { LLMConfigModal } from "./LLMConfigModal";
+import { LLMConfigField } from "./modals/LLMConfigModal";
 
 export function WorkflowPropertiesPanel() {
   const { getWorkflow, setWorkflow } = useWorkflowStore(
@@ -30,12 +18,6 @@ export function WorkflowPropertiesPanel() {
 <rect x="3" y="3" width="2" height="2" fill="#E5E7EB"/>
 </svg>
 `;
-  const { modelOption } = useModelSelectionOptions(
-    modelSelectorOptions.map((option) => option.value),
-    workflow.default_llm.model,
-    "chat"
-  );
-  const { isOpen, onClose, onToggle } = useDisclosure();
 
   return (
     <BasePropertiesPanel
@@ -63,29 +45,12 @@ export function WorkflowPropertiesPanel() {
       }
     >
       <PropertyField title="Default LLM">
-        <LLMConfigModal
-          isOpen={isOpen}
-          onClose={onClose}
+        <LLMConfigField
           llmConfig={workflow.default_llm}
           onChange={(llmConfig) => {
             setWorkflow({ default_llm: llmConfig });
           }}
         />
-        <HStack spacing={2} paddingX={2} width="full" align="center">
-          <Box width="14px">{modelOption?.icon}</Box>
-          <Box fontSize={14} fontFamily="mono" noOfLines={1}>
-            {modelOption?.label}
-          </Box>
-          {(!!modelOption?.version || modelOption?.isDisabled) && (
-            <Text fontSize={14} fontFamily="mono" color="gray.400">
-              ({modelOption?.value ? modelOption?.version : "disabled"})
-            </Text>
-          )}
-          <Spacer />
-          <Button size="sm" variant="ghost" onClick={onToggle}>
-            <Sliders2 size={16} />
-          </Button>
-        </HStack>
       </PropertyField>
     </BasePropertiesPanel>
   );

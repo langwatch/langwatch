@@ -24,7 +24,7 @@ import {
   isExecutableComponent,
   NodeSectionTitle,
   TypeLabel,
-} from "../Nodes";
+} from "../nodes/Nodes";
 
 export function PropertyField({
   title,
@@ -116,10 +116,12 @@ export function BasePropertiesPanel({
   node,
   header,
   children,
+  fieldsAfter,
 }: {
   node: Node<Component> | Workflow;
   header?: React.ReactNode;
   children?: React.ReactNode;
+  fieldsAfter?: React.ReactNode;
 }) {
   const { deselectAllNodes, propertiesExpanded, setPropertiesExpanded } =
     useWorkflowStore(
@@ -189,6 +191,7 @@ export function BasePropertiesPanel({
           </Button>
         </HStack>
       </HStack>
+      {children}
       {!isWorkflow(node) && (
         <>
           <PropertyFields
@@ -199,7 +202,7 @@ export function BasePropertiesPanel({
           <PropertyFields title="Outputs" fields={node.data.outputs ?? []} />
         </>
       )}
-      {children}
+      {fieldsAfter}
     </VStack>
   );
 }

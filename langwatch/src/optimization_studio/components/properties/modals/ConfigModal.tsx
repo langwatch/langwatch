@@ -1,0 +1,75 @@
+import {
+  Box,
+  Button,
+  HStack,
+  Portal,
+  Spacer,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
+import { X } from "react-feather";
+
+export function ConfigModal({
+  isOpen,
+  onClose,
+  title,
+  children,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  title: string;
+  children: React.ReactNode;
+}) {
+  if (!isOpen) {
+    return null;
+  }
+
+  return (
+    <>
+      <Portal>
+        <Box
+          position="absolute"
+          zIndex={99}
+          top={0}
+          left={0}
+          width="full"
+          height="full"
+          onClick={onClose}
+        />
+      </Portal>
+      <VStack
+        borderRadius="2px"
+        border="1px solid"
+        borderColor="gray.200"
+        background="white"
+        position="absolute"
+        zIndex={100}
+        minWidth="600px"
+        transform="translateX(-100%)"
+        left="-12px"
+        spacing={0}
+        boxShadow="0px 0px 10px rgba(0, 0, 0, 0.1)"
+      >
+        <HStack
+          width="full"
+          paddingX={4}
+          paddingY={2}
+          paddingRight={1}
+          borderBottom="1px solid"
+          borderColor="gray.200"
+        >
+          <Text fontSize={14} fontWeight={500}>
+            {title}
+          </Text>
+          <Spacer />
+          <Button size="sm" variant="ghost" onClick={onClose}>
+            <X size={16} />
+          </Button>
+        </HStack>
+        <VStack paddingY={2} paddingX={4} width="full" align="start">
+          {children}
+        </VStack>
+      </VStack>
+    </>
+  );
+}

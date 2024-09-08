@@ -40,7 +40,7 @@ type WorkflowStore = Workflow & {
   onConnect: (connection: Connection) => void;
   setNodes: (nodes: Node[]) => void;
   setEdges: (edges: Edge[]) => void;
-  setNode: (node: Partial<Node>) => void;
+  setNode: (node: Partial<Node> & { id: string }) => void;
   setComponentExecutionState: (
     id: string,
     executionState: BaseComponent["execution_state"]
@@ -193,9 +193,13 @@ const store = (
   setEdges: (edges: Edge[]) => {
     set({ edges });
   },
-  setNode: (node: Partial<Node>) => {
+  setNode: (node: Partial<Node> & { id: string }) => {
     set({
-      nodes: get().nodes.map((n) => (n.id === node.id ? { ...n, ...node } : n)),
+      nodes: get().nodes.map((n) =>
+        n.id === node.id
+          ? { ...n, ...node, data: { ...n.data, ...node.data } }
+          : n
+      ),
     });
   },
   setComponentExecutionState: (
@@ -250,6 +254,9 @@ const store = (
   },
   setWorkflowSelected: (selected: boolean) => {
     set({ workflowSelected: selected });
+    if (selected) {
+      set({ nodes: get().nodes.map((node) => ({ ...node, selected: false })) });
+    }
   },
 });
 

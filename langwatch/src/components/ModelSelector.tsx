@@ -41,37 +41,45 @@ export const useModelSelectionOptions = (
     { enabled: !!project?.id }
   );
 
-  const selectOptions: ModelOption[] = options
-    .map((model) => {
-      const modelOption = modelSelectorOptions.find(
-        (option) => option.value === model
-      );
+  const selectOptions: Record<string, ModelOption> = Object.fromEntries(
+    options
+      .map((model): [string, ModelOption] => {
+        const modelOption = modelSelectorOptions.find(
+          (option) => option.value === model
+        );
 
-      if (!modelOption) {
-        return {
-          label: model,
-          value: model,
-          version: "",
-          icon: null,
-          isDisabled: true,
-          mode: mode,
-        };
-      }
+        if (!modelOption) {
+          return [
+            model,
+            {
+              label: model,
+              value: model,
+              version: "",
+              icon: null,
+              isDisabled: true,
+              mode: mode,
+            },
+          ];
+        }
 
-      const provider = model.split("/")[0]!;
-      const modelProvider = modelProviders.data?.[provider];
+        const provider = model.split("/")[0]!;
+        const modelProvider = modelProviders.data?.[provider];
 
-      return {
-        ...modelOption,
-        value: modelProvider?.enabled ? modelOption.value : "",
-        isDisabled: !modelProvider?.enabled,
-      };
-    })
-    .filter((x) => x && (!mode || x.mode === mode));
+        return [
+          model,
+          {
+            ...modelOption,
+            value: modelProvider?.enabled ? modelOption.value : "",
+            isDisabled: !modelProvider?.enabled,
+          },
+        ];
+      })
+      .filter(([_, option]) => option && (!mode || option.mode === mode))
+  );
 
-  const modelOption = selectOptions.find((option) => option.value === model);
+  const modelOption = selectOptions[model];
 
-  return { modelOption, selectOptions };
+  return { modelOption, selectOptions: Object.values(selectOptions) };
 };
 
 export const ModelSelector = React.memo(function ModelSelector({
@@ -137,16 +145,20 @@ export const ModelSelector = React.memo(function ModelSelector({
               <Box width="14px">{props.data.icon}</Box>
               <Box fontSize={size === "sm" ? 12 : 14} fontFamily="mono">
                 {children}
+                {(!!props.data.version || props.data.isDisabled) && (
+                  <>
+                    {" "}
+                    <Text
+                      display="inline-block"
+                      fontSize={size === "sm" ? 12 : 14}
+                      fontFamily="mono"
+                      color="gray.400"
+                    >
+                      ({props.data.value ? props.data.version : "disabled"})
+                    </Text>
+                  </>
+                )}
               </Box>
-              {(!!props.data.version || props.data.isDisabled) && (
-                <Text
-                  fontSize={size === "sm" ? 12 : 14}
-                  fontFamily="mono"
-                  color="gray.400"
-                >
-                  ({props.data.value ? props.data.version : "disabled"})
-                </Text>
-              )}
             </HStack>
           </chakraComponents.Option>
         ),
@@ -162,8 +174,13 @@ export const ModelSelector = React.memo(function ModelSelector({
 
           return (
             <chakraComponents.ValueContainer {...props}>
-              <HStack spacing={2} align="center" opacity={isDisabled ? 0.5 : 1}>
-                <Box width={size === "sm" ? "14px" : "16px"}>{icon}</Box>
+              <HStack
+                overflow="hidden"
+                spacing={2}
+                align="center"
+                opacity={isDisabled ? 0.5 : 1}
+              >
+                <Box minWidth={size === "sm" ? "14px" : "16px"}>{icon}</Box>
                 <Box fontSize={size === "sm" ? 12 : 14} fontFamily="mono">
                   {children}
                 </Box>
