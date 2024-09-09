@@ -63,6 +63,8 @@ model User {
     lastLoginAt     DateTime?
     Annotation      Annotation[]
     publicShares    PublicShare[]
+    Workflow        Workflow[]
+    WorkflowVersion WorkflowVersion[]
 }
 
 model VerificationToken {
@@ -176,6 +178,8 @@ model Project {
     TriggerSent          TriggerSent[]
     annotationScores     AnnotationScore[]
     publicShares         PublicShare[]
+    workflows            Workflow[]
+    WorkflowVersion      WorkflowVersion[]
 
     @@index([teamId])
 }
@@ -493,4 +497,45 @@ model CustomLLMModelCost {
     updatedAt          DateTime @default(now()) @updatedAt
 
     @@index([projectId])
+}
+
+model Workflow {
+    id              String            @id @default(nanoid())
+    projectId       String
+    project         Project           @relation(fields: [projectId], references: [id])
+    name            String
+    icon            String?
+    createdAt       DateTime          @default(now())
+    updatedAt       DateTime          @default(now()) @updatedAt
+    latestVersionId String?
+    WorkflowVersion WorkflowVersion[]
+    publishedId     String?
+    publishedById   String?
+    publishedBy     User?             @relation(fields: [publishedById], references: [id])
+
+    @@index([projectId])
+    @@index([publishedById])
+}
+
+model WorkflowVersion {
+    id          String            @id @default(nanoid())
+    description String
+    authorId    String
+    author      User              @relation(fields: [authorId], references: [id])
+    projectId   String
+    project     Project           @relation(fields: [projectId], references: [id])
+    workflowId  String
+    workflow    Workflow          @relation(fields: [workflowId], references: [id])
+    parentId    String?
+    parent      WorkflowVersion?  @relation("WorkflowVersionHistory", fields: [parentId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+    children    WorkflowVersion[] @relation("WorkflowVersionHistory")
+    autoSaved   Boolean           @default(false)
+    createdAt   DateTime          @default(now())
+    updatedAt   DateTime          @default(now()) @updatedAt
+
+    @@index([workflowId])
+    @@index([projectId])
+    @@index([parentId])
+    @@index([authorId])
+    @@index([createdAt])
 }
