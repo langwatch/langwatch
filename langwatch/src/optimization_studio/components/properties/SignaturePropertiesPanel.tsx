@@ -1,28 +1,12 @@
-import {
-  Button,
-  HStack,
-  Spacer,
-  Text,
-  useDisclosure,
-  VStack,
-} from "@chakra-ui/react";
+import { Textarea } from "@chakra-ui/react";
 import type { Node } from "@xyflow/react";
-import { useState } from "react";
-import { Folder, Link2 } from "react-feather";
-import { DatasetPreview } from "../../../components/datasets/DatasetPreview";
-import { useGetDatasetData } from "../../hooks/useGetDatasetData";
-import type { Component, Entry, Signature } from "../../types/dsl";
-import { DatasetModal } from "../DatasetModal";
-import {
-  BasePropertiesPanel,
-  PropertyField,
-  PropertySectionTitle,
-} from "./BasePropertiesPanel";
-import { LLMConfigField } from "./modals/LLMConfigModal";
 import { useWorkflowStore } from "../../hooks/useWorkflowStore";
+import type { Signature } from "../../types/dsl";
+import { BasePropertiesPanel, PropertyField } from "./BasePropertiesPanel";
+import { LLMConfigField } from "./modals/LLMConfigModal";
 
 export function SignaturePropertiesPanel({ node }: { node: Node<Signature> }) {
-  const { default_llm, setNode, setWorkflowSelected } = useWorkflowStore(
+  const { default_llm, setNode } = useWorkflowStore(
     ({ default_llm, setNode, setWorkflowSelected }) => ({
       default_llm,
       setNode,
@@ -32,11 +16,7 @@ export function SignaturePropertiesPanel({ node }: { node: Node<Signature> }) {
 
   return (
     <BasePropertiesPanel node={node}>
-      <VStack align="start" spacing={3} width="full">
-        <HStack width="full" paddingRight={2}>
-          <PropertySectionTitle>LLM</PropertySectionTitle>
-          <Spacer />
-        </HStack>
+      <PropertyField title="LLM">
         <LLMConfigField
           allowDefault={true}
           defaultLLMConfig={default_llm}
@@ -50,7 +30,23 @@ export function SignaturePropertiesPanel({ node }: { node: Node<Signature> }) {
             });
           }}
         />
-      </VStack>
+      </PropertyField>
+      <PropertyField title="Prompt">
+        <Textarea
+          fontFamily="monospace"
+          fontSize={14}
+          value={node.data.prompt ?? ""}
+          onChange={(e) =>
+            setNode({
+              id: node.id,
+              data: {
+                ...node.data,
+                prompt: e.target.value,
+              },
+            })
+          }
+        />
+      </PropertyField>
     </BasePropertiesPanel>
   );
 }
