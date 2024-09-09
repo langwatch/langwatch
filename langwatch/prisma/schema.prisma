@@ -504,7 +504,8 @@ model Workflow {
     projectId       String
     project         Project           @relation(fields: [projectId], references: [id])
     name            String
-    icon            String?
+    icon            String
+    description     String
     createdAt       DateTime          @default(now())
     updatedAt       DateTime          @default(now()) @updatedAt
     latestVersionId String?
@@ -522,7 +523,7 @@ model Workflow {
 model WorkflowVersion {
     id                      String            @id @default(nanoid())
     version                 String
-    description             String
+    commitMessage           String
     authorId                String
     author                  User              @relation(fields: [authorId], references: [id])
     projectId               String

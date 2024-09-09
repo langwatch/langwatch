@@ -126,6 +126,7 @@ export type Workflow = {
 
   name: string;
   icon: string;
+  description: string;
   version: string;
 
   default_llm: LLMConfig;

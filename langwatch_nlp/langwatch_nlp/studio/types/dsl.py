@@ -215,6 +215,7 @@ class Workflow(BaseModel):
     spec_version: str
     name: str
     icon: str
+    description: str
     version: str
     default_llm: LLMConfig
     nodes: List[Node]

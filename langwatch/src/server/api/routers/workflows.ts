@@ -10,7 +10,8 @@ const workflowJsonSchema = z
   .object({
     spec_version: z.string(),
     name: z.string(),
-    icon: z.string().optional(),
+    icon: z.string(),
+    description: z.string(),
     version: z.string(),
   })
   .passthrough();
@@ -53,7 +54,7 @@ export const workflowRouter = createTRPCRouter({
         select: {
           id: true,
           version: true,
-          description: true,
+          commitMessage: true,
           authorId: true,
           parentId: true,
           createdAt: true,
@@ -96,7 +97,7 @@ export const workflowRouter = createTRPCRouter({
         ctx,
         input,
         autoSaved: true,
-        description: "autosaved",
+        commitMessage: "autosaved",
       });
 
       return updatedVersion;
@@ -107,7 +108,7 @@ export const workflowRouter = createTRPCRouter({
       z.object({
         projectId: z.string(),
         workflowId: z.string(),
-        description: z.string(),
+        commitMessage: z.string(),
         dsl: workflowJsonSchema,
       })
     )
@@ -117,7 +118,7 @@ export const workflowRouter = createTRPCRouter({
         ctx,
         input,
         autoSaved: false,
-        description: input.description,
+        commitMessage: input.commitMessage,
       });
 
       return newVersion;
@@ -175,7 +176,7 @@ const saveOrCommitWorkflowVersion = async ({
   ctx,
   input,
   autoSaved,
-  description,
+  commitMessage,
 }: {
   ctx: { prisma: PrismaClient; session: Session };
   input: {
@@ -184,7 +185,7 @@ const saveOrCommitWorkflowVersion = async ({
     dsl: z.infer<typeof workflowJsonSchema>;
   };
   autoSaved: boolean;
-  description: string;
+  commitMessage: string;
 }): Promise<WorkflowVersion> => {
   const workflow = await ctx.prisma.workflow.findUnique({
     where: { id: input.workflowId, projectId: input.projectId },
@@ -202,7 +203,7 @@ const saveOrCommitWorkflowVersion = async ({
 
   const data = {
     version: input.dsl.version,
-    description,
+    commitMessage,
     authorId: ctx.session.user.id,
     projectId: input.projectId,
     workflowId: input.workflowId,
@@ -231,6 +232,7 @@ const saveOrCommitWorkflowVersion = async ({
     data: {
       name: input.dsl.name,
       icon: input.dsl.icon,
+      description: input.dsl.description,
       latestVersionId: updatedVersion.id,
     },
   });

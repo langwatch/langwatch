@@ -58,6 +58,8 @@ import { LoadingScreen } from "./LoadingScreen";
 import { ProjectTechStackIcon } from "./TechStack";
 import { LogoIcon } from "./icons/LogoIcon";
 import { useTableView } from "./messages/HeaderButtons";
+import { isFeatureEnabled } from "../utils/featureFlags";
+import { PuzzleIcon } from "./icons/Puzzle";
 
 const Breadcrumbs = ({ currentRoute }: { currentRoute: Route | undefined }) => {
   const { project } = useOrganizationTeamProject();
@@ -92,7 +94,7 @@ const SideMenuLink = ({
   path,
   project,
 }: {
-  icon: Icon;
+  icon: React.ComponentType<{ size?: string | number; color?: string }>;
   label: string;
   path: string;
   project?: Project;
@@ -383,6 +385,14 @@ export const DashboardLayout = ({
           </Box>
 
           <VStack spacing={8}>
+            {isFeatureEnabled("NEXT_PUBLIC_FEATURE_OPTIMIZATION_STUDIO") && (
+              <SideMenuLink
+                path={projectRoutes.workflows.path}
+                icon={PuzzleIcon}
+                label={projectRoutes.workflows.title}
+                project={project}
+              />
+            )}
             <SideMenuLink
               path={projectRoutes.home.path}
               icon={TrendingUp}

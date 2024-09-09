@@ -140,6 +140,7 @@ const store = (
   spec_version: "1.0",
   name: "Untitled Workflow",
   icon: "🧩",
+  description: "",
   version: "0.1",
   nodes: initialNodes,
   edges: initialEdges,
@@ -159,6 +160,7 @@ const store = (
       spec_version: state.spec_version,
       name: state.name,
       icon: state.icon,
+      description: state.description,
       version: state.version,
       default_llm: state.default_llm,
       nodes: state.nodes,
@@ -284,6 +286,7 @@ export const useWorkflowStore = create<WorkflowStore>()(
         const state_ = {
           name: state.name,
           icon: state.icon,
+          description: state.description,
           version: state.version,
           default_llm: state.default_llm,
           edges: state.edges.map((edge) => {
