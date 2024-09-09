@@ -36,7 +36,8 @@ export const teamRolePermissionMapping = {
   ANNOTATIONS_MANAGE: [TeamUserRole.ADMIN, TeamUserRole.MEMBER],
   TRIGGERS_MANAGE: [TeamUserRole.ADMIN, TeamUserRole.MEMBER],
   PLAYGROUND: [TeamUserRole.ADMIN, TeamUserRole.MEMBER],
-  OPTIMIZATION_STUDIO_MANAGE: [TeamUserRole.ADMIN, TeamUserRole.MEMBER],
+  WORKFLOWS_VIEW: [TeamUserRole.ADMIN, TeamUserRole.MEMBER],
+  WORKFLOWS_MANAGE: [TeamUserRole.ADMIN, TeamUserRole.MEMBER],
   TEAM_MEMBERS_MANAGE: [TeamUserRole.ADMIN],
   TEAM_CREATE_NEW_PROJECTS: [TeamUserRole.ADMIN],
 };

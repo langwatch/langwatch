@@ -214,7 +214,7 @@ class WorkflowState(BaseModel):
 class Workflow(BaseModel):
     spec_version: str
     name: str
-    description: str
+    icon: str
     version: str
     default_llm: LLMConfig
     nodes: List[Node]
