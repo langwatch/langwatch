@@ -17,6 +17,39 @@ const workflowJsonSchema = z
   .passthrough();
 
 export const workflowRouter = createTRPCRouter({
+  create: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        dsl: workflowJsonSchema,
+        commitMessage: z.string(),
+      })
+    )
+    .use(checkUserPermissionForProject(TeamRoleGroup.WORKFLOWS_MANAGE))
+    .mutation(async ({ ctx, input }) => {
+      const workflow = await ctx.prisma.workflow.create({
+        data: {
+          id: `workflow_${nanoid()}`,
+          projectId: input.projectId,
+          name: input.dsl.name,
+          icon: input.dsl.icon,
+          description: input.dsl.description,
+        },
+      });
+
+      const version = await saveOrCommitWorkflowVersion({
+        ctx,
+        input: {
+          projectId: input.projectId,
+          workflowId: workflow.id,
+          dsl: input.dsl,
+        },
+        autoSaved: false,
+        commitMessage: input.commitMessage,
+      });
+
+      return { workflow, version };
+    }),
   getAll: protectedProcedure
     .input(z.object({ projectId: z.string() }))
     .use(checkUserPermissionForProject(TeamRoleGroup.WORKFLOWS_VIEW))
@@ -150,7 +183,7 @@ export const workflowRouter = createTRPCRouter({
       }
 
       return ctx.prisma.workflow.update({
-        where: { id: input.workflowId },
+        where: { id: input.workflowId, projectId: input.projectId },
         data: {
           publishedId: input.versionId,
           publishedById: ctx.session.user.id,
@@ -214,7 +247,7 @@ const saveOrCommitWorkflowVersion = async ({
   let updatedVersion: WorkflowVersion;
   if (latestVersion?.autoSaved) {
     updatedVersion = await ctx.prisma.workflowVersion.update({
-      where: { id: latestVersion.id },
+      where: { id: latestVersion.id, projectId: input.projectId },
       data,
     });
   } else {
@@ -228,7 +261,7 @@ const saveOrCommitWorkflowVersion = async ({
   }
 
   await ctx.prisma.workflow.update({
-    where: { id: input.workflowId },
+    where: { id: input.workflowId, projectId: input.projectId },
     data: {
       name: input.dsl.name,
       icon: input.dsl.icon,

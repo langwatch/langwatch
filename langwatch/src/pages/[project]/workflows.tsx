@@ -10,7 +10,7 @@ import {
 import { Plus } from "react-feather";
 import { DashboardLayout } from "../../components/DashboardLayout";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import { NewWorkflowModal } from "../../optimization_studio/components/NewWorkflowModal";
+import { NewWorkflowModal } from "../../optimization_studio/components/workflow/NewWorkflowModal";
 import { WorkflowCardBase } from "../../optimization_studio/components/workflow/WorkflowCard";
 
 export default function MessagesOrIntegrationGuide() {
@@ -27,7 +27,11 @@ export default function MessagesOrIntegrationGuide() {
               Optimization Studio Workflows
             </Heading>
           </HStack>
-          <Grid templateColumns="repeat(3, 1fr)" gap={6} width="full">
+          <Grid
+            templateColumns="repeat(auto-fill, minmax(260px, 1fr))"
+            gap={6}
+            width="full"
+          >
             <WorkflowCardBase onClick={onOpen}>
               <Center width="full" height="full">
                 <HStack>

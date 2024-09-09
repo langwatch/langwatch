@@ -10,7 +10,6 @@ export function WorkflowCardBase(props: React.ComponentProps<typeof VStack>) {
       borderRadius={8}
       background="white"
       boxShadow="md"
-      maxWidth="300px"
       height="200px"
       cursor="pointer"
       role="button"
