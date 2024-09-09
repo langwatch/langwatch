@@ -139,7 +139,7 @@ const store = (
 ): WorkflowStore => ({
   spec_version: "1.0",
   name: "Untitled Workflow",
-  description: "",
+  icon: "🧩",
   version: "0.1",
   nodes: initialNodes,
   edges: initialEdges,
@@ -158,7 +158,7 @@ const store = (
     return {
       spec_version: state.spec_version,
       name: state.name,
-      description: state.description,
+      icon: state.icon,
       version: state.version,
       default_llm: state.default_llm,
       nodes: state.nodes,
@@ -283,7 +283,7 @@ export const useWorkflowStore = create<WorkflowStore>()(
       const partialize = (state: WorkflowStore) => {
         const state_ = {
           name: state.name,
-          description: state.description,
+          icon: state.icon,
           version: state.version,
           default_llm: state.default_llm,
           edges: state.edges.map((edge) => {

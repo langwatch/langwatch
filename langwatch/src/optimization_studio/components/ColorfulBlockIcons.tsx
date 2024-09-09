@@ -3,6 +3,12 @@ import { FunctionIcon } from "../../components/icons/FunctionIcon";
 import { Home } from "react-feather";
 import type { ComponentType } from "../types/dsl";
 
+const sizeMap = {
+  sm: "16px",
+  md: "24px",
+  lg: "32px",
+};
+
 export function ColorfulBlockIcon({
   color,
   size,
@@ -12,11 +18,6 @@ export function ColorfulBlockIcon({
   size: "sm" | "md" | "lg";
   icon: React.ReactNode;
 }) {
-  const sizeMap = {
-    sm: "16px",
-    md: "24px",
-    lg: "32px",
-  };
   const paddingMap = {
     sm: "2px",
     md: "3px",
@@ -73,3 +74,36 @@ export const ComponentIcon = ({
     />
   );
 };
+
+export function WorkflowIcon({
+  icon,
+  size,
+}: {
+  icon: string;
+  size: "sm" | "md" | "lg";
+}) {
+  const reactflowBg = `<svg width="6" height="6" viewBox="0 0 6 6" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="6" height="6" fill="#F2F4F8"/>
+  <rect x="3" y="3" width="2" height="2" fill="#E5E7EB"/>
+  </svg>
+  `;
+
+  return (
+    <Box
+      background={`url('data:image/svg+xml;utf8,${encodeURIComponent(
+        reactflowBg
+      )}')`}
+      borderRadius="4px"
+      border="1px solid"
+      borderColor="gray.200"
+      width={sizeMap[size]}
+      height={sizeMap[size]}
+      display="flex"
+      alignItems="center"
+      justifyContent="center"
+      color="white"
+    >
+      {icon}
+    </Box>
+  );
+}
