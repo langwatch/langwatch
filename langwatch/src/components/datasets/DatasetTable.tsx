@@ -122,17 +122,9 @@ export function DatasetTable({
       pinned: "left",
       sortable: false,
       filter: false,
-      editable: false,
+      editable: true,
       enableCellChangeFlash: false,
       headerComponent: HeaderCheckboxComponent,
-      cellRenderer: (props: CustomCellRendererProps) => (
-        <Checkbox
-          marginLeft="3px"
-          {...props}
-          isChecked={props.value}
-          onChange={(e) => props.setValue?.(e.target.checked)}
-        />
-      ),
     });
 
     return headers;
