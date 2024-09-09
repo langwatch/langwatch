@@ -52,11 +52,7 @@ const handleClientMessage = async (
         await callPython(ws, message);
       case "stop_execution":
       case "execute_component":
-        try {
-          await callPython(ws, message);
-        } catch (error) {
-          handleComponentError(ws, message.payload.node_id, error as Error);
-        }
+        await callPython(ws, message);
         break;
       default:
         //@ts-expect-error
@@ -64,7 +60,18 @@ const handleClientMessage = async (
     }
   } catch (error) {
     console.error("Error handling message:", error);
-    sendErrorToClient(ws, (error as Error).message);
+    if (
+      "node_id" in messageWithoutEnvs.payload &&
+      messageWithoutEnvs.payload.node_id
+    ) {
+      handleComponentError(
+        ws,
+        messageWithoutEnvs.payload.node_id,
+        error as Error
+      );
+    } else {
+      sendErrorToClient(ws, (error as Error).message);
+    }
   }
 };
 

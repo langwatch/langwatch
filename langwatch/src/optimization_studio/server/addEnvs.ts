@@ -56,7 +56,7 @@ const addLiteLLMParams = (
   }
   if (!modelProvider.enabled) {
     throw new Error(
-      `Model provider is disabled: ${provider}, go to settings to enable it`
+      `${provider} model provider is disabled, go to settings to enable it`
     );
   }
 
