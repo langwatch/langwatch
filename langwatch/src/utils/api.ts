@@ -66,7 +66,11 @@ export const api = createTRPCNext<AppRouter>({
 
       queryClientConfig: {
         defaultOptions: {
+          mutations: {
+            networkMode: "always",
+          },
           queries: {
+            networkMode: process.env.NODE_ENV !== "production",
             retry(failureCount, error) {
               if (failureCount >= MAX_RETRIES) {
                 return false;
