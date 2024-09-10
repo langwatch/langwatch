@@ -83,7 +83,7 @@ export const NewWorkflowForm = ({
         }
       );
       onClose();
-      void router.push(`/studio/${createdWorkflow.workflow.id}`);
+      void router.push(`/${project.slug}/studio/${createdWorkflow.workflow.id}`);
     } catch (error) {
       console.error("Error creating workflow:", error);
     }

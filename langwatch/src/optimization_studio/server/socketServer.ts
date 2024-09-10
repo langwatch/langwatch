@@ -96,6 +96,7 @@ const handleComponentError = (
 const callPython = async (ws: WebSocket, event: StudioClientEvent) => {
   let response: Response;
   try {
+    // TODO: add timeout for initial connection
     response = await fetch(
       `${process.env.LANGWATCH_NLP_SERVICE}/studio/execute`,
       {
@@ -118,8 +119,17 @@ const callPython = async (ws: WebSocket, event: StudioClientEvent) => {
       );
     }
   } catch (error) {
-    if ((error as any)?.cause?.code === "ECONNREFUSED") {
+    if (
+      (error as any)?.cause?.code === "ECONNREFUSED" ||
+      (error as any)?.cause?.code === "ETIMEDOUTA"
+    ) {
       throw new Error("Python runtime is unreachable");
+    }
+    if (
+      (error as any)?.message === "fetch failed" &&
+      (error as any)?.cause.code
+    ) {
+      throw new Error((error as any)?.cause.code);
     }
     throw error;
   }

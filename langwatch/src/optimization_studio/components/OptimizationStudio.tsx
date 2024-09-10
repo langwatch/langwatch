@@ -21,6 +21,7 @@ import { titleCase } from "../../utils/stringCasing";
 import Head from "next/head";
 import { EntryNode } from "./nodes/EntryNode";
 import { SignatureNode } from "./nodes/SignatureNode";
+import { Link } from "@chakra-ui/next-js";
 
 export default function OptimizationStudio() {
   const nodeTypes = useMemo(
@@ -85,7 +86,9 @@ export default function OptimizationStudio() {
           borderColor="gray.350"
         >
           <HStack width="full">
-            <LogoIcon width={24} height={24} />
+            <Link href={`/${project?.slug}/workflows`}>
+              <LogoIcon width={24} height={24} />
+            </Link>
           </HStack>
           <HStack width="full" justify="center">
             <Text>Optimization Studio - {name}</Text>
@@ -132,6 +135,15 @@ export default function OptimizationStudio() {
             style={{ width: "100%", height: "100%" }}
             onPaneClick={() => {
               setWorkflowSelected(true);
+            }}
+            defaultViewport={{
+              zoom: 1,
+              x: 100,
+              y: Math.round(
+                ((typeof window !== "undefined"
+                  ? window.innerHeight - 360
+                  : 0) || 300) / 2
+              ),
             }}
           >
             <Controls />

@@ -15,7 +15,6 @@ import debounce from "lodash.debounce";
 import type {
   BaseComponent,
   Component,
-  ComponentType,
   LLMConfig,
   Workflow,
 } from "../types/dsl";
@@ -26,14 +25,19 @@ export type SocketStatus =
   | "connecting-python"
   | "connected";
 
-type WorkflowStore = Workflow & {
+type State = Workflow & {
+  workflowId?: string;
   hoveredNodeId?: string;
   socketStatus: SocketStatus;
   propertiesExpanded: boolean;
   triggerValidation: boolean;
   workflowSelected: boolean;
+};
+
+type WorkflowStore = State & {
+  reset: () => void;
   getWorkflow: () => Workflow;
-  setWorkflow: (workflow: Partial<Workflow>) => void;
+  setWorkflow: (workflow: Partial<Workflow> & { workflowId?: string }) => void;
   setSocketStatus: (status: SocketStatus) => void;
   onNodesChange: (changes: NodeChange[]) => void;
   onEdgesChange: (changes: EdgeChange[]) => void;
@@ -53,78 +57,29 @@ type WorkflowStore = Workflow & {
   setWorkflowSelected: (selected: boolean) => void;
 };
 
-const initialNodes: Node<Component>[] = [
-  {
-    id: "0",
-    type: "entry",
-    position: { x: 0, y: 0 },
-    data: {
-      name: "Entry",
-      outputs: [
-        { identifier: "question", type: "str" },
-        { identifier: "gold_answer", type: "str" },
-      ],
-      dataset: {
-        name: "Test Dataset",
-        inline: {
-          records: {
-            question: [
-              "What is the capital of the moon?",
-              "What is the capital france?",
-            ],
-            gold_answer: [
-              "The moon is made of cheese",
-              "The capital of france is Paris",
-            ],
-          },
-          columnTypes: [
-            { name: "question", type: "string" },
-            { name: "gold_answer", type: "string" },
-          ],
-        },
-      },
-    },
-  },
-  {
-    id: "1",
-    type: "signature",
-    position: { x: 300, y: 300 },
-    data: {
-      name: "GenerateQuery",
-      inputs: [{ identifier: "question", type: "str" }],
-      outputs: [{ identifier: "query", type: "str" }],
-    },
-  },
-  {
-    id: "2",
-    type: "signature",
-    position: { x: 600, y: 300 },
-    data: {
-      name: "GenerateAnswer",
-      inputs: [
-        { identifier: "question", type: "str" },
-        { identifier: "query", type: "str" },
-      ],
-      outputs: [{ identifier: "answer", type: "str" }],
-    },
-  },
-] satisfies (Node<Component> & { type: ComponentType })[];
-
-const initialEdges: Edge[] = [
-  {
-    id: "e1-2",
-    source: "1",
-    sourceHandle: "outputs.query",
-    target: "2",
-    targetHandle: "inputs.query",
-    type: "default",
-  },
-] satisfies (Edge & { type: "default" })[];
-
 const DEFAULT_LLM_CONFIG: LLMConfig = {
   model: "openai/gpt-4o-mini",
   temperature: 0,
   max_tokens: 2048,
+};
+
+const initialState: State = {
+  spec_version: "1.0",
+  name: "Untitled Workflow",
+  icon: "🧩",
+  description: "",
+  version: "0.1",
+  nodes: [],
+  edges: [],
+  default_llm: DEFAULT_LLM_CONFIG,
+  state: {},
+
+  workflowId: undefined,
+  hoveredNodeId: undefined,
+  socketStatus: "disconnected",
+  propertiesExpanded: false,
+  triggerValidation: false,
+  workflowSelected: false,
 };
 
 const store = (
@@ -137,21 +92,10 @@ const store = (
   ) => void,
   get: () => WorkflowStore
 ): WorkflowStore => ({
-  spec_version: "1.0",
-  name: "Untitled Workflow",
-  icon: "🧩",
-  description: "",
-  version: "0.1",
-  nodes: initialNodes,
-  edges: initialEdges,
-  default_llm: DEFAULT_LLM_CONFIG,
-  state: {},
-
-  hoveredNodeId: undefined,
-  socketStatus: "disconnected",
-  propertiesExpanded: false,
-  triggerValidation: false,
-  workflowSelected: false,
+  ...initialState,
+  reset() {
+    set(initialState);
+  },
   getWorkflow: () => {
     const state = get();
 
@@ -168,7 +112,7 @@ const store = (
       state: state.state,
     };
   },
-  setWorkflow: (workflow: Partial<Workflow>) => {
+  setWorkflow: (workflow: Partial<Workflow> & { workflowId?: string }) => {
     set(workflow);
   },
   setSocketStatus: (status: SocketStatus) => {

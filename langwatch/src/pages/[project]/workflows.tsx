@@ -1,15 +1,15 @@
+import { Link } from "@chakra-ui/next-js";
 import {
+  Box,
   Center,
   Container,
   Grid,
   Heading,
   HStack,
   Skeleton,
+  Text,
   useDisclosure,
   VStack,
-  Text,
-  Spacer,
-  Box,
 } from "@chakra-ui/react";
 import { Plus } from "react-feather";
 import { DashboardLayout } from "../../components/DashboardLayout";
@@ -20,7 +20,6 @@ import {
   WorkflowCardBase,
 } from "../../optimization_studio/components/workflow/WorkflowCard";
 import { api } from "../../utils/api";
-import { Link } from "@chakra-ui/next-js";
 
 export default function MessagesOrIntegrationGuide() {
   const { project } = useOrganizationTeamProject();
@@ -70,7 +69,7 @@ export default function MessagesOrIntegrationGuide() {
             {workflows.data?.map((workflow) => (
               <WorkflowCard
                 as={Link}
-                href={`/studio/${workflow.id}`}
+                href={`/${project?.slug}/studio/${workflow.id}`}
                 key={workflow.id}
                 workflowId={workflow.id}
                 query={workflows}
