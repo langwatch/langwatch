@@ -12,7 +12,12 @@ const workflowJsonSchema = z
     name: z.string(),
     icon: z.string(),
     description: z.string(),
-    version: z.string(),
+    version: z
+      .string()
+      .regex(
+        /^\d+\.\d+$/,
+        "Version must be in the format 'number.number' (e.g. 1.0)"
+      ),
   })
   .passthrough();
 
@@ -55,7 +60,7 @@ export const workflowRouter = createTRPCRouter({
     .use(checkUserPermissionForProject(TeamRoleGroup.WORKFLOWS_VIEW))
     .query(async ({ ctx, input }) => {
       return ctx.prisma.workflow.findMany({
-        where: { projectId: input.projectId },
+        where: { projectId: input.projectId, archivedAt: null },
       });
     }),
 
@@ -64,7 +69,11 @@ export const workflowRouter = createTRPCRouter({
     .use(checkUserPermissionForProject(TeamRoleGroup.WORKFLOWS_VIEW))
     .query(async ({ ctx, input }) => {
       const workflow = await ctx.prisma.workflow.findUnique({
-        where: { id: input.workflowId, projectId: input.projectId },
+        where: {
+          id: input.workflowId,
+          projectId: input.projectId,
+          archivedAt: null,
+        },
         include: { latestVersion: true },
       });
 
@@ -203,6 +212,24 @@ export const workflowRouter = createTRPCRouter({
         },
       });
     }),
+
+  archive: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        workflowId: z.string(),
+        unarchive: z.boolean().optional(),
+      })
+    )
+    .use(checkUserPermissionForProject(TeamRoleGroup.WORKFLOWS_MANAGE))
+    .mutation(async ({ ctx, input }) => {
+      return ctx.prisma.workflow.update({
+        where: { id: input.workflowId, projectId: input.projectId },
+        data: {
+          archivedAt: input.unarchive ? null : new Date(),
+        },
+      });
+    }),
 });
 
 const saveOrCommitWorkflowVersion = async ({
@@ -221,7 +248,11 @@ const saveOrCommitWorkflowVersion = async ({
   commitMessage: string;
 }): Promise<WorkflowVersion> => {
   const workflow = await ctx.prisma.workflow.findUnique({
-    where: { id: input.workflowId, projectId: input.projectId },
+    where: {
+      id: input.workflowId,
+      projectId: input.projectId,
+      archivedAt: null,
+    },
     include: { latestVersion: true },
   });
 

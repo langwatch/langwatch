@@ -514,6 +514,7 @@ model Workflow {
     publishedId     String?
     publishedById   String?
     publishedBy     User?             @relation(fields: [publishedById], references: [id])
+    archivedAt      DateTime?
 
     @@index([projectId])
     @@index([publishedById])
