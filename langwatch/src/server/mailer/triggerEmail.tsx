@@ -98,7 +98,7 @@ export const sendTriggerEmail = async ({
     sgMail.setApiKey(env.SENDGRID_API_KEY);
     const msg = {
       to: triggerEmails,
-      from: `no-reply@${env.BASE_HOST}`,
+      from: "LangWatch <contact@langwatch.ai>",
       subject: `Trigger - ${triggerName} `,
       html: emailHtml,
     };
