@@ -26,6 +26,8 @@ export const sendInviteEmail = async ({
     return;
   }
 
+  sgMail.setApiKey(env.SENDGRID_API_KEY ?? "");
+
   const acceptInviteUrl = `${env.BASE_HOST}/invite/accept?inviteCode=${inviteCode}`;
 
   const emailHtml = render(
@@ -97,17 +99,15 @@ export const sendInviteEmail = async ({
       throw error;
     }
   } else if (env.SENDGRID_API_KEY) {
-    sgMail.setApiKey(env.SENDGRID_API_KEY);
     const msg = {
       to: email,
-      from: `no-reply@${env.BASE_HOST}`,
+      from: "LangWatch <contact@langwatch.ai>",
       subject: `You were added to ${organization.name} on LangWatch`,
       html: emailHtml,
     };
 
     try {
       await sgMail.send(msg);
-      console.log("Email sent");
     } catch (error) {
       throw error;
     }
