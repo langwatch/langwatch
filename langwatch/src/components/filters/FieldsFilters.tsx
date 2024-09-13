@@ -33,16 +33,16 @@ import type { inferRouterOutputs } from "@trpc/server";
 import { cloneDeep } from "lodash";
 import numeral from "numeral";
 import React, { useEffect } from "react";
-import { ChevronDown, Search, X, ThumbsUp, ThumbsDown } from "react-feather";
+import { ChevronDown, Search, X } from "react-feather";
 import { useDebounceValue } from "usehooks-ts";
+import { useDrawer } from "~/components/CurrentDrawer";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useFilterParams, type FilterParam } from "../../hooks/useFilterParams";
-import type { AppRouter } from "../../server/api/root";
 import { TeamRoleGroup } from "../../server/api/permission";
+import type { AppRouter } from "../../server/api/root";
 import { availableFilters } from "../../server/filters/registry";
 import type { FilterDefinition, FilterField } from "../../server/filters/types";
 import { api } from "../../utils/api";
-import { useDrawer } from "~/components/CurrentDrawer";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 
 export function FieldsFilters() {
   const { nonEmptyFilters } = useFilterParams();

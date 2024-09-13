@@ -92,5 +92,4 @@ def useful_message_evaluation(question: str, answer: str):
         passed=arguments["score"] > 50,
         score=arguments["score"],
         details=arguments["reasoning"],
-        label="Not useful",
     )
