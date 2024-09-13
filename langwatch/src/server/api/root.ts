@@ -26,6 +26,7 @@ import { publicEnvRouter } from "./routers/publicEnv";
 import { shareRouter } from "./routers/share";
 import { llmModelCostsRouter } from "./routers/llmModelCosts";
 import { translateRouter } from "./routers/translate";
+import { workflowRouter } from "./routers/workflows";
 
 /**
  * This is the primary router for your server.
@@ -59,6 +60,7 @@ export const appRouter = createTRPCRouter({
   publicEnv: publicEnvRouter,
   share: shareRouter,
   translate: translateRouter,
+  workflow: workflowRouter,
   ...(dependencies.extraTRPCRoutes?.() ?? {}),
 });
 

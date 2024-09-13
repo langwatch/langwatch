@@ -12,13 +12,18 @@ import { useEffect, useMemo } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { LogoIcon } from "../../components/icons/LogoIcon";
 import { useWorkflowStore } from "../hooks/useWorkflowStore";
-import { EntryNode, SignatureNode } from "./Nodes";
 import { UndoRedo } from "./UndoRedo";
+import { History } from "./History";
 import DefaultEdge from "./Edge";
-import { PropertiesPanel } from "./PropertiesPanel";
+import { PropertiesPanel } from "./properties/PropertiesPanel";
 import { useSocketClient } from "../hooks/useSocketClient";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { titleCase } from "../../utils/stringCasing";
+import Head from "next/head";
+import { EntryNode } from "./nodes/EntryNode";
+import { SignatureNode } from "./nodes/SignatureNode";
+import { Link } from "@chakra-ui/next-js";
+import { AutoSave } from "./AutoSave";
 
 export default function OptimizationStudio() {
   const nodeTypes = useMemo(
@@ -30,22 +35,31 @@ export default function OptimizationStudio() {
   const gray100 = theme.colors.gray["100"];
   const gray300 = theme.colors.gray["300"];
 
-  const { nodes, edges, onNodesChange, onEdgesChange, onConnect } =
-    useWorkflowStore(
-      useShallow((state) => {
-        if (typeof window !== "undefined") {
-          // @ts-ignore
-          window.state = state;
-        }
-        return {
-          nodes: state.nodes,
-          edges: state.edges,
-          onNodesChange: state.onNodesChange,
-          onEdgesChange: state.onEdgesChange,
-          onConnect: state.onConnect,
-        };
-      })
-    );
+  const {
+    name,
+    nodes,
+    edges,
+    onNodesChange,
+    onEdgesChange,
+    onConnect,
+    setWorkflowSelected,
+  } = useWorkflowStore(
+    useShallow((state) => {
+      if (typeof window !== "undefined") {
+        // @ts-ignore
+        window.state = state;
+      }
+      return {
+        name: state.name,
+        nodes: state.nodes,
+        edges: state.edges,
+        onNodesChange: state.onNodesChange,
+        onEdgesChange: state.onEdgesChange,
+        onConnect: state.onConnect,
+        setWorkflowSelected: state.setWorkflowSelected,
+      };
+    })
+  );
 
   const { project } = useOrganizationTeamProject();
   const { socketStatus, connect, disconnect } = useSocketClient();
@@ -62,6 +76,9 @@ export default function OptimizationStudio() {
 
   return (
     <div style={{ width: "100vw", height: "100vh" }}>
+      <Head>
+        <title>LangWatch - Optimization Studio - {name}</title>
+      </Head>
       <VStack width="full" height="full" spacing={0}>
         <HStack
           width="full"
@@ -71,10 +88,13 @@ export default function OptimizationStudio() {
           borderColor="gray.350"
         >
           <HStack width="full">
-            <LogoIcon width={24} height={24} />
+            <Link href={`/${project?.slug}/workflows`}>
+              <LogoIcon width={24} height={24} />
+            </Link>
+            <AutoSave />
           </HStack>
           <HStack width="full" justify="center">
-            <Text>Optimization Studio</Text>
+            <Text>Optimization Studio - {name}</Text>
             <StatusCircle
               status={socketStatus}
               tooltip={
@@ -104,6 +124,7 @@ export default function OptimizationStudio() {
           </HStack>
           <HStack width="full" justify="end">
             <UndoRedo />
+            <History />
           </HStack>
         </HStack>
         <Box width="full" height="full" position="relative">
@@ -116,6 +137,18 @@ export default function OptimizationStudio() {
             onEdgesChange={onEdgesChange}
             onConnect={onConnect}
             style={{ width: "100%", height: "100%" }}
+            onPaneClick={() => {
+              setWorkflowSelected(true);
+            }}
+            defaultViewport={{
+              zoom: 1,
+              x: 100,
+              y: Math.round(
+                ((typeof window !== "undefined"
+                  ? window.innerHeight - 360
+                  : 0) || 300) / 2
+              ),
+            }}
           >
             <Controls />
             <MiniMap />

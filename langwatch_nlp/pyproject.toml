@@ -22,6 +22,7 @@ mangum = "^0.17.0"
 litellm = {extras = ["proxy"], version = "1.40.7"}
 google-cloud-aiplatform = "^1.54.1"
 uvicorn = ">=0.22.0,<0.23.0"
+dspy-ai = "^2.4.14"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.1.1"

@@ -1,6 +1,5 @@
 import { Button } from "@chakra-ui/react";
 
-import "@xyflow/react/dist/style.css";
 import { RotateCcw, RotateCw } from "react-feather";
 import { useWorkflowStore } from "../hooks/useWorkflowStore";
 import { useEffect } from "react";

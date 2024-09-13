@@ -8,6 +8,7 @@ import { getServerSession } from "next-auth";
 import { parse as parseCookie } from "cookie";
 import { prisma } from "../../server/db";
 import type { StudioClientEvent, StudioServerEvent } from "../types/events";
+import { addEnvs } from "./addEnvs";
 
 const wss = new WebSocketServer({ noServer: true });
 
@@ -40,33 +41,18 @@ const handleConnection = (
 
 const handleClientMessage = async (
   ws: WebSocket,
-  message: StudioClientEvent,
+  messageWithoutEnvs: StudioClientEvent,
   projectId: string
 ) => {
   try {
+    const message = await addEnvs(messageWithoutEnvs, projectId);
+
     switch (message.type) {
       case "is_alive":
         await callPython(ws, message);
       case "stop_execution":
       case "execute_component":
-        try {
-          await callPython(ws, message);
-        } catch (error) {
-          sendMessageToClient(ws, {
-            type: "component_state_change",
-            payload: {
-              component_id:
-                "node_id" in message.payload
-                  ? message.payload.node_id ?? ""
-                  : "",
-              execution_state: {
-                status: "error",
-                error: (error as Error).message,
-                timestamps: { finished_at: Date.now() },
-              },
-            },
-          });
-        }
+        await callPython(ws, message);
         break;
       default:
         //@ts-expect-error
@@ -74,13 +60,43 @@ const handleClientMessage = async (
     }
   } catch (error) {
     console.error("Error handling message:", error);
-    sendErrorToClient(ws, (error as Error).message);
+    if (
+      "node_id" in messageWithoutEnvs.payload &&
+      messageWithoutEnvs.payload.node_id
+    ) {
+      handleComponentError(
+        ws,
+        messageWithoutEnvs.payload.node_id,
+        error as Error
+      );
+    } else {
+      sendErrorToClient(ws, (error as Error).message);
+    }
   }
+};
+
+const handleComponentError = (
+  ws: WebSocket,
+  node_id: string | undefined,
+  error: Error
+) => {
+  sendMessageToClient(ws, {
+    type: "component_state_change",
+    payload: {
+      component_id: node_id ?? "",
+      execution_state: {
+        status: "error",
+        error: error.message,
+        timestamps: { finished_at: Date.now() },
+      },
+    },
+  });
 };
 
 const callPython = async (ws: WebSocket, event: StudioClientEvent) => {
   let response: Response;
   try {
+    // TODO: add timeout for initial connection
     response = await fetch(
       `${process.env.LANGWATCH_NLP_SERVICE}/studio/execute`,
       {
@@ -103,8 +119,17 @@ const callPython = async (ws: WebSocket, event: StudioClientEvent) => {
       );
     }
   } catch (error) {
-    if ((error as any)?.cause?.code === "ECONNREFUSED") {
+    if (
+      (error as any)?.cause?.code === "ECONNREFUSED" ||
+      (error as any)?.cause?.code === "ETIMEDOUTA"
+    ) {
       throw new Error("Python runtime is unreachable");
+    }
+    if (
+      (error as any)?.message === "fetch failed" &&
+      (error as any)?.cause.code
+    ) {
+      throw new Error((error as any)?.cause.code);
     }
     throw error;
   }
@@ -210,7 +235,7 @@ export const handleUpgrade = async (
   const hasPermission = await backendHasTeamProjectPermission(
     { prisma, session },
     { projectId },
-    "OPTIMIZATION_STUDIO_MANAGE"
+    "WORKFLOWS_MANAGE"
   );
   if (!hasPermission) {
     socket.write("HTTP/1.1 403 Forbidden\r\n\r\n");

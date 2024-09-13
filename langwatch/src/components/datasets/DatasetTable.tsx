@@ -4,9 +4,8 @@ import {
   Button,
   Card,
   CardBody,
-  Checkbox,
-  HStack,
   Heading,
+  HStack,
   Spacer,
   Text,
   useDisclosure,
@@ -25,18 +24,15 @@ import {
   type DatasetColumnDef,
 } from "./DatasetGrid";
 
-import type {
-  AgGridReact,
-  CustomCellRendererProps,
-} from "@ag-grid-community/react";
+import type { AgGridReact } from "@ag-grid-community/react";
+import type { Dataset, DatasetRecord } from "@prisma/client";
 import { nanoid } from "nanoid";
 import type {
   DatasetColumns,
   DatasetRecordEntry,
 } from "../../server/datasets/types";
-import { AddRowsFromCSVModal } from "./AddRowsFromCSVModal";
 import { AddOrEditDatasetDrawer } from "../AddOrEditDatasetDrawer";
-import type { Dataset, DatasetRecord } from "@prisma/client";
+import { AddRowsFromCSVModal } from "./AddRowsFromCSVModal";
 
 export type InMemoryDataset = {
   datasetId?: string;

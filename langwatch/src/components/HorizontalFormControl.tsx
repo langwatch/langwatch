@@ -17,10 +17,12 @@ export function HorizontalFormControl({
   children,
   align,
   minWidth,
+  inputWidth,
 }: PropsWithChildren<{
   label: string | ReactNode;
   helper: string;
   isInvalid?: boolean;
+  inputWidth?: string;
 }> &
   StackProps) {
   return (
@@ -42,7 +44,7 @@ export function HorizontalFormControl({
           </FormHelperText>
         </VStack>
         <Spacer />
-        <Box minWidth={["full", "full", "50%"]}>{children}</Box>
+        <Box minWidth={["full", "full", inputWidth ?? "50%"]}>{children}</Box>
       </HStack>
     </FormControl>
   );

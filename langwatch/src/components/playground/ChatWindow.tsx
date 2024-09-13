@@ -18,12 +18,12 @@ import { type Message } from "ai/react";
 import React, { useEffect, useRef } from "react";
 import { ChevronDown, MinusCircle, PlusCircle, Send } from "react-feather";
 import { useDebounceValue } from "usehooks-ts";
-import { usePlaygroundStore } from "../../hooks/usePlaygroundStore";
-import { ModelSelector, modelSelectorOptions } from "../ModelSelector";
 import {
   useChatWithSubscription,
   type ChatRef,
 } from "../../hooks/useChatWithSubscription";
+import { usePlaygroundStore } from "../../hooks/usePlaygroundStore";
+import { allModelOptions, ModelSelector } from "../ModelSelector";
 import { Messages } from "./Messages";
 
 export const ChatWindowWrapper = React.memo(function ChatWindowWrapper({
@@ -168,7 +168,7 @@ const ChatWindow = React.memo(function ChatWindow({
           cursor="move"
         />
         <ModelSelector
-          options={modelSelectorOptions.map((option) => option.value)}
+          options={allModelOptions}
           model={chatWindowState.model}
           onChange={(model) => setModel(windowId, model)}
           size="sm"

@@ -77,9 +77,16 @@ class BaseComponent(BaseModel):
     execution_state: Optional[ExecutionState] = None
 
 
+class LLMConfig(BaseModel):
+    model: Optional[str] = None
+    temperature: Optional[float] = None
+    max_tokens: Optional[int] = None
+    litellm_params: Optional[Dict[str, str]] = None
+
+
 class Signature(BaseComponent):
     prompt: Optional[str] = None
-    llm: Optional[str] = None
+    llm: Optional[LLMConfig] = None
 
 
 class Edge(BaseModel):
@@ -121,7 +128,6 @@ class Entry(BaseComponent):
 
 
 class Evaluator(BaseComponent):
-    type: Literal["evaluator"] = "evaluator"
     inputs: List[
         Union[
             Dict[Literal["identifier", "type"], Literal["score", "float"]],
@@ -135,9 +141,32 @@ class Evaluator(BaseComponent):
 Component = Union[BaseComponent, Entry, Signature, Module, Evaluator]
 
 
-class Node(BaseModel):
+class BaseNode(BaseModel):
     id: str
-    data: Component
+    data: BaseComponent
+
+
+class SignatureNode(BaseNode):
+    type: Literal["signature"] = "signature"
+    data: Signature
+
+
+class ModuleNode(BaseNode):
+    type: Literal["module"] = "module"
+    data: Module
+
+
+class EntryNode(BaseNode):
+    type: Literal["entry"] = "entry"
+    data: Entry
+
+
+class EvaluatorNode(BaseNode):
+    type: Literal["evaluator"] = "evaluator"
+    data: Evaluator
+
+
+Node = Union[SignatureNode, ModuleNode, EntryNode, EvaluatorNode]
 
 
 class Flow(BaseModel):
@@ -185,9 +214,10 @@ class WorkflowState(BaseModel):
 class Workflow(BaseModel):
     spec_version: str
     name: str
+    icon: str
     description: str
     version: str
-    default_llm: Optional[str] = None
+    default_llm: LLMConfig
     nodes: List[Node]
     edges: List[Edge]
     state: WorkflowState

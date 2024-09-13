@@ -26,6 +26,62 @@ export const modelSelectorOptions: ModelOption[] = Object.entries(models).map(
   })
 );
 
+export const allModelOptions = modelSelectorOptions.map(
+  (option) => option.value
+);
+
+export const useModelSelectionOptions = (
+  options: string[],
+  model: string,
+  mode: "chat" | "embedding" | "evaluator" = "chat"
+) => {
+  const { project } = useOrganizationTeamProject();
+  const modelProviders = api.modelProvider.getAllForProject.useQuery(
+    { projectId: project?.id ?? "" },
+    { enabled: !!project?.id }
+  );
+
+  const selectOptions: Record<string, ModelOption> = Object.fromEntries(
+    options
+      .map((model): [string, ModelOption] => {
+        const modelOption = modelSelectorOptions.find(
+          (option) => option.value === model
+        );
+
+        if (!modelOption) {
+          return [
+            model,
+            {
+              label: model,
+              value: model,
+              version: "",
+              icon: null,
+              isDisabled: true,
+              mode: mode,
+            },
+          ];
+        }
+
+        const provider = model.split("/")[0]!;
+        const modelProvider = modelProviders.data?.[provider];
+
+        return [
+          model,
+          {
+            ...modelOption,
+            value: modelProvider?.enabled ? modelOption.value : "",
+            isDisabled: !modelProvider?.enabled,
+          },
+        ];
+      })
+      .filter(([_, option]) => option && (!mode || option.mode === mode))
+  );
+
+  const modelOption = selectOptions[model];
+
+  return { modelOption, selectOptions: Object.values(selectOptions) };
+};
+
 export const ModelSelector = React.memo(function ModelSelector({
   model,
   options,
@@ -36,46 +92,14 @@ export const ModelSelector = React.memo(function ModelSelector({
   model: string;
   options: string[];
   onChange: (model: string) => void;
-  size?: "sm" | "md";
+  size?: "sm" | "md" | "full";
   mode?: "chat" | "embedding" | "evaluator";
 }) {
-  const { project } = useOrganizationTeamProject();
-
-  const modelProviders = api.modelProvider.getAllForProject.useQuery(
-    { projectId: project?.id ?? "" },
-    { enabled: !!project?.id }
+  const { modelOption, selectOptions } = useModelSelectionOptions(
+    options,
+    model,
+    mode
   );
-
-  const modelOption = modelSelectorOptions.find(
-    (option) => option.value === model && (!mode || option.mode === mode)
-  );
-  const selectOptions: ModelOption[] = options
-    .map((model) => {
-      const modelOption = modelSelectorOptions.find(
-        (option) => option.value === model
-      );
-
-      if (!modelOption) {
-        return {
-          label: model,
-          value: model,
-          version: "",
-          icon: null,
-          isDisabled: true,
-          mode: mode,
-        };
-      }
-
-      const provider = model.split("/")[0]!;
-      const modelProvider = modelProviders.data?.[provider];
-
-      return {
-        ...modelOption,
-        value: modelProvider?.enabled ? modelOption.value : "",
-        isDisabled: !modelProvider?.enabled,
-      };
-    })
-    .filter((x) => x);
 
   return (
     <MultiSelect
@@ -88,7 +112,7 @@ export const ModelSelector = React.memo(function ModelSelector({
         container: (base) => ({
           ...base,
           background: "white",
-          width: size === "sm" ? "250px" : "auto",
+          width: size === "sm" ? "250px" : size === "full" ? "100%" : "auto",
           borderRadius: "5px",
           padding: 0,
         }),
@@ -121,16 +145,20 @@ export const ModelSelector = React.memo(function ModelSelector({
               <Box width="14px">{props.data.icon}</Box>
               <Box fontSize={size === "sm" ? 12 : 14} fontFamily="mono">
                 {children}
+                {(!!props.data.version || props.data.isDisabled) && (
+                  <>
+                    {" "}
+                    <Text
+                      display="inline-block"
+                      fontSize={size === "sm" ? 12 : 14}
+                      fontFamily="mono"
+                      color="gray.400"
+                    >
+                      ({props.data.value ? props.data.version : "disabled"})
+                    </Text>
+                  </>
+                )}
               </Box>
-              {(!!props.data.version || props.data.isDisabled) && (
-                <Text
-                  fontSize={size === "sm" ? 12 : 14}
-                  fontFamily="mono"
-                  color="gray.400"
-                >
-                  ({props.data.value ? props.data.version : "disabled"})
-                </Text>
-              )}
             </HStack>
           </chakraComponents.Option>
         ),
@@ -146,8 +174,13 @@ export const ModelSelector = React.memo(function ModelSelector({
 
           return (
             <chakraComponents.ValueContainer {...props}>
-              <HStack spacing={2} align="center" opacity={isDisabled ? 0.5 : 1}>
-                <Box width={size === "sm" ? "14px" : "16px"}>{icon}</Box>
+              <HStack
+                overflow="hidden"
+                spacing={2}
+                align="center"
+                opacity={isDisabled ? 0.5 : 1}
+              >
+                <Box minWidth={size === "sm" ? "14px" : "16px"}>{icon}</Box>
                 <Box fontSize={size === "sm" ? 12 : 14} fontFamily="mono">
                   {children}
                 </Box>

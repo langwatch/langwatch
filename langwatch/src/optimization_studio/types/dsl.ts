@@ -64,19 +64,26 @@ export type BaseComponent = {
   };
 };
 
-type Signature = BaseComponent & {
-  prompt?: string;
-  llm?: string;
+export type LLMConfig = {
+  model: string;
+  temperature?: number;
+  max_tokens?: number;
+  litellm_params?: Record<string, string>;
 };
 
-type Module = BaseComponent & {
+export type Signature = BaseComponent & {
+  prompt?: string;
+  llm?: LLMConfig;
+};
+
+export type Module = BaseComponent & {
   components?: Flow["nodes"];
   forward_pass?: Flow["edges"] | { code: string };
 };
 
-type Retriever = BaseComponent;
+export type Retriever = BaseComponent;
 
-type PromptingTechnique = BaseComponent;
+export type PromptingTechnique = BaseComponent;
 
 export type Entry = BaseComponent & {
   inputs?: never;
@@ -90,7 +97,7 @@ export type Entry = BaseComponent & {
   };
 };
 
-type Evaluator = BaseComponent & {
+export type Evaluator = BaseComponent & {
   type: "evaluator";
   inputs: (
     | { identifier: "score"; type: "float" }
@@ -118,10 +125,11 @@ export type Workflow = {
   spec_version: string;
 
   name: string;
+  icon: string;
   description: string;
   version: string;
 
-  default_llm?: string;
+  default_llm: LLMConfig;
 
   nodes: Node<Component>[];
   edges: Edge[];

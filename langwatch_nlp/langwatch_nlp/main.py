@@ -1,8 +1,10 @@
 import asyncio
+import multiprocessing
 import os
 from typing import Dict, List, Optional, Union
 from dotenv import load_dotenv
-from mangum import Mangum
+
+# from mangum import Mangum
 
 from langwatch_nlp.generate_proxy_config import generate_proxy_config
 
@@ -11,6 +13,7 @@ load_dotenv()
 import langwatch_nlp.error_tracking
 from fastapi import FastAPI
 
+from langwatch_nlp.studio.execute import app as studio_app, lifespan
 
 import langwatch_nlp.topic_clustering.batch_clustering as batch_clustering
 import langwatch_nlp.topic_clustering.incremental_clustering as incremental_clustering
@@ -25,12 +28,11 @@ if "DATABASE_URL" in os.environ:
     del os.environ["DATABASE_URL"]
 
 # Config
-app = FastAPI()
+app = FastAPI(lifespan=lifespan)
 batch_clustering.setup_endpoints(app)
 incremental_clustering.setup_endpoints(app)
 sentiment_analysis.setup_endpoints(app)
 
-from langwatch_nlp.studio.execute import app as studio_app
 
 app.mount("/studio", studio_app)
 
@@ -102,5 +104,7 @@ if not loop.is_running():
 else:
     asyncio.ensure_future(proxy_startup())
 
-if __name__ != "__main__":
-    handler = Mangum(app, lifespan="off")
+if __name__ == "__main__":
+    multiprocessing.set_start_method("fork")
+# else:
+#     handler = Mangum(app, lifespan="off")

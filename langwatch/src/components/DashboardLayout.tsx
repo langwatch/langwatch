@@ -33,6 +33,7 @@ import React, { useState, type PropsWithChildren } from "react";
 import {
   ChevronDown,
   ChevronRight,
+  Edit,
   Image as ImageIcon,
   Lock,
   MessageSquare,
@@ -41,10 +42,8 @@ import {
   Search,
   Settings,
   Shield,
-  Edit,
   Table,
   TrendingUp,
-  type Icon,
 } from "react-feather";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import { useRequiredSession } from "../hooks/useRequiredSession";
@@ -52,11 +51,13 @@ import { dependencies } from "../injection/dependencies.client";
 import { OrganizationRoleGroup } from "../server/api/permission";
 import type { FullyLoadedOrganization } from "../server/api/routers/organization";
 import { api } from "../utils/api";
+import { isFeatureEnabled } from "../utils/featureFlags";
 import { findCurrentRoute, projectRoutes, type Route } from "../utils/routes";
 import { CurrentDrawer } from "./CurrentDrawer";
 import { LoadingScreen } from "./LoadingScreen";
 import { ProjectTechStackIcon } from "./TechStack";
 import { LogoIcon } from "./icons/LogoIcon";
+import { PuzzleIcon } from "./icons/Puzzle";
 import { useTableView } from "./messages/HeaderButtons";
 
 const Breadcrumbs = ({ currentRoute }: { currentRoute: Route | undefined }) => {
@@ -92,7 +93,7 @@ const SideMenuLink = ({
   path,
   project,
 }: {
-  icon: Icon;
+  icon: React.ComponentType<{ size?: string | number; color?: string }>;
   label: string;
   path: string;
   project?: Project;
@@ -383,6 +384,14 @@ export const DashboardLayout = ({
           </Box>
 
           <VStack spacing={8}>
+            {isFeatureEnabled("NEXT_PUBLIC_FEATURE_OPTIMIZATION_STUDIO") && (
+              <SideMenuLink
+                path={projectRoutes.workflows.path}
+                icon={PuzzleIcon}
+                label={projectRoutes.workflows.title}
+                project={project}
+              />
+            )}
             <SideMenuLink
               path={projectRoutes.home.path}
               icon={TrendingUp}

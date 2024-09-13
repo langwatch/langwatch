@@ -3,6 +3,10 @@ export const projectRoutes = {
     path: "/[project]",
     title: "Home",
   },
+  workflows: {
+    path: "/[project]/workflows",
+    title: "Workflows",
+  },
   messages: {
     path: "/[project]/messages",
     title: "Messages",

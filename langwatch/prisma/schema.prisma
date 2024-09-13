@@ -63,6 +63,8 @@ model User {
     lastLoginAt     DateTime?
     Annotation      Annotation[]
     publicShares    PublicShare[]
+    Workflow        Workflow[]
+    WorkflowVersion WorkflowVersion[]
 }
 
 model VerificationToken {
@@ -176,6 +178,8 @@ model Project {
     TriggerSent          TriggerSent[]
     annotationScores     AnnotationScore[]
     publicShares         PublicShare[]
+    workflows            Workflow[]
+    WorkflowVersion      WorkflowVersion[]
 
     @@index([teamId])
 }
@@ -493,4 +497,57 @@ model CustomLLMModelCost {
     updatedAt          DateTime @default(now()) @updatedAt
 
     @@index([projectId])
+}
+
+model Workflow {
+    id               String            @id @default(nanoid())
+    projectId        String
+    project          Project           @relation(fields: [projectId], references: [id])
+    name             String
+    icon             String
+    description      String
+    createdAt        DateTime          @default(now())
+    updatedAt        DateTime          @default(now()) @updatedAt
+    latestVersionId  String?
+    latestVersion    WorkflowVersion?  @relation("LatestVersion", fields: [latestVersionId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+    currentVersionId String?
+    currentVersion   WorkflowVersion?  @relation("CurrentVersion", fields: [currentVersionId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+    versions         WorkflowVersion[] @relation("Versions")
+    publishedId      String?
+    publishedById    String?
+    publishedBy      User?             @relation(fields: [publishedById], references: [id])
+    archivedAt       DateTime?
+
+    @@index([projectId])
+    @@index([publishedById])
+    @@index([latestVersionId])
+    @@index([currentVersionId])
+}
+
+model WorkflowVersion {
+    id                       String            @id @default(nanoid())
+    version                  String
+    commitMessage            String
+    authorId                 String
+    author                   User              @relation(fields: [authorId], references: [id])
+    projectId                String
+    project                  Project           @relation(fields: [projectId], references: [id])
+    workflowId               String
+    workflow                 Workflow          @relation("Versions", fields: [workflowId], references: [id])
+    parentId                 String?
+    parent                   WorkflowVersion?  @relation("WorkflowVersionHistory", fields: [parentId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+    children                 WorkflowVersion[] @relation("WorkflowVersionHistory")
+    autoSaved                Boolean           @default(false)
+    createdAt                DateTime          @default(now())
+    updatedAt                DateTime          @default(now()) @updatedAt
+    dsl                      Json
+    WorkflowAsLatestVersion  Workflow[]        @relation("LatestVersion")
+    WorkflowAsCurrentVersion Workflow[]        @relation("CurrentVersion")
+
+    @@unique([workflowId, version])
+    @@index([workflowId])
+    @@index([projectId])
+    @@index([parentId])
+    @@index([authorId])
+    @@index([createdAt])
 }

@@ -1,17 +1,28 @@
 import asyncio
+from contextlib import asynccontextmanager
 from multiprocessing import Process, Queue
+from multiprocessing.synchronize import Event
+import os
 from queue import Empty
+import queue
 import time
-from typing import AsyncGenerator, Dict, TypedDict
+from typing import AsyncGenerator, Dict, TypedDict, cast
 from fastapi import FastAPI, Response, BackgroundTasks
 from fastapi.responses import StreamingResponse
 import json
+import dspy
 
+from langwatch_nlp.studio.dspy.lite_llm import DSPyLiteLLM
+from langwatch_nlp.studio.parser import parse_component
+from langwatch_nlp.studio.process_pool import IsolatedProcessPool
 from langwatch_nlp.studio.types.dsl import (
     ComponentExecutionStatus,
     ExecutionState,
+    LLMConfig,
+    Signature,
     Timestamps,
 )
+from langwatch_nlp.studio.utils import disable_dsp_caching
 from .types.events import (
     ComponentStateChange,
     ComponentStateChangePayload,
@@ -27,7 +38,20 @@ from .types.events import (
     ErrorPayload,
 )
 
-app = FastAPI()
+pool: IsolatedProcessPool[StudioClientEvent, StudioServerEvent]
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    global pool
+    pool = IsolatedProcessPool(event_worker, size=4)
+
+    yield
+
+    pool.shutdown()
+
+
+app = FastAPI(lifespan=lifespan)
 
 
 async def execute_component(event: ExecuteComponentPayload):
@@ -48,7 +72,30 @@ async def execute_component(event: ExecuteComponentPayload):
 
     node = [node for node in event.workflow.nodes if node.id == event.node_id][0]
 
-    await asyncio.sleep(3)
+    component = parse_component(node)
+
+    module = (
+        dspy.Predict(component)
+        if issubclass(component, dspy.Signature)
+        else component()
+    )
+
+    llm_config = (
+        cast(LLMConfig, cast(Signature, node.data).llm)
+        if hasattr(node.data, "llm") and cast(Signature, node.data).llm
+        else event.workflow.default_llm
+    )
+
+    lm = DSPyLiteLLM(
+        max_tokens=llm_config.max_tokens or 2048,
+        temperature=llm_config.temperature or 0,
+        **(llm_config.litellm_params or {}),
+    )
+    dspy.settings.configure(experimental=True)
+    disable_dsp_caching()
+    module.set_lm(lm=lm)
+
+    result = module(**event.inputs)
 
     yield ComponentStateChange(
         payload=ComponentStateChangePayload(
@@ -57,9 +104,7 @@ async def execute_component(event: ExecuteComponentPayload):
                 status=ComponentExecutionStatus.success,
                 trace_id=event.trace_id,
                 timestamps=Timestamps(finished_at=int(time.time() * 1000)),
-                outputs={
-                    output.identifier: "barbaz" for output in node.data.outputs or []
-                },
+                outputs=result._store,
             ),
         )
     )
@@ -110,12 +155,28 @@ def component_error_event(trace_id: str, node_id: str, error: str):
     )
 
 
-def execute_event_to_queue(event: StudioClientEvent, queue: "Queue[StudioServerEvent]"):
-    async def async_execute_event():
-        async for event_ in execute_event(event):
-            queue.put(event_)
+def event_worker(
+    ready_event: Event,
+    queue_in: "Queue[StudioClientEvent | None]",
+    queue_out: "Queue[StudioServerEvent]",
+):
+    ready_event.set()
+    while True:
+        try:
+            event = queue_in.get(timeout=1)
+            if event is None:  # Sentinel to exit
+                break
+            try:
 
-    asyncio.run(async_execute_event())
+                async def async_execute_event(event):
+                    async for event_ in execute_event(event):
+                        queue_out.put(event_)
+
+                asyncio.run(async_execute_event(event))
+            except Exception as e:
+                queue_out.put(Error(payload=ErrorPayload(message=repr(e))))
+        except queue.Empty:
+            continue
 
 
 class RunningProcess(TypedDict):
@@ -131,8 +192,6 @@ running_processes: Dict[str, RunningProcess] = {}
 # a lot of this. At same time, we want to fork the main process to avoid double RAM spending and
 # startup times.
 async def execute_event_on_a_subprocess(event: StudioClientEvent):
-    queue: "Queue[StudioServerEvent]" = Queue()
-
     if isinstance(event, StopExecution):
         if event.payload.trace_id in running_processes:
             queue = running_processes[event.payload.trace_id]["queue"]
@@ -156,8 +215,7 @@ async def execute_event_on_a_subprocess(event: StudioClientEvent):
                 yield Error(payload=ErrorPayload(message="Interrupted"))
         return
 
-    process = Process(target=execute_event_to_queue, args=(event, queue))
-    process.start()
+    process, queue = pool.submit(event)
 
     if (
         hasattr(event.payload, "trace_id")

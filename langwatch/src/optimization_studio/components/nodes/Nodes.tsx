@@ -7,75 +7,22 @@ import {
   Spinner,
   Text,
   Tooltip,
-  useDisclosure,
   VStack,
   type ButtonProps,
 } from "@chakra-ui/react";
 
-import { Handle, type Node, type NodeProps, Position } from "@xyflow/react";
-import { useEffect, useState } from "react";
+import { Handle, Position, type Node, type NodeProps } from "@xyflow/react";
 import { Check, Play, Square, X } from "react-feather";
 import { PulseLoader } from "react-spinners";
-import { DatasetPreview } from "../../components/datasets/DatasetPreview";
-import { useComponentExecution } from "../hooks/useComponentExecution";
-import { useGetDatasetData } from "../hooks/useGetDatasetData";
-import { useWorkflowStore } from "../hooks/useWorkflowStore";
+import { useDebounceValue } from "usehooks-ts";
+import { useComponentExecution } from "../../hooks/useComponentExecution";
+import { useWorkflowStore } from "../../hooks/useWorkflowStore";
 import {
   type Component,
   type ComponentType,
-  type Entry,
   type Field,
-} from "../types/dsl";
-import { ComponentIcon } from "./ColorfulBlockIcons";
-import { DatasetModal } from "./DatasetModal";
-import { useDebounceValue } from "usehooks-ts";
-
-export function SignatureNode(props: NodeProps<Node<Component>>) {
-  return <ComponentNode {...props} />;
-}
-
-export function EntryNode(props: NodeProps<Node<Component>>) {
-  const [rendered, setRendered] = useState(false);
-  const { isOpen, onOpen, onClose } = useDisclosure();
-
-  useEffect(() => {
-    setRendered(true);
-  }, []);
-
-  const { rows, columns } = useGetDatasetData({
-    dataset: (props.data as Entry).dataset,
-    preview: true,
-  });
-
-  return (
-    <ComponentNode {...props} outputsName="Fields" hidePlayButton>
-      <NodeSectionTitle>Dataset</NodeSectionTitle>
-      <Box
-        width="200%"
-        transform="scale(0.5)"
-        transformOrigin="top left"
-        height={`${(34 + 28 * (rows?.length ?? 0)) / 2}px`}
-      >
-        {rendered && (
-          <DatasetPreview
-            rows={rows}
-            columns={columns.map((column) => ({
-              name: column.name,
-              type: "string",
-            }))}
-            onClick={onOpen}
-          />
-        )}
-      </Box>
-      <DatasetModal
-        isOpen={isOpen}
-        editingDataset={(props.data as Entry).dataset}
-        onClose={onClose}
-        node={props}
-      />
-    </ComponentNode>
-  );
-}
+} from "../../types/dsl";
+import { ComponentIcon } from "../ColorfulBlockIcons";
 
 export function getNodeDisplayName(node: { id: string; data: Component }) {
   return node.data.name ?? node.data.cls ?? node.id;
@@ -205,10 +152,11 @@ export const isExecutableComponent = (node: Pick<Node<Component>, "type">) => {
   return node.type !== "entry" && node.type !== "prompting_technique";
 };
 
-function ComponentNode(
+export function ComponentNode(
   props: NodeProps<Node<Component>> & {
     icon?: React.ReactNode;
     children?: React.ReactNode;
+    fieldsAfter?: React.ReactNode;
     outputsName?: string;
     hidePlayButton?: boolean;
   }
@@ -275,6 +223,7 @@ function ComponentNode(
           />
         )}
       </HStack>
+      {props.children}
       {props.data.inputs && (
         <>
           <NodeSectionTitle>Inputs</NodeSectionTitle>
@@ -295,7 +244,7 @@ function ComponentNode(
           />
         </>
       )}
-      {props.children}
+      {props.fieldsAfter}
     </VStack>
   );
 }
