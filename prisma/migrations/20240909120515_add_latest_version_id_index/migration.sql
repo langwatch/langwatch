@@ -1,0 +1,1 @@
+../../../langwatch/langwatch/prisma/migrations/20240909120515_add_latest_version_id_index/migration.sql

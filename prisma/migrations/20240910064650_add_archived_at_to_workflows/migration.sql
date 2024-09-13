@@ -1,0 +1,1 @@
+../../../langwatch/langwatch/prisma/migrations/20240910064650_add_archived_at_to_workflows/migration.sql

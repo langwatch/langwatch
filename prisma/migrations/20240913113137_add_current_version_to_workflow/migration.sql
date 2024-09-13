@@ -1,0 +1,1 @@
+../../../langwatch/langwatch/prisma/migrations/20240913113137_add_current_version_to_workflow/migration.sql
