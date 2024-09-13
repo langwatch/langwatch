@@ -55,7 +55,7 @@ export function WorkflowCard({
   children,
   ...props
 }: {
-  workflowId: string;
+  workflowId?: string;
   query?: UseTRPCQueryResult<
     inferRouterOutputs<AppRouter>["workflow"]["getAll"],
     TRPCClientErrorLike<AppRouter>

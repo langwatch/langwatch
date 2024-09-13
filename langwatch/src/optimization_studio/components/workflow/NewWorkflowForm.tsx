@@ -1,6 +1,3 @@
-import { useRef, useState, useEffect } from "react";
-import { useForm } from "react-hook-form";
-import { useRouter } from "next/router";
 import {
   Button,
   FormControl,
@@ -15,10 +12,13 @@ import {
   useToast,
   VStack,
 } from "@chakra-ui/react";
-import { EmojiPickerModal } from "../properties/modals/EmojiPickerModal";
+import { useRouter } from "next/router";
+import { useEffect, useRef } from "react";
+import { useForm } from "react-hook-form";
+import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
 import { api } from "../../../utils/api";
 import type { Workflow } from "../../types/dsl";
-import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
+import { EmojiPickerModal } from "../properties/modals/EmojiPickerModal";
 
 type FormData = {
   name: string;
@@ -83,7 +83,9 @@ export const NewWorkflowForm = ({
         }
       );
       onClose();
-      void router.push(`/${project.slug}/studio/${createdWorkflow.workflow.id}`);
+      void router.push(
+        `/${project.slug}/studio/${createdWorkflow.workflow.id}`
+      );
     } catch (error) {
       console.error("Error creating workflow:", error);
     }
@@ -140,9 +142,8 @@ export const NewWorkflowForm = ({
           type="submit"
           colorScheme="blue"
           isLoading={createWorkflowMutation.isLoading}
-          onClick={(e) => {
-            console.log("submit 0");
-            handleSubmit(onSubmit)();
+          onClick={() => {
+            void handleSubmit(onSubmit)();
           }}
         >
           Create Workflow

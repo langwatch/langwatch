@@ -32,12 +32,14 @@ type State = Workflow & {
   propertiesExpanded: boolean;
   triggerValidation: boolean;
   workflowSelected: boolean;
+  previousWorkflow: Workflow | undefined;
 };
 
 type WorkflowStore = State & {
   reset: () => void;
   getWorkflow: () => Workflow;
   setWorkflow: (workflow: Partial<Workflow> & { workflowId?: string }) => void;
+  setPreviousWorkflow: (workflow: Workflow | undefined) => void;
   setSocketStatus: (status: SocketStatus) => void;
   onNodesChange: (changes: NodeChange[]) => void;
   onEdgesChange: (changes: EdgeChange[]) => void;
@@ -80,6 +82,7 @@ const initialState: State = {
   propertiesExpanded: false,
   triggerValidation: false,
   workflowSelected: false,
+  previousWorkflow: undefined,
 };
 
 const store = (
@@ -114,6 +117,9 @@ const store = (
   },
   setWorkflow: (workflow: Partial<Workflow> & { workflowId?: string }) => {
     set(workflow);
+  },
+  setPreviousWorkflow: (workflow: Workflow | undefined) => {
+    set({ previousWorkflow: workflow });
   },
   setSocketStatus: (status: SocketStatus) => {
     set({ socketStatus: status });
@@ -231,7 +237,7 @@ export const useWorkflowStore = create<WorkflowStore>()(
           name: state.name,
           icon: state.icon,
           description: state.description,
-          version: state.version,
+          version: undefined,
           default_llm: state.default_llm,
           edges: state.edges.map((edge) => {
             const edge_ = { ...edge };

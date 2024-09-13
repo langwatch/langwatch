@@ -1,10 +1,9 @@
-import React, { type PropsWithChildren } from "react";
-import { Text } from "@chakra-ui/react";
+import { Text, type TextProps } from "@chakra-ui/react";
 
-export function SmallLabel({ children }: PropsWithChildren) {
+export function SmallLabel(props: TextProps) {
   return (
-    <Text fontSize={11} fontWeight="bold" textTransform="uppercase">
-      {children}
+    <Text fontSize={11} fontWeight="bold" textTransform="uppercase" {...props}>
+      {props.children}
     </Text>
   );
 }

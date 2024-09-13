@@ -5,6 +5,8 @@ import { nanoid } from "nanoid";
 import { TeamRoleGroup, checkUserPermissionForProject } from "../permission";
 import type { PrismaClient, WorkflowVersion } from "@prisma/client";
 import { type Session } from "next-auth";
+import type { Workflow } from "../../../optimization_studio/types/dsl";
+import type { Unpacked } from "../../../utils/types";
 
 const workflowJsonSchema = z
   .object({
@@ -74,7 +76,7 @@ export const workflowRouter = createTRPCRouter({
           projectId: input.projectId,
           archivedAt: null,
         },
-        include: { latestVersion: true },
+        include: { currentVersion: true },
       });
 
       if (!workflow) {
@@ -91,36 +93,95 @@ export const workflowRouter = createTRPCRouter({
     .input(z.object({ projectId: z.string(), workflowId: z.string() }))
     .use(checkUserPermissionForProject(TeamRoleGroup.WORKFLOWS_VIEW))
     .query(async ({ ctx, input }) => {
-      return ctx.prisma.workflowVersion.findMany({
+      const workflow = await ctx.prisma.workflow.findUnique({
+        where: {
+          id: input.workflowId,
+          projectId: input.projectId,
+          archivedAt: null,
+        },
+        select: { currentVersionId: true, latestVersionId: true },
+      });
+
+      if (!workflow) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Workflow not found",
+        });
+      }
+
+      const versions = await ctx.prisma.workflowVersion.findMany({
         where: { workflowId: input.workflowId, projectId: input.projectId },
         select: {
           id: true,
           version: true,
-          commitMessage: true,
-          authorId: true,
-          parentId: true,
-          createdAt: true,
-          updatedAt: true,
           autoSaved: true,
+          commitMessage: true,
+          updatedAt: true,
+          author: {
+            select: {
+              name: true,
+              image: true,
+            },
+          },
         },
         orderBy: { createdAt: "desc" },
       });
+
+      const versionsWithoutAllDsls = versions as unknown as (Unpacked<
+        typeof versions
+      > & {
+        isCurrentVersion?: boolean;
+        isLatestVersion?: boolean;
+      })[];
+      for (const version of versionsWithoutAllDsls) {
+        if (version.id === workflow?.currentVersionId) {
+          version.isCurrentVersion = true;
+        }
+        if (version.id === workflow?.latestVersionId) {
+          version.isLatestVersion = true;
+        }
+      }
+
+      return versionsWithoutAllDsls;
     }),
 
-  getVersionById: protectedProcedure
+  restoreVersion: protectedProcedure
     .input(z.object({ projectId: z.string(), versionId: z.string() }))
-    .use(checkUserPermissionForProject(TeamRoleGroup.WORKFLOWS_VIEW))
-    .query(async ({ ctx, input }) => {
+    .use(checkUserPermissionForProject(TeamRoleGroup.WORKFLOWS_MANAGE))
+    .mutation(async ({ ctx, input }) => {
       const version = await ctx.prisma.workflowVersion.findUnique({
         where: { id: input.versionId, projectId: input.projectId },
       });
 
-      if (!version) {
+      if (!version || !version.dsl) {
         throw new TRPCError({
           code: "NOT_FOUND",
           message: "Workflow version not found",
         });
       }
+
+      const workflow = await ctx.prisma.workflow.findUnique({
+        where: { id: version.workflowId, projectId: input.projectId },
+      });
+
+      if (!workflow) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Workflow not found",
+        });
+      }
+
+      const dsl = version.dsl as unknown as Workflow;
+
+      await ctx.prisma.workflow.update({
+        where: { id: workflow.id, projectId: input.projectId },
+        data: {
+          name: dsl.name,
+          icon: dsl.icon,
+          description: dsl.description,
+          currentVersionId: version.id,
+        },
+      });
 
       return version;
     }),
@@ -139,7 +200,7 @@ export const workflowRouter = createTRPCRouter({
         ctx,
         input,
         autoSaved: true,
-        commitMessage: "autosaved",
+        commitMessage: "Autosaved",
       });
 
       return updatedVersion;
@@ -265,8 +326,12 @@ const saveOrCommitWorkflowVersion = async ({
 
   const latestVersion = workflow.latestVersion;
 
+  const [versionMajor, versionMinor] = (latestVersion?.version ?? "1.0").split(
+    "."
+  );
+  const nextVersion = `${versionMajor}.${parseInt(versionMinor ?? "0") + 1}`;
+
   const data = {
-    version: input.dsl.version,
     commitMessage,
     authorId: ctx.session.user.id,
     projectId: input.projectId,
@@ -286,6 +351,7 @@ const saveOrCommitWorkflowVersion = async ({
       data: {
         id: nanoid(),
         parentId: latestVersion?.id,
+        version: autoSaved ? nextVersion : input.dsl.version,
         ...data,
       },
     });
@@ -298,6 +364,7 @@ const saveOrCommitWorkflowVersion = async ({
       icon: input.dsl.icon,
       description: input.dsl.description,
       latestVersionId: updatedVersion.id,
+      currentVersionId: updatedVersion.id,
     },
   });
 

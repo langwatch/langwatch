@@ -33,6 +33,7 @@ import React, { useState, type PropsWithChildren } from "react";
 import {
   ChevronDown,
   ChevronRight,
+  Edit,
   Image as ImageIcon,
   Lock,
   MessageSquare,
@@ -41,10 +42,8 @@ import {
   Search,
   Settings,
   Shield,
-  Edit,
   Table,
   TrendingUp,
-  type Icon,
 } from "react-feather";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import { useRequiredSession } from "../hooks/useRequiredSession";
@@ -52,14 +51,14 @@ import { dependencies } from "../injection/dependencies.client";
 import { OrganizationRoleGroup } from "../server/api/permission";
 import type { FullyLoadedOrganization } from "../server/api/routers/organization";
 import { api } from "../utils/api";
+import { isFeatureEnabled } from "../utils/featureFlags";
 import { findCurrentRoute, projectRoutes, type Route } from "../utils/routes";
 import { CurrentDrawer } from "./CurrentDrawer";
 import { LoadingScreen } from "./LoadingScreen";
 import { ProjectTechStackIcon } from "./TechStack";
 import { LogoIcon } from "./icons/LogoIcon";
-import { useTableView } from "./messages/HeaderButtons";
-import { isFeatureEnabled } from "../utils/featureFlags";
 import { PuzzleIcon } from "./icons/Puzzle";
+import { useTableView } from "./messages/HeaderButtons";
 
 const Breadcrumbs = ({ currentRoute }: { currentRoute: Route | undefined }) => {
   const { project } = useOrganizationTeamProject();

@@ -13,6 +13,7 @@ import { useShallow } from "zustand/react/shallow";
 import { LogoIcon } from "../../components/icons/LogoIcon";
 import { useWorkflowStore } from "../hooks/useWorkflowStore";
 import { UndoRedo } from "./UndoRedo";
+import { History } from "./History";
 import DefaultEdge from "./Edge";
 import { PropertiesPanel } from "./properties/PropertiesPanel";
 import { useSocketClient } from "../hooks/useSocketClient";
@@ -22,6 +23,7 @@ import Head from "next/head";
 import { EntryNode } from "./nodes/EntryNode";
 import { SignatureNode } from "./nodes/SignatureNode";
 import { Link } from "@chakra-ui/next-js";
+import { AutoSave } from "./AutoSave";
 
 export default function OptimizationStudio() {
   const nodeTypes = useMemo(
@@ -89,6 +91,7 @@ export default function OptimizationStudio() {
             <Link href={`/${project?.slug}/workflows`}>
               <LogoIcon width={24} height={24} />
             </Link>
+            <AutoSave />
           </HStack>
           <HStack width="full" justify="center">
             <Text>Optimization Studio - {name}</Text>
@@ -121,6 +124,7 @@ export default function OptimizationStudio() {
           </HStack>
           <HStack width="full" justify="end">
             <UndoRedo />
+            <History />
           </HStack>
         </HStack>
         <Box width="full" height="full" position="relative">
