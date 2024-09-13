@@ -1,11 +1,4 @@
-import {
-  Box,
-  HStack,
-  Text,
-  VStack,
-  Spacer,
-  Tooltip,
-} from "@chakra-ui/react";
+import { Box, HStack, Text, VStack, Spacer, Tooltip } from "@chakra-ui/react";
 import type { ElasticSearchEvaluation } from "../../server/tracer/types";
 import { getEvaluatorDefinitions } from "../../server/evaluations/getEvaluator";
 import numeral from "numeral";
@@ -72,6 +65,12 @@ export function EvaluationStatusItem({
                         </Text>
                       </HStack>
                     )}
+                  {check.label && (
+                    <HStack align="start">
+                      <Text>Label:</Text>
+                      <Text color={color}>{check.label}</Text>
+                    </HStack>
+                  )}
                   {check.details && (
                     <HStack align="start">
                       <Text>Details:</Text>
@@ -102,7 +101,9 @@ export function EvaluationStatusItem({
           </VStack>
         </HStack>
         <Spacer />
-        <Text fontSize={"sm"} color="gray.400">{check.evaluator_id}</Text>
+        <Text fontSize={"sm"} color="gray.400">
+          {check.evaluator_id}
+        </Text>
         <Text color="gray.400">·</Text>
         <Text fontSize={"sm"}>
           {check.timestamps.finished_at && (

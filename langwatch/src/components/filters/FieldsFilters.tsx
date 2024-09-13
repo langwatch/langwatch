@@ -54,6 +54,7 @@ export function FieldsFilters() {
     "metadata.labels",
     "evaluations.passed",
     "evaluations.score",
+    "evaluations.label",
     "events.metrics.value",
     "metadata.user_id",
     "metadata.thread_id",

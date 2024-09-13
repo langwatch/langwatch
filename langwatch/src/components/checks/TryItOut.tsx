@@ -37,9 +37,7 @@ import {
   type Evaluators,
   type SingleEvaluationResult,
 } from "../../server/evaluations/evaluators.generated";
-import {
-  evaluatorsSchema
-} from "../../server/evaluations/evaluators.zod.generated";
+import { evaluatorsSchema } from "../../server/evaluations/evaluators.zod.generated";
 import { getEvaluatorDefinitions } from "../../server/evaluations/getEvaluator";
 import { evaluatePreconditions } from "../../server/evaluations/preconditions";
 import type { CheckPreconditions } from "../../server/evaluations/types";
@@ -520,6 +518,10 @@ export function TryItOut({
                               ) : evaluatorDefinition?.isGuardrail ? (
                                 <Td maxWidth="120" color={color}>
                                   {runningResult.passed ? "Pass" : "Fail"}
+                                </Td>
+                              ) : runningResult.label ? (
+                                <Td maxWidth="120" color={color}>
+                                  {runningResult.label}
                                 </Td>
                               ) : (
                                 <Td maxWidth="120" color={color}>

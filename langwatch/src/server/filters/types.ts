@@ -19,6 +19,7 @@ export const filterFieldsEnum = z.enum([
   "evaluations.passed",
   "evaluations.score",
   "evaluations.state",
+  "evaluations.label",
   "events.event_type",
   "events.metrics.key",
   "events.metrics.value",

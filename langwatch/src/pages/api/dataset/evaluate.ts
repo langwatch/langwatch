@@ -51,9 +51,7 @@ const batchEvaluationInputSchema = z.object({
   settings: z.object({}).passthrough().optional().nullable(),
 });
 
-type BatchEvaluationRESTParams = z.infer<
-  typeof batchEvaluationInputSchema
->;
+type BatchEvaluationRESTParams = z.infer<typeof batchEvaluationInputSchema>;
 
 export default async function handler(
   req: NextApiRequest,
@@ -229,7 +227,8 @@ export default async function handler(
     });
   }
 
-  const { score, passed, details, cost, status } = result as EvaluationResult;
+  const { score, passed, details, cost, status, label } =
+    result as EvaluationResult;
 
   await prisma.batchEvaluation.create({
     data: {
@@ -240,6 +239,7 @@ export default async function handler(
       status: status,
       score: score ?? 0,
       passed: passed ?? false,
+      label: label,
       details: details ?? "",
       cost: cost?.amount ?? 0,
       evaluation: evaluation,

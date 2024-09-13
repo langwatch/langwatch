@@ -207,6 +207,17 @@ const SpanNode: React.FC<SpanNodeProps> = ({ span, level }) => {
                 </Text>
               </>
             )}
+            {evaluationResult?.label !== undefined && (
+              <>
+                <Text>·</Text>
+                <Text
+                  fontSize={13}
+                  color={evaluationStatusColor(evaluationResult)}
+                >
+                  {evaluationResult.label}
+                </Text>
+              </>
+            )}
           </HStack>
         </VStack>
       </HStack>

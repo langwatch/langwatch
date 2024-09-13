@@ -89,6 +89,7 @@ export const updateCheckStatusInES = async ({
   status,
   score,
   passed,
+  label,
   error,
   details,
   retries,
@@ -100,6 +101,7 @@ export const updateCheckStatusInES = async ({
   error?: any;
   score?: number;
   passed?: boolean;
+  label?: string;
   details?: string;
   retries?: number;
   is_guardrail?: boolean;
@@ -117,6 +119,7 @@ export const updateCheckStatusInES = async ({
     ...(is_guardrail !== undefined && { is_guardrail }),
     ...(score !== undefined && { score }),
     ...(passed !== undefined && { passed }),
+    ...(label !== undefined && { label }),
     ...(error && { error: captureError(error) }),
     ...(details !== undefined && { details }),
     ...(retries && { retries }),

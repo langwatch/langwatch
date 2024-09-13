@@ -525,7 +525,7 @@ export const analyticsMetrics = {
                 cardinality: {
                   cardinality: {
                     script: {
-                      source: `return doc['evaluations.trace_id'].value + ' ' + doc['evaluations.evaluator_id'].value`,
+                      source: `return doc['evaluations.evaluation_id'].value`,
                     },
                   },
                 },
@@ -849,6 +849,31 @@ export const analyticsGroups = {
             child: {
               terms: {
                 field: "evaluations.passed",
+                size: 50,
+              },
+              aggs: {
+                back_to_root: {
+                  reverse_nested: {},
+                  aggs: aggToGroup,
+                },
+              },
+            },
+          },
+        },
+      }),
+      extractionPath: () => "check_state_group>child>buckets>back_to_root",
+    },
+    evaluation_label: {
+      label: "Evaluation Label",
+      aggregation: (aggToGroup) => ({
+        check_state_group: {
+          nested: {
+            path: "evaluations",
+          },
+          aggs: {
+            child: {
+              terms: {
+                field: "evaluations.label",
                 size: 50,
               },
               aggs: {

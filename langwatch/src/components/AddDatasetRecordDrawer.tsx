@@ -267,6 +267,7 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
           type: item.type,
           passed: item.passed,
           score: item.score,
+          label: item.label,
         };
       });
   };

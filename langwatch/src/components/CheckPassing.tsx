@@ -31,6 +31,7 @@ export function CheckPassing({ check }: { check: ElasticSearchEvaluation }) {
               ? "Passed"
               : "Failed"
             : "Score: " + formatEvaluationScore(check.score)}
+          {check.label ? `. Label: ${check.label}` : ""}
           {check.details ? `. Details: ${check.details}` : ""}
         </Text>
       ) : check.status == "skipped" ? (

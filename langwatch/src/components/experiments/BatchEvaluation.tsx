@@ -50,6 +50,7 @@ export default function BatchEvaluation({
       "Status",
       "Details",
       "Score",
+      "Label",
       "Cost",
       "Created at",
     ];
@@ -64,6 +65,7 @@ export default function BatchEvaluation({
       string,
       string,
       number,
+      string,
       number,
       string,
     ];
@@ -85,6 +87,7 @@ export default function BatchEvaluation({
         evaluation.status,
         evaluation.details,
         evaluation.score,
+        evaluation.label ?? "",
         evaluation.cost,
         new Date(evaluation.createdAt).toLocaleString(),
       ]);

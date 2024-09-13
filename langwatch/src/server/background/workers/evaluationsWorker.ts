@@ -333,6 +333,7 @@ export const startEvaluationsWorker = (
             ? {
                 score: result.score,
                 passed: result.passed,
+                label: result.label,
               }
             : {}),
           details: "details" in result ? result.details ?? "" : "",

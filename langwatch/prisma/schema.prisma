@@ -337,6 +337,7 @@ model BatchEvaluation {
     data         Json       @default("{}")
     status       String
     score        Float
+    label        String?
     passed       Boolean
     details      String
     cost         Float
