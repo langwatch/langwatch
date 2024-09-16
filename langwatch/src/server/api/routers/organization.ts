@@ -143,6 +143,36 @@ export const organizationRouter = createTRPCRouter({
       // Return success response
       return { success: true, teamSlug };
     }),
+  deleteMember: protectedProcedure
+    .input(z.object({ userId: z.string(), organizationId: z.string() }))
+    .use(
+      checkUserPermissionForOrganization(
+        OrganizationRoleGroup.ORGANIZATION_MANAGE
+      )
+    )
+    .mutation(async ({ input, ctx }) => {
+      const { userId, organizationId } = input;
+      const prisma = ctx.prisma;
+
+      await prisma.organizationUser.delete({
+        where: {
+          userId_organizationId: {
+            userId,
+            organizationId,
+          },
+        },
+      });
+      await prisma.teamUser.deleteMany({
+        where: {
+          userId,
+          team: {
+            organizationId,
+          },
+        },
+      });
+
+      return { success: true };
+    }),
 
   getAll: protectedProcedure
     .input(

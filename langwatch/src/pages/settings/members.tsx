@@ -1,3 +1,4 @@
+import { DeleteIcon } from "@chakra-ui/icons";
 import {
   Button,
   Card,
@@ -7,6 +8,10 @@ import {
   Heading,
   Input,
   LinkBox,
+  Menu,
+  MenuButton,
+  MenuItem,
+  MenuList,
   Modal,
   ModalBody,
   ModalCloseButton,
@@ -30,7 +35,8 @@ import {
 } from "@chakra-ui/react";
 import { OrganizationUserRole } from "@prisma/client";
 import { Select as MultiSelect, chakraComponents } from "chakra-react-select";
-import { Lock, Mail, Plus, Trash } from "react-feather";
+import { Lock, Mail, MoreVertical, Plus, Trash } from "react-feather";
+
 import {
   Controller,
   useFieldArray,
@@ -43,8 +49,8 @@ import type {
   OrganizationWithMembersAndTheirTeams,
   TeamWithProjects,
 } from "../../server/api/routers/organization";
-import { api } from "../../utils/api";
 import { type PlanInfo } from "../../server/subscriptionHandler";
+import { api } from "../../utils/api";
 
 type Option = { label: string; value: string; description?: string };
 
@@ -102,6 +108,7 @@ function MembersList({
     label: team.name,
     value: team.id,
   }));
+  const queryClient = api.useContext();
 
   const {
     isOpen: isAddMembersOpen,
@@ -131,6 +138,7 @@ function MembersList({
       { enabled: !!organization }
     );
   const createInvitesMutation = api.organization.createInvites.useMutation();
+  const deleteMemberMutation = api.organization.deleteMember.useMutation();
   const toast = useToast();
 
   const onSubmit: SubmitHandler<MembersForm> = (data) => {
@@ -177,6 +185,39 @@ function MembersList({
     append({ email: "", teamOptions });
   };
 
+  const deleteMember = (userId: string) => {
+    deleteMemberMutation.mutate(
+      {
+        organizationId: organization.id,
+        userId,
+      },
+      {
+        onSuccess: () => {
+          toast({
+            title: "Member removed successfully",
+            description: "The member has been removed from the organization.",
+            status: "success",
+            duration: 5000,
+            isClosable: true,
+            position: "top-right",
+          });
+          // how to refect this organizationWithMembers
+          void queryClient.organization.getOrganizationWithMembersAndTheirTeams.invalidate();
+        },
+        onError: () => {
+          toast({
+            title: "Sorry, something went wrong",
+            description: "Please try that again",
+            status: "error",
+            duration: 5000,
+            isClosable: true,
+            position: "top-right",
+          });
+        },
+      }
+    );
+  };
+
   return (
     <SettingsLayout>
       <VStack
@@ -184,7 +225,7 @@ function MembersList({
         paddingY={6}
         spacing={6}
         width="full"
-        maxWidth="920px"
+        maxWidth="980px"
         align="start"
       >
         <HStack width="full" marginTop={2}>
@@ -224,6 +265,7 @@ function MembersList({
                   <Th>Email</Th>
                   <Th>Role</Th>
                   <Th>Teams</Th>
+                  <Th>Actions</Th>
                 </Tr>
               </Thead>
               <Tbody>
@@ -240,6 +282,29 @@ function MembersList({
                         )
                         .map((tmember) => tmember.name)
                         .join(", ")}
+                    </Td>
+                    <Td>
+                      <Menu>
+                        <MenuButton
+                          as={Button}
+                          variant={"ghost"}
+                          // isLoading={
+                          //   deleteGraphs.isLoading &&
+                          //   deleteGraphs.variables?.id === graph.id
+                          // }
+                        >
+                          <MoreVertical />
+                        </MenuButton>
+                        <MenuList>
+                          <MenuItem
+                            color="red.600"
+                            onClick={() => deleteMember(member.userId)}
+                            icon={<DeleteIcon />}
+                          >
+                            Remove Member
+                          </MenuItem>
+                        </MenuList>
+                      </Menu>
                     </Td>
                   </LinkBox>
                 ))}
