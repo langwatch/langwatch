@@ -285,7 +285,7 @@ export const processCollectorJob = async (
   void markProjectFirstMessage(project);
 
   try {
-    void scoreSatisfactionFromInput({
+    await scoreSatisfactionFromInput({
       traceId: trace.trace_id,
       projectId: trace.project_id,
       input: trace.input,
