@@ -1,6 +1,6 @@
 import {
   reservedSpanParamsSchema,
-  reservedTraceMetadataSchema
+  reservedTraceMetadataSchema,
 } from "./server/types/tracer.generated";
 
 export type Strict<T> = T & { [K in Exclude<keyof any, keyof T>]: never };
@@ -55,7 +55,7 @@ export function camelToSnakeCaseNested<T>(
 ): CamelToSnakeCaseNested<T> {
   if (Array.isArray(obj)) {
     return obj.map((item) =>
-      camelToSnakeCaseNested(item)
+      camelToSnakeCaseNested(item, parentKey)
     ) as CamelToSnakeCaseNested<T>;
   } else if (typeof obj === "object" && obj !== null) {
     const newObj: any = {};
@@ -67,7 +67,14 @@ export function camelToSnakeCaseNested<T>(
           (parentKey === "metadata" &&
             !Object.keys(reservedTraceMetadataSchema.shape).includes(newKey)) ||
           (parentKey === "params" &&
-            !Object.keys(reservedSpanParamsSchema.shape).includes(newKey))
+            !Object.keys(reservedSpanParamsSchema.shape).includes(newKey)) ||
+          (parentKey === "input" &&
+            ["json", "raw", "list"].includes(newObj.type) &&
+            newKey === "value") ||
+          (parentKey === "output" &&
+            ["json", "raw", "list"].includes(newObj.type) &&
+            newKey === "value") ||
+          (parentKey === "contexts" && newKey === "content")
         ) {
           newObj[key] = (obj as any)[key];
         } else {

@@ -57,7 +57,7 @@ describe("LangWatch tracer", () => {
       output: {
         type: "json",
         value: {
-          weather: "sunny",
+          WEATHER: "sunny",
         },
       },
     });
@@ -84,7 +84,7 @@ describe("LangWatch tracer", () => {
         },
         {
           documentId: "doc2",
-          content: "document chunk 2",
+          content: { FOO: "document chunk 2" },
         },
       ],
     });
@@ -140,6 +140,39 @@ describe("LangWatch tracer", () => {
       sdk_version: version,
     });
     expect(requestBody.spans.length).toBe(3);
+    expect(requestBody.spans[0]).toEqual({
+      span_id: expect.any(String),
+      trace_id: expect.any(String),
+      type: "span",
+      name: "weather_function",
+      input: {
+        type: "json",
+        value: { city: "Tokyo" },
+      },
+      output: {
+        type: "json",
+        value: { WEATHER: "sunny" },
+      },
+      timestamps: {
+        started_at: expect.any(Number),
+        finished_at: expect.any(Number),
+      },
+    });
+    expect(requestBody.spans[1]).toEqual({
+      span_id: expect.any(String),
+      trace_id: expect.any(String),
+      type: "rag",
+      name: "my-vectordb-retrieval",
+      input: { type: "text", value: "search query" },
+      contexts: [
+        { document_id: "doc1", content: "document chunk 1" },
+        { document_id: "doc2", content: { FOO: "document chunk 2" } },
+      ],
+      timestamps: {
+        started_at: expect.any(Number),
+        finished_at: expect.any(Number),
+      },
+    });
   });
 
   it("captures exceptions", async () => {
