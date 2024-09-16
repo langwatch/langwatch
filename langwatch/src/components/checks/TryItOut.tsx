@@ -232,6 +232,8 @@ export function TryItOut({
     0
   );
 
+  const hasAnyLabels = evaluatorDefinition?.result.label;
+
   return (
     <VStack width="full" spacing={6} marginTop={6}>
       <HStack width="full" align="end">
@@ -366,6 +368,7 @@ export function TryItOut({
                       ) : (
                         <Th width="120px">Score</Th>
                       )}
+                      {hasAnyLabels && <Th width="120px">Label</Th>}
                       <Th width="250px">Details</Th>
                       <Th width="120px">Cost</Th>
                     </Tr>
@@ -503,33 +506,39 @@ export function TryItOut({
                               </Td>
                             )}
                             {runningResult ? (
-                              runningResult.status === "loading" ? (
-                                <Td maxWidth="120">
-                                  <Spinner size="sm" />
-                                </Td>
-                              ) : runningResult.status === "skipped" ? (
-                                <Td maxWidth="120" color={color}>
-                                  Skipped
-                                </Td>
-                              ) : runningResult.status === "error" ? (
-                                <Td maxWidth="120" color={color}>
-                                  Error
-                                </Td>
-                              ) : evaluatorDefinition?.isGuardrail ? (
-                                <Td maxWidth="120" color={color}>
-                                  {runningResult.passed ? "Pass" : "Fail"}
-                                </Td>
-                              ) : runningResult.label ? (
-                                <Td maxWidth="120" color={color}>
-                                  {runningResult.label}
-                                </Td>
-                              ) : (
-                                <Td maxWidth="120" color={color}>
-                                  {numeral(runningResult.score).format(
-                                    "0.[00]"
-                                  )}
-                                </Td>
-                              )
+                              <>
+                                {runningResult.status === "loading" ? (
+                                  <Td maxWidth="120">
+                                    <Spinner size="sm" />
+                                  </Td>
+                                ) : runningResult.status === "skipped" ? (
+                                  <Td maxWidth="120" color={color}>
+                                    Skipped
+                                  </Td>
+                                ) : runningResult.status === "error" ? (
+                                  <Td maxWidth="120" color={color}>
+                                    Error
+                                  </Td>
+                                ) : evaluatorDefinition?.isGuardrail ? (
+                                  <Td maxWidth="120" color={color}>
+                                    {runningResult.passed ? "Pass" : "Fail"}
+                                  </Td>
+                                ) : (
+                                  <Td maxWidth="120" color={color}>
+                                    {numeral(runningResult.score).format(
+                                      "0.[00]"
+                                    )}
+                                  </Td>
+                                )}
+                                {hasAnyLabels && (
+                                  <Td maxWidth="120" color={color}>
+                                    {runningResult.status === "processed" &&
+                                    "label" in runningResult
+                                      ? runningResult.label
+                                      : "-"}
+                                  </Td>
+                                )}
+                              </>
                             ) : i == firstPassingPrecondition ? (
                               <Td maxWidth="120">Waiting to run</Td>
                             ) : (
