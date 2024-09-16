@@ -104,17 +104,24 @@ export const processCollectorJob = async (
     await addLLMTokensCount(projectId, addGuardrailCosts(spans))
   );
 
-  const esSpans: ElasticSearchSpan[] = spans.map((span) => ({
-    ...span,
-    input: span.input ? typedValueToElasticSearch(span.input) : null,
-    output: span.output ? typedValueToElasticSearch(span.output) : null,
-    project_id: project.id,
-    timestamps: {
-      ...span.timestamps,
-      inserted_at: Date.now(),
-      updated_at: Date.now(),
-    },
-  }));
+  const esSpans: ElasticSearchSpan[] = spans.map((span) => {
+    const esSpan = {
+      ...span,
+      input: span.input ? typedValueToElasticSearch(span.input) : null,
+      output: span.output ? typedValueToElasticSearch(span.output) : null,
+      project_id: project.id,
+      timestamps: {
+        ...span.timestamps,
+        inserted_at: Date.now(),
+        updated_at: Date.now(),
+      },
+    };
+    // Fix for open search, nested fields cannot be explicitly set to null if empty
+    if (!span.params) {
+      delete esSpan.params;
+    }
+    return esSpan;
+  });
 
   const [input, output] = await Promise.all([
     getTraceInput(spans, project.id),
