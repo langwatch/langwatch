@@ -179,7 +179,7 @@ resource "aws_db_instance" "metabase" {
   identifier         = "metabase-db"
   storage_type       = "gp2"
   engine             = "postgres"
-  engine_version     = "16.2"
+  engine_version     = "16.3"
   instance_class     = "db.t4g.micro"
   allocated_storage  = 5
   username           = "metabase"
