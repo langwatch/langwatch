@@ -11,4 +11,4 @@ COPY . .
 
 EXPOSE 8080
 
-CMD poetry run hypercorn langwatch_nlp.main:app --bind :8080
+CMD poetry run uvicorn langwatch_nlp.main:app --host 0.0.0.0 --port 8080
