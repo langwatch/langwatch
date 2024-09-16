@@ -34,7 +34,7 @@ export const evaluatorTempNameMap: Record<string, string> = {
   "Azure Content Safety": "Content Safety",
   "OpenAI Moderation": "Moderation",
   "Azure Jailbreak Detection": "Jailbreak Detection",
-  "Google Cloud DLP PII Detection": "PII Detection",
+  "Presidio PII Detection": "PII Detection",
   "Lingua Language Detection": "Language Detection",
   "Azure Prompt Shield": "Prompt Injection Detection",
 };
@@ -51,7 +51,8 @@ export function EvaluatorSelection({
   const availableEvaluators = Object.entries(AVAILABLE_EVALUATORS).filter(
     ([key, _evaluator]) =>
       !key.startsWith("example/") &&
-      key !== "aws/comprehend_pii_detection"
+      key !== "aws/comprehend_pii_detection" &&
+      key !== "google_cloud/dlp_pii_detection"
   );
 
   const categories: Category[] = ["safety", "policy", "quality", "custom"];
