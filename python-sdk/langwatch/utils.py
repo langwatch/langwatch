@@ -105,7 +105,7 @@ def autoconvert_typed_values(
         SpanInputOutput, value_, ["type", "value"]
     ):
         return cast(SpanInputOutput, value_)
-    if type(value_) == list and all(
+    if type(value_) == list and len(value_) > 0 and all(
         validate_safe(ChatMessage, item, ["role"]) for item in value_
     ):
         return TypedValueChatMessages(type="chat_messages", value=value_)
@@ -114,7 +114,7 @@ def autoconvert_typed_values(
         json_ = json.dumps(value, cls=SerializableWithStringFallback)
         return TypedValueJson(type="json", value=json.loads(json_))
     except:
-        return TypedValueRaw(type="raw", value=str(value))
+        return TypedValueRaw(type="raw", value=str(value_))
 
 
 def validate_safe(type_, item: dict, min_required_keys_for_pydantic_1: List[str]):

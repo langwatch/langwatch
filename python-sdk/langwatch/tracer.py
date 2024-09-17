@@ -1,3 +1,4 @@
+import copy
 from importlib.metadata import version
 import os
 from concurrent.futures import Future, ThreadPoolExecutor
@@ -310,9 +311,11 @@ class ContextSpan:
         if type:
             self.type = type
         if input:
-            self.input = input
+            # Avoid late mutations after capturing the value
+            self.input = copy.deepcopy(input)
         if output:
-            self.output = output
+            # Avoid late mutations after capturing the value
+            self.output = copy.deepcopy(output)
         if error:
             self.error = error
         if timestamps:
@@ -322,7 +325,8 @@ class ContextSpan:
                 self.timestamps = timestamps
         if contexts:
             if self.type == "rag":
-                self.contexts = contexts
+                # Avoid late mutations after capturing the value
+                self.contexts = copy.deepcopy(contexts)
             else:
                 warn(
                     "Trying `contexts` on a non-RAG span, this attribute will be ignored for non-RAG spans, please make sure you set the span type to `rag` by using the decorator as @span(type='rag')"
@@ -335,9 +339,11 @@ class ContextSpan:
                     "Trying `model` on a non-LLM span, this attribute will be ignored for non-LLM spans, please make sure you set the span type to `llm` by using the decorator as @span(type='llm')"
                 )
         if params:
-            self.params = params
+            # Avoid late mutations after capturing the value
+            self.params = copy.deepcopy(params)
         if metrics:
-            self.metrics = metrics
+            # Avoid late mutations after capturing the value
+            self.metrics = copy.deepcopy(metrics)
 
     def add_evaluation(
         self,
@@ -803,7 +809,8 @@ class ContextTrace:
         if expected_output:
             self.expected_output = expected_output
         if evaluations:
-            self.evaluations = evaluations
+            # Avoid late mutations after capturing the value
+            self.evaluations = copy.deepcopy(evaluations)
 
         self.root_span.update(
             span_id=span_id,
