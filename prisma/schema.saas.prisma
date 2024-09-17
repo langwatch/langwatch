@@ -42,6 +42,9 @@ model Subscription {
   lastPaymentFailedDate DateTime?
   createdAt             DateTime           @default(now())
   updatedAt             DateTime           @default(now()) @updatedAt
+  maxMembers            Int?
+  maxProjects           Int?
+  maxMessagesPerMonth   Int?
 
   organization Organization @relation(fields: [organizationId], references: [id])
   invoices     Invoice[]

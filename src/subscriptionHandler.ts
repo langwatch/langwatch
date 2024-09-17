@@ -118,14 +118,22 @@ export class SubscriptionHandlerSaas extends SubscriptionHandler {
       },
     });
 
+    let customLimits: Partial<PlanInfo> = {};
+    if (activeSubscription?.maxMembers) {
+      customLimits.maxMembers = activeSubscription.maxMembers;
+    }
+    if (activeSubscription?.maxProjects) {
+      customLimits.maxProjects = activeSubscription.maxProjects;
+    }
+    if (activeSubscription?.maxMessagesPerMonth) {
+      customLimits.maxMessagesPerMonth = activeSubscription.maxMessagesPerMonth;
+    }
+
     if (!activeSubscription) {
       return { ...PLAN_LIMITS[PlanTypes.FREE], overrideAddingLimitations };
     }
 
-    let customLimits: Partial<PlanInfo> = {};
-    if (
-      organizationId === "organization_GGc925F6vj7IC67_jn3-0"
-    ) {
+    if (organizationId === "organization_GGc925F6vj7IC67_jn3-0") {
       customLimits = {
         maxMembers: 10,
       };
