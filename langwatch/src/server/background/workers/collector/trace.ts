@@ -7,9 +7,14 @@ export const getTraceInput = async (
   projectId: string
 ): Promise<Trace["input"]> => {
   const value = getFirstInputAsText(spans);
-  const embeddings = value
-    ? await getOpenAIEmbeddings(value, projectId)
-    : undefined;
+  let embeddings = undefined;
+  if (value) {
+    try {
+      embeddings = await getOpenAIEmbeddings(value, projectId);
+    } catch (e) {
+      console.error(`Error getting embeddings for trace input: ${e as any}`);
+    }
+  }
   return { value: value, embeddings };
 };
 
@@ -18,8 +23,13 @@ export const getTraceOutput = async (
   projectId: string
 ): Promise<Trace["output"]> => {
   const value = getLastOutputAsText(spans);
-  const embeddings = value
-    ? await getOpenAIEmbeddings(value, projectId)
-    : undefined;
+  let embeddings = undefined;
+  if (value) {
+    try {
+      embeddings = await getOpenAIEmbeddings(value, projectId);
+    } catch (e) {
+      console.error(`Error getting embeddings for trace input: ${e as any}`);
+    }
+  }
   return { value: value, embeddings };
 };

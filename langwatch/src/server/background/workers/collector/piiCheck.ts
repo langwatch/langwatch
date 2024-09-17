@@ -1,18 +1,14 @@
+import { DlpServiceClient } from "@google-cloud/dlp";
 import type { google } from "@google-cloud/dlp/build/protos/protos";
+import type { PIIRedactionLevel } from "@prisma/client";
 import { env } from "../../../../env.mjs";
+import { getDebugger } from "../../../../utils/logger";
+import type { BatchEvaluationResult } from "../../../evaluations/evaluators.generated";
 import type {
   ElasticSearchSpan,
   ElasticSearchTrace,
   Trace,
 } from "../../../tracer/types";
-import { getDebugger } from "../../../../utils/logger";
-import { DlpServiceClient } from "@google-cloud/dlp";
-import type { PIIRedactionLevel } from "@prisma/client";
-import { runEvaluation } from "../evaluationsWorker";
-import type {
-  BatchEvaluationResult,
-  SingleEvaluationResult,
-} from "../../../evaluations/evaluators.generated";
 
 const debug = getDebugger("langwatch:trace_checks:piiCheck");
 
@@ -159,11 +155,8 @@ const clearPII = async (
     try {
       await presidioClearPII(currentObject, lastKey, piiRedactionLevel);
     } catch (e) {
-      if (process.env.VITEST_MODE) {
+      if (!credentials || process.env.VITEST_MODE) {
         throw e;
-      }
-      if (!credentials) {
-        return;
       }
       debug(
         `Error running presidio PII check, running google_dlp as fallback, error: ${
@@ -178,11 +171,8 @@ const clearPII = async (
     try {
       await googleDLPClearPII(currentObject, lastKey, piiRedactionLevel);
     } catch (e) {
-      if (process.env.VITEST_MODE) {
+      if (!process.env.LANGEVALS_ENDPOINT || process.env.VITEST_MODE) {
         throw e;
-      }
-      if (!process.env.LANGEVALS_ENDPOINT) {
-        return;
       }
       debug(
         `Error running google_dlp PII check, running presidio as fallback, error: ${
