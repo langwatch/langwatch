@@ -469,7 +469,7 @@ const RunDetails = React.memo(
                 {dspyStep.data && `(${dspyStep.data.predictors.length})`}
               </Tab>
               <Tab>
-                Examples {dspyStep.data && `(${dspyStep.data.examples.length})`}
+                Evaluations {dspyStep.data && `(${dspyStep.data.examples.length})`}
               </Tab>
               <Tab>
                 LLM Calls{" "}
