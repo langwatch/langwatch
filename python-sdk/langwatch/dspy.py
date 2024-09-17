@@ -192,6 +192,9 @@ class LangWatchDSPy:
         if not hasattr(dspy.OpenAI, "_original_request"):
             dspy.OpenAI._original_request = dspy.OpenAI.request  # type: ignore
 
+        if not hasattr(dspy.AzureOpenAI, "_original_request"):
+            dspy.AzureOpenAI._original_request = dspy.AzureOpenAI.request  # type: ignore
+
         this = self
 
         def patched_request(self, *args, **kwargs):
@@ -203,6 +206,7 @@ class LangWatchDSPy:
             return response
 
         dspy.OpenAI.request = patched_request
+        dspy.AzureOpenAI.request = patched_request
 
     def track_metric(
         self,
