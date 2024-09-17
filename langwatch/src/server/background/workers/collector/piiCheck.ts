@@ -1,9 +1,18 @@
 import type { google } from "@google-cloud/dlp/build/protos/protos";
 import { env } from "../../../../env.mjs";
-import type { ElasticSearchSpan, ElasticSearchTrace, Trace } from "../../../tracer/types";
+import type {
+  ElasticSearchSpan,
+  ElasticSearchTrace,
+  Trace,
+} from "../../../tracer/types";
 import { getDebugger } from "../../../../utils/logger";
 import { DlpServiceClient } from "@google-cloud/dlp";
 import type { PIIRedactionLevel } from "@prisma/client";
+import { runEvaluation } from "../evaluationsWorker";
+import type {
+  BatchEvaluationResult,
+  SingleEvaluationResult,
+} from "../../../evaluations/evaluators.generated";
 
 const debug = getDebugger("langwatch:trace_checks:piiCheck");
 
@@ -13,33 +22,89 @@ const credentials = env.GOOGLE_APPLICATION_CREDENTIALS
   : undefined;
 const dlp = new DlpServiceClient({ credentials });
 
-const strictInfoTypes = [
-  "FIRST_NAME",
-  "LAST_NAME",
-  "PERSON_NAME",
-  "DATE_OF_BIRTH",
-  "LOCATION",
-  "STREET_ADDRESS",
-  "PHONE_NUMBER",
-  "EMAIL_ADDRESS",
-  "CREDIT_CARD_NUMBER",
-  "IBAN_CODE",
-  "IP_ADDRESS",
-  "PASSPORT",
-  "VAT_NUMBER",
-  "MEDICAL_RECORD_NUMBER",
-];
+const strictInfoTypes = {
+  google_dlp: [
+    "FIRST_NAME",
+    "LAST_NAME",
+    "PERSON_NAME",
+    "DATE_OF_BIRTH",
+    "LOCATION",
+    "STREET_ADDRESS",
+    "PHONE_NUMBER",
+    "EMAIL_ADDRESS",
+    "CREDIT_CARD_NUMBER",
+    "IBAN_CODE",
+    "IP_ADDRESS",
+    "PASSPORT",
+    "VAT_NUMBER",
+    "MEDICAL_RECORD_NUMBER",
+  ],
+  presidio: [
+    "CREDIT_CARD",
+    "CRYPTO",
+    "EMAIL_ADDRESS",
+    "IBAN_CODE",
+    "IP_ADDRESS",
+    "LOCATION",
+    "PERSON",
+    "PHONE_NUMBER",
+    "MEDICAL_LICENSE",
+    "US_BANK_NUMBER",
+    "US_DRIVER_LICENSE",
+    "US_ITIN",
+    "US_PASSPORT",
+    "US_SSN",
+    "UK_NHS",
+    "SG_NRIC_FIN",
+    "AU_ABN",
+    "AU_ACN",
+    "AU_TFN",
+    "AU_MEDICARE",
+    "IN_PAN",
+    "IN_AADHAAR",
+    "IN_VEHICLE_REGISTRATION",
+    "IN_VOTER",
+    "IN_PASSPORT",
+  ],
+};
 
-const essentialInfoTypes = [
-  "PHONE_NUMBER",
-  "EMAIL_ADDRESS",
-  "CREDIT_CARD_NUMBER",
-  "IBAN_CODE",
-  "IP_ADDRESS",
-  "PASSPORT",
-  "VAT_NUMBER",
-  "MEDICAL_RECORD_NUMBER",
-];
+const essentialInfoTypes = {
+  google_dlp: [
+    "PHONE_NUMBER",
+    "EMAIL_ADDRESS",
+    "CREDIT_CARD_NUMBER",
+    "IBAN_CODE",
+    "IP_ADDRESS",
+    "PASSPORT",
+    "VAT_NUMBER",
+    "MEDICAL_RECORD_NUMBER",
+  ],
+  presidio: [
+    "CREDIT_CARD",
+    "CRYPTO",
+    "EMAIL_ADDRESS",
+    "IBAN_CODE",
+    "IP_ADDRESS",
+    "PHONE_NUMBER",
+    "MEDICAL_LICENSE",
+    "US_BANK_NUMBER",
+    "US_DRIVER_LICENSE",
+    "US_ITIN",
+    "US_PASSPORT",
+    "US_SSN",
+    "UK_NHS",
+    "SG_NRIC_FIN",
+    "AU_ABN",
+    "AU_ACN",
+    "AU_TFN",
+    "AU_MEDICARE",
+    "IN_PAN",
+    "IN_AADHAAR",
+    "IN_VEHICLE_REGISTRATION",
+    "IN_VOTER",
+    "IN_PASSPORT",
+  ],
+};
 
 const dlpCheck = async (
   text: string,
@@ -51,7 +116,7 @@ const dlpCheck = async (
       infoTypes: (piiRedactionLevel === "ESSENTIAL"
         ? essentialInfoTypes
         : strictInfoTypes
-      ).map((name) => ({ name })),
+      ).google_dlp.map((name) => ({ name })),
       minLikelihood: "POSSIBLE",
       limits: {
         maxFindingsPerRequest: 0, // (0 = server maximum)
@@ -70,7 +135,8 @@ const dlpCheck = async (
 const clearPII = async (
   object: Record<string | number, any>,
   keysPath: (string | number)[],
-  piiRedactionLevel: PIIRedactionLevel
+  piiRedactionLevel: PIIRedactionLevel,
+  mainMethod: "google_dlp" | "presidio"
 ) => {
   const lastKey = keysPath[keysPath.length - 1];
   if (!lastKey) {
@@ -89,6 +155,50 @@ const clearPII = async (
     return;
   }
 
+  if (mainMethod === "presidio") {
+    try {
+      await presidioClearPII(currentObject, lastKey, piiRedactionLevel);
+    } catch (e) {
+      if (process.env.VITEST_MODE) {
+        throw e;
+      }
+      if (!credentials) {
+        return;
+      }
+      debug(
+        `Error running presidio PII check, running google_dlp as fallback, error: ${
+          e as any
+        }`
+      );
+      await googleDLPClearPII(currentObject, lastKey, piiRedactionLevel);
+    }
+  }
+
+  if (mainMethod === "google_dlp") {
+    try {
+      await googleDLPClearPII(currentObject, lastKey, piiRedactionLevel);
+    } catch (e) {
+      if (process.env.VITEST_MODE) {
+        throw e;
+      }
+      if (!process.env.LANGEVALS_ENDPOINT) {
+        return;
+      }
+      debug(
+        `Error running google_dlp PII check, running presidio as fallback, error: ${
+          e as any
+        }`
+      );
+      await presidioClearPII(currentObject, lastKey, piiRedactionLevel);
+    }
+  }
+};
+
+const googleDLPClearPII = async (
+  currentObject: Record<string | number, any>,
+  lastKey: string | number,
+  piiRedactionLevel: PIIRedactionLevel
+): Promise<void> => {
   const findings = await dlpCheck(currentObject[lastKey], piiRedactionLevel);
   for (const finding of findings) {
     const start = finding.location?.codepointRange?.start;
@@ -108,13 +218,61 @@ const clearPII = async (
   }
 };
 
+const presidioClearPII = async (
+  currentObject: Record<string | number, any>,
+  lastKey: string | number,
+  piiRedactionLevel: PIIRedactionLevel
+): Promise<void> => {
+  const response = await fetch(
+    `${env.LANGEVALS_ENDPOINT}/presidio/pii_detection/evaluate`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        data: [{ input: currentObject[lastKey] }],
+        settings: {
+          entities: Object.fromEntries(
+            (piiRedactionLevel === "ESSENTIAL"
+              ? essentialInfoTypes
+              : strictInfoTypes
+            ).presidio.map((name) => [name.toLowerCase(), true])
+          ),
+          min_threshold: 0.5,
+        },
+        env: {},
+      }),
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error(await response.text());
+  }
+
+  const result = ((await response.json()) as BatchEvaluationResult)[0];
+  if (!result) {
+    throw new Error("Unexpected response: empty results");
+  }
+  if (result.status === "skipped") {
+    return;
+  }
+  if (result.status === "error") {
+    throw new Error(result.message);
+  }
+  if (result.status === "processed" && result.raw_response?.anonymized) {
+    currentObject[lastKey] = result.raw_response.anonymized;
+  }
+};
+
 export const cleanupPIIs = async (
   trace: Trace | ElasticSearchTrace,
   spans: ElasticSearchSpan[],
   piiRedactionLevel: PIIRedactionLevel,
-  enforced = true
+  enforced = true,
+  mainMethod: "google_dlp" | "presidio" = "presidio"
 ): Promise<void> => {
-  if (!credentials) {
+  if (!credentials && mainMethod === "google_dlp") {
     if (enforced) {
       throw new Error(
         "GOOGLE_APPLICATION_CREDENTIALS is not set, PII check cannot be performed"
@@ -125,27 +283,38 @@ export const cleanupPIIs = async (
     );
     return;
   }
+  if (mainMethod === "presidio" && !process.env.LANGEVALS_ENDPOINT) {
+    if (enforced) {
+      throw new Error(
+        "LANGEVALS_ENDPOINT is not set, PII check cannot be performed"
+      );
+    }
+    console.warn(
+      "⚠️  WARNING: LANGEVALS_ENDPOINT is not set, so PII check will not be performed, you are risking storing PII on the database, please set them if you wish to avoid that, this will fail in production by default"
+    );
+    return;
+  }
 
   debug("Checking PII for trace", trace.trace_id);
 
   const clearPIIPromises = [
-    clearPII(trace, ["input", "value"], piiRedactionLevel),
-    clearPII(trace, ["output", "value"], piiRedactionLevel),
-    clearPII(trace, ["error", "message"], piiRedactionLevel),
-    clearPII(trace, ["error", "stacktrace"], piiRedactionLevel),
+    clearPII(trace, ["input", "value"], piiRedactionLevel, mainMethod),
+    clearPII(trace, ["output", "value"], piiRedactionLevel, mainMethod),
+    clearPII(trace, ["error", "message"], piiRedactionLevel, mainMethod),
+    clearPII(trace, ["error", "stacktrace"], piiRedactionLevel, mainMethod),
   ];
 
   for (const span of spans) {
     clearPIIPromises.push(
-      clearPII(span, ["input", "value"], piiRedactionLevel)
+      clearPII(span, ["input", "value"], piiRedactionLevel, mainMethod)
     );
     clearPIIPromises.push(
-      clearPII(span, ["error", "message"], piiRedactionLevel)
+      clearPII(span, ["error", "message"], piiRedactionLevel, mainMethod)
     );
 
     if (span.output) {
       clearPIIPromises.push(
-        clearPII(span.output, ["value"], piiRedactionLevel)
+        clearPII(span.output, ["value"], piiRedactionLevel, mainMethod)
       );
     }
 
@@ -153,25 +322,30 @@ export const cleanupPIIs = async (
       if (Array.isArray(context.content)) {
         for (let i = 0; i < context.content.length; i++) {
           clearPIIPromises.push(
-            clearPII(context.content, [i], piiRedactionLevel)
+            clearPII(context.content, [i], piiRedactionLevel, mainMethod)
           );
         }
       } else if (typeof context.content === "object") {
         for (const key in context.content) {
           clearPIIPromises.push(
-            clearPII(context.content, [key], piiRedactionLevel)
+            clearPII(context.content, [key], piiRedactionLevel, mainMethod)
           );
         }
       } else {
         clearPIIPromises.push(
-          clearPII(context, ["content"], piiRedactionLevel)
+          clearPII(context, ["content"], piiRedactionLevel, mainMethod)
         );
       }
     }
 
     for (let i = 0; i < (span.error?.stacktrace ?? []).length; i++) {
       clearPIIPromises.push(
-        clearPII(span.error?.stacktrace ?? [], [i], piiRedactionLevel)
+        clearPII(
+          span.error?.stacktrace ?? [],
+          [i],
+          piiRedactionLevel,
+          mainMethod
+        )
       );
     }
   }

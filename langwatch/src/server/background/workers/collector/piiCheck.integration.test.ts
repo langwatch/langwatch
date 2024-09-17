@@ -17,7 +17,7 @@ describe("PIICheck", () => {
         updated_at: Date.now(),
       },
     };
-    await cleanupPIIs(sampleTrace, [], PIIRedactionLevel.ESSENTIAL);
+    await cleanupPIIs(sampleTrace, [], PIIRedactionLevel.ESSENTIAL, true, "presidio");
     expect(sampleTrace.input?.value).toEqual("hi there");
 
     const samplePIITrace: Trace = {
@@ -35,7 +35,44 @@ describe("PIICheck", () => {
       },
     };
 
-    await cleanupPIIs(samplePIITrace, [], PIIRedactionLevel.ESSENTIAL);
+    await cleanupPIIs(samplePIITrace, [], PIIRedactionLevel.ESSENTIAL, true, "presidio");
+    expect(samplePIITrace.input?.value).toEqual(
+      "hi there, my credit card number is <CREDIT_CARD>"
+    );
+  });
+
+  it("detects PII on traces using google dlp", async () => {
+    const sampleTrace: Trace = {
+      trace_id: "foo",
+      project_id: "foo",
+      metadata: {},
+      input: { value: "hi there" },
+      metrics: {},
+      timestamps: {
+        started_at: Date.now(),
+        inserted_at: Date.now(),
+        updated_at: Date.now(),
+      },
+    };
+    await cleanupPIIs(sampleTrace, [], PIIRedactionLevel.ESSENTIAL, true, "google_dlp");
+    expect(sampleTrace.input?.value).toEqual("hi there");
+
+    const samplePIITrace: Trace = {
+      trace_id: "foo",
+      project_id: "foo",
+      metadata: {},
+      input: {
+        value: "hi there, my credit card number is 4012-8888-8888-1881",
+      },
+      metrics: {},
+      timestamps: {
+        started_at: Date.now(),
+        inserted_at: Date.now(),
+        updated_at: Date.now(),
+      },
+    };
+
+    await cleanupPIIs(samplePIITrace, [], PIIRedactionLevel.ESSENTIAL, true, "google_dlp");
     expect(samplePIITrace.input?.value).toEqual(
       "hi there, my credit card number is [REDACTED]"
     );
