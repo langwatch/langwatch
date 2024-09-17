@@ -131,9 +131,10 @@ const dlpCheck = async (
 const clearPII = async (
   object: Record<string | number, any>,
   keysPath: (string | number)[],
-  piiRedactionLevel: PIIRedactionLevel,
-  mainMethod: "google_dlp" | "presidio"
+  options: PIICheckOptions
 ) => {
+  const { piiRedactionLevel, mainMethod, enforced } = options;
+
   const lastKey = keysPath[keysPath.length - 1];
   if (!lastKey) {
     return;
@@ -151,35 +152,45 @@ const clearPII = async (
     return;
   }
 
-  if (mainMethod === "presidio") {
-    try {
-      await presidioClearPII(currentObject, lastKey, piiRedactionLevel);
-    } catch (e) {
-      if (!credentials || process.env.VITEST_MODE) {
-        throw e;
-      }
-      debug(
-        `Error running presidio PII check, running google_dlp as fallback, error: ${
-          e as any
-        }`
-      );
-      await googleDLPClearPII(currentObject, lastKey, piiRedactionLevel);
-    }
-  }
+  const methods = {
+    presidio: presidioClearPII,
+    google_dlp: googleDLPClearPII,
+  };
+  const firstMethod = mainMethod ?? "presidio";
+  const secondMethod = firstMethod === "google_dlp" ? "presidio" : "google_dlp";
 
-  if (mainMethod === "google_dlp") {
+  try {
+    await methods[firstMethod](currentObject, lastKey, piiRedactionLevel);
+  } catch (e) {
+    if (
+      secondMethod === "google_dlp"
+        ? !credentials
+        : !process.env.LANGEVALS_ENDPOINT
+    ) {
+      if (enforced) {
+        throw e;
+      } else {
+        console.warn(
+          "⚠️  WARNING: Fail to redact PII with error but allowed to continue, this will fail in production by default."
+        );
+        return;
+      }
+    }
+    debug(
+      `Error running ${firstMethod} PII check, running ${secondMethod} as fallback, error: ${
+        e as any
+      }`
+    );
+
     try {
-      await googleDLPClearPII(currentObject, lastKey, piiRedactionLevel);
+      await methods[secondMethod](currentObject, lastKey, piiRedactionLevel);
     } catch (e) {
-      if (!process.env.LANGEVALS_ENDPOINT || process.env.VITEST_MODE) {
+      if (enforced) {
         throw e;
       }
-      debug(
-        `Error running google_dlp PII check, running presidio as fallback, error: ${
-          e as any
-        }`
+      console.warn(
+        "⚠️  WARNING: Fail to redact PII with error but allowed to continue, this will fail in production by default."
       );
-      await presidioClearPII(currentObject, lastKey, piiRedactionLevel);
     }
   }
 };
@@ -255,13 +266,19 @@ const presidioClearPII = async (
   }
 };
 
+type PIICheckOptions = {
+  piiRedactionLevel: PIIRedactionLevel;
+  enforced?: boolean;
+  mainMethod?: "google_dlp" | "presidio";
+};
+
 export const cleanupPIIs = async (
   trace: Trace | ElasticSearchTrace,
   spans: ElasticSearchSpan[],
-  piiRedactionLevel: PIIRedactionLevel,
-  enforced = true,
-  mainMethod: "google_dlp" | "presidio" = "presidio"
+  options: PIICheckOptions
 ): Promise<void> => {
+  const { enforced, mainMethod } = options;
+
   if (!credentials && mainMethod === "google_dlp") {
     if (enforced) {
       throw new Error(
@@ -288,54 +305,37 @@ export const cleanupPIIs = async (
   debug("Checking PII for trace", trace.trace_id);
 
   const clearPIIPromises = [
-    clearPII(trace, ["input", "value"], piiRedactionLevel, mainMethod),
-    clearPII(trace, ["output", "value"], piiRedactionLevel, mainMethod),
-    clearPII(trace, ["error", "message"], piiRedactionLevel, mainMethod),
-    clearPII(trace, ["error", "stacktrace"], piiRedactionLevel, mainMethod),
+    clearPII(trace, ["input", "value"], options),
+    clearPII(trace, ["output", "value"], options),
+    clearPII(trace, ["error", "message"], options),
+    clearPII(trace, ["error", "stacktrace"], options),
   ];
 
   for (const span of spans) {
-    clearPIIPromises.push(
-      clearPII(span, ["input", "value"], piiRedactionLevel, mainMethod)
-    );
-    clearPIIPromises.push(
-      clearPII(span, ["error", "message"], piiRedactionLevel, mainMethod)
-    );
+    clearPIIPromises.push(clearPII(span, ["input", "value"], options));
+    clearPIIPromises.push(clearPII(span, ["error", "message"], options));
 
     if (span.output) {
-      clearPIIPromises.push(
-        clearPII(span.output, ["value"], piiRedactionLevel, mainMethod)
-      );
+      clearPIIPromises.push(clearPII(span.output, ["value"], options));
     }
 
     for (const context of span.contexts ?? []) {
       if (Array.isArray(context.content)) {
         for (let i = 0; i < context.content.length; i++) {
-          clearPIIPromises.push(
-            clearPII(context.content, [i], piiRedactionLevel, mainMethod)
-          );
+          clearPIIPromises.push(clearPII(context.content, [i], options));
         }
       } else if (typeof context.content === "object") {
         for (const key in context.content) {
-          clearPIIPromises.push(
-            clearPII(context.content, [key], piiRedactionLevel, mainMethod)
-          );
+          clearPIIPromises.push(clearPII(context.content, [key], options));
         }
       } else {
-        clearPIIPromises.push(
-          clearPII(context, ["content"], piiRedactionLevel, mainMethod)
-        );
+        clearPIIPromises.push(clearPII(context, ["content"], options));
       }
     }
 
     for (let i = 0; i < (span.error?.stacktrace ?? []).length; i++) {
       clearPIIPromises.push(
-        clearPII(
-          span.error?.stacktrace ?? [],
-          [i],
-          piiRedactionLevel,
-          mainMethod
-        )
+        clearPII(span.error?.stacktrace ?? [], [i], options)
       );
     }
   }

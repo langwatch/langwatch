@@ -17,7 +17,11 @@ describe("PIICheck", () => {
         updated_at: Date.now(),
       },
     };
-    await cleanupPIIs(sampleTrace, [], PIIRedactionLevel.ESSENTIAL, true, "presidio");
+    await cleanupPIIs(sampleTrace, [], {
+      piiRedactionLevel: PIIRedactionLevel.ESSENTIAL,
+      enforced: true,
+      mainMethod: "presidio",
+    });
     expect(sampleTrace.input?.value).toEqual("hi there");
 
     const samplePIITrace: Trace = {
@@ -35,7 +39,11 @@ describe("PIICheck", () => {
       },
     };
 
-    await cleanupPIIs(samplePIITrace, [], PIIRedactionLevel.ESSENTIAL, true, "presidio");
+    await cleanupPIIs(samplePIITrace, [], {
+      piiRedactionLevel: PIIRedactionLevel.ESSENTIAL,
+      enforced: true,
+      mainMethod: "presidio",
+    });
     expect(samplePIITrace.input?.value).toEqual(
       "hi there, my credit card number is <CREDIT_CARD>"
     );
@@ -54,7 +62,11 @@ describe("PIICheck", () => {
         updated_at: Date.now(),
       },
     };
-    await cleanupPIIs(sampleTrace, [], PIIRedactionLevel.ESSENTIAL, true, "google_dlp");
+    await cleanupPIIs(sampleTrace, [], {
+      piiRedactionLevel: PIIRedactionLevel.ESSENTIAL,
+      enforced: true,
+      mainMethod: "google_dlp",
+    });
     expect(sampleTrace.input?.value).toEqual("hi there");
 
     const samplePIITrace: Trace = {
@@ -72,7 +84,11 @@ describe("PIICheck", () => {
       },
     };
 
-    await cleanupPIIs(samplePIITrace, [], PIIRedactionLevel.ESSENTIAL, true, "google_dlp");
+    await cleanupPIIs(samplePIITrace, [], {
+      piiRedactionLevel: PIIRedactionLevel.ESSENTIAL,
+      enforced: true,
+      mainMethod: "google_dlp",
+    });
     expect(samplePIITrace.input?.value).toEqual(
       "hi there, my credit card number is [REDACTED]"
     );

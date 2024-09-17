@@ -185,7 +185,10 @@ export const processCollectorJob = async (
   };
 
   const piiEnforced = env.NODE_ENV === "production";
-  await cleanupPIIs(trace, esSpans, project.piiRedactionLevel, piiEnforced);
+  await cleanupPIIs(trace, esSpans, {
+    piiRedactionLevel: project.piiRedactionLevel,
+    enforced: piiEnforced,
+  });
 
   await esClient.update({
     index: TRACE_INDEX.alias,

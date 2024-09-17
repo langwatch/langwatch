@@ -289,12 +289,17 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
     urlKey: "metadata_key",
     single: true,
     query: (values) => ({
-      bool: {
-        should: values.map((v) => ({
-          exists: { field: metadataKey(v) },
-        })),
-        minimum_should_match: 1,
-      },
+      // Exists is not working on OpenSearch flat_object type, what we lose here is querying too much, it doesn't help on the list search
+      ...(process.env.IS_OPENSEARCH
+        ? { match_all: {} }
+        : {
+            bool: {
+              should: values.map((v) => ({
+                exists: { field: metadataKey(v) },
+              })),
+              minimum_should_match: 1,
+            },
+          }),
     }),
     listMatch: {
       aggregation: (query) => ({
@@ -357,49 +362,69 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
       filter: "metadata.key",
     },
     query: (values, key) => ({
-      bool: {
-        must: [
-          {
-            terms: { [metadataKey(key)]: values },
-          },
-        ] as QueryDslQueryContainer[],
-      } as QueryDslBoolQuery,
+      terms: { [metadataKey(key)]: values },
     }),
     listMatch: {
-      aggregation: (query, key) => ({
-        unique_values: {
-          filter: {
-            exists: {
-              field: metadataKey(key),
-            },
-          },
-          aggs: {
-            child: {
-              filter: query
-                ? {
-                    prefix: {
-                      [metadataKey(key)]: {
-                        value: query,
-                        case_insensitive: true,
-                      },
-                    },
-                  }
+      aggregation: (query, key) => {
+        // TODO: for opensearch, handle the case where the key is "foo.bar" but not in {"foo": {"bar": "baz"}}, but rather in {"foo.bar": "baz"}
+        const nullChecksList = [];
+        let keySoFar = "";
+        for (const k of metadataKey(key).split(".")) {
+          keySoFar += `.${k}`;
+          nullChecksList.push(`params._source${keySoFar} != null`);
+        }
+        const nullChecks = nullChecksList.join(" && ");
+
+        return {
+          unique_values: {
+            filter: {
+              // Exists is not working on OpenSearch flat_object type, what we lose here is querying too much, it doesn't help on the list search
+              ...(process.env.IS_OPENSEARCH
+                ? { match_all: {} }
                 : {
-                    match_all: {},
-                  },
-              aggs: {
-                child: {
-                  terms: {
-                    field: metadataKey(key),
-                    size: 100,
-                    order: { _key: "asc" },
+                    exists: {
+                      field: metadataKey(key),
+                    },
+                  }),
+            },
+            aggs: {
+              child: {
+                filter: query
+                  ? {
+                      prefix: {
+                        [metadataKey(key)]: {
+                          value: query,
+                          case_insensitive: true,
+                        },
+                      },
+                    }
+                  : {
+                      match_all: {},
+                    },
+                aggs: {
+                  child: {
+                    terms: {
+                      ...(process.env.IS_OPENSEARCH
+                        ? {
+                            script: {
+                              source: `if (${nullChecks}) { return params._source.${metadataKey(
+                                key
+                              )}; } else { return null; }`,
+                            },
+                          }
+                        : {
+                            field: metadataKey(key),
+                          }),
+                      size: 100,
+                      order: { _key: "asc" },
+                    },
                   },
                 },
               },
             },
           },
-        },
-      }),
+        };
+      },
       extract: (result: Record<string, any>) => {
         return (
           result.unique_values?.child?.child?.buckets?.map((bucket: any) => ({
@@ -1339,7 +1364,7 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
 const metadataKey = (key: string | undefined) => {
   const reservedKeys = Object.keys(reservedTraceMetadataSchema.shape);
   if (key && reservedKeys.includes(key)) {
-    return `metadata.${key.replaceAll(".", "·")}`;
+    return `metadata.${key.replaceAll("·", ".")}`;
   }
-  return `metadata.custom.${key?.replaceAll(".", "·")}`;
+  return `metadata.custom.${key?.replaceAll("·", ".")}`;
 };
