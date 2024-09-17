@@ -65,7 +65,8 @@ export const usePeriodSelector = (defaultNDays = 30) => {
       typeof router.query.endDate === "string" &&
       isValidDateString(router.query.endDate)
         ? new Date(router.query.endDate)
-        : thisHour,
+        : now,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [router.query.endDate, thisHour]
   );
 
