@@ -137,7 +137,11 @@ export function SpanDetails({
             whiteSpace="pre-wrap"
           >
             <RenderInputOutput
-              value={JSON.stringify(span.params)}
+              value={JSON.stringify(
+                Object.fromEntries(
+                  Object.entries(span.params).filter(([key]) => key !== "_keys")
+                )
+              )}
               collapsed={
                 (!!span.input || !!span.output) &&
                 JSON.stringify(span.params).length > 100

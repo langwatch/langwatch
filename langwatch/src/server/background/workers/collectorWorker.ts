@@ -27,6 +27,7 @@ import { scoreSatisfactionFromInput } from "./collector/satisfaction";
 import { getTraceInput, getTraceOutput } from "./collector/trace";
 import type { QueryDslBoolQuery } from "@elastic/elasticsearch/lib/api/types";
 import { mapEvaluations, scheduleEvaluations } from "./collector/evaluations";
+import { flattenObjectKeys } from "../../api/utils";
 
 const debug = getDebugger("langwatch:workers:collectorWorker");
 
@@ -116,8 +117,13 @@ export const processCollectorJob = async (
         updated_at: Date.now(),
       },
     };
-    // Fix for open search, nested fields cannot be explicitly set to null if empty
-    if (!span.params) {
+    if (esSpan.params && typeof span.params === "object") {
+      esSpan.params = {
+        ...esSpan.params,
+        _keys: flattenObjectKeys(esSpan.params),
+      };
+    } else {
+      // Fix for open search, nested fields cannot be explicitly set to null if empty
       delete esSpan.params;
     }
     return esSpan;
@@ -155,7 +161,7 @@ export const processCollectorJob = async (
         new Set([
           ...existingAllKeys,
           ...Object.keys(reservedTraceMetadata),
-          ...Object.keys(customMetadata),
+          ...flattenObjectKeys(customMetadata),
         ])
       ),
     },
