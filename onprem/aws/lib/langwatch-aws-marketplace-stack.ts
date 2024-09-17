@@ -815,6 +815,16 @@ export class LangWatchAwsMarketplaceStack extends cdk.Stack {
                 name: "langevals",
                 image: `339712859611.dkr.ecr.eu-central-1.amazonaws.com/onprem_langevals:${langWatchPackageJson.version}`,
                 ports: [{ containerPort: 8000 }],
+                resources: {
+                  requests: {
+                    cpu: "4",
+                    memory: "4Gi",
+                  },
+                  limits: {
+                    cpu: "4",
+                    memory: "4Gi",
+                  },
+                },
               },
             ],
           },
