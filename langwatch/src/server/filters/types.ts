@@ -11,6 +11,8 @@ export const filterFieldsEnum = z.enum([
   "metadata.thread_id",
   "metadata.customer_id",
   "metadata.labels",
+  "metadata.key",
+  "metadata.value",
   "traces.error",
   "spans.type",
   "spans.model",

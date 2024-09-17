@@ -59,6 +59,7 @@ export function FieldsFilters() {
     "metadata.user_id",
     "metadata.thread_id",
     "metadata.customer_id",
+    "metadata.value",
     "evaluations.state",
     "traces.error",
   ];
@@ -77,11 +78,12 @@ export function FieldsFilters() {
 
         <Spacer />
 
-        {hasAnyFilters && hasTeamPermission(TeamRoleGroup.TRIGGERS_MANAGE) && (
+        {hasTeamPermission(TeamRoleGroup.TRIGGERS_MANAGE) && (
           <Button
             colorScheme="orange"
             onClick={() => openDrawer("trigger", undefined)}
             size="sm"
+            visibility={hasAnyFilters ? "visible" : "hidden"}
           >
             Add Trigger
           </Button>
@@ -434,7 +436,7 @@ function ListSelection({
                         {details}
                       </Text>
                     )}
-                    <Text>{label}</Text>
+                    <Text>{label === "" ? "<empty>" : label}</Text>
                   </VStack>
                 </Checkbox>
                 <Spacer />

@@ -7,6 +7,7 @@ import {
   type EvaluatorTypes,
 } from "../../server/evaluations/evaluators.generated";
 import type { FilterDefinition, FilterField } from "./types";
+import { reservedTraceMetadataSchema } from "../tracer/types.generated";
 
 export const availableFilters: { [K in FilterField]: FilterDefinition } = {
   "topics.topics": {
@@ -252,7 +253,7 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
                   ? {
                       script: {
                         source: `
-                          for (label in doc['trace.metadata.labels']) {
+                          for (label in doc['metadata.labels']) {
                             if (label.toLowerCase().startsWith(params.query.toLowerCase())) {
                               return label;
                             }
@@ -275,6 +276,133 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
       extract: (result: Record<string, any>) => {
         return (
           result.unique_values?.child?.buckets?.map((bucket: any) => ({
+            field: bucket.key,
+            label: bucket.key,
+            count: bucket.doc_count,
+          })) ?? []
+        );
+      },
+    },
+  },
+  "metadata.key": {
+    name: "Metadata Key",
+    urlKey: "metadata_key",
+    single: true,
+    query: (values) => ({
+      bool: {
+        should: values.map((v) => ({
+          exists: { field: metadataKey(v) },
+        })),
+        minimum_should_match: 1,
+      },
+    }),
+    listMatch: {
+      aggregation: (query) => ({
+        unique_values: {
+          filter: query
+            ? {
+                prefix: {
+                  "metadata.all_keys": {
+                    value: query,
+                    case_insensitive: true,
+                  },
+                },
+              }
+            : {
+                match_all: {},
+              },
+          aggs: {
+            child: {
+              terms: {
+                ...(query
+                  ? {
+                      script: {
+                        source: `
+                          for (key in doc['metadata.all_keys']) {
+                            if (key.toLowerCase().startsWith(params.query.toLowerCase())) {
+                              return key;
+                            }
+                          }
+                          return null;
+                        `,
+                        params: {
+                          query: query,
+                        },
+                      },
+                    }
+                  : { field: "metadata.all_keys" }),
+                size: 100,
+                order: { _key: "asc" },
+              },
+            },
+          },
+        },
+      }),
+      extract: (result: Record<string, any>) => {
+        return (
+          result.unique_values?.child?.buckets?.map((bucket: any) => ({
+            field: bucket.key.replaceAll(".", "·"),
+            label: bucket.key,
+            count: bucket.doc_count,
+          })) ?? []
+        );
+      },
+    },
+  },
+  "metadata.value": {
+    name: "Metadata",
+    urlKey: "metadata",
+    single: true,
+    requiresKey: {
+      filter: "metadata.key",
+    },
+    query: (values, key) => ({
+      bool: {
+        must: [
+          {
+            terms: { [metadataKey(key)]: values },
+          },
+        ] as QueryDslQueryContainer[],
+      } as QueryDslBoolQuery,
+    }),
+    listMatch: {
+      aggregation: (query, key) => ({
+        unique_values: {
+          filter: {
+            exists: {
+              field: metadataKey(key),
+            },
+          },
+          aggs: {
+            child: {
+              filter: query
+                ? {
+                    prefix: {
+                      [metadataKey(key)]: {
+                        value: query,
+                        case_insensitive: true,
+                      },
+                    },
+                  }
+                : {
+                    match_all: {},
+                  },
+              aggs: {
+                child: {
+                  terms: {
+                    field: metadataKey(key),
+                    size: 100,
+                    order: { _key: "asc" },
+                  },
+                },
+              },
+            },
+          },
+        },
+      }),
+      extract: (result: Record<string, any>) => {
+        return (
+          result.unique_values?.child?.child?.buckets?.map((bucket: any) => ({
             field: bucket.key,
             label: bucket.key,
             count: bucket.doc_count,
@@ -1206,4 +1334,12 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
       },
     },
   },
+};
+
+const metadataKey = (key: string | undefined) => {
+  const reservedKeys = Object.keys(reservedTraceMetadataSchema.shape);
+  if (key && reservedKeys.includes(key)) {
+    return `metadata.${key.replaceAll(".", "·")}`;
+  }
+  return `metadata.custom.${key?.replaceAll(".", "·")}`;
 };
