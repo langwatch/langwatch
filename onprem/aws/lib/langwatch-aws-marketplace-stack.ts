@@ -48,7 +48,7 @@ export class LangWatchAwsMarketplaceStack extends cdk.Stack {
     });
 
     this.sesIdentity = new ses.EmailIdentity(this, "LangWatchSESIdentity", {
-      identity: ses.Identity.email(`no-reply@${this.domainName.valueAsString}`),
+      identity: ses.Identity.email(`richard@langwatch.ai`),
     });
 
     // Create a VPC
@@ -67,8 +67,8 @@ export class LangWatchAwsMarketplaceStack extends cdk.Stack {
     const nodegroup = this.cluster.addNodegroupCapacity("ManagedNodes", {
       instanceTypes: [new ec2.InstanceType("m5.xlarge")],
       minSize: 1,
-      maxSize: 5,
-      desiredSize: 2,
+      maxSize: 2,
+      desiredSize: 1,
     });
 
     // Use the predefined service-linked role for AWS Marketplace
@@ -142,9 +142,9 @@ export class LangWatchAwsMarketplaceStack extends cdk.Stack {
     // new LangEvalsStack(this, "LangEvalsStack", { cluster: this.cluster });
     // new LangWatchNLPStack(this, "LangWatchNLPStack", { cluster: this.cluster });
 
-    //this.setupLangEvals(this.cluster);
+    this.setupLangEvals(this.cluster);
 
-    this.setupLangWatchNLP(this.cluster);
+    //this.setupLangWatchNLP(this.cluster);
   }
 
   private setupLangWatchEnv(
@@ -817,11 +817,11 @@ export class LangWatchAwsMarketplaceStack extends cdk.Stack {
                 ports: [{ containerPort: 8000 }],
                 resources: {
                   requests: {
-                    cpu: "4",
+                    cpu: "2",
                     memory: "4Gi",
                   },
                   limits: {
-                    cpu: "4",
+                    cpu: "2",
                     memory: "4Gi",
                   },
                 },
@@ -871,6 +871,16 @@ export class LangWatchAwsMarketplaceStack extends cdk.Stack {
                 name: "langwatch-nlp",
                 image: `339712859611.dkr.ecr.eu-central-1.amazonaws.com/onprem_langwatch_nlp:${langWatchPackageJson.version}`,
                 ports: [{ containerPort: 8080 }],
+                resources: {
+                  requests: {
+                    cpu: "500m",
+                    memory: "1Gi",
+                  },
+                  limits: {
+                    cpu: "1",
+                    memory: "2Gi",
+                  },
+                },
               },
             ],
           },
@@ -900,7 +910,7 @@ export class LangWatchAwsMarketplaceStack extends cdk.Stack {
       name: "langwatch-sa",
     });
 
-    this.snsTopic.grantPublish(langwatchServiceAccount);
+    this.sesIdentity.grantSendEmail(langwatchServiceAccount);
 
     langwatchServiceAccount.addToPrincipalPolicy(
       new iam.PolicyStatement({
