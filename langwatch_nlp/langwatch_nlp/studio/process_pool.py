@@ -39,16 +39,15 @@ class IsolatedProcessPool(Generic[T, U]):
 
     def _fill_pool_continuously(self):
         while self.running:
-            try:
-                if len(self.idle_processes) < self.size:
-                    process_creations = [
-                        self._create_process()
-                        for _ in range(self.size - len(self.idle_processes))
-                    ]
-                    for process, queue_in, queue_out, ready_event in process_creations:
-                        ready_event.wait()
-                        self.idle_processes.append((process, queue_in, queue_out))
-            except queue.Full:
+            if len(self.idle_processes) < self.size:
+                process_creations = [
+                    self._create_process()
+                    for _ in range(self.size - len(self.idle_processes))
+                ]
+                for process, queue_in, queue_out, ready_event in process_creations:
+                    ready_event.wait()
+                    self.idle_processes.append((process, queue_in, queue_out))
+            else:
                 time.sleep(0.1)
 
     def submit(self, event: T) -> tuple[multiprocessing.Process, "Queue[U]"]:
