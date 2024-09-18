@@ -32,6 +32,7 @@ services:
     ports:
       - "8000:8000"
     restart: always
+    pull_policy: always
 
   postgres:
     image: postgres:16

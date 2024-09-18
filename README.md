@@ -98,6 +98,8 @@ That's it! Now open the link provided when the compilation starts or go to your 
 ## Running Locally
 
 You need to have docker and docker compose installed in your local environment to be able to run LangWatch locally.
+You are going to need 8-9GB of RAM to run the docker compose stack, make sure there is enough RAM available to docker when using Docker Desktop.
+
 Then, it's two simple steps:
 
 1. Copy the `langwatch/.env.example` file to `langwatch/.env`

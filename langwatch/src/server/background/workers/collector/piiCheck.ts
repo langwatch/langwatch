@@ -224,6 +224,10 @@ const presidioClearPII = async (
   lastKey: string | number,
   piiRedactionLevel: PIIRedactionLevel
 ): Promise<void> => {
+  const timeout = 2000;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeout);
+
   const response = await fetch(
     `${env.LANGEVALS_ENDPOINT}/presidio/pii_detection/evaluate`,
     {
@@ -244,8 +248,11 @@ const presidioClearPII = async (
         },
         env: {},
       }),
+      signal: controller.signal,
     }
   );
+
+  clearTimeout(timeoutId);
 
   if (!response.ok) {
     throw new Error(await response.text());
