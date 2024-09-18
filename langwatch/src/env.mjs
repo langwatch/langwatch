@@ -48,7 +48,7 @@ export const env = createEnv({
     AWS_REGION: z.string().optional(),
     SENTRY_DSN: z.string().optional(),
     IS_ONPREM: z.string().optional(),
-    AWS_SNS_TOPIC_ARN: z.string().optional(),
+    ONPREM_EMAIL: z.string().optional(),
   },
 
   /**
@@ -93,7 +93,7 @@ export const env = createEnv({
     AWS_REGION: process.env.AWS_REGION,
     SENTRY_DSN: process.env.SENTRY_DSN,
     IS_ONPREM: process.env.IS_ONPREM,
-    AWS_SNS_TOPIC_ARN: process.env.AWS_SNS_TOPIC_ARN,
+    ONPREM_EMAIL: process.env.ONPREM_EMAIL,
   },
   /**
    * Run `build` or `dev` with `SKIP_ENV_VALIDATION` to skip env validation.
