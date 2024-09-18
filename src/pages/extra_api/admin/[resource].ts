@@ -13,6 +13,9 @@ export default async function handler(
     return res.status(404).json({ message: "Not Found" });
   }
 
+  if (req.body.resource === "organizations") {
+    req.body.resource = "organization";
+  }
   const result = await defaultHandler(req.body, prisma as any);
   res.json(result);
 }

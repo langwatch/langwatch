@@ -12,9 +12,18 @@ import {
   Button,
   FunctionField,
   TextInput,
+  Create,
+  SimpleForm,
+  NumberInput,
+  DateInput,
+  SelectInput,
+  Edit,
+  ReferenceInput,
+  AutocompleteInput,
 } from "../../langwatch/langwatch/node_modules/react-admin";
 import { dataProvider } from "ra-data-simple-prisma";
 import type { User } from "@prisma/client";
+import { PlanTypes, SubscriptionStatus } from "@prisma/client";
 // @ts-ignore
 import { useState } from "../../langwatch/langwatch/node_modules/react";
 
@@ -95,8 +104,78 @@ const AdminApp = () => {
         edit={EditGuesser}
         recordRepresentation="name"
       />
+      <Resource
+        name="subscription"
+        list={ListGuesser}
+        edit={SubscriptionEdit}
+        recordRepresentation="name"
+        hasCreate={true}
+        create={SubscriptionCreate}
+        // add a add button to create a new subscription
+      />
     </Admin>
   );
 };
 
 export default AdminApp;
+
+const SubscriptionFromElements = () => {
+  return (
+    <>
+      <ReferenceInput source="organizationId" reference="organization">
+        <AutocompleteInput optionText="name" label="Organization" />
+      </ReferenceInput>
+      <SelectInput
+        source="plan"
+        label="Plan"
+        choices={Object.values(PlanTypes).map((plan) => ({
+          id: plan,
+          name: plan,
+        }))}
+      />
+      <TextInput source="stripeSubscriptionId" label="Stripe Subscription ID" />
+      <SelectInput
+        source="status"
+        label="Status"
+        choices={Object.values(SubscriptionStatus).map((status) => ({
+          id: status,
+          name: status,
+        }))}
+      />
+      <DateInput
+        source="startDate"
+        label="Start Date"
+        parse={(val) => (val ? new Date(val).toISOString() : null)}
+      />
+      <DateInput
+        source="endDate"
+        label="End Date"
+        parse={(val) => (val ? new Date(val).toISOString() : null)}
+      />
+
+      <NumberInput source="maxMembers" label="Max Members" type="number" />
+      <NumberInput source="maxProjects" label="Max Projects" type="number" />
+      <NumberInput
+        source="maxMessagesPerMonth"
+        label="Max Messages Per Month"
+        type="number"
+      />
+    </>
+  );
+};
+
+const SubscriptionCreate = () => (
+  <Create>
+    <SimpleForm>
+      <SubscriptionFromElements />
+    </SimpleForm>
+  </Create>
+);
+
+const SubscriptionEdit = () => (
+  <Edit>
+    <SimpleForm>
+      <SubscriptionFromElements />
+    </SimpleForm>
+  </Edit>
+);
