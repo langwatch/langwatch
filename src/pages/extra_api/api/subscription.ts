@@ -138,6 +138,7 @@ export const subscriptionRouter = () =>
             success_url: `${input.baseUrl}/settings/subscription?success`,
             cancel_url: `${input.baseUrl}/settings/subscription`,
             client_reference_id: `subscription_setup_${subscription.id}`,
+            allow_promotion_codes: true,
           });
 
           return { url: session.url };
