@@ -139,7 +139,7 @@ export function PropertiesPanel() {
         borderColor="gray.350"
         zIndex={100}
       >
-        <PropertiesPanel node={selectedNode} />
+        <PropertiesPanel key={selectedNode.id} node={selectedNode} />
       </Box>
       {propertiesExpanded && (
         <>

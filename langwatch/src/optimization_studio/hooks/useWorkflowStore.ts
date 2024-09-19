@@ -15,6 +15,7 @@ import debounce from "lodash.debounce";
 import type {
   BaseComponent,
   Component,
+  Field,
   LLMConfig,
   Workflow,
 } from "../types/dsl";
@@ -146,13 +147,16 @@ const store = (
     set({ edges });
   },
   setNode: (node: Partial<Node> & { id: string }) => {
-    set({
-      nodes: get().nodes.map((n) =>
-        n.id === node.id
-          ? { ...n, ...node, data: { ...n.data, ...node.data } }
-          : n
-      ),
-    });
+    set(
+      removeInvalidEdges({
+        nodes: get().nodes.map((n) =>
+          n.id === node.id
+            ? { ...n, ...node, data: { ...n.data, ...node.data } }
+            : n
+        ),
+        edges: get().edges,
+      })
+    );
   },
   setComponentExecutionState: (
     id: string,
@@ -257,3 +261,32 @@ export const useWorkflowStore = create<WorkflowStore>()(
     },
   })
 );
+
+export const removeInvalidEdges = ({
+  nodes,
+  edges,
+}: {
+  nodes: Node[];
+  edges: Edge[];
+}) => {
+  return {
+    nodes,
+    edges: edges.filter((edge) => {
+      const source = nodes.find((node) => node.id === edge.source);
+      const [sourceHandleGroup, sourceHandleIdentifier] =
+        edge.sourceHandle?.split(".") ?? [null, null];
+      const sourceHandle = (
+        source?.data[sourceHandleGroup as any] as Field[]
+      )?.find((field) => field.identifier === sourceHandleIdentifier);
+
+      const target = nodes.find((node) => node.id === edge.target);
+      const [targetHandleGroup, targetHandleIdentifier] =
+        edge.targetHandle?.split(".") ?? [null, null];
+      const targetHandle = (
+        target?.data[targetHandleGroup as any] as Field[]
+      )?.find((field) => field.identifier === targetHandleIdentifier);
+
+      return source && target && sourceHandle && targetHandle;
+    }),
+  };
+};

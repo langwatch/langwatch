@@ -5,6 +5,7 @@ import {
   Controls,
   MiniMap,
   ReactFlow,
+  ReactFlowProvider,
 } from "@xyflow/react";
 
 import "@xyflow/react/dist/style.css";
@@ -79,90 +80,93 @@ export default function OptimizationStudio() {
       <Head>
         <title>LangWatch - Optimization Studio - {name}</title>
       </Head>
-      <VStack width="full" height="full" spacing={0}>
-        <HStack
-          width="full"
-          background="white"
-          padding={2}
-          borderBottom="1px solid"
-          borderColor="gray.350"
-        >
-          <HStack width="full">
-            <Link href={`/${project?.slug}/workflows`}>
-              <LogoIcon width={24} height={24} />
-            </Link>
-            <AutoSave />
-          </HStack>
-          <HStack width="full" justify="center">
-            <Text>Optimization Studio - {name}</Text>
-            <StatusCircle
-              status={socketStatus}
-              tooltip={
-                socketStatus === "connecting-python" ||
-                socketStatus === "connecting-socket" ? (
-                  <VStack align="start" spacing={1} padding={2}>
-                    <HStack>
-                      <StatusCircle
-                        status={
-                          socketStatus === "connecting-python"
-                            ? "connected"
-                            : "connecting"
-                        }
-                      />
-                      <Text>Socket Connection</Text>
-                    </HStack>
-                    <HStack>
-                      <StatusCircle status="connecting" />
-                      <Text>Python Runtime</Text>
-                    </HStack>
-                  </VStack>
-                ) : (
-                  titleCase(socketStatus)
-                )
-              }
-            />
-          </HStack>
-          <HStack width="full" justify="end">
-            <UndoRedo />
-            <History />
-          </HStack>
-        </HStack>
-        <Box width="full" height="full" position="relative">
-          <ReactFlow
-            nodeTypes={nodeTypes}
-            edgeTypes={edgeTypes}
-            nodes={nodes}
-            edges={edges}
-            onNodesChange={onNodesChange}
-            onEdgesChange={onEdgesChange}
-            onConnect={onConnect}
-            style={{ width: "100%", height: "100%" }}
-            onPaneClick={() => {
-              setWorkflowSelected(true);
-            }}
-            defaultViewport={{
-              zoom: 1,
-              x: 100,
-              y: Math.round(
-                ((typeof window !== "undefined"
-                  ? window.innerHeight - 360
-                  : 0) || 300) / 2
-              ),
-            }}
+      <ReactFlowProvider>
+        <VStack width="full" height="full" spacing={0}>
+          <HStack
+            width="full"
+            background="white"
+            padding={2}
+            borderBottom="1px solid"
+            borderColor="gray.350"
           >
-            <Controls />
-            <MiniMap />
-            <Background
-              variant={BackgroundVariant.Dots}
-              gap={12}
-              size={2}
-              bgColor={gray100}
-              color={gray300}
-            />
-          </ReactFlow>
-          <PropertiesPanel />
-        </Box>
-      </VStack>
+            <HStack width="full">
+              <Link href={`/${project?.slug}/workflows`}>
+                <LogoIcon width={24} height={24} />
+              </Link>
+              <AutoSave />
+            </HStack>
+            <HStack width="full" justify="center">
+              <Text>Optimization Studio - {name}</Text>
+              <StatusCircle
+                status={socketStatus}
+                tooltip={
+                  socketStatus === "connecting-python" ||
+                  socketStatus === "connecting-socket" ? (
+                    <VStack align="start" spacing={1} padding={2}>
+                      <HStack>
+                        <StatusCircle
+                          status={
+                            socketStatus === "connecting-python"
+                              ? "connected"
+                              : "connecting"
+                          }
+                        />
+                        <Text>Socket Connection</Text>
+                      </HStack>
+                      <HStack>
+                        <StatusCircle status="connecting" />
+                        <Text>Python Runtime</Text>
+                      </HStack>
+                    </VStack>
+                  ) : (
+                    titleCase(socketStatus)
+                  )
+                }
+              />
+            </HStack>
+            <HStack width="full" justify="end">
+              <UndoRedo />
+              <History />
+            </HStack>
+          </HStack>
+          <Box width="full" height="full" position="relative">
+            <ReactFlow
+              nodeTypes={nodeTypes}
+              edgeTypes={edgeTypes}
+              nodes={nodes}
+              edges={edges}
+              onNodesChange={onNodesChange}
+              onEdgesChange={onEdgesChange}
+              onConnect={onConnect}
+              style={{ width: "100%", height: "100%" }}
+              onPaneClick={() => {
+                setWorkflowSelected(true);
+              }}
+              defaultViewport={{
+                zoom: 1,
+                x: 100,
+                y: Math.round(
+                  ((typeof window !== "undefined"
+                    ? window.innerHeight - 360
+                    : 0) || 300) / 2
+                ),
+              }}
+            >
+              <Controls />
+              <MiniMap />
+              <Background
+                variant={BackgroundVariant.Dots}
+                gap={12}
+                size={2}
+                bgColor={gray100}
+                color={gray300}
+              />
+            </ReactFlow>
+
+            <PropertiesPanel />
+          </Box>
+        </VStack>
+      </ReactFlowProvider>
     </div>
   );
 }

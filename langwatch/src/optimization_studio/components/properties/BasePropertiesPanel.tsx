@@ -10,7 +10,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import type { Node } from "@xyflow/react";
+import { useUpdateNodeInternals, type Node } from "@xyflow/react";
 import React from "react";
 import { ChevronDown, Columns, Plus, Trash2, X } from "react-feather";
 import { useFieldArray, useForm } from "react-hook-form";
@@ -81,11 +81,13 @@ export function PropertyFields({
     name: "fields",
   });
 
+  const updateNodeInternals = useUpdateNodeInternals();
   const onSubmit = (data: FieldArrayForm) => {
     setNode({
       id: node.id,
       data: { [field]: data.fields },
     });
+    updateNodeInternals(node.id);
   };
 
   const watchedFields = watch("fields");
@@ -110,96 +112,107 @@ export function PropertyFields({
           <Plus size={16} />
         </Button>
       </HStack>
-      {fields.map((field, index) => (
-        <FormControl
-          key={field.id}
-          isInvalid={!!errors.fields?.[index]?.identifier}
-        >
-          <HStack width="full">
-            <HStack
-              background="gray.100"
-              paddingRight={2}
-              borderRadius="8px"
-              width="full"
-            >
-              <Input
-                {...control.register(`fields.${index}.identifier`, {
-                  required: "Identifier is required",
-                  pattern: {
-                    value: /^[a-zA-Z_][a-zA-Z0-9_-]*$/,
-                    message: "Invalid identifier format",
-                  },
-                  validate: (value) => {
-                    const identifiers = control._formValues.fields.map(
-                      (f: Field) => f.identifier
-                    );
-                    return (
-                      identifiers.filter((id: string) => id === value)
-                        .length === 1 || "Duplicate identifier"
-                    );
-                  },
-                })}
-                width="full"
-                fontFamily="monospace"
-                fontSize={14}
-                border="none"
-                background="transparent"
-                padding="6px 0px 6px 12px"
-              />
+      {fields.map((field, index) => {
+        const identifierField = control.register(`fields.${index}.identifier`, {
+          required: "Required",
+          pattern: {
+            value: /^[a-zA-Z_][a-zA-Z0-9_-]*$/,
+            message: "Only letters, numbers, and underscores are allowed",
+          },
+          validate: (value) => {
+            const identifiers = control._formValues.fields.map(
+              (f: Field) => f.identifier
+            );
+            return (
+              identifiers.filter((id: string) => id === value).length === 1 ||
+              "Duplicate identifier"
+            );
+          },
+        });
+
+        return (
+          <FormControl
+            key={field.id}
+            isInvalid={!!errors.fields?.[index]?.identifier}
+          >
+            <HStack width="full">
               <HStack
-                position="relative"
-                background="white"
+                background="gray.100"
+                paddingRight={2}
                 borderRadius="8px"
-                paddingX={2}
-                paddingY={1}
-                spacing={2}
-                height="full"
+                width="full"
               >
-                <Box fontSize={13}>
-                  <TypeLabel type={watchedFields[index]?.type ?? ""} />
-                </Box>
-                <Box color="gray.600">
-                  <ChevronDown size={14} />
-                </Box>
-                <Select
-                  {...control.register(`fields.${index}.type`)}
-                  opacity={0}
-                  position="absolute"
-                  top={0}
-                  left={0}
-                  width="100%"
-                  height="32px"
-                  icon={<></>}
+                <Input
+                  {...identifierField}
+                  onChange={(e) => {
+                    e.target.value = e.target.value
+                      .replace(/ /g, "_")
+                      .toLowerCase();
+                    void identifierField.onChange(e);
+                  }}
+                  width="full"
+                  fontFamily="monospace"
+                  fontSize={14}
+                  border="none"
+                  background="transparent"
+                  padding="6px 0px 6px 12px"
+                />
+                <HStack
+                  position="relative"
+                  background="white"
+                  borderRadius="8px"
+                  paddingX={2}
+                  paddingY={1}
+                  spacing={2}
+                  height="full"
                 >
-                  <option value="str">str</option>
-                  <option value="float">float</option>
-                  <option value="int">int</option>
-                  <option value="bool">bool</option>
-                  <option value="list[str]">list[str]</option>
-                  <option value="list[float]">list[float]</option>
-                  <option value="list[int]">list[int]</option>
-                  <option value="list[bool]">list[bool]</option>
-                  <option value="dict">dict</option>
-                </Select>
+                  <Box fontSize={13}>
+                    <TypeLabel type={watchedFields[index]?.type ?? ""} />
+                  </Box>
+                  <Box color="gray.600">
+                    <ChevronDown size={14} />
+                  </Box>
+                  <Select
+                    {...control.register(`fields.${index}.type`)}
+                    opacity={0}
+                    position="absolute"
+                    top={0}
+                    left={0}
+                    width="100%"
+                    height="32px"
+                    icon={<></>}
+                  >
+                    <option value="str">str</option>
+                    <option value="float">float</option>
+                    <option value="int">int</option>
+                    <option value="bool">bool</option>
+                    <option value="list[str]">list[str]</option>
+                    <option value="list[float]">list[float]</option>
+                    <option value="list[int]">list[int]</option>
+                    <option value="list[bool]">list[bool]</option>
+                    <option value="dict">dict</option>
+                  </Select>
+                </HStack>
               </HStack>
+              <Button
+                colorScheme="gray"
+                size="sm"
+                height="40px"
+                onClick={() => {
+                  remove(index);
+                  void handleSubmit(onSubmit)();
+                }}
+                isDisabled={fields.length === 1}
+              >
+                <Trash2 size={18} />
+              </Button>
             </HStack>
-            <Button
-              colorScheme="gray"
-              size="sm"
-              height="40px"
-              onClick={() => {
-                remove(index);
-                void handleSubmit(onSubmit)();
-              }}
-            >
-              <Trash2 size={18} />
-            </Button>
-          </HStack>
-          <FormErrorMessage>
-            {errors.fields?.[index]?.identifier?.message}
-          </FormErrorMessage>
-        </FormControl>
-      ))}
+            <FormErrorMessage>
+              {errors.fields?.[index]?.identifier?.message}
+            </FormErrorMessage>
+          </FormControl>
+        );
+      })}
     </VStack>
   );
 }
