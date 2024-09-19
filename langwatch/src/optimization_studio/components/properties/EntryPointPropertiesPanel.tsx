@@ -22,45 +22,40 @@ export function EntryPointPropertiesPanel({ node }: { node: Node<Component> }) {
   });
 
   return (
-    <BasePropertiesPanel
-      node={node}
-      fieldsAfter={
-        <>
-          <HStack width="full">
-            <PropertySectionTitle>Dataset</PropertySectionTitle>
-            <Spacer />
-            <Button
-              size="xs"
-              variant="ghost"
-              marginBottom={-1}
-              leftIcon={<Folder size={14} />}
-              onClick={() => {
-                setEditingDataset(undefined);
-                onOpen();
-              }}
-            >
-              <Text>Choose...</Text>
-            </Button>
-          </HStack>
-          <DatasetPreview
-            rows={rows}
-            columns={columns.map((column) => ({
-              name: column.name,
-              type: "string",
-            }))}
-            onClick={() => {
-              setEditingDataset((node.data as Entry).dataset);
-              onOpen();
-            }}
-          />
-          <DatasetModal
-            isOpen={isOpen}
-            onClose={onClose}
-            node={node}
-            editingDataset={editingDataset}
-          />
-        </>
-      }
-    />
+    <BasePropertiesPanel node={node}>
+      <HStack width="full">
+        <PropertySectionTitle>Dataset</PropertySectionTitle>
+        <Spacer />
+        <Button
+          size="xs"
+          variant="ghost"
+          marginBottom={-1}
+          leftIcon={<Folder size={14} />}
+          onClick={() => {
+            setEditingDataset(undefined);
+            onOpen();
+          }}
+        >
+          <Text>Choose...</Text>
+        </Button>
+      </HStack>
+      <DatasetPreview
+        rows={rows}
+        columns={columns.map((column) => ({
+          name: column.name,
+          type: "string",
+        }))}
+        onClick={() => {
+          setEditingDataset((node.data as Entry).dataset);
+          onOpen();
+        }}
+      />
+      <DatasetModal
+        isOpen={isOpen}
+        onClose={onClose}
+        node={node}
+        editingDataset={editingDataset}
+      />
+    </BasePropertiesPanel>
   );
 }

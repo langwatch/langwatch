@@ -22,38 +22,31 @@ export function EntryNode(props: NodeProps<Node<Component>>) {
   });
 
   return (
-    <ComponentNode
-      {...props}
-      outputsName="Fields"
-      hidePlayButton
-      fieldsAfter={
-        <>
-          <NodeSectionTitle>Dataset</NodeSectionTitle>
-          <Box
-            width="200%"
-            transform="scale(0.5)"
-            transformOrigin="top left"
-            height={`${(34 + 28 * (rows?.length ?? 0)) / 2}px`}
-          >
-            {rendered && (
-              <DatasetPreview
-                rows={rows}
-                columns={columns.map((column) => ({
-                  name: column.name,
-                  type: "string",
-                }))}
-                onClick={onOpen}
-              />
-            )}
-          </Box>
-          <DatasetModal
-            isOpen={isOpen}
-            editingDataset={(props.data as Entry).dataset}
-            onClose={onClose}
-            node={props}
+    <ComponentNode {...props} outputsName="Fields" hidePlayButton>
+      <NodeSectionTitle>Dataset</NodeSectionTitle>
+      <Box
+        width="200%"
+        transform="scale(0.5)"
+        transformOrigin="top left"
+        height={`${(34 + 28 * (rows?.length ?? 0)) / 2}px`}
+      >
+        {rendered && (
+          <DatasetPreview
+            rows={rows}
+            columns={columns.map((column) => ({
+              name: column.name,
+              type: "string",
+            }))}
+            onClick={onOpen}
           />
-        </>
-      }
-    />
+        )}
+      </Box>
+      <DatasetModal
+        isOpen={isOpen}
+        editingDataset={(props.data as Entry).dataset}
+        onClose={onClose}
+        node={props}
+      />
+    </ComponentNode>
   );
 }

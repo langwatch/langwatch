@@ -3,6 +3,10 @@ import {
   Button,
   Center,
   HStack,
+  Menu,
+  MenuButton,
+  MenuItem,
+  MenuList,
   Spacer,
   Spinner,
   Text,
@@ -252,10 +256,12 @@ export function ComponentNode(
 export function ComponentExecutionButton({
   node,
   iconSize = 14,
+  componentOnly = false,
   ...props
 }: {
   node: Node<Component>;
   iconSize?: number;
+  componentOnly?: boolean;
 } & ButtonProps) {
   const { startComponentExecution, stopComponentExecution } =
     useComponentExecution();
@@ -342,17 +348,42 @@ export function ComponentExecutionButton({
         >
           <Square size={iconSize} />
         </Button>
-      ) : (
+      ) : componentOnly ? (
         <Button
           variant="ghost"
           size="xs"
-          onClick={() => {
+          onClick={(e) => {
+            e.stopPropagation();
+            e.preventDefault();
             node && startComponentExecution({ node });
           }}
-          {...props}
         >
           <Play size={iconSize} />
         </Button>
+      ) : (
+        <Menu placement="top-start" size="xs" autoSelect={false}>
+          <MenuButton variant="ghost" size="xs" paddingX={2} {...props}>
+            <Play size={iconSize} />
+          </MenuButton>
+          <MenuList>
+            <MenuItem
+              icon={<Play size={iconSize} />}
+              onClick={() => {
+                node && startComponentExecution({ node });
+              }}
+            >
+              Run this component only
+            </MenuItem>
+            <MenuItem
+              icon={<Play size={iconSize} />}
+              // onClick={() => {
+              //   node && startComponentExecution({ node });
+              // }}
+            >
+              Run all until here
+            </MenuItem>
+          </MenuList>
+        </Menu>
       )}
     </>
   );

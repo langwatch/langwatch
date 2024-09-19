@@ -137,7 +137,10 @@ const store = (
   },
   onConnect: (connection: Connection) => {
     set({
-      edges: addEdge(connection, get().edges),
+      edges: addEdge(connection, get().edges).map((edge) => ({
+        ...edge,
+        type: edge.type ?? "default",
+      })),
     });
   },
   setNodes: (nodes: Node[]) => {
