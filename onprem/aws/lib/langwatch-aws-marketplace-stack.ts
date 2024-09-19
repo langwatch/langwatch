@@ -27,6 +27,7 @@ import { setupFluentd } from "./fluentd";
 export class LangWatchAwsMarketplaceStack extends cdk.Stack {
   public readonly cluster: eks.Cluster;
   private readonly domainName: cdk.CfnParameter;
+  private readonly onPremEmail: cdk.CfnParameter;
   // private readonly snsTopic: sns.Topic;
   private readonly sesIdentity: ses.EmailIdentity;
 
@@ -47,8 +48,14 @@ export class LangWatchAwsMarketplaceStack extends cdk.Stack {
         "The subdomain name where LangWatch will be hosted (e.g., langwatch.yourdomain.com)",
     });
 
+    this.onPremEmail = new cdk.CfnParameter(this, "OnPremEmail", {
+      type: "String",
+      description:
+        "The email address that LangWatch will use to send emails (e.g., no-reply@langwatch.ai)",
+    });
+
     this.sesIdentity = new ses.EmailIdentity(this, "LangWatchSESIdentity", {
-      identity: ses.Identity.email(`richard@langwatch.ai`),
+      identity: ses.Identity.email(this.onPremEmail.valueAsString),
     });
 
     // Create a VPC
@@ -138,12 +145,7 @@ export class LangWatchAwsMarketplaceStack extends cdk.Stack {
 
     //Call the setup methods with dependencies
     this.setupLangWatch(this.cluster);
-
-    // new LangEvalsStack(this, "LangEvalsStack", { cluster: this.cluster });
-    // new LangWatchNLPStack(this, "LangWatchNLPStack", { cluster: this.cluster });
-
     this.setupLangEvals(this.cluster);
-
     //this.setupLangWatchNLP(this.cluster);
   }
 
@@ -235,13 +237,6 @@ export class LangWatchAwsMarketplaceStack extends cdk.Stack {
               "/langwatch_db?schema=public",
             ])
           ),
-          // ELASTICSEARCH_NODE_URL: cdk.SecretValue.unsafePlainText(
-          //   cdk.Fn.join("", [
-          //     "https://elastic:",
-          //     elasticPassword.secretValue.unsafeUnwrap().toString(),
-          //     "@elasticsearch-master:9200",
-          //   ])
-          // ),
           IS_OPENSEARCH: cdk.SecretValue.unsafePlainText("true"),
           ELASTICSEARCH_NODE_URL: cdk.SecretValue.unsafePlainText(
             cdk.Fn.join("", [
@@ -262,11 +257,9 @@ export class LangWatchAwsMarketplaceStack extends cdk.Stack {
           AWS_REGION: cdk.SecretValue.unsafePlainText(this.region),
           USE_AWS_SES: cdk.SecretValue.unsafePlainText("true"),
           IS_ONPREM: cdk.SecretValue.unsafePlainText("true"),
-
-          // OPENAI_API_KEY: cdk.SecretValue.unsafePlainText(
-          //   generateSecureString("OPENAI_API_KEY", 32)
-          // ),
-          // GOOGLE_APPLICATION_CREDENTIALS: cdk.SecretValue.unsafePlainText("{}"),
+          ONPREM_EMAIL: cdk.SecretValue.unsafePlainText(
+            this.onPremEmail.valueAsString
+          ),
         },
       }
     );
@@ -418,15 +411,10 @@ export class LangWatchAwsMarketplaceStack extends cdk.Stack {
                 objectName: "USE_AWS_SES",
                 key: "USE_AWS_SES",
               },
-
-              // {
-              //   objectName: "OPENAI_API_KEY",
-              //   key: "OPENAI_API_KEY",
-              // },
-              // {
-              //   objectName: "GOOGLE_APPLICATION_CREDENTIALS",
-              //   key: "GOOGLE_APPLICATION_CREDENTIALS",
-              // },
+              {
+                objectName: "ONPREM_EMAIL",
+                key: "ONPREM_EMAIL",
+              },
             ],
           },
         ],
@@ -496,14 +484,10 @@ export class LangWatchAwsMarketplaceStack extends cdk.Stack {
                   path: "USE_AWS_SES",
                   objectAlias: "USE_AWS_SES",
                 },
-                // {
-                //   path: "OPENAI_API_KEY",
-                //   objectAlias: "OPENAI_API_KEY",
-                // },
-                // {
-                //   path: "GOOGLE_APPLICATION_CREDENTIALS",
-                //   objectAlias: "GOOGLE_APPLICATION_CREDENTIALS",
-                // },
+                {
+                  path: "ONPREM_EMAIL",
+                  objectAlias: "ONPREM_EMAIL",
+                },
               ],
             },
           ]),
@@ -550,7 +534,6 @@ export class LangWatchAwsMarketplaceStack extends cdk.Stack {
         engineVersion: "7.1",
         cacheParameterGroupName: "default.redis7",
         port: 6379,
-        // cache.t4g.micro vCPU: 2, Memory: 0.5 GiB, Network Performance: Up to 5 Gigabit =>  13.14 USD/month (on-demand price for 1 instance)
         cacheNodeType: "cache.t4g.micro",
         numNodeGroups: 1,
         replicasPerNodeGroup: 1,
@@ -871,16 +854,6 @@ export class LangWatchAwsMarketplaceStack extends cdk.Stack {
                 name: "langwatch-nlp",
                 image: `339712859611.dkr.ecr.eu-central-1.amazonaws.com/onprem_langwatch_nlp:${langWatchPackageJson.version}`,
                 ports: [{ containerPort: 8080 }],
-                resources: {
-                  requests: {
-                    cpu: "500m",
-                    memory: "1Gi",
-                  },
-                  limits: {
-                    cpu: "1",
-                    memory: "2Gi",
-                  },
-                },
               },
             ],
           },
