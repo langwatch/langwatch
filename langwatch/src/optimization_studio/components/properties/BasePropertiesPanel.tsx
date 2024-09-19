@@ -1,14 +1,19 @@
 import {
   Box,
   Button,
+  FormControl,
+  FormErrorMessage,
   HStack,
+  Input,
   Select,
   Spacer,
   Text,
   VStack,
 } from "@chakra-ui/react";
 import type { Node } from "@xyflow/react";
-import { ChevronDown, Columns, X } from "react-feather";
+import React from "react";
+import { ChevronDown, Columns, Plus, Trash2, X } from "react-feather";
+import { useFieldArray, useForm } from "react-hook-form";
 import { useShallow } from "zustand/react/shallow";
 import { useWorkflowStore } from "../../hooks/useWorkflowStore";
 import type {
@@ -41,60 +46,159 @@ export function PropertyField({
   );
 }
 
-export function PropertyFields({
-  title,
-  fields,
-}: {
-  title: string;
+type FieldArrayForm = {
   fields: Field[];
+};
+
+export function PropertyFields({
+  node,
+  title,
+  field,
+}: {
+  node: Node<Component>;
+  title: string;
+  field: "parameters" | "inputs" | "outputs";
 }) {
-  if (fields.length === 0) {
-    return null;
-  }
+  const { setNode } = useWorkflowStore(
+    useShallow((state) => ({
+      setNode: state.setNode,
+    }))
+  );
+
+  const {
+    control,
+    handleSubmit,
+    formState: { errors },
+    watch,
+  } = useForm<FieldArrayForm>({
+    defaultValues: {
+      fields: node.data[field] ?? [],
+    },
+  });
+
+  const { fields, append, remove } = useFieldArray({
+    control,
+    name: "fields",
+  });
+
+  const onSubmit = (data: FieldArrayForm) => {
+    setNode({
+      id: node.id,
+      data: { [field]: data.fields },
+    });
+  };
+
+  const watchedFields = watch("fields");
 
   return (
-    <VStack align="start" spacing={3} width="full">
-      <PropertySectionTitle>{title}</PropertySectionTitle>
-      {fields.map((field) => (
-        <HStack
-          key={field.identifier}
-          background="gray.100"
-          padding="6px 8px 6px 12px"
-          borderRadius="8px"
-          width="full"
+    <VStack
+      as="form"
+      align="start"
+      spacing={3}
+      width="full"
+      // eslint-disable-next-line @typescript-eslint/no-misused-promises
+      onChange={handleSubmit(onSubmit)}
+    >
+      <HStack width="full">
+        <PropertySectionTitle>{title}</PropertySectionTitle>
+        <Spacer />
+        <Button
+          size="xs"
+          variant="ghost"
+          onClick={() => append({ identifier: "", type: "str" })}
         >
-          <Text fontFamily="monospace" fontSize={14}>
-            {field.identifier}
-          </Text>
-          <Spacer />
-          <HStack
-            position="relative"
-            background="white"
-            borderRadius="8px"
-            paddingX={2}
-            paddingY={1}
-            spacing={2}
-            height="full"
-          >
-            <Box fontSize={13}>
-              <TypeLabel type={field.type} />
-            </Box>
-            <Box color="gray.600">
-              <ChevronDown size={14} />
-            </Box>
-            <Select
-              opacity={0}
-              position="absolute"
-              top={0}
-              left={0}
-              width="100%"
-              height="32px"
-              icon={<></>}
+          <Plus size={16} />
+        </Button>
+      </HStack>
+      {fields.map((field, index) => (
+        <FormControl
+          key={field.id}
+          isInvalid={!!errors.fields?.[index]?.identifier}
+        >
+          <HStack width="full">
+            <HStack
+              background="gray.100"
+              paddingRight={2}
+              borderRadius="8px"
+              width="full"
             >
-              <option value={field.type}>{field.type}</option>
-            </Select>
+              <Input
+                {...control.register(`fields.${index}.identifier`, {
+                  required: "Identifier is required",
+                  pattern: {
+                    value: /^[a-zA-Z_][a-zA-Z0-9_-]*$/,
+                    message: "Invalid identifier format",
+                  },
+                  validate: (value) => {
+                    const identifiers = control._formValues.fields.map(
+                      (f: Field) => f.identifier
+                    );
+                    return (
+                      identifiers.filter((id: string) => id === value)
+                        .length === 1 || "Duplicate identifier"
+                    );
+                  },
+                })}
+                width="full"
+                fontFamily="monospace"
+                fontSize={14}
+                border="none"
+                background="transparent"
+                padding="6px 0px 6px 12px"
+              />
+              <HStack
+                position="relative"
+                background="white"
+                borderRadius="8px"
+                paddingX={2}
+                paddingY={1}
+                spacing={2}
+                height="full"
+              >
+                <Box fontSize={13}>
+                  <TypeLabel type={watchedFields[index]?.type ?? ""} />
+                </Box>
+                <Box color="gray.600">
+                  <ChevronDown size={14} />
+                </Box>
+                <Select
+                  {...control.register(`fields.${index}.type`)}
+                  opacity={0}
+                  position="absolute"
+                  top={0}
+                  left={0}
+                  width="100%"
+                  height="32px"
+                  icon={<></>}
+                >
+                  <option value="str">str</option>
+                  <option value="float">float</option>
+                  <option value="int">int</option>
+                  <option value="bool">bool</option>
+                  <option value="list[str]">list[str]</option>
+                  <option value="list[float]">list[float]</option>
+                  <option value="list[int]">list[int]</option>
+                  <option value="list[bool]">list[bool]</option>
+                  <option value="dict">dict</option>
+                </Select>
+              </HStack>
+            </HStack>
+            <Button
+              colorScheme="gray"
+              size="sm"
+              height="40px"
+              onClick={() => {
+                remove(index);
+                void handleSubmit(onSubmit)();
+              }}
+            >
+              <Trash2 size={18} />
+            </Button>
           </HStack>
-        </HStack>
+          <FormErrorMessage>
+            {errors.fields?.[index]?.identifier?.message}
+          </FormErrorMessage>
+        </FormControl>
       ))}
     </VStack>
   );
@@ -194,12 +298,9 @@ export function BasePropertiesPanel({
       {children}
       {!isWorkflow(node) && (
         <>
-          <PropertyFields
-            title="Parameters"
-            fields={node.data.parameters ?? []}
-          />
-          <PropertyFields title="Inputs" fields={node.data.inputs ?? []} />
-          <PropertyFields title="Outputs" fields={node.data.outputs ?? []} />
+          <PropertyFields node={node} field="parameters" title="Parameters" />
+          <PropertyFields node={node} field="inputs" title="Inputs" />
+          <PropertyFields node={node} field="outputs" title="Outputs" />
         </>
       )}
       {fieldsAfter}

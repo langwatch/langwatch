@@ -443,25 +443,14 @@ export function DatasetTable({
         >
           Export <DownloadIcon marginLeft={2} />
         </Button>
-        {datasetId ? (
-          <Button
-            colorScheme="gray"
-            onClick={() => editDataset.onOpen()}
-            minWidth="fit-content"
-            leftIcon={<Edit2 height={16} />}
-          >
-            Edit Dataset
-          </Button>
-        ) : (
-          <Button
-            colorScheme="blue"
-            onClick={() => editDataset.onOpen()}
-            minWidth="fit-content"
-            leftIcon={<Save height={16} />}
-          >
-            Save
-          </Button>
-        )}
+        <Button
+          colorScheme="gray"
+          onClick={() => editDataset.onOpen()}
+          minWidth="fit-content"
+          leftIcon={<Edit2 height={16} />}
+        >
+          Edit Dataset
+        </Button>
         {datasetId && !isEmbedded && (
           <Button
             colorScheme="blue"
