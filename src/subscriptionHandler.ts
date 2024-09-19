@@ -133,12 +133,6 @@ export class SubscriptionHandlerSaas extends SubscriptionHandler {
       return { ...PLAN_LIMITS[PlanTypes.FREE], overrideAddingLimitations };
     }
 
-    if (organizationId === "organization_GGc925F6vj7IC67_jn3-0") {
-      customLimits = {
-        maxMembers: 10,
-      };
-    }
-
     return {
       ...PLAN_LIMITS[activeSubscription.plan],
       ...customLimits,
