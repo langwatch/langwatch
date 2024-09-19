@@ -88,7 +88,7 @@ export const sendInviteEmail = async ({
           Data: `You were added to ${organization.name} on LangWatch`,
         },
       },
-      Source: `no-reply@${env.BASE_HOST}`,
+      Source: `${env.ONPREM_EMAIL}`,
     };
     try {
       const command = new SendEmailCommand(params);

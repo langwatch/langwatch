@@ -83,7 +83,7 @@ export const sendTriggerEmail = async ({
           Data: `Trigger - ${triggerName}`,
         },
       },
-      Source: `no-reply@${env.BASE_HOST}`,
+      Source: `${env.ONPREM_EMAIL}`,
     };
 
     try {
