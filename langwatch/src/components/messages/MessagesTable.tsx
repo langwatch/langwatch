@@ -97,6 +97,13 @@ export function MessagesTable() {
     queryOpts
   );
 
+  const topics = api.topics.getAll.useQuery(
+    { projectId: project?.id ?? "" },
+    {
+      enabled: project?.id !== undefined,
+    }
+  );
+
   const downloadTraces = api.traces.getAllForDownload.useMutation();
 
   const traceIds =
@@ -314,7 +321,7 @@ export function MessagesTable() {
         </Td>
       ),
       value: (trace: Trace) =>
-        new Date(trace.timestamps.started_at).toLocaleString(),
+        new Date(trace.timestamps.started_at).toISOString(),
     },
     "input.value": {
       name: "Input",
@@ -558,6 +565,56 @@ export function MessagesTable() {
       ),
       value: (trace: Trace) => JSON.stringify(trace.contexts),
     },
+    topic: {
+      name: "Topic",
+      sortable: true,
+      render: (trace, index) => (
+        <Td
+          key={index}
+          onClick={() =>
+            openDrawer("traceDetails", {
+              traceId: trace.trace_id,
+            })
+          }
+        >
+          <Text>
+            {
+              topics.data?.find((topic) => topic.id === trace.metadata.topic_id)
+                ?.name
+            }
+          </Text>
+        </Td>
+      ),
+      value: (trace: Trace) =>
+        topics.data?.find((topic) => topic.id === trace.metadata.topic_id)
+          ?.name ?? "",
+    },
+    subtopic: {
+      name: "Subtopic",
+      sortable: true,
+      render: (trace, index) => (
+        <Td
+          key={index}
+          onClick={() =>
+            openDrawer("traceDetails", {
+              traceId: trace.trace_id,
+            })
+          }
+        >
+          <Text>
+            {
+              topics.data?.find(
+                (topic) => topic.id === trace.metadata.subtopic_id
+              )?.name
+            }
+          </Text>
+        </Td>
+      ),
+      value: (trace: Trace) =>
+        topics.data?.find((topic) => topic.id === trace.metadata.subtopic_id)
+          ?.name ?? "",
+    },
+
     ...Object.fromEntries(
       Object.entries(traceCheckColumnsAvailable).map(
         ([columnKey, checkName]) => [
