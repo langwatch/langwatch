@@ -5,14 +5,14 @@ from multiprocessing.synchronize import Event
 from queue import Empty
 import queue
 import time
+import traceback
 from typing import AsyncGenerator, Dict, TypedDict
 from fastapi import FastAPI, Response, BackgroundTasks
 from fastapi.responses import StreamingResponse
 import json
 
-from langwatch_nlp.studio.execute.execute_component import (
-    execute_component,
-)
+from langwatch_nlp.studio.execute.execute_component import execute_component
+from langwatch_nlp.studio.execute.execute_flow import execute_flow
 from langwatch_nlp.studio.process_pool import IsolatedProcessPool
 from langwatch_nlp.studio.types.events import (
     Debug,
@@ -45,6 +45,7 @@ app = FastAPI(lifespan=lifespan)
 
 async def execute_event(
     event: StudioClientEvent,
+    queue: "Queue[StudioServerEvent]",
 ) -> AsyncGenerator[StudioServerEvent, None]:
     yield Debug(payload=DebugPayload(message="server starting execution"))
 
@@ -62,6 +63,13 @@ async def execute_event(
                         node_id=event.payload.node_id,
                         error=repr(e),
                     )
+            case "execute_flow":
+                try:
+                    async for event_ in execute_flow(event.payload, queue):
+                        yield event_
+                except Exception as e:
+                    traceback.print_exc()
+                    yield Error(payload=ErrorPayload(message=repr(e)))
             case _:
                 yield Error(
                     payload=ErrorPayload(
@@ -87,8 +95,9 @@ def event_worker(
             if event is None:  # Sentinel to exit
                 break
             try:
+
                 async def async_execute_event(event):
-                    async for event_ in execute_event(event):
+                    async for event_ in execute_event(event, queue_out):
                         queue_out.put(event_)
 
                 asyncio.run(async_execute_event(event))

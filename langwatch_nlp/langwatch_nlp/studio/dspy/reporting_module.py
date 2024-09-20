@@ -6,6 +6,7 @@ import dspy
 from langwatch_nlp.studio.types.dsl import Workflow
 from langwatch_nlp.studio.types.events import (
     StudioServerEvent,
+    component_error_event,
     end_component_event,
     start_component_event,
 )
@@ -43,7 +44,14 @@ class ReportingModule(dspy.Module):
                 self.context.queue.put(
                     start_component_event(node, self.context.trace_id)
                 )
-            result = module(*args, **kwargs)
+            try:
+                result = module(*args, **kwargs)
+            except Exception as e:
+                if self.context and node:
+                    self.context.queue.put(
+                        component_error_event(node.id, self.context.trace_id, repr(e))
+                    )
+                raise e
             if self.context and node:
                 self.context.queue.put(
                     end_component_event(node, self.context.trace_id, dict(result))

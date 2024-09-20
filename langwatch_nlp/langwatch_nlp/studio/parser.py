@@ -53,7 +53,7 @@ def parse_signature(component: Signature, workflow: Workflow) -> type[dspy.Modul
     dspy.settings.configure(experimental=True)
 
     def __init__(self) -> None:
-        super().__init__(SignatureClass)  # type: ignore
+        dspy.Predict.__init__(self, SignatureClass)
         self.set_lm(lm=lm)
 
     ModuleClass: type[dspy.Predict] = type(
@@ -63,7 +63,7 @@ def parse_signature(component: Signature, workflow: Workflow) -> type[dspy.Modul
     return ModuleClass
 
 
-def parse_workflow(workflow: Workflow) -> Tuple[dspy.Module, ast.Module]:
+def parse_workflow(workflow: Workflow) -> Tuple[ReportingModule, ast.Module]:
     # Step 0: Pre-parse components
     parsed_components: Dict[str, type[dspy.Module]] = {}
     for node in workflow.nodes:
@@ -100,7 +100,11 @@ def parse_workflow(workflow: Workflow) -> Tuple[dspy.Module, ast.Module]:
             ast.Expr(
                 ast.Call(
                     func=ast.Attribute(
-                        value=ast.Name(id="super", ctx=ast.Load()),
+                        value=ast.Call(
+                            func=ast.Name(id="super", ctx=ast.Load()),
+                            args=[],
+                            keywords=[],
+                        ),
                         attr="__init__",
                         ctx=ast.Load(),
                     ),
@@ -166,12 +170,12 @@ def parse_workflow(workflow: Workflow) -> Tuple[dspy.Module, ast.Module]:
     exec(compiled_module, namespace, module_dict)
 
     # Return both the AST and the compiled dspy.Module
-    return cast(dspy.Module, module_dict[class_name]), module
+    return cast(ReportingModule, module_dict[class_name]), module
 
 
 def create_forward_method(workflow: Workflow) -> ast.FunctionDef:
     entry_node = next(node for node in workflow.nodes if node.type == "entry")
-    end_node = next(node for node in workflow.nodes if node.type == "end")
+    end_node = next((node for node in workflow.nodes if node.type == "end"), None)
 
     # Create forward method signature
     forward_args = (
@@ -204,14 +208,17 @@ def create_forward_method(workflow: Workflow) -> ast.FunctionDef:
     }
 
     # Process nodes in topological order
+    executable_nodes = [
+        node for node in workflow.nodes if node.type != "entry" and node.type != "end"
+    ]
     processed_nodes: List[str] = []
     i = 0
-    while len(processed_nodes) < len(workflow.nodes) - 2:  # Exclude entry and end nodes
-        if i > len(workflow.nodes):
+    while len(processed_nodes) < len(executable_nodes):  # Exclude entry and end nodes
+        if i > len(executable_nodes):
             raise ValueError("Workflow has a cycle")
         i += 1
-        for node in workflow.nodes:
-            if node.type in ["entry", "end"] or node.id in processed_nodes:
+        for node in executable_nodes:
+            if node.id in processed_nodes:
                 continue
 
             if not all(
@@ -295,22 +302,26 @@ def create_forward_method(workflow: Workflow) -> ast.FunctionDef:
             processed_nodes.append(node.id)
 
     # Create return statement
-    return_dict = ast.Dict(
-        keys=[
-            ast.Constant(value=validate_identifier(input.identifier))
-            for input in end_node.data.inputs or []
-        ],
-        values=[
-            ast.Attribute(
-                value=node_outputs[edge.source][
-                    validate_identifier(edge.sourceHandle.split(".")[-1])
-                ],
-                attr=validate_identifier(edge.sourceHandle.split(".")[-1]),
-                ctx=ast.Load(),
-            )
-            for edge in workflow.edges
-            if edge.target == end_node.id
-        ],
+    return_dict = (
+        ast.Dict(
+            keys=[
+                ast.Constant(value=validate_identifier(input.identifier))
+                for input in end_node.data.inputs or []
+            ],
+            values=[
+                ast.Attribute(
+                    value=node_outputs[edge.source][
+                        validate_identifier(edge.sourceHandle.split(".")[-1])
+                    ],
+                    attr=validate_identifier(edge.sourceHandle.split(".")[-1]),
+                    ctx=ast.Load(),
+                )
+                for edge in workflow.edges
+                if edge.target == end_node.id
+            ],
+        )
+        if end_node
+        else ast.Dict(keys=[], values=[])
     )
     forward_method.body.append(ast.Return(value=return_dict))
 

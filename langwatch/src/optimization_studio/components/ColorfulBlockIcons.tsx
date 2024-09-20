@@ -55,6 +55,7 @@ export const ComponentIcon = ({
     retriever: <Box />,
     prompting_technique: <Box />,
     evaluator: <Box />,
+    end: <Box />,
   };
 
   const componentColorMap: Record<ComponentType, string> = {
@@ -64,6 +65,7 @@ export const ComponentIcon = ({
     retriever: "gray.400",
     prompting_technique: "gray.400",
     evaluator: "gray.400",
+    end: "gray.400",
   };
 
   return (

@@ -130,7 +130,7 @@ export type Workflow = {
 
   state: {
     execution?: {
-      state: ExecutionStatus;
+      status: ExecutionStatus;
       trace_id?: string;
       error?: string;
       timestamps?: {

@@ -27,6 +27,7 @@ import {
   type Field,
 } from "../../types/dsl";
 import { ComponentIcon } from "../ColorfulBlockIcons";
+import { useWorkflowExecution } from "../../hooks/useWorkflowExecution";
 
 export function getNodeDisplayName(node: { id: string; data: Component }) {
   return node.data.name ?? node.data.cls ?? node.id;
@@ -266,6 +267,9 @@ export function ComponentExecutionButton({
   const { startComponentExecution, stopComponentExecution } =
     useComponentExecution();
 
+  const { startWorkflowExecution, stopWorkflowExecution } =
+    useWorkflowExecution();
+
   const [isWaitingLong] = useDebounceValue(
     node?.data.execution_state?.status === "waiting",
     600
@@ -376,9 +380,9 @@ export function ComponentExecutionButton({
             </MenuItem>
             <MenuItem
               icon={<Play size={iconSize} />}
-              // onClick={() => {
-              //   node && startComponentExecution({ node });
-              // }}
+              onClick={() => {
+                node && startWorkflowExecution({ node });
+              }}
             >
               Run all until here
             </MenuItem>

@@ -301,7 +301,7 @@ export function BasePropertiesPanel({
           {!isWorkflow(node) && isExecutableComponent(node) && (
             <>
               <HStack spacing={3}>
-                <ComponentExecutionButton node={node} size="sm" iconSize={16} componentOnly />
+                <ComponentExecutionButton node={node} size="sm" iconSize={16} componentOnly={propertiesExpanded} />
               </HStack>
               <Button
                 variant="ghost"
