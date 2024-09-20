@@ -29,7 +29,7 @@ class Field(BaseModel):
     hidden: Optional[bool] = None
 
 
-class ComponentExecutionStatus(str, Enum):
+class ExecutionStatus(str, Enum):
     idle = "idle"
     waiting = "waiting"
     running = "running"
@@ -39,6 +39,7 @@ class ComponentExecutionStatus(str, Enum):
 
 class ComponentType(str, Enum):
     entry = "entry"
+    end = "end"
     signature = "signature"
     module = "module"
     retriever = "retriever"
@@ -52,7 +53,7 @@ class Timestamps(BaseModel):
 
 
 class ExecutionState(BaseModel):
-    status: ComponentExecutionStatus
+    status: ExecutionStatus
     trace_id: Optional[str] = None
     span_id: Optional[str] = None
     error: Optional[str] = None
@@ -111,6 +112,10 @@ class PromptingTechnique(BaseComponent):
     pass
 
 
+class End(BaseComponent):
+    pass
+
+
 class DatasetInline(BaseModel):
     records: Dict[str, List[str]]
     columnTypes: DatasetColumns
@@ -166,7 +171,12 @@ class EvaluatorNode(BaseNode):
     data: Evaluator
 
 
-Node = Union[SignatureNode, ModuleNode, EntryNode, EvaluatorNode]
+class EndNode(BaseNode):
+    type: Literal["end"] = "end"
+    data: End
+
+
+Node = Union[SignatureNode, ModuleNode, EntryNode, EvaluatorNode, EndNode]
 
 
 class Flow(BaseModel):
@@ -174,26 +184,9 @@ class Flow(BaseModel):
     edges: List[Edge]
 
 
-class WorkflowExecutionStatus(str, Enum):
-    idle = "idle"
-    waiting = "waiting"
-    running = "running"
-    success = "success"
-    error = "error"
-
-
-class EntryMethod(BaseModel):
-    method: Literal["manual_entry", "full_dataset", "random_sample"]
-    size: Optional[int] = None
-
-
 class WorkflowExecutionState(BaseModel):
-    status: WorkflowExecutionStatus
+    status: ExecutionStatus
     trace_id: Optional[str] = None
-    last_component_ref: Optional[str] = None
-    entry: EntryMethod
-    inputs: Dict[str, Dict[str, str]]
-    outputs: Dict[str, Dict[str, str]]
     error: Optional[str] = None
     timestamps: Optional[Timestamps] = None
 
@@ -202,7 +195,7 @@ class ExperimentState(BaseModel):
     experiment_id: Optional[str] = None
     run_id: Optional[str] = None
     run_name: Optional[str] = None
-    state: Optional[WorkflowExecutionStatus] = None
+    state: Optional[ExecutionStatus] = None
     timestamps: Optional[Timestamps] = None
 
 

@@ -1,3 +1,4 @@
+import ast
 import inspect
 import os
 import importlib
@@ -39,3 +40,7 @@ def print_class_definition(cls):
 def disable_dsp_caching():
     MemorizedFunc._is_in_cache_and_valid = lambda *args, **kwargs: False
     AsyncMemorizedFunc._is_in_cache_and_valid = lambda *args, **kwargs: False
+
+
+def print_ast(node):
+    print("\n\n" + ast.unparse(node) + "\n\n")

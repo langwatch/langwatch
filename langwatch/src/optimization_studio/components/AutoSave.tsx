@@ -1,4 +1,3 @@
-import { CheckCircleIcon } from "@chakra-ui/icons";
 import { Box, HStack, Spinner, Text } from "@chakra-ui/react";
 import { useEffect, useState } from "react";
 import { Check, X } from "react-feather";

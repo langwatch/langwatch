@@ -1,8 +1,12 @@
+import time
 from typing import Dict, Optional, Union
 from pydantic import BaseModel
 from typing_extensions import Literal
 from langwatch_nlp.studio.types.dsl import (
     ExecutionState,
+    ExecutionStatus,
+    Node,
+    Timestamps,
     Workflow,
     WorkflowExecutionState,
 )
@@ -35,7 +39,18 @@ class StopExecution(BaseModel):
     payload: StopExecutionPayload
 
 
-StudioClientEvent = Union[IsAlive, ExecuteComponent, StopExecution]
+class ExecuteFlowPayload(BaseModel):
+    trace_id: str
+    workflow: Workflow
+    until_node_id: Optional[str] = None
+
+
+class ExecuteFlow(BaseModel):
+    type: Literal["execute_flow"] = "execute_flow"
+    payload: ExecuteFlowPayload
+
+
+StudioClientEvent = Union[IsAlive, ExecuteComponent, StopExecution, ExecuteFlow]
 
 
 class IsAliveResponse(BaseModel):
@@ -86,3 +101,43 @@ class Done(BaseModel):
 StudioServerEvent = Union[
     IsAliveResponse, ComponentStateChange, ExecutionStateChange, Debug, Error, Done
 ]
+
+
+def start_component_event(node: Node, trace_id: str):
+    return ComponentStateChange(
+        payload=ComponentStateChangePayload(
+            component_id=node.id,
+            execution_state=ExecutionState(
+                status=ExecutionStatus.running,
+                trace_id=trace_id,
+                timestamps=Timestamps(started_at=int(time.time() * 1000)),
+            ),
+        )
+    )
+
+
+def end_component_event(node: Node, trace_id: str, outputs: Dict[str, str]):
+    return ComponentStateChange(
+        payload=ComponentStateChangePayload(
+            component_id=node.id,
+            execution_state=ExecutionState(
+                status=ExecutionStatus.success,
+                trace_id=trace_id,
+                timestamps=Timestamps(finished_at=int(time.time() * 1000)),
+                outputs=outputs,
+            ),
+        )
+    )
+
+
+def component_error_event(trace_id: str, node_id: str, error: str):
+    return ComponentStateChange(
+        payload=ComponentStateChangePayload(
+            component_id=node_id,
+            execution_state=ExecutionState(
+                status=ExecutionStatus.error,
+                error=error,
+                timestamps=Timestamps(finished_at=int(time.time() * 1000)),
+            ),
+        )
+    )

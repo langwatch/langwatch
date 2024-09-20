@@ -70,11 +70,27 @@ export const simpleRagTemplate: Workflow = {
   ],
   edges: [
     {
+      id: "e0-1",
+      source: "entry",
+      sourceHandle: "outputs.question",
+      target: "generate_query",
+      targetHandle: "inputs.question",
+      type: "default",
+    },
+    {
       id: "e1-2",
       source: "generate_query",
       sourceHandle: "outputs.query",
       target: "generate_answer",
       targetHandle: "inputs.query",
+      type: "default",
+    },
+    {
+      id: "e2-3",
+      source: "entry",
+      sourceHandle: "outputs.question",
+      target: "generate_answer",
+      targetHandle: "inputs.question",
       type: "default",
     },
   ],

@@ -33,6 +33,7 @@ export function PropertiesPanel() {
     React.FC<{ node: Node<Component> }>
   > = {
     entry: EntryPointPropertiesPanel,
+    end: BasePropertiesPanel,
     signature: SignaturePropertiesPanel,
     module: BasePropertiesPanel,
     retriever: BasePropertiesPanel,

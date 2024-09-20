@@ -2,7 +2,6 @@ import {
   Button,
   Checkbox,
   FormControl,
-  FormHelperText,
   FormLabel,
   HStack,
   Heading,
@@ -10,15 +9,11 @@ import {
   Link,
   Text,
   VStack,
-  useToast,
+  useToast
 } from "@chakra-ui/react";
 import { useRouter } from "next/router";
 import { useEffect } from "react";
 import { useForm, type SubmitHandler } from "react-hook-form";
-import { SetupLayout } from "~/components/SetupLayout";
-import { api } from "~/utils/api";
-import { useRequiredSession } from "../../hooks/useRequiredSession";
-import { LoadingScreen } from "../../components/LoadingScreen";
 import {
   PhoneInput,
   buildCountryData,
@@ -26,6 +21,10 @@ import {
   parseCountry,
 } from "react-international-phone";
 import "react-international-phone/style.css";
+import { SetupLayout } from "~/components/SetupLayout";
+import { api } from "~/utils/api";
+import { LoadingScreen } from "../../components/LoadingScreen";
+import { useRequiredSession } from "../../hooks/useRequiredSession";
 
 type OrganizationFormData = {
   organizationName?: string;
