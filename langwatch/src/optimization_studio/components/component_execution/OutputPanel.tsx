@@ -51,7 +51,10 @@ export const OutputPanel = ({ node }: { node: Node<Component> }) => {
           node.data.execution_state.timestamps.finished_at ? (
             <SpanDuration
               span={{
-                error: node.data.execution_state?.status === "error" ? node.data.execution_state.error : undefined,
+                error:
+                  node.data.execution_state?.status === "error"
+                    ? node.data.execution_state.error
+                    : undefined,
                 timestamps: {
                   started_at:
                     node.data.execution_state.timestamps.started_at ?? 0,
@@ -93,26 +96,59 @@ export const OutputPanel = ({ node }: { node: Node<Component> }) => {
             )}
             {node.data.execution_state.status === "success" &&
               node.data.execution_state.outputs &&
-              Object.entries(node.data.execution_state.outputs).map(
-                ([identifier, value]) => (
-                  <VStack
-                    width="full"
-                    align="start"
-                    key={identifier}
-                    spacing={3}
-                  >
-                    <Text
-                      fontSize={13}
-                      fontWeight="bold"
-                      textTransform="uppercase"
-                      color="gray.600"
+              Object.entries(node.data.execution_state.outputs)
+                .filter(([_, value]) => value !== null)
+                .map(([identifier, value]) => {
+                  const isFail =
+                    (node.type === "evaluator" &&
+                      identifier === "passed" &&
+                      value === false) ||
+                    (identifier === "status" && value === "error");
+                  const isSkipped =
+                    node.type === "evaluator" &&
+                    identifier === "status" &&
+                    value === "skipped";
+                  const isSuccess =
+                    node.type === "evaluator" &&
+                    identifier === "passed" &&
+                    value === true;
+
+                  return (
+                    <VStack
+                      width="full"
+                      align="start"
+                      key={identifier}
+                      spacing={3}
+                      color={
+                        isSkipped
+                          ? "yellow.600"
+                          : isFail
+                          ? "red.600"
+                          : isSuccess
+                          ? "green.600"
+                          : undefined
+                      }
                     >
-                      {identifier}
-                    </Text>
-                    <OutputBox value={value} />
-                  </VStack>
-                )
-              )}
+                      <Text
+                        fontSize={13}
+                        fontWeight="bold"
+                        textTransform="uppercase"
+                        color={
+                          isSkipped
+                            ? "yellow.600"
+                            : isFail
+                            ? "red.600"
+                            : isSuccess
+                            ? "green.600"
+                            : "gray.600"
+                        }
+                      >
+                        {identifier}
+                      </Text>
+                      <OutputBox value={value} />
+                    </VStack>
+                  );
+                })}
           </>
         ) : (
           <Text color="gray.500">Waiting for execution</Text>

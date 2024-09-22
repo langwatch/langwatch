@@ -15,7 +15,13 @@ import {
   type ButtonProps,
 } from "@chakra-ui/react";
 
-import { Handle, Position, type Node, type NodeProps } from "@xyflow/react";
+import {
+  Handle,
+  NodeToolbar,
+  Position,
+  type Node,
+  type NodeProps,
+} from "@xyflow/react";
 import { Check, Play, Square, X } from "react-feather";
 import { PulseLoader } from "react-spinners";
 import { useDebounceValue } from "usehooks-ts";
@@ -82,10 +88,12 @@ function NodeOutputs({
   namespace,
   outputs,
   selected,
+  hideOutputHandles,
 }: {
   namespace: string;
   outputs: Field[];
   selected: boolean;
+  hideOutputHandles?: boolean;
 }) {
   return (
     <>
@@ -100,20 +108,22 @@ function NodeOutputs({
           width="full"
           position="relative"
         >
-          <Handle
-            type="source"
-            id={`${namespace}.${output.identifier}`}
-            position={Position.Right}
-            style={{
-              marginRight: "-10px",
-              width: "8px",
-              height: "8px",
-              background: "white",
-              borderRadius: "100%",
-              border: `1px solid #2B6CB0`,
-              boxShadow: `0px 0px ${selected ? "4px" : "2px"} 0px #2B6CB0`,
-            }}
-          />
+          {!hideOutputHandles && (
+            <Handle
+              type="source"
+              id={`${namespace}.${output.identifier}`}
+              position={Position.Right}
+              style={{
+                marginRight: "-10px",
+                width: "8px",
+                height: "8px",
+                background: "white",
+                borderRadius: "100%",
+                border: `1px solid #2B6CB0`,
+                boxShadow: `0px 0px ${selected ? "4px" : "2px"} 0px #2B6CB0`,
+              }}
+            />
+          )}
           <Text>{output.identifier}</Text>
           <Text color="gray.400">:</Text>
           <TypeLabel type={output.type} />
@@ -164,6 +174,7 @@ export function ComponentNode(
     fieldsAfter?: React.ReactNode;
     outputsName?: string;
     hidePlayButton?: boolean;
+    hideOutputHandles?: boolean;
   }
 ) {
   const {
@@ -215,7 +226,11 @@ export function ComponentNode(
       }}
     >
       <HStack spacing={2} width="full">
-        <ComponentIcon type={props.type as ComponentType} size="md" />
+        <ComponentIcon
+          type={props.type as ComponentType}
+          cls={props.data.cls}
+          size="md"
+        />
         <Text fontSize={12} fontWeight={500}>
           {getNodeDisplayName(props)}
         </Text>
@@ -246,6 +261,7 @@ export function ComponentNode(
             namespace="outputs"
             outputs={props.data.outputs}
             selected={!!props.selected || isHovered}
+            hideOutputHandles={props.hideOutputHandles}
           />
         </>
       )}
@@ -322,16 +338,26 @@ export function ComponentExecutionButton({
             node?.data.execution_state?.status === "running") && (
             <Spinner size="xs" />
           )}
-          {node?.data.execution_state?.status === "error" && (
+          {node?.data.execution_state?.status === "error" ||
+          (node?.type === "evaluator" &&
+            node?.data.execution_state?.status === "success" &&
+            (node?.data.execution_state?.outputs?.status === "error" ||
+              node?.data.execution_state?.outputs?.passed === false)) ? (
             <Box color="red.500">
               <X size={iconSize} />
             </Box>
-          )}
-          {node?.data.execution_state?.status === "success" && (
-            <Box color="green.500">
+          ) : node?.data.execution_state?.status === "success" ? (
+            <Box
+              color={
+                node?.type === "evaluator" &&
+                node?.data.execution_state?.outputs?.status === "skipped"
+                  ? "yellow.500"
+                  : "green.500"
+              }
+            >
               <Check size={iconSize} />
             </Box>
-          )}
+          ) : null}
         </Center>
       </Tooltip>
       {node?.data.execution_state?.status === "running" ||
@@ -368,24 +394,28 @@ export function ComponentExecutionButton({
           <MenuButton variant="ghost" size="xs" paddingX={2} {...props}>
             <Play size={iconSize} />
           </MenuButton>
-          <MenuList>
-            <MenuItem
-              icon={<Play size={iconSize} />}
-              onClick={() => {
-                node && startComponentExecution({ node });
-              }}
-            >
-              Run this component only
-            </MenuItem>
-            <MenuItem
-              icon={<Play size={iconSize} />}
-              onClick={() => {
-                node && startWorkflowExecution({ untilNodeId: node.id });
-              }}
-            >
-              Run all until here
-            </MenuItem>
-          </MenuList>
+          <NodeToolbar>
+            <MenuList>
+              <MenuItem
+                icon={<Play size={14} />}
+                onClick={() => {
+                  node && startComponentExecution({ node });
+                }}
+                fontSize={13}
+              >
+                Run this component only
+              </MenuItem>
+              <MenuItem
+                icon={<Play size={14} />}
+                onClick={() => {
+                  node && startWorkflowExecution({ untilNodeId: node.id });
+                }}
+                fontSize={13}
+              >
+                Run all until here
+              </MenuItem>
+            </MenuList>
+          </NodeToolbar>
         </Menu>
       )}
     </>

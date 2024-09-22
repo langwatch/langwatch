@@ -57,9 +57,9 @@ class ExecutionState(BaseModel):
     trace_id: Optional[str] = None
     span_id: Optional[str] = None
     error: Optional[str] = None
-    parameters: Optional[Dict[str, str]] = None
-    inputs: Optional[Dict[str, str]] = None
-    outputs: Optional[Dict[str, str]] = None
+    parameters: Optional[Dict[str, Any]] = None
+    inputs: Optional[Dict[str, Any]] = None
+    outputs: Optional[Dict[str, Any]] = None
     timestamps: Optional[Timestamps] = None
 
 
@@ -133,7 +133,7 @@ class Entry(BaseComponent):
 
 
 class Evaluator(BaseComponent):
-    inputs: List[
+    outputs: List[
         Union[
             Dict[Literal["identifier", "type"], Literal["score", "float"]],
             Dict[Literal["identifier", "type"], Literal["passed", "bool"]],

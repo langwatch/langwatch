@@ -33,9 +33,9 @@ export const blankTemplate: Workflow = {
             columnTypes: [{ name: "question", type: "string" }],
           },
         },
-      } as Entry,
+      } satisfies Entry,
     },
-  ],
+  ] satisfies Workflow["nodes"],
   edges: [],
   state: {},
 };

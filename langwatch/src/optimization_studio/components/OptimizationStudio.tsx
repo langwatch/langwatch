@@ -25,10 +25,15 @@ import { EntryNode } from "./nodes/EntryNode";
 import { SignatureNode } from "./nodes/SignatureNode";
 import { Link } from "@chakra-ui/next-js";
 import { AutoSave } from "./AutoSave";
+import { EvaluatorNode } from "./nodes/EvaluatorNode";
 
 export default function OptimizationStudio() {
   const nodeTypes = useMemo(
-    () => ({ entry: EntryNode, signature: SignatureNode }),
+    () => ({
+      entry: EntryNode,
+      signature: SignatureNode,
+      evaluator: EvaluatorNode,
+    }),
     []
   );
   const edgeTypes = useMemo(() => ({ default: DefaultEdge }), []);

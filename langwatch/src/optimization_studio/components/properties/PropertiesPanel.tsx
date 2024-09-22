@@ -12,6 +12,7 @@ import { EntryPointPropertiesPanel } from "./EntryPointPropertiesPanel";
 import { BasePropertiesPanel } from "./BasePropertiesPanel";
 import { WorkflowPropertiesPanel } from "./WorkflowPropertiesPanel";
 import { SignaturePropertiesPanel } from "./SignaturePropertiesPanel";
+import { EvaluatorPropertiesPanel } from "./EvaluatorPropertiesPanel";
 
 export function PropertiesPanel() {
   const {
@@ -38,7 +39,7 @@ export function PropertiesPanel() {
     module: BasePropertiesPanel,
     retriever: BasePropertiesPanel,
     prompting_technique: BasePropertiesPanel,
-    evaluator: BasePropertiesPanel,
+    evaluator: EvaluatorPropertiesPanel as React.FC<{ node: Node<Component> }>,
   };
 
   const { width, height } = useWindowSize();
@@ -53,7 +54,8 @@ export function PropertiesPanel() {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      const isPopoverOpen = document.querySelector(".chakra-popover__popper") !== null;
+      const isPopoverOpen =
+        document.querySelector(".chakra-popover__popper") !== null;
       if (e.key === "Escape" && propertiesExpanded && !isPopoverOpen) {
         setPropertiesExpanded(false);
         e.stopPropagation();

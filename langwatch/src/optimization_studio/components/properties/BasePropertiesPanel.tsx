@@ -54,12 +54,12 @@ export function PropertyFields({
   node,
   title,
   field,
-  editable = true,
+  readOnly = false,
 }: {
   node: Node<Component>;
   title: string;
   field: "parameters" | "inputs" | "outputs";
-  editable?: boolean;
+  readOnly?: boolean;
 }) {
   const { setNode } = useWorkflowStore(
     useShallow((state) => ({
@@ -106,7 +106,7 @@ export function PropertyFields({
       <HStack width="full">
         <PropertySectionTitle>{title}</PropertySectionTitle>
         <Spacer />
-        {editable ? (
+        {!readOnly ? (
           <Button
             size="xs"
             variant="ghost"
@@ -146,7 +146,7 @@ export function PropertyFields({
                 borderRadius="8px"
                 width="full"
               >
-                {editable ? (
+                {!readOnly ? (
                   <Input
                     {...identifierField}
                     onChange={(e) => {
@@ -184,7 +184,7 @@ export function PropertyFields({
                   <Box fontSize={13}>
                     <TypeLabel type={watchedFields[index]?.type ?? ""} />
                   </Box>
-                  {editable ? (
+                  {!readOnly ? (
                     <>
                       <Box color="gray.600">
                         <ChevronDown size={14} />
@@ -213,7 +213,7 @@ export function PropertyFields({
                   ) : null}
                 </HStack>
               </HStack>
-              {editable ? (
+              {!readOnly ? (
                 <Button
                   colorScheme="gray"
                   size="sm"
@@ -255,11 +255,17 @@ export function BasePropertiesPanel({
   header,
   children,
   fieldsAfter,
+  inputsReadOnly,
+  outputsTitle,
+  outputsReadOnly,
 }: {
   node: Node<Component> | Workflow;
   header?: React.ReactNode;
   children?: React.ReactNode;
   fieldsAfter?: React.ReactNode;
+  inputsReadOnly?: boolean;
+  outputsTitle?: string;
+  outputsReadOnly?: boolean;
 }) {
   const { deselectAllNodes, propertiesExpanded, setPropertiesExpanded } =
     useWorkflowStore(
@@ -289,7 +295,11 @@ export function BasePropertiesPanel({
             header
           ) : !isWorkflow(node) ? (
             <>
-              <ComponentIcon type={node.type as ComponentType} size="lg" />
+              <ComponentIcon
+                type={node.type as ComponentType}
+                cls={node.data.cls}
+                size="lg"
+              />
               <Text fontSize={16} fontWeight={500}>
                 {getNodeDisplayName(node)}
               </Text>
@@ -301,7 +311,12 @@ export function BasePropertiesPanel({
           {!isWorkflow(node) && isExecutableComponent(node) && (
             <>
               <HStack spacing={3}>
-                <ComponentExecutionButton node={node} size="sm" iconSize={16} componentOnly={propertiesExpanded} />
+                <ComponentExecutionButton
+                  node={node}
+                  size="sm"
+                  iconSize={16}
+                  componentOnly={propertiesExpanded}
+                />
               </HStack>
               <Button
                 variant="ghost"
@@ -330,23 +345,23 @@ export function BasePropertiesPanel({
         </HStack>
       </HStack>
       {children}
-      {!isWorkflow(node) &&
-        (node.type === "entry" ? (
-          <>
-            <PropertyFields
-              node={node}
-              field="outputs"
-              title="Fields"
-              editable={false}
-            />
-          </>
-        ) : (
-          <>
-            {/* <PropertyFields node={node} field="parameters" title="Parameters" /> */}
-            <PropertyFields node={node} field="inputs" title="Inputs" />
-            <PropertyFields node={node} field="outputs" title="Outputs" />
-          </>
-        ))}
+      {!isWorkflow(node) && (
+        <>
+          {/* <PropertyFields node={node} field="parameters" title="Parameters" /> */}
+          <PropertyFields
+            node={node}
+            field="inputs"
+            title="Inputs"
+            readOnly={inputsReadOnly}
+          />
+          <PropertyFields
+            node={node}
+            field="outputs"
+            title={outputsTitle ?? "Outputs"}
+            readOnly={outputsReadOnly}
+          />
+        </>
+      )}
       {fieldsAfter}
     </VStack>
   );

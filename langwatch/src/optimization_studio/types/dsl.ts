@@ -1,5 +1,6 @@
 import type { Edge, Node } from "@xyflow/react";
 import type { DatasetColumns } from "../../server/datasets/types";
+import type { MODULES } from "./modules";
 
 export type Field = {
   identifier: string;
@@ -55,9 +56,9 @@ export type BaseComponent = {
     trace_id?: string;
     span_id?: string;
     error?: string;
-    parameters?: Record<string, string>;
-    inputs?: Record<string, string>;
-    outputs?: Record<string, string>;
+    parameters?: Record<string, any>;
+    inputs?: Record<string, any>;
+    outputs?: Record<string, any>;
     timestamps?: {
       started_at?: number;
       finished_at?: number;
@@ -99,15 +100,7 @@ export type Entry = BaseComponent & {
   };
 };
 
-export type Evaluator = BaseComponent & {
-  type: "evaluator";
-  inputs: (
-    | { identifier: "score"; type: "float" }
-    | { identifier: "passed"; type: "bool" }
-    | { identifier: "label"; type: "str" }
-    | { identifier: "details"; type: "str" }
-  )[];
-};
+export type Evaluator = BaseComponent & MODULES["evaluator"];
 
 export type Component = BaseComponent | Entry | Signature | Module | Evaluator;
 

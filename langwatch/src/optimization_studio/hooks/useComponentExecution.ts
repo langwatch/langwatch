@@ -16,6 +16,7 @@ export const useComponentExecution = () => {
   const [triggerTimeout, setTriggerTimeout] = useState<{
     component_id: string;
     trace_id: string;
+    timeout_on_status: "waiting" | "running";
   } | null>(null);
 
   const {
@@ -41,7 +42,7 @@ export const useComponentExecution = () => {
       triggerTimeout &&
       node &&
       node.data.execution_state?.trace_id === triggerTimeout.trace_id &&
-      node.data.execution_state?.status === "waiting"
+      node.data.execution_state?.status === triggerTimeout.timeout_on_status
     ) {
       const execution_state: BaseComponent["execution_state"] = {
         status: "error",
@@ -109,7 +110,11 @@ export const useComponentExecution = () => {
       sendMessage(payload);
 
       setTimeout(() => {
-        setTriggerTimeout({ component_id: node.id, trace_id });
+        setTriggerTimeout({
+          component_id: node.id,
+          trace_id,
+          timeout_on_status: "waiting",
+        });
       }, 10_000);
     },
     [
@@ -150,6 +155,14 @@ export const useComponentExecution = () => {
         payload: { trace_id, node_id },
       };
       sendMessage(payload);
+
+      setTimeout(() => {
+        setTriggerTimeout({
+          component_id: node_id,
+          trace_id,
+          timeout_on_status: "running",
+        });
+      }, 2_000);
     },
     [socketAvailable, sendMessage, setComponentExecutionState]
   );

@@ -34,7 +34,7 @@ export function EntryPointPropertiesPanel({ node }: { node: Node<Component> }) {
   const { setNode } = useWorkflowStore(({ setNode }) => ({ setNode }));
 
   return (
-    <BasePropertiesPanel node={node}>
+    <BasePropertiesPanel node={node} outputsTitle="Fields" outputsReadOnly={true}>
       <HStack width="full">
         <PropertySectionTitle>Dataset</PropertySectionTitle>
         <Spacer />
