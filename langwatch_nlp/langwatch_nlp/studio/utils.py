@@ -3,8 +3,11 @@ import builtins
 import inspect
 import keyword
 import re
+from typing import Any, Dict, List
 
 from joblib.memory import MemorizedFunc, AsyncMemorizedFunc
+
+from langwatch_nlp.studio.types.dsl import DatasetInline
 
 
 def print_class_definition(cls):
@@ -59,3 +62,27 @@ def validate_identifier(identifier: str) -> str:
     ):
         raise ValueError(f"Reserved identifier cannot be used: {identifier}")
     return identifier
+
+
+def transpose_inline_dataset_to_object_list(dataset: DatasetInline):
+    columns = dataset.records
+
+    lengths = [len(values) for values in columns.values()]
+    if len(lengths) == 0:
+        return []
+    max_length = max(lengths)
+
+    result: List[Dict[str, Any]] = []
+
+    for i in range(max_length):
+        row: Dict[str, Any] = {}
+        for column_name, values in columns.items():
+            row[column_name] = values[i] if i < len(values) else None
+        result.append(row)
+
+    return result
+
+
+class ClientReadableValueError(ValueError):
+    def __repr__(self) -> str:
+        return self.args[0]

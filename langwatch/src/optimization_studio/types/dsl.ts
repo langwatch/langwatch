@@ -88,6 +88,7 @@ export type PromptingTechnique = BaseComponent;
 
 export type Entry = BaseComponent & {
   inputs?: never;
+  entry_selection: "first" | "last" | "random";
   dataset?: {
     id?: string;
     name?: string;

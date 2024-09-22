@@ -3,7 +3,10 @@ import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { TeamRoleGroup, checkUserPermissionForProject } from "../permission";
 import { type DatasetRecord } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
-import { newDatasetEntriesSchema, type DatasetRecordEntry } from "../../datasets/types";
+import {
+  newDatasetEntriesSchema,
+  type DatasetRecordEntry,
+} from "../../datasets/types";
 import { nanoid } from "nanoid";
 import { prisma } from "../../db";
 
@@ -94,19 +97,11 @@ export const datasetRecordRouter = createTRPCRouter({
   getAll: protectedProcedure
     .input(z.object({ projectId: z.string(), datasetId: z.string() }))
     .use(checkUserPermissionForProject(TeamRoleGroup.DATASETS_VIEW))
-    .query(async ({ input, ctx }) => {
-      const prisma = ctx.prisma;
-
-      const datasets = await prisma.dataset.findFirst({
-        where: { id: input.datasetId, projectId: input.projectId },
-        include: {
-          datasetRecords: {
-            orderBy: { createdAt: "asc" },
-          },
-        },
+    .query(async ({ input }) => {
+      return getFullDataset({
+        datasetId: input.datasetId,
+        projectId: input.projectId,
       });
-
-      return datasets;
     }),
   getHead: protectedProcedure
     .input(z.object({ projectId: z.string(), datasetId: z.string() }))
@@ -199,4 +194,39 @@ export const createManyDatasetRecords = async ({
   return prisma.datasetRecord.createMany({
     data: recordData as (DatasetRecord & { entry: any })[],
   });
+};
+
+export const getFullDataset = async ({
+  datasetId,
+  projectId,
+  entrySelection = "all",
+}: {
+  datasetId: string;
+  projectId: string;
+  entrySelection?: "first" | "last" | "random" | "all";
+}) => {
+  let count = 0;
+  if (entrySelection === "random" || entrySelection === "last") {
+    count = await prisma.datasetRecord.count({
+      where: { datasetId, projectId },
+    });
+  }
+
+  const dataset = await prisma.dataset.findFirst({
+    where: { id: datasetId, projectId },
+    include: {
+      datasetRecords: {
+        orderBy: { createdAt: "asc" },
+        take: entrySelection === "all" ? undefined : 1,
+        skip:
+          entrySelection === "last"
+            ? Math.max(count - 1, 0)
+            : entrySelection === "random"
+            ? Math.floor(Math.random() * count)
+            : 0,
+      },
+    },
+  });
+
+  return dataset;
 };

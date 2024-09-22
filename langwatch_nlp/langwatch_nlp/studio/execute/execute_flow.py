@@ -1,8 +1,10 @@
 from multiprocessing import Queue
 import time
-from typing import Dict, Set
+from typing import Dict, Set, cast
 from langwatch_nlp.studio.dspy.workflow_module import WorkflowModule
 from langwatch_nlp.studio.types.dsl import (
+    Entry,
+    EntryNode,
     ExecutionStatus,
     Field,
     Timestamps,
@@ -15,7 +17,11 @@ from langwatch_nlp.studio.types.events import (
     ExecutionStateChangePayload,
     StudioServerEvent,
 )
-from langwatch_nlp.studio.utils import disable_dsp_caching
+from langwatch_nlp.studio.utils import (
+    ClientReadableValueError,
+    disable_dsp_caching,
+    transpose_inline_dataset_to_object_list,
+)
 
 
 async def execute_flow(event: ExecuteFlowPayload, queue: "Queue[StudioServerEvent]"):
@@ -30,9 +36,23 @@ async def execute_flow(event: ExecuteFlowPayload, queue: "Queue[StudioServerEven
     # TODO: handle workflow errors here throwing an special event showing the error was during the execution of the workflow?
     yield start_workflow_event(workflow, trace_id)
 
-    module = WorkflowModule(workflow, execute_evaluators=True, until_node_id=until_node_id)
+    module = WorkflowModule(
+        workflow, execute_evaluators=True, until_node_id=until_node_id
+    )
     module.set_reporting(queue=queue, trace_id=trace_id, workflow=workflow)
-    result = module(question="what is the meaning of life?")
+
+    entry_node = cast(
+        EntryNode, next(node for node in workflow.nodes if isinstance(node.data, Entry))
+    )
+    if not entry_node.data.dataset:
+        raise ValueError("Missing dataset in entry node")
+    entries = transpose_inline_dataset_to_object_list(entry_node.data.dataset.inline)
+    if len(entries) == 0:
+        raise ClientReadableValueError(
+            "Dataset is empty, please add at least one entry and try again"
+        )
+
+    result = module(**entries[0])
 
     yield end_workflow_event(workflow, trace_id)
 
@@ -78,6 +98,6 @@ def validate_workflow(workflow: Workflow) -> None:
                     and not input_field.optional
                     and input_field.identifier not in connected_inputs[node.id]
                 ):
-                    raise ValueError(
+                    raise ClientReadableValueError(
                         f"Missing required input '{input_field.identifier}' for node {node.id}"
                     )

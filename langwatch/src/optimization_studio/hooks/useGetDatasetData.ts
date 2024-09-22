@@ -4,10 +4,12 @@ import type {
   DatasetRecordEntry,
 } from "../../server/datasets/types";
 import type { Entry } from "../types/dsl";
-import { transposeIDlessColumnsFirstToRowsFirstWithId } from "../utils/datasetUtils";
+import {
+  datasetDatabaseRecordsToInMemoryDataset,
+  transposeColumnsFirstToRowsFirstWithId,
+} from "../utils/datasetUtils";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
-import { datasetDatabaseRecordsToInMemoryDataset } from "../../components/datasets/DatasetTable";
 import type { TRPCClientErrorLike } from "@trpc/client";
 import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
 import type { inferRouterOutputs } from "@trpc/server";
@@ -63,9 +65,7 @@ export const useGetDatasetData = ({
 
     if (dataset?.inline) {
       return {
-        records: transposeIDlessColumnsFirstToRowsFirstWithId(
-          dataset.inline.records
-        ),
+        records: transposeColumnsFirstToRowsFirstWithId(dataset.inline.records),
         columnTypes: dataset.inline.columnTypes,
       };
     }

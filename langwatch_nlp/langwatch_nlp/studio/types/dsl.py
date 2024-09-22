@@ -1,4 +1,4 @@
-from typing import List, Dict, Union, Optional, Literal
+from typing import Any, List, Dict, Union, Optional, Literal
 from pydantic import BaseModel, Field as PydanticField
 from enum import Enum
 
@@ -117,14 +117,14 @@ class End(BaseComponent):
 
 
 class DatasetInline(BaseModel):
-    records: Dict[str, List[str]]
+    records: Dict[str, List[Any]]
     columnTypes: DatasetColumns
 
 
+# Differently from the typescript DSL, we require the dataset to be passed inline in the entry node here
 class Dataset(BaseModel):
-    id: Optional[str] = None
     name: Optional[str] = None
-    inline: Optional[DatasetInline] = None
+    inline: DatasetInline
 
 
 class Entry(BaseComponent):

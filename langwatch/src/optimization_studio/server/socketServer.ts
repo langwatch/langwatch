@@ -9,6 +9,7 @@ import { parse as parseCookie } from "cookie";
 import { prisma } from "../../server/db";
 import type { StudioClientEvent, StudioServerEvent } from "../types/events";
 import { addEnvs } from "./addEnvs";
+import { loadDatasets } from "./loadDatasets";
 
 const wss = new WebSocketServer({ noServer: true });
 
@@ -45,7 +46,10 @@ const handleClientMessage = async (
   projectId: string
 ) => {
   try {
-    const message = await addEnvs(messageWithoutEnvs, projectId);
+    const message = await loadDatasets(
+      await addEnvs(messageWithoutEnvs, projectId),
+      projectId
+    );
 
     switch (message.type) {
       case "is_alive":

@@ -1,5 +1,5 @@
 import { DEFAULT_DATASET_NAME } from "../../components/datasets/DatasetTable";
-import type { Workflow } from "../types/dsl";
+import type { Entry, Workflow } from "../types/dsl";
 
 export const simpleRagTemplate: Workflow = {
   spec_version: "1.0",
@@ -23,6 +23,7 @@ export const simpleRagTemplate: Workflow = {
           { identifier: "question", type: "str" },
           { identifier: "gold_answer", type: "str" },
         ],
+        entry_selection: "first",
         dataset: {
           name: DEFAULT_DATASET_NAME,
           inline: {
@@ -42,7 +43,7 @@ export const simpleRagTemplate: Workflow = {
             ],
           },
         },
-      },
+      } as Entry,
     },
     {
       id: "generate_query",
