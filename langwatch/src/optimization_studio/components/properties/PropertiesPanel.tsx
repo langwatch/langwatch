@@ -168,7 +168,7 @@ export function PropertiesPanel() {
               as={motion.div}
               width="100%"
               height="100%"
-              initial={{ x: "100%" }}
+              initial={{ x: "110%" }}
               animate={{ x: "0%" }}
               transition="0.1s ease-out 0.05s"
               paddingY="40px"
@@ -198,7 +198,7 @@ export function PropertiesPanel() {
               as={motion.div}
               width="100%"
               height="100%"
-              initial={{ x: "-100%" }}
+              initial={{ x: "-110%" }}
               animate={{ x: "0%" }}
               transition="0.1s ease-out 0.05s"
               paddingY="40px"

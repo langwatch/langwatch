@@ -1,5 +1,5 @@
 from multiprocessing import Queue
-from typing import Optional
+from typing import Any, Optional
 import dspy
 
 
@@ -14,7 +14,7 @@ from pydantic import BaseModel
 
 
 class ReportingContext(BaseModel):
-    queue: Queue
+    queue: Any
     trace_id: str
     workflow: Workflow
 
@@ -39,13 +39,13 @@ class ReportingModule(dspy.Module):
             else None
         )
 
-        def wrapper(*args, **kwargs):
+        def wrapper(**kwargs):
             if self.context and node:
                 self.context.queue.put(
-                    start_component_event(node, self.context.trace_id)
+                    start_component_event(node, self.context.trace_id, kwargs)
                 )
             try:
-                result = module(*args, **kwargs)
+                result = module(**kwargs)
             except Exception as e:
                 if self.context and node:
                     self.context.queue.put(

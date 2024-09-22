@@ -68,6 +68,7 @@ export const useWorkflowExecution = () => {
       setWorkflowExecutionState({
         status: "waiting",
         trace_id,
+        until_node_id: untilNodeId,
       });
 
       const payload: StudioClientEvent = {

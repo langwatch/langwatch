@@ -267,8 +267,7 @@ export function ComponentExecutionButton({
   const { startComponentExecution, stopComponentExecution } =
     useComponentExecution();
 
-  const { startWorkflowExecution, stopWorkflowExecution } =
-    useWorkflowExecution();
+  const { startWorkflowExecution } = useWorkflowExecution();
 
   const [isWaitingLong] = useDebounceValue(
     node?.data.execution_state?.status === "waiting",
@@ -381,7 +380,7 @@ export function ComponentExecutionButton({
             <MenuItem
               icon={<Play size={iconSize} />}
               onClick={() => {
-                node && startWorkflowExecution({ node });
+                node && startWorkflowExecution({ untilNodeId: node.id });
               }}
             >
               Run all until here

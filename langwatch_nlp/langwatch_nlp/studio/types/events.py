@@ -103,15 +103,20 @@ StudioServerEvent = Union[
 ]
 
 
-def start_component_event(node: Node, trace_id: str):
+def start_component_event(
+    node: Node, trace_id: str, inputs: Optional[Dict[str, str]] = None
+):
+    execution_state = ExecutionState(
+        status=ExecutionStatus.running,
+        trace_id=trace_id,
+        timestamps=Timestamps(started_at=int(time.time() * 1000)),
+    )
+    if inputs:
+        execution_state.inputs = inputs
     return ComponentStateChange(
         payload=ComponentStateChangePayload(
             component_id=node.id,
-            execution_state=ExecutionState(
-                status=ExecutionStatus.running,
-                trace_id=trace_id,
-                timestamps=Timestamps(started_at=int(time.time() * 1000)),
-            ),
+            execution_state=execution_state,
         )
     )
 

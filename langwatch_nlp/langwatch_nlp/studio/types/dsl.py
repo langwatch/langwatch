@@ -187,6 +187,7 @@ class Flow(BaseModel):
 class WorkflowExecutionState(BaseModel):
     status: ExecutionStatus
     trace_id: Optional[str] = None
+    until_node_id: Optional[str] = None
     error: Optional[str] = None
     timestamps: Optional[Timestamps] = None
 

@@ -132,6 +132,7 @@ export type Workflow = {
     execution?: {
       status: ExecutionStatus;
       trace_id?: string;
+      until_node_id?: string;
       error?: string;
       timestamps?: {
         started_at?: number;
@@ -178,7 +179,7 @@ const LLMSignatureFlow: Flow = {
       },
       data: {
         _library_ref: "builtin/ChainOfThought",
-        cls: "dspy.ChainOfThought",
+        cls: "ChainOfThought",
       },
     },
     {
@@ -218,7 +219,7 @@ const LLMSignatureFlow: Flow = {
       },
       data: {
         _library_ref: "builtin/ColBERTv2",
-        cls: "dspy.ColBERTv2",
+        cls: "ColBERTv2",
         parameters: [
           {
             identifier: "url",
@@ -249,7 +250,7 @@ const LLMSignatureFlow: Flow = {
       },
       data: {
         _library_ref: "builtin/ChainOfThought",
-        cls: "dspy.ChainOfThought",
+        cls: "ChainOfThought",
         inputs: [
           {
             identifier: "signature",
@@ -350,7 +351,7 @@ const LLMSignatureFlow: Flow = {
 //           _library_ref: "builtin/ChainOfThought",
 //           id: "chain_of_thought_1",
 //           type: "prompting_technique",
-//           cls: "dspy.ChainOfThought",
+//           cls: "ChainOfThought",
 //         },
 //         {
 //           id: "generate_query_1",
@@ -378,7 +379,7 @@ const LLMSignatureFlow: Flow = {
 //           _library_ref: "builtin/ColBERTv2",
 //           id: "colbertv2_1",
 //           type: "retriever",
-//           cls: "dspy.ColBERTv2",
+//           cls: "ColBERTv2",
 //           parameters: [
 //             {
 //               identifier: "url",
@@ -403,7 +404,7 @@ const LLMSignatureFlow: Flow = {
 //           _library_ref: "builtin/ChainOfThought",
 //           id: "chain_of_thought_2",
 //           type: "prompting_technique",
-//           cls: "dspy.ChainOfThought",
+//           cls: "ChainOfThought",
 //           inputs: [
 //             {
 //               identifier: "signature",

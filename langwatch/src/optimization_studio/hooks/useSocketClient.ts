@@ -33,12 +33,16 @@ export const useSocketClient = () => {
     setComponentExecutionState,
     setWorkflowExecutionState,
     getWorkflow,
+    setSelectedNode,
+    setPropertiesExpanded,
   } = useWorkflowStore((state) => ({
     socketStatus: state.socketStatus,
     setSocketStatus: state.setSocketStatus,
     setComponentExecutionState: state.setComponentExecutionState,
     setWorkflowExecutionState: state.setWorkflowExecutionState,
     getWorkflow: state.getWorkflow,
+    setSelectedNode: state.setSelectedNode,
+    setPropertiesExpanded: state.setPropertiesExpanded,
   }));
 
   const toast = useToast();
@@ -104,9 +108,18 @@ export const useSocketClient = () => {
               execution_state: data.payload.execution_state,
             });
           }
+          if (
+            data.payload.execution_state?.status !== "running" &&
+            getWorkflow().state.execution?.status === "running" &&
+            getWorkflow().state.execution?.until_node_id ===
+              data.payload.component_id
+          ) {
+            setSelectedNode(data.payload.component_id);
+            setPropertiesExpanded(true);
+          }
           break;
         case "execution_state_change":
-          // TODO
+          setWorkflowExecutionState(data.payload.execution_state);
           break;
         case "error":
           checkIfUnreachableErrorMessage(data.payload.message);
@@ -138,8 +151,12 @@ export const useSocketClient = () => {
     [
       alertOnComponent,
       checkIfUnreachableErrorMessage,
+      getWorkflow,
       setComponentExecutionState,
+      setPropertiesExpanded,
+      setSelectedNode,
       setSocketStatus,
+      setWorkflowExecutionState,
       stopWorkflowIfRunning,
       toast,
     ]

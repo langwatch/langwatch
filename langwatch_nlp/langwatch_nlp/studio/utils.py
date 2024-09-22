@@ -1,8 +1,8 @@
 import ast
+import builtins
 import inspect
-import os
-import importlib
-import dsp.modules.cache_utils
+import keyword
+import re
 
 from joblib.memory import MemorizedFunc, AsyncMemorizedFunc
 
@@ -44,3 +44,18 @@ def disable_dsp_caching():
 
 def print_ast(node):
     print("\n\n" + ast.unparse(node) + "\n\n")
+
+
+def validate_identifier(identifier: str) -> str:
+    """Validate and sanitize an identifier."""
+    # Only allow alphanumeric characters and underscores, must start with a letter or underscore
+    if not re.match(r"^[a-zA-Z_][a-zA-Z0-9_]*$", identifier):
+        raise ValueError(f"Invalid identifier: {identifier}")
+    # Check its also not a reserved word
+    if (
+        keyword.iskeyword(identifier)
+        or identifier in dir(builtins)
+        or identifier == "self"
+    ):
+        raise ValueError(f"Reserved identifier cannot be used: {identifier}")
+    return identifier

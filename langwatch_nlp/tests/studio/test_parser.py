@@ -1,4 +1,4 @@
-from langwatch_nlp.studio.parser import parse_workflow
+from langwatch_nlp.studio.dspy.workflow_module import WorkflowModule
 from langwatch_nlp.studio.types.dataset import DatasetColumn, DatasetColumnType
 from langwatch_nlp.studio.types.dsl import (
     Dataset,
@@ -16,7 +16,7 @@ from langwatch_nlp.studio.types.dsl import (
     Workflow,
     WorkflowState,
 )
-from langwatch_nlp.studio.utils import print_ast
+from langwatch_nlp.studio.utils import print_class_definition
 
 
 def test_parse_workflow():
@@ -229,5 +229,5 @@ def test_parse_workflow():
         state=WorkflowState(execution=None, experiment=None),
     )
 
-    _, ast_module = parse_workflow(workflow)
-    print_ast(ast_module)
+    module = WorkflowModule(workflow)
+    print_class_definition(module.__class__)

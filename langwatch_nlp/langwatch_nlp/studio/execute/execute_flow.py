@@ -1,7 +1,7 @@
 from multiprocessing import Queue
 import time
 from typing import Dict, Set
-from langwatch_nlp.studio.parser import parse_workflow
+from langwatch_nlp.studio.dspy.workflow_module import WorkflowModule
 from langwatch_nlp.studio.types.dsl import (
     ExecutionStatus,
     Field,
@@ -27,13 +27,12 @@ async def execute_flow(event: ExecuteFlowPayload, queue: "Queue[StudioServerEven
 
     disable_dsp_caching()
 
+    # TODO: handle workflow errors here throwing an special event showing the error was during the execution of the workflow?
     yield start_workflow_event(workflow, trace_id)
 
-    Flow, _ = parse_workflow(workflow)
-    module = Flow()
+    module = WorkflowModule(workflow, execute_evaluators=True, until_node_id=until_node_id)
     module.set_reporting(queue=queue, trace_id=trace_id, workflow=workflow)
     result = module(question="what is the meaning of life?")
-    print("\n\nresult", result, "\n\n")
 
     yield end_workflow_event(workflow, trace_id)
 
