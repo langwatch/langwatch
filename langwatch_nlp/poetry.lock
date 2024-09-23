@@ -1880,6 +1880,24 @@ tenacity = ">=8.1.0,<9.0.0"
 extended-testing = ["jinja2 (>=3,<4)"]
 
 [[package]]
+name = "langevals-core"
+version = "0.1.8"
+description = "Core package for LLM evaluation platform, providing base classes and utilities."
+optional = false
+python-versions = "<4.0,>=3.11"
+files = [
+    {file = "langevals_core-0.1.8-py3-none-any.whl", hash = "sha256:8b1d788850b352468e67f0269b4ebe3c994a174aa8e8b5a66f587c08ef0ede7d"},
+    {file = "langevals_core-0.1.8.tar.gz", hash = "sha256:3a02f3e98d9b0b5c1de6da6490afa9f01db3aa01d6e90931ad23ae37a80836f8"},
+]
+
+[package.dependencies]
+litellm = ">=1.40.7,<2.0.0"
+pandas = ">=2.2.2,<3.0.0"
+pydantic = ">=2.6.4,<3.0.0"
+tenacity = ">=8.4.0,<9.0.0"
+tqdm = ">=4.66.4,<5.0.0"
+
+[[package]]
 name = "langsmith"
 version = "0.1.49"
 description = "Client library to connect to the LangSmith LLM Tracing and Evaluation Platform."
@@ -3737,17 +3755,18 @@ typing = ["mypy (>=1.4)", "rich", "twisted"]
 
 [[package]]
 name = "tenacity"
-version = "8.2.3"
+version = "8.5.0"
 description = "Retry code until it succeeds"
 optional = false
-python-versions = ">=3.7"
+python-versions = ">=3.8"
 files = [
-    {file = "tenacity-8.2.3-py3-none-any.whl", hash = "sha256:ce510e327a630c9e1beaf17d42e6ffacc88185044ad85cf74c0a8887c6a0f88c"},
-    {file = "tenacity-8.2.3.tar.gz", hash = "sha256:5398ef0d78e63f40007c1fb4c0bff96e1911394d2fa8d194f77619c05ff6cc8a"},
+    {file = "tenacity-8.5.0-py3-none-any.whl", hash = "sha256:b594c2a5945830c267ce6b79a166228323ed52718f30302c1359836112346687"},
+    {file = "tenacity-8.5.0.tar.gz", hash = "sha256:8bc6c0c8a09b31e6cad13c47afbed1a567518250a9a171418582ed8d9c20ca78"},
 ]
 
 [package.extras]
-doc = ["reno", "sphinx", "tornado (>=4.5)"]
+doc = ["reno", "sphinx"]
+test = ["pytest", "tornado (>=4.5)", "typeguard"]
 
 [[package]]
 name = "tiktoken"
@@ -3940,13 +3959,13 @@ files = [
 
 [[package]]
 name = "tqdm"
-version = "4.66.2"
+version = "4.66.5"
 description = "Fast, Extensible Progress Meter"
 optional = false
 python-versions = ">=3.7"
 files = [
-    {file = "tqdm-4.66.2-py3-none-any.whl", hash = "sha256:1ee4f8a893eb9bef51c6e35730cebf234d5d0b6bd112b0271e10ed7c24a02bd9"},
-    {file = "tqdm-4.66.2.tar.gz", hash = "sha256:6cd52cdf0fef0e0f543299cfc96fec90d7b8a7e88745f411ec33eb44d5ed3531"},
+    {file = "tqdm-4.66.5-py3-none-any.whl", hash = "sha256:90279a3770753eafc9194a0364852159802111925aa30eb3f9d85b0e805ac7cd"},
+    {file = "tqdm-4.66.5.tar.gz", hash = "sha256:e1020aef2e5096702d8a025ac7d16b1577279c9d63f8375b63083e9a5f0fcbad"},
 ]
 
 [package.dependencies]
@@ -4691,4 +4710,4 @@ testing = ["big-O", "jaraco.functools", "jaraco.itertools", "more-itertools", "p
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.11"
-content-hash = "377f4ebed4a05f5a0736b0b71101cccb575b4135c70a1cb6ec6e2640da8d81c6"
+content-hash = "e47c5b9e32db46d25fd7dce1a0ccc8cc199673c2bfc36768a546f832ac7703cf"

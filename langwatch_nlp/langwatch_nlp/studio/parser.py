@@ -1,19 +1,20 @@
-from typing import cast
-from langwatch_nlp.studio.types.dsl import Node, Signature
+from langwatch_nlp.studio.dspy.lite_llm import DSPyLiteLLM
+from langwatch_nlp.studio.modules.registry import MODULES
+from langwatch_nlp.studio.types.dsl import Evaluator, Node, Signature, Workflow
 import dspy
 
-from langwatch_nlp.studio.utils import print_class_definition
 
-
-def parse_component(node: Node) -> type[dspy.Signature] | type[dspy.Module]:
+def parse_component(node: Node, workflow: Workflow) -> type[dspy.Module]:
     match node.type:
         case "signature":
-            return parse_signature(node.data)
+            return parse_signature(node.data, workflow)
+        case "evaluator":
+            return parse_evaluator(node.data)
         case _:
             raise NotImplementedError(f"Unknown component type: {node.type}")
 
 
-def parse_signature(component: Signature) -> type[dspy.Signature]:
+def parse_signature(component: Signature, workflow: Workflow) -> type[dspy.Module]:
     class_name = component.name or "AnonymousSignature"
 
     # Create a dictionary to hold the class attributes
@@ -34,6 +35,33 @@ def parse_signature(component: Signature) -> type[dspy.Signature]:
         class_dict["__doc__"] = component.prompt
 
     # Create the class dynamically
-    SignatureClass: type[dspy.Signature] = type(class_name, (dspy.Signature,), class_dict)
+    SignatureClass: type[dspy.Signature] = type(
+        class_name + "Signature", (dspy.Signature,), class_dict
+    )
 
-    return SignatureClass
+    llm_config = component.llm if component.llm else workflow.default_llm
+
+    lm = DSPyLiteLLM(
+        max_tokens=llm_config.max_tokens or 2048,
+        temperature=llm_config.temperature or 0,
+        **(llm_config.litellm_params or {"model": llm_config.model}),
+    )
+
+    dspy.settings.configure(experimental=True)
+
+    def __init__(self) -> None:
+        dspy.Predict.__init__(self, SignatureClass)
+        self.set_lm(lm=lm)
+
+    ModuleClass: type[dspy.Predict] = type(
+        class_name, (dspy.Predict,), {"__init__": __init__}
+    )
+
+    return ModuleClass
+
+
+def parse_evaluator(component: Evaluator) -> type[dspy.Module]:
+    if not component.cls:
+        raise ValueError("Evaluator class not specified")
+
+    return MODULES["evaluator"][component.cls]

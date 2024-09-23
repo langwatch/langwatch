@@ -6,8 +6,9 @@ import type {
 } from "../../server/datasets/types";
 import type { Entry, Field } from "../types/dsl";
 import type { InMemoryDataset } from "../../components/datasets/DatasetTable";
+import type { Dataset, DatasetRecord } from "@prisma/client";
 
-export function transposeIDlessColumnsFirstToRowsFirstWithId(
+export function transposeColumnsFirstToRowsFirstWithId(
   data: Record<string, string[]>
 ): DatasetRecordEntry[] {
   return Object.entries(data).reduce((acc, [column, values]) => {
@@ -96,3 +97,25 @@ export function inMemoryDatasetToNodeDataset(
         },
       };
 }
+
+export const datasetDatabaseRecordsToInMemoryDataset = (
+  dataset: Dataset & { datasetRecords: DatasetRecord[] }
+): InMemoryDataset => {
+  const columns = (dataset.columnTypes ?? []) as DatasetColumns;
+  const datasetRecords = dataset.datasetRecords.map((record) => {
+    const row: DatasetRecordEntry = { id: record.id };
+    columns.forEach((col) => {
+      const value = dataset.id
+        ? (record.entry as Record<string, any>)?.[col.name]
+        : (record as DatasetRecordEntry)[col.name];
+      row[col.name] = typeof value === "object" ? JSON.stringify(value) : value;
+    });
+    return row;
+  });
+
+  return {
+    name: dataset.name,
+    datasetRecords,
+    columnTypes: dataset.columnTypes as DatasetColumns,
+  };
+};

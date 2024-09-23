@@ -6,53 +6,22 @@ import type { Node } from "@xyflow/react";
 import type { BaseComponent, Component, Field } from "../types/dsl";
 import { nanoid } from "nanoid";
 import { useToast } from "@chakra-ui/react";
-import { useAlertOnComponent } from "./useAlertOnComponent";
 
-export const useComponentExecution = () => {
+export const useWorkflowExecution = () => {
   const { sendMessage, socketStatus } = useSocketClient();
 
   const toast = useToast();
 
   const [triggerTimeout, setTriggerTimeout] = useState<{
-    component_id: string;
     trace_id: string;
-    timeout_on_status: "waiting" | "running";
   } | null>(null);
 
-  const {
-    node,
-    setSelectedNode,
-    setPropertiesExpanded,
-    setTriggerValidation,
-    getWorkflow,
-    setComponentExecutionState,
-  } = useWorkflowStore((state) => ({
-    node: state.nodes.find((node) => node.id === triggerTimeout?.component_id),
-    setSelectedNode: state.setSelectedNode,
-    setPropertiesExpanded: state.setPropertiesExpanded,
-    setTriggerValidation: state.setTriggerValidation,
-    getWorkflow: state.getWorkflow,
-    setComponentExecutionState: state.setComponentExecutionState,
-  }));
-
-  const alertOnComponent = useAlertOnComponent();
-
-  useEffect(() => {
-    if (
-      triggerTimeout &&
-      node &&
-      node.data.execution_state?.trace_id === triggerTimeout.trace_id &&
-      node.data.execution_state?.status === triggerTimeout.timeout_on_status
-    ) {
-      const execution_state: BaseComponent["execution_state"] = {
-        status: "error",
-        error: "Timeout",
-        timestamps: { finished_at: Date.now() },
-      };
-      setComponentExecutionState(node.id, execution_state);
-      alertOnComponent({ componentId: node.id, execution_state });
-    }
-  }, [triggerTimeout, node, setComponentExecutionState, alertOnComponent]);
+  const { getWorkflow, setWorkflowExecutionState } = useWorkflowStore(
+    (state) => ({
+      getWorkflow: state.getWorkflow,
+      setWorkflowExecutionState: state.setWorkflowExecutionState,
+    })
+  );
 
   const socketAvailable = useCallback(() => {
     if (socketStatus !== "connected") {
@@ -67,72 +36,62 @@ export const useComponentExecution = () => {
     return true;
   }, [socketStatus, toast]);
 
-  const startComponentExecution = useCallback(
-    ({
-      node,
-      inputs,
-    }: {
-      node: Node<Component>;
-      inputs?: Record<string, string>;
-    }) => {
-      if (!socketAvailable()) {
-        return;
-      }
-
-      const { missingFields, inputs: inputs_ } = getInputsForExecution({
-        node,
-        inputs,
+  useEffect(() => {
+    const workflow = getWorkflow();
+    if (
+      triggerTimeout &&
+      workflow.state.execution?.trace_id === triggerTimeout.trace_id &&
+      workflow.state.execution?.status === "waiting"
+    ) {
+      setWorkflowExecutionState({
+        status: "error",
+        error: "Timeout",
+        timestamps: { finished_at: Date.now() },
       });
-      if (missingFields.length > 0) {
-        setSelectedNode(node.id);
-        setPropertiesExpanded(true);
-        setTriggerValidation(true);
+      toast({
+        title: "Timeout starting workflow execution",
+        status: "error",
+        duration: 5000,
+        isClosable: true,
+      });
+    }
+  }, [triggerTimeout, setWorkflowExecutionState, getWorkflow, toast]);
+
+  const startWorkflowExecution = useCallback(
+    ({ untilNodeId }: { untilNodeId?: string }) => {
+      if (!socketAvailable()) {
         return;
       }
 
       const trace_id = `trace_${nanoid()}`;
 
-      setComponentExecutionState(node.id, {
+      setWorkflowExecutionState({
         status: "waiting",
         trace_id,
-        inputs: inputs_,
+        until_node_id: untilNodeId,
       });
 
       const payload: StudioClientEvent = {
-        type: "execute_component",
+        type: "execute_flow",
         payload: {
           trace_id,
           workflow: getWorkflow(),
-          node_id: node.id,
-          inputs: inputs_,
+          until_node_id: untilNodeId,
         },
       };
       sendMessage(payload);
 
       setTimeout(() => {
-        setTriggerTimeout({
-          component_id: node.id,
-          trace_id,
-          timeout_on_status: "waiting",
-        });
+        setTriggerTimeout({ trace_id });
       }, 10_000);
     },
-    [
-      socketAvailable,
-      setComponentExecutionState,
-      getWorkflow,
-      sendMessage,
-      setSelectedNode,
-      setPropertiesExpanded,
-      setTriggerValidation,
-    ]
+    [socketAvailable, getWorkflow, sendMessage, setWorkflowExecutionState]
   );
 
-  const stopComponentExecution = useCallback(
+  const stopWorkflowExecution = useCallback(
     ({
       trace_id,
       node_id,
-      current_state,
     }: {
       trace_id: string;
       node_id: string;
@@ -142,8 +101,10 @@ export const useComponentExecution = () => {
         return;
       }
 
-      if (current_state?.status === "waiting") {
-        setComponentExecutionState(node_id, {
+      const workflow = getWorkflow();
+      const current_state = workflow.state.execution?.status;
+      if (current_state === "waiting") {
+        setWorkflowExecutionState({
           status: "idle",
           trace_id: undefined,
         });
@@ -155,21 +116,13 @@ export const useComponentExecution = () => {
         payload: { trace_id, node_id },
       };
       sendMessage(payload);
-
-      setTimeout(() => {
-        setTriggerTimeout({
-          component_id: node_id,
-          trace_id,
-          timeout_on_status: "running",
-        });
-      }, 2_000);
     },
-    [socketAvailable, sendMessage, setComponentExecutionState]
+    [socketAvailable, setWorkflowExecutionState, sendMessage, getWorkflow]
   );
 
   return {
-    startComponentExecution,
-    stopComponentExecution,
+    startWorkflowExecution,
+    stopWorkflowExecution,
   };
 };
 

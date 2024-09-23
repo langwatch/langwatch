@@ -13,7 +13,7 @@ load_dotenv()
 import langwatch_nlp.error_tracking
 from fastapi import FastAPI
 
-from langwatch_nlp.studio.execute import app as studio_app, lifespan
+from langwatch_nlp.studio.app import app as studio_app, lifespan
 
 import langwatch_nlp.topic_clustering.batch_clustering as batch_clustering
 import langwatch_nlp.topic_clustering.incremental_clustering as incremental_clustering

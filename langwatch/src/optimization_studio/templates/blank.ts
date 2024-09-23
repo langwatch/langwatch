@@ -1,5 +1,5 @@
 import { DEFAULT_DATASET_NAME } from "../../components/datasets/DatasetTable";
-import type { Workflow } from "../types/dsl";
+import type { Entry, Workflow } from "../types/dsl";
 
 export const blankTemplate: Workflow = {
   spec_version: "1.0",
@@ -23,6 +23,7 @@ export const blankTemplate: Workflow = {
       data: {
         name: "Entry",
         outputs: [{ identifier: "question", type: "str" }],
+        entry_selection: "first",
         dataset: {
           name: DEFAULT_DATASET_NAME,
           inline: {
@@ -32,9 +33,9 @@ export const blankTemplate: Workflow = {
             columnTypes: [{ name: "question", type: "string" }],
           },
         },
-      },
+      } satisfies Entry,
     },
-  ],
+  ] satisfies Workflow["nodes"],
   edges: [],
   state: {},
 };

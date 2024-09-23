@@ -2,40 +2,29 @@ import asyncio
 from contextlib import asynccontextmanager
 from multiprocessing import Process, Queue
 from multiprocessing.synchronize import Event
-import os
 from queue import Empty
 import queue
 import time
-from typing import AsyncGenerator, Dict, TypedDict, cast
+import traceback
+from typing import AsyncGenerator, Dict, TypedDict
 from fastapi import FastAPI, Response, BackgroundTasks
 from fastapi.responses import StreamingResponse
 import json
-import dspy
 
-from langwatch_nlp.studio.dspy.lite_llm import DSPyLiteLLM
-from langwatch_nlp.studio.parser import parse_component
+from langwatch_nlp.studio.execute.execute_component import execute_component
+from langwatch_nlp.studio.execute.execute_flow import execute_flow
 from langwatch_nlp.studio.process_pool import IsolatedProcessPool
-from langwatch_nlp.studio.types.dsl import (
-    ComponentExecutionStatus,
-    ExecutionState,
-    LLMConfig,
-    Signature,
-    Timestamps,
-)
-from langwatch_nlp.studio.utils import disable_dsp_caching
-from .types.events import (
-    ComponentStateChange,
-    ComponentStateChangePayload,
+from langwatch_nlp.studio.types.events import (
     Debug,
     DebugPayload,
     Done,
-    ExecuteComponentPayload,
     IsAliveResponse,
     StopExecution,
     StudioClientEvent,
     StudioServerEvent,
     Error,
     ErrorPayload,
+    component_error_event,
 )
 
 pool: IsolatedProcessPool[StudioClientEvent, StudioServerEvent]
@@ -54,64 +43,9 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 
 
-async def execute_component(event: ExecuteComponentPayload):
-    yield Debug(payload=DebugPayload(message="executing component"))
-
-    started_at = int(time.time() * 1000)
-
-    yield ComponentStateChange(
-        payload=ComponentStateChangePayload(
-            component_id=event.node_id,
-            execution_state=ExecutionState(
-                status=ComponentExecutionStatus.running,
-                trace_id=event.trace_id,
-                timestamps=Timestamps(started_at=started_at),
-            ),
-        )
-    )
-
-    node = [node for node in event.workflow.nodes if node.id == event.node_id][0]
-
-    component = parse_component(node)
-
-    module = (
-        dspy.Predict(component)
-        if issubclass(component, dspy.Signature)
-        else component()
-    )
-
-    llm_config = (
-        cast(LLMConfig, cast(Signature, node.data).llm)
-        if hasattr(node.data, "llm") and cast(Signature, node.data).llm
-        else event.workflow.default_llm
-    )
-
-    lm = DSPyLiteLLM(
-        max_tokens=llm_config.max_tokens or 2048,
-        temperature=llm_config.temperature or 0,
-        **(llm_config.litellm_params or {}),
-    )
-    dspy.settings.configure(experimental=True)
-    disable_dsp_caching()
-    module.set_lm(lm=lm)
-
-    result = module(**event.inputs)
-
-    yield ComponentStateChange(
-        payload=ComponentStateChangePayload(
-            component_id=event.node_id,
-            execution_state=ExecutionState(
-                status=ComponentExecutionStatus.success,
-                trace_id=event.trace_id,
-                timestamps=Timestamps(finished_at=int(time.time() * 1000)),
-                outputs=result._store,
-            ),
-        )
-    )
-
-
 async def execute_event(
     event: StudioClientEvent,
+    queue: "Queue[StudioServerEvent]",
 ) -> AsyncGenerator[StudioServerEvent, None]:
     yield Debug(payload=DebugPayload(message="server starting execution"))
 
@@ -129,6 +63,13 @@ async def execute_event(
                         node_id=event.payload.node_id,
                         error=repr(e),
                     )
+            case "execute_flow":
+                try:
+                    async for event_ in execute_flow(event.payload, queue):
+                        yield event_
+                except Exception as e:
+                    traceback.print_exc()
+                    yield Error(payload=ErrorPayload(message=repr(e)))
             case _:
                 yield Error(
                     payload=ErrorPayload(
@@ -140,19 +81,6 @@ async def execute_event(
         yield Error(payload=ErrorPayload(message=repr(e)))
 
     yield Done()
-
-
-def component_error_event(trace_id: str, node_id: str, error: str):
-    return ComponentStateChange(
-        payload=ComponentStateChangePayload(
-            component_id=node_id,
-            execution_state=ExecutionState(
-                status=ComponentExecutionStatus.error,
-                error=error,
-                timestamps=Timestamps(finished_at=int(time.time() * 1000)),
-            ),
-        )
-    )
 
 
 def event_worker(
@@ -169,7 +97,7 @@ def event_worker(
             try:
 
                 async def async_execute_event(event):
-                    async for event_ in execute_event(event):
+                    async for event_ in execute_event(event, queue_out):
                         queue_out.put(event_)
 
                 asyncio.run(async_execute_event(event))

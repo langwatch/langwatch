@@ -25,7 +25,6 @@ import {
 } from "./DatasetGrid";
 
 import type { AgGridReact } from "@ag-grid-community/react";
-import type { Dataset, DatasetRecord } from "@prisma/client";
 import { nanoid } from "nanoid";
 import type {
   DatasetColumns,
@@ -33,6 +32,7 @@ import type {
 } from "../../server/datasets/types";
 import { AddOrEditDatasetDrawer } from "../AddOrEditDatasetDrawer";
 import { AddRowsFromCSVModal } from "./AddRowsFromCSVModal";
+import { datasetDatabaseRecordsToInMemoryDataset } from "../../optimization_studio/utils/datasetUtils";
 
 export type InMemoryDataset = {
   datasetId?: string;
@@ -579,25 +579,3 @@ export function DatasetTable({
     </>
   );
 }
-
-export const datasetDatabaseRecordsToInMemoryDataset = (
-  dataset: Dataset & { datasetRecords: DatasetRecord[] }
-): InMemoryDataset => {
-  const columns = (dataset.columnTypes ?? []) as DatasetColumns;
-  const datasetRecords = dataset.datasetRecords.map((record) => {
-    const row: DatasetRecordEntry = { id: record.id };
-    columns.forEach((col) => {
-      const value = dataset.id
-        ? (record.entry as Record<string, any>)?.[col.name]
-        : (record as DatasetRecordEntry)[col.name];
-      row[col.name] = typeof value === "object" ? JSON.stringify(value) : value;
-    });
-    return row;
-  });
-
-  return {
-    name: dataset.name,
-    datasetRecords,
-    columnTypes: dataset.columnTypes as DatasetColumns,
-  };
-};

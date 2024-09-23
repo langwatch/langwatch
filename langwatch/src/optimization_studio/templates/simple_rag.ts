@@ -1,11 +1,12 @@
 import { DEFAULT_DATASET_NAME } from "../../components/datasets/DatasetTable";
-import type { Workflow } from "../types/dsl";
+import type { Entry, Evaluator, Workflow } from "../types/dsl";
 
 export const simpleRagTemplate: Workflow = {
   spec_version: "1.0",
   name: "Simple RAG",
   icon: "🧩",
-  description: "Query transformation, vector database search and answer generation",
+  description:
+    "Query transformation, vector database search and answer generation",
   version: "1.0",
   default_llm: {
     model: "openai/gpt-4o-mini",
@@ -23,6 +24,7 @@ export const simpleRagTemplate: Workflow = {
           { identifier: "question", type: "str" },
           { identifier: "gold_answer", type: "str" },
         ],
+        entry_selection: "first",
         dataset: {
           name: DEFAULT_DATASET_NAME,
           inline: {
@@ -42,7 +44,7 @@ export const simpleRagTemplate: Workflow = {
             ],
           },
         },
-      },
+      } satisfies Entry,
     },
     {
       id: "generate_query",
@@ -67,14 +69,47 @@ export const simpleRagTemplate: Workflow = {
         outputs: [{ identifier: "answer", type: "str" }],
       },
     },
-  ],
+    {
+      id: "exact_match",
+      type: "evaluator",
+      position: { x: 900, y: 300 },
+      data: {
+        name: "ExactMatch",
+        cls: "ExactMatchEvaluator",
+        inputs: [
+          { identifier: "output", type: "str" },
+          { identifier: "expected_output", type: "str" },
+        ],
+        outputs: [
+          { identifier: "passed", type: "bool" },
+          { identifier: "score", type: "float" },
+        ],
+      } satisfies Evaluator,
+    },
+  ] satisfies Workflow["nodes"],
   edges: [
+    {
+      id: "e0-1",
+      source: "entry",
+      sourceHandle: "outputs.question",
+      target: "generate_query",
+      targetHandle: "inputs.question",
+      type: "default",
+    },
     {
       id: "e1-2",
       source: "generate_query",
       sourceHandle: "outputs.query",
       target: "generate_answer",
       targetHandle: "inputs.query",
+      type: "default",
+    },
+    {
+      id: "e2-3",
+      source: "entry",
+      sourceHandle: "outputs.question",
+      target: "generate_answer",
+      targetHandle: "inputs.question",
       type: "default",
     },
   ],

@@ -1,9 +1,13 @@
+import ast
+import builtins
 import inspect
-import os
-import importlib
-import dsp.modules.cache_utils
+import keyword
+import re
+from typing import Any, Dict, List
 
 from joblib.memory import MemorizedFunc, AsyncMemorizedFunc
+
+from langwatch_nlp.studio.types.dsl import DatasetInline
 
 
 def print_class_definition(cls):
@@ -39,3 +43,46 @@ def print_class_definition(cls):
 def disable_dsp_caching():
     MemorizedFunc._is_in_cache_and_valid = lambda *args, **kwargs: False
     AsyncMemorizedFunc._is_in_cache_and_valid = lambda *args, **kwargs: False
+
+
+def print_ast(node):
+    print("\n\n" + ast.unparse(node) + "\n\n")
+
+
+def validate_identifier(identifier: str) -> str:
+    """Validate and sanitize an identifier."""
+    # Only allow alphanumeric characters and underscores, must start with a letter or underscore
+    if not re.match(r"^[a-zA-Z_][a-zA-Z0-9_]*$", identifier):
+        raise ValueError(f"Invalid identifier: {identifier}")
+    # Check its also not a reserved word
+    if (
+        keyword.iskeyword(identifier)
+        or identifier in dir(builtins)
+        or identifier == "self"
+    ):
+        raise ValueError(f"Reserved identifier cannot be used: {identifier}")
+    return identifier
+
+
+def transpose_inline_dataset_to_object_list(dataset: DatasetInline):
+    columns = dataset.records
+
+    lengths = [len(values) for values in columns.values()]
+    if len(lengths) == 0:
+        return []
+    max_length = max(lengths)
+
+    result: List[Dict[str, Any]] = []
+
+    for i in range(max_length):
+        row: Dict[str, Any] = {}
+        for column_name, values in columns.items():
+            row[column_name] = values[i] if i < len(values) else None
+        result.append(row)
+
+    return result
+
+
+class ClientReadableValueError(ValueError):
+    def __repr__(self) -> str:
+        return self.args[0]

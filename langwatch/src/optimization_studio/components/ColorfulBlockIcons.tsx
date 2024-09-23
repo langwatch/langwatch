@@ -1,7 +1,10 @@
 import { Box } from "@chakra-ui/react";
 import { FunctionIcon } from "../../components/icons/FunctionIcon";
-import { Home } from "react-feather";
+import { Check, Circle, Home } from "react-feather";
 import type { ComponentType } from "../types/dsl";
+import { EqualsIcon } from "../../components/icons/EqualsIcon";
+import type { MODULES } from "../types/modules";
+import { LLMIcon } from "../../components/icons/LLMIcon";
 
 const sizeMap = {
   sm: "16px",
@@ -41,20 +44,35 @@ export function ColorfulBlockIcon({
   );
 }
 
+export function EvaluatorIcon({ cls }: { cls?: string }) {
+  const iconMap: Record<MODULES["evaluator"]["cls"], React.ReactNode> = {
+    ExactMatchEvaluator: <EqualsIcon />,
+  };
+
+  const cls_ = cls as keyof typeof iconMap;
+  if (!iconMap[cls_]) {
+    return <Check />;
+  }
+  return iconMap[cls_];
+}
+
 export const ComponentIcon = ({
   type,
+  cls,
   size,
 }: {
   type: ComponentType;
+  cls?: string;
   size: "sm" | "md" | "lg";
 }) => {
   const componentIconMap: Record<ComponentType, React.ReactNode> = {
-    signature: <FunctionIcon />,
+    signature: <LLMIcon />,
     entry: <Home />,
     module: <Box />,
     retriever: <Box />,
     prompting_technique: <Box />,
-    evaluator: <Box />,
+    evaluator: <EvaluatorIcon cls={cls} />,
+    end: <Box />,
   };
 
   const componentColorMap: Record<ComponentType, string> = {
@@ -63,7 +81,8 @@ export const ComponentIcon = ({
     module: "gray.400",
     retriever: "gray.400",
     prompting_technique: "gray.400",
-    evaluator: "gray.400",
+    evaluator: "#5FD15D",
+    end: "gray.400",
   };
 
   return (

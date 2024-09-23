@@ -27,12 +27,23 @@ export const useSocketClient = () => {
   const { project } = useOrganizationTeamProject();
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  const { socketStatus, setSocketStatus, setComponentExecutionState } =
-    useWorkflowStore((state) => ({
-      socketStatus: state.socketStatus,
-      setSocketStatus: state.setSocketStatus,
-      setComponentExecutionState: state.setComponentExecutionState,
-    }));
+  const {
+    socketStatus,
+    setSocketStatus,
+    setComponentExecutionState,
+    setWorkflowExecutionState,
+    getWorkflow,
+    setSelectedNode,
+    setPropertiesExpanded,
+  } = useWorkflowStore((state) => ({
+    socketStatus: state.socketStatus,
+    setSocketStatus: state.setSocketStatus,
+    setComponentExecutionState: state.setComponentExecutionState,
+    setWorkflowExecutionState: state.setWorkflowExecutionState,
+    getWorkflow: state.getWorkflow,
+    setSelectedNode: state.setSelectedNode,
+    setPropertiesExpanded: state.setPropertiesExpanded,
+  }));
 
   const toast = useToast();
   const alertOnComponent = useAlertOnComponent();
@@ -47,6 +58,28 @@ export const useSocketClient = () => {
       }
     },
     [socketStatus, setSocketStatus]
+  );
+
+  const stopWorkflowIfRunning = useCallback(
+    (message: string | undefined) => {
+      setWorkflowExecutionState({
+        status: "error",
+        error: message,
+        timestamps: { finished_at: Date.now() },
+      });
+      if (message == "Interrupted") {
+        for (const node of getWorkflow().nodes) {
+          if (node.data.execution_state?.status === "running") {
+            setComponentExecutionState(node.id, {
+              status: "error",
+              error: message,
+              timestamps: { finished_at: Date.now() },
+            });
+          }
+        }
+      }
+    },
+    [setWorkflowExecutionState, getWorkflow, setComponentExecutionState]
   );
 
   const handleMessage = useCallback(
@@ -69,17 +102,28 @@ export const useSocketClient = () => {
           );
           if (data.payload.execution_state?.status === "error") {
             checkIfUnreachableErrorMessage(data.payload.execution_state.error);
+            stopWorkflowIfRunning(data.payload.execution_state.error);
             alertOnComponent({
               componentId: data.payload.component_id,
               execution_state: data.payload.execution_state,
             });
           }
+          if (
+            data.payload.execution_state?.status !== "running" &&
+            getWorkflow().state.execution?.status === "running" &&
+            getWorkflow().state.execution?.until_node_id ===
+              data.payload.component_id
+          ) {
+            setSelectedNode(data.payload.component_id);
+            setPropertiesExpanded(true);
+          }
           break;
         case "execution_state_change":
-          // TODO
+          setWorkflowExecutionState(data.payload.execution_state);
           break;
         case "error":
           checkIfUnreachableErrorMessage(data.payload.message);
+          stopWorkflowIfRunning(data.payload.message);
           toast({
             title: "Error",
             description: data.payload.message,
@@ -107,8 +151,13 @@ export const useSocketClient = () => {
     [
       alertOnComponent,
       checkIfUnreachableErrorMessage,
+      getWorkflow,
       setComponentExecutionState,
+      setPropertiesExpanded,
+      setSelectedNode,
       setSocketStatus,
+      setWorkflowExecutionState,
+      stopWorkflowIfRunning,
       toast,
     ]
   );

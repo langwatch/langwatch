@@ -1,4 +1,4 @@
-from typing import List, Dict, Union, Optional, Literal
+from typing import Any, List, Dict, Union, Optional, Literal
 from pydantic import BaseModel, Field as PydanticField
 from enum import Enum
 
@@ -29,7 +29,7 @@ class Field(BaseModel):
     hidden: Optional[bool] = None
 
 
-class ComponentExecutionStatus(str, Enum):
+class ExecutionStatus(str, Enum):
     idle = "idle"
     waiting = "waiting"
     running = "running"
@@ -39,6 +39,7 @@ class ComponentExecutionStatus(str, Enum):
 
 class ComponentType(str, Enum):
     entry = "entry"
+    end = "end"
     signature = "signature"
     module = "module"
     retriever = "retriever"
@@ -52,13 +53,13 @@ class Timestamps(BaseModel):
 
 
 class ExecutionState(BaseModel):
-    status: ComponentExecutionStatus
+    status: ExecutionStatus
     trace_id: Optional[str] = None
     span_id: Optional[str] = None
     error: Optional[str] = None
-    parameters: Optional[Dict[str, str]] = None
-    inputs: Optional[Dict[str, str]] = None
-    outputs: Optional[Dict[str, str]] = None
+    parameters: Optional[Dict[str, Any]] = None
+    inputs: Optional[Dict[str, Any]] = None
+    outputs: Optional[Dict[str, Any]] = None
     timestamps: Optional[Timestamps] = None
 
 
@@ -111,15 +112,19 @@ class PromptingTechnique(BaseComponent):
     pass
 
 
+class End(BaseComponent):
+    pass
+
+
 class DatasetInline(BaseModel):
-    records: Dict[str, List[str]]
+    records: Dict[str, List[Any]]
     columnTypes: DatasetColumns
 
 
+# Differently from the typescript DSL, we require the dataset to be passed inline in the entry node here
 class Dataset(BaseModel):
-    id: Optional[str] = None
     name: Optional[str] = None
-    inline: Optional[DatasetInline] = None
+    inline: DatasetInline
 
 
 class Entry(BaseComponent):
@@ -128,7 +133,7 @@ class Entry(BaseComponent):
 
 
 class Evaluator(BaseComponent):
-    inputs: List[
+    outputs: List[
         Union[
             Dict[Literal["identifier", "type"], Literal["score", "float"]],
             Dict[Literal["identifier", "type"], Literal["passed", "bool"]],
@@ -166,7 +171,12 @@ class EvaluatorNode(BaseNode):
     data: Evaluator
 
 
-Node = Union[SignatureNode, ModuleNode, EntryNode, EvaluatorNode]
+class EndNode(BaseNode):
+    type: Literal["end"] = "end"
+    data: End
+
+
+Node = Union[SignatureNode, ModuleNode, EntryNode, EvaluatorNode, EndNode]
 
 
 class Flow(BaseModel):
@@ -174,26 +184,10 @@ class Flow(BaseModel):
     edges: List[Edge]
 
 
-class WorkflowExecutionStatus(str, Enum):
-    idle = "idle"
-    waiting = "waiting"
-    running = "running"
-    success = "success"
-    error = "error"
-
-
-class EntryMethod(BaseModel):
-    method: Literal["manual_entry", "full_dataset", "random_sample"]
-    size: Optional[int] = None
-
-
 class WorkflowExecutionState(BaseModel):
-    status: WorkflowExecutionStatus
+    status: ExecutionStatus
     trace_id: Optional[str] = None
-    last_component_ref: Optional[str] = None
-    entry: EntryMethod
-    inputs: Dict[str, Dict[str, str]]
-    outputs: Dict[str, Dict[str, str]]
+    until_node_id: Optional[str] = None
     error: Optional[str] = None
     timestamps: Optional[Timestamps] = None
 
@@ -202,7 +196,7 @@ class ExperimentState(BaseModel):
     experiment_id: Optional[str] = None
     run_id: Optional[str] = None
     run_name: Optional[str] = None
-    state: Optional[WorkflowExecutionStatus] = None
+    state: Optional[ExecutionStatus] = None
     timestamps: Optional[Timestamps] = None
 
 

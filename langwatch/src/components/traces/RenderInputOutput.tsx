@@ -44,7 +44,7 @@ export function RenderInputOutput(
         ? typeof value === "string"
           ? value
           : (value as any).toString()
-        : ""}
+        : `${value}`}
     </Text>
   );
 }

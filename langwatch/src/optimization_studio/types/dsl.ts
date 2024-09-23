@@ -1,5 +1,6 @@
 import type { Edge, Node } from "@xyflow/react";
 import type { DatasetColumns } from "../../server/datasets/types";
+import type { MODULES } from "./modules";
 
 export type Field = {
   identifier: string;
@@ -22,7 +23,7 @@ export type Field = {
   hidden?: boolean;
 };
 
-export type ComponentExecutionStatus =
+export type ExecutionStatus =
   | "idle"
   | "waiting"
   | "running"
@@ -31,6 +32,7 @@ export type ComponentExecutionStatus =
 
 export type ComponentType =
   | "entry"
+  | "end"
   | "signature"
   | "module"
   | "retriever"
@@ -50,13 +52,13 @@ export type BaseComponent = {
   };
 
   execution_state?: {
-    status: ComponentExecutionStatus;
+    status: ExecutionStatus;
     trace_id?: string;
     span_id?: string;
     error?: string;
-    parameters?: Record<string, string>;
-    inputs?: Record<string, string>;
-    outputs?: Record<string, string>;
+    parameters?: Record<string, any>;
+    inputs?: Record<string, any>;
+    outputs?: Record<string, any>;
     timestamps?: {
       started_at?: number;
       finished_at?: number;
@@ -87,6 +89,7 @@ export type PromptingTechnique = BaseComponent;
 
 export type Entry = BaseComponent & {
   inputs?: never;
+  entry_selection: "first" | "last" | "random";
   dataset?: {
     id?: string;
     name?: string;
@@ -97,15 +100,7 @@ export type Entry = BaseComponent & {
   };
 };
 
-export type Evaluator = BaseComponent & {
-  type: "evaluator";
-  inputs: (
-    | { identifier: "score"; type: "float" }
-    | { identifier: "passed"; type: "bool" }
-    | { identifier: "label"; type: "str" }
-    | { identifier: "details"; type: "str" }
-  )[];
-};
+export type Evaluator = BaseComponent & MODULES["evaluator"];
 
 export type Component = BaseComponent | Entry | Signature | Module | Evaluator;
 
@@ -113,13 +108,6 @@ type Flow = {
   nodes: Node<Component>[];
   edges: Edge[];
 };
-
-export type WorkflowExecutionStatus =
-  | "idle"
-  | "waiting"
-  | "running"
-  | "success"
-  | "error";
 
 export type Workflow = {
   spec_version: string;
@@ -136,15 +124,9 @@ export type Workflow = {
 
   state: {
     execution?: {
-      state: WorkflowExecutionStatus;
+      status: ExecutionStatus;
       trace_id?: string;
-      last_component_ref?: string;
-      entry:
-        | { method: "manual_entry" }
-        | { method: "full_dataset" }
-        | { method: "random_sample"; size: number };
-      inputs: Record<string, Record<string, string>>;
-      outputs: Record<string, Record<string, string>>;
+      until_node_id?: string;
       error?: string;
       timestamps?: {
         started_at?: number;
@@ -155,7 +137,7 @@ export type Workflow = {
       experiment_id?: string;
       run_id?: string;
       run_name?: string;
-      state?: WorkflowExecutionStatus;
+      state?: ExecutionStatus;
       timestamps?: {
         started_at?: number;
         finished_at?: number;
@@ -193,7 +175,7 @@ export const LLMSignatureFlow: Flow = {
       data: {
         name: "ChainOfThought",
         _library_ref: "builtin/ChainOfThought",
-        cls: "dspy.ChainOfThought",
+        cls: "ChainOfThought",
       },
     },
     {
@@ -234,7 +216,7 @@ export const LLMSignatureFlow: Flow = {
       data: {
         name: "ColBERTv2",
         _library_ref: "builtin/ColBERTv2",
-        cls: "dspy.ColBERTv2",
+        cls: "ColBERTv2",
         parameters: [
           {
             identifier: "url",
@@ -266,7 +248,7 @@ export const LLMSignatureFlow: Flow = {
       data: {
         name: "ChainOfThought",
         _library_ref: "builtin/ChainOfThought",
-        cls: "dspy.ChainOfThought",
+        cls: "ChainOfThought",
         inputs: [
           {
             identifier: "signature",
@@ -367,7 +349,7 @@ export const LLMSignatureFlow: Flow = {
 //           _library_ref: "builtin/ChainOfThought",
 //           id: "chain_of_thought_1",
 //           type: "prompting_technique",
-//           cls: "dspy.ChainOfThought",
+//           cls: "ChainOfThought",
 //         },
 //         {
 //           id: "generate_query_1",
@@ -395,7 +377,7 @@ export const LLMSignatureFlow: Flow = {
 //           _library_ref: "builtin/ColBERTv2",
 //           id: "colbertv2_1",
 //           type: "retriever",
-//           cls: "dspy.ColBERTv2",
+//           cls: "ColBERTv2",
 //           parameters: [
 //             {
 //               identifier: "url",
@@ -420,7 +402,7 @@ export const LLMSignatureFlow: Flow = {
 //           _library_ref: "builtin/ChainOfThought",
 //           id: "chain_of_thought_2",
 //           type: "prompting_technique",
-//           cls: "dspy.ChainOfThought",
+//           cls: "ChainOfThought",
 //           inputs: [
 //             {
 //               identifier: "signature",

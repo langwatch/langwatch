@@ -1,5 +1,6 @@
-import { Text } from "@chakra-ui/react";
+import { Box, HStack, Spinner, Text } from "@chakra-ui/react";
 import { useEffect, useState } from "react";
+import { Check, X } from "react-feather";
 import { useDebouncedCallback } from "use-debounce";
 import { useShallow } from "zustand/react/shallow";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
@@ -69,13 +70,26 @@ export function AutoSave() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stateWorkflow]);
 
-  return autosave.isLoading ? (
-    <Text fontSize={13}>Saving...</Text>
-  ) : autosave.isError ? (
-    <Text fontSize={13} color="red.600">
-      Failed to autosave
-    </Text>
-  ) : recentlySaved ? (
-    <Text fontSize={13}>Saved</Text>
-  ) : null;
+  return (
+    <Box paddingLeft={2}>
+      {autosave.isLoading ? (
+        <HStack>
+          <Spinner size="xs" />
+          <Text fontSize={13}>Saving...</Text>
+        </HStack>
+      ) : autosave.isError ? (
+        <HStack color="red.600">
+          <X size={16} />
+          <Text fontSize={13}>Failed to autosave</Text>
+        </HStack>
+      ) : recentlySaved ? (
+        <HStack>
+          <Box color="green.600">
+            <Check width="16px" height="16px" />
+          </Box>
+          <Text fontSize={13}>Saved</Text>
+        </HStack>
+      ) : null}
+    </Box>
+  );
 }

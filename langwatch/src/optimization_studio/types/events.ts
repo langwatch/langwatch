@@ -17,6 +17,14 @@ export type StudioClientEvent =
         trace_id: string;
         node_id?: string;
       };
+    }
+  | {
+      type: "execute_flow";
+      payload: {
+        trace_id: string;
+        workflow: Workflow;
+        until_node_id?: string;
+      };
     };
 
 export type StudioServerEvent =

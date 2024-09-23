@@ -12,6 +12,7 @@ import { EntryPointPropertiesPanel } from "./EntryPointPropertiesPanel";
 import { BasePropertiesPanel } from "./BasePropertiesPanel";
 import { WorkflowPropertiesPanel } from "./WorkflowPropertiesPanel";
 import { SignaturePropertiesPanel } from "./SignaturePropertiesPanel";
+import { EvaluatorPropertiesPanel } from "./EvaluatorPropertiesPanel";
 
 export function PropertiesPanel() {
   const {
@@ -33,11 +34,12 @@ export function PropertiesPanel() {
     React.FC<{ node: Node<Component> }>
   > = {
     entry: EntryPointPropertiesPanel,
+    end: BasePropertiesPanel,
     signature: SignaturePropertiesPanel,
     module: BasePropertiesPanel,
     retriever: BasePropertiesPanel,
     prompting_technique: BasePropertiesPanel,
-    evaluator: BasePropertiesPanel,
+    evaluator: EvaluatorPropertiesPanel as React.FC<{ node: Node<Component> }>,
   };
 
   const { width, height } = useWindowSize();
@@ -168,7 +170,7 @@ export function PropertiesPanel() {
               as={motion.div}
               width="100%"
               height="100%"
-              initial={{ x: "100%" }}
+              initial={{ x: "110%" }}
               animate={{ x: "0%" }}
               transition="0.1s ease-out 0.05s"
               paddingY="40px"
@@ -198,7 +200,7 @@ export function PropertiesPanel() {
               as={motion.div}
               width="100%"
               height="100%"
-              initial={{ x: "-100%" }}
+              initial={{ x: "-110%" }}
               animate={{ x: "0%" }}
               transition="0.1s ease-out 0.05s"
               paddingY="40px"

@@ -54,10 +54,12 @@ export function PropertyFields({
   node,
   title,
   field,
+  readOnly = false,
 }: {
   node: Node<Component>;
   title: string;
   field: "parameters" | "inputs" | "outputs";
+  readOnly?: boolean;
 }) {
   const { setNode } = useWorkflowStore(
     useShallow((state) => ({
@@ -104,13 +106,15 @@ export function PropertyFields({
       <HStack width="full">
         <PropertySectionTitle>{title}</PropertySectionTitle>
         <Spacer />
-        <Button
-          size="xs"
-          variant="ghost"
-          onClick={() => append({ identifier: "", type: "str" })}
-        >
-          <Plus size={16} />
-        </Button>
+        {!readOnly ? (
+          <Button
+            size="xs"
+            variant="ghost"
+            onClick={() => append({ identifier: "", type: "str" })}
+          >
+            <Plus size={16} />
+          </Button>
+        ) : null}
       </HStack>
       {fields.map((field, index) => {
         const identifierField = control.register(`fields.${index}.identifier`, {
@@ -142,21 +146,32 @@ export function PropertyFields({
                 borderRadius="8px"
                 width="full"
               >
-                <Input
-                  {...identifierField}
-                  onChange={(e) => {
-                    e.target.value = e.target.value
-                      .replace(/ /g, "_")
-                      .toLowerCase();
-                    void identifierField.onChange(e);
-                  }}
-                  width="full"
-                  fontFamily="monospace"
-                  fontSize={14}
-                  border="none"
-                  background="transparent"
-                  padding="6px 0px 6px 12px"
-                />
+                {!readOnly ? (
+                  <Input
+                    {...identifierField}
+                    onChange={(e) => {
+                      e.target.value = e.target.value
+                        .replace(/ /g, "_")
+                        .toLowerCase();
+                      void identifierField.onChange(e);
+                    }}
+                    width="full"
+                    fontFamily="monospace"
+                    fontSize={14}
+                    border="none"
+                    background="transparent"
+                    padding="6px 0px 6px 12px"
+                  />
+                ) : (
+                  <Text
+                    fontFamily="monospace"
+                    fontSize={14}
+                    width="full"
+                    padding="8px 0px 8px 12px"
+                  >
+                    {field.identifier}
+                  </Text>
+                )}
                 <HStack
                   position="relative"
                   background="white"
@@ -169,43 +184,49 @@ export function PropertyFields({
                   <Box fontSize={13}>
                     <TypeLabel type={watchedFields[index]?.type ?? ""} />
                   </Box>
-                  <Box color="gray.600">
-                    <ChevronDown size={14} />
-                  </Box>
-                  <Select
-                    {...control.register(`fields.${index}.type`)}
-                    opacity={0}
-                    position="absolute"
-                    top={0}
-                    left={0}
-                    width="100%"
-                    height="32px"
-                    icon={<></>}
-                  >
-                    <option value="str">str</option>
-                    <option value="float">float</option>
-                    <option value="int">int</option>
-                    <option value="bool">bool</option>
-                    <option value="list[str]">list[str]</option>
-                    <option value="list[float]">list[float]</option>
-                    <option value="list[int]">list[int]</option>
-                    <option value="list[bool]">list[bool]</option>
-                    <option value="dict">dict</option>
-                  </Select>
+                  {!readOnly ? (
+                    <>
+                      <Box color="gray.600">
+                        <ChevronDown size={14} />
+                      </Box>
+                      <Select
+                        {...control.register(`fields.${index}.type`)}
+                        opacity={0}
+                        position="absolute"
+                        top={0}
+                        left={0}
+                        width="100%"
+                        height="32px"
+                        icon={<></>}
+                      >
+                        <option value="str">str</option>
+                        <option value="float">float</option>
+                        <option value="int">int</option>
+                        <option value="bool">bool</option>
+                        <option value="list[str]">list[str]</option>
+                        <option value="list[float]">list[float]</option>
+                        <option value="list[int]">list[int]</option>
+                        <option value="list[bool]">list[bool]</option>
+                        <option value="dict">dict</option>
+                      </Select>
+                    </>
+                  ) : null}
                 </HStack>
               </HStack>
-              <Button
-                colorScheme="gray"
-                size="sm"
-                height="40px"
-                onClick={() => {
-                  remove(index);
-                  void handleSubmit(onSubmit)();
-                }}
-                isDisabled={fields.length === 1}
-              >
-                <Trash2 size={18} />
-              </Button>
+              {!readOnly ? (
+                <Button
+                  colorScheme="gray"
+                  size="sm"
+                  height="40px"
+                  onClick={() => {
+                    remove(index);
+                    void handleSubmit(onSubmit)();
+                  }}
+                  isDisabled={fields.length === 1}
+                >
+                  <Trash2 size={18} />
+                </Button>
+              ) : null}
             </HStack>
             <FormErrorMessage>
               {errors.fields?.[index]?.identifier?.message}
@@ -234,11 +255,17 @@ export function BasePropertiesPanel({
   header,
   children,
   fieldsAfter,
+  inputsReadOnly,
+  outputsTitle,
+  outputsReadOnly,
 }: {
   node: Node<Component> | Workflow;
   header?: React.ReactNode;
   children?: React.ReactNode;
   fieldsAfter?: React.ReactNode;
+  inputsReadOnly?: boolean;
+  outputsTitle?: string;
+  outputsReadOnly?: boolean;
 }) {
   const { deselectAllNodes, propertiesExpanded, setPropertiesExpanded } =
     useWorkflowStore(
@@ -268,7 +295,11 @@ export function BasePropertiesPanel({
             header
           ) : !isWorkflow(node) ? (
             <>
-              <ComponentIcon type={node.type as ComponentType} size="lg" />
+              <ComponentIcon
+                type={node.type as ComponentType}
+                cls={node.data.cls}
+                size="lg"
+              />
               <Text fontSize={16} fontWeight={500}>
                 {getNodeDisplayName(node)}
               </Text>
@@ -280,7 +311,12 @@ export function BasePropertiesPanel({
           {!isWorkflow(node) && isExecutableComponent(node) && (
             <>
               <HStack spacing={3}>
-                <ComponentExecutionButton node={node} size="sm" iconSize={16} />
+                <ComponentExecutionButton
+                  node={node}
+                  size="sm"
+                  iconSize={16}
+                  componentOnly={propertiesExpanded}
+                />
               </HStack>
               <Button
                 variant="ghost"
@@ -311,9 +347,19 @@ export function BasePropertiesPanel({
       {children}
       {!isWorkflow(node) && (
         <>
-          <PropertyFields node={node} field="parameters" title="Parameters" />
-          <PropertyFields node={node} field="inputs" title="Inputs" />
-          <PropertyFields node={node} field="outputs" title="Outputs" />
+          {/* <PropertyFields node={node} field="parameters" title="Parameters" /> */}
+          <PropertyFields
+            node={node}
+            field="inputs"
+            title="Inputs"
+            readOnly={inputsReadOnly}
+          />
+          <PropertyFields
+            node={node}
+            field="outputs"
+            title={outputsTitle ?? "Outputs"}
+            readOnly={outputsReadOnly}
+          />
         </>
       )}
       {fieldsAfter}
