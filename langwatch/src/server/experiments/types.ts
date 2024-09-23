@@ -98,7 +98,7 @@ export type ESBatchEvaluation = {
   dataset: {
     index: string;
     entry: Record<string, any>;
-    cost: number;
+    cost?: number;
   }[];
   evaluations: {
     evaluator: string;

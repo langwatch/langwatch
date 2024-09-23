@@ -60,6 +60,7 @@ class ExecutionState(BaseModel):
     parameters: Optional[Dict[str, Any]] = None
     inputs: Optional[Dict[str, Any]] = None
     outputs: Optional[Dict[str, Any]] = None
+    cost: Optional[float] = None
     timestamps: Optional[Timestamps] = None
 
 

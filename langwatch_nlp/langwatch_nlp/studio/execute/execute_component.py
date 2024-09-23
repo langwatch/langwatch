@@ -17,7 +17,9 @@ async def execute_component(event: ExecuteComponentPayload):
 
     yield start_component_event(node, event.trace_id)
 
-    module = parse_component(node, event.workflow)
-    result = module()(**event.inputs)
+    module = parse_component(node, event.workflow)()
+    result = module(**event.inputs)
 
-    yield end_component_event(node, event.trace_id, dict(result))
+    cost = result.get_cost() if hasattr(result, "get_cost") else None
+
+    yield end_component_event(node, event.trace_id, dict(result), cost)

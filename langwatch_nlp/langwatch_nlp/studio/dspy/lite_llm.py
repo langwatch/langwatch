@@ -7,6 +7,7 @@ from typing import Any, Literal, Optional, cast
 
 import backoff
 import litellm
+from litellm.utils import completion_cost
 import openai
 
 from dsp.modules.cache_utils import CacheMemory, NotebookCacheMemory, cache_turn_on
@@ -20,6 +21,7 @@ class DSPyLiteLLM(dspy.OpenAI):
             kwargs["litellm_params"] = {"api_version": os.environ["AZURE_API_VERSION"]}
         kwargs["drop_params"] = True
         kwargs["model_type"] = "chat"
+        self.cost = 0
         super().__init__(**kwargs)
 
     def basic_request(self, prompt: str, **kwargs):
@@ -41,6 +43,15 @@ class DSPyLiteLLM(dspy.OpenAI):
             "raw_kwargs": raw_kwargs,
         }
         self.history.append(history)
+
+        self.cost += completion_cost(
+            completion_response=response,
+            # TODO: use https://docs.litellm.ai/docs/completion/token_usage#9-register_model all the way from frontend to litellm params for custom model costs
+            # custom_cost_per_token={
+            #     "input_cost_per_token": 0.1,
+            #     "output_cost_per_token": 0.3,
+            # },
+        )
 
         return response
 

@@ -2,7 +2,7 @@ import os
 import pytest
 from langwatch_nlp.studio.dspy.lite_llm import DSPyLiteLLM
 from langwatch_nlp.studio.dspy.workflow_module import (
-    PredictionWithEvaluation,
+    PredictionWithEvaluationAndCost,
     WorkflowModule,
 )
 from langwatch_nlp.studio.types.dataset import DatasetColumn, DatasetColumnType
@@ -307,7 +307,7 @@ def test_parse_workflow():
     )
 
     module = WorkflowModule(workflow, execute_evaluators=False)
-    result: PredictionWithEvaluation = module(
+    result: PredictionWithEvaluationAndCost = module(
         question="What is the capital of France?",
         gold_answer="Paris",
     )

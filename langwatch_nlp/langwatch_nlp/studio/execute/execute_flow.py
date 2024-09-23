@@ -54,6 +54,8 @@ async def execute_flow(event: ExecuteFlowPayload, queue: "Queue[StudioServerEven
 
     result = module(**entries[0])
 
+    # cost = result.get_cost() if hasattr(result, "get_cost") else None
+
     yield end_workflow_event(workflow, trace_id)
 
 

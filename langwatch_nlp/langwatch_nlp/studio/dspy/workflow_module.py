@@ -1,4 +1,5 @@
 from typing import Callable, Dict, Any, Literal, Optional, Tuple, cast, overload
+from langwatch_nlp.studio.dspy.predict_with_cost import PredictionWithCost
 from langwatch_nlp.studio.parser import parse_component
 from langwatch_nlp.studio.types.dsl import Workflow, Node, Field
 from langwatch_nlp.studio.dspy.reporting_module import ReportingModule
@@ -93,15 +94,16 @@ class WorkflowModule(ReportingModule):
         ]
         loops = 0
         stop = False
+        cost = 0
         while len(executed_nodes) < len(executable_nodes):
             if loops >= len(executable_nodes):
                 raise Exception("Workflow has a loop")
             loops += 1
             for node in executable_nodes:
                 if node.id not in executed_nodes and has_all_inputs(node):
-                    node_outputs[node.id] = (
-                        self.execute_node(node, node_outputs, inputs) or {}
-                    )
+                    result = self.execute_node(node, node_outputs, inputs) or {}
+                    cost += result.get_cost() if hasattr(result, "get_cost") else 0  # type: ignore
+                    node_outputs[node.id] = result
                     executed_nodes.add(node.id)
 
                     if self.until_node_id and node.id == self.until_node_id:
@@ -143,8 +145,9 @@ class WorkflowModule(ReportingModule):
         if end_node:
             node_outputs["end"] = final_output
 
-        return PredictionWithEvaluation(
+        return PredictionWithEvaluationAndCost(
             evaluation=self.evaluate_prediction,
+            cost=cost,
             **node_outputs,
         )
 
@@ -180,17 +183,19 @@ class WorkflowModule(ReportingModule):
         return score
 
 
-class PredictionWithEvaluation(dspy.Prediction):
+class PredictionWithEvaluationAndCost(PredictionWithCost):
     def __init__(
         self,
         evaluation: Callable[
             [dspy.Example, dspy.Prediction, Optional[Any], bool],
             float | tuple[float, dict],
         ],
+        cost: float,
         **kwargs
     ):
         super().__init__(**kwargs)
         self._evaluation = evaluation
+        self._cost = cost
 
     @overload
     def evaluation(

@@ -59,6 +59,7 @@ export type BaseComponent = {
     parameters?: Record<string, any>;
     inputs?: Record<string, any>;
     outputs?: Record<string, any>;
+    cost?: number;
     timestamps?: {
       started_at?: number;
       finished_at?: number;

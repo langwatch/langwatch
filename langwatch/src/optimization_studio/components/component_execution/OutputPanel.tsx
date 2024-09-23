@@ -8,10 +8,11 @@ import {
   type BoxProps,
 } from "@chakra-ui/react";
 import type { Node } from "@xyflow/react";
+import numeral from "numeral";
+import { useDebounceValue } from "usehooks-ts";
 import { RenderInputOutput } from "../../../components/traces/RenderInputOutput";
 import { SpanDuration } from "../../../components/traces/SpanDetails";
 import type { Component } from "../../types/dsl";
-import { useDebounceValue } from "usehooks-ts";
 
 export const OutputPanel = ({ node }: { node: Node<Component> }) => {
   const [isWaitingLong] = useDebounceValue(
@@ -45,25 +46,42 @@ export const OutputPanel = ({ node }: { node: Node<Component> }) => {
           </Heading>
           <Spacer />
           {node.data.execution_state?.timestamps &&
-          (node.data.execution_state?.status === "success" ||
-            node.data.execution_state?.status === "error") &&
-          node.data.execution_state.timestamps.started_at &&
-          node.data.execution_state.timestamps.finished_at ? (
-            <SpanDuration
-              span={{
-                error:
-                  node.data.execution_state?.status === "error"
-                    ? node.data.execution_state.error
-                    : undefined,
-                timestamps: {
-                  started_at:
-                    node.data.execution_state.timestamps.started_at ?? 0,
-                  finished_at:
-                    node.data.execution_state.timestamps.finished_at ?? 0,
-                },
-              }}
-            />
-          ) : null}
+            (node.data.execution_state?.status === "success" ||
+              node.data.execution_state?.status === "error") && (
+              <HStack spacing={3}>
+                {node.data.execution_state.cost && (
+                  <Text color="gray.500">
+                    {numeral(node.data.execution_state.cost).format(
+                      "$0.00000a"
+                    )}
+                  </Text>
+                )}
+                {node.data.execution_state.timestamps.started_at &&
+                node.data.execution_state.timestamps.finished_at ? (
+                  <>
+                    {node.data.execution_state.cost && (
+                      <Text color="gray.400">·</Text>
+                    )}
+                    <SpanDuration
+                      span={{
+                        error:
+                          node.data.execution_state?.status === "error"
+                            ? node.data.execution_state.error
+                            : undefined,
+                        timestamps: {
+                          started_at:
+                            node.data.execution_state.timestamps.started_at ??
+                            0,
+                          finished_at:
+                            node.data.execution_state.timestamps.finished_at ??
+                            0,
+                        },
+                      }}
+                    />
+                  </>
+                ) : null}
+              </HStack>
+            )}
         </HStack>
         {node.data.execution_state ? (
           <>
