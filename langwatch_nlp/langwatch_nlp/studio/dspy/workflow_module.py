@@ -1,4 +1,4 @@
-from typing import Callable, Dict, Any, Literal, Optional, cast
+from typing import Callable, Dict, Any, Literal, Optional, Tuple, cast, overload
 from langwatch_nlp.studio.parser import parse_component
 from langwatch_nlp.studio.types.dsl import Workflow, Node, Field
 from langwatch_nlp.studio.dspy.reporting_module import ReportingModule
@@ -185,17 +185,33 @@ class PredictionWithEvaluation(dspy.Prediction):
         self,
         evaluation: Callable[
             [dspy.Example, dspy.Prediction, Optional[Any], bool],
-            bool | float | tuple[float, dict],
+            float | tuple[float, dict],
         ],
         **kwargs
     ):
         super().__init__(**kwargs)
         self._evaluation = evaluation
 
+    @overload
+    def evaluation(
+        self,
+        example: dspy.Example,
+        trace: Optional[Any] = None,
+        return_results: Literal[False] = False,
+    ) -> float: ...
+
+    @overload
+    def evaluation(
+        self,
+        example: dspy.Example,
+        trace: Optional[Any] = None,
+        return_results: Literal[True] = True,
+    ) -> Tuple[float, dict]: ...
+
     def evaluation(
         self,
         example,
         trace=None,
         return_results=False,
-    ) -> bool | float | tuple[float, dict]:
+    ) -> float | tuple[float, dict]:
         return self._evaluation(example, self, trace, return_results)

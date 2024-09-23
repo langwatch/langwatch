@@ -351,3 +351,29 @@ export const dspyStepsMapping: ElasticSearchMappingFrom<DSPyStep> = {
     },
   },
 };
+
+export const batchEvaluationMapping: ElasticSearchMappingFrom<BatchEvaluation> =
+  {
+    project_id: { type: "keyword" },
+    experiment_id: { type: "keyword" },
+    run_id: { type: "keyword" },
+    dataset: {
+      properties: {
+        index: { type: "keyword" },
+        entry: { type: FLATENNED_TYPE } as any,
+      },
+    },
+    evaluations: {
+      type: "nested",
+      properties: {
+        evaluator: { type: "keyword" },
+        index: { type: "keyword" },
+        score: { type: "float" },
+        label: { type: "keyword" },
+        passed: { type: "boolean" },
+        details: { type: "text" },
+        cost: { type: "float" },
+        inputs: { type: FLATENNED_TYPE } as any,
+      },
+    },
+  };

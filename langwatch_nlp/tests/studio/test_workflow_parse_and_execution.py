@@ -1,4 +1,10 @@
-from langwatch_nlp.studio.dspy.workflow_module import WorkflowModule
+import os
+import pytest
+from langwatch_nlp.studio.dspy.lite_llm import DSPyLiteLLM
+from langwatch_nlp.studio.dspy.workflow_module import (
+    PredictionWithEvaluation,
+    WorkflowModule,
+)
 from langwatch_nlp.studio.types.dataset import DatasetColumn, DatasetColumnType
 from langwatch_nlp.studio.types.dsl import (
     Dataset,
@@ -8,6 +14,8 @@ from langwatch_nlp.studio.types.dsl import (
     EndNode,
     Entry,
     EntryNode,
+    Evaluator,
+    EvaluatorNode,
     Field,
     FieldType,
     LLMConfig,
@@ -16,10 +24,13 @@ from langwatch_nlp.studio.types.dsl import (
     Workflow,
     WorkflowState,
 )
-from langwatch_nlp.studio.utils import print_class_definition
+from langwatch_nlp.studio.utils import disable_dsp_caching
+import dspy
 
 
+@pytest.mark.integration
 def test_parse_workflow():
+    disable_dsp_caching()
     workflow = Workflow(
         spec_version="1.0",
         name="Simple RAG",
@@ -30,7 +41,10 @@ def test_parse_workflow():
             model="openai/gpt-4o-mini",
             temperature=0.0,
             max_tokens=2048,
-            litellm_params=None,
+            litellm_params={
+                "api_key": os.environ["OPENAI_API_KEY"],
+                "model": "openai/gpt-4o-mini",
+            },
         ),
         nodes=[
             EntryNode(
@@ -63,7 +77,6 @@ def test_parse_workflow():
                     decorated_by=None,
                     execution_state=None,
                     dataset=Dataset(
-                        id=None,
                         name="Draft Dataset",
                         inline=DatasetInline(
                             records={
@@ -191,6 +204,54 @@ def test_parse_workflow():
                 ),
                 type="end",
             ),
+            EvaluatorNode(
+                id="exact_match_evaluator",
+                data=Evaluator(
+                    name="Evaluator",
+                    cls="ExactMatchEvaluator",
+                    inputs=[
+                        Field(
+                            identifier="output",
+                            type=FieldType.str,
+                            optional=None,
+                            defaultValue=None,
+                            description=None,
+                            prefix=None,
+                            hidden=None,
+                        ),
+                        Field(
+                            identifier="expected_output",
+                            type=FieldType.str,
+                            optional=None,
+                            defaultValue=None,
+                            description=None,
+                            prefix=None,
+                            hidden=None,
+                        ),
+                    ],
+                    outputs=[
+                        Field(
+                            identifier="score",
+                            type=FieldType.float,
+                            optional=None,
+                            defaultValue=None,
+                            description=None,
+                            prefix=None,
+                            hidden=None,
+                        ),
+                        Field(
+                            identifier="passed",
+                            type=FieldType.bool,
+                            optional=None,
+                            defaultValue=None,
+                            description=None,
+                            prefix=None,
+                            hidden=None,
+                        ),
+                    ],
+                ),
+                type="evaluator",
+            ),
         ],
         edges=[
             Edge(
@@ -225,9 +286,40 @@ def test_parse_workflow():
                 targetHandle="end.result",
                 type="default",
             ),
+            Edge(
+                id="e4-5",
+                source="generate_answer",
+                sourceHandle="outputs.answer",
+                target="exact_match_evaluator",
+                targetHandle="inputs.output",
+                type="default",
+            ),
+            Edge(
+                id="e5-6",
+                source="entry",
+                sourceHandle="outputs.gold_answer",
+                target="exact_match_evaluator",
+                targetHandle="inputs.expected_output",
+                type="default",
+            ),
         ],
         state=WorkflowState(execution=None, experiment=None),
     )
 
-    module = WorkflowModule(workflow)
-    print_class_definition(module.__class__)
+    module = WorkflowModule(workflow, execute_evaluators=False)
+    result: PredictionWithEvaluation = module(
+        question="What is the capital of France?",
+        gold_answer="Paris",
+    )
+    assert result["end"]["result"] == "Paris"
+
+    evaluation, evaluation_results = result.evaluation(
+        example=dspy.Example(
+            question="What is the capital of France?", gold_answer="Paris"
+        ),
+        return_results=True,
+    )
+
+    assert evaluation == 1.0
+    assert evaluation_results["exact_match_evaluator"].status == "processed"
+    assert evaluation_results["exact_match_evaluator"].score == 1.0

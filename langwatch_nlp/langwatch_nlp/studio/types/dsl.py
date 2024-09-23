@@ -133,14 +133,7 @@ class Entry(BaseComponent):
 
 
 class Evaluator(BaseComponent):
-    outputs: List[
-        Union[
-            Dict[Literal["identifier", "type"], Literal["score", "float"]],
-            Dict[Literal["identifier", "type"], Literal["passed", "bool"]],
-            Dict[Literal["identifier", "type"], Literal["label", "str"]],
-            Dict[Literal["identifier", "type"], Literal["details", "str"]],
-        ]
-    ] = []
+    outputs: List[Field] = []
 
 
 Component = Union[BaseComponent, Entry, Signature, Module, Evaluator]
