@@ -2,8 +2,8 @@ export function LLMIcon() {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"
-      width="77"
-      height="77"
+      width="17"
+      height="17"
       fill="none"
       viewBox="0 0 77 77"
     >
