@@ -20,6 +20,11 @@ export const DSPY_STEPS_INDEX: IndexSpec = {
   alias: "search-dspy-steps-alias",
 };
 
+export const BATCH_EVALUATION_INDEX: IndexSpec = {
+  base: "search-batch-evaluations",
+  alias: "search-batch-evaluations-alias",
+};
+
 export const OPENAI_EMBEDDING_DIMENSION = 1536;
 
 export const esClient = env.IS_OPENSEARCH
@@ -182,3 +187,11 @@ export const dspyStepIndexId = ({
   runId: string;
   index: string;
 }) => `${projectId}/${runId}/${index}`;
+
+export const batchEvaluationId = ({
+  projectId,
+  runId,
+}: {
+  projectId: string;
+  runId: string;
+}) => `${projectId}/${runId}`;

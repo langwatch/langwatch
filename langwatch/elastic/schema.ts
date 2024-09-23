@@ -6,7 +6,10 @@ import {
   FLATENNED_TYPE,
   OPENAI_EMBEDDING_DIMENSION,
 } from "../src/server/elasticsearch";
-import type { DSPyStep } from "../src/server/experiments/types";
+import type {
+  DSPyStep,
+  ESBatchEvaluation,
+} from "../src/server/experiments/types";
 import {
   type ElasticSearchEvent,
   type ElasticSearchSpan,
@@ -305,6 +308,7 @@ export const dspyStepsMapping: ElasticSearchMappingFrom<DSPyStep> = {
   project_id: { type: "keyword" },
   experiment_id: { type: "keyword" },
   run_id: { type: "keyword" },
+  workflow_version_id: { type: "keyword" },
   index: { type: "keyword" },
   score: { type: "float" },
   label: { type: "keyword" },
@@ -352,15 +356,17 @@ export const dspyStepsMapping: ElasticSearchMappingFrom<DSPyStep> = {
   },
 };
 
-export const batchEvaluationMapping: ElasticSearchMappingFrom<BatchEvaluation> =
+export const batchEvaluationMapping: ElasticSearchMappingFrom<ESBatchEvaluation> =
   {
     project_id: { type: "keyword" },
     experiment_id: { type: "keyword" },
     run_id: { type: "keyword" },
+    workflow_version_id: { type: "keyword" },
     dataset: {
       properties: {
         index: { type: "keyword" },
         entry: { type: FLATENNED_TYPE } as any,
+        cost: { type: "float" },
       },
     },
     evaluations: {
@@ -374,6 +380,13 @@ export const batchEvaluationMapping: ElasticSearchMappingFrom<BatchEvaluation> =
         details: { type: "text" },
         cost: { type: "float" },
         inputs: { type: FLATENNED_TYPE } as any,
+      },
+    },
+    timestamps: {
+      properties: {
+        created_at: { type: "date" },
+        inserted_at: { type: "date" },
+        updated_at: { type: "date" },
       },
     },
   };

@@ -1,0 +1,2 @@
+-- AlterEnum
+ALTER TYPE "ExperimentType" ADD VALUE 'BATCH_EVALUATION_V2';

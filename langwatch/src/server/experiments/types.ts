@@ -38,6 +38,7 @@ export type DSPyPredictor = {
 export type DSPyStep = {
   project_id: string;
   run_id: string;
+  workflow_version_id?: string;
   experiment_id: string;
   index: string;
   score: number;
@@ -87,4 +88,41 @@ export type DSPyRunsSummary = {
   runId: string;
   steps: DSPyStepSummary[];
   created_at: number;
+};
+
+export type ESBatchEvaluation = {
+  project_id: string;
+  experiment_id: string;
+  run_id: string;
+  workflow_version_id?: string;
+  dataset: {
+    index: string;
+    entry: Record<string, any>;
+    cost: number;
+  }[];
+  evaluations: {
+    evaluator: string;
+    index: string;
+    score: number;
+    label: string;
+    passed: boolean;
+    details: string;
+    cost: number;
+    inputs: Record<string, any>;
+  }[];
+  timestamps: {
+    created_at: number;
+    inserted_at: number;
+    updated_at: number;
+  };
+};
+
+export type ESBatchEvaluationRESTParams = Omit<
+  ESBatchEvaluation,
+  "project_id" | "experiment_id" | "timestamps"
+> & {
+  experiment_slug: string;
+  timestamps: {
+    created_at: number;
+  };
 };

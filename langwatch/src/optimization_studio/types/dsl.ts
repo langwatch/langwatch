@@ -134,9 +134,8 @@ export type Workflow = {
       };
     };
     experiment?: {
-      experiment_id?: string;
+      experiment_slug?: string;
       run_id?: string;
-      run_name?: string;
       state?: ExecutionStatus;
       timestamps?: {
         started_at?: number;

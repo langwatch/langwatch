@@ -380,6 +380,7 @@ model Trigger {
 enum ExperimentType {
     DSPY
     BATCH_EVALUATION
+    BATCH_EVALUATION_V2
 }
 
 model Experiment {
@@ -389,12 +390,15 @@ model Experiment {
     slug             String
     projectId        String
     project          Project           @relation(fields: [projectId], references: [id])
+    workflowId       String?
+    workflow         Workflow?         @relation(fields: [workflowId], references: [id])
     createdAt        DateTime          @default(now())
     updatedAt        DateTime          @default(now()) @updatedAt
     batchEvaluations BatchEvaluation[]
 
     @@unique([projectId, slug])
     @@index([projectId])
+    @@index([workflowId])
 }
 
 model Annotation {
@@ -518,6 +522,7 @@ model Workflow {
     publishedById    String?
     publishedBy      User?             @relation(fields: [publishedById], references: [id])
     archivedAt       DateTime?
+    experiments      Experiment[]
 
     @@index([projectId])
     @@index([publishedById])
