@@ -164,7 +164,7 @@ export type Workflow = {
   };
 };
 
-const LLMSignatureFlow: Flow = {
+export const LLMSignatureFlow: Flow = {
   nodes: [
     {
       id: "entry",
@@ -174,6 +174,7 @@ const LLMSignatureFlow: Flow = {
         y: 0,
       },
       data: {
+        name: "Entry",
         outputs: [
           {
             identifier: "question",
@@ -190,6 +191,7 @@ const LLMSignatureFlow: Flow = {
         y: 0,
       },
       data: {
+        name: "ChainOfThought",
         _library_ref: "builtin/ChainOfThought",
         cls: "dspy.ChainOfThought",
       },
@@ -230,6 +232,7 @@ const LLMSignatureFlow: Flow = {
         y: 0,
       },
       data: {
+        name: "ColBERTv2",
         _library_ref: "builtin/ColBERTv2",
         cls: "dspy.ColBERTv2",
         parameters: [
@@ -261,6 +264,7 @@ const LLMSignatureFlow: Flow = {
         y: 0,
       },
       data: {
+        name: "ChainOfThought",
         _library_ref: "builtin/ChainOfThought",
         cls: "dspy.ChainOfThought",
         inputs: [

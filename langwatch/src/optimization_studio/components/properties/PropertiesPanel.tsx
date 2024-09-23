@@ -52,7 +52,8 @@ export function PropertiesPanel() {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      const isPopoverOpen = document.querySelector(".chakra-popover__popper") !== null;
+      const isPopoverOpen =
+        document.querySelector(".chakra-popover__popper") !== null;
       if (e.key === "Escape" && propertiesExpanded && !isPopoverOpen) {
         setPropertiesExpanded(false);
         e.stopPropagation();

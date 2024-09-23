@@ -17,6 +17,7 @@ import { UndoRedo } from "./UndoRedo";
 import { History } from "./History";
 import DefaultEdge from "./Edge";
 import { PropertiesPanel } from "./properties/PropertiesPanel";
+import { NodeSelectionPanel } from "./nodes/NodeSelectionPanel";
 import { useSocketClient } from "../hooks/useSocketClient";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { titleCase } from "../../utils/stringCasing";
@@ -152,7 +153,7 @@ export default function OptimizationStudio() {
                 ),
               }}
             >
-              <Controls />
+              <Controls position="bottom-center" orientation="horizontal" />
               <MiniMap />
               <Background
                 variant={BackgroundVariant.Dots}
@@ -164,6 +165,7 @@ export default function OptimizationStudio() {
             </ReactFlow>
 
             <PropertiesPanel />
+            <NodeSelectionPanel />
           </Box>
         </VStack>
       </ReactFlowProvider>
