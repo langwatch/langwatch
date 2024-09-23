@@ -72,10 +72,10 @@ export function PropertiesPanel() {
   if (!selectedNode && workflowSelected) {
     return (
       <Box
-        position="absolute"
+        position={propertiesExpanded ? "absolute" : "relative"}
         top={0}
         right={0}
-        background="black"
+        background="white"
         border="1px solid"
         borderColor="gray.350"
         borderTopWidth={0}
@@ -134,6 +134,7 @@ export function PropertiesPanel() {
         }}
         transition="0.05s ease-out"
         ref={ref}
+        position={propertiesExpanded ? "absolute" : "relative"}
         top={0}
         right={0}
         background="white"

@@ -43,9 +43,11 @@ export const NodeSelectionPanel = () => {
         display={isOpen ? "block" : "none"}
         opacity={propertiesExpanded ? 0 : 1}
         visibility={propertiesExpanded ? "hidden" : "visible"}
-        transform={propertiesExpanded ? "translateX(-100%)" : "translateX(0)"}
-        transition="opacity 0.3s, visibility 0.3s, transform 0.3s"
-        position={isOpen ? "relative" : "absolute"}
+        // transform={propertiesExpanded ? "translateX(-100%)" : "translateX(0)"}
+        // transition="opacity 0.3s, visibility 0.3s, transform 0.3s"
+        position={
+          propertiesExpanded ? "absolute" : isOpen ? "relative" : "absolute"
+        }
         top={0}
         left={0}
         background="white"
