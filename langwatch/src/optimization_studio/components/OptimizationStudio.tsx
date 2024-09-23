@@ -1,4 +1,12 @@
-import { Box, HStack, Text, Tooltip, useTheme, VStack } from "@chakra-ui/react";
+import {
+  Box,
+  HStack,
+  Text,
+  Tooltip,
+  useTheme,
+  VStack,
+  Flex,
+} from "@chakra-ui/react";
 import {
   Background,
   BackgroundVariant,
@@ -6,6 +14,7 @@ import {
   MiniMap,
   ReactFlow,
   ReactFlowProvider,
+  Panel,
 } from "@xyflow/react";
 
 import "@xyflow/react/dist/style.css";
@@ -136,41 +145,44 @@ export default function OptimizationStudio() {
             </HStack>
           </HStack>
           <Box width="full" height="full" position="relative">
-            <ReactFlow
-              nodeTypes={nodeTypes}
-              edgeTypes={edgeTypes}
-              nodes={nodes}
-              edges={edges}
-              onNodesChange={onNodesChange}
-              onEdgesChange={onEdgesChange}
-              onConnect={onConnect}
-              style={{ width: "100%", height: "100%" }}
-              onPaneClick={() => {
-                setWorkflowSelected(true);
-              }}
-              defaultViewport={{
-                zoom: 1,
-                x: 100,
-                y: Math.round(
-                  ((typeof window !== "undefined"
-                    ? window.innerHeight - 360
-                    : 0) || 300) / 2
-                ),
-              }}
-            >
-              <Controls position="bottom-center" orientation="horizontal" />
-              <MiniMap />
-              <Background
-                variant={BackgroundVariant.Dots}
-                gap={12}
-                size={2}
-                bgColor={gray100}
-                color={gray300}
-              />
-            </ReactFlow>
+            <Flex width="full" height="full">
+              <NodeSelectionPanel />
+              <ReactFlow
+                nodeTypes={nodeTypes}
+                edgeTypes={edgeTypes}
+                nodes={nodes}
+                edges={edges}
+                onNodesChange={onNodesChange}
+                onEdgesChange={onEdgesChange}
+                onConnect={onConnect}
+                //  style={{ width: "100%", height: "100%" }}
+                onPaneClick={() => {
+                  setWorkflowSelected(true);
+                }}
+                defaultViewport={{
+                  zoom: 1,
+                  x: 100,
+                  y: Math.round(
+                    ((typeof window !== "undefined"
+                      ? window.innerHeight - 360
+                      : 0) || 300) / 2
+                  ),
+                }}
+              >
+                <Controls position="bottom-center" orientation="horizontal" />
+                <MiniMap />
+                <Panel position="bottom-left">bottom-left</Panel>
+                <Background
+                  variant={BackgroundVariant.Dots}
+                  gap={12}
+                  size={2}
+                  bgColor={gray100}
+                  color={gray300}
+                />
+              </ReactFlow>
 
-            <PropertiesPanel />
-            <NodeSelectionPanel />
+              <PropertiesPanel />
+            </Flex>
           </Box>
         </VStack>
       </ReactFlowProvider>

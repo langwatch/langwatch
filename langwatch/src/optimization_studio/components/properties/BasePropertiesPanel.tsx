@@ -11,7 +11,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { useUpdateNodeInternals, type Node } from "@xyflow/react";
-import React from "react";
+import React, { useState } from "react";
 import { ChevronDown, Columns, Plus, Trash2, X } from "react-feather";
 import { useFieldArray, useForm } from "react-hook-form";
 import { useShallow } from "zustand/react/shallow";
@@ -267,14 +267,21 @@ export function BasePropertiesPanel({
   outputsTitle?: string;
   outputsReadOnly?: boolean;
 }) {
-  const { deselectAllNodes, propertiesExpanded, setPropertiesExpanded } =
-    useWorkflowStore(
-      useShallow((state) => ({
-        deselectAllNodes: state.deselectAllNodes,
-        propertiesExpanded: state.propertiesExpanded,
-        setPropertiesExpanded: state.setPropertiesExpanded,
-      }))
-    );
+  const {
+    deselectAllNodes,
+    propertiesExpanded,
+    setPropertiesExpanded,
+    setNode,
+  } = useWorkflowStore(
+    useShallow((state) => ({
+      deselectAllNodes: state.deselectAllNodes,
+      propertiesExpanded: state.propertiesExpanded,
+      setPropertiesExpanded: state.setPropertiesExpanded,
+      setNode: state.setNode,
+    }))
+  );
+
+  const [isEditingName, setIsEditingName] = useState(false);
 
   const isWorkflow = (node: Node<Component> | Workflow): node is Workflow =>
     !("data" in node);
@@ -300,9 +307,43 @@ export function BasePropertiesPanel({
                 cls={node.data.cls}
                 size="lg"
               />
-              <Text fontSize={16} fontWeight={500}>
-                {getNodeDisplayName(node)}
-              </Text>
+              {isEditingName ? (
+                <Input
+                  fontSize={16}
+                  marginLeft={1}
+                  fontWeight={500}
+                  width="190px"
+                  variant="outline"
+                  background="transparent"
+                  value={node.data.name}
+                  borderRadius={5}
+                  paddingLeft={1}
+                  margin={0}
+                  size="sm"
+                  onBlur={() => setIsEditingName(false)}
+                  onChange={(e) => {
+                    setNode({
+                      id: node.id,
+                      data: {
+                        name: e.target.value,
+                      },
+                    });
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      setIsEditingName(false);
+                    }
+                  }}
+                />
+              ) : (
+                <Text
+                  fontSize={16}
+                  fontWeight={500}
+                  onClick={() => setIsEditingName(true)}
+                >
+                  {getNodeDisplayName(node)}
+                </Text>
+              )}
             </>
           ) : null}
         </HStack>
@@ -310,7 +351,12 @@ export function BasePropertiesPanel({
         <HStack spacing={0} marginRight="-4px">
           {!isWorkflow(node) && isExecutableComponent(node) && (
             <>
-              <HStack spacing={3}>
+              <HStack
+                spacing={3}
+                onClick={() => {
+                  setPropertiesExpanded(!propertiesExpanded);
+                }}
+              >
                 <ComponentExecutionButton
                   node={node}
                   size="sm"
@@ -322,7 +368,9 @@ export function BasePropertiesPanel({
                 variant="ghost"
                 size="sm"
                 color="gray.500"
-                onClick={() => setPropertiesExpanded(!propertiesExpanded)}
+                onClick={() => {
+                  setPropertiesExpanded(!propertiesExpanded);
+                }}
               >
                 <Columns size={16} />
               </Button>

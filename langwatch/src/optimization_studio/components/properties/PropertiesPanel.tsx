@@ -75,7 +75,7 @@ export function PropertiesPanel() {
         position="absolute"
         top={0}
         right={0}
-        background="white"
+        background="black"
         border="1px solid"
         borderColor="gray.350"
         borderTopWidth={0}
@@ -134,7 +134,6 @@ export function PropertiesPanel() {
         }}
         transition="0.05s ease-out"
         ref={ref}
-        position="absolute"
         top={0}
         right={0}
         background="white"
