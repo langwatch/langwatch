@@ -119,7 +119,7 @@ export default async function handler(
           extra: { projectId: project.id, param },
         });
 
-        const validationError = fromZodError(error as ZodError);
+        const validationError = fromZodError(error);
         return res.status(400).json({ error: validationError.message });
       } else {
         debug(

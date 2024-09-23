@@ -2,6 +2,7 @@ import {
   getProjectModelProviders,
   prepareLitellmParams,
 } from "../../server/api/routers/modelProviders";
+import { prisma } from "../../server/db";
 import type { MaybeStoredModelProvider } from "../../server/modelProviders/registry";
 import type { LLMConfig, Workflow } from "../types/dsl";
 import type { StudioClientEvent } from "../types/events";
@@ -14,10 +15,21 @@ export const addEnvs = async (
     return event;
   }
 
-  const modelProviders = await getProjectModelProviders(projectId);
+  const [modelProviders, { apiKey }] = await Promise.all([
+    getProjectModelProviders(projectId),
+    prisma.project.findUniqueOrThrow({
+      where: {
+        id: projectId,
+      },
+      select: {
+        apiKey: true,
+      },
+    }),
+  ]);
 
-  const workflow: Workflow = {
+  const workflow: Workflow & { api_key: string } = {
     ...event.payload.workflow,
+    api_key: apiKey,
     default_llm: addLiteLLMParams(
       event.payload.workflow.default_llm,
       modelProviders

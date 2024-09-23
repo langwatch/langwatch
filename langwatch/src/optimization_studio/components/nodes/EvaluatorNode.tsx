@@ -3,5 +3,5 @@ import { ComponentNode } from "./Nodes";
 import type { Evaluator } from "../../types/dsl";
 
 export function EvaluatorNode(props: NodeProps<Node<Evaluator>>) {
-  return <ComponentNode {...props} />;
+  return <ComponentNode {...props} hideOutputHandles />;
 }

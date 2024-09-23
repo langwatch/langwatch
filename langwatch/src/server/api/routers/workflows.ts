@@ -127,13 +127,13 @@ export const workflowRouter = createTRPCRouter({
         orderBy: { createdAt: "desc" },
       });
 
-      const versionsWithoutAllDsls = versions as unknown as (Unpacked<
+      const versionsWithTags = versions as unknown as (Unpacked<
         typeof versions
       > & {
         isCurrentVersion?: boolean;
         isLatestVersion?: boolean;
       })[];
-      for (const version of versionsWithoutAllDsls) {
+      for (const version of versionsWithTags) {
         if (version.id === workflow?.currentVersionId) {
           version.isCurrentVersion = true;
         }
@@ -142,7 +142,7 @@ export const workflowRouter = createTRPCRouter({
         }
       }
 
-      return versionsWithoutAllDsls;
+      return versionsWithTags;
     }),
 
   restoreVersion: protectedProcedure
@@ -192,6 +192,7 @@ export const workflowRouter = createTRPCRouter({
         projectId: z.string(),
         workflowId: z.string(),
         dsl: workflowJsonSchema,
+        setAsLatestVersion: z.boolean(),
       })
     )
     .use(checkUserPermissionForProject(TeamRoleGroup.WORKFLOWS_MANAGE))
@@ -201,6 +202,7 @@ export const workflowRouter = createTRPCRouter({
         input,
         autoSaved: true,
         commitMessage: "Autosaved",
+        setAsLatestVersion: input.setAsLatestVersion,
       });
 
       return updatedVersion;
@@ -298,6 +300,7 @@ const saveOrCommitWorkflowVersion = async ({
   input,
   autoSaved,
   commitMessage,
+  setAsLatestVersion = true,
 }: {
   ctx: { prisma: PrismaClient; session: Session };
   input: {
@@ -307,6 +310,7 @@ const saveOrCommitWorkflowVersion = async ({
   };
   autoSaved: boolean;
   commitMessage: string;
+  setAsLatestVersion?: boolean;
 }): Promise<WorkflowVersion> => {
   const workflow = await ctx.prisma.workflow.findUnique({
     where: {
@@ -363,8 +367,10 @@ const saveOrCommitWorkflowVersion = async ({
       name: input.dsl.name,
       icon: input.dsl.icon,
       description: input.dsl.description,
-      latestVersionId: updatedVersion.id,
       currentVersionId: updatedVersion.id,
+      latestVersionId: setAsLatestVersion
+        ? updatedVersion.id
+        : latestVersion?.id,
     },
   });
 

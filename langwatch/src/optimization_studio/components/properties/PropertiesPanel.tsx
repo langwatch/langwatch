@@ -99,7 +99,7 @@ export function PropertiesPanel() {
   const panelWidth = ref.current?.offsetWidth ?? 350;
   const halfPanelWidth = Math.round(panelWidth / 2);
   const middlePoint = Math.round(width / 2 - halfPanelWidth);
-  const topPanelHeight = 41;
+  const topPanelHeight = 49;
   const fullPanelHeight = height - topPanelHeight;
 
   // TODO: close on X if expanded

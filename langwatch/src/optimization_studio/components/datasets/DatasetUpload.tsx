@@ -6,9 +6,10 @@ import {
   useDisclosure,
   VStack,
 } from "@chakra-ui/react";
-import { type Node, type NodeProps } from "@xyflow/react";
-import type { Component, Entry } from "../../types/dsl";
 import { nanoid } from "nanoid";
+import { useState } from "react";
+import { AddOrEditDatasetDrawer } from "../../../components/AddOrEditDatasetDrawer";
+import type { InMemoryDataset } from "../../../components/datasets/DatasetTable";
 import {
   CSVReaderComponent,
   MAX_ROWS_LIMIT,
@@ -17,9 +18,7 @@ import type {
   DatasetColumns,
   DatasetRecordEntry,
 } from "../../../server/datasets/types";
-import { AddOrEditDatasetDrawer } from "../../../components/AddOrEditDatasetDrawer";
-import { useState } from "react";
-import type { InMemoryDataset } from "../../../components/datasets/DatasetTable";
+import type { Entry } from "../../types/dsl";
 
 export function DatasetUpload({
   setIsEditing,

@@ -3,6 +3,7 @@ from typing import Dict, Optional, Union
 from pydantic import BaseModel
 from typing_extensions import Literal
 from langwatch_nlp.studio.types.dsl import (
+    EvaluationExecutionState,
     ExecutionState,
     ExecutionStatus,
     Node,
@@ -50,6 +51,16 @@ class ExecuteFlow(BaseModel):
     payload: ExecuteFlowPayload
 
 
+class ExecuteEvaluationPayload(BaseModel):
+    run_id: str
+    workflow: Workflow
+
+
+class ExecuteEvaluation(BaseModel):
+    type: Literal["execute_evaluation"] = "execute_evaluation"
+    payload: ExecuteEvaluationPayload
+
+
 StudioClientEvent = Union[IsAlive, ExecuteComponent, StopExecution, ExecuteFlow]
 
 
@@ -74,6 +85,15 @@ class ExecutionStateChangePayload(BaseModel):
 class ExecutionStateChange(BaseModel):
     type: Literal["execution_state_change"] = "execution_state_change"
     payload: ExecutionStateChangePayload
+
+
+class EvaluationStateChangePayload(BaseModel):
+    evaluation_state: EvaluationExecutionState
+
+
+class EvaluationStateChange(BaseModel):
+    type: Literal["evaluation_state_change"] = "evaluation_state_change"
+    payload: EvaluationStateChangePayload
 
 
 class DebugPayload(BaseModel):
@@ -121,7 +141,9 @@ def start_component_event(
     )
 
 
-def end_component_event(node: Node, trace_id: str, outputs: Dict[str, str], cost: Optional[float] = None):
+def end_component_event(
+    node: Node, trace_id: str, outputs: Dict[str, str], cost: Optional[float] = None
+):
     return ComponentStateChange(
         payload=ComponentStateChangePayload(
             component_id=node.id,

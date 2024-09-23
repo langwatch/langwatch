@@ -32,6 +32,7 @@ import dspy
 def test_parse_workflow():
     disable_dsp_caching()
     workflow = Workflow(
+        api_key="",
         spec_version="1.0",
         name="Simple RAG",
         icon="🧩",
@@ -303,7 +304,7 @@ def test_parse_workflow():
                 type="default",
             ),
         ],
-        state=WorkflowState(execution=None, experiment=None),
+        state=WorkflowState(execution=None, evaluation=None),
     )
 
     module = WorkflowModule(workflow, execute_evaluators=False)

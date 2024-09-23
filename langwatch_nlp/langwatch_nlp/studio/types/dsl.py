@@ -186,20 +186,22 @@ class WorkflowExecutionState(BaseModel):
     timestamps: Optional[Timestamps] = None
 
 
-class ExperimentState(BaseModel):
+class EvaluationExecutionState(BaseModel):
     experiment_id: Optional[str] = None
     run_id: Optional[str] = None
     run_name: Optional[str] = None
-    state: Optional[ExecutionStatus] = None
+    status: Optional[ExecutionStatus] = None
+    error: Optional[str] = None
     timestamps: Optional[Timestamps] = None
 
 
 class WorkflowState(BaseModel):
     execution: Optional[WorkflowExecutionState] = None
-    experiment: Optional[ExperimentState] = None
+    evaluation: Optional[EvaluationExecutionState] = None
 
 
 class Workflow(BaseModel):
+    api_key: str
     spec_version: str
     name: str
     icon: str

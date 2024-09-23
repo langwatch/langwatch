@@ -13,7 +13,7 @@ import {
 } from "@chakra-ui/react";
 import Parse from "papaparse";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Edit2, Play, Plus, Save, Upload } from "react-feather";
+import { Edit2, Play, Plus, Upload } from "react-feather";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
 import { useDrawer } from "../CurrentDrawer";

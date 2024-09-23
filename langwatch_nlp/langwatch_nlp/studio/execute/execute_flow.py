@@ -52,7 +52,11 @@ async def execute_flow(event: ExecuteFlowPayload, queue: "Queue[StudioServerEven
             "Dataset is empty, please add at least one entry and try again"
         )
 
-    result = module(**entries[0])
+    try:
+        result = module(**entries[0])
+    except Exception as e:
+        yield error_workflow_event(trace_id, str(e))
+        return
 
     # cost = result.get_cost() if hasattr(result, "get_cost") else None
 
@@ -78,6 +82,18 @@ def end_workflow_event(workflow: Workflow, trace_id: str):
                 status=ExecutionStatus.success,
                 trace_id=trace_id,
                 timestamps=Timestamps(finished_at=int(time.time() * 1000)),
+            )
+        )
+    )
+
+
+def error_workflow_event(trace_id: str, error: str):
+    return ExecutionStateChange(
+        payload=ExecutionStateChangePayload(
+            execution_state=WorkflowExecutionState(
+                status=ExecutionStatus.error,
+                trace_id=trace_id,
+                error=error,
             )
         )
     )

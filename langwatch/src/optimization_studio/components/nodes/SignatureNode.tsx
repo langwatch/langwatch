@@ -1,4 +1,4 @@
-import { HStack, Text } from "@chakra-ui/react";
+import { HStack } from "@chakra-ui/react";
 import { type Node, type NodeProps } from "@xyflow/react";
 import type { Signature } from "../../types/dsl";
 import { LLMModelDisplay } from "../properties/modals/LLMConfigModal";

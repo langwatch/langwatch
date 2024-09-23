@@ -134,10 +134,11 @@ export type Workflow = {
         finished_at?: number;
       };
     };
-    experiment?: {
+    evaluation?: {
       experiment_slug?: string;
       run_id?: string;
-      state?: ExecutionStatus;
+      status?: ExecutionStatus;
+      error?: string;
       timestamps?: {
         started_at?: number;
         finished_at?: number;

@@ -53,7 +53,10 @@ type WorkflowStore = State & {
     executionState: BaseComponent["execution_state"]
   ) => void;
   setWorkflowExecutionState: (
-    executionState: Workflow["state"]["execution"]
+    executionState: Partial<Workflow["state"]["execution"]>
+  ) => void;
+  setEvaluationState: (
+    evaluationState: Partial<Workflow["state"]["evaluation"]>
   ) => void;
   setHoveredNodeId: (nodeId: string | undefined) => void;
   setSelectedNode: (nodeId: string) => void;
@@ -202,6 +205,16 @@ const store = (
           ...(get().state.execution ?? {}),
           ...executionState,
         } as Workflow["state"]["execution"],
+      },
+    });
+  },
+  setEvaluationState: (
+    evaluationState: Partial<Workflow["state"]["evaluation"]>
+  ) => {
+    set({
+      state: {
+        ...get().state,
+        evaluation: { ...(get().state.evaluation ?? {}), ...evaluationState },
       },
     });
   },

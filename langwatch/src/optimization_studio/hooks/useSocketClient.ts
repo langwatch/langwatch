@@ -32,6 +32,7 @@ export const useSocketClient = () => {
     setSocketStatus,
     setComponentExecutionState,
     setWorkflowExecutionState,
+    setEvaluationState,
     getWorkflow,
     setSelectedNode,
     setPropertiesExpanded,
@@ -40,6 +41,7 @@ export const useSocketClient = () => {
     setSocketStatus: state.setSocketStatus,
     setComponentExecutionState: state.setComponentExecutionState,
     setWorkflowExecutionState: state.setWorkflowExecutionState,
+    setEvaluationState: state.setEvaluationState,
     getWorkflow: state.getWorkflow,
     setSelectedNode: state.setSelectedNode,
     setPropertiesExpanded: state.setPropertiesExpanded,
@@ -67,19 +69,30 @@ export const useSocketClient = () => {
         error: message,
         timestamps: { finished_at: Date.now() },
       });
-      if (message == "Interrupted") {
-        for (const node of getWorkflow().nodes) {
-          if (node.data.execution_state?.status === "running") {
-            setComponentExecutionState(node.id, {
-              status: "error",
-              error: message,
-              timestamps: { finished_at: Date.now() },
-            });
-          }
+      for (const node of getWorkflow().nodes) {
+        if (node.data.execution_state?.status === "running") {
+          setComponentExecutionState(node.id, {
+            status: "error",
+            error: message,
+            timestamps: { finished_at: Date.now() },
+          });
         }
       }
     },
     [setWorkflowExecutionState, getWorkflow, setComponentExecutionState]
+  );
+
+  const alertOnError = useCallback(
+    (message: string | undefined) => {
+      toast({
+        title: "Error",
+        description: message,
+        status: "error",
+        duration: 5000,
+        isClosable: true,
+      });
+    },
+    [toast]
   );
 
   const handleMessage = useCallback(
@@ -102,7 +115,6 @@ export const useSocketClient = () => {
           );
           if (data.payload.execution_state?.status === "error") {
             checkIfUnreachableErrorMessage(data.payload.execution_state.error);
-            stopWorkflowIfRunning(data.payload.execution_state.error);
             alertOnComponent({
               componentId: data.payload.component_id,
               execution_state: data.payload.execution_state,
@@ -120,17 +132,21 @@ export const useSocketClient = () => {
           break;
         case "execution_state_change":
           setWorkflowExecutionState(data.payload.execution_state);
+          if (data.payload.execution_state?.status === "error") {
+            alertOnError(data.payload.execution_state.error);
+            stopWorkflowIfRunning(data.payload.execution_state.error);
+          }
+          break;
+        case "evaluation_state_change":
+          setEvaluationState(data.payload.evaluation_state);
+          if (data.payload.evaluation_state?.status === "error") {
+            alertOnError(data.payload.evaluation_state.error);
+          }
           break;
         case "error":
           checkIfUnreachableErrorMessage(data.payload.message);
           stopWorkflowIfRunning(data.payload.message);
-          toast({
-            title: "Error",
-            description: data.payload.message,
-            status: "error",
-            duration: 5000,
-            isClosable: true,
-          });
+          alertOnError(data.payload.message);
           break;
         case "debug":
           break;
@@ -157,7 +173,9 @@ export const useSocketClient = () => {
       setSelectedNode,
       setSocketStatus,
       setWorkflowExecutionState,
+      setEvaluationState,
       stopWorkflowIfRunning,
+      alertOnError,
       toast,
     ]
   );

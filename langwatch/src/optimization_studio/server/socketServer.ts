@@ -61,6 +61,9 @@ const handleClientMessage = async (
       case "execute_flow":
         await callPython(ws, message);
         break;
+      case "execute_evaluation":
+        await callPython(ws, message);
+        break;
       default:
         //@ts-expect-error
         sendErrorToClient(ws, `Unknown event type on server: ${message.type}`);
