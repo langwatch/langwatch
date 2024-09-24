@@ -53,12 +53,7 @@ export function BatchEvaluationV2({
   return (
     <HStack align="start" width="full" height="full">
       <BatchEvaluationV2RunList project={project} experiment={experiment} />
-      <VStack
-        align="start"
-        width="calc(100vw - 398px)"
-        spacing={8}
-        padding={6}
-      >
+      <VStack align="start" width="calc(100vw - 398px)" spacing={8} padding={6}>
         <HStack width="full" align="end" spacing={6}>
           <Heading as="h1" size="lg">
             {experiment.name ?? experiment.slug}
@@ -472,7 +467,11 @@ export function BatchEvaluationV2EvaluationResult({
                         )
                       : "-"}
                   </Td>
-                  <Td>{datasetEntry?.duration ?? "-"}</Td>
+                  <Td>
+                    {datasetEntry?.duration
+                      ? formatMilliseconds(datasetEntry.duration)
+                      : "-"}
+                  </Td>
 
                   {Array.from(evaluationResultsColumns).map((column) => {
                     const value = (evaluation as any)[column];

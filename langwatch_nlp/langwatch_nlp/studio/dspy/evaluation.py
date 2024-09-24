@@ -29,11 +29,13 @@ class PredictionWithEvaluationCostAndDuration(PredictionWithCostAndDuration):
             float | tuple[float, dict],
         ],
         cost: float,
+        duration: int,
         **kwargs,
     ):
         super().__init__(**kwargs)
         self._evaluation = evaluation
         self._cost = cost
+        self._duration = duration
 
     @overload
     def evaluation(
@@ -93,8 +95,7 @@ class EvaluationReporting:
         pred: PredictionWithEvaluationCostAndDuration,
         evaluation_results: dict[str, EvaluationResultWithMetadata],
     ):
-        entry = dict(example)
-        del entry["_index"]
+        entry = dict(example.inputs())
         cost = pred.get_cost() if hasattr(pred, "get_cost") else None
         duration = pred.get_duration() if hasattr(pred, "get_duration") else None
 

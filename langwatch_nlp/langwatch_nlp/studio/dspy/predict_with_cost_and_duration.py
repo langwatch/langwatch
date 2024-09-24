@@ -26,8 +26,7 @@ class PredictWithCostAndDuration(dspy.Predict):
     def forward(self, *args, **kwargs):
         start_time = time.time()
         response = super().forward(*args, **kwargs)
-        end_time = time.time()
-        duration = round((end_time - start_time) * 1000)
+        duration = round((time.time() - start_time) * 1000)
 
         lm = cast(DSPyLiteLLM, self.get_lm())
         response.__class__ = PredictionWithCostAndDuration

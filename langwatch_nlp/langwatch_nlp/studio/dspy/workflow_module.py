@@ -119,14 +119,17 @@ class WorkflowModule(ReportingModule):
         loops = 0
         stop = False
         cost = 0
+        duration = 0
         while len(executed_nodes) < len(executable_nodes):
             if loops >= len(executable_nodes):
                 raise Exception("Workflow has a loop")
             loops += 1
             for node in executable_nodes:
                 if node.id not in executed_nodes and has_all_inputs(node):
+                    start_time = time.time()
                     result = self.execute_node(node, node_outputs, inputs) or {}
                     cost += result.get_cost() if hasattr(result, "get_cost") else 0  # type: ignore
+                    duration += round((time.time() - start_time) * 1000)
                     node_outputs[node.id] = result  # type: ignore
                     executed_nodes.add(node.id)
 
@@ -172,6 +175,7 @@ class WorkflowModule(ReportingModule):
         return PredictionWithEvaluationCostAndDuration(
             evaluation=self.evaluate_prediction,
             cost=cost,
+            duration=duration,
             **node_outputs,
         )
 
