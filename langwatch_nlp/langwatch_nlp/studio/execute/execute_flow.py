@@ -102,6 +102,12 @@ def error_workflow_event(trace_id: str, error: str):
 def validate_workflow(workflow: Workflow) -> None:
     connected_inputs: Dict[str, Set[str]] = {node.id: set() for node in workflow.nodes}
 
+    entry_node = next(
+        (node for node in workflow.nodes if isinstance(node.data, Entry)), None
+    )
+    if not entry_node:
+        raise ClientReadableValueError("Entry node is missing")
+
     # Map edges to connected inputs
     for edge in workflow.edges:
         target_id, target_field = edge.target, edge.targetHandle.split(".")[-1]

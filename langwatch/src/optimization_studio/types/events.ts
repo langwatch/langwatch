@@ -31,6 +31,7 @@ export type StudioClientEvent =
       payload: {
         run_id: string;
         workflow: Workflow;
+        workflow_version_id: string;
       };
     };
 

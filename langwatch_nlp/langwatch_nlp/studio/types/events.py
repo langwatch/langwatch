@@ -54,6 +54,7 @@ class ExecuteFlow(BaseModel):
 class ExecuteEvaluationPayload(BaseModel):
     run_id: str
     workflow: Workflow
+    workflow_version_id: str
 
 
 class ExecuteEvaluation(BaseModel):
@@ -61,7 +62,9 @@ class ExecuteEvaluation(BaseModel):
     payload: ExecuteEvaluationPayload
 
 
-StudioClientEvent = Union[IsAlive, ExecuteComponent, StopExecution, ExecuteFlow]
+StudioClientEvent = Union[
+    IsAlive, ExecuteComponent, StopExecution, ExecuteFlow, ExecuteEvaluation
+]
 
 
 class IsAliveResponse(BaseModel):
@@ -119,7 +122,13 @@ class Done(BaseModel):
 
 
 StudioServerEvent = Union[
-    IsAliveResponse, ComponentStateChange, ExecutionStateChange, Debug, Error, Done
+    IsAliveResponse,
+    ComponentStateChange,
+    ExecutionStateChange,
+    EvaluationStateChange,
+    Debug,
+    Error,
+    Done,
 ]
 
 

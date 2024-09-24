@@ -57,7 +57,7 @@ export function HistoryPopover({ onClose }: { onClose: () => void }) {
   const { project } = useOrganizationTeamProject();
   const { workflowId, getWorkflow, setWorkflow, setPreviousWorkflow } =
     useWorkflowStore(
-      ({ workflowId, getWorkflow, setWorkflow, setPreviousWorkflow }) => ({
+      ({ workflow_id: workflowId, getWorkflow, setWorkflow, setPreviousWorkflow }) => ({
         workflowId,
         getWorkflow,
         setWorkflow,
@@ -320,15 +320,14 @@ export const useVersionState = ({
   form?: UseFormReturn<{ version: string; commitMessage: string }>;
   allowSaveIfAutoSaveIsCurrentButNotLatest?: boolean;
 }) => {
-  const { workflowId, version, getWorkflow, previousWorkflow } =
-    useWorkflowStore(
-      ({ workflowId, version, getWorkflow, previousWorkflow }) => ({
-        workflowId,
-        version,
-        getWorkflow,
-        previousWorkflow,
-      })
-    );
+  const { workflowId, getWorkflow, previousWorkflow } = useWorkflowStore(
+    ({ workflow_id: workflowId, version, getWorkflow, previousWorkflow }) => ({
+      workflowId,
+      version,
+      getWorkflow,
+      previousWorkflow,
+    })
+  );
 
   const versions = api.workflow.getVersions.useQuery(
     {
@@ -347,17 +346,50 @@ export const useVersionState = ({
     ? hasDSLChange(getWorkflow(), previousWorkflow, true)
     : false;
   const canSaveNewVersion = !!(
-    hasChanges ||
-    latestVersion?.autoSaved ||
+    !!latestVersion?.autoSaved ||
     (allowSaveIfAutoSaveIsCurrentButNotLatest && currentVersion?.autoSaved)
   );
 
-  const [versionMajor, versionMinor] = version.split(".");
+  const [versionMajor, versionMinor] = latestVersion?.version.split(".") ?? [
+    "0",
+    "0",
+  ];
   const nextVersion = useMemo(() => {
-    return currentVersion?.autoSaved
-      ? currentVersion.version
+    return latestVersion?.autoSaved
+      ? latestVersion.version
       : `${versionMajor}.${parseInt(versionMinor ?? "0") + 1}`;
-  }, [versionMajor, versionMinor, currentVersion]);
+  }, [
+    latestVersion?.autoSaved,
+    latestVersion?.version,
+    versionMajor,
+    versionMinor,
+  ]);
+
+  const versionToBeEvaluated = useMemo(() => {
+    return canSaveNewVersion
+      ? { id: "", version: nextVersion, commitMessage: "" }
+      : currentVersion?.autoSaved
+      ? {
+          id: currentVersion?.parent?.id,
+          version: currentVersion?.parent?.version,
+          commitMessage: currentVersion?.parent?.commitMessage,
+        }
+      : {
+          id: currentVersion?.id,
+          version: currentVersion?.version,
+          commitMessage: currentVersion?.commitMessage,
+        };
+  }, [
+    canSaveNewVersion,
+    currentVersion?.autoSaved,
+    currentVersion?.commitMessage,
+    currentVersion?.id,
+    currentVersion?.parent?.commitMessage,
+    currentVersion?.parent?.id,
+    currentVersion?.parent?.version,
+    currentVersion?.version,
+    nextVersion,
+  ]);
 
   useEffect(() => {
     if (form) {
@@ -372,6 +404,7 @@ export const useVersionState = ({
     hasChanges,
     canSaveNewVersion,
     nextVersion,
+    versionToBeEvaluated,
   };
 };
 

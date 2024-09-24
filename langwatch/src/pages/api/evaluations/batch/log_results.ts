@@ -70,9 +70,9 @@ export default async function handler(
 
   // TODO: check for plan limits here?
 
-  let params: ESBatchEvaluationRESTParams[];
+  let params: ESBatchEvaluationRESTParams;
   try {
-    params = z.array(eSBatchEvaluationRESTParamsSchema).parse(req.body);
+    params = eSBatchEvaluationRESTParamsSchema.parse(req.body);
   } catch (error) {
     debug(
       "Invalid log_results data received",
@@ -87,52 +87,48 @@ export default async function handler(
     return res.status(400).json({ error: validationError.message });
   }
 
-  for (const param of params) {
-    if (
-      param.timestamps.created_at &&
-      param.timestamps.created_at.toString().length === 10
-    ) {
-      debug(
-        "Timestamps not in milliseconds for batch evaluation run",
-        param.run_id,
-        "on experiment",
-        param.experiment_slug
-      );
-      return res.status(400).json({
-        error:
-          "Timestamps should be in milliseconds not in seconds, please multiply it by 1000",
-      });
-    }
+  if (
+    params.timestamps.created_at &&
+    params.timestamps.created_at.toString().length === 10
+  ) {
+    debug(
+      "Timestamps not in milliseconds for batch evaluation run",
+      params.run_id,
+      "on experiment",
+      params.experiment_slug
+    );
+    return res.status(400).json({
+      error:
+        "Timestamps should be in milliseconds not in seconds, please multiply it by 1000",
+    });
   }
 
-  for (const param of params) {
-    try {
-      await processBatchEvaluation(project, param);
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        debug(
-          "Failed to validate data for batch evaluation",
-          error,
-          JSON.stringify(param, null, "  ")
-        );
-        Sentry.captureException(error, {
-          extra: { projectId: project.id, param },
-        });
+  try {
+    await processBatchEvaluation(project, params);
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      debug(
+        "Failed to validate data for batch evaluation",
+        error,
+        JSON.stringify(params, null, "  ")
+      );
+      Sentry.captureException(error, {
+        extra: { projectId: project.id, param: params },
+      });
 
-        const validationError = fromZodError(error);
-        return res.status(400).json({ error: validationError.message });
-      } else {
-        debug(
-          "Internal server error processing batch evaluation",
-          error,
-          JSON.stringify(param, null, "  ")
-        );
-        Sentry.captureException(error, {
-          extra: { projectId: project.id, param },
-        });
+      const validationError = fromZodError(error);
+      return res.status(400).json({ error: validationError.message });
+    } else {
+      debug(
+        "Internal server error processing batch evaluation",
+        error,
+        JSON.stringify(params, null, "  ")
+      );
+      Sentry.captureException(error, {
+        extra: { projectId: project.id, param: params },
+      });
 
-        return res.status(500).json({ error: "Internal server error" });
-      }
+      return res.status(500).json({ error: "Internal server error" });
     }
   }
 
@@ -153,6 +149,7 @@ const processBatchEvaluation = async (
 
   const id = batchEvaluationId({
     projectId: project.id,
+    experimentId: experiment.id,
     runId: run_id,
   });
 

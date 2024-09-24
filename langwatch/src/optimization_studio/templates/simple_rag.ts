@@ -35,7 +35,7 @@ export const simpleRagTemplate: Workflow = {
               ],
               gold_answer: [
                 "The moon has no capital",
-                "The capital of france is Paris",
+                "Paris",
               ],
             },
             columnTypes: [

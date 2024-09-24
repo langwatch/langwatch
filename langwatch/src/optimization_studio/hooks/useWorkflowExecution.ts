@@ -14,6 +14,7 @@ export const useWorkflowExecution = () => {
 
   const [triggerTimeout, setTriggerTimeout] = useState<{
     trace_id: string;
+    timeout_on_status: "waiting" | "running";
   } | null>(null);
 
   const { getWorkflow, setWorkflowExecutionState } = useWorkflowStore(
@@ -41,7 +42,7 @@ export const useWorkflowExecution = () => {
     if (
       triggerTimeout &&
       workflow.state.execution?.trace_id === triggerTimeout.trace_id &&
-      workflow.state.execution?.status === "waiting"
+      workflow.state.execution?.status === triggerTimeout.timeout_on_status
     ) {
       setWorkflowExecutionState({
         status: "error",
@@ -49,7 +50,11 @@ export const useWorkflowExecution = () => {
         timestamps: { finished_at: Date.now() },
       });
       toast({
-        title: "Timeout starting workflow execution",
+        title: `Timeout ${
+          triggerTimeout.timeout_on_status === "waiting"
+            ? "starting"
+            : "stopping"
+        } workflow execution`,
         status: "error",
         duration: 5000,
         isClosable: true,
@@ -82,7 +87,7 @@ export const useWorkflowExecution = () => {
       sendMessage(payload);
 
       setTimeout(() => {
-        setTriggerTimeout({ trace_id });
+        setTriggerTimeout({ trace_id, timeout_on_status: "waiting" });
       }, 10_000);
     },
     [socketAvailable, getWorkflow, sendMessage, setWorkflowExecutionState]
@@ -116,6 +121,13 @@ export const useWorkflowExecution = () => {
         payload: { trace_id, node_id },
       };
       sendMessage(payload);
+
+      setTimeout(() => {
+        setTriggerTimeout({
+          trace_id,
+          timeout_on_status: "running",
+        });
+      }, 2_000);
     },
     [socketAvailable, setWorkflowExecutionState, sendMessage, getWorkflow]
   );
@@ -125,43 +137,3 @@ export const useWorkflowExecution = () => {
     stopWorkflowExecution,
   };
 };
-
-export function getInputsForExecution({
-  node,
-  inputs,
-}: {
-  node: Node<Component>;
-  inputs?: Record<string, string>;
-}): { missingFields: Field[]; inputs: Record<string, string> } {
-  const allFields = new Set(
-    node.data.inputs?.map((field) => field.identifier) ?? []
-  );
-  const requiredFields =
-    node.data.inputs?.filter((field) => !field.optional) ?? [];
-  const defaultValues = node.data.inputs?.reduce(
-    (acc, field) => {
-      if (field.defaultValue !== undefined) {
-        acc[field.identifier] = field.defaultValue;
-      }
-      return acc;
-    },
-    {} as Record<string, string>
-  );
-
-  const inputs_ = Object.fromEntries(
-    Object.entries({
-      ...defaultValues,
-      ...(node?.data.execution_state?.inputs ?? {}),
-      ...(inputs ?? {}),
-    }).filter(([key]) => allFields.has(key))
-  );
-
-  const missingFields = requiredFields.filter(
-    (field) =>
-      !(field.identifier in inputs_) ||
-      inputs_[field.identifier] === undefined ||
-      inputs_[field.identifier] === ""
-  );
-
-  return { missingFields, inputs: inputs_ };
-}

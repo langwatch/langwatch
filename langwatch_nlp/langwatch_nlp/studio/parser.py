@@ -1,5 +1,5 @@
 from langwatch_nlp.studio.dspy.lite_llm import DSPyLiteLLM
-from langwatch_nlp.studio.dspy.predict_with_cost import PredictWithCost
+from langwatch_nlp.studio.dspy.predict_with_cost_and_duration import PredictWithCostAndDuration
 from langwatch_nlp.studio.modules.registry import MODULES
 from langwatch_nlp.studio.types.dsl import Evaluator, Node, Signature, Workflow
 import dspy
@@ -51,11 +51,11 @@ def parse_signature(component: Signature, workflow: Workflow) -> type[dspy.Modul
     dspy.settings.configure(experimental=True)
 
     def __init__(self) -> None:
-        PredictWithCost.__init__(self, SignatureClass)
+        PredictWithCostAndDuration.__init__(self, SignatureClass)
         self.set_lm(lm=lm)
 
-    ModuleClass: type[PredictWithCost] = type(
-        class_name, (PredictWithCost,), {"__init__": __init__}
+    ModuleClass: type[PredictWithCostAndDuration] = type(
+        class_name, (PredictWithCostAndDuration,), {"__init__": __init__}
     )
 
     return ModuleClass

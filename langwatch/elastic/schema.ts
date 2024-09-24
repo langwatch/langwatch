@@ -364,21 +364,25 @@ export const batchEvaluationMapping: ElasticSearchMappingFrom<ESBatchEvaluation>
     workflow_version_id: { type: "keyword" },
     dataset: {
       properties: {
-        index: { type: "keyword" },
+        index: { type: "integer" },
         entry: { type: FLATENNED_TYPE } as any,
         cost: { type: "float" },
+        duration: { type: "integer" },
       },
     },
     evaluations: {
       type: "nested",
       properties: {
         evaluator: { type: "keyword" },
-        index: { type: "keyword" },
+        name: { type: "keyword" },
+        status: { type: "keyword" },
+        index: { type: "integer" },
         score: { type: "float" },
         label: { type: "keyword" },
         passed: { type: "boolean" },
         details: { type: "text" },
         cost: { type: "float" },
+        duration: { type: "integer" },
         inputs: { type: FLATENNED_TYPE } as any,
       },
     },

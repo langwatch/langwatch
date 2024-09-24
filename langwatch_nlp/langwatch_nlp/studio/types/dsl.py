@@ -202,6 +202,7 @@ class WorkflowState(BaseModel):
 
 class Workflow(BaseModel):
     api_key: str
+    workflow_id: str
     spec_version: str
     name: str
     icon: str

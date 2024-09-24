@@ -48,7 +48,11 @@ export const useEvaluationExecution = () => {
         timestamps: { finished_at: Date.now() },
       });
       toast({
-        title: "Timeout starting evaluation execution",
+        title: `Timeout ${
+          triggerTimeout.timeout_on_status === "waiting"
+            ? "starting"
+            : "stopping"
+        } evaluation execution`,
         status: "error",
         duration: 5000,
         isClosable: true,
@@ -56,48 +60,44 @@ export const useEvaluationExecution = () => {
     }
   }, [triggerTimeout, setEvaluationState, getWorkflow, toast]);
 
-  const startEvaluationExecution = useCallback(() => {
-    if (!socketAvailable()) {
-      return;
-    }
+  const startEvaluationExecution = useCallback(
+    ({ workflow_version_id }: { workflow_version_id: string }) => {
+      if (!socketAvailable()) {
+        return;
+      }
 
-    const run_id = `run_${nanoid()}`;
+      const run_id = `run_${nanoid()}`;
 
-    setEvaluationState({
-      status: "waiting",
-      run_id,
-    });
-
-    const payload: StudioClientEvent = {
-      type: "execute_evaluation",
-      payload: {
+      setEvaluationState({
+        status: "waiting",
         run_id,
-        workflow: getWorkflow(),
-      },
-    };
-    console.log("payload", JSON.stringify(payload, undefined, 2));
-    sendMessage(payload);
+      });
 
-    setTimeout(() => {
-      setTriggerTimeout({ run_id, timeout_on_status: "waiting" });
-    }, 10_000);
-  }, [socketAvailable, getWorkflow, sendMessage, setEvaluationState]);
+      const payload: StudioClientEvent = {
+        type: "execute_evaluation",
+        payload: {
+          run_id,
+          workflow: getWorkflow(),
+          workflow_version_id,
+        },
+      };
+      sendMessage(payload);
+
+      setTimeout(() => {
+        setTriggerTimeout({ run_id, timeout_on_status: "waiting" });
+      }, 10_000);
+    },
+    [socketAvailable, getWorkflow, sendMessage, setEvaluationState]
+  );
 
   const stopEvaluationExecution = useCallback(
-    ({
-      run_id,
-      node_id,
-    }: {
-      run_id: string;
-      node_id: string;
-      current_state: BaseComponent["execution_state"];
-    }) => {
+    ({ run_id }: { run_id: string }) => {
       if (!socketAvailable()) {
         return;
       }
 
       const workflow = getWorkflow();
-      const current_state = workflow.state.execution?.status;
+      const current_state = workflow.state.evaluation?.status;
       if (current_state === "waiting") {
         setEvaluationState({
           status: "idle",
@@ -108,7 +108,7 @@ export const useEvaluationExecution = () => {
 
       const payload: StudioClientEvent = {
         type: "stop_execution",
-        payload: { trace_id: run_id, node_id },
+        payload: { trace_id: run_id },
       };
       sendMessage(payload);
 
@@ -127,43 +127,3 @@ export const useEvaluationExecution = () => {
     stopEvaluationExecution,
   };
 };
-
-export function getInputsForExecution({
-  node,
-  inputs,
-}: {
-  node: Node<Component>;
-  inputs?: Record<string, string>;
-}): { missingFields: Field[]; inputs: Record<string, string> } {
-  const allFields = new Set(
-    node.data.inputs?.map((field) => field.identifier) ?? []
-  );
-  const requiredFields =
-    node.data.inputs?.filter((field) => !field.optional) ?? [];
-  const defaultValues = node.data.inputs?.reduce(
-    (acc, field) => {
-      if (field.defaultValue !== undefined) {
-        acc[field.identifier] = field.defaultValue;
-      }
-      return acc;
-    },
-    {} as Record<string, string>
-  );
-
-  const inputs_ = Object.fromEntries(
-    Object.entries({
-      ...defaultValues,
-      ...(node?.data.execution_state?.inputs ?? {}),
-      ...(inputs ?? {}),
-    }).filter(([key]) => allFields.has(key))
-  );
-
-  const missingFields = requiredFields.filter(
-    (field) =>
-      !(field.identifier in inputs_) ||
-      inputs_[field.identifier] === undefined ||
-      inputs_[field.identifier] === ""
-  );
-
-  return { missingFields, inputs: inputs_ };
-}

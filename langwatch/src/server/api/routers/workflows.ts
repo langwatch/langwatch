@@ -49,7 +49,10 @@ export const workflowRouter = createTRPCRouter({
         input: {
           projectId: input.projectId,
           workflowId: workflow.id,
-          dsl: input.dsl,
+          dsl: {
+            ...input.dsl,
+            workflow_id: workflow.id,
+          },
         },
         autoSaved: false,
         commitMessage: input.commitMessage,
@@ -117,6 +120,13 @@ export const workflowRouter = createTRPCRouter({
           autoSaved: true,
           commitMessage: true,
           updatedAt: true,
+          parent: {
+            select: {
+              id: true,
+              version: true,
+              commitMessage: true,
+            },
+          },
           author: {
             select: {
               name: true,
@@ -127,15 +137,25 @@ export const workflowRouter = createTRPCRouter({
         orderBy: { createdAt: "desc" },
       });
 
-      const versionsWithTags = versions as unknown as (Unpacked<
-        typeof versions
+      console.log("versions", versions);
+
+      const versionsWithTags = versions as unknown as (Omit<
+        Unpacked<typeof versions>,
+        "parent"
       > & {
         isCurrentVersion?: boolean;
         isLatestVersion?: boolean;
+        parent?: {
+          id: string;
+          version: string;
+          commitMessage: string;
+        };
       })[];
       for (const version of versionsWithTags) {
         if (version.id === workflow?.currentVersionId) {
           version.isCurrentVersion = true;
+        } else {
+          delete version.parent;
         }
         if (version.id === workflow?.latestVersionId) {
           version.isLatestVersion = true;
@@ -318,7 +338,15 @@ const saveOrCommitWorkflowVersion = async ({
       projectId: input.projectId,
       archivedAt: null,
     },
-    include: { latestVersion: true },
+    include: { latestVersion: true, currentVersion: true },
+  });
+  const autoSavedVersion = await ctx.prisma.workflowVersion.findFirst({
+    where: {
+      workflowId: input.workflowId,
+      projectId: input.projectId,
+      autoSaved: true,
+    },
+    orderBy: { createdAt: "desc" },
   });
 
   if (!workflow) {
@@ -345,10 +373,15 @@ const saveOrCommitWorkflowVersion = async ({
   };
 
   let updatedVersion: WorkflowVersion;
-  if (latestVersion?.autoSaved) {
+  if (autoSavedVersion) {
     updatedVersion = await ctx.prisma.workflowVersion.update({
-      where: { id: latestVersion.id, projectId: input.projectId },
-      data,
+      where: { id: autoSavedVersion.id, projectId: input.projectId },
+      data: {
+        ...data,
+        ...(workflow.currentVersionId !== autoSavedVersion.id && {
+          parentId: workflow.currentVersionId,
+        }),
+      },
     });
   } else {
     updatedVersion = await ctx.prisma.workflowVersion.create({

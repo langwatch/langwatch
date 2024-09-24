@@ -12,6 +12,7 @@ from fastapi.responses import StreamingResponse
 import json
 
 from langwatch_nlp.studio.execute.execute_component import execute_component
+from langwatch_nlp.studio.execute.execute_evaluation import execute_evaluation
 from langwatch_nlp.studio.execute.execute_flow import execute_flow
 from langwatch_nlp.studio.process_pool import IsolatedProcessPool
 from langwatch_nlp.studio.types.events import (
@@ -69,6 +70,12 @@ async def execute_event(
                         yield event_
                 except Exception as e:
                     traceback.print_exc()
+                    yield Error(payload=ErrorPayload(message=repr(e)))
+            case "execute_evaluation":
+                try:
+                    async for event_ in execute_evaluation(event.payload, queue):
+                        yield event_
+                except Exception as e:
                     yield Error(payload=ErrorPayload(message=repr(e)))
             case _:
                 yield Error(

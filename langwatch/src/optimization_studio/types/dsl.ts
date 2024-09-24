@@ -112,6 +112,7 @@ type Flow = {
 
 export type Workflow = {
   spec_version: string;
+  workflow_id?: string;
 
   name: string;
   icon: string;
@@ -145,6 +146,11 @@ export type Workflow = {
       };
     };
   };
+};
+
+export type ServerWorkflow = Omit<Workflow, "workflow_id"> & {
+  api_key: string;
+  workflow_id: string;
 };
 
 const LLMSignatureFlow: Flow = {

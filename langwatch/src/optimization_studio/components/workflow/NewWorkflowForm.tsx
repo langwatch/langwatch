@@ -42,7 +42,6 @@ export const NewWorkflowForm = ({
     handleSubmit,
     watch,
     setValue,
-    reset,
     formState: { errors },
   } = useForm<FormData>({
     defaultValues: {

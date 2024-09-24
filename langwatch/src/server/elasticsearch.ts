@@ -190,8 +190,10 @@ export const dspyStepIndexId = ({
 
 export const batchEvaluationId = ({
   projectId,
+  experimentId,
   runId,
 }: {
   projectId: string;
+  experimentId: string;
   runId: string;
-}) => `${projectId}/${runId}`;
+}) => `${projectId}/${experimentId}/${runId}`;

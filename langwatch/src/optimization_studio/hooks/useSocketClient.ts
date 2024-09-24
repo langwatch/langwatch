@@ -86,7 +86,7 @@ export const useSocketClient = () => {
     (message: string | undefined) => {
       toast({
         title: "Error",
-        description: message,
+        description: message?.slice(0, 140),
         status: "error",
         duration: 5000,
         isClosable: true,

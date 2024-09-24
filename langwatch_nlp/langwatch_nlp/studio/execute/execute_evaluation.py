@@ -2,12 +2,11 @@ from multiprocessing import Queue
 import time
 from typing import cast
 import dspy
+from langwatch_nlp.studio.dspy.evaluation import EvaluationReporting
 from langwatch_nlp.studio.dspy.workflow_module import (
-    PredictionWithEvaluationAndCost,
     WorkflowModule,
 )
 from langwatch_nlp.studio.execute.execute_flow import (
-    start_workflow_event,
     validate_workflow,
 )
 from langwatch_nlp.studio.types.dsl import (
@@ -16,17 +15,16 @@ from langwatch_nlp.studio.types.dsl import (
     EvaluationExecutionState,
     ExecutionStatus,
     Timestamps,
-    Workflow,
 )
 from langwatch_nlp.studio.types.events import (
     EvaluationStateChange,
     EvaluationStateChangePayload,
-    ExecuteFlowPayload,
     ExecuteEvaluationPayload,
     StudioServerEvent,
 )
 from langwatch_nlp.studio.utils import (
     disable_dsp_caching,
+    get_input_keys,
     transpose_inline_dataset_to_object_list,
 )
 
@@ -56,25 +54,27 @@ async def execute_evaluation(
         raise ValueError("Missing dataset in entry node")
     entries = transpose_inline_dataset_to_object_list(entry_node.data.dataset.inline)
 
+    input_keys = get_input_keys(workflow)
     examples = [
-        dspy.Example(index=index, **entry) for index, entry in enumerate(entries)
+        dspy.Example(_index=index, **entry).with_inputs(*input_keys)
+        for index, entry in enumerate(entries)
     ]
-
-    def evaluate_and_report(example, pred: PredictionWithEvaluationAndCost, trace=None):
-        evaluation, evaluation_results = pred.evaluation(example, return_results=True)
-
-        print("\n\n", evaluation_results, "\n\n")
-
-        return evaluation
 
     evaluator = Evaluate(
         devset=examples, num_threads=1, display_progress=True, display_table=True
     )
 
+    reporting = EvaluationReporting(workflow, event.workflow_version_id, run_id)
     try:
-        results = evaluator(module, metric=evaluate_and_report)
-        print("\n\nfinal results", results, "\n\n")
+        results = evaluator(module, metric=reporting.evaluate_and_report)
     except Exception as e:
+        yield error_evaluation_event(run_id, str(e))
+        return
+
+    try:
+        await reporting.wait_for_completion()
+    except Exception as e:
+        # TODO: report to sentry
         yield error_evaluation_event(run_id, str(e))
         return
 

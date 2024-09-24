@@ -53,14 +53,9 @@ const handleClientMessage = async (
 
     switch (message.type) {
       case "is_alive":
-        await callPython(ws, message);
       case "stop_execution":
       case "execute_component":
-        await callPython(ws, message);
-        break;
       case "execute_flow":
-        await callPython(ws, message);
-        break;
       case "execute_evaluation":
         await callPython(ws, message);
         break;
