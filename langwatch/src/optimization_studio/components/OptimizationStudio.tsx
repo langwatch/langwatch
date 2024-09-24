@@ -17,6 +17,10 @@ import {
   Panel,
 } from "@xyflow/react";
 
+import { DndProvider } from "react-dnd";
+import { HTML5Backend } from "react-dnd-html5-backend";
+import { useDrop } from "react-dnd";
+
 import "@xyflow/react/dist/style.css";
 import { useEffect, useMemo } from "react";
 import { useShallow } from "zustand/react/shallow";
@@ -36,6 +40,37 @@ import { SignatureNode } from "./nodes/SignatureNode";
 import { Link } from "@chakra-ui/next-js";
 import { AutoSave } from "./AutoSave";
 import { EvaluatorNode } from "./nodes/EvaluatorNode";
+
+// New component that uses useDrop
+function DragDropArea({ children }) {
+  const [{ canDrop, isOver }, drop] = useDrop(() => ({
+    accept: "node",
+    drop: (item, monitor) => {
+      const clientOffset = monitor.getClientOffset();
+      if (clientOffset) {
+        const { x, y } = clientOffset;
+        console.log("Dropped at:", { x, y });
+        return { name: "Studio", x, y }; // Return the name and the coordinates
+      }
+      return { name: "Studio" }; // Default return if no coordinates
+    },
+    collect: (monitor) => ({
+      isOver: monitor.isOver(),
+      canDrop: monitor.canDrop(),
+    }),
+  }));
+
+  return (
+    <Box
+      ref={drop}
+      width="full"
+      height="full"
+      border={canDrop ? `1px solid orange` : "1px solid transparent"}
+    >
+      {children}
+    </Box>
+  );
+}
 
 export default function OptimizationStudio() {
   const nodeTypes = useMemo(
@@ -95,97 +130,99 @@ export default function OptimizationStudio() {
       <Head>
         <title>LangWatch - Optimization Studio - {name}</title>
       </Head>
-      <ReactFlowProvider>
-        <VStack width="full" height="full" spacing={0}>
-          <HStack
-            width="full"
-            background="white"
-            padding={2}
-            borderBottom="1px solid"
-            borderColor="gray.350"
-          >
-            <HStack width="full">
-              <Link href={`/${project?.slug}/workflows`}>
-                <LogoIcon width={24} height={24} />
-              </Link>
-              <AutoSave />
-            </HStack>
-            <HStack width="full" justify="center">
-              <Text>Optimization Studio - {name}</Text>
-              <StatusCircle
-                status={socketStatus}
-                tooltip={
-                  socketStatus === "connecting-python" ||
-                  socketStatus === "connecting-socket" ? (
-                    <VStack align="start" spacing={1} padding={2}>
-                      <HStack>
-                        <StatusCircle
-                          status={
-                            socketStatus === "connecting-python"
-                              ? "connected"
-                              : "connecting"
-                          }
-                        />
-                        <Text>Socket Connection</Text>
-                      </HStack>
-                      <HStack>
-                        <StatusCircle status="connecting" />
-                        <Text>Python Runtime</Text>
-                      </HStack>
-                    </VStack>
-                  ) : (
-                    titleCase(socketStatus)
-                  )
-                }
-              />
-            </HStack>
-            <HStack width="full" justify="end">
-              <UndoRedo />
-              <History />
-            </HStack>
-          </HStack>
-          <Box width="full" height="full" position="relative">
-            <Flex width="full" height="full">
-              <NodeSelectionPanel />
-              <ReactFlow
-                nodeTypes={nodeTypes}
-                edgeTypes={edgeTypes}
-                nodes={nodes}
-                edges={edges}
-                onNodesChange={onNodesChange}
-                onEdgesChange={onEdgesChange}
-                onConnect={onConnect}
-                //  style={{ width: "100%", height: "100%" }}
-                onPaneClick={() => {
-                  setWorkflowSelected(true);
-                }}
-                defaultViewport={{
-                  zoom: 1,
-                  x: 100,
-                  y: Math.round(
-                    ((typeof window !== "undefined"
-                      ? window.innerHeight - 360
-                      : 0) || 300) / 2
-                  ),
-                }}
-              >
-                <Controls position="bottom-center" orientation="horizontal" />
-                <MiniMap />
-                <Panel position="bottom-left">bottom-left</Panel>
-                <Background
-                  variant={BackgroundVariant.Dots}
-                  gap={12}
-                  size={2}
-                  bgColor={gray100}
-                  color={gray300}
+      <DndProvider backend={HTML5Backend}>
+        <ReactFlowProvider>
+          <VStack width="full" height="full" spacing={0}>
+            <HStack
+              width="full"
+              background="white"
+              padding={2}
+              borderBottom="1px solid"
+              borderColor="gray.350"
+            >
+              <HStack width="full">
+                <Link href={`/${project?.slug}/workflows`}>
+                  <LogoIcon width={24} height={24} />
+                </Link>
+                <AutoSave />
+              </HStack>
+              <HStack width="full" justify="center">
+                <Text>Optimization Studio - {name}</Text>
+                <StatusCircle
+                  status={socketStatus}
+                  tooltip={
+                    socketStatus === "connecting-python" ||
+                    socketStatus === "connecting-socket" ? (
+                      <VStack align="start" spacing={1} padding={2}>
+                        <HStack>
+                          <StatusCircle
+                            status={
+                              socketStatus === "connecting-python"
+                                ? "connected"
+                                : "connecting"
+                            }
+                          />
+                          <Text>Socket Connection</Text>
+                        </HStack>
+                        <HStack>
+                          <StatusCircle status="connecting" />
+                          <Text>Python Runtime</Text>
+                        </HStack>
+                      </VStack>
+                    ) : (
+                      titleCase(socketStatus)
+                    )
+                  }
                 />
-              </ReactFlow>
-
-              <PropertiesPanel />
-            </Flex>
-          </Box>
-        </VStack>
-      </ReactFlowProvider>
+              </HStack>
+              <HStack width="full" justify="end">
+                <UndoRedo />
+                <History />
+              </HStack>
+            </HStack>
+            <Box width="full" height="full" position="relative">
+              <Flex width="full" height="full">
+                <NodeSelectionPanel />
+                <DragDropArea>
+                  <ReactFlow
+                    nodeTypes={nodeTypes}
+                    edgeTypes={edgeTypes}
+                    nodes={nodes}
+                    edges={edges}
+                    onNodesChange={onNodesChange}
+                    onEdgesChange={onEdgesChange}
+                    onConnect={onConnect}
+                    //  style={{ width: "100%", height: "100%" }}
+                    onPaneClick={() => {
+                      setWorkflowSelected(true);
+                    }}
+                    defaultViewport={{
+                      zoom: 1,
+                      x: 100,
+                      y: Math.round(
+                        ((typeof window !== "undefined"
+                          ? window.innerHeight - 360
+                          : 0) || 300) / 2
+                      ),
+                    }}
+                  >
+                    <Controls position="bottom-left" orientation="horizontal" />
+                    <MiniMap />
+                    <Background
+                      variant={BackgroundVariant.Dots}
+                      gap={12}
+                      size={2}
+                      bgColor={gray100}
+                      color={gray300}
+                    />
+                  </ReactFlow>
+                </DragDropArea>
+                <PropertiesPanel />
+              </Flex>
+            </Box>
+          </VStack>
+        </ReactFlowProvider>
+      </DndProvider>
     </div>
   );
 }

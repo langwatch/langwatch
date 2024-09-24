@@ -12,6 +12,9 @@ import { useWorkflowStore } from "../../hooks/useWorkflowStore";
 import { type ComponentType } from "../../types/dsl";
 import { ComponentIcon } from "../ColorfulBlockIcons";
 import { imageConfigDefault } from "next/dist/shared/lib/image-config";
+import { nanoid } from "nanoid";
+import { useDrag } from "react-dnd";
+
 export const NodeSelectionPanel = () => {
   const { propertiesExpanded } = useWorkflowStore((state) => ({
     propertiesExpanded: state.propertiesExpanded,
@@ -103,8 +106,23 @@ type Node = {
 };
 
 export const NodeDraggable = (props: { node: Node }) => {
+  const [{ isDragging }, drag] = useDrag({
+    type: "node",
+    item: { node: props.node },
+    collect: (monitor) => ({
+      isDragging: !!monitor.isDragging(),
+      clientOffset: monitor.getClientOffset(),
+    }),
+
+    end: (item, monitor) => {
+      const dropResult = monitor.getDropResult();
+      if (item && dropResult) {
+        // @ts-ignore
+        handleSetNodes(item.node, dropResult.x, dropResult.y);
+      }
+    },
+  });
   const { screenToFlowPosition } = useReactFlow();
-  const { x, y } = useViewport();
   const { setNodes, nodes } = useWorkflowStore((state) => ({
     setWorkflow: state.setWorkflow,
     setNodes: state.setNodes,
@@ -112,55 +130,34 @@ export const NodeDraggable = (props: { node: Node }) => {
     propertiesExpanded: state.propertiesExpanded,
   }));
 
-  function incrementLastId(str: string) {
-    const lastChar = str.slice(-1);
+  const handleSetNodes = (e: Node, x: number, y: number) => {
+    const newNode = props.node;
+    const nodeId = newNode.type + "_" + nanoid(6);
+    newNode.id = nodeId;
 
-    if (!isNaN(lastChar as any)) {
-      const incrementedChar = parseInt(lastChar) + 1;
+    const position = screenToFlowPosition({ x: x, y: y });
 
-      return str.slice(0, -1) + incrementedChar;
-    } else {
-      return str;
-    }
-  }
-
-  const handleSetNodes = (e: React.DragEvent<HTMLDivElement>) => {
-    const new_node = props.node;
-
-    const existing_node = nodes.filter((node) => node.id === new_node?.id);
-
-    if (existing_node.length > 0 && new_node) {
-      const new_id = incrementLastId(new_node.id);
-      new_node.id = new_id;
-    }
-
-    const position = screenToFlowPosition({ x: e.clientX, y: e.clientY });
-
-    console.log("new_node", new_node);
-    console.log("existing_node", existing_node);
+    console.log("new_node", newNode);
     console.log("nodes", nodes);
 
-    if (new_node) {
-      new_node.position = {
-        x: position.x - 20,
-        y: position.y - 20,
+    if (newNode) {
+      newNode.position = {
+        x: position.x,
+        y: position.y,
       } as XYPosition;
-      setNodes([...nodes, new_node as XYFlowNode]);
+      setNodes([...nodes, newNode as XYFlowNode]);
     }
   };
 
   return (
     <Box
       background="white"
-      draggable
+      ref={drag}
       borderRadius={4}
       padding={1}
       cursor="grab"
       width="full"
       overflow="hidden"
-      onDragEnd={(e) => {
-        handleSetNodes(e);
-      }}
     >
       <HStack>
         <ComponentIcon type={props.node.type as ComponentType} size="md" />
