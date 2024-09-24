@@ -24,10 +24,11 @@ import {
   Tr,
   VStack,
   Td,
+  Tooltip,
 } from "@chakra-ui/react";
 import type { Experiment, Project } from "@prisma/client";
 import { useRouter } from "next/router";
-import { useCallback, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ExternalLink } from "react-feather";
 import { VersionBox } from "../../optimization_studio/components/History";
 import { api } from "../../utils/api";
@@ -54,8 +55,7 @@ export function BatchEvaluationV2({
       <BatchEvaluationV2RunList project={project} experiment={experiment} />
       <VStack
         align="start"
-        width="100%"
-        maxWidth="1200px"
+        width="calc(100vw - 398px)"
         spacing={8}
         padding={6}
       >
@@ -401,22 +401,24 @@ export function BatchEvaluationV2EvaluationResult({
       <Table size="sm" variant="grid">
         <Thead>
           <Tr>
-            <Th minWidth="15px" maxWidth="15px" paddingY={3} rowSpan={2}></Th>
+            <Th width="35px" paddingY={3} rowSpan={2}></Th>
+
             <Th colSpan={datasetColumns.size} paddingY={2}>
-              Dataset
+              <Text>Dataset</Text>
             </Th>
+
+            <Th colSpan={evaluationInputsColumns.size} paddingY={2}>
+              <Text>Evaluation Entry</Text>
+            </Th>
+
             <Th rowSpan={2}>Cost</Th>
             <Th rowSpan={2}>Duration</Th>
+
             {Array.from(evaluationResultsColumns).map((column) => (
               <Th key={`evaluation-result-${column}`} rowSpan={2}>
                 {column}
               </Th>
             ))}
-            <Th colSpan={evaluationInputsColumns.size} paddingY={2}>
-              Evaluation Entry
-            </Th>
-            <Th rowSpan={2}>Evaluation Cost</Th>
-            <Th rowSpan={2}>Evaluation Duration</Th>
           </Tr>
           <Tr>
             {Array.from(datasetColumns).map((column) => (
@@ -439,21 +441,39 @@ export function BatchEvaluationV2EvaluationResult({
 
               return (
                 <Tr key={evaluation.index}>
-                  <Td>{evaluation.index + 1}</Td>
+                  <Td width="35px" paddingY={3}>
+                    {evaluation.index + 1}
+                  </Td>
+
                   {Array.from(datasetColumns).map((column) => (
-                    <Td key={`dataset-${column}`}>
-                      {datasetEntry?.entry[column] ?? "-"}
+                    <Td key={`dataset-${column}`} maxWidth="250px">
+                      <HoverableBigText>
+                        {datasetEntry?.entry[column] ?? "-"}
+                      </HoverableBigText>
                     </Td>
                   ))}
+
+                  {Array.from(evaluationInputsColumns).map((column) => (
+                    <Td key={`evaluation-entry-${column}`} maxWidth="250px">
+                      <HoverableBigText>
+                        {evaluation.inputs[column] ?? "-"}
+                      </HoverableBigText>
+                    </Td>
+                  ))}
+
                   <Td>
                     {datasetEntry?.cost
                       ? formatMoney(
-                          { amount: datasetEntry?.cost ?? 0, currency: "USD" },
+                          {
+                            amount: datasetEntry?.cost ?? 0,
+                            currency: "USD",
+                          },
                           "$0.00[000]"
                         )
                       : "-"}
                   </Td>
                   <Td>{datasetEntry?.duration ?? "-"}</Td>
+
                   {Array.from(evaluationResultsColumns).map((column) => {
                     const value = (evaluation as any)[column];
                     return (
@@ -475,25 +495,53 @@ export function BatchEvaluationV2EvaluationResult({
                       </Td>
                     );
                   })}
-                  {Array.from(evaluationInputsColumns).map((column) => (
-                    <Td key={`evaluation-entry-${column}`}>
-                      {evaluation.inputs[column] ?? "-"}
-                    </Td>
-                  ))}
-                  <Td>
-                    {evaluation.cost
-                      ? formatMoney(
-                          { amount: evaluation.cost, currency: "USD" },
-                          "$0.00[000]"
-                        )
-                      : "-"}
-                  </Td>
-                  <Td>{formatMilliseconds(evaluation.duration ?? 0)}</Td>
                 </Tr>
               );
             })}
         </Tbody>
       </Table>
     </TableContainer>
+  );
+}
+
+export function HoverableBigText({ children }: { children: React.ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [isOverflown, setIsOverflown] = useState(false);
+
+  useEffect(() => {
+    const element = ref.current!;
+
+    const checkOverflow = () => {
+      setIsOverflown(
+        element
+          ? Math.abs(element.offsetWidth - element.scrollWidth) > 2 ||
+              Math.abs(element.offsetHeight - element.scrollHeight) > 2
+          : false
+      );
+    };
+
+    checkOverflow();
+    window.addEventListener("resize", checkOverflow);
+
+    return () => {
+      window.removeEventListener("resize", checkOverflow);
+    };
+  }, []);
+
+  return (
+    <Tooltip
+      isDisabled={!isOverflown}
+      label={<Box whiteSpace="pre-wrap">{children}</Box>}
+    >
+      <Box
+        ref={ref}
+        width="full"
+        height="full"
+        whiteSpace="normal"
+        noOfLines={7}
+      >
+        {children}
+      </Box>
+    </Tooltip>
   );
 }
