@@ -8,12 +8,6 @@ import {
   CardHeader,
   HStack,
   Heading,
-  Modal,
-  ModalBody,
-  ModalCloseButton,
-  ModalContent,
-  ModalHeader,
-  ModalOverlay,
   Skeleton,
   Spacer,
   Switch,
@@ -30,11 +24,9 @@ import {
   Thead,
   Tr,
   VStack,
-  useDisclosure,
-  useTheme,
+  useTheme
 } from "@chakra-ui/react";
 import type { Experiment, Project } from "@prisma/client";
-import NextLink from "next/link";
 import { useRouter } from "next/router";
 import numeral from "numeral";
 import React, { useEffect, useState } from "react";
@@ -58,9 +50,8 @@ import { formatMoney } from "../../utils/formatMoney";
 import { formatTimeAgo } from "../../utils/formatTimeAgo";
 import { getColorForString } from "../../utils/rotatingColors";
 import { MetadataTag } from "../MetadataTag";
-import { Discord } from "../icons/Discord";
-import { GitHub } from "../icons/GitHub";
 import { RenderInputOutput } from "../traces/RenderInputOutput";
+import { FeedbackLink } from "../FeedbackLink";
 
 export function DSPyExperiment({
   project,
@@ -332,55 +323,6 @@ export function DSPyExperiment({
   );
 }
 
-function FeedbackLink() {
-  const { isOpen, onOpen, onClose } = useDisclosure();
-
-  return (
-    <>
-      <Modal isOpen={isOpen} onClose={onClose}>
-        <ModalOverlay />
-        <ModalContent>
-          <ModalHeader>Feedback on DSPy Visualizer</ModalHeader>
-          <ModalCloseButton />
-          <ModalBody>
-            <VStack align="start" paddingBottom={4}>
-              <Text paddingBottom={4}>
-                Join our Discord community or open a Github Issue for any
-                issues, questions or ideas.
-              </Text>
-              <NextLink
-                href="https://discord.gg/kT4PhDS2gH"
-                target="_blank"
-                passHref
-              >
-                <Button as="span" variant="link" leftIcon={<Discord />}>
-                  Discord
-                </Button>
-              </NextLink>
-              <NextLink
-                href="https://github.com/langwatch/langwatch"
-                target="_blank"
-                passHref
-              >
-                <Button as="span" variant="link" leftIcon={<GitHub />}>
-                  Github
-                </Button>
-              </NextLink>
-            </VStack>
-          </ModalBody>
-        </ModalContent>
-      </Modal>
-      <Button
-        variant="link"
-        onClick={onOpen}
-        fontWeight="normal"
-        color="gray.800"
-      >
-        Give Feedback
-      </Button>
-    </>
-  );
-}
 
 const RunDetails = React.memo(
   function RunDetails({

@@ -57,7 +57,12 @@ export function HistoryPopover({ onClose }: { onClose: () => void }) {
   const { project } = useOrganizationTeamProject();
   const { workflowId, getWorkflow, setWorkflow, setPreviousWorkflow } =
     useWorkflowStore(
-      ({ workflow_id: workflowId, getWorkflow, setWorkflow, setPreviousWorkflow }) => ({
+      ({
+        workflow_id: workflowId,
+        getWorkflow,
+        setWorkflow,
+        setPreviousWorkflow,
+      }) => ({
         workflowId,
         getWorkflow,
         setWorkflow,
@@ -217,22 +222,7 @@ export function HistoryPopover({ onClose }: { onClose: () => void }) {
             >
               <Divider marginBottom={2} />
               <HStack width="full" spacing={3}>
-                <Box
-                  padding={3}
-                  backgroundColor={
-                    version.autoSaved ? "orange.50" : "orange.100"
-                  }
-                  borderRadius={6}
-                  fontWeight={600}
-                  fontSize={13}
-                  color="gray.600"
-                  whiteSpace="nowrap"
-                  textAlign="center"
-                  minWidth="48px"
-                  height="44px"
-                >
-                  {version.autoSaved ? " " : version.version}
-                </Box>
+                <VersionBox version={version} />
                 <VStack align="start" width="full" spacing={1}>
                   <HStack>
                     <Text fontWeight={600} fontSize={13} noOfLines={1}>
@@ -281,6 +271,29 @@ export function HistoryPopover({ onClose }: { onClose: () => void }) {
     </PopoverContent>
   );
 }
+
+export const VersionBox = ({
+  version,
+}: {
+  version: { autoSaved?: boolean; version: string };
+}) => {
+  return (
+    <Box
+      padding={3}
+      backgroundColor={version.autoSaved ? "orange.50" : "orange.100"}
+      borderRadius={6}
+      fontWeight={600}
+      fontSize={13}
+      color="gray.600"
+      whiteSpace="nowrap"
+      textAlign="center"
+      minWidth="48px"
+      height="44px"
+    >
+      {version.autoSaved ? " " : version.version}
+    </Box>
+  );
+};
 
 export const hasDSLChange = (
   dslCurrent: Workflow,

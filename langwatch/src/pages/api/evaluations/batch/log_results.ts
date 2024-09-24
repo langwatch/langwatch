@@ -144,7 +144,9 @@ const processBatchEvaluation = async (
   const experiment = await findOrCreateExperiment(
     project,
     experiment_slug,
-    ExperimentType.BATCH_EVALUATION_V2
+    ExperimentType.BATCH_EVALUATION_V2,
+    param.name ?? param.experiment_slug,
+    param.workflow_id ?? undefined
   );
 
   const id = batchEvaluationId({

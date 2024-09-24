@@ -72,9 +72,11 @@ export default async function handler(
 export const findOrCreateExperiment = async (
   project: Project,
   experiment_slug: string,
-  experiment_type: ExperimentType
+  experiment_type: ExperimentType,
+  experiment_name?: string,
+  workflowId?: string
 ) => {
-  const slug_ = slugify(experiment_slug.replace(/[:\?&]/g, "-"), {
+  const slug_ = slugify(experiment_slug.replace(/[:\?&_]/g, "-"), {
     lower: true,
     strict: true,
     replacement: "-",
@@ -86,12 +88,20 @@ export const findOrCreateExperiment = async (
     experiment = await prisma.experiment.create({
       data: {
         id: `experiment_${nanoid()}`,
-        name: experiment_slug,
+        name: experiment_name ?? experiment_slug,
         slug: slug_,
         projectId: project.id,
         type: experiment_type,
+        workflowId: workflowId,
       },
     });
+  } else {
+    if (experiment_name) {
+      await prisma.experiment.update({
+        where: { id: experiment.id, projectId: project.id },
+        data: { name: experiment_name, workflowId: workflowId },
+      });
+    }
   }
   return experiment;
 };
