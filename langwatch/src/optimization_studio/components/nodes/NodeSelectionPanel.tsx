@@ -11,8 +11,6 @@ import { Box as BoxIcon, X, ChevronsLeft } from "react-feather";
 import { useWorkflowStore } from "../../hooks/useWorkflowStore";
 import { type ComponentType } from "../../types/dsl";
 import { ComponentIcon } from "../ColorfulBlockIcons";
-import { imageConfigDefault } from "next/dist/shared/lib/image-config";
-import { nanoid } from "nanoid";
 import { useDrag } from "react-dnd";
 
 export const NodeSelectionPanel = () => {
@@ -116,6 +114,7 @@ export const NodeDraggable = (props: { node: Node }) => {
 
     end: (item, monitor) => {
       const dropResult = monitor.getDropResult();
+
       if (item && dropResult) {
         // @ts-ignore
         handleSetNodes(item.node, dropResult.x, dropResult.y);
@@ -130,10 +129,28 @@ export const NodeDraggable = (props: { node: Node }) => {
     propertiesExpanded: state.propertiesExpanded,
   }));
 
+  const extractIdNumber = (str?: string) => {
+    const match = str?.match(/_(\d+)$/);
+    return match?.[1] ? parseInt(match[1], 10) : null;
+  };
+
+  const findLowestAvailableId = (prefix: string) => {
+    const usedIds = nodes
+      .map((node) => extractIdNumber(node.id))
+      .filter((id) => id !== null);
+
+    let i = 1;
+    while (usedIds.includes(i)) {
+      i++;
+    }
+    return `${prefix}_${i}`;
+  };
+
   const handleSetNodes = (e: Node, x: number, y: number) => {
     const newNode = props.node;
-    const nodeId = newNode.type + "_" + nanoid(6);
-    newNode.id = nodeId;
+
+    const new_id = findLowestAvailableId(newNode.type);
+    newNode.id = new_id;
 
     const position = screenToFlowPosition({ x: x, y: y });
 
@@ -150,22 +167,25 @@ export const NodeDraggable = (props: { node: Node }) => {
   };
 
   return (
-    <Box
-      background="white"
-      ref={drag}
-      borderRadius={4}
-      padding={1}
-      cursor="grab"
-      width="full"
-      overflow="hidden"
-    >
-      <HStack>
-        <ComponentIcon type={props.node.type as ComponentType} size="md" />
-        <Text>{props.node.data.name}</Text>
-        <Spacer />
-        <DragHandleIcon width="14px" height="14px" color="gray.350" />
-      </HStack>
-    </Box>
+    <>
+      <Box
+        background="white"
+        ref={drag}
+        borderRadius={4}
+        padding={1}
+        cursor="grab"
+        width="full"
+        overflow="hidden"
+        opacity={isDragging ? 0.5 : 1}
+      >
+        <HStack>
+          <ComponentIcon type={props.node.type as ComponentType} size="md" />
+          <Text>{props.node.data.name}</Text>
+          <Spacer />
+          <DragHandleIcon width="14px" height="14px" color="gray.350" />
+        </HStack>
+      </Box>
+    </>
   );
 };
 

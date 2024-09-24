@@ -47,7 +47,7 @@ type WorkflowStore = State & {
   onConnect: (connection: Connection) => void;
   setNodes: (nodes: Node[]) => void;
   setEdges: (edges: Edge[]) => void;
-  setNode: (node: Partial<Node> & { id: string }) => void;
+  setNode: (node: Partial<Node> & { id: string }, newId?: string) => void;
   setComponentExecutionState: (
     id: string,
     executionState: BaseComponent["execution_state"]
@@ -152,12 +152,17 @@ const store = (
   setEdges: (edges: Edge[]) => {
     set({ edges });
   },
-  setNode: (node: Partial<Node> & { id: string }) => {
+  setNode: (node: Partial<Node> & { id: string }, newId?: string) => {
     set(
       removeInvalidEdges({
         nodes: get().nodes.map((n) =>
           n.id === node.id
-            ? { ...n, ...node, data: { ...n.data, ...node.data } }
+            ? {
+                ...n,
+                ...node,
+                data: { ...n.data, ...node.data },
+                id: newId ? newId : n.id,
+              }
             : n
         ),
         edges: get().edges,

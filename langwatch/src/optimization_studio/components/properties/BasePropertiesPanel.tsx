@@ -282,9 +282,22 @@ export function BasePropertiesPanel({
   );
 
   const [isEditingName, setIsEditingName] = useState(false);
+  const [name, setName] = useState<string | undefined>(undefined);
 
   const isWorkflow = (node: Node<Component> | Workflow): node is Workflow =>
     !("data" in node);
+
+  const handleNameChange = (value: string, id: string) => {
+    setNode(
+      {
+        id: id,
+        data: {
+          name: value,
+        },
+      },
+      name
+    );
+  };
 
   return (
     <VStack
@@ -315,23 +328,26 @@ export function BasePropertiesPanel({
                   width="190px"
                   variant="outline"
                   background="transparent"
-                  value={node.data.name}
+                  value={name ?? getNodeDisplayName(node)}
                   borderRadius={5}
                   paddingLeft={1}
                   margin={0}
                   size="sm"
-                  onBlur={() => setIsEditingName(false)}
+                  onBlur={() => {
+                    setIsEditingName(false);
+                    if (name) {
+                      handleNameChange(name, node.id);
+                    }
+                  }}
                   onChange={(e) => {
-                    setNode({
-                      id: node.id,
-                      data: {
-                        name: e.target.value,
-                      },
-                    });
+                    setName(e.target.value);
                   }}
                   onKeyDown={(e) => {
                     if (e.key === "Enter") {
                       setIsEditingName(false);
+                      if (name) {
+                        handleNameChange(name, node.id);
+                      }
                     }
                   }}
                 />
