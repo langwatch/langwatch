@@ -463,7 +463,7 @@ export function BatchEvaluationV2EvaluationResult({
                             amount: datasetEntry?.cost ?? 0,
                             currency: "USD",
                           },
-                          "$0.00[000]"
+                          "$0.00[00]"
                         )
                       : "-"}
                   </Td>

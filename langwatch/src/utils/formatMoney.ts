@@ -7,8 +7,15 @@ export const formatMoney = (money: Money, format = "$0.00[00]"): string => {
     EUR: "€",
   };
 
-  if (money.amount < 0.0001 && money.amount > 0) {
-    return `< ${currencySymbols[money.currency ?? "USD"]}0.0001`;
+  const formatted = numeral(money.amount ?? 0).format(format);
+
+  const minimumAmount = format.replace(/[\$\[\]]/g, "").replace(/0$/, "1");
+  if (
+    formatted === "$0.00" &&
+    money.amount < parseFloat(minimumAmount) &&
+    money.amount > 0
+  ) {
+    return `< ${currencySymbols[money.currency ?? "USD"]}${minimumAmount}`;
   }
 
   if (money.amount > 1) {
@@ -17,7 +24,5 @@ export const formatMoney = (money: Money, format = "$0.00[00]"): string => {
       .replace("$", currencySymbols[money.currency ?? "USD"]);
   }
 
-  return numeral(money.amount ?? 0)
-    .format(format)
-    .replace("$", currencySymbols[money.currency ?? "USD"]);
+  return formatted.replace("$", currencySymbols[money.currency ?? "USD"]);
 };
