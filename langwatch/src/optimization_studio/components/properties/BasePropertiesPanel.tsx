@@ -288,6 +288,8 @@ export function BasePropertiesPanel({
     !("data" in node);
 
   const handleNameChange = (value: string, id: string) => {
+    const newId = value.replace(/[^a-zA-Z0-9_]/g, "_");
+
     setNode(
       {
         id: id,
@@ -295,7 +297,7 @@ export function BasePropertiesPanel({
           name: value,
         },
       },
-      name
+      newId
     );
   };
 

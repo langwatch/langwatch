@@ -49,7 +49,6 @@ function DragDropArea({ children }) {
       const clientOffset = monitor.getClientOffset();
       if (clientOffset) {
         const { x, y } = clientOffset;
-        console.log("Dropped at:", { x, y });
         return { name: "Studio", x, y }; // Return the name and the coordinates
       }
       return { name: "Studio" }; // Default return if no coordinates
