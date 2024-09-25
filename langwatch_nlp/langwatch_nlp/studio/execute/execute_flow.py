@@ -52,7 +52,13 @@ async def execute_flow(event: ExecuteFlowPayload, queue: "Queue[StudioServerEven
             "Dataset is empty, please add at least one entry and try again"
         )
 
-    result = module(**entries[0])
+    try:
+        result = module(**entries[0])
+    except Exception as e:
+        yield error_workflow_event(trace_id, str(e))
+        return
+
+    # cost = result.get_cost() if hasattr(result, "get_cost") else None
 
     yield end_workflow_event(workflow, trace_id)
 
@@ -81,8 +87,26 @@ def end_workflow_event(workflow: Workflow, trace_id: str):
     )
 
 
+def error_workflow_event(trace_id: str, error: str):
+    return ExecutionStateChange(
+        payload=ExecutionStateChangePayload(
+            execution_state=WorkflowExecutionState(
+                status=ExecutionStatus.error,
+                trace_id=trace_id,
+                error=error,
+            )
+        )
+    )
+
+
 def validate_workflow(workflow: Workflow) -> None:
     connected_inputs: Dict[str, Set[str]] = {node.id: set() for node in workflow.nodes}
+
+    entry_node = next(
+        (node for node in workflow.nodes if isinstance(node.data, Entry)), None
+    )
+    if not entry_node:
+        raise ClientReadableValueError("Entry node is missing")
 
     # Map edges to connected inputs
     for edge in workflow.edges:

@@ -7,22 +7,20 @@ import type { BaseComponent, Component, Field } from "../types/dsl";
 import { nanoid } from "nanoid";
 import { useToast } from "@chakra-ui/react";
 
-export const useWorkflowExecution = () => {
+export const useEvaluationExecution = () => {
   const { sendMessage, socketStatus } = useSocketClient();
 
   const toast = useToast();
 
   const [triggerTimeout, setTriggerTimeout] = useState<{
-    trace_id: string;
+    run_id: string;
     timeout_on_status: "waiting" | "running";
   } | null>(null);
 
-  const { getWorkflow, setWorkflowExecutionState } = useWorkflowStore(
-    (state) => ({
-      getWorkflow: state.getWorkflow,
-      setWorkflowExecutionState: state.setWorkflowExecutionState,
-    })
-  );
+  const { getWorkflow, setEvaluationState } = useWorkflowStore((state) => ({
+    getWorkflow: state.getWorkflow,
+    setEvaluationState: state.setEvaluationState,
+  }));
 
   const socketAvailable = useCallback(() => {
     if (socketStatus !== "connected") {
@@ -41,10 +39,10 @@ export const useWorkflowExecution = () => {
     const workflow = getWorkflow();
     if (
       triggerTimeout &&
-      workflow.state.execution?.trace_id === triggerTimeout.trace_id &&
-      workflow.state.execution?.status === triggerTimeout.timeout_on_status
+      workflow.state.evaluation?.run_id === triggerTimeout.run_id &&
+      workflow.state.evaluation?.status === triggerTimeout.timeout_on_status
     ) {
-      setWorkflowExecutionState({
+      setEvaluationState({
         status: "error",
         error: "Timeout",
         timestamps: { finished_at: Date.now() },
@@ -54,86 +52,78 @@ export const useWorkflowExecution = () => {
           triggerTimeout.timeout_on_status === "waiting"
             ? "starting"
             : "stopping"
-        } workflow execution`,
+        } evaluation execution`,
         status: "error",
         duration: 5000,
         isClosable: true,
       });
     }
-  }, [triggerTimeout, setWorkflowExecutionState, getWorkflow, toast]);
+  }, [triggerTimeout, setEvaluationState, getWorkflow, toast]);
 
-  const startWorkflowExecution = useCallback(
-    ({ untilNodeId }: { untilNodeId?: string }) => {
+  const startEvaluationExecution = useCallback(
+    ({ workflow_version_id }: { workflow_version_id: string }) => {
       if (!socketAvailable()) {
         return;
       }
 
-      const trace_id = `trace_${nanoid()}`;
+      const run_id = `run_${nanoid()}`;
 
-      setWorkflowExecutionState({
+      setEvaluationState({
         status: "waiting",
-        trace_id,
-        until_node_id: untilNodeId,
+        run_id,
       });
 
       const payload: StudioClientEvent = {
-        type: "execute_flow",
+        type: "execute_evaluation",
         payload: {
-          trace_id,
+          run_id,
           workflow: getWorkflow(),
-          until_node_id: untilNodeId,
+          workflow_version_id,
         },
       };
       sendMessage(payload);
 
       setTimeout(() => {
-        setTriggerTimeout({ trace_id, timeout_on_status: "waiting" });
+        setTriggerTimeout({ run_id, timeout_on_status: "waiting" });
       }, 10_000);
     },
-    [socketAvailable, getWorkflow, sendMessage, setWorkflowExecutionState]
+    [socketAvailable, getWorkflow, sendMessage, setEvaluationState]
   );
 
-  const stopWorkflowExecution = useCallback(
-    ({
-      trace_id,
-      node_id,
-    }: {
-      trace_id: string;
-      node_id: string;
-      current_state: BaseComponent["execution_state"];
-    }) => {
+  const stopEvaluationExecution = useCallback(
+    ({ run_id }: { run_id: string }) => {
       if (!socketAvailable()) {
         return;
       }
 
       const workflow = getWorkflow();
-      const current_state = workflow.state.execution?.status;
+      const current_state = workflow.state.evaluation?.status;
       if (current_state === "waiting") {
-        setWorkflowExecutionState({
+        setEvaluationState({
           status: "idle",
-          trace_id: undefined,
+          run_id: undefined,
         });
         return;
       }
 
       const payload: StudioClientEvent = {
         type: "stop_execution",
-        payload: { trace_id, node_id },
+        payload: { trace_id: run_id },
       };
       sendMessage(payload);
 
       setTimeout(() => {
         setTriggerTimeout({
-          trace_id,
+          run_id,
           timeout_on_status: "running",
         });
       }, 2_000);
     },
-    [socketAvailable, setWorkflowExecutionState, sendMessage, getWorkflow]
+    [socketAvailable, setEvaluationState, sendMessage, getWorkflow]
   );
 
   return {
-    startWorkflowExecution,
-    stopWorkflowExecution,
+    startEvaluationExecution,
+    stopEvaluationExecution,
   };
 };

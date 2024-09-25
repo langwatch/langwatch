@@ -12,6 +12,7 @@ from fastapi.responses import StreamingResponse
 import json
 
 from langwatch_nlp.studio.execute.execute_component import execute_component
+from langwatch_nlp.studio.execute.execute_evaluation import execute_evaluation
 from langwatch_nlp.studio.execute.execute_flow import execute_flow
 from langwatch_nlp.studio.process_pool import IsolatedProcessPool
 from langwatch_nlp.studio.types.events import (
@@ -69,6 +70,12 @@ async def execute_event(
                         yield event_
                 except Exception as e:
                     traceback.print_exc()
+                    yield Error(payload=ErrorPayload(message=repr(e)))
+            case "execute_evaluation":
+                try:
+                    async for event_ in execute_evaluation(event.payload, queue):
+                        yield event_
+                except Exception as e:
                     yield Error(payload=ErrorPayload(message=repr(e)))
             case _:
                 yield Error(
@@ -145,13 +152,9 @@ async def execute_event_on_a_subprocess(event: StudioClientEvent):
 
     process, queue = pool.submit(event)
 
-    if (
-        hasattr(event.payload, "trace_id")
-        and event.payload.trace_id not in running_processes  # type: ignore
-    ):
-        running_processes[event.payload.trace_id] = RunningProcess(  # type: ignore
-            process=process, queue=queue
-        )
+    trace_id = get_trace_id(event)
+    if trace_id and trace_id not in running_processes:
+        running_processes[trace_id] = RunningProcess(process=process, queue=queue)
 
     timeout_without_messages = 120  # seconds
 
@@ -193,11 +196,21 @@ async def execute_event_on_a_subprocess(event: StudioClientEvent):
             process.terminate()
             process.join()
 
-        if (
-            hasattr(event.payload, "trace_id")
-            and event.payload.trace_id in running_processes  # type: ignore
-        ):
-            del running_processes[event.payload.trace_id]  # type: ignore
+        trace_id = get_trace_id(event)
+        if trace_id and trace_id in running_processes:
+            del running_processes[trace_id]
+
+
+def get_trace_id(event: StudioClientEvent):
+    return (
+        event.payload.trace_id  # type: ignore
+        if hasattr(event.payload, "trace_id")
+        else (
+            event.payload.run_id  # type: ignore
+            if hasattr(event.payload, "run_id")
+            else None
+        )
+    )
 
 
 async def event_encoder(event_generator: AsyncGenerator[StudioServerEvent, None]):

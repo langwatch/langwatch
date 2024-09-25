@@ -1,12 +1,14 @@
 import * as fs from "fs";
 import * as path from "path";
 import {
+  BATCH_EVALUATION_INDEX,
   DSPY_STEPS_INDEX,
   esClient,
   MIGRATION_INDEX,
   TRACE_INDEX,
 } from "../server/elasticsearch";
 import {
+  batchEvaluationMapping,
   dspyStepsMapping,
   elasticMigrations,
   traceMapping,
@@ -105,6 +107,7 @@ const getLastIndexForBase = async (base: string) => {
 };
 
 const createIndexes = async (lastMigration: string) => {
+  // Traces
   const traceExists = await getLastIndexForBase(TRACE_INDEX.base);
   if (!traceExists) {
     const settings: any = {
@@ -134,6 +137,7 @@ const createIndexes = async (lastMigration: string) => {
     is_write_index: true,
   });
 
+  // DSPy Steps
   const dspyStepExists = await getLastIndexForBase(DSPY_STEPS_INDEX.base);
   if (!dspyStepExists) {
     await esClient.indices.create({
@@ -157,6 +161,33 @@ const createIndexes = async (lastMigration: string) => {
     is_write_index: true,
   });
 
+  // Batch Evaluations
+  const batchEvaluationExists = await getLastIndexForBase(
+    BATCH_EVALUATION_INDEX.base
+  );
+  if (!batchEvaluationExists) {
+    await esClient.indices.create({
+      index: BATCH_EVALUATION_INDEX.base,
+      settings: {
+        number_of_shards: 1,
+        number_of_replicas: 0,
+      },
+      mappings: {
+        properties: batchEvaluationMapping as Record<string, MappingProperty>,
+      },
+    });
+  }
+  await esClient.indices.putMapping({
+    index: batchEvaluationExists?.index ?? BATCH_EVALUATION_INDEX.base,
+    properties: batchEvaluationMapping as Record<string, MappingProperty>,
+  });
+  await esClient.indices.putAlias({
+    index: batchEvaluationExists?.index ?? BATCH_EVALUATION_INDEX.base,
+    name: BATCH_EVALUATION_INDEX.alias,
+    is_write_index: true,
+  });
+
+  // Migrations
   const migrationsExists = await esClient.indices.exists({
     index: MIGRATION_INDEX,
   });

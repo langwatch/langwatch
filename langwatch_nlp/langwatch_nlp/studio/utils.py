@@ -3,11 +3,17 @@ import builtins
 import inspect
 import keyword
 import re
-from typing import Any, Dict, List
+from typing import Any, Dict, List, cast
 
 from joblib.memory import MemorizedFunc, AsyncMemorizedFunc
 
-from langwatch_nlp.studio.types.dsl import DatasetInline
+from langwatch_nlp.studio.types.dsl import (
+    DatasetInline,
+    Entry,
+    EntryNode,
+    Node,
+    Workflow,
+)
 
 
 def print_class_definition(cls):
@@ -81,6 +87,26 @@ def transpose_inline_dataset_to_object_list(dataset: DatasetInline):
         result.append(row)
 
     return result
+
+
+def get_node_by_id(workflow: Workflow, node_id: str) -> Node:
+    return next(node for node in workflow.nodes if node.id == node_id)
+
+
+def get_input_keys(workflow: Workflow) -> List[str]:
+    entry_node = cast(
+        EntryNode, next(node for node in workflow.nodes if isinstance(node.data, Entry))
+    )
+    input_keys = set()
+    for edge in workflow.edges:
+        if (
+            edge.source == entry_node.id
+            and edge.sourceHandle.split(".")[-1] not in input_keys
+            and get_node_by_id(workflow, edge.target).type != "evaluator"
+        ):
+            input_keys.add(edge.sourceHandle.split(".")[-1])
+
+    return list(input_keys)
 
 
 class ClientReadableValueError(ValueError):

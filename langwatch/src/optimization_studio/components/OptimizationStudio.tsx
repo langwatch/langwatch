@@ -40,9 +40,10 @@ import { SignatureNode } from "./nodes/SignatureNode";
 import { Link } from "@chakra-ui/next-js";
 import { AutoSave } from "./AutoSave";
 import { EvaluatorNode } from "./nodes/EvaluatorNode";
+import { Evaluate } from "./Evaluate";
 
 // New component that uses useDrop
-function DragDropArea({ children }) {
+function DragDropArea({ children }: { children: React.ReactNode }) {
   const [{ canDrop, isOver }, drop] = useDrop(() => ({
     accept: "node",
     drop: (item, monitor) => {
@@ -177,6 +178,9 @@ export default function OptimizationStudio() {
               <HStack width="full" justify="end">
                 <UndoRedo />
                 <History />
+              </HStack>
+              <HStack justify="end" paddingLeft={2}>
+                <Evaluate />
               </HStack>
             </HStack>
             <Box width="full" height="full" position="relative">

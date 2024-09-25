@@ -3,6 +3,7 @@ from typing import Dict, Optional, Union
 from pydantic import BaseModel
 from typing_extensions import Literal
 from langwatch_nlp.studio.types.dsl import (
+    EvaluationExecutionState,
     ExecutionState,
     ExecutionStatus,
     Node,
@@ -50,7 +51,20 @@ class ExecuteFlow(BaseModel):
     payload: ExecuteFlowPayload
 
 
-StudioClientEvent = Union[IsAlive, ExecuteComponent, StopExecution, ExecuteFlow]
+class ExecuteEvaluationPayload(BaseModel):
+    run_id: str
+    workflow: Workflow
+    workflow_version_id: str
+
+
+class ExecuteEvaluation(BaseModel):
+    type: Literal["execute_evaluation"] = "execute_evaluation"
+    payload: ExecuteEvaluationPayload
+
+
+StudioClientEvent = Union[
+    IsAlive, ExecuteComponent, StopExecution, ExecuteFlow, ExecuteEvaluation
+]
 
 
 class IsAliveResponse(BaseModel):
@@ -76,6 +90,15 @@ class ExecutionStateChange(BaseModel):
     payload: ExecutionStateChangePayload
 
 
+class EvaluationStateChangePayload(BaseModel):
+    evaluation_state: EvaluationExecutionState
+
+
+class EvaluationStateChange(BaseModel):
+    type: Literal["evaluation_state_change"] = "evaluation_state_change"
+    payload: EvaluationStateChangePayload
+
+
 class DebugPayload(BaseModel):
     message: str
 
@@ -99,7 +122,13 @@ class Done(BaseModel):
 
 
 StudioServerEvent = Union[
-    IsAliveResponse, ComponentStateChange, ExecutionStateChange, Debug, Error, Done
+    IsAliveResponse,
+    ComponentStateChange,
+    ExecutionStateChange,
+    EvaluationStateChange,
+    Debug,
+    Error,
+    Done,
 ]
 
 
@@ -121,7 +150,9 @@ def start_component_event(
     )
 
 
-def end_component_event(node: Node, trace_id: str, outputs: Dict[str, str]):
+def end_component_event(
+    node: Node, trace_id: str, outputs: Dict[str, str], cost: Optional[float] = None
+):
     return ComponentStateChange(
         payload=ComponentStateChangePayload(
             component_id=node.id,
@@ -130,6 +161,7 @@ def end_component_event(node: Node, trace_id: str, outputs: Dict[str, str]):
                 trace_id=trace_id,
                 timestamps=Timestamps(finished_at=int(time.time() * 1000)),
                 outputs=outputs,
+                cost=cost,
             ),
         )
     )

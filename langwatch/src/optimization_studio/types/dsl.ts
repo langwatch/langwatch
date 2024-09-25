@@ -59,6 +59,7 @@ export type BaseComponent = {
     parameters?: Record<string, any>;
     inputs?: Record<string, any>;
     outputs?: Record<string, any>;
+    cost?: number;
     timestamps?: {
       started_at?: number;
       finished_at?: number;
@@ -111,6 +112,7 @@ type Flow = {
 
 export type Workflow = {
   spec_version: string;
+  workflow_id?: string;
 
   name: string;
   icon: string;
@@ -133,11 +135,11 @@ export type Workflow = {
         finished_at?: number;
       };
     };
-    experiment?: {
-      experiment_id?: string;
+    evaluation?: {
+      experiment_slug?: string;
       run_id?: string;
-      run_name?: string;
-      state?: ExecutionStatus;
+      status?: ExecutionStatus;
+      error?: string;
       timestamps?: {
         started_at?: number;
         finished_at?: number;
@@ -146,7 +148,12 @@ export type Workflow = {
   };
 };
 
-export const LLMSignatureFlow: Flow = {
+export type ServerWorkflow = Omit<Workflow, "workflow_id"> & {
+  api_key: string;
+  workflow_id: string;
+};
+
+const LLMSignatureFlow: Flow = {
   nodes: [
     {
       id: "entry",

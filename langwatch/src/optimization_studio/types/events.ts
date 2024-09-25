@@ -25,6 +25,14 @@ export type StudioClientEvent =
         workflow: Workflow;
         until_node_id?: string;
       };
+    }
+  | {
+      type: "execute_evaluation";
+      payload: {
+        run_id: string;
+        workflow: Workflow;
+        workflow_version_id: string;
+      };
     };
 
 export type StudioServerEvent =
@@ -42,6 +50,12 @@ export type StudioServerEvent =
       type: "execution_state_change";
       payload: {
         execution_state: Workflow["state"]["execution"];
+      };
+    }
+  | {
+      type: "evaluation_state_change";
+      payload: {
+        evaluation_state: Workflow["state"]["evaluation"];
       };
     }
   | {

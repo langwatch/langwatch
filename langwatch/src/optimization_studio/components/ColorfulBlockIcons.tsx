@@ -1,6 +1,5 @@
 import { Box } from "@chakra-ui/react";
-import { FunctionIcon } from "../../components/icons/FunctionIcon";
-import { Check, Circle, Home } from "react-feather";
+import { Check, Home } from "react-feather";
 import type { ComponentType } from "../types/dsl";
 import { EqualsIcon } from "../../components/icons/EqualsIcon";
 import type { MODULES } from "../types/modules";

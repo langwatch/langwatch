@@ -27,7 +27,7 @@ export type SocketStatus =
   | "connected";
 
 type State = Workflow & {
-  workflowId?: string;
+  workflow_id?: string;
   hoveredNodeId?: string;
   socketStatus: SocketStatus;
   propertiesExpanded: boolean;
@@ -53,7 +53,10 @@ type WorkflowStore = State & {
     executionState: BaseComponent["execution_state"]
   ) => void;
   setWorkflowExecutionState: (
-    executionState: Workflow["state"]["execution"]
+    executionState: Partial<Workflow["state"]["execution"]>
+  ) => void;
+  setEvaluationState: (
+    evaluationState: Partial<Workflow["state"]["evaluation"]>
   ) => void;
   setHoveredNodeId: (nodeId: string | undefined) => void;
   setSelectedNode: (nodeId: string) => void;
@@ -70,8 +73,9 @@ const DEFAULT_LLM_CONFIG: LLMConfig = {
 };
 
 const initialState: State = {
+  workflow_id: undefined,
   spec_version: "1.0",
-  name: "Untitled Workflow",
+  name: "Loading...",
   icon: "🧩",
   description: "",
   version: "0.1",
@@ -80,7 +84,6 @@ const initialState: State = {
   default_llm: DEFAULT_LLM_CONFIG,
   state: {},
 
-  workflowId: undefined,
   hoveredNodeId: undefined,
   socketStatus: "disconnected",
   propertiesExpanded: false,
@@ -108,6 +111,7 @@ const store = (
 
     // Keep only the keys present on Workflow type
     return {
+      workflow_id: state.workflow_id,
       spec_version: state.spec_version,
       name: state.name,
       icon: state.icon,
@@ -119,7 +123,7 @@ const store = (
       state: state.state,
     };
   },
-  setWorkflow: (workflow: Partial<Workflow> & { workflowId?: string }) => {
+  setWorkflow: (workflow: Partial<Workflow>) => {
     set(workflow);
   },
   setPreviousWorkflow: (workflow: Workflow | undefined) => {
@@ -185,6 +189,9 @@ const store = (
               execution_state: {
                 ...(current_execution_state ?? {}),
                 ...executionState,
+                ...(executionState?.error
+                  ? { error: executionState.error.slice(0, 140) }
+                  : {}),
                 timestamps: {
                   ...(timestamps ?? {}),
                   ...(executionState?.timestamps ?? {}),
@@ -206,7 +213,26 @@ const store = (
         execution: {
           ...(get().state.execution ?? {}),
           ...executionState,
+          ...(executionState?.error
+            ? { error: executionState.error.slice(0, 140) }
+            : {}),
         } as Workflow["state"]["execution"],
+      },
+    });
+  },
+  setEvaluationState: (
+    evaluationState: Partial<Workflow["state"]["evaluation"]>
+  ) => {
+    set({
+      state: {
+        ...get().state,
+        evaluation: {
+          ...(get().state.evaluation ?? {}),
+          ...evaluationState,
+          ...(evaluationState?.error
+            ? { error: evaluationState.error.slice(0, 140) }
+            : {}),
+        },
       },
     });
   },

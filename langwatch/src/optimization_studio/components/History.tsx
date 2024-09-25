@@ -23,7 +23,7 @@ import {
 } from "@chakra-ui/react";
 
 import { useCallback, useEffect, useMemo } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, type UseFormReturn } from "react-hook-form";
 import { HistoryIcon } from "../../components/icons/History";
 import { SmallLabel } from "../../components/SmallLabel";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
@@ -32,27 +32,7 @@ import { formatTimeAgo } from "../../utils/formatTimeAgo";
 import { useWorkflowStore } from "../hooks/useWorkflowStore";
 import isDeepEqual from "fast-deep-equal";
 import type { Workflow } from "../types/dsl";
-
-export const hasDSLChange = (dslCurrent: Workflow, dslPrevious: Workflow) => {
-  const clearDsl = (dsl: Workflow) => {
-    return {
-      ...dsl,
-      version: undefined,
-      edges: dsl.edges.map((edge) => {
-        const edge_ = { ...edge };
-        delete edge_.selected;
-        return edge_;
-      }),
-      nodes: dsl.nodes.map((node) => {
-        const node_ = { ...node, data: { ...node.data } };
-        delete node_.selected;
-        return node_;
-      }),
-    };
-  };
-
-  return !isDeepEqual(clearDsl(dslCurrent), clearDsl(dslPrevious));
-};
+import type { Project } from "@prisma/client";
 
 export function History() {
   const { isOpen, onToggle, onClose } = useDisclosure();
@@ -75,30 +55,20 @@ export function History() {
 
 export function HistoryPopover({ onClose }: { onClose: () => void }) {
   const { project } = useOrganizationTeamProject();
-  const {
-    workflowId,
-    version,
-    getWorkflow,
-    setWorkflow,
-    setPreviousWorkflow,
-    previousWorkflow,
-  } = useWorkflowStore(
-    ({
-      workflowId,
-      version,
-      getWorkflow,
-      setWorkflow,
-      setPreviousWorkflow,
-      previousWorkflow,
-    }) => ({
-      workflowId,
-      version,
-      getWorkflow,
-      setWorkflow,
-      setPreviousWorkflow,
-      previousWorkflow,
-    })
-  );
+  const { workflowId, getWorkflow, setWorkflow, setPreviousWorkflow } =
+    useWorkflowStore(
+      ({
+        workflow_id: workflowId,
+        getWorkflow,
+        setWorkflow,
+        setPreviousWorkflow,
+      }) => ({
+        workflowId,
+        getWorkflow,
+        setWorkflow,
+        setPreviousWorkflow,
+      })
+    );
   const form = useForm<{ version: string; commitMessage: string }>({
     defaultValues: {
       version: "",
@@ -106,24 +76,14 @@ export function HistoryPopover({ onClose }: { onClose: () => void }) {
     },
   });
 
-  const versions = api.workflow.getVersions.useQuery(
-    {
-      projectId: project?.id ?? "",
-      workflowId: workflowId ?? "",
-    },
-    { enabled: !!project?.id && !!workflowId }
-  );
-  const currentVersion = versions.data?.find(
-    (version) => version.isCurrentVersion
-  );
-  const latestVersion = versions.data?.find(
-    (version) => version.isLatestVersion
-  );
-  const hasChanges = previousWorkflow
-    ? hasDSLChange(getWorkflow(), previousWorkflow)
-    : false;
-  const canSaveNewVersion =
-    currentVersion && (hasChanges || currentVersion.autoSaved);
+  const {
+    versions,
+    currentVersion,
+    hasChanges,
+    canSaveNewVersion,
+    nextVersion,
+  } = useVersionState({ project, form });
+
   const commitVersion = api.workflow.commitVersion.useMutation();
   const restoreVersion = api.workflow.restoreVersion.useMutation();
 
@@ -162,10 +122,9 @@ export function HistoryPopover({ onClose }: { onClose: () => void }) {
           });
           void versions.refetch();
         },
-        onError: (error) => {
+        onError: () => {
           toast({
             title: "Error saving version",
-            description: error.message,
             status: "error",
             duration: 5000,
             isClosable: true,
@@ -175,17 +134,6 @@ export function HistoryPopover({ onClose }: { onClose: () => void }) {
       }
     );
   };
-
-  const [versionMajor, versionMinor] = version.split(".");
-  const nextVersion = useMemo(() => {
-    return latestVersion?.autoSaved
-      ? latestVersion.version
-      : `${versionMajor}.${parseInt(versionMinor ?? "0") + 1}`;
-  }, [versionMajor, versionMinor, latestVersion]);
-
-  useEffect(() => {
-    form.setValue("version", nextVersion);
-  }, [nextVersion, form]);
 
   const onRestore = useCallback(
     async (versionId: string) => {
@@ -235,42 +183,11 @@ export function HistoryPopover({ onClose }: { onClose: () => void }) {
           style={{ width: "100%", padding: "12px" }}
         >
           <VStack align="start" width="full">
-            <HStack width="full">
-              <FormControl
-                width="fit-content"
-                isInvalid={!!form.formState.errors.version}
-              >
-                <VStack align="start">
-                  <SmallLabel color="gray.600">Version</SmallLabel>
-                  <Input
-                    {...form.register("version", {
-                      required: true,
-                      pattern: /^\d+\.\d+$/,
-                    })}
-                    placeholder={nextVersion}
-                    maxWidth="90px"
-                    pattern="\d+\.\d+"
-                    isDisabled={!canSaveNewVersion}
-                  />
-                </VStack>
-              </FormControl>
-              <FormControl
-                width="full"
-                isInvalid={!!form.formState.errors.commitMessage}
-              >
-                <VStack align="start" width="full">
-                  <SmallLabel color="gray.600">Description</SmallLabel>
-                  <Input
-                    {...form.register("commitMessage", {
-                      required: true,
-                    })}
-                    placeholder="What changes have you made?"
-                    width="full"
-                    isDisabled={!canSaveNewVersion}
-                  />
-                </VStack>
-              </FormControl>
-            </HStack>
+            <NewVersionFields
+              form={form}
+              nextVersion={nextVersion}
+              canSaveNewVersion={canSaveNewVersion}
+            />
             <Tooltip label={!canSaveNewVersion ? "No changes to save" : ""}>
               <Button
                 type="submit"
@@ -305,22 +222,7 @@ export function HistoryPopover({ onClose }: { onClose: () => void }) {
             >
               <Divider marginBottom={2} />
               <HStack width="full" spacing={3}>
-                <Box
-                  padding={3}
-                  backgroundColor={
-                    version.autoSaved ? "orange.50" : "orange.100"
-                  }
-                  borderRadius={6}
-                  fontWeight={600}
-                  fontSize={13}
-                  color="gray.600"
-                  whiteSpace="nowrap"
-                  textAlign="center"
-                  minWidth="48px"
-                  height="44px"
-                >
-                  {version.autoSaved ? " " : version.version}
-                </Box>
+                <VersionBox version={version} />
                 <VStack align="start" width="full" spacing={1}>
                   <HStack>
                     <Text fontWeight={600} fontSize={13} noOfLines={1}>
@@ -367,5 +269,203 @@ export function HistoryPopover({ onClose }: { onClose: () => void }) {
         </VStack>
       </PopoverBody>
     </PopoverContent>
+  );
+}
+
+export const VersionBox = ({
+  version,
+}: {
+  version: { autoSaved?: boolean; version: string };
+}) => {
+  return (
+    <Box
+      padding={3}
+      backgroundColor={version.autoSaved ? "orange.50" : "orange.100"}
+      borderRadius={6}
+      fontWeight={600}
+      fontSize={13}
+      color="gray.600"
+      whiteSpace="nowrap"
+      textAlign="center"
+      minWidth="48px"
+      height="44px"
+    >
+      {version.autoSaved ? " " : version.version}
+    </Box>
+  );
+};
+
+export const hasDSLChange = (
+  dslCurrent: Workflow,
+  dslPrevious: Workflow,
+  includeExecutionStates: boolean
+) => {
+  const clearDsl = (dsl: Workflow) => {
+    return {
+      ...dsl,
+      version: undefined,
+      edges: dsl.edges.map((edge) => {
+        const edge_ = { ...edge };
+        delete edge_.selected;
+        return edge_;
+      }),
+      nodes: dsl.nodes.map((node) => {
+        const node_ = { ...node, data: { ...node.data } };
+        delete node_.selected;
+        if (!includeExecutionStates) {
+          delete node_.data.execution_state;
+        }
+        return node_;
+      }),
+      state: includeExecutionStates ? dsl.state : undefined,
+    };
+  };
+
+  return !isDeepEqual(clearDsl(dslCurrent), clearDsl(dslPrevious));
+};
+
+export const useVersionState = ({
+  project,
+  form,
+  allowSaveIfAutoSaveIsCurrentButNotLatest = true,
+}: {
+  project?: Project;
+  form?: UseFormReturn<{ version: string; commitMessage: string }>;
+  allowSaveIfAutoSaveIsCurrentButNotLatest?: boolean;
+}) => {
+  const { workflowId, getWorkflow, previousWorkflow } = useWorkflowStore(
+    ({ workflow_id: workflowId, version, getWorkflow, previousWorkflow }) => ({
+      workflowId,
+      version,
+      getWorkflow,
+      previousWorkflow,
+    })
+  );
+
+  const versions = api.workflow.getVersions.useQuery(
+    {
+      projectId: project?.id ?? "",
+      workflowId: workflowId ?? "",
+    },
+    { enabled: !!project?.id && !!workflowId }
+  );
+  const currentVersion = versions.data?.find(
+    (version) => version.isCurrentVersion
+  );
+  const latestVersion = versions.data?.find(
+    (version) => version.isLatestVersion
+  );
+  const hasChanges = previousWorkflow
+    ? hasDSLChange(getWorkflow(), previousWorkflow, true)
+    : false;
+  const canSaveNewVersion = !!(
+    !!latestVersion?.autoSaved ||
+    (allowSaveIfAutoSaveIsCurrentButNotLatest && currentVersion?.autoSaved)
+  );
+
+  const [versionMajor, versionMinor] = latestVersion?.version.split(".") ?? [
+    "0",
+    "0",
+  ];
+  const nextVersion = useMemo(() => {
+    return latestVersion?.autoSaved
+      ? latestVersion.version
+      : `${versionMajor}.${parseInt(versionMinor ?? "0") + 1}`;
+  }, [
+    latestVersion?.autoSaved,
+    latestVersion?.version,
+    versionMajor,
+    versionMinor,
+  ]);
+
+  const versionToBeEvaluated = useMemo(() => {
+    return canSaveNewVersion
+      ? { id: "", version: nextVersion, commitMessage: "" }
+      : currentVersion?.autoSaved
+      ? {
+          id: currentVersion?.parent?.id,
+          version: currentVersion?.parent?.version,
+          commitMessage: currentVersion?.parent?.commitMessage,
+        }
+      : {
+          id: currentVersion?.id,
+          version: currentVersion?.version,
+          commitMessage: currentVersion?.commitMessage,
+        };
+  }, [
+    canSaveNewVersion,
+    currentVersion?.autoSaved,
+    currentVersion?.commitMessage,
+    currentVersion?.id,
+    currentVersion?.parent?.commitMessage,
+    currentVersion?.parent?.id,
+    currentVersion?.parent?.version,
+    currentVersion?.version,
+    nextVersion,
+  ]);
+
+  useEffect(() => {
+    if (form) {
+      form.setValue("version", nextVersion);
+    }
+  }, [nextVersion, form]);
+
+  return {
+    versions,
+    currentVersion,
+    latestVersion,
+    hasChanges,
+    canSaveNewVersion,
+    nextVersion,
+    versionToBeEvaluated,
+  };
+};
+
+export function NewVersionFields({
+  form,
+  nextVersion,
+  canSaveNewVersion,
+}: {
+  form: UseFormReturn<{ version: string; commitMessage: string }>;
+  nextVersion: string;
+  canSaveNewVersion: boolean;
+}) {
+  return (
+    <HStack width="full">
+      <FormControl
+        width="fit-content"
+        isInvalid={!!form.formState.errors.version}
+      >
+        <VStack align="start">
+          <SmallLabel color="gray.600">Version</SmallLabel>
+          <Input
+            {...form.register("version", {
+              required: true,
+              pattern: /^\d+\.\d+$/,
+            })}
+            placeholder={nextVersion}
+            maxWidth="90px"
+            pattern="\d+\.\d+"
+            isDisabled={!canSaveNewVersion}
+          />
+        </VStack>
+      </FormControl>
+      <FormControl
+        width="full"
+        isInvalid={!!form.formState.errors.commitMessage}
+      >
+        <VStack align="start" width="full">
+          <SmallLabel color="gray.600">Description</SmallLabel>
+          <Input
+            {...form.register("commitMessage", {
+              required: true,
+            })}
+            placeholder="What changes have you made?"
+            width="full"
+            isDisabled={!canSaveNewVersion}
+          />
+        </VStack>
+      </FormControl>
+    </HStack>
   );
 }

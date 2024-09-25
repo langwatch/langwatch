@@ -6,6 +6,7 @@ import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamPr
 import { api } from "../../../utils/api";
 import BatchEvaluation from "../../../components/experiments/BatchEvaluation";
 import { ExperimentType } from "@prisma/client";
+import { BatchEvaluationV2 } from "../../../components/experiments/BatchEvaluationV2";
 
 export default function ExperimentPage() {
   const router = useRouter();
@@ -31,6 +32,8 @@ export default function ExperimentPage() {
           <DSPyExperiment project={project} experiment={experiment.data} />
         ) : experiment.data.type === ExperimentType.BATCH_EVALUATION ? (
           <BatchEvaluation project={project} experiment={experiment.data} />
+        ) : experiment.data.type === ExperimentType.BATCH_EVALUATION_V2 ? (
+          <BatchEvaluationV2 project={project} experiment={experiment.data} />
         ) : (
           <div>Unknown experiment type</div>
         ))}

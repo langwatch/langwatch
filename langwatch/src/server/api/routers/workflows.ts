@@ -49,7 +49,10 @@ export const workflowRouter = createTRPCRouter({
         input: {
           projectId: input.projectId,
           workflowId: workflow.id,
-          dsl: input.dsl,
+          dsl: {
+            ...input.dsl,
+            workflow_id: workflow.id,
+          },
         },
         autoSaved: false,
         commitMessage: input.commitMessage,
@@ -117,6 +120,13 @@ export const workflowRouter = createTRPCRouter({
           autoSaved: true,
           commitMessage: true,
           updatedAt: true,
+          parent: {
+            select: {
+              id: true,
+              version: true,
+              commitMessage: true,
+            },
+          },
           author: {
             select: {
               name: true,
@@ -127,22 +137,30 @@ export const workflowRouter = createTRPCRouter({
         orderBy: { createdAt: "desc" },
       });
 
-      const versionsWithoutAllDsls = versions as unknown as (Unpacked<
-        typeof versions
+      const versionsWithTags = versions as unknown as (Omit<
+        Unpacked<typeof versions>,
+        "parent"
       > & {
         isCurrentVersion?: boolean;
         isLatestVersion?: boolean;
+        parent?: {
+          id: string;
+          version: string;
+          commitMessage: string;
+        };
       })[];
-      for (const version of versionsWithoutAllDsls) {
+      for (const version of versionsWithTags) {
         if (version.id === workflow?.currentVersionId) {
           version.isCurrentVersion = true;
+        } else {
+          delete version.parent;
         }
         if (version.id === workflow?.latestVersionId) {
           version.isLatestVersion = true;
         }
       }
 
-      return versionsWithoutAllDsls;
+      return versionsWithTags;
     }),
 
   restoreVersion: protectedProcedure
@@ -192,6 +210,7 @@ export const workflowRouter = createTRPCRouter({
         projectId: z.string(),
         workflowId: z.string(),
         dsl: workflowJsonSchema,
+        setAsLatestVersion: z.boolean(),
       })
     )
     .use(checkUserPermissionForProject(TeamRoleGroup.WORKFLOWS_MANAGE))
@@ -201,6 +220,7 @@ export const workflowRouter = createTRPCRouter({
         input,
         autoSaved: true,
         commitMessage: "Autosaved",
+        setAsLatestVersion: input.setAsLatestVersion,
       });
 
       return updatedVersion;
@@ -298,6 +318,7 @@ const saveOrCommitWorkflowVersion = async ({
   input,
   autoSaved,
   commitMessage,
+  setAsLatestVersion = true,
 }: {
   ctx: { prisma: PrismaClient; session: Session };
   input: {
@@ -307,6 +328,7 @@ const saveOrCommitWorkflowVersion = async ({
   };
   autoSaved: boolean;
   commitMessage: string;
+  setAsLatestVersion?: boolean;
 }): Promise<WorkflowVersion> => {
   const workflow = await ctx.prisma.workflow.findUnique({
     where: {
@@ -314,7 +336,15 @@ const saveOrCommitWorkflowVersion = async ({
       projectId: input.projectId,
       archivedAt: null,
     },
-    include: { latestVersion: true },
+    include: { latestVersion: true, currentVersion: true },
+  });
+  const autoSavedVersion = await ctx.prisma.workflowVersion.findFirst({
+    where: {
+      workflowId: input.workflowId,
+      projectId: input.projectId,
+      autoSaved: true,
+    },
+    orderBy: { createdAt: "desc" },
   });
 
   if (!workflow) {
@@ -341,10 +371,15 @@ const saveOrCommitWorkflowVersion = async ({
   };
 
   let updatedVersion: WorkflowVersion;
-  if (latestVersion?.autoSaved) {
+  if (autoSavedVersion) {
     updatedVersion = await ctx.prisma.workflowVersion.update({
-      where: { id: latestVersion.id, projectId: input.projectId },
-      data,
+      where: { id: autoSavedVersion.id, projectId: input.projectId },
+      data: {
+        ...data,
+        ...(workflow.currentVersionId !== autoSavedVersion.id && {
+          parentId: workflow.currentVersionId,
+        }),
+      },
     });
   } else {
     updatedVersion = await ctx.prisma.workflowVersion.create({
@@ -363,8 +398,10 @@ const saveOrCommitWorkflowVersion = async ({
       name: input.dsl.name,
       icon: input.dsl.icon,
       description: input.dsl.description,
-      latestVersionId: updatedVersion.id,
       currentVersionId: updatedVersion.id,
+      latestVersionId: setAsLatestVersion
+        ? updatedVersion.id
+        : latestVersion?.id,
     },
   });
 

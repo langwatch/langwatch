@@ -35,12 +35,14 @@ export function AutoSave() {
     () => {
       if (!project || !workflow.data) return;
 
-      if (previousWorkflow && hasDSLChange(previousWorkflow, stateWorkflow)) {
+      if (previousWorkflow && hasDSLChange(previousWorkflow, stateWorkflow, true)) {
+        const setAsLatestVersion = hasDSLChange(previousWorkflow, stateWorkflow, false);
         autosave.mutate(
           {
             projectId: project.id,
             workflowId: workflow.data.id,
             dsl: stateWorkflow,
+            setAsLatestVersion,
           },
           {
             onSuccess: (data) => {
