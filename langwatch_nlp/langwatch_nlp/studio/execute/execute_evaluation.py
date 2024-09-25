@@ -45,7 +45,6 @@ async def execute_evaluation(
     yield start_evaluation_event(run_id)
 
     module = WorkflowModule(workflow, execute_evaluators=False)
-    module.set_reporting(queue=queue, trace_id=run_id, workflow=workflow)
 
     entry_node = cast(
         EntryNode, next(node for node in workflow.nodes if isinstance(node.data, Entry))

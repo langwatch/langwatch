@@ -391,6 +391,7 @@ export const batchEvaluationMapping: ElasticSearchMappingFrom<ESBatchEvaluation>
         created_at: { type: "date" },
         inserted_at: { type: "date" },
         updated_at: { type: "date" },
+        finished_at: { type: "date" },
       },
     },
   };

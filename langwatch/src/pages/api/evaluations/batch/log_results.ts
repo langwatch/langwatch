@@ -160,9 +160,10 @@ const processBatchEvaluation = async (
     experiment_id: experiment.id,
     project_id: project.id,
     timestamps: {
-      created_at: param.timestamps.created_at,
+      created_at: param.timestamps.created_at ?? new Date().getTime(),
       inserted_at: new Date().getTime(),
       updated_at: new Date().getTime(),
+      finished_at: param.timestamps.finished_at ?? null,
     },
   };
 
@@ -205,11 +206,15 @@ const processBatchEvaluation = async (
       }
 
       ctx._source.timestamps.updated_at = params.updated_at;
+      if (params.finished_at != null) {
+        ctx._source.timestamps.finished_at = params.finished_at;
+      }
     `,
     params: {
       evaluations: batchEvaluation.evaluations,
       dataset: batchEvaluation.dataset,
       updated_at: new Date().getTime(),
+      finished_at: batchEvaluation.timestamps.finished_at,
     },
   };
 

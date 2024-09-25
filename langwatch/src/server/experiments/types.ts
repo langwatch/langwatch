@@ -118,6 +118,7 @@ export type ESBatchEvaluation = {
     created_at: number;
     inserted_at: number;
     updated_at: number;
+    finished_at?: number | null;
   };
 };
 
@@ -129,6 +130,7 @@ export type ESBatchEvaluationRESTParams = Omit<
   workflow_id?: string | null;
   name?: string | null;
   timestamps: {
-    created_at: number;
+    created_at?: number | null;
+    finished_at?: number | null;
   };
 };

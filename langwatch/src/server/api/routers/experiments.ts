@@ -1,7 +1,7 @@
-import { z } from "zod";
-import { createTRPCRouter, protectedProcedure } from "../trpc";
-import { TeamRoleGroup, checkUserPermissionForProject } from "../permission";
+import type { QueryDslBoolQuery } from "@elastic/elasticsearch/lib/api/types";
 import { TRPCError } from "@trpc/server";
+import { z } from "zod";
+import { prisma } from "../../db";
 import {
   BATCH_EVALUATION_INDEX,
   batchEvaluationId,
@@ -14,9 +14,8 @@ import type {
   DSPyStepSummary,
   ESBatchEvaluation,
 } from "../../experiments/types";
-import type { QueryDslBoolQuery } from "@elastic/elasticsearch/lib/api/types";
-import { prisma } from "../../db";
-import type { WorkflowVersion } from "@prisma/client";
+import { checkUserPermissionForProject, TeamRoleGroup } from "../permission";
+import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 export const experimentsRouter = createTRPCRouter({
   getExperimentBySlug: protectedProcedure
@@ -209,6 +208,7 @@ export const experimentsRouter = createTRPCRouter({
               "workflow_version_id",
               "timestamps.created_at",
               "timestamps.updated_at",
+              "timestamps.finished_at",
             ],
             query: {
               bool: {

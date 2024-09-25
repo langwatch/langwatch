@@ -137,9 +137,13 @@ class EvaluationReporting:
 
             self.batch["evaluations"].append(evaluation)
 
-    def send_batch(self):
+    def send_batch(self, finished: bool = False):
         with self.lock:
-            if not self.batch["dataset"] and not self.batch["evaluations"]:
+            if (
+                not finished
+                and not self.batch["dataset"]
+                and not self.batch["evaluations"]
+            ):
                 return
 
             body = {
@@ -154,6 +158,9 @@ class EvaluationReporting:
                     "created_at": self.created_at,
                 },
             }
+
+            if finished:
+                body["timestamps"]["finished_at"] = int(time.time() * 1000)
 
             # Start a new thread to send the batch
             thread = threading.Thread(target=self.post_results, args=(body,))
@@ -180,7 +187,7 @@ class EvaluationReporting:
 
     async def wait_for_completion(self):
         # Send any remaining batch
-        self.send_batch()
+        self.send_batch(finished=True)
 
         for thread in self.threads:
             await asyncio.sleep(0)

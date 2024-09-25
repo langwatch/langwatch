@@ -28,7 +28,7 @@ import {
 } from "@chakra-ui/react";
 import type { Experiment, Project } from "@prisma/client";
 import { useRouter } from "next/router";
-import { useCallback, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { ExternalLink } from "react-feather";
 import { FormatMoney } from "../../optimization_studio/components/FormatMoney";
 import { VersionBox } from "../../optimization_studio/components/History";
@@ -51,10 +51,11 @@ export function BatchEvaluationV2({
   project: Project;
   experiment: Experiment;
 }) {
-  const { batchEvaluationRuns, selectedRun } = useBatchEvaluationState({
-    project,
-    experiment,
-  });
+  const { batchEvaluationRuns, selectedRun, isFinished } =
+    useBatchEvaluationState({
+      project,
+      experiment,
+    });
 
   return (
     <HStack align="start" width="full" height="full" spacing={0}>
@@ -117,6 +118,7 @@ export function BatchEvaluationV2({
                       project={project}
                       experiment={experiment}
                       runId={selectedRun.run_id}
+                      isFinished={isFinished}
                     />
                   </CardBody>
                 </Card>
@@ -139,16 +141,15 @@ const useBatchEvaluationState = ({
   project: Project;
   experiment: Experiment;
 }) => {
+  const [isSomeRunning, setIsSomeRunning] = useState(false);
+
   const batchEvaluationRuns =
     api.experiments.getExperimentBatchEvaluationRuns.useQuery(
       {
         projectId: project.id,
         experimentSlug: experiment.slug,
       },
-      {
-        refetchInterval: 3000,
-        refetchOnMount: false,
-      }
+      { refetchInterval: isSomeRunning ? 3000 : false }
     );
 
   const router = useRouter();
@@ -171,7 +172,28 @@ const useBatchEvaluationState = ({
     [router]
   );
 
-  return { batchEvaluationRuns, selectedRun, setSelectedRunId };
+  const isFinished = useMemo(() => {
+    if (!selectedRun) {
+      return false;
+    }
+    return (
+      getFinishedAt(selectedRun.timestamps, new Date().getTime()) !== undefined
+    );
+  }, [selectedRun]);
+
+  useEffect(() => {
+    if (
+      batchEvaluationRuns.data?.runs.some(
+        (r) => getFinishedAt(r.timestamps, new Date().getTime()) === undefined
+      )
+    ) {
+      setIsSomeRunning(true);
+    } else {
+      setIsSomeRunning(false);
+    }
+  }, [batchEvaluationRuns.data?.runs]);
+
+  return { batchEvaluationRuns, selectedRun, setSelectedRunId, isFinished };
 };
 
 function BatchEvaluationV2RunList({
@@ -300,20 +322,29 @@ export function BatchEvaluationV2EvaluationResults({
   project,
   experiment,
   runId,
+  isFinished,
 }: {
   project: Project;
   experiment: Experiment;
   runId: string;
+  isFinished: boolean;
 }) {
-  const run = api.experiments.getExperimentBatchEvaluationRun.useQuery({
-    projectId: project.id,
-    experimentSlug: experiment.slug,
-    runId,
-  });
+  const run = api.experiments.getExperimentBatchEvaluationRun.useQuery(
+    {
+      projectId: project.id,
+      experimentSlug: experiment.slug,
+      runId,
+    },
+    {
+      refetchInterval: isFinished ? false : 3000,
+      refetchOnMount: false,
+      refetchOnWindowFocus: false,
+    }
+  );
 
   const datasetByIndex = run.data?.dataset.reduce(
-    (acc, item, index) => {
-      acc[index] = item;
+    (acc, item) => {
+      acc[item.index] = item;
       return acc;
     },
     {} as Record<number, ESBatchEvaluation["dataset"][number]>
@@ -525,6 +556,22 @@ export function BatchEvaluationV2EvaluationResult({
   );
 }
 
+const getFinishedAt = (
+  timestamps: ESBatchEvaluation["timestamps"],
+  currentTimestamp: number
+) => {
+  if (timestamps.finished_at) {
+    return timestamps.finished_at;
+  }
+  if (
+    currentTimestamp - new Date(timestamps.updated_at).getTime() >
+    2 * 60 * 1000
+  ) {
+    return new Date(timestamps.updated_at).getTime();
+  }
+  return undefined;
+};
+
 function BatchEvaluationV2EvaluationSummary({
   run,
 }: {
@@ -535,10 +582,26 @@ function BatchEvaluationV2EvaluationSummary({
     >["data"]
   >["runs"][number];
 }) {
+  const [currentTimestamp, setCurrentTimestamp] = useState(0);
+  const finishedAt = useMemo(() => {
+    return getFinishedAt(run.timestamps, currentTimestamp);
+  }, [run.timestamps, currentTimestamp]);
+
   const runtime = run.timestamps.created_at
-    ? new Date(run.timestamps.updated_at).getTime() -
+    ? (finishedAt ?? currentTimestamp) -
       new Date(run.timestamps.created_at).getTime()
     : 0;
+
+  useEffect(() => {
+    if (finishedAt) return;
+
+    const interval = setInterval(() => {
+      setCurrentTimestamp(new Date().getTime());
+    }, 1000);
+
+    return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [!!finishedAt]);
 
   return (
     <HStack

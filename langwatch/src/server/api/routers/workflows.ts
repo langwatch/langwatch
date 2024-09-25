@@ -137,8 +137,6 @@ export const workflowRouter = createTRPCRouter({
         orderBy: { createdAt: "desc" },
       });
 
-      console.log("versions", versions);
-
       const versionsWithTags = versions as unknown as (Omit<
         Unpacked<typeof versions>,
         "parent"
