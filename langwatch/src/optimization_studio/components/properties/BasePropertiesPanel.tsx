@@ -312,7 +312,7 @@ export function BasePropertiesPanel({
       height="full"
     >
       <HStack paddingY={1} paddingLeft={2} width="full" justify="space-between">
-        <HStack spacing={3}>
+        <HStack spacing={2}>
           {header ? (
             header
           ) : !isWorkflow(node) ? (
@@ -327,7 +327,7 @@ export function BasePropertiesPanel({
                   fontSize={16}
                   marginLeft={1}
                   fontWeight={500}
-                  width="190px"
+                  width="100%"
                   variant="outline"
                   background="transparent"
                   value={name ?? getNodeDisplayName(node)}
@@ -336,10 +336,10 @@ export function BasePropertiesPanel({
                   margin={0}
                   size="sm"
                   onBlur={() => {
-                    setIsEditingName(false);
                     if (name) {
                       handleNameChange(name, node.id);
                     }
+                    setIsEditingName(false);
                   }}
                   onChange={(e) => {
                     setName(e.target.value);
@@ -358,6 +358,10 @@ export function BasePropertiesPanel({
                   fontSize={16}
                   fontWeight={500}
                   onClick={() => setIsEditingName(true)}
+                  cursor="pointer"
+                  // maxWidth="140px"
+                  overflow="hidden"
+                  textOverflow="ellipsis"
                 >
                   {getNodeDisplayName(node)}
                 </Text>
@@ -366,11 +370,12 @@ export function BasePropertiesPanel({
           ) : null}
         </HStack>
         <Spacer />
-        <HStack spacing={0} marginRight="-4px">
+
+        <HStack spacing={0} marginRight="-4px" hidden={isEditingName}>
           {!isWorkflow(node) && isExecutableComponent(node) && (
             <>
               <HStack
-                spacing={3}
+                spacing={2}
                 onClick={() => {
                   setPropertiesExpanded(!propertiesExpanded);
                 }}
@@ -382,6 +387,7 @@ export function BasePropertiesPanel({
                   componentOnly={propertiesExpanded}
                 />
               </HStack>
+
               <Button
                 variant="ghost"
                 size="sm"

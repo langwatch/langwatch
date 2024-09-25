@@ -2,6 +2,8 @@ export type PlanInfo = {
   type: string;
   name: string;
   free: boolean;
+  trialDays?: number;
+  daysSinceCreation?: number;
   overrideAddingLimitations?: boolean;
   maxMembers: number;
   maxProjects: number;

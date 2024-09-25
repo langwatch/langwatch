@@ -78,13 +78,16 @@ export const NodeSelectionPanel = () => {
             Components
           </Text>
           {signatures.map((signature) => {
-            return <NodeDraggable key={signature.id} node={signature} />;
+            const nodeCopy = JSON.parse(JSON.stringify(signature));
+            return <NodeDraggable key={signature.id} node={nodeCopy} />;
           })}
+
           <Text fontWeight="500" padding={1}>
             Evaluators
           </Text>
           {evaluators.map((evaluator) => {
-            return <NodeDraggable key={evaluator.id} node={evaluator} />;
+            const nodeCopy = JSON.parse(JSON.stringify(evaluator));
+            return <NodeDraggable key={evaluator.id} node={nodeCopy} />;
           })}
         </VStack>
       </Box>
@@ -134,23 +137,28 @@ export const NodeDraggable = (props: { node: Node }) => {
     return match?.[1] ? parseInt(match[1], 10) : null;
   };
 
-  const findLowestAvailableId = (prefix: string) => {
+  const findLowestAvailableId = (prefix: string, type: string) => {
     const usedIds = nodes
+      .filter((node) => node.type === type)
       .map((node) => extractIdNumber(node.id))
-      .filter((id) => id !== null);
+      .filter((id): id is number => id !== null);
 
     let i = 1;
     while (usedIds.includes(i)) {
       i++;
     }
-    return `${prefix}_${i}`;
+    return `${prefix.slice(0, -1)}(${i})`;
   };
 
   const handleSetNodes = (e: Node, x: number, y: number) => {
     const newNode = props.node;
+    newNode.data.name = newNode.id;
 
-    const new_id = findLowestAvailableId(newNode.type);
-    newNode.id = new_id;
+    if (nodes.length > 0) {
+      const new_id = findLowestAvailableId(newNode.id, newNode.type);
+      newNode.id = new_id;
+      newNode.data.name = new_id;
+    }
 
     const position = screenToFlowPosition({ x: x, y: y });
 

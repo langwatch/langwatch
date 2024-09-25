@@ -139,6 +139,11 @@ export const useOrganizationTeamProject = (
     ? projectsTeamsOrganizationsMatchingSlug?.[0]?.project ?? team.projects[0]
     : undefined;
 
+  const modelProviders = api.modelProvider.getAllForProject.useQuery(
+    { projectId: project?.id ?? "" },
+    { enabled: !!project?.id }
+  );
+
   useEffect(() => {
     if (organization && organization.id !== localStorageOrganizationId) {
       setLocalStorageOrganizationId(organization.id);
@@ -268,5 +273,6 @@ export const useOrganizationTeamProject = (
     hasOrganizationPermission,
     hasTeamPermission,
     isPublicRoute,
+    modelProviders: modelProviders.data,
   };
 };
