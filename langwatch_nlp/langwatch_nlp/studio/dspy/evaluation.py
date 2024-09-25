@@ -1,11 +1,12 @@
 import asyncio
+import threading
 import time
-from typing import Callable, Optional, Any, Tuple, Literal, overload
+from typing import Callable, List, Optional, Any, Tuple, Literal, overload
 import httpx
 import langwatch
 from pydantic import BaseModel
 import dspy
-from tenacity import retry, stop_after_attempt, wait_fixed
+from tenacity import retry, stop_after_attempt, wait_exponential
 from langwatch_nlp.studio.dspy.predict_with_cost_and_duration import (
     PredictionWithCostAndDuration,
 )
@@ -67,7 +68,13 @@ class EvaluationReporting:
         self.workflow = workflow
         self.workflow_version_id = workflow_version_id
         self.run_id = run_id
-        self.futures = []
+        self.created_at = int(time.time() * 1000)
+
+        self.lock = threading.Lock()
+        self.batch = {"dataset": [], "evaluations": []}
+        self.last_sent = time.time()
+        self.debounce_interval = 1  # 1 second
+        self.threads: List[threading.Thread] = []
 
     def evaluate_and_report(
         self,
@@ -77,19 +84,16 @@ class EvaluationReporting:
     ):
         evaluation, evaluation_results = pred.evaluation(example, return_results=True)
 
-        self.futures.append(self.post_results(example, pred, evaluation_results))
+        with self.lock:
+            self.add_to_batch(example, pred, evaluation_results)
+
+        # Check if it's time to send the batch
+        if time.time() - self.last_sent >= self.debounce_interval:
+            self.send_batch()
 
         return evaluation
 
-    async def wait_for_completion(self):
-        await asyncio.gather(*self.futures)
-
-    @retry(
-        stop=stop_after_attempt(3),
-        wait=wait_fixed(1),
-        reraise=True,
-    )
-    async def post_results(
+    def add_to_batch(
         self,
         example: dspy.Example,
         pred: PredictionWithEvaluationCostAndDuration,
@@ -99,7 +103,15 @@ class EvaluationReporting:
         cost = pred.get_cost() if hasattr(pred, "get_cost") else None
         duration = pred.get_duration() if hasattr(pred, "get_duration") else None
 
-        evaluations = []
+        self.batch["dataset"].append(
+            {
+                "index": example._index,
+                "entry": entry,
+                "cost": cost,
+                "duration": duration,
+            }
+        )
+
         for node_id, result_with_metadata in evaluation_results.items():
             node = get_node_by_id(self.workflow, node_id)
             if not node:
@@ -123,33 +135,53 @@ class EvaluationReporting:
                 evaluation["details"] = result.details
                 evaluation["cost"] = result.cost
 
-            evaluations.append(evaluation)
+            self.batch["evaluations"].append(evaluation)
 
-        body = {
-            "experiment_slug": self.workflow.workflow_id,
-            "name": f"{self.workflow.name} - Evaluations",
-            "workflow_id": self.workflow.workflow_id,
-            "run_id": self.run_id,
-            "workflow_version_id": self.workflow_version_id,
-            "dataset": [
-                {
-                    "index": example._index,
-                    "entry": entry,
-                    "cost": cost,
-                    "duration": duration,
-                }
-            ],
-            "evaluations": evaluations,
-            "timestamps": {
-                "created_at": int(time.time() * 1000),
-            },
-        }
+    def send_batch(self):
+        with self.lock:
+            if not self.batch["dataset"] and not self.batch["evaluations"]:
+                return
 
-        async with httpx.AsyncClient() as client:
-            response = await client.post(
-                f"{langwatch.endpoint}/api/evaluations/batch/log_results",
-                headers={"Authorization": f"Bearer {self.workflow.api_key}"},
-                json=body,
-            )
+            body = {
+                "experiment_slug": self.workflow.workflow_id,
+                "name": f"{self.workflow.name} - Evaluations",
+                "workflow_id": self.workflow.workflow_id,
+                "run_id": self.run_id,
+                "workflow_version_id": self.workflow_version_id,
+                "dataset": self.batch["dataset"],
+                "evaluations": self.batch["evaluations"],
+                "timestamps": {
+                    "created_at": self.created_at,
+                },
+            }
 
+            # Start a new thread to send the batch
+            thread = threading.Thread(target=self.post_results, args=(body,))
+            thread.start()
+            self.threads.append(thread)
+
+            # Clear the batch and update the last sent time
+            self.batch = {"dataset": [], "evaluations": []}
+            self.last_sent = time.time()
+
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=2, max=10),
+        reraise=True,
+    )
+    def post_results(self, body):
+        response = httpx.post(
+            f"{langwatch.endpoint}/api/evaluations/batch/log_results",
+            headers={"Authorization": f"Bearer {self.workflow.api_key}"},
+            json=body,
+            timeout=10,
+        )
         response.raise_for_status()
+
+    async def wait_for_completion(self):
+        # Send any remaining batch
+        self.send_batch()
+
+        for thread in self.threads:
+            await asyncio.sleep(0)
+            thread.join()

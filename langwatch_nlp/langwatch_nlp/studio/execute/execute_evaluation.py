@@ -61,20 +61,14 @@ async def execute_evaluation(
     ]
 
     evaluator = Evaluate(
-        devset=examples, num_threads=1, display_progress=True, display_table=True
+        devset=examples, num_threads=10, display_progress=True, display_table=True
     )
 
     reporting = EvaluationReporting(workflow, event.workflow_version_id, run_id)
     try:
         results = evaluator(module, metric=reporting.evaluate_and_report)
-    except Exception as e:
-        yield error_evaluation_event(run_id, str(e))
-        return
-
-    try:
         await reporting.wait_for_completion()
     except Exception as e:
-        # TODO: report to sentry
         yield error_evaluation_event(run_id, str(e))
         return
 
