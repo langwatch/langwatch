@@ -30,7 +30,7 @@ class PredictWithCostAndDuration(dspy.Predict):
 
         lm = cast(DSPyLiteLLM, self.get_lm())
         response.__class__ = PredictionWithCostAndDuration
-        response._cost = lm.cost
+        response._cost = lm.last_cost
         response._duration = duration
 
         return response

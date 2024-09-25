@@ -21,7 +21,7 @@ class DSPyLiteLLM(dspy.OpenAI):
             kwargs["litellm_params"] = {"api_version": os.environ["AZURE_API_VERSION"]}
         kwargs["drop_params"] = True
         kwargs["model_type"] = "chat"
-        self.cost = 0
+        self.last_cost = 0
         super().__init__(**kwargs)
 
     def basic_request(self, prompt: str, **kwargs):
@@ -36,15 +36,16 @@ class DSPyLiteLLM(dspy.OpenAI):
         kwargs = {"stringify_request": json.dumps(kwargs)}
         response = chat_request(**kwargs)
 
-        history = {
-            "prompt": prompt,
-            "response": response,
-            "kwargs": kwargs,
-            "raw_kwargs": raw_kwargs,
-        }
-        self.history.append(history)
+        # TODO: is this necessary?
+        # history = {
+        #     "prompt": prompt,
+        #     "response": response,
+        #     "kwargs": kwargs,
+        #     "raw_kwargs": raw_kwargs,
+        # }
+        # self.history.append(history)
 
-        self.cost += completion_cost(
+        self.last_cost = completion_cost(
             completion_response=response,
             # TODO: use https://docs.litellm.ai/docs/completion/token_usage#9-register_model all the way from frontend to litellm params for custom model costs
             # custom_cost_per_token={

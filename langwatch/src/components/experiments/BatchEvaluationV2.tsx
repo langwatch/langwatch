@@ -6,6 +6,7 @@ import {
   Card,
   CardBody,
   CardHeader,
+  Divider,
   HStack,
   Heading,
   Skeleton,
@@ -14,29 +15,34 @@ import {
   TabList,
   TabPanel,
   TabPanels,
-  TableContainer,
   Table,
+  TableContainer,
   Tabs,
   Tbody,
+  Td,
   Text,
   Th,
   Thead,
   Tr,
   VStack,
-  Td,
-  Tooltip,
 } from "@chakra-ui/react";
 import type { Experiment, Project } from "@prisma/client";
 import { useRouter } from "next/router";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo } from "react";
 import { ExternalLink } from "react-feather";
+import { FormatMoney } from "../../optimization_studio/components/FormatMoney";
 import { VersionBox } from "../../optimization_studio/components/History";
+import type { ESBatchEvaluation } from "../../server/experiments/types";
 import { api } from "../../utils/api";
-import { formatMoney } from "../../utils/formatMoney";
+import { formatMilliseconds } from "../../utils/formatMilliseconds";
 import { formatTimeAgo } from "../../utils/formatTimeAgo";
 import { getColorForString } from "../../utils/rotatingColors";
-import type { ESBatchEvaluation } from "../../server/experiments/types";
-import { formatMilliseconds } from "../../utils/formatMilliseconds";
+import { HoverableBigText } from "../HoverableBigText";
+import type { TRPCClientErrorLike } from "@trpc/client";
+import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
+import type { inferRouterOutputs } from "@trpc/server";
+import type { AppRouter } from "../../server/api/root";
+import numeral from "numeral";
 
 export function BatchEvaluationV2({
   project,
@@ -51,66 +57,77 @@ export function BatchEvaluationV2({
   });
 
   return (
-    <HStack align="start" width="full" height="full">
+    <HStack align="start" width="full" height="full" spacing={0}>
       <BatchEvaluationV2RunList project={project} experiment={experiment} />
-      <VStack align="start" width="calc(100vw - 398px)" spacing={8} padding={6}>
-        <HStack width="full" align="end" spacing={6}>
-          <Heading as="h1" size="lg">
-            {experiment.name ?? experiment.slug}
-          </Heading>
-          <Spacer />
-          {experiment.workflowId && (
-            <Button
-              as={"a"}
-              size="sm"
-              target="_blank"
-              href={`/${project.slug}/studio/${experiment.workflowId}`}
-              leftIcon={<ExternalLink size={16} />}
-              textDecoration="none"
-              marginBottom="-6px"
-              colorScheme="orange"
-            >
-              Open Workflow
-            </Button>
+      <Box width="calc(100vw - 398px)" height="full" position="relative">
+        <VStack
+          align="start"
+          width="full"
+          height="full"
+          spacing={8}
+          padding={6}
+        >
+          <HStack width="full" align="end" spacing={6}>
+            <Heading as="h1" size="lg">
+              {experiment.name ?? experiment.slug}
+            </Heading>
+            <Spacer />
+            {experiment.workflowId && (
+              <Button
+                as={"a"}
+                size="sm"
+                target="_blank"
+                href={`/${project.slug}/studio/${experiment.workflowId}`}
+                leftIcon={<ExternalLink size={16} />}
+                textDecoration="none"
+                marginBottom="-6px"
+                colorScheme="orange"
+              >
+                Open Workflow
+              </Button>
+            )}
+          </HStack>
+          {batchEvaluationRuns.isLoading ? (
+            <Skeleton width="100%" height="30px" />
+          ) : batchEvaluationRuns.error ? (
+            <Alert status="error">
+              <AlertIcon />
+              Error loading experiment runs
+            </Alert>
+          ) : batchEvaluationRuns.data?.runs.length === 0 ? (
+            <Text>Waiting for results...</Text>
+          ) : (
+            selectedRun && (
+              <>
+                <Card width="100%">
+                  <CardHeader>
+                    <HStack width="full">
+                      <Heading as="h2" size="md">
+                        {selectedRun.workflow_version?.commitMessage ??
+                          "Evaluation Results"}
+                      </Heading>
+                      <Spacer />
+                      <Text fontSize="13" color="gray.400">
+                        {selectedRun.run_id}
+                      </Text>
+                    </HStack>
+                  </CardHeader>
+                  <CardBody paddingTop={0}>
+                    <BatchEvaluationV2EvaluationResults
+                      project={project}
+                      experiment={experiment}
+                      runId={selectedRun.run_id}
+                    />
+                  </CardBody>
+                </Card>
+              </>
+            )
           )}
-        </HStack>
-        {batchEvaluationRuns.isLoading ? (
-          <Skeleton width="100%" height="30px" />
-        ) : batchEvaluationRuns.error ? (
-          <Alert status="error">
-            <AlertIcon />
-            Error loading experiment runs
-          </Alert>
-        ) : batchEvaluationRuns.data?.runs.length === 0 ? (
-          <Text>Waiting for results...</Text>
-        ) : (
-          selectedRun && (
-            <>
-              <Card width="100%">
-                <CardHeader>
-                  <HStack width="full">
-                    <Heading as="h2" size="md">
-                      {selectedRun.workflow_version?.commitMessage ??
-                        "Evaluation Results"}
-                    </Heading>
-                    <Spacer />
-                    <Text fontSize="13" color="gray.400">
-                      {selectedRun.run_id}
-                    </Text>
-                  </HStack>
-                </CardHeader>
-                <CardBody paddingTop={0}>
-                  <BatchEvaluationV2EvaluationResults
-                    project={project}
-                    experiment={experiment}
-                    runId={selectedRun.run_id}
-                  />
-                </CardBody>
-              </Card>
-            </>
-          )
+        </VStack>
+        {selectedRun && (
+          <BatchEvaluationV2EvaluationSummary run={selectedRun} />
         )}
-      </VStack>
+      </Box>
     </HStack>
   );
 }
@@ -250,18 +267,23 @@ function BatchEvaluationV2RunList({
                     <>
                       {/* <Text>·</Text> */}
                       <Text whiteSpace="nowrap">
-                        {formatMoney(
-                          { amount: runCost, currency: "USD" },
-                          "$0.00[0]"
-                        )}
+                        <FormatMoney
+                          amount={runCost}
+                          currency="USD"
+                          format="$0.00[0]"
+                        />
                       </Text>
                     </>
                   )}
                 </HStack>
                 <HStack color="gray.400" fontSize="13px">
                   <Text whiteSpace="nowrap" noOfLines={1}>
-                    {run.created_at
-                      ? formatTimeAgo(run.created_at, "yyyy-MM-dd HH:mm", 5)
+                    {run.timestamps.created_at
+                      ? formatTimeAgo(
+                          run.timestamps.created_at,
+                          "yyyy-MM-dd HH:mm",
+                          5
+                        )
                       : "Waiting for steps..."}
                   </Text>
                 </HStack>
@@ -457,15 +479,15 @@ export function BatchEvaluationV2EvaluationResult({
                   ))}
 
                   <Td>
-                    {datasetEntry?.cost
-                      ? formatMoney(
-                          {
-                            amount: datasetEntry?.cost ?? 0,
-                            currency: "USD",
-                          },
-                          "$0.00[00]"
-                        )
-                      : "-"}
+                    {datasetEntry?.cost ? (
+                      <FormatMoney
+                        amount={datasetEntry?.cost ?? 0}
+                        currency="USD"
+                        format="$0.00[00]"
+                      />
+                    ) : (
+                      "-"
+                    )}
                   </Td>
                   <Td>
                     {datasetEntry?.duration
@@ -503,44 +525,89 @@ export function BatchEvaluationV2EvaluationResult({
   );
 }
 
-export function HoverableBigText({ children }: { children: React.ReactNode }) {
-  const ref = useRef<HTMLDivElement>(null);
-  const [isOverflown, setIsOverflown] = useState(false);
-
-  useEffect(() => {
-    const element = ref.current!;
-
-    const checkOverflow = () => {
-      setIsOverflown(
-        element
-          ? Math.abs(element.offsetWidth - element.scrollWidth) > 2 ||
-              Math.abs(element.offsetHeight - element.scrollHeight) > 2
-          : false
-      );
-    };
-
-    checkOverflow();
-    window.addEventListener("resize", checkOverflow);
-
-    return () => {
-      window.removeEventListener("resize", checkOverflow);
-    };
-  }, []);
+function BatchEvaluationV2EvaluationSummary({
+  run,
+}: {
+  run: NonNullable<
+    UseTRPCQueryResult<
+      inferRouterOutputs<AppRouter>["experiments"]["getExperimentBatchEvaluationRuns"],
+      TRPCClientErrorLike<AppRouter>
+    >["data"]
+  >["runs"][number];
+}) {
+  const runtime = run.timestamps.created_at
+    ? new Date(run.timestamps.updated_at).getTime() -
+      new Date(run.timestamps.created_at).getTime()
+    : 0;
 
   return (
-    <Tooltip
-      isDisabled={!isOverflown}
-      label={<Box whiteSpace="pre-wrap">{children}</Box>}
+    <HStack
+      position="sticky"
+      left={0}
+      bottom={0}
+      width="100%"
+      background="white"
+      borderTop="1px solid"
+      borderColor="gray.200"
+      paddingY={4}
+      paddingX={6}
+      spacing={5}
     >
-      <Box
-        ref={ref}
-        width="full"
-        height="full"
-        whiteSpace="normal"
-        noOfLines={7}
-      >
-        {children}
-      </Box>
-    </Tooltip>
+      {Object.entries(run.summary.evaluations).map(([_, evaluation]) => {
+        return (
+          <>
+            <VStack align="start" spacing={1}>
+              <Text fontWeight="500">{evaluation.name}</Text>
+              <Text>
+                {evaluation.average_passed ? (
+                  <>
+                    {numeral(evaluation.average_passed).format("0.[0]%")}{" "}
+                    {evaluation.average_passed == evaluation.average_score
+                      ? "pass"
+                      : `(${numeral(evaluation.average_score).format(
+                          "0.[00]"
+                        )})`}
+                  </>
+                ) : (
+                  <>{numeral(evaluation.average_score).format("0.[00]")}</>
+                )}
+              </Text>
+            </VStack>
+            <Divider orientation="vertical" height="48px" />
+          </>
+        );
+      })}
+      <VStack align="start" spacing={1}>
+        <Text fontWeight="500">Mean Cost</Text>
+        <Text>
+          <FormatMoney
+            amount={run.summary.dataset_average_cost}
+            currency="USD"
+            format="$0.00[00]"
+          />
+        </Text>
+      </VStack>
+      <Divider orientation="vertical" height="48px" />
+      <VStack align="start" spacing={1}>
+        <Text fontWeight="500">Mean Duration</Text>
+        <Text>{formatMilliseconds(run.summary.dataset_average_duration)}</Text>
+      </VStack>
+      <Divider orientation="vertical" height="48px" />
+      <VStack align="start" spacing={1}>
+        <Text fontWeight="500">Total Cost</Text>
+        <Text>
+          <FormatMoney
+            amount={run.summary.cost}
+            currency="USD"
+            format="$0.00[00]"
+          />
+        </Text>
+      </VStack>
+      <Divider orientation="vertical" height="48px" />
+      <VStack align="start" spacing={1}>
+        <Text fontWeight="500">Runtime</Text>
+        <Text>{numeral(runtime / 1000).format("00:00:00")}</Text>
+      </VStack>
+    </HStack>
   );
 }

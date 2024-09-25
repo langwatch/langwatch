@@ -61,7 +61,7 @@ async def execute_evaluation(
     ]
 
     evaluator = Evaluate(
-        devset=examples, num_threads=10, display_progress=True, display_table=True
+        devset=examples, num_threads=10, display_progress=False, display_table=False
     )
 
     reporting = EvaluationReporting(workflow, event.workflow_version_id, run_id)

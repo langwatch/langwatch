@@ -204,7 +204,12 @@ export const experimentsRouter = createTRPCRouter({
           index: BATCH_EVALUATION_INDEX.alias,
           size: 10_000,
           body: {
-            _source: ["run_id", "workflow_version_id", "timestamps.created_at"],
+            _source: [
+              "run_id",
+              "workflow_version_id",
+              "timestamps.created_at",
+              "timestamps.updated_at",
+            ],
             query: {
               bool: {
                 must: [
@@ -226,6 +231,58 @@ export const experimentsRouter = createTRPCRouter({
                   evaluations_cost: {
                     sum: {
                       field: "evaluations.cost",
+                    },
+                  },
+                  dataset_average_cost: {
+                    avg: {
+                      field: "dataset.cost",
+                    },
+                  },
+                  dataset_average_duration: {
+                    avg: {
+                      field: "dataset.duration",
+                    },
+                  },
+                  evaluations: {
+                    nested: {
+                      path: "evaluations",
+                    },
+                    aggs: {
+                      child: {
+                        terms: { field: "evaluations.evaluator", size: 100 },
+                        aggs: {
+                          name: {
+                            terms: { field: "evaluations.name", size: 100 },
+                          },
+                          processed_evaluations: {
+                            filter: {
+                              term: { "evaluations.status": "processed" },
+                            },
+                            aggs: {
+                              average_score: {
+                                avg: {
+                                  field: "evaluations.score",
+                                },
+                              },
+                              has_passed: {
+                                filter: {
+                                  bool: {
+                                    should: [
+                                      { term: { "evaluations.passed": true } },
+                                      { term: { "evaluations.passed": false } },
+                                    ],
+                                  },
+                                },
+                              },
+                              average_passed: {
+                                avg: {
+                                  field: "evaluations.passed",
+                                },
+                              },
+                            },
+                          },
+                        },
+                      },
                     },
                   },
                 },
@@ -278,9 +335,36 @@ export const experimentsRouter = createTRPCRouter({
         return {
           run_id: hit._source!.run_id,
           workflow_version: versionsMap[hit._source!.workflow_version_id!],
-          created_at: hit._source!.timestamps.created_at,
+          timestamps: hit._source!.timestamps,
           summary: {
             cost: runAgg?.dataset_cost.value + runAgg?.evaluations_cost.value,
+            dataset_average_cost: runAgg?.dataset_average_cost.value,
+            dataset_average_duration: runAgg?.dataset_average_duration.value,
+            evaluations: Object.fromEntries(
+              runAgg?.evaluations.child.buckets.map((bucket: any) => {
+                return [
+                  bucket.key,
+                  {
+                    name: bucket.name.buckets[0].key ?? bucket.key,
+                    average_score:
+                      bucket.processed_evaluations.average_score.value,
+                    ...(bucket.processed_evaluations.has_passed.doc_count > 0
+                      ? {
+                          average_passed:
+                            bucket.processed_evaluations.average_passed.value,
+                        }
+                      : {}),
+                  },
+                ];
+              })
+            ) as Record<
+              string,
+              {
+                name: string;
+                average_score: number;
+                average_passed?: number;
+              }
+            >,
           },
         };
       });
