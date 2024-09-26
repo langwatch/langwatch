@@ -103,7 +103,7 @@ class EvaluationReporting:
         if self.progress == 0:
             # Send initial empty batch to create the experiment in LangWatch
             self.send_batch()
-        self.last_sent = 0
+            self.last_sent = 0
 
         with self.lock:
             self.add_to_batch(example, pred, evaluation_results)
