@@ -51,7 +51,7 @@ export function BatchEvaluationV2({
   project: Project;
   experiment: Experiment;
 }) {
-  const { batchEvaluationRuns, selectedRun, isFinished } =
+  const { batchEvaluationRuns, selectedRun, setSelectedRunId, isFinished } =
     useBatchEvaluationState({
       project,
       experiment,
@@ -59,7 +59,11 @@ export function BatchEvaluationV2({
 
   return (
     <HStack align="start" width="full" height="full" spacing={0}>
-      <BatchEvaluationV2RunList project={project} experiment={experiment} />
+      <BatchEvaluationV2RunList
+        batchEvaluationRuns={batchEvaluationRuns}
+        selectedRun={selectedRun}
+        setSelectedRunId={setSelectedRunId}
+      />
       <Box width="calc(100vw - 398px)" height="full" position="relative">
         <VStack
           align="start"
@@ -134,42 +138,53 @@ export function BatchEvaluationV2({
   );
 }
 
-const useBatchEvaluationState = ({
+export const useBatchEvaluationState = ({
   project,
   experiment,
+  selectedRunId,
+  setSelectedRunId,
 }: {
-  project: Project;
-  experiment: Experiment;
+  project?: Project;
+  experiment?: Experiment;
+  selectedRunId?: string;
+  setSelectedRunId?: (runId: string) => void;
 }) => {
   const [isSomeRunning, setIsSomeRunning] = useState(false);
 
   const batchEvaluationRuns =
     api.experiments.getExperimentBatchEvaluationRuns.useQuery(
       {
-        projectId: project.id,
-        experimentSlug: experiment.slug,
+        projectId: project?.id ?? "",
+        experimentSlug: experiment?.slug ?? "",
       },
-      { refetchInterval: isSomeRunning ? 3000 : false }
+      {
+        refetchInterval: isSomeRunning ? 3000 : false,
+        enabled: !!project && !!experiment,
+      }
     );
 
   const router = useRouter();
 
-  const selectedRunIdFromQuery =
-    typeof router.query.runId === "string" ? router.query.runId : null;
+  const selectedRunId_ =
+    selectedRunId ??
+    (typeof router.query.runId === "string" ? router.query.runId : null);
 
   const selectedRun = useMemo(() => {
     return (
-      batchEvaluationRuns.data?.runs.find(
-        (r) => r.run_id === selectedRunIdFromQuery
-      ) ?? batchEvaluationRuns.data?.runs[0]
+      batchEvaluationRuns.data?.runs.find((r) => r.run_id === selectedRunId_) ??
+      batchEvaluationRuns.data?.runs[0]
     );
-  }, [batchEvaluationRuns.data?.runs, selectedRunIdFromQuery]);
+  }, [batchEvaluationRuns.data?.runs, selectedRunId_]);
 
-  const setSelectedRunId = useCallback(
+  const setSelectedRunId_ = useCallback(
     (runId: string) => {
-      void router.push({ query: { ...router.query, runId } });
+      if (setSelectedRunId) {
+        setSelectedRunId(runId);
+      } else {
+        void router.push({ query: { ...router.query, runId } });
+      }
     },
-    [router]
+    [router, setSelectedRunId]
   );
 
   const isFinished = useMemo(() => {
@@ -193,37 +208,54 @@ const useBatchEvaluationState = ({
     }
   }, [batchEvaluationRuns.data?.runs]);
 
-  return { batchEvaluationRuns, selectedRun, setSelectedRunId, isFinished };
+  return {
+    batchEvaluationRuns,
+    selectedRun,
+    setSelectedRunId: setSelectedRunId_,
+    isFinished,
+  };
 };
 
-function BatchEvaluationV2RunList({
-  project,
-  experiment,
+export function BatchEvaluationV2RunList({
+  batchEvaluationRuns,
+  selectedRun,
+  setSelectedRunId,
+  size = "md",
 }: {
-  project: Project;
-  experiment: Experiment;
+  batchEvaluationRuns: UseTRPCQueryResult<
+    inferRouterOutputs<AppRouter>["experiments"]["getExperimentBatchEvaluationRuns"],
+    TRPCClientErrorLike<AppRouter>
+  >;
+  selectedRun:
+    | NonNullable<
+        UseTRPCQueryResult<
+          inferRouterOutputs<AppRouter>["experiments"]["getExperimentBatchEvaluationRuns"],
+          TRPCClientErrorLike<AppRouter>
+        >["data"]
+      >["runs"][number]
+    | undefined;
+  setSelectedRunId: (runId: string) => void;
+  size?: "sm" | "md";
 }) {
-  const { batchEvaluationRuns, selectedRun, setSelectedRunId } =
-    useBatchEvaluationState({
-      project,
-      experiment,
-    });
-
   return (
     <VStack
       align="start"
       background="white"
-      paddingY={4}
+      paddingY={size === "sm" ? 0 : 4}
       borderRightWidth="1px"
       borderColor="gray.300"
       fontSize="14px"
-      minWidth="300px"
+      minWidth={size === "sm" ? "250px" : "300px"}
+      maxWidth={size === "sm" ? "250px" : "300px"}
       height="full"
       spacing={0}
+      overflowY="auto"
     >
-      <Heading as="h2" size="md" paddingX={6} paddingY={4}>
-        Evaluation Runs
-      </Heading>
+      {size !== "sm" && (
+        <Heading as="h2" size="md" paddingX={6} paddingY={4}>
+          Evaluation Runs
+        </Heading>
+      )}
       {batchEvaluationRuns.isLoading ? (
         <>
           {Array.from({ length: 3 }).map((_, index) => (
@@ -249,8 +281,8 @@ function BatchEvaluationV2RunList({
           return (
             <HStack
               key={run?.run_id ?? "new"}
-              paddingX={6}
-              paddingY={4}
+              paddingX={size === "sm" ? 2 : 6}
+              paddingY={size === "sm" ? 2 : 4}
               width="100%"
               cursor="pointer"
               role="button"
@@ -283,8 +315,13 @@ function BatchEvaluationV2RunList({
                 />
               )}
               <VStack align="start" spacing={0}>
-                <Text>{runName}</Text>
-                <HStack color="gray.400" fontSize="13px">
+                <Text fontSize={size === "sm" ? "13px" : "14px"}>
+                  {runName}
+                </Text>
+                <HStack
+                  color="gray.400"
+                  fontSize={size === "sm" ? "12px" : "13px"}
+                >
                   {runCost && (
                     <>
                       {/* <Text>·</Text> */}
@@ -298,7 +335,10 @@ function BatchEvaluationV2RunList({
                     </>
                   )}
                 </HStack>
-                <HStack color="gray.400" fontSize="13px">
+                <HStack
+                  color="gray.400"
+                  fontSize={size === "sm" ? "12px" : "13px"}
+                >
                   <Text whiteSpace="nowrap" noOfLines={1}>
                     {run.timestamps.created_at
                       ? formatTimeAgo(
@@ -323,11 +363,13 @@ export function BatchEvaluationV2EvaluationResults({
   experiment,
   runId,
   isFinished,
+  size = "md",
 }: {
   project: Project;
   experiment: Experiment;
   runId: string;
   isFinished: boolean;
+  size?: "sm" | "md";
 }) {
   const run = api.experiments.getExperimentBatchEvaluationRun.useQuery(
     {
@@ -381,7 +423,16 @@ export function BatchEvaluationV2EvaluationResults({
   );
 
   return (
-    <Tabs>
+    <Tabs
+      size={size}
+      width="full"
+      height="full"
+      display="flex"
+      flexDirection="column"
+      minWidth="0"
+      minHeight="0"
+      overflowX="auto"
+    >
       <TabList>
         {Object.entries(resultsByEvaluator).map(([evaluator, results]) => (
           <Tab key={evaluator}>
@@ -389,14 +440,15 @@ export function BatchEvaluationV2EvaluationResults({
           </Tab>
         ))}
       </TabList>
-      <TabPanels>
+      <TabPanels width="full" minHeight="0" overflowY="auto">
         {Object.entries(resultsByEvaluator).map(([evaluator, results]) => {
           return (
-            <TabPanel key={evaluator} padding={0}>
+            <TabPanel key={evaluator} padding={0} width="full" minHeight="0">
               <BatchEvaluationV2EvaluationResult
                 results={results}
                 datasetByIndex={datasetByIndex}
                 datasetColumns={datasetColumns}
+                size={size}
               />
             </TabPanel>
           );
@@ -410,10 +462,12 @@ export function BatchEvaluationV2EvaluationResult({
   results,
   datasetByIndex,
   datasetColumns,
+  size = "md",
 }: {
   results: ESBatchEvaluation["evaluations"];
   datasetByIndex: Record<number, ESBatchEvaluation["dataset"][number]>;
   datasetColumns: Set<string>;
+  size?: "sm" | "md";
 }) {
   const evaluationInputsColumns = new Set(
     results.flatMap((result) => Object.keys(result.inputs ?? {}))
@@ -446,10 +500,10 @@ export function BatchEvaluationV2EvaluationResult({
 
   return (
     <TableContainer>
-      <Table size="sm" variant="grid">
+      <Table size={size === "sm" ? "xs" : "sm"} variant="grid">
         <Thead>
           <Tr>
-            <Th width="35px" paddingY={3} rowSpan={2}></Th>
+            <Th width="35px" rowSpan={2}></Th>
 
             <Th colSpan={datasetColumns.size} paddingY={2}>
               <Text>Dataset</Text>
@@ -489,9 +543,7 @@ export function BatchEvaluationV2EvaluationResult({
 
               return (
                 <Tr key={evaluation.index}>
-                  <Td width="35px" paddingY={3}>
-                    {evaluation.index + 1}
-                  </Td>
+                  <Td width="35px">{evaluation.index + 1}</Td>
 
                   {Array.from(datasetColumns).map((column) => (
                     <Td key={`dataset-${column}`} maxWidth="250px">

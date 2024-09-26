@@ -157,7 +157,7 @@ export function PropertyFields({
                     }}
                     width="full"
                     fontFamily="monospace"
-                    fontSize={14}
+                    fontSize={13}
                     border="none"
                     background="transparent"
                     padding="6px 0px 6px 12px"
@@ -165,7 +165,7 @@ export function PropertyFields({
                 ) : (
                   <Text
                     fontFamily="monospace"
-                    fontSize={14}
+                    fontSize={13}
                     width="full"
                     padding="8px 0px 8px 12px"
                   >
@@ -245,7 +245,7 @@ export function PropertySectionTitle({
 }) {
   return (
     <Box paddingLeft={2}>
-      <NodeSectionTitle fontSize={13}>{children}</NodeSectionTitle>
+      <NodeSectionTitle fontSize={12}>{children}</NodeSectionTitle>
     </Box>
   );
 }
@@ -324,7 +324,7 @@ export function BasePropertiesPanel({
               />
               {isEditingName ? (
                 <Input
-                  fontSize={16}
+                  fontSize={15}
                   marginLeft={1}
                   fontWeight={500}
                   width="100%"
@@ -355,7 +355,7 @@ export function BasePropertiesPanel({
                 />
               ) : (
                 <Text
-                  fontSize={16}
+                  fontSize={15}
                   fontWeight={500}
                   onClick={() => setIsEditingName(true)}
                   cursor="pointer"

@@ -6,6 +6,7 @@ import {
   useTheme,
   VStack,
   Flex,
+  Center,
 } from "@chakra-ui/react";
 import {
   Background,
@@ -14,7 +15,6 @@ import {
   MiniMap,
   ReactFlow,
   ReactFlowProvider,
-  Panel,
 } from "@xyflow/react";
 
 import { DndProvider } from "react-dnd";
@@ -22,7 +22,7 @@ import { HTML5Backend } from "react-dnd-html5-backend";
 import { useDrop } from "react-dnd";
 
 import "@xyflow/react/dist/style.css";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { LogoIcon } from "../../components/icons/LogoIcon";
 import { useWorkflowStore } from "../hooks/useWorkflowStore";
@@ -30,7 +30,10 @@ import { UndoRedo } from "./UndoRedo";
 import { History } from "./History";
 import DefaultEdge from "./Edge";
 import { PropertiesPanel } from "./properties/PropertiesPanel";
-import { NodeSelectionPanel } from "./nodes/NodeSelectionPanel";
+import {
+  NodeSelectionPanel,
+  NodeSelectionPanelButton,
+} from "./nodes/NodeSelectionPanel";
 import { useSocketClient } from "../hooks/useSocketClient";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { titleCase } from "../../utils/stringCasing";
@@ -41,10 +44,18 @@ import { Link } from "@chakra-ui/next-js";
 import { AutoSave } from "./AutoSave";
 import { EvaluatorNode } from "./nodes/EvaluatorNode";
 import { Evaluate } from "./Evaluate";
+import {
+  Panel,
+  PanelGroup,
+  PanelResizeHandle,
+  type ImperativePanelHandle,
+} from "react-resizable-panels";
+import { ResultsPanel } from "./ResultsPanel";
+import { ProgressToast } from "./ProgressToast";
 
 // New component that uses useDrop
 function DragDropArea({ children }: { children: React.ReactNode }) {
-  const [{ canDrop, isOver }, drop] = useDrop(() => ({
+  const [{ canDrop }, drop] = useDrop(() => ({
     accept: "node",
     drop: (item, monitor) => {
       const clientOffset = monitor.getClientOffset();
@@ -65,7 +76,7 @@ function DragDropArea({ children }: { children: React.ReactNode }) {
       ref={drop}
       width="full"
       height="full"
-      border={canDrop ? `1px solid orange` : "1px solid transparent"}
+      boxShadow={canDrop ? "inset 0 0 0 1px orange" : undefined}
     >
       {children}
     </Box>
@@ -125,6 +136,19 @@ export default function OptimizationStudio() {
     };
   }, [connect, disconnect, project]);
 
+  const [nodeSelectionPanelIsOpen, setNodeSelectionPanelIsOpen] =
+    useState(true);
+
+  const panelRef = useRef<ImperativePanelHandle>(null);
+  const [isPanelCollapsed, setIsPanelCollapsed] = useState(false);
+
+  const collapsePanel = () => {
+    const panel = panelRef.current;
+    if (panel) {
+      panel.collapse();
+    }
+  };
+
   return (
     <div style={{ width: "100vw", height: "100vh" }}>
       <Head>
@@ -147,7 +171,9 @@ export default function OptimizationStudio() {
                 <AutoSave />
               </HStack>
               <HStack width="full" justify="center">
-                <Text>Optimization Studio - {name}</Text>
+                <Text noOfLines={1} fontSize="15px">
+                  Optimization Studio - {name}
+                </Text>
                 <StatusCircle
                   status={socketStatus}
                   tooltip={
@@ -185,41 +211,84 @@ export default function OptimizationStudio() {
             </HStack>
             <Box width="full" height="full" position="relative">
               <Flex width="full" height="full">
-                <NodeSelectionPanel />
-                <DragDropArea>
-                  <ReactFlow
-                    nodeTypes={nodeTypes}
-                    edgeTypes={edgeTypes}
-                    nodes={nodes}
-                    edges={edges}
-                    onNodesChange={onNodesChange}
-                    onEdgesChange={onEdgesChange}
-                    onConnect={onConnect}
-                    //  style={{ width: "100%", height: "100%" }}
-                    onPaneClick={() => {
-                      setWorkflowSelected(true);
-                    }}
-                    defaultViewport={{
-                      zoom: 1,
-                      x: 100,
-                      y: Math.round(
-                        ((typeof window !== "undefined"
-                          ? window.innerHeight - 360
-                          : 0) || 300) / 2
-                      ),
-                    }}
-                  >
-                    <Controls position="bottom-left" orientation="horizontal" />
-                    <MiniMap />
-                    <Background
-                      variant={BackgroundVariant.Dots}
-                      gap={12}
-                      size={2}
-                      bgColor={gray100}
-                      color={gray300}
+                <NodeSelectionPanel
+                  isOpen={nodeSelectionPanelIsOpen}
+                  setIsOpen={setNodeSelectionPanelIsOpen}
+                />
+                <PanelGroup direction="vertical">
+                  <Panel style={{ position: "relative" }}>
+                    <NodeSelectionPanelButton
+                      isOpen={nodeSelectionPanelIsOpen}
+                      setIsOpen={setNodeSelectionPanelIsOpen}
                     />
-                  </ReactFlow>
-                </DragDropArea>
+                    {isPanelCollapsed && <ProgressToast />}
+                    <DragDropArea>
+                      <ReactFlow
+                        nodeTypes={nodeTypes}
+                        edgeTypes={edgeTypes}
+                        nodes={nodes}
+                        edges={edges}
+                        onNodesChange={onNodesChange}
+                        onEdgesChange={onEdgesChange}
+                        onConnect={onConnect}
+                        onPaneClick={() => {
+                          setWorkflowSelected(true);
+                        }}
+                        defaultViewport={{
+                          zoom: 1,
+                          x: 100,
+                          y: Math.round(
+                            ((typeof window !== "undefined"
+                              ? window.innerHeight - 360
+                              : 0) || 300) / 2
+                          ),
+                        }}
+                        proOptions={{ hideAttribution: true }}
+                      >
+                        <Controls
+                          position="bottom-left"
+                          orientation="horizontal"
+                          style={{
+                            marginLeft: nodeSelectionPanelIsOpen
+                              ? "16px"
+                              : "80px",
+                            marginBottom: "18px",
+                          }}
+                        />
+                        <Background
+                          variant={BackgroundVariant.Dots}
+                          gap={12}
+                          size={2}
+                          bgColor={gray100}
+                          color={gray300}
+                        />
+                      </ReactFlow>
+                    </DragDropArea>
+                  </Panel>
+                  <PanelResizeHandle
+                    style={{ position: "relative", marginTop: "-20px" }}
+                  >
+                    <Center paddingY={2}>
+                      <Box
+                        width="30px"
+                        height="3px"
+                        borderRadius="full"
+                        background="gray.400"
+                      />
+                    </Center>
+                  </PanelResizeHandle>
+                  <Panel
+                    collapsible
+                    minSize={6}
+                    ref={panelRef}
+                    onCollapse={() => setIsPanelCollapsed(true)}
+                    onExpand={() => setIsPanelCollapsed(false)}
+                  >
+                    {!isPanelCollapsed && (
+                      <ResultsPanel collapsePanel={collapsePanel} />
+                    )}
+                  </Panel>
+                </PanelGroup>
                 <PropertiesPanel />
               </Flex>
             </Box>

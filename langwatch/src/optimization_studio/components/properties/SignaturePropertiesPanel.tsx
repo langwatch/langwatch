@@ -34,7 +34,7 @@ export function SignaturePropertiesPanel({ node }: { node: Node<Signature> }) {
       <PropertyField title="Prompt">
         <Textarea
           fontFamily="monospace"
-          fontSize={14}
+          fontSize={13}
           value={node.data.prompt ?? ""}
           onChange={(e) =>
             setNode({

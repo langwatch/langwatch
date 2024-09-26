@@ -8,7 +8,7 @@ import { LLMIcon } from "../../components/icons/LLMIcon";
 const sizeMap = {
   sm: "16px",
   md: "24px",
-  lg: "32px",
+  lg: "28px",
 };
 
 export function ColorfulBlockIcon({

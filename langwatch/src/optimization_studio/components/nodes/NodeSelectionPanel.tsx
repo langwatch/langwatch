@@ -13,66 +13,66 @@ import { type ComponentType } from "../../types/dsl";
 import { ComponentIcon } from "../ColorfulBlockIcons";
 import { useDrag } from "react-dnd";
 
-export const NodeSelectionPanel = () => {
+export function NodeSelectionPanelButton({
+  isOpen,
+  setIsOpen,
+}: {
+  isOpen: boolean;
+  setIsOpen: (isOpen: boolean) => void;
+}) {
+  return (
+    <Box
+      display={isOpen ? "none" : "block"}
+      position="absolute"
+      bottom={3}
+      left={3}
+      zIndex={100}
+      background="white"
+      borderRadius={4}
+      borderColor="gray.350"
+    >
+      <Button
+        variant="outline"
+        onClick={() => {
+          setIsOpen(!isOpen);
+        }}
+      >
+        <BoxIcon size={22} />
+      </Button>
+    </Box>
+  );
+}
+
+export const NodeSelectionPanel = ({
+  isOpen,
+  setIsOpen,
+}: {
+  isOpen: boolean;
+  setIsOpen: (isOpen: boolean) => void;
+}) => {
   const { propertiesExpanded } = useWorkflowStore((state) => ({
     propertiesExpanded: state.propertiesExpanded,
   }));
 
-  const [isOpen, setIsOpen] = useState(true);
   return (
-    <>
-      <Box
-        display={isOpen ? "none" : "block"}
-        position="absolute"
-        top={2}
-        left={2}
-        zIndex={100}
-        background="white"
-        borderRadius={4}
-        borderColor="gray.350"
-      >
-        <Button
-          variant="outline"
-          onClick={() => {
-            setIsOpen(!isOpen);
-          }}
-        >
-          <BoxIcon size={22} />
-        </Button>
-      </Box>
-      <Box
-        display={isOpen ? "block" : "none"}
-        opacity={propertiesExpanded ? 0 : 1}
-        visibility={propertiesExpanded ? "hidden" : "visible"}
-        // transform={propertiesExpanded ? "translateX(-100%)" : "translateX(0)"}
-        // transition="opacity 0.3s, visibility 0.3s, transform 0.3s"
-        position={
-          propertiesExpanded ? "absolute" : isOpen ? "relative" : "absolute"
-        }
-        top={0}
-        left={0}
-        background="white"
-        border="1px solid"
-        borderColor="gray.350"
-        borderTopWidth={0}
-        borderBottomWidth={0}
-        borderRightWidth={0}
-        zIndex={100}
-        height="full"
-        padding={2}
-      >
-        <HStack width="full">
-          <Spacer />
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => {
-              setIsOpen(!isOpen);
-            }}
-          >
-            {isOpen ? <ChevronsLeft size={18} /> : <BoxIcon size={18} />}
-          </Button>
-        </HStack>
+    <Box
+      display={isOpen ? "block" : "none"}
+      opacity={propertiesExpanded ? 0 : 1}
+      visibility={propertiesExpanded ? "hidden" : "visible"}
+      position={
+        propertiesExpanded ? "absolute" : isOpen ? "relative" : "absolute"
+      }
+      top={0}
+      left={0}
+      background="white"
+      borderRight="1px solid"
+      borderColor="gray.200"
+      zIndex={100}
+      height="full"
+      padding={3}
+      fontSize="14px"
+    >
+      <VStack height="full">
         <VStack spacing={4} align="start">
           <Text fontWeight="500" padding={1}>
             Components
@@ -90,8 +90,21 @@ export const NodeSelectionPanel = () => {
             return <NodeDraggable key={evaluator.id} node={nodeCopy} />;
           })}
         </VStack>
-      </Box>
-    </>
+        <Spacer />
+        <HStack width="full">
+          <Spacer />
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => {
+              setIsOpen(!isOpen);
+            }}
+          >
+            {isOpen ? <ChevronsLeft size={18} /> : <BoxIcon size={18} />}
+          </Button>
+        </HStack>
+      </VStack>
+    </Box>
   );
 };
 
@@ -162,13 +175,10 @@ export const NodeDraggable = (props: { node: Node }) => {
 
     const position = screenToFlowPosition({ x: x, y: y });
 
-    console.log("new_node", newNode);
-    console.log("nodes", nodes);
-
     if (newNode) {
       newNode.position = {
-        x: position.x,
-        y: position.y,
+        x: position.x - 90,
+        y: position.y - 80,
       } as XYPosition;
       setNodes([...nodes, newNode as XYFlowNode]);
     }

@@ -9,6 +9,7 @@ import * as Sentry from "@sentry/nextjs";
 import { z } from "zod";
 import { nanoid } from "nanoid";
 import slugify from "slugify";
+import { experimentSlugify } from "../../../server/experiments/utils";
 
 export const debug = getDebugger("langwatch:dspy:init");
 
@@ -76,11 +77,7 @@ export const findOrCreateExperiment = async (
   experiment_name?: string,
   workflowId?: string
 ) => {
-  const slug_ = slugify(experiment_slug.replace(/[:\?&_]/g, "-"), {
-    lower: true,
-    strict: true,
-    replacement: "-",
-  });
+  const slug_ = experimentSlugify(experiment_slug);
   let experiment = await prisma.experiment.findUnique({
     where: { projectId_slug: { projectId: project.id, slug: slug_ } },
   });

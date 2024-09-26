@@ -5,6 +5,7 @@ import { type AppType } from "next/app";
 import { api } from "~/utils/api";
 
 import { switchAnatomy } from "@chakra-ui/anatomy";
+import { tableAnatomy } from "@chakra-ui/anatomy";
 import {
   ChakraProvider,
   defineStyle,
@@ -29,6 +30,11 @@ const inter = Inter({ subsets: ["latin"] });
 // eslint-disable-next-line @typescript-eslint/unbound-method
 const { definePartsStyle, defineMultiStyleConfig } =
   createMultiStyleConfigHelpers(switchAnatomy.keys);
+
+const {
+  definePartsStyle: definePartsStyleTable,
+  defineMultiStyleConfig: defineMultiStyleConfigTable,
+} = createMultiStyleConfigHelpers(tableAnatomy.keys);
 
 export const theme = extendTheme({
   styles: {
@@ -67,7 +73,7 @@ export const theme = extendTheme({
     },
   },
   components: {
-    Table: {
+    Table: defineMultiStyleConfigTable({
       variants: {
         grid: {
           th: {
@@ -81,7 +87,24 @@ export const theme = extendTheme({
           },
         },
       },
-    },
+      sizes: {
+        xs: definePartsStyleTable({
+          tr: {
+            lineHeight: "1em",
+          },
+          th: {
+            fontSize: "11px",
+            paddingY: 2,
+            paddingX: 3,
+          },
+          td: {
+            fontSize: "13px",
+            paddingY: 2,
+            paddingX: 3,
+          },
+        }),
+      },
+    }),
     Card: defineStyleConfig({
       baseStyle: {
         container: {

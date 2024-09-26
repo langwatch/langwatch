@@ -12,6 +12,7 @@ import {
   Skeleton,
   SkeletonText,
   Text,
+  Tooltip,
   useDisclosure,
   useToast,
   VStack,
@@ -30,16 +31,25 @@ import { NewVersionFields, useVersionState } from "./History";
 export function Evaluate() {
   const { isOpen, onToggle, onClose } = useDisclosure();
 
+  const { evaluationState } = useWorkflowStore(({ state }) => ({
+    evaluationState: state.evaluation,
+  }));
+
+  const isRunning = evaluationState?.status === "running";
+
   return (
     <>
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={onToggle}
-        leftIcon={<CheckSquare size={16} />}
-      >
-        Evaluate
-      </Button>
+      <Tooltip label={isRunning ? "Evaluation is running" : ""}>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={onToggle}
+          leftIcon={<CheckSquare size={16} />}
+          isDisabled={isRunning}
+        >
+          Evaluate
+        </Button>
+      </Tooltip>
       <Modal isOpen={isOpen} onClose={onClose}>
         <ModalOverlay />
         {isOpen && <EvaluateModalContent onClose={onClose} />}
@@ -73,8 +83,7 @@ export function EvaluateModalContent({ onClose }: { onClose: () => void }) {
 
   const toast = useToast();
   const commitVersion = api.workflow.commitVersion.useMutation();
-  const { startEvaluationExecution, stopEvaluationExecution } =
-    useEvaluationExecution();
+  const { startEvaluationExecution } = useEvaluationExecution();
 
   const [hasStarted, setHasStarted] = useState(false);
 
@@ -149,35 +158,7 @@ export function EvaluateModalContent({ onClose }: { onClose: () => void }) {
   const isRunning = evaluationState?.status === "running";
 
   if (isRunning) {
-    return (
-      <ModalContent>
-        <ModalHeader fontWeight={600}>Evaluating Workflow</ModalHeader>
-        <ModalCloseButton />
-        <ModalBody>
-          <VStack align="start" width="full" spacing={4}>
-            <Text>
-              Evaluation is running, please wait for it to finish before
-              starting a new one.
-            </Text>
-            <HStack width="full">
-              <Progress size="xs" width="full" isIndeterminate />
-              <Button
-                size="xs"
-                variant="outline"
-                onClick={() => {
-                  stopEvaluationExecution({
-                    run_id: evaluationState.run_id ?? "",
-                  });
-                }}
-              >
-                <X size={16} />
-              </Button>
-            </HStack>
-          </VStack>
-        </ModalBody>
-        <ModalFooter />
-      </ModalContent>
-    );
+    return null;
   }
 
   if (!versions.data) {
