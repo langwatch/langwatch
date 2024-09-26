@@ -169,6 +169,24 @@ export function EvaluateModalContent({ onClose }: { onClose: () => void }) {
 
       let versionId: string | undefined = versionToBeEvaluated.id;
 
+      if (!estimatedTotal) {
+        return;
+      }
+
+      if (
+        estimatedTotal >= 300 &&
+        !confirm(`Going to evaluate ${estimatedTotal} entries. Are you sure?`)
+      ) {
+        return;
+      }
+
+      if (estimatedTotal >= 5000) {
+        alert(
+          "A maximum of 5000 entries can be evaluated at a time. Please contact support if you need to evaluate more."
+        );
+        return;
+      }
+
       if (canSaveNewVersion) {
         try {
           const versionResponse = await commitVersion.mutateAsync({
