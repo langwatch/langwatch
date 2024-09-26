@@ -44,6 +44,7 @@ import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
 import type { inferRouterOutputs } from "@trpc/server";
 import type { AppRouter } from "../../server/api/root";
 import numeral from "numeral";
+import React from "react";
 
 export function BatchEvaluationV2({
   project,
@@ -387,220 +388,227 @@ export function BatchEvaluationV2RunList({
   );
 }
 
-export function BatchEvaluationV2EvaluationResults({
-  project,
-  experiment,
-  runId,
-  total,
-  isFinished,
-  size = "md",
-}: {
-  project: Project;
-  experiment: Experiment;
-  runId: string | undefined;
-  total: number | undefined;
-  isFinished: boolean;
-  size?: "sm" | "md";
-}) {
-  const [keepRefetching, setKeepRefetching] = useState(true);
+export const BatchEvaluationV2EvaluationResults = React.memo(
+  function BatchEvaluationV2EvaluationResults({
+    project,
+    experiment,
+    runId,
+    isFinished,
+    size = "md",
+  }: {
+    project: Project;
+    experiment: Experiment;
+    runId: string | undefined;
+    isFinished: boolean;
+    size?: "sm" | "md";
+  }) {
+    const [keepRefetching, setKeepRefetching] = useState(true);
 
-  const run = api.experiments.getExperimentBatchEvaluationRun.useQuery(
-    {
-      projectId: project.id,
-      experimentSlug: experiment.slug,
-      runId: runId ?? "",
-    },
-    {
-      enabled: !!runId,
-      refetchInterval: keepRefetching ? 2000 : false,
-      refetchOnMount: false,
-      refetchOnWindowFocus: false,
-    }
-  );
-
-  useEffect(() => {
-    if (isFinished) {
-      setTimeout(() => {
-        setKeepRefetching(false);
-      }, 2_000);
-    } else {
-      setKeepRefetching(true);
-    }
-  }, [isFinished]);
-
-  const datasetByIndex = run.data?.dataset.reduce(
-    (acc, item) => {
-      acc[item.index] = item;
-      return acc;
-    },
-    {} as Record<number, ESBatchEvaluation["dataset"][number]>
-  );
-
-  const resultsByEvaluator = run.data?.evaluations.reduce(
-    (acc, evaluation) => {
-      if (!acc[evaluation.evaluator]) {
-        acc[evaluation.evaluator] = [];
+    const run = api.experiments.getExperimentBatchEvaluationRun.useQuery(
+      {
+        projectId: project.id,
+        experimentSlug: experiment.slug,
+        runId: runId ?? "",
+      },
+      {
+        enabled: !!runId,
+        refetchInterval: keepRefetching ? 1000 : false,
+        refetchOnMount: false,
+        refetchOnWindowFocus: false,
       }
-      acc[evaluation.evaluator]!.push(evaluation);
-      return acc;
-    },
-    {} as Record<string, ESBatchEvaluation["evaluations"]>
-  );
-
-  if (run.error) {
-    return (
-      <Alert status="error">
-        <AlertIcon />
-        Error loading evaluation results
-      </Alert>
     );
-  }
 
-  if (!resultsByEvaluator || !datasetByIndex) {
-    return (
-      <VStack spacing={0} width="full" height="full" minWidth="0">
-        <Tabs
-          size={size}
-          width="full"
-          height="full"
-          display="flex"
-          flexDirection="column"
-          minHeight="0"
-          overflowX="auto"
-          padding={0}
-        >
-          <TabList>
-            <Tab>
-              <Skeleton width="60px" height="22px" />
-            </Tab>
-          </TabList>
-          <TabPanels minWidth="full" minHeight="0" overflowY="auto">
-            <TabPanel padding={0}>
-              <Table size={size === "sm" ? "xs" : "sm"} variant="grid">
-                <Thead>
-                  <Tr>
-                    <Th rowSpan={2} width="50px">
-                      <Skeleton width="100%" height="52px" />
-                    </Th>
-                    <Th>
-                      <Skeleton width="100%" height="18px" />
-                    </Th>
-                    <Th>
-                      <Skeleton width="100%" height="18px" />
-                    </Th>
-                    <Th>
-                      <Skeleton width="100%" height="18px" />
-                    </Th>
-                  </Tr>
-                  <Tr>
-                    <Th>
-                      <Skeleton width="100%" height="18px" />
-                    </Th>
-                    <Th>
-                      <Skeleton width="100%" height="18px" />
-                    </Th>
-                    <Th>
-                      <Skeleton width="100%" height="18px" />
-                    </Th>
-                  </Tr>
-                </Thead>
-                <Tbody>
-                  <Tr>
-                    <Td>
-                      <Skeleton width="100%" height="18px" />
-                    </Td>
-                    <Td>
-                      <Skeleton width="100%" height="18px" />
-                    </Td>
-                    <Td>
-                      <Skeleton width="100%" height="18px" />
-                    </Td>
-                    <Td>
-                      <Skeleton width="100%" height="18px" />
-                    </Td>
-                  </Tr>
-                </Tbody>
-              </Table>
-            </TabPanel>
-          </TabPanels>
-        </Tabs>
-      </VStack>
+    useEffect(() => {
+      if (isFinished) {
+        setTimeout(() => {
+          setKeepRefetching(false);
+        }, 2_000);
+      } else {
+        setKeepRefetching(true);
+      }
+    }, [isFinished]);
+
+    const datasetByIndex = run.data?.dataset.reduce(
+      (acc, item) => {
+        acc[item.index] = item;
+        return acc;
+      },
+      {} as Record<number, ESBatchEvaluation["dataset"][number]>
     );
-  }
 
-  const datasetColumns = new Set(
-    Object.values(datasetByIndex).flatMap((item) =>
-      Object.keys(item.entry ?? {})
-    )
-  );
+    const resultsByEvaluator = run.data?.evaluations.reduce(
+      (acc, evaluation) => {
+        if (!acc[evaluation.evaluator]) {
+          acc[evaluation.evaluator] = [];
+        }
+        acc[evaluation.evaluator]!.push(evaluation);
+        return acc;
+      },
+      {} as Record<string, ESBatchEvaluation["evaluations"]>
+    );
 
-  return (
-    <Tabs
-      size={size}
-      width="full"
-      height="full"
-      display="flex"
-      flexDirection="column"
-      minHeight="0"
-      overflowX="auto"
-      position="relative"
-    >
-      <Box
-        position="absolute"
-        top={1}
-        right={2}
-        color="gray.400"
-        fontSize="12px"
-      >
-        {runId}
-      </Box>
-      <TabList>
-        {Object.entries(resultsByEvaluator).map(([evaluator, results]) => (
-          <Tab key={evaluator}>
-            {results.find((r) => r.name)?.name ?? evaluator}
-          </Tab>
-        ))}
-      </TabList>
-      <TabPanels minWidth="full" minHeight="0" overflowY="auto">
-        {Object.entries(resultsByEvaluator).map(([evaluator, results]) => {
-          return (
-            <TabPanel
-              key={evaluator}
-              padding={0}
+    const [hasScrolled, setHasScrolled] = useState(false);
+
+    if (run.error) {
+      return (
+        <Alert status="error">
+          <AlertIcon />
+          Error loading evaluation results
+        </Alert>
+      );
+    }
+
+    if (!resultsByEvaluator || !datasetByIndex) {
+      return (
+        <VStack spacing={0} width="full" height="full" minWidth="0">
+          <Tabs
+            size={size}
+            width="full"
+            height="full"
+            display="flex"
+            flexDirection="column"
+            minHeight="0"
+            overflowX="auto"
+            padding={0}
+          >
+            <TabList>
+              <Tab>
+                <Skeleton width="60px" height="22px" />
+              </Tab>
+            </TabList>
+            <TabPanels
               minWidth="full"
-              width="fit-content"
               minHeight="0"
+              overflowY="auto"
+              onScroll={() => setHasScrolled(true)}
             >
-              <BatchEvaluationV2EvaluationResult
-                results={results}
-                datasetByIndex={datasetByIndex}
-                datasetColumns={datasetColumns}
-                total={total}
-                isFinished={isFinished}
-                size={size}
-              />
-            </TabPanel>
-          );
-        })}
-      </TabPanels>
-    </Tabs>
-  );
-}
+              <TabPanel padding={0}>
+                <Table size={size === "sm" ? "xs" : "sm"} variant="grid">
+                  <Thead>
+                    <Tr>
+                      <Th rowSpan={2} width="50px">
+                        <Skeleton width="100%" height="52px" />
+                      </Th>
+                      <Th>
+                        <Skeleton width="100%" height="18px" />
+                      </Th>
+                      <Th>
+                        <Skeleton width="100%" height="18px" />
+                      </Th>
+                      <Th>
+                        <Skeleton width="100%" height="18px" />
+                      </Th>
+                    </Tr>
+                    <Tr>
+                      <Th>
+                        <Skeleton width="100%" height="18px" />
+                      </Th>
+                      <Th>
+                        <Skeleton width="100%" height="18px" />
+                      </Th>
+                      <Th>
+                        <Skeleton width="100%" height="18px" />
+                      </Th>
+                    </Tr>
+                  </Thead>
+                  <Tbody>
+                    <Tr>
+                      <Td>
+                        <Skeleton width="100%" height="18px" />
+                      </Td>
+                      <Td>
+                        <Skeleton width="100%" height="18px" />
+                      </Td>
+                      <Td>
+                        <Skeleton width="100%" height="18px" />
+                      </Td>
+                      <Td>
+                        <Skeleton width="100%" height="18px" />
+                      </Td>
+                    </Tr>
+                  </Tbody>
+                </Table>
+              </TabPanel>
+            </TabPanels>
+          </Tabs>
+        </VStack>
+      );
+    }
+
+    const datasetColumns = new Set(
+      Object.values(datasetByIndex).flatMap((item) =>
+        Object.keys(item.entry ?? {})
+      )
+    );
+
+    return (
+      <Tabs
+        size={size}
+        width="full"
+        height="full"
+        display="flex"
+        flexDirection="column"
+        minHeight="0"
+        overflowX="auto"
+        position="relative"
+      >
+        <Box
+          position="absolute"
+          top={1}
+          right={2}
+          color="gray.400"
+          fontSize="12px"
+        >
+          {runId}
+        </Box>
+        <TabList>
+          {Object.entries(resultsByEvaluator).map(([evaluator, results]) => (
+            <Tab key={evaluator}>
+              {results.find((r) => r.name)?.name ?? evaluator}
+            </Tab>
+          ))}
+        </TabList>
+        <TabPanels minWidth="full" minHeight="0" overflowY="auto">
+          {Object.entries(resultsByEvaluator).map(([evaluator, results]) => {
+            return (
+              <TabPanel
+                key={evaluator}
+                padding={0}
+                minWidth="full"
+                width="fit-content"
+                minHeight="0"
+              >
+                <BatchEvaluationV2EvaluationResult
+                  results={results}
+                  datasetByIndex={datasetByIndex}
+                  datasetColumns={datasetColumns}
+                  isFinished={isFinished}
+                  size={size}
+                  hasScrolled={hasScrolled}
+                />
+              </TabPanel>
+            );
+          })}
+        </TabPanels>
+      </Tabs>
+    );
+  }
+);
 
 export function BatchEvaluationV2EvaluationResult({
   results,
   datasetByIndex,
   datasetColumns,
-  total,
   isFinished,
   size = "md",
+  hasScrolled,
 }: {
   results: ESBatchEvaluation["evaluations"];
   datasetByIndex: Record<number, ESBatchEvaluation["dataset"][number]>;
   datasetColumns: Set<string>;
-  total: number | undefined;
   isFinished: boolean;
   size?: "sm" | "md";
+  hasScrolled: boolean;
 }) {
   const evaluationInputsColumns = new Set(
     results.flatMap((result) => Object.keys(result.inputs ?? {}))
@@ -650,18 +658,26 @@ export function BatchEvaluationV2EvaluationResult({
           scrollParent.scrollHeight;
       }
 
-      if (isAtBottom) {
+      if (isAtBottom || (!hasScrolled && !isFinished)) {
         setTimeout(() => {
-          if (!containerRef.current) return;
+          if (!containerRef.current || hasScrolled) return;
           scrollParent?.scrollTo({
             // eslint-disable-next-line react-hooks/exhaustive-deps
             top: containerRef.current.scrollHeight,
             behavior: "smooth",
           });
         }, 100);
+        setTimeout(() => {
+          if (!containerRef.current || hasScrolled) return;
+          scrollParent?.scrollTo({
+            // eslint-disable-next-line react-hooks/exhaustive-deps
+            top: containerRef.current.scrollHeight,
+            behavior: "smooth",
+          });
+        }, 1000);
       }
     };
-  }, [results]);
+  }, [results, isFinished, hasScrolled]);
 
   return (
     <TableContainer ref={containerRef}>

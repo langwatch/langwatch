@@ -96,6 +96,7 @@ export function EvaluationResults() {
     },
     {
       enabled: !!project && !!workflowId,
+      refetchOnWindowFocus: false,
     }
   );
 
@@ -205,6 +206,7 @@ export function OptimizationResults() {
     },
     {
       enabled: !!project && !!workflowId,
+      refetchOnWindowFocus: false,
     }
   );
 
