@@ -7,6 +7,7 @@ import {
   HStack,
   Progress,
   Spacer,
+  Text,
   VStack,
 } from "@chakra-ui/react";
 import { useWorkflowStore } from "../hooks/useWorkflowStore";
@@ -17,11 +18,10 @@ export function ProgressToast() {
 }
 
 export function EvaluationProgressToast() {
-  const { workflowId, getWorkflow, evaluationState } = useWorkflowStore(
-    ({ workflow_id: workflowId, getWorkflow, state }) => ({
-      workflowId,
-      getWorkflow,
+  const { evaluationState, setOpenResultsPanelRequest } = useWorkflowStore(
+    ({ state, setOpenResultsPanelRequest }) => ({
       evaluationState: state.evaluation,
+      setOpenResultsPanelRequest,
     })
   );
 
@@ -37,6 +37,9 @@ export function EvaluationProgressToast() {
     <BaseProgressToast
       description="Running evaluation"
       progress={<EvaluationProgressBar />}
+      onClick={() => {
+        setOpenResultsPanelRequest("evaluations");
+      }}
       onCancel={() => {
         stopEvaluationExecution({
           run_id: evaluationState?.run_id ?? "",
@@ -49,9 +52,13 @@ export function EvaluationProgressToast() {
 export function BaseProgressToast({
   description,
   progress,
+  onClick,
+  onCancel,
 }: {
   description: string;
   progress: React.ReactNode;
+  onClick: () => void;
+  onCancel: () => void;
 }) {
   return (
     <Alert
@@ -66,6 +73,7 @@ export function BaseProgressToast({
       borderRadius="md"
       border="1px solid"
       borderColor="gray.200"
+      onClick={onClick}
     >
       <VStack align="start" spacing={1}>
         <VStack align="start" spacing={1} paddingY={2} paddingX={3}>
@@ -76,7 +84,15 @@ export function BaseProgressToast({
           <HStack minWidth="300px">
             <AlertDescription fontSize="14px">{description}</AlertDescription>
             <Spacer />
-            <Button size="sm">Cancel</Button>
+            <Button
+              size="sm"
+              onClick={(e) => {
+                e.stopPropagation();
+                onCancel();
+              }}
+            >
+              Cancel
+            </Button>
           </HStack>
         </VStack>
         {progress}
@@ -85,10 +101,41 @@ export function BaseProgressToast({
   );
 }
 
-export function EvaluationProgressBar() {
+export function EvaluationProgressBar({
+  size = "xs",
+}: {
+  size?: "xs" | "sm" | "md" | "lg";
+}) {
   const { evaluationState } = useWorkflowStore(({ state }) => ({
     evaluationState: state.evaluation,
   }));
 
-  return <Progress size="xs" width="full" isIndeterminate />;
+  const progress = evaluationState?.progress ?? 0;
+  const total = evaluationState?.total ?? 100;
+  const isIndeterminate =
+    evaluationState?.status === "waiting" || !evaluationState?.total;
+
+  return (
+    <HStack width="full" spacing={4}>
+      {!isIndeterminate && size !== "xs" && (
+        <Text whiteSpace="nowrap">{Math.round((progress / total) * 100)}%</Text>
+      )}
+      <Progress
+        size={size}
+        width="full"
+        colorScheme="blue"
+        isIndeterminate={isIndeterminate}
+        isAnimated
+        borderRadius="sm"
+        value={progress}
+        max={total ? total : undefined}
+        hasStripe
+      />
+      {!isIndeterminate && size !== "xs" && (
+        <Text whiteSpace="nowrap">
+          {progress} / {total}
+        </Text>
+      )}
+    </HStack>
+  );
 }

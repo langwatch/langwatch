@@ -88,7 +88,7 @@ export default async function handler(
   }
 
   if (
-    params.timestamps.created_at &&
+    params.timestamps?.created_at &&
     params.timestamps.created_at.toString().length === 10
   ) {
     debug(
@@ -145,7 +145,7 @@ const processBatchEvaluation = async (
     project,
     experiment_slug,
     ExperimentType.BATCH_EVALUATION_V2,
-    param.name ?? param.experiment_slug,
+    param.name ?? undefined,
     param.workflow_id ?? undefined
   );
 
@@ -159,11 +159,13 @@ const processBatchEvaluation = async (
     ...param,
     experiment_id: experiment.id,
     project_id: project.id,
+    dataset: param.dataset ?? [],
+    evaluations: param.evaluations ?? [],
     timestamps: {
-      created_at: param.timestamps.created_at ?? new Date().getTime(),
+      ...param.timestamps,
+      created_at: param.timestamps?.created_at ?? new Date().getTime(),
       inserted_at: new Date().getTime(),
       updated_at: new Date().getTime(),
-      finished_at: param.timestamps.finished_at ?? null,
     },
   };
 
@@ -209,12 +211,24 @@ const processBatchEvaluation = async (
       if (params.finished_at != null) {
         ctx._source.timestamps.finished_at = params.finished_at;
       }
+      if (params.stopped_at != null) {
+        ctx._source.timestamps.stopped_at = params.stopped_at;
+      }
+      if (params.progress != null) {
+        ctx._source.progress = params.progress;
+      }
+      if (params.total != null) {
+        ctx._source.total = params.total;
+      }
     `,
     params: {
       evaluations: batchEvaluation.evaluations,
       dataset: batchEvaluation.dataset,
       updated_at: new Date().getTime(),
       finished_at: batchEvaluation.timestamps.finished_at,
+      stopped_at: batchEvaluation.timestamps.stopped_at,
+      progress: batchEvaluation.progress,
+      total: batchEvaluation.total,
     },
   };
 

@@ -60,11 +60,25 @@ export function Evaluate() {
 
 export function EvaluateModalContent({ onClose }: { onClose: () => void }) {
   const { project } = useOrganizationTeamProject();
-  const { workflowId, getWorkflow, evaluationState } = useWorkflowStore(
-    ({ workflow_id: workflowId, getWorkflow, state }) => ({
+  const {
+    workflowId,
+    getWorkflow,
+    evaluationState,
+    deselectAllNodes,
+    setOpenResultsPanelRequest,
+  } = useWorkflowStore(
+    ({
+      workflow_id: workflowId,
+      getWorkflow,
+      state,
+      deselectAllNodes,
+      setOpenResultsPanelRequest,
+    }) => ({
       workflowId,
       getWorkflow,
       evaluationState: state.evaluation,
+      deselectAllNodes: deselectAllNodes,
+      setOpenResultsPanelRequest: setOpenResultsPanelRequest,
     })
   );
   const form = useForm<{ version: string; commitMessage: string }>({
@@ -90,8 +104,16 @@ export function EvaluateModalContent({ onClose }: { onClose: () => void }) {
   useEffect(() => {
     if (hasStarted && evaluationState?.status === "running") {
       onClose();
+      deselectAllNodes();
+      setOpenResultsPanelRequest("evaluations");
     }
-  }, [evaluationState?.status, hasStarted, onClose]);
+  }, [
+    evaluationState?.status,
+    hasStarted,
+    onClose,
+    deselectAllNodes,
+    setOpenResultsPanelRequest,
+  ]);
 
   const onSubmit = useCallback(
     async ({

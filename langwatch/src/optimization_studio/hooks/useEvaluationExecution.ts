@@ -1,11 +1,9 @@
+import { useToast } from "@chakra-ui/react";
+import { nanoid } from "nanoid";
 import { useCallback, useEffect, useState } from "react";
+import type { StudioClientEvent } from "../types/events";
 import { useSocketClient } from "./useSocketClient";
 import { useWorkflowStore } from "./useWorkflowStore";
-import type { StudioClientEvent } from "../types/events";
-import type { Node } from "@xyflow/react";
-import type { BaseComponent, Component, Field } from "../types/dsl";
-import { nanoid } from "nanoid";
-import { useToast } from "@chakra-ui/react";
 
 export const useEvaluationExecution = () => {
   const { sendMessage, socketStatus } = useSocketClient();
@@ -17,10 +15,12 @@ export const useEvaluationExecution = () => {
     timeout_on_status: "waiting" | "running";
   } | null>(null);
 
-  const { getWorkflow, setEvaluationState } = useWorkflowStore((state) => ({
-    getWorkflow: state.getWorkflow,
-    setEvaluationState: state.setEvaluationState,
-  }));
+  const { getWorkflow, setEvaluationState, setOpenResultsPanelRequest } =
+    useWorkflowStore((state) => ({
+      getWorkflow: state.getWorkflow,
+      setEvaluationState: state.setEvaluationState,
+      setOpenResultsPanelRequest: state.setOpenResultsPanelRequest,
+    }));
 
   const socketAvailable = useCallback(() => {
     if (socketStatus !== "connected") {
@@ -68,9 +68,12 @@ export const useEvaluationExecution = () => {
 
       const run_id = `run_${nanoid()}`;
 
+      setOpenResultsPanelRequest("closed");
       setEvaluationState({
         status: "waiting",
         run_id,
+        progress: 0,
+        total: 0,
       });
 
       const payload: StudioClientEvent = {
@@ -87,7 +90,13 @@ export const useEvaluationExecution = () => {
         setTriggerTimeout({ run_id, timeout_on_status: "waiting" });
       }, 10_000);
     },
-    [socketAvailable, getWorkflow, sendMessage, setEvaluationState]
+    [
+      socketAvailable,
+      setOpenResultsPanelRequest,
+      setEvaluationState,
+      getWorkflow,
+      sendMessage,
+    ]
   );
 
   const stopEvaluationExecution = useCallback(
@@ -107,8 +116,8 @@ export const useEvaluationExecution = () => {
       }
 
       const payload: StudioClientEvent = {
-        type: "stop_execution",
-        payload: { trace_id: run_id },
+        type: "stop_evaluation_execution",
+        payload: { workflow: workflow, run_id },
       };
       sendMessage(payload);
 

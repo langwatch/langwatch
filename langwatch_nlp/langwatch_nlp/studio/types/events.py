@@ -40,6 +40,16 @@ class StopExecution(BaseModel):
     payload: StopExecutionPayload
 
 
+class StopEvaluationExecutionPayload(BaseModel):
+    workflow: Workflow
+    run_id: str
+
+
+class StopEvaluationExecution(BaseModel):
+    type: Literal["stop_evaluation_execution"] = "stop_evaluation_execution"
+    payload: StopEvaluationExecutionPayload
+
+
 class ExecuteFlowPayload(BaseModel):
     trace_id: str
     workflow: Workflow
@@ -63,7 +73,12 @@ class ExecuteEvaluation(BaseModel):
 
 
 StudioClientEvent = Union[
-    IsAlive, ExecuteComponent, StopExecution, ExecuteFlow, ExecuteEvaluation
+    IsAlive,
+    ExecuteComponent,
+    StopExecution,
+    ExecuteFlow,
+    ExecuteEvaluation,
+    StopEvaluationExecution,
 ]
 
 

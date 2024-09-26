@@ -11,8 +11,12 @@ from fastapi import FastAPI, Response, BackgroundTasks
 from fastapi.responses import StreamingResponse
 import json
 
+from langwatch_nlp.studio.dspy.evaluation import EvaluationReporting
 from langwatch_nlp.studio.execute.execute_component import execute_component
-from langwatch_nlp.studio.execute.execute_evaluation import execute_evaluation
+from langwatch_nlp.studio.execute.execute_evaluation import (
+    error_evaluation_event,
+    execute_evaluation,
+)
 from langwatch_nlp.studio.execute.execute_flow import execute_flow
 from langwatch_nlp.studio.process_pool import IsolatedProcessPool
 from langwatch_nlp.studio.types.events import (
@@ -20,6 +24,7 @@ from langwatch_nlp.studio.types.events import (
     DebugPayload,
     Done,
     IsAliveResponse,
+    StopEvaluationExecution,
     StopExecution,
     StudioClientEvent,
     StudioServerEvent,
@@ -129,17 +134,7 @@ running_processes: Dict[str, RunningProcess] = {}
 async def execute_event_on_a_subprocess(event: StudioClientEvent):
     if isinstance(event, StopExecution):
         if event.payload.trace_id in running_processes:
-            queue = running_processes[event.payload.trace_id]["queue"]
-            queue.put(Done())
-
-            await asyncio.sleep(0.2)
-
-            # Check again because the process generally finishes gracefully on its own
-            if event.payload.trace_id in running_processes:
-                process = running_processes[event.payload.trace_id]["process"]
-                process.kill()
-                process.join()
-                del running_processes[event.payload.trace_id]
+            await stop_process(event.payload.trace_id)
             if event.payload.node_id:
                 yield component_error_event(
                     trace_id=event.payload.trace_id,
@@ -148,6 +143,27 @@ async def execute_event_on_a_subprocess(event: StudioClientEvent):
                 )
             else:
                 yield Error(payload=ErrorPayload(message="Interrupted"))
+        return
+
+    if isinstance(event, StopEvaluationExecution):
+        if event.payload.run_id in running_processes:
+            await stop_process(event.payload.run_id)
+            EvaluationReporting.post_results(
+                event.payload.workflow.api_key,
+                {
+                    "experiment_slug": event.payload.workflow.workflow_id,
+                    "run_id": event.payload.run_id,
+                    "timestamps": {
+                        "finished_at": int(time.time() * 1000),
+                        "stopped_at": int(time.time() * 1000),
+                    },
+                },
+            )
+            yield error_evaluation_event(
+                run_id=event.payload.run_id,
+                error="Evaluation Stopped",
+                stopped_at=int(time.time() * 1000),
+            )
         return
 
     process, queue = pool.submit(event)
@@ -211,6 +227,20 @@ def get_trace_id(event: StudioClientEvent):
             else None
         )
     )
+
+
+async def stop_process(trace_id: str):
+    queue = running_processes[trace_id]["queue"]
+    queue.put(Done())
+
+    await asyncio.sleep(0.2)
+
+    # Check again because the process generally finishes gracefully on its own
+    if trace_id in running_processes:
+        process = running_processes[trace_id]["process"]
+        process.kill()
+        process.join()
+        del running_processes[trace_id]
 
 
 async def event_encoder(event_generator: AsyncGenerator[StudioServerEvent, None]):

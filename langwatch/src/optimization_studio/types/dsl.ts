@@ -140,6 +140,8 @@ export type Workflow = {
       run_id?: string;
       status?: ExecutionStatus;
       error?: string;
+      progress?: number;
+      total?: number;
       timestamps?: {
         started_at?: number;
         finished_at?: number;

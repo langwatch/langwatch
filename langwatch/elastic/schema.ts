@@ -362,6 +362,8 @@ export const batchEvaluationMapping: ElasticSearchMappingFrom<ESBatchEvaluation>
     experiment_id: { type: "keyword" },
     run_id: { type: "keyword" },
     workflow_version_id: { type: "keyword" },
+    progress: { type: "integer" },
+    total: { type: "integer" },
     dataset: {
       properties: {
         index: { type: "integer" },
@@ -391,6 +393,7 @@ export const batchEvaluationMapping: ElasticSearchMappingFrom<ESBatchEvaluation>
         created_at: { type: "date" },
         inserted_at: { type: "date" },
         updated_at: { type: "date" },
+        stopped_at: { type: "date" },
         finished_at: { type: "date" },
       },
     },

@@ -209,6 +209,7 @@ export const experimentsRouter = createTRPCRouter({
               "timestamps.created_at",
               "timestamps.updated_at",
               "timestamps.finished_at",
+              "timestamps.stopped_at",
             ],
             query: {
               bool: {

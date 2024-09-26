@@ -81,6 +81,7 @@ export const findOrCreateExperiment = async (
   let experiment = await prisma.experiment.findUnique({
     where: { projectId_slug: { projectId: project.id, slug: slug_ } },
   });
+
   if (!experiment) {
     experiment = await prisma.experiment.create({
       data: {
@@ -93,7 +94,7 @@ export const findOrCreateExperiment = async (
       },
     });
   } else {
-    if (experiment_name) {
+    if (!!experiment_name || !!workflowId) {
       await prisma.experiment.update({
         where: { id: experiment.id, projectId: project.id },
         data: { name: experiment_name, workflowId: workflowId },

@@ -361,13 +361,17 @@ const saveOrCommitWorkflowVersion = async ({
   );
   const nextVersion = `${versionMajor}.${parseInt(versionMinor ?? "0") + 1}`;
 
+  const dslWithoutStates = {
+    ...input.dsl,
+    state: {},
+  };
   const data = {
     commitMessage,
     authorId: ctx.session.user.id,
     projectId: input.projectId,
     workflowId: input.workflowId,
     autoSaved,
-    dsl: input.dsl as object,
+    dsl: dslWithoutStates as object,
   };
 
   let updatedVersion: WorkflowVersion;

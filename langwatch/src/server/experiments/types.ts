@@ -95,6 +95,8 @@ export type ESBatchEvaluation = {
   experiment_id: string;
   run_id: string;
   workflow_version_id?: string | null;
+  progress?: number | null;
+  total?: number | null;
   dataset: {
     index: number;
     entry: Record<string, any>;
@@ -118,19 +120,22 @@ export type ESBatchEvaluation = {
     created_at: number;
     inserted_at: number;
     updated_at: number;
+    stopped_at?: number | null;
     finished_at?: number | null;
   };
 };
 
 export type ESBatchEvaluationRESTParams = Omit<
-  ESBatchEvaluation,
+  Partial<ESBatchEvaluation>,
   "project_id" | "experiment_id" | "timestamps"
 > & {
   experiment_slug: string;
+  run_id: string | null;
   workflow_id?: string | null;
   name?: string | null;
-  timestamps: {
+  timestamps?: {
     created_at?: number | null;
     finished_at?: number | null;
+    stopped_at?: number | null;
   };
 };

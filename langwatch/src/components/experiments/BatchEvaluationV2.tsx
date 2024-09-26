@@ -11,6 +11,7 @@ import {
   Heading,
   Skeleton,
   Spacer,
+  Spinner,
   Tab,
   TabList,
   TabPanel,
@@ -92,7 +93,9 @@ export function BatchEvaluationV2({
               </Button>
             )}
           </HStack>
-          {batchEvaluationRuns.isLoading ? (
+          {batchEvaluationRuns.isLoading ||
+          (batchEvaluationRuns.error &&
+            batchEvaluationRuns.error.data?.httpStatus == 404) ? (
             <Skeleton width="100%" height="30px" />
           ) : batchEvaluationRuns.error ? (
             <Alert status="error">
@@ -106,16 +109,10 @@ export function BatchEvaluationV2({
               <>
                 <Card width="100%">
                   <CardHeader>
-                    <HStack width="full">
-                      <Heading as="h2" size="md">
-                        {selectedRun.workflow_version?.commitMessage ??
-                          "Evaluation Results"}
-                      </Heading>
-                      <Spacer />
-                      <Text fontSize="13" color="gray.400">
-                        {selectedRun.run_id}
-                      </Text>
-                    </HStack>
+                    <Heading as="h2" size="md">
+                      {selectedRun.workflow_version?.commitMessage ??
+                        "Evaluation Results"}
+                    </Heading>
                   </CardHeader>
                   <CardBody paddingTop={0}>
                     <BatchEvaluationV2EvaluationResults
@@ -151,6 +148,8 @@ export const useBatchEvaluationState = ({
 }) => {
   const [isSomeRunning, setIsSomeRunning] = useState(false);
 
+  const [keepFetching, setKeepFetching] = useState(false);
+
   const batchEvaluationRuns =
     api.experiments.getExperimentBatchEvaluationRuns.useQuery(
       {
@@ -158,23 +157,34 @@ export const useBatchEvaluationState = ({
         experimentSlug: experiment?.slug ?? "",
       },
       {
-        refetchInterval: isSomeRunning ? 3000 : false,
+        refetchInterval: keepFetching ? 1 : isSomeRunning ? 3000 : false,
         enabled: !!project && !!experiment,
       }
     );
 
   const router = useRouter();
 
-  const selectedRunId_ =
-    selectedRunId ??
-    (typeof router.query.runId === "string" ? router.query.runId : null);
-
-  const selectedRun = useMemo(() => {
-    return (
-      batchEvaluationRuns.data?.runs.find((r) => r.run_id === selectedRunId_) ??
-      batchEvaluationRuns.data?.runs[0]
+  const { selectedRunId_, selectedRun } = useMemo(() => {
+    const selectedRunId_ =
+      selectedRunId ??
+      (typeof router.query.runId === "string" ? router.query.runId : null) ??
+      batchEvaluationRuns.data?.runs[0]?.run_id;
+    const selectedRun = batchEvaluationRuns.data?.runs.find(
+      (r) => r.run_id === selectedRunId_
     );
-  }, [batchEvaluationRuns.data?.runs, selectedRunId_]);
+    return { selectedRunId_, selectedRun };
+  }, [selectedRunId, router.query.runId, batchEvaluationRuns.data?.runs]);
+
+  useEffect(() => {
+    if (selectedRunId && !selectedRun) {
+      setKeepFetching(true);
+      setTimeout(() => {
+        setKeepFetching(false);
+      }, 5_000);
+    } else {
+      setKeepFetching(false);
+    }
+  }, [batchEvaluationRuns.data?.runs, selectedRunId, selectedRun]);
 
   const setSelectedRunId_ = useCallback(
     (runId: string) => {
@@ -211,6 +221,7 @@ export const useBatchEvaluationState = ({
   return {
     batchEvaluationRuns,
     selectedRun,
+    selectedRunId: selectedRunId_,
     setSelectedRunId: setSelectedRunId_,
     isFinished,
   };
@@ -317,6 +328,15 @@ export function BatchEvaluationV2RunList({
               <VStack align="start" spacing={0}>
                 <Text fontSize={size === "sm" ? "13px" : "14px"}>
                   {runName}
+                  {getFinishedAt(run.timestamps, new Date().getTime()) ===
+                    undefined && (
+                    <Spinner
+                      size="xs"
+                      display="inline-block"
+                      marginLeft={2}
+                      marginBottom="-2px"
+                    />
+                  )}
                 </Text>
                 <HStack
                   color="gray.400"
@@ -348,6 +368,14 @@ export function BatchEvaluationV2RunList({
                         )
                       : "Waiting for steps..."}
                   </Text>
+                  {run.timestamps.stopped_at && (
+                    <Box
+                      width="6px"
+                      height="6px"
+                      background="red.300"
+                      borderRadius="full"
+                    />
+                  )}
                 </HStack>
               </VStack>
             </HStack>
@@ -367,7 +395,7 @@ export function BatchEvaluationV2EvaluationResults({
 }: {
   project: Project;
   experiment: Experiment;
-  runId: string;
+  runId: string | undefined;
   isFinished: boolean;
   size?: "sm" | "md";
 }) {
@@ -375,9 +403,10 @@ export function BatchEvaluationV2EvaluationResults({
     {
       projectId: project.id,
       experimentSlug: experiment.slug,
-      runId,
+      runId: runId ?? "",
     },
     {
+      enabled: !!runId,
       refetchInterval: isFinished ? false : 3000,
       refetchOnMount: false,
       refetchOnWindowFocus: false,
@@ -413,7 +442,75 @@ export function BatchEvaluationV2EvaluationResults({
   }
 
   if (!resultsByEvaluator || !datasetByIndex) {
-    return <Skeleton width="100%" height="30px" />;
+    return (
+      <VStack spacing={0} width="full" height="full" minWidth="0">
+        <Tabs
+          size={size}
+          width="full"
+          height="full"
+          display="flex"
+          flexDirection="column"
+          minHeight="0"
+          overflowX="auto"
+          padding={0}
+        >
+          <TabList>
+            <Tab>
+              <Skeleton width="60px" height="22px" />
+            </Tab>
+          </TabList>
+          <TabPanels minWidth="full" minHeight="0" overflowY="auto">
+            <TabPanel padding={0}>
+              <Table size={size === "sm" ? "xs" : "sm"} variant="grid">
+                <Thead>
+                  <Tr>
+                    <Th rowSpan={2} width="50px">
+                      <Skeleton width="100%" height="52px" />
+                    </Th>
+                    <Th>
+                      <Skeleton width="100%" height="18px" />
+                    </Th>
+                    <Th>
+                      <Skeleton width="100%" height="18px" />
+                    </Th>
+                    <Th>
+                      <Skeleton width="100%" height="18px" />
+                    </Th>
+                  </Tr>
+                  <Tr>
+                    <Th>
+                      <Skeleton width="100%" height="18px" />
+                    </Th>
+                    <Th>
+                      <Skeleton width="100%" height="18px" />
+                    </Th>
+                    <Th>
+                      <Skeleton width="100%" height="18px" />
+                    </Th>
+                  </Tr>
+                </Thead>
+                <Tbody>
+                  <Tr>
+                    <Td>
+                      <Skeleton width="100%" height="18px" />
+                    </Td>
+                    <Td>
+                      <Skeleton width="100%" height="18px" />
+                    </Td>
+                    <Td>
+                      <Skeleton width="100%" height="18px" />
+                    </Td>
+                    <Td>
+                      <Skeleton width="100%" height="18px" />
+                    </Td>
+                  </Tr>
+                </Tbody>
+              </Table>
+            </TabPanel>
+          </TabPanels>
+        </Tabs>
+      </VStack>
+    );
   }
 
   const datasetColumns = new Set(
@@ -429,10 +526,19 @@ export function BatchEvaluationV2EvaluationResults({
       height="full"
       display="flex"
       flexDirection="column"
-      minWidth="0"
       minHeight="0"
       overflowX="auto"
+      position="relative"
     >
+      <Box
+        position="absolute"
+        top={1}
+        right={2}
+        color="gray.400"
+        fontSize="12px"
+      >
+        {runId}
+      </Box>
       <TabList>
         {Object.entries(resultsByEvaluator).map(([evaluator, results]) => (
           <Tab key={evaluator}>
@@ -440,10 +546,16 @@ export function BatchEvaluationV2EvaluationResults({
           </Tab>
         ))}
       </TabList>
-      <TabPanels width="full" minHeight="0" overflowY="auto">
+      <TabPanels minWidth="full" minHeight="0" overflowY="auto">
         {Object.entries(resultsByEvaluator).map(([evaluator, results]) => {
           return (
-            <TabPanel key={evaluator} padding={0} width="full" minHeight="0">
+            <TabPanel
+              key={evaluator}
+              padding={0}
+              minWidth="full"
+              width="fit-content"
+              minHeight="0"
+            >
               <BatchEvaluationV2EvaluationResult
                 results={results}
                 datasetByIndex={datasetByIndex}
@@ -624,7 +736,7 @@ const getFinishedAt = (
   return undefined;
 };
 
-function BatchEvaluationV2EvaluationSummary({
+export function BatchEvaluationV2EvaluationSummary({
   run,
 }: {
   run: NonNullable<
@@ -639,10 +751,13 @@ function BatchEvaluationV2EvaluationSummary({
     return getFinishedAt(run.timestamps, currentTimestamp);
   }, [run.timestamps, currentTimestamp]);
 
-  const runtime = run.timestamps.created_at
-    ? (finishedAt ?? currentTimestamp) -
-      new Date(run.timestamps.created_at).getTime()
-    : 0;
+  const runtime = Math.max(
+    run.timestamps.created_at
+      ? (finishedAt ?? currentTimestamp) -
+          new Date(run.timestamps.created_at).getTime()
+      : 0,
+    0
+  );
 
   useEffect(() => {
     if (finishedAt) return;
@@ -693,8 +808,10 @@ function BatchEvaluationV2EvaluationSummary({
         );
       })}
       <VStack align="start" spacing={1}>
-        <Text fontWeight="500">Mean Cost</Text>
-        <Text>
+        <Text fontWeight="500" noOfLines={1}>
+          Mean Cost
+        </Text>
+        <Text noOfLines={1} whiteSpace="nowrap">
           <FormatMoney
             amount={run.summary.dataset_average_cost}
             currency="USD"
@@ -704,13 +821,17 @@ function BatchEvaluationV2EvaluationSummary({
       </VStack>
       <Divider orientation="vertical" height="48px" />
       <VStack align="start" spacing={1}>
-        <Text fontWeight="500">Mean Duration</Text>
+        <Text fontWeight="500" noOfLines={1}>
+          Mean Duration
+        </Text>
         <Text>{formatMilliseconds(run.summary.dataset_average_duration)}</Text>
       </VStack>
       <Divider orientation="vertical" height="48px" />
       <VStack align="start" spacing={1}>
-        <Text fontWeight="500">Total Cost</Text>
-        <Text>
+        <Text fontWeight="500" noOfLines={1}>
+          Total Cost
+        </Text>
+        <Text noOfLines={1} whiteSpace="nowrap">
           <FormatMoney
             amount={run.summary.cost}
             currency="USD"
@@ -720,9 +841,27 @@ function BatchEvaluationV2EvaluationSummary({
       </VStack>
       <Divider orientation="vertical" height="48px" />
       <VStack align="start" spacing={1}>
-        <Text fontWeight="500">Runtime</Text>
-        <Text>{numeral(runtime / 1000).format("00:00:00")}</Text>
+        <Text fontWeight="500" noOfLines={1}>
+          Runtime
+        </Text>
+        <Text noOfLines={1} whiteSpace="nowrap">
+          {numeral(runtime / 1000).format("00:00:00")}
+        </Text>
       </VStack>
+      {run.timestamps.stopped_at && (
+        <>
+          <Spacer />
+          <HStack>
+            <Box
+              width="12px"
+              height="12px"
+              background="red.500"
+              borderRadius="full"
+            />
+            <Text>Stopped</Text>
+          </HStack>
+        </>
+      )}
     </HStack>
   );
 }

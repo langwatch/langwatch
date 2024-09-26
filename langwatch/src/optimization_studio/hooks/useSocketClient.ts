@@ -36,6 +36,7 @@ export const useSocketClient = () => {
     getWorkflow,
     setSelectedNode,
     setPropertiesExpanded,
+    setOpenResultsPanelRequest,
   } = useWorkflowStore((state) => ({
     socketStatus: state.socketStatus,
     setSocketStatus: state.setSocketStatus,
@@ -45,6 +46,7 @@ export const useSocketClient = () => {
     getWorkflow: state.getWorkflow,
     setSelectedNode: state.setSelectedNode,
     setPropertiesExpanded: state.setPropertiesExpanded,
+    setOpenResultsPanelRequest: state.setOpenResultsPanelRequest,
   }));
 
   const toast = useToast();
@@ -141,6 +143,9 @@ export const useSocketClient = () => {
           setEvaluationState(data.payload.evaluation_state);
           if (data.payload.evaluation_state?.status === "error") {
             alertOnError(data.payload.evaluation_state.error);
+            setTimeout(() => {
+              setOpenResultsPanelRequest("evaluations");
+            }, 500);
           }
           break;
         case "error":

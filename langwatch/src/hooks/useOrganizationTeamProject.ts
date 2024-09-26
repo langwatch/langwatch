@@ -141,7 +141,11 @@ export const useOrganizationTeamProject = (
 
   const modelProviders = api.modelProvider.getAllForProject.useQuery(
     { projectId: project?.id ?? "" },
-    { enabled: !!project?.id }
+    {
+      enabled: !!project?.id,
+      staleTime: keepFetching ? undefined : Infinity,
+      refetchOnMount: false,
+    }
   );
 
   useEffect(() => {

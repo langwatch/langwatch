@@ -34,6 +34,7 @@ type State = Workflow & {
   triggerValidation: boolean;
   workflowSelected: boolean;
   previousWorkflow: Workflow | undefined;
+  openResultsPanelRequest: "evaluations" | "closed" | undefined;
 };
 
 type WorkflowStore = State & {
@@ -64,6 +65,9 @@ type WorkflowStore = State & {
   setPropertiesExpanded: (expanded: boolean) => void;
   setTriggerValidation: (triggerValidation: boolean) => void;
   setWorkflowSelected: (selected: boolean) => void;
+  setOpenResultsPanelRequest: (
+    request: "evaluations" | "closed" | undefined
+  ) => void;
 };
 
 const DEFAULT_LLM_CONFIG: LLMConfig = {
@@ -90,6 +94,7 @@ const initialState: State = {
   triggerValidation: false,
   workflowSelected: false,
   previousWorkflow: undefined,
+  openResultsPanelRequest: undefined,
 };
 
 const store = (
@@ -263,6 +268,9 @@ const store = (
     if (selected) {
       set({ nodes: get().nodes.map((node) => ({ ...node, selected: false })) });
     }
+  },
+  setOpenResultsPanelRequest: (request) => {
+    set({ openResultsPanelRequest: request });
   },
 });
 

@@ -33,6 +33,13 @@ export type StudioClientEvent =
         workflow: Workflow;
         workflow_version_id: string;
       };
+    }
+  | {
+      type: "stop_evaluation_execution";
+      payload: {
+        workflow: Workflow;
+        run_id: string;
+      };
     };
 
 export type StudioServerEvent =

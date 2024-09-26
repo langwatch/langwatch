@@ -1,4 +1,5 @@
 import asyncio
+from multiprocessing import Queue
 import threading
 import time
 from typing import Callable, List, Optional, Any, Tuple, Literal, overload
@@ -12,7 +13,12 @@ from langwatch_nlp.studio.dspy.predict_with_cost_and_duration import (
 )
 from langevals_core.base_evaluator import SingleEvaluationResult
 
-from langwatch_nlp.studio.types.dsl import Workflow
+from langwatch_nlp.studio.types.dsl import EvaluationExecutionState, Workflow
+from langwatch_nlp.studio.types.events import (
+    EvaluationStateChange,
+    EvaluationStateChangePayload,
+    StudioServerEvent,
+)
 from langwatch_nlp.studio.utils import get_node_by_id
 
 
@@ -64,11 +70,21 @@ class PredictionWithEvaluationCostAndDuration(PredictionWithCostAndDuration):
 
 
 class EvaluationReporting:
-    def __init__(self, workflow: Workflow, workflow_version_id: str, run_id: str):
+    def __init__(
+        self,
+        workflow: Workflow,
+        workflow_version_id: str,
+        run_id: str,
+        total: int,
+        queue: "Queue[StudioServerEvent]",
+    ):
         self.workflow = workflow
         self.workflow_version_id = workflow_version_id
         self.run_id = run_id
         self.created_at = int(time.time() * 1000)
+        self.total = total
+        self.progress = 0
+        self.queue = queue
 
         self.lock = threading.Lock()
         self.batch = {"dataset": [], "evaluations": []}
@@ -84,8 +100,23 @@ class EvaluationReporting:
     ):
         evaluation, evaluation_results = pred.evaluation(example, return_results=True)
 
+        if self.progress == 0:
+            # Send initial empty batch to create the experiment in LangWatch
+            self.send_batch()
+
         with self.lock:
             self.add_to_batch(example, pred, evaluation_results)
+            self.progress += 1
+
+        self.queue.put(
+            EvaluationStateChange(
+                payload=EvaluationStateChangePayload(
+                    evaluation_state=EvaluationExecutionState(
+                        run_id=self.run_id, progress=self.progress, total=self.total
+                    )
+                )
+            )
+        )
 
         # Check if it's time to send the batch
         if time.time() - self.last_sent >= self.debounce_interval:
@@ -139,13 +170,6 @@ class EvaluationReporting:
 
     def send_batch(self, finished: bool = False):
         with self.lock:
-            if (
-                not finished
-                and not self.batch["dataset"]
-                and not self.batch["evaluations"]
-            ):
-                return
-
             body = {
                 "experiment_slug": self.workflow.workflow_id,
                 "name": f"{self.workflow.name} - Evaluations",
@@ -154,6 +178,8 @@ class EvaluationReporting:
                 "workflow_version_id": self.workflow_version_id,
                 "dataset": self.batch["dataset"],
                 "evaluations": self.batch["evaluations"],
+                "progress": self.progress,
+                "total": self.total,
                 "timestamps": {
                     "created_at": self.created_at,
                 },
@@ -163,7 +189,10 @@ class EvaluationReporting:
                 body["timestamps"]["finished_at"] = int(time.time() * 1000)
 
             # Start a new thread to send the batch
-            thread = threading.Thread(target=self.post_results, args=(body,))
+            thread = threading.Thread(
+                target=EvaluationReporting.post_results,
+                args=(self.workflow.api_key, body),
+            )
             thread.start()
             self.threads.append(thread)
 
@@ -171,15 +200,16 @@ class EvaluationReporting:
             self.batch = {"dataset": [], "evaluations": []}
             self.last_sent = time.time()
 
+    @classmethod
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=2, max=10),
         reraise=True,
     )
-    def post_results(self, body):
+    def post_results(cls, api_key: str, body: dict):
         response = httpx.post(
             f"{langwatch.endpoint}/api/evaluations/batch/log_results",
-            headers={"Authorization": f"Bearer {self.workflow.api_key}"},
+            headers={"Authorization": f"Bearer {api_key}"},
             json=body,
             timeout=10,
         )

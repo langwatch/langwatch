@@ -50,6 +50,7 @@ class ComponentType(str, Enum):
 class Timestamps(BaseModel):
     started_at: Optional[int] = None
     finished_at: Optional[int] = None
+    stopped_at: Optional[int] = None
 
 
 class ExecutionState(BaseModel):
@@ -192,6 +193,8 @@ class EvaluationExecutionState(BaseModel):
     run_name: Optional[str] = None
     status: Optional[ExecutionStatus] = None
     error: Optional[str] = None
+    progress: Optional[int] = None
+    total: Optional[int] = None
     timestamps: Optional[Timestamps] = None
 
 

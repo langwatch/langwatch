@@ -3,24 +3,30 @@ import {
   AlertIcon,
   Button,
   HStack,
+  Skeleton,
+  Spacer,
   Tab,
   TabList,
   TabPanel,
   TabPanels,
   Tabs,
   Text,
+  VStack,
 } from "@chakra-ui/react";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { useWorkflowStore } from "../hooks/useWorkflowStore";
 import { api } from "../../utils/api";
 import {
   BatchEvaluationV2EvaluationResults,
+  BatchEvaluationV2EvaluationSummary,
   BatchEvaluationV2RunList,
   useBatchEvaluationState,
 } from "../../components/experiments/BatchEvaluationV2";
 import { experimentSlugify } from "../../server/experiments/utils";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { X } from "react-feather";
+import { EvaluationProgressBar } from "./ProgressToast";
+import { useEvaluationExecution } from "../hooks/useEvaluationExecution";
 
 export function ResultsPanel({
   collapsePanel,
@@ -60,7 +66,7 @@ export function ResultsPanel({
           <Tab>Evaluations</Tab>
           <Tab>Optimizations</Tab>
         </TabList>
-        <TabPanels minHeight="0">
+        <TabPanels minHeight="0" height="full">
           <TabPanel padding={0} height="full">
             <EvaluationResults />
           </TabPanel>
@@ -74,9 +80,12 @@ export function ResultsPanel({
 }
 
 export function EvaluationResults() {
-  const { workflowId } = useWorkflowStore(({ workflow_id: workflowId }) => ({
-    workflowId,
-  }));
+  const { workflowId, evaluationState } = useWorkflowStore(
+    ({ workflow_id: workflowId, state }) => ({
+      workflowId,
+      evaluationState: state.evaluation,
+    })
+  );
 
   const { project } = useOrganizationTeamProject();
 
@@ -90,15 +99,23 @@ export function EvaluationResults() {
     }
   );
 
-  const [selectedRunId, setSelectedRunId] = useState<string>();
+  const [selectedRunId, setSelectedRunId] = useState<string | undefined>(
+    evaluationState?.run_id
+  );
 
-  const { selectedRun, isFinished, batchEvaluationRuns } =
-    useBatchEvaluationState({
-      project: project,
-      experiment: experiment.data,
-      selectedRunId,
-      setSelectedRunId,
-    });
+  const { stopEvaluationExecution } = useEvaluationExecution();
+
+  const {
+    selectedRun,
+    isFinished,
+    batchEvaluationRuns,
+    selectedRunId: selectedRunId_,
+  } = useBatchEvaluationState({
+    project: project,
+    experiment: experiment.data,
+    selectedRunId,
+    setSelectedRunId,
+  });
 
   if (experiment.isError && experiment.error.data?.httpStatus === 404) {
     return <Text padding={4}>No evaluations started yet</Text>;
@@ -117,6 +134,8 @@ export function EvaluationResults() {
     return <Text padding={4}>Loading...</Text>;
   }
 
+  const evaluationStateRunId = evaluationState?.run_id;
+
   return (
     <HStack align="start" width="full" height="full" spacing={0}>
       <BatchEvaluationV2RunList
@@ -125,15 +144,48 @@ export function EvaluationResults() {
         setSelectedRunId={setSelectedRunId}
         size="sm"
       />
-      {selectedRun && (
+      <VStack spacing={0} width="full" height="full" minWidth="0">
         <BatchEvaluationV2EvaluationResults
           project={project}
           experiment={experiment.data}
-          runId={selectedRun.run_id}
+          runId={selectedRunId_}
           isFinished={isFinished}
           size="sm"
         />
-      )}
+        <Spacer />
+        {selectedRun && (
+          <BatchEvaluationV2EvaluationSummary run={selectedRun} />
+        )}
+        {(!selectedRun || selectedRun.run_id === evaluationStateRunId) &&
+          evaluationStateRunId &&
+          evaluationState?.status === "running" && (
+            <HStack
+              width="full"
+              padding={3}
+              borderTop="1px solid"
+              borderColor="gray.200"
+            >
+              <Text whiteSpace="nowrap" marginTop="-1px" paddingX={2}>
+                Running
+              </Text>
+              <EvaluationProgressBar size="lg" />
+              <Button
+                size="xs"
+                variant="ghost"
+                onClick={() =>
+                  stopEvaluationExecution({
+                    run_id: evaluationStateRunId,
+                  })
+                }
+                minHeight="28px"
+                minWidth="28px"
+                padding="6px"
+              >
+                <X />
+              </Button>
+            </HStack>
+          )}
+      </VStack>
     </HStack>
   );
 }

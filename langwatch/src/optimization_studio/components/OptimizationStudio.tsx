@@ -105,6 +105,8 @@ export default function OptimizationStudio() {
     onEdgesChange,
     onConnect,
     setWorkflowSelected,
+    openResultsPanelRequest,
+    setOpenResultsPanelRequest,
   } = useWorkflowStore(
     useShallow((state) => {
       if (typeof window !== "undefined") {
@@ -119,6 +121,8 @@ export default function OptimizationStudio() {
         onEdgesChange: state.onEdgesChange,
         onConnect: state.onConnect,
         setWorkflowSelected: state.setWorkflowSelected,
+        openResultsPanelRequest: state.openResultsPanelRequest,
+        setOpenResultsPanelRequest: state.setOpenResultsPanelRequest,
       };
     })
   );
@@ -148,6 +152,40 @@ export default function OptimizationStudio() {
       panel.collapse();
     }
   };
+
+  useEffect(() => {
+    if (openResultsPanelRequest === "evaluations" && isPanelCollapsed) {
+      panelRef.current?.expand(0);
+      panelRef.current?.resize(6);
+      const step = () => {
+        const size = panelRef.current?.getSize() ?? 0;
+        if (size < 70) {
+          panelRef.current?.resize(size + 10);
+          window.requestAnimationFrame(step);
+        }
+      };
+      step();
+    }
+    if (openResultsPanelRequest === "closed" && !isPanelCollapsed) {
+      panelRef.current?.collapse();
+    }
+    setOpenResultsPanelRequest(undefined);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openResultsPanelRequest]);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !("$crisp" in window)) {
+      return;
+    }
+
+    // @ts-ignore
+    window.$crisp.push(["do", "chat:hide"]);
+
+    return () => {
+      // @ts-ignore
+      window.$crisp.push(["do", "chat:show"]);
+    };
+  }, []);
 
   return (
     <div style={{ width: "100vw", height: "100vh" }}>

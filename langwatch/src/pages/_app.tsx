@@ -32,7 +32,9 @@ const { definePartsStyle, defineMultiStyleConfig } =
   createMultiStyleConfigHelpers(switchAnatomy.keys);
 
 const {
+  // eslint-disable-next-line @typescript-eslint/unbound-method
   definePartsStyle: definePartsStyleTable,
+  // eslint-disable-next-line @typescript-eslint/unbound-method
   defineMultiStyleConfig: defineMultiStyleConfigTable,
 } = createMultiStyleConfigHelpers(tableAnatomy.keys);
 

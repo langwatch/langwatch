@@ -1,6 +1,6 @@
 from multiprocessing import Queue
 import time
-from typing import cast
+from typing import Optional, cast
 import dspy
 from langwatch_nlp.studio.dspy.evaluation import EvaluationReporting
 from langwatch_nlp.studio.dspy.workflow_module import (
@@ -60,10 +60,16 @@ async def execute_evaluation(
     ]
 
     evaluator = Evaluate(
-        devset=examples, num_threads=10, display_progress=False, display_table=False
+        devset=examples, num_threads=10, display_progress=True, display_table=False
     )
 
-    reporting = EvaluationReporting(workflow, event.workflow_version_id, run_id)
+    reporting = EvaluationReporting(
+        workflow,
+        event.workflow_version_id,
+        run_id=run_id,
+        total=len(examples),
+        queue=queue,
+    )
     try:
         results = evaluator(module, metric=reporting.evaluate_and_report)
         await reporting.wait_for_completion()
@@ -98,13 +104,17 @@ def end_evaluation_event(run_id: str):
     )
 
 
-def error_evaluation_event(run_id: str, error: str):
+def error_evaluation_event(run_id: str, error: str, stopped_at: Optional[int] = None):
     return EvaluationStateChange(
         payload=EvaluationStateChangePayload(
             evaluation_state=EvaluationExecutionState(
                 status=ExecutionStatus.error,
                 run_id=run_id,
                 error=error,
+                timestamps=Timestamps(
+                    finished_at=int(time.time() * 1000),
+                    stopped_at=stopped_at,
+                ),
             )
         )
     )
