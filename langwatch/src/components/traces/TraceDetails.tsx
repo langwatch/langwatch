@@ -254,7 +254,7 @@ export function TraceDetails(props: {
 function Events({ traceId }: { traceId: string }) {
   const { trace } = useTraceDetailsState(traceId);
 
-  return trace.data?.events?.length == 0 ? (
+  return trace.data && (trace.data?.events ?? []).length == 0 ? (
     <Text>
       No events found.{" "}
       <Link
