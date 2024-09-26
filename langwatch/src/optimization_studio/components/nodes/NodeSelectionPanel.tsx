@@ -143,7 +143,7 @@ export const NodeDraggable = (props: { node: Node }) => {
   }));
 
   const extractIdNumber = (str?: string) => {
-    const match = str?.match(/_(\d+)$/);
+    const match = str?.match(/\((\d+)\)$/);
     return match?.[1] ? parseInt(match[1], 10) : null;
   };
 
@@ -157,16 +157,16 @@ export const NodeDraggable = (props: { node: Node }) => {
     while (usedIds.includes(i)) {
       i++;
     }
-    return `${prefix.slice(0, -1)}(${i})`;
+
+    return `${prefix}(${i})`;
   };
 
   const handleSetNodes = (e: Node, x: number, y: number) => {
     const newNode = props.node;
-    newNode.data.name = newNode.id;
 
     if (nodes.length > 0) {
-      const new_id = findLowestAvailableId(newNode.id, newNode.type);
-      newNode.id = new_id;
+      const new_id = findLowestAvailableId(newNode.data.name, newNode.type);
+      newNode.id = new_id.toLowerCase().replace(/\s/g, "_");
       newNode.data.name = new_id;
     }
 
@@ -206,7 +206,7 @@ export const NodeDraggable = (props: { node: Node }) => {
 
 const signatures = [
   {
-    id: "signature_1",
+    id: "llm_signature",
     type: "signature",
 
     data: {
