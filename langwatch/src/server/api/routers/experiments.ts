@@ -195,7 +195,7 @@ export const experimentsRouter = createTRPCRouter({
 
       type ESBatchEvaluationRunInfo = Pick<
         ESBatchEvaluation,
-        "run_id" | "workflow_version_id" | "timestamps"
+        "run_id" | "workflow_version_id" | "timestamps" | "total"
       >;
 
       const batchEvaluationRuns =
@@ -210,6 +210,7 @@ export const experimentsRouter = createTRPCRouter({
               "timestamps.updated_at",
               "timestamps.finished_at",
               "timestamps.stopped_at",
+              "total",
             ],
             query: {
               bool: {
@@ -337,6 +338,7 @@ export const experimentsRouter = createTRPCRouter({
           run_id: hit._source!.run_id,
           workflow_version: versionsMap[hit._source!.workflow_version_id!],
           timestamps: hit._source!.timestamps,
+          total: hit._source!.total,
           summary: {
             cost: runAgg?.dataset_cost.value + runAgg?.evaluations_cost.value,
             dataset_average_cost: runAgg?.dataset_average_cost.value,

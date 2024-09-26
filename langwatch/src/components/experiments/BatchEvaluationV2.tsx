@@ -29,7 +29,7 @@ import {
 } from "@chakra-ui/react";
 import type { Experiment, Project } from "@prisma/client";
 import { useRouter } from "next/router";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ExternalLink } from "react-feather";
 import { FormatMoney } from "../../optimization_studio/components/FormatMoney";
 import { VersionBox } from "../../optimization_studio/components/History";
@@ -119,6 +119,7 @@ export function BatchEvaluationV2({
                       project={project}
                       experiment={experiment}
                       runId={selectedRun.run_id}
+                      total={selectedRun.total ?? undefined}
                       isFinished={isFinished}
                     />
                   </CardBody>
@@ -390,15 +391,19 @@ export function BatchEvaluationV2EvaluationResults({
   project,
   experiment,
   runId,
+  total,
   isFinished,
   size = "md",
 }: {
   project: Project;
   experiment: Experiment;
   runId: string | undefined;
+  total: number | undefined;
   isFinished: boolean;
   size?: "sm" | "md";
 }) {
+  const [keepRefetching, setKeepRefetching] = useState(true);
+
   const run = api.experiments.getExperimentBatchEvaluationRun.useQuery(
     {
       projectId: project.id,
@@ -407,11 +412,21 @@ export function BatchEvaluationV2EvaluationResults({
     },
     {
       enabled: !!runId,
-      refetchInterval: isFinished ? false : 3000,
+      refetchInterval: keepRefetching ? 2000 : false,
       refetchOnMount: false,
       refetchOnWindowFocus: false,
     }
   );
+
+  useEffect(() => {
+    if (isFinished) {
+      setTimeout(() => {
+        setKeepRefetching(false);
+      }, 2_000);
+    } else {
+      setKeepRefetching(true);
+    }
+  }, [isFinished]);
 
   const datasetByIndex = run.data?.dataset.reduce(
     (acc, item) => {
@@ -560,6 +575,8 @@ export function BatchEvaluationV2EvaluationResults({
                 results={results}
                 datasetByIndex={datasetByIndex}
                 datasetColumns={datasetColumns}
+                total={total}
+                isFinished={isFinished}
                 size={size}
               />
             </TabPanel>
@@ -574,11 +591,15 @@ export function BatchEvaluationV2EvaluationResult({
   results,
   datasetByIndex,
   datasetColumns,
+  total,
+  isFinished,
   size = "md",
 }: {
   results: ESBatchEvaluation["evaluations"];
   datasetByIndex: Record<number, ESBatchEvaluation["dataset"][number]>;
   datasetColumns: Set<string>;
+  total: number | undefined;
+  isFinished: boolean;
   size?: "sm" | "md";
 }) {
   const evaluationInputsColumns = new Set(
@@ -591,16 +612,16 @@ export function BatchEvaluationV2EvaluationResult({
     details: false,
   };
   for (const result of results) {
-    if (result.score) {
+    if (result.score !== undefined && result.score !== null) {
       evaluatorResultsColumnsMap.score = true;
     }
-    if (result.passed) {
+    if (result.passed !== undefined && result.passed !== null) {
       evaluatorResultsColumnsMap.passed = true;
     }
-    if (result.label) {
+    if (result.label !== undefined && result.label !== null) {
       evaluatorResultsColumnsMap.label = true;
     }
-    if (result.details) {
+    if (result.details !== undefined && result.details !== null) {
       evaluatorResultsColumnsMap.details = true;
     }
   }
@@ -610,8 +631,40 @@ export function BatchEvaluationV2EvaluationResult({
       .map(([key]) => key)
   );
 
+  const totalRows = Math.max(...results.map((r) => r.index + 1));
+
+  // Scroll to the bottom on rerender if component was at the bottom previously
+  const containerRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const container = containerRef.current;
+
+    return () => {
+      let isAtBottom = true;
+      const scrollParent = container?.parentElement?.parentElement;
+      if (scrollParent) {
+        const currentScrollTop = scrollParent.scrollTop;
+        const scrollParentHeight = scrollParent.clientHeight;
+
+        isAtBottom =
+          currentScrollTop + scrollParentHeight + 32 >=
+          scrollParent.scrollHeight;
+      }
+
+      if (isAtBottom) {
+        setTimeout(() => {
+          if (!containerRef.current) return;
+          scrollParent?.scrollTo({
+            // eslint-disable-next-line react-hooks/exhaustive-deps
+            top: containerRef.current.scrollHeight,
+            behavior: "smooth",
+          });
+        }, 100);
+      }
+    };
+  }, [results]);
+
   return (
-    <TableContainer>
+    <TableContainer ref={containerRef}>
       <Table size={size === "sm" ? "xs" : "sm"} variant="grid">
         <Thead>
           <Tr>
@@ -648,72 +701,81 @@ export function BatchEvaluationV2EvaluationResult({
           </Tr>
         </Thead>
         <Tbody>
-          {results
-            .sort((a, b) => a.index - b.index)
-            .map((evaluation) => {
-              const datasetEntry = datasetByIndex[evaluation.index];
+          {Array.from({ length: totalRows }).map((_, index) => {
+            const evaluation = results.find((r) => r.index === index);
+            const datasetEntry = datasetByIndex[index];
 
-              return (
-                <Tr key={evaluation.index}>
-                  <Td width="35px">{evaluation.index + 1}</Td>
+            return (
+              <Tr key={index}>
+                <Td width="35px">{index + 1}</Td>
 
-                  {Array.from(datasetColumns).map((column) => (
-                    <Td key={`dataset-${column}`} maxWidth="250px">
+                {Array.from(datasetColumns).map((column) => (
+                  <Td key={`dataset-${column}`} maxWidth="250px">
+                    {datasetEntry ? (
                       <HoverableBigText>
-                        {datasetEntry?.entry[column] ?? "-"}
+                        {datasetEntry.entry[column] ?? "-"}
                       </HoverableBigText>
-                    </Td>
-                  ))}
-
-                  {Array.from(evaluationInputsColumns).map((column) => (
-                    <Td key={`evaluation-entry-${column}`} maxWidth="250px">
-                      <HoverableBigText>
-                        {evaluation.inputs[column] ?? "-"}
-                      </HoverableBigText>
-                    </Td>
-                  ))}
-
-                  <Td>
-                    {datasetEntry?.cost ? (
-                      <FormatMoney
-                        amount={datasetEntry?.cost ?? 0}
-                        currency="USD"
-                        format="$0.00[00]"
-                      />
                     ) : (
                       "-"
                     )}
                   </Td>
-                  <Td>
-                    {datasetEntry?.duration
-                      ? formatMilliseconds(datasetEntry.duration)
-                      : "-"}
-                  </Td>
+                ))}
 
-                  {Array.from(evaluationResultsColumns).map((column) => {
-                    const value = (evaluation as any)[column];
-                    return (
-                      <Td
-                        key={`evaluation-result-${column}`}
-                        background={
-                          value === false
-                            ? "red.100"
-                            : value === true
-                            ? "green.100"
-                            : "none"
-                        }
-                      >
-                        {value === false
-                          ? "false"
+                {Array.from(evaluationInputsColumns).map((column) => (
+                  <Td key={`evaluation-entry-${column}`} maxWidth="250px">
+                    {evaluation ? (
+                      <HoverableBigText>
+                        {evaluation.inputs[column] ?? "-"}
+                      </HoverableBigText>
+                    ) : (
+                      "-"
+                    )}
+                  </Td>
+                ))}
+
+                <Td>
+                  {datasetEntry?.cost ? (
+                    <FormatMoney
+                      amount={datasetEntry?.cost ?? 0}
+                      currency="USD"
+                      format="$0.00[00]"
+                    />
+                  ) : (
+                    "-"
+                  )}
+                </Td>
+                <Td>
+                  {datasetEntry?.duration
+                    ? formatMilliseconds(datasetEntry.duration)
+                    : "-"}
+                </Td>
+
+                {Array.from(evaluationResultsColumns).map((column) => {
+                  const value = (
+                    evaluation as Record<string, any> | undefined
+                  )?.[column];
+                  return (
+                    <Td
+                      key={`evaluation-result-${column}`}
+                      background={
+                        value === false
+                          ? "red.100"
                           : value === true
-                          ? "true"
-                          : value ?? "-"}
-                      </Td>
-                    );
-                  })}
-                </Tr>
-              );
-            })}
+                          ? "green.100"
+                          : "none"
+                      }
+                    >
+                      {value === false
+                        ? "false"
+                        : value === true
+                        ? "true"
+                        : value ?? "-"}
+                    </Td>
+                  );
+                })}
+              </Tr>
+            );
+          })}
         </Tbody>
       </Table>
     </TableContainer>

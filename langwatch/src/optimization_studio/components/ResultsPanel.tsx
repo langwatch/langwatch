@@ -149,6 +149,7 @@ export function EvaluationResults() {
           project={project}
           experiment={experiment.data}
           runId={selectedRunId_}
+          total={selectedRun?.total ?? undefined}
           isFinished={isFinished}
           size="sm"
         />

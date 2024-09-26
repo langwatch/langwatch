@@ -126,7 +126,7 @@ export const useEvaluationExecution = () => {
           run_id,
           timeout_on_status: "running",
         });
-      }, 2_000);
+      }, 5_000);
     },
     [socketAvailable, setEvaluationState, sendMessage, getWorkflow]
   );

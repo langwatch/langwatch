@@ -321,6 +321,7 @@ export default function OptimizationStudio() {
                     ref={panelRef}
                     onCollapse={() => setIsPanelCollapsed(true)}
                     onExpand={() => setIsPanelCollapsed(false)}
+                    defaultSize={0}
                   >
                     {!isPanelCollapsed && (
                       <ResultsPanel collapsePanel={collapsePanel} />
