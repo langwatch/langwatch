@@ -6,9 +6,8 @@ import { getDebugger } from "../../../utils/logger";
 
 import { type ExperimentType, type Project } from "@prisma/client";
 import * as Sentry from "@sentry/nextjs";
-import { z } from "zod";
 import { nanoid } from "nanoid";
-import slugify from "slugify";
+import { z } from "zod";
 import { experimentSlugify } from "../../../server/experiments/utils";
 
 export const debug = getDebugger("langwatch:dspy:init");

@@ -25,6 +25,8 @@ export const simpleRagTemplate: Workflow = {
           { identifier: "gold_answer", type: "str" },
         ],
         entry_selection: "first",
+        train_test_split: 0.2,
+        seed: 42,
         dataset: {
           name: DEFAULT_DATASET_NAME,
           inline: {
@@ -33,10 +35,7 @@ export const simpleRagTemplate: Workflow = {
                 "What is the capital of the moon?",
                 "What is the capital france?",
               ],
-              gold_answer: [
-                "The moon has no capital",
-                "Paris",
-              ],
+              gold_answer: ["The moon has no capital", "Paris"],
             },
             columnTypes: [
               { name: "question", type: "string" },

@@ -61,7 +61,13 @@ export const useEvaluationExecution = () => {
   }, [triggerTimeout, setEvaluationState, getWorkflow, toast]);
 
   const startEvaluationExecution = useCallback(
-    ({ workflow_version_id }: { workflow_version_id: string }) => {
+    ({
+      workflow_version_id,
+      evaluate_on,
+    }: {
+      workflow_version_id: string;
+      evaluate_on: "full" | "test" | "train";
+    }) => {
       if (!socketAvailable()) {
         return;
       }
@@ -82,6 +88,7 @@ export const useEvaluationExecution = () => {
           run_id,
           workflow: getWorkflow(),
           workflow_version_id,
+          evaluate_on,
         },
       };
       sendMessage(payload);

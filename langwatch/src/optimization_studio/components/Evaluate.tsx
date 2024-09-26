@@ -1,5 +1,6 @@
 import {
   Button,
+  Divider,
   HStack,
   Modal,
   ModalBody,
@@ -9,8 +10,10 @@ import {
   ModalHeader,
   ModalOverlay,
   Progress,
+  Select,
   Skeleton,
   SkeletonText,
+  Spacer,
   Text,
   Tooltip,
   useDisclosure,
@@ -18,7 +21,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { CheckSquare, StopCircle, X } from "react-feather";
 import { useForm, type UseFormReturn } from "react-hook-form";
 import { SmallLabel } from "../../components/SmallLabel";
@@ -27,6 +30,9 @@ import { api } from "../../utils/api";
 import { useEvaluationExecution } from "../hooks/useEvaluationExecution";
 import { useWorkflowStore } from "../hooks/useWorkflowStore";
 import { NewVersionFields, useVersionState } from "./History";
+import type { Entry } from "../types/dsl";
+import type { Node } from "@xyflow/react";
+import { useGetDatasetData } from "../hooks/useGetDatasetData";
 
 export function Evaluate() {
   const { isOpen, onToggle, onClose } = useDisclosure();
@@ -81,17 +87,51 @@ export function EvaluateModalContent({ onClose }: { onClose: () => void }) {
       setOpenResultsPanelRequest: setOpenResultsPanelRequest,
     })
   );
-  const form = useForm<{ version: string; commitMessage: string }>({
+
+  const entryNode = getWorkflow().nodes.find(
+    (node) => node.type === "entry"
+  ) as Node<Entry> | undefined;
+
+  const { total } = useGetDatasetData({
+    dataset: entryNode?.data.dataset,
+    preview: true,
+  });
+
+  const form = useForm<{
+    version: string;
+    commitMessage: string;
+    evaluateOn: "full" | "test" | "train";
+  }>({
     defaultValues: {
       version: "",
       commitMessage: "",
+      evaluateOn: total && total > 50 ? "test" : "full",
     },
   });
+
+  const evaluateOn = form.watch("evaluateOn");
+  const estimatedTotal = useMemo(() => {
+    if (evaluateOn === "full") {
+      return total;
+    }
+    if (evaluateOn === "test") {
+      return Math.ceil((total ?? 0) * (entryNode?.data.train_test_split ?? 0));
+    }
+    if (evaluateOn === "train") {
+      return Math.floor(
+        (total ?? 0) * (1 - (entryNode?.data.train_test_split ?? 0))
+      );
+    }
+    return 0;
+  }, [evaluateOn, total, entryNode?.data.train_test_split]);
 
   const { versions, canSaveNewVersion, nextVersion, versionToBeEvaluated } =
     useVersionState({
       project,
-      form,
+      form: form as unknown as UseFormReturn<{
+        version: string;
+        commitMessage: string;
+      }>,
       allowSaveIfAutoSaveIsCurrentButNotLatest: false,
     });
 
@@ -119,9 +159,11 @@ export function EvaluateModalContent({ onClose }: { onClose: () => void }) {
     async ({
       version,
       commitMessage,
+      evaluateOn,
     }: {
       version: string;
       commitMessage: string;
+      evaluateOn: "full" | "test" | "train";
     }) => {
       if (!project || !workflowId) return;
 
@@ -162,7 +204,10 @@ export function EvaluateModalContent({ onClose }: { onClose: () => void }) {
         return;
       }
 
-      startEvaluationExecution({ workflow_version_id: versionId });
+      startEvaluationExecution({
+        workflow_version_id: versionId,
+        evaluate_on: evaluateOn,
+      });
       setHasStarted(true);
     },
     [
@@ -185,7 +230,7 @@ export function EvaluateModalContent({ onClose }: { onClose: () => void }) {
 
   if (!versions.data) {
     return (
-      <ModalContent>
+      <ModalContent borderTop="5px solid" borderColor="green.400">
         <ModalHeader fontWeight={600}>Evaluate Workflow</ModalHeader>
         <ModalCloseButton />
         <ModalBody>
@@ -204,29 +249,49 @@ export function EvaluateModalContent({ onClose }: { onClose: () => void }) {
       as="form"
       // eslint-disable-next-line @typescript-eslint/no-misused-promises
       onSubmit={form.handleSubmit(onSubmit)}
+      borderTop="5px solid"
+      borderColor="green.400"
     >
       <ModalHeader fontWeight={600}>Evaluate Workflow</ModalHeader>
       <ModalCloseButton />
       <ModalBody>
-        <VStack align="start" width="full">
-          <VersionToBeEvaluated
-            form={form}
-            nextVersion={nextVersion}
-            canSaveNewVersion={canSaveNewVersion}
-            versionToBeEvaluated={versionToBeEvaluated}
-          />
+        <VStack align="start" width="full" spacing={4}>
+          <VStack align="start" width="full">
+            <VersionToBeEvaluated
+              form={
+                form as unknown as UseFormReturn<{
+                  version: string;
+                  commitMessage: string;
+                }>
+              }
+              nextVersion={nextVersion}
+              canSaveNewVersion={canSaveNewVersion}
+              versionToBeEvaluated={versionToBeEvaluated}
+            />
+          </VStack>
+          <VStack align="start" width="full" spacing={2}>
+            <SmallLabel color="gray.600">Evaluate on</SmallLabel>
+            <Select {...form.register("evaluateOn")}>
+              <option value="full">Full Dataset</option>
+              <option value="test">Test</option>
+              <option value="train">Train</option>
+            </Select>
+          </VStack>
         </VStack>
       </ModalBody>
-      <ModalFooter>
-        <Button
-          variant="outline"
-          type="submit"
-          alignSelf="end"
-          leftIcon={<CheckSquare size={16} />}
-          isLoading={evaluationState?.status === "waiting"}
-        >
-          {canSaveNewVersion ? "Save & Run Evaluation" : "Run Evaluation"}
-        </Button>
+      <ModalFooter borderTop="1px solid" borderColor="gray.200" marginTop={4}>
+        <HStack width="full">
+          <Text fontWeight={500}>{estimatedTotal} entries</Text>
+          <Spacer />
+          <Button
+            variant="outline"
+            type="submit"
+            leftIcon={<CheckSquare size={16} />}
+            isLoading={evaluationState?.status === "waiting"}
+          >
+            {canSaveNewVersion ? "Save & Run Evaluation" : "Run Evaluation"}
+          </Button>
+        </HStack>
       </ModalFooter>
     </ModalContent>
   );

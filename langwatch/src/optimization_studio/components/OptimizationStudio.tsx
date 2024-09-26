@@ -1,57 +1,55 @@
 import {
   Box,
+  Center,
+  Flex,
   HStack,
   Text,
   Tooltip,
   useTheme,
   VStack,
-  Flex,
-  Center,
 } from "@chakra-ui/react";
 import {
   Background,
   BackgroundVariant,
   Controls,
-  MiniMap,
   ReactFlow,
-  ReactFlowProvider,
+  ReactFlowProvider
 } from "@xyflow/react";
 
-import { DndProvider } from "react-dnd";
+import { DndProvider, useDrop } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
-import { useDrop } from "react-dnd";
 
-import "@xyflow/react/dist/style.css";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { useShallow } from "zustand/react/shallow";
-import { LogoIcon } from "../../components/icons/LogoIcon";
-import { useWorkflowStore } from "../hooks/useWorkflowStore";
-import { UndoRedo } from "./UndoRedo";
-import { History } from "./History";
-import DefaultEdge from "./Edge";
-import { PropertiesPanel } from "./properties/PropertiesPanel";
-import {
-  NodeSelectionPanel,
-  NodeSelectionPanelButton,
-} from "./nodes/NodeSelectionPanel";
-import { useSocketClient } from "../hooks/useSocketClient";
-import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import { titleCase } from "../../utils/stringCasing";
-import Head from "next/head";
-import { EntryNode } from "./nodes/EntryNode";
-import { SignatureNode } from "./nodes/SignatureNode";
 import { Link } from "@chakra-ui/next-js";
-import { AutoSave } from "./AutoSave";
-import { EvaluatorNode } from "./nodes/EvaluatorNode";
-import { Evaluate } from "./Evaluate";
+import "@xyflow/react/dist/style.css";
+import Head from "next/head";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Panel,
   PanelGroup,
   PanelResizeHandle,
   type ImperativePanelHandle,
 } from "react-resizable-panels";
-import { ResultsPanel } from "./ResultsPanel";
+import { useShallow } from "zustand/react/shallow";
+import { LogoIcon } from "../../components/icons/LogoIcon";
+import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
+import { titleCase } from "../../utils/stringCasing";
+import { useSocketClient } from "../hooks/useSocketClient";
+import { useWorkflowStore } from "../hooks/useWorkflowStore";
+import { AutoSave } from "./AutoSave";
+import DefaultEdge from "./Edge";
+import { Evaluate } from "./Evaluate";
+import { History } from "./History";
+import { EntryNode } from "./nodes/EntryNode";
+import { EvaluatorNode } from "./nodes/EvaluatorNode";
+import {
+  NodeSelectionPanel,
+  NodeSelectionPanelButton,
+} from "./nodes/NodeSelectionPanel";
+import { SignatureNode } from "./nodes/SignatureNode";
 import { ProgressToast } from "./ProgressToast";
+import { PropertiesPanel } from "./properties/PropertiesPanel";
+import { ResultsPanel } from "./ResultsPanel";
+import { UndoRedo } from "./UndoRedo";
 
 // New component that uses useDrop
 function DragDropArea({ children }: { children: React.ReactNode }) {

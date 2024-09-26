@@ -32,6 +32,7 @@ export type StudioClientEvent =
         run_id: string;
         workflow: Workflow;
         workflow_version_id: string;
+        evaluate_on: "full" | "test" | "train";
       };
     }
   | {

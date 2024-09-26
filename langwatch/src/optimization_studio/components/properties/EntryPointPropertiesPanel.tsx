@@ -2,6 +2,7 @@ import {
   Box,
   Button,
   HStack,
+  Input,
   Select,
   Spacer,
   Text,
@@ -85,8 +86,8 @@ export function EntryPointPropertiesPanel({ node }: { node: Node<Component> }) {
       />
       <VStack width="full" align="start">
         <HStack width="full">
-          <PropertySectionTitle>Test Entry</PropertySectionTitle>
-          <Tooltip label="Select which entry to choose from the dataset when executing a single test run of the workflow.">
+          <PropertySectionTitle>Manual Test Entry</PropertySectionTitle>
+          <Tooltip label="When manually running the full workflow, a single entry from the dataset will be used, choose which one to pick.">
             <Box paddingTop={1}>
               <Info size={14} />
             </Box>
@@ -110,6 +111,68 @@ export function EntryPointPropertiesPanel({ node }: { node: Node<Component> }) {
           <option value="random">Random</option>
         </Select>
       </VStack>
+      <HStack width="full">
+        <VStack width="full" align="start">
+          <HStack width="full">
+            <PropertySectionTitle>Train/Test Split</PropertySectionTitle>
+            <Tooltip
+              label={`During optimization, a bigger part of the dataset is used for training and a smaller part for testing, this guarantees that the test set is not leaked into the training, preventing the LLM to "cheat" it's way into a better score.`}
+            >
+              <Box paddingTop={1}>
+                <Info size={14} />
+              </Box>
+            </Tooltip>
+          </HStack>
+          <Select
+            value={(node.data as Entry).train_test_split ?? "0.2"}
+            onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
+              const trainTestSplit = parseFloat(e.target.value);
+              setNode({
+                id: node.id,
+                data: {
+                  ...node.data,
+                  train_test_split: trainTestSplit,
+                },
+              });
+            }}
+          >
+            <option value="0.1">90% train, 10% test</option>
+            <option value="0.2">80% train, 20% test</option>
+            <option value="0.3">70% train, 30% test</option>
+            <option value="0.4">60% train, 40% test</option>
+            <option value="0.5">50% train, 50% test</option>
+          </Select>
+        </VStack>
+        <VStack align="start" width="40%">
+          <HStack width="full">
+            <PropertySectionTitle>Seed</PropertySectionTitle>
+            <Tooltip
+              label={`For making sure the original dataset order does not affect performance, a seed is used to shuffle it before the split.`}
+            >
+              <Box paddingTop={1}>
+                <Info size={14} />
+              </Box>
+            </Tooltip>
+          </HStack>
+          <Input
+            type="number"
+            required
+            value={(node.data as Entry).seed ?? "42"}
+            min={-1}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+              const seed = parseInt(e.target.value);
+              if (isNaN(seed)) return;
+              setNode({
+                id: node.id,
+                data: {
+                  ...node.data,
+                  seed: seed,
+                },
+              });
+            }}
+          />
+        </VStack>
+      </HStack>
     </BasePropertiesPanel>
   );
 }

@@ -170,18 +170,19 @@ export const useSocketClient = () => {
       }
     },
     [
-      alertOnComponent,
-      checkIfUnreachableErrorMessage,
-      getWorkflow,
-      setComponentExecutionState,
-      setPropertiesExpanded,
-      setSelectedNode,
       setSocketStatus,
+      setComponentExecutionState,
+      getWorkflow,
       setWorkflowExecutionState,
       setEvaluationState,
+      checkIfUnreachableErrorMessage,
       stopWorkflowIfRunning,
       alertOnError,
       toast,
+      alertOnComponent,
+      setSelectedNode,
+      setPropertiesExpanded,
+      setOpenResultsPanelRequest,
     ]
   );
 

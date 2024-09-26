@@ -3,7 +3,6 @@ import {
   AlertIcon,
   Button,
   HStack,
-  Skeleton,
   Spacer,
   Tab,
   TabList,
@@ -13,20 +12,20 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import { useWorkflowStore } from "../hooks/useWorkflowStore";
-import { api } from "../../utils/api";
+import { useState } from "react";
+import { X } from "react-feather";
 import {
   BatchEvaluationV2EvaluationResults,
   BatchEvaluationV2EvaluationSummary,
   BatchEvaluationV2RunList,
   useBatchEvaluationState,
 } from "../../components/experiments/BatchEvaluationV2";
+import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { experimentSlugify } from "../../server/experiments/utils";
-import { useEffect, useState } from "react";
-import { X } from "react-feather";
-import { EvaluationProgressBar } from "./ProgressToast";
+import { api } from "../../utils/api";
 import { useEvaluationExecution } from "../hooks/useEvaluationExecution";
+import { useWorkflowStore } from "../hooks/useWorkflowStore";
+import { EvaluationProgressBar } from "./ProgressToast";
 
 export function ResultsPanel({
   collapsePanel,
@@ -150,7 +149,6 @@ export function EvaluationResults() {
           project={project}
           experiment={experiment.data}
           runId={selectedRunId_}
-          total={selectedRun?.total ?? undefined}
           isFinished={isFinished}
           size="sm"
         />

@@ -120,7 +120,6 @@ export function BatchEvaluationV2({
                       project={project}
                       experiment={experiment}
                       runId={selectedRun.run_id}
-                      total={selectedRun.total ?? undefined}
                       isFinished={isFinished}
                     />
                   </CardBody>

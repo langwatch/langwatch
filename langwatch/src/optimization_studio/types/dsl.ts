@@ -91,6 +91,8 @@ export type PromptingTechnique = BaseComponent;
 export type Entry = BaseComponent & {
   inputs?: never;
   entry_selection: "first" | "last" | "random";
+  train_test_split: number;
+  seed: number;
   dataset?: {
     id?: string;
     name?: string;

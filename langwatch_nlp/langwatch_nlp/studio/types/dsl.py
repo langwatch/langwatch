@@ -132,6 +132,8 @@ class Dataset(BaseModel):
 class Entry(BaseComponent):
     inputs: None = None
     dataset: Optional[Dataset] = None
+    train_test_split: float
+    seed: int
 
 
 class Evaluator(BaseComponent):

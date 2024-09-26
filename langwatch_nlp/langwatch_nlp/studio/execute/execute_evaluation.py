@@ -29,6 +29,7 @@ from langwatch_nlp.studio.utils import (
 )
 
 from dspy.evaluate import Evaluate
+from sklearn.model_selection import train_test_split
 
 
 async def execute_evaluation(
@@ -52,6 +53,18 @@ async def execute_evaluation(
     if not entry_node.data.dataset:
         raise ValueError("Missing dataset in entry node")
     entries = transpose_inline_dataset_to_object_list(entry_node.data.dataset.inline)
+
+    test_size = entry_node.data.train_test_split
+    seed = entry_node.data.seed
+
+    if event.evaluate_on == "full":
+        pass
+    elif event.evaluate_on == "test":
+        _, entries = train_test_split(entries, test_size=test_size, random_state=seed)
+    elif event.evaluate_on == "train":
+        entries, _ = train_test_split(entries, test_size=test_size, random_state=seed)
+    else:
+        raise ValueError(f"Invalid evaluate_on value: {event.evaluate_on}")
 
     input_keys = get_input_keys(workflow)
     examples = [

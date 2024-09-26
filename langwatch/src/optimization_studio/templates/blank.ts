@@ -24,6 +24,8 @@ export const blankTemplate: Workflow = {
         name: "Entry",
         outputs: [{ identifier: "question", type: "str" }],
         entry_selection: "first",
+        train_test_split: 0.2,
+        seed: 42,
         dataset: {
           name: DEFAULT_DATASET_NAME,
           inline: {
