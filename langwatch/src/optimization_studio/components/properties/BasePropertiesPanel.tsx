@@ -255,6 +255,8 @@ export function BasePropertiesPanel({
   header,
   children,
   fieldsAfter,
+  hideInputs,
+  hideOutputs,
   inputsReadOnly,
   outputsTitle,
   outputsReadOnly,
@@ -263,6 +265,8 @@ export function BasePropertiesPanel({
   header?: React.ReactNode;
   children?: React.ReactNode;
   fieldsAfter?: React.ReactNode;
+  hideInputs?: boolean;
+  hideOutputs?: boolean;
   inputsReadOnly?: boolean;
   outputsTitle?: string;
   outputsReadOnly?: boolean;
@@ -310,6 +314,7 @@ export function BasePropertiesPanel({
       width="25vw"
       minWidth="350px"
       height="full"
+      overflowY="auto"
     >
       <HStack paddingY={1} paddingLeft={2} width="full" justify="space-between">
         <HStack spacing={2}>
@@ -359,7 +364,6 @@ export function BasePropertiesPanel({
                   fontWeight={500}
                   onClick={() => setIsEditingName(true)}
                   cursor="pointer"
-                  // maxWidth="140px"
                   overflow="hidden"
                   textOverflow="ellipsis"
                 >
@@ -420,18 +424,22 @@ export function BasePropertiesPanel({
       {!isWorkflow(node) && (
         <>
           {/* <PropertyFields node={node} field="parameters" title="Parameters" /> */}
-          <PropertyFields
-            node={node}
-            field="inputs"
-            title="Inputs"
-            readOnly={inputsReadOnly}
-          />
-          <PropertyFields
-            node={node}
-            field="outputs"
-            title={outputsTitle ?? "Outputs"}
-            readOnly={outputsReadOnly}
-          />
+          {!hideInputs && (
+            <PropertyFields
+              node={node}
+              field="inputs"
+              title="Inputs"
+              readOnly={inputsReadOnly}
+            />
+          )}
+          {!hideOutputs && (
+            <PropertyFields
+              node={node}
+              field="outputs"
+              title={outputsTitle ?? "Outputs"}
+              readOnly={outputsReadOnly}
+            />
+          )}
         </>
       )}
       {fieldsAfter}

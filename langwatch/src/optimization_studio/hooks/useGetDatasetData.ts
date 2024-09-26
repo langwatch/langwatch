@@ -28,6 +28,7 @@ export const useGetDatasetData = ({
     inferRouterOutputs<AppRouter>["datasetRecord"]["getHead"],
     TRPCClientErrorLike<AppRouter>
   >;
+  total: number | undefined;
 } => {
   const { project } = useOrganizationTeamProject();
   const databaseDataset = api.datasetRecord.getHead.useQuery(
@@ -44,8 +45,8 @@ export const useGetDatasetData = ({
       },
     }
   );
-  const databaseDataset_ = databaseDataset.data
-    ? datasetDatabaseRecordsToInMemoryDataset(databaseDataset.data)
+  const databaseDataset_ = databaseDataset.data?.dataset
+    ? datasetDatabaseRecordsToInMemoryDataset(databaseDataset.data.dataset)
     : undefined;
 
   const data:
@@ -97,5 +98,6 @@ export const useGetDatasetData = ({
     rows,
     columns: data?.columnTypes ?? [],
     query: databaseDataset,
+    total: databaseDataset.data?.total,
   };
 };

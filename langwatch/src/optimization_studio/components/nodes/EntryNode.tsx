@@ -1,4 +1,4 @@
-import { Box, useDisclosure } from "@chakra-ui/react";
+import { Box, Text, useDisclosure } from "@chakra-ui/react";
 
 import { type Node, type NodeProps } from "@xyflow/react";
 import { useEffect, useState } from "react";
@@ -16,14 +16,21 @@ export function EntryNode(props: NodeProps<Node<Component>>) {
     setRendered(true);
   }, []);
 
-  const { rows, columns } = useGetDatasetData({
+  const { rows, columns, total } = useGetDatasetData({
     dataset: (props.data as Entry).dataset,
     preview: true,
   });
 
   return (
     <ComponentNode {...props} outputsName="Fields" hidePlayButton>
-      <NodeSectionTitle>Dataset</NodeSectionTitle>
+      <NodeSectionTitle>
+        Dataset{" "}
+        {total && (
+          <Text as="span" color="gray.400">
+            ({total} rows)
+          </Text>
+        )}
+      </NodeSectionTitle>
       <Box
         width="200%"
         transform="scale(0.5)"

@@ -1,17 +1,15 @@
 import { DragHandleIcon } from "@chakra-ui/icons";
 import { Box, Button, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
 import {
-  useViewport,
-  type XYPosition,
-  type Node as XYFlowNode,
   useReactFlow,
+  type Node as XYFlowNode,
+  type XYPosition,
 } from "@xyflow/react";
-import { useState } from "react";
-import { Box as BoxIcon, X, ChevronsLeft } from "react-feather";
+import { useDrag } from "react-dnd";
+import { Box as BoxIcon, ChevronsLeft } from "react-feather";
 import { useWorkflowStore } from "../../hooks/useWorkflowStore";
 import { type ComponentType } from "../../types/dsl";
 import { ComponentIcon } from "../ColorfulBlockIcons";
-import { useDrag } from "react-dnd";
 
 export function NodeSelectionPanelButton({
   isOpen,
@@ -127,7 +125,6 @@ export const NodeDraggable = (props: { node: Node }) => {
       isDragging: !!monitor.isDragging(),
       clientOffset: monitor.getClientOffset(),
     }),
-
     end: (item, monitor) => {
       const dropResult = monitor.getDropResult();
 

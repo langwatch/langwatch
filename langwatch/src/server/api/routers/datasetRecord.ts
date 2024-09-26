@@ -109,7 +109,7 @@ export const datasetRecordRouter = createTRPCRouter({
     .query(async ({ input, ctx }) => {
       const prisma = ctx.prisma;
 
-      const datasets = await prisma.dataset.findFirst({
+      const dataset = await prisma.dataset.findFirst({
         where: { id: input.datasetId, projectId: input.projectId },
         include: {
           datasetRecords: {
@@ -119,7 +119,11 @@ export const datasetRecordRouter = createTRPCRouter({
         },
       });
 
-      return datasets;
+      const total = await prisma.datasetRecord.count({
+        where: { datasetId: input.datasetId, projectId: input.projectId },
+      });
+
+      return { dataset, total };
     }),
   deleteMany: protectedProcedure
     .input(

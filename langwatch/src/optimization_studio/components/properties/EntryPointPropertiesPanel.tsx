@@ -27,41 +27,56 @@ export function EntryPointPropertiesPanel({ node }: { node: Node<Component> }) {
   const [editingDataset, setEditingDataset] = useState<
     Entry["dataset"] | undefined
   >();
-  const { rows, columns } = useGetDatasetData({
+  const { rows, columns, total } = useGetDatasetData({
     dataset: "dataset" in node.data ? node.data.dataset : undefined,
     preview: true,
   });
   const { setNode } = useWorkflowStore(({ setNode }) => ({ setNode }));
 
   return (
-    <BasePropertiesPanel node={node} outputsTitle="Fields" outputsReadOnly={true}>
-      <HStack width="full">
-        <PropertySectionTitle>Dataset</PropertySectionTitle>
-        <Spacer />
-        <Button
-          size="xs"
-          variant="ghost"
-          marginBottom={-1}
-          leftIcon={<Folder size={14} />}
+    <BasePropertiesPanel
+      node={node}
+      outputsTitle="Fields"
+      outputsReadOnly={true}
+      hideInputs={true}
+    >
+      <VStack width="full" align="start">
+        <HStack width="full">
+          <PropertySectionTitle>
+            Dataset{" "}
+            {total && (
+              <Text as="span" color="gray.400">
+                ({total} rows)
+              </Text>
+            )}
+          </PropertySectionTitle>
+          <Spacer />
+          <Button
+            size="xs"
+            variant="ghost"
+            marginBottom={-1}
+            leftIcon={<Folder size={14} />}
+            onClick={() => {
+              setEditingDataset(undefined);
+              onOpen();
+            }}
+          >
+            <Text>Choose...</Text>
+          </Button>
+        </HStack>
+        <DatasetPreview
+          rows={rows}
+          columns={columns.map((column) => ({
+            name: column.name,
+            type: "string",
+          }))}
           onClick={() => {
-            setEditingDataset(undefined);
+            setEditingDataset((node.data as Entry).dataset);
             onOpen();
           }}
-        >
-          <Text>Choose...</Text>
-        </Button>
-      </HStack>
-      <DatasetPreview
-        rows={rows}
-        columns={columns.map((column) => ({
-          name: column.name,
-          type: "string",
-        }))}
-        onClick={() => {
-          setEditingDataset((node.data as Entry).dataset);
-          onOpen();
-        }}
-      />
+          minHeight={`${36 + 29 * (rows?.length ?? 0)}px`}
+        />
+      </VStack>
       <DatasetModal
         isOpen={isOpen}
         onClose={onClose}
