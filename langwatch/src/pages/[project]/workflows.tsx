@@ -13,9 +13,7 @@ import {
 } from "@chakra-ui/react";
 import { Plus } from "react-feather";
 import { DashboardLayout } from "../../components/DashboardLayout";
-import { TrialEnded } from "~/components/TrialEnded";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import { useSubscription } from "../../hooks/useSubscription";
 import { NewWorkflowModal } from "../../optimization_studio/components/workflow/NewWorkflowModal";
 import {
   WorkflowCard,
@@ -25,10 +23,7 @@ import {
 import { api } from "../../utils/api";
 
 export default function MessagesOrIntegrationGuide() {
-  const { project, modelProviders } = useOrganizationTeamProject();
-  const { hasTrialEnded } = useSubscription();
-
-  console.log("modelProviders", modelProviders);
+  const { project } = useOrganizationTeamProject();
 
   const { isOpen, onClose, onOpen } = useDisclosure();
 
@@ -36,10 +31,6 @@ export default function MessagesOrIntegrationGuide() {
     { projectId: project?.id ?? "" },
     { enabled: !!project }
   );
-
-  if (hasTrialEnded) {
-    return <TrialEnded />;
-  }
 
   return (
     <DashboardLayout>
