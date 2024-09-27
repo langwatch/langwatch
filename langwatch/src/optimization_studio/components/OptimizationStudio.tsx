@@ -51,6 +51,7 @@ import { PropertiesPanel } from "./properties/PropertiesPanel";
 import { ResultsPanel } from "./ResultsPanel";
 import { UndoRedo } from "./UndoRedo";
 import { useAskBeforeLeaving } from "../hooks/useAskBeforeLeaving";
+import { RunningStatus } from "./ExecutionState";
 
 // New component that uses useDrop
 function DragDropArea({ children }: { children: React.ReactNode }) {
@@ -106,6 +107,7 @@ export default function OptimizationStudio() {
     setWorkflowSelected,
     openResultsPanelRequest,
     setOpenResultsPanelRequest,
+    executionStatus,
   } = useWorkflowStore(
     useShallow((state) => {
       if (typeof window !== "undefined") {
@@ -122,6 +124,7 @@ export default function OptimizationStudio() {
         setWorkflowSelected: state.setWorkflowSelected,
         openResultsPanelRequest: state.openResultsPanelRequest,
         setOpenResultsPanelRequest: state.setOpenResultsPanelRequest,
+        executionStatus: state.state.execution?.status,
       };
     })
   );
@@ -207,7 +210,10 @@ export default function OptimizationStudio() {
                 <Link href={`/${project?.slug}/workflows`}>
                   <LogoIcon width={24} height={24} />
                 </Link>
-                <AutoSave />
+                <RunningStatus />
+                {!["waiting", "running"].includes(executionStatus ?? "") && (
+                  <AutoSave />
+                )}
               </HStack>
               <HStack width="full" justify="center">
                 <Text noOfLines={1} fontSize="15px">

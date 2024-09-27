@@ -94,14 +94,7 @@ export const useWorkflowExecution = () => {
   );
 
   const stopWorkflowExecution = useCallback(
-    ({
-      trace_id,
-      node_id,
-    }: {
-      trace_id: string;
-      node_id: string;
-      current_state: BaseComponent["execution_state"];
-    }) => {
+    ({ trace_id }: { trace_id: string }) => {
       if (!socketAvailable()) {
         return;
       }
@@ -118,7 +111,7 @@ export const useWorkflowExecution = () => {
 
       const payload: StudioClientEvent = {
         type: "stop_execution",
-        payload: { trace_id, node_id },
+        payload: { trace_id },
       };
       sendMessage(payload);
 

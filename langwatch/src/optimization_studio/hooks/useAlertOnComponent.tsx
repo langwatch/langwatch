@@ -87,12 +87,6 @@ export const useAlertOnComponent = () => {
         isClosable: true,
       });
     },
-    [
-      selectedNode?.id,
-      propertiesExpanded,
-      toast,
-      setSelectedNode,
-      setPropertiesExpanded,
-    ]
+    [selectedNode?.id, propertiesExpanded, toast]
   );
 };
