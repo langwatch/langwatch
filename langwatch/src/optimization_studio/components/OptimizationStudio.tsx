@@ -13,7 +13,7 @@ import {
   BackgroundVariant,
   Controls,
   ReactFlow,
-  ReactFlowProvider
+  ReactFlowProvider,
 } from "@xyflow/react";
 
 import { DndProvider, useDrop } from "react-dnd";
@@ -50,6 +50,7 @@ import { ProgressToast } from "./ProgressToast";
 import { PropertiesPanel } from "./properties/PropertiesPanel";
 import { ResultsPanel } from "./ResultsPanel";
 import { UndoRedo } from "./UndoRedo";
+import { useAskBeforeLeaving } from "../hooks/useAskBeforeLeaving";
 
 // New component that uses useDrop
 function DragDropArea({ children }: { children: React.ReactNode }) {
@@ -184,6 +185,8 @@ export default function OptimizationStudio() {
       window.$crisp.push(["do", "chat:show"]);
     };
   }, []);
+
+  useAskBeforeLeaving();
 
   return (
     <div style={{ width: "100vw", height: "100vh" }}>
