@@ -435,7 +435,7 @@ export const BatchEvaluationV2EvaluationResults = React.memo(
       {} as Record<number, ESBatchEvaluation["dataset"][number]>
     );
 
-    const resultsByEvaluator = run.data?.evaluations.reduce(
+    let resultsByEvaluator = run.data?.evaluations.reduce(
       (acc, evaluation) => {
         if (!acc[evaluation.evaluator]) {
           acc[evaluation.evaluator] = [];
@@ -445,6 +445,15 @@ export const BatchEvaluationV2EvaluationResults = React.memo(
       },
       {} as Record<string, ESBatchEvaluation["evaluations"]>
     );
+
+    if (
+      Object.keys(resultsByEvaluator ?? {}).length === 0 &&
+      (run.data?.dataset.length ?? 0) > 0
+    ) {
+      resultsByEvaluator = {
+        all: [],
+      };
+    }
 
     const [hasScrolled, setHasScrolled] = useState(false);
 
@@ -638,7 +647,9 @@ export function BatchEvaluationV2EvaluationResult({
       .map(([key]) => key)
   );
 
-  const totalRows = Math.max(...results.map((r) => r.index + 1));
+  const totalRows = Math.max(
+    ...Object.values(datasetByIndex).map((d) => d.index + 1)
+  );
 
   // Scroll to the bottom on rerender if component was at the bottom previously
   const containerRef = useRef<HTMLDivElement>(null);
@@ -689,9 +700,11 @@ export function BatchEvaluationV2EvaluationResult({
               <Text>Dataset</Text>
             </Th>
 
-            <Th colSpan={evaluationInputsColumns.size} paddingY={2}>
-              <Text>Evaluation Entry</Text>
-            </Th>
+            {results.length > 0 && (
+              <Th colSpan={evaluationInputsColumns.size} paddingY={2}>
+                <Text>Evaluation Entry</Text>
+              </Th>
+            )}
 
             <Th rowSpan={2}>Cost</Th>
             <Th rowSpan={2}>Duration</Th>
