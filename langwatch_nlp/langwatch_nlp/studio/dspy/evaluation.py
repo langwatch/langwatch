@@ -8,8 +8,8 @@ import langwatch
 from pydantic import BaseModel
 import dspy
 from tenacity import retry, stop_after_attempt, wait_exponential
-from langwatch_nlp.studio.dspy.predict_with_cost_and_duration import (
-    PredictionWithCostAndDuration,
+from langwatch_nlp.studio.dspy.predict_with_metadata import (
+    PredictionWithMetadata,
 )
 from langevals_core.base_evaluator import SingleEvaluationResult
 
@@ -28,21 +28,23 @@ class EvaluationResultWithMetadata(BaseModel):
     duration: int
 
 
-class PredictionWithEvaluationCostAndDuration(PredictionWithCostAndDuration):
+class PredictionWithEvaluationAndMetadata(PredictionWithMetadata):
     def __init__(
         self,
         evaluation: Callable[
-            [dspy.Example, dspy.Prediction, Optional[Any], bool],
+            [dspy.Example, PredictionWithMetadata, Optional[Any], bool],
             float | tuple[float, dict],
         ],
         cost: float,
         duration: int,
+        error: Optional[Exception] = None,
         **kwargs,
     ):
         super().__init__(**kwargs)
         self._evaluation = evaluation
         self._cost = cost
         self._duration = duration
+        self._error = error
 
     @overload
     def evaluation(
@@ -95,7 +97,7 @@ class EvaluationReporting:
     def evaluate_and_report(
         self,
         example: dspy.Example,
-        pred: PredictionWithEvaluationCostAndDuration,
+        pred: PredictionWithEvaluationAndMetadata,
         trace=None,
     ):
         evaluation, evaluation_results = pred.evaluation(example, return_results=True)
@@ -128,21 +130,24 @@ class EvaluationReporting:
     def add_to_batch(
         self,
         example: dspy.Example,
-        pred: PredictionWithEvaluationCostAndDuration,
+        pred: PredictionWithEvaluationAndMetadata,
         evaluation_results: dict[str, EvaluationResultWithMetadata],
     ):
         entry = dict(example.inputs())
         cost = pred.get_cost() if hasattr(pred, "get_cost") else None
         duration = pred.get_duration() if hasattr(pred, "get_duration") else None
+        error = pred.get_error() if hasattr(pred, "get_error") else None
 
-        self.batch["dataset"].append(
-            {
-                "index": example._index,
-                "entry": entry,
-                "cost": cost,
-                "duration": duration,
-            }
-        )
+        predicted = {
+            "index": example._index,
+            "entry": entry,
+            "cost": cost,
+            "duration": duration,
+        }
+        if error:
+            predicted["error"] = str(error)
+
+        self.batch["dataset"].append(predicted)
 
         for node_id, result_with_metadata in evaluation_results.items():
             node = get_node_by_id(self.workflow, node_id)
@@ -166,6 +171,8 @@ class EvaluationReporting:
                 evaluation["label"] = result.label
                 evaluation["details"] = result.details
                 evaluation["cost"] = result.cost
+            elif result.status == "error" or result.status == "skipped":
+                evaluation["details"] = result.details
 
             self.batch["evaluations"].append(evaluation)
 

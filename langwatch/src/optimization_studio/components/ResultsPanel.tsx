@@ -141,6 +141,7 @@ export function EvaluationResults() {
       <BatchEvaluationV2RunList
         batchEvaluationRuns={batchEvaluationRuns}
         selectedRun={selectedRun}
+        selectedRunId={selectedRunId_}
         setSelectedRunId={setSelectedRunId}
         size="sm"
       />

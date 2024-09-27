@@ -19,13 +19,13 @@ langchain-community = "^0.0.28"
 nanoid = "^2.0.0"
 python-dotenv = "^1.0.1"
 mangum = "^0.17.0"
-litellm = {extras = ["proxy"], version = "1.40.7"}
+litellm = { extras = ["proxy"], version = "1.40.7" }
 google-cloud-aiplatform = "^1.54.1"
 uvicorn = ">=0.22.0,<0.23.0"
 dspy-ai = "^2.4.14"
-langevals-core = "^0.1.9"
+langevals-core = "^0.1.10"
 httpx = "^0.27.2"
-langwatch = {path = "../python-sdk", develop = true}
+langwatch = { path = "../python-sdk", develop = true }
 scikit-learn = "^1.5.2"
 
 [tool.poetry.group.dev.dependencies]

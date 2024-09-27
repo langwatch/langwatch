@@ -140,12 +140,15 @@ export const useSocketClient = () => {
           }
           break;
         case "evaluation_state_change":
+          const currentEvaluationState = getWorkflow().state.evaluation;
           setEvaluationState(data.payload.evaluation_state);
           if (data.payload.evaluation_state?.status === "error") {
             alertOnError(data.payload.evaluation_state.error);
-            setTimeout(() => {
-              setOpenResultsPanelRequest("evaluations");
-            }, 500);
+            if (currentEvaluationState?.status !== "waiting") {
+              setTimeout(() => {
+                setOpenResultsPanelRequest("evaluations");
+              }, 500);
+            }
           }
           break;
         case "error":

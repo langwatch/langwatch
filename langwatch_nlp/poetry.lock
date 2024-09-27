@@ -1910,13 +1910,13 @@ extended-testing = ["jinja2 (>=3,<4)"]
 
 [[package]]
 name = "langevals-core"
-version = "0.1.9"
+version = "0.1.10"
 description = "Core package for LLM evaluation platform, providing base classes and utilities."
 optional = false
 python-versions = "<4.0,>=3.11"
 files = [
-    {file = "langevals_core-0.1.9-py3-none-any.whl", hash = "sha256:36c9a0fdf769479da412f4add8814855748da6ed96eacff7571b324bdd64a44b"},
-    {file = "langevals_core-0.1.9.tar.gz", hash = "sha256:41a936a3a0042a9febff33312aefbfee90e1d833324aa0c787e737aef9627edc"},
+    {file = "langevals_core-0.1.10-py3-none-any.whl", hash = "sha256:81dfb3f51e77a9b4d11751b2521fd1f7ee76d3dcc62514b8a28042153a8f8b0e"},
+    {file = "langevals_core-0.1.10.tar.gz", hash = "sha256:b5933b9219b6d99bd3f0730936271a2da6e2a3e9840f1190117e031b13e8d96b"},
 ]
 
 [package.dependencies]
@@ -4941,4 +4941,4 @@ testing = ["big-O", "jaraco.functools", "jaraco.itertools", "more-itertools", "p
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.11,<3.13"
-content-hash = "8ec572509ab15b6f5d0b2fa126db8b411e67c98784b96c6ebc43e4effababed8"
+content-hash = "64cdf1fe2945b79a1ddfdcead29dc9e0e8ea1ef661dfd7ed6609b56eccd91d2e"

@@ -71,6 +71,7 @@ export default async function execute() {
       });
     } catch (error) {
       console.error(`Failed to apply migration: ${migration}`, error);
+      throw error;
     }
   }
 }

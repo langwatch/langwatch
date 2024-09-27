@@ -216,7 +216,7 @@ export async function handleEvaluatorCall(
     // Retry once in case of timeout error
     if (
       result.status === "error" &&
-      result.message.toLowerCase().includes("timed out")
+      result.details.toLowerCase().includes("timed out")
     ) {
       result = await runEval();
     }
@@ -231,7 +231,7 @@ export async function handleEvaluatorCall(
     result = {
       status: "error",
       error_type: "INTERNAL_ERROR",
-      message: "Internal error",
+      details: "Internal error",
       traceback: [],
     };
   }
@@ -259,7 +259,7 @@ export async function handleEvaluatorCall(
       ? {
           status: "error",
           error_type: "EVALUATOR_ERROR",
-          message: result.message,
+          details: result.details,
           ...(isGuardrail ? { passed: true } : {}), // We don't want to fail the check if the evaluator throws, becuase this is likely a bug in the evaluator
         }
       : result.status === "skipped"
@@ -294,7 +294,7 @@ export async function handleEvaluatorCall(
       ...(result.status === "error"
         ? {
             error: {
-              message: result.message,
+              details: result.details,
               stack: result.traceback,
             },
           }

@@ -37,7 +37,7 @@ async def execute_flow(event: ExecuteFlowPayload, queue: "Queue[StudioServerEven
     yield start_workflow_event(workflow, trace_id)
 
     module = WorkflowModule(
-        workflow, execute_evaluators=True, until_node_id=until_node_id
+        workflow, manual_execution_mode=True, until_node_id=until_node_id
     )
     module.set_reporting(queue=queue, trace_id=trace_id, workflow=workflow)
 

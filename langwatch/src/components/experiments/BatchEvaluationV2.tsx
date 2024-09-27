@@ -24,6 +24,7 @@ import {
   Text,
   Th,
   Thead,
+  Tooltip,
   Tr,
   VStack,
 } from "@chakra-ui/react";
@@ -53,17 +54,23 @@ export function BatchEvaluationV2({
   project: Project;
   experiment: Experiment;
 }) {
-  const { batchEvaluationRuns, selectedRun, setSelectedRunId, isFinished } =
-    useBatchEvaluationState({
-      project,
-      experiment,
-    });
+  const {
+    batchEvaluationRuns,
+    selectedRun,
+    selectedRunId,
+    setSelectedRunId,
+    isFinished,
+  } = useBatchEvaluationState({
+    project,
+    experiment,
+  });
 
   return (
     <HStack align="start" width="full" height="full" spacing={0}>
       <BatchEvaluationV2RunList
         batchEvaluationRuns={batchEvaluationRuns}
         selectedRun={selectedRun}
+        selectedRunId={selectedRunId}
         setSelectedRunId={setSelectedRunId}
       />
       <Box width="calc(100vw - 398px)" height="full" position="relative">
@@ -231,6 +238,7 @@ export const useBatchEvaluationState = ({
 export function BatchEvaluationV2RunList({
   batchEvaluationRuns,
   selectedRun,
+  selectedRunId,
   setSelectedRunId,
   size = "md",
 }: {
@@ -246,6 +254,7 @@ export function BatchEvaluationV2RunList({
         >["data"]
       >["runs"][number]
     | undefined;
+  selectedRunId: string | undefined;
   setSelectedRunId: (runId: string) => void;
   size?: "sm" | "md";
 }) {
@@ -286,102 +295,162 @@ export function BatchEvaluationV2RunList({
           Waiting for runs...
         </Text>
       ) : (
-        batchEvaluationRuns.data?.runs.map((run) => {
-          const runCost = run.summary.cost;
-          const runName = run.workflow_version?.commitMessage ?? run.run_id;
-
-          return (
+        <>
+          {!batchEvaluationRuns.data?.runs.find(
+            (r) => r.run_id === selectedRunId
+          ) && (
             <HStack
-              key={run?.run_id ?? "new"}
               paddingX={size === "sm" ? 2 : 6}
               paddingY={size === "sm" ? 2 : 4}
               width="100%"
               cursor="pointer"
               role="button"
-              background={
-                selectedRun?.run_id === run.run_id ? "gray.200" : "none"
-              }
+              background="gray.200"
               _hover={{
-                background:
-                  selectedRun?.run_id === run.run_id ? "gray.200" : "gray.100",
-              }}
-              onClick={(e) => {
-                e.stopPropagation();
-                setSelectedRunId(run.run_id);
+                background: "gray.100",
               }}
               spacing={3}
             >
-              {run.workflow_version ? (
-                <VersionBox version={run.workflow_version} />
-              ) : (
-                <Box
-                  width="24px"
-                  height="24px"
-                  minWidth="24px"
-                  minHeight="24px"
-                  background="gray.300"
-                  borderRadius="100%"
-                  backgroundColor={
-                    getColorForString("colors", run.run_id).color
-                  }
-                />
-              )}
-              <VStack align="start" spacing={0}>
-                <Text fontSize={size === "sm" ? "13px" : "14px"}>
-                  {runName}
-                  {getFinishedAt(run.timestamps, new Date().getTime()) ===
-                    undefined && (
-                    <Spinner
-                      size="xs"
-                      display="inline-block"
-                      marginLeft={2}
-                      marginBottom="-2px"
-                    />
-                  )}
-                </Text>
-                <HStack
-                  color="gray.400"
-                  fontSize={size === "sm" ? "12px" : "13px"}
-                >
-                  {runCost && (
-                    <>
-                      {/* <Text>·</Text> */}
-                      <Text whiteSpace="nowrap">
-                        <FormatMoney
-                          amount={runCost}
-                          currency="USD"
-                          format="$0.00[0]"
-                        />
-                      </Text>
-                    </>
-                  )}
+              <Box
+                padding={3}
+                backgroundColor="orange.100"
+                borderRadius={6}
+                fontWeight={600}
+                fontSize={13}
+                color="gray.600"
+                whiteSpace="nowrap"
+                textAlign="center"
+                minWidth="48px"
+                height="44px"
+              />
+              <VStack align="start" spacing={2} width="100%" paddingRight={2}>
+                <HStack width="100%">
+                  <Skeleton width="100%" height="12px" />
+                  <Spinner size="xs" />
                 </HStack>
-                <HStack
-                  color="gray.400"
-                  fontSize={size === "sm" ? "12px" : "13px"}
-                >
-                  <Text whiteSpace="nowrap" noOfLines={1}>
-                    {run.timestamps.created_at
-                      ? formatTimeAgo(
-                          run.timestamps.created_at,
-                          "yyyy-MM-dd HH:mm",
-                          5
-                        )
-                      : "Waiting for steps..."}
-                  </Text>
-                  {run.timestamps.stopped_at && (
-                    <Box
-                      width="6px"
-                      height="6px"
-                      background="red.300"
-                      borderRadius="full"
-                    />
-                  )}
-                </HStack>
+                <Skeleton width="100%" height="12px" />
               </VStack>
             </HStack>
-          );
-        })
+          )}
+          {batchEvaluationRuns.data?.runs.map((run) => {
+            const runCost = run.summary.cost;
+            const runName = run.workflow_version?.commitMessage ?? run.run_id;
+
+            return (
+              <HStack
+                key={run?.run_id ?? "new"}
+                paddingX={size === "sm" ? 2 : 6}
+                paddingY={size === "sm" ? 2 : 4}
+                width="100%"
+                cursor="pointer"
+                role="button"
+                background={
+                  selectedRun?.run_id === run.run_id ? "gray.200" : "none"
+                }
+                _hover={{
+                  background:
+                    selectedRun?.run_id === run.run_id
+                      ? "gray.200"
+                      : "gray.100",
+                }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSelectedRunId(run.run_id);
+                }}
+                spacing={3}
+              >
+                {run.workflow_version ? (
+                  <VersionBox version={run.workflow_version} />
+                ) : (
+                  <Box
+                    padding={3}
+                    backgroundColor={
+                      run.timestamps.stopped_at
+                        ? "red.200"
+                        : getColorForString("colors", run.run_id).color
+                    }
+                    borderRadius={6}
+                    fontWeight={600}
+                    fontSize={13}
+                    color="gray.600"
+                    whiteSpace="nowrap"
+                    textAlign="center"
+                    minWidth="48px"
+                    height="44px"
+                  />
+                )}
+                <VStack align="start" spacing={0}>
+                  <Text fontSize={size === "sm" ? "13px" : "14px"}>
+                    {runName}
+                    {getFinishedAt(run.timestamps, new Date().getTime()) ===
+                      undefined && (
+                      <Spinner
+                        size="xs"
+                        display="inline-block"
+                        marginLeft={2}
+                        marginBottom="-2px"
+                      />
+                    )}
+                  </Text>
+                  <HStack
+                    color="gray.400"
+                    fontSize={size === "sm" ? "12px" : "13px"}
+                    spacing={1}
+                  >
+                    {Object.values(run.summary.evaluations)
+                      .slice(0, 2)
+                      .map((evaluation, index) => (
+                        <>
+                          {index > 0 && <Text>·</Text>}
+                          <Tooltip label={evaluation.name}>
+                            <Text>
+                              {formatEvaluationSummary(evaluation, true)}
+                            </Text>
+                          </Tooltip>
+                        </>
+                      ))}
+                    {runCost && (
+                      <>
+                        {Object.keys(run.summary.evaluations).length > 0 && (
+                          <Text>·</Text>
+                        )}
+                        <Text whiteSpace="nowrap">
+                          <FormatMoney
+                            amount={runCost}
+                            currency="USD"
+                            format="$0.00[0]"
+                          />
+                        </Text>
+                      </>
+                    )}
+                  </HStack>
+                  <HStack
+                    color="gray.400"
+                    fontSize={size === "sm" ? "12px" : "13px"}
+                  >
+                    <Text whiteSpace="nowrap" noOfLines={1}>
+                      {run.timestamps.created_at
+                        ? formatTimeAgo(
+                            run.timestamps.created_at,
+                            "yyyy-MM-dd HH:mm",
+                            5
+                          )
+                        : "Waiting for steps..."}
+                    </Text>
+                    {run.timestamps.stopped_at && (
+                      <Box
+                        width="6px"
+                        height="6px"
+                        background="red.300"
+                        borderRadius="full"
+                      />
+                    )}
+                  </HStack>
+                </VStack>
+              </HStack>
+            );
+          })}
+        </>
       )}
     </VStack>
   );
@@ -549,6 +618,10 @@ export const BatchEvaluationV2EvaluationResults = React.memo(
       )
     );
 
+    if (Object.keys(resultsByEvaluator).length === 0) {
+      return <Text padding={4}>No results</Text>;
+    }
+
     return (
       <Tabs
         size={size}
@@ -646,6 +719,10 @@ export function BatchEvaluationV2EvaluationResult({
       .filter(([_key, value]) => value)
       .map(([key]) => key)
   );
+  // If any evaluator succeeded, we don't need the details column, both "skipped" and "error" just shows in place of the column
+  if (evaluationResultsColumns.size > 1) {
+    evaluationResultsColumns.delete("details");
+  }
 
   const totalRows = Math.max(
     ...Object.values(datasetByIndex).map((d) => d.index + 1)
@@ -749,17 +826,28 @@ export function BatchEvaluationV2EvaluationResult({
                   </Td>
                 ))}
 
-                {Array.from(evaluationInputsColumns).map((column) => (
-                  <Td key={`evaluation-entry-${column}`} maxWidth="250px">
-                    {evaluation ? (
-                      <HoverableBigText>
-                        {evaluation.inputs[column] ?? "-"}
-                      </HoverableBigText>
-                    ) : (
-                      "-"
-                    )}
-                  </Td>
-                ))}
+                {datasetEntry?.error
+                  ? Array.from(evaluationInputsColumns).map((column) => (
+                      <Td
+                        key={`evaluation-entry-${column}`}
+                        background="red.200"
+                      >
+                        <Tooltip label={datasetEntry.error}>
+                          <Box noOfLines={1}>Error</Box>
+                        </Tooltip>
+                      </Td>
+                    ))
+                  : Array.from(evaluationInputsColumns).map((column) => (
+                      <Td key={`evaluation-entry-${column}`} maxWidth="250px">
+                        {evaluation ? (
+                          <HoverableBigText>
+                            {evaluation.inputs[column] ?? "-"}
+                          </HoverableBigText>
+                        ) : (
+                          "-"
+                        )}
+                      </Td>
+                    ))}
 
                 <Td>
                   {datasetEntry?.cost ? (
@@ -779,6 +867,32 @@ export function BatchEvaluationV2EvaluationResult({
                 </Td>
 
                 {Array.from(evaluationResultsColumns).map((column) => {
+                  if (evaluation?.status === "error") {
+                    return (
+                      <Td
+                        key={`evaluation-result-${column}`}
+                        background="red.200"
+                      >
+                        <Tooltip label={evaluation.details}>
+                          <Box noOfLines={1}>Error</Box>
+                        </Tooltip>
+                      </Td>
+                    );
+                  }
+
+                  if (evaluation?.status === "skipped") {
+                    return (
+                      <Td
+                        key={`evaluation-result-${column}`}
+                        background="yellow.100"
+                      >
+                        <Tooltip label={evaluation.details}>
+                          <Box noOfLines={1}>Skipped</Box>
+                        </Tooltip>
+                      </Td>
+                    );
+                  }
+
                   const value = (
                     evaluation as Record<string, any> | undefined
                   )?.[column];
@@ -878,20 +992,7 @@ export function BatchEvaluationV2EvaluationSummary({
           <>
             <VStack align="start" spacing={1}>
               <Text fontWeight="500">{evaluation.name}</Text>
-              <Text>
-                {evaluation.average_passed ? (
-                  <>
-                    {numeral(evaluation.average_passed).format("0.[0]%")}{" "}
-                    {evaluation.average_passed == evaluation.average_score
-                      ? "pass"
-                      : `(${numeral(evaluation.average_score).format(
-                          "0.[00]"
-                        )})`}
-                  </>
-                ) : (
-                  <>{numeral(evaluation.average_score).format("0.[00]")}</>
-                )}
-              </Text>
+              <Text>{formatEvaluationSummary(evaluation)}</Text>
             </VStack>
             <Divider orientation="vertical" height="48px" />
           </>
@@ -955,3 +1056,21 @@ export function BatchEvaluationV2EvaluationSummary({
     </HStack>
   );
 }
+
+const formatEvaluationSummary = (
+  evaluation: {
+    average_score: number;
+    average_passed?: number;
+  },
+  short = false
+): string => {
+  return evaluation.average_passed !== undefined
+    ? numeral(evaluation.average_passed).format("0.[0]%") +
+        " " +
+        (evaluation.average_passed == evaluation.average_score
+          ? short
+            ? ""
+            : "pass"
+          : `(${numeral(evaluation.average_score).format("0.[00]")})`)
+    : numeral(evaluation.average_score).format("0.[00]");
+};

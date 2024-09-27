@@ -102,6 +102,7 @@ export type ESBatchEvaluation = {
     entry: Record<string, any>;
     cost?: number | null;
     duration?: number | null;
+    error?: string | null;
   }[];
   evaluations: {
     evaluator: string;

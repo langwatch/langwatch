@@ -324,7 +324,7 @@ export const startEvaluationsWorker = (
           ...(result.status === "error"
             ? {
                 error: {
-                  message: result.message,
+                  message: result.details,
                   stack: result.traceback,
                 },
               }

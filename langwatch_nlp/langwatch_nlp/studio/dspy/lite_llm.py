@@ -36,14 +36,13 @@ class DSPyLiteLLM(dspy.OpenAI):
         kwargs = {"stringify_request": json.dumps(kwargs)}
         response = chat_request(**kwargs)
 
-        # TODO: is this necessary?
-        # history = {
-        #     "prompt": prompt,
-        #     "response": response,
-        #     "kwargs": kwargs,
-        #     "raw_kwargs": raw_kwargs,
-        # }
-        # self.history.append(history)
+        history = {
+            "prompt": prompt,
+            "response": response,
+            "kwargs": kwargs,
+            "raw_kwargs": raw_kwargs,
+        }
+        self.history.append(history)
 
         self.last_cost = completion_cost(
             completion_response=response,

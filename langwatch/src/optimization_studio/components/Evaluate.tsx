@@ -1,6 +1,5 @@
 import {
   Button,
-  Divider,
   HStack,
   Modal,
   ModalBody,
@@ -9,10 +8,8 @@ import {
   ModalFooter,
   ModalHeader,
   ModalOverlay,
-  Progress,
   Select,
   Skeleton,
-  SkeletonText,
   Spacer,
   Text,
   Tooltip,
@@ -21,18 +18,18 @@ import {
   VStack,
 } from "@chakra-ui/react";
 
+import type { Node } from "@xyflow/react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { CheckSquare, StopCircle, X } from "react-feather";
+import { CheckSquare } from "react-feather";
 import { useForm, type UseFormReturn } from "react-hook-form";
 import { SmallLabel } from "../../components/SmallLabel";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
 import { useEvaluationExecution } from "../hooks/useEvaluationExecution";
-import { useWorkflowStore } from "../hooks/useWorkflowStore";
-import { NewVersionFields, useVersionState } from "./History";
-import type { Entry } from "../types/dsl";
-import type { Node } from "@xyflow/react";
 import { useGetDatasetData } from "../hooks/useGetDatasetData";
+import { useWorkflowStore } from "../hooks/useWorkflowStore";
+import type { Entry } from "../types/dsl";
+import { NewVersionFields, useVersionState } from "./History";
 
 export function Evaluate() {
   const { isOpen, onToggle, onClose } = useDisclosure();

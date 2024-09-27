@@ -266,7 +266,7 @@ const presidioClearPII = async (
     return;
   }
   if (result.status === "error") {
-    throw new Error(result.message);
+    throw new Error(result.details);
   }
   if (result.status === "processed" && result.raw_response?.anonymized) {
     currentObject[lastKey] = result.raw_response.anonymized;

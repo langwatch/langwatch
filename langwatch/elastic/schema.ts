@@ -370,6 +370,7 @@ export const batchEvaluationMapping: ElasticSearchMappingFrom<ESBatchEvaluation>
         entry: { type: FLATENNED_TYPE } as any,
         cost: { type: "float" },
         duration: { type: "integer" },
+        error: { type: "text" },
       },
     },
     evaluations: {

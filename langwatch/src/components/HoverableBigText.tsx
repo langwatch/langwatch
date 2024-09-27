@@ -1,7 +1,7 @@
-import { Box, Tooltip } from "@chakra-ui/react";
+import { Box, Tooltip, type BoxProps } from "@chakra-ui/react";
 import { useEffect, useRef, useState } from "react";
 
-export function HoverableBigText({ children }: { children: React.ReactNode }) {
+export function HoverableBigText({ children, ...props }: BoxProps) {
   const ref = useRef<HTMLDivElement>(null);
   const [isOverflown, setIsOverflown] = useState(false);
 
@@ -36,6 +36,7 @@ export function HoverableBigText({ children }: { children: React.ReactNode }) {
         height="full"
         whiteSpace="normal"
         noOfLines={7}
+        {...props}
       >
         {children}
       </Box>

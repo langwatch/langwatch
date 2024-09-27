@@ -194,7 +194,7 @@ export default async function handler(
     result = {
       status: "error",
       error_type: "INTERNAL_ERROR",
-      message: "Internal error",
+      details: "Internal error",
       traceback: [],
     };
   }

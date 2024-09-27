@@ -213,7 +213,7 @@ export function TryItOut({
             [runningState.nextTraceId]: {
               status: "error",
               error_type: typeof err,
-              message: err.message,
+              details: err.message,
               traceback: [],
             },
           }));
@@ -385,8 +385,6 @@ export function TryItOut({
                       const resultDetails = runningResult
                         ? "details" in runningResult
                           ? runningResult.details
-                          : "message" in runningResult
-                          ? runningResult.message
                           : ""
                         : "";
 
