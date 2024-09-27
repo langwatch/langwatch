@@ -124,9 +124,10 @@ export const useSocketClient = () => {
           }
           if (
             data.payload.execution_state?.status !== "running" &&
-            getWorkflow().state.execution?.status === "running" &&
-            getWorkflow().state.execution?.until_node_id ===
-              data.payload.component_id
+            ((getWorkflow().state.execution?.status === "running" &&
+              getWorkflow().state.execution?.until_node_id ===
+                data.payload.component_id) ||
+              getWorkflow().state.execution?.status !== "running")
           ) {
             setSelectedNode(data.payload.component_id);
             setPropertiesExpanded(true);

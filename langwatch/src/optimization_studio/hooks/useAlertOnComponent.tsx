@@ -57,7 +57,7 @@ export const useAlertOnComponent = () => {
                 <AlertDescription>
                   <VStack align="start">
                     <Text>{execution_state?.error}</Text>
-                    <Button
+                    {/* <Button
                       colorScheme="white"
                       variant="link"
                       size="sm"
@@ -68,7 +68,7 @@ export const useAlertOnComponent = () => {
                       }}
                     >
                       Go to component
-                    </Button>
+                    </Button> */}
                   </VStack>
                 </AlertDescription>
               </VStack>
