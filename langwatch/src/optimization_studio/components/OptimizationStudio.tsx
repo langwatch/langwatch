@@ -53,6 +53,7 @@ import { UndoRedo } from "./UndoRedo";
 import { useAskBeforeLeaving } from "../hooks/useAskBeforeLeaving";
 import { RunningStatus } from "./ExecutionState";
 import { CurrentDrawer } from "../../components/CurrentDrawer";
+import { Optimize } from "./Optimize";
 
 // New component that uses useDrop
 function DragDropArea({ children }: { children: React.ReactNode }) {
@@ -156,8 +157,16 @@ export default function OptimizationStudio() {
     }
   };
 
+  const [defaultTab, setDefaultTab] = useState<"evaluations" | "optimizations">(
+    "evaluations"
+  );
+
   useEffect(() => {
-    if (openResultsPanelRequest === "evaluations" && isPanelCollapsed) {
+    if (
+      openResultsPanelRequest === "evaluations" ||
+      (openResultsPanelRequest === "optimizations" && isPanelCollapsed)
+    ) {
+      setDefaultTab(openResultsPanelRequest);
       panelRef.current?.expand(0);
       panelRef.current?.resize(6);
       const step = () => {
@@ -253,6 +262,7 @@ export default function OptimizationStudio() {
               </HStack>
               <HStack justify="end" paddingLeft={2}>
                 <Evaluate />
+                <Optimize />
               </HStack>
             </HStack>
             <Box width="full" height="full" position="relative">
@@ -332,7 +342,7 @@ export default function OptimizationStudio() {
                     defaultSize={0}
                   >
                     {!isPanelCollapsed && (
-                      <ResultsPanel collapsePanel={collapsePanel} />
+                      <ResultsPanel collapsePanel={collapsePanel} defaultTab={defaultTab} />
                     )}
                   </Panel>
                 </PanelGroup>

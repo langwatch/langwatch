@@ -1,4 +1,5 @@
 import type { BaseComponent, Workflow } from "./dsl";
+import type { OPTIMIZERS } from "./optimizers";
 
 export type StudioClientEvent =
   | { type: "is_alive"; payload: Record<string, never> }
@@ -36,7 +37,24 @@ export type StudioClientEvent =
       };
     }
   | {
+      type: "execute_optimization";
+      payload: {
+        run_id: string;
+        workflow: Workflow;
+        workflow_version_id: string;
+        optimizer: keyof typeof OPTIMIZERS;
+        params: (typeof OPTIMIZERS)[keyof typeof OPTIMIZERS]["params"];
+      };
+    }
+  | {
       type: "stop_evaluation_execution";
+      payload: {
+        workflow: Workflow;
+        run_id: string;
+      };
+    }
+  | {
+      type: "stop_optimization_execution";
       payload: {
         workflow: Workflow;
         run_id: string;

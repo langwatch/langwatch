@@ -34,7 +34,7 @@ type State = Workflow & {
   triggerValidation: boolean;
   workflowSelected: boolean;
   previousWorkflow: Workflow | undefined;
-  openResultsPanelRequest: "evaluations" | "closed" | undefined;
+  openResultsPanelRequest: "evaluations" | "optimizations" | "closed" | undefined;
 };
 
 type WorkflowStore = State & {
@@ -59,6 +59,9 @@ type WorkflowStore = State & {
   setEvaluationState: (
     evaluationState: Partial<Workflow["state"]["evaluation"]>
   ) => void;
+  setOptimizationState: (
+    optimizationState: Partial<Workflow["state"]["optimization"]>
+  ) => void;
   setHoveredNodeId: (nodeId: string | undefined) => void;
   setSelectedNode: (nodeId: string) => void;
   deselectAllNodes: () => void;
@@ -66,7 +69,7 @@ type WorkflowStore = State & {
   setTriggerValidation: (triggerValidation: boolean) => void;
   setWorkflowSelected: (selected: boolean) => void;
   setOpenResultsPanelRequest: (
-    request: "evaluations" | "closed" | undefined
+    request: "evaluations" | "optimizations" | "closed" | undefined
   ) => void;
 };
 
@@ -236,6 +239,22 @@ const store = (
           ...evaluationState,
           ...(evaluationState?.error
             ? { error: evaluationState.error.slice(0, 140) }
+            : {}),
+        },
+      },
+    });
+  },
+  setOptimizationState: (
+    optimizationState: Partial<Workflow["state"]["optimization"]>
+  ) => {
+    set({
+      state: {
+        ...get().state,
+        optimization: {
+          ...(get().state.optimization ?? {}),
+          ...optimizationState,
+          ...(optimizationState?.error
+            ? { error: optimizationState.error.slice(0, 140) }
             : {}),
         },
       },

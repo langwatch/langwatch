@@ -29,8 +29,10 @@ import { EvaluationProgressBar } from "./ProgressToast";
 
 export function ResultsPanel({
   collapsePanel,
+  defaultTab,
 }: {
   collapsePanel: (isCollapsed: boolean) => void;
+  defaultTab: "evaluations" | "optimizations";
 }) {
   return (
     <HStack
@@ -60,6 +62,7 @@ export function ResultsPanel({
         display="flex"
         flexDirection="column"
         size="sm"
+        defaultIndex={defaultTab === "evaluations" ? 0 : 1}
       >
         <TabList>
           <Tab>Evaluations</Tab>

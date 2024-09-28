@@ -149,6 +149,16 @@ export type Workflow = {
         finished_at?: number;
       };
     };
+    optimization?: {
+      experiment_slug?: string;
+      run_id?: string;
+      status?: ExecutionStatus;
+      error?: string;
+      timestamps?: {
+        started_at?: number;
+        finished_at?: number;
+      };
+    };
   };
 };
 
