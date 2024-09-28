@@ -52,6 +52,7 @@ import { ResultsPanel } from "./ResultsPanel";
 import { UndoRedo } from "./UndoRedo";
 import { useAskBeforeLeaving } from "../hooks/useAskBeforeLeaving";
 import { RunningStatus } from "./ExecutionState";
+import { CurrentDrawer } from "../../components/CurrentDrawer";
 
 // New component that uses useDrop
 function DragDropArea({ children }: { children: React.ReactNode }) {
@@ -341,6 +342,7 @@ export default function OptimizationStudio() {
           </VStack>
         </ReactFlowProvider>
       </DndProvider>
+      <CurrentDrawer />
     </div>
   );
 }

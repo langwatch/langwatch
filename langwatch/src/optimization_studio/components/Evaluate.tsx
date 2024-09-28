@@ -228,6 +228,7 @@ export function EvaluateModalContent({ onClose }: { onClose: () => void }) {
     [
       canSaveNewVersion,
       commitVersion,
+      estimatedTotal,
       getWorkflow,
       project,
       startEvaluationExecution,

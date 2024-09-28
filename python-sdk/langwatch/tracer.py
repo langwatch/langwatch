@@ -627,11 +627,12 @@ class ContextTrace:
     metadata: TraceMetadata = {}
     expected_output: Optional[str] = None
     span: Type[ContextSpan]
-    root_span: ContextSpan
+    root_span: Optional[ContextSpan] = None
     evaluations: List[Evaluation] = []
 
     _capture_input: bool = True
     _capture_output: bool = True
+    _skip_root_span: bool = False
 
     api_key: Optional[str] = None
     _force_sync: bool = False
@@ -657,12 +658,15 @@ class ContextTrace:
         params: Optional[SpanParams] = None,
         metrics: Optional[SpanMetrics] = None,
         evaluations: Optional[List[Evaluation]] = None,
+        skip_root_span: bool = False,
     ):
         self.api_key = api_key or langwatch.api_key
         self.spans: Dict[str, Span] = {}
 
         self._capture_input = capture_input
         self._capture_output = capture_output
+        self._skip_root_span = skip_root_span
+
         self.trace_id = trace_id or f"trace_{nanoid.generate()}"
         self.metadata = metadata or {}
         self.expected_output = expected_output
@@ -671,30 +675,33 @@ class ContextTrace:
         self.span = cast(
             Type[ContextSpan], lambda **kwargs: ContextSpan(trace=self, **kwargs)
         )
-        self.root_span = self.span(
-            span_id=span_id,
-            name=name,
-            type=type,
-            input=input,
-            output=output,
-            error=error,
-            timestamps=timestamps,
-            contexts=contexts,
-            model=model,
-            params=params,
-            metrics=metrics,
-        )
+        if not skip_root_span:
+            self.root_span = self.span(
+                span_id=span_id,
+                name=name,
+                type=type,
+                input=input,
+                output=output,
+                error=error,
+                timestamps=timestamps,
+                contexts=contexts,
+                model=model,
+                params=params,
+                metrics=metrics,
+            )
 
     def __enter__(self):
         get_logger().debug(f"Entered trace {self.trace_id}")
         self.context_token = current_trace_var.set(self)
-        self.root_span.__enter__()
+        if self.root_span:
+            self.root_span.__enter__()
         return self
 
     def __exit__(self, _type, _value, _traceback):
         get_logger().debug(f"Exiting trace {self.trace_id}")
         self.deferred_send_spans()
-        self.root_span.__exit__(_type, _value, _traceback)
+        if self.root_span:
+            self.root_span.__exit__(_type, _value, _traceback)
         if self.context_token:
             try:
                 current_trace_var.reset(self.context_token)
@@ -710,24 +717,32 @@ class ContextTrace:
             # Span constructor parameters
             "capture_input": self._capture_input,
             "capture_output": self._capture_output,
-            "name": self.root_span.name,
-            "type": self.root_span.type,
-            "input": self.root_span.input,
-            "output": self.root_span.output,
-            "error": self.root_span.error,
-            "timestamps": None,
-            "contexts": self.root_span.contexts,
-            "model": self.root_span.model,
-            "params": self.root_span.params,
-            "metrics": self.root_span.metrics,
+            "skip_root_span": self._skip_root_span,
         }
+
+        if self.root_span:
+            trace_kwargs.update(
+                {
+                    "name": self.root_span.name,
+                    "type": self.root_span.type,
+                    "input": self.root_span.input,
+                    "output": self.root_span.output,
+                    "error": self.root_span.error,
+                    "timestamps": None,
+                    "contexts": self.root_span.contexts,
+                    "model": self.root_span.model,
+                    "params": self.root_span.params,
+                    "metrics": self.root_span.metrics,
+                }
+            )
 
         if inspect.isasyncgenfunction(func):
 
             @functools.wraps(func)
             async def async_gen_wrapper(*args, **kwargs):
                 with ContextTrace(**trace_kwargs) as trace:
-                    trace.root_span._capture_name_and_input(func, *args, **kwargs)
+                    if trace.root_span:
+                        trace.root_span._capture_name_and_input(func, *args, **kwargs)
                     items = []
                     async for item in func(*args, **kwargs):
                         items.append(item)
@@ -738,7 +753,8 @@ class ContextTrace:
                         if all(isinstance(item, str) for item in items)
                         else items
                     )
-                    trace.root_span._capture_output_and_maybe_name(func, output)
+                    if trace.root_span:
+                        trace.root_span._capture_output_and_maybe_name(func, output)
 
             return async_gen_wrapper  # type: ignore
         elif inspect.isgeneratorfunction(func):
@@ -746,7 +762,8 @@ class ContextTrace:
             @functools.wraps(func)
             def sync_gen_wrapper(*args, **kwargs):
                 with ContextTrace(**trace_kwargs) as trace:
-                    trace.root_span._capture_name_and_input(func, *args, **kwargs)
+                    if trace.root_span:
+                        trace.root_span._capture_name_and_input(func, *args, **kwargs)
                     items = []
                     for item in func(*args, **kwargs):
                         items.append(item)
@@ -757,7 +774,8 @@ class ContextTrace:
                         if all(isinstance(item, str) for item in items)
                         else items
                     )
-                    trace.root_span._capture_output_and_maybe_name(func, output)
+                    if trace.root_span:
+                        trace.root_span._capture_output_and_maybe_name(func, output)
 
             return sync_gen_wrapper  # type: ignore
         elif inspect.iscoroutinefunction(func):
@@ -765,9 +783,11 @@ class ContextTrace:
             @functools.wraps(func)
             async def async_wrapper(*args, **kwargs):
                 with ContextTrace(**trace_kwargs) as trace:
-                    trace.root_span._capture_name_and_input(func, *args, **kwargs)
+                    if trace.root_span:
+                        trace.root_span._capture_name_and_input(func, *args, **kwargs)
                     output = await func(*args, **kwargs)
-                    trace.root_span._capture_output_and_maybe_name(func, output)
+                    if trace.root_span:
+                        trace.root_span._capture_output_and_maybe_name(func, output)
                     return output
 
             return async_wrapper  # type: ignore
@@ -776,9 +796,11 @@ class ContextTrace:
             @functools.wraps(func)  # type: ignore
             def sync_wrapper(*args, **kwargs):
                 with ContextTrace(**trace_kwargs) as trace:
-                    trace.root_span._capture_name_and_input(func, *args, **kwargs)
+                    if trace.root_span:
+                        trace.root_span._capture_name_and_input(func, *args, **kwargs)
                     output = func(*args, **kwargs)  # type: ignore
-                    trace.root_span._capture_output_and_maybe_name(func, output)
+                    if trace.root_span:
+                        trace.root_span._capture_output_and_maybe_name(func, output)
                     return output
 
             return sync_wrapper  # type: ignore
@@ -812,19 +834,20 @@ class ContextTrace:
             # Avoid late mutations after capturing the value
             self.evaluations = copy.deepcopy(evaluations)
 
-        self.root_span.update(
-            span_id=span_id,
-            name=name,
-            type=type,
-            input=input,
-            output=output,
-            error=error,
-            timestamps=timestamps,
-            contexts=contexts,
-            model=model,
-            params=params,
-            metrics=metrics,
-        )
+        if self.root_span:
+            self.root_span.update(
+                span_id=span_id,
+                name=name,
+                type=type,
+                input=input,
+                output=output,
+                error=error,
+                timestamps=timestamps,
+                contexts=contexts,
+                model=model,
+                params=params,
+                metrics=metrics,
+            )
 
     def add_evaluation(
         self,

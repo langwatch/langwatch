@@ -121,6 +121,7 @@ SpanTypes = Literal[
     "rag",
     "workflow",
     "component",
+    "module",
     "server",
     "client",
     "producer",

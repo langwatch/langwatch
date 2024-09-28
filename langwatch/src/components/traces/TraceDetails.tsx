@@ -113,7 +113,7 @@ export function TraceDetails(props: {
       >
         <VStack align="start" width="full">
           <HStack width="full" marginTop={4}>
-            <Text paddingTop={5} fontSize="2xl" fontWeight="600">
+            <Text paddingTop={2} fontSize="2xl" fontWeight="600">
               Trace Details
             </Text>
             <Spacer />
@@ -199,7 +199,7 @@ export function TraceDetails(props: {
             </TabList>
 
             <TabPanels>
-              <TabPanel>
+              <TabPanel paddingX={0}>
                 <TraceSummary traceId={props.traceId} />
                 <SpanTree traceId={props.traceId} />
               </TabPanel>

@@ -1,5 +1,7 @@
 import time
 from typing import Callable, Dict, Any, Literal, Optional, Tuple, cast, overload
+
+import langwatch
 from langwatch_nlp.studio.dspy.evaluation import (
     EvaluationResultWithMetadata,
     PredictionWithEvaluationAndMetadata,
@@ -38,6 +40,10 @@ class WorkflowModule(ReportingModule):
                 setattr(self, validate_identifier(node.id), self.components[node.id])
 
     def forward(self, **kwargs):
+        try:
+            langwatch.get_current_span().update(type="workflow")
+        except Exception:
+            pass
         return self.execute_workflow(kwargs)
 
     @overload
@@ -135,8 +141,8 @@ class WorkflowModule(ReportingModule):
                     if node.id not in executed_nodes and has_all_inputs(node):
                         start_time = time.time()
                         result = self.execute_node(node, node_outputs, inputs) or {}
-                        cost += result.get_cost() if hasattr(result, "get_cost") else 0  # type: ignore
                         duration += round((time.time() - start_time) * 1000)
+                        cost += result.get_cost() if hasattr(result, "get_cost") else 0  # type: ignore
                         node_outputs[node.id] = result  # type: ignore
                         executed_nodes.add(node.id)
 

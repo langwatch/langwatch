@@ -43,7 +43,7 @@ export const TraceDetailsDrawer = (props: TraceDetailsDrawerProps) => {
               <Minimize2 onClick={toggleView} cursor={"pointer"} />
             )}
 
-            <DrawerCloseButton />
+            <DrawerCloseButton zIndex={1} />
           </HStack>
           <TraceDetails
             traceId={props.traceId}

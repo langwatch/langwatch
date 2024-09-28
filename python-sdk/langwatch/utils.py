@@ -19,9 +19,11 @@ from pydantic import BaseModel, ValidationError
 from langwatch.types import (
     ChatMessage,
     ErrorCapture,
+    EvaluationResult,
     RAGChunk,
     SpanInputOutput,
     TypedValueChatMessages,
+    TypedValueEvaluationResult,
     TypedValueJson,
     TypedValueRaw,
     TypedValueText,
@@ -105,10 +107,25 @@ def autoconvert_typed_values(
         SpanInputOutput, value_, ["type", "value"]
     ):
         return cast(SpanInputOutput, value_)
-    if type(value_) == list and len(value_) > 0 and all(
-        validate_safe(ChatMessage, item, ["role"]) for item in value_
+    if (
+        type(value_) == list
+        and len(value_) > 0
+        and all(validate_safe(ChatMessage, item, ["role"]) for item in value_)
     ):
         return TypedValueChatMessages(type="chat_messages", value=value_)
+
+    if isinstance(value_, BaseModel) and value_.__class__.__name__ in [
+        "EvaluationResult",
+        "EvaluationResultSkipped",
+        "EvaluationResultError",
+    ]:
+        return TypedValueEvaluationResult(
+            type="evaluation_result",
+            value=cast(
+                EvaluationResult,
+                value_.model_dump(exclude_unset=False, exclude_none=True),
+            ),
+        )
 
     try:
         json_ = json.dumps(value, cls=SerializableWithStringFallback)

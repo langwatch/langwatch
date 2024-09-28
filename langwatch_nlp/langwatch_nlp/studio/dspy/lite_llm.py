@@ -2,16 +2,11 @@ import os
 import dspy
 import functools
 import json
-import logging
-from typing import Any, Literal, Optional, cast
 
-import backoff
 import litellm
 from litellm.utils import completion_cost
-import openai
 
 from dsp.modules.cache_utils import CacheMemory, NotebookCacheMemory, cache_turn_on
-from dsp.modules.lm import LM
 
 
 class DSPyLiteLLM(dspy.OpenAI):

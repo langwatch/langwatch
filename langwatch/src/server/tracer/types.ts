@@ -161,6 +161,8 @@ export type SpanTypes =
   // Low-code
   | "workflow"
   | "component"
+  // DSPy
+  | "module"
   // OpenTelemetry
   | "server"
   | "client"

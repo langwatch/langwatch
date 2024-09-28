@@ -305,6 +305,7 @@ export const SpanTypeTag = ({ span }: { span: ElasticSearchSpan }) => {
               rag: "red",
               guardrail: "blue",
               component: "gray",
+              module: "gray",
               workflow: "purple",
               server: "blue",
               client: "green",

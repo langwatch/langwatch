@@ -9,7 +9,7 @@ import {
 } from "@chakra-ui/react";
 import { useRouter } from "next/router";
 import numeral from "numeral";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { useTraceDetailsState } from "../../hooks/useTraceDetailsState";
 import type { ElasticSearchSpan } from "../../server/tracer/types";
@@ -27,6 +27,7 @@ import {
 } from "../checks/EvaluationStatus";
 import { IconWrapper } from "../IconWrapper";
 import { formatEvaluationScore } from "./EvaluationStatusItem";
+import { HoverableBigText } from "../HoverableBigText";
 
 type SpanWithChildren = ElasticSearchSpan & { children: SpanWithChildren[] };
 
@@ -120,7 +121,7 @@ const SpanNode: React.FC<SpanNodeProps> = ({ span, level }) => {
         align="start"
         paddingY={2}
         paddingX={level > 0 ? 8 : 4}
-        paddingRight={14}
+        paddingRight={4}
         borderRadius={6}
         background={span.span_id === currentSpanId ? "gray.100" : undefined}
         _hover={{
@@ -156,9 +157,13 @@ const SpanNode: React.FC<SpanNodeProps> = ({ span, level }) => {
         </HStack>
         <VStack align="start">
           <HStack>
-            <Text color={!span.name && !span.model ? "gray.400" : undefined}>
+            <HoverableBigText
+              color={!span.name && !span.model ? "gray.400" : undefined}
+              maxWidth="180px"
+              noOfLines={1}
+            >
               {span.name ?? span.model ?? "(unnamed)"}
-            </Text>
+            </HoverableBigText>
             {evaluationResult && (
               <IconWrapper
                 width="18px"
@@ -267,10 +272,28 @@ export function SpanTree(props: SpanTreeProps) {
   const { traceId, spanId, trace } = useTraceDetailsState(props.traceId);
   const router = useRouter();
   const { project } = useOrganizationTeamProject();
+
+  const [keepRefetching, setKeepRefetching] = useState(false);
   const spans = api.spans.getAllForTrace.useQuery(
     { projectId: project?.id ?? "", traceId: traceId ?? "" },
-    { enabled: !!project && !!traceId, refetchOnWindowFocus: false }
+    {
+      enabled: !!project && !!traceId,
+      refetchOnWindowFocus: false,
+      refetchInterval: keepRefetching ? 1_000 : undefined,
+    }
   );
+
+  useEffect(() => {
+    if ((trace.data?.timestamps.inserted_at ?? 0) < Date.now() - 10 * 1000) {
+      return;
+    }
+
+    setKeepRefetching(true);
+    const timeout = setTimeout(() => {
+      setKeepRefetching(false);
+    }, 10_000);
+    return () => clearTimeout(timeout);
+  }, [trace.data?.timestamps.inserted_at]);
 
   const span = spanId
     ? spans.data?.find((span) => span.span_id === spanId)

@@ -1,11 +1,9 @@
+import { useToast } from "@chakra-ui/react";
+import { nanoid } from "nanoid";
 import { useCallback, useEffect, useState } from "react";
+import type { StudioClientEvent } from "../types/events";
 import { useSocketClient } from "./useSocketClient";
 import { useWorkflowStore } from "./useWorkflowStore";
-import type { StudioClientEvent } from "../types/events";
-import type { Node } from "@xyflow/react";
-import type { BaseComponent, Component, Field } from "../types/dsl";
-import { nanoid } from "nanoid";
-import { useToast } from "@chakra-ui/react";
 
 export const useWorkflowExecution = () => {
   const { sendMessage, socketStatus } = useSocketClient();

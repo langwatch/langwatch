@@ -22,6 +22,17 @@ from langwatch_nlp.studio.types.events import (
 from langwatch_nlp.studio.utils import get_node_by_id
 
 
+class Evaluator(dspy.Module):
+    def __init__(self):
+        super().__init__()
+
+    def forward(self):
+        try:
+            langwatch.get_current_span().update(type="evaluation")
+        except Exception:
+            pass
+
+
 class EvaluationResultWithMetadata(BaseModel):
     result: SingleEvaluationResult
     inputs: dict[str, Any]

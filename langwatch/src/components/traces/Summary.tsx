@@ -96,7 +96,15 @@ const TraceSummaryValues = React.forwardRef(function TraceSummaryValues(
   return (
     <>
       <HStack
-        borderBottomWidth={1}
+        borderBottomWidth={
+          !!trace.metrics?.completion_tokens ||
+          !!trace.metrics?.prompt_tokens ||
+          typeof trace.metrics?.total_cost === "number" ||
+          !!trace.metrics?.first_token_ms ||
+          !!trace.metrics?.total_time_ms
+            ? 1
+            : 0
+        }
         borderColor="gray.300"
         width="full"
         align="stretch"

@@ -623,7 +623,7 @@ class DSPyTracer:
             dspy.Predict.__original_forward__ = dspy.Predict.forward  # type: ignore
             dspy.Predict.forward = self.patched_predict_forward()
 
-        language_model_classes = dspy.LM.__subclasses__()
+        language_model_classes = dspy.OpenAI.__subclasses__() + dspy.LM.__subclasses__()
         for lm in language_model_classes:
             if not hasattr(lm, "__original_basic_request__"):
                 lm.__original_basic_request__ = lm.basic_request  # type: ignore
@@ -648,7 +648,7 @@ class DSPyTracer:
     def patched_module_call(self):
         self_ = self
 
-        @langwatch.span(ignore_missing_trace_warning=True, type="chain")
+        @langwatch.span(ignore_missing_trace_warning=True, type="module")
         def __call__(self: dspy.Module, *args, **kwargs):
             span = self_.safe_get_current_span()
             signature = (
@@ -676,7 +676,7 @@ class DSPyTracer:
     def patched_predict_forward(self):
         self_ = self
 
-        @langwatch.span(ignore_missing_trace_warning=True, type="chain")
+        @langwatch.span(ignore_missing_trace_warning=True, type="module")
         def forward(self: dspy.Predict, **kwargs):
             span = self_.safe_get_current_span()
             signature = kwargs.get("signature", self.signature)

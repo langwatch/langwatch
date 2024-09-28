@@ -1,5 +1,6 @@
 import {
   Box,
+  Button,
   Heading,
   HStack,
   Spacer,
@@ -13,12 +14,15 @@ import { useDebounceValue } from "usehooks-ts";
 import { RenderInputOutput } from "../../../components/traces/RenderInputOutput";
 import { SpanDuration } from "../../../components/traces/SpanDetails";
 import type { Component } from "../../types/dsl";
+import { useDrawer } from "../../../components/CurrentDrawer";
 
 export const OutputPanel = ({ node }: { node: Node<Component> }) => {
   const [isWaitingLong] = useDebounceValue(
     node?.data.execution_state?.status === "waiting",
     600
   );
+
+  const { openDrawer } = useDrawer();
 
   return (
     <Box
@@ -33,7 +37,7 @@ export const OutputPanel = ({ node }: { node: Node<Component> }) => {
       overflowY="auto"
     >
       <VStack align="start" spacing={3}>
-        <HStack align="start" width="full">
+        <HStack align="center" width="full" paddingBottom={3}>
           <Heading
             as="h3"
             fontSize={16}
@@ -80,6 +84,17 @@ export const OutputPanel = ({ node }: { node: Node<Component> }) => {
                     />
                   </>
                 ) : null}
+                <Text color="gray.400">·</Text>
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    openDrawer("traceDetails", {
+                      traceId: node.data.execution_state?.trace_id ?? "",
+                    });
+                  }}
+                >
+                  Full Trace
+                </Button>
               </HStack>
             )}
         </HStack>

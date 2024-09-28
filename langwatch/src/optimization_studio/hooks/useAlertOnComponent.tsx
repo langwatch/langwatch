@@ -3,7 +3,6 @@ import {
   AlertDescription,
   AlertIcon,
   AlertTitle,
-  Button,
   CloseButton,
   Text,
   useToast,
@@ -16,16 +15,9 @@ import { useWorkflowStore } from "./useWorkflowStore";
 export const useAlertOnComponent = () => {
   const toast = useToast();
 
-  const {
-    selectedNode,
-    setSelectedNode,
-    propertiesExpanded,
-    setPropertiesExpanded,
-  } = useWorkflowStore((state) => ({
+  const { selectedNode, propertiesExpanded } = useWorkflowStore((state) => ({
     selectedNode: state.nodes.find((node) => node.selected),
-    setSelectedNode: state.setSelectedNode,
     propertiesExpanded: state.propertiesExpanded,
-    setPropertiesExpanded: state.setPropertiesExpanded,
   }));
 
   return useCallback(
