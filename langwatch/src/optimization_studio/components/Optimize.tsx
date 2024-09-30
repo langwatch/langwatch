@@ -15,7 +15,7 @@ import {
   Tooltip,
   useDisclosure,
   useToast,
-  VStack
+  VStack,
 } from "@chakra-ui/react";
 
 import type { Node } from "@xyflow/react";
@@ -363,7 +363,7 @@ export function OptimizeModalContent({ onClose }: { onClose: () => void }) {
           <VStack align="start" spacing={0}>
             <Text fontWeight={500}>{trainTotal + testTotal} entries</Text>
             <Text whiteSpace="nowrap" fontSize="13px">
-              ({trainTotal} train / {testTotal} test)
+              ({trainTotal} optimization / {testTotal} test)
             </Text>
           </VStack>
           <Spacer />

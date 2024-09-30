@@ -10,6 +10,7 @@ import {
   Heading,
   Skeleton,
   Spacer,
+  Spinner,
   Switch,
   Tab,
   TabList,
@@ -29,7 +30,7 @@ import {
 import type { Experiment, Project, WorkflowVersion } from "@prisma/client";
 import { useRouter } from "next/router";
 import numeral from "numeral";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { ChevronDown, ChevronUp } from "react-feather";
 import {
   CartesianGrid,
@@ -68,6 +69,7 @@ export function DSPyExperiment({
   const {
     dspyRuns,
     selectedRuns,
+    setSelectedRuns,
     highlightedRun,
     setHighlightedRun,
     selectedPoint,
@@ -84,6 +86,7 @@ export function DSPyExperiment({
       <DSPyExperimentRunList
         dspyRuns={dspyRuns}
         selectedRuns={selectedRuns}
+        setSelectedRuns={setSelectedRuns}
         setHighlightedRun={setHighlightedRun}
         dspyRunsPlusIncoming={dspyRunsPlusIncoming}
       />
@@ -162,9 +165,13 @@ export function DSPyExperiment({
 export const useDSPyExperimentState = ({
   project,
   experiment,
+  selectedRuns,
+  setSelectedRuns,
 }: {
   project: Project;
   experiment: Experiment;
+  selectedRuns?: string[];
+  setSelectedRuns?: (runs: string[]) => void;
 }) => {
   const dspyRuns = api.experiments.getExperimentDSPyRuns.useQuery(
     {
@@ -180,25 +187,53 @@ export const useDSPyExperimentState = ({
   const router = useRouter();
 
   const [highlightedRun, setHighlightedRun] = useState<string | null>(null);
-  const selectedRuns =
-    typeof router.query.runIds === "string"
-      ? router.query.runIds.split(",")
-      : null;
+
+  const selectedRuns_ = useMemo(() => {
+    const selectedRuns_ =
+      selectedRuns ??
+      (typeof router.query.runIds === "string"
+        ? router.query.runIds.split(",")
+        : null);
+    return !selectedRuns_ || selectedRuns_.length === 0
+      ? dspyRuns.data?.[0]?.runId
+        ? [dspyRuns.data[0].runId]
+        : []
+      : selectedRuns_;
+  }, [dspyRuns.data, router.query.runIds, selectedRuns]);
+
+  const setSelectedRuns_ = useCallback(
+    (runIds: string[]) => {
+      if (setSelectedRuns) {
+        setSelectedRuns(runIds);
+      } else {
+        const query: Record<string, string | undefined> = {
+          ...router.query,
+          runIds: runIds.join(","),
+        };
+        if (!query.runIds) {
+          delete query.runIds;
+        }
+        void router.push({ query });
+      }
+    },
+    [router, setSelectedRuns]
+  );
+
   const [selectedPoint, setSelectedPoint] = useState<{
     runId: string;
     index: string;
   } | null>(null);
 
   useEffect(() => {
-    if (selectedPoint && !selectedRuns?.includes(selectedPoint.runId)) {
+    if (selectedPoint && !selectedRuns_.includes(selectedPoint.runId)) {
       setSelectedPoint(null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedRuns]);
+  }, [selectedRuns_]);
 
   const visibleRuns =
-    dspyRuns.data && selectedRuns
-      ? dspyRuns.data.filter((run) => selectedRuns.includes(run.runId))
+    dspyRuns.data && selectedRuns_
+      ? dspyRuns.data.filter((run) => selectedRuns_.includes(run.runId))
       : dspyRuns.data;
 
   const firstVisibleRun = visibleRuns?.[0];
@@ -244,7 +279,7 @@ export const useDSPyExperimentState = ({
   );
 
   const nonMatchingRunIds =
-    selectedRuns?.filter(
+    selectedRuns_?.filter(
       (runId) => !dspyRuns.data?.some((run) => run.runId === runId)
     ) ?? [];
   const dspyRunsPlusIncoming =
@@ -256,7 +291,8 @@ export const useDSPyExperimentState = ({
 
   return {
     dspyRuns,
-    selectedRuns,
+    selectedRuns: selectedRuns_,
+    setSelectedRuns: setSelectedRuns_,
     highlightedRun,
     setHighlightedRun,
     dspyRunsPlusIncoming,
@@ -272,6 +308,7 @@ export const useDSPyExperimentState = ({
 export function DSPyExperimentRunList({
   dspyRuns,
   selectedRuns,
+  setSelectedRuns,
   setHighlightedRun,
   dspyRunsPlusIncoming,
   size = "md",
@@ -281,6 +318,7 @@ export function DSPyExperimentRunList({
     TRPCClientErrorLike<AppRouter>
   >;
   selectedRuns: string[] | null;
+  setSelectedRuns: (runs: string[]) => void;
   setHighlightedRun: (runId: string | null) => void;
   dspyRunsPlusIncoming:
     | ({
@@ -289,8 +327,6 @@ export function DSPyExperimentRunList({
     | undefined;
   size?: "md" | "sm";
 }) {
-  const router = useRouter();
-
   return (
     <VStack
       align="start"
@@ -303,11 +339,6 @@ export function DSPyExperimentRunList({
       maxWidth={size === "sm" ? "250px" : "300px"}
       height="full"
       spacing={0}
-      onClick={() => {
-        const query = { ...router.query };
-        delete query.runId;
-        void router.push({ query });
-      }}
     >
       {size !== "sm" && (
         <Heading as="h2" size="md" paddingX={6} paddingY={4}>
@@ -365,38 +396,55 @@ export function DSPyExperimentRunList({
               onMouseLeave={() => setHighlightedRun(null)}
               onClick={(e) => {
                 e.stopPropagation();
-                const query: Record<string, string | undefined> = {
-                  ...router.query,
-                  runIds: (selectedRuns?.includes(run.runId)
+                e.preventDefault();
+                const isHoldingShift = e.shiftKey;
+
+                setSelectedRuns?.(
+                  selectedRuns?.includes(run.runId)
                     ? selectedRuns.filter((id) => id !== run.runId)
-                    : [...(selectedRuns ?? []), run.runId]
-                  ).join(","),
-                };
-                if (!query.runIds) {
-                  delete query.runIds;
-                }
-                void router.push({ query });
+                    : isHoldingShift
+                    ? [...(selectedRuns ?? []), run.runId]
+                    : [run.runId]
+                );
                 setHighlightedRun(null);
               }}
               spacing={3}
             >
-              {run.workflow_version ? (
-                <VersionBox version={run.workflow_version} />
+              {!dspyRuns.data?.find((r) => r.runId === run.runId) ? (
+                <HStack
+                  paddingX={size === "sm" ? 2 : 6}
+                  paddingY={size === "sm" ? 2 : 4}
+                  width="100%"
+                  cursor="pointer"
+                  role="button"
+                  background="gray.200"
+                  _hover={{
+                    background: "gray.100",
+                  }}
+                  spacing={3}
+                >
+                  <VersionBox />
+                  <VStack
+                    align="start"
+                    spacing={2}
+                    width="100%"
+                    paddingRight={2}
+                  >
+                    <HStack width="100%">
+                      <Skeleton width="100%" height="12px" />
+                      <Spinner size="xs" />
+                    </HStack>
+                    <Skeleton width="100%" height="12px" />
+                  </VStack>
+                </HStack>
               ) : (
-                <Box
-                  width="24px"
-                  height="24px"
-                  background="gray.300"
-                  borderRadius="100%"
-                  backgroundColor={getColorForString("colors", run.runId).color}
-                />
-              )}
-              <VStack align="start" spacing={0}>
-                <HStack>
-                  {run.workflow_version && (
+                <>
+                  {run.workflow_version ? (
+                    <VersionBox version={run.workflow_version} />
+                  ) : (
                     <Box
-                      width="12px"
-                      height="12px"
+                      width="24px"
+                      height="24px"
                       background="gray.300"
                       borderRadius="100%"
                       backgroundColor={
@@ -404,33 +452,48 @@ export function DSPyExperimentRunList({
                       }
                     />
                   )}
-                  <Text fontSize={size === "sm" ? "13px" : "14px"}>
-                    {runName}
-                  </Text>
-                </HStack>
-
-                <HStack
-                  color="gray.400"
-                  fontSize={size === "sm" ? "12px" : "13px"}
-                >
-                  <Text>
-                    {run.created_at
-                      ? formatTimeAgo(run.created_at, "yyyy-MM-dd HH:mm", 5)
-                      : "Waiting for steps..."}
-                  </Text>
-                  {runCost && (
-                    <>
-                      <Text>·</Text>
-                      <Text>
-                        {formatMoney(
-                          { amount: runCost, currency: "USD" },
-                          "$0.00[0]"
-                        )}
+                  <VStack align="start" spacing={0}>
+                    <HStack>
+                      {run.workflow_version && (
+                        <Box
+                          width="12px"
+                          height="12px"
+                          background="gray.300"
+                          borderRadius="100%"
+                          backgroundColor={
+                            getColorForString("colors", run.runId).color
+                          }
+                        />
+                      )}
+                      <Text fontSize={size === "sm" ? "13px" : "14px"}>
+                        {runName}
                       </Text>
-                    </>
-                  )}
-                </HStack>
-              </VStack>
+                    </HStack>
+
+                    <HStack
+                      color="gray.400"
+                      fontSize={size === "sm" ? "12px" : "13px"}
+                    >
+                      <Text>
+                        {run.created_at
+                          ? formatTimeAgo(run.created_at, "yyyy-MM-dd HH:mm", 5)
+                          : "Waiting for steps..."}
+                      </Text>
+                      {runCost && (
+                        <>
+                          <Text>·</Text>
+                          <Text>
+                            {formatMoney(
+                              { amount: runCost, currency: "USD" },
+                              "$0.00[0]"
+                            )}
+                          </Text>
+                        </>
+                      )}
+                    </HStack>
+                  </VStack>
+                </>
+              )}
             </HStack>
           );
         })
@@ -532,7 +595,7 @@ export const RunDetails = React.memo(
             {tabIndex === 0 && size !== "sm" && (
               <Box position="absolute" top={0} right={4}>
                 <HStack>
-                  <Text fontSize={size === "sm" ? "13px" : "14px"}>Raw</Text>
+                  <Text>Raw</Text>
                   <Switch
                     isChecked={displayRawParams}
                     onChange={() => setDisplayRawParams(!displayRawParams)}

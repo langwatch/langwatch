@@ -21,7 +21,12 @@ import {
 import type { Node } from "@xyflow/react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { CheckSquare } from "react-feather";
-import { useForm, type UseFormReturn } from "react-hook-form";
+import {
+  Controller,
+  useForm,
+  type UseControllerProps,
+  type UseFormReturn,
+} from "react-hook-form";
 import { SmallLabel } from "../../components/SmallLabel";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
@@ -32,6 +37,7 @@ import type { Entry } from "../types/dsl";
 import { NewVersionFields, useVersionState } from "./History";
 import { AddModelProviderKey } from "./AddModelProviderKey";
 import { useModelProviderKeys } from "../hooks/useModelProviderKeys";
+import { chakraComponents, Select as MultiSelect } from "chakra-react-select";
 
 export function Evaluate() {
   const { isOpen, onToggle, onClose } = useDisclosure();
@@ -62,6 +68,18 @@ export function Evaluate() {
     </>
   );
 }
+
+type EvaluateForm = {
+  version: string;
+  commitMessage: string;
+  evaluateOn: DatasetSplitOption;
+};
+
+type DatasetSplitOption = {
+  label: string;
+  value: "full" | "test" | "train";
+  description: string;
+};
 
 export function EvaluateModalContent({ onClose }: { onClose: () => void }) {
   const { project } = useOrganizationTeamProject();
@@ -98,27 +116,46 @@ export function EvaluateModalContent({ onClose }: { onClose: () => void }) {
     preview: true,
   });
 
-  const form = useForm<{
-    version: string;
-    commitMessage: string;
-    evaluateOn: "full" | "test" | "train";
-  }>({
+  const datasetName = entryNode?.data.dataset?.name;
+  const splitOptions: DatasetSplitOption[] = [
+    {
+      label: "Full dataset",
+      value: "full",
+      description: `Full ${datasetName} dataset`,
+    },
+    {
+      label: "Test entries",
+      value: "test",
+      description: `${Math.round(
+        (entryNode?.data.train_test_split ?? 0) * 100
+      )}% of ${datasetName} dataset`,
+    },
+    {
+      label: "Train entries",
+      value: "train",
+      description: `${Math.round(
+        (1 - (entryNode?.data.train_test_split ?? 0)) * 100
+      )}% of ${datasetName} dataset`,
+    },
+  ];
+
+  const form = useForm<EvaluateForm>({
     defaultValues: {
       version: "",
       commitMessage: "",
-      evaluateOn: total && total > 50 ? "test" : "full",
+      evaluateOn: total && total > 50 ? splitOptions[1]! : splitOptions[0]!,
     },
   });
 
   const evaluateOn = form.watch("evaluateOn");
   const estimatedTotal = useMemo(() => {
-    if (evaluateOn === "full") {
+    if (evaluateOn.value === "full") {
       return total;
     }
-    if (evaluateOn === "test") {
+    if (evaluateOn.value === "test") {
       return Math.ceil((total ?? 0) * (entryNode?.data.train_test_split ?? 0));
     }
-    if (evaluateOn === "train") {
+    if (evaluateOn.value === "train") {
       return Math.floor(
         (total ?? 0) * (1 - (entryNode?.data.train_test_split ?? 0))
       );
@@ -157,15 +194,7 @@ export function EvaluateModalContent({ onClose }: { onClose: () => void }) {
   ]);
 
   const onSubmit = useCallback(
-    async ({
-      version,
-      commitMessage,
-      evaluateOn,
-    }: {
-      version: string;
-      commitMessage: string;
-      evaluateOn: "full" | "test" | "train";
-    }) => {
+    async ({ version, commitMessage, evaluateOn }: EvaluateForm) => {
       if (!project || !workflowId) return;
 
       let versionId: string | undefined = versionToBeEvaluated.id;
@@ -225,7 +254,7 @@ export function EvaluateModalContent({ onClose }: { onClose: () => void }) {
 
       startEvaluationExecution({
         workflow_version_id: versionId,
-        evaluate_on: evaluateOn,
+        evaluate_on: evaluateOn.value,
       });
       setHasStarted(true);
     },
@@ -291,11 +320,14 @@ export function EvaluateModalContent({ onClose }: { onClose: () => void }) {
           </VStack>
           <VStack align="start" width="full" spacing={2}>
             <SmallLabel color="gray.600">Evaluate on</SmallLabel>
-            <Select {...form.register("evaluateOn")}>
-              <option value="full">Full Dataset</option>
-              <option value="test">Test</option>
-              <option value="train">Train</option>
-            </Select>
+            <Controller
+              control={form.control}
+              name="evaluateOn"
+              rules={{ required: "Evaluate on is required" }}
+              render={({ field }) => (
+                <DatasetSplitSelect field={field} options={splitOptions} />
+              )}
+            />
           </VStack>
         </VStack>
       </ModalBody>
@@ -361,5 +393,56 @@ export const VersionToBeEvaluated = ({
         <Text>{versionToBeEvaluated.commitMessage}</Text>
       </VStack>
     </HStack>
+  );
+};
+
+const DatasetSplitSelect = ({
+  field,
+  options,
+}: {
+  field: UseControllerProps<EvaluateForm>;
+  options: DatasetSplitOption[];
+}) => {
+  return (
+    <MultiSelect
+      {...field}
+      options={options}
+      hideSelectedOptions={false}
+      isSearchable={false}
+      useBasicStyles
+      chakraStyles={{
+        container: (base) => ({
+          ...base,
+          background: "white",
+          width: "100%",
+          borderRadius: "5px",
+        }),
+      }}
+      components={{
+        Menu: ({ children, ...props }) => (
+          <chakraComponents.Menu
+            {...props}
+            innerProps={{
+              ...props.innerProps,
+            }}
+          >
+            {children}
+          </chakraComponents.Menu>
+        ),
+        Option: ({ children, ...props }) => (
+          <chakraComponents.Option {...props}>
+            <VStack align="start">
+              <Text>{children}</Text>
+              <Text
+                color={props.isSelected ? "white" : "gray.500"}
+                fontSize={13}
+              >
+                {(props.data as any).description}
+              </Text>
+            </VStack>
+          </chakraComponents.Option>
+        ),
+      }}
+    />
   );
 };

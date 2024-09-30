@@ -36,6 +36,7 @@ import {
   useDSPyExperimentState,
 } from "../../components/experiments/DSPyExperiment";
 import type { Experiment, Project } from "@prisma/client";
+import { useOptimizationExecution } from "../hooks/useOptimizationExecution";
 
 export function ResultsPanel({
   collapsePanel,
@@ -251,9 +252,18 @@ export function LoadedOptimizationResults({
   experiment: Experiment;
   project: Project;
 }) {
+  const { optimizationState } = useWorkflowStore(({ state }) => ({
+    optimizationState: state.optimization,
+  }));
+
+  const [selectedRuns, setSelectedRuns] = useState<string[]>(
+    optimizationState?.run_id ? [optimizationState.run_id] : []
+  );
+
   const {
     dspyRuns,
-    selectedRuns,
+    selectedRuns: selectedRuns_,
+    setSelectedRuns: setSelectedRuns_,
     highlightedRun,
     setHighlightedRun,
     selectedPoint,
@@ -263,73 +273,109 @@ export function LoadedOptimizationResults({
     labelNames,
     runsById,
     optimizerNames,
-  } = useDSPyExperimentState({ project, experiment });
+  } = useDSPyExperimentState({
+    project,
+    experiment,
+    selectedRuns,
+    setSelectedRuns,
+  });
+
+  const { stopOptimizationExecution } = useOptimizationExecution();
+
+  const optimizationStateRunId = optimizationState?.run_id;
 
   return (
     <HStack align="start" width="full" height="full" spacing={0}>
       <DSPyExperimentRunList
         dspyRuns={dspyRuns}
-        selectedRuns={selectedRuns}
+        selectedRuns={selectedRuns_}
+        setSelectedRuns={setSelectedRuns_}
         setHighlightedRun={setHighlightedRun}
         dspyRunsPlusIncoming={dspyRunsPlusIncoming}
         size="sm"
       />
-      <VStack
-        align="start"
-        width="100%"
-        maxWidth="1200px"
-        height="full"
-        overflowY="auto"
-        spacing={0}
-      >
-        {dspyRuns.isLoading ? (
-          <Skeleton width="100%" height="30px" />
-        ) : dspyRuns.error ? (
-          <Alert status="error">
-            <AlertIcon />
-            Error loading experiment runs
-          </Alert>
-        ) : dspyRuns.data?.length === 0 ? (
-          <Text>Waiting for the first completed step to arrive...</Text>
-        ) : (
-          dspyRuns.data && (
-            <>
-              <VStack width="full" paddingX={1} paddingY={2} align="start">
-                <Heading as="h2" size="sm" paddingLeft={4} paddingTop={2}>
-                  {optimizerNames.length == 1
-                    ? optimizerNames[0]!
-                    : optimizerNames.length > 1
-                    ? "Multiple Optimizers"
-                    : "Waiting for the first completed step to arrive..."}
-                </Heading>
-                <DSPyRunsScoresChart
-                  dspyRuns={dspyRuns.data}
-                  selectedPoint={selectedPoint}
-                  setSelectedPoint={setSelectedPoint}
-                  highlightedRun={highlightedRun}
-                  selectedRuns={selectedRuns}
-                  stepToDisplay={stepToDisplay}
-                  labelNames={labelNames}
-                />
-              </VStack>
-              <Box width="full" borderTop="1px solid" borderColor="gray.200">
-                {stepToDisplay &&
-                  (!highlightedRun ||
-                    highlightedRun === stepToDisplay.run_id) && (
-                    <RunDetails
-                      project={project}
-                      experiment={experiment}
-                      dspyStepSummary={stepToDisplay}
-                      workflowVersion={
-                        runsById?.[stepToDisplay.run_id]?.workflow_version
-                      }
-                      size="sm"
-                    />
-                  )}
-              </Box>
-            </>
-          )
-        )}
+      <VStack align="start" width="full" height="full" spacing={0}>
+        <VStack width="full" height="full" overflowY="auto">
+          {dspyRuns.isLoading ? (
+            <Skeleton width="100%" height="30px" />
+          ) : dspyRuns.error ? (
+            <Alert status="error">
+              <AlertIcon />
+              Error loading experiment runs
+            </Alert>
+          ) : dspyRuns.data?.length === 0 ? (
+            <Text>Waiting for the first completed step to arrive...</Text>
+          ) : (
+            dspyRuns.data && (
+              <>
+                <VStack width="full" paddingX={1} paddingY={2} align="start">
+                  <Heading as="h2" size="sm" paddingLeft={4} paddingTop={2}>
+                    {optimizerNames.length == 1
+                      ? optimizerNames[0]!
+                      : optimizerNames.length > 1
+                      ? "Multiple Optimizers"
+                      : "Waiting for the first completed step to arrive..."}
+                  </Heading>
+                  <DSPyRunsScoresChart
+                    dspyRuns={dspyRuns.data}
+                    selectedPoint={selectedPoint}
+                    setSelectedPoint={setSelectedPoint}
+                    highlightedRun={highlightedRun}
+                    selectedRuns={selectedRuns_}
+                    stepToDisplay={stepToDisplay}
+                    labelNames={labelNames}
+                  />
+                </VStack>
+                <Box width="full" borderTop="1px solid" borderColor="gray.200">
+                  {stepToDisplay &&
+                    (!highlightedRun ||
+                      highlightedRun === stepToDisplay.run_id) && (
+                      <RunDetails
+                        project={project}
+                        experiment={experiment}
+                        dspyStepSummary={stepToDisplay}
+                        workflowVersion={
+                          runsById?.[stepToDisplay.run_id]?.workflow_version
+                        }
+                        size="sm"
+                      />
+                    )}
+                </Box>
+              </>
+            )
+          )}
+        </VStack>
+        <Spacer />
+        {(selectedRuns.length === 0 ||
+          selectedRuns.includes(optimizationStateRunId ?? "")) &&
+          optimizationStateRunId &&
+          optimizationState?.status === "running" && (
+            <HStack
+              width="full"
+              padding={3}
+              borderTop="1px solid"
+              borderColor="gray.200"
+            >
+              <Text whiteSpace="nowrap" marginTop="-1px" paddingX={2}>
+                Running
+              </Text>
+              <EvaluationProgressBar size="lg" />
+              <Button
+                size="xs"
+                variant="ghost"
+                onClick={() =>
+                  stopOptimizationExecution({
+                    run_id: optimizationStateRunId,
+                  })
+                }
+                minHeight="28px"
+                minWidth="28px"
+                padding="6px"
+              >
+                <X />
+              </Button>
+            </HStack>
+          )}
       </VStack>
     </HStack>
   );

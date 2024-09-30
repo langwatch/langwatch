@@ -147,6 +147,7 @@ export type Workflow = {
       timestamps?: {
         started_at?: number;
         finished_at?: number;
+        stopped_at?: number;
       };
     };
     optimization?: {
@@ -157,6 +158,7 @@ export type Workflow = {
       timestamps?: {
         started_at?: number;
         finished_at?: number;
+        stopped_at?: number;
       };
     };
   };

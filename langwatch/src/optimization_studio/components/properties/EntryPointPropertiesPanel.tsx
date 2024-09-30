@@ -114,9 +114,9 @@ export function EntryPointPropertiesPanel({ node }: { node: Node<Component> }) {
       <HStack width="full">
         <VStack width="full" align="start">
           <HStack width="full">
-            <PropertySectionTitle>Train/Test Split</PropertySectionTitle>
+            <PropertySectionTitle>Optimization/Test Split</PropertySectionTitle>
             <Tooltip
-              label={`During optimization, a bigger part of the dataset is used for training and a smaller part for testing, this guarantees that the test set is not leaked into the training, preventing the LLM to "cheat" it's way into a better score.`}
+              label={`During optimization, a bigger part of the dataset is used for optimization and a smaller part for testing, this guarantees that the test set is not leaked into the optimization, preventing the LLM to "cheat" it's way into a better score.`}
             >
               <Box paddingTop={1}>
                 <Info size={14} />
@@ -136,11 +136,11 @@ export function EntryPointPropertiesPanel({ node }: { node: Node<Component> }) {
               });
             }}
           >
-            <option value="0.1">90% train, 10% test</option>
-            <option value="0.2">80% train, 20% test</option>
-            <option value="0.3">70% train, 30% test</option>
-            <option value="0.4">60% train, 40% test</option>
-            <option value="0.5">50% train, 50% test</option>
+            <option value="0.1">90% optimization, 10% test</option>
+            <option value="0.2">80% optimization, 20% test</option>
+            <option value="0.3">70% optimization, 30% test</option>
+            <option value="0.4">60% optimization, 40% test</option>
+            <option value="0.5">50% optimization, 50% test</option>
           </Select>
         </VStack>
         <VStack align="start" width="40%">

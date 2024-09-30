@@ -76,7 +76,7 @@ export function EvaluatorSelection({
       {
         name: "Automated Annotations Evaluator",
         description:
-          "Train your own evaluator, fine-tuned on your project's annotation scores to mimic human review scores and reasoning and automatically evaluate messages just like your team members would",
+          "Optimize your own evaluator, fine-tuned on your project's annotation scores to mimic human review scores and reasoning and automatically evaluate messages just like your team members would",
         category: "custom",
         isGuardrail: false,
         requiredFields: [],
