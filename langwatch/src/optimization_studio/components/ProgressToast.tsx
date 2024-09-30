@@ -12,9 +12,15 @@ import {
 } from "@chakra-ui/react";
 import { useWorkflowStore } from "../hooks/useWorkflowStore";
 import { useEvaluationExecution } from "../hooks/useEvaluationExecution";
+import { useOptimizationExecution } from "../hooks/useOptimizationExecution";
 
 export function ProgressToast() {
-  return <EvaluationProgressToast />;
+  return (
+    <VStack spacing={4}>
+      <EvaluationProgressToast />
+      <OptimizationProgressToast />
+    </VStack>
+  );
 }
 
 export function EvaluationProgressToast() {
@@ -43,6 +49,38 @@ export function EvaluationProgressToast() {
       onCancel={() => {
         stopEvaluationExecution({
           run_id: evaluationState?.run_id ?? "",
+        });
+      }}
+    />
+  );
+}
+
+export function OptimizationProgressToast() {
+  const { optimizationState, setOpenResultsPanelRequest } = useWorkflowStore(
+    ({ state, setOpenResultsPanelRequest }) => ({
+      optimizationState: state.optimization,
+      setOpenResultsPanelRequest,
+    })
+  );
+
+  const { stopOptimizationExecution } = useOptimizationExecution();
+
+  const isRunning = optimizationState?.status === "running";
+
+  if (!isRunning) {
+    return null;
+  }
+
+  return (
+    <BaseProgressToast
+      description="Running optimization"
+      progress={<EvaluationProgressBar />}
+      onClick={() => {
+        setOpenResultsPanelRequest("optimizations");
+      }}
+      onCancel={() => {
+        stopOptimizationExecution({
+          run_id: optimizationState?.run_id ?? "",
         });
       }}
     />

@@ -7,6 +7,7 @@ from langwatch_nlp.studio.types.dsl import (
     ExecutionState,
     ExecutionStatus,
     Node,
+    OptimizationExecutionState,
     Timestamps,
     Workflow,
     WorkflowExecutionState,
@@ -40,16 +41,6 @@ class StopExecution(BaseModel):
     payload: StopExecutionPayload
 
 
-class StopEvaluationExecutionPayload(BaseModel):
-    workflow: Workflow
-    run_id: str
-
-
-class StopEvaluationExecution(BaseModel):
-    type: Literal["stop_evaluation_execution"] = "stop_evaluation_execution"
-    payload: StopEvaluationExecutionPayload
-
-
 class ExecuteFlowPayload(BaseModel):
     trace_id: str
     workflow: Workflow
@@ -73,6 +64,46 @@ class ExecuteEvaluation(BaseModel):
     payload: ExecuteEvaluationPayload
 
 
+class StopEvaluationExecutionPayload(BaseModel):
+    workflow: Workflow
+    run_id: str
+
+
+class StopEvaluationExecution(BaseModel):
+    type: Literal["stop_evaluation_execution"] = "stop_evaluation_execution"
+    payload: StopEvaluationExecutionPayload
+
+
+class ExecuteOptimizationParams(BaseModel):
+    max_bootstrapped_demos: Optional[int] = None
+    max_labeled_demos: Optional[int] = None
+    max_rounds: Optional[int] = None
+    num_candidate_programs: Optional[int] = None
+
+
+class ExecuteOptimizationPayload(BaseModel):
+    run_id: str
+    workflow: Workflow
+    workflow_version_id: str
+    optimizer: Literal["BootstrapFewShot", "BootstrapFewShotWithRandomSearch"]
+    params: ExecuteOptimizationParams
+
+
+class ExecuteOptimization(BaseModel):
+    type: Literal["execute_optimization"] = "execute_optimization"
+    payload: ExecuteOptimizationPayload
+
+
+class StopOptimizationExecutionPayload(BaseModel):
+    workflow: Workflow
+    run_id: str
+
+
+class StopOptimizationExecution(BaseModel):
+    type: Literal["stop_optimization_execution"] = "stop_optimization_execution"
+    payload: StopOptimizationExecutionPayload
+
+
 StudioClientEvent = Union[
     IsAlive,
     ExecuteComponent,
@@ -80,6 +111,8 @@ StudioClientEvent = Union[
     ExecuteFlow,
     ExecuteEvaluation,
     StopEvaluationExecution,
+    ExecuteOptimization,
+    StopOptimizationExecution,
 ]
 
 
@@ -115,6 +148,15 @@ class EvaluationStateChange(BaseModel):
     payload: EvaluationStateChangePayload
 
 
+class OptimizationStateChangePayload(BaseModel):
+    optimization_state: OptimizationExecutionState
+
+
+class OptimizationStateChange(BaseModel):
+    type: Literal["optimization_state_change"] = "optimization_state_change"
+    payload: OptimizationStateChangePayload
+
+
 class DebugPayload(BaseModel):
     message: str
 
@@ -142,6 +184,7 @@ StudioServerEvent = Union[
     ComponentStateChange,
     ExecutionStateChange,
     EvaluationStateChange,
+    OptimizationStateChange,
     Debug,
     Error,
     Done,

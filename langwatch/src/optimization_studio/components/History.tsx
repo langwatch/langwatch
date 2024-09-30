@@ -20,6 +20,7 @@ import {
   useDisclosure,
   useToast,
   VStack,
+  type BoxProps,
 } from "@chakra-ui/react";
 
 import { useCallback, useEffect, useMemo } from "react";
@@ -274,13 +275,15 @@ export function HistoryPopover({ onClose }: { onClose: () => void }) {
 
 export const VersionBox = ({
   version,
+  children,
+  ...props
 }: {
-  version: { autoSaved?: boolean; version: string };
-}) => {
+  version?: { autoSaved?: boolean; version: string };
+} & BoxProps) => {
   return (
     <Box
+      backgroundColor={version?.autoSaved ? "orange.50" : "orange.100"}
       padding={3}
-      backgroundColor={version.autoSaved ? "orange.50" : "orange.100"}
       borderRadius={6}
       fontWeight={600}
       fontSize={13}
@@ -289,8 +292,10 @@ export const VersionBox = ({
       textAlign="center"
       minWidth="48px"
       height="44px"
+      {...props}
     >
-      {version.autoSaved ? " " : version.version}
+      {version?.autoSaved ? " " : version?.version}
+      {children}
     </Box>
   );
 };

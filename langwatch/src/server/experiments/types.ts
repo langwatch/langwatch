@@ -1,3 +1,5 @@
+import type { WorkflowVersion } from "@prisma/client";
+
 type AnyJSONDumpedClass = {
   __class__?: string;
 } & Record<string, any>;
@@ -86,6 +88,7 @@ export type DSPyStepSummary = {
 
 export type DSPyRunsSummary = {
   runId: string;
+  workflow_version?: WorkflowVersion;
   steps: DSPyStepSummary[];
   created_at: number;
 };

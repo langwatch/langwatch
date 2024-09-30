@@ -33,6 +33,7 @@ export const useSocketClient = () => {
     setComponentExecutionState,
     setWorkflowExecutionState,
     setEvaluationState,
+    setOptimizationState,
     getWorkflow,
     setSelectedNode,
     setPropertiesExpanded,
@@ -43,6 +44,7 @@ export const useSocketClient = () => {
     setComponentExecutionState: state.setComponentExecutionState,
     setWorkflowExecutionState: state.setWorkflowExecutionState,
     setEvaluationState: state.setEvaluationState,
+    setOptimizationState: state.setOptimizationState,
     getWorkflow: state.getWorkflow,
     setSelectedNode: state.setSelectedNode,
     setPropertiesExpanded: state.setPropertiesExpanded,
@@ -152,6 +154,18 @@ export const useSocketClient = () => {
             }
           }
           break;
+        case "optimization_state_change":
+          const currentOptimizationState = getWorkflow().state.optimization;
+          setOptimizationState(data.payload.optimization_state);
+          if (data.payload.optimization_state?.status === "error") {
+            alertOnError(data.payload.optimization_state.error);
+            if (currentOptimizationState?.status !== "waiting") {
+              setTimeout(() => {
+                setOpenResultsPanelRequest("optimizations");
+              }, 500);
+            }
+          }
+          break;
         case "error":
           checkIfUnreachableErrorMessage(data.payload.message);
           stopWorkflowIfRunning(data.payload.message);
@@ -179,6 +193,7 @@ export const useSocketClient = () => {
       getWorkflow,
       setWorkflowExecutionState,
       setEvaluationState,
+      setOptimizationState,
       checkIfUnreachableErrorMessage,
       stopWorkflowIfRunning,
       alertOnError,

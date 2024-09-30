@@ -1,4 +1,5 @@
-from langwatch_nlp.studio.dspy.lite_llm import DSPyLiteLLM
+import os
+from typing import Any
 from langwatch_nlp.studio.dspy.predict_with_metadata import PredictWithMetadata
 from langwatch_nlp.studio.modules.registry import MODULES
 from langwatch_nlp.studio.types.dsl import Evaluator, Node, Signature, Workflow
@@ -41,21 +42,30 @@ def parse_signature(component: Signature, workflow: Workflow) -> type[dspy.Modul
     )
 
     llm_config = component.llm if component.llm else workflow.default_llm
+    llm_params : dict[str, Any] = llm_config.litellm_params or {"model": llm_config.model}
+    if "azure/" in (llm_params["model"] or ""):
+        llm_params["api_version"] = os.environ["AZURE_API_VERSION"]
+    llm_params["drop_params"] = True
+    llm_params["model_type"] = "chat"
 
-    lm = DSPyLiteLLM(
+    lm = dspy.LM(
         max_tokens=llm_config.max_tokens or 2048,
         temperature=llm_config.temperature or 0,
-        **(llm_config.litellm_params or {"model": llm_config.model}),
+        **llm_params,
     )
 
     dspy.settings.configure(experimental=True)
 
-    def __init__(self) -> None:
+    def __init__(self, *args, **kwargs) -> None:
         PredictWithMetadata.__init__(self, SignatureClass)
         self.set_lm(lm=lm)
 
+    def reset(self) -> None:
+        PredictWithMetadata.reset(self)
+        self.lm = lm
+
     ModuleClass: type[PredictWithMetadata] = type(
-        class_name, (PredictWithMetadata,), {"__init__": __init__}
+        class_name, (PredictWithMetadata,), {"__init__": __init__, "reset": reset}
     )
 
     return ModuleClass

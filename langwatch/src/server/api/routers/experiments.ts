@@ -69,6 +69,7 @@ export const experimentsRouter = createTRPCRouter({
             "index",
             "score",
             "label",
+            "workflow_version_id",
             "optimizer.name",
             "llm_calls.completion_tokens",
             "llm_calls.prompt_tokens",
@@ -83,6 +84,14 @@ export const experimentsRouter = createTRPCRouter({
         },
       });
 
+      const versionIds = dspySteps.hits.hits
+        .map((hit) => {
+          return hit._source!.workflow_version_id!;
+        })
+        .filter(Boolean);
+
+      const versionsMap = await getVersionMap(input.projectId, versionIds);
+
       const result: DSPyRunsSummary[] = (
         dspySteps.aggregations!.runs as any
       ).buckets
@@ -90,20 +99,25 @@ export const experimentsRouter = createTRPCRouter({
           const steps = dspySteps.hits.hits.filter(
             (hit) => hit._source!.run_id === bucket.key
           );
+          const versionId = steps.filter(
+            (step) => step._source!.workflow_version_id
+          )[0]?._source!.workflow_version_id;
 
           return {
             runId: bucket.key,
+            workflow_version: versionId ? versionsMap[versionId] : null,
             steps: steps
               .map((hit) => {
-                const llmCalls = hit._source!.llm_calls ?? [];
+                const source = hit._source!;
+                const llmCalls = source.llm_calls ?? [];
 
                 return {
-                  run_id: hit._source!.run_id,
-                  index: hit._source!.index,
-                  score: hit._source!.score,
-                  label: hit._source!.label,
+                  run_id: source.run_id,
+                  index: source.index,
+                  score: source.score,
+                  label: source.label,
                   optimizer: {
-                    name: hit._source!.optimizer.name,
+                    name: source.optimizer.name,
                   },
                   llm_calls_summary: {
                     total: llmCalls.length,
@@ -120,7 +134,7 @@ export const experimentsRouter = createTRPCRouter({
                     ),
                   },
                   timestamps: {
-                    created_at: hit._source!.timestamps.created_at,
+                    created_at: source.timestamps.created_at,
                   },
                 } as DSPyStepSummary;
               })
@@ -299,33 +313,7 @@ export const experimentsRouter = createTRPCRouter({
         })
         .filter(Boolean);
 
-      const versions = await prisma.workflowVersion.findMany({
-        where: {
-          projectId: input.projectId,
-          id: {
-            in: versionIds,
-          },
-        },
-        select: {
-          id: true,
-          version: true,
-          commitMessage: true,
-          author: {
-            select: {
-              name: true,
-              image: true,
-            },
-          },
-        },
-      });
-
-      const versionsMap = versions.reduce(
-        (acc, version) => {
-          acc[version.id] = version;
-          return acc;
-        },
-        {} as Record<string, (typeof versions)[number]>
-      );
+      const versionsMap = await getVersionMap(input.projectId, versionIds);
 
       const runs = batchEvaluationRuns.hits.hits.map((hit) => {
         const source = hit._source!;
@@ -335,10 +323,12 @@ export const experimentsRouter = createTRPCRouter({
         ).buckets.find((bucket: any) => bucket.key === source.run_id);
 
         return {
-          run_id: hit._source!.run_id,
-          workflow_version: versionsMap[hit._source!.workflow_version_id!],
-          timestamps: hit._source!.timestamps,
-          total: hit._source!.total,
+          run_id: source.run_id,
+          workflow_version: source.workflow_version_id
+            ? versionsMap[source.workflow_version_id]
+            : null,
+          timestamps: source.timestamps,
+          total: source.total,
           summary: {
             cost: runAgg?.dataset_cost.value + runAgg?.evaluations_cost.value,
             dataset_average_cost: runAgg?.dataset_average_cost.value,
@@ -432,4 +422,36 @@ const getExperimentBySlug = async (
   }
 
   return experiment;
+};
+
+const getVersionMap = async (projectId: string, versionIds: string[]) => {
+  const versions = await prisma.workflowVersion.findMany({
+    where: {
+      projectId: projectId,
+      id: {
+        in: versionIds,
+      },
+    },
+    select: {
+      id: true,
+      version: true,
+      commitMessage: true,
+      author: {
+        select: {
+          name: true,
+          image: true,
+        },
+      },
+    },
+  });
+
+  const versionsMap = versions.reduce(
+    (acc, version) => {
+      acc[version.id] = version;
+      return acc;
+    },
+    {} as Record<string, (typeof versions)[number]>
+  );
+
+  return versionsMap;
 };

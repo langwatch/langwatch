@@ -58,6 +58,8 @@ const handleClientMessage = async (
       case "execute_flow":
       case "execute_evaluation":
       case "stop_evaluation_execution":
+      case "execute_optimization":
+      case "stop_optimization_execution":
         await callPython(ws, message);
         break;
       default:

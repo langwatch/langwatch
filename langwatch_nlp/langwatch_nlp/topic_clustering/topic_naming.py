@@ -2,6 +2,7 @@ from concurrent.futures import Future, ThreadPoolExecutor
 import math
 from typing import Optional
 import litellm
+from litellm.cost_calculator import completion_cost
 import numpy as np
 from openai import AzureOpenAI, OpenAI
 import os
@@ -86,7 +87,7 @@ def generate_topic_names(
         print(f"Failed to generate topic names for {len(topic_examples)} topics: {e}")
         raise e
 
-    total_cost = litellm.completion_cost(response)
+    total_cost = completion_cost(response)
 
     topic_names: list[str] = list(json.loads(response.choices[0].message.tool_calls[0].function.arguments).values())  # type: ignore
     topic_names = topic_names[0 : len(topic_examples)]
@@ -306,7 +307,7 @@ def improve_name_between_two_topics(
         **litellm_params,  # type: ignore
     )
 
-    total_cost = litellm.completion_cost(response)
+    total_cost = completion_cost(response)
 
     arguments = json.loads(response.choices[0].message.tool_calls[0].function.arguments)  # type: ignore
     new_topic_a_name = arguments["topic_a"]

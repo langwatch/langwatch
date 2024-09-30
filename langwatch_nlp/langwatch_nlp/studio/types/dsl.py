@@ -200,9 +200,19 @@ class EvaluationExecutionState(BaseModel):
     timestamps: Optional[Timestamps] = None
 
 
+class OptimizationExecutionState(BaseModel):
+    experiment_id: Optional[str] = None
+    run_id: Optional[str] = None
+    run_name: Optional[str] = None
+    status: Optional[ExecutionStatus] = None
+    error: Optional[str] = None
+    timestamps: Optional[Timestamps] = None
+
+
 class WorkflowState(BaseModel):
     execution: Optional[WorkflowExecutionState] = None
     evaluation: Optional[EvaluationExecutionState] = None
+    optimization: Optional[OptimizationExecutionState] = None
 
 
 class Workflow(BaseModel):

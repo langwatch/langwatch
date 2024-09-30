@@ -311,18 +311,7 @@ export function BatchEvaluationV2RunList({
               }}
               spacing={3}
             >
-              <Box
-                padding={3}
-                backgroundColor="orange.100"
-                borderRadius={6}
-                fontWeight={600}
-                fontSize={13}
-                color="gray.600"
-                whiteSpace="nowrap"
-                textAlign="center"
-                minWidth="48px"
-                height="44px"
-              />
+              <VersionBox />
               <VStack align="start" spacing={2} width="100%" paddingRight={2}>
                 <HStack width="100%">
                   <Skeleton width="100%" height="12px" />
@@ -362,21 +351,12 @@ export function BatchEvaluationV2RunList({
                 {run.workflow_version ? (
                   <VersionBox version={run.workflow_version} />
                 ) : (
-                  <Box
-                    padding={3}
+                  <VersionBox
                     backgroundColor={
                       run.timestamps.stopped_at
                         ? "red.200"
                         : getColorForString("colors", run.run_id).color
                     }
-                    borderRadius={6}
-                    fontWeight={600}
-                    fontSize={13}
-                    color="gray.600"
-                    whiteSpace="nowrap"
-                    textAlign="center"
-                    minWidth="48px"
-                    height="44px"
                   />
                 )}
                 <VStack align="start" spacing={0}>

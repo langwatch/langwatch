@@ -54,7 +54,10 @@ class SerializableAndPydanticEncoder(json.JSONEncoder):
             return {"__class__": classname} | o.__dict__
         if isinstance(o, Completions):
             return {"__class__": classname} | o.__dict__
-        return super().default(o)
+        try:
+            return super().default(o)
+        except:
+            return str(o)
 
 
 class DSPyLLMCall(TypedDict):
@@ -91,6 +94,7 @@ class DSPyOptimizer(BaseModel):
 class DSPyStep(BaseModel):
     run_id: str
     experiment_slug: str
+    workflow_version_id: Optional[str] = None
     index: str
     score: float
     label: str
@@ -122,7 +126,15 @@ class LangWatchDSPy:
             cls._instance = super().__new__(cls)
         return cls._instance
 
-    def init(self, experiment: str, optimizer: Optional[Teleprompter]):
+    def init(
+        self,
+        experiment: str,
+        optimizer: Optional[Teleprompter],
+        run_id: Optional[str] = None,
+        slug: Optional[str] = None,
+        workflow_id: Optional[str] = None,
+        workflow_version_id: Optional[str] = None,
+    ):
         if langwatch.api_key is None:
             print("API key was not detected, calling langwatch.login()...")
             langwatch.login()
@@ -132,7 +144,12 @@ class LangWatchDSPy:
             response = httpx.post(
                 f"{langwatch.endpoint}/api/experiment/init",
                 headers={"X-Auth-Token": langwatch.api_key or ""},
-                json={"experiment_slug": experiment, "experiment_type": "DSPY"},
+                json={
+                    "experiment_slug": slug or experiment,
+                    "experiment_type": "DSPY",
+                    "experiment_name": experiment,
+                    "workflow_id": workflow_id,
+                },
             )
         except Exception as e:
             raise Exception(f"Error initializing LangWatch experiment: {e}")
@@ -143,9 +160,10 @@ class LangWatchDSPy:
             )
         response.raise_for_status()
 
-        self.experiment_slug = experiment
+        self.experiment_slug = slug or experiment
         random.seed()  # MIPRO meses up the global seed, so we need to reset it to random to get a new run_id
-        self.run_id = generate_slug(3)
+        self.run_id = run_id or generate_slug(3)
+        self.workflow_version_id = workflow_version_id
         self.reset()
 
         self.patch_llms()
@@ -253,6 +271,7 @@ class LangWatchDSPy:
             predictors=predictors,
             examples=self.examples_buffer,
             llm_calls=self.llm_calls_buffer,
+            workflow_version_id=self.workflow_version_id,
             timestamps=Timestamps(created_at=int(time.time() * 1000)),
         )
         self.steps_buffer.append(step)

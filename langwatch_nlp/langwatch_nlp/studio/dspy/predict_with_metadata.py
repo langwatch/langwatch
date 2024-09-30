@@ -1,7 +1,6 @@
 import time
 from typing import Optional, cast
 import dspy
-from langwatch_nlp.studio.dspy.lite_llm import DSPyLiteLLM
 
 
 class PredictionWithMetadata(dspy.Prediction):
@@ -15,10 +14,10 @@ class PredictionWithMetadata(dspy.Prediction):
         return self._error
 
     def get_cost(self):
-        return self._cost
+        return self._cost or 0
 
     def get_duration(self):
-        return self._duration
+        return self._duration or 0
 
 
 class PredictWithMetadata(dspy.Predict):
@@ -33,9 +32,12 @@ class PredictWithMetadata(dspy.Predict):
         response = super().forward(*args, **kwargs)
         duration = round((time.time() - start_time) * 1000)
 
-        lm = cast(DSPyLiteLLM, self.get_lm())
+        lm = cast(dspy.LM, self.get_lm())
         response.__class__ = PredictionWithMetadata
-        response._cost = lm.last_cost
+        last_response = lm.history[-1]
+        response._cost = 0
+        if last_response:
+            response._cost = last_response.get("cost", 0)
         response._duration = duration
 
         return response

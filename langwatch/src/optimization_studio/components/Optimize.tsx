@@ -9,17 +9,17 @@ import {
   ModalFooter,
   ModalHeader,
   ModalOverlay,
-  Select,
   Skeleton,
   Spacer,
   Text,
   Tooltip,
   useDisclosure,
   useToast,
-  VStack,
+  VStack
 } from "@chakra-ui/react";
 
 import type { Node } from "@xyflow/react";
+import { chakraComponents, Select as MultiSelect } from "chakra-react-select";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { CheckSquare, Info, TrendingUp } from "react-feather";
 import {
@@ -31,15 +31,13 @@ import {
 import { SmallLabel } from "../../components/SmallLabel";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
-import { useEvaluationExecution } from "../hooks/useEvaluationExecution";
 import { useGetDatasetData } from "../hooks/useGetDatasetData";
+import { useOptimizationExecution } from "../hooks/useOptimizationExecution";
 import { useWorkflowStore } from "../hooks/useWorkflowStore";
 import type { Entry } from "../types/dsl";
-import { NewVersionFields, useVersionState } from "./History";
-import { VersionToBeEvaluated } from "./Evaluate";
-import { useOptimizationExecution } from "../hooks/useOptimizationExecution";
 import { OPTIMIZERS } from "../types/optimizers";
-import { Select as MultiSelect, chakraComponents } from "chakra-react-select";
+import { VersionToBeEvaluated } from "./Evaluate";
+import { useVersionState } from "./History";
 
 const optimizerOptions: {
   label: string;

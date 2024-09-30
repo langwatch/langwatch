@@ -15,6 +15,8 @@ export const debug = getDebugger("langwatch:dspy:init");
 const dspyInitParamsSchema = z.object({
   experiment_slug: z.string(),
   experiment_type: z.enum(["DSPY", "BATCH_EVALUATION"]),
+  experiment_name: z.string().optional(),
+  workflowId: z.string().optional(),
 });
 
 export default async function handler(
@@ -61,7 +63,9 @@ export default async function handler(
   const experiment = await findOrCreateExperiment(
     project,
     params.experiment_slug,
-    params.experiment_type
+    params.experiment_type,
+    params.experiment_name,
+    params.workflowId
   );
 
   return res

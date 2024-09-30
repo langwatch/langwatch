@@ -85,6 +85,12 @@ export type StudioServerEvent =
       };
     }
   | {
+      type: "optimization_state_change";
+      payload: {
+        optimization_state: Workflow["state"]["optimization"];
+      };
+    }
+  | {
       type: "debug";
       payload: {
         message: string;
