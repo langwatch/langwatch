@@ -28,6 +28,7 @@ import { getTraceInput, getTraceOutput } from "./collector/trace";
 import type { QueryDslBoolQuery } from "@elastic/elasticsearch/lib/api/types";
 import { mapEvaluations, scheduleEvaluations } from "./collector/evaluations";
 import { flattenObjectKeys } from "../../api/utils";
+import { elasticSearchSpanToSpan } from "../../tracer/utils";
 
 const debug = getDebugger("langwatch:workers:collectorWorker");
 
@@ -129,9 +130,32 @@ export const processCollectorJob = async (
     return esSpan;
   });
 
+  let existingSpans: Span[] = [];
+  if (existingTrace?.inserted_at) {
+    const existingTraceResponse = await esClient.search<ElasticSearchTrace>({
+      index: TRACE_INDEX.alias,
+      body: {
+        size: 1,
+        query: {
+          bool: {
+            must: [
+              { term: { trace_id: traceId } },
+              { term: { project_id: project.id } },
+            ] as QueryDslBoolQuery["must"],
+          } as QueryDslBoolQuery,
+        },
+        _source: ["spans"],
+      },
+    });
+    existingSpans = (
+      existingTraceResponse.hits.hits[0]?._source?.spans ?? []
+    ).map(elasticSearchSpanToSpan);
+  }
+
+  const allSpans = existingSpans.concat(spans);
   const [input, output] = await Promise.all([
-    getTraceInput(spans, project.id),
-    getTraceOutput(spans, project.id),
+    getTraceInput(allSpans, project.id),
+    getTraceOutput(allSpans, project.id),
   ]);
   const error = getLastOutputError(spans);
 

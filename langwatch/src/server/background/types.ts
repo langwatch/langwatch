@@ -1,6 +1,7 @@
 import type { EvaluatorTypes } from "../../server/evaluations/evaluators.generated";
 import type {
   CustomMetadata,
+  ElasticSearchSpan,
   ElasticSearchTrace,
   ReservedTraceMetadata,
   RESTEvaluation,

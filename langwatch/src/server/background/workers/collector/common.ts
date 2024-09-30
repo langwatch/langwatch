@@ -182,6 +182,17 @@ export const typedValueToText = (
         return stringified(json.return_values.output);
       }
 
+      // LangChain
+      if (typeof json.inputs === "object" && json.inputs.input !== undefined) {
+        return stringified(json.inputs.input);
+      }
+      if (
+        typeof json.outputs === "object" &&
+        json.outputs.output !== undefined
+      ) {
+        return stringified(json.outputs.output);
+      }
+
       return undefined;
     };
 
