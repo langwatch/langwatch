@@ -35,7 +35,7 @@ export const getFirstInputAsText = (spans: Span[]): string => {
   const text = typedValueToText(input, true);
   if (
     !text &&
-    topmostInputs[0]?.name === "RunnableSequence" &&
+    topmostInputs[0]?.name?.startsWith("RunnableSequence") &&
     topmostInputs[1]?.input
   ) {
     return typedValueToText(topmostInputs[1].input, true);
@@ -186,11 +186,29 @@ export const typedValueToText = (
       if (typeof json.inputs === "object" && json.inputs.input !== undefined) {
         return stringified(json.inputs.input);
       }
+      if (typeof json.inputs === "object" && json.inputs.text !== undefined) {
+        return stringified(json.inputs.text);
+      }
+      if (typeof json.inputs === "object" && json.inputs.query !== undefined) {
+        return stringified(json.inputs.query);
+      }
+      if (
+        typeof json.inputs === "object" &&
+        json.inputs.question !== undefined
+      ) {
+        return stringified(json.inputs.question);
+      }
       if (
         typeof json.outputs === "object" &&
         json.outputs.output !== undefined
       ) {
         return stringified(json.outputs.output);
+      }
+      if (typeof json.outputs === "string") {
+        return json.outputs;
+      }
+      if (typeof json.outputs === "object" && json.outputs.text !== undefined) {
+        return stringified(json.outputs.text);
       }
 
       return undefined;
