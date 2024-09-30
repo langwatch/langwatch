@@ -300,25 +300,27 @@ export function EvaluateModalContent({ onClose }: { onClose: () => void }) {
         </VStack>
       </ModalBody>
       <ModalFooter borderTop="1px solid" borderColor="gray.200" marginTop={4}>
-        <HStack width="full">
-          <Text fontWeight={500}>{estimatedTotal} entries</Text>
-          <Spacer />
-          <Button
-            variant="outline"
-            type="submit"
-            leftIcon={<CheckSquare size={16} />}
-            isLoading={evaluationState?.status === "waiting"}
-            isDisabled={hasProvidersWithoutCustomKeys}
-          >
-            {canSaveNewVersion ? "Save & Run Evaluation" : "Run Evaluation"}
-          </Button>
-        </HStack>
+        <VStack align="start" width="full">
+          {hasProvidersWithoutCustomKeys && (
+            <AddModelProviderKey
+              nodeProvidersWithoutCustomKeys={nodeProvidersWithoutCustomKeys}
+            />
+          )}
+          <HStack width="full">
+            <Text fontWeight={500}>{estimatedTotal} entries</Text>
+            <Spacer />
+            <Button
+              variant="outline"
+              type="submit"
+              leftIcon={<CheckSquare size={16} />}
+              isLoading={evaluationState?.status === "waiting"}
+              isDisabled={hasProvidersWithoutCustomKeys}
+            >
+              {canSaveNewVersion ? "Save & Run Evaluation" : "Run Evaluation"}
+            </Button>
+          </HStack>
+        </VStack>
       </ModalFooter>
-      {hasProvidersWithoutCustomKeys && (
-        <AddModelProviderKey
-          nodeProvidersWithoutCustomKeys={nodeProvidersWithoutCustomKeys}
-        />
-      )}
     </ModalContent>
   );
 }
