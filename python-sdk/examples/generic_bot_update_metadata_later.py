@@ -1,3 +1,4 @@
+import time
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -28,15 +29,16 @@ async def main(message: cl.Message):
     trace.send_spans()
 
     # At a later point, update the trace with expected_output
+    time.sleep(3)
     id = trace.trace_id
 
     trace = langwatch.trace(trace_id=id)
 
-    trace.update(
-        expected_output="Hello there! How can I be helpful?"
-    )
+    trace.update(expected_output="Hello there! How can I be helpful?")
     trace.send_spans()
-    public_url = trace.share() # it works even before the trace was fully synced, but users might take a second to see on the UI
+    public_url = (
+        trace.share()
+    )  # it works even before the trace was fully synced, but users might take a second to see on the UI
     print("See the trace at:", public_url)
 
     await msg.stream_token(generated_message)

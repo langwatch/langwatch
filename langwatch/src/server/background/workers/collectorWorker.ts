@@ -329,21 +329,29 @@ const processCollectorJob_ = async (
 
   void markProjectFirstMessage(project);
 
-  const job = await collectorQueue!.add(
-    "collector",
-    {
-      action: "check_and_adjust",
-      traceId,
-      projectId,
-    },
-    {
-      jobId: `collector_${traceId}_check_and_adjust`,
-      delay: 3000,
-    }
-  );
+  const checkAndAdjust = async () => {
+    return collectorQueue!.add(
+      "collector",
+      {
+        action: "check_and_adjust",
+        traceId,
+        projectId,
+      },
+      {
+        jobId: `collector_${traceId}_check_and_adjust`,
+        delay: 3000,
+      }
+    );
+  };
 
-  // Push it forward if two traces are processed at the same time
-  await job?.changeDelay(3000);
+  const job = await checkAndAdjust();
+  try {
+    // Push it forward if two traces are processed at the same time
+    await job?.changeDelay(3000);
+  } catch {
+    await job.remove();
+    await checkAndAdjust();
+  }
 };
 
 const processCollectorCheckAndAdjustJob = async (
