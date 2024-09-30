@@ -86,9 +86,11 @@ export function SignedInExtraFooterComponents() {
     });
 })('18f008fe-1a55-4b22-70d9-964d6e98b130');`}
           </Script>
-          <Script id="crisp">
-            {`window.$crisp=[];window.CRISP_WEBSITE_ID="cca9eacd-c4d6-4258-a7fc-9606be6fd012";(function(){d=document;s=d.createElement("script");s.src="https://client.crisp.chat/l.js";s.async=1;d.getElementsByTagName("head")[0].appendChild(s);})();`}
-          </Script>
+          {window.location.pathname.includes("/studio") ? null : (
+            <Script id="crisp">
+              {`window.$crisp=[];window.CRISP_WEBSITE_ID="cca9eacd-c4d6-4258-a7fc-9606be6fd012";(function(){d=document;s=d.createElement("script");s.src="https://client.crisp.chat/l.js";s.async=1;d.getElementsByTagName("head")[0].appendChild(s);})();`}
+            </Script>
+          )}
         </>
       )}
     </>
