@@ -30,6 +30,8 @@ import { useGetDatasetData } from "../hooks/useGetDatasetData";
 import { useWorkflowStore } from "../hooks/useWorkflowStore";
 import type { Entry } from "../types/dsl";
 import { NewVersionFields, useVersionState } from "./History";
+import { AddModelProviderKey } from "./AddModelProviderKey";
+import { useModelProviderKeys } from "../hooks/useModelProviderKeys";
 
 export function Evaluate() {
   const { isOpen, onToggle, onClose } = useDisclosure();
@@ -63,6 +65,8 @@ export function Evaluate() {
 
 export function EvaluateModalContent({ onClose }: { onClose: () => void }) {
   const { project } = useOrganizationTeamProject();
+  const { hasProvidersWithoutCustomKeys, nodeProvidersWithoutCustomKeys } =
+    useModelProviderKeys();
   const {
     workflowId,
     getWorkflow,
@@ -304,11 +308,17 @@ export function EvaluateModalContent({ onClose }: { onClose: () => void }) {
             type="submit"
             leftIcon={<CheckSquare size={16} />}
             isLoading={evaluationState?.status === "waiting"}
+            isDisabled={hasProvidersWithoutCustomKeys}
           >
             {canSaveNewVersion ? "Save & Run Evaluation" : "Run Evaluation"}
           </Button>
         </HStack>
       </ModalFooter>
+      {hasProvidersWithoutCustomKeys && (
+        <AddModelProviderKey
+          nodeProvidersWithoutCustomKeys={nodeProvidersWithoutCustomKeys}
+        />
+      )}
     </ModalContent>
   );
 }
