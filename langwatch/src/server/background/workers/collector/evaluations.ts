@@ -2,7 +2,10 @@ import { EvaluationExecutionMode } from "@prisma/client";
 import crypto from "crypto";
 import slugify from "slugify";
 import type { EvaluatorTypes } from "../../../../server/evaluations/evaluators.generated";
-import { evaluatePreconditions } from "../../../../server/evaluations/preconditions";
+import {
+  evaluatePreconditions,
+  type PreconditionTrace,
+} from "../../../../server/evaluations/preconditions";
 import type { CheckPreconditions } from "../../../../server/evaluations/types";
 import { getDebugger } from "../../../../utils/logger";
 import { prisma } from "../../../db";
@@ -10,7 +13,7 @@ import type { ElasticSearchEvaluation } from "../../../tracer/types";
 import { type ElasticSearchTrace, type Span } from "../../../tracer/types";
 import { elasticSearchEvaluationSchema } from "../../../tracer/types.generated";
 import { scheduleTraceCheck } from "../../queues/traceChecksQueue";
-import type { CollectorJob } from "../../types";
+import type { CollectorJob, TraceCheckJob } from "../../types";
 
 const debug = getDebugger("langwatch:evaluations");
 
@@ -65,7 +68,7 @@ export const mapEvaluations = (
 };
 
 export const scheduleEvaluations = async (
-  trace: ElasticSearchTrace,
+  trace: TraceCheckJob["trace"] & PreconditionTrace,
   spans: Span[]
 ) => {
   const isOutputEmpty = !trace.output?.value;

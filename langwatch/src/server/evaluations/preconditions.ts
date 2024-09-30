@@ -3,16 +3,20 @@ import {
   type ElasticSearchTrace,
   type RAGSpan,
   type Span,
-  type Trace,
 } from "../tracer/types";
 import { getEvaluatorDefinitions } from "./getEvaluator";
 import type { CheckPreconditions } from "./types";
 import { extractRAGTextualContext } from "../background/workers/collector/rag";
 
+export type PreconditionTrace = Pick<
+  ElasticSearchTrace,
+  "input" | "output" | "metadata" | "expected_output"
+>;
+
 // TODO: write tests
 export function evaluatePreconditions(
   evaluatorType: string,
-  trace: Trace | ElasticSearchTrace,
+  trace: PreconditionTrace,
   spans: Span[],
   preconditions: CheckPreconditions
 ): boolean {

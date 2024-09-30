@@ -1,9 +1,14 @@
+import type { QueryDslBoolQuery } from "@elastic/elasticsearch/lib/api/types";
 import type { Project } from "@prisma/client";
 import * as Sentry from "@sentry/nextjs";
 import { Worker } from "bullmq";
-import type { CollectorJob } from "~/server/background/types";
+import type {
+  CollectorCheckAndAdjustJob,
+  CollectorJob,
+} from "~/server/background/types";
 import { env } from "../../../env.mjs";
 import { getDebugger } from "../../../utils/logger";
+import { flattenObjectKeys } from "../../api/utils";
 import { prisma } from "../../db";
 import { TRACE_INDEX, esClient, traceIndexId } from "../../elasticsearch";
 import { connection } from "../../redis";
@@ -15,7 +20,9 @@ import {
   type Span,
   type SpanInputOutput,
 } from "../../tracer/types";
+import { elasticSearchSpanToSpan } from "../../tracer/utils";
 import { COLLECTOR_QUEUE, collectorQueue } from "../queues/collectorQueue";
+import { mapEvaluations, scheduleEvaluations } from "./collector/evaluations";
 import {
   addGuardrailCosts,
   addLLMTokensCount,
@@ -25,10 +32,6 @@ import { cleanupPIIs } from "./collector/piiCheck";
 import { addInputAndOutputForRAGs } from "./collector/rag";
 import { scoreSatisfactionFromInput } from "./collector/satisfaction";
 import { getTraceInput, getTraceOutput } from "./collector/trace";
-import type { QueryDslBoolQuery } from "@elastic/elasticsearch/lib/api/types";
-import { mapEvaluations, scheduleEvaluations } from "./collector/evaluations";
-import { flattenObjectKeys } from "../../api/utils";
-import { elasticSearchSpanToSpan } from "../../tracer/utils";
 
 const debug = getDebugger("langwatch:workers:collectorWorker");
 
@@ -83,6 +86,16 @@ export const scheduleTraceCollectionWithFallback = async (
 };
 
 export const processCollectorJob = async (
+  id: string | undefined,
+  data: CollectorJob | CollectorCheckAndAdjustJob
+) => {
+  if ("action" in data && data.action === "check_and_adjust") {
+    return processCollectorCheckAndAdjustJob(id, data);
+  }
+  return processCollectorJob_(id, data as CollectorJob);
+};
+
+const processCollectorJob_ = async (
   id: string | undefined,
   data: CollectorJob
 ) => {
@@ -154,8 +167,8 @@ export const processCollectorJob = async (
 
   const allSpans = existingSpans.concat(spans);
   const [input, output] = await Promise.all([
-    getTraceInput(allSpans, project.id),
-    getTraceOutput(allSpans, project.id),
+    getTraceInput(allSpans, project.id, true),
+    getTraceOutput(allSpans, project.id, true),
   ]);
   const error = getLastOutputError(spans);
 
@@ -314,24 +327,131 @@ export const processCollectorJob = async (
     });
   }
 
+  void markProjectFirstMessage(project);
+
+  const job = await collectorQueue!.add(
+    "collector",
+    {
+      action: "check_and_adjust",
+      traceId,
+      projectId,
+    },
+    {
+      jobId: `collector_${traceId}_check_and_adjust`,
+      delay: 3000,
+    }
+  );
+
+  // Push it forward if two traces are processed at the same time
+  await job?.changeDelay(3000);
+};
+
+const processCollectorCheckAndAdjustJob = async (
+  id: string | undefined,
+  data: CollectorCheckAndAdjustJob
+) => {
+  debug(`Post-processing job ${id} with data:`, JSON.stringify(data, null, 2));
+
+  const { traceId, projectId } = data;
+  const existingTraceResponse = await esClient.search<ElasticSearchTrace>({
+    index: TRACE_INDEX.alias,
+    body: {
+      size: 1,
+      query: {
+        bool: {
+          must: [
+            { term: { trace_id: traceId } },
+            { term: { project_id: projectId } },
+          ] as QueryDslBoolQuery["must"],
+        } as QueryDslBoolQuery,
+      },
+      _source: [
+        "spans",
+        "timestamps.inserted_at",
+        "metadata",
+        "expected_output",
+      ],
+    },
+  });
+
+  const existingTrace = existingTraceResponse.hits.hits[0]?._source;
+  if (!existingTrace) {
+    return;
+  }
+
+  const spans = existingTrace.spans?.map(elasticSearchSpanToSpan) ?? [];
+  console.log("spans", JSON.stringify(spans, undefined, 2));
+  const [input, output] = await Promise.all([
+    getTraceInput(spans, projectId),
+    getTraceOutput(spans, projectId),
+  ]);
+  const error = getLastOutputError(spans);
+  console.log("input.value", input?.value);
+  console.log("output.value", output?.value);
+
+  const trace: Pick<
+    ElasticSearchTrace,
+    | "trace_id"
+    | "project_id"
+    | "input"
+    | "output"
+    | "error"
+    | "metadata"
+    | "expected_output"
+  > = {
+    trace_id: traceId,
+    project_id: projectId,
+    input,
+    output,
+    error,
+    metadata: existingTrace.metadata,
+    expected_output: existingTrace.expected_output,
+  };
+
+  await esClient.update({
+    index: TRACE_INDEX.alias,
+    id: traceIndexId({ traceId, projectId }),
+    retry_on_conflict: 10,
+    body: {
+      script: {
+        source: `
+          if (params.input != null) {
+            ctx._source.input = params.input;
+          }
+          if (params.output != null) {
+            ctx._source.output = params.output;
+          }
+          if (params.error != null) {
+            ctx._source.error = params.error;
+          }
+        `,
+        lang: "painless",
+        params: {
+          input: input ?? null,
+          output: output ?? null,
+          error: error ?? null,
+        },
+      },
+    },
+    refresh: true,
+  });
+
   // Does not re-schedule trace checks for too old traces being resynced
   if (
-    !existingTrace?.inserted_at ||
-    existingTrace.inserted_at > Date.now() - 30 * 1000
+    !existingTrace?.timestamps?.inserted_at ||
+    existingTrace.timestamps.inserted_at > Date.now() - 30 * 1000
   ) {
     void scheduleEvaluations(trace, spans);
   }
 
-  void markProjectFirstMessage(project);
-
   try {
     await scoreSatisfactionFromInput({
-      traceId: trace.trace_id,
-      projectId: trace.project_id,
-      input: trace.input,
+      traceId,
+      projectId,
+      input,
     });
   } catch {
-    debug("Failed to score satisfaction for", trace.trace_id);
+    debug("Failed to score satisfaction for", traceId);
   }
 };
 

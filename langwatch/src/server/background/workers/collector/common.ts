@@ -218,7 +218,7 @@ export const typedValueToText = (
       const json = typed.value as any;
 
       const value = stringIfSpecialKeys(json);
-      if (value) {
+      if (value !== undefined) {
         return value;
       }
 

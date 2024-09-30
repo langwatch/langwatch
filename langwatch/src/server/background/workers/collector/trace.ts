@@ -4,11 +4,12 @@ import { getFirstInputAsText, getLastOutputAsText } from "./common";
 
 export const getTraceInput = async (
   spans: Span[],
-  projectId: string
+  projectId: string,
+  skipEmbeddings = false
 ): Promise<Trace["input"]> => {
   const value = getFirstInputAsText(spans);
   let embeddings = undefined;
-  if (value) {
+  if (value && !skipEmbeddings) {
     try {
       embeddings = await getOpenAIEmbeddings(value, projectId);
     } catch (e) {
@@ -20,11 +21,12 @@ export const getTraceInput = async (
 
 export const getTraceOutput = async (
   spans: Span[],
-  projectId: string
+  projectId: string,
+  skipEmbeddings = false
 ): Promise<Trace["output"]> => {
   const value = getLastOutputAsText(spans);
   let embeddings = undefined;
-  if (value) {
+  if (value && !skipEmbeddings) {
     try {
       embeddings = await getOpenAIEmbeddings(value, projectId);
     } catch (e) {

@@ -56,3 +56,9 @@ export type CollectorJob = {
   };
   paramsMD5: string;
 };
+
+export type CollectorCheckAndAdjustJob = {
+  action: "check_and_adjust";
+  traceId: string;
+  projectId: string;
+};
