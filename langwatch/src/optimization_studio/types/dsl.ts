@@ -18,7 +18,7 @@ export type Field = {
     | "llm";
   optional?: boolean;
   defaultValue?: string;
-  description?: string;
+  desc?: string;
   prefix?: string;
   hidden?: boolean;
 };
@@ -77,6 +77,7 @@ export type LLMConfig = {
 export type Signature = BaseComponent & {
   prompt?: string;
   llm?: LLMConfig;
+  demonstrations?: Record<string, any>[];
 };
 
 export type Module = BaseComponent & {

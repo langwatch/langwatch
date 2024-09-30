@@ -6,7 +6,7 @@ export const OPTIMIZERS = {
     params: {
       max_bootstrapped_demos: 4,
       max_labeled_demos: 16,
-      max_rounds: 10,
+      max_rounds: 1,
     },
   },
   BootstrapFewShotWithRandomSearch: {
@@ -16,7 +16,7 @@ export const OPTIMIZERS = {
     params: {
       max_bootstrapped_demos: 4,
       max_labeled_demos: 16,
-      max_rounds: 10,
+      max_rounds: 1,
       num_candidate_programs: 10,
     },
   },

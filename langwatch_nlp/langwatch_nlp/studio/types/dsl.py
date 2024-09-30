@@ -24,7 +24,7 @@ class Field(BaseModel):
     type: FieldType
     optional: Optional[bool] = None
     defaultValue: Optional[str] = None
-    description: Optional[str] = None
+    desc: Optional[str] = None
     prefix: Optional[str] = None
     hidden: Optional[bool] = None
 
@@ -90,6 +90,7 @@ class LLMConfig(BaseModel):
 class Signature(BaseComponent):
     prompt: Optional[str] = None
     llm: Optional[LLMConfig] = None
+    demonstrations: Optional[List[Dict[str, Any]]] = None
 
 
 class Edge(BaseModel):

@@ -13,6 +13,7 @@ import {
   TabPanels,
   Tabs,
   Text,
+  useToast,
   VStack,
 } from "@chakra-ui/react";
 import { useState } from "react";
@@ -28,15 +29,22 @@ import { experimentSlugify } from "../../server/experiments/utils";
 import { api } from "../../utils/api";
 import { useEvaluationExecution } from "../hooks/useEvaluationExecution";
 import { useWorkflowStore } from "../hooks/useWorkflowStore";
-import { EvaluationProgressBar } from "./ProgressToast";
+import {
+  EvaluationProgressBar,
+  OptimizationProgressBar,
+} from "./ProgressToast";
 import {
   DSPyExperimentRunList,
+  DSPyExperimentSummary,
   DSPyRunsScoresChart,
   RunDetails,
   useDSPyExperimentState,
 } from "../../components/experiments/DSPyExperiment";
 import type { Experiment, Project } from "@prisma/client";
 import { useOptimizationExecution } from "../hooks/useOptimizationExecution";
+import type { AppliedOptimization } from "../../server/experiments/types";
+import type { Signature } from "../types/dsl";
+import type { Node } from "@xyflow/react";
 
 export function ResultsPanel({
   collapsePanel,
@@ -252,9 +260,15 @@ export function LoadedOptimizationResults({
   experiment: Experiment;
   project: Project;
 }) {
-  const { optimizationState } = useWorkflowStore(({ state }) => ({
-    optimizationState: state.optimization,
-  }));
+  const { optimizationState, nodes, setNodes, setOpenResultsPanelRequest } =
+    useWorkflowStore(
+      ({ state, nodes, setNodes, setOpenResultsPanelRequest }) => ({
+        optimizationState: state.optimization,
+        nodes,
+        setNodes,
+        setOpenResultsPanelRequest,
+      })
+    );
 
   const [selectedRuns, setSelectedRuns] = useState<string[]>(
     optimizationState?.run_id ? [optimizationState.run_id] : []
@@ -283,6 +297,82 @@ export function LoadedOptimizationResults({
   const { stopOptimizationExecution } = useOptimizationExecution();
 
   const optimizationStateRunId = optimizationState?.run_id;
+
+  const toast = useToast();
+
+  const onApplyOptimizations = (
+    appliedOptimizations: AppliedOptimization[]
+  ) => {
+    const appliedOptimizationsMap = Object.fromEntries(
+      appliedOptimizations.map((optimization) => [
+        optimization.id,
+        optimization,
+      ])
+    );
+    const matchingNodes = nodes.filter(
+      (node) => appliedOptimizationsMap[node.id]
+    );
+
+    console.log("appliedOptimizationsMap", appliedOptimizationsMap);
+    console.log("matchingNodes", matchingNodes);
+
+    setNodes(
+      nodes.map((node) => {
+        const optimization = appliedOptimizationsMap[node.id];
+        if (node.type === "signature" && optimization) {
+          const node_ = {
+            ...node,
+            // deep clone the node data
+            data: JSON.parse(JSON.stringify(node.data)),
+          } as Node<Signature>;
+          if (optimization.demonstrations) {
+            node_.data.demonstrations = optimization.demonstrations;
+          }
+          if (optimization.prompt) {
+            node_.data.prompt = optimization.prompt;
+          }
+          const optimizedFieldsByIdentifier = Object.fromEntries(
+            optimization.fields?.map((field) => [field.identifier, field]) ?? []
+          );
+          node_.data.inputs = node_.data.inputs?.map((input) => {
+            const optimizedField =
+              optimizedFieldsByIdentifier[input.identifier];
+            if (optimizedField && optimizedField.field_type === "input") {
+              return {
+                ...input,
+                ...optimizedField,
+              };
+            }
+            return input;
+          });
+          node_.data.outputs = node_.data.outputs?.map((output) => {
+            const optimizedField =
+              optimizedFieldsByIdentifier[output.identifier];
+            if (optimizedField && optimizedField.field_type === "output") {
+              return {
+                ...output,
+                ...optimizedField,
+              };
+            }
+            return output;
+          });
+          return node_;
+        }
+        return node;
+      })
+    );
+
+    setOpenResultsPanelRequest("closed");
+    toast({
+      title: "Optimizations Applied!",
+      description: `${matchingNodes.length} ${
+        matchingNodes.length === 1 ? "component was" : "components were"
+      } updated.`,
+      status: "success",
+      duration: 5000,
+      isClosable: true,
+    });
+  };
 
   return (
     <HStack align="start" width="full" height="full" spacing={0}>
@@ -346,8 +436,16 @@ export function LoadedOptimizationResults({
           )}
         </VStack>
         <Spacer />
-        {(selectedRuns.length === 0 ||
-          selectedRuns.includes(optimizationStateRunId ?? "")) &&
+        {runsById && selectedRuns_.length === 1 && (
+          <DSPyExperimentSummary
+            project={project}
+            experiment={experiment}
+            run={runsById[selectedRuns_[0]!]!}
+            onApply={onApplyOptimizations}
+          />
+        )}
+        {(selectedRuns_.length === 0 ||
+          selectedRuns_.includes(optimizationStateRunId ?? "")) &&
           optimizationStateRunId &&
           optimizationState?.status === "running" && (
             <HStack
@@ -359,7 +457,7 @@ export function LoadedOptimizationResults({
               <Text whiteSpace="nowrap" marginTop="-1px" paddingX={2}>
                 Running
               </Text>
-              <EvaluationProgressBar size="lg" />
+              <OptimizationProgressBar size="lg" />
               <Button
                 size="xs"
                 variant="ghost"

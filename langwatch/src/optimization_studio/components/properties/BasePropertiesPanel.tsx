@@ -200,14 +200,14 @@ export function PropertyFields({
                         icon={<></>}
                       >
                         <option value="str">str</option>
-                        <option value="float">float</option>
+                        {/* <option value="float">float</option>
                         <option value="int">int</option>
                         <option value="bool">bool</option>
                         <option value="list[str]">list[str]</option>
                         <option value="list[float]">list[float]</option>
                         <option value="list[int]">list[int]</option>
                         <option value="list[bool]">list[bool]</option>
-                        <option value="dict">dict</option>
+                        <option value="dict">dict</option> */}
                       </Select>
                     </>
                   ) : null}

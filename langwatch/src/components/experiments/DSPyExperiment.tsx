@@ -6,6 +6,8 @@ import {
   Card,
   CardBody,
   CardHeader,
+  Center,
+  Divider,
   HStack,
   Heading,
   Skeleton,
@@ -28,6 +30,9 @@ import {
   useTheme,
 } from "@chakra-ui/react";
 import type { Experiment, Project, WorkflowVersion } from "@prisma/client";
+import type { TRPCClientErrorLike } from "@trpc/client";
+import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
+import type { inferRouterOutputs } from "@trpc/server";
 import { useRouter } from "next/router";
 import numeral from "numeral";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
@@ -42,7 +47,11 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { VersionBox } from "../../optimization_studio/components/History";
+import type { AppRouter } from "../../server/api/root";
 import type {
+  AppliedOptimization,
+  AppliedOptimizationField,
   DSPyRunsSummary,
   DSPyStepSummary,
 } from "../../server/experiments/types";
@@ -50,14 +59,12 @@ import { api } from "../../utils/api";
 import { formatMoney } from "../../utils/formatMoney";
 import { formatTimeAgo } from "../../utils/formatTimeAgo";
 import { getColorForString } from "../../utils/rotatingColors";
+import { FeedbackLink } from "../FeedbackLink";
 import { MetadataTag } from "../MetadataTag";
 import { RenderInputOutput } from "../traces/RenderInputOutput";
-import { FeedbackLink } from "../FeedbackLink";
-import { VersionBox } from "../../optimization_studio/components/History";
-import type { TRPCClientErrorLike } from "@trpc/client";
-import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
-import type { inferRouterOutputs } from "@trpc/server";
-import type { AppRouter } from "../../server/api/root";
+import { titleCase } from "../../utils/stringCasing";
+import { FormatMoney } from "../../optimization_studio/components/FormatMoney";
+import { LLMIcon } from "../icons/LLMIcon";
 
 export function DSPyExperiment({
   project,
@@ -82,7 +89,7 @@ export function DSPyExperiment({
   } = useDSPyExperimentState({ project, experiment });
 
   return (
-    <HStack align="start" width="full" height="full">
+    <HStack align="start" width="full" height="full" spacing={0}>
       <DSPyExperimentRunList
         dspyRuns={dspyRuns}
         selectedRuns={selectedRuns}
@@ -90,74 +97,84 @@ export function DSPyExperiment({
         setHighlightedRun={setHighlightedRun}
         dspyRunsPlusIncoming={dspyRunsPlusIncoming}
       />
-      <VStack
-        align="start"
-        width="100%"
-        maxWidth="1200px"
-        spacing={8}
-        padding={6}
-      >
-        <HStack width="full" align="end">
-          <Heading as="h1" size="lg">
-            {experiment.name ?? experiment.slug}
-          </Heading>
-          <Spacer />
-          <FeedbackLink />
-        </HStack>
-        {dspyRuns.isLoading ? (
-          <Skeleton width="100%" height="30px" />
-        ) : dspyRuns.error ? (
-          <Alert status="error">
-            <AlertIcon />
-            Error loading experiment runs
-          </Alert>
-        ) : dspyRuns.data?.length === 0 ? (
-          <Text>Waiting for the first completed step to arrive...</Text>
-        ) : (
-          dspyRuns.data && (
-            <>
-              <Card width="100%">
-                <CardHeader>
-                  <Heading as="h2" size="md">
-                    {optimizerNames.length == 1
-                      ? optimizerNames[0]!
-                      : optimizerNames.length > 1
-                      ? "Multiple Optimizers"
-                      : "Waiting for the first completed step to arrive..."}
-                  </Heading>
-                </CardHeader>
-                <CardBody>
-                  <DSPyRunsScoresChart
-                    dspyRuns={dspyRuns.data}
-                    selectedPoint={selectedPoint}
-                    setSelectedPoint={setSelectedPoint}
-                    highlightedRun={highlightedRun}
-                    selectedRuns={selectedRuns}
-                    stepToDisplay={stepToDisplay}
-                    labelNames={labelNames}
-                  />
-                </CardBody>
-              </Card>
-              {stepToDisplay &&
-                (!highlightedRun ||
-                  highlightedRun === stepToDisplay.run_id) && (
-                  <Card width="100%">
-                    <CardBody padding={0}>
-                      <RunDetails
-                        project={project}
-                        experiment={experiment}
-                        dspyStepSummary={stepToDisplay}
-                        workflowVersion={
-                          runsById?.[stepToDisplay.run_id]?.workflow_version
-                        }
-                      />
-                    </CardBody>
-                  </Card>
-                )}
-            </>
-          )
+      <Box width="calc(100vw - 391px)" height="full" position="relative">
+        <VStack
+          align="start"
+          width="100%"
+          maxWidth="1200px"
+          height="full"
+          spacing={8}
+          padding={6}
+        >
+          <HStack width="full" align="end">
+            <Heading as="h1" size="lg">
+              {experiment.name ?? experiment.slug}
+            </Heading>
+            <Spacer />
+            <FeedbackLink />
+          </HStack>
+          {dspyRuns.isLoading ? (
+            <Skeleton width="100%" height="30px" />
+          ) : dspyRuns.error ? (
+            <Alert status="error">
+              <AlertIcon />
+              Error loading experiment runs
+            </Alert>
+          ) : dspyRuns.data?.length === 0 ? (
+            <Text>Waiting for the first completed step to arrive...</Text>
+          ) : (
+            dspyRuns.data && (
+              <>
+                <Card width="100%">
+                  <CardHeader>
+                    <Heading as="h2" size="md">
+                      {optimizerNames.length == 1
+                        ? optimizerNames[0]!
+                        : optimizerNames.length > 1
+                        ? "Multiple Optimizers"
+                        : "Waiting for the first completed step to arrive..."}
+                    </Heading>
+                  </CardHeader>
+                  <CardBody>
+                    <DSPyRunsScoresChart
+                      dspyRuns={dspyRuns.data}
+                      selectedPoint={selectedPoint}
+                      setSelectedPoint={setSelectedPoint}
+                      highlightedRun={highlightedRun}
+                      selectedRuns={selectedRuns}
+                      stepToDisplay={stepToDisplay}
+                      labelNames={labelNames}
+                    />
+                  </CardBody>
+                </Card>
+                {stepToDisplay &&
+                  (!highlightedRun ||
+                    highlightedRun === stepToDisplay.run_id) && (
+                    <Card width="100%">
+                      <CardBody padding={0}>
+                        <RunDetails
+                          project={project}
+                          experiment={experiment}
+                          dspyStepSummary={stepToDisplay}
+                          workflowVersion={
+                            runsById?.[stepToDisplay.run_id]?.workflow_version
+                          }
+                        />
+                      </CardBody>
+                    </Card>
+                  )}
+              </>
+            )
+          )}
+        </VStack>
+        {runsById && selectedRuns?.length === 1 && (
+          <DSPyExperimentSummary
+            project={project}
+            experiment={experiment}
+            run={runsById[selectedRuns[0]!]!}
+          />
         )}
-      </VStack>
+      </Box>
     </HStack>
   );
 }
@@ -388,16 +405,21 @@ export function DSPyExperimentRunList({
                   ? "gray.200"
                   : "gray.100",
               }}
-              onMouseEnter={() => {
-                if (!selectedRuns?.includes(run.runId)) {
-                  setHighlightedRun(run.runId);
-                }
-              }}
-              onMouseLeave={() => setHighlightedRun(null)}
+              // Remove this for now, maybe a bit akward UX
+              // onMouseEnter={() => {
+              //   if (!selectedRuns?.includes(run.runId)) {
+              //     setHighlightedRun(run.runId);
+              //   }
+              // }}
+              // onMouseLeave={() => setHighlightedRun(null)}
               onClick={(e) => {
                 e.stopPropagation();
                 e.preventDefault();
                 const isHoldingShift = e.shiftKey;
+
+                if (isHoldingShift) {
+                  document.getSelection()?.removeAllRanges();
+                }
 
                 setSelectedRuns?.(
                   selectedRuns?.includes(run.runId)
@@ -584,7 +606,11 @@ export const RunDetails = React.memo(
                 ).format("0a")}
               />
               <MetadataTag
-                label={dspyStepSummary.label}
+                label={
+                  dspyStepSummary.label === "score"
+                    ? "Step " + titleCase(dspyStepSummary.label)
+                    : titleCase(dspyStepSummary.label)
+                }
                 value={numeral(dspyStepSummary.score).format("0.[00]")}
               />
             </HStack>
@@ -592,6 +618,18 @@ export const RunDetails = React.memo(
         )}
         <Tabs index={tabIndex} onChange={setTabIndex} size={size} width="100%">
           <TabList position="relative">
+            {size === "sm" && (
+              <Center
+                height="31px"
+                marginBottom="-2px"
+                paddingX={4}
+                fontWeight={500}
+                color="gray.500"
+                background="gray.100"
+              >
+                <Text>Step {dspyStepSummary.index}</Text>
+              </Center>
+            )}
             {tabIndex === 0 && size !== "sm" && (
               <Box position="absolute" top={0} right={4}>
                 <HStack>
@@ -614,6 +652,42 @@ export const RunDetails = React.memo(
             <Tab>
               LLM Calls {dspyStep.data && `(${dspyStep.data.llm_calls.length})`}
             </Tab>
+            {size === "sm" && (
+              <>
+                <Spacer />
+                <HStack
+                  paddingX={4}
+                  color="gray.500"
+                  fontSize="12px"
+                  textTransform="uppercase"
+                >
+                  <Text>
+                    Step Cost:{" "}
+                    {formatMoney(
+                      {
+                        amount: dspyStepSummary.llm_calls_summary.total_cost,
+                        currency: "USD",
+                      },
+                      "$0.00[00]"
+                    )}
+                  </Text>
+                  <Divider orientation="vertical" />
+                  <Text>
+                    Step Tokens:{" "}
+                    {numeral(
+                      dspyStepSummary.llm_calls_summary.total_tokens
+                    ).format("0a")}
+                  </Text>
+                  <Divider orientation="vertical" />
+                  <Text>
+                    {dspyStepSummary.label === "score"
+                      ? "Step " + dspyStepSummary.label
+                      : dspyStepSummary.label}
+                    : {numeral(dspyStepSummary.score).format("0.[00]")}
+                  </Text>
+                </HStack>
+              </>
+            )}
           </TabList>
 
           <TabPanels>
@@ -644,7 +718,7 @@ export const RunDetails = React.memo(
                         Name
                       </Th>
                       <Th width="25%" paddingY={3}>
-                        Instructions
+                        Prompt
                       </Th>
                       <Th width="25%" paddingY={3}>
                         Signature
@@ -713,6 +787,7 @@ export const RunDetails = React.memo(
                                     shouldCollapse={(field) => {
                                       return field.type === "array";
                                     }}
+                                    displayObjectSize={true}
                                   />
                                 ) : (
                                   "-"
@@ -949,7 +1024,20 @@ function CollapsableSignature({
       </HStack>
       {isOpen && signature?.fields ? (
         <RenderInputOutput
-          value={JSON.stringify(signature.fields)}
+          value={JSON.stringify(
+            Object.fromEntries(
+              Object.entries(signature.fields).map(([key, value]) => {
+                return [
+                  key,
+                  Object.fromEntries(
+                    Object.entries(value as any).filter(
+                      ([key, value]) => key !== "__class__"
+                    )
+                  ),
+                ];
+              })
+            )
+          )}
           collapseStringsAfterLength={140}
           collapsed={false}
         />
@@ -1138,5 +1226,122 @@ export function DSPyRunsScoresChart({
         </LineChart>
       </ResponsiveContainer>
     </Box>
+  );
+}
+
+export function DSPyExperimentSummary({
+  project,
+  experiment,
+  run,
+  onApply,
+}: {
+  project: Project;
+  experiment: Experiment;
+  run: NonNullable<
+    UseTRPCQueryResult<
+      inferRouterOutputs<AppRouter>["experiments"]["getExperimentDSPyRuns"],
+      TRPCClientErrorLike<AppRouter>
+    >["data"]
+  >[number];
+  onApply?: (appliedOptimizations: AppliedOptimization[]) => void;
+}) {
+  const { totalCost, bestScore, bestScoreStepSummary, bestScoreLabel } =
+    useMemo(() => {
+      const totalCost = run.steps
+        ?.map((step) => step.llm_calls_summary.total_cost)
+        .reduce((acc, cost) => acc + cost, 0);
+      const bestScore = run.steps
+        ?.map((step) => step.score)
+        .reduce((acc, score) => (score > acc ? score : acc), 0);
+      const bestScoreStepSummary = run.steps?.find(
+        (step) => step.score === bestScore
+      );
+      const bestScoreLabel = bestScoreStepSummary?.label;
+
+      return { totalCost, bestScore, bestScoreStepSummary, bestScoreLabel };
+    }, [run]);
+
+  const bestScoreStep = api.experiments.getExperimentDSPyStep.useQuery(
+    {
+      projectId: project.id,
+      experimentSlug: experiment.slug,
+      runId: bestScoreStepSummary?.run_id ?? "",
+      index: bestScoreStepSummary?.index ?? "",
+    },
+    {
+      enabled: !!bestScoreStepSummary && !!onApply,
+    }
+  );
+
+  return (
+    <HStack
+      position="sticky"
+      left={0}
+      bottom={0}
+      width="100%"
+      background="white"
+      borderTop="1px solid"
+      borderColor="gray.200"
+      paddingY={4}
+      paddingX={6}
+      spacing={5}
+    >
+      <VStack align="start" spacing={1}>
+        <Text fontWeight="500" noOfLines={1}>
+          {!bestScoreLabel || bestScoreLabel === "score"
+            ? "Best Score"
+            : titleCase(bestScoreLabel)}
+        </Text>
+        <Text noOfLines={1} whiteSpace="nowrap">
+          {numeral(bestScore).format("0.[00]")}
+        </Text>
+      </VStack>
+      <Divider orientation="vertical" height="48px" />
+      <VStack align="start" spacing={1}>
+        <Text fontWeight="500" noOfLines={1}>
+          Total Cost
+        </Text>
+        <Text noOfLines={1} whiteSpace="nowrap">
+          <FormatMoney amount={totalCost} currency="USD" format="$0.00[00]" />
+        </Text>
+      </VStack>
+      <Spacer />
+      <Button
+        size="md"
+        colorScheme="green"
+        leftIcon={<LLMIcon />}
+        onClick={() => {
+          if (!bestScoreStep.data) return;
+          const appliedOptimizations: AppliedOptimization[] =
+            bestScoreStep.data.predictors.map((predictor) => {
+              const optimization: AppliedOptimization = {
+                id: predictor.name,
+                prompt: predictor.predictor.signature?.instructions,
+                fields: Object.entries(
+                  predictor.predictor.signature?.fields ?? {}
+                ).map(([key, value]: [string, any]) => {
+                  const field: AppliedOptimizationField = {
+                    identifier: key,
+                    field_type: value.field_type ?? "input",
+                    prefix: value.prefix,
+                    desc: value.desc,
+                  };
+
+                  return field;
+                }),
+                demonstrations: predictor.predictor.demos
+                  ?.map((demo: any) => demo._store)
+                  .filter(Boolean),
+              };
+              return optimization;
+            });
+          if (onApply) {
+            onApply(appliedOptimizations);
+          }
+        }}
+      >
+        Apply Optimizations
+      </Button>
+    </HStack>
   );
 }

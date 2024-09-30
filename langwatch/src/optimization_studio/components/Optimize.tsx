@@ -346,7 +346,7 @@ export function OptimizeModalContent({ onClose }: { onClose: () => void }) {
             </VStack>
           )}
         </HStack>
-        {"max_rounds" in optimizer.params && (
+        {/* {"max_rounds" in optimizer.params && (
           <VStack align="start" width="full" spacing={2}>
             <SmallLabel color="gray.600">Max Rounds</SmallLabel>
             <Input
@@ -356,7 +356,7 @@ export function OptimizeModalContent({ onClose }: { onClose: () => void }) {
               max={100}
             />
           </VStack>
-        )}
+        )} */}
       </ModalBody>
       <ModalFooter borderTop="1px solid" borderColor="gray.200" marginTop={4}>
         <HStack width="full">
