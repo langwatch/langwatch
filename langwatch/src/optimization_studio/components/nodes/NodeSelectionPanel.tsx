@@ -50,6 +50,7 @@ export const NodeSelectionPanel = ({
 }) => {
   const { propertiesExpanded } = useWorkflowStore((state) => ({
     propertiesExpanded: state.propertiesExpanded,
+    getWorkflow: state.getWorkflow,
   }));
 
   return (

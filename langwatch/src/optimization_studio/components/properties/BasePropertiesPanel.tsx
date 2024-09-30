@@ -332,7 +332,6 @@ export function BasePropertiesPanel({
                   fontSize={15}
                   marginLeft={1}
                   fontWeight={500}
-                  width="100%"
                   variant="outline"
                   background="transparent"
                   value={name ?? getNodeDisplayName(node)}
@@ -341,10 +340,10 @@ export function BasePropertiesPanel({
                   margin={0}
                   size="sm"
                   onBlur={() => {
+                    setIsEditingName(false);
                     if (name) {
                       handleNameChange(name, node.id);
                     }
-                    setIsEditingName(false);
                   }}
                   onChange={(e) => {
                     setName(e.target.value);
