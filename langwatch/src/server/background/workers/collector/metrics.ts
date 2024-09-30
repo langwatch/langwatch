@@ -18,7 +18,7 @@ export const computeTraceMetrics = (spans: Span[]): Trace["metrics"] => {
   let tokensEstimated = false;
   let totalCost: number | null = null;
 
-  spans.forEach((span) => {
+  (spans ?? []).forEach((span) => {
     if (
       earliestStartedAt === null ||
       span.timestamps.started_at < earliestStartedAt

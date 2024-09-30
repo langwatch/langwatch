@@ -20,10 +20,23 @@ import { startCollectorWorker } from "./workers/collectorWorker";
 
 import * as Sentry from "@sentry/node";
 
+class WorkersRestart extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "WorkersRestart";
+  }
+}
+
 if (process.env.SENTRY_DSN) {
   Sentry.init({
     dsn: process.env.SENTRY_DSN,
     tracesSampleRate: 1.0,
+    beforeSend(event, hint) {
+      if (hint.originalException instanceof WorkersRestart) {
+        return null;
+      }
+      return event;
+    },
   });
 }
 
@@ -70,7 +83,7 @@ export const start = (
           ]);
 
           setTimeout(() => {
-            throw new Error("Max runtime reached, restarting worker");
+            throw new WorkersRestart("Max runtime reached, restarting worker");
           }, 0);
         })();
       }, maxRuntimeMs);
