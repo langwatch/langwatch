@@ -22,7 +22,6 @@ os.environ["AZURE_API_VERSION"] = "2024-02-01"
 
 @retry(wait=wait_exponential(min=12, max=60), stop=stop_after_attempt(4))
 def generate_topic_names(
-    model: str,
     litellm_params: dict[str, str],
     topic_examples: list[list[str]],
     existing: Optional[list[str]] = None,
@@ -127,9 +126,7 @@ def generate_topic_names_split(
 
         if batch_len >= split_point:
             try:
-                result, cost_ = generate_topic_names(
-                    model, litellm_params, batch, existing
-                )
+                result, cost_ = generate_topic_names(litellm_params, batch, existing)
                 cost["amount"] += cost_["amount"]
                 results += result
             except Exception as e:
@@ -138,7 +135,7 @@ def generate_topic_names_split(
 
     if len(batch) > 0:
         try:
-            result, cost_ = generate_topic_names(model, litellm_params, batch, existing)
+            result, cost_ = generate_topic_names(litellm_params, batch, existing)
             cost["amount"] += cost_["amount"]
             results += result
         except Exception as e:
@@ -185,12 +182,14 @@ def improve_similar_names(
     if len(topic_names) != len(topic_examples):
         raise ValueError("topic_names and topic_examples must have the same length.")
 
-    # Temporary until text-embedding-3-small is also available on azure: https://learn.microsoft.com/en-us/answers/questions/1531681/openai-new-embeddings-model
-    response = litellm.embedding(
-        **embeddings_litellm_params,  # type: ignore
-        input=[name if name else "" for name in topic_names],
-    )
-    embeddings = [data["embedding"] for data in response.data or []]
+    embeddings = []
+    for name in topic_names:
+        response = litellm.embedding(
+            **embeddings_litellm_params,  # type: ignore
+            input=name if name else "",
+        )
+        if response.data:
+            embeddings.append(response.data[0]["embedding"])
 
     # find the two closest embeddings
     closest_distance = float("inf")
