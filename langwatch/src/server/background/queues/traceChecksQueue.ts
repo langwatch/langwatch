@@ -5,8 +5,11 @@ import { captureError } from "../../../utils/captureError";
 import { esClient, TRACE_INDEX, traceIndexId } from "../../elasticsearch";
 import { connection } from "../../redis";
 import type { ElasticSearchEvaluation } from "../../tracer/types";
+import { getDebugger } from "../../../utils/logger";
 
 export const TRACE_CHECKS_QUEUE_NAME = "evaluations";
+
+const debug = getDebugger("langwatch:evaluations:queue");
 
 export const traceChecksQueue =
   connection &&
@@ -51,9 +54,15 @@ export const scheduleTraceCheck = async ({
   if (currentJob) {
     const state = await currentJob.getState();
     if (state == "failed") {
+      debug(
+        `retrying ${check.type} (checkId: ${check.evaluator_id}) for trace ${trace.trace_id}`
+      );
       await currentJob.retry(state);
     }
   } else {
+    debug(
+      `scheduling ${check.type} (checkId: ${check.evaluator_id}) for trace ${trace.trace_id}`
+    );
     await traceChecksQueue?.add(
       check.type,
       {

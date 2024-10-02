@@ -15,8 +15,6 @@ import { elasticSearchEvaluationSchema } from "../../../tracer/types.generated";
 import { scheduleTraceCheck } from "../../queues/traceChecksQueue";
 import type { CollectorJob, TraceCheckJob } from "../../types";
 
-const debug = getDebugger("langwatch:evaluations");
-
 export const evaluationNameAutoslug = (name: string) => {
   const autoslug = slugify(name || "unnamed", {
     lower: true,
@@ -100,9 +98,6 @@ export const scheduleEvaluations = async (
         preconditions
       );
       if (preconditionsMet) {
-        debug(
-          `scheduling ${check.checkType} (checkId: ${check.id}) for trace ${trace.trace_id}`
-        );
         traceChecksSchedulings.push(
           scheduleTraceCheck({
             check: {
