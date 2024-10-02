@@ -691,12 +691,7 @@ export const RunDetails = React.memo(
           </TabList>
 
           <TabPanels>
-            <TabPanel
-              padding={0}
-              paddingTop={displayRawParams ? 4 : 0}
-              maxHeight="calc(100vh - 160px)"
-              overflowY="auto"
-            >
+            <TabPanel padding={0} paddingTop={displayRawParams ? 4 : 0}>
               {dspyStep.isLoading ? (
                 <Skeleton width="100%" height="30px" />
               ) : dspyStep.error ? (
@@ -802,11 +797,7 @@ export const RunDetails = React.memo(
                 </Table>
               ) : null}
             </TabPanel>
-            <TabPanel
-              padding={0}
-              maxHeight="calc(100vh - 160px)"
-              overflowY="auto"
-            >
+            <TabPanel padding={0}>
               {tabIndex === 1 && (
                 <Table size={size === "sm" ? "xs" : "sm"} variant="grid">
                   <Thead>
@@ -889,11 +880,7 @@ export const RunDetails = React.memo(
                 </Table>
               )}
             </TabPanel>
-            <TabPanel
-              padding={0}
-              maxHeight="calc(100vh - 160px)"
-              overflowY="auto"
-            >
+            <TabPanel padding={0}>
               <Table size={size === "sm" ? "xs" : "sm"} variant="grid">
                 <Thead>
                   <Tr>
@@ -1237,23 +1224,25 @@ export function DSPyExperimentSummary({
 }: {
   project: Project;
   experiment: Experiment;
-  run: NonNullable<
-    UseTRPCQueryResult<
-      inferRouterOutputs<AppRouter>["experiments"]["getExperimentDSPyRuns"],
-      TRPCClientErrorLike<AppRouter>
-    >["data"]
-  >[number];
+  run:
+    | NonNullable<
+        UseTRPCQueryResult<
+          inferRouterOutputs<AppRouter>["experiments"]["getExperimentDSPyRuns"],
+          TRPCClientErrorLike<AppRouter>
+        >["data"]
+      >[number]
+    | undefined;
   onApply?: (appliedOptimizations: AppliedOptimization[]) => void;
 }) {
   const { totalCost, bestScore, bestScoreStepSummary, bestScoreLabel } =
     useMemo(() => {
-      const totalCost = run.steps
+      const totalCost = run?.steps
         ?.map((step) => step.llm_calls_summary.total_cost)
         .reduce((acc, cost) => acc + cost, 0);
-      const bestScore = run.steps
+      const bestScore = run?.steps
         ?.map((step) => step.score)
         .reduce((acc, score) => (score > acc ? score : acc), 0);
-      const bestScoreStepSummary = run.steps?.find(
+      const bestScoreStepSummary = run?.steps?.find(
         (step) => step.score === bestScore
       );
       const bestScoreLabel = bestScoreStepSummary?.label;
@@ -1302,46 +1291,52 @@ export function DSPyExperimentSummary({
           Total Cost
         </Text>
         <Text noOfLines={1} whiteSpace="nowrap">
-          <FormatMoney amount={totalCost} currency="USD" format="$0.00[00]" />
+          {run && totalCost ? (
+            <FormatMoney amount={totalCost} currency="USD" format="$0.00[00]" />
+          ) : (
+            "-"
+          )}
         </Text>
       </VStack>
       <Spacer />
-      <Button
-        size="md"
-        colorScheme="green"
-        leftIcon={<LLMIcon />}
-        onClick={() => {
-          if (!bestScoreStep.data) return;
-          const appliedOptimizations: AppliedOptimization[] =
-            bestScoreStep.data.predictors.map((predictor) => {
-              const optimization: AppliedOptimization = {
-                id: predictor.name,
-                prompt: predictor.predictor.signature?.instructions,
-                fields: Object.entries(
-                  predictor.predictor.signature?.fields ?? {}
-                ).map(([key, value]: [string, any]) => {
-                  const field: AppliedOptimizationField = {
-                    identifier: key,
-                    field_type: value.field_type ?? "input",
-                    prefix: value.prefix,
-                    desc: value.desc,
-                  };
+      {bestScoreStep.data && (
+        <Button
+          size="md"
+          colorScheme="green"
+          leftIcon={<LLMIcon />}
+          onClick={() => {
+            if (!bestScoreStep.data) return;
+            const appliedOptimizations: AppliedOptimization[] =
+              bestScoreStep.data.predictors.map((predictor) => {
+                const optimization: AppliedOptimization = {
+                  id: predictor.name,
+                  prompt: predictor.predictor.signature?.instructions,
+                  fields: Object.entries(
+                    predictor.predictor.signature?.fields ?? {}
+                  ).map(([key, value]: [string, any]) => {
+                    const field: AppliedOptimizationField = {
+                      identifier: key,
+                      field_type: value.field_type ?? "input",
+                      prefix: value.prefix,
+                      desc: value.desc,
+                    };
 
-                  return field;
-                }),
-                demonstrations: predictor.predictor.demos
-                  ?.map((demo: any) => demo._store)
-                  .filter(Boolean),
-              };
-              return optimization;
-            });
-          if (onApply) {
-            onApply(appliedOptimizations);
-          }
-        }}
-      >
-        Apply Optimizations
-      </Button>
+                    return field;
+                  }),
+                  demonstrations: predictor.predictor.demos
+                    ?.map((demo: any) => demo._store)
+                    .filter(Boolean),
+                };
+                return optimization;
+              });
+            if (onApply) {
+              onApply(appliedOptimizations);
+            }
+          }}
+        >
+          Apply Optimizations
+        </Button>
+      )}
     </HStack>
   );
 }

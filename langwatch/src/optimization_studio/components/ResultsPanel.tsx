@@ -313,9 +313,6 @@ export function LoadedOptimizationResults({
       (node) => appliedOptimizationsMap[node.id]
     );
 
-    console.log("appliedOptimizationsMap", appliedOptimizationsMap);
-    console.log("matchingNodes", matchingNodes);
-
     setNodes(
       nodes.map((node) => {
         const optimization = appliedOptimizationsMap[node.id];
@@ -440,12 +437,12 @@ export function LoadedOptimizationResults({
           <DSPyExperimentSummary
             project={project}
             experiment={experiment}
-            run={runsById[selectedRuns_[0]!]!}
+            run={runsById[selectedRuns_[0]!]}
             onApply={onApplyOptimizations}
           />
         )}
-        {(selectedRuns_.length === 0 ||
-          selectedRuns_.includes(optimizationStateRunId ?? "")) &&
+        {(selectedRuns.length === 0 ||
+          selectedRuns.includes(optimizationStateRunId ?? "")) &&
           optimizationStateRunId &&
           optimizationState?.status === "running" && (
             <HStack

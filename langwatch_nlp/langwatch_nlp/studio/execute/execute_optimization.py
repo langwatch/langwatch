@@ -123,7 +123,7 @@ async def execute_optimization(
 
         optimized_program = optimizer.compile(module, trainset=train)
 
-        print("\n\noptimized_program", optimized_program, "\n\n")
+        # print("\n\noptimized_program", optimized_program, "\n\n")
 
         ## optimize
 

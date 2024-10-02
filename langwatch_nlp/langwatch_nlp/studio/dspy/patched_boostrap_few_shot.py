@@ -26,12 +26,14 @@ class ExampleWithEntryMap(dspy.Example):
                 field.identifier for field in (target.data.outputs or [])
             ]
             all_outputs_presents = all(key in all_keys for key in target_output_keys)
+            if not all_outputs_presents:
+                continue
 
-            if all_outputs_presents and edge.target not in self._map:
-                self._map[edge.target] = {}
-                self._map[edge.target][edge.sourceHandle.split(".")[-1]] = (
-                    edge.targetHandle.split(".")[-1]
-                )
+            if edge.target not in self._map:
+                self._map[edge.target] = {k: k for k in target_output_keys}
+            self._map[edge.target][edge.sourceHandle.split(".")[-1]] = (
+                edge.targetHandle.split(".")[-1]
+            )
 
         return self
 
