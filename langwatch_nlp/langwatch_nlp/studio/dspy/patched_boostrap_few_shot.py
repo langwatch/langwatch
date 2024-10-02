@@ -12,11 +12,23 @@ class ExampleWithEntryMap(dspy.Example):
         self._map = {}
 
     def with_map_from_workflow(self, workflow):
+        all_keys = self.inputs().keys() + self.labels().keys()
         for edge in workflow.edges:
             source = get_node_by_id(workflow, edge.source)
-            if source and isinstance(source.data, Entry):
-                if edge.target not in self._map:
-                    self._map[edge.target] = {}
+            if not source or not isinstance(source.data, Entry):
+                continue
+
+            target = get_node_by_id(workflow, edge.target)
+            if not target:
+                continue
+
+            target_output_keys = [
+                field.identifier for field in (target.data.outputs or [])
+            ]
+            all_outputs_presents = all(key in all_keys for key in target_output_keys)
+
+            if all_outputs_presents and edge.target not in self._map:
+                self._map[edge.target] = {}
                 self._map[edge.target][edge.sourceHandle.split(".")[-1]] = (
                     edge.targetHandle.split(".")[-1]
                 )

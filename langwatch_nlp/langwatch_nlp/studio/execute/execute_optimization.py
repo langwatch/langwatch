@@ -7,7 +7,7 @@ from langwatch_nlp.studio.dspy.evaluation import (
     EvaluationReporting,
     PredictionWithEvaluationAndMetadata,
 )
-from langwatch_nlp.studio.dspy.patched_labeled_few_shot import ExampleWithEntryMap
+from langwatch_nlp.studio.dspy.patched_boostrap_few_shot import ExampleWithEntryMap
 from langwatch_nlp.studio.dspy.workflow_module import (
     WorkflowModule,
 )
