@@ -19,7 +19,7 @@ export const traceChecksQueue =
       },
       attempts: 3,
       removeOnComplete: {
-        age: 0, // immediately remove completed jobs
+        age: 60 * 60, // Remove in 1 hour to prevent accidental reruns
       },
       removeOnFail: {
         age: 60 * 60 * 24 * 3, // 3 days
@@ -50,7 +50,7 @@ export const scheduleTraceCheck = async ({
   const currentJob = await traceChecksQueue?.getJob(jobId);
   if (currentJob) {
     const state = await currentJob.getState();
-    if (state == "completed" || state == "failed") {
+    if (state == "failed") {
       await currentJob.retry(state);
     }
   } else {

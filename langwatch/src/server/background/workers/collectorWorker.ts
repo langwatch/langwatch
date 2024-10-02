@@ -388,14 +388,11 @@ const processCollectorCheckAndAdjustJob = async (
   }
 
   const spans = existingTrace.spans?.map(elasticSearchSpanToSpan) ?? [];
-  console.log("spans", JSON.stringify(spans, undefined, 2));
   const [input, output] = await Promise.all([
     getTraceInput(spans, projectId),
     getTraceOutput(spans, projectId),
   ]);
   const error = getLastOutputError(spans);
-  console.log("input.value", input?.value);
-  console.log("output.value", output?.value);
 
   const trace: Pick<
     ElasticSearchTrace,
