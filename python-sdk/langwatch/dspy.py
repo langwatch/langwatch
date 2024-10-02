@@ -666,7 +666,11 @@ class DSPyTracer:
         for lm in language_model_classes:
             if not hasattr(lm, "__original_basic_request__"):
                 lm.__original_basic_request__ = lm.basic_request  # type: ignore
-                lm.basic_request = self.patched_language_model_request()
+                lm.basic_request = self.patched_legacy_language_model_request()
+
+        if not hasattr(dspy.LM, "__original_call__"):
+            dspy.LM.__original_call__ = dspy.LM.__call__  # type: ignore
+            dspy.LM.__call__ = self.patched_language_model_call()
 
         retrieve_classes = dspy.Retrieve.__subclasses__()
         for retrieve in retrieve_classes:
@@ -734,7 +738,48 @@ class DSPyTracer:
 
         return forward
 
-    def patched_language_model_request(self):
+    def patched_language_model_call(self):
+        self_ = self
+
+        @langwatch.span(ignore_missing_trace_warning=True, type="llm")
+        def call(self: dspy.LM, prompt=None, messages=None, **kwargs):
+            all_kwargs = self.kwargs | kwargs
+            model = self.model
+            params = {}
+            if "temperature" in all_kwargs:
+                params["temperature"] = all_kwargs["temperature"]
+            if "max_tokens" in all_kwargs:
+                params["max_tokens"] = all_kwargs["max_tokens"]
+
+            span = self_.safe_get_current_span()
+            if span:
+                span.update(
+                    name=model,
+                    model=model,
+                    input=(
+                        messages if messages else [{"role": "user", "content": prompt}]
+                    ),
+                    params=params,
+                )
+
+            result = self.__class__.__original_call__(self, prompt, messages, **kwargs)  # type: ignore
+
+            span.update(output=result)
+
+            history = self.history[-1] if len(self.history) > 0 else None
+            if history and "usage" in history:
+                span.update(
+                    metrics={
+                        "completion_tokens": history["usage"]["completion_tokens"],
+                        "prompt_tokens": history["usage"]["prompt_tokens"],
+                    }
+                )
+
+            return result
+
+        return call
+
+    def patched_legacy_language_model_request(self):
         self_ = self
 
         @langwatch.span(ignore_missing_trace_warning=True, type="llm")

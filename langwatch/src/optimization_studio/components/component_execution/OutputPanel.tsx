@@ -53,17 +53,17 @@ export const OutputPanel = ({ node }: { node: Node<Component> }) => {
             (node.data.execution_state?.status === "success" ||
               node.data.execution_state?.status === "error") && (
               <HStack spacing={3}>
-                {node.data.execution_state.cost && (
+                {node.data.execution_state.cost !== undefined && (
                   <Text color="gray.500">
                     {numeral(node.data.execution_state.cost).format(
-                      "$0.00000a"
+                      "$0.00[000]a"
                     )}
                   </Text>
                 )}
                 {node.data.execution_state.timestamps.started_at &&
                 node.data.execution_state.timestamps.finished_at ? (
                   <>
-                    {node.data.execution_state.cost && (
+                    {node.data.execution_state.cost !== undefined && (
                       <Text color="gray.400">·</Text>
                     )}
                     <SpanDuration

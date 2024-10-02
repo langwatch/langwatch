@@ -119,7 +119,7 @@ export const InputPanel = ({ node }: { node: Node<Component> }) => {
             <HorizontalFormControl
               key={input.identifier}
               label={input.identifier}
-              helper={input.desc ?? ""}
+              helper={""}
               isInvalid={!!errors[input.identifier]}
             >
               <Textarea {...register(input.identifier)} />

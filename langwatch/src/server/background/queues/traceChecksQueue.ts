@@ -53,7 +53,7 @@ export const scheduleTraceCheck = async ({
   const currentJob = await traceChecksQueue?.getJob(jobId);
   if (currentJob) {
     const state = await currentJob.getState();
-    if (state == "failed") {
+    if (state == "failed" || state == "completed") {
       debug(
         `retrying ${check.type} (checkId: ${check.evaluator_id}) for trace ${trace.trace_id}`
       );
