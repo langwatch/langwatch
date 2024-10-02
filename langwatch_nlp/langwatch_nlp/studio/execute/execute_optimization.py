@@ -7,6 +7,7 @@ from langwatch_nlp.studio.dspy.evaluation import (
     EvaluationReporting,
     PredictionWithEvaluationAndMetadata,
 )
+from langwatch_nlp.studio.dspy.patched_labeled_few_shot import ExampleWithEntryMap
 from langwatch_nlp.studio.dspy.workflow_module import (
     WorkflowModule,
 )
@@ -90,7 +91,9 @@ async def execute_optimization(
 
         input_keys = get_input_keys(workflow)
         examples = [
-            dspy.Example(_index=index, **entry).with_inputs(*input_keys)
+            ExampleWithEntryMap(_index=index, **entry)
+            .with_inputs(*input_keys)
+            .with_map_from_workflow(workflow)
             for index, entry in enumerate(entries)
         ]
 
