@@ -5,8 +5,11 @@ import { captureError } from "../../../utils/captureError";
 import { esClient, TRACE_INDEX, traceIndexId } from "../../elasticsearch";
 import { connection } from "../../redis";
 import type { ElasticSearchEvaluation } from "../../tracer/types";
+import { getDebugger } from "../../../utils/logger";
 
 export const TRACE_CHECKS_QUEUE_NAME = "evaluations";
+
+const debug = getDebugger("langwatch:evaluations:queue");
 
 export const traceChecksQueue =
   connection &&
@@ -19,7 +22,7 @@ export const traceChecksQueue =
       },
       attempts: 3,
       removeOnComplete: {
-        age: 0, // immediately remove completed jobs
+        age: 60 * 60, // Remove in 1 hour to prevent accidental reruns
       },
       removeOnFail: {
         age: 60 * 60 * 24 * 3, // 3 days
@@ -50,10 +53,16 @@ export const scheduleTraceCheck = async ({
   const currentJob = await traceChecksQueue?.getJob(jobId);
   if (currentJob) {
     const state = await currentJob.getState();
-    if (state == "completed" || state == "failed") {
+    if (state == "failed") {
+      debug(
+        `retrying ${check.type} (checkId: ${check.evaluator_id}) for trace ${trace.trace_id}`
+      );
       await currentJob.retry(state);
     }
   } else {
+    debug(
+      `scheduling ${check.type} (checkId: ${check.evaluator_id}) for trace ${trace.trace_id}`
+    );
     await traceChecksQueue?.add(
       check.type,
       {

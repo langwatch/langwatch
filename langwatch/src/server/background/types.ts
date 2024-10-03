@@ -1,6 +1,7 @@
 import type { EvaluatorTypes } from "../../server/evaluations/evaluators.generated";
 import type {
   CustomMetadata,
+  ElasticSearchSpan,
   ElasticSearchTrace,
   ReservedTraceMetadata,
   RESTEvaluation,
@@ -54,4 +55,10 @@ export type CollectorJob = {
     existing_metadata?: ElasticSearchTrace["metadata"];
   };
   paramsMD5: string;
+};
+
+export type CollectorCheckAndAdjustJob = {
+  action: "check_and_adjust";
+  traceId: string;
+  projectId: string;
 };

@@ -177,3 +177,25 @@ export function EvaluationProgressBar({
     </HStack>
   );
 }
+
+export function OptimizationProgressBar({
+  size = "xs",
+}: {
+  size?: "xs" | "sm" | "md" | "lg";
+}) {
+  const isIndeterminate = true;
+
+  return (
+    <HStack width="full" spacing={4}>
+      <Progress
+        size={size}
+        width="full"
+        colorScheme="blue"
+        isIndeterminate={isIndeterminate}
+        isAnimated
+        borderRadius="sm"
+        hasStripe
+      />
+    </HStack>
+  );
+}

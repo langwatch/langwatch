@@ -18,7 +18,7 @@ export type Field = {
     | "llm";
   optional?: boolean;
   defaultValue?: string;
-  description?: string;
+  desc?: string;
   prefix?: string;
   hidden?: boolean;
 };
@@ -77,6 +77,7 @@ export type LLMConfig = {
 export type Signature = BaseComponent & {
   prompt?: string;
   llm?: LLMConfig;
+  demonstrations?: Record<string, any>[];
 };
 
 export type Module = BaseComponent & {
@@ -148,6 +149,7 @@ export type Workflow = {
       timestamps?: {
         started_at?: number;
         finished_at?: number;
+        stopped_at?: number;
       };
     };
     optimization?: {
@@ -158,6 +160,7 @@ export type Workflow = {
       timestamps?: {
         started_at?: number;
         finished_at?: number;
+        stopped_at?: number;
       };
     };
   };

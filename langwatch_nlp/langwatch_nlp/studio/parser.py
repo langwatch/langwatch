@@ -9,14 +9,14 @@ import dspy
 def parse_component(node: Node, workflow: Workflow) -> type[dspy.Module]:
     match node.type:
         case "signature":
-            return parse_signature(node.data, workflow)
+            return parse_signature(node.id, node.data, workflow)
         case "evaluator":
             return parse_evaluator(node.data)
         case _:
             raise NotImplementedError(f"Unknown component type: {node.type}")
 
 
-def parse_signature(component: Signature, workflow: Workflow) -> type[dspy.Module]:
+def parse_signature(node_id: str, component: Signature, workflow: Workflow) -> type[dspy.Module]:
     class_name = component.name or "AnonymousSignature"
 
     # Create a dictionary to hold the class attributes
@@ -59,6 +59,7 @@ def parse_signature(component: Signature, workflow: Workflow) -> type[dspy.Modul
     def __init__(self, *args, **kwargs) -> None:
         PredictWithMetadata.__init__(self, SignatureClass)
         self.set_lm(lm=lm)
+        self._node_id = node_id
 
     def reset(self) -> None:
         PredictWithMetadata.reset(self)

@@ -18,7 +18,10 @@ from langwatch_nlp.studio.execute.execute_evaluation import (
     execute_evaluation,
 )
 from langwatch_nlp.studio.execute.execute_flow import execute_flow
-from langwatch_nlp.studio.execute.execute_optimization import execute_optimization
+from langwatch_nlp.studio.execute.execute_optimization import (
+    error_optimization_event,
+    execute_optimization,
+)
 from langwatch_nlp.studio.process_pool import IsolatedProcessPool
 from langwatch_nlp.studio.types.events import (
     Debug,
@@ -27,6 +30,7 @@ from langwatch_nlp.studio.types.events import (
     IsAliveResponse,
     StopEvaluationExecution,
     StopExecution,
+    StopOptimizationExecution,
     StudioClientEvent,
     StudioServerEvent,
     Error,
@@ -169,6 +173,16 @@ async def execute_event_on_a_subprocess(event: StudioClientEvent):
             yield error_evaluation_event(
                 run_id=event.payload.run_id,
                 error="Evaluation Stopped",
+                stopped_at=int(time.time() * 1000),
+            )
+        return
+
+    if isinstance(event, StopOptimizationExecution):
+        if event.payload.run_id in running_processes:
+            await stop_process(event.payload.run_id)
+            yield error_optimization_event(
+                run_id=event.payload.run_id,
+                error="Optimization Stopped",
                 stopped_at=int(time.time() * 1000),
             )
         return

@@ -44,7 +44,7 @@ def get_embedding(text: str, embeddings_litellm_params: dict[str, str]) -> list[
     text = text.replace("\n", " ")
 
     response = litellm.embedding(
-        input=[text], **embeddings_litellm_params  # type: ignore
+        input=text, **embeddings_litellm_params  # type: ignore
     )
 
     data = response.data

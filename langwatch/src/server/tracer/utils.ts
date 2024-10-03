@@ -120,7 +120,8 @@ export const elasticSearchToTypedValue = (
   try {
     return {
       type: typed.type,
-      value: JSON.parse(typed.value),
+      value:
+        typeof typed.value === "string" ? JSON.parse(typed.value) : typed.value,
     } as any;
   } catch (e) {
     return {

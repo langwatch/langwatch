@@ -59,7 +59,8 @@ async def main(message: cl.Message):
         config=RunnableConfig(
             callbacks=[
                 cl.LangchainCallbackHandler(),
-            ]
+            ],
+            metadata={"user_id": "123", "thread_id": "789", "customer_id": "456"},
         ),
     ):
         await msg.stream_token(chunk)

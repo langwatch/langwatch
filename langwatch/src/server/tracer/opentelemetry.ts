@@ -18,6 +18,8 @@ import type {
   TypedValueChatMessages,
 } from "./types";
 import {
+  customMetadataSchema,
+  reservedTraceMetadataSchema,
   spanTypesSchema,
   typedValueChatMessagesSchema,
 } from "./types.generated";
@@ -280,6 +282,46 @@ const addOpenTelemetrySpanAsSpan = (
             type: "json",
             value: attributesMap.traceloop.entity.input,
           };
+
+    // Check for langchain metadata inside traceloop https://github.com/traceloop/openllmetry/issues/1783
+    const json = attributesMap.traceloop.entity.input;
+    if (
+      input.type === "json" &&
+      typeof json === "object" &&
+      json !== null &&
+      "metadata" in json
+    ) {
+      // @ts-ignore
+      const metadata = json.metadata;
+      const reservedTraceMetadata = Object.fromEntries(
+        Object.entries(reservedTraceMetadataSchema.parse(metadata)).filter(
+          ([_key, value]) => value !== null && value !== undefined
+        )
+      );
+      const remainingMetadata = Object.fromEntries(
+        Object.entries(metadata).filter(
+          ([key]) => !(key in reservedTraceMetadataSchema.shape)
+        )
+      );
+      const customMetadata = customMetadataSchema.parse(remainingMetadata);
+
+      if (Object.keys(reservedTraceMetadata).length > 0) {
+        trace.reservedTraceMetadata = {
+          ...trace.reservedTraceMetadata,
+          ...reservedTraceMetadata,
+        };
+      }
+
+      if (Object.keys(customMetadata).length > 0) {
+        trace.customMetadata = {
+          ...trace.customMetadata,
+          ...customMetadata,
+        };
+      }
+
+      // @ts-ignore
+      delete json.metadata;
+    }
     delete attributesMap.traceloop.entity.input;
   }
 

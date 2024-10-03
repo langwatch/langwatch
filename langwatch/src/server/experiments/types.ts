@@ -143,3 +143,17 @@ export type ESBatchEvaluationRESTParams = Omit<
     stopped_at?: number | null;
   };
 };
+
+export type AppliedOptimization = {
+  id: string;
+  prompt?: string;
+  fields?: AppliedOptimizationField[];
+  demonstrations?: Record<string, any>[];
+};
+
+export type AppliedOptimizationField = {
+  identifier: string;
+  field_type: "input" | "output";
+  prefix?: string;
+  desc?: string;
+};
