@@ -7,6 +7,8 @@ import {
   Tooltip,
   useTheme,
   VStack,
+  useDisclosure,
+  Button,
 } from "@chakra-ui/react";
 import {
   Background,
@@ -14,6 +16,7 @@ import {
   Controls,
   ReactFlow,
   ReactFlowProvider,
+  Panel as FlowPanel,
 } from "@xyflow/react";
 
 import { DndProvider, useDrop } from "react-dnd";
@@ -54,6 +57,7 @@ import { useAskBeforeLeaving } from "../hooks/useAskBeforeLeaving";
 import { RunningStatus } from "./ExecutionState";
 import { CurrentDrawer } from "../../components/CurrentDrawer";
 import { Optimize } from "./Optimize";
+import { ChatWindow } from "./ChatWindow";
 
 // New component that uses useDrop
 function DragDropArea({ children }: { children: React.ReactNode }) {
@@ -201,11 +205,14 @@ export default function OptimizationStudio() {
 
   useAskBeforeLeaving();
 
+  const chatModal = useDisclosure();
+
   return (
     <div style={{ width: "100vw", height: "100vh" }}>
       <Head>
         <title>LangWatch - Optimization Studio - {name}</title>
       </Head>
+      <ChatWindow isOpen={chatModal.isOpen} onClose={chatModal.onClose} />
       <DndProvider backend={HTML5Backend}>
         <ReactFlowProvider>
           <VStack width="full" height="full" spacing={0}>
@@ -318,6 +325,11 @@ export default function OptimizationStudio() {
                           bgColor={gray100}
                           color={gray300}
                         />
+                        {socketStatus === "connected" && (
+                          <FlowPanel position="bottom-right">
+                            <Button onClick={chatModal.onOpen}>Chat</Button>
+                          </FlowPanel>
+                        )}
                       </ReactFlow>
                     </DragDropArea>
                   </Panel>
@@ -342,7 +354,10 @@ export default function OptimizationStudio() {
                     defaultSize={0}
                   >
                     {!isPanelCollapsed && (
-                      <ResultsPanel collapsePanel={collapsePanel} defaultTab={defaultTab} />
+                      <ResultsPanel
+                        collapsePanel={collapsePanel}
+                        defaultTab={defaultTab}
+                      />
                     )}
                   </Panel>
                 </PanelGroup>

@@ -1,5 +1,5 @@
 import time
-from typing import Dict, Optional, Union
+from typing import Dict, Optional, Union, List
 from pydantic import BaseModel
 from typing_extensions import Literal
 from langwatch_nlp.studio.types.dsl import (
@@ -45,6 +45,7 @@ class ExecuteFlowPayload(BaseModel):
     trace_id: str
     workflow: Workflow
     until_node_id: Optional[str] = None
+    inputs: Optional[List[Dict[str, str]]] = None
 
 
 class ExecuteFlow(BaseModel):

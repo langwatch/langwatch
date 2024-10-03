@@ -25,6 +25,7 @@ class WorkflowModule(ReportingModule):
         manual_execution_mode: bool,
         until_node_id: Optional[str] = None,
         evaluation_weighting: Literal["mean"] = "mean",
+        inputs: Optional[Dict[str, str]] = None,
     ):
         super().__init__()
         self.workflow = workflow
@@ -32,6 +33,7 @@ class WorkflowModule(ReportingModule):
         self.until_node_id = until_node_id
         self.manual_execution_mode = manual_execution_mode
         self.evaluation_weighting = evaluation_weighting
+        self.inputs = inputs
 
         for node in self.workflow.nodes:
             if node.type not in ["entry", "end"]:

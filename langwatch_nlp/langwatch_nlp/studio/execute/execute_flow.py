@@ -32,6 +32,7 @@ async def execute_flow(event: ExecuteFlowPayload, queue: "Queue[StudioServerEven
     workflow = event.workflow
     trace_id = event.trace_id
     until_node_id = event.until_node_id
+    inputs = event.inputs
 
     disable_dsp_caching()
 
@@ -44,7 +45,10 @@ async def execute_flow(event: ExecuteFlowPayload, queue: "Queue[StudioServerEven
         trace.autotrack_dspy()
 
         module = WorkflowModule(
-            workflow, manual_execution_mode=True, until_node_id=until_node_id
+            workflow,
+            manual_execution_mode=True,
+            until_node_id=until_node_id,
+            inputs=inputs[0] if inputs else None,
         )
         module.set_reporting(queue=queue, trace_id=trace_id, workflow=workflow)
 
@@ -57,6 +61,10 @@ async def execute_flow(event: ExecuteFlowPayload, queue: "Queue[StudioServerEven
         entries = transpose_inline_dataset_to_object_list(
             entry_node.data.dataset.inline
         )
+
+        if inputs:
+            entries = inputs
+
         if len(entries) == 0:
             raise ClientReadableValueError(
                 "Dataset is empty, please add at least one entry and try again"
@@ -64,13 +72,16 @@ async def execute_flow(event: ExecuteFlowPayload, queue: "Queue[StudioServerEven
 
         try:
             result = module(**entries[0])
+
         except Exception as e:
             yield error_workflow_event(trace_id, str(e))
             return
 
     # cost = result.get_cost() if hasattr(result, "get_cost") else None
 
-    yield end_workflow_event(workflow, trace_id)
+    print("result", result)
+
+    yield end_workflow_event(workflow, trace_id, result)
 
     trace.send_spans()
 
@@ -87,13 +98,15 @@ def start_workflow_event(workflow: Workflow, trace_id: str):
     )
 
 
-def end_workflow_event(workflow: Workflow, trace_id: str):
+def end_workflow_event(workflow: Workflow, trace_id: str, result):
+
     return ExecutionStateChange(
         payload=ExecutionStateChangePayload(
             execution_state=WorkflowExecutionState(
                 status=ExecutionStatus.success,
                 trace_id=trace_id,
                 timestamps=Timestamps(finished_at=int(time.time() * 1000)),
+                result=result.toDict(),
             )
         )
     )
