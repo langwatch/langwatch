@@ -28,6 +28,7 @@ import {
   Tr,
   VStack,
   useTheme,
+  Tooltip as ChakraTooltip,
 } from "@chakra-ui/react";
 import type { Experiment, Project, WorkflowVersion } from "@prisma/client";
 import type { TRPCClientErrorLike } from "@trpc/client";
@@ -39,6 +40,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { ChevronDown, ChevronUp } from "react-feather";
 import {
   CartesianGrid,
+  Label,
   Line,
   LineChart,
   ReferenceDot,
@@ -171,7 +173,7 @@ export function DSPyExperiment({
           <DSPyExperimentSummary
             project={project}
             experiment={experiment}
-            run={runsById[selectedRuns[0]!]!}
+            run={runsById[selectedRuns[0]!]}
           />
         )}
       </Box>
@@ -433,18 +435,7 @@ export function DSPyExperimentRunList({
               spacing={3}
             >
               {!dspyRuns.data?.find((r) => r.runId === run.runId) ? (
-                <HStack
-                  paddingX={size === "sm" ? 2 : 6}
-                  paddingY={size === "sm" ? 2 : 4}
-                  width="100%"
-                  cursor="pointer"
-                  role="button"
-                  background="gray.200"
-                  _hover={{
-                    background: "gray.100",
-                  }}
-                  spacing={3}
-                >
+                <>
                   <VersionBox />
                   <VStack
                     align="start"
@@ -458,7 +449,7 @@ export function DSPyExperimentRunList({
                     </HStack>
                     <Skeleton width="100%" height="12px" />
                   </VStack>
-                </HStack>
+                </>
               ) : (
                 <>
                   {run.workflow_version ? (
@@ -1100,6 +1091,21 @@ export function DSPyRunsScoresChart({
     index: string;
   } | null>(null);
 
+  const firstSelectedRun = selectedRuns?.[0];
+
+  const bestScore = useMemo(() => {
+    return data.reduce(
+      (best, point) => {
+        const score = point[firstSelectedRun ?? ""];
+        if (score === undefined) {
+          return best;
+        }
+        return score > best.score ? { score, index: point.index } : best;
+      },
+      { score: -Infinity, index: "" }
+    );
+  }, [data, firstSelectedRun]);
+
   return (
     <Box width="100%" position="relative">
       {data.length === 0 && (
@@ -1115,7 +1121,7 @@ export function DSPyRunsScoresChart({
       <ResponsiveContainer height={300}>
         <LineChart
           data={data}
-          margin={{ top: 20, right: 30, left: 20, bottom: 15 }}
+          margin={{ top: 28, right: 30, left: 20, bottom: 15 }}
           style={{
             cursor: hoveredRunIndex ? "pointer" : "default",
           }}
@@ -1181,6 +1187,23 @@ export function DSPyRunsScoresChart({
               ];
             }}
           />
+          {bestScore.index && (
+            <ReferenceDot
+              x={bestScore.index}
+              y={bestScore.score}
+              r={8}
+              fill="gold"
+              stroke="none"
+            >
+              <Label
+                value="Best"
+                position="top"
+                offset={10}
+                fill={theme.colors.gray[700]}
+                fontSize={12}
+              />
+            </ReferenceDot>
+          )}
           {dspyRuns.map(({ runId }) =>
             runIsVisible(runId) ? (
               <Line
@@ -1300,42 +1323,44 @@ export function DSPyExperimentSummary({
       </VStack>
       <Spacer />
       {bestScoreStep.data && (
-        <Button
-          size="md"
-          colorScheme="green"
-          leftIcon={<LLMIcon />}
-          onClick={() => {
-            if (!bestScoreStep.data) return;
-            const appliedOptimizations: AppliedOptimization[] =
-              bestScoreStep.data.predictors.map((predictor) => {
-                const optimization: AppliedOptimization = {
-                  id: predictor.name,
-                  prompt: predictor.predictor.signature?.instructions,
-                  fields: Object.entries(
-                    predictor.predictor.signature?.fields ?? {}
-                  ).map(([key, value]: [string, any]) => {
-                    const field: AppliedOptimizationField = {
-                      identifier: key,
-                      field_type: value.field_type ?? "input",
-                      prefix: value.prefix,
-                      desc: value.desc,
-                    };
+        <ChakraTooltip label="Applies the optimization that resulted in the best score for this run to your workflow">
+          <Button
+            size="md"
+            colorScheme="green"
+            leftIcon={<LLMIcon />}
+            onClick={() => {
+              if (!bestScoreStep.data) return;
+              const appliedOptimizations: AppliedOptimization[] =
+                bestScoreStep.data.predictors.map((predictor) => {
+                  const optimization: AppliedOptimization = {
+                    id: predictor.name,
+                    prompt: predictor.predictor.signature?.instructions,
+                    fields: Object.entries(
+                      predictor.predictor.signature?.fields ?? {}
+                    ).map(([key, value]: [string, any]) => {
+                      const field: AppliedOptimizationField = {
+                        identifier: key,
+                        field_type: value.field_type ?? "input",
+                        prefix: value.prefix,
+                        desc: value.desc,
+                      };
 
-                    return field;
-                  }),
-                  demonstrations: predictor.predictor.demos
-                    ?.map((demo: any) => demo._store)
-                    .filter(Boolean),
-                };
-                return optimization;
-              });
-            if (onApply) {
-              onApply(appliedOptimizations);
-            }
-          }}
-        >
-          Apply Optimizations
-        </Button>
+                      return field;
+                    }),
+                    demonstrations: predictor.predictor.demos
+                      ?.map((demo: any) => demo._store)
+                      .filter(Boolean),
+                  };
+                  return optimization;
+                });
+              if (onApply) {
+                onApply(appliedOptimizations);
+              }
+            }}
+          >
+            Apply Optimization
+          </Button>
+        </ChakraTooltip>
       )}
     </HStack>
   );

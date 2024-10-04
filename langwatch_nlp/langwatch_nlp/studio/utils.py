@@ -109,6 +109,22 @@ def get_input_keys(workflow: Workflow) -> List[str]:
     return list(input_keys)
 
 
+def get_output_keys(workflow: Workflow) -> List[str]:
+    entry_node = cast(
+        EntryNode, next(node for node in workflow.nodes if isinstance(node.data, Entry))
+    )
+    output_keys = set()
+    for edge in workflow.edges:
+        if (
+            edge.source == entry_node.id
+            and edge.sourceHandle.split(".")[-1] not in output_keys
+            and get_node_by_id(workflow, edge.target).type == "evaluator"
+        ):
+            output_keys.add(edge.sourceHandle.split(".")[-1])
+
+    return list(output_keys)
+
+
 class ClientReadableValueError(ValueError):
     def __repr__(self) -> str:
         return self.args[0]

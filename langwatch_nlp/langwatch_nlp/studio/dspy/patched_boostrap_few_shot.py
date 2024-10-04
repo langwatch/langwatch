@@ -50,6 +50,56 @@ class ExampleWithEntryMap(dspy.Example):
         return None
 
 
+map_labeled_examples = False
+
+
+def patch_labeled_few_shot_once():
+    global map_labeled_examples
+    map_labeled_examples = True
+
+
+_original_compile = dspy.LabeledFewShot.compile
+
+
+class PatchedLabeledFewShot(dspy.LabeledFewShot):
+    def compile(self, student, *, trainset, sample=True):
+        global map_labeled_examples
+
+        if not map_labeled_examples:
+            return _original_compile(self, student, trainset=trainset, sample=sample)
+
+        map_labeled_examples = False
+
+        self.student = student.reset_copy()
+        self.trainset = trainset
+
+        if len(self.trainset) == 0:
+            return self.student
+
+        rng = random.Random(0)
+
+        for predictor in self.student.predictors():
+            if not hasattr(predictor, "_node_id"):
+                continue
+
+            if sample:
+                samples = rng.sample(self.trainset, min(self.k, len(self.trainset)))
+            else:
+                samples = self.trainset[: min(self.k, len(self.trainset))]
+
+            samples = [demo.map_for_node(predictor._node_id) for demo in samples]
+            samples = [demo for demo in samples if demo is not None]
+            if len(samples) == 0:
+                continue
+
+            predictor.demos = samples
+
+        return self.student
+
+
+dspy.LabeledFewShot.compile = PatchedLabeledFewShot.compile  # type: ignore
+
+
 class PatchedBootstrapFewShot(dspy.BootstrapFewShot):
     def _train(self):
         rng = random.Random(0)

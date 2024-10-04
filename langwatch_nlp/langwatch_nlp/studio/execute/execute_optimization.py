@@ -7,7 +7,10 @@ from langwatch_nlp.studio.dspy.evaluation import (
     EvaluationReporting,
     PredictionWithEvaluationAndMetadata,
 )
-from langwatch_nlp.studio.dspy.patched_boostrap_few_shot import ExampleWithEntryMap
+from langwatch_nlp.studio.dspy.patched_boostrap_few_shot import (
+    ExampleWithEntryMap,
+    patch_labeled_few_shot_once,
+)
 from langwatch_nlp.studio.dspy.workflow_module import (
     WorkflowModule,
 )
@@ -36,6 +39,7 @@ from langwatch_nlp.studio.types.events import (
 from langwatch_nlp.studio.utils import (
     disable_dsp_caching,
     get_input_keys,
+    get_output_keys,
     transpose_inline_dataset_to_object_list,
 )
 
@@ -90,8 +94,11 @@ async def execute_optimization(
         seed = entry_node.data.seed
 
         input_keys = get_input_keys(workflow)
+        all_keys = set(input_keys + get_output_keys(workflow))
         examples = [
-            ExampleWithEntryMap(_index=index, **entry)
+            ExampleWithEntryMap(
+                _index=index, **{k: v for k, v in entry.items() if k in all_keys}
+            )
             .with_inputs(*input_keys)
             .with_map_from_workflow(workflow)
             for index, entry in enumerate(entries)
@@ -111,6 +118,9 @@ async def execute_optimization(
 
         params = event.params.model_dump(exclude_none=True)
         optimizer = OPTIMIZERS[event.optimizer](metric=metric, **params)
+
+        if event.optimizer == "BootstrapFewShotWithRandomSearch":
+            patch_labeled_few_shot_once()
 
         langwatch.dspy.init(
             run_id=run_id,
