@@ -77,7 +77,7 @@ export type LLMConfig = {
 export type Signature = BaseComponent & {
   prompt?: string;
   llm?: LLMConfig;
-  demonstrations?: Record<string, any>[];
+  demonstrations?: NodeDataset;
 };
 
 export type Module = BaseComponent & {
@@ -89,19 +89,21 @@ export type Retriever = BaseComponent;
 
 export type PromptingTechnique = BaseComponent;
 
+export type NodeDataset = {
+  id?: string;
+  name?: string;
+  inline?: {
+    records: Record<string, string[]>;
+    columnTypes: DatasetColumns;
+  };
+};
+
 export type Entry = BaseComponent & {
   inputs?: never;
   entry_selection: "first" | "last" | "random";
   train_test_split: number;
   seed: number;
-  dataset?: {
-    id?: string;
-    name?: string;
-    inline?: {
-      records: Record<string, string[]>;
-      columnTypes: DatasetColumns;
-    };
-  };
+  dataset?: NodeDataset;
 };
 
 export type Evaluator = BaseComponent & MODULES["evaluator"];

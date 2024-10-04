@@ -45,6 +45,11 @@ import { useOptimizationExecution } from "../hooks/useOptimizationExecution";
 import type { AppliedOptimization } from "../../server/experiments/types";
 import type { Signature } from "../types/dsl";
 import type { Node } from "@xyflow/react";
+import {
+  simpleRecordListToNodeDataset,
+  transpostRowsFirstToColumnsFirstWithoutId,
+} from "../utils/datasetUtils";
+import type { DatasetRecordEntry } from "../../server/datasets/types";
 
 export function ResultsPanel({
   collapsePanel,
@@ -323,7 +328,15 @@ export function LoadedOptimizationResults({
             data: JSON.parse(JSON.stringify(node.data)),
           } as Node<Signature>;
           if (optimization.demonstrations) {
-            node_.data.demonstrations = optimization.demonstrations;
+            node_.data.demonstrations = simpleRecordListToNodeDataset(
+              Object.values(optimization.demonstrations).map((demonstration) =>
+                Object.fromEntries(
+                  Object.entries(demonstration).filter(
+                    ([key]) => key !== "augmented"
+                  )
+                )
+              )
+            );
           }
           if (optimization.prompt) {
             node_.data.prompt = optimization.prompt;
@@ -438,7 +451,12 @@ export function LoadedOptimizationResults({
             project={project}
             experiment={experiment}
             run={runsById[selectedRuns_[0]!]}
-            onApply={onApplyOptimizations}
+            onApply={
+              optimizationState?.status === "running" &&
+              optimizationStateRunId === selectedRuns_[0]
+                ? undefined
+                : onApplyOptimizations
+            }
           />
         )}
         {(selectedRuns.length === 0 ||

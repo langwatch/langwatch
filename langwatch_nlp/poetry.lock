@@ -2063,13 +2063,13 @@ requests = ">=2,<3"
 
 [[package]]
 name = "langwatch"
-version = "0.1.27"
+version = "0.1.28"
 description = "Python SDK for LangWatch for monitoring your LLMs"
 optional = false
 python-versions = "!=2.7.*,!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,!=3.5.*,!=3.6.*,!=3.7.*,!=3.8.*,>=3.9"
 files = [
-    {file = "langwatch-0.1.27-py3-none-any.whl", hash = "sha256:0199a1c3e6517bc756f0e2b7bb9a90dcd0183c86095bc7ef99f4ef38958b4637"},
-    {file = "langwatch-0.1.27.tar.gz", hash = "sha256:3378f99ca2138004ce9304e3091f6b2551d7216886ac730814d739733f26dd8d"},
+    {file = "langwatch-0.1.28-py3-none-any.whl", hash = "sha256:3ed383fbd5aa348c6ebd93d3a8b15abfab30e4f6dbfc5113aa26e01d7dc69b18"},
+    {file = "langwatch-0.1.28.tar.gz", hash = "sha256:e34c542e97cd34becdab322a116f8751097dcec82aa31eeeedd2e226e2aa6c24"},
 ]
 
 [package.dependencies]
@@ -5215,4 +5215,4 @@ testing = ["big-O", "jaraco.functools", "jaraco.itertools", "more-itertools", "p
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.11,<3.13"
-content-hash = "306fbbcc252487a83bc6e80548be332346d159546df1eebd8e62a7fe0a5b36bb"
+content-hash = "dc4a1f0569fd1d38afb2bd407ce54681c10e467a4726d96b78fa2a4924f78319"

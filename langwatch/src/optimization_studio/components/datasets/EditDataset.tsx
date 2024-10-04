@@ -13,6 +13,10 @@ export function EditDataset({
   editingDataset,
   setEditingDataset,
   setSelectedDataset,
+  title,
+  cta,
+  hideButtons = false,
+  bottomSpace,
 }: {
   editingDataset: Required<Entry>["dataset"];
   setEditingDataset: (dataset: Entry["dataset"]) => void;
@@ -21,6 +25,10 @@ export function EditDataset({
     columnTypes: DatasetColumns,
     close: boolean
   ) => void;
+  title?: string;
+  cta?: string;
+  hideButtons?: boolean;
+  bottomSpace?: string;
 }) {
   const { rows, columns, query } = useGetDatasetData({
     dataset: editingDataset,
@@ -74,6 +82,9 @@ export function EditDataset({
         inMemoryDataset={inMemoryDataset}
         onUpdateDataset={onUpdateDataset}
         isEmbedded={true}
+        title={title}
+        hideButtons={hideButtons}
+        bottomSpace={bottomSpace}
       />
       <Button
         colorScheme="blue"
@@ -84,7 +95,7 @@ export function EditDataset({
           setSelectedDataset(editingDataset, columnTypes, true);
         }}
       >
-        Select Dataset
+        {cta ?? "Select Dataset"}
       </Button>
     </Box>
   );

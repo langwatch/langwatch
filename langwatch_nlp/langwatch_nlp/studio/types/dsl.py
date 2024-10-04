@@ -87,10 +87,28 @@ class LLMConfig(BaseModel):
     litellm_params: Optional[Dict[str, str]] = None
 
 
+class DatasetInline(BaseModel):
+    records: Dict[str, List[Any]]
+    columnTypes: DatasetColumns
+
+
+# Differently from the typescript DSL, we require the dataset to be passed inline in the entry node here
+class NodeDataset(BaseModel):
+    name: Optional[str] = None
+    inline: DatasetInline
+
+
+class Entry(BaseComponent):
+    inputs: None = None
+    dataset: Optional[NodeDataset] = None
+    train_test_split: float
+    seed: int
+
+
 class Signature(BaseComponent):
     prompt: Optional[str] = None
     llm: Optional[LLMConfig] = None
-    demonstrations: Optional[List[Dict[str, Any]]] = None
+    demonstrations: Optional[NodeDataset] = None
 
 
 class Edge(BaseModel):
@@ -117,24 +135,6 @@ class PromptingTechnique(BaseComponent):
 
 class End(BaseComponent):
     pass
-
-
-class DatasetInline(BaseModel):
-    records: Dict[str, List[Any]]
-    columnTypes: DatasetColumns
-
-
-# Differently from the typescript DSL, we require the dataset to be passed inline in the entry node here
-class Dataset(BaseModel):
-    name: Optional[str] = None
-    inline: DatasetInline
-
-
-class Entry(BaseComponent):
-    inputs: None = None
-    dataset: Optional[Dataset] = None
-    train_test_split: float
-    seed: int
 
 
 class Evaluator(BaseComponent):

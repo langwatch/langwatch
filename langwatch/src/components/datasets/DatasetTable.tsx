@@ -48,11 +48,17 @@ export function DatasetTable({
   inMemoryDataset,
   onUpdateDataset,
   isEmbedded = false,
+  title,
+  hideButtons = false,
+  bottomSpace = "300px",
 }: {
   datasetId?: string;
   inMemoryDataset?: InMemoryDataset;
   onUpdateDataset?: (dataset: InMemoryDataset & { datasetId?: string }) => void;
   isEmbedded?: boolean;
+  title?: string;
+  hideButtons?: boolean;
+  bottomSpace?: string;
 }) {
   const { project } = useOrganizationTeamProject();
 
@@ -414,10 +420,20 @@ export function DatasetTable({
         spacing={6}
       >
         <Heading as={"h1"} size="lg">
-          {isEmbedded ? "Edit Dataset" : "Dataset"}{" "}
-          {`- ${
-            dataset?.name ? dataset.name : datasetId ? "" : DEFAULT_DATASET_NAME
-          }`}
+          {title ? (
+            title
+          ) : (
+            <>
+              {isEmbedded ? "Edit Dataset" : "Dataset"}{" "}
+              {`- ${
+                dataset?.name
+                  ? dataset.name
+                  : datasetId
+                  ? ""
+                  : DEFAULT_DATASET_NAME
+              }`}
+            </>
+          )}
         </Heading>
         <Text fontSize={"14px"} color="gray.400">
           {parentRowData?.length} records
@@ -430,45 +446,49 @@ export function DatasetTable({
             : ""}
         </Text>
         <Spacer />
-        <Button
-          onClick={() => addRowsFromCSVModal.onOpen()}
-          rightIcon={<Upload height={17} width={17} strokeWidth={2.5} />}
-        >
-          Add from CSV
-        </Button>
-        <Button
-          colorScheme="gray"
-          minWidth="fit-content"
-          onClick={() => dataset && downloadCSV()}
-        >
-          Export <DownloadIcon marginLeft={2} />
-        </Button>
-        <Button
-          colorScheme="gray"
-          onClick={() => editDataset.onOpen()}
-          minWidth="fit-content"
-          leftIcon={<Edit2 height={16} />}
-        >
-          Edit Dataset
-        </Button>
-        {datasetId && !isEmbedded && (
-          <Button
-            colorScheme="blue"
-            onClick={() => {
-              openDrawer("batchEvaluation", {
-                datasetSlug: databaseDataset.data?.slug,
-              });
-            }}
-            minWidth="fit-content"
-            leftIcon={<Play height={16} />}
-          >
-            Batch Evaluation
-          </Button>
+        {!hideButtons && (
+          <>
+            <Button
+              onClick={() => addRowsFromCSVModal.onOpen()}
+              rightIcon={<Upload height={17} width={17} strokeWidth={2.5} />}
+            >
+              Add from CSV
+            </Button>
+            <Button
+              colorScheme="gray"
+              minWidth="fit-content"
+              onClick={() => dataset && downloadCSV()}
+            >
+              Export <DownloadIcon marginLeft={2} />
+            </Button>
+            <Button
+              colorScheme="gray"
+              onClick={() => editDataset.onOpen()}
+              minWidth="fit-content"
+              leftIcon={<Edit2 height={16} />}
+            >
+              Edit Dataset
+            </Button>
+            {datasetId && !isEmbedded && (
+              <Button
+                colorScheme="blue"
+                onClick={() => {
+                  openDrawer("batchEvaluation", {
+                    datasetSlug: databaseDataset.data?.slug,
+                  });
+                }}
+                minWidth="fit-content"
+                leftIcon={<Play height={16} />}
+              >
+                Batch Evaluation
+              </Button>
+            )}
+          </>
         )}
       </HStack>
       <Card>
         <CardBody padding={0} position="relative">
-          <Box height="calc(max(100vh - 300px, 500px))">
+          <Box height={`calc(max(100vh - ${bottomSpace}, 500px))`}>
             <DatasetGrid
               columnDefs={columnDefs}
               rowData={localRowData}

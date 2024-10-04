@@ -7,7 +7,7 @@ from langwatch_nlp.studio.dspy.workflow_module import (
 )
 from langwatch_nlp.studio.types.dataset import DatasetColumn, DatasetColumnType
 from langwatch_nlp.studio.types.dsl import (
-    Dataset,
+    NodeDataset,
     DatasetInline,
     Edge,
     End,
@@ -77,7 +77,7 @@ def test_parse_workflow():
                     ],
                     decorated_by=None,
                     execution_state=None,
-                    dataset=Dataset(
+                    dataset=NodeDataset(
                         name="Draft Dataset",
                         inline=DatasetInline(
                             records={

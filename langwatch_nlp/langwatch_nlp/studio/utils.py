@@ -70,7 +70,9 @@ def validate_identifier(identifier: str) -> str:
     return identifier
 
 
-def transpose_inline_dataset_to_object_list(dataset: DatasetInline):
+def transpose_inline_dataset_to_object_list(
+    dataset: DatasetInline,
+) -> List[Dict[str, Any]]:
     columns = dataset.records
 
     lengths = [len(values) for values in columns.values()]

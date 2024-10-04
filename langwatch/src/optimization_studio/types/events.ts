@@ -9,7 +9,7 @@ export type StudioClientEvent =
         trace_id: string;
         workflow: Workflow;
         node_id: string;
-        inputs: string[];
+        inputs: Record<string, string>;
       };
     }
   | {
@@ -25,7 +25,7 @@ export type StudioClientEvent =
         trace_id: string;
         workflow: Workflow;
         until_node_id?: string;
-        inputs?: Record<string, string>;
+        inputs?: Record<string, string>[];
       };
     }
   | {

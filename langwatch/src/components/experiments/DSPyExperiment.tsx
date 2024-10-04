@@ -1322,7 +1322,7 @@ export function DSPyExperimentSummary({
         </Text>
       </VStack>
       <Spacer />
-      {bestScoreStep.data && (
+      {bestScoreStep.data && onApply && (
         <ChakraTooltip label="Applies the optimization that resulted in the best score for this run to your workflow">
           <Button
             size="md"
