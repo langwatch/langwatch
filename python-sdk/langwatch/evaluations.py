@@ -11,6 +11,7 @@ from langwatch.tracer import ContextSpan, ContextTrace, get_current_trace
 from langwatch.types import (
     Conversation,
     EvaluationResult,
+    Money,
     SpanMetrics,
     RAGChunk,
     SpanTypes,
@@ -18,11 +19,6 @@ from langwatch.types import (
     TypedValueGuardrailResult,
     TypedValueJson,
 )
-
-
-class Money(BaseModel):
-    currency: str
-    amount: float
 
 
 class EvaluationResultModel(BaseModel):

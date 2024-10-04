@@ -32,6 +32,8 @@ from langwatch.types import (
     EvaluationResult,
     EvaluationTimestamps,
     LLMSpan,
+    Money,
+    MoneyDict,
     SpanMetrics,
     SpanParams,
     RAGChunk,
@@ -340,10 +342,18 @@ class ContextSpan:
                 )
         if params:
             # Avoid late mutations after capturing the value
-            self.params = copy.deepcopy(params)
+            params = copy.deepcopy(params)
+            if self.params:
+                self.params = {**self.params, **params}
+            else:
+                self.params = params
         if metrics:
             # Avoid late mutations after capturing the value
-            self.metrics = copy.deepcopy(metrics)
+            metrics = copy.deepcopy(metrics)
+            if self.metrics:
+                self.metrics = {**self.metrics, **metrics}
+            else:
+                self.metrics = metrics
 
     def add_evaluation(
         self,
@@ -357,6 +367,7 @@ class ContextSpan:
         score: Optional[float] = None,
         label: Optional[str] = None,
         details: Optional[str] = None,
+        cost: Optional[Union[Money, MoneyDict, float]] = None,
         error: Optional[Exception] = None,
         timestamps: Optional[EvaluationTimestamps] = None,
     ):
@@ -374,6 +385,7 @@ class ContextSpan:
             score=score,
             label=label,
             details=details,
+            cost=cost,
             error=error,
             timestamps=timestamps,
         )
@@ -862,6 +874,7 @@ class ContextTrace:
         score: Optional[float] = None,
         label: Optional[str] = None,
         details: Optional[str] = None,
+        cost: Optional[Union[Money, MoneyDict, float]] = None,
         error: Optional[Exception] = None,
         timestamps: Optional[EvaluationTimestamps] = None,
     ):
@@ -892,6 +905,16 @@ class ContextTrace:
             evaluation_result["label"] = label
         if details is not None:
             evaluation_result["details"] = details
+        if cost is not None:
+            if isinstance(cost, Money):
+                evaluation_result["cost"] = {
+                    "currency": cost.currency,
+                    "amount": cost.amount,
+                }
+            elif isinstance(cost, float) or isinstance(cost, int):
+                evaluation_result["cost"] = {"currency": "USD", "amount": cost}
+            else:
+                evaluation_result["cost"] = cost
 
         if not span:
             span = self.span(type="evaluation")
@@ -921,6 +944,8 @@ class ContextTrace:
                 else None
             ),
         )
+        if "cost" in evaluation_result and evaluation_result["cost"]:
+            span.update(metrics=SpanMetrics(cost=evaluation_result["cost"]["amount"]))
         span.end()
 
         evaluation = Evaluation(

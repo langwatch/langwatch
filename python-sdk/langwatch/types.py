@@ -1,5 +1,6 @@
 from typing import Any, Dict, List, Literal, Optional, Union
 from typing_extensions import TypedDict
+from pydantic import BaseModel
 
 
 ChatRole = Literal[
@@ -49,12 +50,23 @@ class TypedValueList(TypedDict):
     value: List["SpanInputOutput"]
 
 
+class Money(BaseModel):
+    currency: str
+    amount: float
+
+
+class MoneyDict(TypedDict):
+    currency: str
+    amount: float
+
+
 class EvaluationResult(TypedDict, total=False):
     status: Literal["processed", "skipped", "error"]
     passed: Optional[bool]
     score: Optional[float]
     details: Optional[str]
     label: Optional[str]
+    cost: Optional[MoneyDict]
 
 
 class ConversationEntry(TypedDict):

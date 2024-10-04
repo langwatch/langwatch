@@ -115,6 +115,7 @@ def answer_result_helper():
         name="Valid Python Code",  # required
         passed=not code_error,
         details=result if code_error else None,
+        cost={"currency": "USD", "amount": 1.5},
     )
 
     return code_to_execute, result

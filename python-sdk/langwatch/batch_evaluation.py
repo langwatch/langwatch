@@ -18,12 +18,7 @@ import httpx
 from tqdm import tqdm
 import pandas as pd
 
-from langwatch.types import RAGChunk
-
-
-class Money(BaseModel):
-    currency: str
-    amount: float
+from langwatch.types import Money, RAGChunk
 
 
 class EvaluationResult(BaseModel):
