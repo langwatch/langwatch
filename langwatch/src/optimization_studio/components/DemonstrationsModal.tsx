@@ -32,15 +32,16 @@ export function DemonstrationsModal({
 
   const [rendered, setRendered] = useState(false);
   useEffect(() => {
+    const columns = fieldsToDatasetColumns([
+      ...(node.data.inputs ?? []),
+      ...(node.data.outputs ?? []),
+    ]);
+
     let demonstrations = (node.data as Signature).demonstrations;
     if (
       !demonstrations?.inline ||
       Object.keys(demonstrations.inline.records).length === 0
     ) {
-      const columns = fieldsToDatasetColumns([
-        ...(node.data.inputs ?? []),
-        ...(node.data.outputs ?? []),
-      ]);
       demonstrations = {
         inline: {
           records: Object.fromEntries(
@@ -50,6 +51,13 @@ export function DemonstrationsModal({
         },
       };
     }
+    demonstrations = {
+      ...demonstrations,
+      inline: {
+        ...demonstrations.inline,
+        columnTypes: columns,
+      } as NodeDataset["inline"],
+    };
 
     setEditingDataset(isOpen ? demonstrations : undefined);
     setRendered(isOpen);
