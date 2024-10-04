@@ -392,8 +392,10 @@ function StatusCircle({
   return (
     <Tooltip label={tooltip}>
       <Box
-        width="12px"
-        height="12px"
+        minWidth="12px"
+        maxWidth="12px"
+        minHeight="12px"
+        maxHeight="12px"
         background={
           status === "connected"
             ? "green.500"

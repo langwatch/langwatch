@@ -18,7 +18,7 @@ import { ArrowLeft } from "react-feather";
 import type { DatasetColumns } from "../../server/datasets/types";
 import { useWorkflowStore } from "../hooks/useWorkflowStore";
 import type { Component, Entry } from "../types/dsl";
-import { datasetColumnsToFieldTypes } from "../utils/datasetUtils";
+import { datasetColumnsToFields } from "../utils/datasetUtils";
 import { DatasetSelection } from "./datasets/DatasetSelection";
 import { DatasetUpload } from "./datasets/DatasetUpload";
 import { EditDataset } from "./datasets/EditDataset";
@@ -64,7 +64,7 @@ export function DatasetModal({
         id: node.id,
         data: {
           ...node.data,
-          outputs: datasetColumnsToFieldTypes(columnTypes),
+          outputs: datasetColumnsToFields(columnTypes),
           dataset: dataset,
         } as Entry,
       });

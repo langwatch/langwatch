@@ -34,7 +34,7 @@ export const useGetDatasetData = ({
   const databaseDataset = api.datasetRecord.getHead.useQuery(
     { projectId: project?.id ?? "", datasetId: dataset?.id ?? "" },
     {
-      enabled: !!project && !!dataset?.id,
+      enabled: !!project && !!dataset?.id && dataset?.id !== "",
       refetchOnWindowFocus: false,
       refetchOnMount: false,
       staleTime: 1000 * 60 * 60,
@@ -95,7 +95,7 @@ export const useGetDatasetData = ({
   }, [data, preview, columnSet]);
 
   return {
-    rows,
+    rows: rows ?? [],
     columns: data?.columnTypes ?? [],
     query: databaseDataset,
     total: dataset?.inline?.records
