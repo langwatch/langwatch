@@ -58,6 +58,7 @@ import { RunningStatus } from "./ExecutionState";
 import { CurrentDrawer } from "../../components/CurrentDrawer";
 import { Optimize } from "./Optimize";
 import { ChatWindow } from "./ChatWindow";
+import { Play } from "react-feather";
 
 // New component that uses useDrop
 function DragDropArea({ children }: { children: React.ReactNode }) {
@@ -325,11 +326,19 @@ export default function OptimizationStudio() {
                           bgColor={gray100}
                           color={gray300}
                         />
-                        {socketStatus === "connected" && (
-                          <FlowPanel position="bottom-right">
-                            <Button onClick={chatModal.onOpen}>Chat</Button>
-                          </FlowPanel>
-                        )}
+
+                        <FlowPanel position="bottom-right">
+                          <Button
+                            onClick={chatModal.onOpen}
+                            rightIcon={<Play size={16} />}
+                            isDisabled={socketStatus !== "connected"}
+                            variant="outline"
+                            size="sm"
+                            background="white"
+                          >
+                            Playground
+                          </Button>
+                        </FlowPanel>
                       </ReactFlow>
                     </DragDropArea>
                   </Panel>
