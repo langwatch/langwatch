@@ -24,8 +24,9 @@ import { useWorkflowExecution } from "../hooks/useWorkflowExecution";
 import { useWorkflowStore } from "../hooks/useWorkflowStore";
 import { RunningStatus } from "./ExecutionState";
 import { titleCase } from "../../utils/stringCasing";
+import { useForm } from "react-hook-form";
 
-import { type Edge } from "@xyflow/react";
+import { type Edge, type Node } from "@xyflow/react";
 
 interface ChatWindowProps {
   isOpen: boolean;
@@ -40,7 +41,7 @@ export const ChatWindow = ({ isOpen, onClose }: ChatWindowProps) => {
         <ModalHeader>Test Message</ModalHeader>
         <ModalCloseButton />
         <ModalBody>
-          <ChatBox />
+          <ChatBox isOpen={isOpen} />
         </ModalBody>
         <ModalFooter></ModalFooter>
       </ModalContent>
@@ -65,14 +66,13 @@ const useMultipleInputs = (entryEdges: Edge[]) => {
   });
 
   const handleInputChange = useCallback((key: string, value: string) => {
-    console.log("key-value", key, value);
     setInputs((prev) => ({ ...prev, [key]: value }));
   }, []);
 
   return { inputs, handleInputChange };
 };
 
-const ChatBox = () => {
+const ChatBox = ({ isOpen }: { isOpen: boolean }) => {
   const { getWorkflow, executionStatus } = useWorkflowStore((state) => ({
     getWorkflow: state.getWorkflow,
     setWorkflowExecutionState: state.setWorkflowExecutionState,
@@ -81,14 +81,16 @@ const ChatBox = () => {
 
   const { startWorkflowExecution } = useWorkflowExecution();
 
-  const { nodes } = useWorkflowStore();
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
 
   const workflow = getWorkflow();
 
-  console.log(workflow);
-
   const entryEdges = workflow.edges.filter((edge) => edge.source === "entry");
+  const evaluators = workflow.nodes.filter((node) => node.type === "evaluator");
+
+  const entryInputs = entryEdges.filter(
+    (edge) => !evaluators?.some((evaluator) => evaluator.id === edge.target)
+  );
 
   useEffect(() => {
     if (workflow.state.execution?.status === "success") {
@@ -113,10 +115,16 @@ const ChatBox = () => {
     }
   }, [workflow.state.execution?.status]);
 
+  useEffect(() => {
+    if (isOpen) {
+      setChatMessages([]);
+    }
+  }, [isOpen]);
+
   const { inputs, handleInputChange } = useMultipleInputs(entryEdges);
 
   const sendMultiMessage = () => {
-    const message = entryEdges
+    const message = entryInputs
       .map((edge) => {
         const sourceHandle = edge.sourceHandle?.split(".")[1];
         return sourceHandle
@@ -133,11 +141,11 @@ const ChatBox = () => {
   return (
     <HStack align={"start"} spacing={1}>
       <MultipleInput
-        entryEdges={entryEdges}
         inputs={inputs}
         handleInputChange={handleInputChange}
         sendMultiMessage={sendMultiMessage}
         isSingle={false}
+        entryInputs={entryInputs}
       />
       <VStack
         spacing={4}
@@ -198,11 +206,11 @@ const ChatBox = () => {
         </Box>
 
         <MultipleInput
-          entryEdges={entryEdges}
           inputs={inputs}
           handleInputChange={handleInputChange}
           sendMultiMessage={sendMultiMessage}
           isSingle={true}
+          entryInputs={entryInputs}
         />
       </VStack>
     </HStack>
@@ -210,37 +218,46 @@ const ChatBox = () => {
 };
 
 const MultipleInput = ({
-  entryEdges,
   inputs,
   handleInputChange,
   sendMultiMessage,
   isSingle,
+  entryInputs,
 }: {
-  entryEdges: Edge[];
   inputs: Record<string, string>;
   handleInputChange: (key: string, value: string) => void;
   sendMultiMessage: () => void;
   isSingle: boolean;
+  entryInputs: Edge[];
 }) => {
-  console.log(isSingle);
+  const { handleSubmit } = useForm();
+  const onSubmit = () => {
+    sendMultiMessage();
+  };
+
   if (
-    (!isSingle && entryEdges.length === 1) ||
-    (isSingle && entryEdges.length > 1)
+    (!isSingle && entryInputs.length === 1) ||
+    (isSingle && entryInputs.length > 1)
   ) {
     return;
   }
-  if (entryEdges && entryEdges.length === 1) {
+  if (entryInputs && entryInputs.length === 1) {
     return (
-      <InputGroup>
+      <InputGroup
+        as="form"
+        // eslint-disable-next-line @typescript-eslint/no-misused-promises
+        onSubmit={handleSubmit(onSubmit)}
+      >
         <Input
+          required
           value={inputs[0]}
           onChange={(e) =>
             handleInputChange(
-              entryEdges[0]?.sourceHandle?.split(".")?.[1] ?? "",
+              entryInputs[0]?.sourceHandle?.split(".")?.[1] ?? "",
               e.target.value
             )
           }
-          placeholder={`Send ${entryEdges[0]?.sourceHandle?.split(".")[1]} `}
+          placeholder={`Send ${entryInputs[0]?.sourceHandle?.split(".")[1]} `}
           onKeyDown={(e) => {
             if (e.key === "Enter") {
               sendMultiMessage();
@@ -248,12 +265,7 @@ const MultipleInput = ({
           }}
         />
         <InputRightElement padding={2}>
-          <Button
-            size="sm"
-            padding={2}
-            colorScheme="orange"
-            onClick={sendMultiMessage}
-          >
+          <Button size="sm" padding={2} colorScheme="orange" type="submit">
             <Send />
           </Button>
         </InputRightElement>
@@ -269,9 +281,13 @@ const MultipleInput = ({
         height={"60vh"}
         padding={2}
         justifyContent="space-between"
+        as="form"
+        // eslint-disable-next-line @typescript-eslint/no-misused-promises
+        onSubmit={handleSubmit(onSubmit)}
       >
+        {/* <form onSubmit={handleSubmit}> */}
         <Stack spacing={3} width={"full"}>
-          {entryEdges.map((edge, index) => {
+          {entryInputs.map((edge, index) => {
             return (
               <Stack key={index}>
                 <SmallLabel>
@@ -280,6 +296,7 @@ const MultipleInput = ({
                 <Input
                   key={index}
                   value={inputs[index]}
+                  required
                   onChange={(e) =>
                     handleInputChange(
                       edge.sourceHandle?.split(".")[1] ?? "",
@@ -291,7 +308,7 @@ const MultipleInput = ({
             );
           })}
         </Stack>
-        <Button width="full" colorScheme="orange" onClick={sendMultiMessage}>
+        <Button width="full" type="submit" colorScheme="orange">
           Submit
         </Button>
       </VStack>
