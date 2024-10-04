@@ -624,7 +624,11 @@ class LangWatchTrackedMIPROv2(MIPROv2):
                     optimizer=DSPyOptimizer(
                         name=MIPROv2.__name__,
                         parameters={
-                            "num_candidates": this.n,
+                            "num_candidates": (
+                                this.num_candidates
+                                if hasattr(this, "num_candidates")
+                                else this.n if hasattr(this, "n") else None
+                            ),
                             "init_temperature": this.init_temperature,
                         },
                     ),

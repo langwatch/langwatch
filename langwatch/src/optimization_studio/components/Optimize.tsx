@@ -44,7 +44,7 @@ const optimizerOptions: {
   value: keyof typeof OPTIMIZERS;
   description: string;
 }[] = Object.entries(OPTIMIZERS).map(([key, optimizer]) => ({
-  label: key,
+  label: optimizer.name,
   value: key as keyof typeof OPTIMIZERS,
   description: optimizer.description,
 }));

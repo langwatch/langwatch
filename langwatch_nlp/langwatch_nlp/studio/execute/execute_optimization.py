@@ -40,6 +40,7 @@ from langwatch_nlp.studio.utils import (
     disable_dsp_caching,
     get_input_keys,
     get_output_keys,
+    node_llm_config_to_dspy_lm,
     transpose_inline_dataset_to_object_list,
 )
 
@@ -47,6 +48,7 @@ from dspy.evaluate import Evaluate
 from sklearn.model_selection import train_test_split
 
 import dspy.primitives.module
+from dspy.teleprompt import MIPROv2
 
 _original_postprocess_parameter_name = dspy.primitives.module.postprocess_parameter_name
 
@@ -117,7 +119,21 @@ async def execute_optimization(
         langwatch.api_key = workflow.api_key
 
         params = event.params.model_dump(exclude_none=True)
-        optimizer = OPTIMIZERS[event.optimizer](metric=metric, **params)
+        if event.optimizer == "MIPROv2ZeroShot":
+            llm_config = workflow.default_llm
+            lm = node_llm_config_to_dspy_lm(llm_config)
+            # TODO: can we do it not globally? will this overwride the signature ones?
+            dspy.configure(lm=lm)
+
+            optimizer = OPTIMIZERS[event.optimizer](
+                metric=metric,
+                # TODO: allow to pass in those parameters
+                num_candidates=7,  # type: ignore
+                # teacher_settings=dict(lm=lm),
+                **params,
+            )
+        else:
+            optimizer = OPTIMIZERS[event.optimizer](metric=metric, **params)
 
         if event.optimizer == "BootstrapFewShotWithRandomSearch":
             patch_labeled_few_shot_once()
@@ -131,7 +147,21 @@ async def execute_optimization(
             workflow_version_id=event.workflow_version_id,
         )
 
-        optimized_program = optimizer.compile(module, trainset=train)
+        if event.optimizer == "MIPROv2ZeroShot":
+            optimizer = cast(MIPROv2, optimizer)
+            optimized_program = optimizer.compile(
+                module,
+                trainset=train,
+                max_bootstrapped_demos=0,
+                max_labeled_demos=0,
+                num_trials=15,
+                minibatch_size=25,
+                minibatch_full_eval_steps=10,
+                minibatch=False,
+                requires_permission_to_run=False,
+            )
+        else:
+            optimized_program = optimizer.compile(module, trainset=train)
 
         # print("\n\noptimized_program", optimized_program, "\n\n")
 

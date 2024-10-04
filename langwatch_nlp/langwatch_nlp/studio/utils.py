@@ -2,6 +2,7 @@ import ast
 import builtins
 import inspect
 import keyword
+import os
 import re
 from typing import Any, Dict, List, cast
 
@@ -11,9 +12,11 @@ from langwatch_nlp.studio.types.dsl import (
     DatasetInline,
     Entry,
     EntryNode,
+    LLMConfig,
     Node,
     Workflow,
 )
+import dspy
 
 
 def print_class_definition(cls):
@@ -130,3 +133,20 @@ def get_output_keys(workflow: Workflow) -> List[str]:
 class ClientReadableValueError(ValueError):
     def __repr__(self) -> str:
         return self.args[0]
+
+
+def node_llm_config_to_dspy_lm(llm_config: LLMConfig) -> dspy.LM:
+    llm_params: dict[str, Any] = llm_config.litellm_params or {
+        "model": llm_config.model
+    }
+    if "azure/" in (llm_params["model"] or ""):
+        llm_params["api_version"] = os.environ["AZURE_API_VERSION"]
+    llm_params["drop_params"] = True
+    llm_params["model_type"] = "chat"
+
+    lm = dspy.LM(
+        max_tokens=llm_config.max_tokens or 2048,
+        temperature=llm_config.temperature or 0,
+        **llm_params,
+    )
+    return lm
