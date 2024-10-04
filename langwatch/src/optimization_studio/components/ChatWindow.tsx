@@ -17,16 +17,16 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { useCallback, useState, useEffect } from "react";
-import { SmallLabel } from "~/components/SmallLabel";
+import { useCallback, useEffect, useState } from "react";
 import { Send } from "react-feather";
+import { useForm } from "react-hook-form";
+import { SmallLabel } from "~/components/SmallLabel";
+import { titleCase } from "../../utils/stringCasing";
 import { useWorkflowExecution } from "../hooks/useWorkflowExecution";
 import { useWorkflowStore } from "../hooks/useWorkflowStore";
 import { RunningStatus } from "./ExecutionState";
-import { titleCase } from "../../utils/stringCasing";
-import { useForm } from "react-hook-form";
 
-import { type Edge, type Node } from "@xyflow/react";
+import { type Edge } from "@xyflow/react";
 
 interface ChatWindowProps {
   isOpen: boolean;
@@ -285,7 +285,6 @@ const MultipleInput = ({
         // eslint-disable-next-line @typescript-eslint/no-misused-promises
         onSubmit={handleSubmit(onSubmit)}
       >
-        {/* <form onSubmit={handleSubmit}> */}
         <Stack spacing={3} width={"full"}>
           {entryInputs.map((edge, index) => {
             return (
