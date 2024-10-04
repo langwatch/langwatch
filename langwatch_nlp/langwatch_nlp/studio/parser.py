@@ -1,9 +1,11 @@
 import os
-from typing import Any
+from typing import Any, Dict, List
 from langwatch_nlp.studio.dspy.predict_with_metadata import PredictWithMetadata
 from langwatch_nlp.studio.modules.registry import MODULES
 from langwatch_nlp.studio.types.dsl import Evaluator, Node, Signature, Workflow
 import dspy
+
+from langwatch_nlp.studio.utils import transpose_inline_dataset_to_object_list
 
 
 def parse_component(node: Node, workflow: Workflow) -> type[dspy.Module]:
@@ -16,7 +18,9 @@ def parse_component(node: Node, workflow: Workflow) -> type[dspy.Module]:
             raise NotImplementedError(f"Unknown component type: {node.type}")
 
 
-def parse_signature(node_id: str, component: Signature, workflow: Workflow) -> type[dspy.Module]:
+def parse_signature(
+    node_id: str, component: Signature, workflow: Workflow
+) -> type[dspy.Module]:
     class_name = component.name or "AnonymousSignature"
 
     # Create a dictionary to hold the class attributes
@@ -42,7 +46,9 @@ def parse_signature(node_id: str, component: Signature, workflow: Workflow) -> t
     )
 
     llm_config = component.llm if component.llm else workflow.default_llm
-    llm_params : dict[str, Any] = llm_config.litellm_params or {"model": llm_config.model}
+    llm_params: dict[str, Any] = llm_config.litellm_params or {
+        "model": llm_config.model
+    }
     if "azure/" in (llm_params["model"] or ""):
         llm_params["api_version"] = os.environ["AZURE_API_VERSION"]
     llm_params["drop_params"] = True
@@ -60,6 +66,13 @@ def parse_signature(node_id: str, component: Signature, workflow: Workflow) -> t
         PredictWithMetadata.__init__(self, SignatureClass)
         self.set_lm(lm=lm)
         self._node_id = node_id
+        if component.demonstrations:
+            demos: List[Dict[str, Any]] = transpose_inline_dataset_to_object_list(
+                component.demonstrations.inline
+            )
+            self.demos = demos
+        else:
+            self.demos = []
 
     def reset(self) -> None:
         PredictWithMetadata.reset(self)

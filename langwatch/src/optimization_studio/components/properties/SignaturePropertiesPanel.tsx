@@ -1,17 +1,27 @@
-import { Box, HStack, Text, Textarea, Tooltip, VStack } from "@chakra-ui/react";
+import {
+  Box,
+  Button,
+  HStack,
+  Spacer,
+  Text,
+  Textarea,
+  Tooltip,
+  useDisclosure,
+  VStack,
+} from "@chakra-ui/react";
 import type { Node } from "@xyflow/react";
-import { useMemo } from "react";
+import { Edit2, Info } from "react-feather";
 import { DatasetPreview } from "../../../components/datasets/DatasetPreview";
-import type { DatasetColumnType } from "../../../server/datasets/types";
+import { useGetDatasetData } from "../../hooks/useGetDatasetData";
 import { useWorkflowStore } from "../../hooks/useWorkflowStore";
 import type { Signature } from "../../types/dsl";
+import { DemonstrationsModal } from "../DemonstrationsModal";
 import {
   BasePropertiesPanel,
   PropertyField,
   PropertySectionTitle,
 } from "./BasePropertiesPanel";
 import { LLMConfigField } from "./modals/LLMConfigModal";
-import { Info } from "react-feather";
 
 export function SignaturePropertiesPanel({ node }: { node: Node<Signature> }) {
   const { default_llm, setNode } = useWorkflowStore(
@@ -22,43 +32,15 @@ export function SignaturePropertiesPanel({ node }: { node: Node<Signature> }) {
     })
   );
 
-  const { demonstrationRows, demonstrationColumns, total } = useMemo(() => {
-    const allKeys = (node.data.inputs ?? [])
-      .map((input) => input.identifier)
-      .concat((node.data.outputs ?? []).map((output) => output.identifier))
-      .concat(["id"]);
-    const demonstrationRows =
-      node.data.demonstrations?.map((demonstration, index) => {
-        return {
-          ...Object.fromEntries(
-            Object.entries(demonstration).filter(([key]) =>
-              allKeys.includes(key)
-            )
-          ),
-          id: `${index}`,
-        };
-      }) ?? [];
-    const presentKeys = new Set();
-    demonstrationRows?.forEach((row) => {
-      Object.entries(row).forEach(([key, value]) => {
-        if (value !== undefined && value !== null) {
-          presentKeys.add(key);
-        }
-      });
-    });
-    const demonstrationColumns = Array.from(presentKeys)
-      .filter((key) => key !== "id")
-      .map((key) => ({
-        name: key as string,
-        type: "string" as DatasetColumnType,
-      }));
-
-    return {
-      demonstrationRows,
-      demonstrationColumns,
-      total: demonstrationRows?.length,
-    };
-  }, [node.data.demonstrations, node.data.inputs, node.data.outputs]);
+  const { isOpen, onOpen, onClose } = useDisclosure();
+  const {
+    rows: demonstrationRows,
+    columns: demonstrationColumns,
+    total,
+  } = useGetDatasetData({
+    dataset: node.data.demonstrations,
+    preview: true,
+  });
 
   return (
     <BasePropertiesPanel
@@ -66,10 +48,10 @@ export function SignaturePropertiesPanel({ node }: { node: Node<Signature> }) {
       fieldsAfter={
         <>
           <VStack width="full" align="start" spacing={2}>
-            <HStack>
+            <HStack width="full">
               <PropertySectionTitle>
                 Demonstrations{" "}
-                {total > 0 && (
+                {total !== undefined && total > 0 && (
                   <Text as="span" color="gray.400">
                     ({total} rows)
                   </Text>
@@ -80,11 +62,28 @@ export function SignaturePropertiesPanel({ node }: { node: Node<Signature> }) {
                   <Info size={14} />
                 </Box>
               </Tooltip>
+              <Spacer />
+              <Button
+                size="xs"
+                variant="ghost"
+                marginBottom={-1}
+                leftIcon={<Edit2 size={14} />}
+                onClick={() => {
+                  onOpen();
+                }}
+              >
+                <Text>Edit</Text>
+              </Button>
             </HStack>
             <DatasetPreview
               rows={demonstrationRows}
               columns={demonstrationColumns}
               minHeight={`${36 + 29 * (demonstrationRows?.length ?? 0)}px`}
+            />
+            <DemonstrationsModal
+              isOpen={isOpen}
+              onClose={onClose}
+              node={node}
             />
           </VStack>
         </>
