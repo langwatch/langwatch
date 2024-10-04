@@ -61,7 +61,13 @@ export const useWorkflowExecution = () => {
   }, [triggerTimeout, setWorkflowExecutionState, getWorkflow, toast]);
 
   const startWorkflowExecution = useCallback(
-    ({ untilNodeId }: { untilNodeId?: string }) => {
+    ({
+      untilNodeId,
+      inputs,
+    }: {
+      untilNodeId?: string;
+      inputs?: Array<Record<string, string>>;
+    }) => {
       if (!socketAvailable()) {
         return;
       }
@@ -80,6 +86,7 @@ export const useWorkflowExecution = () => {
           trace_id,
           workflow: getWorkflow(),
           until_node_id: untilNodeId,
+          inputs: inputs,
         },
       };
       sendMessage(payload);

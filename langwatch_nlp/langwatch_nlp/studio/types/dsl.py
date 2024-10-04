@@ -188,6 +188,7 @@ class WorkflowExecutionState(BaseModel):
     until_node_id: Optional[str] = None
     error: Optional[str] = None
     timestamps: Optional[Timestamps] = None
+    result: Optional[Dict[str, Any]] = None
 
 
 class EvaluationExecutionState(BaseModel):

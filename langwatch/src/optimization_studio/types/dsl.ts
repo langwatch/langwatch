@@ -133,6 +133,7 @@ export type Workflow = {
       trace_id?: string;
       until_node_id?: string;
       error?: string;
+      result?: Record<string, any>;
       timestamps?: {
         started_at?: number;
         finished_at?: number;
