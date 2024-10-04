@@ -59,6 +59,7 @@ import { CurrentDrawer } from "../../components/CurrentDrawer";
 import { Optimize } from "./Optimize";
 import { ChatWindow } from "./ChatWindow";
 import { Play } from "react-feather";
+import { Publish } from "./Publish";
 
 // New component that uses useDrop
 function DragDropArea({ children }: { children: React.ReactNode }) {
@@ -270,7 +271,9 @@ export default function OptimizationStudio() {
               </HStack>
               <HStack justify="end" paddingLeft={2}>
                 <Evaluate />
+
                 <Optimize />
+                <Publish />
               </HStack>
             </HStack>
             <Box width="full" height="full" position="relative">
