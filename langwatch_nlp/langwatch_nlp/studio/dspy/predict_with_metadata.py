@@ -2,6 +2,9 @@ import time
 from typing import Optional, cast
 import dspy
 
+# Remove @functools.lru_cache for cached_litellm_completion for proper PredictionWithMetadata info
+import langwatch_nlp.studio.dspy.patched_caching
+
 
 class PredictionWithMetadata(dspy.Prediction):
     def __init__(self, *args, error: Optional[Exception] = None, **kwargs):

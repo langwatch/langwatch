@@ -29,6 +29,7 @@ from dspy.evaluate.evaluate import Evaluate
 
 from langwatch.tracer import ContextTrace
 from langwatch.utils import reduce_payload_size
+import litellm
 
 
 class SerializableAndPydanticEncoder(json.JSONEncoder):
@@ -275,6 +276,11 @@ class LangWatchDSPy:
                     response["model"] = lm_response["model"]
                 if "choices" in lm_response:
                     response["choices"] = lm_response["choices"]
+                if (
+                    not "_hidden_params" in lm_response
+                    or "additional_headers" not in lm_response["_hidden_params"]
+                ):
+                    response["cached"] = True
                 llm_call["response"] = response
 
                 if "usage" in entry:

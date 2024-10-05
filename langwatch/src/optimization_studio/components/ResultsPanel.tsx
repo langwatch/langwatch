@@ -56,6 +56,8 @@ export function ResultsPanel({
   collapsePanel: (isCollapsed: boolean) => void;
   defaultTab: "evaluations" | "optimizations";
 }) {
+  const [tabIndex, setTabIndex] = useState(0);
+
   return (
     <HStack
       display={isCollapsed ? "none" : undefined}
@@ -86,6 +88,8 @@ export function ResultsPanel({
         flexDirection="column"
         size="sm"
         defaultIndex={defaultTab === "evaluations" ? 0 : 1}
+        index={tabIndex}
+        onChange={(index) => setTabIndex(index)}
       >
         <TabList>
           <Tab>Evaluations</Tab>
@@ -93,10 +97,10 @@ export function ResultsPanel({
         </TabList>
         <TabPanels minHeight="0" height="full">
           <TabPanel padding={0} height="full">
-            {!isCollapsed && <EvaluationResults />}
+            {!isCollapsed && tabIndex === 0 && <EvaluationResults />}
           </TabPanel>
           <TabPanel padding={0} height="full">
-            {!isCollapsed && <OptimizationResults />}
+            {!isCollapsed && tabIndex === 1 && <OptimizationResults />}
           </TabPanel>
         </TabPanels>
       </Tabs>

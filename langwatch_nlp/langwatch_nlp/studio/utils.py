@@ -7,6 +7,7 @@ import re
 from typing import Any, Dict, List, cast
 
 from joblib.memory import MemorizedFunc, AsyncMemorizedFunc
+import litellm
 
 from langwatch_nlp.studio.types.dsl import (
     DatasetInline,
@@ -52,6 +53,7 @@ def print_class_definition(cls):
 def disable_dsp_caching():
     MemorizedFunc._is_in_cache_and_valid = lambda *args, **kwargs: False
     AsyncMemorizedFunc._is_in_cache_and_valid = lambda *args, **kwargs: False
+    litellm.cache = None
 
 
 def print_ast(node):
