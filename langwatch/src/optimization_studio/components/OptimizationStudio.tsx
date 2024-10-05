@@ -57,8 +57,8 @@ import { useAskBeforeLeaving } from "../hooks/useAskBeforeLeaving";
 import { RunningStatus } from "./ExecutionState";
 import { CurrentDrawer } from "../../components/CurrentDrawer";
 import { Optimize } from "./Optimize";
-import { ChatWindow } from "./ChatWindow";
-import { Play } from "react-feather";
+import { ChatWindow, PlaygroundButton } from "./ChatWindow";
+import { Play, TrendingUp } from "react-feather";
 
 // New component that uses useDrop
 function DragDropArea({ children }: { children: React.ReactNode }) {
@@ -153,7 +153,7 @@ export default function OptimizationStudio() {
     useState(true);
 
   const panelRef = useRef<ImperativePanelHandle>(null);
-  const [isPanelCollapsed, setIsPanelCollapsed] = useState(false);
+  const [isResultsPanelCollapsed, setIsResultsPanelCollapsed] = useState(false);
 
   const collapsePanel = () => {
     const panel = panelRef.current;
@@ -169,21 +169,23 @@ export default function OptimizationStudio() {
   useEffect(() => {
     if (
       openResultsPanelRequest === "evaluations" ||
-      (openResultsPanelRequest === "optimizations" && isPanelCollapsed)
+      (openResultsPanelRequest === "optimizations" && isResultsPanelCollapsed)
     ) {
       setDefaultTab(openResultsPanelRequest);
       panelRef.current?.expand(0);
       panelRef.current?.resize(6);
+
+      const openTo = openResultsPanelRequest === "optimizations" ? 100 : 70;
       const step = () => {
         const size = panelRef.current?.getSize() ?? 0;
-        if (size < 70) {
+        if (size < openTo) {
           panelRef.current?.resize(size + 10);
           window.requestAnimationFrame(step);
         }
       };
       step();
     }
-    if (openResultsPanelRequest === "closed" && !isPanelCollapsed) {
+    if (openResultsPanelRequest === "closed" && !isResultsPanelCollapsed) {
       panelRef.current?.collapse();
     }
     setOpenResultsPanelRequest(undefined);
@@ -206,14 +208,11 @@ export default function OptimizationStudio() {
 
   useAskBeforeLeaving();
 
-  const chatModal = useDisclosure();
-
   return (
     <div style={{ width: "100vw", height: "100vh" }}>
       <Head>
         <title>LangWatch - Optimization Studio - {name}</title>
       </Head>
-      <ChatWindow isOpen={chatModal.isOpen} onClose={chatModal.onClose} />
       <DndProvider backend={HTML5Backend}>
         <ReactFlowProvider>
           <VStack width="full" height="full" spacing={0}>
@@ -267,8 +266,7 @@ export default function OptimizationStudio() {
               <HStack width="full" justify="end">
                 <UndoRedo />
                 <History />
-              </HStack>
-              <HStack justify="end" paddingLeft={2}>
+                <Box />
                 <Evaluate />
                 <Optimize />
               </HStack>
@@ -281,11 +279,30 @@ export default function OptimizationStudio() {
                 />
                 <PanelGroup direction="vertical">
                   <Panel style={{ position: "relative" }}>
-                    <NodeSelectionPanelButton
-                      isOpen={nodeSelectionPanelIsOpen}
-                      setIsOpen={setNodeSelectionPanelIsOpen}
-                    />
-                    {isPanelCollapsed && <ProgressToast />}
+                    <HStack
+                      position="absolute"
+                      bottom={3}
+                      left={3}
+                      zIndex={100}
+                    >
+                      <NodeSelectionPanelButton
+                        isOpen={nodeSelectionPanelIsOpen}
+                        setIsOpen={setNodeSelectionPanelIsOpen}
+                      />
+                      <Button
+                        display={isResultsPanelCollapsed ? "block" : "none"}
+                        background="white"
+                        borderRadius={4}
+                        borderColor="gray.350"
+                        variant="outline"
+                        onClick={() => {
+                          panelRef.current?.expand(70);
+                        }}
+                      >
+                        <TrendingUp size={22} />
+                      </Button>
+                    </HStack>
+                    {isResultsPanelCollapsed && <ProgressToast />}
                     <DragDropArea>
                       <ReactFlow
                         nodeTypes={nodeTypes}
@@ -314,8 +331,12 @@ export default function OptimizationStudio() {
                           orientation="horizontal"
                           style={{
                             marginLeft: nodeSelectionPanelIsOpen
-                              ? "16px"
-                              : "80px",
+                              ? !isResultsPanelCollapsed
+                                ? "16px"
+                                : "80px"
+                              : !isResultsPanelCollapsed
+                              ? "80px"
+                              : "142px",
                             marginBottom: "18px",
                           }}
                         />
@@ -328,16 +349,7 @@ export default function OptimizationStudio() {
                         />
 
                         <FlowPanel position="bottom-right">
-                          <Button
-                            onClick={chatModal.onOpen}
-                            rightIcon={<Play size={16} />}
-                            isDisabled={socketStatus !== "connected"}
-                            variant="outline"
-                            size="sm"
-                            background="white"
-                          >
-                            Playground
-                          </Button>
+                          <PlaygroundButton />
                         </FlowPanel>
                       </ReactFlow>
                     </DragDropArea>
@@ -358,16 +370,15 @@ export default function OptimizationStudio() {
                     collapsible
                     minSize={6}
                     ref={panelRef}
-                    onCollapse={() => setIsPanelCollapsed(true)}
-                    onExpand={() => setIsPanelCollapsed(false)}
+                    onCollapse={() => setIsResultsPanelCollapsed(true)}
+                    onExpand={() => setIsResultsPanelCollapsed(false)}
                     defaultSize={0}
                   >
-                    {!isPanelCollapsed && (
-                      <ResultsPanel
-                        collapsePanel={collapsePanel}
-                        defaultTab={defaultTab}
-                      />
-                    )}
+                    <ResultsPanel
+                      isCollapsed={isResultsPanelCollapsed}
+                      collapsePanel={collapsePanel}
+                      defaultTab={defaultTab}
+                    />
                   </Panel>
                 </PanelGroup>
                 <PropertiesPanel />

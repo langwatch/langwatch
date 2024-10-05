@@ -88,13 +88,26 @@ export const useSocketClient = () => {
 
   const alertOnError = useCallback(
     (message: string | undefined) => {
-      toast({
-        title: "Error",
-        description: message?.slice(0, 140),
-        status: "error",
-        duration: 5000,
-        isClosable: true,
-      });
+      if (
+        !!message?.toLowerCase().includes("stopped") ||
+        !!message?.toLowerCase().includes("interrupted")
+      ) {
+        toast({
+          title: "Stopped",
+          description: message?.slice(0, 140),
+          status: "info",
+          duration: 3000,
+          isClosable: true,
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: message?.slice(0, 140),
+          status: "error",
+          duration: 5000,
+          isClosable: true,
+        });
+      }
     },
     [toast]
   );

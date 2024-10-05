@@ -360,7 +360,11 @@ export function BatchEvaluationV2RunList({
                   />
                 )}
                 <VStack align="start" spacing={0}>
-                  <Text fontSize={size === "sm" ? "13px" : "14px"}>
+                  <Text
+                    fontSize={size === "sm" ? "13px" : "14px"}
+                    noOfLines={1}
+                    wordBreak="break-all"
+                  >
                     {runName}
                     {getFinishedAt(run.timestamps, new Date().getTime()) ===
                       undefined && (

@@ -19,25 +19,18 @@ export function NodeSelectionPanelButton({
   setIsOpen: (isOpen: boolean) => void;
 }) {
   return (
-    <Box
+    <Button
       display={isOpen ? "none" : "block"}
-      position="absolute"
-      bottom={3}
-      left={3}
-      zIndex={100}
       background="white"
       borderRadius={4}
       borderColor="gray.350"
+      variant="outline"
+      onClick={() => {
+        setIsOpen(!isOpen);
+      }}
     >
-      <Button
-        variant="outline"
-        onClick={() => {
-          setIsOpen(!isOpen);
-        }}
-      >
-        <BoxIcon size={22} />
-      </Button>
-    </Box>
+      <BoxIcon size={22} />
+    </Button>
   );
 }
 
