@@ -74,8 +74,6 @@ async def execute_optimization(
     try:
         validate_workflow(workflow)
 
-        disable_dsp_caching()
-
         # TODO: handle workflow errors here throwing an special event showing the error was during the execution of the workflow?
         yield start_optimization_event(run_id)
         valid = True
