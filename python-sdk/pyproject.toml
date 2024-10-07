@@ -40,6 +40,7 @@ pandas = "^2.2.2"
 coolname = "^2.2.0"
 dspy-ai = { version = "^2.5.2", optional = true }
 deprecated = "^1.2.14"
+# crewai = { version = "^0.67.1", optional = true } # Required python >=3.10
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.4.2"
