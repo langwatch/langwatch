@@ -1,20 +1,17 @@
 import { DragHandleIcon } from "@chakra-ui/icons";
 import { Box, Button, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
-import {
-  useReactFlow,
-  type Node as XYFlowNode,
-  type XYPosition,
-} from "@xyflow/react";
-import { useEffect, useMemo } from "react";
+import { useReactFlow, type Node, type XYPosition } from "@xyflow/react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useDrag, useDragLayer } from "react-dnd";
 import { Box as BoxIcon, ChevronsLeft } from "react-feather";
-import { NodeComponents } from ".";
-import { HoverableBigText } from "../../../components/HoverableBigText";
-import { useWorkflowStore } from "../../hooks/useWorkflowStore";
-import { MODULES } from "../../registry";
-import { type Component, type ComponentType } from "../../types/dsl";
-import { ComponentIcon } from "../ColorfulBlockIcons";
+import { NodeComponents } from "./nodes";
+import { HoverableBigText } from "../../components/HoverableBigText";
+import { useWorkflowStore } from "../hooks/useWorkflowStore";
+import { MODULES } from "../registry";
+import { type Component, type ComponentType } from "../types/dsl";
+import { ComponentIcon } from "./ColorfulBlockIcons";
 import { getEmptyImage } from "react-dnd-html5-backend";
+import { nameToId } from "../utils/nodeUtils";
 
 export function NodeSelectionPanelButton({
   isOpen,
@@ -71,8 +68,8 @@ export const NodeSelectionPanel = ({
       width="300px"
       minWidth="300px"
     >
-      <VStack height="full">
-        <VStack spacing={4} align="start">
+      <VStack width="full" height="full">
+        <VStack width="full" spacing={4} align="start">
           <Text fontWeight="500" padding={1}>
             Components
           </Text>
@@ -117,40 +114,25 @@ export const NodeSelectionPanel = ({
   );
 };
 
-type Node = {
-  id: string;
-  type: string;
-  position?: XYPosition;
-  data: {
-    name: string;
-    inputs: { identifier: string; type: string }[];
-    outputs: { identifier: string; type: string }[];
+const findLowestAvailableName = (nodes: Node[], prefix: string) => {
+  const findNode = (id: string) => {
+    return nodes.find((node) => node.id === id);
   };
-};
-
-const extractIdNumber = (str?: string) => {
-  const match = str?.match(/\((\d+)\)$/);
-  return match?.[1] ? parseInt(match[1], 10) : 1;
-};
-
-const findLowestAvailableName = (nodes: XYFlowNode[], prefix: string) => {
-  const usedIds = nodes
-    .filter(
-      (node) => (node.data.name as string | undefined)?.startsWith(prefix)
-    )
-    .map((node) => extractIdNumber(node.id))
-    .filter((id): id is number => id !== null);
 
   let i = 1;
-  while (usedIds.includes(i)) {
+  let name;
+  let id;
+  do {
+    if (i === 1) {
+      name = prefix;
+    } else {
+      name = `${prefix} (${i})`;
+    }
+    id = nameToId(name);
     i++;
-  }
+  } while (findNode(id));
 
-  if (i === 1) {
-    return prefix;
-  }
-
-  return `${prefix} (${i})`;
+  return { name, id };
 };
 
 export const NodeDraggable = (props: {
@@ -164,11 +146,10 @@ export const NodeDraggable = (props: {
     propertiesExpanded: state.propertiesExpanded,
   }));
   const { newNode } = useMemo(() => {
-    const newName = findLowestAvailableName(
+    const { name: newName, id: newId } = findLowestAvailableName(
       nodes,
       props.component.name ?? "Component"
     );
-    const newId = newName.toLowerCase().replace(/\s/g, "_");
     const newNode = {
       id: newId,
       type: props.type,
@@ -206,10 +187,10 @@ export const NodeDraggable = (props: {
 
     if (newNode) {
       newNode.position = {
-        x: position.x - 90,
-        y: position.y - 80,
-      } as XYPosition;
-      setNodes([...nodes, newNode as XYFlowNode]);
+        x: position.x - (newNode.width ?? 0) / 2,
+        y: position.y - (newNode.height ?? 0) / 2,
+      };
+      setNodes([...nodes, newNode]);
     }
   };
 
@@ -229,7 +210,7 @@ export const NodeDraggable = (props: {
         overflow="hidden"
         opacity={collected.isDragging ? 0.5 : 1}
       >
-        <HStack>
+        <HStack width="full">
           <ComponentIcon
             type={props.type}
             cls={props.component.cls}
@@ -247,16 +228,27 @@ export const NodeDraggable = (props: {
 };
 
 export function CustomDragLayer() {
-  const { isDragging, item, currentOffset } = useDragLayer(
-    (monitor) => ({
-      item: monitor.getItem(),
-      itemType: monitor.getItemType(),
-      currentOffset: monitor.getSourceClientOffset(),
-      isDragging: monitor.isDragging(),
-    })
-  );
+  const { isDragging, item, currentOffset } = useDragLayer((monitor) => ({
+    item: monitor.getItem(),
+    itemType: monitor.getItemType(),
+    currentOffset: monitor.getClientOffset(),
+    isDragging: monitor.isDragging(),
+  })) as {
+    isDragging: boolean;
+    item: { node: Node } | undefined;
+    currentOffset: XYPosition;
+  };
 
-  if (!isDragging) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (item && ref.current) {
+      const { width, height } = ref.current.getBoundingClientRect();
+      item.node.width = width;
+      item.node.height = height;
+    }
+  }, [isDragging, item]);
+
+  if (!isDragging || !item) {
     return null;
   }
 
@@ -269,18 +261,19 @@ export function CustomDragLayer() {
         pointerEvents: "none",
         zIndex: 200,
         left: currentOffset?.x ?? 0,
-        top: (currentOffset?.y ?? 0) + 32,
-        transform: "translateY(-50%)",
+        top: currentOffset?.y ?? 0,
+        transform: "translate(-50%, -50%)",
         opacity: 0.5,
       }}
     >
       <ComponentNode
+        ref={ref}
         id={item.node.id}
-        type={item.node.type}
-        data={item.node.data}
+        type={item.node.type as ComponentType}
+        data={item.node.data as any}
         draggable={false}
-        width={200}
-        height={200}
+        width={item.node.width}
+        height={item.node.height}
         deletable={false}
         selectable={false}
         selected={false}

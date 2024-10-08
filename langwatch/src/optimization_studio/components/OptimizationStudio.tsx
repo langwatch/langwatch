@@ -48,7 +48,7 @@ import {
   CustomDragLayer,
   NodeSelectionPanel,
   NodeSelectionPanelButton,
-} from "./nodes/NodeSelectionPanel";
+} from "./NodeSelectionPanel";
 import { SignatureNode } from "./nodes/SignatureNode";
 import { ProgressToast } from "./ProgressToast";
 import { PropertiesPanel } from "./properties/PropertiesPanel";

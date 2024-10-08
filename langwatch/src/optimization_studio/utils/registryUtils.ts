@@ -50,7 +50,9 @@ export const convertEvaluators = (
 
       return {
         cls,
-        name: evaluatorTempNameMap[evaluator.name] ?? evaluator.name,
+        name: (evaluatorTempNameMap[evaluator.name] ?? evaluator.name)
+          .replace("Evaluator", "")
+          .trim(),
         inputs,
         outputs,
       } satisfies Evaluator;

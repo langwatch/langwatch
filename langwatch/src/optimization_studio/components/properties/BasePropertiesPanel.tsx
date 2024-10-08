@@ -30,6 +30,7 @@ import {
   NodeSectionTitle,
   TypeLabel,
 } from "../nodes/Nodes";
+import { nameToId } from "../../utils/nodeUtils";
 
 export function PropertyField({
   title,
@@ -292,7 +293,7 @@ export function BasePropertiesPanel({
     !("data" in node);
 
   const handleNameChange = (value: string, id: string) => {
-    const newId = value.replace(/[^a-zA-Z0-9_]/g, "_");
+    const newId = nameToId(value);
 
     setNode(
       {

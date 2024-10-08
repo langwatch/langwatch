@@ -34,7 +34,7 @@ const ALLOWED_EVALUATORS = [
 const evaluators: Evaluator[] = [
   {
     cls: "ExactMatchEvaluator",
-    name: "ExactMatchEvaluator",
+    name: "Exact Match",
     inputs: [
       { identifier: "output", type: "str" },
       { identifier: "expected_output", type: "str" },
