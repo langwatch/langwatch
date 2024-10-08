@@ -119,6 +119,11 @@ export function PublishModalContent({ onClose }: { onClose: () => void }) {
   const toast = useToast();
   const publishWorkflow = api.workflow.publish.useMutation();
 
+  console.log(versions.data);
+
+  console.log("vversionToBeEvaluated", versionToBeEvaluated);
+  console.log("workflowId", workflowId);
+
   const onSubmit = () => {
     publishWorkflow.mutate(
       {
