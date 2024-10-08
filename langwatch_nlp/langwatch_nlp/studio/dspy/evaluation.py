@@ -177,11 +177,16 @@ class EvaluationReporting:
             }
 
             if result.status == "processed":
-                evaluation["score"] = result.score
-                evaluation["passed"] = result.passed
-                evaluation["label"] = result.label
-                evaluation["details"] = result.details
-                evaluation["cost"] = result.cost
+                if result.score is not None:
+                    evaluation["score"] = result.score
+                if result.passed is not None:
+                    evaluation["passed"] = result.passed
+                if result.label is not None:
+                    evaluation["label"] = result.label
+                if result.details is not None:
+                    evaluation["details"] = result.details
+                if result.cost is not None:
+                    evaluation["cost"] = result.cost.amount
             elif result.status == "error" or result.status == "skipped":
                 evaluation["details"] = result.details
 

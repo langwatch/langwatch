@@ -22,7 +22,7 @@ async def execute_component(event: ExecuteComponentPayload):
         trace_id=event.trace_id, api_key=event.workflow.api_key, skip_root_span=True
     ) as trace:
         trace.autotrack_dspy()
-        module = parse_component(node, event.workflow)()
+        module = parse_component(node, event.workflow)
         result = module(**event.inputs)
 
     cost = result.get_cost() if hasattr(result, "get_cost") else None

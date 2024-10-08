@@ -38,7 +38,7 @@ class WorkflowModule(ReportingModule):
         for node in self.workflow.nodes:
             if node.type not in ["entry", "end"]:
                 component = parse_component(node, workflow)
-                self.components[node.id] = component()
+                self.components[node.id] = component
                 setattr(self, validate_identifier(node.id), self.components[node.id])
 
     def forward(self, **kwargs):

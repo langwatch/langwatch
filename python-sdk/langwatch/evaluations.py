@@ -42,6 +42,7 @@ def evaluate(
     as_guardrail: bool = False,
     trace: Optional[ContextTrace] = None,
     span: Optional[ContextSpan] = None,
+    api_key: Optional[str] = None,
 ):
     with _optional_create_span(
         trace=trace,
@@ -62,6 +63,7 @@ def evaluate(
             span_id=span.span_id if span else None,
             span=span,
             as_guardrail=as_guardrail,
+            api_key=api_key,
         )
         try:
             with httpx.Client(timeout=30) as client:
@@ -85,6 +87,7 @@ async def async_evaluate(
     as_guardrail: bool = False,
     trace: Optional[ContextTrace] = None,
     span: Optional[ContextSpan] = None,
+    api_key: Optional[str] = None,
 ):
     with _optional_create_span(
         trace=trace,
@@ -105,6 +108,7 @@ async def async_evaluate(
             span_id=span.span_id if span else None,
             span=span,
             as_guardrail=as_guardrail,
+            api_key=api_key,
         )
         try:
             async with httpx.AsyncClient(timeout=30) as client:
@@ -154,6 +158,7 @@ def prepare_data(
     span_id: Optional[Union[str, UUID]] = None,
     span: Optional[ContextSpan] = None,
     as_guardrail: bool = False,
+    api_key: Optional[str] = None,
 ):
     data = {}
     if input:
@@ -182,7 +187,7 @@ def prepare_data(
             "settings": settings,
             "as_guardrail": as_guardrail,
         },
-        "headers": {"X-Auth-Token": str(langwatch.api_key)},
+        "headers": {"X-Auth-Token": str(api_key or langwatch.api_key)},
     }
 
 

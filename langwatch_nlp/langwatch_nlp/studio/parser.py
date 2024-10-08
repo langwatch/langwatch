@@ -1,6 +1,7 @@
 import os
 from typing import Any, Dict, List
 from langwatch_nlp.studio.dspy.predict_with_metadata import PredictWithMetadata
+from langwatch_nlp.studio.modules.evaluators.langwatch import LangWatchEvaluator
 from langwatch_nlp.studio.modules.registry import MODULES
 from langwatch_nlp.studio.types.dsl import Evaluator, Node, Signature, Workflow
 import dspy
@@ -11,12 +12,12 @@ from langwatch_nlp.studio.utils import (
 )
 
 
-def parse_component(node: Node, workflow: Workflow) -> type[dspy.Module]:
+def parse_component(node: Node, workflow: Workflow) -> dspy.Module:
     match node.type:
         case "signature":
-            return parse_signature(node.id, node.data, workflow)
+            return parse_signature(node.id, node.data, workflow)()
         case "evaluator":
-            return parse_evaluator(node.data)
+            return parse_evaluator(node.data, workflow)
         case _:
             raise NotImplementedError(f"Unknown component type: {node.type}")
 
@@ -76,8 +77,23 @@ def parse_signature(
     return ModuleClass
 
 
-def parse_evaluator(component: Evaluator) -> type[dspy.Module]:
+def parse_evaluator(component: Evaluator, workflow: Workflow) -> dspy.Module:
     if not component.cls:
         raise ValueError("Evaluator class not specified")
 
-    return MODULES["evaluator"][component.cls]
+    if component.cls == "LangWatchEvaluator":
+        settings = {
+            field.identifier: field.defaultValue
+            for field in (component.parameters or [])
+            if field.defaultValue
+        }
+        if not component.evaluator:
+            raise ValueError("Evaluator not specified")
+        return LangWatchEvaluator(
+            api_key=workflow.api_key,
+            evaluator=component.evaluator,
+            name=component.name or "LangWatchEvaluator",
+            settings=settings,
+        )
+
+    return MODULES["evaluator"][component.cls]()

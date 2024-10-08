@@ -1,6 +1,5 @@
 import type { Edge, Node } from "@xyflow/react";
 import type { DatasetColumns } from "../../server/datasets/types";
-import type { MODULES } from "./modules";
 
 export type Field = {
   identifier: string;
@@ -108,6 +107,7 @@ export type Entry = BaseComponent & {
 
 export type Evaluator = Omit<BaseComponent, "cls"> & {
   cls: string;
+  evaluator?: string;
 };
 
 export type Component = BaseComponent | Entry | Signature | Module | Evaluator;

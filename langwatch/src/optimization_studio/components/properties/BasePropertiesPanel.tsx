@@ -31,6 +31,7 @@ import {
   TypeLabel,
 } from "../nodes/Nodes";
 import { nameToId } from "../../utils/nodeUtils";
+import { HoverableBigText } from "../../../components/HoverableBigText";
 
 export function PropertyField({
   title,
@@ -317,7 +318,7 @@ export function BasePropertiesPanel({
       height="full"
       overflowY="auto"
     >
-      <HStack paddingY={1} paddingLeft={2} width="full" justify="space-between">
+      <HStack paddingY={1} paddingLeft={2} width="full" justify="space-between" spacing={0}>
         <HStack spacing={2}>
           {header ? (
             header
@@ -359,7 +360,8 @@ export function BasePropertiesPanel({
                   }}
                 />
               ) : (
-                <Text
+                <HoverableBigText
+                  noOfLines={2}
                   fontSize={15}
                   fontWeight={500}
                   onClick={() => setIsEditingName(true)}
@@ -368,13 +370,11 @@ export function BasePropertiesPanel({
                   textOverflow="ellipsis"
                 >
                   {getNodeDisplayName(node)}
-                </Text>
+                </HoverableBigText>
               )}
             </>
           ) : null}
         </HStack>
-        <Spacer />
-
         <HStack spacing={0} marginRight="-4px" hidden={isEditingName}>
           {!isWorkflow(node) && isExecutableComponent(node) && (
             <>

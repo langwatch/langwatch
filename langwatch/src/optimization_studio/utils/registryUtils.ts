@@ -6,22 +6,22 @@ export const convertEvaluators = (
   evaluators: typeof AVAILABLE_EVALUATORS
 ): Evaluator[] => {
   return Object.entries(evaluators)
-    .filter(([cls, evaluator]) => {
+    .filter(([evaluator, definition]) => {
       if (
-        evaluator.requiredFields.includes("conversation") ||
-        evaluator.optionalFields.includes("conversation") ||
-        cls.startsWith("example/")
+        definition.requiredFields.includes("conversation") ||
+        definition.optionalFields.includes("conversation") ||
+        evaluator.startsWith("example/")
       ) {
         return false;
       }
       return true;
     })
-    .map(([cls, evaluator]) => {
-      const inputs: Field[] = [];
+    .map(([evaluator, definition]) => {
+      let inputs: Field[] = [];
       const outputs: Field[] = [];
 
       // Add required fields
-      evaluator.requiredFields.forEach((field) => {
+      definition.requiredFields.forEach((field) => {
         inputs.push({
           identifier: field,
           type: field === "contexts" ? "list[str]" : "str",
@@ -29,7 +29,7 @@ export const convertEvaluators = (
       });
 
       // Add optional fields
-      evaluator.optionalFields.forEach((field) => {
+      definition.optionalFields.forEach((field) => {
         inputs.push({
           identifier: field,
           type: field === "contexts" ? "list[str]" : "str",
@@ -37,20 +37,33 @@ export const convertEvaluators = (
         });
       });
 
+      const fieldsOrder = [
+        "conversation",
+        "input",
+        "contexts",
+        "output",
+        "expected_output",
+      ];
+      inputs = inputs.sort(
+        (a, b) =>
+          fieldsOrder.indexOf(a.identifier) - fieldsOrder.indexOf(b.identifier)
+      );
+
       // Add outputs based on the result object
-      if (evaluator.result.score) {
+      if (definition.result.score) {
         outputs.push({ identifier: "score", type: "float" });
       }
-      if (evaluator.result.passed) {
+      if (definition.result.passed) {
         outputs.push({ identifier: "passed", type: "bool" });
       }
-      if (evaluator.result.label) {
+      if (definition.result.label) {
         outputs.push({ identifier: "label", type: "str" });
       }
 
       return {
-        cls,
-        name: (evaluatorTempNameMap[evaluator.name] ?? evaluator.name)
+        cls: "LangWatchEvaluator",
+        evaluator,
+        name: (evaluatorTempNameMap[definition.name] ?? definition.name)
           .replace("Evaluator", "")
           .trim(),
         inputs,

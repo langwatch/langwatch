@@ -125,19 +125,8 @@ const DynamicZodForm = ({
                   )}
                   model={field.value}
                   onChange={(model) => field.onChange(model)}
+                  mode={fieldName === "model" ? "chat" : "embedding"}
                 />
-                {fieldName == "model" &&
-                  evaluator?.name.toLowerCase().includes("ragas") &&
-                  !field.value?.endsWith("16k") && (
-                    <Alert status="warning" marginTop={4}>
-                      <AlertIcon />
-                      <Text>
-                        <b>Heads up:</b> Ragas is built for GPT-3.5 16K
-                        specifically, and might not produce accurate scores with
-                        other models
-                      </Text>
-                    </Alert>
-                  )}
               </>
             )}
           />

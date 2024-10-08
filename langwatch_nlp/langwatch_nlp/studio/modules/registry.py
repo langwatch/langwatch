@@ -1,5 +1,6 @@
 from typing import Type, Union
 from langwatch_nlp.studio.modules.evaluators.exact_match import ExactMatchEvaluator
+from langwatch_nlp.studio.modules.evaluators.langwatch import LangWatchEvaluator
 from dspy.teleprompt import (
     BootstrapFewShot,
     BootstrapFewShotWithRandomSearch,
@@ -10,6 +11,7 @@ from dspy.teleprompt import (
 MODULES = {
     "evaluator": {
         "ExactMatchEvaluator": ExactMatchEvaluator,
+        "LangWatchEvaluator": LangWatchEvaluator,
     }
 }
 
