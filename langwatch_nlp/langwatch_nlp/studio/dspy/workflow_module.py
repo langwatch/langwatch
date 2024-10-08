@@ -111,7 +111,9 @@ class WorkflowModule(ReportingModule):
 
             def has_all_inputs(node: Node) -> bool:
                 required_inputs = set(
-                    cast(Field, input).identifier for input in node.data.inputs or []
+                    cast(Field, input).identifier
+                    for input in node.data.inputs or []
+                    if not input.optional
                 )
                 available_inputs = set()
                 for edge in self.workflow.edges:
