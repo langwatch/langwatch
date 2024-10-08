@@ -35,6 +35,8 @@ from langwatch_nlp.studio.types.events import (
     StudioServerEvent,
     Error,
     ErrorPayload,
+    ExecuteFlow,
+    ExecuteFlowPayload,
     component_error_event,
 )
 
@@ -273,8 +275,40 @@ async def event_encoder(event_generator: AsyncGenerator[StudioServerEvent, None]
 async def execute(
     event: StudioClientEvent, response: Response, background_tasks: BackgroundTasks
 ):
+    print(f"Received event for execution: {event}", flush=True)
     response.headers["Cache-Control"] = "no-cache"
     return StreamingResponse(
         event_encoder(execute_event_on_a_subprocess(event)),
         media_type="text/event-stream",
     )
+
+
+@app.post("/execute_sync")
+async def execute_sync(event: StudioClientEvent):
+    print(f"Received event for sync execution: {event}", flush=True)
+
+    result = None
+    error = None
+
+    try:
+        async for event_result in execute_event_on_a_subprocess(event):
+            print(f"Received event in sync execution: {event_result}", flush=True)
+            if isinstance(event_result, Done):
+                break
+            elif isinstance(event_result, Error):
+                error = event_result.payload.message
+            else:
+                result = event_result
+
+        if error:
+            print(f"Error occurred: {error}", flush=True)
+            return {"error": error}
+        elif result:
+            print(f"Result: {result.model_dump(exclude_none=True)}", flush=True)
+            return {"result": result.model_dump(exclude_none=True)}
+        else:
+            print("No result or error received", flush=True)
+            return {"error": "No result or error received"}
+    except Exception as e:
+        print(f"Unexpected exception: {str(e)}", flush=True)
+        return {"error": f"Unexpected error: {str(e)}"}

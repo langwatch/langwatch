@@ -235,6 +235,9 @@ const MultipleInput = ({
     sendMultiMessage();
   };
 
+  console.log("inputs", inputs);
+  console.log("entryInputs", entryInputs);
+
   if (
     (!isSingle && entryInputs.length === 1) ||
     (isSingle && entryInputs.length > 1)

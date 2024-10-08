@@ -15,8 +15,12 @@ import {
   useDisclosure,
   useToast,
   VStack,
+  Menu,
+  MenuButton,
+  MenuList,
+  MenuItem,
 } from "@chakra-ui/react";
-
+import { ChevronDownIcon } from "@chakra-ui/icons";
 import { CheckSquare } from "react-feather";
 import { SmallLabel } from "../../components/SmallLabel";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
@@ -37,7 +41,30 @@ export function Publish() {
 
   return (
     <>
-      <Tooltip label={isRunning ? "Evaluation is running" : ""}>
+      <Menu>
+        {({ isOpen }) => (
+          <>
+            <MenuButton
+              isActive={isOpen}
+              as={Button}
+              variant="outline"
+              size="sm"
+              rightIcon={<ChevronDownIcon />}
+            >
+              Publish
+            </MenuButton>
+            <MenuList zIndex={9999}>
+              <MenuItem onClick={onToggle}>Publish Workflow</MenuItem>
+              <MenuItem>Run App</MenuItem>
+            </MenuList>
+          </>
+        )}
+      </Menu>
+      <Modal isOpen={isOpen} onClose={onClose}>
+        <ModalOverlay />
+        {isOpen && <PublishModalContent onClose={onClose} />}
+      </Modal>
+      {/* <Tooltip label={isRunning ? "Evaluation is running" : ""}>
         <Button
           variant="outline"
           size="sm"
@@ -51,7 +78,7 @@ export function Publish() {
       <Modal isOpen={isOpen} onClose={onClose}>
         <ModalOverlay />
         {isOpen && <PublishModalContent onClose={onClose} />}
-      </Modal>
+      </Modal> */}
     </>
   );
 }
@@ -76,10 +103,18 @@ export function PublishModalContent({ onClose }: { onClose: () => void }) {
     })
   );
 
-  const { versions, versionToBeEvaluated } = useVersionState({
+  const { versions, currentVersion } = useVersionState({
     project,
     allowSaveIfAutoSaveIsCurrentButNotLatest: false,
   });
+
+  const versionToBeSaved = versions.data
+    ?.sort((a, b) => b.version.localeCompare(a.version)) // Sort by version ID in descending order
+    .find((version) => version.autoSaved === false);
+
+  console.log("currentVersion", currentVersion);
+
+  console.log("versionToBeSaved", versionToBeSaved);
 
   const toast = useToast();
   const publishWorkflow = api.workflow.publish.useMutation();
@@ -89,7 +124,7 @@ export function PublishModalContent({ onClose }: { onClose: () => void }) {
       {
         projectId: project?.id ?? "",
         workflowId: workflowId ?? "",
-        versionId: versionToBeEvaluated.id ?? "",
+        versionId: currentVersion?.id ?? "",
       },
       {
         onSuccess: () => {
@@ -144,7 +179,9 @@ export function PublishModalContent({ onClose }: { onClose: () => void }) {
       <ModalBody>
         <VStack align="start" width="full" spacing={4}>
           <VStack align="start" width="full">
-            <VersionToBeEvaluated versionToBeEvaluated={versionToBeEvaluated} />
+            {currentVersion && (
+              <VersionToBeEvaluated versionToBeEvaluated={currentVersion} />
+            )}
           </VStack>
         </VStack>
       </ModalBody>
