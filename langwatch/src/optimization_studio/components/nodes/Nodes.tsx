@@ -2,6 +2,7 @@ import {
   Box,
   Button,
   Center,
+  forwardRef,
   HStack,
   Menu,
   MenuButton,
@@ -34,6 +35,7 @@ import {
 } from "../../types/dsl";
 import { ComponentIcon } from "../ColorfulBlockIcons";
 import { useWorkflowExecution } from "../../hooks/useWorkflowExecution";
+import type { Ref } from "react";
 
 export function getNodeDisplayName(node: { id: string; data: Component }) {
   return node.data.name ?? node.data.cls ?? node.id;
@@ -78,6 +80,8 @@ function NodeInputs({
           <Text>{input.identifier}</Text>
           <Text color="gray.400">:</Text>
           <TypeLabel type={input.type} />
+          <Spacer />
+          {input.optional && <Text color="gray.400">(optional)</Text>}
         </HStack>
       ))}
     </>
@@ -167,7 +171,7 @@ export const isExecutableComponent = (node: Pick<Node<Component>, "type">) => {
   return node.type !== "entry" && node.type !== "prompting_technique";
 };
 
-export function ComponentNode(
+export const ComponentNode = forwardRef(function ComponentNode(
   props: NodeProps<Node<Component>> & {
     icon?: React.ReactNode;
     children?: React.ReactNode;
@@ -175,7 +179,8 @@ export function ComponentNode(
     outputsName?: string;
     hidePlayButton?: boolean;
     hideOutputHandles?: boolean;
-  }
+  },
+  ref: Ref<HTMLDivElement>
 ) {
   const {
     node,
@@ -202,6 +207,7 @@ export function ComponentNode(
 
   return (
     <VStack
+      ref={ref}
       borderRadius="12px"
       background="white"
       padding="10px"
@@ -235,12 +241,14 @@ export function ComponentNode(
           {getNodeDisplayName(props)}
         </Text>
         <Spacer />
-        {node && isExecutableComponent(node) && (
+        {node && isExecutableComponent(node) ? (
           <ComponentExecutionButton
             node={node}
             marginRight="-6px"
             marginLeft="-4px"
           />
+        ) : (
+          <Box width="54px" />
         )}
       </HStack>
       {props.children}
@@ -268,7 +276,7 @@ export function ComponentNode(
       {props.fieldsAfter}
     </VStack>
   );
-}
+});
 
 export function ComponentExecutionButton({
   node,

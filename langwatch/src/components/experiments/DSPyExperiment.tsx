@@ -458,6 +458,8 @@ export function DSPyExperimentRunList({
                     <Box
                       width="24px"
                       height="24px"
+                      minWidth="24px"
+                      minHeight="24px"
                       background="gray.300"
                       borderRadius="100%"
                       backgroundColor={
@@ -471,6 +473,8 @@ export function DSPyExperimentRunList({
                         <Box
                           width="12px"
                           height="12px"
+                          minWidth="12px"
+                          minHeight="12px"
                           background="gray.300"
                           borderRadius="100%"
                           backgroundColor={

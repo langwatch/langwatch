@@ -106,7 +106,9 @@ export type Entry = BaseComponent & {
   dataset?: NodeDataset;
 };
 
-export type Evaluator = BaseComponent & MODULES["evaluator"];
+export type Evaluator = Omit<BaseComponent, "cls"> & {
+  cls: string;
+};
 
 export type Component = BaseComponent | Entry | Signature | Module | Evaluator;
 

@@ -5,11 +5,16 @@ import {
   type Node as XYFlowNode,
   type XYPosition,
 } from "@xyflow/react";
-import { useDrag } from "react-dnd";
+import { useEffect, useMemo } from "react";
+import { useDrag, useDragLayer } from "react-dnd";
 import { Box as BoxIcon, ChevronsLeft } from "react-feather";
+import { NodeComponents } from ".";
+import { HoverableBigText } from "../../../components/HoverableBigText";
 import { useWorkflowStore } from "../../hooks/useWorkflowStore";
-import { type ComponentType } from "../../types/dsl";
+import { MODULES } from "../../registry";
+import { type Component, type ComponentType } from "../../types/dsl";
 import { ComponentIcon } from "../ColorfulBlockIcons";
+import { getEmptyImage } from "react-dnd-html5-backend";
 
 export function NodeSelectionPanelButton({
   isOpen,
@@ -63,23 +68,35 @@ export const NodeSelectionPanel = ({
       height="full"
       padding={3}
       fontSize="14px"
+      width="300px"
+      minWidth="300px"
     >
       <VStack height="full">
         <VStack spacing={4} align="start">
           <Text fontWeight="500" padding={1}>
             Components
           </Text>
-          {signatures.map((signature) => {
-            const nodeCopy = JSON.parse(JSON.stringify(signature));
-            return <NodeDraggable key={signature.id} node={nodeCopy} />;
+          {MODULES.signatures.map((signature) => {
+            return (
+              <NodeDraggable
+                key={signature.name}
+                component={signature}
+                type="signature"
+              />
+            );
           })}
 
           <Text fontWeight="500" padding={1}>
             Evaluators
           </Text>
-          {evaluators.map((evaluator) => {
-            const nodeCopy = JSON.parse(JSON.stringify(evaluator));
-            return <NodeDraggable key={evaluator.id} node={nodeCopy} />;
+          {MODULES.evaluators.map((evaluator) => {
+            return (
+              <NodeDraggable
+                key={evaluator.cls}
+                component={evaluator}
+                type="evaluator"
+              />
+            );
           })}
         </VStack>
         <Spacer />
@@ -111,10 +128,64 @@ type Node = {
   };
 };
 
-export const NodeDraggable = (props: { node: Node }) => {
-  const [{ isDragging }, drag] = useDrag({
+const extractIdNumber = (str?: string) => {
+  const match = str?.match(/\((\d+)\)$/);
+  return match?.[1] ? parseInt(match[1], 10) : 1;
+};
+
+const findLowestAvailableName = (nodes: XYFlowNode[], prefix: string) => {
+  const usedIds = nodes
+    .filter(
+      (node) => (node.data.name as string | undefined)?.startsWith(prefix)
+    )
+    .map((node) => extractIdNumber(node.id))
+    .filter((id): id is number => id !== null);
+
+  let i = 1;
+  while (usedIds.includes(i)) {
+    i++;
+  }
+
+  if (i === 1) {
+    return prefix;
+  }
+
+  return `${prefix} (${i})`;
+};
+
+export const NodeDraggable = (props: {
+  component: Component;
+  type: ComponentType;
+}) => {
+  const { setNodes, nodes } = useWorkflowStore((state) => ({
+    setWorkflow: state.setWorkflow,
+    setNodes: state.setNodes,
+    nodes: state.nodes,
+    propertiesExpanded: state.propertiesExpanded,
+  }));
+  const { newNode } = useMemo(() => {
+    const newName = findLowestAvailableName(
+      nodes,
+      props.component.name ?? "Component"
+    );
+    const newId = newName.toLowerCase().replace(/\s/g, "_");
+    const newNode = {
+      id: newId,
+      type: props.type,
+      data: {
+        ...props.component,
+        name: newName,
+      },
+    };
+
+    return { newName, newId, newNode };
+  }, [props.component, props.type, nodes]);
+
+  const [collected, drag, preview] = useDrag({
     type: "node",
-    item: { node: props.node },
+    item: {
+      node: newNode,
+    },
     collect: (monitor) => ({
       isDragging: !!monitor.isDragging(),
       clientOffset: monitor.getClientOffset(),
@@ -129,41 +200,8 @@ export const NodeDraggable = (props: { node: Node }) => {
     },
   });
   const { screenToFlowPosition } = useReactFlow();
-  const { setNodes, nodes } = useWorkflowStore((state) => ({
-    setWorkflow: state.setWorkflow,
-    setNodes: state.setNodes,
-    nodes: state.nodes,
-    propertiesExpanded: state.propertiesExpanded,
-  }));
 
-  const extractIdNumber = (str?: string) => {
-    const match = str?.match(/\((\d+)\)$/);
-    return match?.[1] ? parseInt(match[1], 10) : null;
-  };
-
-  const findLowestAvailableId = (prefix: string, type: string) => {
-    const usedIds = nodes
-      .filter((node) => node.type === type)
-      .map((node) => extractIdNumber(node.id))
-      .filter((id): id is number => id !== null);
-
-    let i = 1;
-    while (usedIds.includes(i)) {
-      i++;
-    }
-
-    return `${prefix}(${i})`;
-  };
-
-  const handleSetNodes = (e: Node, x: number, y: number) => {
-    const newNode = props.node;
-
-    if (nodes.length > 0) {
-      const new_id = findLowestAvailableId(newNode.data.name, newNode.type);
-      newNode.id = new_id.toLowerCase().replace(/\s/g, "_");
-      newNode.data.name = new_id;
-    }
-
+  const handleSetNodes = (newNode: Node, x: number, y: number) => {
     const position = screenToFlowPosition({ x: x, y: y });
 
     if (newNode) {
@@ -175,6 +213,10 @@ export const NodeDraggable = (props: { node: Node }) => {
     }
   };
 
+  useEffect(() => {
+    preview(getEmptyImage(), { captureDraggingState: true });
+  }, [preview]);
+
   return (
     <>
       <Box
@@ -185,11 +227,17 @@ export const NodeDraggable = (props: { node: Node }) => {
         cursor="grab"
         width="full"
         overflow="hidden"
-        opacity={isDragging ? 0.5 : 1}
+        opacity={collected.isDragging ? 0.5 : 1}
       >
         <HStack>
-          <ComponentIcon type={props.node.type as ComponentType} size="md" />
-          <Text>{props.node.data.name}</Text>
+          <ComponentIcon
+            type={props.type}
+            cls={props.component.cls}
+            size="md"
+          />
+          <HoverableBigText noOfLines={1}>
+            {props.component.name}
+          </HoverableBigText>
           <Spacer />
           <DragHandleIcon width="14px" height="14px" color="gray.350" />
         </HStack>
@@ -198,45 +246,54 @@ export const NodeDraggable = (props: { node: Node }) => {
   );
 };
 
-const signatures = [
-  {
-    id: "llm_signature",
-    type: "signature",
+export function CustomDragLayer() {
+  const { itemType, isDragging, item, currentOffset } = useDragLayer(
+    (monitor) => ({
+      item: monitor.getItem(),
+      itemType: monitor.getItemType(),
+      currentOffset: monitor.getSourceClientOffset(),
+      isDragging: monitor.isDragging(),
+    })
+  );
 
-    data: {
-      name: "LLM Signature",
-      inputs: [
-        {
-          identifier: "question",
-          type: "str",
-        },
-      ],
-      outputs: [
-        {
-          identifier: "query",
-          type: "str",
-        },
-      ],
-    },
-  },
-];
+  if (!isDragging) {
+    return null;
+  }
 
-const evaluators = [
-  {
-    id: "evaluator_1",
-    type: "evaluator",
+  const ComponentNode = NodeComponents[item.node.type as ComponentType];
 
-    data: {
-      cls: "ExactMatchEvaluator",
-      name: "ExactMatchEvaluator",
-      inputs: [
-        { identifier: "output", type: "str" },
-        { identifier: "expected_output", type: "str" },
-      ],
-      outputs: [
-        { identifier: "passed", type: "bool" },
-        { identifier: "score", type: "float" },
-      ],
-    },
-  },
-];
+  return (
+    <div
+      style={{
+        position: "fixed",
+        pointerEvents: "none",
+        zIndex: 200,
+        left: currentOffset?.x ?? 0,
+        top: (currentOffset?.y ?? 0) + 32,
+        transform: "translateY(-50%)",
+        opacity: 0.5,
+      }}
+    >
+      <ComponentNode
+        id={item.node.id}
+        type={item.node.type}
+        data={item.node.data}
+        draggable={false}
+        width={200}
+        height={200}
+        deletable={false}
+        selectable={false}
+        selected={false}
+        sourcePosition={undefined}
+        targetPosition={undefined}
+        dragHandle={undefined}
+        parentId={undefined}
+        zIndex={200}
+        dragging={true}
+        isConnectable={false}
+        positionAbsoluteX={0}
+        positionAbsoluteY={0}
+      />
+    </div>
+  );
+}

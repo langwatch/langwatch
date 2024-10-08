@@ -45,6 +45,7 @@ import { History } from "./History";
 import { EntryNode } from "./nodes/EntryNode";
 import { EvaluatorNode } from "./nodes/EvaluatorNode";
 import {
+  CustomDragLayer,
   NodeSelectionPanel,
   NodeSelectionPanelButton,
 } from "./nodes/NodeSelectionPanel";
@@ -59,6 +60,7 @@ import { CurrentDrawer } from "../../components/CurrentDrawer";
 import { Optimize } from "./Optimize";
 import { ChatWindow, PlaygroundButton } from "./ChatWindow";
 import { Play, TrendingUp } from "react-feather";
+import { NodeComponents } from "./nodes";
 
 // New component that uses useDrop
 function DragDropArea({ children }: { children: React.ReactNode }) {
@@ -91,14 +93,7 @@ function DragDropArea({ children }: { children: React.ReactNode }) {
 }
 
 export default function OptimizationStudio() {
-  const nodeTypes = useMemo(
-    () => ({
-      entry: EntryNode,
-      signature: SignatureNode,
-      evaluator: EvaluatorNode,
-    }),
-    []
-  );
+  const nodeTypes = useMemo(() => NodeComponents, []);
   const edgeTypes = useMemo(() => ({ default: DefaultEdge }), []);
   const theme = useTheme();
   const gray100 = theme.colors.gray["100"];
@@ -213,8 +208,9 @@ export default function OptimizationStudio() {
       <Head>
         <title>LangWatch - Optimization Studio - {name}</title>
       </Head>
-      <DndProvider backend={HTML5Backend}>
-        <ReactFlowProvider>
+      <ReactFlowProvider>
+        <DndProvider backend={HTML5Backend}>
+          <CustomDragLayer />
           <VStack width="full" height="full" spacing={0}>
             <HStack
               width="full"
@@ -385,8 +381,8 @@ export default function OptimizationStudio() {
               </Flex>
             </Box>
           </VStack>
-        </ReactFlowProvider>
-      </DndProvider>
+        </DndProvider>
+      </ReactFlowProvider>
       <CurrentDrawer />
     </div>
   );
