@@ -247,7 +247,7 @@ export const NodeDraggable = (props: {
 };
 
 export function CustomDragLayer() {
-  const { itemType, isDragging, item, currentOffset } = useDragLayer(
+  const { isDragging, item, currentOffset } = useDragLayer(
     (monitor) => ({
       item: monitor.getItem(),
       itemType: monitor.getItemType(),

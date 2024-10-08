@@ -44,7 +44,7 @@ deprecated = "^1.2.14"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.4.2"
-chainlit = "^0.7.501"
+chainlit = "^1.2.0"
 python-dotenv = "1.0.1"
 jupyter = "^1.0.0"
 langchain_community = "^0.2.4"

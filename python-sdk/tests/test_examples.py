@@ -57,6 +57,8 @@ def get_example_files():
 async def test_example(example_file):
     if example_file == "batch_evalutation.py":
         pytest.skip("batch_evalutation.py is not a runnable example")
+    if example_file == "langchain_rag_bot_with_threads.py":
+        pytest.skip("langchain_rag_bot_with_threads.py requires authentication")
 
     global last_trace
     last_trace = None
