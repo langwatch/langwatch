@@ -46,6 +46,7 @@ class ExecuteFlowPayload(BaseModel):
     workflow: Workflow
     until_node_id: Optional[str] = None
     inputs: Optional[List[Dict[str, str]]] = None
+    manual_execution_mode: Optional[bool] = None
 
 
 class ExecuteFlow(BaseModel):

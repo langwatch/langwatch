@@ -86,6 +86,7 @@ async def execute_optimization(
         )
         if not entry_node.data.dataset:
             raise ValueError("Missing dataset in entry node")
+        assert entry_node.data.dataset.inline is not None, "Dataset inline is None"
         entries = transpose_inline_dataset_to_object_list(
             entry_node.data.dataset.inline
         )

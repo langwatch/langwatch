@@ -95,7 +95,7 @@ class DatasetInline(BaseModel):
 # Differently from the typescript DSL, we require the dataset to be passed inline in the entry node here
 class NodeDataset(BaseModel):
     name: Optional[str] = None
-    inline: DatasetInline
+    inline: Optional[DatasetInline] = None
 
 
 class Entry(BaseComponent):

@@ -7,7 +7,7 @@ import queue
 import time
 import traceback
 from typing import AsyncGenerator, Dict, TypedDict
-from fastapi import FastAPI, Response, BackgroundTasks
+from fastapi import FastAPI, Response, BackgroundTasks, HTTPException
 from fastapi.responses import StreamingResponse
 import json
 
@@ -27,6 +27,7 @@ from langwatch_nlp.studio.types.events import (
     Debug,
     DebugPayload,
     Done,
+    ExecutionStateChange,
     IsAliveResponse,
     StopEvaluationExecution,
     StopExecution,
@@ -39,6 +40,7 @@ from langwatch_nlp.studio.types.events import (
     ExecuteFlowPayload,
     component_error_event,
 )
+
 
 pool: IsolatedProcessPool[StudioClientEvent, StudioServerEvent]
 
@@ -287,28 +289,25 @@ async def execute(
 async def execute_sync(event: StudioClientEvent):
     print(f"Received event for sync execution: {event}", flush=True)
 
-    result = None
-    error = None
+    event_stream = execute_event_on_a_subprocess(event)
 
-    try:
-        async for event_result in execute_event_on_a_subprocess(event):
-            print(f"Received event in sync execution: {event_result}", flush=True)
-            if isinstance(event_result, Done):
-                break
-            elif isinstance(event_result, Error):
-                error = event_result.payload.message
-            else:
-                result = event_result
+    # Monitor the stream for the "success" state
+    async for response in event_stream:
+        if isinstance(response, ExecutionStateChange):
+            status = response.payload.execution_state.status
 
-        if error:
-            print(f"Error occurred: {error}", flush=True)
-            return {"error": error}
-        elif result:
-            print(f"Result: {result.model_dump(exclude_none=True)}", flush=True)
-            return {"result": result.model_dump(exclude_none=True)}
-        else:
-            print("No result or error received", flush=True)
-            return {"error": "No result or error received"}
-    except Exception as e:
-        print(f"Unexpected exception: {str(e)}", flush=True)
-        return {"error": f"Unexpected error: {str(e)}"}
+            if status == "success":
+                return {
+                    "trace_id": response.payload.execution_state.trace_id,
+                    "status": "success",
+                    "output": response.payload.execution_state.result,
+                }
+            elif status == "error":
+                raise HTTPException(
+                    status_code=500, detail=response.payload.execution_state.error
+                )
+
+    # If the loop completes without finding success or error
+    raise HTTPException(
+        status_code=500, detail="Execution completed without success or error status"
+    )

@@ -27,7 +27,7 @@ import { shareRouter } from "./routers/share";
 import { llmModelCostsRouter } from "./routers/llmModelCosts";
 import { translateRouter } from "./routers/translate";
 import { workflowRouter } from "./routers/workflows";
-
+import { optimizationRouter } from "./routers/optimization";
 /**
  * This is the primary router for your server.
  *
@@ -61,6 +61,7 @@ export const appRouter = createTRPCRouter({
   share: shareRouter,
   translate: translateRouter,
   workflow: workflowRouter,
+  optimization: optimizationRouter,
   ...(dependencies.extraTRPCRoutes?.() ?? {}),
 });
 

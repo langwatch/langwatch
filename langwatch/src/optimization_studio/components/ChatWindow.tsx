@@ -6,13 +6,6 @@ import {
   Input,
   InputGroup,
   InputRightElement,
-  Modal,
-  ModalBody,
-  ModalCloseButton,
-  ModalContent,
-  ModalFooter,
-  ModalHeader,
-  ModalOverlay,
   Stack,
   Text,
   VStack,
@@ -21,33 +14,15 @@ import { useCallback, useEffect, useState } from "react";
 import { Send } from "react-feather";
 import { useForm } from "react-hook-form";
 import { SmallLabel } from "~/components/SmallLabel";
+import { api } from "~/utils/api";
+import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { titleCase } from "../../utils/stringCasing";
 import { useWorkflowExecution } from "../hooks/useWorkflowExecution";
 import { useWorkflowStore } from "../hooks/useWorkflowStore";
+import type { Component } from "../types/dsl";
 import { RunningStatus } from "./ExecutionState";
 
-import { type Edge } from "@xyflow/react";
-
-interface ChatWindowProps {
-  isOpen: boolean;
-  onClose: () => void;
-}
-
-export const ChatWindow = ({ isOpen, onClose }: ChatWindowProps) => {
-  return (
-    <Modal onClose={onClose} size={"5xl"} isOpen={isOpen}>
-      <ModalOverlay />
-      <ModalContent maxHeight={"100vh"}>
-        <ModalHeader>Test Message</ModalHeader>
-        <ModalCloseButton />
-        <ModalBody>
-          <ChatBox isOpen={isOpen} />
-        </ModalBody>
-        <ModalFooter></ModalFooter>
-      </ModalContent>
-    </Modal>
-  );
-};
+import { type Edge, type Node } from "@xyflow/react";
 
 interface ChatMessage {
   input: string[];
@@ -72,28 +47,44 @@ const useMultipleInputs = (entryEdges: Edge[]) => {
   return { inputs, handleInputChange };
 };
 
-const ChatBox = ({ isOpen }: { isOpen: boolean }) => {
-  const { getWorkflow, executionStatus } = useWorkflowStore((state) => ({
+export const ChatBox = ({
+  workflowId,
+  isOpen,
+  useApi,
+  nodes,
+  edges,
+  executionStatus,
+}: {
+  isOpen?: boolean;
+  useApi?: boolean;
+  workflowId: string;
+  nodes: Component[];
+  edges: Edge[];
+  executionStatus: string;
+}) => {
+  const { getWorkflow } = useWorkflowStore((state) => ({
     getWorkflow: state.getWorkflow,
-    setWorkflowExecutionState: state.setWorkflowExecutionState,
-    executionStatus: state.state.execution?.status,
   }));
-
+  const { project } = useOrganizationTeamProject();
   const { startWorkflowExecution } = useWorkflowExecution();
+
+  const optimization = api.optimization.chat.useMutation();
+  const workflow = getWorkflow();
 
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
 
-  const workflow = getWorkflow();
+  const entryEdges = edges.filter((edge) => edge.source === "entry");
 
-  const entryEdges = workflow.edges.filter((edge) => edge.source === "entry");
-  const evaluators = workflow.nodes.filter((node) => node.type === "evaluator");
+  console.log("nodes", nodes);
+
+  const evaluators = nodes.filter((node) => node.type === "evaluator");
 
   const entryInputs = entryEdges.filter(
     (edge) => !evaluators?.some((evaluator) => evaluator.id === edge.target)
   );
 
   useEffect(() => {
-    if (workflow.state.execution?.status === "success") {
+    if (executionStatus === "success") {
       const result = workflow.state.execution?.result;
 
       if (result && typeof result === "object") {
@@ -113,7 +104,7 @@ const ChatBox = ({ isOpen }: { isOpen: boolean }) => {
         }
       }
     }
-  }, [workflow.state.execution?.status]);
+  }, [executionStatus]);
 
   useEffect(() => {
     if (isOpen) {
@@ -135,11 +126,33 @@ const ChatBox = ({ isOpen }: { isOpen: boolean }) => {
 
     setChatMessages([{ input: [message], output: [""] }]);
 
-    startWorkflowExecution({ inputs: [inputs] });
+    if (useApi) {
+      void submitToAPI(message);
+    } else {
+      startWorkflowExecution({ inputs: [inputs] });
+    }
+  };
+
+  const submitToAPI = async (message: string) => {
+    const optimizationResponse = await optimization.mutateAsync({
+      workflowId,
+      inputMessages: [inputs],
+      projectId: project?.id ?? "",
+    });
+
+    if (optimizationResponse.status === "success") {
+      const formattedOutput = Object.entries(
+        optimizationResponse.output[Object.keys(optimizationResponse.output)[0]]
+      )
+        .map(([key, value]) => `${titleCase(key)}: ${String(value)}`)
+        .join("\n");
+
+      setChatMessages([{ input: [message], output: [formattedOutput] }]);
+    }
   };
 
   return (
-    <HStack align={"start"} spacing={1}>
+    <HStack align={"start"} spacing={1} height={"100%"}>
       <MultipleInput
         inputs={inputs}
         handleInputChange={handleInputChange}
@@ -151,7 +164,7 @@ const ChatBox = ({ isOpen }: { isOpen: boolean }) => {
         spacing={4}
         align="stretch"
         width="100%"
-        height={"60vh"}
+        height={"100%"}
         border={"1px"}
         borderColor={"gray.200"}
         borderRadius={"lg"}
@@ -179,7 +192,9 @@ const ChatBox = ({ isOpen }: { isOpen: boolean }) => {
                 </Box>
               ))}
               {message.output.map((output, outputIndex) =>
-                executionStatus === "running" || output ? (
+                output ||
+                optimization.isLoading ||
+                executionStatus === "running" ? (
                   <Box
                     key={`output-${outputIndex}`}
                     alignSelf="flex-start"
@@ -192,8 +207,9 @@ const ChatBox = ({ isOpen }: { isOpen: boolean }) => {
                       borderRadius="lg"
                       whiteSpace="pre-wrap"
                     >
-                      {executionStatus === "running" ? (
-                        <RunningStatus />
+                      {optimization.isLoading ||
+                      executionStatus === "running" ? (
+                        <RunningStatus isLoading={optimization.isLoading} />
                       ) : (
                         output
                       )}
@@ -234,9 +250,6 @@ const MultipleInput = ({
   const onSubmit = () => {
     sendMultiMessage();
   };
-
-  console.log("inputs", inputs);
-  console.log("entryInputs", entryInputs);
 
   if (
     (!isSingle && entryInputs.length === 1) ||
@@ -281,7 +294,7 @@ const MultipleInput = ({
         border={"1px"}
         borderColor={"gray.200"}
         borderRadius={"lg"}
-        height={"60vh"}
+        height={"100%"}
         padding={2}
         justifyContent="space-between"
         as="form"

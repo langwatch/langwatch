@@ -37,7 +37,6 @@ async def execute_evaluation(
 ):
     workflow = event.workflow
     run_id = event.run_id
-
     valid = False
 
     try:
@@ -57,6 +56,8 @@ async def execute_evaluation(
         )
         if not entry_node.data.dataset:
             raise ValueError("Missing dataset in entry node")
+
+        assert entry_node.data.dataset.inline is not None
         entries = transpose_inline_dataset_to_object_list(
             entry_node.data.dataset.inline
         )

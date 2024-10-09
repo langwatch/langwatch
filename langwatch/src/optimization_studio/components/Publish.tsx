@@ -19,6 +19,7 @@ import {
   MenuButton,
   MenuList,
   MenuItem,
+  Link,
 } from "@chakra-ui/react";
 import { ChevronDownIcon } from "@chakra-ui/icons";
 import { CheckSquare } from "react-feather";
@@ -29,10 +30,13 @@ import { useModelProviderKeys } from "../hooks/useModelProviderKeys";
 import { useWorkflowStore } from "../hooks/useWorkflowStore";
 import { AddModelProviderKey } from "./AddModelProviderKey";
 import { useVersionState } from "./History";
+import { useRouter } from "next/router";
 
-export function Publish() {
+export function Publish({ isDisabled }: { isDisabled: boolean }) {
   const { isOpen, onToggle, onClose } = useDisclosure();
-
+  const router = useRouter();
+  const { project } = useOrganizationTeamProject();
+  console.log("router", router);
   const { evaluationState } = useWorkflowStore(({ state }) => ({
     evaluationState: state.evaluation,
   }));
@@ -46,6 +50,7 @@ export function Publish() {
           <>
             <MenuButton
               isActive={isOpen}
+              isDisabled={isDisabled}
               as={Button}
               variant="outline"
               size="sm"
@@ -55,7 +60,14 @@ export function Publish() {
             </MenuButton>
             <MenuList zIndex={9999}>
               <MenuItem onClick={onToggle}>Publish Workflow</MenuItem>
-              <MenuItem>Run App</MenuItem>
+              <Link
+                href={`/${project?.slug}/chat/${
+                  router.query.workflow as string
+                }`}
+                isExternal
+              >
+                <MenuItem>Run App</MenuItem>
+              </Link>
             </MenuList>
           </>
         )}
@@ -112,17 +124,8 @@ export function PublishModalContent({ onClose }: { onClose: () => void }) {
     ?.sort((a, b) => b.version.localeCompare(a.version)) // Sort by version ID in descending order
     .find((version) => version.autoSaved === false);
 
-  console.log("currentVersion", currentVersion);
-
-  console.log("versionToBeSaved", versionToBeSaved);
-
   const toast = useToast();
   const publishWorkflow = api.workflow.publish.useMutation();
-
-  console.log(versions.data);
-
-  console.log("vversionToBeEvaluated", versionToBeEvaluated);
-  console.log("workflowId", workflowId);
 
   const onSubmit = () => {
     publishWorkflow.mutate(

@@ -26,6 +26,7 @@ export type StudioClientEvent =
         workflow: Workflow;
         until_node_id?: string;
         inputs?: Record<string, string>[];
+        manual_execution_mode?: boolean;
       };
     }
   | {

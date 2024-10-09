@@ -9,6 +9,13 @@ import {
   VStack,
   useDisclosure,
   Button,
+  Modal,
+  ModalBody,
+  ModalCloseButton,
+  ModalContent,
+  ModalFooter,
+  ModalHeader,
+  ModalOverlay,
 } from "@chakra-ui/react";
 import {
   Background,
@@ -57,9 +64,9 @@ import { useAskBeforeLeaving } from "../hooks/useAskBeforeLeaving";
 import { RunningStatus } from "./ExecutionState";
 import { CurrentDrawer } from "../../components/CurrentDrawer";
 import { Optimize } from "./Optimize";
-import { ChatWindow } from "./ChatWindow";
 import { Play } from "react-feather";
 import { Publish } from "./Publish";
+import { ChatBox } from "./ChatWindow";
 
 // New component that uses useDrop
 function DragDropArea({ children }: { children: React.ReactNode }) {
@@ -116,6 +123,7 @@ export default function OptimizationStudio() {
     openResultsPanelRequest,
     setOpenResultsPanelRequest,
     executionStatus,
+    workflowId,
   } = useWorkflowStore(
     useShallow((state) => {
       if (typeof window !== "undefined") {
@@ -133,6 +141,7 @@ export default function OptimizationStudio() {
         openResultsPanelRequest: state.openResultsPanelRequest,
         setOpenResultsPanelRequest: state.setOpenResultsPanelRequest,
         executionStatus: state.state.execution?.status,
+        workflowId: state.workflowId,
       };
     })
   );
@@ -214,7 +223,7 @@ export default function OptimizationStudio() {
       <Head>
         <title>LangWatch - Optimization Studio - {name}</title>
       </Head>
-      <ChatWindow isOpen={chatModal.isOpen} onClose={chatModal.onClose} />
+
       <DndProvider backend={HTML5Backend}>
         <ReactFlowProvider>
           <VStack width="full" height="full" spacing={0}>
@@ -273,7 +282,7 @@ export default function OptimizationStudio() {
                 <Evaluate />
 
                 <Optimize />
-                <Publish />
+                <Publish isDisabled={socketStatus !== "connected"} />
               </HStack>
             </HStack>
             <Box width="full" height="full" position="relative">
@@ -380,6 +389,23 @@ export default function OptimizationStudio() {
         </ReactFlowProvider>
       </DndProvider>
       <CurrentDrawer />
+      <Modal onClose={chatModal.onClose} size={"5xl"} isOpen={chatModal.isOpen}>
+        <ModalOverlay />
+        <ModalContent height={"60vh"}>
+          <ModalHeader>Test Message</ModalHeader>
+          <ModalCloseButton />
+          <ModalBody>
+            <ChatBox
+              isOpen={chatModal.isOpen}
+              workflowId={workflowId}
+              nodes={nodes}
+              edges={edges}
+              executionStatus={executionStatus ?? ""}
+            />
+          </ModalBody>
+          <ModalFooter></ModalFooter>
+        </ModalContent>
+      </Modal>
     </div>
   );
 }

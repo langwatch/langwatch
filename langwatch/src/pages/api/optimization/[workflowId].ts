@@ -119,16 +119,15 @@ export default async function handler(
       trace_id,
       workflow: getWorkFlow(workflowData),
       inputs: [body],
+      manual_execution_mode: false,
     },
   };
 
   const event = await addEnvs(messageWithoutEnvs, project.id);
 
-  console.log("event_postman", JSON.stringify(event, null, 2));
-
   try {
     const response = await fetch(
-      `${process.env.LANGWATCH_NLP_SERVICE}/studio/execute`,
+      `${process.env.LANGWATCH_NLP_SERVICE}/studio/execute_sync`,
       {
         method: "POST",
         headers: {
@@ -138,11 +137,14 @@ export default async function handler(
       }
     );
 
-    console.log("response", response);
+    const data = await response.json();
 
-    return res.status(200).json({ message: response, modelProviders });
+    if (!response.ok) {
+      return res.status(500).json({ message: data.detail });
+    }
+
+    return res.status(200).json(data);
   } catch (error) {
-    console.log("error", error);
     return res.status(500).json({ message: error });
   }
 }
@@ -197,9 +199,20 @@ const checkForRequiredLLMKeys = (
     }
   });
 
-  publishedWorkflowVersion.nodes.map((node: Node) => {
-    if (node.type === "signature") {
-      llmModelsNeeded.push(node.data.llm.model.split("/")[0] as string);
+  publishedWorkflowVersion.nodes.forEach((node: Node) => {
+    if (
+      node.type === "signature" &&
+      node.data &&
+      typeof node.data === "object" &&
+      "llm" in node.data
+    ) {
+      const llmData = node.data.llm as { model?: string };
+      if (llmData.model) {
+        const modelName = llmData.model.split("/")[0];
+        if (modelName) {
+          llmModelsNeeded.push(modelName);
+        }
+      }
     }
   });
 

@@ -26,13 +26,19 @@ from langwatch_nlp.studio.utils import (
 )
 
 
-async def execute_flow(event: ExecuteFlowPayload, queue: "Queue[StudioServerEvent]"):
+async def execute_flow(
+    event: ExecuteFlowPayload,
+    queue: "Queue[StudioServerEvent]",
+):
     validate_workflow(event.workflow)
 
     workflow = event.workflow
     trace_id = event.trace_id
     until_node_id = event.until_node_id
     inputs = event.inputs
+    manual_execution_mode = (
+        True if event.manual_execution_mode is None else event.manual_execution_mode
+    )
 
     disable_dsp_caching()
 
@@ -40,13 +46,15 @@ async def execute_flow(event: ExecuteFlowPayload, queue: "Queue[StudioServerEven
     yield start_workflow_event(workflow, trace_id)
 
     with langwatch.trace(
-        trace_id=event.trace_id, api_key=event.workflow.api_key, skip_root_span=True
+        trace_id=event.trace_id,
+        api_key=event.workflow.api_key,
+        skip_root_span=True,
     ) as trace:
         trace.autotrack_dspy()
 
         module = WorkflowModule(
             workflow,
-            manual_execution_mode=True,
+            manual_execution_mode=manual_execution_mode,
             until_node_id=until_node_id,
             inputs=inputs[0] if inputs else None,
         )
@@ -58,12 +66,16 @@ async def execute_flow(event: ExecuteFlowPayload, queue: "Queue[StudioServerEven
         )
         if not entry_node.data.dataset:
             raise ValueError("Missing dataset in entry node")
-        entries = transpose_inline_dataset_to_object_list(
-            entry_node.data.dataset.inline
-        )
 
         if inputs:
             entries = inputs
+
+        else:
+            if not entry_node.data.dataset.inline:
+                raise ValueError("Missing inline dataset in entry node")
+            entries = transpose_inline_dataset_to_object_list(
+                entry_node.data.dataset.inline
+            )
 
         if len(entries) == 0:
             raise ClientReadableValueError(

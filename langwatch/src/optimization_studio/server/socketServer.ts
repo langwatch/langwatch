@@ -102,7 +102,6 @@ const handleComponentError = (
 };
 
 const callPython = async (ws: WebSocket, event: StudioClientEvent) => {
-  console.log("eventt", JSON.stringify(event, null, 2));
   let response: Response;
   try {
     // TODO: add timeout for initial connection
