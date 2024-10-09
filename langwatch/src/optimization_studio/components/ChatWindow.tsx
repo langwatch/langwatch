@@ -19,7 +19,6 @@ import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProje
 import { titleCase } from "../../utils/stringCasing";
 import { useWorkflowExecution } from "../hooks/useWorkflowExecution";
 import { useWorkflowStore } from "../hooks/useWorkflowStore";
-import type { Component } from "../types/dsl";
 import { RunningStatus } from "./ExecutionState";
 
 import { type Edge, type Node } from "@xyflow/react";
@@ -57,10 +56,10 @@ export const ChatBox = ({
 }: {
   isOpen?: boolean;
   useApi?: boolean;
-  workflowId: string;
-  nodes: Component[];
+  workflowId?: string;
+  nodes: Node[];
   edges: Edge[];
-  executionStatus: string;
+  executionStatus?: string;
 }) => {
   const { getWorkflow } = useWorkflowStore((state) => ({
     getWorkflow: state.getWorkflow,
@@ -74,8 +73,6 @@ export const ChatBox = ({
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
 
   const entryEdges = edges.filter((edge) => edge.source === "entry");
-
-  console.log("nodes", nodes);
 
   const evaluators = nodes.filter((node) => node.type === "evaluator");
 
@@ -134,6 +131,9 @@ export const ChatBox = ({
   };
 
   const submitToAPI = async (message: string) => {
+    if (!workflowId) {
+      return;
+    }
     const optimizationResponse = await optimization.mutateAsync({
       workflowId,
       inputMessages: [inputs],
@@ -141,11 +141,17 @@ export const ChatBox = ({
     });
 
     if (optimizationResponse.status === "success") {
-      const formattedOutput = Object.entries(
-        optimizationResponse.output[Object.keys(optimizationResponse.output)[0]]
-      )
-        .map(([key, value]) => `${titleCase(key)}: ${String(value)}`)
-        .join("\n");
+      // const formattedOutput = Object.entries(
+      //   optimizationResponse.output[Object.keys(optimizationResponse.output)[0]]
+      // )
+      //   .map(([key, value]) => `${titleCase(key)}: ${String(value)}`)
+      //   .join("\n");
+
+      const formattedOutput = JSON.stringify(
+        optimizationResponse.output,
+        null,
+        2
+      );
 
       setChatMessages([{ input: [message], output: [formattedOutput] }]);
     }

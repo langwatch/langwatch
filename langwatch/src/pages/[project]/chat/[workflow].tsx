@@ -4,6 +4,9 @@ import { FullLogo } from "../../../components/icons/FullLogo";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
 import { ChatBox } from "../../../optimization_studio/components/ChatWindow";
 import { api } from "../../../utils/api";
+import { type Edge, type Node } from "@xyflow/react";
+import { type Workflow } from "../../../optimization_studio/types/dsl";
+
 export default function ChatPage() {
   const router = useRouter();
   const { project } = useOrganizationTeamProject();
@@ -30,9 +33,14 @@ export default function ChatPage() {
           <ChatBox
             useApi={true}
             workflowId={workflowId}
-            nodes={publishedWorkflow.data.dsl.nodes}
-            edges={publishedWorkflow.data.dsl.edges}
-            dsl={publishedWorkflow.data.dsl}
+            nodes={
+              (publishedWorkflow.data.dsl as unknown as Workflow)
+                ?.nodes as unknown as Node[]
+            }
+            edges={
+              (publishedWorkflow.data.dsl as unknown as Workflow)
+                ?.edges as unknown as Edge[]
+            }
           />
         </Card>
       </Box>

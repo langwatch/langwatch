@@ -1,6 +1,5 @@
 import { type NextApiRequest, type NextApiResponse } from "next";
 import { prisma } from "../../../server/db"; // Adjust the import based on your setup
-import { getDebugger } from "../../../utils/logger";
 import { getProjectModelProviders } from "~/server/api/routers/modelProviders";
 import { type Workflow } from "~/optimization_studio/types/dsl";
 import { nanoid } from "nanoid";
@@ -8,13 +7,8 @@ import { nanoid } from "nanoid";
 import type { StudioClientEvent } from "~/optimization_studio/types/events";
 
 import { type Edge, type Node } from "@xyflow/react";
-import {
-  modelProviders,
-  type MaybeStoredModelProvider,
-} from "~/server/modelProviders/registry";
+import { type MaybeStoredModelProvider } from "~/server/modelProviders/registry";
 import { addEnvs } from "~/optimization_studio/server/addEnvs";
-
-const debug = getDebugger("langwatch:collector");
 
 export default async function handler(
   req: NextApiRequest,

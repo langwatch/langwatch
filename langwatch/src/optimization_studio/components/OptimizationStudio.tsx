@@ -123,7 +123,6 @@ export default function OptimizationStudio() {
     openResultsPanelRequest,
     setOpenResultsPanelRequest,
     executionStatus,
-    workflowId,
   } = useWorkflowStore(
     useShallow((state) => {
       if (typeof window !== "undefined") {
@@ -141,7 +140,6 @@ export default function OptimizationStudio() {
         openResultsPanelRequest: state.openResultsPanelRequest,
         setOpenResultsPanelRequest: state.setOpenResultsPanelRequest,
         executionStatus: state.state.execution?.status,
-        workflowId: state.workflowId,
       };
     })
   );
@@ -397,7 +395,6 @@ export default function OptimizationStudio() {
           <ModalBody>
             <ChatBox
               isOpen={chatModal.isOpen}
-              workflowId={workflowId}
               nodes={nodes}
               edges={edges}
               executionStatus={executionStatus ?? ""}

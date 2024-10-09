@@ -21,11 +21,6 @@ export const optimizationRouter = createTRPCRouter({
       });
 
       const apiKey = project?.apiKey;
-      console.log("apiKey", apiKey);
-      console.log("workflowId", workflowId);
-      console.log("projectId", projectId);
-
-      console.log("inputMessages", inputMessages);
 
       const response = await fetch(
         `${process.env.BASE_HOST}/api/optimization/${workflowId}`,
@@ -49,14 +44,12 @@ export const optimizationRouter = createTRPCRouter({
       const workflow = await ctx.prisma.workflow.findFirst({
         where: { id: workflowId, projectId: projectId },
       });
-      console.log("workflow", workflow);
       const publishedWorkflow = await ctx.prisma.workflowVersion.findFirst({
         where: {
-          id: workflow?.publishedId,
+          id: workflow?.publishedId ?? "",
           projectId: projectId,
         },
       });
-      console.log("publishedWorkflow", publishedWorkflow);
       return publishedWorkflow;
     }),
 });

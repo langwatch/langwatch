@@ -16,7 +16,6 @@ import {
   Text,
   VStack,
   useToast,
-  Select,
 } from "@chakra-ui/react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import React, { useCallback } from "react";
