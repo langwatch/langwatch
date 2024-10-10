@@ -105,11 +105,16 @@ export const Annotations = ({ traceId }: { traceId: string }) => {
                         (option) => option.id === key
                       )?.name;
 
-                      if (
-                        scoreOption.value === null ||
-                        scoreOption.value === ""
-                      )
-                        return;
+                      if (!name) return null;
+
+                      const isEmpty =
+                        !scoreOption ||
+                        scoreOption === "" ||
+                        (typeof scoreOption === "object" &&
+                          (scoreOption.value === null ||
+                            scoreOption.value === ""));
+
+                      if (isEmpty) return null;
 
                       return (
                         name && (
