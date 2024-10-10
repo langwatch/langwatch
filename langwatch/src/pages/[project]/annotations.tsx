@@ -34,6 +34,10 @@ import { api } from "~/utils/api";
 import { useFilterParams } from "~/hooks/useFilterParams";
 import { useRouter } from "next/router";
 import { getSingleQueryParam } from "~/utils/getSingleQueryParam";
+import type { AppRouter } from "../../server/api/root";
+import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
+import type { inferRouterOutputs } from "@trpc/server";
+import type { TRPCClientErrorLike } from "@trpc/client";
 
 export default function Annotations() {
   const { project } = useOrganizationTeamProject();
@@ -60,7 +64,14 @@ export default function Annotations() {
     setPeriod,
   } = usePeriodSelector();
 
-  let annotations = [];
+  type RouterOutput = inferRouterOutputs<AppRouter>;
+  type AnnotationsQuery = UseTRPCQueryResult<
+    | RouterOutput["annotation"]["getAll"]
+    | RouterOutput["annotation"]["getByTraceIds"],
+    TRPCClientErrorLike<AppRouter>
+  >;
+
+  let annotations: AnnotationsQuery | undefined;
 
   if (hasAnyFilters) {
     const traceIds =
