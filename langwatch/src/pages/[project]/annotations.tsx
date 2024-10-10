@@ -27,18 +27,61 @@ import { HelpCircle, ThumbsDown, ThumbsUp } from "react-feather";
 import { useDrawer } from "~/components/CurrentDrawer";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { FilterSidebar } from "~/components/filters/FilterSidebar";
+import { FilterToggle } from "~/components/filters/FilterToggle";
+import { PeriodSelector, usePeriodSelector } from "~/components/PeriodSelector";
 import { api } from "~/utils/api";
+import { useFilterParams } from "~/hooks/useFilterParams";
+import { useRouter } from "next/router";
+import { getSingleQueryParam } from "~/utils/getSingleQueryParam";
 
 export default function Annotations() {
   const { project } = useOrganizationTeamProject();
   const { openDrawer, isDrawerOpen } = useDrawer();
+  const router = useRouter();
+  const { filterParams, queryOpts, nonEmptyFilters } = useFilterParams();
 
-  const annotations = api.annotation.getAll.useQuery(
-    { projectId: project?.id ?? "" },
+  const hasAnyFilters = nonEmptyFilters.length > 0;
+  const traceGroups = api.traces.getAllForProject.useQuery(
     {
-      enabled: !!project,
-    }
+      ...filterParams,
+      query: getSingleQueryParam(router.query.query),
+      groupBy: "none",
+      pageOffset: 0,
+      pageSize: 10000,
+      sortBy: getSingleQueryParam(router.query.sortBy),
+      sortDirection: getSingleQueryParam(router.query.orderBy),
+    },
+    queryOpts
   );
+
+  const {
+    period: { startDate, endDate },
+    setPeriod,
+  } = usePeriodSelector();
+
+  let annotations = [];
+
+  if (hasAnyFilters) {
+    const traceIds =
+      traceGroups.data?.groups.flatMap((group) =>
+        group.map((trace) => trace.trace_id)
+      ) ?? [];
+
+    annotations = api.annotation.getByTraceIds.useQuery(
+      { projectId: project?.id ?? "", traceIds },
+      {
+        enabled: project?.id !== undefined,
+      }
+    );
+  } else {
+    annotations = api.annotation.getAll.useQuery(
+      { projectId: project?.id ?? "", startDate, endDate },
+      {
+        enabled: !!project,
+      }
+    );
+  }
 
   const scoreOptions = api.annotationScore.getAll.useQuery(
     { projectId: project?.id ?? "" },
@@ -150,45 +193,51 @@ export default function Annotations() {
           >
             Export all <DownloadIcon marginLeft={2} />
           </Button>
+          <PeriodSelector
+            period={{ startDate, endDate }}
+            setPeriod={setPeriod}
+          />
+          <FilterToggle />
         </HStack>
-        <Card>
-          <CardBody>
-            {annotations.data &&
-            annotations.data.length == 0 &&
-            scoreOptions.data &&
-            scoreOptions.data.length == 0 ? (
-              <Text>
-                No annotations found.{" "}
-                <Link
-                  href="https://docs.langwatch.ai/features/annotations"
-                  target="_blank"
-                  textDecoration="underline"
-                >
-                  Get started with annotations
-                </Link>
-                .
-              </Text>
-            ) : (
-              <TableContainer>
-                <Table variant="simple">
-                  <Thead>
-                    <Tr>
-                      <Th>User</Th>
-                      <Th>Comment</Th>
-                      <Th>Trace ID</Th>
-                      <Th>Rating</Th>
+        <HStack align="start" spacing={6}>
+          <Card>
+            <CardBody>
+              {annotations.data &&
+              annotations.data.length == 0 &&
+              scoreOptions.data &&
+              scoreOptions.data.length == 0 ? (
+                <Text>
+                  No annotations found.{" "}
+                  <Link
+                    href="https://docs.langwatch.ai/features/annotations"
+                    target="_blank"
+                    textDecoration="underline"
+                  >
+                    Get started with annotations
+                  </Link>
+                  .
+                </Text>
+              ) : (
+                <TableContainer>
+                  <Table variant="simple">
+                    <Thead>
+                      <Tr>
+                        <Th>User</Th>
+                        <Th>Comment</Th>
+                        <Th>Trace ID</Th>
+                        <Th>Rating</Th>
 
-                      {scoreOptions.data &&
-                        scoreOptions.data.length > 0 &&
-                        scoreOptions.data?.map((key) => (
-                          <Th key={key.id}>{key.name}</Th>
-                        ))}
-                      <Th>Created At</Th>
-                    </Tr>
-                  </Thead>
-                  <Tbody>
-                    {annotations.isLoading
-                      ? Array.from({ length: 3 }).map((_, i) => (
+                        {scoreOptions.data &&
+                          scoreOptions.data.length > 0 &&
+                          scoreOptions.data?.map((key) => (
+                            <Th key={key.id}>{key.name}</Th>
+                          ))}
+                        <Th>Created At</Th>
+                      </Tr>
+                    </Thead>
+                    <Tbody>
+                      {annotations.isLoading ? (
+                        Array.from({ length: 3 }).map((_, i) => (
                           <Tr key={i}>
                             {Array.from({ length: 4 }).map((_, i) => (
                               <Td key={i}>
@@ -197,8 +246,8 @@ export default function Annotations() {
                             ))}
                           </Tr>
                         ))
-                      : annotations.data && annotations.data.length > 0
-                      ? annotations.data?.map((annotation) => (
+                      ) : annotations.data && annotations.data.length > 0 ? (
+                        annotations.data?.map((annotation) => (
                           <Tr
                             cursor="pointer"
                             key={annotation.id}
@@ -233,13 +282,24 @@ export default function Annotations() {
                             <Td>{annotation.createdAt.toLocaleString()}</Td>
                           </Tr>
                         ))
-                      : null}
-                  </Tbody>
-                </Table>
-              </TableContainer>
-            )}
-          </CardBody>
-        </Card>
+                      ) : (
+                        <Tr>
+                          <Td colSpan={5}>
+                            <Text>
+                              No annotations found for selected filters or
+                              period.
+                            </Text>
+                          </Td>
+                        </Tr>
+                      )}
+                    </Tbody>
+                  </Table>
+                </TableContainer>
+              )}
+            </CardBody>
+          </Card>
+          <FilterSidebar />
+        </HStack>
       </Container>
     </DashboardLayout>
   );
