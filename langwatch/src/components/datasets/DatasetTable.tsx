@@ -51,6 +51,7 @@ export function DatasetTable({
   title,
   hideButtons = false,
   bottomSpace = "300px",
+  loadingOverlayComponent,
 }: {
   datasetId?: string;
   inMemoryDataset?: InMemoryDataset;
@@ -59,6 +60,7 @@ export function DatasetTable({
   title?: string;
   hideButtons?: boolean;
   bottomSpace?: string;
+  loadingOverlayComponent?: (() => React.ReactNode) | null;
 }) {
   const { project } = useOrganizationTeamProject();
 
@@ -495,6 +497,9 @@ export function DatasetTable({
               onCellValueChanged={onCellValueChanged}
               ref={gridRef}
               domLayout="normal"
+              {...(loadingOverlayComponent !== undefined
+                ? { loadingOverlayComponent }
+                : {})}
             />
           </Box>
         </CardBody>

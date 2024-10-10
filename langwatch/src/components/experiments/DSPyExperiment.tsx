@@ -458,6 +458,8 @@ export function DSPyExperimentRunList({
                     <Box
                       width="24px"
                       height="24px"
+                      minWidth="24px"
+                      minHeight="24px"
                       background="gray.300"
                       borderRadius="100%"
                       backgroundColor={
@@ -471,6 +473,8 @@ export function DSPyExperimentRunList({
                         <Box
                           width="12px"
                           height="12px"
+                          minWidth="12px"
+                          minHeight="12px"
                           background="gray.300"
                           borderRadius="100%"
                           backgroundColor={
@@ -879,16 +883,13 @@ export const RunDetails = React.memo(
                     <Th width="20%" paddingY={3}>
                       Model
                     </Th>
-                    <Th width="35%" paddingY={3}>
+                    <Th width="25%" paddingY={3}>
+                      Messages
+                    </Th>
+                    <Th width="45%" paddingY={3}>
                       Response
                     </Th>
-                    <Th width="15%" paddingY={3}>
-                      Prompt Tokens
-                    </Th>
-                    <Th width="15%" paddingY={3}>
-                      Completion Tokens
-                    </Th>
-                    <Th width="15%" paddingY={3}>
+                    <Th width="10%" paddingY={3}>
                       Cost
                     </Th>
                   </Tr>
@@ -898,9 +899,6 @@ export const RunDetails = React.memo(
                     Array.from({ length: 3 }).map((_, index) => (
                       <Tr key={index}>
                         <Td background="gray.50">&nbsp;</Td>
-                        <Td>
-                          <Skeleton width="100%" height="30px" />
-                        </Td>
                         <Td>
                           <Skeleton width="100%" height="30px" />
                         </Td>
@@ -936,6 +934,16 @@ export const RunDetails = React.memo(
                           </Td>
                           <Td>{llmCall.model}</Td>
                           <Td>
+                            <RenderInputOutput
+                              value={JSON.stringify(
+                                llmCall.response?.prompt ??
+                                  llmCall.response?.messages
+                              )}
+                              collapseStringsAfterLength={140}
+                              collapsed={true}
+                            />
+                          </Td>
+                          <Td>
                             {response ? (
                               response
                             ) : (
@@ -946,15 +954,20 @@ export const RunDetails = React.memo(
                               />
                             )}
                           </Td>
-                          <Td>{llmCall.prompt_tokens}</Td>
-                          <Td>{llmCall.completion_tokens}</Td>
                           <Td>
-                            {llmCall.cost
-                              ? formatMoney(
-                                  { amount: llmCall.cost, currency: "USD" },
-                                  "$0.00[0000]"
-                                )
-                              : "-"}
+                            {llmCall.cost ? (
+                              formatMoney(
+                                { amount: llmCall.cost, currency: "USD" },
+                                "$0.00[0000]"
+                              )
+                            ) : llmCall.response.cached ? (
+                              <HStack align="start">
+                                <Text>$0.00</Text>
+                                <Text color="gray.400">(cached)</Text>
+                              </HStack>
+                            ) : (
+                              "-"
+                            )}
                           </Td>
                         </Tr>
                       );

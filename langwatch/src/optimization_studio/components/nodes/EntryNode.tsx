@@ -1,14 +1,17 @@
 import { Box, Text, useDisclosure } from "@chakra-ui/react";
 
 import { type Node, type NodeProps } from "@xyflow/react";
-import { useEffect, useState } from "react";
+import { forwardRef, useEffect, useState, type Ref } from "react";
 import { DatasetPreview } from "../../../components/datasets/DatasetPreview";
 import { useGetDatasetData } from "../../hooks/useGetDatasetData";
 import { type Component, type Entry } from "../../types/dsl";
 import { DatasetModal } from "../DatasetModal";
 import { ComponentNode, NodeSectionTitle } from "./Nodes";
 
-export function EntryNode(props: NodeProps<Node<Component>>) {
+export const EntryNode = forwardRef(function EntryNode(
+  props: NodeProps<Node<Component>>,
+  ref: Ref<HTMLDivElement>
+) {
   const [rendered, setRendered] = useState(false);
   const { isOpen, onOpen, onClose } = useDisclosure();
 
@@ -22,7 +25,7 @@ export function EntryNode(props: NodeProps<Node<Component>>) {
   });
 
   return (
-    <ComponentNode {...props} outputsName="Fields" hidePlayButton>
+    <ComponentNode ref={ref} {...props} outputsName="Fields" hidePlayButton>
       <NodeSectionTitle>
         Dataset{" "}
         {total && (
@@ -56,4 +59,4 @@ export function EntryNode(props: NodeProps<Node<Component>>) {
       />
     </ComponentNode>
   );
-}
+});

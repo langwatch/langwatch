@@ -27,6 +27,7 @@ from langwatch_nlp.studio.types.events import (
     Debug,
     DebugPayload,
     Done,
+    ExecuteOptimization,
     ExecutionStateChange,
     IsAliveResponse,
     StopEvaluationExecution,
@@ -198,6 +199,9 @@ async def execute_event_on_a_subprocess(event: StudioClientEvent):
         running_processes[trace_id] = RunningProcess(process=process, queue=queue)
 
     timeout_without_messages = 120  # seconds
+    if isinstance(event, ExecuteOptimization):
+        # TODO: temporary until we actually send events in the middle of optimization process
+        timeout_without_messages = 120 * 60  # 120 minutes
 
     try:
         done = False

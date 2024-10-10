@@ -88,14 +88,14 @@ export const Annotations = ({ traceId }: { traceId: string }) => {
                 </VStack>
                 <Spacer />
                 {isCurrentUser && <Edit size={"18px"} />}
-                {annotation.isThumbsUp ? (
-                  <ThumbsUp size={"18px"} />
-                ) : (
-                  <ThumbsDown size={"18px"} />
-                )}
               </HStack>
               <Text>{annotation.comment}</Text>
-              <VStack align="start" spacing={0}>
+              <VStack align="start" spacing={1}>
+                {annotation.isThumbsUp ? (
+                  <ThumbsUp size={"20px"} />
+                ) : (
+                  <ThumbsDown size={"20px"} />
+                )}
                 {annotation.scoreOptions &&
                   typeof annotation.scoreOptions === "object" &&
                   Object.entries(annotation.scoreOptions).map(
@@ -105,19 +105,34 @@ export const Annotations = ({ traceId }: { traceId: string }) => {
                         (option) => option.id === key
                       )?.name;
 
+                      if (
+                        typeof scoreOption === "object" &&
+                        scoreOption !== null &&
+                        "value" in scoreOption &&
+                        (scoreOption.value === null || scoreOption.value === "")
+                      ) {
+                        return null;
+                      }
                       return (
                         name && (
                           <Text key={key} fontSize={"sm"}>
-                            <HStack>
+                            <HStack spacing={1}>
                               <Text fontWeight="bold">{name}:</Text>
-                              <Text key={key}>
-                                {typeof scoreOption === "object" &&
-                                  "value" in scoreOption && (
-                                    <Text key={key}>
-                                      {String(scoreOption.value)}
-                                    </Text>
-                                  )}
-                              </Text>
+                              {typeof scoreOption === "object" &&
+                                "value" in scoreOption && (
+                                  <HStack spacing={1}>
+                                    <Text>{String(scoreOption.value)}</Text>
+                                    {scoreOption.reason && (
+                                      <Text key={key}>
+                                        (
+                                        {typeof scoreOption.reason === "object"
+                                          ? JSON.stringify(scoreOption.reason)
+                                          : scoreOption.reason}
+                                        )
+                                      </Text>
+                                    )}
+                                  </HStack>
+                                )}
                             </HStack>
                           </Text>
                         )

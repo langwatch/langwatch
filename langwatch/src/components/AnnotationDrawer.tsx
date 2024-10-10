@@ -19,7 +19,7 @@ import {
   Divider,
 } from "@chakra-ui/react";
 
-import { ExternalLink, ThumbsDown, ThumbsUp } from "react-feather";
+import { ExternalLink, ThumbsDown, ThumbsUp, Trash } from "react-feather";
 import { useDrawer } from "~/components/CurrentDrawer";
 import { MetadataTag } from "~/components/MetadataTag";
 import { SmallLabel } from "~/components/SmallLabel";
@@ -32,6 +32,17 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { HorizontalFormControl } from "./HorizontalFormControl";
 import Link from "next/link";
+import {
+  type UseFormRegister,
+  type UseFormWatch,
+  type UseFormSetValue,
+} from "react-hook-form";
+
+type Annotation = {
+  isThumbsUp: string;
+  comment: string;
+  scoreOptions: Record<string, { value: string; reason: string }> | undefined;
+};
 
 export function AnnotationDrawer({
   traceId,
@@ -103,12 +114,6 @@ export function AnnotationDrawer({
       });
     }
   }, [scoreOptions, setValue, action, isThumbsUp, comment]);
-
-  type Annotation = {
-    isThumbsUp: string;
-    comment: string;
-    scoreOptions: Record<string, { value: string; reason: string }> | undefined;
-  };
 
   const onSubmit = (data: Annotation) => {
     const isThumbsUp = data.isThumbsUp === "thumbsUp";
@@ -305,7 +310,12 @@ export function AnnotationDrawer({
                   const options = Array.isArray(scoreType.options)
                     ? (scoreType.options as AnnotationScoreOption[])
                     : [];
-                  return ScoreBlock({ ...scoreType, options }, watch, register);
+                  return ScoreBlock(
+                    { ...scoreType, options },
+                    watch,
+                    register,
+                    setValue
+                  );
                 })}
                 <VStack align="start" spacing={4} width="full">
                   <Text>Comments</Text>
@@ -373,7 +383,12 @@ type AnnotationScore = {
   description: string | null;
 };
 
-const ScoreBlock = (scoreType: AnnotationScore, watch: any, register: any) => {
+const ScoreBlock = (
+  scoreType: AnnotationScore,
+  watch: UseFormWatch<Annotation>,
+  register: UseFormRegister<Annotation>,
+  setValue: UseFormSetValue<Annotation>
+) => {
   const scoreValue = watch(`scoreOptions.${scoreType.id}.value`);
 
   return (
@@ -396,7 +411,17 @@ const ScoreBlock = (scoreType: AnnotationScore, watch: any, register: any) => {
           })}
           <Spacer />
           <SmallLabel>Reasoning</SmallLabel>
-          <Input {...register(`scoreOptions.${scoreType.id}.reason`)} />
+          <HStack>
+            <Input {...register(`scoreOptions.${scoreType.id}.reason`)} />
+            <Button
+              onClick={() => {
+                setValue(`scoreOptions.${scoreType.id}.reason`, "");
+                setValue(`scoreOptions.${scoreType.id}.value`, "");
+              }}
+            >
+              <Trash />
+            </Button>
+          </HStack>
         </VStack>
       </RadioGroup>
     </HorizontalFormControl>

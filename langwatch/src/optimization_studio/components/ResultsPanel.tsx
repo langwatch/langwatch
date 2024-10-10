@@ -16,6 +16,8 @@ import {
   useToast,
   VStack,
 } from "@chakra-ui/react";
+import type { Experiment, Project } from "@prisma/client";
+import type { Node } from "@xyflow/react";
 import { useState } from "react";
 import { X } from "react-feather";
 import {
@@ -24,15 +26,6 @@ import {
   BatchEvaluationV2RunList,
   useBatchEvaluationState,
 } from "../../components/experiments/BatchEvaluationV2";
-import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import { experimentSlugify } from "../../server/experiments/utils";
-import { api } from "../../utils/api";
-import { useEvaluationExecution } from "../hooks/useEvaluationExecution";
-import { useWorkflowStore } from "../hooks/useWorkflowStore";
-import {
-  EvaluationProgressBar,
-  OptimizationProgressBar,
-} from "./ProgressToast";
 import {
   DSPyExperimentRunList,
   DSPyExperimentSummary,
@@ -40,26 +33,34 @@ import {
   RunDetails,
   useDSPyExperimentState,
 } from "../../components/experiments/DSPyExperiment";
-import type { Experiment, Project } from "@prisma/client";
-import { useOptimizationExecution } from "../hooks/useOptimizationExecution";
+import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import type { AppliedOptimization } from "../../server/experiments/types";
+import { experimentSlugify } from "../../server/experiments/utils";
+import { api } from "../../utils/api";
+import { useEvaluationExecution } from "../hooks/useEvaluationExecution";
+import { useOptimizationExecution } from "../hooks/useOptimizationExecution";
+import { useWorkflowStore } from "../hooks/useWorkflowStore";
 import type { Signature } from "../types/dsl";
-import type { Node } from "@xyflow/react";
+import { simpleRecordListToNodeDataset } from "../utils/datasetUtils";
 import {
-  simpleRecordListToNodeDataset,
-  transpostRowsFirstToColumnsFirstWithoutId,
-} from "../utils/datasetUtils";
-import type { DatasetRecordEntry } from "../../server/datasets/types";
+  EvaluationProgressBar,
+  OptimizationProgressBar,
+} from "./ProgressToast";
 
 export function ResultsPanel({
+  isCollapsed,
   collapsePanel,
   defaultTab,
 }: {
+  isCollapsed: boolean;
   collapsePanel: (isCollapsed: boolean) => void;
   defaultTab: "evaluations" | "optimizations";
 }) {
+  const [tabIndex, setTabIndex] = useState(0);
+
   return (
     <HStack
+      display={isCollapsed ? "none" : undefined}
       background="white"
       borderTop="2px solid"
       borderColor="gray.200"
@@ -87,6 +88,8 @@ export function ResultsPanel({
         flexDirection="column"
         size="sm"
         defaultIndex={defaultTab === "evaluations" ? 0 : 1}
+        index={tabIndex}
+        onChange={(index) => setTabIndex(index)}
       >
         <TabList>
           <Tab>Evaluations</Tab>
@@ -94,10 +97,10 @@ export function ResultsPanel({
         </TabList>
         <TabPanels minHeight="0" height="full">
           <TabPanel padding={0} height="full">
-            <EvaluationResults />
+            {!isCollapsed && tabIndex === 0 && <EvaluationResults />}
           </TabPanel>
           <TabPanel padding={0} height="full">
-            <OptimizationResults />
+            {!isCollapsed && tabIndex === 1 && <OptimizationResults />}
           </TabPanel>
         </TabPanels>
       </Tabs>

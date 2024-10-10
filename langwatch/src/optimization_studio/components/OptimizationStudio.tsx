@@ -52,9 +52,10 @@ import { History } from "./History";
 import { EntryNode } from "./nodes/EntryNode";
 import { EvaluatorNode } from "./nodes/EvaluatorNode";
 import {
+  CustomDragLayer,
   NodeSelectionPanel,
   NodeSelectionPanelButton,
-} from "./nodes/NodeSelectionPanel";
+} from "./NodeSelectionPanel";
 import { SignatureNode } from "./nodes/SignatureNode";
 import { ProgressToast } from "./ProgressToast";
 import { PropertiesPanel } from "./properties/PropertiesPanel";
@@ -64,7 +65,9 @@ import { useAskBeforeLeaving } from "../hooks/useAskBeforeLeaving";
 import { RunningStatus } from "./ExecutionState";
 import { CurrentDrawer } from "../../components/CurrentDrawer";
 import { Optimize } from "./Optimize";
-import { Play } from "react-feather";
+import { ChatWindow, PlaygroundButton } from "./ChatWindow";
+import { Play, TrendingUp } from "react-feather";
+import { NodeComponents } from "./nodes";
 import { Publish } from "./Publish";
 import { ChatBox } from "./ChatWindow";
 
@@ -99,14 +102,7 @@ function DragDropArea({ children }: { children: React.ReactNode }) {
 }
 
 export default function OptimizationStudio() {
-  const nodeTypes = useMemo(
-    () => ({
-      entry: EntryNode,
-      signature: SignatureNode,
-      evaluator: EvaluatorNode,
-    }),
-    []
-  );
+  const nodeTypes = useMemo(() => NodeComponents, []);
   const edgeTypes = useMemo(() => ({ default: DefaultEdge }), []);
   const theme = useTheme();
   const gray100 = theme.colors.gray["100"];
@@ -161,7 +157,7 @@ export default function OptimizationStudio() {
     useState(true);
 
   const panelRef = useRef<ImperativePanelHandle>(null);
-  const [isPanelCollapsed, setIsPanelCollapsed] = useState(false);
+  const [isResultsPanelCollapsed, setIsResultsPanelCollapsed] = useState(false);
 
   const collapsePanel = () => {
     const panel = panelRef.current;
@@ -177,21 +173,23 @@ export default function OptimizationStudio() {
   useEffect(() => {
     if (
       openResultsPanelRequest === "evaluations" ||
-      (openResultsPanelRequest === "optimizations" && isPanelCollapsed)
+      (openResultsPanelRequest === "optimizations" && isResultsPanelCollapsed)
     ) {
       setDefaultTab(openResultsPanelRequest);
       panelRef.current?.expand(0);
       panelRef.current?.resize(6);
+
+      const openTo = openResultsPanelRequest === "optimizations" ? 100 : 70;
       const step = () => {
         const size = panelRef.current?.getSize() ?? 0;
-        if (size < 70) {
+        if (size < openTo) {
           panelRef.current?.resize(size + 10);
           window.requestAnimationFrame(step);
         }
       };
       step();
     }
-    if (openResultsPanelRequest === "closed" && !isPanelCollapsed) {
+    if (openResultsPanelRequest === "closed" && !isResultsPanelCollapsed) {
       panelRef.current?.collapse();
     }
     setOpenResultsPanelRequest(undefined);
@@ -221,9 +219,9 @@ export default function OptimizationStudio() {
       <Head>
         <title>LangWatch - Optimization Studio - {name}</title>
       </Head>
-
-      <DndProvider backend={HTML5Backend}>
-        <ReactFlowProvider>
+      <ReactFlowProvider>
+        <DndProvider backend={HTML5Backend}>
+          <CustomDragLayer />
           <VStack width="full" height="full" spacing={0}>
             <HStack
               width="full"
@@ -275,8 +273,7 @@ export default function OptimizationStudio() {
               <HStack width="full" justify="end">
                 <UndoRedo />
                 <History />
-              </HStack>
-              <HStack justify="end" paddingLeft={2}>
+                <Box />
                 <Evaluate />
 
                 <Optimize />
@@ -291,11 +288,30 @@ export default function OptimizationStudio() {
                 />
                 <PanelGroup direction="vertical">
                   <Panel style={{ position: "relative" }}>
-                    <NodeSelectionPanelButton
-                      isOpen={nodeSelectionPanelIsOpen}
-                      setIsOpen={setNodeSelectionPanelIsOpen}
-                    />
-                    {isPanelCollapsed && <ProgressToast />}
+                    <HStack
+                      position="absolute"
+                      bottom={3}
+                      left={3}
+                      zIndex={100}
+                    >
+                      <NodeSelectionPanelButton
+                        isOpen={nodeSelectionPanelIsOpen}
+                        setIsOpen={setNodeSelectionPanelIsOpen}
+                      />
+                      <Button
+                        display={isResultsPanelCollapsed ? "block" : "none"}
+                        background="white"
+                        borderRadius={4}
+                        borderColor="gray.350"
+                        variant="outline"
+                        onClick={() => {
+                          panelRef.current?.expand(70);
+                        }}
+                      >
+                        <TrendingUp size={22} />
+                      </Button>
+                    </HStack>
+                    {isResultsPanelCollapsed && <ProgressToast />}
                     <DragDropArea>
                       <ReactFlow
                         nodeTypes={nodeTypes}
@@ -324,8 +340,12 @@ export default function OptimizationStudio() {
                           orientation="horizontal"
                           style={{
                             marginLeft: nodeSelectionPanelIsOpen
-                              ? "16px"
-                              : "80px",
+                              ? !isResultsPanelCollapsed
+                                ? "16px"
+                                : "80px"
+                              : !isResultsPanelCollapsed
+                              ? "80px"
+                              : "142px",
                             marginBottom: "18px",
                           }}
                         />
@@ -338,16 +358,7 @@ export default function OptimizationStudio() {
                         />
 
                         <FlowPanel position="bottom-right">
-                          <Button
-                            onClick={chatModal.onOpen}
-                            rightIcon={<Play size={16} />}
-                            isDisabled={socketStatus !== "connected"}
-                            variant="outline"
-                            size="sm"
-                            background="white"
-                          >
-                            Playground
-                          </Button>
+                          <PlaygroundButton onClick={chatModal.onOpen} />
                         </FlowPanel>
                       </ReactFlow>
                     </DragDropArea>
@@ -368,24 +379,23 @@ export default function OptimizationStudio() {
                     collapsible
                     minSize={6}
                     ref={panelRef}
-                    onCollapse={() => setIsPanelCollapsed(true)}
-                    onExpand={() => setIsPanelCollapsed(false)}
+                    onCollapse={() => setIsResultsPanelCollapsed(true)}
+                    onExpand={() => setIsResultsPanelCollapsed(false)}
                     defaultSize={0}
                   >
-                    {!isPanelCollapsed && (
-                      <ResultsPanel
-                        collapsePanel={collapsePanel}
-                        defaultTab={defaultTab}
-                      />
-                    )}
+                    <ResultsPanel
+                      isCollapsed={isResultsPanelCollapsed}
+                      collapsePanel={collapsePanel}
+                      defaultTab={defaultTab}
+                    />
                   </Panel>
                 </PanelGroup>
                 <PropertiesPanel />
               </Flex>
             </Box>
           </VStack>
-        </ReactFlowProvider>
-      </DndProvider>
+        </DndProvider>
+      </ReactFlowProvider>
       <CurrentDrawer />
       <Modal onClose={chatModal.onClose} size={"5xl"} isOpen={chatModal.isOpen}>
         <ModalOverlay />
@@ -418,8 +428,10 @@ function StatusCircle({
   return (
     <Tooltip label={tooltip}>
       <Box
-        width="12px"
-        height="12px"
+        minWidth="12px"
+        maxWidth="12px"
+        minHeight="12px"
+        maxHeight="12px"
         background={
           status === "connected"
             ? "green.500"

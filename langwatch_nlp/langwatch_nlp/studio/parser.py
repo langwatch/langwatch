@@ -1,19 +1,23 @@
 import os
 from typing import Any, Dict, List
 from langwatch_nlp.studio.dspy.predict_with_metadata import PredictWithMetadata
+from langwatch_nlp.studio.modules.evaluators.langwatch import LangWatchEvaluator
 from langwatch_nlp.studio.modules.registry import MODULES
 from langwatch_nlp.studio.types.dsl import Evaluator, Node, Signature, Workflow
 import dspy
 
-from langwatch_nlp.studio.utils import transpose_inline_dataset_to_object_list
+from langwatch_nlp.studio.utils import (
+    node_llm_config_to_dspy_lm,
+    transpose_inline_dataset_to_object_list,
+)
 
 
-def parse_component(node: Node, workflow: Workflow) -> type[dspy.Module]:
+def parse_component(node: Node, workflow: Workflow) -> dspy.Module:
     match node.type:
         case "signature":
-            return parse_signature(node.id, node.data, workflow)
+            return parse_signature(node.id, node.data, workflow)()
         case "evaluator":
-            return parse_evaluator(node.data)
+            return parse_evaluator(node.data, workflow)
         case _:
             raise NotImplementedError(f"Unknown component type: {node.type}")
 
@@ -46,19 +50,7 @@ def parse_signature(
     )
 
     llm_config = component.llm if component.llm else workflow.default_llm
-    llm_params: dict[str, Any] = llm_config.litellm_params or {
-        "model": llm_config.model
-    }
-    if "azure/" in (llm_params["model"] or ""):
-        llm_params["api_version"] = os.environ["AZURE_API_VERSION"]
-    llm_params["drop_params"] = True
-    llm_params["model_type"] = "chat"
-
-    lm = dspy.LM(
-        max_tokens=llm_config.max_tokens or 2048,
-        temperature=llm_config.temperature or 0,
-        **llm_params,
-    )
+    lm = node_llm_config_to_dspy_lm(llm_config)
 
     dspy.settings.configure(experimental=True)
 
@@ -85,8 +77,23 @@ def parse_signature(
     return ModuleClass
 
 
-def parse_evaluator(component: Evaluator) -> type[dspy.Module]:
+def parse_evaluator(component: Evaluator, workflow: Workflow) -> dspy.Module:
     if not component.cls:
         raise ValueError("Evaluator class not specified")
 
-    return MODULES["evaluator"][component.cls]
+    if component.cls == "LangWatchEvaluator":
+        settings = {
+            field.identifier: field.defaultValue
+            for field in (component.parameters or [])
+            if field.defaultValue
+        }
+        if not component.evaluator:
+            raise ValueError("Evaluator not specified")
+        return LangWatchEvaluator(
+            api_key=workflow.api_key,
+            evaluator=component.evaluator,
+            name=component.name or "LangWatchEvaluator",
+            settings=settings,
+        )
+
+    return MODULES["evaluator"][component.cls]()

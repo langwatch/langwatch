@@ -12,7 +12,7 @@ export function RenderInputOutput(
 
   let json: object | undefined;
   try {
-    if (value) {
+    if (value && typeof value === "string") {
       const json_ = JSON.parse(value);
       if (typeof json_ === "object") {
         json = json_;
@@ -20,6 +20,9 @@ export function RenderInputOutput(
       if (typeof json_ === "string") {
         value = json_;
       }
+    }
+    if (typeof value === "object") {
+      json = value;
     }
   } catch (e) {}
 

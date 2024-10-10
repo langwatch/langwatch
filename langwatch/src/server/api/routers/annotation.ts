@@ -144,12 +144,22 @@ export const annotationRouter = createTRPCRouter({
       });
     }),
   getAll: protectedProcedure
-    .input(z.object({ projectId: z.string() }))
+    .input(
+      z.object({
+        projectId: z.string(),
+        startDate: z.date().optional(),
+        endDate: z.date().optional(),
+      })
+    )
     .use(checkUserPermissionForProject(TeamRoleGroup.ANNOTATIONS_VIEW))
     .query(async ({ ctx, input }) => {
       return ctx.prisma.annotation.findMany({
         where: {
           projectId: input.projectId,
+          createdAt: {
+            gte: input.startDate,
+            lte: input.endDate,
+          },
         },
         orderBy: {
           createdAt: "desc",

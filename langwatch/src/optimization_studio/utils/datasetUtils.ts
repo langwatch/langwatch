@@ -65,14 +65,14 @@ const columnTypeToFieldTypeMap: Record<DatasetColumnType, Field["type"]> = {
   evaluations: "dict",
 };
 
-export function fieldTypesToDatasetColumns(fields: Field[]): DatasetColumns {
+export function fieldsToDatasetColumns(fields: Field[]): DatasetColumns {
   return fields.map((field) => ({
     name: field.identifier,
     type: fieldToColumnTypeMap[field.type],
   }));
 }
 
-export function datasetColumnsToFieldTypes(columns: DatasetColumns): Field[] {
+export function datasetColumnsToFields(columns: DatasetColumns): Field[] {
   return columns.map((column) => ({
     identifier: column.name,
     type: columnTypeToFieldTypeMap[column.type],

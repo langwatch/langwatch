@@ -1,5 +1,5 @@
 FROM node:20-alpine
-RUN apk --no-cache add curl
+RUN apk --no-cache add curl python3 make gcc g++
 WORKDIR /app
 COPY langwatch/package.json langwatch/package-lock.json ./langwatch/
 RUN npm --prefix=langwatch ci

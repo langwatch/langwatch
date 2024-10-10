@@ -8,10 +8,19 @@ import {
   InputRightElement,
   Stack,
   Text,
+  Tooltip,
+  useDisclosure,
   VStack,
+  Modal,
+  ModalBody,
+  ModalCloseButton,
+  ModalContent,
+  ModalFooter,
+  ModalHeader,
+  ModalOverlay,
 } from "@chakra-ui/react";
 import { useCallback, useEffect, useState } from "react";
-import { Send } from "react-feather";
+import { Play, Send } from "react-feather";
 import { useForm } from "react-hook-form";
 import { SmallLabel } from "~/components/SmallLabel";
 import { api } from "~/utils/api";
@@ -20,8 +29,55 @@ import { titleCase } from "../../utils/stringCasing";
 import { useWorkflowExecution } from "../hooks/useWorkflowExecution";
 import { useWorkflowStore } from "../hooks/useWorkflowStore";
 import { RunningStatus } from "./ExecutionState";
-
 import { type Edge, type Node } from "@xyflow/react";
+
+import { useSocketClient } from "../hooks/useSocketClient";
+
+interface ChatWindowProps {
+  isOpen: boolean;
+  onClose: () => void;
+}
+
+export const PlaygroundButton = ({ onClick }: { onClick: () => void }) => {
+  const chatModal = useDisclosure();
+  const { socketStatus } = useSocketClient();
+
+  const isDisabled = socketStatus !== "connected";
+
+  return (
+    <>
+      <Tooltip label={isDisabled ? "Studio is not connected" : undefined}>
+        <Button
+          onClick={onClick}
+          rightIcon={<Play size={16} />}
+          isDisabled={isDisabled}
+          variant="outline"
+          size="sm"
+          background="white"
+        >
+          Playground
+        </Button>
+      </Tooltip>
+      {/* <ChatWindow isOpen={chatModal.isOpen} onClose={chatModal.onClose} /> */}
+    </>
+  );
+};
+
+export const ChatWindow = ({ isOpen, onClose }: ChatWindowProps) => {
+  return (
+    <Modal onClose={onClose} size={"5xl"} isOpen={isOpen}>
+      <ModalOverlay />
+      <ModalContent maxHeight={"100vh"}>
+        <ModalHeader>Test Message</ModalHeader>
+        <ModalCloseButton />
+        <ModalBody>
+          <ChatBox isOpen={isOpen} />
+        </ModalBody>
+        <ModalFooter></ModalFooter>
+      </ModalContent>
+    </Modal>
+  );
+};
 
 interface ChatMessage {
   input: string[];

@@ -1,14 +1,19 @@
 import { Box } from "@chakra-ui/react";
-import { Check, Home } from "react-feather";
-import type { ComponentType } from "../types/dsl";
+import { Check, Home, Shield } from "react-feather";
 import { EqualsIcon } from "../../components/icons/EqualsIcon";
-import type { MODULES } from "../types/modules";
 import { LLMIcon } from "../../components/icons/LLMIcon";
+import type { ComponentType } from "../types/dsl";
 
 const sizeMap = {
   sm: "16px",
   md: "24px",
   lg: "28px",
+};
+
+const fontSizeMap = {
+  sm: "12px",
+  md: "16px",
+  lg: "18px",
 };
 
 export function ColorfulBlockIcon({
@@ -32,7 +37,9 @@ export function ColorfulBlockIcon({
       borderRadius="4px"
       padding={paddingMap[size]}
       width={sizeMap[size]}
+      minWidth={sizeMap[size]}
       height={sizeMap[size]}
+      fontSize={fontSizeMap[size]}
       display="flex"
       alignItems="center"
       justifyContent="center"
@@ -44,15 +51,16 @@ export function ColorfulBlockIcon({
 }
 
 export function EvaluatorIcon({ cls }: { cls?: string }) {
-  const iconMap: Record<MODULES["evaluator"]["cls"], React.ReactNode> = {
+  const iconMap: Record<string, React.ReactNode> = {
     ExactMatchEvaluator: <EqualsIcon />,
+    "azure/prompt_injection": <Shield />,
+    "openai/moderation": <Shield />,
   };
 
-  const cls_ = cls as keyof typeof iconMap;
-  if (!iconMap[cls_]) {
+  if (!iconMap[cls ?? ""]) {
     return <Check />;
   }
-  return iconMap[cls_];
+  return iconMap[cls ?? ""];
 }
 
 export const ComponentIcon = ({

@@ -339,6 +339,13 @@ const addOpenTelemetrySpanAsSpan = (
   }
   delete attributesMap.input;
 
+  if (!input && attributesMap.crew_inputs) {
+    input = {
+      type: "json",
+      value: attributesMap.crew_inputs,
+    };
+  }
+
   // Output
   if (
     attributesMap.llm?.output_messages &&
@@ -500,13 +507,21 @@ const addOpenTelemetrySpanAsSpan = (
     }
   }
 
+  // Name
+  let name = otelSpan.name;
+  if (name === "Task._execute_core" && (input?.value as any)?.agent) {
+    try {
+      name = (input?.value as any).agent.match(/role='(.*?)'/)?.[1] ?? name;
+    } catch {}
+  }
+
   const span: BaseSpan & { model: LLMSpan["model"] } = {
     span_id: otelSpan.spanId as string,
     trace_id: otelSpan.traceId as string,
     ...(otelSpan.parentSpanId
       ? { parent_id: otelSpan.parentSpanId as string }
       : {}),
-    name: otelSpan.name,
+    name,
     type,
     model,
     input,

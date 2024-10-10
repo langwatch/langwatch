@@ -6,6 +6,7 @@ import {
   ModalContent,
   ModalHeader,
   ModalOverlay,
+  Spinner,
 } from "@chakra-ui/react";
 import { type Node, type NodeProps } from "@xyflow/react";
 import { useCallback, useEffect, useState } from "react";
@@ -14,6 +15,7 @@ import type { DatasetColumns } from "../../server/datasets/types";
 import { useWorkflowStore } from "../hooks/useWorkflowStore";
 import type { Component, NodeDataset, Signature } from "../types/dsl";
 import { EditDataset } from "./datasets/EditDataset";
+import { fieldsToDatasetColumns } from "../utils/datasetUtils";
 
 export function DemonstrationsModal({
   isOpen,
@@ -30,8 +32,33 @@ export function DemonstrationsModal({
 
   const [rendered, setRendered] = useState(false);
   useEffect(() => {
-    const demonstrations = (node.data as Signature).demonstrations;
-    // TODO: empty dataset if none but using the inputs and output keys
+    const columns = fieldsToDatasetColumns([
+      ...(node.data.inputs ?? []),
+      ...(node.data.outputs ?? []),
+    ]);
+
+    let demonstrations = (node.data as Signature).demonstrations;
+    if (
+      !demonstrations?.inline ||
+      Object.keys(demonstrations.inline.records).length === 0
+    ) {
+      demonstrations = {
+        inline: {
+          records: Object.fromEntries(
+            columns.map((column) => [column.name, []])
+          ),
+          columnTypes: columns,
+        },
+      };
+    }
+    demonstrations = {
+      ...demonstrations,
+      inline: {
+        ...demonstrations.inline,
+        columnTypes: columns,
+      } as NodeDataset["inline"],
+    };
+
     setEditingDataset(isOpen ? demonstrations : undefined);
     setRendered(isOpen);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -81,6 +108,7 @@ export function DemonstrationsModal({
                   cta="Save"
                   hideButtons={true}
                   bottomSpace="268px"
+                  loadingOverlayComponent={null}
                 />
               )}
             </ModalBody>

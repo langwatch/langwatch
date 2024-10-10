@@ -23,7 +23,7 @@ class Field(BaseModel):
     identifier: str
     type: FieldType
     optional: Optional[bool] = None
-    defaultValue: Optional[str] = None
+    defaultValue: Optional[Any] = None
     desc: Optional[str] = None
     prefix: Optional[str] = None
     hidden: Optional[bool] = None
@@ -138,6 +138,7 @@ class End(BaseComponent):
 
 
 class Evaluator(BaseComponent):
+    evaluator: Optional[str] = None
     outputs: List[Field] = []
 
 

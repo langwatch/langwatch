@@ -29,6 +29,7 @@ from dspy.evaluate.evaluate import Evaluate
 
 from langwatch.tracer import ContextTrace
 from langwatch.utils import reduce_payload_size
+import litellm
 
 
 class SerializableAndPydanticEncoder(json.JSONEncoder):
@@ -80,9 +81,13 @@ class SerializableAndPydanticEncoder(json.JSONEncoder):
             return str(o)
 
 
-class DSPyLLMCall(TypedDict):
+class DSPyLLMCall(TypedDict, total=False):
     __class__: str
+    model: Optional[str] = None
     response: Any
+    prompt_tokens: Optional[int] = None
+    completion_tokens: Optional[int] = None
+    cost: Optional[float] = None
 
 
 class Timestamps(BaseModel):
@@ -233,6 +238,9 @@ class LangWatchDSPy:
         if not hasattr(dspy.AzureOpenAI, "_original_request"):
             dspy.AzureOpenAI._original_request = dspy.AzureOpenAI.request  # type: ignore
 
+        if not hasattr(dspy.LM, "_original_call"):
+            dspy.LM._original_call = dspy.LM.__call__  # type: ignore
+
         this = self
 
         def patched_request(self, *args, **kwargs):
@@ -243,8 +251,55 @@ class LangWatchDSPy:
             )
             return response
 
+        def patched_call(self, *args, **kwargs):
+            classname = f"{self.__class__.__module__}.{self.__class__.__name__}"
+            outputs = self._original_call(*args, **kwargs)
+            if len(self.history) > 0:
+                entry = self.history[-1]
+                lm_response = entry["response"]
+
+                llm_call = DSPyLLMCall(
+                    __class__=classname,
+                    model=self.model,
+                )
+
+                response = {}
+                if len(outputs) == 1:
+                    response["output"] = outputs[0]
+                else:
+                    response["outputs"] = outputs
+                if "prompt" in entry:
+                    response["prompt"] = entry["prompt"]
+                if "messages" in entry:
+                    response["messages"] = entry["messages"]
+                if "model" in lm_response:
+                    response["model"] = lm_response["model"]
+                if "choices" in lm_response:
+                    response["choices"] = lm_response["choices"]
+                if (
+                    not "_hidden_params" in lm_response
+                    or "additional_headers" not in lm_response["_hidden_params"]
+                ):
+                    response["cached"] = True
+                llm_call["response"] = response
+
+                if "usage" in entry:
+                    if "prompt_tokens" in entry["usage"]:
+                        llm_call["prompt_tokens"] = entry["usage"]["prompt_tokens"]
+                    if "completion_tokens" in entry["usage"]:
+                        llm_call["completion_tokens"] = entry["usage"][
+                            "completion_tokens"
+                        ]
+
+                if "cost" in entry:
+                    llm_call["cost"] = entry["cost"]
+
+                this.llm_calls_buffer.append(llm_call)
+            return outputs
+
         dspy.OpenAI.request = patched_request
         dspy.AzureOpenAI.request = patched_request
+        dspy.LM.__call__ = patched_call
 
     def track_metric(
         self,
@@ -624,7 +679,11 @@ class LangWatchTrackedMIPROv2(MIPROv2):
                     optimizer=DSPyOptimizer(
                         name=MIPROv2.__name__,
                         parameters={
-                            "num_candidates": this.n,
+                            "num_candidates": (
+                                this.num_candidates
+                                if hasattr(this, "num_candidates")
+                                else this.n if hasattr(this, "n") else None
+                            ),
                             "init_temperature": this.init_temperature,
                         },
                     ),

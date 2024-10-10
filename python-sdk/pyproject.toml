@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "langwatch"
-version = "0.1.28"
+version = "0.1.29"
 description = "Python SDK for LangWatch for monitoring your LLMs"
 authors = ["Rogerio Chaves <rogerio@langwatch.ai>"]
 homepage = "https://github.com/langwatch/langwatch"
@@ -40,10 +40,11 @@ pandas = "^2.2.2"
 coolname = "^2.2.0"
 dspy-ai = { version = "^2.5.2", optional = true }
 deprecated = "^1.2.14"
+# crewai = { version = "^0.67.1", optional = true } # Required python >=3.10
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.4.2"
-chainlit = "^0.7.501"
+chainlit = "^1.2.0"
 python-dotenv = "1.0.1"
 jupyter = "^1.0.0"
 langchain_community = "^0.2.4"

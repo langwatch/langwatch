@@ -155,7 +155,6 @@ export const useBatchEvaluationState = ({
   setSelectedRunId?: (runId: string) => void;
 }) => {
   const [isSomeRunning, setIsSomeRunning] = useState(false);
-
   const [keepFetching, setKeepFetching] = useState(false);
 
   const batchEvaluationRuns =
@@ -165,7 +164,7 @@ export const useBatchEvaluationState = ({
         experimentSlug: experiment?.slug ?? "",
       },
       {
-        refetchInterval: keepFetching ? 1 : isSomeRunning ? 3000 : false,
+        refetchInterval: keepFetching ? 1 : isSomeRunning ? 3000 : 10_000,
         enabled: !!project && !!experiment,
       }
     );
@@ -360,7 +359,11 @@ export function BatchEvaluationV2RunList({
                   />
                 )}
                 <VStack align="start" spacing={0}>
-                  <Text fontSize={size === "sm" ? "13px" : "14px"}>
+                  <Text
+                    fontSize={size === "sm" ? "13px" : "14px"}
+                    noOfLines={1}
+                    wordBreak="break-all"
+                  >
                     {runName}
                     {getFinishedAt(run.timestamps, new Date().getTime()) ===
                       undefined && (

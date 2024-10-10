@@ -17,6 +17,7 @@ export function EditDataset({
   cta,
   hideButtons = false,
   bottomSpace,
+  loadingOverlayComponent,
 }: {
   editingDataset: Required<Entry>["dataset"];
   setEditingDataset: (dataset: Entry["dataset"]) => void;
@@ -29,6 +30,7 @@ export function EditDataset({
   cta?: string;
   hideButtons?: boolean;
   bottomSpace?: string;
+  loadingOverlayComponent?: (() => React.ReactNode) | null;
 }) {
   const { rows, columns, query } = useGetDatasetData({
     dataset: editingDataset,
@@ -85,6 +87,7 @@ export function EditDataset({
         title={title}
         hideButtons={hideButtons}
         bottomSpace={bottomSpace}
+        loadingOverlayComponent={loadingOverlayComponent}
       />
       <Button
         colorScheme="blue"

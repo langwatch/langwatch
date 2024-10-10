@@ -2063,13 +2063,13 @@ requests = ">=2,<3"
 
 [[package]]
 name = "langwatch"
-version = "0.1.28"
+version = "0.1.29"
 description = "Python SDK for LangWatch for monitoring your LLMs"
 optional = false
 python-versions = "!=2.7.*,!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,!=3.5.*,!=3.6.*,!=3.7.*,!=3.8.*,>=3.9"
 files = [
-    {file = "langwatch-0.1.28-py3-none-any.whl", hash = "sha256:3ed383fbd5aa348c6ebd93d3a8b15abfab30e4f6dbfc5113aa26e01d7dc69b18"},
-    {file = "langwatch-0.1.28.tar.gz", hash = "sha256:e34c542e97cd34becdab322a116f8751097dcec82aa31eeeedd2e226e2aa6c24"},
+    {file = "langwatch-0.1.29-py3-none-any.whl", hash = "sha256:7fce0aa90715e061fcf6e4cdb2d42824c268a9a26280d2172714e928b577d6d1"},
+    {file = "langwatch-0.1.29.tar.gz", hash = "sha256:22ae8d86057181578e145dae36e1c562198d61350aca63173fc01d9101751bb1"},
 ]
 
 [package.dependencies]
@@ -2091,13 +2091,13 @@ openai = ["openai (>=1.42.0,<2.0.0)"]
 
 [[package]]
 name = "litellm"
-version = "1.48.5"
+version = "1.48.16"
 description = "Library to easily interface with LLM API providers"
 optional = false
 python-versions = "!=2.7.*,!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,!=3.5.*,!=3.6.*,!=3.7.*,>=3.8"
 files = [
-    {file = "litellm-1.48.5-py3-none-any.whl", hash = "sha256:d69ae3809047922f1051f0c501759be3363421e1e17230dc4483f8e630f364d1"},
-    {file = "litellm-1.48.5.tar.gz", hash = "sha256:7b698623647c588e7740ada3b1faea2ee005804d93c4e6c3c975a7f0a77b751a"},
+    {file = "litellm-1.48.16-py3-none-any.whl", hash = "sha256:a7bcce83c97cbacdaf89f24d1c51d81117bcf0af2f0f3a41532656c570d23932"},
+    {file = "litellm-1.48.16.tar.gz", hash = "sha256:bda6fc7c8429fcd42c3a80618098678dae833990b2347740aadb84886035b31c"},
 ]
 
 [package.dependencies]
@@ -2112,7 +2112,7 @@ gunicorn = {version = ">=22.0.0,<23.0.0", optional = true, markers = "extra == \
 importlib-metadata = ">=6.8.0"
 jinja2 = ">=3.1.2,<4.0.0"
 jsonschema = ">=4.22.0,<5.0.0"
-openai = ">=1.45.0"
+openai = ">=1.51.0"
 orjson = {version = ">=3.9.7,<4.0.0", optional = true, markers = "extra == \"proxy\""}
 pydantic = ">=2.0.0,<3.0.0"
 PyJWT = {version = ">=2.8.0,<3.0.0", optional = true, markers = "extra == \"proxy\""}
@@ -2529,13 +2529,13 @@ signedtoken = ["cryptography (>=3.0.0)", "pyjwt (>=2.0.0,<3)"]
 
 [[package]]
 name = "openai"
-version = "1.50.2"
+version = "1.51.0"
 description = "The official Python library for the openai API"
 optional = false
 python-versions = ">=3.7.1"
 files = [
-    {file = "openai-1.50.2-py3-none-any.whl", hash = "sha256:822dd2051baa3393d0d5406990611975dd6f533020dc9375a34d4fe67e8b75f7"},
-    {file = "openai-1.50.2.tar.gz", hash = "sha256:3987ae027152fc8bea745d60b02c8f4c4a76e1b5c70e73565fa556db6f78c9e6"},
+    {file = "openai-1.51.0-py3-none-any.whl", hash = "sha256:d9affafb7e51e5a27dce78589d4964ce4d6f6d560307265933a94b2e3f3c5d2c"},
+    {file = "openai-1.51.0.tar.gz", hash = "sha256:8dc4f9d75ccdd5466fc8c99a952186eddceb9fd6ba694044773f3736a847149d"},
 ]
 
 [package.dependencies]
@@ -5215,4 +5215,4 @@ testing = ["big-O", "jaraco.functools", "jaraco.itertools", "more-itertools", "p
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.11,<3.13"
-content-hash = "dc4a1f0569fd1d38afb2bd407ce54681c10e467a4726d96b78fa2a4924f78319"
+content-hash = "e986f80b3f90129078bf400bf70d43f275a932709676e630302494b1df7e12e8"

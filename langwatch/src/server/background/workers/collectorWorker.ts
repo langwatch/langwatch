@@ -446,7 +446,7 @@ const processCollectorCheckAndAdjustJob = async (
     !existingTrace?.timestamps?.inserted_at ||
     existingTrace.timestamps.inserted_at > Date.now() - 30 * 1000
   ) {
-    void scheduleEvaluations(trace, spans);
+    await scheduleEvaluations(trace, spans);
   }
 
   try {

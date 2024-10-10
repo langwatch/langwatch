@@ -87,7 +87,7 @@ class ExecuteOptimizationPayload(BaseModel):
     run_id: str
     workflow: Workflow
     workflow_version_id: str
-    optimizer: Literal["BootstrapFewShot", "BootstrapFewShotWithRandomSearch"]
+    optimizer: Literal["MIPROv2ZeroShot", "BootstrapFewShot", "BootstrapFewShotWithRandomSearch"]
     params: ExecuteOptimizationParams
 
 
