@@ -105,17 +105,14 @@ export const Annotations = ({ traceId }: { traceId: string }) => {
                         (option) => option.id === key
                       )?.name;
 
-                      if (!name) return null;
-
-                      const isEmpty =
-                        !scoreOption ||
-                        scoreOption === "" ||
-                        (typeof scoreOption === "object" &&
-                          (scoreOption.value === null ||
-                            scoreOption.value === ""));
-
-                      if (isEmpty) return null;
-
+                      if (
+                        typeof scoreOption === "object" &&
+                        scoreOption !== null &&
+                        "value" in scoreOption &&
+                        (scoreOption.value === null || scoreOption.value === "")
+                      ) {
+                        return null;
+                      }
                       return (
                         name && (
                           <Text key={key} fontSize={"sm"}>
@@ -127,7 +124,11 @@ export const Annotations = ({ traceId }: { traceId: string }) => {
                                     <Text>{String(scoreOption.value)}</Text>
                                     {scoreOption.reason && (
                                       <Text key={key}>
-                                        ({scoreOption.reason})
+                                        (
+                                        {typeof scoreOption.reason === "object"
+                                          ? JSON.stringify(scoreOption.reason)
+                                          : scoreOption.reason}
+                                        )
                                       </Text>
                                     )}
                                   </HStack>
