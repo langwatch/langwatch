@@ -20,6 +20,7 @@ import {
   MenuItem,
   Link,
   Box,
+  MenuDivider,
 } from "@chakra-ui/react";
 import { ChevronDownIcon } from "@chakra-ui/icons";
 import { CheckSquare } from "react-feather";
@@ -43,6 +44,17 @@ export function Publish({ isDisabled }: { isDisabled: boolean }) {
   const apiModal = useDisclosure();
   const router = useRouter();
   const { project } = useOrganizationTeamProject();
+  const workflowId = router.query.workflow as string;
+
+  const publishedWorkflow = api.optimization.getPublishedWorkflow.useQuery(
+    {
+      workflowId: workflowId ?? "",
+      projectId: project?.id ?? "",
+    },
+    {
+      enabled: !!project?.id,
+    }
+  );
 
   return (
     <>
@@ -60,6 +72,16 @@ export function Publish({ isDisabled }: { isDisabled: boolean }) {
               Publish
             </MenuButton>
             <MenuList zIndex={9999}>
+              {publishedWorkflow.data?.version && (
+                <>
+                  <HStack px={3}>
+                    <SmallLabel color="gray.600">Published Version</SmallLabel>
+                    <Text fontSize="xs">{publishedWorkflow.data?.version}</Text>
+                  </HStack>
+                  <MenuDivider />
+                </>
+              )}
+
               <MenuItem onClick={publishModal.onToggle}>
                 Publish Workflow
               </MenuItem>
@@ -68,10 +90,18 @@ export function Publish({ isDisabled }: { isDisabled: boolean }) {
                   router.query.workflow as string
                 }`}
                 isExternal
+                _hover={{
+                  textDecoration: "none",
+                }}
               >
                 <MenuItem>Run App</MenuItem>
               </Link>
-              <MenuItem onClick={apiModal.onToggle}>Workflow API</MenuItem>
+              <MenuItem
+                onClick={apiModal.onToggle}
+                isDisabled={!publishedWorkflow.data?.version}
+              >
+                Workflow API
+              </MenuItem>
             </MenuList>
           </>
         )}
@@ -257,8 +287,6 @@ export const ApiModalContent = () => {
   if (!publishedWorkflow.data) {
     return;
   }
-
-  console.log(publishedWorkflow.data);
 
   const entryEdges =
     (publishedWorkflow.data?.dsl as unknown as Workflow)?.edges?.filter(
