@@ -71,7 +71,7 @@ export default function Annotations() {
     TRPCClientErrorLike<AppRouter>
   >;
 
-  let annotations: AnnotationsQuery | undefined;
+  let annotations: AnnotationsQuery;
 
   if (hasAnyFilters) {
     const traceIds =
