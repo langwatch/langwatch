@@ -115,20 +115,21 @@ export default function Annotations() {
       "Created At",
     ];
 
-    const csv = annotations.data?.map((annotation) => {
-      return [
-        annotation.user?.name,
-        annotation.comment,
-        annotation.traceId,
-        annotation.isThumbsUp ? "Thumbs Up" : "Thumbs Down",
-        JSON.stringify(annotation.scoreOptions),
-        annotation.createdAt.toLocaleString(),
-      ];
-    });
+    const csv =
+      annotations?.data?.map((annotation) => {
+        return [
+          annotation.user?.name ?? "",
+          annotation.comment ?? "",
+          annotation.traceId ?? "",
+          annotation.isThumbsUp ? "Thumbs Up" : "Thumbs Down",
+          JSON.stringify(annotation.scoreOptions ?? {}),
+          annotation.createdAt?.toLocaleString() ?? "",
+        ];
+      }) ?? [];
 
     const csvBlob = Parse.unparse({
       fields: fields,
-      data: csv ?? [],
+      data: csv,
     });
 
     const url = window.URL.createObjectURL(new Blob([csvBlob]));
