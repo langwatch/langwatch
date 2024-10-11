@@ -6,6 +6,7 @@ import { ChatBox } from "../../../optimization_studio/components/ChatWindow";
 import { api } from "../../../utils/api";
 import { type Edge, type Node } from "@xyflow/react";
 import { type Workflow } from "../../../optimization_studio/types/dsl";
+import { LoadingScreen } from "../../../components/LoadingScreen";
 
 export default function ChatPage() {
   const router = useRouter();
@@ -22,9 +23,14 @@ export default function ChatPage() {
     }
   );
 
+  if (publishedWorkflow.isLoading) {
+    return <LoadingScreen />;
+  }
+
   if (!publishedWorkflow.data) {
     return;
   }
+
   return (
     <Box h="100vh">
       <Box h="100%" bg="gray.100" p={16} pt={4}>

@@ -1,6 +1,16 @@
+import { ChevronDownIcon } from "@chakra-ui/icons";
 import {
+  Alert,
+  AlertIcon,
+  Box,
   Button,
   HStack,
+  Link,
+  Menu,
+  MenuButton,
+  MenuDivider,
+  MenuItem,
+  MenuList,
   Modal,
   ModalBody,
   ModalCloseButton,
@@ -14,33 +24,30 @@ import {
   useDisclosure,
   useToast,
   VStack,
-  Menu,
-  MenuButton,
-  MenuList,
-  MenuItem,
-  Link,
-  Box,
-  MenuDivider,
 } from "@chakra-ui/react";
-import { ChevronDownIcon } from "@chakra-ui/icons";
-import { CheckSquare } from "react-feather";
+import { useRouter } from "next/router";
+import { useState } from "react";
+import {
+  CheckSquare,
+  FileText,
+  Play,
+  Code,
+  Upload,
+  Globe,
+} from "react-feather";
+import { RenderCode } from "~/components/code/RenderCode";
 import { SmallLabel } from "../../components/SmallLabel";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
 import { useModelProviderKeys } from "../hooks/useModelProviderKeys";
 import { useWorkflowStore } from "../hooks/useWorkflowStore";
+import type { Workflow } from "../types/dsl";
 import { AddModelProviderKey } from "./AddModelProviderKey";
 import { useVersionState } from "./History";
-import { useRouter } from "next/router";
-import { RenderCode } from "~/components/code/RenderCode";
-import type { Workflow } from "../types/dsl";
-import { useState } from "react";
 
 import { type Edge, type Node } from "@xyflow/react";
 
 export function Publish({ isDisabled }: { isDisabled: boolean }) {
-  //const { isOpen, onToggle, onClose } = useDisclosure();
-
   const publishModal = useDisclosure();
   const apiModal = useDisclosure();
   const router = useRouter();
@@ -73,12 +80,9 @@ export function Publish({ isDisabled }: { isDisabled: boolean }) {
               Publish
             </MenuButton>
             <MenuList zIndex={9999}>
-              <MenuItem onClick={publishModal.onToggle}>
-                Publish New Version
-              </MenuItem>
               {publishedWorkflow.data?.version && (
                 <>
-                  <MenuDivider />
+                  {/* <MenuDivider /> */}
                   <HStack px={3}>
                     <SmallLabel color="gray.600">Published Version</SmallLabel>
                     <Text fontSize="xs">{publishedWorkflow.data?.version}</Text>
@@ -86,6 +90,13 @@ export function Publish({ isDisabled }: { isDisabled: boolean }) {
                   <MenuDivider />
                 </>
               )}
+              <MenuItem
+                onClick={publishModal.onToggle}
+                icon={<Globe size={16} />}
+              >
+                Publish New Version
+              </MenuItem>
+
               <Link
                 href={`/${project?.slug}/chat/${
                   router.query.workflow as string
@@ -96,15 +107,19 @@ export function Publish({ isDisabled }: { isDisabled: boolean }) {
                 }}
                 isDisabled={!publishedWorkflow.data?.version}
               >
-                <MenuItem isDisabled={!publishedWorkflow.data?.version}>
+                <MenuItem
+                  isDisabled={!publishedWorkflow.data?.version}
+                  icon={<Play size={16} />}
+                >
                   Run App
                 </MenuItem>
               </Link>
               <MenuItem
                 onClick={apiModal.onToggle}
                 isDisabled={!publishedWorkflow.data?.version}
+                icon={<Code size={16} />}
               >
-                Workflow API
+                View API Reference
               </MenuItem>
             </MenuList>
           </>
@@ -145,14 +160,10 @@ export function Publish({ isDisabled }: { isDisabled: boolean }) {
       })
     );
 
-    const { versions, currentVersion } = useVersionState({
+    const { versions, currentVersion, versionToBeEvaluated } = useVersionState({
       project,
       allowSaveIfAutoSaveIsCurrentButNotLatest: false,
     });
-
-    // const versionToBeSaved = versions.data
-    //   ?.sort((a, b) => b.version.localeCompare(a.version)) // Sort by version ID in descending order
-    //   .find((version) => version.autoSaved === false);
 
     const toast = useToast();
     const publishWorkflow = api.workflow.publish.useMutation();
@@ -168,15 +179,7 @@ export function Publish({ isDisabled }: { isDisabled: boolean }) {
         },
         {
           onSuccess: () => {
-            toast({
-              title: "Workflow published successfully",
-              status: "success",
-              duration: 2000,
-              isClosable: true,
-              position: "top-right",
-            });
             setIsPublished(true);
-            // onClose();
           },
           onError: () => {
             toast({
@@ -191,11 +194,10 @@ export function Publish({ isDisabled }: { isDisabled: boolean }) {
       );
     };
 
-    const isRunning = evaluationState?.status === "running";
-
-    if (isRunning) {
-      return null;
-    }
+    const openApiModal = () => {
+      apiModal.onToggle();
+      onClose();
+    };
 
     if (!versions.data) {
       return (
@@ -220,8 +222,10 @@ export function Publish({ isDisabled }: { isDisabled: boolean }) {
         <ModalBody>
           <VStack align="start" width="full" spacing={4}>
             <VStack align="start" width="full">
-              {currentVersion && (
-                <VersionToBeEvaluated versionToBeEvaluated={currentVersion} />
+              {versionToBeEvaluated && (
+                <VersionToBeEvaluated
+                  versionToBeEvaluated={versionToBeEvaluated}
+                />
               )}
             </VStack>
           </VStack>
@@ -239,20 +243,22 @@ export function Publish({ isDisabled }: { isDisabled: boolean }) {
                 <Button
                   variant="outline"
                   type="submit"
-                  leftIcon={<CheckSquare size={16} />}
-                  isLoading={evaluationState?.status === "waiting"}
+                  leftIcon={<Globe size={16} />}
+                  isLoading={publishWorkflow.isLoading}
                   isDisabled={hasProvidersWithoutCustomKeys}
                   onClick={onSubmit}
                 >
-                  Publish New Version.
+                  Publish New Version
                 </Button>
               </HStack>
             )}
             {isPublished && (
               <VStack align="start" width="full">
-                <Text>Published!</Text>
-                <HStack width="full">
-                  <Spacer />
+                <Alert status="success">
+                  <AlertIcon />
+                  New version published
+                </Alert>
+                <VStack width="full" align="start">
                   <Link
                     href={`/${project?.slug}/chat/${
                       router.query.workflow as string
@@ -262,12 +268,23 @@ export function Publish({ isDisabled }: { isDisabled: boolean }) {
                       textDecoration: "none",
                     }}
                   >
-                    <Button colorScheme="green">Run App</Button>
+                    <Button
+                      colorScheme="green"
+                      leftIcon={<Play size={16} />}
+                      variant="outline"
+                    >
+                      Run App
+                    </Button>
                   </Link>
-                  <Button colorScheme="green" onClick={apiModal.onToggle}>
-                    Workflow API
+                  <Button
+                    colorScheme="green"
+                    onClick={() => openApiModal()}
+                    leftIcon={<Code size={16} />}
+                    variant="outline"
+                  >
+                    View API Reference
                   </Button>
-                </HStack>
+                </VStack>
               </VStack>
             )}
           </VStack>
