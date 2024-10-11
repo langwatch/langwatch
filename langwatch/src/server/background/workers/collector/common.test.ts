@@ -783,4 +783,226 @@ describe("Span organizing and flattening tests", () => {
     expect(input).toEqual("1");
     expect(output).toEqual("Hey there! How can I help you today? 🌟");
   });
+
+  it.only("extracts right input and output 3", () => {
+    const spans = [
+      {
+        output: {
+          type: "json",
+          value: '{"messages":[{"role":"user","content":"hey there"}]}',
+        },
+        input: {
+          type: "json",
+          value: '{"messages":[{"role":"user","content":"hey there"}]}',
+        },
+        trace_id: "trace_980Pq_-8ri9C4eMv7hduy",
+        span_id: "span_e9a58fd1-2747-44ab-824a-b4a6c52b8edd",
+        project_id: "KAXYxPR8MUgTcP8CF193y",
+        parent_id: "span_8e5c4b6c-fb09-4be0-8567-463c1b31c1de",
+        timestamps: {
+          finished_at: 1728648730545,
+          updated_at: 1728648735155,
+          started_at: 1728648730542,
+          inserted_at: 1728648735155,
+        },
+        name: "__start__",
+        metrics: null,
+        type: "chain",
+        error: null,
+      },
+      {
+        trace_id: "trace_980Pq_-8ri9C4eMv7hduy",
+        span_id: "span_c0d02d15-ed6b-480b-8e4e-b95aa31b25b9",
+        timestamps: {
+          finished_at: 1728648731709,
+          updated_at: 1728648735155,
+          started_at: 1728648730587,
+          inserted_at: 1728648735155,
+        },
+        type: "llm",
+        error: null,
+        params: {
+          stream: true,
+          temperature: 0.7,
+          tools: [
+            {
+              function: {
+                name: "langwatch_search",
+                description:
+                  "Search for information about LangWatch. For any questions about LangWatch, use this tool if you didn't already",
+                parameters: {
+                  type: "object",
+                  properties: {
+                    query: {
+                      description: "query to look up in retriever",
+                      type: "string",
+                    },
+                  },
+                  required: ["query"],
+                },
+              },
+              type: "function",
+            },
+          ],
+          n: 1,
+          _keys: ["n", "stream", "temperature", "tools"],
+        },
+        output: {
+          type: "chat_messages",
+          value:
+            '[{"role":"assistant","content":"Hello! How can I assist you today?"}]',
+        },
+        input: {
+          type: "chat_messages",
+          value: '[{"role":"user","content":"hey there"}]',
+        },
+        project_id: "KAXYxPR8MUgTcP8CF193y",
+        parent_id: "span_6e85deb1-5174-4320-a027-34af93c47e41",
+        name: null,
+        model: "openai/gpt-3.5-turbo",
+        metrics: {
+          tokens_estimated: true,
+          completion_tokens: 9,
+          prompt_tokens: 2,
+          cost: 0.000021000000000000002,
+        },
+      },
+      {
+        output: {
+          type: "json",
+          value:
+            '{"messages":[{"role":"assistant","content":"Hello! How can I assist you today?"}]}',
+        },
+        input: {
+          type: "json",
+          value:
+            '{"messages":[{"role":"assistant","content":"Hello! How can I assist you today?"}]}',
+        },
+        trace_id: "trace_980Pq_-8ri9C4eMv7hduy",
+        span_id: "span_c06010fe-1188-4826-8c7d-ad5f94b2d05d",
+        project_id: "KAXYxPR8MUgTcP8CF193y",
+        parent_id: "span_6e85deb1-5174-4320-a027-34af93c47e41",
+        timestamps: {
+          finished_at: 1728648731744,
+          updated_at: 1728648735155,
+          started_at: 1728648731741,
+          inserted_at: 1728648735155,
+        },
+        name: "_write",
+        metrics: null,
+        type: "chain",
+        error: null,
+      },
+      {
+        output: {
+          type: "text",
+          value: '"__end__"',
+        },
+        input: {
+          type: "json",
+          value:
+            '{"messages":[{"role":"user","content":"hey there"},{"role":"assistant","content":"Hello! How can I assist you today?"}]}',
+        },
+        trace_id: "trace_980Pq_-8ri9C4eMv7hduy",
+        span_id: "span_c93729d0-3900-4836-a862-32e523b06c63",
+        project_id: "KAXYxPR8MUgTcP8CF193y",
+        parent_id: "span_6e85deb1-5174-4320-a027-34af93c47e41",
+        timestamps: {
+          finished_at: 1728648731771,
+          updated_at: 1728648735155,
+          started_at: 1728648731769,
+          inserted_at: 1728648735155,
+        },
+        name: "should_continue",
+        metrics: null,
+        type: "chain",
+        error: null,
+      },
+      {
+        output: {
+          type: "json",
+          value:
+            '{"messages":[{"role":"assistant","content":"Hello! How can I assist you today?"}]}',
+        },
+        input: {
+          type: "json",
+          value: '{"messages":[{"role":"user","content":"hey there"}]}',
+        },
+        trace_id: "trace_980Pq_-8ri9C4eMv7hduy",
+        span_id: "span_6e85deb1-5174-4320-a027-34af93c47e41",
+        project_id: "KAXYxPR8MUgTcP8CF193y",
+        parent_id: "span_8e5c4b6c-fb09-4be0-8567-463c1b31c1de",
+        timestamps: {
+          finished_at: 1728648731783,
+          updated_at: 1728648735155,
+          started_at: 1728648730583,
+          inserted_at: 1728648735155,
+        },
+        name: "agent",
+        metrics: null,
+        type: "chain",
+        error: null,
+      },
+      {
+        output: {
+          type: "json",
+          value:
+            '{"messages":[{"role":"user","content":"hey there"},{"role":"assistant","content":"Hello! How can I assist you today?"}]}',
+        },
+        input: {
+          type: "json",
+          value: '{"messages":[{"role":"user","content":"hey there"}]}',
+        },
+        trace_id: "trace_980Pq_-8ri9C4eMv7hduy",
+        span_id: "span_8e5c4b6c-fb09-4be0-8567-463c1b31c1de",
+        project_id: "KAXYxPR8MUgTcP8CF193y",
+        parent_id: "span_fnKgUACWwNNA3DogXr6Np",
+        timestamps: {
+          finished_at: 1728648731795,
+          updated_at: 1728648735155,
+          started_at: 1728648730538,
+          inserted_at: 1728648735155,
+        },
+        name: "LangGraph",
+        metrics: null,
+        type: "chain",
+        error: null,
+      },
+      {
+        output: {
+          type: "json",
+          value: "null",
+        },
+        input: {
+          type: "json",
+          value:
+            '{"message":{"id":"fdd1fce6-051f-4305-a1b1-04addc4b301e","threadId":"d25109d5-0daa-4133-a3fe-afc4cc879676","parentId":null,"createdAt":"2024-10-11T12:12:10.517501Z","start":"2024-10-11T12:12:10.517501Z","end":"2024-10-11T12:12:10.517501Z","output":"hey there","name":"admin","type":"user_message","language":null,"streaming":false,"isError":false,"waitForAnswer":false,"indent":null,"metadata":{},"tags":null}}',
+        },
+        trace_id: "trace_980Pq_-8ri9C4eMv7hduy",
+        span_id: "span_fnKgUACWwNNA3DogXr6Np",
+        project_id: "KAXYxPR8MUgTcP8CF193y",
+        parent_id: null,
+        timestamps: {
+          finished_at: 1728648731809,
+          updated_at: 1728648735155,
+          started_at: 1728648730523,
+          inserted_at: 1728648735155,
+        },
+        name: "main",
+        metrics: null,
+        type: "span",
+        error: null,
+      },
+    ];
+
+    const input = getFirstInputAsText(
+      spans.map(elasticSearchSpanToSpan as any)
+    );
+    const output = getLastOutputAsText(
+      spans.map(elasticSearchSpanToSpan as any)
+    );
+
+    expect(input).toEqual("hey there");
+    expect(output).toEqual("Hello! How can I assist you today?");
+  });
 });

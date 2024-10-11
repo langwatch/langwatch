@@ -173,7 +173,16 @@ def autoconvert_rag_contexts(value: Union[List[RAGChunk], List[str]]) -> List[RA
 class SerializableAndPydanticEncoder(json.JSONEncoder):
     def default(self, o):
         try:
-            from langchain_core.load.serializable import Serializable  # type: ignore
+            import langchain_core.messages
+            from langwatch.langchain import langchain_message_to_chat_message
+
+            if isinstance(o, langchain_core.messages.BaseMessage):
+                return langchain_message_to_chat_message(o)
+        except ImportError:
+            pass
+
+        try:
+            from langchain_core.load.serializable import Serializable
 
             if isinstance(o, Serializable):
                 return o.__repr__()
