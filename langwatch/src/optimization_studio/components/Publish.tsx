@@ -34,6 +34,7 @@ import { useVersionState } from "./History";
 import { useRouter } from "next/router";
 import { RenderCode } from "~/components/code/RenderCode";
 import type { Workflow } from "../types/dsl";
+import { useState } from "react";
 
 import { type Edge, type Node } from "@xyflow/react";
 
@@ -72,8 +73,12 @@ export function Publish({ isDisabled }: { isDisabled: boolean }) {
               Publish
             </MenuButton>
             <MenuList zIndex={9999}>
+              <MenuItem onClick={publishModal.onToggle}>
+                Publish New Version
+              </MenuItem>
               {publishedWorkflow.data?.version && (
                 <>
+                  <MenuDivider />
                   <HStack px={3}>
                     <SmallLabel color="gray.600">Published Version</SmallLabel>
                     <Text fontSize="xs">{publishedWorkflow.data?.version}</Text>
@@ -81,10 +86,6 @@ export function Publish({ isDisabled }: { isDisabled: boolean }) {
                   <MenuDivider />
                 </>
               )}
-
-              <MenuItem onClick={publishModal.onToggle}>
-                Publish Workflow
-              </MenuItem>
               <Link
                 href={`/${project?.slug}/chat/${
                   router.query.workflow as string
@@ -93,8 +94,11 @@ export function Publish({ isDisabled }: { isDisabled: boolean }) {
                 _hover={{
                   textDecoration: "none",
                 }}
+                isDisabled={!publishedWorkflow.data?.version}
               >
-                <MenuItem>Run App</MenuItem>
+                <MenuItem isDisabled={!publishedWorkflow.data?.version}>
+                  Run App
+                </MenuItem>
               </Link>
               <MenuItem
                 onClick={apiModal.onToggle}
@@ -118,130 +122,159 @@ export function Publish({ isDisabled }: { isDisabled: boolean }) {
       </Modal>
     </>
   );
-}
 
-export function PublishModalContent({ onClose }: { onClose: () => void }) {
-  const { project } = useOrganizationTeamProject();
-  const { hasProvidersWithoutCustomKeys, nodeProvidersWithoutCustomKeys } =
-    useModelProviderKeys();
-  const { workflowId, evaluationState } = useWorkflowStore(
-    ({
-      workflow_id: workflowId,
-      getWorkflow,
-      state,
-      deselectAllNodes,
-      setOpenResultsPanelRequest,
-    }) => ({
-      workflowId,
-      getWorkflow,
-      evaluationState: state.evaluation,
-      deselectAllNodes: deselectAllNodes,
-      setOpenResultsPanelRequest: setOpenResultsPanelRequest,
-    })
-  );
+  function PublishModalContent({ onClose }: { onClose: () => void }) {
+    const { project } = useOrganizationTeamProject();
+    const router = useRouter();
 
-  const { versions, currentVersion } = useVersionState({
-    project,
-    allowSaveIfAutoSaveIsCurrentButNotLatest: false,
-  });
-
-  // const versionToBeSaved = versions.data
-  //   ?.sort((a, b) => b.version.localeCompare(a.version)) // Sort by version ID in descending order
-  //   .find((version) => version.autoSaved === false);
-
-  const toast = useToast();
-  const publishWorkflow = api.workflow.publish.useMutation();
-
-  const onSubmit = () => {
-    publishWorkflow.mutate(
-      {
-        projectId: project?.id ?? "",
-        workflowId: workflowId ?? "",
-        versionId: currentVersion?.id ?? "",
-      },
-      {
-        onSuccess: () => {
-          toast({
-            title: "Workflow published successfully",
-            status: "success",
-            duration: 5000,
-            isClosable: true,
-            position: "top-right",
-          });
-          onClose();
-        },
-        onError: () => {
-          toast({
-            title: "Error publishing workflow",
-            status: "error",
-            duration: 5000,
-            isClosable: true,
-            position: "top-right",
-          });
-        },
-      }
+    const { hasProvidersWithoutCustomKeys, nodeProvidersWithoutCustomKeys } =
+      useModelProviderKeys();
+    const { workflowId, evaluationState } = useWorkflowStore(
+      ({
+        workflow_id: workflowId,
+        getWorkflow,
+        state,
+        deselectAllNodes,
+        setOpenResultsPanelRequest,
+      }) => ({
+        workflowId,
+        getWorkflow,
+        evaluationState: state.evaluation,
+        deselectAllNodes: deselectAllNodes,
+        setOpenResultsPanelRequest: setOpenResultsPanelRequest,
+      })
     );
-  };
 
-  const isRunning = evaluationState?.status === "running";
+    const { versions, currentVersion } = useVersionState({
+      project,
+      allowSaveIfAutoSaveIsCurrentButNotLatest: false,
+    });
 
-  if (isRunning) {
-    return null;
-  }
+    // const versionToBeSaved = versions.data
+    //   ?.sort((a, b) => b.version.localeCompare(a.version)) // Sort by version ID in descending order
+    //   .find((version) => version.autoSaved === false);
 
-  if (!versions.data) {
+    const toast = useToast();
+    const publishWorkflow = api.workflow.publish.useMutation();
+
+    const [isPublished, setIsPublished] = useState(false);
+
+    const onSubmit = () => {
+      publishWorkflow.mutate(
+        {
+          projectId: project?.id ?? "",
+          workflowId: workflowId ?? "",
+          versionId: currentVersion?.id ?? "",
+        },
+        {
+          onSuccess: () => {
+            toast({
+              title: "Workflow published successfully",
+              status: "success",
+              duration: 2000,
+              isClosable: true,
+              position: "top-right",
+            });
+            setIsPublished(true);
+            // onClose();
+          },
+          onError: () => {
+            toast({
+              title: "Error publishing workflow",
+              status: "error",
+              duration: 5000,
+              isClosable: true,
+              position: "top-right",
+            });
+          },
+        }
+      );
+    };
+
+    const isRunning = evaluationState?.status === "running";
+
+    if (isRunning) {
+      return null;
+    }
+
+    if (!versions.data) {
+      return (
+        <ModalContent borderTop="5px solid" borderColor="green.400">
+          <ModalHeader fontWeight={600}>Publish Workflow</ModalHeader>
+          <ModalCloseButton />
+          <ModalBody>
+            <VStack align="start" width="full">
+              <Skeleton width="full" height="20px" />
+              <Skeleton width="full" height="20px" />
+            </VStack>
+          </ModalBody>
+          <ModalFooter />
+        </ModalContent>
+      );
+    }
+
     return (
       <ModalContent borderTop="5px solid" borderColor="green.400">
         <ModalHeader fontWeight={600}>Publish Workflow</ModalHeader>
         <ModalCloseButton />
         <ModalBody>
-          <VStack align="start" width="full">
-            <Skeleton width="full" height="20px" />
-            <Skeleton width="full" height="20px" />
+          <VStack align="start" width="full" spacing={4}>
+            <VStack align="start" width="full">
+              {currentVersion && (
+                <VersionToBeEvaluated versionToBeEvaluated={currentVersion} />
+              )}
+            </VStack>
           </VStack>
         </ModalBody>
-        <ModalFooter />
+        <ModalFooter borderTop="1px solid" borderColor="gray.200" marginTop={4}>
+          <VStack align="start" width="full">
+            {hasProvidersWithoutCustomKeys && (
+              <AddModelProviderKey
+                nodeProvidersWithoutCustomKeys={nodeProvidersWithoutCustomKeys}
+              />
+            )}
+            {!isPublished && (
+              <HStack width="full">
+                <Spacer />
+                <Button
+                  variant="outline"
+                  type="submit"
+                  leftIcon={<CheckSquare size={16} />}
+                  isLoading={evaluationState?.status === "waiting"}
+                  isDisabled={hasProvidersWithoutCustomKeys}
+                  onClick={onSubmit}
+                >
+                  Publish New Version.
+                </Button>
+              </HStack>
+            )}
+            {isPublished && (
+              <VStack align="start" width="full">
+                <Text>Published!</Text>
+                <HStack width="full">
+                  <Spacer />
+                  <Link
+                    href={`/${project?.slug}/chat/${
+                      router.query.workflow as string
+                    }`}
+                    isExternal
+                    _hover={{
+                      textDecoration: "none",
+                    }}
+                  >
+                    <Button colorScheme="green">Run App</Button>
+                  </Link>
+                  <Button colorScheme="green" onClick={apiModal.onToggle}>
+                    Workflow API
+                  </Button>
+                </HStack>
+              </VStack>
+            )}
+          </VStack>
+        </ModalFooter>
       </ModalContent>
     );
   }
-
-  return (
-    <ModalContent borderTop="5px solid" borderColor="green.400">
-      <ModalHeader fontWeight={600}>Publish Workflow</ModalHeader>
-      <ModalCloseButton />
-      <ModalBody>
-        <VStack align="start" width="full" spacing={4}>
-          <VStack align="start" width="full">
-            {currentVersion && (
-              <VersionToBeEvaluated versionToBeEvaluated={currentVersion} />
-            )}
-          </VStack>
-        </VStack>
-      </ModalBody>
-      <ModalFooter borderTop="1px solid" borderColor="gray.200" marginTop={4}>
-        <VStack align="start" width="full">
-          {hasProvidersWithoutCustomKeys && (
-            <AddModelProviderKey
-              nodeProvidersWithoutCustomKeys={nodeProvidersWithoutCustomKeys}
-            />
-          )}
-          <HStack width="full">
-            <Spacer />
-            <Button
-              variant="outline"
-              type="submit"
-              leftIcon={<CheckSquare size={16} />}
-              isLoading={evaluationState?.status === "waiting"}
-              isDisabled={hasProvidersWithoutCustomKeys}
-              onClick={onSubmit}
-            >
-              Publish Workflow
-            </Button>
-          </HStack>
-        </VStack>
-      </ModalFooter>
-    </ModalContent>
-  );
 }
 
 export const VersionToBeEvaluated = ({
