@@ -98,14 +98,17 @@ export function Publish({ isDisabled }: { isDisabled: boolean }) {
               </MenuItem>
 
               <Link
-                href={`/${project?.slug}/chat/${
-                  router.query.workflow as string
-                }`}
+                href={
+                  !publishedWorkflow.data?.version
+                    ? undefined
+                    : `/${project?.slug}/chat/${
+                        router.query.workflow as string
+                      }`
+                }
                 isExternal
                 _hover={{
                   textDecoration: "none",
                 }}
-                isDisabled={!publishedWorkflow.data?.version}
               >
                 <MenuItem
                   isDisabled={!publishedWorkflow.data?.version}
