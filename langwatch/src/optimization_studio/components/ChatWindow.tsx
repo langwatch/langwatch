@@ -36,9 +36,24 @@ import { useSocketClient } from "../hooks/useSocketClient";
 interface ChatWindowProps {
   isOpen: boolean;
   onClose: () => void;
+  useApi?: boolean;
+  workflowId?: string;
+  nodes: Node[];
+  edges: Edge[];
+  executionStatus?: string;
 }
 
-export const PlaygroundButton = ({ onClick }: { onClick: () => void }) => {
+export const PlaygroundButton = ({
+  onClick,
+  nodes,
+  edges,
+  executionStatus,
+}: {
+  onClick: () => void;
+  nodes: Node[];
+  edges: Edge[];
+  executionStatus: string;
+}) => {
   const chatModal = useDisclosure();
   const { socketStatus } = useSocketClient();
 
@@ -48,7 +63,7 @@ export const PlaygroundButton = ({ onClick }: { onClick: () => void }) => {
     <>
       <Tooltip label={isDisabled ? "Studio is not connected" : undefined}>
         <Button
-          onClick={onClick}
+          onClick={chatModal.onOpen}
           rightIcon={<Play size={16} />}
           isDisabled={isDisabled}
           variant="outline"
@@ -58,20 +73,37 @@ export const PlaygroundButton = ({ onClick }: { onClick: () => void }) => {
           Playground
         </Button>
       </Tooltip>
-      {/* <ChatWindow isOpen={chatModal.isOpen} onClose={chatModal.onClose} /> */}
+      <ChatWindow
+        isOpen={chatModal.isOpen}
+        onClose={chatModal.onClose}
+        nodes={nodes}
+        edges={edges}
+        executionStatus={executionStatus}
+      />
     </>
   );
 };
 
-export const ChatWindow = ({ isOpen, onClose }: ChatWindowProps) => {
+export const ChatWindow = ({
+  isOpen,
+  onClose,
+  nodes,
+  edges,
+  executionStatus,
+}: ChatWindowProps) => {
   return (
     <Modal onClose={onClose} size={"5xl"} isOpen={isOpen}>
       <ModalOverlay />
-      <ModalContent maxHeight={"100vh"}>
+      <ModalContent height={"60vh"}>
         <ModalHeader>Test Message</ModalHeader>
         <ModalCloseButton />
         <ModalBody>
-          <ChatBox isOpen={isOpen} />
+          <ChatBox
+            isOpen={isOpen}
+            nodes={nodes}
+            edges={edges}
+            executionStatus={executionStatus}
+          />
         </ModalBody>
         <ModalFooter></ModalFooter>
       </ModalContent>

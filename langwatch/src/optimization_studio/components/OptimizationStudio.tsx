@@ -358,7 +358,12 @@ export default function OptimizationStudio() {
                         />
 
                         <FlowPanel position="bottom-right">
-                          <PlaygroundButton onClick={chatModal.onOpen} />
+                          <PlaygroundButton
+                            onClick={chatModal.onOpen}
+                            nodes={nodes}
+                            edges={edges}
+                            executionStatus={executionStatus ?? ""}
+                          />
                         </FlowPanel>
                       </ReactFlow>
                     </DragDropArea>
@@ -397,22 +402,6 @@ export default function OptimizationStudio() {
         </DndProvider>
       </ReactFlowProvider>
       <CurrentDrawer />
-      <Modal onClose={chatModal.onClose} size={"5xl"} isOpen={chatModal.isOpen}>
-        <ModalOverlay />
-        <ModalContent height={"60vh"}>
-          <ModalHeader>Test Message</ModalHeader>
-          <ModalCloseButton />
-          <ModalBody>
-            <ChatBox
-              isOpen={chatModal.isOpen}
-              nodes={nodes}
-              edges={edges}
-              executionStatus={executionStatus ?? ""}
-            />
-          </ModalBody>
-          <ModalFooter></ModalFooter>
-        </ModalContent>
-      </Modal>
     </div>
   );
 }
