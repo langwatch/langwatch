@@ -125,7 +125,7 @@ export function TraceDetails(props: {
         <VStack align="start" width="full">
           <HStack width="full" marginTop={4}>
             <Text paddingTop={2} fontSize="2xl" fontWeight="600">
-              Trace Details
+              Message Details
             </Text>
             <Spacer />
             <HStack>
@@ -212,16 +212,30 @@ export function TraceDetails(props: {
 
             <TabPanels>
               {isTableView && (
-                <TabPanel paddingX={0}>
-                  <Conversation threadId={threadId} traceId={props.traceId} />
+                <TabPanel paddingX={0} padding={0}>
+                  <Box
+                    transition="all 0.3s ease-in-out"
+                    width={"full"}
+                    height="100vh"
+                    maxHeight="100vh"
+                    overflowX="hidden"
+                    overflowY="auto"
+                    position="sticky"
+                    top={0}
+                    id="conversation-scroll-container"
+                    background={trace.data ? "gray.50" : "white"}
+                    paddingBottom="220px"
+                  >
+                    <Conversation threadId={threadId} traceId={props.traceId} />
+                  </Box>
                 </TabPanel>
               )}
-              <TabPanel paddingX={0}>
+              <TabPanel padding={0}>
                 <TraceSummary traceId={props.traceId} />
                 <SpanTree traceId={props.traceId} />
               </TabPanel>
               {anyGuardrails && (
-                <TabPanel>
+                <TabPanel paddingX={0}>
                   <Guardrails
                     project={project}
                     traceId={props.traceId ?? ""}
@@ -237,7 +251,7 @@ export function TraceDetails(props: {
                   anyGuardrails={anyGuardrails}
                 />
               </TabPanel>
-              <TabPanel>
+              <TabPanel paddingX={0}>
                 {annotationsQuery.isLoading ? (
                   <Text>Loading...</Text>
                 ) : annotationsQuery.data &&
