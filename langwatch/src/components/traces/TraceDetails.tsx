@@ -39,7 +39,8 @@ import { useEffect, useState } from "react";
 import { useTraceDetailsState } from "../../hooks/useTraceDetailsState";
 import { formatTimeAgo } from "../../utils/formatTimeAgo";
 import { evaluationPassed } from "../checks/EvaluationStatus";
-
+import { Conversation } from "../../pages/[project]/messages/[trace]/index";
+import { useRouter } from "next/router";
 interface TraceEval {
   project?: Project;
   traceId: string;
@@ -52,6 +53,10 @@ export function TraceDetails(props: {
   publicShare?: PublicShare;
 }) {
   const { project, hasTeamPermission } = useOrganizationTeamProject();
+  const [threadId, setThreadId] = useState<string | undefined>(undefined);
+  const router = useRouter();
+
+  const isTableView = router.query.view === "table";
 
   const { openDrawer } = useDrawer();
 
@@ -100,6 +105,12 @@ export function TraceDetails(props: {
     props.annotationTab && anyGuardrails ? 3 : props.annotationTab ? 2 : 0;
 
   const { trace } = useTraceDetailsState(props.traceId);
+
+  useEffect(() => {
+    if (trace.data?.metadata.thread_id) {
+      setThreadId(trace.data.metadata.thread_id);
+    }
+  }, [trace.data?.metadata.thread_id]);
 
   return (
     <>
@@ -156,6 +167,7 @@ export function TraceDetails(props: {
         <VStack align="start" width="full">
           <Tabs width="full" defaultIndex={annotationTabIndex}>
             <TabList>
+              {isTableView && <Tab>Messages</Tab>}
               <Tab>Details</Tab>
               {anyGuardrails && (
                 <Tab>
@@ -199,6 +211,11 @@ export function TraceDetails(props: {
             </TabList>
 
             <TabPanels>
+              {isTableView && (
+                <TabPanel paddingX={0}>
+                  <Conversation threadId={threadId} traceId={props.traceId} />
+                </TabPanel>
+              )}
               <TabPanel paddingX={0}>
                 <TraceSummary traceId={props.traceId} />
                 <SpanTree traceId={props.traceId} />

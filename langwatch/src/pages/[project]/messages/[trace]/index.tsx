@@ -122,11 +122,17 @@ export default function TraceDetails() {
   );
 }
 
-function Conversation({ threadId }: { threadId?: string }) {
+export function Conversation({
+  threadId,
+  traceId,
+}: {
+  threadId?: string;
+  traceId: string;
+}) {
   const router = useRouter();
-  const { traceId, trace } = useTraceDetailsState(
-    (router.query.trace as string) ?? ""
-  );
+  const traceIdParam = (router.query.trace as string) || traceId;
+  const { trace } = useTraceDetailsState(traceIdParam);
+
   const { project } = useOrganizationTeamProject();
 
   const currentTraceRef = useRef<HTMLDivElement>(null);
