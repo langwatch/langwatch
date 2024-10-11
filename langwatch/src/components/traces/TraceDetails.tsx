@@ -39,7 +39,8 @@ import { useEffect, useState } from "react";
 import { useTraceDetailsState } from "../../hooks/useTraceDetailsState";
 import { formatTimeAgo } from "../../utils/formatTimeAgo";
 import { evaluationPassed } from "../checks/EvaluationStatus";
-
+import { Conversation } from "../../pages/[project]/messages/[trace]/index";
+import { useRouter } from "next/router";
 interface TraceEval {
   project?: Project;
   traceId: string;
@@ -52,6 +53,10 @@ export function TraceDetails(props: {
   publicShare?: PublicShare;
 }) {
   const { project, hasTeamPermission } = useOrganizationTeamProject();
+  const [threadId, setThreadId] = useState<string | undefined>(undefined);
+  const router = useRouter();
+
+  const isTableView = router.query.view === "table";
 
   const { openDrawer } = useDrawer();
 
@@ -101,6 +106,12 @@ export function TraceDetails(props: {
 
   const { trace } = useTraceDetailsState(props.traceId);
 
+  useEffect(() => {
+    if (trace.data?.metadata.thread_id) {
+      setThreadId(trace.data.metadata.thread_id);
+    }
+  }, [trace.data?.metadata.thread_id]);
+
   return (
     <>
       <VStack
@@ -114,7 +125,7 @@ export function TraceDetails(props: {
         <VStack align="start" width="full">
           <HStack width="full" marginTop={4}>
             <Text paddingTop={2} fontSize="2xl" fontWeight="600">
-              Trace Details
+              Message Details
             </Text>
             <Spacer />
             <HStack>
@@ -156,6 +167,7 @@ export function TraceDetails(props: {
         <VStack align="start" width="full">
           <Tabs width="full" defaultIndex={annotationTabIndex}>
             <TabList>
+              {isTableView && <Tab>Messages</Tab>}
               <Tab>Details</Tab>
               {anyGuardrails && (
                 <Tab>
@@ -199,12 +211,31 @@ export function TraceDetails(props: {
             </TabList>
 
             <TabPanels>
-              <TabPanel paddingX={0}>
+              {isTableView && (
+                <TabPanel paddingX={0} padding={0}>
+                  <Box
+                    transition="all 0.3s ease-in-out"
+                    width={"full"}
+                    height="100vh"
+                    maxHeight="100vh"
+                    overflowX="hidden"
+                    overflowY="auto"
+                    position="sticky"
+                    top={0}
+                    id="conversation-scroll-container"
+                    background={trace.data ? "gray.50" : "white"}
+                    paddingBottom="220px"
+                  >
+                    <Conversation threadId={threadId} traceId={props.traceId} />
+                  </Box>
+                </TabPanel>
+              )}
+              <TabPanel padding={0}>
                 <TraceSummary traceId={props.traceId} />
                 <SpanTree traceId={props.traceId} />
               </TabPanel>
               {anyGuardrails && (
-                <TabPanel>
+                <TabPanel paddingX={0}>
                   <Guardrails
                     project={project}
                     traceId={props.traceId ?? ""}
@@ -220,7 +251,7 @@ export function TraceDetails(props: {
                   anyGuardrails={anyGuardrails}
                 />
               </TabPanel>
-              <TabPanel>
+              <TabPanel paddingX={0}>
                 {annotationsQuery.isLoading ? (
                   <Text>Loading...</Text>
                 ) : annotationsQuery.data &&

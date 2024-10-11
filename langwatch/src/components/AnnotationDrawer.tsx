@@ -334,12 +334,12 @@ export function AnnotationDrawer({
                   </Button>
                   {action === "edit" && (
                     <Button
-                      colorScheme="black"
+                      colorScheme="red"
                       variant="outline"
                       isLoading={deleteAnnotation.isLoading}
                       onClick={() => handleDelete()}
                     >
-                      <DeleteIcon />
+                      Delete
                     </Button>
                   )}
                 </HStack>
