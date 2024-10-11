@@ -96,14 +96,16 @@ export const sharedFiltersInputSchema = z.object({
   startDate: z.number(),
   endDate: z.number(),
   query: z.string().optional(),
-  filters: z.record(
-    filterFieldsEnum,
-    z.union([
-      z.array(z.string()),
-      z.record(z.string(), z.array(z.string())),
-      z.record(z.string(), z.record(z.string(), z.array(z.string()))),
-    ])
-  ),
+  filters: z
+    .record(
+      filterFieldsEnum,
+      z.union([
+        z.array(z.string()),
+        z.record(z.string(), z.array(z.string())),
+        z.record(z.string(), z.record(z.string(), z.array(z.string()))),
+      ])
+    )
+    .default({}),
 });
 
 export type SharedFiltersInput = z.infer<typeof sharedFiltersInputSchema>;

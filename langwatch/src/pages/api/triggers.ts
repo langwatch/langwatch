@@ -78,7 +78,7 @@ const getTracesForAlert = async (trigger: Trigger, projects: Project[]) => {
     endDate: new Date().getTime(),
   };
 
-  const traces = await getAllTracesForProject(input);
+  const traces = await getAllTracesForProject({ input });
 
   const getTracesToSend = async (traces: TraceGroups, triggerId: string) => {
     const tracesToSend = [];

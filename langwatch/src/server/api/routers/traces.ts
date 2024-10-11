@@ -46,7 +46,7 @@ const tracesFilterInput = sharedFiltersInputSchema.extend({
   pageSize: z.number().optional(),
 });
 
-const getAllForProjectInput = tracesFilterInput.extend({
+export const getAllForProjectInput = tracesFilterInput.extend({
   groupBy: z.string().optional(),
   sortBy: z.string().optional(),
   sortDirection: z.string().optional(),
@@ -90,7 +90,7 @@ export const tracesRouter = createTRPCRouter({
     .input(getAllForProjectInput)
     .use(checkUserPermissionForProject(TeamRoleGroup.MESSAGES_VIEW))
     .query(async ({ ctx, input }) => {
-      return await getAllTracesForProject(input, ctx);
+      return await getAllTracesForProject({ input, ctx });
     }),
   getById: publicProcedure
     .input(z.object({ projectId: z.string(), traceId: z.string() }))
@@ -311,14 +311,14 @@ export const tracesRouter = createTRPCRouter({
     )
     .use(checkUserPermissionForProject(TeamRoleGroup.MESSAGES_VIEW))
     .query(async ({ ctx, input }) => {
-      const { groups } = await getAllTracesForProject(
-        {
+      const { groups } = await getAllTracesForProject({
+        input: {
           ...input,
           groupBy: "none",
           pageSize: 100,
         },
-        ctx
-      );
+        ctx,
+      });
       const traceIds = groups.flatMap((group) =>
         group.map((trace) => trace.trace_id)
       );
@@ -368,21 +368,26 @@ export const tracesRouter = createTRPCRouter({
     .input(getAllForProjectInput.extend({ includeContexts: z.boolean() }))
     .use(checkUserPermissionForProject(TeamRoleGroup.MESSAGES_VIEW))
     .mutation(async ({ ctx, input }) => {
-      return await getAllTracesForProject(
-        { ...input, pageOffset: 0, pageSize: 10_000 },
+      return await getAllTracesForProject({
+        input: { ...input, pageOffset: 0, pageSize: 10_000 },
         ctx,
-        true,
-        input.includeContexts
-      );
+        downloadMode: true,
+        includeContexts: input.includeContexts,
+      });
     }),
 });
 
-export const getAllTracesForProject = async (
-  input: z.infer<typeof getAllForProjectInput>,
-  ctx?: { prisma: PrismaClient; session: Session },
+export const getAllTracesForProject = async ({
+  input,
+  ctx,
   downloadMode = false,
-  includeContexts = true
-) => {
+  includeContexts = true,
+}: {
+  input: z.infer<typeof getAllForProjectInput>;
+  ctx?: { prisma: PrismaClient; session: Session };
+  downloadMode?: boolean;
+  includeContexts?: boolean;
+}) => {
   const { pivotIndexConditions } = generateTracesPivotQueryConditions(input);
 
   let pageSize = input.pageSize ? input.pageSize : 25;
@@ -394,7 +399,7 @@ export const getAllTracesForProject = async (
     pageSize = 10_000;
   }
 
-  let canSeeCosts = false;
+  let canSeeCosts = true;
   if (ctx?.prisma) {
     canSeeCosts =
       (await backendHasTeamProjectPermission(
