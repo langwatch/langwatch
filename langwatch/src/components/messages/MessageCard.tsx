@@ -45,6 +45,7 @@ import { useDrawer } from "../CurrentDrawer";
 import { formatTimeAgo } from "../../utils/formatTimeAgo";
 import { EventsCounter } from "./EventsCounter";
 import { evaluationPassed } from "../checks/EvaluationStatus";
+import remarkGfm from "remark-gfm";
 
 export type TraceWithGuardrail = Trace & {
   lastGuardrail: (EvaluationResult & { name?: string }) | undefined;
@@ -189,7 +190,7 @@ export function MessageCard({
             </Box>
             <Box wordBreak="break-all">
               {trace.output?.value ? (
-                <Markdown className="markdown">
+                <Markdown remarkPlugins={[remarkGfm]} className="markdown">
                   {getSlicedOutput(trace)}
                 </Markdown>
               ) : trace.lastGuardrail ? (

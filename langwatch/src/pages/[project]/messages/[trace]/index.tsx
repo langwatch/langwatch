@@ -43,6 +43,7 @@ import {
 } from "../../../../components/messages/MessageCard";
 import { formatTimeAgo } from "../../../../utils/formatTimeAgo";
 import { EventsCounter } from "../../../../components/messages/EventsCounter";
+import remarkGfm from "remark-gfm";
 
 export default function TraceDetails() {
   const router = useRouter();
@@ -380,8 +381,6 @@ const TraceMessages = React.forwardRef(function TraceMessages(
       align="start"
       width="full"
       spacing={2}
-      _first={{ paddingTop: 4 }}
-      _last={{ paddingBottom: 0 }}
     >
       <Box
         width="full"
@@ -394,7 +393,7 @@ const TraceMessages = React.forwardRef(function TraceMessages(
         onMouseLeave={() => setShowAnnotationHover(false)}
         position="relative"
       >
-        <Container maxWidth="5xl">
+        <Container maxWidth="1200px">
           <Grid templateColumns="repeat(4, 1fr)">
             <GridItem colSpan={3}>
               <Box
@@ -453,7 +452,10 @@ const TraceMessages = React.forwardRef(function TraceMessages(
                       <Text color="red.900">{trace.error.message}</Text>
                     </VStack>
                   ) : trace.output?.value ? (
-                    <Markdown className="markdown markdown-conversation-history">
+                    <Markdown
+                      remarkPlugins={[remarkGfm]}
+                      className="markdown markdown-conversation-history"
+                    >
                       {translatedTextOutput && translationActive
                         ? translatedTextOutput
                         : trace.output.value}
