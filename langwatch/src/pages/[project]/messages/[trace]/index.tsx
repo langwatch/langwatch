@@ -114,7 +114,7 @@ export default function TraceDetails() {
             background={trace.data ? "gray.50" : "white"}
             paddingBottom="220px"
           >
-            <Conversation threadId={threadId} />
+            <Conversation threadId={threadId} traceId={traceId} />
           </Box>
         </HStack>
       </Box>
