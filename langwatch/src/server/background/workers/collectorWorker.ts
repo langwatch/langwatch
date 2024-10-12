@@ -218,7 +218,10 @@ const processCollectorJob_ = async (
     ...(expectedOutput ? { expected_output: { value: expectedOutput } } : {}),
     metrics: computeTraceMetrics(spans),
     error,
-    indexing_md5s: [...(existingTrace?.indexing_md5s ?? []), paramsMD5],
+    indexing_md5s: [...(existingTrace?.indexing_md5s ?? []), paramsMD5].slice(
+      0,
+      10
+    ),
   };
 
   const piiEnforced = env.NODE_ENV === "production";
@@ -281,6 +284,11 @@ const processCollectorJob_ = async (
             }
           }
 
+          // Limit the number of spans to 200
+          if (ctx._source.spans.size() > 200) {
+            ctx._source.spans = ctx._source.spans.subList(ctx._source.spans.size() - 200, ctx._source.spans.size());
+          }
+
           // Handle evaluations
           for (def newEvaluation : params.newEvaluations) {
             if (ctx._source.evaluations == null) {
@@ -303,6 +311,14 @@ const processCollectorJob_ = async (
             } else {
               ctx._source.evaluations.add(newEvaluation);
             }
+          }
+
+          // Limit the number of evaluations to 50
+          if (ctx._source.evaluations.size() > 50) {
+            ctx._source.evaluations = ctx._source.evaluations.subList(
+              ctx._source.evaluations.size() - 50,
+              ctx._source.evaluations.size()
+            );
           }
         `,
         lang: "painless",
