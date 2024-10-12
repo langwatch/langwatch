@@ -218,10 +218,10 @@ const processCollectorJob_ = async (
     ...(expectedOutput ? { expected_output: { value: expectedOutput } } : {}),
     metrics: computeTraceMetrics(spans),
     error,
-    indexing_md5s: [...(existingTrace?.indexing_md5s ?? []), paramsMD5].slice(
-      0,
-      10
-    ),
+    indexing_md5s: [...(existingTrace?.indexing_md5s ?? []), paramsMD5]
+      .reverse()
+      .slice(0, 10)
+      .reverse(),
   };
 
   const piiEnforced = env.NODE_ENV === "production";
