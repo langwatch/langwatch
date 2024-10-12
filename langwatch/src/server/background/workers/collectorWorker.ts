@@ -285,7 +285,7 @@ const processCollectorJob_ = async (
           }
 
           // Limit the number of spans to 200
-          if (ctx._source.spans.size() > 200) {
+          if (ctx._source.spans != null && ctx._source.spans.size() > 200) {
             ctx._source.spans = ctx._source.spans.subList(ctx._source.spans.size() - 200, ctx._source.spans.size());
           }
 
@@ -314,7 +314,7 @@ const processCollectorJob_ = async (
           }
 
           // Limit the number of evaluations to 50
-          if (ctx._source.evaluations.size() > 50) {
+          if (ctx._source.evaluations != null && ctx._source.evaluations.size() > 50) {
             ctx._source.evaluations = ctx._source.evaluations.subList(
               ctx._source.evaluations.size() - 50,
               ctx._source.evaluations.size()
