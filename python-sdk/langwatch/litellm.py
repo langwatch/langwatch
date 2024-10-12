@@ -176,7 +176,10 @@ class LiteLLMPatch:
     ):
         # Accumulate deltas
         chat_outputs: Dict[int, List[ChatMessage]] = {}
+        usage = None
         for delta in deltas:
+            if hasattr(delta, "usage") and delta.usage is not None:  # type: ignore
+                usage = delta.usage  # type: ignore
             for choice in delta.choices:
                 choice = cast(StreamingChoices, choice)
                 index = choice.index
@@ -242,7 +245,14 @@ class LiteLLMPatch:
                 TypedValueChatMessages(type="chat_messages", value=output)
                 for output in chat_outputs.values()
             ],
-            metrics=SpanMetrics(),
+            metrics=(
+                SpanMetrics(
+                    prompt_tokens=usage.prompt_tokens if usage else None,
+                    completion_tokens=usage.completion_tokens if usage else None,
+                )
+                if usage
+                else SpanMetrics()
+            ),
             timestamps=timestamps,
             **kwargs,
         )
@@ -261,7 +271,12 @@ class LiteLLMPatch:
                 TypedValueChatMessages(
                     type="chat_messages",
                     value=[
-                        cast(ChatMessage, cast(Choices, output).message.model_dump(exclude_unset=True))
+                        cast(
+                            ChatMessage,
+                            cast(Choices, output).message.model_dump(
+                                exclude_unset=True
+                            ),
+                        )
                     ],
                 )
                 for output in response.choices

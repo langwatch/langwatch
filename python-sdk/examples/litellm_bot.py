@@ -30,6 +30,7 @@ async def main(message: cl.Message):
             {"role": "user", "content": message.content},
         ],
         stream=True,
+        stream_options={"include_usage": True},
     )
 
     for part in cast(CustomStreamWrapper, response):
