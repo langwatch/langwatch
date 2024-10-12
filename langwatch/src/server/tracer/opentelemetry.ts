@@ -289,7 +289,11 @@ const addOpenTelemetrySpanAsSpan = (
       input.type === "json" &&
       typeof json === "object" &&
       json !== null &&
-      "metadata" in json
+      "metadata" in json &&
+      // @ts-ignore
+      typeof json.metadata === "object" &&
+      // @ts-ignore
+      !Array.isArray(json.metadata)
     ) {
       // @ts-ignore
       const metadata = json.metadata;

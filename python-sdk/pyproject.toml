@@ -62,6 +62,7 @@ opentelemetry-instrumentation-anthropic = "^0.31.3"
 openinference-instrumentation-haystack = "^0.1.12"
 openinference-instrumentation-dspy = "^0.1.12"
 opentelemetry-instrumentation-llamaindex = "^0.31.3"
+anthropic = "^0.36.0"
 haystack-ai = "^2.5.1"
 streamlit = "^1.37.1"
 

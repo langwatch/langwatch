@@ -62,8 +62,18 @@ def get_example_files():
 async def test_example(example_file):
     if example_file == "batch_evalutation.py":
         pytest.skip("batch_evalutation.py is not a runnable example")
-    if example_file == "langchain_rag_bot_with_threads.py":
-        pytest.skip("langchain_rag_bot_with_threads.py requires authentication")
+    if example_file == "opentelemetry/openllmetry_anthropic_bot.py":
+        pytest.skip(
+            "openllmetry anthropic has a bug starting another async process inside"
+        )
+    if example_file == "opentelemetry/openllmetry_openai_bot.py":
+        pytest.skip(
+            "openllmetry openai has a bug starting another async process inside"
+        )
+    if example_file == "langchain_rag_bot_vertex_ai.py":
+        pytest.skip(
+            "langchain_rag_bot_vertex_ai.py is broken due to a bug in current langchain version of global state mutation when running together with other langchain"
+        )
 
     global last_trace
     last_trace = None
