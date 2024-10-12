@@ -28,9 +28,12 @@ async def main(message: cl.Message):
             {"role": "user", "content": message.content},
         ],
         stream=True,
+        stream_options={"include_usage": True},
     )
 
     for part in completion:
+        if len(part.choices) == 0:
+            continue
         if token := part.choices[0].delta.content or "":
             await msg.stream_token(token)
 

@@ -563,7 +563,10 @@ class OpenAIChatCompletionTracer:
     ):
         # Accumulate deltas
         chat_outputs: Dict[int, List[ChatMessage]] = {}
+        usage = None
         for delta in deltas:
+            if hasattr(delta, "usage") and delta.usage is not None:
+                usage = delta.usage
             for choice in delta.choices:
                 index = choice.index
                 delta = choice.delta
@@ -629,7 +632,14 @@ class OpenAIChatCompletionTracer:
                 TypedValueChatMessages(type="chat_messages", value=output)
                 for output in chat_outputs.values()
             ],
-            metrics=SpanMetrics(),
+            metrics=(
+                SpanMetrics(
+                    prompt_tokens=usage.prompt_tokens if usage else None,
+                    completion_tokens=usage.completion_tokens if usage else None,
+                )
+                if usage
+                else SpanMetrics()
+            ),
             timestamps=timestamps,
             **kwargs,
         )
@@ -649,7 +659,9 @@ class OpenAIChatCompletionTracer:
             outputs=[
                 TypedValueChatMessages(
                     type="chat_messages",
-                    value=[cast(ChatMessage, output.message.model_dump(exclude_unset=True))],
+                    value=[
+                        cast(ChatMessage, output.message.model_dump(exclude_unset=True))
+                    ],
                 )
                 for output in response.choices
             ],
