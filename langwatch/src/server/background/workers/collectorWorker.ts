@@ -99,7 +99,7 @@ const processCollectorJob_ = async (
   id: string | undefined,
   data: CollectorJob
 ) => {
-  debug(`Processing job ${id} with data:`, JSON.stringify(data, null, 2));
+  debug(`Processing job ${id} with data:`, JSON.stringify(data));
 
   let spans = data.spans;
   const {
@@ -374,7 +374,7 @@ const processCollectorCheckAndAdjustJob = async (
   id: string | undefined,
   data: CollectorCheckAndAdjustJob
 ) => {
-  debug(`Post-processing job ${id} with data:`, JSON.stringify(data, null, 2));
+  debug(`Post-processing job ${id}`);
 
   const { traceId, projectId } = data;
   const existingTraceResponse = await esClient.search<ElasticSearchTrace>({
