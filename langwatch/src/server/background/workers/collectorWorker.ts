@@ -203,7 +203,7 @@ const processCollectorJob_ = async (
       ),
     },
     timestamps: {
-      ...(!existingTrace
+      ...(!existingTrace?.inserted_at
         ? {
             started_at:
               Math.min(...spans.map((span) => span.timestamps.started_at)) ??
@@ -232,22 +232,35 @@ const processCollectorJob_ = async (
     id: traceIndexId({ traceId, projectId: project.id }),
     retry_on_conflict: 10,
     body: {
-      doc: trace,
-      doc_as_upsert: true,
-    },
-  });
-
-  await esClient.update({
-    index: TRACE_INDEX.alias,
-    id: traceIndexId({ traceId, projectId: project.id }),
-    retry_on_conflict: 10,
-    body: {
       script: {
         source: `
+          // Update the document with the trace data
+          if (ctx._source == null) {
+            ctx._source = params.trace;
+          } else {
+            // Deep merge
+            for (String key : params.trace.keySet()) {
+              if (params.trace[key] instanceof Map) {
+                if (!ctx._source.containsKey(key) || !(ctx._source[key] instanceof Map)) {
+                  ctx._source[key] = new HashMap();
+                }
+                Map nestedSource = ctx._source[key];
+                Map nestedUpdate = params.trace[key];
+                for (String nestedKey : nestedUpdate.keySet()) {
+                  nestedSource[nestedKey] = nestedUpdate[nestedKey];
+                }
+              } else {
+                ctx._source[key] = params.trace[key];
+              }
+            }
+          }
+
+          def currentTime = System.currentTimeMillis();
+
+          // Handle spans
           if (ctx._source.spans == null) {
             ctx._source.spans = [];
           }
-          def currentTime = System.currentTimeMillis();
           for (def newSpan : params.newSpans) {
             def existingSpanIndex = -1;
             for (int i = 0; i < ctx._source.spans.size(); i++) {
@@ -267,69 +280,50 @@ const processCollectorJob_ = async (
               ctx._source.spans.add(newSpan);
             }
           }
+
+          // Handle evaluations
+          for (def newEvaluation : params.newEvaluations) {
+            if (ctx._source.evaluations == null) {
+              ctx._source.evaluations = [];
+            }
+            def existingEvaluationIndex = -1;
+            for (int i = 0; i < ctx._source.evaluations.size(); i++) {
+              if (ctx._source.evaluations[i].evaluator_id == newEvaluation.evaluator_id) {
+                existingEvaluationIndex = i;
+                break;
+              }
+            }
+            if (existingEvaluationIndex >= 0) {
+              if (newEvaluation.timestamps == null) {
+                newEvaluation.timestamps = new HashMap();
+                newEvaluation.timestamps.inserted_at = currentTime;
+              }
+              newEvaluation.timestamps.updated_at = currentTime;
+              ctx._source.evaluations[existingEvaluationIndex] = newEvaluation;
+            } else {
+              ctx._source.evaluations.add(newEvaluation);
+            }
+          }
         `,
         lang: "painless",
         params: {
+          trace,
           newSpans: esSpans,
+          newEvaluations: evaluations ?? [],
         },
       },
       upsert: {
         ...trace,
         spans: esSpans,
+        ...(evaluations ? { evaluations } : {}),
       },
     },
     refresh: true,
   });
 
-  if (evaluations && evaluations.length > 0) {
-    await esClient.update({
-      index: TRACE_INDEX.alias,
-      id: traceIndexId({ traceId, projectId: project.id }),
-      retry_on_conflict: 10,
-      body: {
-        script: {
-          source: `
-            if (ctx._source.evaluations == null) {
-              ctx._source.evaluations = [];
-            }
-            def currentTime = System.currentTimeMillis();
-            for (def newEvaluation : params.newEvaluations) {
-              def existingEvaluationIndex = -1;
-              for (int i = 0; i < ctx._source.evaluations.size(); i++) {
-                if (ctx._source.evaluations[i].evaluator_id == newEvaluation.evaluator_id) {
-                  existingEvaluationIndex = i;
-                  break;
-                }
-              }
-              if (existingEvaluationIndex >= 0) {
-                if (newEvaluation.timestamps == null) {
-                  newEvaluation.timestamps = new HashMap();
-                  newEvaluation.timestamps.inserted_at = currentTime;
-                }
-                newEvaluation.timestamps.updated_at = currentTime;
-                ctx._source.evaluations[existingEvaluationIndex] = newEvaluation;
-              } else {
-                ctx._source.evaluations.add(newEvaluation);
-              }
-            }
-          `,
-          lang: "painless",
-          params: {
-            newEvaluations: evaluations,
-          },
-        },
-        upsert: {
-          ...trace,
-          evaluations,
-        },
-      },
-      refresh: true,
-    });
-  }
-
   void markProjectFirstMessage(project);
 
-  const checkAndAdjust = async () => {
+  const checkAndAdjust = async (postfix = "") => {
     return collectorQueue!.add(
       "collector",
       {
@@ -338,7 +332,7 @@ const processCollectorJob_ = async (
         projectId,
       },
       {
-        jobId: `collector_${traceId}_check_and_adjust`,
+        jobId: `collector_${traceId}_check_and_adjust${postfix}`,
         delay: 3000,
       }
     );
@@ -349,8 +343,14 @@ const processCollectorJob_ = async (
     // Push it forward if two traces are processed at the same time
     await job?.changeDelay(3000);
   } catch {
-    await job.remove();
-    await checkAndAdjust();
+    try {
+      // Remove the existing job and start a new one to rerun adjust
+      await job.remove();
+      await checkAndAdjust();
+    } catch {
+      // If that fails too because adjust is running, start a new job with different id for later
+      await checkAndAdjust("_2");
+    }
   }
 };
 

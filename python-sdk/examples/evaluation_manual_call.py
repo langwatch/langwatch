@@ -39,12 +39,19 @@ async def main(message: cl.Message):
 
     answer_relevancy = langwatch.get_current_span().evaluate(
         "ragas/answer_relevancy",
-        name="Answer Relevancy",
+        name="Manually Called Answer Relevancy",
         input=message.content,
         output=full_response,
         settings={
             "max_tokens": 512,
         },
+    )
+
+    langwatch.get_current_span().add_evaluation(
+        name="Useful Message Evaluation",
+        passed=True,
+        score=99,
+        details="This is a custom manual evaluation",
     )
 
     await msg.stream_token(

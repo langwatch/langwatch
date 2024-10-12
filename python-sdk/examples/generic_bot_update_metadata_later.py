@@ -34,7 +34,10 @@ async def main(message: cl.Message):
 
     trace = langwatch.trace(trace_id=id)
 
-    trace.update(expected_output="Hello there! How can I be helpful?")
+    trace.update(
+        expected_output="Hello there! How can I be helpful?",
+        metadata={"labels": ["test"]},
+    )
     trace.send_spans()
     public_url = (
         trace.share()

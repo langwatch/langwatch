@@ -56,6 +56,7 @@ from langchain_community.tools import DuckDuckGoSearchRun
 search_tool = DuckDuckGoSearchRun()
 
 agent1 = Agent(
+    llm="openai/gpt-4o-mini",
     role="first agent",
     goal="who is {input}?",
     backstory="agent backstory",
@@ -70,6 +71,7 @@ task1 = Task(
 )
 
 agent2 = Agent(
+    llm="openai/gpt-4o-mini",
     role="second agent",
     goal="summarize the short bio for {input} and if needed do more research",
     backstory="agent backstory",

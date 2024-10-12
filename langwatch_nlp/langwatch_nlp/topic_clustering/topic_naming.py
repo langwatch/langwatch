@@ -20,7 +20,7 @@ T = TypeVar("T")
 os.environ["AZURE_API_VERSION"] = "2024-02-01"
 
 
-@retry(wait=wait_exponential(min=12, max=60), stop=stop_after_attempt(4))
+@retry(wait=wait_exponential(min=12, max=60), stop=stop_after_attempt(4), reraise=True)
 def generate_topic_names(
     litellm_params: dict[str, str],
     topic_examples: list[list[str]],
@@ -255,7 +255,7 @@ def improve_similar_names(
     return topic_names_, cost__
 
 
-@retry(wait=wait_exponential(min=12, max=60), stop=stop_after_attempt(4))
+@retry(wait=wait_exponential(min=12, max=60), stop=stop_after_attempt(4), reraise=True)
 def improve_name_between_two_topics(
     model: str,
     litellm_params: dict[str, str],

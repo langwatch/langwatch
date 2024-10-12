@@ -1,6 +1,7 @@
 import json
 import os
 import importlib
+import sys
 from typing import Optional, cast
 import pytest
 import asyncio
@@ -47,7 +48,11 @@ class TraceIdCapturerExporter(SpanExporter):
 def get_example_files():
     examples_dir = os.path.join(os.path.dirname(__file__), "..", "examples")
     opentelemetry_dir = os.path.join(examples_dir, "opentelemetry")
-    return [f for f in os.listdir(examples_dir) if f.endswith(".py")] + [
+    return [
+        f
+        for f in os.listdir(examples_dir)
+        if f.endswith(".py") and not f.startswith("__")
+    ] + [
         "opentelemetry/" + f for f in os.listdir(opentelemetry_dir) if f.endswith(".py")
     ]
 

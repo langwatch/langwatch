@@ -35,7 +35,7 @@ def load_embeddings(embeddings_litellm_params: dict[str, str]):
     return embeddings[key]
 
 
-@retry(wait=wait_random_exponential(min=1, max=20), stop=stop_after_attempt(6))
+@retry(wait=wait_random_exponential(min=1, max=20), stop=stop_after_attempt(6), reraise=True)
 def get_embedding(text: str, embeddings_litellm_params: dict[str, str]) -> list[float]:
     if "AZURE_API_VERSION" not in os.environ:
         os.environ["AZURE_API_VERSION"] = "2024-02-01"  # To make sure

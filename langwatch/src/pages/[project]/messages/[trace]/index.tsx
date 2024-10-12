@@ -402,6 +402,7 @@ const TraceMessages = React.forwardRef(function TraceMessages(
                 borderRight="1px solid"
                 borderColor="gray.200"
                 marginRight={10}
+                paddingLeft={10}
                 paddingRight={10}
               >
                 {showAnnotationHover && <AnnotationHover />}

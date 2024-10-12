@@ -35,7 +35,11 @@ export const TraceDetailsDrawer = (props: TraceDetailsDrawerProps) => {
       }}
     >
       <DrawerContent paddingX={0}>
-        <DrawerBody paddingX={0}>
+        <DrawerBody
+          paddingX={0}
+          overflowY="auto"
+          id="conversation-scroll-container"
+        >
           <HStack paddingTop={2} paddingLeft={6}>
             {traceView === "span" ? (
               <Maximize2 onClick={toggleView} cursor={"pointer"} />
