@@ -298,7 +298,6 @@ export const batchClusterTraces = async (
   }
   const embeddingsModel = await getProjectEmbeddingsModel(project.id);
   const clusteringResult = await fetchTopicsBatchClustering(project.id, {
-    model: topicModel.model,
     litellm_params: prepareLitellmParams(
       topicModel.model,
       topicModel.modelProvider
@@ -508,6 +507,21 @@ export const fetchTopicsBatchClustering = async (
     { method: "POST", json: params }
   );
 
+  if (!response.ok) {
+    let body = "";
+    try {
+      body = JSON.stringify(await response.json(), null, 2)
+        .split("\n")
+        .slice(0, 10)
+        .join("\n");
+    } catch (error) {
+      body = await response.text();
+    }
+    throw new Error(
+      `Failed to fetch topics batch clustering: ${response.statusText}\n\n${body}`
+    );
+  }
+
   const result = (await response.json()) as TopicClusteringResponse;
 
   return result;
@@ -535,6 +549,21 @@ export const fetchTopicsIncrementalClustering = async (
     `${env.LANGWATCH_NLP_SERVICE}/topics/incremental_clustering`,
     { method: "POST", json: params }
   );
+
+  if (!response.ok) {
+    let body = "";
+    try {
+      body = JSON.stringify(await response.json(), null, 2)
+        .split("\n")
+        .slice(0, 10)
+        .join("\n");
+    } catch (error) {
+      body = await response.text();
+    }
+    throw new Error(
+      `Failed to fetch topics incremental clustering: ${response.statusText}\n\n${body}`
+    );
+  }
 
   const result = (await response.json()) as TopicClusteringResponse;
 

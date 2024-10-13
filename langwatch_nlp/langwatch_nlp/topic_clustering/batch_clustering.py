@@ -75,7 +75,6 @@ def build_hierarchy(
 
 class BatchClusteringParams(BaseModel):
     traces: list[Trace]
-    model: str
     deployment_name: Optional[str] = None
     litellm_params: dict[str, str]
     embeddings_litellm_params: dict[str, str]
@@ -86,7 +85,7 @@ def setup_endpoints(app: FastAPI):
     def topics_batch_clustering(
         params: BatchClusteringParams,
     ) -> TopicClusteringResponse:
-        model = params.model
+        model = params.litellm_params["model"]
         if model.startswith("azure/") and params.deployment_name:
             model = f"azure/{params.deployment_name}"
 
