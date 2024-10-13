@@ -1,7 +1,9 @@
-const { createServer } = require("http");
-const { parse } = require("url");
-const next = require("next");
-const path = require("path");
+import { createServer, type IncomingMessage } from "http";
+import { parse } from "url";
+import next from "next";
+import path from "path";
+import type { Duplex } from "stream";
+// eslint-disable-next-line @typescript-eslint/no-var-requires
 let studioSocket = require("../build-websocket/socketServer");
 
 const reloadStudioSocket = () => {
@@ -11,11 +13,12 @@ const reloadStudioSocket = () => {
 };
 
 if (process.env.NODE_ENV !== "production") {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
   const watch = require("watch");
   watch.createMonitor(
     path.join(__dirname, "../build-websocket"),
     { interval: 1 },
-    function (monitor) {
+    function (monitor: any) {
       monitor.on("changed", function () {
         reloadStudioSocket();
       });
@@ -49,18 +52,20 @@ module.exports.startApp = async (dir = path.dirname(__dirname)) => {
     }
   });
 
-  const upgradeListener = (defaultHandler) => (req, socket, head) => {
-    const parsedUrl = parse(req.url ?? "", true);
+  const upgradeListener =
+    (defaultHandler: (req: any, socket: any, head: Buffer) => any) =>
+    (req: IncomingMessage, socket: Duplex, head: Buffer) => {
+      const parsedUrl = parse(req.url ?? "", true);
 
-    // Pass hot module reloading requests to Next.js
-    if (parsedUrl.pathname === "/_next/webpack-hmr") {
-      void defaultHandler(req, socket, head);
-    } else if (parsedUrl.pathname?.startsWith("/api/studio/ws")) {
-      void studioSocket.handleUpgrade(req, socket, head, parsedUrl);
-    } else {
-      socket.destroy();
-    }
-  };
+      // Pass hot module reloading requests to Next.js
+      if (parsedUrl.pathname === "/_next/webpack-hmr") {
+        void defaultHandler(req, socket, head);
+      } else if (parsedUrl.pathname?.startsWith("/api/studio/ws")) {
+        void studioSocket.handleUpgrade(req, socket, head, parsedUrl);
+      } else {
+        socket.destroy();
+      }
+    };
 
   const initialHandler = upgradeListener(upgradeHandler);
   server.on("upgrade", initialHandler);
