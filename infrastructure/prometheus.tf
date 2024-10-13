@@ -35,6 +35,7 @@ resource "local_file" "adot_config" {
     metrics_api_key             = local.lw_secrets_map["METRICS_API_KEY"]
     aws_region                  = data.aws_region.current.name
     cluster_name                = aws_ecs_cluster.langwatch[0].name
+    langwatch_service_url       = aws_alb.langwatch_alb[0].dns_name
     prometheus_remote_write_url = aws_prometheus_workspace.langwatch[0].prometheus_endpoint
   })
   filename = "${path.module}/prometheus-collector/adot-config.yaml"
@@ -75,6 +76,8 @@ resource "aws_ecs_task_definition" "adot_collector" {
       }
     }
   ])
+
+  depends_on = [null_resource.build_adot_collector_image[0]]
 }
 
 resource "aws_cloudwatch_log_group" "adot_collector" {
@@ -111,7 +114,11 @@ resource "aws_iam_policy" "ecs_discovery_policy" {
         Action = [
           "ecs:ListClusters",
           "ecs:ListServices",
+          "ecs:ListTasks",
+          "ecs:DescribeContainerInstances",
           "ecs:DescribeServices",
+          "ecs:DescribeTasks",
+          "ecs:DescribeTaskDefinition",
           "ec2:DescribeInstances"
         ]
         Resource = "*"
@@ -178,7 +185,7 @@ resource "null_resource" "build_adot_collector_image" {
 
       echo "Building ADOT collector image..."
 
-      cd ${path.module}/prometheus-collector
+      cd ./prometheus-collector
       aws ecr get-login-password --profile ${module.variables.profile} --region ${data.aws_region.current.name} | docker login --username AWS --password-stdin ${data.aws_caller_identity.current.account_id}.dkr.ecr.${data.aws_region.current.name}.amazonaws.com || true
       set +e
       image_exists=$(docker manifest inspect ${aws_ecr_repository.adot_collector.repository_url}:${local.adot_config_hash} > /dev/null 2>&1 && echo yes)
@@ -228,4 +235,13 @@ resource "aws_security_group_rule" "allow_ecs_to_adot" {
   protocol                 = "tcp"
   security_group_id        = aws_security_group.adot_collector.id
   source_security_group_id = aws_security_group.langwatch.id
+}
+
+resource "aws_security_group_rule" "allow_adot_to_alb" {
+  type                     = "ingress"
+  from_port                = 443
+  to_port                  = 443
+  protocol                 = "tcp"
+  security_group_id        = aws_security_group.alb_sg.id
+  source_security_group_id = aws_security_group.adot_collector.id
 }

@@ -7,38 +7,24 @@ receivers:
       scrape_configs:
         - job_name: "langwatch"
           metrics_path: "/metrics"
-          scheme: http
+          scheme: https
+          tls_config:
+            insecure_skip_verify: true
+          static_configs:
+            - targets: ["${langwatch_service_url}:443"]
           authorization:
             type: Bearer
             credentials: "${metrics_api_key}"
-          ec2_sd_configs:
-            - region: ${aws_region}
-              port: 3000
-          relabel_configs:
-            - source_labels: [__meta_ec2_tag_aws_ecs_cluster]
-              regex: ${cluster_name}
-              action: keep
-            - source_labels: [__meta_ec2_private_ip]
-              target_label: instance
-            - target_label: service_type
-              replacement: main
         - job_name: "langwatch-workers"
           metrics_path: "/workers/metrics"
-          scheme: http
+          scheme: https
+          tls_config:
+            insecure_skip_verify: true
+          static_configs:
+            - targets: ["${langwatch_service_url}:443"]
           authorization:
             type: Bearer
             credentials: "${metrics_api_key}"
-          ec2_sd_configs:
-            - region: ${aws_region}
-              port: 3000
-          relabel_configs:
-            - source_labels: [__meta_ec2_tag_aws_ecs_cluster]
-              regex: ${cluster_name}
-              action: keep
-            - source_labels: [__meta_ec2_private_ip]
-              target_label: instance
-            - target_label: service_type
-              replacement: worker
   awsecscontainermetrics:
     collection_interval: 10s
 processors:
@@ -72,6 +58,9 @@ extensions:
     region: ${aws_region}
     service: aps
 service:
+  telemetry:
+    logs:
+      level: debug
   extensions: [pprof, zpages, health_check, sigv4auth]
   pipelines:
     metrics:
