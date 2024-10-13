@@ -32,6 +32,7 @@ import { cleanupPIIs } from "./collector/piiCheck";
 import { addInputAndOutputForRAGs } from "./collector/rag";
 import { scoreSatisfactionFromInput } from "./collector/satisfaction";
 import { getTraceInput, getTraceOutput } from "./collector/trace";
+import { getJobProcessingCounter } from "../../metrics";
 
 const debug = getDebugger("langwatch:workers:collectorWorker");
 
@@ -90,9 +91,15 @@ export const processCollectorJob = async (
   data: CollectorJob | CollectorCheckAndAdjustJob
 ) => {
   if ("action" in data && data.action === "check_and_adjust") {
-    return processCollectorCheckAndAdjustJob(id, data);
+    getJobProcessingCounter("collector_check_and_adjust", "processing").inc();
+    const result = await processCollectorCheckAndAdjustJob(id, data);
+    getJobProcessingCounter("collector_check_and_adjust", "completed").inc();
+    return result;
   }
-  return processCollectorJob_(id, data as CollectorJob);
+  getJobProcessingCounter("collector", "processing").inc();
+  const result = await processCollectorJob_(id, data as CollectorJob);
+  getJobProcessingCounter("collector", "completed").inc();
+  return result;
 };
 
 const processCollectorJob_ = async (
@@ -496,6 +503,15 @@ export const startCollectorWorker = () => {
   });
 
   collectorWorker.on("failed", (job, err) => {
+    if (
+      job?.data &&
+      "action" in job.data &&
+      job.data.action === "check_and_adjust"
+    ) {
+      getJobProcessingCounter("collector_check_and_adjust", "failed").inc();
+    } else {
+      getJobProcessingCounter("collector", "failed").inc();
+    }
     debug(`Job ${job?.id} failed with error ${err.message}`);
     Sentry.withScope((scope) => {
       scope.setTag("worker", "collector");

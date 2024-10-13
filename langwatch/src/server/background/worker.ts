@@ -19,6 +19,8 @@ import { startTrackEventsWorker } from "./workers/trackEventsWorker";
 import { startCollectorWorker } from "./workers/collectorWorker";
 
 import * as Sentry from "@sentry/node";
+import http from "http";
+import { register } from "prom-client";
 
 class WorkersRestart extends Error {
   constructor(message: string) {
@@ -65,6 +67,8 @@ export const start = (
     const topicClusteringWorker = startTopicClusteringWorker();
     const trackEventsWorker = startTrackEventsWorker();
 
+    startMetricsServer();
+
     if (maxRuntimeMs) {
       setTimeout(() => {
         debug("Max runtime reached, closing worker");
@@ -90,5 +94,31 @@ export const start = (
         trackEventsWorker,
       });
     }
+  });
+};
+
+const startMetricsServer = () => {
+  const server = http.createServer((req, res) => {
+    if (req.url === "/metrics") {
+      res.setHeader("Content-Type", register.contentType);
+      try {
+        register
+          .metrics()
+          .then((metrics) => {
+            res.end(metrics);
+          })
+          .catch((err) => {
+            res.writeHead(500).end(err);
+          });
+      } catch (err) {
+        res.writeHead(500).end(err);
+      }
+    } else {
+      res.writeHead(404).end();
+    }
+  });
+
+  server.listen(2999, () => {
+    debug("Workers metrics server listening on port 2999");
   });
 };

@@ -32,6 +32,11 @@ import {
   updateCheckStatusInES,
 } from "../queues/traceChecksQueue";
 import type { Conversation } from "../../../server/evaluations/types";
+import {
+  evaluationDurationHistogram,
+  getEvaluationStatusCounter,
+  getJobProcessingCounter,
+} from "../../metrics";
 
 const debug = getDebugger("langwatch:workers:traceChecksWorker");
 
@@ -205,6 +210,8 @@ export const runEvaluation = async ({
     evaluatorEnv = await setupEnv(settings.embeddings_model);
   }
 
+  const startTime = performance.now();
+
   const response = await fetch(
     `${env.LANGEVALS_ENDPOINT}/${checkType}/evaluate`,
     {
@@ -228,6 +235,9 @@ export const runEvaluation = async ({
     }
   );
 
+  const duration = performance.now() - startTime;
+  evaluationDurationHistogram.labels(checkType).observe(duration);
+
   if (!response.ok) {
     if (response.status >= 500 && retries > 0) {
       await new Promise((resolve) => setTimeout(resolve, 100));
@@ -243,6 +253,7 @@ export const runEvaluation = async ({
         retries: retries - 1,
       });
     } else {
+      getEvaluationStatusCounter(checkType, "error").inc();
       let statusText = response.statusText;
       try {
         statusText = JSON.stringify(await response.json(), undefined, 2);
@@ -253,8 +264,11 @@ export const runEvaluation = async ({
 
   const result = ((await response.json()) as BatchEvaluationResult)[0];
   if (!result) {
+    getEvaluationStatusCounter(checkType, "error").inc();
     throw "Unexpected response: empty results";
   }
+
+  getEvaluationStatusCounter(checkType, result.status).inc();
 
   return result;
 };
@@ -278,6 +292,8 @@ export const startEvaluationsWorker = (
       ) {
         return;
       }
+
+      getJobProcessingCounter("evaluation", "processing").inc();
 
       try {
         debug(`Processing job ${job.id} with data:`, job.data);
@@ -339,6 +355,7 @@ export const startEvaluationsWorker = (
           details: "details" in result ? result.details ?? "" : "",
         });
         debug("Successfully processed job:", job.id);
+        getJobProcessingCounter("evaluation", "completed").inc();
       } catch (error) {
         await updateCheckStatusInES({
           check: job.data.check,
@@ -384,6 +401,7 @@ export const startEvaluationsWorker = (
   });
 
   traceChecksWorker.on("failed", (job, err) => {
+    getJobProcessingCounter("evaluation", "failed").inc();
     debug(`Job ${job?.id} failed with error ${err.message}`);
     Sentry.withScope((scope) => {
       scope.setTag("worker", "traceChecks");

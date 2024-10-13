@@ -3,6 +3,9 @@ import { parse } from "url";
 import next from "next";
 import path from "path";
 import type { Duplex } from "stream";
+import { register } from "prom-client";
+import promBundle from "express-prom-bundle";
+
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 let studioSocket = require("../build-websocket/socketServer");
 
@@ -26,6 +29,42 @@ if (process.env.NODE_ENV !== "production") {
   );
 }
 
+export const metricsMiddleware = promBundle({
+  metricsPath: "/metrics",
+  includeMethod: true,
+  includePath: true,
+  includeStatusCode: true,
+  includeUp: true,
+  customLabels: { project_name: "langwatch" },
+  normalizePath: (req) => {
+    if (req.url?.includes("/_next/static")) {
+      return "/_next/static";
+    }
+    // @ts-ignore
+    const nextMeta = req[Symbol.for("NextInternalRequestMeta")];
+    const nextJsPath = nextMeta.match?.definition?.pathname;
+    if (nextJsPath) {
+      // Keep trpc request individual if they are not being lumped in together
+      if (req.url?.includes("/trpc") && !req.url?.includes(",")) {
+        return req.url.split("?")[0];
+      }
+      return nextJsPath;
+    }
+    return req.url;
+  },
+});
+
+const isMetricsAuthorized = (req: IncomingMessage): boolean => {
+  const authHeader = req.headers.authorization;
+  if (process.env.NODE_ENV === "production" && !process.env.METRICS_API_KEY) {
+    throw new Error("METRICS_API_KEY is not set");
+  }
+  return (
+    !!process.env.METRICS_API_KEY &&
+    authHeader === `Bearer ${process.env.METRICS_API_KEY}`
+  );
+};
+
 module.exports.startApp = async (dir = path.dirname(__dirname)) => {
   const dev = process.env.NODE_ENV !== "production";
   const hostname = "0.0.0.0";
@@ -44,7 +83,34 @@ module.exports.startApp = async (dir = path.dirname(__dirname)) => {
       // This tells it to parse the query portion of the URL.
       const parsedUrl = parse(req.url ?? "", true);
 
-      await handle(req, res, parsedUrl);
+      if (
+        parsedUrl.pathname === "/metrics" ||
+        parsedUrl.pathname === "/workers/metrics"
+      ) {
+        if (!isMetricsAuthorized(req)) {
+          res.statusCode = 401;
+          res.end("Unauthorized");
+          return;
+        }
+
+        if (parsedUrl.pathname === "/metrics") {
+          res.setHeader("Content-Type", register.contentType);
+          res.end(await register.metrics());
+        } else {
+          const workersMetricsRes = await fetch("http://0.0.0.0:2999/metrics");
+          const workersMetrics = await workersMetricsRes.text();
+          res.setHeader("Content-Type", register.contentType);
+          res.end(workersMetrics);
+        }
+      } else {
+        // Apply metrics middleware
+        await new Promise<void>((resolve) => {
+          void metricsMiddleware(req as any, res as any, resolve as any);
+        });
+
+        // Handle the request with Next.js
+        await handle(req, res, parsedUrl);
+      }
     } catch (err) {
       console.error("Error occurred handling", req.url, err);
       res.statusCode = 500;

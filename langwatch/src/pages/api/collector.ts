@@ -25,6 +25,10 @@ import {
   spanValidatorSchema,
 } from "../../server/tracer/types.generated";
 import { getDebugger } from "../../utils/logger";
+import {
+  getPayloadSizeHistogram,
+  traceSpanCountHistogram,
+} from "../../server/metrics";
 
 const debug = getDebugger("langwatch:collector");
 
@@ -79,6 +83,8 @@ export default async function handler(
       message: `ERR_PLAN_LIMIT: You have reached the monthly limit of ${activePlan.maxMessagesPerMonth} messages, please go to LangWatch dashboard to verify your plan.`,
     });
   }
+
+  getPayloadSizeHistogram("collector").observe(JSON.stringify(req.body).length);
 
   // We migrated those keys to inside metadata, but we still want to support them for retrocompatibility for a while
   if (!("metadata" in req.body) || !req.body.metadata) {
@@ -163,6 +169,8 @@ export default async function handler(
       .status(400)
       .json({ message: "Invalid 'spans' field, expecting array" });
   }
+
+  traceSpanCountHistogram.observe(req.body.spans?.length ?? 0);
 
   let reservedTraceMetadata: ReservedTraceMetadata = {};
   let customMetadata: CustomMetadata = {};

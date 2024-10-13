@@ -31,6 +31,7 @@ import {
   getLLMModelCosts,
   type MaybeStoredLLMModelCost,
 } from "../../../server/modelProviders/llmModelCost";
+import { getPayloadSizeHistogram } from "../../../server/metrics";
 
 export const debug = getDebugger("langwatch:dspy:log_steps");
 
@@ -65,6 +66,8 @@ export default async function handler(
   if (!project) {
     return res.status(401).json({ message: "Invalid auth token." });
   }
+
+  getPayloadSizeHistogram("log_steps").observe(JSON.stringify(req.body).length);
 
   let params: DSPyStepRESTParams[];
   try {

@@ -10,6 +10,7 @@ import { TRACE_INDEX, esClient, traceIndexId } from "../../elasticsearch";
 import { connection } from "../../redis";
 import { elasticSearchEventSchema } from "../../tracer/types.generated";
 import { TRACK_EVENTS_QUEUE_NAME } from "../queues/trackEventsQueue";
+import { getJobProcessingCounter } from "../../metrics";
 
 const debug = getDebugger("langwatch:workers:trackEventWorker");
 
@@ -23,6 +24,7 @@ export const startTrackEventsWorker = () => {
     TRACK_EVENTS_QUEUE_NAME,
     async (job) => {
       debug(`Processing job ${job.id} with data:`, job.data);
+      getJobProcessingCounter("track_event", "processing").inc();
 
       let event: ElasticSearchEvent = {
         ...job.data.event,
@@ -99,6 +101,7 @@ export const startTrackEventsWorker = () => {
         },
         refresh: true,
       });
+      getJobProcessingCounter("track_event", "completed").inc();
     },
     {
       connection,
@@ -112,6 +115,7 @@ export const startTrackEventsWorker = () => {
 
   trackEventsWorker.on("failed", (job, err) => {
     debug(`Job ${job?.id} failed with error ${err.message}`);
+    getJobProcessingCounter("track_event", "failed").inc();
     Sentry.withScope((scope) => {
       scope.setTag("worker", "trackEvents");
       scope.setExtra("job", job?.data);

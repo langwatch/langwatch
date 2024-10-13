@@ -5,6 +5,7 @@ import { getDebugger } from "../../../utils/logger";
 import { connection } from "../../redis";
 import { clusterTopicsForProject } from "../../topicClustering/topicClustering";
 import { TOPIC_CLUSTERING_QUEUE_NAME } from "../queues/topicClusteringQueue";
+import { getJobProcessingCounter } from "../../metrics";
 
 const debug = getDebugger("langwatch:workers:topicClusteringWorker");
 
@@ -17,9 +18,11 @@ export const startTopicClusteringWorker = () => {
   const topicClusteringWorker = new Worker<TopicClusteringJob, void, string>(
     TOPIC_CLUSTERING_QUEUE_NAME,
     async (job) => {
+      getJobProcessingCounter("topic_clustering", "processing").inc();
       debug(`Processing job ${job.id} with data:`, job.data);
 
       await clusterTopicsForProject(job.data.project_id, job.data.search_after);
+      getJobProcessingCounter("topic_clustering", "completed").inc();
     },
     {
       connection,
@@ -32,6 +35,7 @@ export const startTopicClusteringWorker = () => {
   });
 
   topicClusteringWorker.on("failed", (job, err) => {
+    getJobProcessingCounter("topic_clustering", "failed").inc();
     debug(`Job ${job?.id} failed with error ${err.message}`);
     Sentry.withScope((scope) => {
       scope.setTag("worker", "topicClustering");

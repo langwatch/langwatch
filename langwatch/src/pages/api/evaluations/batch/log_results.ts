@@ -20,6 +20,7 @@ import {
   batchEvaluationId,
   esClient,
 } from "../../../../server/elasticsearch";
+import { getPayloadSizeHistogram } from "../../../../server/metrics";
 
 export const debug = getDebugger("langwatch:evaluations:batch:log_results");
 
@@ -67,6 +68,10 @@ export default async function handler(
   if (!project) {
     return res.status(401).json({ message: "Invalid auth token." });
   }
+
+  getPayloadSizeHistogram("log_results").observe(
+    JSON.stringify(req.body).length
+  );
 
   // TODO: check for plan limits here?
 
