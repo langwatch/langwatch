@@ -508,15 +508,13 @@ export const fetchTopicsBatchClustering = async (
   );
 
   if (!response.ok) {
-    let body = "";
+    let body = await response.text();
     try {
-      body = JSON.stringify(await response.json(), null, 2)
+      body = JSON.stringify(JSON.parse(body), null, 2)
         .split("\n")
         .slice(0, 10)
         .join("\n");
-    } catch (error) {
-      body = await response.text();
-    }
+    } catch {}
     throw new Error(
       `Failed to fetch topics batch clustering: ${response.statusText}\n\n${body}`
     );
@@ -551,15 +549,13 @@ export const fetchTopicsIncrementalClustering = async (
   );
 
   if (!response.ok) {
-    let body = "";
+    let body = await response.text();
     try {
-      body = JSON.stringify(await response.json(), null, 2)
+      body = JSON.stringify(JSON.parse(body), null, 2)
         .split("\n")
         .slice(0, 10)
         .join("\n");
-    } catch (error) {
-      body = await response.text();
-    }
+    } catch {}
     throw new Error(
       `Failed to fetch topics incremental clustering: ${response.statusText}\n\n${body}`
     );
