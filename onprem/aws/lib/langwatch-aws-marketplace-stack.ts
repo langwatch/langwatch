@@ -260,6 +260,9 @@ export class LangWatchAwsMarketplaceStack extends cdk.Stack {
           ONPREM_EMAIL: cdk.SecretValue.unsafePlainText(
             this.onPremEmail.valueAsString
           ),
+          METRICS_API_KEY: cdk.SecretValue.unsafePlainText(
+            generateSecureString("MetricsAPIKey", 32)
+          ),
         },
       }
     );
@@ -415,6 +418,10 @@ export class LangWatchAwsMarketplaceStack extends cdk.Stack {
                 objectName: "ONPREM_EMAIL",
                 key: "ONPREM_EMAIL",
               },
+              {
+                objectName: "METRICS_API_KEY",
+                key: "METRICS_API_KEY",
+              },
             ],
           },
         ],
@@ -487,6 +494,10 @@ export class LangWatchAwsMarketplaceStack extends cdk.Stack {
                 {
                   path: "ONPREM_EMAIL",
                   objectAlias: "ONPREM_EMAIL",
+                },
+                {
+                  path: "METRICS_API_KEY",
+                  objectAlias: "METRICS_API_KEY",
                 },
               ],
             },

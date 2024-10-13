@@ -1,4 +1,4 @@
-const dotenv = require("dotenv");
+import dotenv from "dotenv";
 
 dotenv.config();
 
@@ -11,6 +11,7 @@ if (process.env.NODE_ENV === "production") {
   require("events").EventEmitter.defaultMaxListeners = 128;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-var-requires
 const { startApp } = require("./langwatch/langwatch/src/start.js");
 
 startApp("./langwatch/langwatch");
