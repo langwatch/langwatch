@@ -321,11 +321,11 @@ resource "aws_security_group" "langwatch" {
   vpc_id = aws_vpc.main.id
 
   ingress {
-    description     = "HTTP from ALB and bastion ec2"
+    description     = "HTTP from ALB, bastion ec2 and ADOT collector"
     from_port       = 3000
     to_port         = 3000
     protocol        = "tcp"
-    security_groups = [aws_security_group.alb_sg.id, aws_security_group.bation-ec2.id]
+    security_groups = [aws_security_group.alb_sg.id, aws_security_group.bation-ec2.id, aws_security_group.adot_collector.id]
   }
 
   egress {

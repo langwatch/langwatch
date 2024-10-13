@@ -1,0 +1,83 @@
+receivers:
+  prometheus:
+    config:
+      global:
+        scrape_interval: 15s
+        scrape_timeout: 10s
+      scrape_configs:
+        - job_name: "langwatch"
+          metrics_path: "/metrics"
+          scheme: http
+          authorization:
+            type: Bearer
+            credentials: "${metrics_api_key}"
+          ec2_sd_configs:
+            - region: ${aws_region}
+              port: 3000
+          relabel_configs:
+            - source_labels: [__meta_ec2_tag_aws_ecs_cluster]
+              regex: ${cluster_name}
+              action: keep
+            - source_labels: [__meta_ec2_private_ip]
+              target_label: instance
+            - target_label: service_type
+              replacement: main
+        - job_name: "langwatch-workers"
+          metrics_path: "/workers/metrics"
+          scheme: http
+          authorization:
+            type: Bearer
+            credentials: "${metrics_api_key}"
+          ec2_sd_configs:
+            - region: ${aws_region}
+              port: 3000
+          relabel_configs:
+            - source_labels: [__meta_ec2_tag_aws_ecs_cluster]
+              regex: ${cluster_name}
+              action: keep
+            - source_labels: [__meta_ec2_private_ip]
+              target_label: instance
+            - target_label: service_type
+              replacement: worker
+  awsecscontainermetrics:
+    collection_interval: 10s
+processors:
+  filter:
+    metrics:
+      include:
+        match_type: strict
+        metric_names:
+          - ecs.task.memory.utilized
+          - ecs.task.memory.reserved
+          - ecs.task.cpu.utilized
+          - ecs.task.cpu.reserved
+          - ecs.task.network.rate.rx
+          - ecs.task.network.rate.tx
+          - ecs.task.storage.read_bytes
+          - ecs.task.storage.write_bytes
+exporters:
+  prometheusremotewrite:
+    endpoint: ${prometheus_remote_write_url}api/v1/remote_write
+    auth:
+      authenticator: sigv4auth
+  logging:
+    loglevel: info
+extensions:
+  health_check:
+  pprof:
+    endpoint: :1888
+  zpages:
+    endpoint: :55679
+  sigv4auth:
+    region: ${aws_region}
+    service: aps
+service:
+  extensions: [pprof, zpages, health_check, sigv4auth]
+  pipelines:
+    metrics:
+      receivers: [prometheus]
+      exporters: [logging, prometheusremotewrite]
+    metrics/ecs:
+      receivers: [awsecscontainermetrics]
+      processors: [filter]
+      exporters: [logging, prometheusremotewrite]

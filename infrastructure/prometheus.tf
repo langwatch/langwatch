@@ -1,169 +1,231 @@
-# locals {
-#   lw_secrets_map = jsondecode(data.aws_secretsmanager_secret_version.langwatch.secret_string)
-# }
+locals {
+  lw_secrets_map   = jsondecode(data.aws_secretsmanager_secret_version.langwatch.secret_string)
+  adot_config_hash = substr(md5(local_file.adot_config[0].content), 0, 8)
+}
 
-# # Create Amazon Managed Prometheus workspace
-# resource "aws_prometheus_workspace" "langwatch" {
-#   count = module.variables.profile == "lw-prod" ? 1 : 0
-#   alias = "langwatch-prometheus"
-# }
+resource "aws_prometheus_workspace" "langwatch" {
+  count = module.variables.profile == "lw-prod" ? 1 : 0
+  alias = "langwatch-prometheus"
+  logging_configuration {
+    log_group_arn = "${aws_cloudwatch_log_group.prometheus.arn}:*"
+  }
+}
 
-# # IAM role for Prometheus
-# resource "aws_iam_role" "prometheus_role" {
-#   name = "prometheus-role"
+resource "aws_cloudwatch_log_group" "prometheus" {
+  name              = "/amp/prometheus"
+  retention_in_days = 14
+}
 
-#   assume_role_policy = jsonencode({
-#     Version = "2012-10-17"
-#     Statement = [
-#       {
-#         Action = "sts:AssumeRole"
-#         Effect = "Allow"
-#         Principal = {
-#           Service = "amp.amazonaws.com"
-#         }
-#       }
-#     ]
-#   })
-# }
+resource "aws_security_group" "prometheus_sg" {
+  name        = "prometheus-sg"
+  description = "Security group for Prometheus"
+  vpc_id      = aws_vpc.main.id
 
-# # IAM policy for Prometheus to access ECS and EC2
-# resource "aws_iam_role_policy" "prometheus_policy" {
-#   name = "prometheus-policy"
-#   role = aws_iam_role.prometheus_role.id
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+}
 
-#   policy = jsonencode({
-#     Version = "2012-10-17"
-#     Statement = [
-#       {
-#         Effect = "Allow"
-#         Action = [
-#           "ecs:ListClusters",
-#           "ecs:ListServices",
-#           "ecs:DescribeServices",
-#           "ec2:DescribeInstances"
-#         ]
-#         Resource = "*"
-#       }
-#     ]
-#   })
-# }
+resource "local_file" "adot_config" {
+  count = module.variables.profile == "lw-prod" ? 1 : 0
+  content = templatefile("${path.module}/prometheus-collector/adot-config.tftpl", {
+    metrics_api_key             = local.lw_secrets_map["METRICS_API_KEY"]
+    aws_region                  = data.aws_region.current.name
+    cluster_name                = aws_ecs_cluster.langwatch[0].name
+    prometheus_remote_write_url = aws_prometheus_workspace.langwatch[0].prometheus_endpoint
+  })
+  filename = "${path.module}/prometheus-collector/adot-config.yaml"
+}
 
-# # Prometheus scrape configuration
-# resource "aws_prometheus_rule_group_namespace" "langwatch_scrape_config" {
-#   name         = "langwatch-scrape-config"
-#   workspace_id = aws_prometheus_workspace.langwatch[0].id
+resource "aws_ecr_repository" "adot_collector" {
+  name                 = "adot-collector"
+  image_tag_mutability = "IMMUTABLE"
+}
 
-#   data = <<EOF
-# groups:
-#   - name: langwatch
-#     rules:
-#       - record: up
-#         expr: up{job="langwatch"}
-# EOF
-# }
+resource "aws_ecs_task_definition" "adot_collector" {
+  family                   = "adot-collector-task"
+  network_mode             = "awsvpc"
+  requires_compatibilities = ["FARGATE"]
+  cpu                      = "256"
+  memory                   = "512"
+  execution_role_arn       = aws_iam_role.ecs_task_execution_role.arn
+  task_role_arn            = aws_iam_role.adot_collector_task_role.arn
 
-# # Security group rule to allow Prometheus to access the ECS service
-# resource "aws_security_group_rule" "allow_prometheus" {
-#   type                     = "ingress"
-#   from_port                = 3000
-#   to_port                  = 3000
-#   protocol                 = "tcp"
-#   security_group_id        = aws_security_group.langwatch.id
-#   source_security_group_id = aws_security_group.prometheus_sg.id
-# }
+  container_definitions = jsonencode([
+    {
+      name      = "adot-collector"
+      image     = "${aws_ecr_repository.adot_collector.repository_url}:${local.adot_config_hash}"
+      essential = true
+      portMappings = [
+        {
+          containerPort = 4317
+          hostPort      = 4317
+        }
+      ]
+      logConfiguration = {
+        logDriver = "awslogs"
+        options = {
+          awslogs-group         = "/ecs/adot-collector"
+          awslogs-region        = data.aws_region.current.name
+          awslogs-stream-prefix = "adot-collector"
+        }
+      }
+    }
+  ])
+}
 
-# # Security group for Prometheus
-# resource "aws_security_group" "prometheus_sg" {
-#   name        = "prometheus-sg"
-#   description = "Security group for Prometheus"
-#   vpc_id      = aws_vpc.main.id
+resource "aws_cloudwatch_log_group" "adot_collector" {
+  name              = "/ecs/adot-collector"
+  retention_in_days = 14
+}
 
-#   egress {
-#     from_port   = 0
-#     to_port     = 0
-#     protocol    = "-1"
-#     cidr_blocks = ["0.0.0.0/0"]
-#   }
-# }
+resource "aws_iam_role" "adot_collector_task_role" {
+  name = "adot-collector-task-role"
 
-# # Prometheus configuration
-# resource "aws_prometheus_scraper" "langwatch_main" {
-#   count = module.variables.profile == "lw-prod" ? 1 : 0
-#   source {
-#     ecs {
-#       cluster_arn = aws_ecs_cluster.langwatch[0].arn
-#       subnet_ids  = aws_subnet.private[*].id
-#     }
-#   }
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRole"
+        Effect = "Allow"
+        Principal = {
+          Service = "ecs-tasks.amazonaws.com"
+        }
+      }
+    ]
+  })
+}
 
-#   destination {
-#     amp {
-#       workspace_arn = aws_prometheus_workspace.langwatch[0].arn
-#     }
-#   }
+resource "aws_iam_policy" "ecs_discovery_policy" {
+  name        = "ecs-discovery-policy"
+  description = "Policy for ECS/EC2 discovery for ADOT collector"
 
-#   scrape_configuration = <<EOT
-# global:
-#   scrape_interval: 15s
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "ecs:ListClusters",
+          "ecs:ListServices",
+          "ecs:DescribeServices",
+          "ec2:DescribeInstances"
+        ]
+        Resource = "*"
+      }
+    ]
+  })
+}
 
-# scrape_configs:
-#   - job_name: 'langwatch'
-#     metrics_path: '/metrics'
-#     scheme: http
-#     authorization:
-#       type: Bearer
-#       credentials: '${local.lw_secrets_map["METRICS_API_KEY"]}'
-#     ec2_sd_configs:
-#       - region: ${data.aws_region.current.name}
-#         port: 3000
-#     relabel_configs:
-#       - source_labels: [__meta_ec2_tag_aws_ecs_cluster]
-#         regex: ${aws_ecs_cluster.langwatch[0].name}
-#         action: keep
-#       - source_labels: [__meta_ec2_private_ip]
-#         target_label: instance
-#       - target_label: service_type
-#         replacement: main
-# EOT
-# }
+resource "aws_iam_role_policy_attachment" "adot_collector_ec2_discovery" {
+  role       = aws_iam_role.adot_collector_task_role.name
+  policy_arn = aws_iam_policy.ecs_discovery_policy.arn
+}
 
-# # Prometheus scraper for workers
-# resource "aws_prometheus_scraper" "langwatch_workers" {
-#   count = module.variables.profile == "lw-prod" ? 1 : 0
-#   source {
-#     ecs {
-#       cluster_arn = aws_ecs_cluster.langwatch[0].arn
-#       subnet_ids  = aws_subnet.private[*].id
-#     }
-#   }
+resource "aws_iam_role_policy_attachment" "adot_collector_ecs_task_execution" {
+  role       = aws_iam_role.adot_collector_task_role.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
+}
 
-#   destination {
-#     amp {
-#       workspace_arn = aws_prometheus_workspace.langwatch[0].arn
-#     }
-#   }
+resource "aws_iam_role_policy_attachment" "adot_collector_cloudwatch" {
+  role       = aws_iam_role.adot_collector_task_role.name
+  policy_arn = "arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy"
+}
 
-#   scrape_configuration = <<EOT
-# global:
-#   scrape_interval: 15s
+resource "aws_iam_role_policy_attachment" "adot_collector_amp_remote_write" {
+  role       = aws_iam_role.adot_collector_task_role.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonPrometheusRemoteWriteAccess"
+}
 
-# scrape_configs:
-#   - job_name: 'langwatch-workers'
-#     metrics_path: '/workers/metrics'
-#     scheme: http
-#     authorization:
-#       type: Bearer
-#       credentials: '${local.lw_secrets_map["METRICS_API_KEY"]}'
-#     ec2_sd_configs:
-#       - region: ${data.aws_region.current.name}
-#         port: 3000
-#     relabel_configs:
-#       - source_labels: [__meta_ec2_tag_aws_ecs_cluster]
-#         regex: ${aws_ecs_cluster.langwatch[0].name}
-#         action: keep
-#       - source_labels: [__meta_ec2_private_ip]
-#         target_label: instance
-#       - target_label: service_type
-#         replacement: worker
-# EOT
-# }
+resource "aws_iam_policy" "prometheus_ecs_logging" {
+  name        = "prometheus-ecs-logging"
+  description = "Allow ECS tasks to send logs to CloudWatch"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "logs:CreateLogStream",
+          "logs:PutLogEvents",
+          "logs:CreateLogGroup"
+        ]
+        Resource = "arn:aws:logs:*:*:*"
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "ecs_logging" {
+  role       = aws_iam_role.ecs_task_execution_role.name
+  policy_arn = aws_iam_policy.prometheus_ecs_logging.arn
+}
+
+resource "null_resource" "build_adot_collector_image" {
+  count = module.variables.profile == "lw-prod" ? 1 : 0
+
+  triggers = {
+    adot_config_hash = local.adot_config_hash
+  }
+
+  provisioner "local-exec" {
+    command = <<EOT
+      set -eo pipefail
+
+      echo "Building ADOT collector image..."
+
+      cd ${path.module}/prometheus-collector
+      aws ecr get-login-password --profile ${module.variables.profile} --region ${data.aws_region.current.name} | docker login --username AWS --password-stdin ${data.aws_caller_identity.current.account_id}.dkr.ecr.${data.aws_region.current.name}.amazonaws.com || true
+      set +e
+      image_exists=$(docker manifest inspect ${aws_ecr_repository.adot_collector.repository_url}:${local.adot_config_hash} > /dev/null 2>&1 && echo yes)
+      set -e
+      if [ -z "$image_exists" ]; then
+        docker buildx build . --platform="linux/amd64" --push -t ${aws_ecr_repository.adot_collector.repository_url}:${local.adot_config_hash}
+      fi
+    EOT
+  }
+
+  depends_on = [local_file.adot_config[0], aws_ecr_repository.adot_collector]
+}
+
+resource "aws_ecs_service" "adot_collector" {
+  count = module.variables.profile == "lw-prod" ? 1 : 0
+
+  name            = "adot-collector-service"
+  cluster         = aws_ecs_cluster.langwatch[0].id
+  task_definition = aws_ecs_task_definition.adot_collector.arn
+  desired_count   = 1
+  launch_type     = "FARGATE"
+
+  network_configuration {
+    subnets          = [aws_subnet.private_subnet_1.id, aws_subnet.private_subnet_2.id]
+    security_groups  = [aws_security_group.adot_collector.id]
+    assign_public_ip = false
+  }
+}
+
+resource "aws_security_group" "adot_collector" {
+  name        = "adot-collector-sg"
+  description = "Security group for ADOT collector"
+  vpc_id      = aws_vpc.main.id
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+}
+
+resource "aws_security_group_rule" "allow_ecs_to_adot" {
+  type                     = "ingress"
+  from_port                = 4317
+  to_port                  = 4317
+  protocol                 = "tcp"
+  security_group_id        = aws_security_group.adot_collector.id
+  source_security_group_id = aws_security_group.langwatch.id
+}
