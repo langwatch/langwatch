@@ -1,5 +1,5 @@
 locals {
-  secrets_map = jsondecode(data.aws_secretsmanager_secret_version.langwatch.secret_string)
+  lw_secrets_map = jsondecode(data.aws_secretsmanager_secret_version.langwatch.secret_string)
 }
 
 # Create Amazon Managed Prometheus workspace
@@ -101,7 +101,7 @@ scrape_configs:
     scheme: http
     authorization:
       type: Bearer
-      credentials: '${local.secrets_map["METRICS_API_KEY"]}'
+      credentials: '${local.lw_secrets_map["METRICS_API_KEY"]}'
     ec2_sd_configs:
       - region: ${data.aws_region.current.name}
         port: 3000
@@ -116,7 +116,7 @@ scrape_configs:
     scheme: http
     authorization:
       type: Bearer
-      credentials: '${local.secrets_map["METRICS_API_KEY"]}'
+      credentials: '${local.lw_secrets_map["METRICS_API_KEY"]}'
     ec2_sd_configs:
       - region: ${data.aws_region.current.name}
         port: 3000
