@@ -60,7 +60,7 @@ const isMetricsAuthorized = (req: IncomingMessage): boolean => {
     throw new Error("METRICS_API_KEY is not set");
   }
   return (
-    !!process.env.METRICS_API_KEY &&
+    !process.env.METRICS_API_KEY ||
     authHeader === `Bearer ${process.env.METRICS_API_KEY}`
   );
 };
