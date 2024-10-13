@@ -80,7 +80,7 @@ resource "aws_ecs_task_definition" "langwatch" {
         ], [
         {
           name  = "LANGWATCH_NLP_SERVICE"
-          value = "http://${aws_lb.langwatch_nlp_alb[0].dns_name}"
+          value = "http://${kubernetes_service.langwatch_nlp[0].status[0].load_balancer[0].ingress[0].hostname}"
         },
         {
           name  = "REDIS_URL"
