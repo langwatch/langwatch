@@ -273,7 +273,17 @@ export default function Annotations() {
                                 size="sm"
                               />
                             </Td>
-                            <Td>{annotation.comment}</Td>
+                            <Td>
+                              <Tooltip label={annotation.comment}>
+                                <Text
+                                  noOfLines={2}
+                                  display="block"
+                                  maxWidth={450}
+                                >
+                                  {annotation.comment}
+                                </Text>
+                              </Tooltip>
+                            </Td>
                             <Td>{annotation.traceId}</Td>
                             <Td>
                               {annotation.isThumbsUp ? (
