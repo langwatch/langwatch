@@ -266,7 +266,7 @@ export default function CheckConfigForm({
                   {checkType && evaluatorsSchema.shape[checkType] && (
                     <DynamicZodForm
                       schema={evaluatorsSchema.shape[checkType].shape.settings}
-                      checkType={checkType}
+                      evaluatorType={checkType}
                       prefix="settings"
                       errors={errors.settings}
                     />

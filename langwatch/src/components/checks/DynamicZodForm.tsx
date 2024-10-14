@@ -9,8 +9,11 @@ import {
   Textarea,
   Text,
   VStack,
+  Tooltip,
+  FormControl,
 } from "@chakra-ui/react";
 import React from "react";
+import { Info, Plus, Trash2, X } from "react-feather";
 import {
   Controller,
   useFieldArray,
@@ -26,21 +29,23 @@ import type {
 import { getEvaluatorDefinitions } from "../../server/evaluations/getEvaluator";
 import { camelCaseToTitleCase, titleCase } from "../../utils/stringCasing";
 import { HorizontalFormControl } from "../HorizontalFormControl";
-import type { CheckConfigFormData } from "./CheckConfigForm";
-import { X } from "react-feather";
-import { SmallLabel } from "../SmallLabel";
 import { ModelSelector } from "../ModelSelector";
+import { SmallLabel } from "../SmallLabel";
+import type { CheckConfigFormData } from "./CheckConfigForm";
+import { PropertySectionTitle } from "../../optimization_studio/components/properties/BasePropertiesPanel";
 
 const DynamicZodForm = ({
   schema,
-  checkType: evaluatorType,
+  evaluatorType,
   prefix,
   errors,
+  variant = "default",
 }: {
   schema: ZodType;
-  checkType: EvaluatorTypes;
+  evaluatorType: EvaluatorTypes;
   prefix: string;
   errors: FieldErrors<CheckConfigFormData>["settings"];
+  variant?: "default" | "studio";
 }) => {
   const { control, register } = useFormContext();
 
@@ -61,13 +66,24 @@ const DynamicZodForm = ({
 
     if (fieldSchema_ instanceof z.ZodString) {
       if (["topic", "name"].includes(fieldKey) || !isNaN(+fieldKey)) {
-        return <Input {...register(fullPath)} />;
+        return (
+          <Input
+            size={variant === "studio" ? "sm" : "md"}
+            {...register(fullPath)}
+          />
+        );
       }
-      return <Textarea {...register(fullPath)} />;
+      return (
+        <Textarea
+          size={variant === "studio" ? "sm" : "md"}
+          {...register(fullPath)}
+        />
+      );
     } else if (fieldSchema_ instanceof z.ZodNumber) {
       return (
         <Input
           type="number"
+          size={variant === "studio" ? "sm" : "md"}
           step={
             typeof defaultValue === "number" &&
             Math.round(defaultValue) != defaultValue
@@ -91,10 +107,17 @@ const DynamicZodForm = ({
                 onBlur={onBlur}
                 name={name}
                 ref={ref}
+                size={variant === "studio" ? "sm" : "md"}
+                paddingLeft={variant === "studio" ? 2 : undefined}
               />
             )}
           />
-          <FormLabel htmlFor={fullPath} mb="0">
+          <FormLabel
+            htmlFor={fullPath}
+            marginBottom="0"
+            fontWeight={variant === "studio" ? 400 : undefined}
+            fontSize={variant === "studio" ? "13px" : undefined}
+          >
             {camelCaseToTitleCase(fieldName.split(".").reverse()[0] ?? "")}
           </FormLabel>
         </HStack>
@@ -124,6 +147,7 @@ const DynamicZodForm = ({
                   model={field.value}
                   onChange={(model) => field.onChange(model)}
                   mode={fieldName === "model" ? "chat" : "embedding"}
+                  size={variant === "studio" ? "sm" : "md"}
                 />
               </>
             )}
@@ -138,6 +162,7 @@ const DynamicZodForm = ({
           render={({ field }) => (
             <Select
               {...field}
+              size={variant === "studio" ? "sm" : "md"}
               onChange={(e) => {
                 const literalValues = options.map(
                   (option: any) => option.value
@@ -192,6 +217,19 @@ const DynamicZodForm = ({
 
       return (
         <VStack align="start" width="full">
+          {variant === "studio" && (
+            <Button
+              position="absolute"
+              right={0}
+              top="-36px"
+              padding={0}
+              size="sm"
+              variant="ghost"
+              onClick={() => append(defaultValues)}
+            >
+              <Plus size={16} />
+            </Button>
+          )}
           {fields.map((field, index) => (
             <Box
               key={field.id}
@@ -200,13 +238,13 @@ const DynamicZodForm = ({
                   ? "4px solid"
                   : undefined
               }
-              borderLeftColor="orange.400"
+              borderLeftColor={variant === "studio" ? "gray.200" : "orange.400"}
               width="full"
             >
               <HStack
                 borderLeftColor="reset"
                 padding={fieldSchema_.element instanceof z.ZodObject ? 3 : 0}
-                paddingRight={3}
+                paddingRight={variant === "studio" ? 0 : 3}
                 width="full"
                 align="start"
                 position="relative"
@@ -221,9 +259,13 @@ const DynamicZodForm = ({
                   onClick={() => remove(index)}
                   color="gray.400"
                 >
-                  <X />
+                  {variant === "studio" ? (
+                    <Trash2 size={14} />
+                  ) : (
+                    <X size={18} />
+                  )}
                 </Button>
-                <Box width="95%">
+                <Box width={variant === "studio" ? "100%" : "95%"}>
                   {renderField(
                     fieldSchema_.element,
                     `${fieldName}.${index}`,
@@ -233,7 +275,9 @@ const DynamicZodForm = ({
               </HStack>
             </Box>
           ))}
-          <Button onClick={() => append(defaultValues)}>Add</Button>
+          {variant !== "studio" && (
+            <Button onClick={() => append(defaultValues)}>Add</Button>
+          )}
         </VStack>
       );
     } else if (fieldSchema_ instanceof z.ZodObject) {
@@ -270,6 +314,38 @@ const DynamicZodForm = ({
       return Object.keys(schema.shape).map((key) => {
         const field = schema.shape[key];
         const isOptional = field instanceof z.ZodOptional;
+        const helperText =
+          evaluatorDefinition?.settings?.[
+            key as keyof Evaluators[T]["settings"]
+          ].description ?? "";
+        const isInvalid = errors && key in errors && !!(errors as any)[key];
+
+        if (variant === "studio") {
+          return (
+            <VStack key={key} as="form" align="start" spacing={3} width="full">
+              <HStack width="full">
+                <PropertySectionTitle>
+                  {camelCaseToTitleCase(key)}
+                </PropertySectionTitle>
+                {isOptional && (
+                  <Text color="gray.500" fontSize={12}>
+                    (optional)
+                  </Text>
+                )}
+                <Tooltip label={helperText}>
+                  <Info size={14} />
+                </Tooltip>
+              </HStack>
+              <FormControl isInvalid={isInvalid}>
+                {renderField(
+                  field,
+                  basePath ? `${basePath}.${key}` : key,
+                  evaluatorDefinition
+                )}
+              </FormControl>
+            </VStack>
+          );
+        }
 
         return (
           <React.Fragment key={key}>
@@ -277,12 +353,8 @@ const DynamicZodForm = ({
               label={
                 camelCaseToTitleCase(key) + (isOptional ? " (Optional)" : "")
               }
-              helper={
-                evaluatorDefinition?.settings?.[
-                  key as keyof Evaluators[T]["settings"]
-                ].description ?? ""
-              }
-              isInvalid={errors && key in errors && !!(errors as any)[key]}
+              helper={helperText}
+              isInvalid={isInvalid}
             >
               {renderField(
                 field,

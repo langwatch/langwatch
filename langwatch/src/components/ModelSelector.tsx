@@ -112,7 +112,7 @@ export const ModelSelector = React.memo(function ModelSelector({
         container: (base) => ({
           ...base,
           background: "white",
-          width: size === "sm" ? "250px" : size === "full" ? "100%" : "auto",
+          width: size === "full" ? "100%" : "auto",
           borderRadius: "5px",
           padding: 0,
         }),
