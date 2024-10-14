@@ -21,6 +21,7 @@ import {
   Skeleton,
   Spacer,
   Text,
+  Tooltip,
   useDisclosure,
   useToast,
   VStack,
@@ -218,6 +219,10 @@ export function Publish({ isDisabled }: { isDisabled: boolean }) {
       );
     }
 
+    const isDisabled = hasProvidersWithoutCustomKeys
+      ? "Set up your API keys to publish a new version"
+      : false;
+
     return (
       <ModalContent borderTop="5px solid" borderColor="green.400">
         <ModalHeader fontWeight={600}>Publish Workflow</ModalHeader>
@@ -234,26 +239,28 @@ export function Publish({ isDisabled }: { isDisabled: boolean }) {
           </VStack>
         </ModalBody>
         <ModalFooter borderTop="1px solid" borderColor="gray.200" marginTop={4}>
-          <VStack align="start" width="full">
+          <VStack align="start" width="full" spacing={3}>
             {hasProvidersWithoutCustomKeys && (
               <AddModelProviderKey
                 nodeProvidersWithoutCustomKeys={nodeProvidersWithoutCustomKeys}
               />
             )}
             {!isPublished && (
-              <HStack width="full">
-                <Spacer />
-                <Button
-                  variant="outline"
-                  type="submit"
-                  leftIcon={<Globe size={16} />}
-                  isLoading={publishWorkflow.isLoading}
-                  isDisabled={hasProvidersWithoutCustomKeys}
-                  onClick={onSubmit}
-                >
-                  Publish New Version
-                </Button>
-              </HStack>
+              <Tooltip label={isDisabled}>
+                <HStack width="full">
+                  <Spacer />
+                  <Button
+                    variant="outline"
+                    type="submit"
+                    leftIcon={<Globe size={16} />}
+                    isLoading={publishWorkflow.isLoading}
+                    isDisabled={!!isDisabled}
+                    onClick={onSubmit}
+                  >
+                    Publish New Version
+                  </Button>
+                </HStack>
+              </Tooltip>
             )}
             {isPublished && (
               <VStack align="start" width="full">

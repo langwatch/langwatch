@@ -1,4 +1,6 @@
 import {
+  Alert,
+  AlertIcon,
   Button,
   HStack,
   Input,
@@ -38,6 +40,8 @@ import type { Entry } from "../types/dsl";
 import { OPTIMIZERS } from "../types/optimizers";
 import { VersionToBeEvaluated } from "./Evaluate";
 import { useVersionState } from "./History";
+import { useModelProviderKeys } from "../hooks/useModelProviderKeys";
+import { AddModelProviderKey } from "./AddModelProviderKey";
 
 const optimizerOptions: {
   label: string;
@@ -91,6 +95,7 @@ export function OptimizeModalContent({ onClose }: { onClose: () => void }) {
   const {
     workflowId,
     getWorkflow,
+    nodes,
     optimizationState,
     deselectAllNodes,
     setOpenResultsPanelRequest,
@@ -98,12 +103,14 @@ export function OptimizeModalContent({ onClose }: { onClose: () => void }) {
     ({
       workflow_id: workflowId,
       getWorkflow,
+      nodes,
       state,
       deselectAllNodes,
       setOpenResultsPanelRequest,
     }) => ({
       workflowId,
       getWorkflow,
+      nodes,
       optimizationState: state.optimization,
       deselectAllNodes: deselectAllNodes,
       setOpenResultsPanelRequest: setOpenResultsPanelRequest,
@@ -255,6 +262,9 @@ export function OptimizeModalContent({ onClose }: { onClose: () => void }) {
     ]
   );
 
+  const { hasProvidersWithoutCustomKeys, nodeProvidersWithoutCustomKeys } =
+    useModelProviderKeys();
+
   const isRunning = optimizationState?.status === "running";
 
   if (isRunning) {
@@ -276,6 +286,16 @@ export function OptimizeModalContent({ onClose }: { onClose: () => void }) {
       </ModalContent>
     );
   }
+
+  const hasEvaluator = !!nodes.find((node) => node.type === "evaluator");
+  const isDisabled =
+    trainTotal + testTotal < 20
+      ? "You need at least 20 entries to run the automated optimizer"
+      : hasProvidersWithoutCustomKeys
+      ? "Set up your API keys to run optimizations"
+      : !hasEvaluator
+      ? "You need at least one evaluator node in your workflow to run optimizations"
+      : false;
 
   return (
     <ModalContent
@@ -359,23 +379,43 @@ export function OptimizeModalContent({ onClose }: { onClose: () => void }) {
         )} */}
       </ModalBody>
       <ModalFooter borderTop="1px solid" borderColor="gray.200" marginTop={4}>
-        <HStack width="full">
-          <VStack align="start" spacing={0}>
-            <Text fontWeight={500}>{trainTotal + testTotal} entries</Text>
-            <Text whiteSpace="nowrap" fontSize="13px">
-              ({trainTotal} optimization / {testTotal} test)
-            </Text>
-          </VStack>
-          <Spacer />
-          <Button
-            variant="outline"
-            type="submit"
-            leftIcon={<CheckSquare size={16} />}
-            isLoading={optimizationState?.status === "waiting"}
-          >
-            {canSaveNewVersion ? "Save & Run Optimization" : "Run Optimization"}
-          </Button>
-        </HStack>
+        <VStack align="start" width="full" spacing={3}>
+          {hasProvidersWithoutCustomKeys ? (
+            <AddModelProviderKey
+              nodeProvidersWithoutCustomKeys={nodeProvidersWithoutCustomKeys}
+            />
+          ) : !hasEvaluator ? (
+            <Alert status="warning">
+              <AlertIcon />
+              <Text>
+                You need at least one evaluator node in your workflow to be able
+                to run optimizations
+              </Text>
+            </Alert>
+          ) : null}
+          <HStack width="full">
+            <VStack align="start" spacing={0}>
+              <Text fontWeight={500}>{trainTotal + testTotal} entries</Text>
+              <Text whiteSpace="nowrap" fontSize="13px">
+                ({trainTotal} optimization / {testTotal} test)
+              </Text>
+            </VStack>
+            <Spacer />
+            <Tooltip label={isDisabled}>
+              <Button
+                variant="outline"
+                type="submit"
+                leftIcon={<CheckSquare size={16} />}
+                isLoading={optimizationState?.status === "waiting"}
+                isDisabled={!!isDisabled}
+              >
+                {canSaveNewVersion
+                  ? "Save & Run Optimization"
+                  : "Run Optimization"}
+              </Button>
+            </Tooltip>
+          </HStack>
+        </VStack>
       </ModalFooter>
     </ModalContent>
   );

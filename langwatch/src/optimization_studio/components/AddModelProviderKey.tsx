@@ -8,14 +8,9 @@ import {
   VStack,
 } from "@chakra-ui/react";
 
+import { Alert } from "@chakra-ui/react";
 import { modelProviderIcons } from "../../server/modelProviders/iconsMap";
 import { titleCase } from "../../utils/stringCasing";
-import {
-  Alert,
-  AlertIcon,
-  AlertTitle,
-  AlertDescription,
-} from "@chakra-ui/react";
 
 export const AddModelProviderKey = ({
   nodeProvidersWithoutCustomKeys,
@@ -26,8 +21,10 @@ export const AddModelProviderKey = ({
     <Alert status="warning">
       <VStack align="start" width="full">
         <HStack paddingBottom={3}>
-          <AlertIcon />
-          <Text>Add keys to run evaluations</Text>
+          <Text>
+            You need to set up your own API keys for the following providers to
+            be able to run evaluations:
+          </Text>
         </HStack>
         <VStack align="start" width="full" spacing={3}>
           {nodeProvidersWithoutCustomKeys.map((provider) => (
@@ -43,7 +40,9 @@ export const AddModelProviderKey = ({
               <Spacer />
 
               <Link href="/settings/model-providers" target="_blank">
-                <Button size="sm">Add keys</Button>
+                <Button colorScheme="orange" size="sm">
+                  Add keys
+                </Button>
               </Link>
             </HStack>
           ))}

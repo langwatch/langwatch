@@ -18,7 +18,7 @@ import {
 } from "@chakra-ui/react";
 import type { Experiment, Project } from "@prisma/client";
 import type { Node } from "@xyflow/react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { X } from "react-feather";
 import {
   BatchEvaluationV2EvaluationResults,
@@ -56,7 +56,13 @@ export function ResultsPanel({
   collapsePanel: (isCollapsed: boolean) => void;
   defaultTab: "evaluations" | "optimizations";
 }) {
-  const [tabIndex, setTabIndex] = useState(0);
+  const [tabIndex, setTabIndex] = useState(
+    defaultTab === "evaluations" ? 0 : 1
+  );
+
+  useEffect(() => {
+    setTabIndex(defaultTab === "evaluations" ? 0 : 1);
+  }, [defaultTab]);
 
   return (
     <HStack
@@ -87,7 +93,6 @@ export function ResultsPanel({
         display="flex"
         flexDirection="column"
         size="sm"
-        defaultIndex={defaultTab === "evaluations" ? 0 : 1}
         index={tabIndex}
         onChange={(index) => setTabIndex(index)}
       >

@@ -99,7 +99,7 @@ export const useGetDatasetData = ({
     columns: data?.columnTypes ?? [],
     query: databaseDataset,
     total: dataset?.inline?.records
-      ? Object.values(dataset?.inline.records)[0]?.length
+      ? Object.values(dataset?.inline.records)[0]?.length ?? 0
       : databaseDataset.data?.total,
   };
 };

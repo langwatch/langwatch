@@ -293,6 +293,12 @@ export function EvaluateModalContent({ onClose }: { onClose: () => void }) {
     );
   }
 
+  const isDisabled = hasProvidersWithoutCustomKeys
+    ? "Set up your API keys to run evaluations"
+    : !estimatedTotal || estimatedTotal < 1
+    ? "You need at least 1 dataset entry to run evaluations"
+    : false;
+
   return (
     <ModalContent
       as="form"
@@ -332,7 +338,7 @@ export function EvaluateModalContent({ onClose }: { onClose: () => void }) {
         </VStack>
       </ModalBody>
       <ModalFooter borderTop="1px solid" borderColor="gray.200" marginTop={4}>
-        <VStack align="start" width="full">
+        <VStack align="start" width="full" spacing={3}>
           {hasProvidersWithoutCustomKeys && (
             <AddModelProviderKey
               nodeProvidersWithoutCustomKeys={nodeProvidersWithoutCustomKeys}
@@ -341,15 +347,17 @@ export function EvaluateModalContent({ onClose }: { onClose: () => void }) {
           <HStack width="full">
             <Text fontWeight={500}>{estimatedTotal} entries</Text>
             <Spacer />
-            <Button
-              variant="outline"
-              type="submit"
-              leftIcon={<CheckSquare size={16} />}
-              isLoading={evaluationState?.status === "waiting"}
-              isDisabled={hasProvidersWithoutCustomKeys}
-            >
-              {canSaveNewVersion ? "Save & Run Evaluation" : "Run Evaluation"}
-            </Button>
+            <Tooltip label={isDisabled}>
+              <Button
+                variant="outline"
+                type="submit"
+                leftIcon={<CheckSquare size={16} />}
+                isLoading={evaluationState?.status === "waiting"}
+                isDisabled={!!isDisabled}
+              >
+                {canSaveNewVersion ? "Save & Run Evaluation" : "Run Evaluation"}
+              </Button>
+            </Tooltip>
           </HStack>
         </VStack>
       </ModalFooter>
