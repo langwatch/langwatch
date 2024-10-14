@@ -32,7 +32,10 @@ import { cleanupPIIs } from "./collector/piiCheck";
 import { addInputAndOutputForRAGs } from "./collector/rag";
 import { scoreSatisfactionFromInput } from "./collector/satisfaction";
 import { getTraceInput, getTraceOutput } from "./collector/trace";
-import { getJobProcessingCounter } from "../../metrics";
+import {
+  getJobProcessingCounter,
+  getJobProcessingDurationHistogram,
+} from "../../metrics";
 
 const debug = getDebugger("langwatch:workers:collectorWorker");
 
@@ -90,15 +93,22 @@ export const processCollectorJob = async (
   id: string | undefined,
   data: CollectorJob | CollectorCheckAndAdjustJob
 ) => {
+  const start = Date.now();
   if ("action" in data && data.action === "check_and_adjust") {
     getJobProcessingCounter("collector_check_and_adjust", "processing").inc();
     const result = await processCollectorCheckAndAdjustJob(id, data);
     getJobProcessingCounter("collector_check_and_adjust", "completed").inc();
+    const duration = Date.now() - start;
+    getJobProcessingDurationHistogram("collector_check_and_adjust").observe(
+      duration
+    );
     return result;
   }
   getJobProcessingCounter("collector", "processing").inc();
   const result = await processCollectorJob_(id, data as CollectorJob);
   getJobProcessingCounter("collector", "completed").inc();
+  const duration = Date.now() - start;
+  getJobProcessingDurationHistogram("collector").observe(duration);
   return result;
 };
 

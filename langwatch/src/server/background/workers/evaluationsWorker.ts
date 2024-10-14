@@ -36,6 +36,7 @@ import {
   evaluationDurationHistogram,
   getEvaluationStatusCounter,
   getJobProcessingCounter,
+  getJobProcessingDurationHistogram,
 } from "../../metrics";
 
 const debug = getDebugger("langwatch:workers:traceChecksWorker");
@@ -294,6 +295,7 @@ export const startEvaluationsWorker = (
       }
 
       getJobProcessingCounter("evaluation", "processing").inc();
+      const start = Date.now();
 
       try {
         debug(`Processing job ${job.id} with data:`, job.data);
@@ -355,6 +357,9 @@ export const startEvaluationsWorker = (
           details: "details" in result ? result.details ?? "" : "",
         });
         debug("Successfully processed job:", job.id);
+
+        const duration = Date.now() - start;
+        getJobProcessingDurationHistogram("evaluation").observe(duration);
         getJobProcessingCounter("evaluation", "completed").inc();
       } catch (error) {
         await updateCheckStatusInES({

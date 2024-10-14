@@ -10,7 +10,10 @@ import { TRACE_INDEX, esClient, traceIndexId } from "../../elasticsearch";
 import { connection } from "../../redis";
 import { elasticSearchEventSchema } from "../../tracer/types.generated";
 import { TRACK_EVENTS_QUEUE_NAME } from "../queues/trackEventsQueue";
-import { getJobProcessingCounter } from "../../metrics";
+import {
+  getJobProcessingCounter,
+  getJobProcessingDurationHistogram,
+} from "../../metrics";
 
 const debug = getDebugger("langwatch:workers:trackEventWorker");
 
@@ -25,7 +28,7 @@ export const startTrackEventsWorker = () => {
     async (job) => {
       debug(`Processing job ${job.id} with data:`, job.data);
       getJobProcessingCounter("track_event", "processing").inc();
-
+      const start = Date.now();
       let event: ElasticSearchEvent = {
         ...job.data.event,
         project_id: job.data.project_id,
@@ -102,6 +105,8 @@ export const startTrackEventsWorker = () => {
         refresh: true,
       });
       getJobProcessingCounter("track_event", "completed").inc();
+      const duration = Date.now() - start;
+      getJobProcessingDurationHistogram("track_event").observe(duration);
     },
     {
       connection,

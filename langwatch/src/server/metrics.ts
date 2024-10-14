@@ -34,6 +34,8 @@ const payloadSizeHistogram = new Histogram({
     12582912, // 12 MB
     16777216, // 16 MB
     33554432, // 32 MB
+    67108864, // 64 MB
+    134217728, // 128 MB
   ],
 });
 
@@ -69,6 +71,21 @@ const jobProcessingCounter = new Counter({
 
 export const getJobProcessingCounter = (jobType: JobType, status: JobStatus) =>
   jobProcessingCounter.labels(jobType, status);
+
+// Histogram for evaluation duration
+register.removeSingleMetric("job_processing_duration_milliseconds");
+export const jobProcessingDurationHistogram = new Histogram({
+  name: "job_processing_duration_milliseconds",
+  help: "Duration of jobs in milliseconds",
+  labelNames: ["job_type"] as const,
+  buckets: [
+    10, 20, 50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 1200, 1400,
+    1600, 1800, 2000, 2500, 3000, 3500, 4000, 4500, 5000, 7500, 10000,
+  ],
+});
+
+export const getJobProcessingDurationHistogram = (jobType: JobType) =>
+  jobProcessingDurationHistogram.labels(jobType);
 
 // Histogram for evaluation duration
 register.removeSingleMetric("evaluation_duration_milliseconds");

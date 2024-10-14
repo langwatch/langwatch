@@ -5,7 +5,10 @@ import { getDebugger } from "../../../utils/logger";
 import { connection } from "../../redis";
 import { clusterTopicsForProject } from "../../topicClustering/topicClustering";
 import { TOPIC_CLUSTERING_QUEUE_NAME } from "../queues/topicClusteringQueue";
-import { getJobProcessingCounter } from "../../metrics";
+import {
+  getJobProcessingCounter,
+  getJobProcessingDurationHistogram,
+} from "../../metrics";
 
 const debug = getDebugger("langwatch:workers:topicClusteringWorker");
 
@@ -19,10 +22,13 @@ export const startTopicClusteringWorker = () => {
     TOPIC_CLUSTERING_QUEUE_NAME,
     async (job) => {
       getJobProcessingCounter("topic_clustering", "processing").inc();
+      const start = Date.now();
       debug(`Processing job ${job.id} with data:`, job.data);
 
       await clusterTopicsForProject(job.data.project_id, job.data.search_after);
       getJobProcessingCounter("topic_clustering", "completed").inc();
+      const duration = Date.now() - start;
+      getJobProcessingDurationHistogram("topic_clustering").observe(duration);
     },
     {
       connection,
