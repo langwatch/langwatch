@@ -56,7 +56,8 @@ export function TraceDetails(props: {
   const [threadId, setThreadId] = useState<string | undefined>(undefined);
   const router = useRouter();
 
-  const isTableView = router.query.view === "table";
+  const canViewMessages =
+    router.query.view == "table" || router.query["drawer.annotationTab"];
 
   const { openDrawer } = useDrawer();
 
@@ -102,7 +103,7 @@ export function TraceDetails(props: {
   const anyGuardrails = !!evaluations.data?.some((x) => x.is_guardrail);
 
   const annotationTabIndex =
-    props.annotationTab && anyGuardrails ? 3 : props.annotationTab ? 2 : 0;
+    props.annotationTab && anyGuardrails ? 4 : props.annotationTab ? 3 : 0;
 
   const { trace } = useTraceDetailsState(props.traceId);
 
@@ -166,7 +167,7 @@ export function TraceDetails(props: {
         <VStack align="start" width="full">
           <Tabs width="full" defaultIndex={annotationTabIndex}>
             <TabList paddingX={6}>
-              {isTableView && <Tab>Messages</Tab>}
+              {canViewMessages && <Tab>Messages</Tab>}
               <Tab>Trace Details</Tab>
               {anyGuardrails && (
                 <Tab>
@@ -210,7 +211,7 @@ export function TraceDetails(props: {
             </TabList>
 
             <TabPanels>
-              {isTableView && (
+              {canViewMessages && (
                 <TabPanel paddingX={0} padding={0}>
                   <Conversation threadId={threadId} traceId={props.traceId} />
                 </TabPanel>
