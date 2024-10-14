@@ -5,7 +5,9 @@ type Endpoint =
   | "log_steps"
   | "log_results"
   | "dataset"
-  | "dataset_record";
+  | "dataset_record"
+  | "topic_clustering_batch"
+  | "topic_clustering_incremental";
 
 // Histogram for collector payload size (in bytes)
 register.removeSingleMetric("payload_size_bytes");

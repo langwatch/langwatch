@@ -30,6 +30,7 @@ import {
   getProjectModelProviders,
   prepareLitellmParams,
 } from "../api/routers/modelProviders";
+import { getPayloadSizeHistogram } from "../metrics";
 
 const debug = getDebugger("langwatch:topicClustering");
 
@@ -495,12 +496,10 @@ export const fetchTopicsBatchClustering = async (
     return;
   }
 
-  debug(
-    "Uploading",
-    JSON.stringify(params).length / 125000,
-    "mb of traces data for project",
-    projectId
-  );
+  const size = JSON.stringify(params).length;
+  getPayloadSizeHistogram("topic_clustering_batch").observe(size);
+
+  debug("Uploading", size / 125000, "mb of traces data for project", projectId);
 
   const response = await fetchHTTP2(
     `${env.LANGWATCH_NLP_SERVICE}/topics/batch_clustering`,
@@ -536,12 +535,10 @@ export const fetchTopicsIncrementalClustering = async (
     return;
   }
 
-  debug(
-    "Uploading",
-    JSON.stringify(params).length / 125000,
-    "mb of traces data for project",
-    projectId
-  );
+  const size = JSON.stringify(params).length;
+  getPayloadSizeHistogram("topic_clustering_incremental").observe(size);
+
+  debug("Uploading", size / 125000, "mb of traces data for project", projectId);
 
   const response = await fetchHTTP2(
     `${env.LANGWATCH_NLP_SERVICE}/topics/incremental_clustering`,

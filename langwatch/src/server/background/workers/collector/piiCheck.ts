@@ -9,6 +9,10 @@ import type {
   ElasticSearchTrace,
   Trace,
 } from "../../../tracer/types";
+import {
+  evaluationDurationHistogram,
+  getEvaluationStatusCounter,
+} from "../../../metrics";
 
 const debug = getDebugger("langwatch:trace_checks:piiCheck");
 
@@ -228,6 +232,8 @@ const presidioClearPII = async (
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeout);
 
+  const startTime = performance.now();
+
   const response = await fetch(
     `${env.LANGEVALS_ENDPOINT}/presidio/pii_detection/evaluate`,
     {
@@ -254,14 +260,22 @@ const presidioClearPII = async (
 
   clearTimeout(timeoutId);
 
+  const duration = performance.now() - startTime;
+  evaluationDurationHistogram
+    .labels("presidio/pii_detection")
+    .observe(duration);
+
   if (!response.ok) {
+    getEvaluationStatusCounter("presidio/pii_detection", "error").inc();
     throw new Error(await response.text());
   }
 
   const result = ((await response.json()) as BatchEvaluationResult)[0];
   if (!result) {
+    getEvaluationStatusCounter("presidio/pii_detection", "error").inc();
     throw new Error("Unexpected response: empty results");
   }
+  getEvaluationStatusCounter("presidio/pii_detection", result.status).inc();
   if (result.status === "skipped") {
     return;
   }
