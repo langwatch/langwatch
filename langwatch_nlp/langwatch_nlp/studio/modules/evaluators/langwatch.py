@@ -31,6 +31,9 @@ class LangWatchEvaluator(Evaluator):
     def forward(self, **kwargs) -> SingleEvaluationResult:
         super().forward()
 
+        if "contexts" in kwargs and type(kwargs["contexts"]) != list:
+            kwargs["contexts"] = [kwargs["contexts"]]
+
         result = langwatch.evaluations.evaluate(
             self.evaluator,
             name=self.name,

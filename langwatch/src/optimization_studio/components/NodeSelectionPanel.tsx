@@ -89,7 +89,7 @@ export const NodeSelectionPanel = ({
           {MODULES.evaluators.map((evaluator) => {
             return (
               <NodeDraggable
-                key={evaluator.cls}
+                key={evaluator.name}
                 component={evaluator}
                 type="evaluator"
               />

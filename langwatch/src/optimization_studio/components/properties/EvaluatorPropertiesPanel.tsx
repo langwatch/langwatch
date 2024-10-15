@@ -1,5 +1,5 @@
 import type { Node } from "@xyflow/react";
-import type { Evaluator } from "../../types/dsl";
+import type { Evaluator, Field } from "../../types/dsl";
 import { BasePropertiesPanel } from "./BasePropertiesPanel";
 import { z } from "zod";
 import { FormProvider, useForm } from "react-hook-form";
@@ -10,15 +10,95 @@ import {
 } from "../../../server/evaluations/evaluators.generated";
 import { evaluatorsSchema } from "../../../server/evaluations/evaluators.zod.generated";
 import { VStack } from "@chakra-ui/react";
+import { useCallback, useEffect } from "react";
+import { getEvaluatorDefaultSettings } from "../../../server/evaluations/getEvaluator";
+import { useWorkflowStore } from "../../hooks/useWorkflowStore";
+import { useDebouncedCallback } from "use-debounce";
 
 export function EvaluatorPropertiesPanel({ node }: { node: Node<Evaluator> }) {
-  const form = useForm();
+  const { setNode } = useWorkflowStore(({ setNode }) => ({ setNode }));
+
+  const form = useForm({
+    defaultValues: {
+      settings: Object.fromEntries(
+        (node.data.parameters ?? []).map(({ identifier, defaultValue }) => [
+          identifier,
+          defaultValue,
+        ])
+      ),
+    },
+  });
+
   const evaluator = node.data.evaluator;
 
   const schema =
     evaluator && evaluator in AVAILABLE_EVALUATORS
       ? evaluatorsSchema.shape[evaluator as keyof Evaluators].shape.settings
       : undefined;
+
+  useEffect(() => {
+    if (!evaluator || !(evaluator in AVAILABLE_EVALUATORS)) return;
+    if (node.data.parameters) return;
+
+    const evaluatorDefinition =
+      AVAILABLE_EVALUATORS[evaluator as keyof Evaluators];
+
+    const setDefaultSettings = (
+      defaultValues: Record<string, any>,
+      prefix: string
+    ) => {
+      if (!defaultValues) return;
+
+      Object.entries(defaultValues).forEach(([key, value]) => {
+        if (
+          typeof value === "object" &&
+          !Array.isArray(value) &&
+          value !== null
+        ) {
+          setDefaultSettings(value, `${prefix}.${key}`);
+        } else {
+          //@ts-ignore
+          form.setValue(`${prefix}.${key}`, value);
+        }
+      });
+    };
+
+    setDefaultSettings(
+      getEvaluatorDefaultSettings(evaluatorDefinition),
+      "settings"
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [evaluator]);
+
+  const onSubmit = useCallback(
+    (data: { settings: Record<string, any> }) => {
+      setNode({
+        id: node.id,
+        data: {
+          parameters: Object.entries(data.settings).map(
+            ([identifier, value]) =>
+              ({
+                identifier,
+                type: "str",
+                defaultValue: value,
+              }) as Field
+          ),
+        },
+      });
+    },
+    [node.id, setNode]
+  );
+
+  const handleSubmit_ = useCallback(() => {
+    void form.handleSubmit(onSubmit)();
+  }, [form, onSubmit]);
+
+  const handleSubmitDebounced = useDebouncedCallback(handleSubmit_, 1000);
+  useEffect(() => {
+    form.watch(() => {
+      handleSubmitDebounced();
+    });
+  }, [form, handleSubmitDebounced]);
 
   return (
     <BasePropertiesPanel node={node} inputsReadOnly outputsReadOnly>
@@ -31,8 +111,7 @@ export function EvaluatorPropertiesPanel({ node }: { node: Node<Evaluator> }) {
                 schema={schema}
                 evaluatorType={evaluator as keyof Evaluators}
                 prefix="settings"
-                // errors={form.formState.errors}
-                errors={undefined}
+                errors={form.formState.errors.settings}
                 variant="studio"
               />
             </VStack>
