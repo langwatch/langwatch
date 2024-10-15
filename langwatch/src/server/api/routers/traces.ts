@@ -626,7 +626,10 @@ export const getSpansForTraceIds = async (
   );
 };
 
-const getTracesWithSpans = async (projectId: string, traceIds: string[]) => {
+export const getTracesWithSpans = async (
+  projectId: string,
+  traceIds: string[]
+) => {
   const tracesResult = await esClient.search<ElasticSearchTrace>({
     index: TRACE_INDEX.alias,
     body: {

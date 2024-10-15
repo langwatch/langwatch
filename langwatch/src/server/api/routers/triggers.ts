@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
-import { TriggerAction } from "@prisma/client";
+import { AlertType, TriggerAction } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { extractCheckKeys } from "../utils";
 
@@ -91,6 +91,27 @@ export const triggerRouter = createTRPCRouter({
       });
 
       return { success: true };
+    }),
+  addCustomMessage: protectedProcedure
+    .input(
+      z.object({
+        triggerId: z.string(),
+        message: z.string(),
+        projectId: z.string(),
+        alertType: z.nativeEnum(AlertType),
+        name: z.string().optional(),
+      })
+    )
+    .use(checkUserPermissionForProject(TeamRoleGroup.TRIGGERS_MANAGE))
+    .mutation(async ({ ctx, input }) => {
+      return ctx.prisma.trigger.update({
+        where: { id: input.triggerId, projectId: input.projectId },
+        data: {
+          message: input.message,
+          alertType: input.alertType,
+          name: input.name,
+        },
+      });
     }),
   getTriggers: protectedProcedure
     .input(z.object({ projectId: z.string() }))

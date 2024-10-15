@@ -360,6 +360,12 @@ enum TriggerAction {
     SEND_SLACK_MESSAGE
 }
 
+enum AlertType {
+    CRITICAL
+    WARNING
+    INFO
+}
+
 model Trigger {
     id           String        @id @default(nanoid())
     name         String
@@ -372,6 +378,8 @@ model Trigger {
     createdAt    DateTime      @default(now())
     updatedAt    DateTime      @default(now()) @updatedAt
     active       Boolean       @default(true)
+    message      String?
+    alertType    AlertType?
     TriggerSent  TriggerSent[]
 
     @@index([projectId])

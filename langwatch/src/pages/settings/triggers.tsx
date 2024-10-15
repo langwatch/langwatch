@@ -19,20 +19,41 @@ import {
   Tr,
   VStack,
   useToast,
+  Modal,
+  ModalOverlay,
+  ModalContent,
+  ModalHeader,
+  ModalFooter,
+  ModalBody,
+  ModalCloseButton,
+  useDisclosure,
+  Textarea,
+  Select,
+  Input,
 } from "@chakra-ui/react";
 import type { TriggerAction } from "@prisma/client";
 import { MoreVertical } from "react-feather";
 import SettingsLayout from "../../components/SettingsLayout";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
-import { DeleteIcon } from "@chakra-ui/icons";
+import { DeleteIcon, EditIcon } from "@chakra-ui/icons";
 import { Switch } from "@chakra-ui/react";
 import { ProjectSelector } from "../../components/DashboardLayout";
+import { type AlertType } from "@prisma/client";
+import {
+  useForm,
+  Controller,
+  type SubmitHandler,
+  type Control,
+  type UseFormHandleSubmit,
+} from "react-hook-form";
+import { z } from "zod";
+import { SmallLabel } from "~/components/SmallLabel";
 
 export default function Members() {
   const { project, organizations } = useOrganizationTeamProject();
   const toast = useToast();
-
+  const { isOpen, onOpen, onClose } = useDisclosure();
   const triggers = api.trigger.getTriggers.useQuery(
     {
       projectId: project?.id ?? "",
@@ -41,6 +62,15 @@ export default function Members() {
       enabled: !!project?.id,
     }
   );
+
+  const { setValue, ...formMethods } = useForm({
+    defaultValues: {
+      triggerId: "",
+      customMessage: "",
+      alertType: "INFO",
+      name: "",
+    },
+  });
 
   const toggleTrigger = api.trigger.toggleTrigger.useMutation();
   const deleteTriggerMutation = api.trigger.deleteById.useMutation();
@@ -121,6 +151,11 @@ export default function Members() {
       case "SEND_EMAIL":
         return (actionParams as { members: string[] }).members?.join(", ");
     }
+  };
+
+  const handleCloseModal = () => {
+    onClose();
+    void triggers.refetch();
   };
 
   return (
@@ -218,6 +253,24 @@ export default function Members() {
                             </MenuButton>
                             <MenuList>
                               <MenuItem
+                                icon={<EditIcon />}
+                                onClick={() => {
+                                  setValue("triggerId", trigger.id);
+                                  setValue(
+                                    "customMessage",
+                                    trigger.message ?? ""
+                                  );
+                                  setValue(
+                                    "alertType",
+                                    trigger.alertType ?? ""
+                                  );
+                                  setValue("name", trigger.name ?? "");
+                                  onOpen();
+                                }}
+                              >
+                                Customize
+                              </MenuItem>
+                              <MenuItem
                                 color="red.600"
                                 onClick={(event) => {
                                   event.stopPropagation();
@@ -226,7 +279,7 @@ export default function Members() {
                                 }}
                                 icon={<DeleteIcon />}
                               >
-                                Delete trigger
+                                Delete
                               </MenuItem>
                             </MenuList>
                           </Menu>
@@ -240,6 +293,133 @@ export default function Members() {
           </CardBody>
         </Card>
       </VStack>
+      <Modal isOpen={isOpen} onClose={handleCloseModal} size="2xl">
+        <ModalOverlay />
+        <ModalContent>
+          <ModalHeader>Customize Your Trigger</ModalHeader>
+          <ModalCloseButton />
+          <ModalBody>
+            <TriggerForm
+              control={
+                formMethods.control as unknown as Control<TriggerFormData>
+              }
+              handleSubmit={
+                formMethods.handleSubmit as unknown as UseFormHandleSubmit<TriggerFormData>
+              }
+              onClose={handleCloseModal}
+            />
+          </ModalBody>
+
+          <ModalFooter></ModalFooter>
+        </ModalContent>
+      </Modal>
     </SettingsLayout>
   );
 }
+
+const triggerFormSchema = z.object({
+  alertType: z.enum(["CRITICAL", "WARNING", "INFO", ""]),
+  customMessage: z.string().optional(),
+  triggerId: z.string(),
+  name: z.string().optional(),
+});
+
+type TriggerFormData = z.infer<typeof triggerFormSchema>;
+
+const TriggerForm = ({
+  control,
+  handleSubmit,
+  onClose,
+}: {
+  control: Control<TriggerFormData>;
+  handleSubmit: UseFormHandleSubmit<TriggerFormData>;
+  onClose: () => void;
+}) => {
+  const addCustomMessageMutation = api.trigger.addCustomMessage.useMutation();
+  const { project } = useOrganizationTeamProject();
+  const toast = useToast();
+
+  const onSubmit: SubmitHandler<TriggerFormData> = (data) => {
+    addCustomMessageMutation.mutate(
+      {
+        triggerId: data.triggerId,
+        message: data.customMessage ?? "",
+        alertType: data.alertType as AlertType,
+        projectId: project?.id ?? "",
+        name: data.name ?? "",
+      },
+      {
+        onSuccess: () => {
+          toast({
+            title: "Custom message",
+            status: "success",
+            description: "Custom message added",
+            duration: 5000,
+            isClosable: true,
+          });
+          onClose();
+        },
+        onError: () => {
+          toast({
+            title: "Custom message",
+            status: "error",
+            description: "Failed to add custom message",
+            duration: 5000,
+            isClosable: true,
+          });
+        },
+      }
+    );
+  };
+
+  return (
+    //eslint-disable-next-line @typescript-eslint/no-misused-promises
+    <form onSubmit={handleSubmit(onSubmit)}>
+      <VStack spacing={4} align="start" width="full">
+        <Text>
+          Create a customized message for this trigger. This will override the
+          default message for this trigger.
+        </Text>
+        <VStack width="full" align="start">
+          <SmallLabel>Title</SmallLabel>
+          <Controller
+            name="name"
+            control={control}
+            render={({ field }) => <Input {...field} />}
+          />
+        </VStack>
+        <VStack width="full" align="start">
+          <SmallLabel>Alert Type</SmallLabel>
+          <Controller
+            name="alertType"
+            control={control}
+            rules={{ required: "Alert type is required" }}
+            render={({ field }) => (
+              <Select {...field} placeholder="Select Alert Type">
+                <option value="INFO">Info</option>
+                <option value="WARNING">Warning</option>
+                <option value="CRITICAL">Critical</option>
+              </Select>
+            )}
+          />
+        </VStack>
+        <VStack width="full" align="start">
+          <SmallLabel>Alert Message</SmallLabel>
+          <Controller
+            name="customMessage"
+            control={control}
+            render={({ field }) => (
+              <Textarea {...field} placeholder="Your message" />
+            )}
+          />
+        </VStack>
+        <HStack width="full">
+          <Spacer />
+          <Button type="submit" colorScheme="orange">
+            Save Trigger
+          </Button>
+        </HStack>
+      </VStack>
+    </form>
+  );
+};

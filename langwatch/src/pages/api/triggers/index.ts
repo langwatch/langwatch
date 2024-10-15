@@ -1,9 +1,14 @@
-import { TriggerAction, type Project, type Trigger } from "@prisma/client";
+import {
+  type AlertType,
+  TriggerAction,
+  type Project,
+  type Trigger,
+} from "@prisma/client";
 import { type NextApiRequest, type NextApiResponse } from "next";
 import { getAllTracesForProject } from "~/server/api/routers/traces";
 import { sendTriggerEmail } from "~/server/mailer/triggerEmail";
 import { sendSlackWebhook } from "~/server/triggers/sendSlackWebhook";
-import { prisma } from "../../server/db";
+import { prisma } from "../../../server/db";
 
 import { type Trace } from "~/server/tracer/types";
 
@@ -120,6 +125,8 @@ const getTracesForAlert = async (trigger: Trigger, projects: Project[]) => {
         triggerData,
         triggerName: name,
         projectSlug: project!.slug,
+        triggerType: trigger.alertType as AlertType,
+        triggerMessage: trigger.message as string,
       };
 
       updatedAt = getLatestUpdatedAt(traces);
@@ -137,6 +144,8 @@ const getTracesForAlert = async (trigger: Trigger, projects: Project[]) => {
         triggerData,
         triggerName: name,
         projectSlug: project!.slug,
+        triggerType: trigger.alertType as AlertType,
+        triggerMessage: trigger.message as string,
       };
 
       updatedAt = getLatestUpdatedAt(traces);
