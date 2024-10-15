@@ -1,0 +1,1 @@
+../../../langwatch/langwatch/prisma/migrations/20241015145814_add_alert_type_and_message_to_triggers/migration.sql
