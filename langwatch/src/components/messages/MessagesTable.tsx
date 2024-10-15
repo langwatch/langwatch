@@ -241,6 +241,8 @@ export function MessagesTable() {
                     ? traceCheck.passed
                       ? "Passed"
                       : "Failed"
+                    : traceCheck.label !== undefined
+                    ? traceCheck.label
                     : traceCheck.score !== undefined
                     ? numeral(traceCheck.score).format("0.[00]")
                     : "N/A"}

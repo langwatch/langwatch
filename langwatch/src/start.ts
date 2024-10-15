@@ -42,7 +42,7 @@ export const metricsMiddleware = promBundle({
     }
     // @ts-ignore
     const nextMeta = req[Symbol.for("NextInternalRequestMeta")];
-    const nextJsPath = nextMeta.match?.definition?.pathname;
+    const nextJsPath = nextMeta?.match?.definition?.pathname;
     if (nextJsPath) {
       // Keep trpc request individual if they are not being lumped in together
       if (req.url?.includes("/trpc") && !req.url?.includes(",")) {

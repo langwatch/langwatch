@@ -23,6 +23,7 @@ const signatures: Signature[] = [
 const ALLOWED_EVALUATORS = [
   "ragas/answer_correctness",
   "ragas/answer_relevancy",
+  "ragas/faithfulness",
   "langevals/basic",
   "langevals/llm_boolean",
   "langevals/llm_score",

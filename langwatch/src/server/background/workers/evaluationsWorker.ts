@@ -213,9 +213,9 @@ export const runEvaluation = async ({
 
   const startTime = performance.now();
 
-  const response = await fetch(
-    `${env.LANGEVALS_ENDPOINT}/${checkType}/evaluate`,
-    {
+  let response;
+  try {
+    response = await fetch(`${env.LANGEVALS_ENDPOINT}/${checkType}/evaluate`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -233,8 +233,13 @@ export const runEvaluation = async ({
         settings: settings && typeof settings === "object" ? settings : {},
         env: evaluatorEnv,
       }),
+    });
+  } catch (error) {
+    if (error instanceof Error && error.message.includes("fetch failed")) {
+      throw new Error("Evaluator cannot be reached");
     }
-  );
+    throw error;
+  }
 
   const duration = performance.now() - startTime;
   evaluationDurationHistogram.labels(checkType).observe(duration);

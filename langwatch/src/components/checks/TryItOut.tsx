@@ -365,9 +365,9 @@ export function TryItOut({
                       <Th width="225px">Output</Th>
                       {evaluatorDefinition?.isGuardrail ? (
                         <Th width="120px">Passed</Th>
-                      ) : (
+                      ) : evaluatorDefinition?.result.score ? (
                         <Th width="120px">Score</Th>
-                      )}
+                      ) : null}
                       {hasAnyLabels && <Th width="120px">Label</Th>}
                       <Th width="250px">Details</Th>
                       <Th width="120px">Cost</Th>
@@ -521,21 +521,23 @@ export function TryItOut({
                                   <Td maxWidth="120" color={color}>
                                     {runningResult.passed ? "Pass" : "Fail"}
                                   </Td>
-                                ) : (
+                                ) : evaluatorDefinition?.result.score ? (
                                   <Td maxWidth="120" color={color}>
                                     {numeral(runningResult.score).format(
                                       "0.[00]"
                                     )}
                                   </Td>
-                                )}
-                                {hasAnyLabels && (
-                                  <Td maxWidth="120" color={color}>
-                                    {runningResult.status === "processed" &&
-                                    "label" in runningResult
-                                      ? runningResult.label
-                                      : "-"}
-                                  </Td>
-                                )}
+                                ) : null}
+                                {hasAnyLabels &&
+                                  (evaluatorDefinition?.isGuardrail ||
+                                    !!evaluatorDefinition?.result.score ||
+                                    runningResult.status === "processed") && (
+                                    <Td maxWidth="120" color={color}>
+                                      {"label" in runningResult
+                                        ? runningResult.label
+                                        : "-"}
+                                    </Td>
+                                  )}
                               </>
                             ) : i == firstPassingPrecondition ? (
                               <Td maxWidth="120">Waiting to run</Td>
