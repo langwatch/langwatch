@@ -5,16 +5,6 @@
   --color-border-muted: hsla(210, 18%, 87%, 1);
 }
 
-/* Dark theme. */
-@media (prefers-color-scheme: dark) {
-  :root {
-    --color-canvas-default: #0d1117;
-    --color-canvas-subtle: #161b22;
-    --color-border-default: #30363d;
-    --color-border-muted: #21262d;
-  }
-}
-
 .markdown {
   font-size: 14px;
 
