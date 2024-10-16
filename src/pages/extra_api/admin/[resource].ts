@@ -16,6 +16,11 @@ export default async function handler(
   if (req.body.resource === "organizations") {
     req.body.resource = "organization";
   }
+
+  if (req.body.resource === "organizationFeatures") {
+    req.body.resource = "organizationFeature";
+  }
+
   const result = await defaultHandler(req.body, prisma as any);
   res.json(result);
 }

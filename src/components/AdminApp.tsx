@@ -113,6 +113,14 @@ const AdminApp = () => {
         create={SubscriptionCreate}
         // add a add button to create a new subscription
       />
+      <Resource
+        name="organizationFeature"
+        list={ListGuesser}
+        edit={EditGuesser}
+        recordRepresentation="name"
+        hasCreate={true}
+        create={OrganizationFeatureCreate}
+      />
     </Admin>
   );
 };
@@ -178,4 +186,15 @@ const SubscriptionEdit = () => (
       <SubscriptionFromElements />
     </SimpleForm>
   </Edit>
+);
+
+const OrganizationFeatureCreate = () => (
+  <Create>
+    <SimpleForm>
+      <TextInput source="feature" label="Feature" />
+      <ReferenceInput source="organizationId" reference="organization">
+        <AutocompleteInput optionText="name" label="Organization" />
+      </ReferenceInput>
+    </SimpleForm>
+  </Create>
 );
