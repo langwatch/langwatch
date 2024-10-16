@@ -258,6 +258,7 @@ export function BasePropertiesPanel({
   children,
   fieldsAfter,
   hideInputs,
+  inputsTitle,
   hideOutputs,
   inputsReadOnly,
   outputsTitle,
@@ -268,6 +269,7 @@ export function BasePropertiesPanel({
   children?: React.ReactNode;
   fieldsAfter?: React.ReactNode;
   hideInputs?: boolean;
+  inputsTitle?: string;
   hideOutputs?: boolean;
   inputsReadOnly?: boolean;
   outputsTitle?: string;
@@ -428,7 +430,7 @@ export function BasePropertiesPanel({
             <PropertyFields
               node={node}
               field="inputs"
-              title="Inputs"
+              title={inputsTitle ?? "Inputs"}
               readOnly={inputsReadOnly}
             />
           )}

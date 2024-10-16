@@ -1,5 +1,5 @@
 import { DEFAULT_DATASET_NAME } from "../../components/datasets/DatasetTable";
-import type { Entry, Workflow } from "../types/dsl";
+import type { End, Entry, Signature, Workflow } from "../types/dsl";
 
 export const blankTemplate: Workflow = {
   spec_version: "1.0",
@@ -37,7 +37,43 @@ export const blankTemplate: Workflow = {
         },
       } satisfies Entry,
     },
+    {
+      id: "llm_call",
+      type: "signature",
+      position: { x: 300, y: 0 },
+      data: {
+        name: "LLM Call",
+        inputs: [{ identifier: "question", type: "str" }],
+        outputs: [{ identifier: "answer", type: "str" }],
+      } satisfies Signature,
+    },
+    {
+      id: "end",
+      type: "end",
+      position: { x: 600, y: 30 },
+      data: {
+        name: "End",
+        inputs: [{ identifier: "output", type: "str" }],
+      } satisfies End,
+    },
   ] satisfies Workflow["nodes"],
-  edges: [],
+  edges: [
+    {
+      id: "e0-1",
+      source: "entry",
+      sourceHandle: "outputs.question",
+      target: "llm_call",
+      targetHandle: "inputs.question",
+      type: "default",
+    },
+    {
+      id: "e1-2",
+      source: "llm_call",
+      sourceHandle: "outputs.answer",
+      target: "end",
+      targetHandle: "inputs.output",
+      type: "default",
+    },
+  ],
   state: {},
 };

@@ -1,29 +1,22 @@
 import {
   Box,
+  Button,
   Center,
   Flex,
   HStack,
   Text,
   Tooltip,
-  useTheme,
-  VStack,
   useDisclosure,
-  Button,
-  Modal,
-  ModalBody,
-  ModalCloseButton,
-  ModalContent,
-  ModalFooter,
-  ModalHeader,
-  ModalOverlay,
+  useTheme,
+  VStack
 } from "@chakra-ui/react";
 import {
   Background,
   BackgroundVariant,
   Controls,
+  Panel as FlowPanel,
   ReactFlow,
   ReactFlowProvider,
-  Panel as FlowPanel,
 } from "@xyflow/react";
 
 import { DndProvider, useDrop } from "react-dnd";
@@ -33,6 +26,7 @@ import { Link } from "@chakra-ui/next-js";
 import "@xyflow/react/dist/style.css";
 import Head from "next/head";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { TrendingUp } from "react-feather";
 import {
   Panel,
   PanelGroup,
@@ -40,42 +34,37 @@ import {
   type ImperativePanelHandle,
 } from "react-resizable-panels";
 import { useShallow } from "zustand/react/shallow";
+import { CurrentDrawer } from "../../components/CurrentDrawer";
 import { LogoIcon } from "../../components/icons/LogoIcon";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { titleCase } from "../../utils/stringCasing";
+import { useAskBeforeLeaving } from "../hooks/useAskBeforeLeaving";
 import { useSocketClient } from "../hooks/useSocketClient";
 import { useWorkflowStore } from "../hooks/useWorkflowStore";
 import { AutoSave } from "./AutoSave";
+import { PlaygroundButton } from "./ChatWindow";
 import DefaultEdge from "./Edge";
 import { Evaluate } from "./Evaluate";
+import { RunningStatus } from "./ExecutionState";
 import { History } from "./History";
-import { EntryNode } from "./nodes/EntryNode";
-import { EvaluatorNode } from "./nodes/EvaluatorNode";
+import { NodeComponents } from "./nodes";
 import {
   CustomDragLayer,
   NodeSelectionPanel,
   NodeSelectionPanelButton,
 } from "./NodeSelectionPanel";
-import { SignatureNode } from "./nodes/SignatureNode";
+import { Optimize } from "./Optimize";
 import { ProgressToast } from "./ProgressToast";
 import { PropertiesPanel } from "./properties/PropertiesPanel";
+import { Publish } from "./Publish";
 import { ResultsPanel } from "./ResultsPanel";
 import { UndoRedo } from "./UndoRedo";
-import { useAskBeforeLeaving } from "../hooks/useAskBeforeLeaving";
-import { RunningStatus } from "./ExecutionState";
-import { CurrentDrawer } from "../../components/CurrentDrawer";
-import { Optimize } from "./Optimize";
-import { ChatWindow, PlaygroundButton } from "./ChatWindow";
-import { Play, TrendingUp } from "react-feather";
-import { NodeComponents } from "./nodes";
-import { Publish } from "./Publish";
-import { ChatBox } from "./ChatWindow";
 
 // New component that uses useDrop
 function DragDropArea({ children }: { children: React.ReactNode }) {
   const [{ canDrop }, drop] = useDrop(() => ({
     accept: "node",
-    drop: (item, monitor) => {
+    drop: (_item, monitor) => {
       const clientOffset = monitor.getClientOffset();
       if (clientOffset) {
         const { x, y } = clientOffset;

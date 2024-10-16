@@ -176,7 +176,8 @@ export const ComponentNode = forwardRef(function ComponentNode(
     icon?: React.ReactNode;
     children?: React.ReactNode;
     fieldsAfter?: React.ReactNode;
-    outputsName?: string;
+    inputsTitle?: string;
+    outputsTitle?: string;
     hidePlayButton?: boolean;
     hideOutputHandles?: boolean;
   },
@@ -254,7 +255,7 @@ export const ComponentNode = forwardRef(function ComponentNode(
       {props.children}
       {props.data.inputs && (
         <>
-          <NodeSectionTitle>Inputs</NodeSectionTitle>
+          <NodeSectionTitle>{props.inputsTitle ?? "Inputs"}</NodeSectionTitle>
           <NodeInputs
             namespace="inputs"
             inputs={props.data.inputs}
@@ -264,7 +265,7 @@ export const ComponentNode = forwardRef(function ComponentNode(
       )}
       {props.data.outputs && (
         <>
-          <NodeSectionTitle>{props.outputsName ?? "Outputs"}</NodeSectionTitle>
+          <NodeSectionTitle>{props.outputsTitle ?? "Outputs"}</NodeSectionTitle>
           <NodeOutputs
             namespace="outputs"
             outputs={props.data.outputs}

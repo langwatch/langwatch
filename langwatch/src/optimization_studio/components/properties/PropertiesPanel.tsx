@@ -13,6 +13,7 @@ import { BasePropertiesPanel } from "./BasePropertiesPanel";
 import { WorkflowPropertiesPanel } from "./WorkflowPropertiesPanel";
 import { SignaturePropertiesPanel } from "./SignaturePropertiesPanel";
 import { EvaluatorPropertiesPanel } from "./EvaluatorPropertiesPanel";
+import { EndPropertiesPanel } from "./EndPropertiesPanel";
 
 export function PropertiesPanel() {
   const {
@@ -34,7 +35,7 @@ export function PropertiesPanel() {
     React.FC<{ node: Node<Component> }>
   > = {
     entry: EntryPointPropertiesPanel,
-    end: BasePropertiesPanel,
+    end: EndPropertiesPanel as React.FC<{ node: Node<Component> }>,
     signature: SignaturePropertiesPanel,
     module: BasePropertiesPanel,
     retriever: BasePropertiesPanel,

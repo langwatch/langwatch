@@ -36,7 +36,7 @@ class WorkflowModule(ReportingModule):
         self.inputs = inputs
 
         for node in self.workflow.nodes:
-            if node.type not in ["entry", "end"]:
+            if node.type not in ["entry"]:
                 component = parse_component(node, workflow)
                 self.components[node.id] = component
                 setattr(self, validate_identifier(node.id), self.components[node.id])
@@ -75,8 +75,6 @@ class WorkflowModule(ReportingModule):
     ):
         if node.type == "entry":
             return inputs
-        elif node.type == "end":
-            return None
 
         component = self.components[node.id]
         input_args = {}
@@ -131,8 +129,7 @@ class WorkflowModule(ReportingModule):
             executable_nodes = [
                 node
                 for node in self.workflow.nodes
-                if node.type != "end"
-                and node.type != "entry"
+                if node.type != "entry"
                 and (node.type != "evaluator" or self.manual_execution_mode)
             ]
             loops = 0

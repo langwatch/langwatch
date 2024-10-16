@@ -110,7 +110,17 @@ export type Evaluator = Omit<BaseComponent, "cls"> & {
   evaluator?: string;
 };
 
-export type Component = BaseComponent | Entry | Signature | Module | Evaluator;
+export type End = BaseComponent & {
+  outputs?: never;
+};
+
+export type Component =
+  | BaseComponent
+  | Entry
+  | Signature
+  | Module
+  | Evaluator
+  | End;
 
 type Flow = {
   nodes: Node<Component>[];

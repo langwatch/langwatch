@@ -3,7 +3,7 @@ from typing import Any, Dict, List
 from langwatch_nlp.studio.dspy.predict_with_metadata import PredictWithMetadata
 from langwatch_nlp.studio.modules.evaluators.langwatch import LangWatchEvaluator
 from langwatch_nlp.studio.modules.registry import MODULES
-from langwatch_nlp.studio.types.dsl import Evaluator, Node, Signature, Workflow
+from langwatch_nlp.studio.types.dsl import End, Evaluator, Node, Signature, Workflow
 import dspy
 
 from langwatch_nlp.studio.utils import (
@@ -18,6 +18,8 @@ def parse_component(node: Node, workflow: Workflow) -> dspy.Module:
             return parse_signature(node.id, node.data, workflow)()
         case "evaluator":
             return parse_evaluator(node.data, workflow)
+        case "end":
+            return parse_end(node.data, workflow)
         case _:
             raise NotImplementedError(f"Unknown component type: {node.type}")
 
@@ -97,3 +99,11 @@ def parse_evaluator(component: Evaluator, workflow: Workflow) -> dspy.Module:
         )
 
     return MODULES["evaluator"][component.cls]()
+
+
+def parse_end(_component: End, _workflow: Workflow) -> dspy.Module:
+    class EndNode(dspy.Module):
+        def forward(self, **kwargs) -> Any:
+            return kwargs
+
+    return EndNode()

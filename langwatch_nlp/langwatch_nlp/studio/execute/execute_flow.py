@@ -45,57 +45,61 @@ async def execute_flow(
     # TODO: handle workflow errors here throwing an special event showing the error was during the execution of the workflow?
     yield start_workflow_event(workflow, trace_id)
 
-    with langwatch.trace(
-        trace_id=event.trace_id,
-        api_key=event.workflow.api_key,
-        skip_root_span=True,
-    ) as trace:
-        trace.autotrack_dspy()
+    try:
+        with langwatch.trace(
+            trace_id=event.trace_id,
+            api_key=event.workflow.api_key,
+            skip_root_span=True,
+        ) as trace:
+            trace.autotrack_dspy()
 
-        module = WorkflowModule(
-            workflow,
-            manual_execution_mode=manual_execution_mode,
-            until_node_id=until_node_id,
-            inputs=inputs[0] if inputs else None,
-        )
-        module.set_reporting(queue=queue, trace_id=trace_id, workflow=workflow)
-
-        entry_node = cast(
-            EntryNode,
-            next(node for node in workflow.nodes if isinstance(node.data, Entry)),
-        )
-        if not entry_node.data.dataset:
-            raise ValueError("Missing dataset in entry node")
-
-        if inputs:
-            entries = inputs
-
-        else:
-            if not entry_node.data.dataset.inline:
-                raise ValueError("Missing inline dataset in entry node")
-            entries = transpose_inline_dataset_to_object_list(
-                entry_node.data.dataset.inline
+            module = WorkflowModule(
+                workflow,
+                manual_execution_mode=manual_execution_mode,
+                until_node_id=until_node_id,
+                inputs=inputs[0] if inputs else None,
             )
+            module.set_reporting(queue=queue, trace_id=trace_id, workflow=workflow)
 
-        if len(entries) == 0:
-            raise ClientReadableValueError(
-                "Dataset is empty, please add at least one entry and try again"
+            entry_node = cast(
+                EntryNode,
+                next(node for node in workflow.nodes if isinstance(node.data, Entry)),
             )
+            if not entry_node.data.dataset:
+                raise ValueError("Missing dataset in entry node")
 
-        try:
-            result = module(**entries[0])
+            if inputs:
+                entries = inputs
 
-        except Exception as e:
-            yield error_workflow_event(trace_id, str(e))
-            return
+            else:
+                if not entry_node.data.dataset.inline:
+                    raise ValueError("Missing inline dataset in entry node")
+                entries = transpose_inline_dataset_to_object_list(
+                    entry_node.data.dataset.inline
+                )
 
-    # cost = result.get_cost() if hasattr(result, "get_cost") else None
+            if len(entries) == 0:
+                raise ClientReadableValueError(
+                    "Dataset is empty, please add at least one entry and try again"
+                )
 
-    print("result", result)
+            try:
+                result = module(**entries[0])
 
-    yield end_workflow_event(workflow, trace_id, result)
+            except Exception as e:
+                import traceback
 
-    trace.send_spans()
+                traceback.print_exc()
+                yield error_workflow_event(trace_id, str(e))
+                return
+
+        # cost = result.get_cost() if hasattr(result, "get_cost") else None
+
+        print("result", result)
+
+        yield end_workflow_event(workflow, trace_id, result)
+    finally:
+        trace.send_spans()
 
 
 def start_workflow_event(workflow: Workflow, trace_id: str):

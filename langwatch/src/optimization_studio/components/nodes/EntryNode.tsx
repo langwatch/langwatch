@@ -25,7 +25,7 @@ export const EntryNode = forwardRef(function EntryNode(
   });
 
   return (
-    <ComponentNode ref={ref} {...props} outputsName="Fields" hidePlayButton>
+    <ComponentNode ref={ref} {...props} outputsTitle="Fields" hidePlayButton>
       <NodeSectionTitle>
         Dataset{" "}
         {total && (

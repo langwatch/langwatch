@@ -1,5 +1,5 @@
 import { Box } from "@chakra-ui/react";
-import { Check, Home, Shield } from "react-feather";
+import { Check, Flag, Home, Shield, Box as BoxIcon } from "react-feather";
 import { EqualsIcon } from "../../components/icons/EqualsIcon";
 import { LLMIcon } from "../../components/icons/LLMIcon";
 import type { ComponentType } from "../types/dsl";
@@ -75,11 +75,11 @@ export const ComponentIcon = ({
   const componentIconMap: Record<ComponentType, React.ReactNode> = {
     signature: <LLMIcon />,
     entry: <Home />,
-    module: <Box />,
-    retriever: <Box />,
-    prompting_technique: <Box />,
+    module: <BoxIcon />,
+    retriever: <BoxIcon />,
+    prompting_technique: <BoxIcon />,
     evaluator: <EvaluatorIcon cls={cls} />,
-    end: <Box />,
+    end: <Flag />,
   };
 
   const componentColorMap: Record<ComponentType, string> = {
@@ -89,7 +89,7 @@ export const ComponentIcon = ({
     retriever: "gray.400",
     prompting_technique: "gray.400",
     evaluator: "#5FD15D",
-    end: "gray.400",
+    end: "orange.400",
   };
 
   return (

@@ -1,5 +1,5 @@
 import { DEFAULT_DATASET_NAME } from "../../components/datasets/DatasetTable";
-import type { Entry, Evaluator, Workflow } from "../types/dsl";
+import type { End, Entry, Evaluator, Workflow } from "../types/dsl";
 
 export const simpleRagTemplate: Workflow = {
   spec_version: "1.0",
@@ -48,7 +48,7 @@ export const simpleRagTemplate: Workflow = {
     {
       id: "generate_query",
       type: "signature",
-      position: { x: 300, y: 300 },
+      position: { x: 300, y: 0 },
       data: {
         name: "GenerateQuery",
         inputs: [{ identifier: "question", type: "str" }],
@@ -58,7 +58,7 @@ export const simpleRagTemplate: Workflow = {
     {
       id: "generate_answer",
       type: "signature",
-      position: { x: 600, y: 300 },
+      position: { x: 600, y: 0 },
       data: {
         name: "GenerateAnswer",
         inputs: [
@@ -85,6 +85,15 @@ export const simpleRagTemplate: Workflow = {
         ],
       } satisfies Evaluator,
     },
+    {
+      id: "end",
+      type: "end",
+      position: { x: 900, y: 0 },
+      data: {
+        name: "End",
+        inputs: [{ identifier: "output", type: "str" }],
+      } satisfies End,
+    },
   ] satisfies Workflow["nodes"],
   edges: [
     {
@@ -109,6 +118,30 @@ export const simpleRagTemplate: Workflow = {
       sourceHandle: "outputs.question",
       target: "generate_answer",
       targetHandle: "inputs.question",
+      type: "default",
+    },
+    {
+      id: "e3-4",
+      source: "generate_answer",
+      sourceHandle: "outputs.answer",
+      target: "end",
+      targetHandle: "inputs.output",
+      type: "default",
+    },
+    {
+      id: "e4-5",
+      source: "entry",
+      sourceHandle: "outputs.gold_answer",
+      target: "exact_match",
+      targetHandle: "inputs.expected_output",
+      type: "default",
+    },
+    {
+      id: "e5-6",
+      source: "generate_answer",
+      sourceHandle: "outputs.answer",
+      target: "exact_match",
+      targetHandle: "inputs.output",
       type: "default",
     },
   ],
