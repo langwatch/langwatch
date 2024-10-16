@@ -20,6 +20,7 @@ import {
   Edit,
   ReferenceInput,
   AutocompleteInput,
+  required,
 } from "../../langwatch/langwatch/node_modules/react-admin";
 import { dataProvider } from "ra-data-simple-prisma";
 import type { User } from "@prisma/client";
@@ -130,8 +131,18 @@ export default AdminApp;
 const SubscriptionFromElements = () => {
   return (
     <>
-      <ReferenceInput source="organizationId" reference="organization">
-        <AutocompleteInput optionText="name" label="Organization" />
+      <ReferenceInput
+        source="organizationId"
+        reference="organization"
+        perPage={100}
+        sort={{ field: "name", order: "ASC" }}
+      >
+        <AutocompleteInput
+          optionText="name"
+          label="Organization"
+          validate={required()}
+          filterToQuery={(searchText) => ({ name: searchText })}
+        />
       </ReferenceInput>
       <SelectInput
         source="plan"
@@ -191,9 +202,27 @@ const SubscriptionEdit = () => (
 const OrganizationFeatureCreate = () => (
   <Create>
     <SimpleForm>
-      <TextInput source="feature" label="Feature" />
-      <ReferenceInput source="organizationId" reference="organization">
-        <AutocompleteInput optionText="name" label="Organization" />
+      <TextInput
+        source="feature"
+        label="Feature"
+        isRequired={true}
+        validate={(value) => {
+          if (!value) return "Feature is required";
+          return undefined;
+        }}
+      />
+      <ReferenceInput
+        source="organizationId"
+        reference="organizations"
+        perPage={100}
+        sort={{ field: "name", order: "ASC" }}
+      >
+        <AutocompleteInput
+          optionText="name"
+          label="Organization"
+          validate={required()}
+          filterToQuery={(searchText) => ({ name: searchText })} // Improve filtering
+        />
       </ReferenceInput>
     </SimpleForm>
   </Create>
