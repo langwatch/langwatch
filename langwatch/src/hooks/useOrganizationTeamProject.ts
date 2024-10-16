@@ -238,6 +238,7 @@ export const useOrganizationTeamProject = (
       hasTeamPermission: () => false,
       hasOrganizationPermission: () => false,
       isPublicRoute,
+      isOrganizationFeatureEnabled: () => false,
     };
   }
 
@@ -267,6 +268,10 @@ export const useOrganizationTeamProject = (
     );
   };
 
+  const isOrganizationFeatureEnabled = (feature: string): boolean => {
+    return organization?.features?.some((f) => f.feature === feature) ?? false;
+  };
+
   return {
     isLoading: false,
     isRefetching: organizations.isRefetching,
@@ -278,5 +283,6 @@ export const useOrganizationTeamProject = (
     hasTeamPermission,
     isPublicRoute,
     modelProviders: modelProviders.data,
+    isOrganizationFeatureEnabled,
   };
 };

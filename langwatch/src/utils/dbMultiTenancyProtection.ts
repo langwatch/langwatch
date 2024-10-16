@@ -12,6 +12,7 @@ const EXEMPT_MODELS = [
   "OrganizationInvite",
   "Project",
   "Subscription",
+  "OrganizationFeature",
 ];
 
 const _guardProjectId = ({ params }: { params: Prisma.MiddlewareParams }) => {

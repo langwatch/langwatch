@@ -142,6 +142,7 @@ model Organization {
     usageSpendingMaxLimit Int?
 
     promoCode String?
+    features  OrganizationFeature[]
 }
 
 enum PIIRedactionLevel {
@@ -564,4 +565,17 @@ model WorkflowVersion {
     @@index([parentId])
     @@index([authorId])
     @@index([createdAt])
+}
+
+model OrganizationFeature {
+    id             String       @id @default(nanoid())
+    feature        String
+    organizationId String
+    organization   Organization @relation(fields: [organizationId], references: [id])
+    createdAt      DateTime     @default(now())
+    updatedAt      DateTime     @default(now()) @updatedAt
+
+    @@unique([feature, organizationId])
+    @@index([feature])
+    @@index([organizationId])
 }

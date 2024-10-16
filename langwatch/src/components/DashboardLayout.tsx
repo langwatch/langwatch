@@ -51,7 +51,6 @@ import { dependencies } from "../injection/dependencies.client";
 import { OrganizationRoleGroup } from "../server/api/permission";
 import type { FullyLoadedOrganization } from "../server/api/routers/organization";
 import { api } from "../utils/api";
-import { isFeatureEnabled } from "../utils/featureFlags";
 import { findCurrentRoute, projectRoutes, type Route } from "../utils/routes";
 import { CurrentDrawer } from "./CurrentDrawer";
 import { LoadingScreen } from "./LoadingScreen";
@@ -324,6 +323,7 @@ export const DashboardLayout = ({
     project,
     hasOrganizationPermission,
     isPublicRoute,
+    isOrganizationFeatureEnabled,
   } = useOrganizationTeamProject();
   const usage = api.limits.getUsage.useQuery(
     { organizationId: organization?.id ?? "" },
@@ -384,7 +384,7 @@ export const DashboardLayout = ({
           </Box>
 
           <VStack spacing={8}>
-            {isFeatureEnabled("NEXT_PUBLIC_FEATURE_OPTIMIZATION_STUDIO") && (
+            {isOrganizationFeatureEnabled("OPTIMIZATION_STUDIO") && (
               <SideMenuLink
                 path={projectRoutes.workflows.path}
                 icon={PuzzleIcon}

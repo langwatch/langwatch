@@ -33,9 +33,14 @@ export type TeamWithProjectsAndMembers = TeamWithProjects & {
   members: TeamUser[];
 };
 
+export type OrganizationFeature = {
+  feature: string;
+};
+
 export type FullyLoadedOrganization = Organization & {
   members: OrganizationUser[];
   teams: TeamWithProjectsAndMembers[];
+  features: OrganizationFeature[];
 };
 
 export type TeamMemberWithUser = TeamUser & {
@@ -198,6 +203,7 @@ export const organizationRouter = createTRPCRouter({
           },
           include: {
             members: true,
+            features: true,
             teams: {
               include: {
                 members: true,
