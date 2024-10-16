@@ -15,7 +15,8 @@ export const camelCaseToTitleCase = (input: string): string => {
 };
 
 // Special cases (acronyms etc.)
-const accronyms = /(\b(llm|rag|id|ip|iban|vat|pii|url|nrp|us|uk|es|it|pl|sg|au|in|fi|itin|ssn|nhs|nif|nie|nric|uen|abn|acn|tfn)\b)/gi;
+const accronyms =
+  /(\b(llm|rag|id|ip|iban|vat|pii|url|nrp|us|uk|es|it|pl|sg|au|in|fi|itin|ssn|nhs|nif|nie|nric|uen|abn|acn|tfn)\b)/gi;
 
 export const titleCase = (input: string): string => {
   return input
@@ -37,3 +38,10 @@ export const uppercaseFirstLetter = (input: string): string => {
 
 export const camelCaseToLowerCase = (input: string): string =>
   camelCaseToTitleCase(input).toLowerCase();
+
+// https://stackoverflow.com/a/77731548/996404
+export const camelCaseToSnakeCase = (input: string): string => {
+  return input
+    .replace(/(([a-z])(?=[A-Z][a-zA-Z])|([A-Z])(?=[A-Z][a-z]))/g, "$1_")
+    .toLowerCase();
+};

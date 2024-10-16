@@ -20,6 +20,7 @@ export const blankTemplate: Workflow = {
         x: 0,
         y: 0,
       },
+      deletable: false,
       data: {
         name: "Entry",
         outputs: [{ identifier: "question", type: "str" }],
@@ -51,6 +52,7 @@ export const blankTemplate: Workflow = {
       id: "end",
       type: "end",
       position: { x: 600, y: 30 },
+      deletable: false,
       data: {
         name: "End",
         inputs: [{ identifier: "output", type: "str" }],

@@ -18,6 +18,7 @@ export const simpleRagTemplate: Workflow = {
       id: "entry",
       type: "entry",
       position: { x: 0, y: 0 },
+      deletable: false,
       data: {
         name: "Entry",
         outputs: [
@@ -89,6 +90,7 @@ export const simpleRagTemplate: Workflow = {
       id: "end",
       type: "end",
       position: { x: 900, y: 0 },
+      deletable: false,
       data: {
         name: "End",
         inputs: [{ identifier: "output", type: "str" }],

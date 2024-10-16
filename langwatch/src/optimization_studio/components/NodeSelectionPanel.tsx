@@ -1,17 +1,17 @@
 import { DragHandleIcon } from "@chakra-ui/icons";
 import { Box, Button, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
 import { useReactFlow, type Node, type XYPosition } from "@xyflow/react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useDrag, useDragLayer } from "react-dnd";
+import { getEmptyImage } from "react-dnd-html5-backend";
 import { Box as BoxIcon, ChevronsLeft } from "react-feather";
-import { NodeComponents } from "./nodes";
 import { HoverableBigText } from "../../components/HoverableBigText";
 import { useWorkflowStore } from "../hooks/useWorkflowStore";
 import { MODULES } from "../registry";
 import { type Component, type ComponentType } from "../types/dsl";
+import { findLowestAvailableName } from "../utils/nodeUtils";
 import { ComponentIcon } from "./ColorfulBlockIcons";
-import { getEmptyImage } from "react-dnd-html5-backend";
-import { nameToId } from "../utils/nodeUtils";
+import { NodeComponents } from "./nodes";
 
 export function NodeSelectionPanelButton({
   isOpen,
@@ -112,27 +112,6 @@ export const NodeSelectionPanel = ({
       </VStack>
     </Box>
   );
-};
-
-const findLowestAvailableName = (nodes: Node[], prefix: string) => {
-  const findNode = (id: string) => {
-    return nodes.find((node) => node.id === id);
-  };
-
-  let i = 1;
-  let name;
-  let id;
-  do {
-    if (i === 1) {
-      name = prefix;
-    } else {
-      name = `${prefix} (${i})`;
-    }
-    id = nameToId(name);
-    i++;
-  } while (findNode(id));
-
-  return { name, id };
 };
 
 export const NodeDraggable = (props: {

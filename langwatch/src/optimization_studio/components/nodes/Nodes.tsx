@@ -23,7 +23,15 @@ import {
   type Node,
   type NodeProps,
 } from "@xyflow/react";
-import { Check, Play, Square, X } from "react-feather";
+import {
+  Check,
+  Copy,
+  MoreHorizontal,
+  Play,
+  Square,
+  Trash2,
+  X,
+} from "react-feather";
 import { PulseLoader } from "react-spinners";
 import { useDebounceValue } from "usehooks-ts";
 import { useComponentExecution } from "../../hooks/useComponentExecution";
@@ -36,6 +44,7 @@ import {
 import { ComponentIcon } from "../ColorfulBlockIcons";
 import { useWorkflowExecution } from "../../hooks/useWorkflowExecution";
 import type { Ref } from "react";
+import { useShallow } from "zustand/react/shallow";
 
 export function getNodeDisplayName(node: { id: string; data: Component }) {
   return node.data.name ?? node.data.cls ?? node.id;
@@ -189,20 +198,30 @@ export const ComponentNode = forwardRef(function ComponentNode(
     setHoveredNodeId,
     setSelectedNode,
     setPropertiesExpanded,
+    deleteNode,
+    duplicateNode,
   } = useWorkflowStore(
-    ({
-      nodes,
-      hoveredNodeId,
-      setHoveredNodeId,
-      setSelectedNode,
-      setPropertiesExpanded,
-    }) => ({
-      node: nodes.find((node) => node.id === props.id),
-      hoveredNodeId,
-      setHoveredNodeId,
-      setSelectedNode,
-      setPropertiesExpanded,
-    })
+    useShallow(
+      ({
+        nodes,
+        hoveredNodeId,
+        setHoveredNodeId,
+        setSelectedNode,
+        setPropertiesExpanded,
+        setNodes,
+        deleteNode,
+        duplicateNode,
+      }) => ({
+        node: nodes.find((node) => node.id === props.id),
+        hoveredNodeId,
+        setHoveredNodeId,
+        setSelectedNode,
+        setPropertiesExpanded,
+        setNodes,
+        deleteNode,
+        duplicateNode,
+      })
+    )
   );
   const isHovered = hoveredNodeId === props.id;
 
@@ -232,6 +251,44 @@ export const ComponentNode = forwardRef(function ComponentNode(
         }
       }}
     >
+      {props.selected && !["entry", "end"].includes(props.type) && (
+        <Menu placement="top-start" size="xs" autoSelect={false}>
+          <MenuButton
+            background="white"
+            position="absolute"
+            top="-26px"
+            right={1}
+            paddingX={1}
+            paddingY={1}
+            borderRadius={6}
+            minWidth="auto"
+            minHeight="auto"
+            boxShadow="sm"
+          >
+            <MoreHorizontal size={11} />
+          </MenuButton>
+          <NodeToolbar>
+            <MenuList>
+              <MenuItem
+                icon={<Copy size={14} />}
+                onClick={() => {
+                  duplicateNode(props.id);
+                }}
+              >
+                Duplicate
+              </MenuItem>
+              <MenuItem
+                icon={<Trash2 size={14} />}
+                onClick={() => {
+                  deleteNode(props.id);
+                }}
+              >
+                Delete
+              </MenuItem>
+            </MenuList>
+          </NodeToolbar>
+        </Menu>
+      )}
       <HStack spacing={2} width="full">
         <ComponentIcon
           type={props.type as ComponentType}

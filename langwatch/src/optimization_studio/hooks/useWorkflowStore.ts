@@ -19,6 +19,7 @@ import type {
   LLMConfig,
   Workflow,
 } from "../types/dsl";
+import { findLowestAvailableName } from "../utils/nodeUtils";
 
 export type SocketStatus =
   | "disconnected"
@@ -34,7 +35,11 @@ type State = Workflow & {
   triggerValidation: boolean;
   workflowSelected: boolean;
   previousWorkflow: Workflow | undefined;
-  openResultsPanelRequest: "evaluations" | "optimizations" | "closed" | undefined;
+  openResultsPanelRequest:
+    | "evaluations"
+    | "optimizations"
+    | "closed"
+    | undefined;
 };
 
 type WorkflowStore = State & {
@@ -49,6 +54,8 @@ type WorkflowStore = State & {
   setNodes: (nodes: Node[]) => void;
   setEdges: (edges: Edge[]) => void;
   setNode: (node: Partial<Node> & { id: string }, newId?: string) => void;
+  deleteNode: (id: string) => void;
+  duplicateNode: (id: string) => void;
   setComponentExecutionState: (
     id: string,
     executionState: BaseComponent["execution_state"]
@@ -180,6 +187,45 @@ const store = (
         edges: get().edges,
       })
     );
+  },
+  deleteNode: (id: string) => {
+    set(
+      removeInvalidEdges({
+        nodes: get().nodes.filter((node) => node.id !== id),
+        edges: get().edges,
+      })
+    );
+  },
+  duplicateNode: (id: string) => {
+    const currentNode = get().nodes.find((node) => node.id === id);
+    if (!currentNode) {
+      return;
+    }
+
+    const { name: newName, id: newId } = findLowestAvailableName(
+      get().nodes,
+      currentNode.data.name?.replace(/ \(.*?\)$/, "") ?? "Component"
+    );
+
+    const newNode = {
+      ...currentNode,
+      id: newId,
+      selected: false,
+      dragging: false,
+      measured: undefined,
+      position: {
+        x: currentNode.position.x + 250 + Math.round(Math.random() * 20),
+        y: currentNode.position.y + Math.round(Math.random() * 20),
+      },
+      data: {
+        ...currentNode.data,
+        name: newName,
+        execution_state: undefined,
+      },
+    };
+    set({
+      nodes: [...get().nodes, newNode],
+    });
   },
   setComponentExecutionState: (
     id: string,
