@@ -1,9 +1,18 @@
-import os
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 from langwatch_nlp.studio.dspy.predict_with_metadata import PredictWithMetadata
+from langwatch_nlp.studio.dspy.retrieve import ContextsRetriever
 from langwatch_nlp.studio.modules.evaluators.langwatch import LangWatchEvaluator
-from langwatch_nlp.studio.modules.registry import MODULES
-from langwatch_nlp.studio.types.dsl import End, Evaluator, Node, Signature, Workflow
+from langwatch_nlp.studio.modules.registry import EVALUATORS, RETRIEVERS
+from langwatch_nlp.studio.types.dsl import (
+    End,
+    Evaluator,
+    Field,
+    FieldType,
+    Node,
+    Retriever,
+    Signature,
+    Workflow,
+)
 import dspy
 
 from langwatch_nlp.studio.utils import (
@@ -16,6 +25,8 @@ def parse_component(node: Node, workflow: Workflow) -> dspy.Module:
     match node.type:
         case "signature":
             return parse_signature(node.id, node.data, workflow)()
+        case "retriever":
+            return parse_retriever(node.id, node.data, workflow)
         case "evaluator":
             return parse_evaluator(node.data, workflow)
         case "end":
@@ -60,7 +71,7 @@ def parse_signature(
         PredictWithMetadata.__init__(self, SignatureClass)
         self.set_lm(lm=lm)
         self._node_id = node_id
-        if component.demonstrations:
+        if component.demonstrations and component.demonstrations.inline:
             demos: List[Dict[str, Any]] = transpose_inline_dataset_to_object_list(
                 component.demonstrations.inline
             )
@@ -84,11 +95,7 @@ def parse_evaluator(component: Evaluator, workflow: Workflow) -> dspy.Module:
         raise ValueError("Evaluator class not specified")
 
     if component.cls == "LangWatchEvaluator":
-        settings = {
-            field.identifier: field.defaultValue
-            for field in (component.parameters or [])
-            if field.defaultValue
-        }
+        settings = parse_fields(component.parameters or [])
         if not component.evaluator:
             raise ValueError("Evaluator not specified")
         return LangWatchEvaluator(
@@ -98,7 +105,7 @@ def parse_evaluator(component: Evaluator, workflow: Workflow) -> dspy.Module:
             settings=settings,
         )
 
-    return MODULES["evaluator"][component.cls]()
+    return EVALUATORS[component.cls]()
 
 
 def parse_end(_component: End, _workflow: Workflow) -> dspy.Module:
@@ -107,3 +114,33 @@ def parse_end(_component: End, _workflow: Workflow) -> dspy.Module:
             return kwargs
 
     return EndNode()
+
+
+def parse_retriever(
+    node_id: str, component: Retriever, workflow: Workflow
+) -> dspy.Module:
+    if not component.cls:
+        raise ValueError("Retriever class not specified")
+
+    kwargs = parse_fields(component.parameters or [])
+    return ContextsRetriever(rm=RETRIEVERS[component.cls], **kwargs)
+
+
+def parse_fields(fields: List[Field]) -> Dict[str, Any]:
+    return {
+        field.identifier: field.defaultValue for field in fields if field.defaultValue
+    }
+
+
+def parse_field_value(field: Field) -> Optional[Any]:
+    if field.defaultValue is None or field.defaultValue == "":
+        return None
+    if field.type == FieldType.int:
+        return int(field.defaultValue)
+    if field.type == FieldType.float:
+        return float(field.defaultValue)
+    if field.type == FieldType.bool:
+        return bool(field.defaultValue)
+    if field.type == FieldType.str:
+        return str(field.defaultValue)
+    return field.defaultValue

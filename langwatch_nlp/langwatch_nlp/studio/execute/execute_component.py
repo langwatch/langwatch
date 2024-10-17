@@ -29,5 +29,10 @@ async def execute_component(event: ExecuteComponentPayload):
         cost = result.get_cost() if hasattr(result, "get_cost") else None
 
         yield end_component_event(node, event.trace_id, dict(result), cost)
+    except Exception as e:
+        import traceback
+
+        traceback.print_exc()
+        raise e
     finally:
         trace.send_spans()
