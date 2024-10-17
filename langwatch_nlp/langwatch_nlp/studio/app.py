@@ -304,7 +304,11 @@ async def execute_sync(event: StudioClientEvent):
                 return {
                     "trace_id": response.payload.execution_state.trace_id,
                     "status": "success",
-                    "output": response.payload.execution_state.result,
+                    "result": (
+                        response.payload.execution_state.result.get("end")
+                        if response.payload.execution_state.result
+                        else None
+                    ),
                 }
             elif status == "error":
                 raise HTTPException(

@@ -25,7 +25,6 @@ import { useForm } from "react-hook-form";
 import { SmallLabel } from "~/components/SmallLabel";
 import { api } from "~/utils/api";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import { titleCase } from "../../utils/stringCasing";
 import { useWorkflowExecution } from "../hooks/useWorkflowExecution";
 import { useWorkflowStore } from "../hooks/useWorkflowStore";
 import { RunningStatus } from "./ExecutionState";
@@ -44,12 +43,10 @@ interface ChatWindowProps {
 }
 
 export const PlaygroundButton = ({
-  onClick,
   nodes,
   edges,
   executionStatus,
 }: {
-  onClick: () => void;
   nodes: Node[];
   edges: Edge[];
   executionStatus: string;
@@ -164,29 +161,32 @@ export const ChatBox = ({
 
   const evaluators = nodes.filter((node) => node.type === "evaluator");
 
-  const entryInputs = entryEdges.filter(
-    (edge) => !evaluators?.some((evaluator) => evaluator.id === edge.target)
-  );
+  const entryInputs = entryEdges.reduce((acc, edge) => {
+    if (
+      !evaluators?.some((evaluator) => evaluator.id === edge.target) &&
+      !acc.some((e) => e.sourceHandle === edge.sourceHandle)
+    ) {
+      acc.push(edge);
+    }
+    return acc;
+  }, [] as Edge[]);
 
   useEffect(() => {
     if (executionStatus === "success") {
       const result = workflow.state.execution?.result;
 
       if (result && typeof result === "object") {
-        const firstKey = Object.keys(result)[0];
+        const formattedOutput = Object.entries(result.end)
+          .map(([key, value]: [string, string]) => `${key}: ${value}`)
 
-        if (firstKey && typeof result[firstKey] === "object") {
-          const formattedOutput = Object.entries(result[firstKey]!)
-            .map(([key, value]) => `${titleCase(key)}: ${String(value)}`)
-            .join("\n");
+          .join("\n");
 
-          setChatMessages([
-            {
-              input: [chatMessages[0]?.input ?? ""].flat(),
-              output: [formattedOutput],
-            },
-          ]);
-        }
+        setChatMessages([
+          {
+            input: [chatMessages[0]?.input ?? ""].flat(),
+            output: [formattedOutput],
+          },
+        ]);
       }
     }
   }, [executionStatus]);
@@ -229,17 +229,9 @@ export const ChatBox = ({
     });
 
     if (optimizationResponse.status === "success") {
-      // const formattedOutput = Object.entries(
-      //   optimizationResponse.output[Object.keys(optimizationResponse.output)[0]]
-      // )
-      //   .map(([key, value]) => `${titleCase(key)}: ${String(value)}`)
-      //   .join("\n");
-
-      const formattedOutput = JSON.stringify(
-        optimizationResponse.output,
-        null,
-        2
-      );
+      const formattedOutput = Object.entries(optimizationResponse.result)
+        .map(([key, value]: [string, string]) => `${key}: ${value}`)
+        .join("\n");
 
       setChatMessages([{ input: [message], output: [formattedOutput] }]);
     }
