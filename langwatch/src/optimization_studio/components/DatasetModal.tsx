@@ -12,7 +12,11 @@ import {
   TabPanels,
   Tabs,
 } from "@chakra-ui/react";
-import { type Node, type NodeProps } from "@xyflow/react";
+import {
+  useUpdateNodeInternals,
+  type Node,
+  type NodeProps,
+} from "@xyflow/react";
 import { useCallback, useEffect, useState } from "react";
 import { ArrowLeft } from "react-feather";
 import type { DatasetColumns } from "../../server/datasets/types";
@@ -47,6 +51,8 @@ export function DatasetModal({
 
   const { setNode } = useWorkflowStore(({ setNode }) => ({ setNode }));
 
+  const updateNodeInternals = useUpdateNodeInternals();
+
   const setSelectedDataset = useCallback(
     (
       dataset: Required<Entry>["dataset"],
@@ -68,6 +74,7 @@ export function DatasetModal({
           dataset: dataset,
         } as Entry,
       });
+      updateNodeInternals(node.id);
       if (close) {
         onClose();
       }
