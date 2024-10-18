@@ -224,9 +224,8 @@ export const useSocketClient = () => {
     if (socketInstance?.readyState === WebSocket.OPEN) return;
 
     setSocketStatus("connecting-socket");
-    // TODO: ws or wss?
     socketInstance = new WebSocket(
-      `ws://${
+      `${window.location.protocol === "https:" ? "wss" : "ws"}://${
         window.location.host
       }/api/studio/ws?projectId=${encodeURIComponent(project.id)}`
     );

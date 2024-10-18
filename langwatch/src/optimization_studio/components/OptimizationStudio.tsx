@@ -201,8 +201,6 @@ export default function OptimizationStudio() {
 
   useAskBeforeLeaving();
 
-  const chatModal = useDisclosure();
-
   return (
     <div style={{ width: "100vw", height: "100vh" }}>
       <Head>
@@ -348,7 +346,6 @@ export default function OptimizationStudio() {
 
                         <FlowPanel position="bottom-right">
                           <PlaygroundButton
-                            onClick={chatModal.onOpen}
                             nodes={nodes}
                             edges={edges}
                             executionStatus={executionStatus ?? ""}
