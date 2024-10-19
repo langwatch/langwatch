@@ -27,16 +27,16 @@ resource "aws_ecs_task_definition" "langwatch_nlp" {
   family                   = "langwatch-nlp-task"
   network_mode             = "awsvpc"
   requires_compatibilities = ["FARGATE"]
-  cpu                      = 512
-  memory                   = 1024
+  cpu                      = 1024
+  memory                   = 2048
   execution_role_arn       = aws_iam_role.ecs_task_execution_role_langwatch_nlp.arn
 
   container_definitions = jsonencode([
     {
       name      = "langwatch_nlp"
       image     = "${aws_ecr_repository.langwatch_nlp.repository_url}:${local.langwatch_nlp_tag}"
-      cpu       = 512
-      memory    = 1024
+      cpu       = 1024
+      memory    = 2048
       essential = true
       portMappings = [
         {
