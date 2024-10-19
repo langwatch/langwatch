@@ -116,12 +116,10 @@ const callPython = async (ws: WebSocket, event: StudioClientEvent) => {
       }
     );
     if (!response.ok) {
-      let body = "";
+      let body = await response.text();
       try {
-        body = JSON.stringify(await response.json(), null, 2);
-      } catch (error) {
-        body = await response.text();
-      }
+        body = JSON.stringify(body, null, 2);
+      } catch {}
       throw new Error(
         `Failed to call Python: ${response.statusText}\n\n${body}`
       );
