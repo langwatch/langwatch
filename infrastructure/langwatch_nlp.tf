@@ -155,6 +155,42 @@ resource "aws_lb" "langwatch_nlp_alb" {
   enable_deletion_protection = false
 
   idle_timeout = 600 // 10 minutes
+
+  access_logs {
+    bucket  = aws_s3_bucket.alb_logs.bucket
+    prefix  = "langwatch-nlp-alb"
+    enabled = true
+  }
+}
+
+
+resource "aws_s3_bucket" "alb_logs" {
+  bucket = "langwatch-nlp-alb-logs"
+}
+
+resource "aws_s3_bucket_ownership_controls" "alb_logs" {
+  bucket = aws_s3_bucket.alb_logs.id
+  rule {
+    object_ownership = "BucketOwnerPreferred"
+  }
+}
+
+resource "aws_s3_bucket_policy" "alb_logs" {
+  bucket = aws_s3_bucket.alb_logs.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Principal = {
+          AWS = "arn:aws:iam::054676820928:root"  // ALB account ID for eu-central-1
+        }
+        Action   = "s3:PutObject"
+        Resource = "${aws_s3_bucket.alb_logs.arn}/*"
+      }
+    ]
+  })
 }
 
 resource "aws_security_group" "langwatch_nlp_alb_sg" {
