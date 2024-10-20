@@ -169,7 +169,7 @@ export function EvaluationResults() {
   });
 
   if (experiment.isError && experiment.error.data?.httpStatus === 404) {
-    if (evaluationState?.status === "running") {
+    if (keepFetching) {
       return <Text padding={4}>Loading...</Text>;
     }
     return <Text padding={4}>No evaluations started yet</Text>;
