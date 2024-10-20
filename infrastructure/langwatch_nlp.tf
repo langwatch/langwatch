@@ -101,11 +101,11 @@ resource "aws_alb_target_group" "langwatch_nlp_tg" {
   health_check {
     enabled             = true
     healthy_threshold   = 2
-    unhealthy_threshold = 2
-    timeout             = 5
+    unhealthy_threshold = 5
+    timeout             = 10
     path                = "/docs"
     protocol            = "HTTP"
-    interval            = 30
+    interval            = 60
     matcher             = "200"
   }
 }
@@ -153,6 +153,8 @@ resource "aws_lb" "langwatch_nlp_alb" {
   subnets            = [aws_subnet.public_subnet_1.id, aws_subnet.public_subnet_2.id]
 
   enable_deletion_protection = false
+
+  idle_timeout = 600 // 10 minutes
 }
 
 resource "aws_security_group" "langwatch_nlp_alb_sg" {
