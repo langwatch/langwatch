@@ -123,6 +123,8 @@ export function EvaluationResults() {
 
   const { project } = useOrganizationTeamProject();
 
+  const [keepFetching, setKeepFetching] = useState(false);
+
   const experiment = api.experiments.getExperimentBySlug.useQuery(
     {
       projectId: project?.id ?? "",
@@ -131,8 +133,17 @@ export function EvaluationResults() {
     {
       enabled: !!project && !!workflowId,
       refetchOnWindowFocus: false,
+      refetchInterval: keepFetching ? 1 : undefined,
     }
   );
+
+  useEffect(() => {
+    if (evaluationState?.status === "running" && !experiment.data) {
+      setKeepFetching(true);
+    } else {
+      setKeepFetching(false);
+    }
+  }, [evaluationState?.status, experiment.data]);
 
   const [selectedRunId, setSelectedRunId] = useState<string | undefined>(
     evaluationState?.run_id
