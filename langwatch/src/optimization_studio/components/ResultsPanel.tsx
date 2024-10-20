@@ -141,7 +141,12 @@ export function EvaluationResults() {
     if (evaluationState?.status === "running" && !experiment.data) {
       setKeepFetching(true);
     } else {
-      setKeepFetching(false);
+      setTimeout(
+        () => {
+          setKeepFetching(false);
+        },
+        experiment.data ? 0 : 15_000
+      );
     }
   }, [evaluationState?.status, experiment.data]);
 
@@ -164,6 +169,9 @@ export function EvaluationResults() {
   });
 
   if (experiment.isError && experiment.error.data?.httpStatus === 404) {
+    if (evaluationState?.status === "running") {
+      return <Text padding={4}>Loading...</Text>;
+    }
     return <Text padding={4}>No evaluations started yet</Text>;
   }
 
