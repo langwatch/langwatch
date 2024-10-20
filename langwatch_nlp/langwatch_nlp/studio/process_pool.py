@@ -2,7 +2,6 @@ import multiprocessing
 from multiprocessing import Event, Queue
 from multiprocessing.synchronize import Event as EventType
 import threading
-import queue
 import time
 from typing import Callable, Generic, TypeVar
 
@@ -32,7 +31,8 @@ class IsolatedProcessPool(Generic[T, U]):
         queue_out: "Queue[U]" = Queue()
         ready_event = Event()
         p = multiprocessing.Process(
-            target=self.worker, args=(ready_event, queue_in, queue_out)
+            target=self.worker,
+            args=(ready_event, queue_in, queue_out),
         )
         p.start()
         return p, queue_in, queue_out, ready_event
@@ -40,12 +40,16 @@ class IsolatedProcessPool(Generic[T, U]):
     def _fill_pool_continuously(self):
         while self.running:
             if len(self.idle_processes) < self.size:
+                print(
+                    f"[ProcessPool] Creating {self.size - len(self.idle_processes)} processes"
+                )
                 process_creations = [
                     self._create_process()
                     for _ in range(self.size - len(self.idle_processes))
                 ]
                 for process, queue_in, queue_out, ready_event in process_creations:
                     ready_event.wait()
+                    print(f"[ProcessPool] Process ready")
                     self.idle_processes.append((process, queue_in, queue_out))
             else:
                 time.sleep(0.1)
@@ -55,6 +59,7 @@ class IsolatedProcessPool(Generic[T, U]):
         while True:
             try:
                 process, queue_in, queue_out = self.idle_processes.pop()
+                print(f"[ProcessPool] Process popped")
                 break
             except IndexError:
                 if not self.running:

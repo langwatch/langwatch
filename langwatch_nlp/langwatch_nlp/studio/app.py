@@ -2,8 +2,12 @@ import asyncio
 from contextlib import asynccontextmanager
 from multiprocessing import Process, Queue
 from multiprocessing.synchronize import Event
+import os
 from queue import Empty
 import queue
+import signal
+import sys
+import threading
 import time
 import traceback
 from typing import AsyncGenerator, Dict, TypedDict
@@ -117,6 +121,7 @@ def event_worker(
     queue_out: "Queue[StudioServerEvent]",
 ):
     ready_event.set()
+    signal.signal(signal.SIGUSR1, shutdown_handler)
     while True:
         try:
             event = queue_in.get(timeout=1)
@@ -133,6 +138,21 @@ def event_worker(
                 queue_out.put(Error(payload=ErrorPayload(message=repr(e))))
         except queue.Empty:
             continue
+
+
+def shutdown_handler(sig, frame):
+    timer = threading.Timer(3.0, forceful_exit)
+    timer.start()
+
+    try:
+        sys.exit(0)
+    finally:
+        timer.cancel()
+
+
+def forceful_exit():
+    print("Forceful exit triggered", file=sys.stderr)
+    os._exit(1)
 
 
 class RunningProcess(TypedDict):
@@ -226,20 +246,14 @@ async def execute_event_on_a_subprocess(event: StudioClientEvent):
         if not done:
             # Timeout occurred
             yield Error(payload=ErrorPayload(message="Execution timed out"))
-            process.terminate()
-            process.join(timeout=5)  # Give it 5 seconds to terminate gracefully
-            if process.is_alive():
-                # Force kill if it doesn't terminate
-                process.kill()
-                process.join()
+            kill_process(process)
 
     except Exception as e:
         yield Error(payload=ErrorPayload(message=f"Unexpected error: {repr(e)}"))
     finally:
         # Ensure the process is terminated and resources are cleaned up
         if process.is_alive():
-            process.terminate()
-            process.join()
+            kill_process(process)
 
         trace_id = get_trace_id(event)
         if trace_id and trace_id in running_processes:
@@ -267,9 +281,15 @@ async def stop_process(trace_id: str):
     # Check again because the process generally finishes gracefully on its own
     if trace_id in running_processes:
         process = running_processes[trace_id]["process"]
-        process.kill()
-        process.join()
+        kill_process(process)
+
         del running_processes[trace_id]
+
+
+def kill_process(process: Process):
+    if process.pid is None:
+        return
+    os.kill(process.pid, signal.SIGUSR1)
 
 
 async def event_encoder(event_generator: AsyncGenerator[StudioServerEvent, None]):
