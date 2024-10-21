@@ -125,12 +125,12 @@ resource "aws_alb_target_group" "langwatch_nlp_tg" {
   health_check {
     enabled             = true
     healthy_threshold   = 2
-    unhealthy_threshold = 5
-    timeout             = 10
+    unhealthy_threshold = 3
+    timeout             = 5
     path                = "/docs"
     protocol            = "HTTP"
-    interval            = 60
-    matcher             = "200"
+    interval            = 30
+    matcher             = "200-299"
   }
 }
 
@@ -178,7 +178,7 @@ resource "aws_lb" "langwatch_nlp_alb" {
 
   enable_deletion_protection = false
 
-  idle_timeout = 600 // 10 minutes
+  idle_timeout = 60
 
   access_logs {
     bucket  = aws_s3_bucket.alb_logs.bucket
