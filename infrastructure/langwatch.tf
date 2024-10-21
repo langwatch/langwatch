@@ -49,6 +49,7 @@ resource "aws_ecs_task_definition" "langwatch" {
   network_mode             = "awsvpc"
   requires_compatibilities = ["FARGATE"]
   execution_role_arn       = aws_iam_role.ecs_task_execution_role.arn
+  task_role_arn            = aws_iam_role.ecs_task_role_langwatch.arn
   cpu                      = 1024
   memory                   = 2048
 
@@ -99,6 +100,28 @@ resource "aws_ecs_task_definition" "langwatch" {
     aws_iam_role_policy_attachment.langwatch,
     aws_lb.langwatch_nlp_alb[0],
   ]
+}
+
+resource "aws_iam_role" "ecs_task_role_langwatch" {
+  name = "ecs_task_role_langwatch"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRole"
+        Effect = "Allow"
+        Principal = {
+          Service = "ecs-tasks.amazonaws.com"
+        }
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "ecs_task_role_policy_attachment" {
+  role       = aws_iam_role.ecs_task_role_langwatch.name
+  policy_arn = aws_iam_policy.ecs_exec_policy.arn
 }
 
 resource "aws_ecs_service" "langwatch_service" {
