@@ -66,10 +66,7 @@ export const sendSlackWebhook = async ({
     await webhook.send({
       text: `${alertIcon(triggerType)} LangWatch Trigger - *${triggerName}* 
        ${triggerMessage ? `\n\n*Msg:* ${triggerMessage}` : ""}
-      \n${traceLinks.join("")}
-      \nTo stop further notifications, please de-activate or delete your trigger <${
-        env.BASE_HOST
-      }/settings/triggers|here>`,
+      \n${traceLinks.join("")}`,
       username: "LangWatch",
       icon_emoji: ":robot_face:",
     });
