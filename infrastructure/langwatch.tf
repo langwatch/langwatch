@@ -497,3 +497,30 @@ resource "aws_iam_role_policy_attachment" "codedeploy_ecs_policy_attachment" {
   role       = aws_iam_role.codedeploy_role.name
   policy_arn = aws_iam_policy.codedeploy_ecs_policy.arn
 }
+
+resource "aws_iam_policy" "ecs_exec_policy" {
+  name        = "ecs_exec_policy"
+  path        = "/"
+  description = "Allow ECS Exec (SSM) for tasks"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "ssmmessages:CreateControlChannel",
+          "ssmmessages:CreateDataChannel",
+          "ssmmessages:OpenControlChannel",
+          "ssmmessages:OpenDataChannel"
+        ]
+        Resource = "*"
+      },
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "ecs_exec_policy_attachment" {
+  role       = aws_iam_role.ecs_task_execution_role.name
+  policy_arn = aws_iam_policy.ecs_exec_policy.arn
+}

@@ -329,3 +329,30 @@ resource "null_resource" "langwatch_nlp_docker_image" {
 
   depends_on = [aws_ecr_repository.langwatch_nlp]
 }
+
+resource "aws_iam_policy" "ecs_exec_policy_langwatch_nlp" {
+  name        = "ecs_exec_policy_langwatch_nlp"
+  path        = "/"
+  description = "Allow ECS Exec (SSM) for LangWatch NLP tasks"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "ssmmessages:CreateControlChannel",
+          "ssmmessages:CreateDataChannel",
+          "ssmmessages:OpenControlChannel",
+          "ssmmessages:OpenDataChannel"
+        ]
+        Resource = "*"
+      },
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "ecs_exec_policy_attachment_langwatch_nlp" {
+  role       = aws_iam_role.ecs_task_execution_role_langwatch_nlp.name
+  policy_arn = aws_iam_policy.ecs_exec_policy_langwatch_nlp.arn
+}
