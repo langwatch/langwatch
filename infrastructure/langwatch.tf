@@ -131,7 +131,6 @@ resource "aws_ecs_service" "langwatch_service" {
   task_definition        = aws_ecs_task_definition.langwatch[0].arn
   desired_count          = 1
   launch_type            = "FARGATE"
-  enable_execute_command = true
 
   deployment_controller {
     type = "CODE_DEPLOY"
