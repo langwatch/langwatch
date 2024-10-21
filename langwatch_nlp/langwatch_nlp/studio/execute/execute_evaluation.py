@@ -43,7 +43,6 @@ async def execute_evaluation(
         validate_workflow(workflow)
 
         disable_dsp_caching()
-        dspy.settings.configure(experimental=True)
 
         # TODO: handle workflow errors here throwing an special event showing the error was during the execution of the workflow?
         yield start_evaluation_event(run_id)
