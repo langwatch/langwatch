@@ -70,12 +70,13 @@ resource "aws_cloudwatch_log_group" "langwatch_nlp_logs" {
 }
 
 resource "aws_ecs_service" "langwatch_nlp" {
-  count           = module.variables.profile == "lw-prod" ? 1 : 0
-  name            = "langwatch-nlp-service"
-  cluster         = aws_ecs_cluster.langwatch_nlp[0].id
-  task_definition = aws_ecs_task_definition.langwatch_nlp[0].arn
-  desired_count   = 1
-  launch_type     = "FARGATE"
+  count                  = module.variables.profile == "lw-prod" ? 1 : 0
+  name                   = "langwatch-nlp-service"
+  cluster                = aws_ecs_cluster.langwatch_nlp[0].id
+  task_definition        = aws_ecs_task_definition.langwatch_nlp[0].arn
+  desired_count          = 1
+  launch_type            = "FARGATE"
+  enable_execute_command = true
 
   network_configuration {
     subnets          = [aws_subnet.public_subnet_1.id, aws_subnet.public_subnet_2.id]
