@@ -8,6 +8,7 @@ from langwatch_nlp.studio.types.events import (
     start_component_event,
 )
 import langwatch
+import dspy
 
 
 async def execute_component(event: ExecuteComponentPayload):
@@ -15,6 +16,7 @@ async def execute_component(event: ExecuteComponentPayload):
 
     node = [node for node in event.workflow.nodes if node.id == event.node_id][0]
     disable_dsp_caching()
+    dspy.settings.configure(experimental=True)
 
     yield start_component_event(node, event.trace_id)
 

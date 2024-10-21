@@ -69,6 +69,8 @@ async def execute_optimization(
     workflow = event.workflow
     run_id = event.run_id
 
+    dspy.settings.configure(experimental=True)
+
     valid = False
 
     try:

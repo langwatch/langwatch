@@ -60,6 +60,13 @@ if (process.env.IS_OPENSEARCH) {
     return (await originalSearch(...params)).body;
   };
 
+  const originalGet = esClient.get.bind(esClient);
+  // @ts-ignore
+  esClient.get = async (...params) => {
+    // @ts-ignore
+    return (await originalGet(...params)).body;
+  };
+
   const originalGetSource = esClient.getSource.bind(esClient);
   // @ts-ignore
   esClient.getSource = async (...params) => {

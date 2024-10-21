@@ -24,6 +24,7 @@ from langwatch_nlp.studio.utils import (
     disable_dsp_caching,
     transpose_inline_dataset_to_object_list,
 )
+import dspy
 
 
 async def execute_flow(
@@ -41,6 +42,7 @@ async def execute_flow(
     )
 
     disable_dsp_caching()
+    dspy.settings.configure(experimental=True)
 
     # TODO: handle workflow errors here throwing an special event showing the error was during the execution of the workflow?
     yield start_workflow_event(workflow, trace_id)
