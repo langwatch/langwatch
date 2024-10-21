@@ -58,7 +58,7 @@ class IsolatedProcessPool(Generic[T, U]):
         start_time = time.time()
         while True:
             try:
-                process, queue_in, queue_out = self.idle_processes.pop()
+                process, queue_in, queue_out = self.idle_processes.pop(0)
                 print(f"[ProcessPool] Process popped")
                 break
             except IndexError:
