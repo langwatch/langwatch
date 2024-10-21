@@ -36,7 +36,7 @@ resource "aws_ecs_task_definition" "langwatch_nlp" {
     {
       name      = "langwatch_nlp"
       image     = "${aws_ecr_repository.langwatch_nlp.repository_url}:${local.langwatch_nlp_tag}"
-      cpu       = 1024
+      cpu       = 2048
       memory    = 2048
       essential = true
       portMappings = [
