@@ -1,5 +1,5 @@
 import time
-from typing import Dict, Optional, Union, List
+from typing import Any, Dict, Optional, Union, List
 from pydantic import BaseModel
 from typing_extensions import Literal
 from langwatch_nlp.studio.types.dsl import (
@@ -23,7 +23,7 @@ class ExecuteComponentPayload(BaseModel):
     trace_id: str
     workflow: Workflow
     node_id: str
-    inputs: Dict[str, str]
+    inputs: Dict[str, Any]
 
 
 class ExecuteComponent(BaseModel):
@@ -45,7 +45,7 @@ class ExecuteFlowPayload(BaseModel):
     trace_id: str
     workflow: Workflow
     until_node_id: Optional[str] = None
-    inputs: Optional[List[Dict[str, str]]] = None
+    inputs: Optional[List[Dict[str, Any]]] = None
     manual_execution_mode: Optional[bool] = None
 
 
@@ -194,7 +194,7 @@ StudioServerEvent = Union[
 
 
 def start_component_event(
-    node: Node, trace_id: str, inputs: Optional[Dict[str, str]] = None
+    node: Node, trace_id: str, inputs: Optional[Dict[str, Any]] = None
 ):
     execution_state = ExecutionState(
         status=ExecutionStatus.running,
@@ -212,7 +212,7 @@ def start_component_event(
 
 
 def end_component_event(
-    node: Node, trace_id: str, outputs: Dict[str, str], cost: Optional[float] = None
+    node: Node, trace_id: str, outputs: Dict[str, Any], cost: Optional[float] = None
 ):
     return ComponentStateChange(
         payload=ComponentStateChangePayload(

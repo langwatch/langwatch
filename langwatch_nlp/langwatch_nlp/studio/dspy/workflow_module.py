@@ -9,7 +9,7 @@ from langwatch_nlp.studio.dspy.evaluation import (
 from langwatch_nlp.studio.dspy.predict_with_metadata import (
     PredictionWithMetadata,
 )
-from langwatch_nlp.studio.parser import parse_component
+from langwatch_nlp.studio.parser import autoparse_fields, parse_component
 from langwatch_nlp.studio.types.dsl import Workflow, Node, Field
 from langwatch_nlp.studio.dspy.reporting_module import ReportingModule
 import dspy
@@ -90,7 +90,9 @@ class WorkflowModule(ReportingModule):
                         edge.source
                     ][edge.sourceHandle.split(".")[-1]]
 
-        result = self.with_reporting(component, node.id)(**input_args)
+        result = self.with_reporting(component, node.id)(
+            **autoparse_fields(node.data.inputs or [], input_args)
+        )
         if return_inputs:
             return result, input_args
         return result

@@ -1,4 +1,4 @@
-from langwatch_nlp.studio.parser import parse_component
+from langwatch_nlp.studio.parser import autoparse_fields, parse_component
 from langwatch_nlp.studio.utils import disable_dsp_caching
 from langwatch_nlp.studio.types.events import (
     Debug,
@@ -24,7 +24,7 @@ async def execute_component(event: ExecuteComponentPayload):
         ) as trace:
             trace.autotrack_dspy()
             module = parse_component(node, event.workflow)
-            result = module(**event.inputs)
+            result = module(**autoparse_fields(node.data.inputs or [], event.inputs))
 
         cost = result.get_cost() if hasattr(result, "get_cost") else None
 

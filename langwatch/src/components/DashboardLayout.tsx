@@ -384,7 +384,8 @@ export const DashboardLayout = ({
           </Box>
 
           <VStack spacing={8}>
-            {isOrganizationFeatureEnabled("OPTIMIZATION_STUDIO") && (
+            {(isOrganizationFeatureEnabled("OPTIMIZATION_STUDIO") ||
+              publicEnv.data?.NODE_ENV === "development") && (
               <SideMenuLink
                 path={projectRoutes.workflows.path}
                 icon={PuzzleIcon}
