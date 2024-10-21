@@ -38,6 +38,11 @@ sentiment_analysis.setup_endpoints(app)
 app.mount("/studio", studio_app)
 
 
+@app.get("/health")
+async def health_check():
+    return {"status": "healthy"}
+
+
 async def proxy_startup():
     original_get_available_deployment = Router.async_get_available_deployment
 
