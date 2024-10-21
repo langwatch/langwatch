@@ -41,8 +41,6 @@ from langwatch_nlp.studio.types.events import (
     StudioServerEvent,
     Error,
     ErrorPayload,
-    ExecuteFlow,
-    ExecuteFlowPayload,
     component_error_event,
 )
 
@@ -212,7 +210,7 @@ async def execute_event_on_a_subprocess(event: StudioClientEvent):
             )
         return
 
-    process, queue = pool.submit(event)
+    process, queue = await pool.submit(event)
 
     trace_id = get_trace_id(event)
     if trace_id and trace_id not in running_processes:
@@ -230,7 +228,7 @@ async def execute_event_on_a_subprocess(event: StudioClientEvent):
         while time_since_last_message < timeout_without_messages:
             time_since_last_message = time.time() - last_message_time
             try:
-                result = queue.get(timeout=0.1)
+                result = queue.get(block=False)
                 yield result
                 last_message_time = time.time()
 
