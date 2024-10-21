@@ -141,7 +141,18 @@ def event_worker(
 
 
 def shutdown_handler(sig, frame):
-    sys.exit(0)
+    timer = threading.Timer(3.0, forceful_exit)
+    timer.start()
+
+    try:
+        sys.exit(0)
+    finally:
+        timer.cancel()
+
+
+def forceful_exit():
+    print("Forceful exit triggered", file=sys.stderr)
+    os._exit(1)
 
 
 class RunningProcess(TypedDict):
