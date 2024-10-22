@@ -129,6 +129,10 @@ export class SubscriptionHandlerSaas extends SubscriptionHandler {
       customLimits.maxMessagesPerMonth = activeSubscription.maxMessagesPerMonth;
     }
 
+    if (activeSubscription?.evaluationsCredit) {
+      customLimits.evaluationsCredit = activeSubscription.evaluationsCredit;
+    }
+
     if (!activeSubscription) {
       return { ...PLAN_LIMITS[PlanTypes.FREE], overrideAddingLimitations };
     }
