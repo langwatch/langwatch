@@ -25,7 +25,14 @@ export const InputPanel = ({ node }: { node: Node<Component> }) => {
     handleSubmit,
     formState: { errors },
   } = useForm<Record<string, string>>({
-    defaultValues: getInputsForExecution({ node }).inputs,
+    defaultValues: Object.fromEntries(
+      Object.entries(getInputsForExecution({ node }).inputs).map(
+        ([key, value]) => [
+          key,
+          typeof value === "object" ? JSON.stringify(value) : value ?? "",
+        ]
+      )
+    ),
     resolver: (values) => {
       const { missingFields } = getInputsForExecution({ node, inputs: values });
 

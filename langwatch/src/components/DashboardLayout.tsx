@@ -323,7 +323,6 @@ export const DashboardLayout = ({
     project,
     hasOrganizationPermission,
     isPublicRoute,
-    isOrganizationFeatureEnabled,
   } = useOrganizationTeamProject();
   const usage = api.limits.getUsage.useQuery(
     { organizationId: organization?.id ?? "" },

@@ -172,6 +172,12 @@ export default async function handler(
 
   traceSpanCountHistogram.observe(req.body.spans?.length ?? 0);
 
+  if (req.body.spans?.length > 200) {
+    return res.status(429).json({
+      message: "Too many spans, maximum of 200 per trace",
+    });
+  }
+
   let reservedTraceMetadata: ReservedTraceMetadata = {};
   let customMetadata: CustomMetadata = {};
   try {

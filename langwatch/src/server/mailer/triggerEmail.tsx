@@ -62,11 +62,6 @@ export const sendTriggerEmail = async ({
         </p>
         {triggerMessage && <p>{triggerMessage}</p>}
         <TriggerTable triggerData={triggerData} projectSlug={projectSlug} />
-
-        <p>
-          To stop further emails, please de-activate or delete your trigger{" "}
-          <Link href={`${env.BASE_HOST}/settings/triggers`}>here</Link>
-        </p>
       </Container>
     </Html>
   );

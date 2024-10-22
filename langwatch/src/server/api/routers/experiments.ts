@@ -337,7 +337,8 @@ export const experimentsRouter = createTRPCRouter({
           timestamps: source.timestamps,
           total: source.total,
           summary: {
-            cost: runAgg?.dataset_cost.value + runAgg?.evaluations_cost.cost.value,
+            cost:
+              runAgg?.dataset_cost.value + runAgg?.evaluations_cost.cost.value,
             dataset_average_cost: runAgg?.dataset_average_cost.value,
             dataset_average_duration: runAgg?.dataset_average_duration.value,
             evaluations: Object.fromEntries(

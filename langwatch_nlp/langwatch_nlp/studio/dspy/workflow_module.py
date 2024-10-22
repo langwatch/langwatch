@@ -9,7 +9,7 @@ from langwatch_nlp.studio.dspy.evaluation import (
 from langwatch_nlp.studio.dspy.predict_with_metadata import (
     PredictionWithMetadata,
 )
-from langwatch_nlp.studio.parser import parse_component
+from langwatch_nlp.studio.parser import autoparse_fields, parse_component
 from langwatch_nlp.studio.types.dsl import Workflow, Node, Field
 from langwatch_nlp.studio.dspy.reporting_module import ReportingModule
 import dspy
@@ -90,7 +90,9 @@ class WorkflowModule(ReportingModule):
                         edge.source
                     ][edge.sourceHandle.split(".")[-1]]
 
-        result = self.with_reporting(component, node.id)(**input_args)
+        result = self.with_reporting(component, node.id)(
+            **autoparse_fields(node.data.inputs or [], input_args)
+        )
         if return_inputs:
             return result, input_args
         return result
@@ -108,21 +110,19 @@ class WorkflowModule(ReportingModule):
             )
 
             def has_all_inputs(node: Node) -> bool:
-                required_inputs = set(
-                    cast(Field, input).identifier
-                    for input in node.data.inputs or []
-                    if not input.optional
-                )
-                available_inputs = set()
+                node_edges = []
+                connected_inputs = set()
                 for edge in self.workflow.edges:
                     if edge.target == node.id:
-                        source_node = get_node_by_id(self.workflow, edge.source)
-                        if (
-                            source_node.type == "entry"
-                            or source_node.id in node_outputs
-                        ):
-                            available_inputs.add(edge.targetHandle.split(".")[-1])
-                return required_inputs.issubset(available_inputs)
+                        node_edges.append(edge)
+                        connected_inputs.add(edge.targetHandle.split(".")[-1])
+
+                available_inputs = set()
+                for edge in node_edges:
+                    source_node = get_node_by_id(self.workflow, edge.source)
+                    if source_node.type == "entry" or source_node.id in node_outputs:
+                        available_inputs.add(edge.targetHandle.split(".")[-1])
+                return connected_inputs.issubset(available_inputs)
 
             # Execute nodes in topological order
             executed_nodes = set()
@@ -155,7 +155,9 @@ class WorkflowModule(ReportingModule):
 
             # Prepare the final output
             final_output = {}
-            if end_node:
+            if end_node and (
+                not self.until_node_id or end_node.id == self.until_node_id
+            ):
                 for edge in self.workflow.edges:
                     if edge.target == end_node.id:
                         source_node = get_node_by_id(self.workflow, edge.source)

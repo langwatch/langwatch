@@ -177,7 +177,7 @@ export const ChatBox = ({
 
       if (result && typeof result === "object") {
         const formattedOutput = Object.entries(result.end)
-          .map(([key, value]: [string, string]) => `${key}: ${value}`)
+          .map(([key, value]: [any, any]) => `${key}: ${value}`)
 
           .join("\n");
 
@@ -230,7 +230,7 @@ export const ChatBox = ({
 
     if (optimizationResponse.status === "success") {
       const formattedOutput = Object.entries(optimizationResponse.result)
-        .map(([key, value]: [string, string]) => `${key}: ${value}`)
+        .map(([key, value]: [any, any]) => `${key}: ${value}`)
         .join("\n");
 
       setChatMessages([{ input: [message], output: [formattedOutput] }]);

@@ -35,6 +35,7 @@ class PredictWithMetadata(dspy.Predict):
         response = super().forward(*args, **kwargs)
         duration = round((time.time() - start_time) * 1000)
 
+        dspy.settings.configure(experimental=True)
         lm = cast(dspy.LM, self.get_lm())
         response.__class__ = PredictionWithMetadata
         last_response = lm.history[-1]

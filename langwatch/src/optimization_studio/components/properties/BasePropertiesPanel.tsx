@@ -320,7 +320,13 @@ export function BasePropertiesPanel({
       height="full"
       overflowY="auto"
     >
-      <HStack paddingY={1} paddingLeft={2} width="full" justify="space-between" spacing={0}>
+      <HStack
+        paddingY={1}
+        paddingLeft={2}
+        width="full"
+        justify="space-between"
+        spacing={0}
+      >
         <HStack spacing={2}>
           {header ? (
             header
@@ -383,14 +389,15 @@ export function BasePropertiesPanel({
               <HStack
                 spacing={2}
                 onClick={() => {
-                  setPropertiesExpanded(!propertiesExpanded);
+                  if (!propertiesExpanded) {
+                    setPropertiesExpanded(true);
+                  }
                 }}
               >
                 <ComponentExecutionButton
                   node={node}
                   size="sm"
                   iconSize={16}
-                  componentOnly={propertiesExpanded}
                 />
               </HStack>
 

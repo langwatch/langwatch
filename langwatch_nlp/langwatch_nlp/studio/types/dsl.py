@@ -165,6 +165,11 @@ class EntryNode(BaseNode):
     data: Entry
 
 
+class RetrieverNode(BaseNode):
+    type: Literal["retriever"] = "retriever"
+    data: Retriever
+
+
 class EvaluatorNode(BaseNode):
     type: Literal["evaluator"] = "evaluator"
     data: Evaluator
@@ -175,7 +180,9 @@ class EndNode(BaseNode):
     data: End
 
 
-Node = Union[SignatureNode, ModuleNode, EntryNode, EvaluatorNode, EndNode]
+Node = Union[
+    SignatureNode, ModuleNode, EntryNode, RetrieverNode, EvaluatorNode, EndNode
+]
 
 
 class Flow(BaseModel):

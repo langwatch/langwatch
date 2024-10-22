@@ -723,13 +723,20 @@ class DSPyTracer:
 
         language_model_classes = dspy.OpenAI.__subclasses__() + dspy.LM.__subclasses__()
         for lm in language_model_classes:
-            if not hasattr(lm, "__original_basic_request__"):
+            if not hasattr(lm, "__original_basic_request__") and hasattr(
+                lm, "basic_request"
+            ):
                 lm.__original_basic_request__ = lm.basic_request  # type: ignore
-                lm.basic_request = self.patched_legacy_language_model_request()
+                lm.basic_request = self.patched_legacy_language_model_request()  # type: ignore
 
         if not hasattr(dspy.LM, "__original_call__"):
             dspy.LM.__original_call__ = dspy.LM.__call__  # type: ignore
             dspy.LM.__call__ = self.patched_language_model_call()
+
+        patching_retrieve = False
+        if not hasattr(dspy.Retrieve, "__original_forward__"):
+            dspy.Retrieve.__original_forward__ = dspy.Retrieve.forward  # type: ignore
+            patching_retrieve = True
 
         retrieve_classes = dspy.Retrieve.__subclasses__()
         for retrieve in retrieve_classes:
@@ -737,8 +744,7 @@ class DSPyTracer:
                 retrieve.__original_forward__ = retrieve.forward  # type: ignore
                 retrieve.forward = self.patched_retrieve_forward(cls=retrieve)
 
-        if not hasattr(dspy.Retrieve, "__original_forward__"):
-            dspy.Retrieve.__original_forward__ = dspy.Retrieve.forward  # type: ignore
+        if patching_retrieve:
             dspy.Retrieve.forward = self.patched_retrieve_forward(cls=dspy.Retrieve)
 
     def safe_get_current_span(self):

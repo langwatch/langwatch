@@ -87,6 +87,9 @@ async def execute_flow(
                 result = module(**entries[0])
 
             except Exception as e:
+                import traceback
+
+                traceback.print_exc()
                 yield error_workflow_event(trace_id, str(e))
                 return
 

@@ -164,7 +164,7 @@
     "prisma": "^5.6.0",
     "simple-statistics": "^7.8.3",
     "ts-to-zod": "^3.4.1",
-    "tsx": "^3.14.0",
+    "tsx": "^4.7.0",
     "typescript": "^5.1.6",
     "vitest": "^0.34.6"
   },

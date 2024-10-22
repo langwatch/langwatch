@@ -1,8 +1,16 @@
 import { Box } from "@chakra-ui/react";
-import { Check, Flag, Home, Shield, Box as BoxIcon } from "react-feather";
+import {
+  Check,
+  Flag,
+  Home,
+  Shield,
+  Box as BoxIcon,
+  BookOpen,
+} from "react-feather";
 import { EqualsIcon } from "../../components/icons/EqualsIcon";
 import { LLMIcon } from "../../components/icons/LLMIcon";
 import type { ComponentType } from "../types/dsl";
+import { WeaviateIcon } from "../../components/icons/WeaviateIcon";
 
 const sizeMap = {
   sm: "16px",
@@ -63,6 +71,17 @@ export function EvaluatorIcon({ cls }: { cls?: string }) {
   return iconMap[cls ?? ""];
 }
 
+export function RetrieverIcon({ cls }: { cls?: string }) {
+  const iconMap: Record<string, React.ReactNode> = {
+    WeaviateRM: <WeaviateIcon />,
+  };
+
+  if (!iconMap[cls ?? ""]) {
+    return <BookOpen />;
+  }
+  return iconMap[cls ?? ""];
+}
+
 export const ComponentIcon = ({
   type,
   cls,
@@ -76,7 +95,7 @@ export const ComponentIcon = ({
     signature: <LLMIcon />,
     entry: <Home />,
     module: <BoxIcon />,
-    retriever: <BoxIcon />,
+    retriever: <RetrieverIcon cls={cls} />,
     prompting_technique: <BoxIcon />,
     evaluator: <EvaluatorIcon cls={cls} />,
     end: <Flag />,
@@ -86,7 +105,7 @@ export const ComponentIcon = ({
     signature: "green.400",
     entry: "blue.400",
     module: "gray.400",
-    retriever: "gray.400",
+    retriever: "purple.400",
     prompting_technique: "gray.400",
     evaluator: "#5FD15D",
     end: "orange.400",

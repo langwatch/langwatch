@@ -123,6 +123,8 @@ export function EvaluationResults() {
 
   const { project } = useOrganizationTeamProject();
 
+  const [keepFetching, setKeepFetching] = useState(false);
+
   const experiment = api.experiments.getExperimentBySlug.useQuery(
     {
       projectId: project?.id ?? "",
@@ -131,8 +133,22 @@ export function EvaluationResults() {
     {
       enabled: !!project && !!workflowId,
       refetchOnWindowFocus: false,
+      refetchInterval: keepFetching ? 1 : undefined,
     }
   );
+
+  useEffect(() => {
+    if (evaluationState?.status === "running" && !experiment.data) {
+      setKeepFetching(true);
+    } else {
+      setTimeout(
+        () => {
+          setKeepFetching(false);
+        },
+        experiment.data ? 0 : 15_000
+      );
+    }
+  }, [evaluationState?.status, experiment.data]);
 
   const [selectedRunId, setSelectedRunId] = useState<string | undefined>(
     evaluationState?.run_id
@@ -153,6 +169,9 @@ export function EvaluationResults() {
   });
 
   if (experiment.isError && experiment.error.data?.httpStatus === 404) {
+    if (keepFetching) {
+      return <Text padding={4}>Loading...</Text>;
+    }
     return <Text padding={4}>No evaluations started yet</Text>;
   }
 

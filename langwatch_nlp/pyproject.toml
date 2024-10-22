@@ -22,11 +22,12 @@ mangum = "^0.17.0"
 litellm = { extras = ["proxy"], version = "1.48.16" }
 google-cloud-aiplatform = "^1.54.1"
 uvicorn = ">=0.22.0,<0.23.0"
-dspy-ai = "^2.5.2"
+dspy-ai = { extras = ["weaviate"], version = "^2.5.10" }
 langevals-core = "^0.1.10"
-httpx = "^0.27.2"
-langwatch = "^0.1.29"
+httpx = "^0.27.0"
+langwatch = "^0.1.31"
 scikit-learn = "^1.5.2"
+weaviate-client = "^4.8.1"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.1.1"

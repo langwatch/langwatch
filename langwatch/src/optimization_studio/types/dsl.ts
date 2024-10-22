@@ -16,7 +16,7 @@ export type Field = {
     | "signature"
     | "llm";
   optional?: boolean;
-  defaultValue?: string;
+  defaultValue?: any;
   desc?: string;
   prefix?: string;
   hidden?: boolean;

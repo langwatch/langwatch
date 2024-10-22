@@ -304,6 +304,7 @@ export const ComponentNode = forwardRef(function ComponentNode(
             node={node}
             marginRight="-6px"
             marginLeft="-4px"
+            isInsideNode={true}
           />
         ) : (
           <Box width="54px" />
@@ -340,11 +341,13 @@ export function ComponentExecutionButton({
   node,
   iconSize = 14,
   componentOnly = false,
+  isInsideNode = false,
   ...props
 }: {
   node: Node<Component>;
   iconSize?: number;
   componentOnly?: boolean;
+  isInsideNode?: boolean;
 } & ButtonProps) {
   const { startComponentExecution, stopComponentExecution } =
     useComponentExecution();
@@ -367,6 +370,8 @@ export function ComponentExecutionButton({
 
   const shouldOpenExecutionResults =
     node?.data.execution_state && !propertiesExpanded;
+
+  const Wrapper = isInsideNode ? NodeToolbar : Box;
 
   return (
     <>
@@ -460,7 +465,7 @@ export function ComponentExecutionButton({
           <MenuButton variant="ghost" size="xs" paddingX={2} {...props}>
             <Play size={iconSize} />
           </MenuButton>
-          <NodeToolbar>
+          <Wrapper>
             <MenuList>
               <MenuItem
                 icon={<Play size={14} />}
@@ -469,7 +474,7 @@ export function ComponentExecutionButton({
                 }}
                 fontSize={13}
               >
-                Run this component only
+                Run with manual input
               </MenuItem>
               <MenuItem
                 icon={<Play size={14} />}
@@ -478,10 +483,10 @@ export function ComponentExecutionButton({
                 }}
                 fontSize={13}
               >
-                Run all until here
+                Run workflow until here
               </MenuItem>
             </MenuList>
-          </NodeToolbar>
+          </Wrapper>
         </Menu>
       )}
     </>

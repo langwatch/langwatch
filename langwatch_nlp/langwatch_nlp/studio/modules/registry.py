@@ -1,4 +1,5 @@
 from typing import Type, Union
+from langwatch_nlp.studio.dspy.retrieve import ColBERTv2RM
 from langwatch_nlp.studio.modules.evaluators.exact_match import ExactMatchEvaluator
 from langwatch_nlp.studio.modules.evaluators.langwatch import LangWatchEvaluator
 from dspy.teleprompt import (
@@ -7,12 +8,17 @@ from dspy.teleprompt import (
     MIPROv2,
 )
 
+import dspy
+from dspy.retrieve.weaviate_rm import WeaviateRM
 
-MODULES = {
-    "evaluator": {
-        "ExactMatchEvaluator": ExactMatchEvaluator,
-        "LangWatchEvaluator": LangWatchEvaluator,
-    }
+EVALUATORS: dict[str, Type[dspy.Module]] = {
+    "ExactMatchEvaluator": ExactMatchEvaluator,
+    "LangWatchEvaluator": LangWatchEvaluator,
+}
+
+RETRIEVERS: dict[str, Type[dspy.Retrieve]] = {
+    "ColBERTv2": ColBERTv2RM,
+    "WeaviateRM": WeaviateRM,
 }
 
 OPTIMIZERS: dict[

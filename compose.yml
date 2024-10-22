@@ -26,6 +26,8 @@ services:
     ports:
       - "8080:8080"
     restart: always
+    environment:
+      - LANGWATCH_ENDPOINT=http://app:3000
 
   langevals:
     image: langwatch/langevals:latest
