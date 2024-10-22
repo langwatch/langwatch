@@ -93,7 +93,7 @@ export const processCollectorJob = async (
   id: string | undefined,
   data: CollectorJob | CollectorCheckAndAdjustJob
 ) => {
-  if ("spans" in data && data.spans?.length >= 200) {
+  if ("spans" in data && data.spans?.length > 200) {
     console.log("Too many spans, maximum of 200 per trace, dropping job");
     return;
   }
