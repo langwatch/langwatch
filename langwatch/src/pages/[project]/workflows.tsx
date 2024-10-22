@@ -25,7 +25,8 @@ import { api } from "../../utils/api";
 import { useEffect } from "react";
 
 export default function MessagesOrIntegrationGuide() {
-  const { project } = useOrganizationTeamProject();
+  const { project, isOrganizationFeatureEnabled } =
+    useOrganizationTeamProject();
 
   const { isOpen, onClose, onOpen } = useDisclosure();
 
@@ -34,7 +35,7 @@ export default function MessagesOrIntegrationGuide() {
     { enabled: !!project }
   );
 
-  if (true) {
+  if (!isOrganizationFeatureEnabled("OPTIMIZATION_STUDIO")) {
     return (
       <DashboardLayout>
         <Container maxWidth="1200px" padding={6}>

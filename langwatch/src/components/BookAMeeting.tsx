@@ -67,28 +67,30 @@ export const BookAMeeting = () => {
       </Modal>
       <Card>
         <CardBody>
-          <HStack>
-            <Box width="full" height="300px" backgroundColor="red"></Box>
+          <HStack align="start" spacing={8}>
+            <Box height="300px" width="400px" backgroundColor="gray.100"></Box>
 
-            <VStack align="start">
+            <VStack align="start" spacing={4}>
               <Heading as="h2" size="md">
-                Optimize your product with LangWatch
+                LangWatch Optimization Studio
               </Heading>
               <UnorderedList>
-                <ListItem>Ensure quality with a single click</ListItem>
                 <ListItem>
-                  Upload your datasets for easy performance tracking
+                  <b>Ensure quality</b> with a single click
                 </ListItem>
                 <ListItem>
-                  Automatically evaluate the efficiency of your models
+                  <b>Upload your datasets</b> for easy performance tracking
                 </ListItem>
                 <ListItem>
-                  Optimize your solution using advanced DSPy algorithms in a
-                  single click{" "}
+                  <b>Automatically evaluate</b> the efficiency of your models
+                </ListItem>
+                <ListItem>
+                  <b>Optimize</b> your solution using advanced DSPy algorithms
+                  in a single click
                 </ListItem>
               </UnorderedList>
               <Button colorScheme="orange" onClick={onOpen}>
-                Chat with us for access
+                Get early access
               </Button>
             </VStack>
           </HStack>

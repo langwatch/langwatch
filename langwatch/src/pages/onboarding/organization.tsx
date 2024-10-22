@@ -43,6 +43,7 @@ import {
   TrendingUp,
   User,
   Users,
+  Check,
 } from "react-feather";
 import {
   useForm,
@@ -197,7 +198,8 @@ export default function OrganizationOnboarding() {
       <Database size={16} color="orange" />
     ),
     "Classification tasks": <Tag size={16} color="orange" />,
-    Other: <MoreHorizontal size={16} color="orange" />,
+    "Custom Evaluation": <Check size={16} color="orange" />,
+    // Other: <MoreHorizontal size={16} color="orange" />,
   };
 
   const howDidYouHearAboutUs = {
@@ -207,7 +209,7 @@ export default function OrganizationOnboarding() {
     Newsletter: <Mail size={16} color="orange" />,
     Conference: <Mic size={16} color="orange" />,
     Partner: <LinkIcon size={16} color="orange" />,
-    Other: <MoreHorizontal size={16} color="orange" />,
+    // Other: <MoreHorizontal size={16} color="orange" />,
   };
 
   const group = getRootProps();
