@@ -179,6 +179,11 @@ const SubscriptionFromElements = () => {
         label="Max Messages Per Month"
         type="number"
       />
+      <NumberInput
+        source="evaluationsCredit"
+        label="Evaluations Credit"
+        type="number"
+      />
     </>
   );
 };
