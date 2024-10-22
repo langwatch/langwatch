@@ -22,6 +22,11 @@ import {
   Spacer,
   RadioGroup,
   FormErrorMessage,
+  List,
+  ListItem,
+  ListIcon,
+  OrderedList,
+  UnorderedList,
 } from "@chakra-ui/react";
 import ErrorPage from "next/error";
 import { useRouter } from "next/router";
@@ -122,19 +127,56 @@ export default function ProjectOnboardingSelect() {
 
   const projectTypes = {
     optimization: {
-      heading: "Start Optimizing",
+      heading: "LangWatch Optimization Studio",
       image: "/images/optimization.png",
-      text: "Guaranteeing the quality of your LLM's with a scientific, ML-based approach - supported by DSPy.",
+      text: (
+        <UnorderedList>
+          <ListItem>
+            <b>Ensure quality</b> with a single click
+          </ListItem>
+          <ListItem>
+            <b>Upload your datasets</b> for easy performance tracking
+          </ListItem>
+          <ListItem>
+            Automatically evaluate the efficiency of your models
+          </ListItem>
+          <ListItem>
+            <b>Optimize</b> your solution using advanced DSPy algorithms in a
+            single click
+          </ListItem>
+        </UnorderedList>
+      ),
     },
     monitoring: {
-      heading: "Start Monitoring",
+      heading: "Monitoring and Analytics",
       image: "/images/monitoring.avif",
-      text: "The LLMops platform to get a deeper understanding of your LLM-product performance. And start integrating yourself.",
+      text: (
+        <UnorderedList>
+          <ListItem>
+            Gain <b>full visibility</b> into your LLM features
+          </ListItem>
+          <ListItem>
+            Add <b>evaluations</b> (from our library or bring your OWN) and{" "}
+            <b>guardrails</b> to your LLM-app
+          </ListItem>
+          <ListItem>
+            <b>Add alerts</b> to slack or e-mail of any errors or
+            non-qualitative outputs.
+          </ListItem>
+          <ListItem>
+            Share user-insights (topics, feedback) & product performance via our{" "}
+            <b>Analytics Dashboard.</b>
+          </ListItem>
+          <ListItem>
+            <b>Create datasets</b> from real-world user data
+          </ListItem>
+        </UnorderedList>
+      ),
     },
   };
 
   return (
-    <SetupLayout>
+    <SetupLayout maxWidth="6xl">
       {/* eslint-disable-next-line @typescript-eslint/no-misused-promises */}
       <form onSubmit={form.handleSubmit(onSubmit)}>
         <VStack gap={4} alignItems="left">
@@ -146,13 +188,6 @@ export default function ProjectOnboardingSelect() {
             We offer two solutions to get started with LangWatch
             <br />
           </Text>
-          {/* <FormControl>
-            <FormLabel>Project Name</FormLabel>
-            <Input
-              {...form.register("name", { required: true })}
-              defaultValue={teamSlug}
-            />
-          </FormControl> */}
 
           <FormControl isInvalid={!!form.formState.errors.projectType}>
             <RadioGroup
@@ -219,7 +254,7 @@ const CustomRadio = ({
   registerProps: ReturnType<UseFormRegister<ProjectFormData>>;
   selectedValue: string;
   heading: string;
-  text: string;
+  text: React.ReactNode;
   image: string;
 }) => {
   return (
@@ -247,17 +282,19 @@ const CustomRadio = ({
       >
         <CardHeader>
           <Heading size="md">{heading}</Heading>
-          <Image
-            src={image}
-            alt={heading}
-            marginTop={4}
-            width={200}
-            height={130}
-          />
+          <HStack>
+            <Spacer />
+            <Image
+              src={image}
+              alt={heading}
+              marginTop={4}
+              width={320}
+              height={200}
+            />
+            <Spacer />
+          </HStack>
         </CardHeader>
-        <CardBody>
-          <Text marginBottom={4}>{text}</Text>
-        </CardBody>
+        <CardBody>{text}</CardBody>
       </Card>
     </Box>
   );

@@ -1,4 +1,4 @@
-import { Box } from "@chakra-ui/react";
+import { Box, Card, CardBody, Heading, HStack, VStack } from "@chakra-ui/react";
 import { useEffect } from "react";
 import {
   Modal,
@@ -10,6 +10,11 @@ import {
   ModalCloseButton,
   useDisclosure,
   Button,
+  List,
+  ListItem,
+  ListIcon,
+  OrderedList,
+  UnorderedList,
 } from "@chakra-ui/react";
 
 export const BookAMeeting = () => {
@@ -33,8 +38,6 @@ export const BookAMeeting = () => {
   }, []);
   return (
     <>
-      <Button onClick={onOpen}>Open Modal</Button>
-
       <Modal isOpen={isOpen} onClose={onClose} size="4xl">
         <ModalOverlay />
         <ModalContent>
@@ -62,24 +65,35 @@ export const BookAMeeting = () => {
           </ModalBody>
         </ModalContent>
       </Modal>
-      <Box width="full" height="300px" backgroundColor="red">
-        {/* <iframe
-        src="https://get.langwatch.ai/meetings/manouk-draisma/c-level?embed=true"
-        frameBorder="0"
-        width="100%"
-        height="100%"
-        allowFullScreen
-      ></iframe> */}
+      <Card>
+        <CardBody>
+          <HStack>
+            <Box width="full" height="300px" backgroundColor="red"></Box>
 
-        {/* <div
-          className="meetings-iframe-container"
-          data-src="https://get.langwatch.ai/meetings/manouk-draisma/c-level?embed=true"
-        ></div> */}
-        {/* <script
-        type="text/javascript"
-        src="https://static.hsappstatic.net/MeetingsEmbed/ex/MeetingsEmbedCode.js"
-      ></script> */}
-      </Box>
+            <VStack align="start">
+              <Heading as="h2" size="md">
+                Optimize your product with LangWatch
+              </Heading>
+              <UnorderedList>
+                <ListItem>Ensure quality with a single click</ListItem>
+                <ListItem>
+                  Upload your datasets for easy performance tracking
+                </ListItem>
+                <ListItem>
+                  Automatically evaluate the efficiency of your models
+                </ListItem>
+                <ListItem>
+                  Optimize your solution using advanced DSPy algorithms in a
+                  single click{" "}
+                </ListItem>
+              </UnorderedList>
+              <Button colorScheme="orange" onClick={onOpen}>
+                Chat with us for access
+              </Button>
+            </VStack>
+          </HStack>
+        </CardBody>
+      </Card>
     </>
   );
 };

@@ -15,6 +15,11 @@ import {
   Card,
   CardHeader,
   CardBody,
+  List,
+  ListItem,
+  ListIcon,
+  OrderedList,
+  UnorderedList,
 } from "@chakra-ui/react";
 import { DashboardLayout } from "./DashboardLayout";
 import { ExternalLinkIcon } from "@chakra-ui/icons";
@@ -69,9 +74,7 @@ export const ProjectIntegration = () => {
           paddingBottom={6}
         >
           <HStack width={"full"}>
-            <Heading as="h1">
-              {framework?.label} {language?.label} Integration
-            </Heading>
+            <Heading as="h1">Integration guides</Heading>
             <Spacer />
             {isRefetching && <Spinner />}
           </HStack>
@@ -79,6 +82,18 @@ export const ProjectIntegration = () => {
             Follow the instructions on our docs to setup your project with
             LangWatch, this page will update automatically as soon as the first
             messages arrive.
+          </Text>
+          <Text>
+            You can also view our{" "}
+            <Link
+              textDecoration="underline"
+              href={`https://app.langwatch.ai/demo`}
+              target="_blank"
+            >
+              demo account
+            </Link>{" "}
+            to look around, we have a sample chatbot integrated there so you can
+            explore.
           </Text>
           {typeof window !== "undefined" &&
             window.location.hostname !== "app.langwatch.ai" && (
@@ -94,6 +109,78 @@ export const ProjectIntegration = () => {
             <Card width="450px">
               <CardHeader>
                 <Heading as="h2" size="md">
+                  Start Monitoring
+                </Heading>
+              </CardHeader>
+              <CardBody>
+                <UnorderedList>
+                  <ListItem>
+                    Gain <b>full visibility</b> into your LLM features
+                  </ListItem>
+                  <ListItem>
+                    Add <b>evaluations</b> from our library or bring your OWN
+                    and <b>guardrails</b> to your LLM-app
+                  </ListItem>
+                  <ListItem>
+                    <b>Add alerts</b> to slack or e-mail of any errors or
+                    non-qualitative outputs.
+                  </ListItem>
+                  <ListItem>
+                    Share user-insights (topics, feedback) & product performance
+                    via our <b>Analytics Dashboard.</b>
+                  </ListItem>
+                  <ListItem>
+                    <b>Create datasets</b> from real-world user data
+                  </ListItem>
+                </UnorderedList>
+              </CardBody>
+            </Card>
+
+            <Card width="450px" minHeight="full">
+              <CardHeader>
+                <Heading as="h2" size="md">
+                  Integration Guides
+                </Heading>
+              </CardHeader>
+              <CardBody>
+                <Link href={integrationDocs.href} isExternal marginLeft="28px">
+                  <HStack align="center" fontSize={18} spacing={4}>
+                    <IconWrapper>
+                      {techStackLanguageOptions.python.icon}
+                    </IconWrapper>
+                    <Text>
+                      Open {techStackLanguageOptions.python.label} Integration
+                      Guide
+                    </Text>
+                    <ExternalLinkIcon />
+                  </HStack>
+                </Link>
+                <Link href={integrationDocs.href} isExternal marginLeft="28px">
+                  <HStack align="center" fontSize={18} spacing={4}>
+                    <IconWrapper>
+                      {techStackLanguageOptions.typescript.icon}
+                    </IconWrapper>
+                    <Text>
+                      Open {techStackLanguageOptions.typescript.label}{" "}
+                      Integration Guide
+                    </Text>
+                    <ExternalLinkIcon />
+                  </HStack>
+                </Link>
+                <Link href={integrationDocs.href} isExternal marginLeft="28px">
+                  <HStack align="center" fontSize={18} spacing={4}>
+                    <IconWrapper>
+                      {techStackLanguageOptions.other.icon}
+                    </IconWrapper>
+                    <Text>Open Custom REST Integration Guide</Text>
+                    <ExternalLinkIcon />
+                  </HStack>
+                </Link>
+              </CardBody>
+            </Card>
+            <Card width="450px">
+              <CardHeader>
+                <Heading as="h2" size="md">
                   API Key
                 </Heading>
               </CardHeader>
@@ -106,37 +193,7 @@ export const ProjectIntegration = () => {
                 </VStack>
               </CardBody>
             </Card>
-            <Card width="450px" minHeight="full">
-              <CardHeader>
-                <Heading as="h2" size="md">
-                  Integration Guide
-                </Heading>
-              </CardHeader>
-              <CardBody>
-                <Link href={integrationDocs.href} isExternal marginLeft="28px">
-                  <HStack align="center" fontSize={18} spacing={4}>
-                    <IconWrapper>{integrationDocs.icon}</IconWrapper>
-                    <Text>Open {integrationDocs.label} Integration Guide</Text>
-                    <ExternalLinkIcon />
-                  </HStack>
-                </Link>
-              </CardBody>
-            </Card>
           </HStack>
-          {publicEnv.data?.DEMO_PROJECT_SLUG && (
-            <Text>
-              You can also open our{" "}
-              <Link
-                textDecoration="underline"
-                href={`https://app.langwatch.ai/${publicEnv.data.DEMO_PROJECT_SLUG}`}
-                target="_blank"
-              >
-                demo account
-              </Link>{" "}
-              to look around, we have a sample chatbot integrated there so you
-              can explore.
-            </Text>
-          )}
         </VStack>
         <Text fontSize="14px">
           Having issues? Messages not visible yet? Check out our{" "}
