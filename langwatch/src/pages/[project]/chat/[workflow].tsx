@@ -32,10 +32,10 @@ export default function ChatPage() {
   }
 
   return (
-    <Box h="100vh">
-      <Box h="100%" bg="gray.100" p={16} pt={4}>
+    <Box height="100vh">
+      <Box height="full" bg="gray.100" p={16} pt={4}>
         <FullLogo />
-        <Card h="90%" bg="white" p={5} mt={4}>
+        <Card height="90%" bg="white" p={5} mt={4}>
           <ChatBox
             useApi={true}
             workflowId={workflowId}

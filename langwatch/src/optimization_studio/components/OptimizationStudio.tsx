@@ -6,7 +6,6 @@ import {
   HStack,
   Text,
   Tooltip,
-  useDisclosure,
   useTheme,
   VStack
 } from "@chakra-ui/react";

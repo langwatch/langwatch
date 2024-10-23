@@ -34,14 +34,13 @@ import { SmallLabel } from "../../components/SmallLabel";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
 import { useGetDatasetData } from "../hooks/useGetDatasetData";
+import { useModelProviderKeys } from "../hooks/useModelProviderKeys";
 import { useOptimizationExecution } from "../hooks/useOptimizationExecution";
 import { useWorkflowStore } from "../hooks/useWorkflowStore";
 import type { Entry } from "../types/dsl";
 import { OPTIMIZERS } from "../types/optimizers";
-import { VersionToBeEvaluated } from "./Evaluate";
-import { useVersionState } from "./History";
-import { useModelProviderKeys } from "../hooks/useModelProviderKeys";
 import { AddModelProviderKey } from "./AddModelProviderKey";
+import { useVersionState, VersionToBeUsed } from "./History";
 
 const optimizerOptions: {
   label: string;
@@ -241,6 +240,8 @@ export function OptimizeModalContent({ onClose }: { onClose: () => void }) {
         return;
       }
 
+      void versions.refetch();
+
       startOptimizationExecution({
         workflow_version_id: versionId,
         optimizer: optimizer.value,
@@ -258,6 +259,7 @@ export function OptimizeModalContent({ onClose }: { onClose: () => void }) {
       toast,
       trainTotal,
       versionToBeEvaluated.id,
+      versions,
       workflowId,
     ]
   );
@@ -310,7 +312,7 @@ export function OptimizeModalContent({ onClose }: { onClose: () => void }) {
       <ModalBody display="flex" flexDirection="column" gap={4}>
         <VStack align="start" width="full" spacing={4}>
           <VStack align="start" width="full">
-            <VersionToBeEvaluated
+            <VersionToBeUsed
               form={
                 form as unknown as UseFormReturn<{
                   version: string;
@@ -406,7 +408,10 @@ export function OptimizeModalContent({ onClose }: { onClose: () => void }) {
                 variant="outline"
                 type="submit"
                 leftIcon={<CheckSquare size={16} />}
-                isLoading={optimizationState?.status === "waiting"}
+                isLoading={
+                  commitVersion.isLoading ||
+                  optimizationState?.status === "waiting"
+                }
                 isDisabled={!!isDisabled}
               >
                 {canSaveNewVersion
