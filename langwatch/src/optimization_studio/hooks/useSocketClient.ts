@@ -288,14 +288,25 @@ export const useSocketClient = () => {
   useEffect(() => {
     if (instanceId !== instances) return;
 
+    const pythonReconnect = () => {
+      pythonDisconnectedTimeout = setTimeout(() => {
+        if (!document.hasFocus()) {
+          // Postpone 10 more seconds if tab is not focused
+          sendMessage({ type: "is_alive", payload: {} });
+          pythonReconnect();
+          return;
+        }
+
+        setSocketStatus("connecting-python");
+      }, 10_000);
+    };
+
     const isAlive = () => {
       if (instanceId !== instances || !document.hasFocus()) return;
       lastIsAliveCallTimestamp = Date.now();
       sendMessage({ type: "is_alive", payload: {} });
       if (socketStatus === "connected" && !pythonDisconnectedTimeout) {
-        pythonDisconnectedTimeout = setTimeout(() => {
-          setSocketStatus("connecting-python");
-        }, 10_000);
+        pythonReconnect();
       }
     };
 
