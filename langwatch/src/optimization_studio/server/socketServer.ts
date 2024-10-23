@@ -60,7 +60,7 @@ const handleClientMessage = async (
       case "stop_evaluation_execution":
       case "execute_optimization":
       case "stop_optimization_execution":
-        await callPython(ws, message);
+        await callPython(ws, message, projectId);
         break;
       default:
         //@ts-expect-error
@@ -101,7 +101,11 @@ const handleComponentError = (
   });
 };
 
-const callPython = async (ws: WebSocket, event: StudioClientEvent) => {
+const callPython = async (
+  ws: WebSocket,
+  event: StudioClientEvent,
+  projectId: string
+) => {
   let response: Response;
   try {
     // TODO: add timeout for initial connection
@@ -111,6 +115,8 @@ const callPython = async (ws: WebSocket, event: StudioClientEvent) => {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          // To keep load balancer sticky
+          Cookie: `LW_PROJECT_ID=${projectId}`,
         },
         body: JSON.stringify(event),
       }
