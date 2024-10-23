@@ -127,10 +127,16 @@ resource "aws_alb_target_group" "langwatch_nlp_tg" {
     healthy_threshold   = 2
     unhealthy_threshold = 3
     timeout             = 5
-    path                = "/docs"
+    path                = "/health"
     protocol            = "HTTP"
     interval            = 30
     matcher             = "200-299"
+  }
+
+  stickiness {
+    enabled     = true
+    type        = "app_cookie"
+    cookie_name = "LW_PROJECT_ID"
   }
 }
 
@@ -178,7 +184,8 @@ resource "aws_lb" "langwatch_nlp_alb" {
 
   enable_deletion_protection = false
 
-  idle_timeout = 60
+  idle_timeout = 4000
+  enable_http2 = true
 
   access_logs {
     bucket  = aws_s3_bucket.alb_logs.bucket
