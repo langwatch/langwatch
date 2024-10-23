@@ -96,7 +96,7 @@ def parse_evaluator(component: Evaluator, workflow: Workflow) -> dspy.Module:
         raise ValueError("Evaluator class not specified")
 
     if component.cls == "LangWatchEvaluator":
-        settings = parse_fields(component.parameters or [])
+        settings = parse_fields(component.parameters or [], autoparse=False)
         if not component.evaluator:
             raise ValueError("Evaluator not specified")
         return LangWatchEvaluator(
@@ -127,9 +127,13 @@ def parse_retriever(
     return ContextsRetriever(rm=RETRIEVERS[component.cls], **kwargs)
 
 
-def parse_fields(fields: List[Field]) -> Dict[str, Any]:
+def parse_fields(fields: List[Field], autoparse=True) -> Dict[str, Any]:
     return {
-        field.identifier: autoparse_field_value(field, field.defaultValue)
+        field.identifier: (
+            autoparse_field_value(field, field.defaultValue)
+            if autoparse
+            else field.defaultValue
+        )
         for field in fields
         if field.defaultValue
     }

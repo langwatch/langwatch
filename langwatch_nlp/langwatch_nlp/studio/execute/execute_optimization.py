@@ -37,14 +37,12 @@ from langwatch_nlp.studio.types.events import (
     StudioServerEvent,
 )
 from langwatch_nlp.studio.utils import (
-    disable_dsp_caching,
     get_input_keys,
     get_output_keys,
     node_llm_config_to_dspy_lm,
     transpose_inline_dataset_to_object_list,
 )
 
-from dspy.evaluate import Evaluate
 from sklearn.model_selection import train_test_split
 
 import dspy.primitives.module

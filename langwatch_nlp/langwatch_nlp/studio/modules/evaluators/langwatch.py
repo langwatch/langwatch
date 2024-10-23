@@ -12,6 +12,8 @@ from langevals_core.base_evaluator import (
 import langwatch
 
 from langwatch_nlp.studio.dspy.evaluation import Evaluator
+from langwatch.evaluations import EvaluationResultModel
+from dsp.modules.cache_utils import CacheMemory
 
 
 class LangWatchEvaluator(Evaluator):
@@ -34,7 +36,7 @@ class LangWatchEvaluator(Evaluator):
         if "contexts" in kwargs and type(kwargs["contexts"]) != list:
             kwargs["contexts"] = [kwargs["contexts"]]
 
-        result = langwatch.evaluations.evaluate(
+        result = _cached_langwatch_evaluate(
             self.evaluator,
             name=self.name,
             settings=self.settings,
@@ -64,3 +66,16 @@ class LangWatchEvaluator(Evaluator):
                 error_type="Error",
                 traceback=[],
             )
+
+
+@CacheMemory.cache
+def _cached_langwatch_evaluate(
+    evaluator: str, name: str, settings: dict, api_key: str, **kwargs
+) -> EvaluationResultModel:
+    return langwatch.evaluations.evaluate(
+        evaluator,
+        name=name,
+        settings=settings,
+        api_key=api_key,
+        **kwargs,
+    )
