@@ -35,7 +35,7 @@ export default function MessagesOrIntegrationGuide() {
     { enabled: !!project }
   );
 
-  if (!isOrganizationFeatureEnabled("OPTIMIZATION_STUDIO")) {
+  if (isOrganizationFeatureEnabled("OPTIMIZATION_STUDIO")) {
     return (
       <DashboardLayout>
         <Container maxWidth="1200px" padding={6}>

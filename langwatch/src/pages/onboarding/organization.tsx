@@ -70,7 +70,7 @@ type OrganizationFormData = {
   solution: string;
   projectType: string;
   companySize: string;
-  useCases: string;
+  projectTypes: string;
   howDidYouHearAboutUs: string;
   companyType: string;
 };
@@ -116,6 +116,7 @@ export default function OrganizationOnboarding() {
       {
         orgName: data.organizationName,
         phoneNumber: data.phoneNumber,
+        signUpData: data,
       },
       {
         onError: () => {
@@ -190,7 +191,7 @@ export default function OrganizationOnboarding() {
     "1000+ employees": <Users size={16} color="orange" />,
   };
 
-  const useCases = {
+  const projectTypes = {
     "Q&A systems": <HelpCircle size={16} color="orange" />,
     Chatbots: <MessageCircle size={16} color="orange" />,
     "Text generation": <FileText size={16} color="orange" />,
@@ -218,7 +219,7 @@ export default function OrganizationOnboarding() {
   const selectedValueSolution = watch("solution");
   const selectedValueCompanyType = watch("companyType");
   const selectedValueCompanySize = watch("companySize");
-  const selectedValueUseCases = watch("useCases");
+  const selectedValueProjectTypes = watch("projectTypes");
   const selectedValueHowDidYouHearAboutUs = watch("howDidYouHearAboutUs");
 
   console.log(errors);
@@ -240,7 +241,7 @@ export default function OrganizationOnboarding() {
   };
 
   const checkThirdStep = () => {
-    if (getValues("useCases") && getValues("howDidYouHearAboutUs")) {
+    if (getValues("projectTypes") && getValues("howDidYouHearAboutUs")) {
       onSubmit(getValues());
       // setActiveStep(3);
     }
@@ -506,23 +507,23 @@ export default function OrganizationOnboarding() {
                 Enter your project type and how you heard about LangWatch to
                 customize your LangWatch experience.
               </Text>
-              <FormControl isInvalid={!!errors.useCases}>
+              <FormControl isInvalid={!!errors.projectTypes}>
                 <FormLabel>Type of project?</FormLabel>
                 <RadioGroup
-                  value={selectedValueUseCases || ""}
-                  onChange={(value) => setValue("useCases", value)}
+                  value={selectedValueProjectTypes || ""}
+                  onChange={(value) => setValue("projectTypes", value)}
                 >
                   <Box {...group}>
                     <HStack width="full" wrap="wrap">
-                      {Object.entries(useCases).map(([value, icon]) => {
+                      {Object.entries(projectTypes).map(([value, icon]) => {
                         return (
                           <CustomRadio
                             key={value}
                             value={value}
-                            registerProps={register("useCases", {
+                            registerProps={register("projectTypes", {
                               required: "Please select a project type",
                             })}
-                            selectedValue={selectedValueUseCases}
+                            selectedValue={selectedValueProjectTypes}
                             icon={icon}
                           />
                         );
@@ -530,7 +531,9 @@ export default function OrganizationOnboarding() {
                     </HStack>
                   </Box>
                 </RadioGroup>
-                <FormErrorMessage>{errors.useCases?.message}</FormErrorMessage>
+                <FormErrorMessage>
+                  {errors.projectTypes?.message}
+                </FormErrorMessage>
               </FormControl>
               <FormControl isInvalid={!!errors.howDidYouHearAboutUs}>
                 <FormLabel>How did you hear about us?</FormLabel>

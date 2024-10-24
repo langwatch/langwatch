@@ -39,12 +39,16 @@ import {
 import { SetupLayout } from "~/components/SetupLayout";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
 import { useRequiredSession } from "../../../hooks/useRequiredSession";
-import { Plus } from "react-feather";
+import { TrendingUp } from "react-feather";
+import { PuzzleIcon } from "~/components/icons/Puzzle";
 import {
   TechStackSelector,
   type ProjectFormData,
 } from "~/components/TechStack";
 import { api } from "../../../utils/api";
+
+import analyticsImage from "../images/analytics.png";
+import optimizationImage from "../images/optimization.png";
 
 export default function ProjectOnboardingSelect() {
   useRequiredSession();
@@ -55,8 +59,6 @@ export default function ProjectOnboardingSelect() {
     },
   });
   const { watch, register, setValue, formState } = form;
-
-  console.log("formState", formState);
 
   const router = useRouter();
   const { organization } = useOrganizationTeamProject({
@@ -127,7 +129,8 @@ export default function ProjectOnboardingSelect() {
 
   const projectTypes = {
     optimization: {
-      heading: "LangWatch Optimization Studio",
+      heading: "Optimization Studio",
+      icon: <PuzzleIcon />,
       image: "/images/optimization.png",
       text: (
         <UnorderedList>
@@ -149,26 +152,22 @@ export default function ProjectOnboardingSelect() {
     },
     monitoring: {
       heading: "Monitoring and Analytics",
-      image: "/images/monitoring.avif",
+      icon: <TrendingUp />,
+      image: "/images/analytics.png",
       text: (
         <UnorderedList>
           <ListItem>
             Gain <b>full visibility</b> into your LLM features
           </ListItem>
           <ListItem>
-            Add <b>evaluations</b> (from our library or bring your OWN) and{" "}
-            <b>guardrails</b> to your LLM-app
+            Add <b>evaluations and guardrails</b> from 30+ libraries or{" "}
+            <b>build your own</b>
           </ListItem>
           <ListItem>
-            <b>Add alerts</b> to slack or e-mail of any errors or
-            non-qualitative outputs.
+            <b>Get alerts</b> to slack or e-mail of any errors
           </ListItem>
           <ListItem>
-            Share user-insights (topics, feedback) & product performance via our{" "}
-            <b>Analytics Dashboard.</b>
-          </ListItem>
-          <ListItem>
-            <b>Create datasets</b> from real-world user data
+            Share the performance via <b>Analytics</b> to anyone
           </ListItem>
         </UnorderedList>
       ),
@@ -181,11 +180,13 @@ export default function ProjectOnboardingSelect() {
       <form onSubmit={form.handleSubmit(onSubmit)}>
         <VStack gap={4} alignItems="left">
           <Heading as="h1" fontSize="x-large">
-            Select your solution
+            Let’s kick things off by monitoring, evaluating, and optimizing your
+            LLMs! 🚀
           </Heading>
 
           <Text paddingBottom={4} fontSize="14px">
-            We offer two solutions to get started with LangWatch
+            With LangWatch, you’ve got two awesome solutions at your fingertips,
+            and you can totally use both! Just pick one to get started below.
             <br />
           </Text>
 
@@ -204,6 +205,7 @@ export default function ProjectOnboardingSelect() {
                         heading={details.heading}
                         text={details.text}
                         image={details.image}
+                        icon={details.icon}
                         registerProps={register("projectType", {
                           required: "Please select a project type",
                         })}
@@ -227,7 +229,6 @@ export default function ProjectOnboardingSelect() {
               type="submit"
               isDisabled={createProject.isLoading}
               onClick={() => {
-                alert("clicked");
                 form.handleSubmit(onSubmit);
               }}
             >
@@ -249,6 +250,7 @@ const CustomRadio = ({
   heading,
   text,
   image,
+  icon,
 }: {
   value: string;
   registerProps: ReturnType<UseFormRegister<ProjectFormData>>;
@@ -256,6 +258,7 @@ const CustomRadio = ({
   heading: string;
   text: React.ReactNode;
   image: string;
+  icon: React.ReactNode;
 }) => {
   return (
     <Box as="label" key={value} width="50%">
@@ -281,16 +284,16 @@ const CustomRadio = ({
         _active={{ borderColor: "orange.600" }}
       >
         <CardHeader>
-          <Heading size="md">{heading}</Heading>
-          <HStack>
+          <Heading size="md">
+            <HStack>
+              {icon}
+              <Text>{heading}</Text>
+            </HStack>
+          </Heading>
+          <HStack padding={6}>
+            {/* {icon} */}
             <Spacer />
-            <Image
-              src={image}
-              alt={heading}
-              marginTop={4}
-              width={320}
-              height={200}
-            />
+            <Image src={image} alt={heading} width="300px" height="200px" />
             <Spacer />
           </HStack>
         </CardHeader>
