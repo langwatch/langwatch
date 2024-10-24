@@ -12,7 +12,10 @@ import { type PropsWithChildren } from "react";
 import { signOut } from "next-auth/react";
 import { LogOut } from "react-feather";
 
-export const SetupLayout = ({ children }: PropsWithChildren) => {
+export const SetupLayout = ({
+  children,
+  maxWidth = "container.sm",
+}: PropsWithChildren<{ maxWidth?: string }>) => {
   return (
     <Box
       width="full"
@@ -30,7 +33,7 @@ export const SetupLayout = ({ children }: PropsWithChildren) => {
           <LogOut />
         </Button>
       </HStack>
-      <Container>
+      <Container maxWidth={maxWidth}>
         <Card>
           <CardBody>{children}</CardBody>
         </Card>

@@ -25,6 +25,7 @@ export type ProjectFormData = {
   framework: string;
   teamId: string;
   newTeamName: string;
+  projectType?: string;
 };
 
 type DocsLink = {

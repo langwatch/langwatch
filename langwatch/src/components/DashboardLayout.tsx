@@ -323,7 +323,6 @@ export const DashboardLayout = ({
     project,
     hasOrganizationPermission,
     isPublicRoute,
-    isOrganizationFeatureEnabled,
   } = useOrganizationTeamProject();
   const usage = api.limits.getUsage.useQuery(
     { organizationId: organization?.id ?? "" },
@@ -384,15 +383,13 @@ export const DashboardLayout = ({
           </Box>
 
           <VStack spacing={8}>
-            {(isOrganizationFeatureEnabled("OPTIMIZATION_STUDIO") ||
-              publicEnv.data?.NODE_ENV === "development") && (
-              <SideMenuLink
-                path={projectRoutes.workflows.path}
-                icon={PuzzleIcon}
-                label={projectRoutes.workflows.title}
-                project={project}
-              />
-            )}
+            <SideMenuLink
+              path={projectRoutes.workflows.path}
+              icon={PuzzleIcon}
+              label={projectRoutes.workflows.title}
+              project={project}
+            />
+
             <SideMenuLink
               path={projectRoutes.home.path}
               icon={TrendingUp}

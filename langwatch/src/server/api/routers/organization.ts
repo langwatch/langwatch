@@ -74,6 +74,20 @@ export const organizationRouter = createTRPCRouter({
       z.object({
         orgName: z.string().optional(),
         phoneNumber: z.string().optional(),
+        signUpData: z
+          .object({
+            usage: z.string().optional(),
+            solution: z.string().optional(),
+            terms: z.boolean().optional(),
+            companyType: z.string().optional(),
+            companySize: z.string().optional(),
+            projectType: z.string().optional(),
+            howDidYouHearAboutUs: z.string().optional(),
+            otherCompanyType: z.string().optional(),
+            otherProjectType: z.string().optional(),
+            otherHowDidYouHearAboutUs: z.string().optional(),
+          })
+          .optional(),
       })
     )
     .use(skipPermissionCheck)
@@ -106,6 +120,7 @@ export const organizationRouter = createTRPCRouter({
             name: orgName,
             slug: orgSlug,
             phoneNumber: input.phoneNumber,
+            signupData: input.signUpData,
           },
         });
 

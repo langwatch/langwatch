@@ -15,12 +15,19 @@ import {
   Card,
   CardHeader,
   CardBody,
+  List,
+  ListItem,
+  ListIcon,
+  OrderedList,
+  UnorderedList,
+  Button,
 } from "@chakra-ui/react";
 import { DashboardLayout } from "./DashboardLayout";
 import { ExternalLinkIcon } from "@chakra-ui/icons";
 import { APIKeyCopyInput } from "../pages/authorize";
 import { api } from "../utils/api";
 import { IconWrapper } from "./IconWrapper";
+import { IntegrationChecks } from "./IntegrationChecks";
 
 export const ProjectIntegration = () => {
   const publicEnv = api.publicEnv.useQuery(
@@ -59,85 +66,145 @@ export const ProjectIntegration = () => {
         width="full"
         spacing={6}
       >
-        <VStack
-          align="flex-start"
-          spacing={6}
-          borderBottomWidth={1}
-          borderBottomColor="gray.400"
-          width="full"
-          paddingTop={6}
-          paddingBottom={6}
-        >
-          <HStack width={"full"}>
-            <Heading as="h1">
-              {framework?.label} {language?.label} Integration
+        <HStack align="start">
+          <VStack
+            align="flex-start"
+            spacing={6}
+            paddingTop={4}
+            borderRightWidth={1}
+            borderRightColor="gray.400"
+            height="full"
+            paddingRight={2}
+          >
+            <Heading as="h2" size="md">
+              Integration checks
             </Heading>
-            <Spacer />
-            {isRefetching && <Spinner />}
-          </HStack>
-          <Text>
-            Follow the instructions on our docs to setup your project with
-            LangWatch, this page will update automatically as soon as the first
-            messages arrive.
-          </Text>
-          {typeof window !== "undefined" &&
-            window.location.hostname !== "app.langwatch.ai" && (
-              <Text>
-                Use{" "}
-                <code>
-                  {`LANGWATCH_ENDPOINT="${window.location.protocol}//${window.location.host}"`}
-                </code>{" "}
-                when setting it up to point to this instance
-              </Text>
-            )}
-          <HStack align="stretch" spacing={6} wrap="wrap">
-            <Card width="450px">
-              <CardHeader>
-                <Heading as="h2" size="md">
-                  API Key
-                </Heading>
-              </CardHeader>
-              <CardBody>
-                <VStack spacing={6}>
-                  <Text>
-                    Copy your LangWatch API key to use for the integration
-                  </Text>
-                  <APIKeyCopyInput />
-                </VStack>
-              </CardBody>
-            </Card>
-            <Card width="450px" minHeight="full">
-              <CardHeader>
-                <Heading as="h2" size="md">
-                  Integration Guide
-                </Heading>
-              </CardHeader>
-              <CardBody>
-                <Link href={integrationDocs.href} isExternal marginLeft="28px">
-                  <HStack align="center" fontSize={18} spacing={4}>
-                    <IconWrapper>{integrationDocs.icon}</IconWrapper>
-                    <Text>Open {integrationDocs.label} Integration Guide</Text>
-                    <ExternalLinkIcon />
-                  </HStack>
-                </Link>
-              </CardBody>
-            </Card>
-          </HStack>
-          {publicEnv.data?.DEMO_PROJECT_SLUG && (
+            <IntegrationChecks />
+          </VStack>
+          <VStack
+            align="flex-start"
+            spacing={6}
+            width="full"
+            paddingLeft={2}
+            paddingTop={4}
+            paddingBottom={4}
+          >
+            <HStack width={"full"}>
+              <Heading as="h2" size="md">
+                Integration guides
+              </Heading>
+              <Spacer />
+              {isRefetching && <Spinner />}
+            </HStack>
             <Text>
-              You can also open our{" "}
-              <Link
-                textDecoration="underline"
-                href={`https://app.langwatch.ai/${publicEnv.data.DEMO_PROJECT_SLUG}`}
-                target="_blank"
-              >
-                demo account
-              </Link>{" "}
-              to look around, we have a sample chatbot integrated there so you
-              can explore.
+              Follow the instructions on our docs to setup your project with
+              LangWatch, this page will update automatically as soon as the
+              first messages arrive.
             </Text>
-          )}
-        </VStack>
+
+            {typeof window !== "undefined" &&
+              window.location.hostname !== "app.langwatch.ai" && (
+                <Text>
+                  Use{" "}
+                  <code>
+                    {`LANGWATCH_ENDPOINT="${window.location.protocol}//${window.location.host}"`}
+                  </code>{" "}
+                  when setting it up to point to this instance
+                </Text>
+              )}
+            <HStack align="stretch" spacing={6}>
+              <Card width="400px">
+                <CardHeader>
+                  <Heading as="h2" size="md">
+                    API Key
+                  </Heading>
+                </CardHeader>
+                <CardBody>
+                  <VStack spacing={6}>
+                    <Text>
+                      Copy your LangWatch API key to use for the integration
+                    </Text>
+                    <APIKeyCopyInput />
+                  </VStack>
+                </CardBody>
+              </Card>
+              <Card minHeight="full">
+                <CardHeader>
+                  <Heading as="h2" size="md">
+                    Integration Guides
+                  </Heading>
+                </CardHeader>
+                <CardBody>
+                  <Link
+                    href={integrationDocs.href}
+                    isExternal
+                    marginLeft="28px"
+                  >
+                    <HStack align="center" fontSize={18} spacing={4}>
+                      <IconWrapper width="36px" height="36px">
+                        {techStackLanguageOptions.python.icon}
+                      </IconWrapper>
+                      <Text>
+                        Open {techStackLanguageOptions.python.label} Integration
+                        Guide
+                      </Text>
+                      <ExternalLinkIcon />
+                    </HStack>
+                  </Link>
+                  <Link
+                    href={integrationDocs.href}
+                    isExternal
+                    marginLeft="28px"
+                  >
+                    <HStack align="center" fontSize={18} spacing={4}>
+                      <IconWrapper width="36px" height="36px">
+                        {techStackLanguageOptions.typescript.icon}
+                      </IconWrapper>
+                      <Text>
+                        Open {techStackLanguageOptions.typescript.label}{" "}
+                        Integration Guide
+                      </Text>
+                      <ExternalLinkIcon />
+                    </HStack>
+                  </Link>
+                  <Link
+                    href={integrationDocs.href}
+                    isExternal
+                    marginLeft="28px"
+                  >
+                    <HStack align="center" fontSize={18} spacing={4}>
+                      <IconWrapper width="36px" height="36px">
+                        {techStackLanguageOptions.other.icon}
+                      </IconWrapper>
+                      <Text>Open Custom REST Integration Guide</Text>
+                      <ExternalLinkIcon />
+                    </HStack>
+                  </Link>
+                </CardBody>
+              </Card>
+              <Card width="300px">
+                <CardHeader>
+                  <Heading as="h2" size="md">
+                    Demo Account
+                  </Heading>
+                </CardHeader>
+                <CardBody>
+                  <VStack spacing={6} align="start">
+                    <Text>
+                      View our demo account to see how LangWatch works with a
+                      sample chatbot.
+                    </Text>
+                    <Link href={`https://app.langwatch.ai/demo`} isExternal>
+                      <Button colorScheme="orange" size="lg">
+                        View Demo
+                      </Button>
+                    </Link>
+                  </VStack>
+                </CardBody>
+              </Card>
+            </HStack>
+          </VStack>
+        </HStack>
         <Text fontSize="14px">
           Having issues? Messages not visible yet? Check out our{" "}
           <Link
