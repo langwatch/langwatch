@@ -81,8 +81,11 @@ export const organizationRouter = createTRPCRouter({
             terms: z.boolean().optional(),
             companyType: z.string().optional(),
             companySize: z.string().optional(),
-            projectTypes: z.string().optional(),
+            projectType: z.string().optional(),
             howDidYouHearAboutUs: z.string().optional(),
+            otherCompanyType: z.string().optional(),
+            otherProjectType: z.string().optional(),
+            otherHowDidYouHearAboutUs: z.string().optional(),
           })
           .optional(),
       })

@@ -65,7 +65,6 @@ export const BookAMeeting = () => {
               alt="Optimization"
               width="400px"
             />
-            {/* <Box height="300px" width="400px" backgroundColor="gray.100"></Box> */}
 
             <VStack align="start" spacing={4}>
               <Heading as="h2" size="md">
@@ -79,7 +78,7 @@ export const BookAMeeting = () => {
                   <b>Upload your datasets</b> for easy performance tracking
                 </ListItem>
                 <ListItem>
-                  <b>Automatically evaluate</b> the efficiency of your models
+                  <b>Automatically evaluate</b> the performance of your models
                 </ListItem>
                 <ListItem>
                   <b>Optimize</b> your solution using advanced DSPy algorithms

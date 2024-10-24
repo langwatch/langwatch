@@ -7,7 +7,7 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 export const IntegrationChecks = () => {
   const { project } = useOrganizationTeamProject();
 
-  const { data } = api.integrationsChecks.getCheckStatus.useQuery(
+  const integrationChecks = api.integrationsChecks.getCheckStatus.useQuery(
     { projectId: project?.id ?? "" },
     { enabled: !!project, refetchOnWindowFocus: false }
   );
@@ -21,37 +21,38 @@ export const IntegrationChecks = () => {
         </ListItem>
         <ListItem>
           <ListIcon
-            as={data?.project ? CheckCircleIcon : Circle}
-            color={data?.project ? "green.500" : "gray.500"}
+            as={integrationChecks.data?.project ? CheckCircleIcon : Circle}
+            color={integrationChecks.data?.project ? "green.500" : "gray.500"}
           />
           Sync your first message
         </ListItem>
         <ListItem>
           <ListIcon
-            as={data?.checks ? CheckCircleIcon : Circle}
-            color={data?.checks ? "green.500" : "gray.500"}
+            as={integrationChecks.data?.checks ? CheckCircleIcon : Circle}
+            color={integrationChecks.data?.checks ? "green.500" : "gray.500"}
           />
           Set up your first evaluation
         </ListItem>
         <ListItem>
           <ListIcon
-            as={data?.triggers ? CheckCircleIcon : Circle}
-            color={data?.triggers ? "green.500" : "gray.500"}
+            as={integrationChecks.data?.triggers ? CheckCircleIcon : Circle}
+            color={integrationChecks.data?.triggers ? "green.500" : "gray.500"}
           />
           Set up an alert
         </ListItem>
-        {/* You can also use custom icons from react-icons */}
         <ListItem>
           <ListIcon
-            as={data?.datasets ? CheckCircleIcon : Circle}
-            color={data?.datasets ? "green.500" : "gray.500"}
+            as={integrationChecks.data?.datasets ? CheckCircleIcon : Circle}
+            color={integrationChecks.data?.datasets ? "green.500" : "gray.500"}
           />
           Create a dataset from the messages
         </ListItem>
         <ListItem>
           <ListIcon
-            as={data?.customGraphs ? CheckCircleIcon : Circle}
-            color={data?.customGraphs ? "green.500" : "gray.500"}
+            as={integrationChecks.data?.customGraphs ? CheckCircleIcon : Circle}
+            color={
+              integrationChecks.data?.customGraphs ? "green.500" : "gray.500"
+            }
           />
           Create a custom dashboard
         </ListItem>

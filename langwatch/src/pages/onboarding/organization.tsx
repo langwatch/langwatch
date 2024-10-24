@@ -70,9 +70,11 @@ type OrganizationFormData = {
   solution: string;
   projectType: string;
   companySize: string;
-  projectTypes: string;
   howDidYouHearAboutUs: string;
   companyType: string;
+  otherCompanyType: string;
+  otherProjectType: string;
+  otherHowDidYouHearAboutUs: string;
 };
 
 export default function OrganizationOnboarding() {
@@ -111,7 +113,6 @@ export default function OrganizationOnboarding() {
   const onSubmit: SubmitHandler<OrganizationFormData> = (
     data: OrganizationFormData
   ) => {
-    console.log(data);
     createOrganization.mutate(
       {
         orgName: data.organizationName,
@@ -191,16 +192,14 @@ export default function OrganizationOnboarding() {
     "1000+ employees": <Users size={16} color="orange" />,
   };
 
-  const projectTypes = {
+  const projectType = {
     "Q&A systems": <HelpCircle size={16} color="orange" />,
     Chatbots: <MessageCircle size={16} color="orange" />,
     "Text generation": <FileText size={16} color="orange" />,
-    "Retrieval-Augmented Generation (RAG)": (
-      <Database size={16} color="orange" />
-    ),
+    " RAG": <Database size={16} color="orange" />,
     "Classification tasks": <Tag size={16} color="orange" />,
     "Custom Evaluation": <Check size={16} color="orange" />,
-    // Other: <MoreHorizontal size={16} color="orange" />,
+    Other: <MoreHorizontal size={16} color="orange" />,
   };
 
   const howDidYouHearAboutUs = {
@@ -210,7 +209,7 @@ export default function OrganizationOnboarding() {
     Newsletter: <Mail size={16} color="orange" />,
     Conference: <Mic size={16} color="orange" />,
     Partner: <LinkIcon size={16} color="orange" />,
-    // Other: <MoreHorizontal size={16} color="orange" />,
+    Other: <MoreHorizontal size={16} color="orange" />,
   };
 
   const group = getRootProps();
@@ -219,10 +218,8 @@ export default function OrganizationOnboarding() {
   const selectedValueSolution = watch("solution");
   const selectedValueCompanyType = watch("companyType");
   const selectedValueCompanySize = watch("companySize");
-  const selectedValueProjectTypes = watch("projectTypes");
+  const selectedValueProjectType = watch("projectType");
   const selectedValueHowDidYouHearAboutUs = watch("howDidYouHearAboutUs");
-
-  console.log(errors);
 
   const checkFirstStep = () => {
     if (
@@ -241,9 +238,8 @@ export default function OrganizationOnboarding() {
   };
 
   const checkThirdStep = () => {
-    if (getValues("projectTypes") && getValues("howDidYouHearAboutUs")) {
-      onSubmit(getValues());
-      // setActiveStep(3);
+    if (getValues("projectType") && getValues("howDidYouHearAboutUs")) {
+      return true;
     }
   };
 
@@ -428,15 +424,25 @@ export default function OrganizationOnboarding() {
                     <HStack width="full" wrap="wrap">
                       {Object.entries(companyType).map(([value, icon]) => {
                         return (
-                          <CustomRadio
-                            key={value}
-                            value={value}
-                            registerProps={register("companyType", {
-                              required: "Please select a company type",
-                            })}
-                            selectedValue={selectedValueCompanyType}
-                            icon={icon}
-                          />
+                          <>
+                            <CustomRadio
+                              key={value}
+                              value={value}
+                              registerProps={register("companyType", {
+                                required: "Please select a company type",
+                              })}
+                              selectedValue={selectedValueCompanyType}
+                              icon={icon}
+                            />
+                            {value === "Other" &&
+                              selectedValueCompanyType === "Other" && (
+                                <Input
+                                  type="text"
+                                  {...register("otherCompanyType")}
+                                  placeholder="Please specify"
+                                />
+                              )}
+                          </>
                         );
                       })}
                     </HStack>
@@ -507,32 +513,42 @@ export default function OrganizationOnboarding() {
                 Enter your project type and how you heard about LangWatch to
                 customize your LangWatch experience.
               </Text>
-              <FormControl isInvalid={!!errors.projectTypes}>
+              <FormControl isInvalid={!!errors.projectType}>
                 <FormLabel>Type of project?</FormLabel>
                 <RadioGroup
-                  value={selectedValueProjectTypes || ""}
-                  onChange={(value) => setValue("projectTypes", value)}
+                  value={selectedValueProjectType || ""}
+                  onChange={(value) => setValue("projectType", value)}
                 >
                   <Box {...group}>
                     <HStack width="full" wrap="wrap">
-                      {Object.entries(projectTypes).map(([value, icon]) => {
+                      {Object.entries(projectType).map(([value, icon]) => {
                         return (
-                          <CustomRadio
-                            key={value}
-                            value={value}
-                            registerProps={register("projectTypes", {
-                              required: "Please select a project type",
-                            })}
-                            selectedValue={selectedValueProjectTypes}
-                            icon={icon}
-                          />
+                          <>
+                            <CustomRadio
+                              key={value}
+                              value={value}
+                              registerProps={register("projectType", {
+                                required: "Please select a project type",
+                              })}
+                              selectedValue={selectedValueProjectType}
+                              icon={icon}
+                            />
+                            {value === "Other" &&
+                              selectedValueProjectType === "Other" && (
+                                <Input
+                                  type="text"
+                                  {...register("otherProjectType")}
+                                  placeholder="Please specify"
+                                />
+                              )}
+                          </>
                         );
                       })}
                     </HStack>
                   </Box>
                 </RadioGroup>
                 <FormErrorMessage>
-                  {errors.projectTypes?.message}
+                  {errors.projectType?.message}
                 </FormErrorMessage>
               </FormControl>
               <FormControl isInvalid={!!errors.howDidYouHearAboutUs}>
@@ -546,16 +562,32 @@ export default function OrganizationOnboarding() {
                       {Object.entries(howDidYouHearAboutUs).map(
                         ([value, icon]) => {
                           return (
-                            <CustomRadio
-                              key={value}
-                              value={value}
-                              registerProps={register("howDidYouHearAboutUs", {
-                                required:
-                                  "Please select how you heard about us",
-                              })}
-                              selectedValue={selectedValueHowDidYouHearAboutUs}
-                              icon={icon}
-                            />
+                            <>
+                              <CustomRadio
+                                key={value}
+                                value={value}
+                                registerProps={register(
+                                  "howDidYouHearAboutUs",
+                                  {
+                                    required:
+                                      "Please select how you heard about us",
+                                  }
+                                )}
+                                selectedValue={
+                                  selectedValueHowDidYouHearAboutUs
+                                }
+                                icon={icon}
+                              />
+                              {value === "Other" &&
+                                selectedValueHowDidYouHearAboutUs ===
+                                  "Other" && (
+                                  <Input
+                                    type="text"
+                                    {...register("otherHowDidYouHearAboutUs")}
+                                    placeholder="Please specify"
+                                  />
+                                )}
+                            </>
                           );
                         }
                       )}
@@ -578,8 +610,12 @@ export default function OrganizationOnboarding() {
                 <Button
                   colorScheme="orange"
                   type="submit"
-                  disabled={createOrganization.isLoading}
-                  onClick={() => checkThirdStep(onSubmit)}
+                  disabled={
+                    createOrganization.isLoading || createOrganization.isSuccess
+                  }
+                  onClick={() => {
+                    checkThirdStep();
+                  }}
                 >
                   {createOrganization.isLoading || createOrganization.isSuccess
                     ? "Loading..."

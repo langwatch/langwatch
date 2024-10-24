@@ -1,54 +1,36 @@
 import {
   Box,
   Button,
+  Card,
+  CardBody,
+  CardHeader,
   FormControl,
-  FormLabel,
+  FormErrorMessage,
   HStack,
   Heading,
-  Input,
-  Text,
-  VStack,
-  useRadio,
-  type UseRadioProps,
-  Select,
-  Alert,
-  AlertIcon,
-  Tooltip,
-  Link,
-  Card,
-  CardHeader,
-  CardBody,
   Image,
-  Spacer,
-  RadioGroup,
-  FormErrorMessage,
-  List,
   ListItem,
-  ListIcon,
-  OrderedList,
+  RadioGroup,
+  Spacer,
+  Text,
   UnorderedList,
+  VStack,
 } from "@chakra-ui/react";
 import ErrorPage from "next/error";
 import { useRouter } from "next/router";
-import { useEffect, type PropsWithChildren } from "react";
+import { useEffect } from "react";
+import { TrendingUp } from "react-feather";
 import {
   useForm,
   type SubmitHandler,
   type UseFormRegister,
 } from "react-hook-form";
+import { PuzzleIcon } from "~/components/icons/Puzzle";
 import { SetupLayout } from "~/components/SetupLayout";
+import { type ProjectFormData } from "~/components/TechStack";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
 import { useRequiredSession } from "../../../hooks/useRequiredSession";
-import { TrendingUp } from "react-feather";
-import { PuzzleIcon } from "~/components/icons/Puzzle";
-import {
-  TechStackSelector,
-  type ProjectFormData,
-} from "~/components/TechStack";
 import { api } from "../../../utils/api";
-
-import analyticsImage from "../images/analytics.png";
-import optimizationImage from "../images/optimization.png";
 
 export default function ProjectOnboardingSelect() {
   useRequiredSession();
@@ -58,7 +40,7 @@ export default function ProjectOnboardingSelect() {
       projectType: "",
     },
   });
-  const { watch, register, setValue, formState } = form;
+  const { watch, register, setValue } = form;
 
   const router = useRouter();
   const { organization } = useOrganizationTeamProject({
@@ -85,15 +67,13 @@ export default function ProjectOnboardingSelect() {
 
   const selectedValueProjectType = watch("projectType");
 
-  const onSubmit: SubmitHandler<ProjectFormData> = (data: ProjectFormData) => {
-    console.log("onSubmit", data);
-    console.log("team", team.data);
+  const onSubmit: SubmitHandler<ProjectFormData> = () => {
     if (!team.data) return;
 
     createProject.mutate({
       organizationId: organization?.id ?? "",
       teamId: team.data.id,
-      name: teamSlug ?? "",
+      name: team.data.name,
       language: "other",
       framework: "other",
     });
@@ -103,8 +83,6 @@ export default function ProjectOnboardingSelect() {
     if (createProject.isSuccess) {
       void (async () => {
         await apiContext.organization.getAll.refetch();
-        console.log("createProject.data", createProject.data);
-        console.log("selectedValueProjectType", selectedValueProjectType);
         // For some reason even though we await for the refetch it's not done yet when we move pages
         setTimeout(() => {
           if (selectedValueProjectType === "optimization") {
@@ -121,6 +99,7 @@ export default function ProjectOnboardingSelect() {
     createProject.data?.projectSlug,
     createProject.isSuccess,
     router,
+    selectedValueProjectType,
   ]);
 
   if (team.isFetched && !team.data) {
@@ -141,7 +120,7 @@ export default function ProjectOnboardingSelect() {
             <b>Upload your datasets</b> for easy performance tracking
           </ListItem>
           <ListItem>
-            Automatically evaluate the efficiency of your models
+            <b>Automatically evaluate</b> the performance of your models
           </ListItem>
           <ListItem>
             <b>Optimize</b> your solution using advanced DSPy algorithms in a
