@@ -256,7 +256,7 @@ export const ChatBox = ({
         borderRadius={"lg"}
         padding={2}
       >
-        <Box flexGrow={1} overflowY="auto" maxHeight="70vh">
+        <Box flexGrow={1} overflowY="auto">
           {chatMessages.map((message, index) => (
             <Flex key={index} flexDirection="column" width="100%" mb={4}>
               {message.input.map((input, inputIndex) => (

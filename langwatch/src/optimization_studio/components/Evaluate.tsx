@@ -8,17 +8,17 @@ import {
   ModalFooter,
   ModalHeader,
   ModalOverlay,
-  Select,
   Skeleton,
   Spacer,
   Text,
   Tooltip,
   useDisclosure,
   useToast,
-  VStack,
+  VStack
 } from "@chakra-ui/react";
 
 import type { Node } from "@xyflow/react";
+import { chakraComponents, Select as MultiSelect } from "chakra-react-select";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { CheckSquare } from "react-feather";
 import {
@@ -32,12 +32,11 @@ import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProje
 import { api } from "../../utils/api";
 import { useEvaluationExecution } from "../hooks/useEvaluationExecution";
 import { useGetDatasetData } from "../hooks/useGetDatasetData";
+import { useModelProviderKeys } from "../hooks/useModelProviderKeys";
 import { useWorkflowStore } from "../hooks/useWorkflowStore";
 import type { Entry } from "../types/dsl";
-import { NewVersionFields, useVersionState } from "./History";
 import { AddModelProviderKey } from "./AddModelProviderKey";
-import { useModelProviderKeys } from "../hooks/useModelProviderKeys";
-import { chakraComponents, Select as MultiSelect } from "chakra-react-select";
+import { useVersionState, VersionToBeUsed } from "./History";
 
 export function Evaluate() {
   const { isOpen, onToggle, onClose } = useDisclosure();
@@ -252,6 +251,8 @@ export function EvaluateModalContent({ onClose }: { onClose: () => void }) {
         return;
       }
 
+      void versions.refetch();
+
       startEvaluationExecution({
         workflow_version_id: versionId,
         evaluate_on: evaluateOn.value,
@@ -267,6 +268,7 @@ export function EvaluateModalContent({ onClose }: { onClose: () => void }) {
       startEvaluationExecution,
       toast,
       versionToBeEvaluated.id,
+      versions,
       workflowId,
     ]
   );
@@ -312,7 +314,7 @@ export function EvaluateModalContent({ onClose }: { onClose: () => void }) {
       <ModalBody>
         <VStack align="start" width="full" spacing={4}>
           <VStack align="start" width="full">
-            <VersionToBeEvaluated
+            <VersionToBeUsed
               form={
                 form as unknown as UseFormReturn<{
                   version: string;
@@ -352,7 +354,10 @@ export function EvaluateModalContent({ onClose }: { onClose: () => void }) {
                 variant="outline"
                 type="submit"
                 leftIcon={<CheckSquare size={16} />}
-                isLoading={evaluationState?.status === "waiting"}
+                isLoading={
+                  commitVersion.isLoading ||
+                  evaluationState?.status === "waiting"
+                }
                 isDisabled={!!isDisabled}
               >
                 {canSaveNewVersion ? "Save & Run Evaluation" : "Run Evaluation"}
@@ -364,45 +369,6 @@ export function EvaluateModalContent({ onClose }: { onClose: () => void }) {
     </ModalContent>
   );
 }
-
-export const VersionToBeEvaluated = ({
-  form,
-  nextVersion,
-  canSaveNewVersion,
-  versionToBeEvaluated,
-}: {
-  form: UseFormReturn<{ version: string; commitMessage: string }>;
-  nextVersion: string;
-  canSaveNewVersion: boolean;
-  versionToBeEvaluated: {
-    id: string | undefined;
-    version: string | undefined;
-    commitMessage: string | undefined;
-  };
-}) => {
-  if (canSaveNewVersion) {
-    return (
-      <NewVersionFields
-        form={form}
-        nextVersion={nextVersion}
-        canSaveNewVersion={canSaveNewVersion}
-      />
-    );
-  }
-
-  return (
-    <HStack width="full">
-      <VStack align="start">
-        <SmallLabel color="gray.600">Version</SmallLabel>
-        <Text width="74px">{versionToBeEvaluated.version}</Text>
-      </VStack>
-      <VStack align="start" width="full">
-        <SmallLabel color="gray.600">Description</SmallLabel>
-        <Text>{versionToBeEvaluated.commitMessage}</Text>
-      </VStack>
-    </HStack>
-  );
-};
 
 const DatasetSplitSelect = ({
   field,

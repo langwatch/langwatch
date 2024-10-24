@@ -474,3 +474,42 @@ export function NewVersionFields({
     </HStack>
   );
 }
+
+export const VersionToBeUsed = ({
+  form,
+  nextVersion,
+  canSaveNewVersion,
+  versionToBeEvaluated,
+}: {
+  form: UseFormReturn<{ version: string; commitMessage: string }>;
+  nextVersion: string;
+  canSaveNewVersion: boolean;
+  versionToBeEvaluated: {
+    id: string | undefined;
+    version: string | undefined;
+    commitMessage: string | undefined;
+  };
+}) => {
+  if (canSaveNewVersion) {
+    return (
+      <NewVersionFields
+        form={form}
+        nextVersion={nextVersion}
+        canSaveNewVersion={canSaveNewVersion}
+      />
+    );
+  }
+
+  return (
+    <HStack width="full">
+      <VStack align="start">
+        <SmallLabel color="gray.600">Version</SmallLabel>
+        <Text width="74px">{versionToBeEvaluated.version}</Text>
+      </VStack>
+      <VStack align="start" width="full">
+        <SmallLabel color="gray.600">Description</SmallLabel>
+        <Text>{versionToBeEvaluated.commitMessage}</Text>
+      </VStack>
+    </HStack>
+  );
+};
