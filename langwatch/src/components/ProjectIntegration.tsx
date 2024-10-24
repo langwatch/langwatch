@@ -70,14 +70,29 @@ export const ProjectIntegration = () => {
           <VStack
             align="flex-start"
             spacing={6}
-            borderBottomWidth={1}
-            borderBottomColor="gray.400"
+            paddingTop={4}
+            borderRightWidth={1}
+            borderRightColor="gray.400"
+            height="full"
+            paddingRight={2}
+          >
+            <Heading as="h2" size="md">
+              Integration checks
+            </Heading>
+            <IntegrationChecks />
+          </VStack>
+          <VStack
+            align="flex-start"
+            spacing={6}
             width="full"
-            paddingTop={6}
-            paddingBottom={6}
+            paddingLeft={2}
+            paddingTop={4}
+            paddingBottom={4}
           >
             <HStack width={"full"}>
-              <Heading as="h1">Integration guides</Heading>
+              <Heading as="h2" size="md">
+                Integration guides
+              </Heading>
               <Spacer />
               {isRefetching && <Spinner />}
             </HStack>
@@ -97,19 +112,23 @@ export const ProjectIntegration = () => {
                   when setting it up to point to this instance
                 </Text>
               )}
-            <HStack align="stretch" spacing={6} wrap="wrap">
-              <Card width="450px">
+            <HStack align="stretch" spacing={6}>
+              <Card width="400px">
                 <CardHeader>
                   <Heading as="h2" size="md">
-                    Integration Checks
+                    API Key
                   </Heading>
                 </CardHeader>
                 <CardBody>
-                  <IntegrationChecks />
+                  <VStack spacing={6}>
+                    <Text>
+                      Copy your LangWatch API key to use for the integration
+                    </Text>
+                    <APIKeyCopyInput />
+                  </VStack>
                 </CardBody>
               </Card>
-
-              <Card width="450px" minHeight="full">
+              <Card minHeight="full">
                 <CardHeader>
                   <Heading as="h2" size="md">
                     Integration Guides
@@ -163,7 +182,7 @@ export const ProjectIntegration = () => {
                   </Link>
                 </CardBody>
               </Card>
-              <Card width="450px">
+              <Card width="300px">
                 <CardHeader>
                   <Heading as="h2" size="md">
                     Demo Account
@@ -180,21 +199,6 @@ export const ProjectIntegration = () => {
                         View Demo
                       </Button>
                     </Link>
-                  </VStack>
-                </CardBody>
-              </Card>
-              <Card width="450px">
-                <CardHeader>
-                  <Heading as="h2" size="md">
-                    API Key
-                  </Heading>
-                </CardHeader>
-                <CardBody>
-                  <VStack spacing={6}>
-                    <Text>
-                      Copy your LangWatch API key to use for the integration
-                    </Text>
-                    <APIKeyCopyInput />
                   </VStack>
                 </CardBody>
               </Card>

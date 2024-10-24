@@ -15,6 +15,7 @@ import {
   ListIcon,
   OrderedList,
   UnorderedList,
+  Image,
 } from "@chakra-ui/react";
 
 export const BookAMeeting = () => {
@@ -52,23 +53,19 @@ export const BookAMeeting = () => {
                 height="690px"
                 allowFullScreen
               ></iframe>
-
-              {/* <div
-                className="meetings-iframe-container"
-                data-src="https://get.langwatch.ai/meetings/manouk-draisma/c-level?embed=true"
-              ></div> */}
-              {/* <script
-        type="text/javascript"
-        src="https://static.hsappstatic.net/MeetingsEmbed/ex/MeetingsEmbedCode.js"
-      ></script> */}
             </Box>
           </ModalBody>
         </ModalContent>
       </Modal>
       <Card>
-        <CardBody>
+        <CardBody padding={12}>
           <HStack align="start" spacing={8}>
-            <Box height="300px" width="400px" backgroundColor="gray.100"></Box>
+            <Image
+              src="/images/optimization.png"
+              alt="Optimization"
+              width="400px"
+            />
+            {/* <Box height="300px" width="400px" backgroundColor="gray.100"></Box> */}
 
             <VStack align="start" spacing={4}>
               <Heading as="h2" size="md">
