@@ -144,6 +144,7 @@ model Organization {
     updatedAt             DateTime             @default(now()) @updatedAt
     OrganizationInvite    OrganizationInvite[]
     usageSpendingMaxLimit Int?
+    signupData            Json?
 
     promoCode String?
     features  OrganizationFeature[]

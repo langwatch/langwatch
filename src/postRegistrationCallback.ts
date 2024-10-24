@@ -80,6 +80,36 @@ const submitLeadFormInHubSpot = async (user: any, org: any) => {
         name: "mobilephone",
         value: org.phoneNumber,
       },
+      {
+        objectTypeId: "0-1",
+        name: "project_types",
+        value: org.signUpData?.projectTypes,
+      },
+      {
+        objectTypeId: "0-1",
+        name: "product_usage",
+        value: org.signUpData?.usage,
+      },
+      {
+        objectTypeId: "0-1",
+        name: "product_solution",
+        value: org.signUpData?.solution,
+      },
+      {
+        objectTypeId: "0-1",
+        name: "company_type",
+        value: org.signUpData?.companyType,
+      },
+      {
+        objectTypeId: "0-1",
+        name: "organization_size",
+        value: org.signUpData?.companySize,
+      },
+      {
+        objectTypeId: "0-1",
+        name: "how_did_you_hear_about_us",
+        value: org.signUpData?.howDidYouHearAboutUs,
+      },
     ],
     context: {
       pageUri: "app.langwatch.ai",
