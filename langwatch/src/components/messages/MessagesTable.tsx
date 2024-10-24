@@ -49,6 +49,7 @@ import {
   List,
   RefreshCw,
   Shield,
+  CheckSquare,
 } from "react-feather";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { Trace, ElasticSearchEvaluation } from "~/server/tracer/types";
@@ -282,6 +283,7 @@ export function MessagesTable() {
               {annotationCount(trace.trace_id)}
               <Checkbox
                 colorScheme="blue"
+                isChecked={selectedTraceIds.includes(trace.trace_id)}
                 onChange={() => traceSelection(trace.trace_id)}
               />
             </HStack>
@@ -840,6 +842,14 @@ export function MessagesTable() {
     link.remove();
   };
 
+  const selectAllTraces = () => {
+    setSelectedTraceIds(
+      traceGroups.data?.groups.flatMap((traceGroup) =>
+        traceGroup.map((trace) => trace.trace_id)
+      ) ?? []
+    );
+  };
+
   return (
     <>
       <Container maxW={"calc(100vw - 200px)"} padding={6}>
@@ -872,6 +882,16 @@ export function MessagesTable() {
             </Tooltip>
           </HStack>
           <Spacer />
+          <Button
+            colorScheme="black"
+            minWidth="fit-content"
+            variant={"ghost"}
+            padding={0}
+            onClick={() => selectAllTraces()}
+            rightIcon={<CheckSquare size={17} />}
+          >
+            Select all
+          </Button>
           <Tooltip label={totalHits >= 10_000 ? "Up to 10.000 items" : ""}>
             <Button
               colorScheme="black"
