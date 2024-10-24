@@ -60,11 +60,11 @@ export const BookAMeeting = () => {
       <Card>
         <CardBody padding={12}>
           <HStack align="start" spacing={8}>
-            <Image
-              src="/images/optimization.png"
-              alt="Optimization"
-              width="400px"
-            />
+            <iframe
+              width="420"
+              height="280"
+              src="https://www.youtube.com/embed/dZG44oRTz84"
+            ></iframe>
 
             <VStack align="start" spacing={4}>
               <Heading as="h2" size="md">
