@@ -82,8 +82,8 @@ const submitLeadFormInHubSpot = async (user: any, org: any) => {
       },
       {
         objectTypeId: "0-1",
-        name: "project_types",
-        value: org.signUpData?.projectTypes,
+        name: "project_type",
+        value: org.signUpData?.projectType,
       },
       {
         objectTypeId: "0-1",
