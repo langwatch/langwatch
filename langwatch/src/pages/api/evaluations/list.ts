@@ -23,6 +23,7 @@ export default async function handler(
           ...value,
           name: evaluatorTempNameMap[value.name] ?? value.name,
           settings_json_schema: zodToJsonSchema(
+            // @ts-ignore
             evaluatorsSchema.shape[key].shape["settings"]
           ),
         },
