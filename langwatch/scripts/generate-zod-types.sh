@@ -46,23 +46,21 @@ generate_experiments_types() {
 # set -eo pipefail
 set -e
 
-# Store process ids and exit codes
-pids=()
-exit_codes=()
-
 # Run all generators in parallel and store their PIDs
 generate_tracer_types &
-pids+=($!)
+pid1=$!
 generate_evaluations_types &
-pids+=($!)
+pid2=$!
 generate_evaluators_types &
-pids+=($!)
+pid3=$!
 generate_datasets_types &
-pids+=($!)
+pid4=$!
 generate_experiments_types &
-pids+=($!)
+pid5=$!
 
 # Wait for each process and check its exit status
-for pid in ${pids[@]}; do
-  wait $pid || exit 1
-done
+wait $pid1 || exit 1
+wait $pid2 || exit 1
+wait $pid3 || exit 1
+wait $pid4 || exit 1
+wait $pid5 || exit 1
