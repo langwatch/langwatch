@@ -23,8 +23,7 @@ async def main(message: cl.Message):
         input=message.content,
     )
     nested_span = span.span(
-        type="llm",
-        input=message.content,
+        type="llm", input=message.content, model="openai/gpt-4o-mini"
     )
 
     time.sleep(1)  # generating the message...

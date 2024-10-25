@@ -137,9 +137,19 @@ const processCollectorJob_ = async (
     where: { id: projectId },
   });
 
-  spans = addInputAndOutputForRAGs(
-    await addLLMTokensCount(projectId, addGuardrailCosts(spans))
-  );
+  spans = addGuardrailCosts(spans);
+  try {
+    spans = await addLLMTokensCount(projectId, spans);
+  } catch (error) {
+    debug("Failed to add LLM tokens count", error, {
+      projectId: project.id,
+      traceId,
+    });
+    Sentry.captureException(new Error("Failed to add LLM tokens count"), {
+      extra: { projectId: project.id, traceId, error: error },
+    });
+  }
+  spans = addInputAndOutputForRAGs(spans);
 
   const esSpans: ElasticSearchSpan[] = spans.map((span) => {
     const esSpan = {
