@@ -83,10 +83,14 @@ export const triggerRouter = createTRPCRouter({
     .input(z.object({ projectId: z.string(), triggerId: z.string() }))
     .use(checkUserPermissionForProject(TeamRoleGroup.TRIGGERS_MANAGE))
     .mutation(async ({ ctx, input }) => {
-      await ctx.prisma.trigger.delete({
+      await ctx.prisma.trigger.update({
         where: {
           id: input.triggerId,
           projectId: input.projectId,
+        },
+        data: {
+          deleted: true,
+          active: false,
         },
       });
 
@@ -120,6 +124,10 @@ export const triggerRouter = createTRPCRouter({
       const triggers = await ctx.prisma.trigger.findMany({
         where: {
           projectId: input.projectId,
+          deleted: false,
+        },
+        orderBy: {
+          createdAt: "desc",
         },
       });
 

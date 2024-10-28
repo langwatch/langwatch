@@ -381,6 +381,7 @@ model Trigger {
     updatedAt    DateTime      @default(now()) @updatedAt
     active       Boolean       @default(true)
     message      String?
+    deleted      Boolean       @default(false)
     alertType    AlertType?
     TriggerSent  TriggerSent[]
 
