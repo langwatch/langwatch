@@ -3,5 +3,12 @@ import type { End } from "../../types/dsl";
 import { BasePropertiesPanel } from "./BasePropertiesPanel";
 
 export function EndPropertiesPanel({ node }: { node: Node<End> }) {
-  return <BasePropertiesPanel node={node} hideOutputs inputsTitle="Results" />;
+  return (
+    <BasePropertiesPanel
+      node={node}
+      hideOutputs
+      hideProperties
+      inputsTitle="Results"
+    />
+  );
 }

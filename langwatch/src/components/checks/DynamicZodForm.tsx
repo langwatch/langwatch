@@ -334,9 +334,11 @@ const DynamicZodForm = ({
                     (optional)
                   </Text>
                 )}
-                <Tooltip label={helperText}>
-                  <Info size={14} />
-                </Tooltip>
+                {helperText && (
+                  <Tooltip label={helperText}>
+                    <Info size={14} />
+                  </Tooltip>
+                )}
               </HStack>
               <FormControl isInvalid={isInvalid}>
                 {renderField(
