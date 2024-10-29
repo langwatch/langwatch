@@ -79,14 +79,16 @@ export function FieldsFilters() {
         <Spacer />
 
         {hasTeamPermission(TeamRoleGroup.TRIGGERS_MANAGE) && (
-          <Button
-            colorScheme="orange"
-            onClick={() => openDrawer("trigger", undefined)}
-            size="sm"
-            visibility={hasAnyFilters ? "visible" : "hidden"}
-          >
-            Add Trigger
-          </Button>
+          <Tooltip label="Create a filter to add a trigger.">
+            <Button
+              colorScheme="orange"
+              onClick={() => openDrawer("trigger", undefined)}
+              size="sm"
+              isDisabled={!hasAnyFilters}
+            >
+              Add Trigger
+            </Button>
+          </Tooltip>
         )}
       </HStack>
       <VStack spacing={4} width="full">
