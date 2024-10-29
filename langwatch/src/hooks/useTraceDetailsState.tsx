@@ -2,6 +2,7 @@ import { useOrganizationTeamProject } from "./useOrganizationTeamProject";
 import { api } from "../utils/api";
 import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
+import { isNotFound } from "../utils/trpcError";
 
 export function useTraceDetailsState(traceId: string) {
   const router = useRouter();
@@ -13,7 +14,7 @@ export function useTraceDetailsState(traceId: string) {
 
   const [keepRefetching, setKeepRefetching] = useState(true);
 
-  const trace = api.traces.getById.useQuery(
+  let trace = api.traces.getById.useQuery(
     { projectId: project?.id ?? "", traceId: traceId },
     {
       enabled: !!project && !!traceId,
@@ -33,6 +34,16 @@ export function useTraceDetailsState(traceId: string) {
     }, 10_000);
     return () => clearTimeout(timeout);
   }, [trace.data]);
+
+  if (isNotFound(trace.error) && keepRefetching) {
+    trace = {
+      ...trace,
+      data: undefined,
+      error: undefined,
+      isLoading: true,
+      isError: false,
+    } as any;
+  }
 
   return { traceId, spanId, trace, openTab };
 }
