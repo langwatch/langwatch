@@ -865,6 +865,12 @@ export class LangWatchAwsMarketplaceStack extends cdk.Stack {
                 name: "langwatch-nlp",
                 image: `339712859611.dkr.ecr.eu-central-1.amazonaws.com/onprem_langwatch_nlp:${langWatchPackageJson.version}`,
                 ports: [{ containerPort: 8080 }],
+                env: [
+                  {
+                    name: "LANGWATCH_ENDPOINT",
+                    value: "http://langwatch-service",
+                  },
+                ],
               },
             ],
           },
