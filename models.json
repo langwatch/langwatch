@@ -101,6 +101,12 @@
     "model_vendor": "azure",
     "mode": "chat"
   },
+  "azure/gpt-4o-mini": {
+    "name": "GPT 4o mini",
+    "version": "latest",
+    "model_vendor": "azure",
+    "mode": "chat"
+  },
   "azure/text-embedding-ada-002": {
     "name": "text-embedding-ada-002",
     "version": "",

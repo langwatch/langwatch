@@ -22,7 +22,6 @@ import {
 } from "../../optimization_studio/components/workflow/WorkflowCard";
 
 import { api } from "../../utils/api";
-import { useEffect } from "react";
 
 export default function MessagesOrIntegrationGuide() {
   const { project, isOrganizationFeatureEnabled } =

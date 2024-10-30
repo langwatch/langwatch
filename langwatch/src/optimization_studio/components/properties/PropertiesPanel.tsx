@@ -14,6 +14,7 @@ import { WorkflowPropertiesPanel } from "./WorkflowPropertiesPanel";
 import { SignaturePropertiesPanel } from "./SignaturePropertiesPanel";
 import { EvaluatorPropertiesPanel } from "./EvaluatorPropertiesPanel";
 import { EndPropertiesPanel } from "./EndPropertiesPanel";
+import { RetrievePropertiesPanel } from "./RetrievePropertiesPanel";
 
 export function PropertiesPanel() {
   const {
@@ -38,7 +39,7 @@ export function PropertiesPanel() {
     end: EndPropertiesPanel as React.FC<{ node: Node<Component> }>,
     signature: SignaturePropertiesPanel,
     module: BasePropertiesPanel,
-    retriever: BasePropertiesPanel,
+    retriever: RetrievePropertiesPanel,
     prompting_technique: BasePropertiesPanel,
     evaluator: EvaluatorPropertiesPanel as React.FC<{ node: Node<Component> }>,
   };

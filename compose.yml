@@ -8,6 +8,7 @@ services:
       - langwatch/.env
     build:
       context: .
+      dockerfile: Dockerfile.prod
     ports:
       - "3000:3000"
     depends_on:
@@ -87,7 +88,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 4096m
+          memory: 3072m
     restart: always
 
 volumes:

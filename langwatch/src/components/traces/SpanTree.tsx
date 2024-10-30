@@ -320,8 +320,8 @@ export function SpanTree(props: SpanTreeProps) {
     }
   }, [project, router, span?.span_id, spanId, spans.data, traceId]);
 
-  if (isNotFound(trace.error)) {
-    return <Alert status="error">Trace not found</Alert>;
+  if (!trace.data) {
+    return null;
   }
 
   return (
@@ -341,13 +341,7 @@ export function SpanTree(props: SpanTreeProps) {
           <AlertIcon />
           An error has occurred trying to load the trace spans
         </Alert>
-      ) : (
-        <VStack gap={4} width="full" padding={4}>
-          <Skeleton width="full" height="20px" />
-          <Skeleton width="full" height="20px" />
-          <Skeleton width="full" height="20px" />
-        </VStack>
-      )}
+      ) : null}
     </VStack>
   );
 }

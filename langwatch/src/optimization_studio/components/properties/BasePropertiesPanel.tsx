@@ -8,11 +8,12 @@ import {
   Select,
   Spacer,
   Text,
+  Tooltip,
   VStack,
 } from "@chakra-ui/react";
 import { useUpdateNodeInternals, type Node } from "@xyflow/react";
 import React, { useState } from "react";
-import { ChevronDown, Columns, Plus, Trash2, X } from "react-feather";
+import { ChevronDown, Columns, Info, Plus, Trash2, X } from "react-feather";
 import { useFieldArray, useForm } from "react-hook-form";
 import { useShallow } from "zustand/react/shallow";
 import { useWorkflowStore } from "../../hooks/useWorkflowStore";
@@ -32,6 +33,7 @@ import {
 } from "../nodes/Nodes";
 import { nameToId } from "../../utils/nodeUtils";
 import { HoverableBigText } from "../../../components/HoverableBigText";
+import { camelCaseToTitleCase } from "../../../utils/stringCasing";
 
 export function PropertyField({
   title,
@@ -52,7 +54,7 @@ type FieldArrayForm = {
   fields: Field[];
 };
 
-export function PropertyFields({
+export function FieldsDefinition({
   node,
   title,
   field,
@@ -240,6 +242,106 @@ export function PropertyFields({
   );
 }
 
+export function FieldsForm({
+  node,
+  title,
+  field,
+}: {
+  node: Node<Component>;
+  title: string;
+  field: "parameters" | "inputs" | "outputs";
+}) {
+  const { setNode } = useWorkflowStore(
+    useShallow((state) => ({
+      setNode: state.setNode,
+    }))
+  );
+
+  const {
+    control,
+    handleSubmit,
+    formState: { errors },
+    watch,
+  } = useForm<FieldArrayForm>({
+    defaultValues: {
+      fields: node.data[field] ?? [],
+    },
+  });
+
+  const { fields } = useFieldArray({
+    control,
+    name: "fields",
+  });
+
+  const updateNodeInternals = useUpdateNodeInternals();
+  const onSubmit = (data: FieldArrayForm) => {
+    setNode({
+      id: node.id,
+      data: { [field]: data.fields },
+    });
+    updateNodeInternals(node.id);
+  };
+
+  // const watchedFields = watch("fields");
+
+  return (
+    <VStack
+      as="form"
+      align="start"
+      spacing={3}
+      width="full"
+      // eslint-disable-next-line @typescript-eslint/no-misused-promises
+      onChange={handleSubmit(onSubmit)}
+    >
+      {fields.map((field, index) => {
+        return (
+          <FormControl
+            key={field.id}
+            isInvalid={!!errors.fields?.[index]?.identifier}
+          >
+            <VStack align="start" spacing={3} width="full">
+              <HStack width="full">
+                <PropertySectionTitle>
+                  {camelCaseToTitleCase(field.identifier)}
+                </PropertySectionTitle>
+                {field.optional && (
+                  <Text color="gray.500" fontSize={12}>
+                    (optional)
+                  </Text>
+                )}
+                {field.desc && (
+                  <Tooltip label={field.desc}>
+                    <Info size={14} />
+                  </Tooltip>
+                )}
+              </HStack>
+              <HStack width="full">
+                {field.type === "float" || field.type === "int" ? (
+                  <Input
+                    type="number"
+                    step={field.type === "float" ? "0.1" : undefined}
+                    size="sm"
+                    {...control.register(`fields.${index}.defaultValue`)}
+                  />
+                ) : (
+                  <Input
+                    type="text"
+                    size="sm"
+                    {...control.register(`fields.${index}.defaultValue`)}
+                  />
+                )}
+              </HStack>
+              <FormErrorMessage>
+                {errors.fields?.[index]?.identifier?.message}
+              </FormErrorMessage>
+            </VStack>
+          </FormControl>
+        );
+      })}
+    </VStack>
+  );
+}
+
 export function PropertySectionTitle({
   children,
 }: {
@@ -257,6 +359,7 @@ export function BasePropertiesPanel({
   header,
   children,
   fieldsAfter,
+  hideProperties,
   hideInputs,
   inputsTitle,
   hideOutputs,
@@ -268,6 +371,7 @@ export function BasePropertiesPanel({
   header?: React.ReactNode;
   children?: React.ReactNode;
   fieldsAfter?: React.ReactNode;
+  hideProperties?: boolean;
   hideInputs?: boolean;
   inputsTitle?: string;
   hideOutputs?: boolean;
@@ -394,11 +498,7 @@ export function BasePropertiesPanel({
                   }
                 }}
               >
-                <ComponentExecutionButton
-                  node={node}
-                  size="sm"
-                  iconSize={16}
-                />
+                <ComponentExecutionButton node={node} size="sm" iconSize={16} />
               </HStack>
 
               <Button
@@ -432,9 +532,11 @@ export function BasePropertiesPanel({
       {children}
       {!isWorkflow(node) && (
         <>
-          {/* <PropertyFields node={node} field="parameters" title="Parameters" /> */}
+          {!hideProperties && (
+            <FieldsForm node={node} field="parameters" title="Parameters" />
+          )}
           {!hideInputs && (
-            <PropertyFields
+            <FieldsDefinition
               node={node}
               field="inputs"
               title={inputsTitle ?? "Inputs"}
@@ -442,7 +544,7 @@ export function BasePropertiesPanel({
             />
           )}
           {!hideOutputs && (
-            <PropertyFields
+            <FieldsDefinition
               node={node}
               field="outputs"
               title={outputsTitle ?? "Outputs"}

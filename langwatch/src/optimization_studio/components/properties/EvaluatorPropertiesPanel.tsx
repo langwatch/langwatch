@@ -101,7 +101,7 @@ export function EvaluatorPropertiesPanel({ node }: { node: Node<Evaluator> }) {
   }, [form, handleSubmitDebounced]);
 
   return (
-    <BasePropertiesPanel node={node} inputsReadOnly outputsReadOnly>
+    <BasePropertiesPanel node={node} hideInputs hideOutputs hideProperties>
       {evaluator &&
         schema instanceof z.ZodObject &&
         Object.keys(schema.shape).length > 0 && (

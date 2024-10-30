@@ -38,8 +38,9 @@ export function EntryPointPropertiesPanel({ node }: { node: Node<Component> }) {
     <BasePropertiesPanel
       node={node}
       outputsTitle="Fields"
-      outputsReadOnly={true}
-      hideInputs={true}
+      outputsReadOnly
+      hideInputs
+      hideProperties
     >
       <VStack width="full" align="start">
         <HStack width="full">

@@ -29,7 +29,7 @@ import type {
 import { getEvaluatorDefinitions } from "../../server/evaluations/getEvaluator";
 import { camelCaseToTitleCase, titleCase } from "../../utils/stringCasing";
 import { HorizontalFormControl } from "../HorizontalFormControl";
-import { ModelSelector } from "../ModelSelector";
+import { allModelOptions, ModelSelector } from "../ModelSelector";
 import { SmallLabel } from "../SmallLabel";
 import type { CheckConfigFormData } from "./CheckConfigForm";
 import { PropertySectionTitle } from "../../optimization_studio/components/properties/BasePropertiesPanel";
@@ -66,21 +66,6 @@ const DynamicZodForm = ({
 
     if (fieldSchema_ instanceof z.ZodDefault) {
       return renderField(fieldSchema_._def.innerType, fieldName, evaluator);
-    } else if (fieldSchema_ instanceof z.ZodString) {
-      if (["topic", "name"].includes(fieldKey) || !isNaN(+fieldKey)) {
-        return (
-          <Input
-            size={variant === "studio" ? "sm" : "md"}
-            {...register(fullPath)}
-          />
-        );
-      }
-      return (
-        <Textarea
-          size={variant === "studio" ? "sm" : "md"}
-          {...register(fullPath)}
-        />
-      );
     } else if (fieldSchema_ instanceof z.ZodNumber) {
       return (
         <Input
@@ -126,12 +111,16 @@ const DynamicZodForm = ({
       );
     } else if (
       fieldSchema_ instanceof z.ZodUnion ||
-      fieldSchema_ instanceof z.ZodLiteral
+      fieldSchema_ instanceof z.ZodLiteral ||
+      (fieldSchema_ instanceof z.ZodString &&
+        (fieldName === "model" || fieldName === "embeddings_model"))
     ) {
       const options =
         fieldSchema_ instanceof z.ZodUnion
           ? fieldSchema_.options
-          : [{ value: fieldSchema_.value }];
+          : fieldSchema_ instanceof z.ZodLiteral
+          ? [{ value: fieldSchema_.value }]
+          : allModelOptions.map((option) => ({ value: option }));
       if (
         (fieldName === "model" || fieldName === "embeddings_model") &&
         evaluator?.name !== "OpenAI Moderation"
@@ -192,6 +181,21 @@ const DynamicZodForm = ({
               ))}
             </Select>
           )}
+        />
+      );
+    } else if (fieldSchema_ instanceof z.ZodString) {
+      if (["topic", "name"].includes(fieldKey) || !isNaN(+fieldKey)) {
+        return (
+          <Input
+            size={variant === "studio" ? "sm" : "md"}
+            {...register(fullPath)}
+          />
+        );
+      }
+      return (
+        <Textarea
+          size={variant === "studio" ? "sm" : "md"}
+          {...register(fullPath)}
         />
       );
     } else if (fieldSchema_ instanceof z.ZodArray) {
@@ -334,9 +338,11 @@ const DynamicZodForm = ({
                     (optional)
                   </Text>
                 )}
-                <Tooltip label={helperText}>
-                  <Info size={14} />
-                </Tooltip>
+                {helperText && (
+                  <Tooltip label={helperText}>
+                    <Info size={14} />
+                  </Tooltip>
+                )}
               </HStack>
               <FormControl isInvalid={isInvalid}>
                 {renderField(

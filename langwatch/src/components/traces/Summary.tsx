@@ -20,6 +20,7 @@ import { useTraceDetailsState } from "../../hooks/useTraceDetailsState";
 import type { Trace } from "../../server/tracer/types";
 import { formatMilliseconds } from "../../utils/formatMilliseconds";
 import { MetadataTag } from "../MetadataTag";
+import { isNotFound } from "../../utils/trpcError";
 
 const SummaryItem = ({
   label,
@@ -50,38 +51,21 @@ const SummaryItem = ({
   );
 };
 
-type TraceSummaryProps = {
-  traceId: string;
-};
-export function TraceSummary(props: TraceSummaryProps) {
+export function TraceSummary(props: { traceId: string }) {
   const { trace } = useTraceDetailsState(props.traceId);
 
-  const [height, setHeight] = useState<number | undefined>(undefined);
-  const summaryRef = useRef<HTMLDivElement>();
-
-  useEffect(() => {
-    if (trace.data && summaryRef.current) {
-      setHeight(summaryRef.current.offsetHeight);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [!!trace.data]);
-
   return trace.data ? (
-    <TraceSummaryValues ref={summaryRef} trace={trace.data} />
+    <TraceSummaryValues trace={trace.data} />
   ) : trace.isError ? (
-    <Alert status="error">
-      <AlertIcon />
-      An error has occurred trying to load this trace
-    </Alert>
+    <>
+      <Alert status="error">
+        <AlertIcon />
+        An error has occurred trying to load this trace
+      </Alert>
+      {isNotFound(trace.error) && <Alert status="error">Trace not found</Alert>}
+    </>
   ) : (
-    <VStack
-      gap={4}
-      paddingX={4}
-      paddingY={6}
-      width="full"
-      minHeight={height ? height + "px" : height}
-      display="none"
-    >
+    <VStack gap={4} paddingX={4} paddingY={6} width="full">
       <Skeleton width="full" height="20px" />
       <Skeleton width="full" height="20px" />
       <Skeleton width="full" height="20px" />
