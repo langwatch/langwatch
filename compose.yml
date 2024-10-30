@@ -4,11 +4,12 @@ services:
   app:
     environment:
       - SKIP_ENV_VALIDATION=true
+      - DISABLE_PII_REDACTION=true
     env_file:
       - langwatch/.env
     build:
       context: .
-      dockerfile: Dockerfile.prod
+      dockerfile: Dockerfile
     ports:
       - "3000:3000"
     depends_on:
@@ -36,6 +37,8 @@ services:
       - "8000:8000"
     restart: always
     pull_policy: always
+    environment:
+      - DISABLE_EVALUATORS_PRELOAD=true
 
   postgres:
     image: postgres:16
@@ -67,12 +70,12 @@ services:
       retries: 5
 
   opensearch:
-    image: opensearchproject/opensearch:2.16.0
+    image: opensearchproject/opensearch:2.17.1
     environment:
       - discovery.type=single-node
       - DISABLE_INSTALL_DEMO_CONFIG=true
       - DISABLE_SECURITY_PLUGIN=true
-      - "OPENSEARCH_JAVA_OPTS=-Xms2048m -Xmx2048m -Djava.util.logging.config.file=logging.properties -Dlog4j2.formatMsgNoLookups=true"
+      - "OPENSEARCH_JAVA_OPTS=-Xms512m -Xms512m -Djava.util.logging.config.file=logging.properties -Dlog4j2.formatMsgNoLookups=true"
       - OPENSEARCH_INITIAL_ADMIN_PASSWORD=some-random-password-which-is-greater-than-16-chars-long
     ports:
       - "9200:9200"
@@ -88,7 +91,8 @@ services:
     deploy:
       resources:
         limits:
-          memory: 3072m
+          memory: 1024m
+          cpus: '1.0'
     restart: always
 
 volumes:

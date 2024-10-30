@@ -256,11 +256,13 @@ const processCollectorJob_ = async (
       .reverse(),
   };
 
-  const piiEnforced = env.NODE_ENV === "production";
-  await cleanupPIIs(trace, esSpans, {
-    piiRedactionLevel: project.piiRedactionLevel,
-    enforced: piiEnforced,
-  });
+  if (!process.env.DISABLE_PII_REDACTION) {
+    const piiEnforced = env.NODE_ENV === "production";
+    await cleanupPIIs(trace, esSpans, {
+      piiRedactionLevel: project.piiRedactionLevel,
+      enforced: piiEnforced,
+    });
+  }
 
   await esClient.update({
     index: TRACE_INDEX.alias,
