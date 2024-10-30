@@ -7,3 +7,4 @@
 *.generated.*
 .DS_Store
 .github
+.env
