@@ -41,12 +41,16 @@ export const useModelSelectionOptions = (
     { enabled: !!project?.id }
   );
 
+  console.log(modelProviders.data);
+
   const selectOptions: Record<string, ModelOption> = Object.fromEntries(
     options
       .map((model): [string, ModelOption] => {
         const modelOption = modelSelectorOptions.find(
           (option) => option.value === model
         );
+
+        console.log("model", modelOption);
 
         if (!modelOption) {
           return [

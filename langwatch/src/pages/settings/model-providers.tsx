@@ -38,6 +38,46 @@ import {
   allowedEmbeddingsModels,
 } from "../../server/topicClustering/types";
 
+import models from "../../../../models.json";
+
+const modelOptionsChatOpenAI = Object.entries(models)
+  .filter(([_, value]) => value.model_vendor === "openai")
+  .filter(([_, value]) => value.mode === "chat")
+  .map(([key, value]) => ({
+    value: key.split("/")[1],
+    label: key.split("/")[1],
+  }));
+
+const modelOptionsEmbeddingsOpenAI = Object.entries(models)
+  .filter(([_, value]) => value.model_vendor === "openai")
+  .filter(([_, value]) => value.mode === "embedding")
+  .map(([key, value]) => ({
+    value: key.split("/")[1],
+    label: key.split("/")[1],
+  }));
+
+const modelOptionsChatAzure = Object.entries(models)
+  .filter(([_, value]) => value.model_vendor === "azure")
+  .filter(([_, value]) => value.mode === "chat")
+  .map(([key, value]) => ({
+    value: key.split("/")[1],
+    label: key.split("/")[1],
+  }));
+
+const modelOptionsEmbeddingsAzure = Object.entries(models)
+  .filter(([_, value]) => value.model_vendor === "azure")
+  .filter(([_, value]) => value.mode === "embedding")
+  .map(([key, value]) => ({
+    value: key.split("/")[1],
+    label: key.split("/")[1],
+  }));
+
+console.log("mod", modelOptionsChatOpenAI);
+console.log("modE", modelOptionsEmbeddingsOpenAI);
+console.log("modEA", modelOptionsEmbeddingsAzure);
+console.log("modCA", modelOptionsChatAzure);
+import CreatableSelect from "react-select/creatable";
+
 export default function ModelsPage() {
   const { project, organizations } = useOrganizationTeamProject();
   const modelProviders = api.modelProvider.getAllForProject.useQuery(
@@ -61,6 +101,7 @@ export default function ModelsPage() {
           <Heading size="lg" as="h1">
             Model Providers
           </Heading>
+
           <Spacer />
           {updateMutation.isLoading && <Spinner />}
           {organizations && project && (
@@ -114,6 +155,8 @@ type ModelProviderForm = {
   enabled: boolean;
   useCustomKeys: boolean;
   customKeys?: Record<string, unknown> | null;
+  customModels?: string[];
+  customEmbeddingsModels?: string[];
 };
 
 function ModelProviderForm({
@@ -129,6 +172,8 @@ function ModelProviderForm({
 
   const localUpdateMutation = api.modelProvider.update.useMutation();
 
+  console.log(provider.customModels);
+
   const providerDefinition =
     modelProvidersRegistry[
       provider.provider as keyof typeof modelProvidersRegistry
@@ -142,6 +187,8 @@ function ModelProviderForm({
         enabled: provider.enabled,
         useCustomKeys: !!provider.customKeys,
         customKeys: provider.customKeys as object | null,
+        customModels: provider.customModels ?? [],
+        customEmbeddingsModels: provider.customEmbeddingsModels ?? [],
       },
       resolver: (data, ...args) => {
         console.log("data", data);
@@ -149,6 +196,7 @@ function ModelProviderForm({
         const data_ = {
           ...data,
           customKeys: data.useCustomKeys ? data.customKeys : null,
+          customModels: data.customModels ?? [],
         };
 
         return zodResolver(
@@ -158,6 +206,7 @@ function ModelProviderForm({
             enabled: z.boolean(),
             useCustomKeys: z.boolean(),
             customKeys: providerDefinition.keysSchema.optional().nullable(),
+            customModels: z.array(z.string()).optional().nullable(),
           })
         )(data_, ...args);
       },
@@ -167,12 +216,16 @@ function ModelProviderForm({
 
   const onSubmit = useCallback(
     async (data: ModelProviderForm) => {
+      console.log("data", data);
+
       await localUpdateMutation.mutateAsync({
         id: provider.id,
         projectId: project?.id ?? "",
         provider: provider.provider,
         enabled: data.enabled,
         customKeys: data.useCustomKeys ? data.customKeys : null,
+        customModels: data.customModels ?? [],
+        customEmbeddingsModels: data.customEmbeddingsModels ?? [],
       });
       toast({
         title: "API Keys Updated",
@@ -202,6 +255,8 @@ function ModelProviderForm({
         provider: provider.provider,
         enabled: e.target.checked,
         customKeys: provider.customKeys as any,
+        customModels: provider.customModels ?? [],
+        customEmbeddingsModels: provider.customEmbeddingsModels ?? [],
       });
       await refetch();
     },
@@ -227,6 +282,8 @@ function ModelProviderForm({
           provider: provider.provider,
           enabled: provider.enabled,
           customKeys: null,
+          customModels: provider.customModels ?? [],
+          customEmbeddingsModels: provider.customEmbeddingsModels ?? [],
         });
         setValue("customKeys", null);
         await refetch();
@@ -240,6 +297,79 @@ function ModelProviderForm({
       provider.enabled,
       project?.id,
       setValue,
+      refetch,
+    ]
+  );
+
+  // const customModelsField = register("customModels");
+  // const onCustomModelsChange = useCallback(
+  //   (value: any) => {
+  //     setValue(
+  //       `customModels`,
+  //       value.map((v: any) => v.value)
+  //     );
+  //   },
+  //   [setValue]
+  // );
+
+  const customModelsField = register("customModels");
+  const onCustomModelsChange = useCallback(
+    async (value: any) => {
+      // Update the form field value
+      // void customModelsField.onChange(value);
+
+      // Update via mutation
+      await updateMutation.mutateAsync({
+        id: provider.id,
+        projectId: project?.id ?? "",
+        provider: provider.provider,
+        enabled: provider.enabled, // Add this line
+        customModels: value.map((v: any) => v.value),
+        customKeys: provider.customKeys as any,
+        customEmbeddingsModels: provider.customEmbeddingsModels ?? [],
+      });
+
+      // Refetch data
+      await refetch();
+    },
+    [
+      customModelsField,
+      updateMutation,
+      provider.id,
+      provider.provider,
+      provider.customKeys,
+      project?.id,
+      refetch,
+    ]
+  );
+
+  const customEmbeddingsModelsField = register("customEmbeddingsModels");
+  const onCustomEmbeddingsModelsChange = useCallback(
+    async (value: any) => {
+      // Update the form field value
+      // void customModelsField.onChange(value);
+
+      // Update via mutation
+      await updateMutation.mutateAsync({
+        id: provider.id,
+        projectId: project?.id ?? "",
+        provider: provider.provider,
+        enabled: provider.enabled, // Add this line
+        customModels: provider.customModels ?? [],
+        customEmbeddingsModels: value.map((v: any) => v.value),
+        customKeys: provider.customKeys as any,
+      });
+
+      // Refetch data
+      await refetch();
+    },
+    [
+      customEmbeddingsModelsField,
+      updateMutation,
+      provider.id,
+      provider.provider,
+      provider.customKeys,
+      project?.id,
       refetch,
     ]
   );
@@ -326,6 +456,51 @@ function ModelProviderForm({
                     </React.Fragment>
                   ))}
                 </Grid>
+
+                <VStack width="full" spacing={4}>
+                  <Box width="full">
+                    <SmallLabel>Models</SmallLabel>
+                    <CreatableSelect
+                      defaultValue={(provider.customModels ?? []).map(
+                        (model) => ({ value: model, label: model })
+                      )}
+                      options={
+                        provider.provider === "openai"
+                          ? modelOptionsChatOpenAI
+                          : provider.provider === "azure"
+                          ? modelOptionsChatAzure
+                          : []
+                      }
+                      onChange={onCustomModelsChange}
+                      isMulti
+                      placeholder="Add custom model"
+                    />
+                  </Box>
+                  {(provider.provider === "openai" ||
+                    provider.provider === "azure") && (
+                    <>
+                      <Box width="full">
+                        <SmallLabel>Embeddings Models</SmallLabel>
+                        <CreatableSelect
+                          defaultValue={(
+                            provider.customEmbeddingsModels ?? []
+                          ).map((model) => ({ value: model, label: model }))}
+                          options={
+                            provider.provider === "openai"
+                              ? modelOptionsEmbeddingsOpenAI
+                              : provider.provider === "azure"
+                              ? modelOptionsEmbeddingsAzure
+                              : []
+                          }
+                          onChange={onCustomEmbeddingsModelsChange}
+                          isMulti
+                          placeholder="Add custom embeddings model"
+                        />
+                      </Box>
+                    </>
+                  )}
+                </VStack>
+
                 <HStack width="full">
                   <Spacer />
                   <Button

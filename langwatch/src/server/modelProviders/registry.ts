@@ -14,6 +14,8 @@ export type MaybeStoredModelProvider = Omit<
   "id" | "projectId" | "createdAt" | "updatedAt"
 > & {
   id?: string;
+  customModels?: string[];
+  customEmbeddingsModels?: string[];
 };
 
 export const modelProviders = {

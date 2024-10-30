@@ -25,11 +25,21 @@ export const modelProviderRouter = createTRPCRouter({
         provider: z.string(),
         enabled: z.boolean(),
         customKeys: z.object({}).passthrough().optional().nullable(),
+        customModels: z.array(z.string()),
+        customEmbeddingsModels: z.array(z.string()),
       })
     )
     .use(checkUserPermissionForProject(TeamRoleGroup.SETUP_PROJECT))
     .mutation(async ({ input, ctx }) => {
-      const { id, projectId, provider, enabled, customKeys } = input;
+      const {
+        id,
+        projectId,
+        provider,
+        enabled,
+        customKeys,
+        customModels,
+        customEmbeddingsModels,
+      } = input;
 
       if (!(provider in modelProviders)) {
         throw new Error("Invalid provider");
@@ -49,6 +59,8 @@ export const modelProviderRouter = createTRPCRouter({
         provider,
         enabled,
         customKeys: validatedKeys as any,
+        customModels,
+        customEmbeddingsModels,
       };
 
       const existingModelProvider = id
