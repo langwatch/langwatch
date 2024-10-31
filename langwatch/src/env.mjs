@@ -43,7 +43,7 @@ export const env = createEnv({
     DEMO_PROJECT_ID: z.string().optional(),
     DEMO_PROJECT_USER_ID: z.string().optional(),
     DEMO_PROJECT_SLUG: z.string().optional(),
-    IS_OPENSEARCH: z.string().optional(),
+    IS_OPENSEARCH: z.boolean().optional(),
     USE_AWS_SES: z.string().optional(),
     AWS_REGION: z.string().optional(),
     SENTRY_DSN: z.string().optional(),
@@ -88,7 +88,9 @@ export const env = createEnv({
     DEMO_PROJECT_ID: process.env.DEMO_PROJECT_ID,
     DEMO_PROJECT_USER_ID: process.env.DEMO_PROJECT_USER_ID,
     DEMO_PROJECT_SLUG: process.env.DEMO_PROJECT_SLUG,
-    IS_OPENSEARCH: process.env.IS_OPENSEARCH,
+    IS_OPENSEARCH:
+      process.env.IS_OPENSEARCH === "1" ||
+      process.env.IS_OPENSEARCH?.toLowerCase() === "true",
     USE_AWS_SES: process.env.USE_AWS_SES,
     AWS_REGION: process.env.AWS_REGION,
     SENTRY_DSN: process.env.SENTRY_DSN,

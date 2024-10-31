@@ -3,8 +3,13 @@ version: "3.8"
 services:
   app:
     environment:
-      - SKIP_ENV_VALIDATION=true
-      - DISABLE_PII_REDACTION=true
+      SKIP_ENV_VALIDATION: true
+      DISABLE_PII_REDACTION: true
+      DATABASE_URL: postgresql://prisma:prisma@postgres:5432/mydb?schema=mydb
+      ELASTICSEARCH_NODE_URL: http://opensearch:9200
+      REDIS_URL: redis://redis:6379
+      LANGWATCH_NLP_SERVICE: http://langwatch_nlp:8080
+      LANGEVALS_ENDPOINT: http://langevals:8000
     env_file:
       - langwatch/.env
     build:
@@ -82,7 +87,7 @@ services:
       - "plugins.sql.enabled=false"
       - "plugins.rollup.enabled=false"
       # Performance settings
-      - "OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m -XX:+UseG1GC -XX:-UseSerialGC -XX:G1ReservePercent=25 -XX:InitiatingHeapOccupancyPercent=30"
+      - "OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m -XX:+UseG1GC -XX:-UseSerialGC -XX:G1ReservePercent=25 -XX:+AlwaysPreTouch -XX:InitiatingHeapOccupancyPercent=30"
       - "cluster.routing.allocation.disk.threshold_enabled=false"
       - "bootstrap.memory_lock=false" # Changed from true to avoid memory locking warnings
       # Disk settings
@@ -91,6 +96,15 @@ services:
       - "cluster.routing.allocation.disk.watermark.flood_stage=97%"
       - "cluster.info.update.interval=1m"
       - OPENSEARCH_INITIAL_ADMIN_PASSWORD=some-random-password-which-is-greater-than-16-chars-long
+      # System limits
+      - "node.store.allow_mmap=false"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
     ports:
       - "9200:9200"
       - "9600:9600"

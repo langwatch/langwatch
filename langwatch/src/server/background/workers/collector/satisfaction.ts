@@ -27,7 +27,7 @@ export const scoreSatisfactionFromInput = async ({
 
   if (!input?.embeddings) {
     console.warn(
-      `Trace ID ${traceId} input does not have embeddings, skipping the job`
+      `Trace ID ${traceId} input does not have embeddings, skipping satisfaction score`
     );
     return;
   }

@@ -22,14 +22,6 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Build and push LangWatch NLP Docker image
-        uses: docker/build-push-action@v6
-        with:
-          context: ./langwatch_nlp
-          push: true
-          platforms: linux/amd64,linux/arm64/v8
-          tags: langwatch/langwatch_nlp:latest
-
       - name: Build and push LangWatch Docker image
         uses: docker/build-push-action@v6
         with:
@@ -37,3 +29,11 @@ jobs:
           push: true
           platforms: linux/amd64,linux/arm64/v8
           tags: langwatch/langwatch:latest
+
+      - name: Build and push LangWatch NLP Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./langwatch_nlp
+          push: true
+          platforms: linux/amd64,linux/arm64/v8
+          tags: langwatch/langwatch_nlp:latest
