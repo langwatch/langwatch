@@ -10,16 +10,15 @@ Reasoning Engine B.V.
 
 LangWatch
 
-The Licensed Work is (c) 2023 Reasoning Engine B.V.
+The Licensed Work is (c) 2024 Reasoning Engine B.V.
 
 ### Additional Use Grant
 
-You may make use of the Licensed Work, provided that you may not use the Licensed Work for providing a SaaS Service.\
-A “SaaS Service” is a commercial offering that allows third parties (other than your employees and contractors) to access the functionality of the Licensed Work.
+None
 
 ### Change Date
 
-2027-12-27
+2099-12-31
 
 ### Change License
 
