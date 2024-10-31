@@ -2,7 +2,6 @@ version: "3.8"
 
 services:
   app:
-    image: langwatch/langwatch:latest
     environment:
       SKIP_ENV_VALIDATION: true
       DISABLE_PII_REDACTION: true
@@ -13,7 +12,9 @@ services:
       LANGEVALS_ENDPOINT: http://langevals:8000
     env_file:
       - langwatch/.env
-    pull_policy: always
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
     ports:
       - "3000:3000"
     depends_on:
@@ -25,13 +26,13 @@ services:
         condition: service_healthy
 
   langwatch_nlp:
-    image: langwatch/langwatch_nlp:latest
+    build:
+      context: ./langwatch_nlp
     env_file:
       - langwatch/.env
     ports:
       - "8080:8080"
     restart: always
-    pull_policy: always
     environment:
       - LANGWATCH_ENDPOINT=http://app:3000
 
