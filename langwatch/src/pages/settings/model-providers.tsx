@@ -40,43 +40,25 @@ import {
 
 import models from "../../../../models.json";
 
-const modelOptionsChatOpenAI = Object.entries(models)
-  .filter(([_, value]) => value.model_vendor === "openai")
-  .filter(([_, value]) => value.mode === "chat")
-  .map(([key, value]) => ({
-    value: key.split("/")[1],
-    label: key.split("/")[1],
-  }));
-
-const modelOptionsEmbeddingsOpenAI = Object.entries(models)
-  .filter(([_, value]) => value.model_vendor === "openai")
-  .filter(([_, value]) => value.mode === "embedding")
-  .map(([key, value]) => ({
-    value: key.split("/")[1],
-    label: key.split("/")[1],
-  }));
-
-const modelOptionsChatAzure = Object.entries(models)
-  .filter(([_, value]) => value.model_vendor === "azure")
-  .filter(([_, value]) => value.mode === "chat")
-  .map(([key, value]) => ({
-    value: key.split("/")[1],
-    label: key.split("/")[1],
-  }));
-
-const modelOptionsEmbeddingsAzure = Object.entries(models)
-  .filter(([_, value]) => value.model_vendor === "azure")
-  .filter(([_, value]) => value.mode === "embedding")
-  .map(([key, value]) => ({
-    value: key.split("/")[1],
-    label: key.split("/")[1],
-  }));
-
-console.log("mod", modelOptionsChatOpenAI);
-console.log("modE", modelOptionsEmbeddingsOpenAI);
-console.log("modEA", modelOptionsEmbeddingsAzure);
-console.log("modCA", modelOptionsChatAzure);
 import CreatableSelect from "react-select/creatable";
+
+const getProviderModelOptions = (
+  provider: string,
+  mode: "chat" | "embedding"
+) => {
+  if (provider === "vertex_ai") {
+    provider = "google";
+  } else if (provider === "groq") {
+    provider = "meta";
+  }
+  return Object.entries(models)
+    .filter(([_, value]) => value.model_vendor === provider)
+    .filter(([_, value]) => value.mode === mode)
+    .map(([key, value]) => ({
+      value: key.split("/").slice(1).join("/"),
+      label: key.split("/").slice(1).join("/"),
+    }));
+};
 
 export default function ModelsPage() {
   const { project, organizations } = useOrganizationTeamProject();
@@ -155,8 +137,8 @@ type ModelProviderForm = {
   enabled: boolean;
   useCustomKeys: boolean;
   customKeys?: Record<string, unknown> | null;
-  customModels?: string[];
-  customEmbeddingsModels?: string[];
+  customModels?: { value: string; label: string }[] | null;
+  customEmbeddingsModels?: { value: string; label: string }[] | null;
 };
 
 function ModelProviderForm({
@@ -172,14 +154,27 @@ function ModelProviderForm({
 
   const localUpdateMutation = api.modelProvider.update.useMutation();
 
-  console.log(provider.customModels);
-
   const providerDefinition =
     modelProvidersRegistry[
       provider.provider as keyof typeof modelProvidersRegistry
     ]!;
 
-  const { register, handleSubmit, formState, watch, setValue } =
+  const getStoredModelOptions = (
+    models: string[],
+    provider: string,
+    mode: "chat" | "embedding"
+  ) => {
+    if (!models || models.length === 0) {
+      const options = getProviderModelOptions(provider, mode);
+      return options;
+    }
+    return models.map((model) => ({
+      value: model,
+      label: model,
+    }));
+  };
+
+  const { register, handleSubmit, formState, watch, setValue, control } =
     useForm<ModelProviderForm>({
       defaultValues: {
         id: provider.id,
@@ -187,8 +182,16 @@ function ModelProviderForm({
         enabled: provider.enabled,
         useCustomKeys: !!provider.customKeys,
         customKeys: provider.customKeys as object | null,
-        customModels: provider.customModels ?? [],
-        customEmbeddingsModels: provider.customEmbeddingsModels ?? [],
+        customModels: getStoredModelOptions(
+          provider.customModels ?? [],
+          provider.provider,
+          "chat"
+        ),
+        customEmbeddingsModels: getStoredModelOptions(
+          provider.customEmbeddingsModels ?? [],
+          provider.provider,
+          "embedding"
+        ),
       },
       resolver: (data, ...args) => {
         console.log("data", data);
@@ -197,7 +200,10 @@ function ModelProviderForm({
           ...data,
           customKeys: data.useCustomKeys ? data.customKeys : null,
           customModels: data.customModels ?? [],
+          customEmbeddingsModels: data.customEmbeddingsModels ?? [],
         };
+
+        console.log("data_", data_);
 
         return zodResolver(
           z.object({
@@ -206,7 +212,24 @@ function ModelProviderForm({
             enabled: z.boolean(),
             useCustomKeys: z.boolean(),
             customKeys: providerDefinition.keysSchema.optional().nullable(),
-            customModels: z.array(z.string()).optional().nullable(),
+            customModels: z
+              .array(
+                z.object({
+                  value: z.string(),
+                  label: z.string(),
+                })
+              )
+              .optional()
+              .nullable(),
+            customEmbeddingsModels: z
+              .array(
+                z.object({
+                  value: z.string(),
+                  label: z.string(),
+                })
+              )
+              .optional()
+              .nullable(),
           })
         )(data_, ...args);
       },
@@ -216,24 +239,30 @@ function ModelProviderForm({
 
   const onSubmit = useCallback(
     async (data: ModelProviderForm) => {
-      console.log("data", data);
+      console.log("dataaa", data);
 
-      await localUpdateMutation.mutateAsync({
-        id: provider.id,
-        projectId: project?.id ?? "",
-        provider: provider.provider,
-        enabled: data.enabled,
-        customKeys: data.useCustomKeys ? data.customKeys : null,
-        customModels: data.customModels ?? [],
-        customEmbeddingsModels: data.customEmbeddingsModels ?? [],
-      });
-      toast({
-        title: "API Keys Updated",
-        status: "success",
-        duration: 3000,
-        isClosable: true,
-      });
-      await refetch();
+      try {
+        await localUpdateMutation.mutateAsync({
+          id: provider.id,
+          projectId: project?.id ?? "",
+          provider: provider.provider,
+          enabled: data.enabled,
+          customKeys: data.useCustomKeys ? data.customKeys : null,
+          customModels: (data.customModels ?? []).map((m) => m.value),
+          customEmbeddingsModels: (data.customEmbeddingsModels ?? []).map(
+            (m) => m.value
+          ),
+        });
+        toast({
+          title: "API Keys Updated",
+          status: "success",
+          duration: 3000,
+          isClosable: true,
+        });
+        await refetch();
+      } catch (error) {
+        console.error(error);
+      }
     },
     [
       localUpdateMutation,
@@ -258,6 +287,7 @@ function ModelProviderForm({
         customModels: provider.customModels ?? [],
         customEmbeddingsModels: provider.customEmbeddingsModels ?? [],
       });
+
       await refetch();
     },
     [
@@ -282,12 +312,30 @@ function ModelProviderForm({
           provider: provider.provider,
           enabled: provider.enabled,
           customKeys: null,
-          customModels: provider.customModels ?? [],
-          customEmbeddingsModels: provider.customEmbeddingsModels ?? [],
+          customModels: null,
+          customEmbeddingsModels: null,
         });
         setValue("customKeys", null);
+        setValue("customModels", null);
+        setValue("customEmbeddingsModels", null);
         await refetch();
       }
+      setValue(
+        "customModels",
+        getStoredModelOptions(
+          provider.customModels ?? [],
+          provider.provider,
+          "chat"
+        )
+      );
+      setValue(
+        "customEmbeddingsModels",
+        getStoredModelOptions(
+          provider.customEmbeddingsModels ?? [],
+          provider.provider,
+          "embedding"
+        )
+      );
     },
     [
       useCustomKeysField,
@@ -301,31 +349,16 @@ function ModelProviderForm({
     ]
   );
 
-  // const customModelsField = register("customModels");
-  // const onCustomModelsChange = useCallback(
-  //   (value: any) => {
-  //     setValue(
-  //       `customModels`,
-  //       value.map((v: any) => v.value)
-  //     );
-  //   },
-  //   [setValue]
-  // );
-
   const customModelsField = register("customModels");
   const onCustomModelsChange = useCallback(
     async (value: any) => {
-      // Update the form field value
-      // void customModelsField.onChange(value);
-
-      // Update via mutation
       await updateMutation.mutateAsync({
         id: provider.id,
         projectId: project?.id ?? "",
         provider: provider.provider,
         enabled: provider.enabled, // Add this line
-        customModels: value.map((v: any) => v.value),
         customKeys: provider.customKeys as any,
+        customModels: value.map((v: any) => v.value),
         customEmbeddingsModels: provider.customEmbeddingsModels ?? [],
       });
 
@@ -460,20 +493,29 @@ function ModelProviderForm({
                 <VStack width="full" spacing={4}>
                   <Box width="full">
                     <SmallLabel>Models</SmallLabel>
-                    <CreatableSelect
-                      defaultValue={(provider.customModels ?? []).map(
-                        (model) => ({ value: model, label: model })
+                    <Controller
+                      name="customModels"
+                      control={control}
+                      // defaultValues={getStoredModelOptions(
+                      //   provider.customModels ?? [],
+                      //   provider.provider,
+                      //   "chat"
+                      // )}
+                      render={({ field }) => (
+                        <CreatableSelect
+                          {...field}
+                          isMulti
+                          options={getProviderModelOptions(
+                            provider.provider,
+                            "chat"
+                          )}
+                          // onChange={(selectedOptions) => {
+                          //   field.onChange(selectedOptions);
+                          //   onCustomModelsChange(selectedOptions); // Custom handler
+                          // }}
+                          placeholder="Add custom model"
+                        />
                       )}
-                      options={
-                        provider.provider === "openai"
-                          ? modelOptionsChatOpenAI
-                          : provider.provider === "azure"
-                          ? modelOptionsChatAzure
-                          : []
-                      }
-                      onChange={onCustomModelsChange}
-                      isMulti
-                      placeholder="Add custom model"
                     />
                   </Box>
                   {(provider.provider === "openai" ||
@@ -481,21 +523,49 @@ function ModelProviderForm({
                     <>
                       <Box width="full">
                         <SmallLabel>Embeddings Models</SmallLabel>
-                        <CreatableSelect
-                          defaultValue={(
-                            provider.customEmbeddingsModels ?? []
-                          ).map((model) => ({ value: model, label: model }))}
-                          options={
-                            provider.provider === "openai"
-                              ? modelOptionsEmbeddingsOpenAI
-                              : provider.provider === "azure"
-                              ? modelOptionsEmbeddingsAzure
-                              : []
-                          }
+                        <Controller
+                          name="customEmbeddingsModels"
+                          control={control}
+                          // defaultValues={getStoredModelOptions(
+                          //   provider.customModels ?? [],
+                          //   provider.provider,
+                          //   "chat"
+                          // )}
+                          render={({ field }) => (
+                            <CreatableSelect
+                              {...field}
+                              isMulti
+                              options={getProviderModelOptions(
+                                provider.provider,
+                                "embedding"
+                              )}
+                              // onChange={(selectedOptions) => {
+                              //   field.onChange(selectedOptions);
+                              //   onCustomEmbeddingsModelsChange(selectedOptions); // Custom handler
+                              // }}
+                              placeholder="Add custom embeddings model"
+                            />
+                          )}
+                        />
+                        {/* <CreatableSelect
+                          defaultValue={getStoredModelOptions(
+                            provider.customEmbeddingsModels ?? [],
+                            provider.provider,
+                            "embedding"
+                          )}
+                          value={getStoredModelOptions(
+                            provider.customEmbeddingsModels ?? [],
+                            provider.provider,
+                            "embedding"
+                          )}
+                          options={getProviderModelOptions(
+                            provider.provider,
+                            "embedding"
+                          )}
                           onChange={onCustomEmbeddingsModelsChange}
                           isMulti
                           placeholder="Add custom embeddings model"
-                        />
+                        /> */}
                       </Box>
                     </>
                   )}

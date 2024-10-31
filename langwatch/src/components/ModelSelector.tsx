@@ -4,7 +4,10 @@ import React from "react";
 import models from "../../../models.json";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import { api } from "../utils/api";
-import { vendorIcons } from "../server/modelProviders/iconsMap";
+import {
+  vendorIcons,
+  modelProviderIcons,
+} from "../server/modelProviders/iconsMap";
 
 export type ModelOption = {
   label: string;
@@ -43,40 +46,72 @@ export const useModelSelectionOptions = (
 
   console.log(modelProviders.data);
 
+  const customModels = getCustomModels(
+    modelProviders.data ?? {},
+    options,
+    mode
+  );
+
+  console.log("customModels", customModels);
+
   const selectOptions: Record<string, ModelOption> = Object.fromEntries(
-    options
+    customModels
       .map((model): [string, ModelOption] => {
-        const modelOption = modelSelectorOptions.find(
-          (option) => option.value === model
-        );
+        // const modelOption = modelSelectorOptions.find(
+        //   (option) => option.value === model
+        // );
 
-        console.log("model", modelOption);
-
-        if (!modelOption) {
-          return [
-            model,
-            {
-              label: model,
-              value: model,
-              version: "",
-              icon: null,
-              isDisabled: true,
-              mode: mode,
-            },
-          ];
-        }
+        console.log("modelOption", model);
 
         const provider = model.split("/")[0]!;
-        const modelProvider = modelProviders.data?.[provider];
+        const modelName = model.split("/")[1]!;
+
+        // const icon =
+        //   provider === "vertex_ai"
+        //     ? vendorIcons["google"]
+        //     : provider === "groq"
+        //     ? vendorIcons["meta"]
+        //     : vendorIcons[provider];
 
         return [
           model,
           {
-            ...modelOption,
-            value: modelProvider?.enabled ? modelOption.value : "",
-            isDisabled: !modelProvider?.enabled,
+            label: modelName,
+            value: model,
+            version: "",
+            icon: modelProviderIcons[
+              provider as keyof typeof modelProviderIcons
+            ],
+            isDisabled: !modelProviders.data?.[provider]?.enabled,
+            mode: mode,
           },
         ];
+
+        // if (!modelOption) {
+        //   return [
+        //     model,
+        //     {
+        //       label: model,
+        //       value: model,
+        //       version: "",
+        //       icon: null,
+        //       isDisabled: true,
+        //       mode: mode,
+        //     },
+        //   ];
+        // }
+
+        // const provider = model.split("/")[0]!;
+        // const modelProvider = modelProviders.data?.[provider];
+
+        // return [
+        //   model,
+        //   {
+        //     ...modelOption,
+        //     value: modelProvider?.enabled ? modelOption.value : "",
+        //     isDisabled: !modelProvider?.enabled,
+        //   },
+        // ];
       })
       .filter(([_, option]) => option && (!mode || option.mode === mode))
   );
@@ -205,3 +240,57 @@ export const ModelSelector = React.memo(function ModelSelector({
     />
   );
 });
+
+const getCustomModels = (
+  modelProviders: Record<string, any>,
+  options: string[],
+  mode: "chat" | "embedding" | "evaluator" = "chat"
+) => {
+  let models: string[] = [];
+  console.log("modelProvidera", modelProviders);
+
+  const customProviders: string[] = [];
+  //const providers: string[];
+
+  // Loop through each provider in the object
+  for (let provider in modelProviders) {
+    // Check if customModels exist and enabled is true
+    if (
+      modelProviders[provider].enabled &&
+      modelProviders[provider].customModels &&
+      mode === "chat"
+    ) {
+      modelProviders[provider].customModels.forEach((model: string) => {
+        models.push(`${provider}/${model}`);
+        customProviders.push(provider);
+      });
+    }
+
+    if (
+      modelProviders[provider].enabled &&
+      modelProviders[provider].customEmbeddingsModels &&
+      mode === "embedding"
+    ) {
+      modelProviders[provider].customEmbeddingsModels?.forEach(
+        (model: string) => {
+          models.push(`${provider}/${model}`);
+          customProviders.push(provider);
+        }
+      );
+    }
+  }
+
+  console.log("optionss", options);
+
+  if (customProviders.length > 0) {
+    options.forEach((option) => {
+      const optionProvider = option.split("/")[0]!;
+      if (!customProviders.includes(optionProvider)) {
+        models.push(option);
+      }
+    });
+    return models;
+  }
+
+  return options;
+};

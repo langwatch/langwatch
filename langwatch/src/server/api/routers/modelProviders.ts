@@ -25,8 +25,8 @@ export const modelProviderRouter = createTRPCRouter({
         provider: z.string(),
         enabled: z.boolean(),
         customKeys: z.object({}).passthrough().optional().nullable(),
-        customModels: z.array(z.string()),
-        customEmbeddingsModels: z.array(z.string()),
+        customModels: z.array(z.string()).optional().nullable(),
+        customEmbeddingsModels: z.array(z.string()).optional().nullable(),
       })
     )
     .use(checkUserPermissionForProject(TeamRoleGroup.SETUP_PROJECT))
@@ -194,6 +194,8 @@ export const prepareLitellmParams = (
   if (endpoint) {
     params.api_base = endpoint;
   }
+
+  console.log("endpoint", endpoint);
 
   if (modelProvider.provider === "vertex_ai") {
     params.vertex_credentials = apiKey ?? "invalid";

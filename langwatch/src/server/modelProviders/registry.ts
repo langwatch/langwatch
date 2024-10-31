@@ -24,7 +24,7 @@ export const modelProviders = {
     apiKey: "OPENAI_API_KEY",
     endpointKey: "OPENAI_BASE_URL",
     keysSchema: z.object({
-      OPENAI_API_KEY: z.string().min(1),
+      OPENAI_API_KEY: z.string().nullable().optional(),
       OPENAI_BASE_URL: z.string().nullable().optional(),
     }),
     enabledSince: new Date("2023-01-01"),
