@@ -55,65 +55,22 @@ export const useModelSelectionOptions = (
   console.log("customModels", customModels);
 
   const selectOptions: Record<string, ModelOption> = Object.fromEntries(
-    customModels
-      .map((model): [string, ModelOption] => {
-        // const modelOption = modelSelectorOptions.find(
-        //   (option) => option.value === model
-        // );
+    customModels.map((model): [string, ModelOption] => {
+      const provider = model.split("/")[0]!;
+      const modelName = model.split("/")[1]!;
 
-        console.log("modelOption", model);
-
-        const provider = model.split("/")[0]!;
-        const modelName = model.split("/")[1]!;
-
-        // const icon =
-        //   provider === "vertex_ai"
-        //     ? vendorIcons["google"]
-        //     : provider === "groq"
-        //     ? vendorIcons["meta"]
-        //     : vendorIcons[provider];
-
-        return [
-          model,
-          {
-            label: modelName,
-            value: model,
-            version: "",
-            icon: modelProviderIcons[
-              provider as keyof typeof modelProviderIcons
-            ],
-            isDisabled: !modelProviders.data?.[provider]?.enabled,
-            mode: mode,
-          },
-        ];
-
-        // if (!modelOption) {
-        //   return [
-        //     model,
-        //     {
-        //       label: model,
-        //       value: model,
-        //       version: "",
-        //       icon: null,
-        //       isDisabled: true,
-        //       mode: mode,
-        //     },
-        //   ];
-        // }
-
-        // const provider = model.split("/")[0]!;
-        // const modelProvider = modelProviders.data?.[provider];
-
-        // return [
-        //   model,
-        //   {
-        //     ...modelOption,
-        //     value: modelProvider?.enabled ? modelOption.value : "",
-        //     isDisabled: !modelProvider?.enabled,
-        //   },
-        // ];
-      })
-      .filter(([_, option]) => option && (!mode || option.mode === mode))
+      return [
+        model,
+        {
+          label: modelName,
+          value: model,
+          version: "",
+          icon: modelProviderIcons[provider as keyof typeof modelProviderIcons],
+          isDisabled: !modelProviders.data?.[provider]?.enabled,
+          mode: mode,
+        },
+      ];
+    })
   );
 
   const modelOption = selectOptions[model];
@@ -246,15 +203,11 @@ const getCustomModels = (
   options: string[],
   mode: "chat" | "embedding" | "evaluator" = "chat"
 ) => {
-  let models: string[] = [];
-  console.log("modelProvidera", modelProviders);
+  const models: string[] = [];
 
   const customProviders: string[] = [];
-  //const providers: string[];
 
-  // Loop through each provider in the object
-  for (let provider in modelProviders) {
-    // Check if customModels exist and enabled is true
+  for (const provider in modelProviders) {
     if (
       modelProviders[provider].enabled &&
       modelProviders[provider].customModels &&
@@ -279,8 +232,6 @@ const getCustomModels = (
       );
     }
   }
-
-  console.log("optionss", options);
 
   if (customProviders.length > 0) {
     options.forEach((option) => {

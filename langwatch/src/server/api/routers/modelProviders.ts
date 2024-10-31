@@ -75,11 +75,19 @@ export const modelProviderRouter = createTRPCRouter({
       if (existingModelProvider) {
         return await ctx.prisma.modelProvider.update({
           where: { id: existingModelProvider.id, projectId },
-          data,
+          data: {
+            ...data,
+            customModels: customModels ?? undefined,
+            customEmbeddingsModels: customEmbeddingsModels ?? undefined,
+          },
         });
       } else {
         return await ctx.prisma.modelProvider.create({
-          data,
+          data: {
+            ...data,
+            customModels: customModels ?? undefined,
+            customEmbeddingsModels: customEmbeddingsModels ?? undefined,
+          },
         });
       }
     }),
@@ -105,6 +113,8 @@ export const getProjectModelProviders = async (projectId: string) => {
             provider: providerKey,
             enabled: modelProvider.enabledSince < project.createdAt,
             customKeys: null,
+            customModels: null,
+            customEmbeddingsModels: null,
             deploymentMapping: null,
           };
           return [providerKey, modelProvider_];
@@ -119,7 +129,16 @@ export const getProjectModelProviders = async (projectId: string) => {
     (acc, modelProvider) => {
       return {
         ...acc,
-        [modelProvider.provider]: modelProvider,
+        [modelProvider.provider]: {
+          provider: modelProvider.provider,
+          enabled: modelProvider.enabled,
+          customKeys: modelProvider.customKeys,
+          customModels: modelProvider.customModels as string[] | null,
+          customEmbeddingsModels: modelProvider.customEmbeddingsModels as
+            | string[]
+            | null,
+          deploymentMapping: modelProvider.deploymentMapping,
+        },
       };
     },
     {} as Record<string, MaybeStoredModelProvider>
@@ -194,8 +213,6 @@ export const prepareLitellmParams = (
   if (endpoint) {
     params.api_base = endpoint;
   }
-
-  console.log("endpoint", endpoint);
 
   if (modelProvider.provider === "vertex_ai") {
     params.vertex_credentials = apiKey ?? "invalid";
