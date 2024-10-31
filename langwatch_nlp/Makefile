@@ -1,21 +1,23 @@
 .PHONY: test test-integration install
 
 test:
-	PYTHONPATH=$$PYTHONPATH:. poetry run pytest -s -m "not integration" -vv $(filter-out $@,$(MAKECMDGOALS))
+	PYTHONPATH=$$PYTHONPATH:. uv run pytest -s -m "not integration" -vv $(filter-out $@,$(MAKECMDGOALS))
 
 test-integration:
-	PYTHONPATH=$$PYTHONPATH:. poetry run pytest -s -m integration $(filter-out $@,$(MAKECMDGOALS))
+	PYTHONPATH=$$PYTHONPATH:. uv run pytest -s -m integration $(filter-out $@,$(MAKECMDGOALS))
 
-lock:
-	poetry lock --no-update
+install: ensure-uv
+	uv sync --all-extras
 
-install: lock
-	poetry install
+ensure-uv:
+	@if ! command -v uv &> /dev/null; then \
+		curl -LsSf https://astral.sh/uv/install.sh | sh; \
+	fi
 
 generate_proxy_config:
 	pip install pyyaml && python langwatch_nlp/generate_proxy_config.py
 
-start:
+start: install
 	@echo "Starting the server..."
-	@poetry run watchmedo auto-restart -p 'none' --signal SIGTERM -- \
+	@uv run watchmedo auto-restart -p 'none' --signal SIGTERM -- \
 		uvicorn -- langwatch_nlp.main:app --host 0.0.0.0 --port 8080 --timeout-keep-alive 70 --reload $(filter-out $@,$(MAKECMDGOALS))

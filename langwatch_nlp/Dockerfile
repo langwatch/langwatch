@@ -2,13 +2,16 @@ FROM python:3.11-slim
 
 WORKDIR /usr/src/app
 
-RUN pip install poetry
+RUN pip install uv
 
-COPY poetry.toml poetry.lock pyproject.toml .
-RUN poetry install
+COPY .python-version uv.lock pyproject.toml .
+RUN uv sync
 
 COPY . .
 
+# Preload for faster subsequent startups
+RUN PYTHONPATH=. uv run python langwatch_nlp/main.py
+
 EXPOSE 8080
 
-CMD poetry run uvicorn langwatch_nlp.main:app --host 0.0.0.0 --port 8080 --timeout-keep-alive 4500 | tee /var/log/uvicorn.log
+CMD uv run uvicorn langwatch_nlp.main:app --host 0.0.0.0 --port 8080 --timeout-keep-alive 4500 | tee /var/log/uvicorn.log
