@@ -75,7 +75,21 @@ services:
       - discovery.type=single-node
       - DISABLE_INSTALL_DEMO_CONFIG=true
       - DISABLE_SECURITY_PLUGIN=true
-      - "OPENSEARCH_JAVA_OPTS=-Xms512m -Xms512m -Djava.util.logging.config.file=logging.properties -Dlog4j2.formatMsgNoLookups=true"
+      # Disable specific plugins
+      - "plugins.anomaly_detection.enabled=false"
+      - "plugins.flow_framework.enabled=false"
+      - "plugins.security_analytics.ioc_finding_enabled=false"
+      - "plugins.sql.enabled=false"
+      - "plugins.rollup.enabled=false"
+      # Performance settings
+      - "OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m -XX:+UseG1GC -XX:-UseSerialGC -XX:G1ReservePercent=25 -XX:InitiatingHeapOccupancyPercent=30"
+      - "cluster.routing.allocation.disk.threshold_enabled=false"
+      - "bootstrap.memory_lock=false" # Changed from true to avoid memory locking warnings
+      # Disk settings
+      - "cluster.routing.allocation.disk.watermark.low=95%"
+      - "cluster.routing.allocation.disk.watermark.high=96%"
+      - "cluster.routing.allocation.disk.watermark.flood_stage=97%"
+      - "cluster.info.update.interval=1m"
       - OPENSEARCH_INITIAL_ADMIN_PASSWORD=some-random-password-which-is-greater-than-16-chars-long
     ports:
       - "9200:9200"
@@ -91,8 +105,8 @@ services:
     deploy:
       resources:
         limits:
-          memory: 1024m
-          cpus: '1.0'
+          memory: 512m
+          cpus: "1.0"
     restart: always
 
 volumes:
