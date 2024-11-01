@@ -44,15 +44,11 @@ export const useModelSelectionOptions = (
     { enabled: !!project?.id }
   );
 
-  console.log(modelProviders.data);
-
   const customModels = getCustomModels(
     modelProviders.data ?? {},
     options,
     mode
   );
-
-  console.log("customModels", customModels);
 
   const selectOptions: Record<string, ModelOption> = Object.fromEntries(
     customModels.map((model): [string, ModelOption] => {
