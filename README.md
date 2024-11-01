@@ -97,14 +97,32 @@ That's it! Now open the link provided when the compilation starts or go to your 
 
 ## Running Locally
 
-You need to have docker and docker compose installed in your local environment to be able to run LangWatch locally.
-You are going to need 8-9GB of RAM to run the docker compose stack, make sure there is enough RAM available to docker when using Docker Desktop.
+You need to have docker installed in your local environment to be able to run LangWatch locally.
 
 Then, it's two simple steps:
 
 1. Copy the `langwatch/.env.example` file to `langwatch/.env`
 
 2. Run `docker compose up --build` and open LangWatch at http://localhost:3000
+
+## Development
+
+You can also run LangWatch locally without docker to develop and help contribute to the project.
+
+1. Copy the `langwatch/.env.example` file to `langwatch/.env` if you haven't already
+
+2. Start just the databases using docker and leave it running:
+
+```bash
+docker compose up redis postgres opensearch
+```
+
+3. Then, on another terminal, install the dependencies and start LangWatch:
+
+```bash
+make install
+make start
+```
 
 ## Documentation
 

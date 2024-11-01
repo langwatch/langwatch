@@ -53,6 +53,9 @@ async def lifespan(app: FastAPI):
     global pool
     pool = IsolatedProcessPool(event_worker, size=4)
 
+    signal.signal(signal.SIGTERM, shutdown_handler)
+    signal.signal(signal.SIGINT, shutdown_handler)
+
     yield
 
     pool.shutdown()

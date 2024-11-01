@@ -11,12 +11,25 @@ export const connection =
     : new IORedis(env.REDIS_URL, {
         maxRetriesPerRequest: null,
         enableOfflineQueue: false,
-        tls:
-          env.NODE_ENV === "production"
-            ? (true as any)
-            : env.REDIS_URL.includes("rediss://"),
+        tls: env.REDIS_URL.includes("rediss://"),
       });
 
 connection?.on("connect", () => {
   debug("Redis connected");
+});
+
+connection?.on("error", (error) => {
+  debug("Redis Error:", error);
+});
+
+connection?.on("ready", () => {
+  debug("Redis is ready to accept commands");
+});
+
+connection?.on("close", () => {
+  debug("Redis connection closed");
+});
+
+connection?.on("reconnecting", () => {
+  debug("Redis reconnecting...");
 });

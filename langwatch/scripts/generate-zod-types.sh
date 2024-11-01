@@ -1,3 +1,5 @@
+#!/bin/sh
+
 generate_tracer_types() {
   ts-to-zod src/server/tracer/types.ts src/server/tracer/types.generated.ts
   if [ "$(uname)" = "Darwin" ]; then
