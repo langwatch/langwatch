@@ -7,7 +7,7 @@
 
 LangWatch is a visual interface for [DSPy](https://github.com/stanfordnlp/dspy) and a complete LLM Ops platform for experimenting, measuring and improving LLM pipelines, with a [fair-code](https://faircode.io/) distribution model.
 
-![Screenshot 2024-11-01 at 13 17 03](https://github.com/user-attachments/assets/386e145e-d910-4dbf-be7c-106b2ce20aad)
+![LangWatch Optimization Studio Screenshot](https://github.com/user-attachments/assets/72d12686-d70b-471b-ab20-0ddfbbc65cff)
 
 ## Demo
 
