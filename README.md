@@ -29,9 +29,9 @@ LangWatch is a visual interface for [DSPy](https://github.com/stanfordnlp/dspy) 
 
 ### 📈 Monitoring & Analytics
 - Cost and performance tracking
-- Real-time debugging
-- User analytics
-- Custom business metrics
+- Real-time debugging and tracing details
+- User analytics and custom business metrics
+- Custom dashboards and alerts
 
 ## LangWatch Cloud
 
