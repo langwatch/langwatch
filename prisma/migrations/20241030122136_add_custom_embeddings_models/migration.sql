@@ -1,0 +1,1 @@
+../../../langwatch/langwatch/prisma/migrations/20241030122136_add_custom_embeddings_models/migration.sql
