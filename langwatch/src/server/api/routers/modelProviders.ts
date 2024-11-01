@@ -25,11 +25,21 @@ export const modelProviderRouter = createTRPCRouter({
         provider: z.string(),
         enabled: z.boolean(),
         customKeys: z.object({}).passthrough().optional().nullable(),
+        customModels: z.array(z.string()).optional().nullable(),
+        customEmbeddingsModels: z.array(z.string()).optional().nullable(),
       })
     )
     .use(checkUserPermissionForProject(TeamRoleGroup.SETUP_PROJECT))
     .mutation(async ({ input, ctx }) => {
-      const { id, projectId, provider, enabled, customKeys } = input;
+      const {
+        id,
+        projectId,
+        provider,
+        enabled,
+        customKeys,
+        customModels,
+        customEmbeddingsModels,
+      } = input;
 
       if (!(provider in modelProviders)) {
         throw new Error("Invalid provider");
@@ -49,6 +59,8 @@ export const modelProviderRouter = createTRPCRouter({
         provider,
         enabled,
         customKeys: validatedKeys as any,
+        customModels,
+        customEmbeddingsModels,
       };
 
       const existingModelProvider = id
@@ -63,11 +75,19 @@ export const modelProviderRouter = createTRPCRouter({
       if (existingModelProvider) {
         return await ctx.prisma.modelProvider.update({
           where: { id: existingModelProvider.id, projectId },
-          data,
+          data: {
+            ...data,
+            customModels: customModels ?? undefined,
+            customEmbeddingsModels: customEmbeddingsModels ?? undefined,
+          },
         });
       } else {
         return await ctx.prisma.modelProvider.create({
-          data,
+          data: {
+            ...data,
+            customModels: customModels ?? undefined,
+            customEmbeddingsModels: customEmbeddingsModels ?? undefined,
+          },
         });
       }
     }),
@@ -93,6 +113,8 @@ export const getProjectModelProviders = async (projectId: string) => {
             provider: providerKey,
             enabled: modelProvider.enabledSince < project.createdAt,
             customKeys: null,
+            customModels: null,
+            customEmbeddingsModels: null,
             deploymentMapping: null,
           };
           return [providerKey, modelProvider_];
@@ -107,7 +129,16 @@ export const getProjectModelProviders = async (projectId: string) => {
     (acc, modelProvider) => {
       return {
         ...acc,
-        [modelProvider.provider]: modelProvider,
+        [modelProvider.provider]: {
+          provider: modelProvider.provider,
+          enabled: modelProvider.enabled,
+          customKeys: modelProvider.customKeys,
+          customModels: modelProvider.customModels as string[] | null,
+          customEmbeddingsModels: modelProvider.customEmbeddingsModels as
+            | string[]
+            | null,
+          deploymentMapping: modelProvider.deploymentMapping,
+        },
       };
     },
     {} as Record<string, MaybeStoredModelProvider>

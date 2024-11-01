@@ -31,12 +31,41 @@ import {
   type MaybeStoredModelProvider,
 } from "../../server/modelProviders/registry";
 import { api } from "../../utils/api";
-import { ModelSelector } from "../../components/ModelSelector";
-import { modelProviderIcons } from "../../server/modelProviders/iconsMap";
 import {
-  allowedTopicClusteringModels,
-  allowedEmbeddingsModels,
-} from "../../server/topicClustering/types";
+  ModelSelector,
+  modelSelectorOptions,
+} from "../../components/ModelSelector";
+import { modelProviderIcons } from "../../server/modelProviders/iconsMap";
+
+const allowedTopicClusteringModels = modelSelectorOptions
+  .filter((option) => option.mode === "chat")
+  .map((option) => option.value);
+
+const allowedEmbeddingsModels = modelSelectorOptions
+  .filter((option) => option.mode === "embedding")
+  .map((option) => option.value);
+
+import models from "../../../../models.json";
+
+import CreatableSelect from "react-select/creatable";
+
+const getProviderModelOptions = (
+  provider: string,
+  mode: "chat" | "embedding"
+) => {
+  if (provider === "vertex_ai") {
+    provider = "google";
+  } else if (provider === "groq") {
+    provider = "meta";
+  }
+  return Object.entries(models)
+    .filter(([_, value]) => value.model_vendor === provider)
+    .filter(([_, value]) => value.mode === mode)
+    .map(([key, _]) => ({
+      value: key.split("/").slice(1).join("/"),
+      label: key.split("/").slice(1).join("/"),
+    }));
+};
 
 export default function ModelsPage() {
   const { project, organizations } = useOrganizationTeamProject();
@@ -61,6 +90,7 @@ export default function ModelsPage() {
           <Heading size="lg" as="h1">
             Model Providers
           </Heading>
+
           <Spacer />
           {updateMutation.isLoading && <Spinner />}
           {organizations && project && (
@@ -114,6 +144,8 @@ type ModelProviderForm = {
   enabled: boolean;
   useCustomKeys: boolean;
   customKeys?: Record<string, unknown> | null;
+  customModels?: { value: string; label: string }[] | null;
+  customEmbeddingsModels?: { value: string; label: string }[] | null;
 };
 
 function ModelProviderForm({
@@ -134,7 +166,22 @@ function ModelProviderForm({
       provider.provider as keyof typeof modelProvidersRegistry
     ]!;
 
-  const { register, handleSubmit, formState, watch, setValue } =
+  const getStoredModelOptions = (
+    models: string[],
+    provider: string,
+    mode: "chat" | "embedding"
+  ) => {
+    if (!models || models.length === 0) {
+      const options = getProviderModelOptions(provider, mode);
+      return options;
+    }
+    return models.map((model) => ({
+      value: model,
+      label: model,
+    }));
+  };
+
+  const { register, handleSubmit, formState, watch, setValue, control } =
     useForm<ModelProviderForm>({
       defaultValues: {
         id: provider.id,
@@ -142,6 +189,16 @@ function ModelProviderForm({
         enabled: provider.enabled,
         useCustomKeys: !!provider.customKeys,
         customKeys: provider.customKeys as object | null,
+        customModels: getStoredModelOptions(
+          provider.customModels ?? [],
+          provider.provider,
+          "chat"
+        ),
+        customEmbeddingsModels: getStoredModelOptions(
+          provider.customEmbeddingsModels ?? [],
+          provider.provider,
+          "embedding"
+        ),
       },
       resolver: (data, ...args) => {
         console.log("data", data);
@@ -149,6 +206,8 @@ function ModelProviderForm({
         const data_ = {
           ...data,
           customKeys: data.useCustomKeys ? data.customKeys : null,
+          customModels: data.customModels ?? [],
+          customEmbeddingsModels: data.customEmbeddingsModels ?? [],
         };
 
         return zodResolver(
@@ -158,6 +217,24 @@ function ModelProviderForm({
             enabled: z.boolean(),
             useCustomKeys: z.boolean(),
             customKeys: providerDefinition.keysSchema.optional().nullable(),
+            customModels: z
+              .array(
+                z.object({
+                  value: z.string(),
+                  label: z.string(),
+                })
+              )
+              .optional()
+              .nullable(),
+            customEmbeddingsModels: z
+              .array(
+                z.object({
+                  value: z.string(),
+                  label: z.string(),
+                })
+              )
+              .optional()
+              .nullable(),
           })
         )(data_, ...args);
       },
@@ -173,6 +250,10 @@ function ModelProviderForm({
         provider: provider.provider,
         enabled: data.enabled,
         customKeys: data.useCustomKeys ? data.customKeys : null,
+        customModels: (data.customModels ?? []).map((m) => m.value),
+        customEmbeddingsModels: (data.customEmbeddingsModels ?? []).map(
+          (m) => m.value
+        ),
       });
       toast({
         title: "API Keys Updated",
@@ -202,7 +283,10 @@ function ModelProviderForm({
         provider: provider.provider,
         enabled: e.target.checked,
         customKeys: provider.customKeys as any,
+        customModels: provider.customModels ?? [],
+        customEmbeddingsModels: provider.customEmbeddingsModels ?? [],
       });
+
       await refetch();
     },
     [
@@ -227,10 +311,30 @@ function ModelProviderForm({
           provider: provider.provider,
           enabled: provider.enabled,
           customKeys: null,
+          customModels: null,
+          customEmbeddingsModels: null,
         });
         setValue("customKeys", null);
+        setValue("customModels", null);
+        setValue("customEmbeddingsModels", null);
         await refetch();
       }
+      setValue(
+        "customModels",
+        getStoredModelOptions(
+          provider.customModels ?? [],
+          provider.provider,
+          "chat"
+        )
+      );
+      setValue(
+        "customEmbeddingsModels",
+        getStoredModelOptions(
+          provider.customEmbeddingsModels ?? [],
+          provider.provider,
+          "embedding"
+        )
+      );
     },
     [
       useCustomKeysField,
@@ -326,6 +430,51 @@ function ModelProviderForm({
                     </React.Fragment>
                   ))}
                 </Grid>
+
+                <VStack width="full" spacing={4}>
+                  <Box width="full">
+                    <SmallLabel>Models</SmallLabel>
+                    <Controller
+                      name="customModels"
+                      control={control}
+                      render={({ field }) => (
+                        <CreatableSelect
+                          {...field}
+                          isMulti
+                          options={getProviderModelOptions(
+                            provider.provider,
+                            "chat"
+                          )}
+                          placeholder="Add custom model"
+                        />
+                      )}
+                    />
+                  </Box>
+                  {(provider.provider === "openai" ||
+                    provider.provider === "azure") && (
+                    <>
+                      <Box width="full">
+                        <SmallLabel>Embeddings Models</SmallLabel>
+                        <Controller
+                          name="customEmbeddingsModels"
+                          control={control}
+                          render={({ field }) => (
+                            <CreatableSelect
+                              {...field}
+                              isMulti
+                              options={getProviderModelOptions(
+                                provider.provider,
+                                "embedding"
+                              )}
+                              placeholder="Add custom embeddings model"
+                            />
+                          )}
+                        />
+                      </Box>
+                    </>
+                  )}
+                </VStack>
+
                 <HStack width="full">
                   <Spacer />
                   <Button

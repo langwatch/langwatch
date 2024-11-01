@@ -432,15 +432,17 @@ model Annotation {
 }
 
 model ModelProvider {
-    id                String   @id @default(nanoid())
-    projectId         String
-    project           Project  @relation(fields: [projectId], references: [id])
-    provider          String
-    enabled           Boolean
-    customKeys        Json?
-    deploymentMapping Json?
-    createdAt         DateTime @default(now())
-    updatedAt         DateTime @default(now()) @updatedAt
+    id                     String   @id @default(nanoid())
+    projectId              String
+    project                Project  @relation(fields: [projectId], references: [id])
+    provider               String
+    enabled                Boolean
+    customKeys             Json?
+    customModels           Json?
+    customEmbeddingsModels Json?
+    deploymentMapping      Json?
+    createdAt              DateTime @default(now())
+    updatedAt              DateTime @default(now()) @updatedAt
 
     @@index([projectId])
 }

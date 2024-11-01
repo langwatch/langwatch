@@ -4,7 +4,10 @@ import React from "react";
 import models from "../../../models.json";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import { api } from "../utils/api";
-import { vendorIcons } from "../server/modelProviders/iconsMap";
+import {
+  vendorIcons,
+  modelProviderIcons,
+} from "../server/modelProviders/iconsMap";
 
 export type ModelOption = {
   label: string;
@@ -41,40 +44,29 @@ export const useModelSelectionOptions = (
     { enabled: !!project?.id }
   );
 
+  const customModels = getCustomModels(
+    modelProviders.data ?? {},
+    options,
+    mode
+  );
+
   const selectOptions: Record<string, ModelOption> = Object.fromEntries(
-    options
-      .map((model): [string, ModelOption] => {
-        const modelOption = modelSelectorOptions.find(
-          (option) => option.value === model
-        );
+    customModels.map((model): [string, ModelOption] => {
+      const provider = model.split("/")[0]!;
+      const modelName = model.split("/")[1]!;
 
-        if (!modelOption) {
-          return [
-            model,
-            {
-              label: model,
-              value: model,
-              version: "",
-              icon: null,
-              isDisabled: true,
-              mode: mode,
-            },
-          ];
-        }
-
-        const provider = model.split("/")[0]!;
-        const modelProvider = modelProviders.data?.[provider];
-
-        return [
-          model,
-          {
-            ...modelOption,
-            value: modelProvider?.enabled ? modelOption.value : "",
-            isDisabled: !modelProvider?.enabled,
-          },
-        ];
-      })
-      .filter(([_, option]) => option && (!mode || option.mode === mode))
+      return [
+        model,
+        {
+          label: modelName,
+          value: model,
+          version: "",
+          icon: modelProviderIcons[provider as keyof typeof modelProviderIcons],
+          isDisabled: !modelProviders.data?.[provider]?.enabled,
+          mode: mode,
+        },
+      ];
+    })
   );
 
   const modelOption = selectOptions[model];
@@ -201,3 +193,51 @@ export const ModelSelector = React.memo(function ModelSelector({
     />
   );
 });
+
+const getCustomModels = (
+  modelProviders: Record<string, any>,
+  options: string[],
+  mode: "chat" | "embedding" | "evaluator" = "chat"
+) => {
+  const models: string[] = [];
+
+  const customProviders: string[] = [];
+
+  for (const provider in modelProviders) {
+    if (
+      modelProviders[provider].enabled &&
+      modelProviders[provider].customModels &&
+      mode === "chat"
+    ) {
+      modelProviders[provider].customModels.forEach((model: string) => {
+        models.push(`${provider}/${model}`);
+        customProviders.push(provider);
+      });
+    }
+
+    if (
+      modelProviders[provider].enabled &&
+      modelProviders[provider].customEmbeddingsModels &&
+      mode === "embedding"
+    ) {
+      modelProviders[provider].customEmbeddingsModels?.forEach(
+        (model: string) => {
+          models.push(`${provider}/${model}`);
+          customProviders.push(provider);
+        }
+      );
+    }
+  }
+
+  if (customProviders.length > 0) {
+    options.forEach((option) => {
+      const optionProvider = option.split("/")[0]!;
+      if (!customProviders.includes(optionProvider)) {
+        models.push(option);
+      }
+    });
+    return models;
+  }
+
+  return options;
+};
