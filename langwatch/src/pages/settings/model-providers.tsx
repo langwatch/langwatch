@@ -61,7 +61,7 @@ const getProviderModelOptions = (
   return Object.entries(models)
     .filter(([_, value]) => value.model_vendor === provider)
     .filter(([_, value]) => value.mode === mode)
-    .map(([key, value]) => ({
+    .map(([key, _]) => ({
       value: key.split("/").slice(1).join("/"),
       label: key.split("/").slice(1).join("/"),
     }));
@@ -244,28 +244,24 @@ function ModelProviderForm({
 
   const onSubmit = useCallback(
     async (data: ModelProviderForm) => {
-      try {
-        await localUpdateMutation.mutateAsync({
-          id: provider.id,
-          projectId: project?.id ?? "",
-          provider: provider.provider,
-          enabled: data.enabled,
-          customKeys: data.useCustomKeys ? data.customKeys : null,
-          customModels: (data.customModels ?? []).map((m) => m.value),
-          customEmbeddingsModels: (data.customEmbeddingsModels ?? []).map(
-            (m) => m.value
-          ),
-        });
-        toast({
-          title: "API Keys Updated",
-          status: "success",
-          duration: 3000,
-          isClosable: true,
-        });
-        await refetch();
-      } catch (error) {
-        console.error(error);
-      }
+      await localUpdateMutation.mutateAsync({
+        id: provider.id,
+        projectId: project?.id ?? "",
+        provider: provider.provider,
+        enabled: data.enabled,
+        customKeys: data.useCustomKeys ? data.customKeys : null,
+        customModels: (data.customModels ?? []).map((m) => m.value),
+        customEmbeddingsModels: (data.customEmbeddingsModels ?? []).map(
+          (m) => m.value
+        ),
+      });
+      toast({
+        title: "API Keys Updated",
+        status: "success",
+        duration: 3000,
+        isClosable: true,
+      });
+      await refetch();
     },
     [
       localUpdateMutation,
