@@ -212,7 +212,7 @@ export class LangWatchAwsMarketplaceStack extends cdk.Stack {
           ),
           REDIS_URL: cdk.SecretValue.unsafePlainText(
             cdk.Fn.join("", [
-              "redis://:",
+              "rediss://:",
               redisPassword
                 .secretValueFromJson("password")
                 .unsafeUnwrap()

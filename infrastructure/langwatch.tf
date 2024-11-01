@@ -85,7 +85,7 @@ resource "aws_ecs_task_definition" "langwatch" {
         },
         {
           name  = "REDIS_URL"
-          value = "redis://:${urlencode(jsondecode(data.aws_secretsmanager_secret_version.redis.secret_string)["password"])}@${aws_elasticache_replication_group.redis[0].primary_endpoint_address}:6379"
+          value = "rediss://:${urlencode(jsondecode(data.aws_secretsmanager_secret_version.redis.secret_string)["password"])}@${aws_elasticache_replication_group.redis[0].primary_endpoint_address}:6379"
         },
         {
           name  = "DATABASE_URL"
