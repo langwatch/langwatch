@@ -1,9 +1,16 @@
 name: Build and Push Docker Images
 
 on:
+  schedule:
+    - cron: '0 0 * * 0'  # Runs at 00:00 on Sunday
   push:
     branches:
       - main
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+    # Only run on commits containing "fix" in the message
+    if: "contains(github.event.head_commit.message, 'fix')"
 
 jobs:
   build-and-push:
