@@ -2,7 +2,7 @@ name: Build and Push Docker Images
 
 on:
   schedule:
-    - cron: '0 0 * * 0'  # Runs at 00:00 on Sunday
+    - cron: '0 10 * * 1'  # Runs at 10:00 on Monday
   push:
     branches:
       - main
