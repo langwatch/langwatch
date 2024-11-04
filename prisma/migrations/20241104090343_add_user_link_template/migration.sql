@@ -1,0 +1,1 @@
+../../../langwatch/langwatch/prisma/migrations/20241104090343_add_user_link_template/migration.sql
