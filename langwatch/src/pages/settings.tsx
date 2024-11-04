@@ -181,6 +181,7 @@ type ProjectFormData = {
   name: string;
   language: string;
   framework: string;
+  userLinkTemplate?: string;
   piiRedactionLevel: {
     label: string;
     value: PIIRedactionLevel;
@@ -188,12 +189,11 @@ type ProjectFormData = {
   };
 };
 
-const piiRedactionLevelOptions : ProjectFormData["piiRedactionLevel"][] = [
+const piiRedactionLevelOptions: ProjectFormData["piiRedactionLevel"][] = [
   {
     label: "Strict",
     value: PIIRedactionLevel.STRICT,
-    description:
-      "Redacts all PII data including names and addresses",
+    description: "Redacts all PII data including names and addresses",
   },
   {
     label: "Essential",
@@ -209,7 +209,10 @@ function ProjectSettingsForm({ project }: { project: Project }) {
     name: project.name,
     language: project.language,
     framework: project.framework,
-    piiRedactionLevel: piiRedactionLevelOptions.find(x => x.value === project.piiRedactionLevel)!,
+    userLinkTemplate: project.userLinkTemplate ?? "",
+    piiRedactionLevel: piiRedactionLevelOptions.find(
+      (x) => x.value === project.piiRedactionLevel
+    )!,
   });
   const form = useForm({
     defaultValues,
@@ -232,6 +235,7 @@ function ProjectSettingsForm({ project }: { project: Project }) {
           projectId: project.id,
           ...data,
           piiRedactionLevel: data.piiRedactionLevel.value,
+          userLinkTemplate: data.userLinkTemplate ?? "",
         },
         {
           onSuccess: () => {
@@ -357,6 +361,17 @@ function ProjectSettingsForm({ project }: { project: Project }) {
                     }}
                   />
                 )}
+              />
+            </HorizontalFormControl>
+            <HorizontalFormControl
+              label="External User Link"
+              helper="Linkify user_ids using a template URL"
+            >
+              <Input
+                width="full"
+                type="text"
+                placeholder="https://example.com/user/{{user_id}}"
+                {...register("userLinkTemplate")}
               />
             </HorizontalFormControl>
           </form>

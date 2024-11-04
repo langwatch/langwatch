@@ -226,6 +226,7 @@ export const projectRouter = createTRPCRouter({
         language: z.string(),
         framework: z.string(),
         piiRedactionLevel: z.enum(["STRICT", "ESSENTIAL"]),
+        userLinkTemplate: z.string().optional(),
       })
     )
     .use(checkUserPermissionForProject(TeamRoleGroup.SETUP_PROJECT))
@@ -250,6 +251,7 @@ export const projectRouter = createTRPCRouter({
           language: input.language,
           framework: input.framework,
           piiRedactionLevel: input.piiRedactionLevel,
+          userLinkTemplate: input.userLinkTemplate,
         },
       });
 
