@@ -4,7 +4,10 @@ import { DashboardLayout } from "~/components/DashboardLayout";
 import { MenuLink } from "~/components/MenuLink";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 
-export default function SettingsLayout({ children }: PropsWithChildren) {
+export default function SettingsLayout({
+  children,
+  isSubscription,
+}: PropsWithChildren<{ isSubscription?: boolean }>) {
   const { project } = useOrganizationTeamProject();
 
   return (
@@ -20,6 +23,7 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
           minWidth="200px"
           height="full"
           spacing={0}
+          display={isSubscription ? "none" : "flex"}
         >
           <MenuLink href="/settings">General Settings</MenuLink>
           <MenuLink href={`/${project?.slug}/setup`}>Setup</MenuLink>
