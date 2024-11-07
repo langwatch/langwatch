@@ -139,6 +139,7 @@ function MembersList({
     );
   const createInvitesMutation = api.organization.createInvites.useMutation();
   const deleteMemberMutation = api.organization.deleteMember.useMutation();
+  const deleteInviteMutation = api.organization.deleteInvite.useMutation();
   const toast = useToast();
 
   const onSubmit: SubmitHandler<MembersForm> = (data) => {
@@ -146,7 +147,7 @@ function MembersList({
       {
         organizationId: organization.id,
         invites: data.invites.map((invite) => ({
-          email: invite.email,
+          email: invite.email.toLowerCase(),
           role: invite.role!.value as OrganizationUserRole,
           teamIds: invite.teamOptions
             .map((teamOption) => teamOption.value)
@@ -213,6 +214,25 @@ function MembersList({
             isClosable: true,
             position: "top-right",
           });
+        },
+      }
+    );
+  };
+
+  const deleteInvite = (inviteId: string) => {
+    deleteInviteMutation.mutate(
+      { inviteId, organizationId: organization.id },
+      {
+        onSuccess: () => {
+          toast({
+            title: "Invite deleted successfully",
+            description: "The invite has been deleted.",
+            status: "success",
+            duration: 5000,
+            isClosable: true,
+            position: "top-right",
+          });
+          void pendingInvites.refetch();
         },
       }
     );
@@ -323,6 +343,7 @@ function MembersList({
                       <Th>Email</Th>
                       <Th>Role</Th>
                       <Th>Teams</Th>
+                      <Th>Actions</Th>
                     </Tr>
                   </Thead>
                   <Tbody>
@@ -338,6 +359,27 @@ function MembersList({
                                 teams.find((team) => team.id == teamId)?.name
                             )
                             .join(", ")}
+                        </Td>
+                        <Td>
+                          <Menu>
+                            <MenuButton as={Button} variant={"ghost"}>
+                              {deleteInviteMutation.isLoading &&
+                              invite.id ===
+                                deleteInviteMutation.variables?.inviteId ? (
+                                <Spinner size="sm" />
+                              ) : (
+                                <MoreVertical />
+                              )}
+                            </MenuButton>
+                            <MenuList>
+                              <MenuItem
+                                color="red.600"
+                                onClick={() => deleteInvite(invite.id)}
+                              >
+                                Delete
+                              </MenuItem>
+                            </MenuList>
+                          </Menu>
                         </Td>
                       </Tr>
                     ))}

@@ -458,6 +458,19 @@ export const organizationRouter = createTRPCRouter({
       // Filter out any null values (skipped invites)
       return invites.filter(Boolean);
     }),
+  deleteInvite: protectedProcedure
+    .input(z.object({ inviteId: z.string(), organizationId: z.string() }))
+    .use(
+      checkUserPermissionForOrganization(
+        OrganizationRoleGroup.ORGANIZATION_MANAGE
+      )
+    )
+    .mutation(async ({ input, ctx }) => {
+      const prisma = ctx.prisma;
+      await prisma.organizationInvite.delete({
+        where: { id: input.inviteId, organizationId: input.organizationId },
+      });
+    }),
   getOrganizationPendingInvites: protectedProcedure
     .input(
       z.object({
