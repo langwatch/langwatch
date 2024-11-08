@@ -451,7 +451,8 @@ function Plan({
                       onSuccess: (result: any) => {
                         window.location.href = result.url;
                       },
-                      onError: () => {
+                      onError: (e) => {
+                        console.log(e);
                         toast({
                           title: "Error",
                           description:

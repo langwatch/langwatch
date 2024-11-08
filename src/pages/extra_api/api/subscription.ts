@@ -15,15 +15,24 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: "2024-04-10",
 });
 
-const prices: Record<"PRO" | "GROWTH", string> =
+const prices: Record<
+  "PRO" | "GROWTH" | "LAUNCH" | "ACCELERATE" | "ENTERPRISE",
+  string
+> =
   env.NODE_ENV === "production"
     ? {
         PRO: "price_1P6fvzIMsTw08cudWCwqfEjq",
         GROWTH: "price_1P6fw2IMsTw08cudFUkOX7jV",
+        LAUNCH: "price_tttttttt",
+        ACCELERATE: "price_ttttttt",
+        ENTERPRISE: "price_ttttttt",
       }
     : {
         PRO: "price_1P6bSyIMsTw08cudmzoqwBVN",
         GROWTH: "price_1P6fbyIMsTw08cudKh5L8w8x",
+        LAUNCH: "price_1QISHaIMsTw08cud6mkt89rk",
+        ACCELERATE: "price_1QISHaIMsTw08cud6mkt89rk",
+        ENTERPRISE: "price_1QISHaIMsTw08cud6mkt89rk",
       };
 
 export const subscriptionRouter = () =>
@@ -33,7 +42,14 @@ export const subscriptionRouter = () =>
         z.object({
           organizationId: z.string(),
           baseUrl: z.string(),
-          plan: z.enum(["FREE", "PRO", "GROWTH"]),
+          plan: z.enum([
+            "FREE",
+            "PRO",
+            "GROWTH",
+            "ENTERPRISE",
+            "LAUNCH",
+            "ACCELERATE",
+          ]),
         })
       )
       .use(
