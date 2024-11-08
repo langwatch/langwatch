@@ -510,8 +510,6 @@ export const organizationRouter = createTRPCRouter({
         include: { organization: true },
       });
 
-      let project: Project | null = null;
-
       if (!invite || invite.expiration < new Date()) {
         throw new TRPCError({
           code: "NOT_FOUND",
@@ -568,14 +566,15 @@ export const organizationRouter = createTRPCRouter({
           });
         }
 
-        project = await prisma.project.findFirst({
-          where: { teamId: teamIds[0] },
-        });
-
         await prisma.organizationInvite.update({
           where: { id: invite.id, organizationId: invite.organizationId },
           data: { status: "ACCEPTED" },
         });
+      });
+
+      const project = await prisma.project.findFirst({
+        where: { teamId: invite.teamIds.split(",")[0] },
+        select: { slug: true },
       });
 
       return { success: true, invite, project };
