@@ -605,6 +605,8 @@ enum PlanTypes {
   ENTERPRISE
   LAUNCH
   ACCELERATE
+  LAUNCH_ANNUAL
+  ACCELERATE_ANNUAL
 }
 
 enum SubscriptionStatus {

@@ -45,6 +45,8 @@ type PlanTypes =
   | "ENTERPRISE"
   | "LAUNCH"
   | "ACCELERATE"
+  | "LAUNCH_ANNUAL"
+  | "ACCELERATE_ANNUAL"
   | "SCALE";
 
 export default function Subscription() {
@@ -148,7 +150,7 @@ export default function Subscription() {
               </HStack>
             </Alert>
           ) : null}
-
+          {console.log(activePlan.data)}
           {activePlan.data && (
             <HStack spacing={2} paddingBottom={4}>
               <Text>
@@ -194,6 +196,7 @@ export default function Subscription() {
             <SimpleGrid templateColumns="repeat(5, 1fr)" gap={3}>
               <Plan
                 plan="FREE"
+                name="Free"
                 price={0}
                 description="For starting with LLM development"
                 features={[
@@ -207,9 +210,9 @@ export default function Subscription() {
               />
               <Plan
                 plan="PRO"
+                name="Pro"
                 price={99}
-                isAnnual={billAnnually}
-                annualPrice={1089}
+                hidden={true}
                 description="For small teams improving their LLM solutions"
                 features={[
                   "10,000 Traces",
@@ -253,9 +256,34 @@ export default function Subscription() {
                   /> */}
               <Plan
                 plan="LAUNCH"
-                isAnnual={billAnnually}
+                name="Launch"
                 price={149}
-                annualPrice={1644}
+                hidden={billAnnually}
+                description="For small teams improving their LLM solutions"
+                features={[
+                  "Optimization Studio (DSPy optimizers)",
+                  "Up to 10 workflows",
+                  "10,000 Traces",
+                  "30-day retention",
+                  "1 Project",
+                  "1 Team Member",
+                ]}
+                additionalCosts={[
+                  "Additional Traces - €50/100,000",
+                  "Additional Users - €19/user",
+                  "Usage-based price for evaluations and guardrails (including first €10 for free)",
+                  ``,
+                ]}
+                selectedPlan={selectedPlan}
+                setSelectedPlan={setSelectedPlan}
+              />
+              <Plan
+                plan="LAUNCH_ANNUAL"
+                name="Launch"
+                saving={"8% saving"}
+                isAnnual={billAnnually}
+                hidden={!billAnnually}
+                price={1644}
                 description="For small teams improving their LLM solutions"
                 features={[
                   "Optimization Studio (DSPy optimizers)",
@@ -276,9 +304,35 @@ export default function Subscription() {
               />
               <Plan
                 plan="ACCELERATE"
-                isAnnual={billAnnually}
+                name="Accelerate"
+                recommended={true}
+                hidden={billAnnually}
                 price={499}
-                annualPrice={5269}
+                description="For business with multiple teams working with LLMs"
+                features={[
+                  "Optimization Studio (DSPy optimizers)",
+                  "Up to 50 workflows",
+                  "100,000 Traces",
+                  "60-day retention",
+                  "10 Projects",
+                  "10 Team Members",
+                ]}
+                additionalCosts={[
+                  "Additional Traces - €45/100,000",
+                  "Additional Users - €10/user",
+                  `Usage-based price for evaluations and guardrails (including first €10 for free)`,
+                ]}
+                selectedPlan={selectedPlan}
+                setSelectedPlan={setSelectedPlan}
+              />
+              <Plan
+                plan="ACCELERATE_ANNUAL"
+                isAnnual={billAnnually}
+                hidden={!billAnnually}
+                recommended={true}
+                saving={"12% saving"}
+                price={5269}
+                name="Accelerate"
                 description="For business with multiple teams working with LLMs"
                 features={[
                   "Optimization Studio (DSPy optimizers)",
@@ -298,9 +352,9 @@ export default function Subscription() {
               />
               <Plan
                 plan="ENTERPRISE"
+                name="Enterprise"
                 isAnnual={billAnnually}
                 price="custom"
-                annualPrice={9169}
                 description="Most scalable solution for enterprise needs"
                 features={[
                   "Optimization Studio (DSPy optimizers)",
@@ -331,20 +385,26 @@ function Plan({
   features,
   price,
   additionalCosts,
-  annualPrice,
   isAnnual,
   selectedPlan,
   setSelectedPlan,
+  hidden,
+  name,
+  recommended,
+  saving,
 }: {
   plan: PlanTypes;
   description: string;
   features: string[];
   price?: number | "custom";
   additionalCosts?: string[];
-  annualPrice?: number;
   isAnnual?: boolean;
   selectedPlan: PlanTypes;
   setSelectedPlan: (plan: PlanTypes) => void;
+  hidden?: boolean;
+  name: string;
+  recommended?: boolean;
+  saving?: string;
 }) {
   const { organization } = useOrganizationTeamProject();
   const activePlan = api.plan.getActivePlan.useQuery(
@@ -360,6 +420,7 @@ function Plan({
 
   return (
     <GridItem
+      hidden={hidden}
       border="1px solid"
       borderColor="gray.300"
       cursor="pointer"
@@ -368,6 +429,7 @@ function Plan({
       borderRadius="12px 12px 0 0"
       minWidth="300px"
       height="100%"
+      zIndex={1}
       onClick={() => {
         setSelectedPlan(plan);
       }}
@@ -379,14 +441,40 @@ function Plan({
         spacing={3}
         height="100%"
         justifyContent="space-between"
+        position="relative"
+        zIndex={10}
       >
+        {recommended && (
+          <Tag
+            position="absolute"
+            top={-5}
+            left="50%"
+            transform="translateX(-50%)"
+            colorScheme="green"
+            zIndex={-1}
+          >
+            Recommended
+          </Tag>
+        )}
+        {saving && (
+          <Box
+            position="absolute"
+            top={10}
+            right={1}
+            color="green"
+            fontSize="xs"
+            paddingX={2}
+          >
+            {saving}
+          </Box>
+        )}
         <VStack width="full" align="start">
           <HStack align="start" width="full" spacing={3}>
             <Radio size="lg" value={plan} marginTop="2px" />
             <VStack spacing={4} align="start" paddingBottom={4}>
               <HStack spacing={4}>
                 <Heading size="md" as="h2">
-                  {uppercaseFirstLetterLowerCaseRest(plan)}
+                  {name}
                 </Heading>
               </HStack>
             </VStack>
@@ -408,7 +496,9 @@ function Plan({
                   <Text alignSelf="start" marginTop="3px">
                     €
                   </Text>
-                  <Text fontSize={26}>{isAnnual ? annualPrice : price}</Text>
+                  <Text fontSize={26}>
+                    {typeof price === "number" ? price.toLocaleString() : price}
+                  </Text>
                   <Text alignSelf="end" marginBottom="3px">
                     {isAnnual ? "/yr" : "/mo"}
                   </Text>
@@ -418,6 +508,8 @@ function Plan({
           </HStack>
 
           {isCurrentPlan && <Tag colorScheme="green">Current Plan</Tag>}
+          {console.log(price)}
+          {console.log(activePlan.data)}
 
           <Text>{description}</Text>
           {features.map((feature) => (
@@ -496,7 +588,7 @@ function Feature({ label }: { label: string }) {
     <HStack spacing={2}>
       {/* @ts-ignore */}
       <Check size={16} color="green" strokeWidth={3} />
-      <Text noWrap>{label}</Text>
+      <Text>{label}</Text>
     </HStack>
   );
 }
