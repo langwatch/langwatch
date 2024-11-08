@@ -40,7 +40,7 @@ export default function Accept() {
             isClosable: true,
             position: "top-right",
           });
-          void router.push("/");
+          void router.push(`/${data.project?.slug ?? ""}`);
         },
       }
     );
