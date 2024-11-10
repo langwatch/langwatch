@@ -16,6 +16,8 @@ import {
   Text,
   VStack,
   useToast,
+  Alert,
+  AlertIcon,
 } from "@chakra-ui/react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import React, { useCallback } from "react";
@@ -35,15 +37,19 @@ import {
   ModelSelector,
   modelSelectorOptions,
 } from "../../components/ModelSelector";
+import {
+  allowedTopicClusteringModels,
+  allowedEmbeddingsModels,
+} from "../../server/topicClustering/types";
 import { modelProviderIcons } from "../../server/modelProviders/iconsMap";
 
-const allowedTopicClusteringModels = modelSelectorOptions
-  .filter((option) => option.mode === "chat")
-  .map((option) => option.value);
+// const allowedTopicClusteringModels = modelSelectorOptions
+//   .filter((option) => option.mode === "chat")
+//   .map((option) => option.value);
 
-const allowedEmbeddingsModels = modelSelectorOptions
-  .filter((option) => option.mode === "embedding")
-  .map((option) => option.value);
+// const allowedEmbeddingsModels = modelSelectorOptions
+//   .filter((option) => option.mode === "embedding")
+//   .map((option) => option.value);
 
 import models from "../../../../models.json";
 
@@ -119,6 +125,7 @@ export default function ModelsPage() {
                     <Skeleton width="full" height="28px" />
                   </Box>
                 ))}
+              {console.log(modelProviders.data)}
               {modelProviders.data &&
                 Object.values(modelProviders.data).map((provider, index) => (
                   <ModelProviderForm
@@ -486,6 +493,13 @@ function ModelProviderForm({
                     Save
                   </Button>
                 </HStack>
+                {provider.provider === "custom" && (
+                  <Alert status="info">
+                    <AlertIcon />
+                    Custom provider supports only OpenAI compatible endpoints,
+                    contact support if you have a custom format.
+                  </Alert>
+                )}
               </>
             )}
           </VStack>

@@ -54,7 +54,7 @@ async def proxy_startup():
         input: Optional[Union[str, List]] = None,
         specific_deployment: Optional[bool] = False,
         request_kwargs: Optional[Dict] = None,
-        **kwargs
+        **kwargs,
     ):
         self.cache.flush_cache()  # prevents litellm proxing from storing failures and mark the deployment as "unhealthy" for everyone in case a single user's API key is invalid for example
 
@@ -65,9 +65,11 @@ async def proxy_startup():
             input=input,
             specific_deployment=specific_deployment,
             request_kwargs=request_kwargs,
-            **kwargs
+            **kwargs,
         )
         deployment = deployment.copy()
+
+        print(f"deployment: {deployment}")
 
         if "litellm_params" not in deployment:
             deployment["litellm_params"] = {}
@@ -85,6 +87,9 @@ async def proxy_startup():
             deployment["litellm_params"]["api_version"] = os.environ[
                 "AZURE_API_VERSION"
             ]
+        if "custom/" in model:
+            deployment["litellm_params"]["model"] = model.replace("custom/", "openai/")
+
         set_client(litellm_router_instance=self, model=deployment)
 
         return deployment

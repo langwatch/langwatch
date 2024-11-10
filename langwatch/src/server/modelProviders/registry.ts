@@ -78,6 +78,16 @@ export const modelProviders = {
     }),
     enabledSince: new Date("2023-01-01"),
   },
+  custom: {
+    name: "Custom",
+    apiKey: "CUSTOM_API_KEY",
+    endpointKey: undefined,
+    keysSchema: z.object({
+      CUSTOM_API_KEY: z.string().optional(),
+      CUSTOM_ENDPOINT: z.string().optional(),
+    }),
+    enabledSince: new Date("2023-01-01"),
+  },
 } satisfies Record<string, ModelProviderDefinition>;
 
 function isValidJson(value: string) {
