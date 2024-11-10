@@ -106,7 +106,7 @@ export const ComponentIcon = ({
     entry: "blue.400",
     module: "gray.400",
     retriever: "purple.400",
-    prompting_technique: "gray.400",
+    prompting_technique: "teal.400",
     evaluator: "#5FD15D",
     end: "orange.400",
   };

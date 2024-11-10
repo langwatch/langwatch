@@ -1,8 +1,16 @@
 import { DragHandleIcon } from "@chakra-ui/icons";
-import { Box, Button, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
+import {
+  Box,
+  Button,
+  HStack,
+  position,
+  Spacer,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
 import { useReactFlow, type Node, type XYPosition } from "@xyflow/react";
 import { useEffect, useMemo, useRef } from "react";
-import { useDrag, useDragLayer } from "react-dnd";
+import { useDrag, useDragDropManager, useDragLayer } from "react-dnd";
 import { getEmptyImage } from "react-dnd-html5-backend";
 import { Box as BoxIcon, ChevronsLeft } from "react-feather";
 import { HoverableBigText } from "../../components/HoverableBigText";
@@ -12,6 +20,7 @@ import { type Component, type ComponentType } from "../types/dsl";
 import { findLowestAvailableName } from "../utils/nodeUtils";
 import { ComponentIcon } from "./ColorfulBlockIcons";
 import { NodeComponents } from "./nodes";
+import { PromptingTechniqueDraggingNode } from "./nodes/PromptingTechniqueNode";
 
 export function NodeSelectionPanelButton({
   isOpen,
@@ -62,14 +71,21 @@ export const NodeSelectionPanel = ({
       borderRight="1px solid"
       borderColor="gray.200"
       zIndex={100}
-      height="full"
-      padding={3}
+      height="calc(100vh - 49px)"
       fontSize="14px"
       width="300px"
       minWidth="300px"
     >
-      <VStack width="full" height="full">
-        <VStack width="full" spacing={4} align="start">
+      <VStack width="full" height="full" spacing={0}>
+        <VStack
+          width="full"
+          height="full"
+          spacing={4}
+          align="start"
+          overflowY="auto"
+          padding={3}
+          paddingBottom="56px"
+        >
           <Text fontWeight="500" padding={1}>
             Components
           </Text>
@@ -82,6 +98,19 @@ export const NodeSelectionPanel = ({
               />
             );
           })}
+
+          {/* <Text fontWeight="500" padding={1}>
+            Prompting Techniques
+          </Text>
+          {MODULES.promptingTechniques.map((promptingTechnique) => {
+            return (
+              <NodeDraggable
+                key={promptingTechnique.name}
+                component={promptingTechnique}
+                type="prompting_technique"
+              />
+            );
+          })} */}
 
           <Text fontWeight="500" padding={1}>
             Retrievers
@@ -109,8 +138,7 @@ export const NodeSelectionPanel = ({
             );
           })}
         </VStack>
-        <Spacer />
-        <HStack width="full">
+        <HStack width="full" padding={3} position="absolute" bottom={0}>
           <Spacer />
           <Button
             size="sm"
@@ -131,9 +159,10 @@ export const NodeDraggable = (props: {
   component: Component;
   type: ComponentType;
 }) => {
-  const { setNodes, nodes } = useWorkflowStore((state) => ({
+  const { setNodes, setNode, nodes } = useWorkflowStore((state) => ({
     setWorkflow: state.setWorkflow,
     setNodes: state.setNodes,
+    setNode: state.setNode,
     nodes: state.nodes,
     propertiesExpanded: state.propertiesExpanded,
   }));
@@ -154,24 +183,6 @@ export const NodeDraggable = (props: {
     return { newName, newId, newNode };
   }, [props.component, props.type, nodes]);
 
-  const [collected, drag, preview] = useDrag({
-    type: "node",
-    item: {
-      node: newNode,
-    },
-    collect: (monitor) => ({
-      isDragging: !!monitor.isDragging(),
-      clientOffset: monitor.getClientOffset(),
-    }),
-    end: (item, monitor) => {
-      const dropResult = monitor.getDropResult();
-
-      if (item && dropResult) {
-        // @ts-ignore
-        handleSetNodes(item.node, dropResult.x, dropResult.y);
-      }
-    },
-  });
   const { screenToFlowPosition } = useReactFlow();
 
   const handleSetNodes = (newNode: Node, x: number, y: number) => {
@@ -186,6 +197,54 @@ export const NodeDraggable = (props: {
     }
   };
 
+  const handleSetPromptingTechnique = (newNode: Node, id: string) => {
+    if (newNode) {
+      newNode.position = {
+        x: 0,
+        y: 0,
+      };
+      setNodes([...nodes, newNode]);
+
+      const currentNode = nodes.find((node) => node.id === id);
+      setNode({
+        id,
+        data: {
+          decorated_by: [
+            ...(currentNode?.data.decorated_by ?? []),
+            {
+              ref: newNode.id,
+            },
+          ],
+        },
+      });
+    }
+  };
+
+  const [collected, drag, preview] = useDrag({
+    type:
+      newNode.type === "prompting_technique" ? "prompting_technique" : "node",
+    item: {
+      node: newNode,
+    },
+    collect: (monitor) => ({
+      isDragging: !!monitor.isDragging(),
+      clientOffset: monitor.getClientOffset(),
+    }),
+    end: (item, monitor) => {
+      const dropResult = monitor.getDropResult();
+
+      if (item && dropResult) {
+        if (item.node.type === "prompting_technique") {
+          // @ts-ignore
+          handleSetPromptingTechnique(item.node, dropResult.id);
+        } else {
+          // @ts-ignore
+          handleSetNodes(item.node, dropResult.x, dropResult.y);
+        }
+      }
+    },
+  });
+
   useEffect(() => {
     preview(getEmptyImage(), { captureDraggingState: true });
   }, [preview]);
@@ -199,7 +258,6 @@ export const NodeDraggable = (props: {
         padding={1}
         cursor="grab"
         width="full"
-        overflow="hidden"
         opacity={collected.isDragging ? 0.5 : 1}
       >
         <HStack width="full">
@@ -244,7 +302,10 @@ export function CustomDragLayer() {
     return null;
   }
 
-  const ComponentNode = NodeComponents[item.node.type as ComponentType];
+  const ComponentNode =
+    item.node.type === "prompting_technique"
+      ? PromptingTechniqueDraggingNode
+      : NodeComponents[item.node.type as ComponentType];
 
   return (
     <div
@@ -255,7 +316,7 @@ export function CustomDragLayer() {
         left: currentOffset?.x ?? 0,
         top: currentOffset?.y ?? 0,
         transform: "translate(-50%, -50%)",
-        opacity: 0.5,
+        opacity: item.node.type === "prompting_technique" ? 1 : 0.5,
       }}
     >
       <ComponentNode

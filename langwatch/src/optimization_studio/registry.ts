@@ -2,6 +2,7 @@ import { AVAILABLE_EVALUATORS } from "../server/evaluations/evaluators.generated
 import {
   type Evaluator,
   type Field,
+  type PromptingTechnique,
   type Retriever,
   type Signature,
 } from "./types/dsl";
@@ -22,6 +23,14 @@ const signatures: Signature[] = [
         type: "str",
       },
     ],
+  },
+];
+
+const promptingTechniques: PromptingTechnique[] = [
+  {
+    cls: "ChainOfThought",
+    name: "ChainOfThought",
+    parameters: [],
   },
 ];
 
@@ -139,6 +148,7 @@ const evaluators: Evaluator[] = [
 
 export const MODULES = {
   signatures,
+  promptingTechniques,
   evaluators,
   retrievers,
 };

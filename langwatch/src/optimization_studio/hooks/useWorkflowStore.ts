@@ -50,6 +50,7 @@ type WorkflowStore = State & {
   setSocketStatus: (status: SocketStatus) => void;
   onNodesChange: (changes: NodeChange[]) => void;
   onEdgesChange: (changes: EdgeChange[]) => void;
+  onNodesDelete: () => void;
   onConnect: (connection: Connection) => void;
   setNodes: (nodes: Node[]) => void;
   setEdges: (edges: Edge[]) => void;
@@ -152,6 +153,11 @@ const store = (
       nodes: applyNodeChanges(changes, get().nodes),
     });
   },
+  onNodesDelete: () => {
+    set({
+      nodes: removeInvalidDecorations(get().nodes),
+    });
+  },
   onEdgesChange: (changes: EdgeChange[]) => {
     set({
       edges: applyEdgeChanges(changes, get().edges),
@@ -191,7 +197,9 @@ const store = (
   deleteNode: (id: string) => {
     set(
       removeInvalidEdges({
-        nodes: get().nodes.filter((node) => node.id !== id),
+        nodes: removeInvalidDecorations(
+          get().nodes.filter((node) => node.id !== id)
+        ),
         edges: get().edges,
       })
     );
@@ -412,4 +420,17 @@ export const removeInvalidEdges = ({
       return source && target && sourceHandle && targetHandle;
     }),
   };
+};
+
+export const removeInvalidDecorations = (nodes: Node[]) => {
+  const nodeIds = new Set(nodes.map((node) => node.id));
+  return nodes.map((node) => {
+    if (node.data.decorated_by) {
+      const decoratedBy = (node.data.decorated_by as { ref: string }[]).filter(
+        (ref) => nodeIds.has(ref.ref)
+      );
+      return { ...node, data: { ...node.data, decorated_by: decoratedBy } };
+    }
+    return node;
+  });
 };

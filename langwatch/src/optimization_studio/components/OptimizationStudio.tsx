@@ -7,7 +7,7 @@ import {
   Text,
   Tooltip,
   useTheme,
-  VStack
+  VStack,
 } from "@chakra-ui/react";
 import {
   Background,
@@ -16,9 +16,10 @@ import {
   Panel as FlowPanel,
   ReactFlow,
   ReactFlowProvider,
+  type Node,
 } from "@xyflow/react";
 
-import { DndProvider, useDrop } from "react-dnd";
+import { DndProvider, useDragLayer, useDrop } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
 
 import { Link } from "@chakra-ui/next-js";
@@ -59,9 +60,8 @@ import { Publish } from "./Publish";
 import { ResultsPanel } from "./ResultsPanel";
 import { UndoRedo } from "./UndoRedo";
 
-// New component that uses useDrop
 function DragDropArea({ children }: { children: React.ReactNode }) {
-  const [{ canDrop }, drop] = useDrop(() => ({
+  const [_, drop] = useDrop(() => ({
     accept: "node",
     drop: (_item, monitor) => {
       const clientOffset = monitor.getClientOffset();
@@ -78,12 +78,7 @@ function DragDropArea({ children }: { children: React.ReactNode }) {
   }));
 
   return (
-    <Box
-      ref={drop}
-      width="full"
-      height="full"
-      boxShadow={canDrop ? "inset 0 0 0 1px orange" : undefined}
-    >
+    <Box ref={drop} width="full" height="full">
       {children}
     </Box>
   );
@@ -92,15 +87,13 @@ function DragDropArea({ children }: { children: React.ReactNode }) {
 export default function OptimizationStudio() {
   const nodeTypes = useMemo(() => NodeComponents, []);
   const edgeTypes = useMemo(() => ({ default: DefaultEdge }), []);
-  const theme = useTheme();
-  const gray100 = theme.colors.gray["100"];
-  const gray300 = theme.colors.gray["300"];
 
   const {
     name,
     nodes,
     edges,
     onNodesChange,
+    onNodesDelete,
     onEdgesChange,
     onConnect,
     setWorkflowSelected,
@@ -118,6 +111,7 @@ export default function OptimizationStudio() {
         nodes: state.nodes,
         edges: state.edges,
         onNodesChange: state.onNodesChange,
+        onNodesDelete: state.onNodesDelete,
         onEdgesChange: state.onEdgesChange,
         onConnect: state.onConnect,
         setWorkflowSelected: state.setWorkflowSelected,
@@ -306,6 +300,7 @@ export default function OptimizationStudio() {
                         edges={edges}
                         onNodesChange={onNodesChange}
                         onEdgesChange={onEdgesChange}
+                        onNodesDelete={() => setTimeout(onNodesDelete, 0)}
                         onConnect={onConnect}
                         onPaneClick={() => {
                           setWorkflowSelected(true);
@@ -335,13 +330,7 @@ export default function OptimizationStudio() {
                             marginBottom: "18px",
                           }}
                         />
-                        <Background
-                          variant={BackgroundVariant.Dots}
-                          gap={12}
-                          size={2}
-                          bgColor={gray100}
-                          color={gray300}
-                        />
+                        <ReactFlowBackground />
 
                         <FlowPanel position="bottom-right">
                           <PlaygroundButton
@@ -388,6 +377,22 @@ export default function OptimizationStudio() {
       </ReactFlowProvider>
       <CurrentDrawer />
     </div>
+  );
+}
+
+function ReactFlowBackground() {
+  const theme = useTheme();
+  const gray100 = theme.colors.gray["100"];
+  const gray300 = theme.colors.gray["300"];
+
+  return (
+    <Background
+      variant={BackgroundVariant.Dots}
+      gap={12}
+      size={2}
+      bgColor={gray100}
+      color={gray300}
+    />
   );
 }
 

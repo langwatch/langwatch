@@ -4,6 +4,7 @@ import { EvaluatorNode } from "./EvaluatorNode";
 import { ComponentNode } from "./Nodes";
 import { SignatureNode } from "./SignatureNode";
 import { EndNode } from "./EndNode";
+import { PromptingTechniqueNode } from "./PromptingTechniqueNode";
 
 export const NodeComponents: Record<
   ComponentType,
@@ -19,5 +20,5 @@ export const NodeComponents: Record<
   end: EndNode,
   module: ComponentNode,
   retriever: ComponentNode,
-  prompting_technique: ComponentNode,
+  prompting_technique: PromptingTechniqueNode,
 };

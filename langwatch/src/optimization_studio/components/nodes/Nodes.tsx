@@ -23,6 +23,8 @@ import {
   type Node,
   type NodeProps,
 } from "@xyflow/react";
+import { useMemo, type Ref } from "react";
+import { useDragLayer } from "react-dnd";
 import {
   Check,
   Copy,
@@ -34,7 +36,9 @@ import {
 } from "react-feather";
 import { PulseLoader } from "react-spinners";
 import { useDebounceValue } from "usehooks-ts";
+import { useShallow } from "zustand/react/shallow";
 import { useComponentExecution } from "../../hooks/useComponentExecution";
+import { useWorkflowExecution } from "../../hooks/useWorkflowExecution";
 import { useWorkflowStore } from "../../hooks/useWorkflowStore";
 import {
   type Component,
@@ -42,9 +46,6 @@ import {
   type Field,
 } from "../../types/dsl";
 import { ComponentIcon } from "../ColorfulBlockIcons";
-import { useWorkflowExecution } from "../../hooks/useWorkflowExecution";
-import type { Ref } from "react";
-import { useShallow } from "zustand/react/shallow";
 
 export function getNodeDisplayName(node: { id: string; data: Component }) {
   return node.data.name ?? node.data.cls ?? node.id;
@@ -189,6 +190,7 @@ export const ComponentNode = forwardRef(function ComponentNode(
     outputsTitle?: string;
     hidePlayButton?: boolean;
     hideOutputHandles?: boolean;
+    backgroundColor?: string;
   },
   ref: Ref<HTMLDivElement>
 ) {
@@ -225,18 +227,38 @@ export const ComponentNode = forwardRef(function ComponentNode(
   );
   const isHovered = hoveredNodeId === props.id;
 
+  const { isDragging, item } = useDragLayer((monitor) => ({
+    item: monitor.getItem(),
+    itemType: monitor.getItemType(),
+    isDragging: monitor.isDragging(),
+  })) as {
+    isDragging: boolean;
+    item: { node: Node } | undefined;
+  };
+
+  const isNotDroppable = useMemo(
+    () =>
+      isDragging &&
+      item?.node.type === "prompting_technique" &&
+      props.type !== "signature",
+    [isDragging, item, props.type]
+  );
+
   return (
     <VStack
+      className="js-component-node"
+      position="relative"
+      opacity={isNotDroppable ? 0.4 : 1}
       ref={ref}
       borderRadius="12px"
-      background="white"
+      backgroundColor={props.backgroundColor ?? "white"}
       padding="10px"
       spacing={2}
       align="start"
       color="gray.600"
       fontSize={11}
       minWidth="180px"
-      boxShadow={`0px 0px 4px 0px rgba(0, 0, 0, ${isHovered ? "0.2" : "0.05"})`}
+      boxShadow={`0px 0px 4px 0px rgba(0, 0, 0, ${isHovered ? "0.2" : "0.1"})`}
       border="none"
       outline={!!props.selected || isHovered ? "1.5px solid" : "none"}
       outlineColor={

@@ -48,7 +48,7 @@ export type BaseComponent = {
   outputs?: Field[];
   decorated_by?: {
     ref: string;
-  };
+  }[];
 
   execution_state?: {
     status: ExecutionStatus;
@@ -240,9 +240,11 @@ const LLMSignatureFlow: Flow = {
             type: "str",
           },
         ],
-        decorated_by: {
-          ref: "ChainOfThought-1",
-        },
+        decorated_by: [
+          {
+            ref: "ChainOfThought-1",
+          },
+        ],
       },
     },
     {
@@ -323,9 +325,11 @@ const LLMSignatureFlow: Flow = {
             type: "str",
           },
         ],
-        decorated_by: {
-          ref: "chain_of_thought_2",
-        },
+        decorated_by: [
+          {
+            ref: "chain_of_thought_2",
+          },
+        ],
       },
     },
   ],
@@ -408,9 +412,9 @@ const LLMSignatureFlow: Flow = {
 //               type: "str",
 //             },
 //           ],
-//           decorated_by: {
+//           decorated_by: [{
 //             ref: "ChainOfThought-1",
-//           },
+//           }],
 //         },
 //         {
 //           _library_ref: "builtin/ColBERTv2",
@@ -471,9 +475,9 @@ const LLMSignatureFlow: Flow = {
 //               type: "str",
 //             },
 //           ],
-//           decorated_by: {
+//           decorated_by: [{
 //             ref: "chain_of_thought_2",
-//           },
+//           }],
 //         },
 //       ],
 //       forward_pass: [

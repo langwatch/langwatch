@@ -476,8 +476,14 @@ export function BasePropertiesPanel({
                   noOfLines={2}
                   fontSize={15}
                   fontWeight={500}
-                  onClick={() => setIsEditingName(true)}
-                  cursor="pointer"
+                  onClick={() => {
+                    if (node.type !== "prompting_technique") {
+                      setIsEditingName(true);
+                    }
+                  }}
+                  cursor={
+                    node.type === "prompting_technique" ? undefined : "pointer"
+                  }
                   overflow="hidden"
                   textOverflow="ellipsis"
                 >
