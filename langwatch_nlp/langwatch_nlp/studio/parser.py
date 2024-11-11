@@ -14,6 +14,7 @@ from langwatch_nlp.studio.types.dsl import (
     Evaluator,
     Field,
     FieldType,
+    LLMConfig,
     Node,
     PromptingTechnique,
     PromptingTechniqueNode,
@@ -136,7 +137,8 @@ def parse_evaluator(component: Evaluator, workflow: Workflow) -> dspy.Module:
             settings=settings,
         )
 
-    return EVALUATORS[component.cls]()
+    settings = parse_fields(component.parameters or [], autoparse=True)
+    return EVALUATORS[component.cls](**settings)
 
 
 def parse_end(_component: End, _workflow: Workflow) -> dspy.Module:
@@ -201,6 +203,8 @@ def autoparse_field_value(field: Field, value: Optional[Any]) -> Optional[Any]:
                 Field(identifier=field.identifier, type=FieldType.str), value
             )
         ]
+    if field.type == FieldType.llm:
+        return LLMConfig.model_validate(value)
     return value
 
 

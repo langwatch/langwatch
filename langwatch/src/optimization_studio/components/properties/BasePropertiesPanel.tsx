@@ -34,6 +34,7 @@ import {
 import { nameToId } from "../../utils/nodeUtils";
 import { HoverableBigText } from "../../../components/HoverableBigText";
 import { camelCaseToTitleCase } from "../../../utils/stringCasing";
+import { LLMConfigField } from "./modals/LLMConfigModal";
 
 export function PropertyField({
   title,
@@ -251,9 +252,10 @@ export function FieldsForm({
   title: string;
   field: "parameters" | "inputs" | "outputs";
 }) {
-  const { setNode } = useWorkflowStore(
+  const { default_llm, setNode } = useWorkflowStore(
     useShallow((state) => ({
       setNode: state.setNode,
+      default_llm: state.default_llm,
     }))
   );
 
@@ -261,7 +263,6 @@ export function FieldsForm({
     control,
     handleSubmit,
     formState: { errors },
-    watch,
   } = useForm<FieldArrayForm>({
     defaultValues: {
       fields: node.data[field] ?? [],
@@ -282,8 +283,6 @@ export function FieldsForm({
     updateNodeInternals(node.id);
   };
 
-  // const watchedFields = watch("fields");
-
   return (
     <VStack
       as="form"
@@ -294,6 +293,29 @@ export function FieldsForm({
       onChange={handleSubmit(onSubmit)}
     >
       {fields.map((field, index) => {
+        if (field.type === "llm") {
+          return (
+            <LLMConfigField
+              allowDefault={true}
+              defaultLLMConfig={default_llm}
+              llmConfig={node.data.parameters?.[index]?.defaultValue}
+              onChange={(llmConfig) => {
+                setNode({
+                  id: node.id,
+                  data: {
+                    parameters: node.data.parameters?.map((p) =>
+                      p.identifier === field.identifier
+                        ? { ...p, defaultValue: llmConfig }
+                        : p
+                    ),
+                  },
+                });
+                updateNodeInternals(node.id);
+              }}
+            />
+          );
+        }
+
         return (
           <FormControl
             key={field.id}
@@ -359,7 +381,7 @@ export function BasePropertiesPanel({
   header,
   children,
   fieldsAfter,
-  hideProperties,
+  hideParameters,
   hideInputs,
   inputsTitle,
   hideOutputs,
@@ -371,7 +393,7 @@ export function BasePropertiesPanel({
   header?: React.ReactNode;
   children?: React.ReactNode;
   fieldsAfter?: React.ReactNode;
-  hideProperties?: boolean;
+  hideParameters?: boolean;
   hideInputs?: boolean;
   inputsTitle?: string;
   hideOutputs?: boolean;
@@ -538,7 +560,7 @@ export function BasePropertiesPanel({
       {children}
       {!isWorkflow(node) && (
         <>
-          {!hideProperties && (
+          {!hideParameters && (
             <FieldsForm node={node} field="parameters" title="Parameters" />
           )}
           {!hideInputs && (

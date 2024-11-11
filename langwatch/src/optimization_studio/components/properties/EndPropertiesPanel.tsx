@@ -7,7 +7,7 @@ export function EndPropertiesPanel({ node }: { node: Node<End> }) {
     <BasePropertiesPanel
       node={node}
       hideOutputs
-      hideProperties
+      hideParameters
       inputsTitle="Results"
     />
   );

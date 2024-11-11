@@ -46,7 +46,7 @@ export function SignaturePropertiesPanel({ node }: { node: Node<Signature> }) {
   return (
     <BasePropertiesPanel
       node={node}
-      hideProperties
+      hideParameters
       fieldsAfter={
         <>
           <VStack width="full" align="start" spacing={2}>

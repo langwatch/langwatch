@@ -134,6 +134,17 @@ const evaluators: Evaluator[] = [
       { identifier: "score", type: "float" },
     ],
   },
+  {
+    cls: "AnswerCorrectnessEvaluator",
+    name: "Answer Correctness",
+    parameters: [{ identifier: "llm", type: "llm" }],
+    inputs: [
+      { identifier: "input", type: "str" },
+      { identifier: "output", type: "str" },
+      { identifier: "expected_output", type: "str" },
+    ],
+    outputs: [{ identifier: "passed", type: "bool" }],
+  },
   ...convertEvaluators(
     Object.fromEntries(
       Object.entries(AVAILABLE_EVALUATORS)

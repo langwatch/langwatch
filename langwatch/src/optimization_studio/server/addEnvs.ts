@@ -32,14 +32,16 @@ export const addEnvs = async (
     throw new Error("Workflow ID is required");
   }
 
+  const default_llm = addLiteLLMParams(
+    event.payload.workflow.default_llm,
+    modelProviders
+  );
+
   const workflow: ServerWorkflow = {
     ...event.payload.workflow,
     workflow_id,
     api_key: apiKey,
-    default_llm: addLiteLLMParams(
-      event.payload.workflow.default_llm,
-      modelProviders
-    ),
+    default_llm: default_llm,
     nodes: event.payload.workflow.nodes.map((node) => {
       if ("llm" in node.data && node.data.llm) {
         return {
@@ -50,7 +52,20 @@ export const addEnvs = async (
           },
         };
       }
-      return node;
+
+      const parameters = node.data.parameters?.map((p) => {
+        if (p.type === "llm") {
+          return {
+            ...p,
+            defaultValue: p.defaultValue
+              ? addLiteLLMParams(p.defaultValue, modelProviders)
+              : default_llm,
+          };
+        }
+        return p;
+      });
+
+      return { ...node, data: { ...node.data, parameters } };
     }),
   };
 
