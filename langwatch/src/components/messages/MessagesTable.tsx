@@ -753,30 +753,54 @@ export function MessagesTable() {
     selectedHeaderColumns
   ).filter(([_, { enabled }]) => enabled);
 
+  const fetchAllTraces = async () => {
+    const allGroups = [];
+    const allChecks = {};
+    let currentOffset = 0;
+    const batchSize = 5000;
+    const maxResults = 10000;
+
+    while (currentOffset < maxResults) {
+      const batch = await downloadTraces.mutateAsync({
+        ...filterParams,
+        query: getSingleQueryParam(router.query.query),
+        groupBy: "none",
+        pageOffset: currentOffset,
+        pageSize: batchSize,
+        sortBy: getSingleQueryParam(router.query.sortBy),
+        sortDirection: getSingleQueryParam(router.query.orderBy),
+        includeContexts: checkedHeaderColumnsEntries.some(
+          ([column]) => column === "contexts"
+        ),
+      });
+
+      if (!batch.groups.length) break;
+
+      allGroups.push(...batch.groups);
+      Object.assign(allChecks, batch.traceChecks);
+      currentOffset += batchSize;
+    }
+
+    return {
+      groups: allGroups,
+      traceChecks: allChecks,
+    };
+  };
+
   const downloadCSV = async (selection = false) => {
     const traceGroups_ = selection
       ? traceGroups.data ?? {
           groups: [],
           traceChecks: {} as Record<string, ElasticSearchEvaluation[]>,
         }
-      : await downloadTraces.mutateAsync({
-          ...filterParams,
-          query: getSingleQueryParam(router.query.query),
-          groupBy: "none",
-          pageOffset: pageOffset,
-          pageSize: pageSize,
-          sortBy: getSingleQueryParam(router.query.sortBy),
-          sortDirection: getSingleQueryParam(router.query.orderBy),
-          includeContexts: checkedHeaderColumnsEntries.some(
-            ([column, enabled]) => column === "contexts" && enabled
-          ),
-        });
+      : await fetchAllTraces();
 
     const checkedHeaderColumnsEntries_ = checkedHeaderColumnsEntries.filter(
       ([column, _]) => column !== "checked"
     );
 
-    const evaluations = traceGroups_.traceChecks;
+    const evaluations: Record<string, ElasticSearchEvaluation[]> =
+      traceGroups_.traceChecks;
 
     const getValueForColumn = (
       trace: TraceWithGuardrail,
