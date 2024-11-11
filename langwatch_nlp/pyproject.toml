@@ -11,7 +11,7 @@ dependencies = [
     "httpx == 0.27.0",
     "langchain-community == 0.0.28",
     "langevals-core == 0.1.10",
-    "langwatch == 0.1.31",
+    "langwatch>=0.1.31",
     "litellm[proxy] == 1.48.16",
     "mangum == 0.17.0",
     "nanoid == 2.0.0",

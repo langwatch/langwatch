@@ -1504,7 +1504,7 @@ requires-dist = [
     { name = "ipykernel", marker = "extra == 'dev'", specifier = "==6.29.5" },
     { name = "langchain-community", specifier = "==0.0.28" },
     { name = "langevals-core", specifier = "==0.1.10" },
-    { name = "langwatch", specifier = "==0.1.31" },
+    { name = "langwatch", specifier = ">=0.1.31" },
     { name = "litellm", extras = ["proxy"], specifier = "==1.48.16" },
     { name = "mangum", specifier = "==0.17.0" },
     { name = "nanoid", specifier = "==2.0.0" },

@@ -17,13 +17,10 @@ EVALUATORS: dict[str, Type[dspy.Module]] = {
 }
 
 
-PromptingTechniqueTypes = Union[
-    Type[dspy.ChainOfThought], Type[dspy.MultiChainComparison]
-]
+PromptingTechniqueTypes = Union[Type[dspy.ChainOfThought], Type[dspy.ReAct]]
 
 PROMPTING_TECHNIQUES: dict[str, PromptingTechniqueTypes] = {
     "ChainOfThought": dspy.ChainOfThought,
-    "MultiChainComparison": dspy.MultiChainComparison,
 }
 
 RETRIEVERS: dict[str, Type[dspy.Retrieve]] = {
