@@ -42,7 +42,7 @@ const PLAN_LIMITS: Record<PlanTypes, PlanInfo> = {
     free: false,
     maxMembers: 1,
     maxProjects: 1,
-    maxWorkflows: 1,
+    maxWorkflows: 10,
     maxMessagesPerMonth: 10_000,
     evaluationsCredit: 10,
     prices: {

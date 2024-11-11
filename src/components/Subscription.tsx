@@ -150,7 +150,6 @@ export default function Subscription() {
               </HStack>
             </Alert>
           ) : null}
-          {console.log(activePlan.data)}
           {activePlan.data && (
             <HStack spacing={2} paddingBottom={4}>
               <Text>
@@ -416,8 +415,6 @@ function Plan({
 
   const isCurrentPlan = activePlan.data?.type === plan;
 
-  console.log(plan);
-
   return (
     <GridItem
       hidden={hidden}
@@ -508,8 +505,6 @@ function Plan({
           </HStack>
 
           {isCurrentPlan && <Tag colorScheme="green">Current Plan</Tag>}
-          {console.log(price)}
-          {console.log(activePlan.data)}
 
           <Text>{description}</Text>
           {features.map((feature) => (
@@ -543,8 +538,7 @@ function Plan({
                       onSuccess: (result: any) => {
                         window.location.href = result.url;
                       },
-                      onError: (e) => {
-                        console.log(e);
+                      onError: () => {
                         toast({
                           title: "Error",
                           description:
