@@ -1,15 +1,22 @@
 import json
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union, cast
 from langwatch_nlp.studio.dspy.predict_with_metadata import PredictWithMetadata
 from langwatch_nlp.studio.dspy.retrieve import ContextsRetriever
 from langwatch_nlp.studio.modules.evaluators.langwatch import LangWatchEvaluator
-from langwatch_nlp.studio.modules.registry import EVALUATORS, RETRIEVERS
+from langwatch_nlp.studio.modules.registry import (
+    EVALUATORS,
+    PROMPTING_TECHNIQUES,
+    RETRIEVERS,
+    PromptingTechniqueTypes,
+)
 from langwatch_nlp.studio.types.dsl import (
     End,
     Evaluator,
     Field,
     FieldType,
     Node,
+    PromptingTechnique,
+    PromptingTechniqueNode,
     Retriever,
     Signature,
     Workflow,
@@ -25,7 +32,9 @@ from langwatch_nlp.studio.utils import (
 def parse_component(node: Node, workflow: Workflow) -> dspy.Module:
     match node.type:
         case "signature":
-            return parse_signature(node.id, node.data, workflow)()
+            return parse_signature(node.id, node.data, workflow)
+        case "prompting_technique":
+            raise NotImplementedError("Prompting techniques cannot be parsed directly")
         case "retriever":
             return parse_retriever(node.id, node.data, workflow)
         case "evaluator":
@@ -38,7 +47,7 @@ def parse_component(node: Node, workflow: Workflow) -> dspy.Module:
 
 def parse_signature(
     node_id: str, component: Signature, workflow: Workflow
-) -> type[dspy.Module]:
+) -> dspy.Module:
     class_name = component.name or "AnonymousSignature"
 
     # Create a dictionary to hold the class attributes
@@ -59,17 +68,34 @@ def parse_signature(
         class_dict["__doc__"] = component.prompt
 
     # Create the class dynamically
-    SignatureClass: type[dspy.Signature] = type(
+    SignatureClass: Union[type[dspy.Signature], dspy.Module] = type(
         class_name + "Signature", (dspy.Signature,), class_dict
     )
+
+    if component.decorated_by:
+        try:
+            decorator_node = cast(
+                PromptingTechniqueNode,
+                next(
+                    node
+                    for node in workflow.nodes
+                    if node.id == component.decorated_by.ref
+                ),
+            )
+        except StopIteration:
+            raise ValueError(f"Decorator node {component.decorated_by} not found")
+        PromptingTechniqueClass = parse_prompting_technique(decorator_node.data)
+        predict = PromptingTechniqueClass(SignatureClass)
+    else:
+        predict = dspy.Predict(SignatureClass)
 
     llm_config = component.llm if component.llm else workflow.default_llm
     lm = node_llm_config_to_dspy_lm(llm_config)
 
     dspy.settings.configure(experimental=True)
 
-    def __init__(self, *args, **kwargs) -> None:
-        PredictWithMetadata.__init__(self, SignatureClass)
+    def __init__(self, module: dspy.Module) -> None:
+        PredictWithMetadata.__init__(self, module)
         self.set_lm(lm=lm)
         self._node_id = node_id
         if component.demonstrations and component.demonstrations.inline:
@@ -80,15 +106,19 @@ def parse_signature(
         else:
             self.demos = []
 
-    def reset(self) -> None:
-        PredictWithMetadata.reset(self)
-        self.lm = lm
-
     ModuleClass: type[PredictWithMetadata] = type(
-        class_name, (PredictWithMetadata,), {"__init__": __init__, "reset": reset}
+        class_name, (PredictWithMetadata,), {"__init__": __init__}
     )
 
-    return ModuleClass
+    return ModuleClass(predict)
+
+
+def parse_prompting_technique(
+    component: PromptingTechnique,
+) -> PromptingTechniqueTypes:
+    if not component.cls:
+        raise ValueError("Prompting technique class not specified")
+    return PROMPTING_TECHNIQUES[component.cls]
 
 
 def parse_evaluator(component: Evaluator, workflow: Workflow) -> dspy.Module:

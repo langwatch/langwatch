@@ -53,8 +53,9 @@ async def lifespan(app: FastAPI):
     global pool
     pool = IsolatedProcessPool(event_worker, size=4)
 
-    signal.signal(signal.SIGTERM, shutdown_handler)
-    signal.signal(signal.SIGINT, shutdown_handler)
+    if os.getenv("RUNNING_IN_DOCKER"):
+        signal.signal(signal.SIGTERM, shutdown_handler)
+        signal.signal(signal.SIGINT, shutdown_handler)
 
     yield
 

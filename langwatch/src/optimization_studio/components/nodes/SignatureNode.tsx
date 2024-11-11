@@ -6,7 +6,7 @@ import { LLMModelDisplay } from "../properties/modals/LLMConfigModal";
 import { ComponentNode, NodeSectionTitle } from "./Nodes";
 import {
   PromptingTechniqueDropArea,
-  PromptingTechniqueWrappers,
+  PromptingTechniqueWrapper,
 } from "./PromptingTechniqueNode";
 
 export const SignatureNode = forwardRef(function SignatureNode(
@@ -14,7 +14,7 @@ export const SignatureNode = forwardRef(function SignatureNode(
   ref: Ref<HTMLDivElement>
 ) {
   return (
-    <PromptingTechniqueWrappers decoratedBy={props.data.decorated_by}>
+    <PromptingTechniqueWrapper decoratedBy={props.data.decorated_by}>
       <PromptingTechniqueDropArea id={props.id}>
         <ComponentNode ref={ref} {...props}>
           {props.data.llm && (
@@ -31,6 +31,6 @@ export const SignatureNode = forwardRef(function SignatureNode(
           )}
         </ComponentNode>
       </PromptingTechniqueDropArea>
-    </PromptingTechniqueWrappers>
+    </PromptingTechniqueWrapper>
   );
 });

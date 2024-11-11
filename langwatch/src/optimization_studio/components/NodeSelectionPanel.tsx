@@ -99,7 +99,7 @@ export const NodeSelectionPanel = ({
             );
           })}
 
-          {/* <Text fontWeight="500" padding={1}>
+          <Text fontWeight="500" padding={1}>
             Prompting Techniques
           </Text>
           {MODULES.promptingTechniques.map((promptingTechnique) => {
@@ -110,7 +110,7 @@ export const NodeSelectionPanel = ({
                 type="prompting_technique"
               />
             );
-          })} */}
+          })}
 
           <Text fontWeight="500" padding={1}>
             Retrievers
@@ -159,13 +159,16 @@ export const NodeDraggable = (props: {
   component: Component;
   type: ComponentType;
 }) => {
-  const { setNodes, setNode, nodes } = useWorkflowStore((state) => ({
-    setWorkflow: state.setWorkflow,
-    setNodes: state.setNodes,
-    setNode: state.setNode,
-    nodes: state.nodes,
-    propertiesExpanded: state.propertiesExpanded,
-  }));
+  const { setNodes, setNode, deleteNode, nodes } = useWorkflowStore(
+    (state) => ({
+      setWorkflow: state.setWorkflow,
+      setNodes: state.setNodes,
+      setNode: state.setNode,
+      deleteNode: state.deleteNode,
+      nodes: state.nodes,
+      propertiesExpanded: state.propertiesExpanded,
+    })
+  );
   const { newNode } = useMemo(() => {
     const { name: newName, id: newId } = findLowestAvailableName(
       nodes,
@@ -206,15 +209,15 @@ export const NodeDraggable = (props: {
       setNodes([...nodes, newNode]);
 
       const currentNode = nodes.find((node) => node.id === id);
+      if (currentNode?.data.decorated_by) {
+        deleteNode(currentNode.data.decorated_by.ref);
+      }
       setNode({
         id,
         data: {
-          decorated_by: [
-            ...(currentNode?.data.decorated_by ?? []),
-            {
-              ref: newNode.id,
-            },
-          ],
+          decorated_by: {
+            ref: newNode.id,
+          },
         },
       });
     }

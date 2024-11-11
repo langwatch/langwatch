@@ -392,7 +392,7 @@ function ModelProviderForm({
                 // eslint-disable-next-line @typescript-eslint/no-misused-promises
                 onChange={onUseCustomKeysChange}
               >
-                Use custom API Keys
+                Use custom settings
               </Checkbox>
             </HStack>
             {useCustomKeys && (

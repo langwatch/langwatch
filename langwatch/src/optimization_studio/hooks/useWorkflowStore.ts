@@ -426,10 +426,9 @@ export const removeInvalidDecorations = (nodes: Node[]) => {
   const nodeIds = new Set(nodes.map((node) => node.id));
   return nodes.map((node) => {
     if (node.data.decorated_by) {
-      const decoratedBy = (node.data.decorated_by as { ref: string }[]).filter(
-        (ref) => nodeIds.has(ref.ref)
-      );
-      return { ...node, data: { ...node.data, decorated_by: decoratedBy } };
+      if (!nodeIds.has((node.data.decorated_by as { ref: string }).ref)) {
+        return { ...node, data: { ...node.data, decorated_by: undefined } };
+      }
     }
     return node;
   });

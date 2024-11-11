@@ -36,7 +36,7 @@ class WorkflowModule(ReportingModule):
         self.inputs = inputs
 
         for node in self.workflow.nodes:
-            if node.type not in ["entry"]:
+            if node.type not in ["entry", "prompting_technique"]:
                 component = parse_component(node, workflow)
                 self.components[node.id] = component
                 setattr(self, validate_identifier(node.id), self.components[node.id])
@@ -104,6 +104,7 @@ class WorkflowModule(ReportingModule):
         error: Optional[Exception] = None
 
         start_time = time.time()
+        connected_nodes = set(x.target for x in self.workflow.edges)
         try:
             end_node = next(
                 (node for node in self.workflow.nodes if node.type == "end"), None
@@ -131,6 +132,7 @@ class WorkflowModule(ReportingModule):
                 for node in self.workflow.nodes
                 if node.type != "entry"
                 and (node.type != "evaluator" or self.manual_execution_mode)
+                and node.id in connected_nodes
             ]
             loops = 0
             stop = False

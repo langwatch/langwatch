@@ -80,6 +80,15 @@ class BaseComponent(BaseModel):
     execution_state: Optional[ExecutionState] = None
 
 
+class Edge(BaseModel):
+    id: str
+    source: str
+    sourceHandle: str
+    target: str
+    targetHandle: str
+    type: str
+
+
 class LLMConfig(BaseModel):
     model: Optional[str] = None
     temperature: Optional[float] = None
@@ -111,13 +120,8 @@ class Signature(BaseComponent):
     demonstrations: Optional[NodeDataset] = None
 
 
-class Edge(BaseModel):
-    id: str
-    source: str
-    sourceHandle: str
-    target: str
-    targetHandle: str
-    type: str
+class PromptingTechnique(BaseComponent):
+    pass
 
 
 class Module(BaseComponent):
@@ -126,10 +130,6 @@ class Module(BaseComponent):
 
 
 class Retriever(BaseComponent):
-    pass
-
-
-class PromptingTechnique(BaseComponent):
     pass
 
 
@@ -142,7 +142,9 @@ class Evaluator(BaseComponent):
     outputs: List[Field] = []
 
 
-Component = Union[BaseComponent, Entry, Signature, Module, Evaluator]
+Component = Union[
+    BaseComponent, Entry, Signature, PromptingTechnique, Module, Evaluator, End
+]
 
 
 class BaseNode(BaseModel):
@@ -153,6 +155,11 @@ class BaseNode(BaseModel):
 class SignatureNode(BaseNode):
     type: Literal["signature"] = "signature"
     data: Signature
+
+
+class PromptingTechniqueNode(BaseNode):
+    type: Literal["prompting_technique"] = "prompting_technique"
+    data: PromptingTechnique
 
 
 class ModuleNode(BaseNode):
@@ -181,7 +188,13 @@ class EndNode(BaseNode):
 
 
 Node = Union[
-    SignatureNode, ModuleNode, EntryNode, RetrieverNode, EvaluatorNode, EndNode
+    SignatureNode,
+    PromptingTechniqueNode,
+    ModuleNode,
+    EntryNode,
+    RetrieverNode,
+    EvaluatorNode,
+    EndNode,
 ]
 
 

@@ -16,6 +16,16 @@ EVALUATORS: dict[str, Type[dspy.Module]] = {
     "LangWatchEvaluator": LangWatchEvaluator,
 }
 
+
+PromptingTechniqueTypes = Union[
+    Type[dspy.ChainOfThought], Type[dspy.MultiChainComparison]
+]
+
+PROMPTING_TECHNIQUES: dict[str, PromptingTechniqueTypes] = {
+    "ChainOfThought": dspy.ChainOfThought,
+    "MultiChainComparison": dspy.MultiChainComparison,
+}
+
 RETRIEVERS: dict[str, Type[dspy.Retrieve]] = {
     "ColBERTv2": ColBERTv2RM,
     "WeaviateRM": WeaviateRM,

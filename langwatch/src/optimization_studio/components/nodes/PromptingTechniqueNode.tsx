@@ -1,29 +1,35 @@
-import { NodeToolbar, type Node, type NodeProps } from "@xyflow/react";
-import type { Ref } from "react";
-import { forwardRef, useMemo, useState } from "react";
-import type { ComponentType, PromptingTechnique } from "../../types/dsl";
-import { ComponentNode, getNodeDisplayName, selectionColor } from "./Nodes";
 import {
   Box,
   HStack,
-  VStack,
-  Text,
-  MenuItem,
-  MenuList,
   Menu,
   MenuButton,
+  MenuItem,
+  MenuList,
+  Text,
+  VStack,
 } from "@chakra-ui/react";
+import { NodeToolbar, type Node, type NodeProps } from "@xyflow/react";
+import type { Ref } from "react";
+import { forwardRef } from "react";
 import { useDrop } from "react-dnd";
+import { MoreHorizontal, Trash2 } from "react-feather";
 import { useWorkflowStore } from "../../hooks/useWorkflowStore";
+import type { ComponentType, PromptingTechnique } from "../../types/dsl";
 import { ComponentIcon } from "../ColorfulBlockIcons";
-import { Copy, MoreHorizontal, Trash2 } from "react-feather";
+import { ComponentNode, selectionColor } from "./Nodes";
 
 export const PromptingTechniqueDraggingNode = forwardRef(
   function PromptingTechniqueDraggingNode(
     props: NodeProps<Node<PromptingTechnique>>,
     ref: Ref<HTMLDivElement>
   ) {
-    return <ComponentNode ref={ref} {...props} hideOutputHandles />;
+    return (
+      <ComponentNode
+        ref={ref}
+        {...{ ...props, data: { ...props.data, name: props.data.cls } }}
+        hideOutputHandles
+      />
+    );
   }
 );
 
@@ -56,63 +62,30 @@ export function PromptingTechniqueDropArea({
   return <Box ref={drop}>{children}</Box>;
 }
 
-export function PromptingTechniqueWrappers({
+export function PromptingTechniqueWrapper({
   children,
   decoratedBy,
 }: {
   children: React.ReactNode;
   decoratedBy?: {
     ref: string;
-  }[];
+  };
 }) {
-  const decorationRefs = decoratedBy?.map(({ ref }) => ref) ?? [];
-  const { nodes } = useWorkflowStore((state) => ({
-    nodes:
-      decorationRefs.length === 0
-        ? []
-        : state.nodes
-            .filter((node) => decorationRefs.includes(node.id))
-            .sort(
-              (a, b) =>
-                decorationRefs.indexOf(a.id) - decorationRefs.indexOf(b.id)
-            ),
-  }));
-
-  const stackedPromptingTechniques = useMemo(
-    () =>
-      nodes.reduce((children, node) => {
-        return (
-          <PromptingTechniqueWrapper key={node.id} node={node}>
-            {children}
-          </PromptingTechniqueWrapper>
-        );
-      }, children),
-    [JSON.stringify(nodes), children]
+  const { node, setNode, deleteNode, deselectAllNodes } = useWorkflowStore(
+    (state) => ({
+      node: decoratedBy?.ref
+        ? state.nodes.find((node) => node.id === decoratedBy.ref)
+        : undefined,
+      setNode: state.setNode,
+      deleteNode: state.deleteNode,
+      deselectAllNodes: state.deselectAllNodes,
+    })
   );
-
-  if (!nodes.length) {
-    return children;
-  }
-
-  return stackedPromptingTechniques;
-}
-
-export function PromptingTechniqueWrapper({
-  children,
-  node,
-}: {
-  children: React.ReactNode;
-  node: Node<PromptingTechnique>;
-}) {
-  const { setNode, deselectAllNodes } = useWorkflowStore((state) => ({
-    setNode: state.setNode,
-    deselectAllNodes: state.deselectAllNodes,
-  }));
   const isHovered = false;
 
-  const { deleteNode } = useWorkflowStore((state) => ({
-    deleteNode: state.deleteNode,
-  }));
+  if (!node) {
+    return children;
+  }
 
   return (
     <VStack
@@ -178,7 +151,7 @@ export function PromptingTechniqueWrapper({
           size="sm"
         />
         <Text fontSize={12} fontWeight={500}>
-          {getNodeDisplayName(node)}
+          {node.data.cls}
         </Text>
       </HStack>
       {children}

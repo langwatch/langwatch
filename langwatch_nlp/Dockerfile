@@ -12,6 +12,8 @@ COPY . .
 # Preload for faster subsequent startups
 RUN PYTHONPATH=. uv run python langwatch_nlp/main.py
 
+ENV RUNNING_IN_DOCKER=true
+
 EXPOSE 8080
 
 CMD uv run uvicorn langwatch_nlp.main:app --host 0.0.0.0 --port 8080 --timeout-keep-alive 4500 | tee /var/log/uvicorn.log

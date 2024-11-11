@@ -155,7 +155,10 @@ def validate_workflow(workflow: Workflow) -> None:
         connected_inputs[target_id].add(target_field)
 
     # Validate required inputs
+    connected_nodes = set(x.target for x in workflow.edges)
     for node in workflow.nodes:
+        if node.id not in connected_nodes:
+            continue
         if node.data.inputs:
             for input_field in node.data.inputs:
                 if (

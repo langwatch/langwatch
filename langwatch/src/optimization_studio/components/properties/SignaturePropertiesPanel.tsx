@@ -10,11 +10,11 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import type { Node } from "@xyflow/react";
-import { Edit2, Info } from "react-feather";
+import { Edit2, Info, X } from "react-feather";
 import { DatasetPreview } from "../../../components/datasets/DatasetPreview";
 import { useGetDatasetData } from "../../hooks/useGetDatasetData";
 import { useWorkflowStore } from "../../hooks/useWorkflowStore";
-import type { Signature } from "../../types/dsl";
+import type { ComponentType, Signature } from "../../types/dsl";
 import { DemonstrationsModal } from "../DemonstrationsModal";
 import {
   BasePropertiesPanel,
@@ -22,6 +22,7 @@ import {
   PropertySectionTitle,
 } from "./BasePropertiesPanel";
 import { LLMConfigField } from "./modals/LLMConfigModal";
+import { ComponentIcon } from "../ColorfulBlockIcons";
 
 export function SignaturePropertiesPanel({ node }: { node: Node<Signature> }) {
   const { default_llm, setNode } = useWorkflowStore(
@@ -90,6 +91,7 @@ export function SignaturePropertiesPanel({ node }: { node: Node<Signature> }) {
         </>
       }
     >
+      {node.data.decorated_by && <PromptingTechniqueField node={node} />}
       <PropertyField title="LLM">
         <LLMConfigField
           allowDefault={true}
@@ -122,5 +124,66 @@ export function SignaturePropertiesPanel({ node }: { node: Node<Signature> }) {
         />
       </PropertyField>
     </BasePropertiesPanel>
+  );
+}
+
+function PromptingTechniqueField({ node }: { node: Node<Signature> }) {
+  const {
+    node: promptingTechniqueNode,
+    deleteNode,
+    setSelectedNode,
+    deselectAllNodes,
+    propertiesExpanded,
+    setPropertiesExpanded,
+  } = useWorkflowStore((state) => ({
+    node: state.nodes.find((n) => n.id === node.data.decorated_by?.ref),
+    deleteNode: state.deleteNode,
+    setSelectedNode: state.setSelectedNode,
+    deselectAllNodes: state.deselectAllNodes,
+    propertiesExpanded: state.propertiesExpanded,
+    setPropertiesExpanded: state.setPropertiesExpanded,
+  }));
+
+  if (!promptingTechniqueNode) {
+    return null;
+  }
+
+  return (
+    <PropertyField title="Prompting Technique">
+      <HStack
+        spacing={2}
+        width="full"
+        paddingX={3}
+        paddingY={2}
+        background="gray.100"
+        borderRadius="8px"
+        cursor="pointer"
+        role="button"
+        onClick={() => {
+          deselectAllNodes();
+          setSelectedNode(promptingTechniqueNode.id);
+        }}
+      >
+        <ComponentIcon
+          type={promptingTechniqueNode.type as ComponentType}
+          cls={promptingTechniqueNode.data.cls}
+          size="md"
+        />
+        <Text fontSize={13} fontWeight={500}>
+          {promptingTechniqueNode.data.cls}
+        </Text>
+        <Spacer />
+        <Button
+          size="xs"
+          variant="ghost"
+          onClick={(e) => {
+            e.stopPropagation();
+            deleteNode(promptingTechniqueNode.id);
+          }}
+        >
+          <X size={14} />
+        </Button>
+      </HStack>
+    </PropertyField>
   );
 }
