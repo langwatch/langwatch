@@ -51,16 +51,22 @@ export const PlaygroundButton = ({
   edges: Edge[];
   executionStatus: string;
 }) => {
-  const chatModal = useDisclosure();
   const { socketStatus } = useSocketClient();
 
   const isDisabled = socketStatus !== "connected";
+
+  const { playgroundOpen, setPlaygroundOpen } = useWorkflowStore((state) => ({
+    playgroundOpen: state.playgroundOpen,
+    setPlaygroundOpen: state.setPlaygroundOpen,
+  }));
 
   return (
     <>
       <Tooltip label={isDisabled ? "Studio is not connected" : undefined}>
         <Button
-          onClick={chatModal.onOpen}
+          onClick={() => {
+            setPlaygroundOpen(true);
+          }}
           rightIcon={<Play size={16} />}
           isDisabled={isDisabled}
           variant="outline"
@@ -71,8 +77,8 @@ export const PlaygroundButton = ({
         </Button>
       </Tooltip>
       <ChatWindow
-        isOpen={chatModal.isOpen}
-        onClose={chatModal.onClose}
+        isOpen={playgroundOpen}
+        onClose={() => setPlaygroundOpen(false)}
         nodes={nodes}
         edges={edges}
         executionStatus={executionStatus}
@@ -362,7 +368,10 @@ const MultipleInput = ({
           placeholder={`Send ${entryInputs[0]?.sourceHandle?.split(".")[1]} `}
           onKeyDown={(e) => {
             if (e.key === "Enter") {
-              sendMultiMessage();
+              onSubmit();
+              setTimeout(() => {
+                (e.target as HTMLInputElement).value = "";
+              }, 1);
             }
           }}
         />

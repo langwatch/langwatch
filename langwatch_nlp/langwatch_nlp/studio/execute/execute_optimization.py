@@ -160,10 +160,6 @@ async def execute_optimization(
         else:
             optimized_program = optimizer.compile(module, trainset=train)
 
-        # print("\n\noptimized_program", optimized_program, "\n\n")
-
-        ## optimize
-
     except Exception as e:
         yield error_optimization_event(
             run_id, str(e), stopped_at=int(time.time() * 1000)

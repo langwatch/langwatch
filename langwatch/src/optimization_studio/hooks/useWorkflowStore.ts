@@ -40,6 +40,7 @@ type State = Workflow & {
     | "optimizations"
     | "closed"
     | undefined;
+  playgroundOpen: boolean;
 };
 
 type WorkflowStore = State & {
@@ -79,6 +80,7 @@ type WorkflowStore = State & {
   setOpenResultsPanelRequest: (
     request: "evaluations" | "optimizations" | "closed" | undefined
   ) => void;
+  setPlaygroundOpen: (open: boolean) => void;
 };
 
 const DEFAULT_LLM_CONFIG: LLMConfig = {
@@ -344,6 +346,9 @@ const store = (
   },
   setOpenResultsPanelRequest: (request) => {
     set({ openResultsPanelRequest: request });
+  },
+  setPlaygroundOpen: (open: boolean) => {
+    set({ playgroundOpen: open });
   },
 });
 

@@ -38,6 +38,7 @@ export const useSocketClient = () => {
     setSelectedNode,
     setPropertiesExpanded,
     setOpenResultsPanelRequest,
+    playgroundOpen,
   } = useWorkflowStore((state) => ({
     socketStatus: state.socketStatus,
     setSocketStatus: state.setSocketStatus,
@@ -49,6 +50,7 @@ export const useSocketClient = () => {
     setSelectedNode: state.setSelectedNode,
     setPropertiesExpanded: state.setPropertiesExpanded,
     setOpenResultsPanelRequest: state.setOpenResultsPanelRequest,
+    playgroundOpen: state.playgroundOpen,
   }));
 
   const toast = useToast();
@@ -138,6 +140,7 @@ export const useSocketClient = () => {
             });
           }
           if (
+            !playgroundOpen &&
             data.payload.execution_state?.status !== "running" &&
             ((getWorkflow().state.execution?.status === "running" &&
               getWorkflow().state.execution?.until_node_id ===
@@ -215,6 +218,7 @@ export const useSocketClient = () => {
       setSelectedNode,
       setPropertiesExpanded,
       setOpenResultsPanelRequest,
+      playgroundOpen,
     ]
   );
 
