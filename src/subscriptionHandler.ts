@@ -15,6 +15,7 @@ const PLAN_LIMITS: Record<PlanTypes, PlanInfo> = {
     maxMembers: 1,
     maxProjects: 1,
     maxMessagesPerMonth: 1000,
+    maxWorkflows: 0,
     evaluationsCredit: 2,
     prices: {
       USD: 0,
@@ -29,9 +30,67 @@ const PLAN_LIMITS: Record<PlanTypes, PlanInfo> = {
     maxProjects: 2,
     maxMessagesPerMonth: 10_000,
     evaluationsCredit: 10,
+    maxWorkflows: 1,
     prices: {
       USD: 99,
       EUR: 99,
+    },
+  },
+  [PlanTypes.LAUNCH]: {
+    type: PlanTypes.LAUNCH,
+    name: "Launch",
+    free: false,
+    maxMembers: 1,
+    maxProjects: 1,
+    maxWorkflows: 1,
+    maxMessagesPerMonth: 10_000,
+    evaluationsCredit: 10,
+    prices: {
+      USD: 149,
+      EUR: 149,
+    },
+  },
+  [PlanTypes.LAUNCH_ANNUAL]: {
+    type: PlanTypes.LAUNCH_ANNUAL,
+    name: "Launch Annual",
+    free: false,
+    maxMembers: 1,
+    maxProjects: 1,
+    maxWorkflows: 10,
+    maxMessagesPerMonth: 10_000,
+    evaluationsCredit: 10,
+    prices: {
+      USD: 1644,
+      EUR: 1644,
+    },
+  },
+
+  [PlanTypes.ACCELERATE]: {
+    type: PlanTypes.ACCELERATE,
+    name: "Accelerate",
+    free: false,
+    maxMembers: 10,
+    maxProjects: 10,
+    maxWorkflows: 50,
+    maxMessagesPerMonth: 10_000,
+    evaluationsCredit: 10,
+    prices: {
+      USD: 499,
+      EUR: 499,
+    },
+  },
+  [PlanTypes.ACCELERATE_ANNUAL]: {
+    type: PlanTypes.ACCELERATE_ANNUAL,
+    name: "Accelerate Annual",
+    free: false,
+    maxMembers: 10,
+    maxProjects: 10,
+    maxWorkflows: 50,
+    maxMessagesPerMonth: 10_000,
+    evaluationsCredit: 10,
+    prices: {
+      USD: 5484,
+      EUR: 5484,
     },
   },
   [PlanTypes.GROWTH]: {
@@ -40,6 +99,7 @@ const PLAN_LIMITS: Record<PlanTypes, PlanInfo> = {
     free: false,
     maxMembers: 10,
     maxProjects: 5,
+    maxWorkflows: 1,
     maxMessagesPerMonth: 100_000,
     evaluationsCredit: 50,
     prices: {
@@ -53,6 +113,7 @@ const PLAN_LIMITS: Record<PlanTypes, PlanInfo> = {
     free: false,
     maxMembers: 1000,
     maxProjects: 100,
+    maxWorkflows: 999,
     maxMessagesPerMonth: 1_000_000,
     evaluationsCredit: 500,
     prices: {

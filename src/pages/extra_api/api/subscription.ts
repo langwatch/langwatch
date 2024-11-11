@@ -15,15 +15,31 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: "2024-04-10",
 });
 
-const prices: Record<"PRO" | "GROWTH", string> =
+const prices: Record<
+  | "PRO"
+  | "GROWTH"
+  | "LAUNCH"
+  | "LAUNCH_ANNUAL"
+  | "ACCELERATE"
+  | "ACCELERATE_ANNUAL",
+  string
+> =
   env.NODE_ENV === "production"
     ? {
         PRO: "price_1P6fvzIMsTw08cudWCwqfEjq",
         GROWTH: "price_1P6fw2IMsTw08cudFUkOX7jV",
+        LAUNCH: "price_1QCgDmIMsTw08cud7d9kl6hq",
+        LAUNCH_ANNUAL: "price_1QHo0eIMsTw08cudYPNLwrW4",
+        ACCELERATE: "price_1QABXSIMsTw08cudeFqpju4s",
+        ACCELERATE_ANNUAL: "price_1QI6qUIMsTw08cudxkCfGCNX",
       }
     : {
         PRO: "price_1P6bSyIMsTw08cudmzoqwBVN",
         GROWTH: "price_1P6fbyIMsTw08cudKh5L8w8x",
+        LAUNCH: "price_1QISHaIMsTw08cud6mkt89rk",
+        LAUNCH_ANNUAL: "price_1QIxvQIMsTw08cudPTtDHuCa",
+        ACCELERATE: "price_1QIt9lIMsTw08cudt4Kue39f",
+        ACCELERATE_ANNUAL: "price_1QIxuwIMsTw08cudjAK7BmNH",
       };
 
 export const subscriptionRouter = () =>
@@ -33,7 +49,15 @@ export const subscriptionRouter = () =>
         z.object({
           organizationId: z.string(),
           baseUrl: z.string(),
-          plan: z.enum(["FREE", "PRO", "GROWTH"]),
+          plan: z.enum([
+            "FREE",
+            "PRO",
+            "GROWTH",
+            "LAUNCH",
+            "ACCELERATE",
+            "LAUNCH_ANNUAL",
+            "ACCELERATE_ANNUAL",
+          ]),
         })
       )
       .use(
@@ -78,7 +102,15 @@ export const subscriptionRouter = () =>
               lineItems.find(
                 (item) =>
                   item.price.id ===
-                  prices[lastSubscription.plan as "PRO" | "GROWTH"]
+                  prices[
+                    lastSubscription.plan as
+                      | "PRO"
+                      | "GROWTH"
+                      | "LAUNCH"
+                      | "ACCELERATE"
+                      | "LAUNCH_ANNUAL"
+                      | "ACCELERATE_ANNUAL"
+                  ]
               ) || lineItems[0]
             )?.id;
             const response = await stripe.subscriptions.update(

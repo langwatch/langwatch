@@ -603,6 +603,10 @@ enum PlanTypes {
   PRO
   GROWTH
   ENTERPRISE
+  LAUNCH
+  ACCELERATE
+  LAUNCH_ANNUAL
+  ACCELERATE_ANNUAL
 }
 
 enum SubscriptionStatus {
@@ -632,6 +636,8 @@ model Subscription {
   maxProjects           Int?
   maxMessagesPerMonth   Int?
   evaluationsCredit     Int?
+  maxWorkflows          Int?
+  maxRetentionDays      Int?
 
   organization Organization @relation(fields: [organizationId], references: [id])
   invoices     Invoice[]
