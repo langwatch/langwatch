@@ -758,7 +758,7 @@ export function MessagesTable() {
     const allChecks = {};
     let currentOffset = 0;
     const batchSize = 5000;
-    const maxResults = 10000;
+    const maxResults = 50_000;
 
     while (currentOffset < maxResults) {
       const batch = await downloadTraces.mutateAsync({
