@@ -21,7 +21,6 @@ import {
   WorkflowCard,
   WorkflowCardBase,
 } from "../../optimization_studio/components/workflow/WorkflowCard";
-import { PlanTypes } from "@prisma/client";
 
 import { api } from "../../utils/api";
 
@@ -47,7 +46,7 @@ export default function MessagesOrIntegrationGuide() {
 
   if (
     isOrganizationFeatureEnabled("OPTIMIZATION_STUDIO") ||
-    usage.data?.activePlan.type !== PlanTypes.FREE
+    usage.data?.activePlan.type !== "FREE"
   ) {
     return (
       <DashboardLayout>
