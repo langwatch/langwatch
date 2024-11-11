@@ -1,4 +1,12 @@
-import { Box, Card, CardBody, Heading, HStack, VStack } from "@chakra-ui/react";
+import {
+  Box,
+  Card,
+  CardBody,
+  Heading,
+  HStack,
+  VStack,
+  Link,
+} from "@chakra-ui/react";
 import { useEffect } from "react";
 import {
   Modal,
@@ -85,9 +93,14 @@ export const BookAMeeting = () => {
                   in a single click
                 </ListItem>
               </UnorderedList>
-              <Button colorScheme="orange" onClick={onOpen}>
-                Get early access
-              </Button>
+              <HStack spacing={4}>
+                <Button variant="outline" onClick={onOpen}>
+                  Get Demo Access
+                </Button>
+                <Link href="/settings/subscription">
+                  <Button colorScheme="green">Subscribe For Access</Button>
+                </Link>
+              </HStack>
             </VStack>
           </HStack>
         </CardBody>
