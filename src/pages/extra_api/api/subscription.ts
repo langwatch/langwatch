@@ -53,7 +53,6 @@ export const subscriptionRouter = () =>
             "FREE",
             "PRO",
             "GROWTH",
-            "ENTERPRISE",
             "LAUNCH",
             "ACCELERATE",
             "LAUNCH_ANNUAL",
@@ -107,9 +106,10 @@ export const subscriptionRouter = () =>
                     lastSubscription.plan as
                       | "PRO"
                       | "GROWTH"
-                      | "ENTERPRISE"
                       | "LAUNCH"
                       | "ACCELERATE"
+                      | "LAUNCH_ANNUAL"
+                      | "ACCELERATE_ANNUAL"
                   ]
               ) || lineItems[0]
             )?.id;
@@ -125,10 +125,6 @@ export const subscriptionRouter = () =>
                 ],
               }
             );
-
-            console.log(response);
-            console.log(input.plan);
-            console.log(itemId);
 
             if (response.status === "active") {
               await prisma.subscription.update({
