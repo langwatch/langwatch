@@ -37,6 +37,7 @@ import {
   Tr,
   VStack,
   useDisclosure,
+  Progress,
 } from "@chakra-ui/react";
 import { useRouter } from "next/router";
 import numeral from "numeral";
@@ -753,14 +754,38 @@ export function MessagesTable() {
     selectedHeaderColumns
   ).filter(([_, { enabled }]) => enabled);
 
+  const [downloadProgress, setDownloadProgress] = useState(0);
+
   const fetchAllTraces = async () => {
     const allGroups = [];
     const allChecks = {};
     let currentOffset = 0;
     const batchSize = 5000;
-    const maxResults = 50_000;
 
-    while (currentOffset < maxResults) {
+    setDownloadProgress(10);
+
+    const initialBatch = await downloadTraces.mutateAsync({
+      ...filterParams,
+      query: getSingleQueryParam(router.query.query),
+      groupBy: "none",
+      pageOffset: currentOffset,
+      pageSize: batchSize,
+      sortBy: getSingleQueryParam(router.query.sortBy),
+      sortDirection: getSingleQueryParam(router.query.orderBy),
+      includeContexts: checkedHeaderColumnsEntries.some(
+        ([column]) => column === "contexts"
+      ),
+    });
+
+    let scrollId = initialBatch.scrollId;
+    allGroups.push(...initialBatch.groups);
+    Object.assign(allChecks, initialBatch.traceChecks);
+
+    const totalHits = initialBatch.totalHits;
+    let processedItems = initialBatch.groups.length;
+    setDownloadProgress((processedItems / totalHits) * 100);
+
+    while (scrollId) {
       const batch = await downloadTraces.mutateAsync({
         ...filterParams,
         query: getSingleQueryParam(router.query.query),
@@ -772,7 +797,13 @@ export function MessagesTable() {
         includeContexts: checkedHeaderColumnsEntries.some(
           ([column]) => column === "contexts"
         ),
+        scrollId: scrollId,
       });
+      processedItems += batch.groups.length;
+
+      setDownloadProgress((processedItems / totalHits) * 100);
+
+      scrollId = batch.scrollId;
 
       if (!batch.groups.length) break;
 
@@ -780,6 +811,8 @@ export function MessagesTable() {
       Object.assign(allChecks, batch.traceChecks);
       currentOffset += batchSize;
     }
+
+    setDownloadProgress(0);
 
     return {
       groups: allGroups,
@@ -928,6 +961,7 @@ export function MessagesTable() {
               Export all <DownloadIcon marginLeft={2} />
             </Button>
           </Tooltip>
+
           <ToggleTableView />
 
           <Popover isOpen={isOpen} onClose={onClose} placement="bottom-end">
@@ -995,6 +1029,7 @@ export function MessagesTable() {
           />
           <FilterToggle />
         </HStack>
+        <Progress value={downloadProgress} size="xs" />
 
         <HStack align={"top"} gap={8}>
           <Card>

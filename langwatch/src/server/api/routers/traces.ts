@@ -4,6 +4,7 @@ import type {
   QueryDslBoolQuery,
   SearchTotalHits,
   Sort,
+  SearchResponse,
 } from "@elastic/elasticsearch/lib/api/types";
 import { PublicShareResourceTypes, type PrismaClient } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
@@ -365,7 +366,12 @@ export const tracesRouter = createTRPCRouter({
     }),
 
   getAllForDownload: protectedProcedure
-    .input(getAllForProjectInput.extend({ includeContexts: z.boolean() }))
+    .input(
+      getAllForProjectInput.extend({
+        includeContexts: z.boolean(),
+        scrollId: z.string().optional(),
+      })
+    )
     .use(checkUserPermissionForProject(TeamRoleGroup.MESSAGES_VIEW))
     .mutation(async ({ ctx, input }) => {
       return await getAllTracesForProject({
@@ -377,6 +383,7 @@ export const tracesRouter = createTRPCRouter({
         ctx,
         downloadMode: true,
         includeContexts: input.includeContexts,
+        scrollId: input.scrollId,
       });
     }),
 });
@@ -386,11 +393,13 @@ export const getAllTracesForProject = async ({
   ctx,
   downloadMode = false,
   includeContexts = true,
+  scrollId = undefined,
 }: {
   input: z.infer<typeof getAllForProjectInput>;
   ctx?: { prisma: PrismaClient; session: Session };
   downloadMode?: boolean;
   includeContexts?: boolean;
+  scrollId?: string;
 }) => {
   const { pivotIndexConditions } = generateTracesPivotQueryConditions(input);
 
@@ -413,31 +422,39 @@ export const getAllTracesForProject = async ({
       )) ?? false;
   }
 
-  const tracesResult = await esClient.search<ElasticSearchTrace>({
-    index: TRACE_INDEX.alias,
-    from: pageOffset,
-    size: pageSize,
-    _source: {
-      excludes: [
-        // TODO: do we really need to exclude both keys and nested keys for embeddings?
-        ...(input.groupBy !== "input"
-          ? ["input.embeddings", "input.embeddings.embeddings"]
-          : []),
-        ...(input.groupBy !== "output"
-          ? ["output.embeddings", "input.embeddings.embeddings"]
-          : []),
-        ...(canSeeCosts ? [] : ["metrics.total_cost"]),
-        ...(downloadMode ? ["spans"] : ["spans.input.value", "spans.error"]),
-      ],
-    },
-    ...(downloadMode && includeContexts
-      ? {
-          // Retrieve only contexts for download, ignore guardrails and all other spans
-          script_fields: {
-            context_spans: {
-              script: {
-                lang: "painless",
-                source: `
+  let tracesResult: SearchResponse<ElasticSearchTrace>;
+  if (scrollId) {
+    tracesResult = await esClient.scroll({
+      scroll_id: scrollId,
+      scroll: "1m",
+    });
+  } else {
+    tracesResult = await esClient.search<ElasticSearchTrace>({
+      index: TRACE_INDEX.alias,
+      from: downloadMode ? undefined : pageOffset,
+      size: pageSize,
+      scroll: downloadMode ? "1m" : undefined,
+      _source: {
+        excludes: [
+          // TODO: do we really need to exclude both keys and nested keys for embeddings?
+          ...(input.groupBy !== "input"
+            ? ["input.embeddings", "input.embeddings.embeddings"]
+            : []),
+          ...(input.groupBy !== "output"
+            ? ["output.embeddings", "input.embeddings.embeddings"]
+            : []),
+          ...(canSeeCosts ? [] : ["metrics.total_cost"]),
+          ...(downloadMode ? ["spans"] : ["spans.input.value", "spans.error"]),
+        ],
+      },
+      ...(downloadMode && includeContexts
+        ? {
+            // Retrieve only contexts for download, ignore guardrails and all other spans
+            script_fields: {
+              context_spans: {
+                script: {
+                  lang: "painless",
+                  source: `
                   def spans = [];
                   if (params._source.spans != null) {
                     for (def span : params._source.spans) {
@@ -450,58 +467,60 @@ export const getAllTracesForProject = async ({
                   }
                   return spans;
                 `,
+                },
               },
             },
-          },
-        }
-      : {}),
-    body: {
-      query: pivotIndexConditions,
-      ...(input.sortBy
-        ? input.sortBy.startsWith("random.")
-          ? {
-              sort: {
-                _script: {
-                  type: "number",
-                  script: {
-                    source: "Math.random()",
+          }
+        : {}),
+      body: {
+        query: pivotIndexConditions,
+        ...(input.sortBy
+          ? input.sortBy.startsWith("random.")
+            ? {
+                sort: {
+                  _script: {
+                    type: "number",
+                    script: {
+                      source: "Math.random()",
+                    },
+                    order: input.sortDirection ?? "desc",
                   },
-                  order: input.sortDirection ?? "desc",
-                },
-              } as Sort,
-            }
-          : input.sortBy.startsWith("evaluations.")
-          ? {
-              sort: {
-                "evaluations.score": {
-                  order: input.sortDirection ?? "desc",
-                  nested: {
-                    path: "evaluations",
-                    filter: {
-                      term: {
-                        "evaluations.evaluator_id": input.sortBy.split(".")[1],
+                } as Sort,
+              }
+            : input.sortBy.startsWith("evaluations.")
+            ? {
+                sort: {
+                  "evaluations.score": {
+                    order: input.sortDirection ?? "desc",
+                    nested: {
+                      path: "evaluations",
+                      filter: {
+                        term: {
+                          "evaluations.evaluator_id":
+                            input.sortBy.split(".")[1],
+                        },
                       },
                     },
                   },
-                },
-              } as Sort,
-            }
+                } as Sort,
+              }
+            : {
+                sort: {
+                  [input.sortBy]: {
+                    order: input.sortDirection ?? "desc",
+                  },
+                } as Sort,
+              }
           : {
               sort: {
-                [input.sortBy]: {
-                  order: input.sortDirection ?? "desc",
+                "timestamps.started_at": {
+                  order: "desc",
                 },
               } as Sort,
-            }
-        : {
-            sort: {
-              "timestamps.started_at": {
-                order: "desc",
-              },
-            } as Sort,
-          }),
-    },
-  });
+            }),
+      },
+    });
+  }
 
   const guardrailsSlugToName = Object.fromEntries(
     (
@@ -586,7 +605,12 @@ export const getAllTracesForProject = async ({
       .map((trace) => [trace.trace_id, trace.evaluations ?? []])
   );
 
-  return { groups, totalHits, traceChecks: evaluations };
+  return {
+    groups,
+    totalHits,
+    traceChecks: evaluations,
+    scrollId: tracesResult._scroll_id,
+  };
 };
 
 export const getSpansForTraceIds = async (
