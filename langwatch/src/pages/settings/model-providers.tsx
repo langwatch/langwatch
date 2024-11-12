@@ -125,7 +125,6 @@ export default function ModelsPage() {
                     <Skeleton width="full" height="28px" />
                   </Box>
                 ))}
-              {console.log(modelProviders.data)}
               {modelProviders.data &&
                 Object.values(modelProviders.data).map((provider, index) => (
                   <ModelProviderForm

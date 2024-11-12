@@ -42,9 +42,10 @@ export const modelProviders = {
   anthropic: {
     name: "Anthropic",
     apiKey: "ANTHROPIC_API_KEY",
-    endpointKey: undefined,
+    endpointKey: "ANTHROPIC_BASE_URL",
     keysSchema: z.object({
       ANTHROPIC_API_KEY: z.string().min(1),
+      ANTHROPIC_BASE_URL: z.string().nullable().optional(),
     }),
     enabledSince: new Date("2023-01-01"),
   },
@@ -81,10 +82,10 @@ export const modelProviders = {
   custom: {
     name: "Custom",
     apiKey: "CUSTOM_API_KEY",
-    endpointKey: "CUSTOM_ENDPOINT",
+    endpointKey: "CUSTOM_BASE_URL",
     keysSchema: z.object({
-      CUSTOM_API_KEY: z.string().optional(),
-      CUSTOM_ENDPOINT: z.string().optional(),
+      CUSTOM_API_KEY: z.string().nullable().optional(),
+      CUSTOM_BASE_URL: z.string().nullable().optional(),
     }),
     enabledSince: new Date("2023-01-01"),
   },
