@@ -89,7 +89,9 @@ async def execute_optimization(
             entry_node.data.dataset.inline
         )
 
-        test_size = entry_node.data.train_test_split
+        train_size = entry_node.data.train_size
+        test_size = entry_node.data.test_size
+        is_percentage = (train_size < 1) or (test_size < 1)
         seed = entry_node.data.seed
 
         input_keys = get_input_keys(workflow)
@@ -103,7 +105,12 @@ async def execute_optimization(
             for index, entry in enumerate(entries)
         ]
 
-        train, test = train_test_split(examples, test_size=test_size, random_state=seed)
+        train, _ = train_test_split(
+            examples,
+            train_size=train_size if is_percentage else int(train_size),
+            random_state=(seed if seed >= 0 else None),
+            shuffle=(seed >= 0),
+        )
 
         def metric(
             example: dspy.Example,

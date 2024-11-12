@@ -91,7 +91,7 @@ const DEFAULT_LLM_CONFIG: LLMConfig = {
 
 const initialState: State = {
   workflow_id: undefined,
-  spec_version: "1.0",
+  spec_version: "1.1",
   name: "Loading...",
   icon: "🧩",
   description: "",

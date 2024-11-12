@@ -136,3 +136,18 @@ export const datasetDatabaseRecordsToInMemoryDataset = (
     columnTypes: dataset.columnTypes as DatasetColumns,
   };
 };
+
+export const trainTestSplit = (
+  list: any[],
+  { trainSize, testSize }: { trainSize: number; testSize: number }
+) => {
+  const total = list.length;
+  const isPercentage = trainSize < 1 || testSize < 1;
+  const train_count = isPercentage ? Math.floor(total * trainSize) : trainSize;
+  const test_count = isPercentage ? Math.ceil(total * testSize) : testSize;
+
+  return {
+    train: list.slice(0, train_count),
+    test: list.slice(train_count, train_count + test_count),
+  };
+};

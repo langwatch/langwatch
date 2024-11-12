@@ -62,18 +62,26 @@ async def execute_evaluation(
             entry_node.data.dataset.inline
         )
 
-        test_size = entry_node.data.train_test_split
+        train_size = entry_node.data.train_size
+        test_size = entry_node.data.test_size
+        is_percentage = (train_size < 1) or (test_size < 1)
         seed = entry_node.data.seed
 
         if event.evaluate_on == "full":
             pass
         elif event.evaluate_on == "test":
             _, entries = train_test_split(
-                entries, test_size=test_size, random_state=seed
+                entries,
+                test_size=test_size if is_percentage else int(test_size),
+                random_state=(seed if seed >= 0 else None),
+                shuffle=(seed >= 0),
             )
         elif event.evaluate_on == "train":
             entries, _ = train_test_split(
-                entries, test_size=test_size, random_state=seed
+                entries,
+                test_size=test_size if is_percentage else int(test_size),
+                random_state=(seed if seed >= 0 else None),
+                shuffle=(seed >= 0),
             )
         else:
             raise ValueError(f"Invalid evaluate_on value: {event.evaluate_on}")

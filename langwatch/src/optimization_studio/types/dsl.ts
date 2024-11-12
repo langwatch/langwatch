@@ -100,7 +100,8 @@ export type NodeDataset = {
 export type Entry = BaseComponent & {
   inputs?: never;
   entry_selection: "first" | "last" | "random";
-  train_test_split: number;
+  train_size: number;
+  test_size: number;
   seed: number;
   dataset?: NodeDataset;
 };
@@ -128,7 +129,7 @@ type Flow = {
 };
 
 export type Workflow = {
-  spec_version: string;
+  spec_version: "1.1";
   workflow_id?: string;
 
   name: string;

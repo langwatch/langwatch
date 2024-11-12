@@ -7,6 +7,7 @@ import type { PrismaClient, WorkflowVersion } from "@prisma/client";
 import { type Session } from "next-auth";
 import type { Workflow } from "../../../optimization_studio/types/dsl";
 import type { Unpacked } from "../../../utils/types";
+import { migrateDSLVersion } from "../../../optimization_studio/types/migrate";
 
 const workflowJsonSchema = z
   .object({
@@ -87,6 +88,12 @@ export const workflowRouter = createTRPCRouter({
           code: "NOT_FOUND",
           message: "Workflow not found",
         });
+      }
+
+      if (workflow.currentVersion) {
+        workflow.currentVersion.dsl = migrateDSLVersion(
+          workflow.currentVersion.dsl as unknown as Workflow
+        ) as any;
       }
 
       return workflow;
@@ -189,7 +196,7 @@ export const workflowRouter = createTRPCRouter({
         });
       }
 
-      const dsl = version.dsl as unknown as Workflow;
+      const dsl = migrateDSLVersion(version.dsl as unknown as Workflow);
 
       await ctx.prisma.workflow.update({
         where: { id: workflow.id, projectId: input.projectId },

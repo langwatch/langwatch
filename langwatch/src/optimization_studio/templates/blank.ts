@@ -2,7 +2,7 @@ import { DEFAULT_DATASET_NAME } from "../../components/datasets/DatasetTable";
 import type { End, Entry, Signature, Workflow } from "../types/dsl";
 
 export const blankTemplate: Workflow = {
-  spec_version: "1.0",
+  spec_version: "1.1",
   name: "Blank Template",
   icon: "🧩",
   description: "Start a new workflow from scratch",
@@ -24,8 +24,9 @@ export const blankTemplate: Workflow = {
       data: {
         name: "Entry",
         outputs: [{ identifier: "question", type: "str" }],
-        entry_selection: "first",
-        train_test_split: 0.2,
+        entry_selection: "random",
+        train_size: 0.8,
+        test_size: 0.2,
         seed: 42,
         dataset: {
           name: DEFAULT_DATASET_NAME,

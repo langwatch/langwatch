@@ -2,7 +2,7 @@ import { DEFAULT_DATASET_NAME } from "../../components/datasets/DatasetTable";
 import type { End, Entry, Evaluator, Retriever, Workflow } from "../types/dsl";
 
 export const simpleRagTemplate: Workflow = {
-  spec_version: "1.0",
+  spec_version: "1.1",
   name: "Simple RAG",
   icon: "🧩",
   description:
@@ -25,8 +25,9 @@ export const simpleRagTemplate: Workflow = {
           { identifier: "question", type: "str" },
           { identifier: "gold_answer", type: "str" },
         ],
-        entry_selection: "first",
-        train_test_split: 0.2,
+        entry_selection: "random",
+        train_size: 0.8,
+        test_size: 0.2,
         seed: 42,
         dataset: {
           name: DEFAULT_DATASET_NAME,

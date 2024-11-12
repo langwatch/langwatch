@@ -10,29 +10,109 @@ import {
   useDisclosure,
   VStack,
 } from "@chakra-ui/react";
+import { zodResolver } from "@hookform/resolvers/zod";
 import type { Node } from "@xyflow/react";
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Folder, Info } from "react-feather";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
 import { DatasetPreview } from "../../../components/datasets/DatasetPreview";
 import { useGetDatasetData } from "../../hooks/useGetDatasetData";
-import type { Component, Entry } from "../../types/dsl";
+import { useWorkflowStore } from "../../hooks/useWorkflowStore";
+import type { Entry } from "../../types/dsl";
 import { DatasetModal } from "../DatasetModal";
 import {
   BasePropertiesPanel,
   PropertySectionTitle,
 } from "./BasePropertiesPanel";
-import { useWorkflowStore } from "../../hooks/useWorkflowStore";
 
-export function EntryPointPropertiesPanel({ node }: { node: Node<Component> }) {
+export function EntryPointPropertiesPanel({ node }: { node: Node<Entry> }) {
   const { isOpen, onOpen, onClose } = useDisclosure();
   const [editingDataset, setEditingDataset] = useState<
     Entry["dataset"] | undefined
   >();
-  const { rows, columns, total } = useGetDatasetData({
+  const {
+    rows,
+    columns,
+    total: total_,
+  } = useGetDatasetData({
     dataset: "dataset" in node.data ? node.data.dataset : undefined,
     preview: true,
   });
+  const total = total_ ?? 0;
   const { setNode } = useWorkflowStore(({ setNode }) => ({ setNode }));
+
+  type FormData = {
+    train_size: number;
+    test_size: number;
+    unit: "percent" | "entries";
+    seed: number;
+  };
+
+  const isPercent =
+    (node.data.train_size ?? 0.8) < 1 || (node.data.test_size ?? 0.2) < 1;
+
+  const form = useForm<FormData>({
+    defaultValues: {
+      train_size: (node.data.train_size ?? 0.8) * (isPercent ? 100 : 1),
+      test_size: (node.data.test_size ?? 0.2) * (isPercent ? 100 : 1),
+      unit: isPercent ? "percent" : "entries",
+      seed: node.data.seed ?? 42,
+    },
+    resolver: zodResolver(
+      z
+        .object({
+          train_size: z.number().min(0),
+          test_size: z.number().min(0),
+          unit: z.enum(["percent", "entries"]),
+          seed: z.number().min(-1).max(100000),
+        })
+        .superRefine((data, ctx) => {
+          const sum = data.train_size + data.test_size;
+
+          if (data.unit === "percent" && sum > 100) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              message: "Total percentage cannot exceed 100%",
+              path: ["test_size"],
+            });
+          }
+
+          if (data.unit === "entries" && total && sum > total) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              message: `Total entries cannot exceed ${total} entries`,
+              path: ["test_size"],
+            });
+          }
+        })
+    ),
+  });
+
+  const onSubmit = useCallback(
+    ({ train_size, test_size, unit, seed }: FormData) => {
+      setNode({
+        id: node.id,
+        data: {
+          ...node.data,
+          train_size: unit === "percent" ? train_size / 100 : train_size,
+          test_size: unit === "percent" ? test_size / 100 : test_size,
+          seed,
+        },
+      });
+    },
+    []
+  );
+
+  const unitField = form.register("unit");
+  const train_size = form.watch("train_size");
+  const test_size = form.watch("test_size");
+  const unit = form.watch("unit");
+  const seed = form.watch("seed");
+
+  useEffect(() => {
+    form.handleSubmit(onSubmit)();
+  }, [unit, train_size, test_size, seed]);
 
   return (
     <BasePropertiesPanel
@@ -42,7 +122,13 @@ export function EntryPointPropertiesPanel({ node }: { node: Node<Component> }) {
       hideInputs
       hideParameters
     >
-      <VStack width="full" align="start">
+      <VStack
+        as="form"
+        width="full"
+        align="start"
+        // eslint-disable-next-line @typescript-eslint/no-misused-promises
+        onSubmit={form.handleSubmit(onSubmit)}
+      >
         <HStack width="full">
           <PropertySectionTitle>
             Dataset{" "}
@@ -85,6 +171,149 @@ export function EntryPointPropertiesPanel({ node }: { node: Node<Component> }) {
         node={node}
         editingDataset={editingDataset}
       />
+      <HStack width="full">
+        <VStack width="full" align="start">
+          <HStack width="full" paddingBottom={2}>
+            <PropertySectionTitle>Optimization/Test Split</PropertySectionTitle>
+            <Tooltip
+              label={`During optimization, a bigger part of the dataset is used for optimization and a smaller part for testing, this guarantees that the test set is not leaked into the optimization, preventing the LLM to "cheat" it's way into a better score.`}
+            >
+              <Box paddingTop={1}>
+                <Info size={14} />
+              </Box>
+            </Tooltip>
+          </HStack>
+          <HStack width="full" spacing={0}>
+            <HStack width="full">
+              <Text
+                fontSize="13px"
+                fontWeight="600"
+                paddingLeft={4}
+                color="gray.500"
+              >
+                Optimization Set
+              </Text>
+            </HStack>
+            <HStack width="full">
+              <Input
+                {...form.register("train_size", { valueAsNumber: true })}
+                type="number"
+                required
+                min={0}
+                max={unit === "percent" ? 100 : undefined}
+                step={1}
+                width="45%"
+                size="sm"
+                paddingRight={1}
+              />
+              <Select width="55%" size="sm" {...unitField}>
+                <option value="percent">%</option>
+                <option value="entries">entries</option>
+              </Select>
+            </HStack>
+          </HStack>
+          {form.formState.errors.train_size && (
+            <Text
+              color="red.700"
+              fontSize="13px"
+              paddingLeft={4}
+              textAlign="right"
+              width="full"
+            >
+              {form.formState.errors.train_size.message}
+            </Text>
+          )}
+          <HStack width="full" spacing={0}>
+            <HStack width="full">
+              <Text
+                fontSize="13px"
+                fontWeight="600"
+                paddingLeft={4}
+                color="gray.500"
+              >
+                Test Set
+              </Text>
+            </HStack>
+            <HStack width="full">
+              <Input
+                {...form.register("test_size", { valueAsNumber: true })}
+                type="number"
+                required
+                min={0}
+                max={unit === "percent" ? 100 : undefined}
+                step={1}
+                width="45%"
+                size="sm"
+                paddingRight={1}
+              />
+
+              <Select
+                width="55%"
+                size="sm"
+                value={unit}
+                onChange={(e) => {
+                  form.setValue(
+                    "unit",
+                    e.target.value as "percent" | "entries"
+                  );
+                }}
+              >
+                <option value="percent">%</option>
+                <option value="entries">entries</option>
+              </Select>
+            </HStack>
+          </HStack>
+          {form.formState.errors.test_size && (
+            <Text
+              color="red.700"
+              fontSize="13px"
+              paddingLeft={4}
+              textAlign="right"
+              width="full"
+            >
+              {form.formState.errors.test_size.message}
+            </Text>
+          )}
+          <HStack width="full" spacing={4}>
+            <HStack width="full">
+              <Text
+                fontSize="13px"
+                fontWeight="600"
+                paddingLeft={4}
+                color="gray.500"
+              >
+                Shuffle Seed
+              </Text>
+              <Tooltip
+                label={`For making sure the original dataset order does not affect performance, a seed is used to shuffle it before the split. Use -1 if you want to disable shuffling.`}
+              >
+                <Box paddingTop={1}>
+                  <Info size={14} />
+                </Box>
+              </Tooltip>
+            </HStack>
+            <Input
+              {...form.register("seed", { valueAsNumber: true })}
+              type="number"
+              size="sm"
+              required
+              value={(node.data as Entry).seed ?? "42"}
+              min={-1}
+            />
+          </HStack>
+          {form.formState.errors.seed && (
+            <Text
+              color="red.700"
+              fontSize="13px"
+              paddingLeft={4}
+              textAlign="right"
+              width="full"
+            >
+              {form.formState.errors.seed.message}
+            </Text>
+          )}
+        </VStack>
+      </HStack>
       <VStack width="full" align="start">
         <HStack width="full">
           <PropertySectionTitle>Manual Test Entry</PropertySectionTitle>
@@ -112,68 +341,6 @@ export function EntryPointPropertiesPanel({ node }: { node: Node<Component> }) {
           <option value="random">Random</option>
         </Select>
       </VStack>
-      <HStack width="full">
-        <VStack width="full" align="start">
-          <HStack width="full">
-            <PropertySectionTitle>Optimization/Test Split</PropertySectionTitle>
-            <Tooltip
-              label={`During optimization, a bigger part of the dataset is used for optimization and a smaller part for testing, this guarantees that the test set is not leaked into the optimization, preventing the LLM to "cheat" it's way into a better score.`}
-            >
-              <Box paddingTop={1}>
-                <Info size={14} />
-              </Box>
-            </Tooltip>
-          </HStack>
-          <Select
-            value={(node.data as Entry).train_test_split ?? "0.2"}
-            onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
-              const trainTestSplit = parseFloat(e.target.value);
-              setNode({
-                id: node.id,
-                data: {
-                  ...node.data,
-                  train_test_split: trainTestSplit,
-                },
-              });
-            }}
-          >
-            <option value="0.1">90% optimization, 10% test</option>
-            <option value="0.2">80% optimization, 20% test</option>
-            <option value="0.3">70% optimization, 30% test</option>
-            <option value="0.4">60% optimization, 40% test</option>
-            <option value="0.5">50% optimization, 50% test</option>
-          </Select>
-        </VStack>
-        <VStack align="start" width="40%">
-          <HStack width="full">
-            <PropertySectionTitle>Seed</PropertySectionTitle>
-            <Tooltip
-              label={`For making sure the original dataset order does not affect performance, a seed is used to shuffle it before the split.`}
-            >
-              <Box paddingTop={1}>
-                <Info size={14} />
-              </Box>
-            </Tooltip>
-          </HStack>
-          <Input
-            type="number"
-            required
-            value={(node.data as Entry).seed ?? "42"}
-            min={-1}
-            onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-              const seed = parseInt(e.target.value);
-              if (isNaN(seed)) return;
-              setNode({
-                id: node.id,
-                data: {
-                  ...node.data,
-                  seed: seed,
-                },
-              });
-            }}
-          />
-        </VStack>
-      </HStack>
     </BasePropertiesPanel>
   );
 }

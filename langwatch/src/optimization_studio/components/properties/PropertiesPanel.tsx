@@ -8,14 +8,14 @@ import { useWorkflowStore } from "../../hooks/useWorkflowStore";
 import type { Component, ComponentType } from "../../types/dsl";
 import { InputPanel } from "../component_execution/InputPanel";
 import { OutputPanel } from "../component_execution/OutputPanel";
-import { EntryPointPropertiesPanel } from "./EntryPointPropertiesPanel";
 import { BasePropertiesPanel } from "./BasePropertiesPanel";
-import { WorkflowPropertiesPanel } from "./WorkflowPropertiesPanel";
-import { SignaturePropertiesPanel } from "./SignaturePropertiesPanel";
-import { EvaluatorPropertiesPanel } from "./EvaluatorPropertiesPanel";
 import { EndPropertiesPanel } from "./EndPropertiesPanel";
-import { RetrievePropertiesPanel } from "./RetrievePropertiesPanel";
+import { EntryPointPropertiesPanel } from "./EntryPointPropertiesPanel";
+import { EvaluatorPropertiesPanel } from "./EvaluatorPropertiesPanel";
 import { PromptingTechniquePropertiesPanel } from "./PromptingTechniquePropertiesPanel";
+import { RetrievePropertiesPanel } from "./RetrievePropertiesPanel";
+import { SignaturePropertiesPanel } from "./SignaturePropertiesPanel";
+import { WorkflowPropertiesPanel } from "./WorkflowPropertiesPanel";
 
 export function PropertiesPanel() {
   const {
@@ -36,7 +36,7 @@ export function PropertiesPanel() {
     ComponentType,
     React.FC<{ node: Node<Component> }>
   > = {
-    entry: EntryPointPropertiesPanel,
+    entry: EntryPointPropertiesPanel as React.FC<{ node: Node<Component> }>,
     end: EndPropertiesPanel as React.FC<{ node: Node<Component> }>,
     signature: SignaturePropertiesPanel,
     module: BasePropertiesPanel,

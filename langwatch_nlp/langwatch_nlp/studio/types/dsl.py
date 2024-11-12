@@ -110,7 +110,8 @@ class NodeDataset(BaseModel):
 class Entry(BaseComponent):
     inputs: None = None
     dataset: Optional[NodeDataset] = None
-    train_test_split: float
+    train_size: float
+    test_size: float
     seed: int
 
 

@@ -14,7 +14,7 @@ import {
   Tooltip,
   useDisclosure,
   useToast,
-  VStack
+  VStack,
 } from "@chakra-ui/react";
 
 import type { Node } from "@xyflow/react";
@@ -37,6 +37,7 @@ import { useWorkflowStore } from "../hooks/useWorkflowStore";
 import type { Entry } from "../types/dsl";
 import { AddModelProviderKey } from "./AddModelProviderKey";
 import { useVersionState, VersionToBeUsed } from "./History";
+import { trainTestSplit } from "../utils/datasetUtils";
 
 export function Evaluate() {
   const { isOpen, onToggle, onClose } = useDisclosure();
@@ -116,6 +117,17 @@ export function EvaluateModalContent({ onClose }: { onClose: () => void }) {
   });
 
   const datasetName = entryNode?.data.dataset?.name;
+  const trainSize = entryNode?.data.train_size ?? 0.8;
+  const testSize = entryNode?.data.test_size ?? 0.2;
+  const isPercentage = trainSize < 1 || testSize < 1;
+
+  const { train, test } = trainTestSplit(
+    Array.from({ length: total ?? 0 }, (_, i) => i),
+    {
+      trainSize,
+      testSize,
+    }
+  );
   const splitOptions: DatasetSplitOption[] = [
     {
       label: "Full dataset",
@@ -125,16 +137,16 @@ export function EvaluateModalContent({ onClose }: { onClose: () => void }) {
     {
       label: "Test entries",
       value: "test",
-      description: `${Math.round(
-        (entryNode?.data.train_test_split ?? 0) * 100
-      )}% of ${datasetName} dataset`,
+      description: isPercentage
+        ? `${Math.round(testSize * 100)}% of ${datasetName} dataset`
+        : `${test.length} entries`,
     },
     {
       label: "Train entries",
       value: "train",
-      description: `${Math.round(
-        (1 - (entryNode?.data.train_test_split ?? 0)) * 100
-      )}% of ${datasetName} dataset`,
+      description: isPercentage
+        ? `${Math.round(trainSize * 100)}% of ${datasetName} dataset`
+        : `${train.length} entries`,
     },
   ];
 
@@ -152,15 +164,13 @@ export function EvaluateModalContent({ onClose }: { onClose: () => void }) {
       return total;
     }
     if (evaluateOn.value === "test") {
-      return Math.ceil((total ?? 0) * (entryNode?.data.train_test_split ?? 0));
+      return test.length;
     }
     if (evaluateOn.value === "train") {
-      return Math.floor(
-        (total ?? 0) * (1 - (entryNode?.data.train_test_split ?? 0))
-      );
+      return train.length;
     }
     return 0;
-  }, [evaluateOn, total, entryNode?.data.train_test_split]);
+  }, [evaluateOn, total, train.length, test.length]);
 
   const { versions, canSaveNewVersion, nextVersion, versionToBeEvaluated } =
     useVersionState({

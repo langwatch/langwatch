@@ -41,6 +41,7 @@ import type { Entry } from "../types/dsl";
 import { OPTIMIZERS } from "../types/optimizers";
 import { AddModelProviderKey } from "./AddModelProviderKey";
 import { useVersionState, VersionToBeUsed } from "./History";
+import { trainTestSplit } from "../utils/datasetUtils";
 
 const optimizerOptions: {
   label: string;
@@ -141,15 +142,16 @@ export function OptimizeModalContent({ onClose }: { onClose: () => void }) {
     form.setValue("params", optimizer.params);
   }, [form, optimizer]);
 
-  const [trainTotal, testTotal] = useMemo(() => {
-    const testTotal = Math.ceil(
-      (total ?? 0) * (entryNode?.data.train_test_split ?? 0)
-    );
-    const trainTotal = Math.floor(
-      (total ?? 0) * (1 - (entryNode?.data.train_test_split ?? 0))
-    );
-    return [trainTotal, testTotal];
-  }, [total, entryNode?.data.train_test_split]);
+  const trainSize = entryNode?.data.train_size ?? 0.8;
+  const testSize = entryNode?.data.test_size ?? 0.2;
+
+  const { train } = trainTestSplit(
+    Array.from({ length: total ?? 0 }, (_, i) => i),
+    {
+      trainSize,
+      testSize,
+    }
+  );
 
   const { versions, canSaveNewVersion, nextVersion, versionToBeEvaluated } =
     useVersionState({
@@ -187,20 +189,20 @@ export function OptimizeModalContent({ onClose }: { onClose: () => void }) {
 
       let versionId: string | undefined = versionToBeEvaluated.id;
 
-      if (!trainTotal || !testTotal) {
+      if (!train.length) {
         return;
       }
 
       if (
-        trainTotal >= 300 &&
-        !confirm(`Going to optimize on ${trainTotal} entries. Are you sure?`)
+        train.length >= 300 &&
+        !confirm(`Going to optimize on ${train.length} entries. Are you sure?`)
       ) {
         return;
       }
 
-      if (trainTotal + testTotal >= 5000) {
+      if (train.length >= 3000) {
         alert(
-          "Optimiziation is limited to a maximum of 5000 entries total. Please contact support if you need to optimize on more."
+          "Optimiziation is limited to a maximum of 3000 entries total. Please contact support if you need to optimize on more."
         );
         return;
       }
@@ -255,9 +257,8 @@ export function OptimizeModalContent({ onClose }: { onClose: () => void }) {
       getWorkflow,
       project,
       startOptimizationExecution,
-      testTotal,
       toast,
-      trainTotal,
+      train.length,
       versionToBeEvaluated.id,
       versions,
       workflowId,
@@ -291,7 +292,7 @@ export function OptimizeModalContent({ onClose }: { onClose: () => void }) {
 
   const hasEvaluator = !!nodes.find((node) => node.type === "evaluator");
   const isDisabled =
-    trainTotal + testTotal < 20
+    train.length < 20
       ? "You need at least 20 entries to run the automated optimizer"
       : hasProvidersWithoutCustomKeys
       ? "Set up your API keys to run optimizations"
@@ -397,9 +398,8 @@ export function OptimizeModalContent({ onClose }: { onClose: () => void }) {
           ) : null}
           <HStack width="full">
             <VStack align="start" spacing={0}>
-              <Text fontWeight={500}>{trainTotal + testTotal} entries</Text>
-              <Text whiteSpace="nowrap" fontSize="13px">
-                ({trainTotal} optimization / {testTotal} test)
+              <Text fontWeight={500}>
+                {train.length} optimization set entries
               </Text>
             </VStack>
             <Spacer />
