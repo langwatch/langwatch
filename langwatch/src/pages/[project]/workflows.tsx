@@ -44,6 +44,11 @@ export default function MessagesOrIntegrationGuide() {
     }
   );
 
+  const canCreateWorkflow =
+    (!!usage.data?.activePlan.maxWorkflows &&
+      (workflows.data?.length ?? 0) < usage.data.activePlan.maxWorkflows) ||
+    isOrganizationFeatureEnabled("OPTIMIZATION_STUDIO");
+
   if (
     isOrganizationFeatureEnabled("OPTIMIZATION_STUDIO") ||
     usage.data?.activePlan.type !== "FREE"
@@ -62,8 +67,7 @@ export default function MessagesOrIntegrationGuide() {
               gap={6}
               width="full"
             >
-              {usage.data?.activePlan.maxWorkflows ===
-              workflows.data?.length ? (
+              {!canCreateWorkflow ? (
                 <WorkflowCardBase>
                   <Tooltip label="You reached the limit of max workflows, click to upgrade your plan to add more workflows">
                     <Center width="full" height="full">
