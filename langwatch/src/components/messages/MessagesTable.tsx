@@ -1029,10 +1029,10 @@ export function MessagesTable() {
           />
           <FilterToggle />
         </HStack>
-        <Progress value={downloadProgress} size="xs" />
 
         <HStack align={"top"} gap={8}>
           <Card>
+            <Progress colorScheme="orange" value={downloadProgress} size="xs" />
             <CardBody>
               {checkedHeaderColumnsEntries.length === 0 && (
                 <Text>No columns selected</Text>
