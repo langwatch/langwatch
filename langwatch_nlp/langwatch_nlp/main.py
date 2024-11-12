@@ -70,6 +70,7 @@ async def proxy_startup():
         deployment = deployment.copy()
 
         print(f"deployment: {deployment}")
+        print(f"model: {model}")
 
         if "litellm_params" not in deployment:
             deployment["litellm_params"] = {}

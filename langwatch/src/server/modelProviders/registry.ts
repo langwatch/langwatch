@@ -81,7 +81,7 @@ export const modelProviders = {
   custom: {
     name: "Custom",
     apiKey: "CUSTOM_API_KEY",
-    endpointKey: undefined,
+    endpointKey: "CUSTOM_ENDPOINT",
     keysSchema: z.object({
       CUSTOM_API_KEY: z.string().optional(),
       CUSTOM_ENDPOINT: z.string().optional(),
