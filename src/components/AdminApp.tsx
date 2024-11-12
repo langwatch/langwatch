@@ -117,7 +117,7 @@ const AdminApp = () => {
       <Resource
         name="organizationFeature"
         list={ListGuesser}
-        edit={EditGuesser}
+        edit={OrganizationFeatureEdit}
         recordRepresentation="name"
         hasCreate={true}
         create={OrganizationFeatureCreate}
@@ -207,28 +207,47 @@ const SubscriptionEdit = () => (
 const OrganizationFeatureCreate = () => (
   <Create>
     <SimpleForm>
-      <TextInput
-        source="feature"
-        label="Feature"
-        isRequired={true}
-        validate={(value) => {
-          if (!value) return "Feature is required";
-          return undefined;
-        }}
-      />
-      <ReferenceInput
-        source="organizationId"
-        reference="organizations"
-        perPage={100}
-        sort={{ field: "name", order: "ASC" }}
-      >
-        <AutocompleteInput
-          optionText="name"
-          label="Organization"
-          validate={required()}
-          filterToQuery={(searchText) => ({ name: searchText })} // Improve filtering
-        />
-      </ReferenceInput>
+      <OrganizationFeatureFormElements />
     </SimpleForm>
   </Create>
+);
+
+const OrganizationFeatureEdit = () => (
+  <Edit>
+    <SimpleForm>
+      <OrganizationFeatureFormElements />
+    </SimpleForm>
+  </Edit>
+);
+
+const OrganizationFeatureFormElements = () => (
+  <>
+    <TextInput
+      source="feature"
+      label="Feature"
+      isRequired={true}
+      validate={(value) => {
+        if (!value) return "Feature is required";
+        return undefined;
+      }}
+    />
+    <ReferenceInput
+      source="organizationId"
+      reference="organizations"
+      perPage={100}
+      sort={{ field: "name", order: "ASC" }}
+    >
+      <AutocompleteInput
+        optionText="name"
+        label="Organization"
+        validate={required()}
+        filterToQuery={(searchText) => ({ name: searchText })} // Improve filtering
+      />
+    </ReferenceInput>
+    <DateInput
+      source="trialEndDate"
+      label="Trial End Date"
+      parse={(val) => (val ? new Date(val).toISOString() : null)}
+    />
+  </>
 );

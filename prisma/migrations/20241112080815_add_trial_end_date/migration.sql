@@ -1,0 +1,1 @@
+../../../langwatch/langwatch/prisma/migrations/20241112080815_add_trial_end_date/migration.sql
