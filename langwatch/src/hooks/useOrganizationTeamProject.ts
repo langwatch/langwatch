@@ -269,7 +269,14 @@ export const useOrganizationTeamProject = (
   };
 
   const isOrganizationFeatureEnabled = (feature: string): boolean => {
-    return organization?.features?.some((f) => f.feature === feature) ?? false;
+    if (!organization?.features) return false;
+    const trialFeature = organization.features.find(
+      (f) => f.feature === feature
+    );
+    if (!trialFeature) return false;
+
+    if (!trialFeature.trialEndDate) return true;
+    return new Date(trialFeature.trialEndDate) > new Date();
   };
 
   return {

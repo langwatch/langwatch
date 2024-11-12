@@ -35,6 +35,7 @@ export type TeamWithProjectsAndMembers = TeamWithProjects & {
 
 export type OrganizationFeature = {
   feature: string;
+  trialEndDate: Date | null;
 };
 
 export type FullyLoadedOrganization = Organization & {
