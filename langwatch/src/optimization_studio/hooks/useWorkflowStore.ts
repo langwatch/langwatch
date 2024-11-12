@@ -108,6 +108,7 @@ const initialState: State = {
   workflowSelected: false,
   previousWorkflow: undefined,
   openResultsPanelRequest: undefined,
+  playgroundOpen: false,
 };
 
 const store = (
