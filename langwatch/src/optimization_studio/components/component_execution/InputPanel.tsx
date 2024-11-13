@@ -65,6 +65,8 @@ export const InputPanel = ({ node }: { node: Node<Component> }) => {
 
   const onSubmit = useCallback(
     (data: Record<string, string>) => {
+      console.log(data);
+      console.log(node);
       startComponentExecution({ node, inputs: data });
     },
     [node, startComponentExecution]

@@ -145,6 +145,16 @@ const evaluators: Evaluator[] = [
     ],
     outputs: [{ identifier: "passed", type: "bool" }],
   },
+  {
+    cls: "test",
+    name: "test",
+    inputs: [
+      { identifier: "category", type: "str" },
+      { identifier: "description", type: "str" },
+    ],
+    outputs: [{ identifier: "output", type: "str" }],
+    workflowId: "test",
+  },
   ...convertEvaluators(
     Object.fromEntries(
       Object.entries(AVAILABLE_EVALUATORS)

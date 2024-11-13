@@ -109,6 +109,7 @@ export type Entry = BaseComponent & {
 export type Evaluator = Omit<BaseComponent, "cls"> & {
   cls: string;
   evaluator?: string;
+  workflowId?: string;
 };
 
 export type End = BaseComponent & {
