@@ -184,6 +184,7 @@ const SubscriptionFromElements = () => {
         label="Evaluations Credit"
         type="number"
       />
+      <NumberInput source="maxWorkflows" label="Max Workflows" type="number" />
     </>
   );
 };
