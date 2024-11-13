@@ -5,7 +5,7 @@ type ModelProviderDefinition = {
   name: string;
   apiKey: string;
   endpointKey: string | undefined;
-  keysSchema: z.AnyZodObject;
+  keysSchema: z.ZodTypeAny;
   enabledSince?: Date;
 };
 
@@ -23,10 +23,23 @@ export const modelProviders = {
     name: "OpenAI",
     apiKey: "OPENAI_API_KEY",
     endpointKey: "OPENAI_BASE_URL",
-    keysSchema: z.object({
-      OPENAI_API_KEY: z.string().nullable().optional(),
-      OPENAI_BASE_URL: z.string().nullable().optional(),
-    }),
+    keysSchema: z
+      .object({
+        OPENAI_API_KEY: z.string().nullable().optional(),
+        OPENAI_BASE_URL: z.string().nullable().optional(),
+      })
+      .superRefine((data, ctx) => {
+        if (
+          (!data.OPENAI_API_KEY || data.OPENAI_API_KEY.trim() === "") &&
+          (!data.OPENAI_BASE_URL || data.OPENAI_BASE_URL.trim() === "")
+        ) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message:
+              "Either OPENAI_API_KEY or OPENAI_BASE_URL must be provided with a non-empty value",
+          });
+        }
+      }),
     enabledSince: new Date("2023-01-01"),
   },
   azure: {
