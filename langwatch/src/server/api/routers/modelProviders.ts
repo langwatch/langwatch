@@ -195,6 +195,15 @@ export const prepareEnvKeys = (modelProvider: MaybeStoredModelProvider) => {
   return Object.fromEntries(
     Object.keys(providerDefinition.keysSchema.shape)
       .map((key) => [key, getModelOrDefaultEnvKey(modelProvider, key)])
+      .map(([key, value]) => {
+        if (key === "CUSTOM_API_KEY") {
+          return ["OPENAI_API_KEY", value];
+        }
+        if (key === "CUSTOM_BASE_URL") {
+          return ["OPENAI_BASE_URL", value];
+        }
+        return [key, value];
+      })
       .filter(([_key, value]) => !!value)
   );
 };
@@ -210,7 +219,6 @@ export const prepareLitellmParams = (
     params.api_key = apiKey;
   }
   const endpoint = getModelOrDefaultEndpointKey(modelProvider);
-  console.log("endpoint", endpoint);
   if (endpoint) {
     params.api_base = endpoint;
   }

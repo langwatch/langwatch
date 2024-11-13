@@ -38,7 +38,9 @@ export function LLMModelDisplay({
 
   return (
     <>
-      <Box width="14px">{modelOption?.icon}</Box>
+      <Box width="14px" minWidth="14px">
+        {modelOption?.icon}
+      </Box>
       <Box
         fontSize={fontSize}
         fontFamily="mono"
