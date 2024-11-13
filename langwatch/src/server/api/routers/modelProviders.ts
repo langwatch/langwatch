@@ -193,7 +193,12 @@ export const prepareEnvKeys = (modelProvider: MaybeStoredModelProvider) => {
   // TODO: add AZURE_DEPLOYMENT_NAME and AZURE_EMBEDDINGS_DEPLOYMENT_NAME for deployment name mapping
 
   return Object.fromEntries(
-    Object.keys(providerDefinition.keysSchema.shape)
+    Object.keys(
+      ("innerType" in providerDefinition.keysSchema
+        ? providerDefinition.keysSchema.innerType()
+        : providerDefinition.keysSchema
+      ).shape
+    )
       .map((key) => [key, getModelOrDefaultEnvKey(modelProvider, key)])
       .map(([key, value]) => {
         if (key === "CUSTOM_API_KEY") {
