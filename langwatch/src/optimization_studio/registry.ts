@@ -19,7 +19,7 @@ const signatures: Signature[] = [
     ],
     outputs: [
       {
-        identifier: "query",
+        identifier: "answer",
         type: "str",
       },
     ],

@@ -53,7 +53,7 @@ export const useModelSelectionOptions = (
   const selectOptions: Record<string, ModelOption> = Object.fromEntries(
     customModels.map((model): [string, ModelOption] => {
       const provider = model.split("/")[0]!;
-      const modelName = model.split("/")[1]!;
+      const modelName = model.split("/").slice(1).join("/");
 
       return [
         model,
@@ -134,7 +134,9 @@ export const ModelSelector = React.memo(function ModelSelector({
         Option: ({ children, ...props }) => (
           <chakraComponents.Option {...props}>
             <HStack spacing={2} align="center">
-              <Box width="14px">{props.data.icon}</Box>
+              <Box width="14px" minWidth="14px">
+                {props.data.icon}
+              </Box>
               <Box fontSize={size === "sm" ? 12 : 14} fontFamily="mono">
                 {children}
                 {(!!props.data.version || props.data.isDisabled) && (

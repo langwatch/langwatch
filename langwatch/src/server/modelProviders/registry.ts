@@ -42,9 +42,10 @@ export const modelProviders = {
   anthropic: {
     name: "Anthropic",
     apiKey: "ANTHROPIC_API_KEY",
-    endpointKey: undefined,
+    endpointKey: "ANTHROPIC_BASE_URL",
     keysSchema: z.object({
       ANTHROPIC_API_KEY: z.string().min(1),
+      ANTHROPIC_BASE_URL: z.string().nullable().optional(),
     }),
     enabledSince: new Date("2023-01-01"),
   },
@@ -75,6 +76,16 @@ export const modelProviders = {
     keysSchema: z.object({
       CLOUDFLARE_ACCOUNT_ID: z.string().min(1),
       CLOUDFLARE_API_KEY: z.string().min(1),
+    }),
+    enabledSince: new Date("2023-01-01"),
+  },
+  custom: {
+    name: "Custom",
+    apiKey: "CUSTOM_API_KEY",
+    endpointKey: "CUSTOM_BASE_URL",
+    keysSchema: z.object({
+      CUSTOM_API_KEY: z.string().nullable().optional(),
+      CUSTOM_BASE_URL: z.string().nullable().optional(),
     }),
     enabledSince: new Date("2023-01-01"),
   },

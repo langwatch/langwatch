@@ -195,6 +195,15 @@ export const prepareEnvKeys = (modelProvider: MaybeStoredModelProvider) => {
   return Object.fromEntries(
     Object.keys(providerDefinition.keysSchema.shape)
       .map((key) => [key, getModelOrDefaultEnvKey(modelProvider, key)])
+      .map(([key, value]) => {
+        if (key === "CUSTOM_API_KEY") {
+          return ["OPENAI_API_KEY", value];
+        }
+        if (key === "CUSTOM_BASE_URL") {
+          return ["OPENAI_BASE_URL", value];
+        }
+        return [key, value];
+      })
       .filter(([_key, value]) => !!value)
   );
 };
@@ -222,7 +231,7 @@ export const prepareLitellmParams = (
       getModelOrDefaultEnvKey(modelProvider, "VERTEXAI_LOCATION") ?? "invalid";
   }
 
-  params.model = model;
+  params.model = model.replace("custom/", "openai/");
 
   // TODO: add azure deployment as params.model as azure/<deployment-name>
 

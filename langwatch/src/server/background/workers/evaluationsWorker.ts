@@ -18,6 +18,7 @@ import {
 import {
   getProjectModelProviders,
   prepareEnvKeys,
+  prepareLitellmParams,
 } from "../../api/routers/modelProviders";
 import {
   esGetSpansByTraceId,
@@ -181,7 +182,7 @@ export const runEvaluation = async ({
 
   let evaluatorEnv: Record<string, string> = {};
 
-  const setupEnv = async (model: string) => {
+  const setupEnv = async (model: string, embeddings: boolean) => {
     const modelProviders = await getProjectModelProviders(projectId);
     const provider = model.split("/")[0]!;
     const modelProvider = modelProviders[provider];
@@ -191,7 +192,21 @@ export const runEvaluation = async ({
     if (!modelProvider.enabled) {
       throw `Provider ${provider} is not enabled`;
     }
-    return prepareEnvKeys(modelProvider);
+    const params = prepareLitellmParams(model, modelProvider);
+
+    let env = Object.fromEntries(
+      Object.entries(params).map(([key, value]) => [
+        embeddings ? `LITELLM_EMBEDDINGS_${key}` : `LITELLM_${key}`,
+        value,
+      ])
+    );
+
+    // TODO: adapt embeddings_model_to_langchain on langevals to also use litellm and not need this
+    if (embeddings) {
+      env = { ...env, ...prepareEnvKeys(modelProvider) };
+    }
+
+    return env;
   };
 
   if (
@@ -200,7 +215,10 @@ export const runEvaluation = async ({
     typeof settings.model === "string" &&
     checkType !== "openai/moderation"
   ) {
-    evaluatorEnv = await setupEnv(settings.model);
+    evaluatorEnv = {
+      ...evaluatorEnv,
+      ...(await setupEnv(settings.model, false)),
+    };
   }
 
   if (
@@ -208,7 +226,10 @@ export const runEvaluation = async ({
     "embeddings_model" in settings &&
     typeof settings.embeddings_model === "string"
   ) {
-    evaluatorEnv = await setupEnv(settings.embeddings_model);
+    evaluatorEnv = {
+      ...evaluatorEnv,
+      ...(await setupEnv(settings.embeddings_model, true)),
+    };
   }
 
   const startTime = performance.now();
