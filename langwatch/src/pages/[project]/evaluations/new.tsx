@@ -16,13 +16,13 @@ export default function NewTraceCheckConfig() {
   const onSubmit = async (data: CheckConfigFormData) => {
     if (!project || !data.checkType) return;
 
-    if (
-      "model" in data.settings &&
-      typeof data.settings.model === "string" &&
-      data.settings.model.includes("custom/")
-    ) {
-      data.settings.model = data.settings.model.replace("custom/", "openai/");
-    }
+    // if (
+    //   "model" in data.settings &&
+    //   typeof data.settings.model === "string" &&
+    //   data.settings.model.includes("custom/")
+    // ) {
+    //   data.settings.model = data.settings.model.replace("custom/", "openai/");
+    // }
 
     try {
       await createCheck.mutateAsync({

@@ -210,6 +210,7 @@ export const prepareLitellmParams = (
     params.api_key = apiKey;
   }
   const endpoint = getModelOrDefaultEndpointKey(modelProvider);
+  console.log("endpoint", endpoint);
   if (endpoint) {
     params.api_base = endpoint;
   }
@@ -222,7 +223,7 @@ export const prepareLitellmParams = (
       getModelOrDefaultEnvKey(modelProvider, "VERTEXAI_LOCATION") ?? "invalid";
   }
 
-  params.model = model;
+  params.model = model.replace("custom/", "openai/");
 
   // TODO: add azure deployment as params.model as azure/<deployment-name>
 

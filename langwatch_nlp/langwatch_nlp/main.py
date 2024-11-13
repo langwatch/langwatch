@@ -88,8 +88,6 @@ async def proxy_startup():
             deployment["litellm_params"]["api_version"] = os.environ[
                 "AZURE_API_VERSION"
             ]
-        if "custom/" in model:
-            deployment["litellm_params"]["model"] = model.replace("custom/", "openai/")
 
         set_client(litellm_router_instance=self, model=deployment)
 
