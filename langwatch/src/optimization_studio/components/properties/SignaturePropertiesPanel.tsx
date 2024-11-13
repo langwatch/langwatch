@@ -14,7 +14,12 @@ import { Edit2, Info, X } from "react-feather";
 import { DatasetPreview } from "../../../components/datasets/DatasetPreview";
 import { useGetDatasetData } from "../../hooks/useGetDatasetData";
 import { useWorkflowStore } from "../../hooks/useWorkflowStore";
-import type { ComponentType, Signature } from "../../types/dsl";
+import type {
+  ComponentType,
+  LLMConfig,
+  NodeDataset,
+  Signature,
+} from "../../types/dsl";
 import { DemonstrationsModal } from "../DemonstrationsModal";
 import {
   BasePropertiesPanel,
@@ -25,13 +30,17 @@ import { LLMConfigField } from "./modals/LLMConfigModal";
 import { ComponentIcon } from "../ColorfulBlockIcons";
 
 export function SignaturePropertiesPanel({ node }: { node: Node<Signature> }) {
-  const { default_llm, setNode } = useWorkflowStore(
-    ({ default_llm, setNode, setWorkflowSelected }) => ({
+  const { default_llm, setNodeParameter } = useWorkflowStore(
+    ({ default_llm, setNodeParameter, setWorkflowSelected }) => ({
       default_llm,
-      setNode,
+      setNodeParameter,
       setWorkflowSelected,
     })
   );
+
+  const parameters = node.data.parameters
+    ? Object.fromEntries(node.data.parameters.map((p) => [p.identifier, p]))
+    : {};
 
   const { isOpen, onOpen, onClose } = useDisclosure();
   const {
@@ -39,7 +48,7 @@ export function SignaturePropertiesPanel({ node }: { node: Node<Signature> }) {
     columns: demonstrationColumns,
     total,
   } = useGetDatasetData({
-    dataset: node.data.demonstrations,
+    dataset: parameters.demonstrations?.value as NodeDataset | undefined,
     preview: true,
   });
 
@@ -91,34 +100,35 @@ export function SignaturePropertiesPanel({ node }: { node: Node<Signature> }) {
         </>
       }
     >
-      {node.data.decorated_by && <PromptingTechniqueField node={node} />}
+      {(parameters.prompting_technique?.value as { ref: string }) && (
+        <PromptingTechniqueField
+          value={(parameters.prompting_technique?.value as { ref: string }).ref}
+        />
+      )}
       <PropertyField title="LLM">
         <LLMConfigField
           allowDefault={true}
           defaultLLMConfig={default_llm}
-          llmConfig={node.data.llm}
+          llmConfig={parameters.llm?.value as LLMConfig | undefined}
           onChange={(llmConfig) => {
-            setNode({
-              id: node.id,
-              data: {
-                llm: llmConfig,
-              },
+            setNodeParameter(node.id, {
+              identifier: "llm",
+              type: "llm",
+              value: llmConfig,
             });
           }}
         />
       </PropertyField>
-      <PropertyField title="Prompt">
+      <PropertyField title="Instructions">
         <Textarea
           fontFamily="monospace"
           fontSize={13}
-          value={node.data.prompt ?? ""}
+          value={(parameters.instructions?.value as string | undefined) ?? ""}
           onChange={(e) =>
-            setNode({
-              id: node.id,
-              data: {
-                ...node.data,
-                prompt: e.target.value,
-              },
+            setNodeParameter(node.id, {
+              identifier: "instructions",
+              type: "str",
+              value: e.target.value,
             })
           }
         />
@@ -127,21 +137,17 @@ export function SignaturePropertiesPanel({ node }: { node: Node<Signature> }) {
   );
 }
 
-function PromptingTechniqueField({ node }: { node: Node<Signature> }) {
+function PromptingTechniqueField({ value }: { value: string | undefined }) {
   const {
     node: promptingTechniqueNode,
     deleteNode,
     setSelectedNode,
     deselectAllNodes,
-    propertiesExpanded,
-    setPropertiesExpanded,
   } = useWorkflowStore((state) => ({
-    node: state.nodes.find((n) => n.id === node.data.decorated_by?.ref),
+    node: state.nodes.find((n) => n.id === value),
     deleteNode: state.deleteNode,
     setSelectedNode: state.setSelectedNode,
     deselectAllNodes: state.deselectAllNodes,
-    propertiesExpanded: state.propertiesExpanded,
-    setPropertiesExpanded: state.setPropertiesExpanded,
   }));
 
   if (!promptingTechniqueNode) {

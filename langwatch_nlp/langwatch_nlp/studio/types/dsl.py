@@ -17,13 +17,15 @@ class FieldType(str, Enum):
     dict = "dict"
     signature = "signature"
     llm = "llm"
+    prompting_technique = "prompting_technique"
+    dataset = "dataset"
 
 
 class Field(BaseModel):
     identifier: str
     type: FieldType
     optional: Optional[bool] = None
-    defaultValue: Optional[Any] = None
+    value: Optional[Any] = None
     desc: Optional[str] = None
     prefix: Optional[str] = None
     hidden: Optional[bool] = None
@@ -76,7 +78,6 @@ class BaseComponent(BaseModel):
     parameters: Optional[List[Field]] = None
     inputs: Optional[List[Field]] = None
     outputs: Optional[List[Field]] = None
-    decorated_by: Optional[DecoratedBy] = None
     execution_state: Optional[ExecutionState] = None
 
 
@@ -116,13 +117,18 @@ class Entry(BaseComponent):
 
 
 class Signature(BaseComponent):
-    prompt: Optional[str] = None
-    llm: Optional[LLMConfig] = None
-    demonstrations: Optional[NodeDataset] = None
+    pass
+    # prompt: Optional[str] = None
+    # llm: Optional[LLMConfig] = None
+    # demonstrations: Optional[NodeDataset] = None
 
 
 class PromptingTechnique(BaseComponent):
     pass
+
+
+class NodeRef(BaseModel):
+    ref: str
 
 
 class Module(BaseComponent):

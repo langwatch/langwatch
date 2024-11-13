@@ -56,6 +56,14 @@ type WorkflowStore = State & {
   setNodes: (nodes: Node[]) => void;
   setEdges: (edges: Edge[]) => void;
   setNode: (node: Partial<Node> & { id: string }, newId?: string) => void;
+  setNodeParameter: (
+    nodeId: string,
+    parameter: Partial<Omit<Field, "value">> & {
+      identifier: string;
+      type: Field["type"];
+      value?: any;
+    }
+  ) => void;
   deleteNode: (id: string) => void;
   duplicateNode: (id: string) => void;
   setComponentExecutionState: (
@@ -91,7 +99,7 @@ const DEFAULT_LLM_CONFIG: LLMConfig = {
 
 const initialState: State = {
   workflow_id: undefined,
-  spec_version: "1.1",
+  spec_version: "1.2",
   name: "Loading...",
   icon: "🧩",
   description: "",
@@ -196,6 +204,40 @@ const store = (
         edges: get().edges,
       })
     );
+  },
+  setNodeParameter: (
+    nodeId: string,
+    parameter: Partial<Omit<Field, "value">> & {
+      identifier: string;
+      type: Field["type"];
+      value?: any;
+    }
+  ) => {
+    set({
+      nodes: get().nodes.map((node) => {
+        if (node.id !== nodeId) {
+          return node;
+        }
+
+        const existingParameter = node.data.parameters?.find(
+          (p) => p.identifier === parameter.identifier
+        );
+
+        return {
+          ...node,
+          data: {
+            ...node.data,
+            parameters: existingParameter
+              ? (node.data.parameters ?? []).map((p) =>
+                  p.identifier === parameter.identifier
+                    ? { ...p, ...parameter }
+                    : p
+                )
+              : [...(node.data.parameters ?? []), parameter],
+          },
+        };
+      }) as Node<Component>[],
+    });
   },
   deleteNode: (id: string) => {
     set(
@@ -431,10 +473,19 @@ export const removeInvalidEdges = ({
 export const removeInvalidDecorations = (nodes: Node[]) => {
   const nodeIds = new Set(nodes.map((node) => node.id));
   return nodes.map((node) => {
-    if (node.data.decorated_by) {
-      if (!nodeIds.has((node.data.decorated_by as { ref: string }).ref)) {
-        return { ...node, data: { ...node.data, decorated_by: undefined } };
-      }
+    if (node.data.parameters) {
+      return {
+        ...node,
+        data: {
+          ...node.data,
+          parameters: (node.data.parameters as Field[]).map((p) =>
+            (p.value as { ref: string })?.ref &&
+            !nodeIds.has((p.value as { ref: string }).ref)
+              ? { ...p, value: undefined }
+              : p
+          ),
+        },
+      };
     }
     return node;
   });

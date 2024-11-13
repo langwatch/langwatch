@@ -2,7 +2,7 @@ import { DEFAULT_DATASET_NAME } from "../../components/datasets/DatasetTable";
 import type { End, Entry, Signature, Workflow } from "../types/dsl";
 
 export const blankTemplate: Workflow = {
-  spec_version: "1.1",
+  spec_version: "1.2",
   name: "Blank Template",
   icon: "🧩",
   description: "Start a new workflow from scratch",
@@ -45,6 +45,28 @@ export const blankTemplate: Workflow = {
       position: { x: 300, y: 0 },
       data: {
         name: "LLM Call",
+        parameters: [
+          {
+            identifier: "llm",
+            type: "llm",
+            value: undefined,
+          },
+          {
+            identifier: "prompting_technique",
+            type: "prompting_technique",
+            value: undefined,
+          },
+          {
+            identifier: "instructions",
+            type: "str",
+            value: undefined,
+          },
+          {
+            identifier: "demonstrations",
+            type: "dataset",
+            value: undefined,
+          },
+        ],
         inputs: [{ identifier: "question", type: "str" }],
         outputs: [{ identifier: "answer", type: "str" }],
       } satisfies Signature,

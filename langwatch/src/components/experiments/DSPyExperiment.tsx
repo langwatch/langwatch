@@ -1347,7 +1347,7 @@ export function DSPyExperimentSummary({
                 bestScoreStep.data.predictors.map((predictor) => {
                   const optimization: AppliedOptimization = {
                     id: predictor.name,
-                    prompt:
+                    instructions:
                       predictor.predictor.extended_signature?.instructions ??
                       predictor.predictor.signature?.instructions,
                     fields: Object.entries(

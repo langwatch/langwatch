@@ -187,12 +187,12 @@ export function getInputsForExecution({
     node.data.inputs?.filter((field) => !field.optional) ?? [];
   const defaultValues = node.data.inputs?.reduce(
     (acc, field) => {
-      if (field.defaultValue !== undefined) {
-        acc[field.identifier] = field.defaultValue;
+      if (field.value !== undefined) {
+        acc[field.identifier] = field.value;
       }
       return acc;
     },
-    {} as Record<string, string>
+    {} as Record<string, any>
   );
 
   const inputs_ = Object.fromEntries(

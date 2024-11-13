@@ -146,7 +146,7 @@ export type ESBatchEvaluationRESTParams = Omit<
 
 export type AppliedOptimization = {
   id: string;
-  prompt?: string;
+  instructions?: string;
   fields?: AppliedOptimizationField[];
   demonstrations?: Record<string, any>[];
 };

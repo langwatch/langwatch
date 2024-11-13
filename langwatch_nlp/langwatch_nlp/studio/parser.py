@@ -16,6 +16,8 @@ from langwatch_nlp.studio.types.dsl import (
     FieldType,
     LLMConfig,
     Node,
+    NodeDataset,
+    NodeRef,
     PromptingTechnique,
     PromptingTechniqueNode,
     Retriever,
@@ -64,33 +66,35 @@ def parse_signature(
         for output_field in component.outputs:
             class_dict[output_field.identifier] = dspy.OutputField()
 
-    # Add the docstring (prompt) if available
-    if component.prompt:
-        class_dict["__doc__"] = component.prompt
+    parameters = parse_fields(component.parameters or [], autoparse=True)
+
+    # Add the docstring (instructions) if available
+    if instructions := cast(str, parameters.get("instructions")):
+        class_dict["__doc__"] = instructions
 
     # Create the class dynamically
     SignatureClass: Union[type[dspy.Signature], dspy.Module] = type(
         class_name + "Signature", (dspy.Signature,), class_dict
     )
 
-    if component.decorated_by:
+    if prompting_technique := cast(NodeRef, parameters.get("prompting_technique")):
         try:
             decorator_node = cast(
                 PromptingTechniqueNode,
                 next(
                     node
                     for node in workflow.nodes
-                    if node.id == component.decorated_by.ref
+                    if node.id == prompting_technique.ref
                 ),
             )
         except StopIteration:
-            raise ValueError(f"Decorator node {component.decorated_by} not found")
+            raise ValueError(f"Decorator node {prompting_technique.ref} not found")
         PromptingTechniqueClass = parse_prompting_technique(decorator_node.data)
         predict = PromptingTechniqueClass(SignatureClass)
     else:
         predict = dspy.Predict(SignatureClass)
 
-    llm_config = component.llm if component.llm else workflow.default_llm
+    llm_config = cast(LLMConfig, parameters.get("llm", workflow.default_llm))
     lm = node_llm_config_to_dspy_lm(llm_config)
 
     dspy.settings.configure(experimental=True)
@@ -99,13 +103,17 @@ def parse_signature(
         PredictWithMetadata.__init__(self, module)
         self.set_lm(lm=lm)
         self._node_id = node_id
-        if component.demonstrations and component.demonstrations.inline:
-            demos: List[Dict[str, Any]] = transpose_inline_dataset_to_object_list(
-                component.demonstrations.inline
-            )
-            self.demos = demos
-        else:
-            self.demos = []
+
+        demonstrations = cast(NodeDataset, parameters.get("demonstrations"))
+        demos: List[Dict[str, Any]] = []
+        if demonstrations and demonstrations.inline:
+            demos = transpose_inline_dataset_to_object_list(demonstrations.inline)
+
+        # TODO: find a better way to assign demos also to CoT and other prompting techniques
+        try:
+            module.demos = demos  # type: ignore
+        except:
+            module._predict.demos = demos  # type: ignore
 
     ModuleClass: type[PredictWithMetadata] = type(
         class_name, (PredictWithMetadata,), {"__init__": __init__}
@@ -162,12 +170,10 @@ def parse_retriever(
 def parse_fields(fields: List[Field], autoparse=True) -> Dict[str, Any]:
     return {
         field.identifier: (
-            autoparse_field_value(field, field.defaultValue)
-            if autoparse
-            else field.defaultValue
+            autoparse_field_value(field, field.value) if autoparse else field.value
         )
         for field in fields
-        if field.defaultValue
+        if field.value
     }
 
 
@@ -205,6 +211,10 @@ def autoparse_field_value(field: Field, value: Optional[Any]) -> Optional[Any]:
         ]
     if field.type == FieldType.llm:
         return LLMConfig.model_validate(value)
+    if field.type == FieldType.prompting_technique:
+        return NodeRef.model_validate(value)
+    if field.type == FieldType.dataset:
+        return NodeDataset.model_validate(value)
     return value
 
 

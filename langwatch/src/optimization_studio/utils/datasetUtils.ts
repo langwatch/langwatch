@@ -50,6 +50,8 @@ const fieldToColumnTypeMap: Record<Field["type"], DatasetColumnType> = {
   dict: "json",
   signature: "string",
   llm: "string",
+  prompting_technique: "string",
+  dataset: "string",
 };
 
 const columnTypeToFieldTypeMap: Record<DatasetColumnType, Field["type"]> = {

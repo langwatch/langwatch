@@ -40,7 +40,7 @@ import { api } from "../../utils/api";
 import { useEvaluationExecution } from "../hooks/useEvaluationExecution";
 import { useOptimizationExecution } from "../hooks/useOptimizationExecution";
 import { useWorkflowStore } from "../hooks/useWorkflowStore";
-import type { Signature } from "../types/dsl";
+import type { Field, Signature } from "../types/dsl";
 import { simpleRecordListToNodeDataset } from "../utils/datasetUtils";
 import {
   EvaluationProgressBar,
@@ -354,8 +354,25 @@ export function LoadedOptimizationResults({
             // deep clone the node data
             data: JSON.parse(JSON.stringify(node.data)),
           } as Node<Signature>;
+
+          const setNodeParameter = (
+            identifier: string,
+            value: Omit<Field, "value"> & { value?: any }
+          ) => {
+            const existingParameter = node_.data.parameters?.find(
+              (p) => p.identifier === identifier
+            );
+            if (existingParameter) {
+              node_.data.parameters = node_.data.parameters?.map((p) =>
+                p.identifier === identifier ? { ...p, value } : p
+              );
+            } else {
+              node_.data.parameters = [...(node_.data.parameters ?? []), value];
+            }
+          };
+
           if (optimization.demonstrations) {
-            node_.data.demonstrations = simpleRecordListToNodeDataset(
+            const demonstrations = simpleRecordListToNodeDataset(
               Object.values(optimization.demonstrations).map((demonstration) =>
                 Object.fromEntries(
                   Object.entries(demonstration).filter(
@@ -364,9 +381,18 @@ export function LoadedOptimizationResults({
                 )
               )
             );
+            setNodeParameter("demonstrations", {
+              identifier: "demonstrations",
+              type: "dataset",
+              value: demonstrations,
+            });
           }
-          if (optimization.prompt) {
-            node_.data.prompt = optimization.prompt;
+          if (optimization.instructions) {
+            setNodeParameter("instructions", {
+              identifier: "instructions",
+              type: "str",
+              value: optimization.instructions,
+            });
           }
           const optimizedFieldsByIdentifier = Object.fromEntries(
             optimization.fields?.map((field) => [field.identifier, field]) ?? []

@@ -43,22 +43,12 @@ export const addEnvs = async (
     api_key: apiKey,
     default_llm: default_llm,
     nodes: event.payload.workflow.nodes.map((node) => {
-      if ("llm" in node.data && node.data.llm) {
-        return {
-          ...node,
-          data: {
-            ...node.data,
-            llm: addLiteLLMParams(node.data.llm, modelProviders),
-          },
-        };
-      }
-
       const parameters = node.data.parameters?.map((p) => {
         if (p.type === "llm") {
           return {
             ...p,
-            defaultValue: p.defaultValue
-              ? addLiteLLMParams(p.defaultValue, modelProviders)
+            value: p.value
+              ? addLiteLLMParams(p.value as LLMConfig, modelProviders)
               : default_llm,
           };
         }
