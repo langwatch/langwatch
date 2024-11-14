@@ -1,0 +1,1 @@
+../../../langwatch/langwatch/prisma/migrations/20241114114706_add_component_boolen_to_workflow/migration.sql
