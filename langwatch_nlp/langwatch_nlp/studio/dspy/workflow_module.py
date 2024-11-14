@@ -143,7 +143,11 @@ class WorkflowModule(ReportingModule):
                 for node in executable_nodes:
                     if node.id not in executed_nodes and has_all_inputs(node):
                         start_time = time.time()
-                        result = self.execute_node(node, node_outputs, inputs) or {}
+                        try:
+                            result = self.execute_node(node, node_outputs, inputs) or {}
+                        except Exception as e:
+                            print(f"Error executing node {node.id}:", e)
+                            raise e
                         duration += round((time.time() - start_time) * 1000)
                         cost += result.get_cost() if hasattr(result, "get_cost") else 0  # type: ignore
                         node_outputs[node.id] = result  # type: ignore

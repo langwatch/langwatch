@@ -1,5 +1,6 @@
 import json
 from typing import Any, Dict, List, Optional, Union, cast
+from langwatch_nlp.studio.dspy.llm_node import LLMNode
 from langwatch_nlp.studio.dspy.predict_with_metadata import PredictWithMetadata
 from langwatch_nlp.studio.dspy.retrieve import ContextsRetriever
 from langwatch_nlp.studio.modules.evaluators.langwatch import LangWatchEvaluator
@@ -97,29 +98,12 @@ def parse_signature(
     llm_config = cast(LLMConfig, parameters.get("llm", workflow.default_llm))
     lm = node_llm_config_to_dspy_lm(llm_config)
 
-    dspy.settings.configure(experimental=True)
+    demonstrations = cast(NodeDataset, parameters.get("demonstrations"))
+    demos: List[Dict[str, Any]] = []
+    if demonstrations and demonstrations.inline:
+        demos = transpose_inline_dataset_to_object_list(demonstrations.inline)
 
-    def __init__(self, module: dspy.Module) -> None:
-        PredictWithMetadata.__init__(self, module)
-        self.set_lm(lm=lm)
-        self._node_id = node_id
-
-        demonstrations = cast(NodeDataset, parameters.get("demonstrations"))
-        demos: List[Dict[str, Any]] = []
-        if demonstrations and demonstrations.inline:
-            demos = transpose_inline_dataset_to_object_list(demonstrations.inline)
-
-        # TODO: find a better way to assign demos also to CoT and other prompting techniques
-        try:
-            module.demos = demos  # type: ignore
-        except:
-            module._predict.demos = demos  # type: ignore
-
-    ModuleClass: type[PredictWithMetadata] = type(
-        class_name, (PredictWithMetadata,), {"__init__": __init__}
-    )
-
-    return ModuleClass(predict)
+    return LLMNode(node_id=node_id, predict=predict, lm=lm, demos=demos)
 
 
 def parse_prompting_technique(

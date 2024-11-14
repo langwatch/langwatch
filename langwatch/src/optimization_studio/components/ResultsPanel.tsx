@@ -357,17 +357,17 @@ export function LoadedOptimizationResults({
 
           const setNodeParameter = (
             identifier: string,
-            value: Omit<Field, "value"> & { value?: any }
+            field: Omit<Field, "value"> & { value?: any }
           ) => {
             const existingParameter = node_.data.parameters?.find(
               (p) => p.identifier === identifier
             );
             if (existingParameter) {
               node_.data.parameters = node_.data.parameters?.map((p) =>
-                p.identifier === identifier ? { ...p, value } : p
+                p.identifier === identifier ? { ...p, ...field } : p
               );
             } else {
-              node_.data.parameters = [...(node_.data.parameters ?? []), value];
+              node_.data.parameters = [...(node_.data.parameters ?? []), field];
             }
           };
 
