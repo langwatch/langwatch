@@ -939,7 +939,8 @@ export const RunDetails = React.memo(
                   ) : dspyStep.data ? (
                     dspyStep.data.llm_calls.map((llmCall, index) => {
                       const response =
-                        llmCall.response?.choices?.[0]?.message?.content;
+                        llmCall.response?.choices?.[0]?.message?.content ??
+                        llmCall.response?.output;
                       return (
                         <Tr key={index}>
                           <Td background="gray.50" textAlign="center">
@@ -1351,11 +1352,7 @@ export function DSPyExperimentSummary({
       </VStack>
       <Spacer />
       {onViewLogs && (
-        <Button
-          size="sm"
-          onClick={onViewLogs}
-          variant="ghost"
-        >
+        <Button size="sm" onClick={onViewLogs} variant="ghost">
           View Logs
         </Button>
       )}

@@ -33,7 +33,7 @@ import {
 } from "../../../server/modelProviders/llmModelCost";
 import { getPayloadSizeHistogram } from "../../../server/metrics";
 
-export const debug = getDebugger("langwatch:dspy:log_steps");
+export const debug = getDebugger("langwatch:dspy_log_steps");
 
 export const config = {
   api: {
@@ -126,7 +126,12 @@ export default async function handler(
         debug(
           "Internal server error processing DSPy step",
           error,
-          JSON.stringify(param, null, "  ")
+          JSON.stringify(param, null, "  ").slice(0, 1000)
+        );
+        console.log(
+          "Internal server error processing DSPy step",
+          error,
+          JSON.stringify(param, null, "  ").slice(0, 1000)
         );
         Sentry.captureException(error, {
           extra: { projectId: project.id, param },
@@ -157,6 +162,7 @@ const processDSPyStep = async (project: Project, param: DSPyStepRESTParams) => {
 
   const llmModelCosts = await getLLMModelCosts({ projectId: project.id });
 
+  let totalSize = 0;
   const dspyStep: DSPyStep = {
     ...param,
     experiment_id: experiment.id,
@@ -175,7 +181,18 @@ const processDSPyStep = async (project: Project, param: DSPyStepRESTParams) => {
         ...call,
         hash: generateHash(call),
       }))
-      .map(extractLLMCallInfo(llmModelCosts)),
+      .map(extractLLMCallInfo(llmModelCosts))
+      .map((llmCall) => {
+        if (llmCall.response?.output) {
+          delete llmCall.response.choices;
+        }
+        totalSize += JSON.stringify(llmCall).length;
+        if (totalSize >= 256_000 && llmCall.response) {
+          llmCall.response.output = "[truncated]";
+          llmCall.response.messages = [];
+        }
+        return llmCall;
+      }),
   };
 
   // To guarantee no extra keys

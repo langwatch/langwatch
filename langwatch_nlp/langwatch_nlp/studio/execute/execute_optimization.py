@@ -139,6 +139,7 @@ async def execute_optimization(
                 task_model=lm,
                 prompt_model=lm,
                 teacher_settings=dict(lm=lm),
+                num_threads=params.get("num_threads", 6),
             )
         elif event.optimizer == "BootstrapFewShotWithRandomSearch":
             optimizer = dspy.BootstrapFewShotWithRandomSearch(
@@ -147,6 +148,7 @@ async def execute_optimization(
                 max_labeled_demos=params.get("max_labeled_demos", 16),
                 max_rounds=params.get("max_rounds", 1),
                 num_candidate_programs=params.get("num_candidate_programs", 10),
+                num_threads=params.get("num_threads", 6),
             )
             patch_labeled_few_shot_once()
 
