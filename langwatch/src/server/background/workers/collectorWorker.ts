@@ -257,11 +257,6 @@ const processCollectorJob_ = async (
       .reverse(),
   };
 
-  if (!existingTrace?.inserted_at) {
-    const delay = trace.timestamps.inserted_at - data.collectedAt;
-    collectorIndexDelayHistogram.observe(delay);
-  }
-
   if (!process.env.DISABLE_PII_REDACTION) {
     const piiEnforced = env.NODE_ENV === "production";
     await cleanupPIIs(trace, esSpans, {
@@ -376,6 +371,11 @@ const processCollectorJob_ = async (
     },
     refresh: true,
   });
+
+  if (!existingTrace?.inserted_at) {
+    const delay = Date.now() - data.collectedAt;
+    collectorIndexDelayHistogram.observe(delay);
+  }
 
   void markProjectFirstMessage(project);
 
