@@ -27,16 +27,10 @@ This is the private SaaS version of LangWatch protected by copyright. No copy, m
 
 1. Install AWS cli and setup `~/.aws/credentials` file
 2. Install SSM [Session Manager plugin](https://docs.aws.amazon.com/systems-manager/latest/userguide/session-manager-working-with-install-plugin.html)
-3. Run the following cli command in a terminal and keep it open for Postgres (this will create a session with the bastion ec2 instance and port forward to the rds instance, using port 5433 locally to not conflict with the locally running postgres instance)
+3. Run the following cli command in a terminal and keep it open for Postgres (this will create a session with the bastion ec2 instance and port forward to the rds instance, using port 5433 locally to not conflict with the locally running postgres instance) and redis (we use port 6378 localy to not conflict with the locally running redis):
 
 ```shell
-aws ssm start-session --region eu-central-1 --target i-00a6de26faec3abcd --document-name AWS-StartPortForwardingSessionToRemoteHost --parameters host="langwatch-pg.cfu2ksege2c2.eu-central-1.rds.amazonaws.com",portNumber="5432",localPortNumber="5433" --profile lw-prod
-```
-
-4. Run the following one for redis (we use port 6378 localy to not conflict with the locally running redis):
-
-```shell
-aws ssm start-session --region eu-central-1 --target i-00a6de26faec3abcd  --document-name AWS-StartPortForwardingSessionToRemoteHost --parameters host="master.langwatch-redis-replication-group.ulyeig.euc1.cache.amazonaws.com",portNumber="6379",localPortNumber="6378"  --profile lw-prod
+npm run prod:forward
 ```
 
 # Cloud Infrastructure
