@@ -37,7 +37,9 @@ export function DemonstrationsModal({
       ...(node.data.outputs ?? []),
     ]);
 
-    let demonstrations = (node.data as Signature).demonstrations;
+    let demonstrations = (node.data as Signature).parameters?.find(
+      (p) => p.identifier === "demonstrations"
+    )?.value as NodeDataset | undefined;
     if (
       !demonstrations?.inline ||
       Object.keys(demonstrations.inline.records).length === 0
@@ -64,22 +66,22 @@ export function DemonstrationsModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
 
-  const { setNode } = useWorkflowStore(({ setNode }) => ({ setNode }));
+  const { setNodeParameter } = useWorkflowStore(({ setNodeParameter }) => ({
+    setNodeParameter,
+  }));
 
   const setSelectedDataset = useCallback(
     (dataset: NodeDataset, _columnTypes: DatasetColumns, close: boolean) => {
-      setNode({
-        id: node.id,
-        data: {
-          ...node.data,
-          demonstrations: dataset,
-        } as Signature,
+      setNodeParameter(node.id, {
+        identifier: "demonstrations",
+        type: "dataset",
+        value: dataset,
       });
       if (close) {
         onClose();
       }
     },
-    [node.data, node.id, setNode, onClose]
+    [node.data, node.id, setNodeParameter, onClose]
   );
 
   return (

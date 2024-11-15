@@ -21,9 +21,9 @@ export function EvaluatorPropertiesPanel({ node }: { node: Node<Evaluator> }) {
   const form = useForm({
     defaultValues: {
       settings: Object.fromEntries(
-        (node.data.parameters ?? []).map(({ identifier, defaultValue }) => [
+        (node.data.parameters ?? []).map(({ identifier, value }) => [
           identifier,
-          defaultValue,
+          value,
         ])
       ),
     },
@@ -80,7 +80,7 @@ export function EvaluatorPropertiesPanel({ node }: { node: Node<Evaluator> }) {
               ({
                 identifier,
                 type: "str",
-                defaultValue: value,
+                value: value,
               }) as Field
           ),
         },

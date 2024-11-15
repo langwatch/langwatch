@@ -16,6 +16,10 @@ import {
   Text,
   VStack,
   useToast,
+  Alert,
+  AlertIcon,
+  FormErrorMessage,
+  FormControl,
 } from "@chakra-ui/react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import React, { useCallback } from "react";
@@ -35,21 +39,17 @@ import {
   ModelSelector,
   modelSelectorOptions,
 } from "../../components/ModelSelector";
+import {
+  allowedTopicClusteringModels,
+  allowedEmbeddingsModels,
+} from "../../server/topicClustering/types";
 import { modelProviderIcons } from "../../server/modelProviders/iconsMap";
-
-const allowedTopicClusteringModels = modelSelectorOptions
-  .filter((option) => option.mode === "chat")
-  .map((option) => option.value);
-
-const allowedEmbeddingsModels = modelSelectorOptions
-  .filter((option) => option.mode === "embedding")
-  .map((option) => option.value);
 
 import models from "../../../../models.json";
 
 import CreatableSelect from "react-select/creatable";
 
-const getProviderModelOptions = (
+export const getProviderModelOptions = (
   provider: string,
   mode: "chat" | "embedding"
 ) => {
@@ -348,7 +348,10 @@ function ModelProviderForm({
     ]
   );
 
-  const providerKeys = providerDefinition.keysSchema.shape;
+  const providerKeys =
+    "shape" in providerDefinition.keysSchema
+      ? providerDefinition.keysSchema.shape
+      : providerDefinition.keysSchema._def.schema.shape;
   const useCustomKeys = watch("useCustomKeys");
 
   return (
@@ -395,41 +398,47 @@ function ModelProviderForm({
                 Use custom settings
               </Checkbox>
             </HStack>
+
             {useCustomKeys && (
               <>
-                <Grid
-                  templateColumns="auto auto"
-                  gap={4}
-                  rowGap={2}
-                  paddingTop={4}
-                  width="full"
-                >
-                  <GridItem color="gray.500">
-                    <SmallLabel>Key</SmallLabel>
-                  </GridItem>
-                  <GridItem color="gray.500">
-                    <SmallLabel>Value</SmallLabel>
-                  </GridItem>
-                  {Object.keys(providerKeys).map((key) => (
-                    <React.Fragment key={key}>
-                      <GridItem alignContent="center" fontFamily="monospace">
-                        {key}
-                      </GridItem>
-                      <GridItem>
-                        <Input
-                          {...register(`customKeys.${key}`)}
-                          placeholder={
-                            (providerDefinition.keysSchema.shape as any)[key]
-                              ._def.typeName === "ZodOptional"
-                              ? "optional"
-                              : undefined
-                          }
-                          isInvalid={!!formState.errors.customKeys?.[key]}
-                        />
-                      </GridItem>
-                    </React.Fragment>
-                  ))}
-                </Grid>
+                <FormControl isInvalid={!!formState.errors.customKeys}>
+                  <Grid
+                    templateColumns="auto auto"
+                    gap={4}
+                    rowGap={2}
+                    paddingTop={4}
+                    width="full"
+                  >
+                    <GridItem color="gray.500">
+                      <SmallLabel>Key</SmallLabel>
+                    </GridItem>
+                    <GridItem color="gray.500">
+                      <SmallLabel>Value</SmallLabel>
+                    </GridItem>
+                    {Object.keys(providerKeys).map((key) => (
+                      <React.Fragment key={key}>
+                        <GridItem alignContent="center" fontFamily="monospace">
+                          {key}
+                        </GridItem>
+                        <GridItem>
+                          <Input
+                            {...register(`customKeys.${key}`)}
+                            placeholder={
+                              (providerKeys as any)[key]._def.typeName ===
+                              "ZodOptional"
+                                ? "optional"
+                                : undefined
+                            }
+                            isInvalid={!!formState.errors.customKeys?.[key]}
+                          />
+                        </GridItem>
+                      </React.Fragment>
+                    ))}
+                  </Grid>
+                  <FormErrorMessage>
+                    {formState.errors.customKeys?.root?.message}
+                  </FormErrorMessage>
+                </FormControl>
 
                 <VStack width="full" spacing={4}>
                   <Box width="full">
@@ -486,6 +495,13 @@ function ModelProviderForm({
                     Save
                   </Button>
                 </HStack>
+                {provider.provider === "custom" && (
+                  <Alert status="info">
+                    <AlertIcon />
+                    Custom provider supports only OpenAI compatible endpoints,
+                    contact support if you have a custom format.
+                  </Alert>
+                )}
               </>
             )}
           </VStack>

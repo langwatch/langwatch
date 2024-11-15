@@ -21,6 +21,7 @@ import type {
   Component,
   ComponentType,
   Field,
+  LLMConfig,
   Workflow,
 } from "../../types/dsl";
 import { ComponentIcon } from "../ColorfulBlockIcons";
@@ -298,14 +299,14 @@ export function FieldsForm({
             <LLMConfigField
               allowDefault={true}
               defaultLLMConfig={default_llm}
-              llmConfig={node.data.parameters?.[index]?.defaultValue}
+              llmConfig={node.data.parameters?.[index]?.value as LLMConfig}
               onChange={(llmConfig) => {
                 setNode({
                   id: node.id,
                   data: {
                     parameters: node.data.parameters?.map((p) =>
                       p.identifier === field.identifier
-                        ? { ...p, defaultValue: llmConfig }
+                        ? { ...p, value: llmConfig }
                         : p
                     ),
                   },
@@ -343,13 +344,13 @@ export function FieldsForm({
                     type="number"
                     step={field.type === "float" ? "0.1" : undefined}
                     size="sm"
-                    {...control.register(`fields.${index}.defaultValue`)}
+                    {...control.register(`fields.${index}.value`)}
                   />
                 ) : (
                   <Input
                     type="text"
                     size="sm"
-                    {...control.register(`fields.${index}.defaultValue`)}
+                    {...control.register(`fields.${index}.value`)}
                   />
                 )}
               </HStack>

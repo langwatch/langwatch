@@ -14,9 +14,11 @@ export type Field = {
     | "list[bool]"
     | "dict"
     | "signature"
-    | "llm";
+    | "llm"
+    | "prompting_technique"
+    | "dataset";
   optional?: boolean;
-  defaultValue?: any;
+  value?: unknown;
   desc?: string;
   prefix?: string;
   hidden?: boolean;
@@ -46,10 +48,6 @@ export type BaseComponent = {
   parameters?: Field[];
   inputs?: Field[];
   outputs?: Field[];
-  decorated_by?: {
-    ref: string;
-  };
-
   execution_state?: {
     status: ExecutionStatus;
     trace_id?: string;
@@ -73,11 +71,7 @@ export type LLMConfig = {
   litellm_params?: Record<string, string>;
 };
 
-export type Signature = BaseComponent & {
-  prompt?: string;
-  llm?: LLMConfig;
-  demonstrations?: NodeDataset;
-};
+export type Signature = BaseComponent;
 
 export type Module = BaseComponent & {
   components?: Flow["nodes"];
@@ -130,7 +124,7 @@ type Flow = {
 };
 
 export type Workflow = {
-  spec_version: "1.1";
+  spec_version: "1.2";
   workflow_id?: string;
 
   name: string;
@@ -172,6 +166,7 @@ export type Workflow = {
       experiment_slug?: string;
       run_id?: string;
       status?: ExecutionStatus;
+      stdout?: string;
       error?: string;
       timestamps?: {
         started_at?: number;
@@ -228,8 +223,30 @@ const LLMSignatureFlow: Flow = {
       },
       data: {
         name: "GenerateQuery",
-        prompt: undefined,
-        llm: undefined,
+        parameters: [
+          {
+            identifier: "prompt",
+            type: "str",
+            value: "",
+          },
+          {
+            identifier: "llm",
+            type: "llm",
+            value: undefined,
+          },
+          {
+            identifier: "prompting_technique",
+            type: "prompting_technique",
+            value: {
+              ref: "chain_of_thought_1",
+            },
+          },
+          {
+            identifier: "demonstrations",
+            type: "dataset",
+            value: undefined,
+          },
+        ],
         inputs: [
           {
             identifier: "question",
@@ -242,9 +259,6 @@ const LLMSignatureFlow: Flow = {
             type: "str",
           },
         ],
-        decorated_by: {
-          ref: "ChainOfThought-1",
-        },
       },
     },
     {
@@ -262,7 +276,7 @@ const LLMSignatureFlow: Flow = {
           {
             identifier: "url",
             type: "str",
-            defaultValue: "http://0.0.0.0",
+            value: "http://0.0.0.0",
           },
         ],
         inputs: [
@@ -307,8 +321,25 @@ const LLMSignatureFlow: Flow = {
       },
       data: {
         name: "GenerateAnswer",
-        prompt: undefined,
-        llm: undefined,
+        parameters: [
+          {
+            identifier: "prompt",
+            type: "str",
+            value: "",
+          },
+          {
+            identifier: "llm",
+            type: "llm",
+            value: undefined,
+          },
+          {
+            identifier: "prompting_technique",
+            type: "prompting_technique",
+            value: {
+              ref: "chain_of_thought_2",
+            },
+          },
+        ],
         inputs: [
           {
             identifier: "question",
@@ -325,9 +356,6 @@ const LLMSignatureFlow: Flow = {
             type: "str",
           },
         ],
-        decorated_by: {
-          ref: "chain_of_thought_2",
-        },
       },
     },
   ],

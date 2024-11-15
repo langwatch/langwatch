@@ -81,6 +81,7 @@ export const useOptimizationExecution = () => {
       setOptimizationState({
         status: "waiting",
         run_id,
+        stdout: "",
       });
 
       const payload: StudioClientEvent = {

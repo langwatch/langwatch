@@ -77,8 +77,10 @@ export const modelProviderRouter = createTRPCRouter({
           where: { id: existingModelProvider.id, projectId },
           data: {
             ...data,
-            customModels: customModels ?? undefined,
-            customEmbeddingsModels: customEmbeddingsModels ?? undefined,
+            customModels: customModels ? customModels : [],
+            customEmbeddingsModels: customEmbeddingsModels
+              ? customEmbeddingsModels
+              : [],
           },
         });
       } else {
@@ -193,8 +195,22 @@ export const prepareEnvKeys = (modelProvider: MaybeStoredModelProvider) => {
   // TODO: add AZURE_DEPLOYMENT_NAME and AZURE_EMBEDDINGS_DEPLOYMENT_NAME for deployment name mapping
 
   return Object.fromEntries(
-    Object.keys(providerDefinition.keysSchema.shape)
+    Object.keys(
+      ("innerType" in providerDefinition.keysSchema
+        ? providerDefinition.keysSchema.innerType()
+        : providerDefinition.keysSchema
+      ).shape
+    )
       .map((key) => [key, getModelOrDefaultEnvKey(modelProvider, key)])
+      .map(([key, value]) => {
+        if (key === "CUSTOM_API_KEY") {
+          return ["OPENAI_API_KEY", value];
+        }
+        if (key === "CUSTOM_BASE_URL") {
+          return ["OPENAI_BASE_URL", value];
+        }
+        return [key, value];
+      })
       .filter(([_key, value]) => !!value)
   );
 };
@@ -222,7 +238,7 @@ export const prepareLitellmParams = (
       getModelOrDefaultEnvKey(modelProvider, "VERTEXAI_LOCATION") ?? "invalid";
   }
 
-  params.model = model;
+  params.model = model.replace("custom/", "openai/");
 
   // TODO: add azure deployment as params.model as azure/<deployment-name>
 

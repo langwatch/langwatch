@@ -2,7 +2,7 @@ import { DEFAULT_DATASET_NAME } from "../../components/datasets/DatasetTable";
 import type { End, Entry, Evaluator, Retriever, Workflow } from "../types/dsl";
 
 export const simpleRagTemplate: Workflow = {
-  spec_version: "1.1",
+  spec_version: "1.2",
   name: "Simple RAG",
   icon: "🧩",
   description:
@@ -216,8 +216,29 @@ export const simpleRagTemplate: Workflow = {
       position: { x: 300, y: 30 },
       data: {
         name: "GenerateQuery",
-        prompt:
-          "given the question, generate a short wikipedia search query to find info about it",
+        parameters: [
+          {
+            identifier: "llm",
+            type: "llm",
+            value: undefined,
+          },
+          {
+            identifier: "prompting_technique",
+            type: "prompting_technique",
+            value: undefined,
+          },
+          {
+            identifier: "instructions",
+            type: "str",
+            value:
+              "given the question, generate a short wikipedia search query to find info about it",
+          },
+          {
+            identifier: "demonstrations",
+            type: "dataset",
+            value: undefined,
+          },
+        ],
         inputs: [{ identifier: "question", type: "str" }],
         outputs: [{ identifier: "query", type: "str" }],
       },
@@ -234,13 +255,13 @@ export const simpleRagTemplate: Workflow = {
             identifier: "k",
             desc: "Number of contexts to retrieve",
             type: "int",
-            defaultValue: 3,
+            value: 3,
           },
           {
             identifier: "url",
             desc: "URL of the ColBERTv2 index",
             type: "str",
-            defaultValue: "http://20.102.90.50:2017/wiki17_abstracts",
+            value: "http://20.102.90.50:2017/wiki17_abstracts",
           },
         ],
         inputs: [
@@ -263,6 +284,28 @@ export const simpleRagTemplate: Workflow = {
       position: { x: 900, y: 10 },
       data: {
         name: "GenerateAnswer",
+        parameters: [
+          {
+            identifier: "llm",
+            type: "llm",
+            value: undefined,
+          },
+          {
+            identifier: "prompting_technique",
+            type: "prompting_technique",
+            value: undefined,
+          },
+          {
+            identifier: "instructions",
+            type: "str",
+            value: undefined,
+          },
+          {
+            identifier: "demonstrations",
+            type: "dataset",
+            value: undefined,
+          },
+        ],
         inputs: [
           { identifier: "question", type: "str" },
           { identifier: "contexts", type: "list[str]" },

@@ -33,6 +33,7 @@ import { allModelOptions, ModelSelector } from "../ModelSelector";
 import { SmallLabel } from "../SmallLabel";
 import type { CheckConfigFormData } from "./CheckConfigForm";
 import { PropertySectionTitle } from "../../optimization_studio/components/properties/BasePropertiesPanel";
+import { allowedEmbeddingsModels } from "../../server/topicClustering/types";
 
 const DynamicZodForm = ({
   schema,
@@ -125,6 +126,11 @@ const DynamicZodForm = ({
         (fieldName === "model" || fieldName === "embeddings_model") &&
         evaluator?.name !== "OpenAI Moderation"
       ) {
+        const selectorOptions =
+          fieldName === "model"
+            ? options.map((option: { value: string }) => option.value)
+            : allowedEmbeddingsModels;
+
         return (
           <Controller
             name={fullPath}
@@ -132,9 +138,7 @@ const DynamicZodForm = ({
             render={({ field }) => (
               <>
                 <ModelSelector
-                  options={options.map(
-                    (option: { value: string }) => option.value
-                  )}
+                  options={selectorOptions}
                   model={field.value}
                   onChange={(model) => field.onChange(model)}
                   mode={fieldName === "model" ? "chat" : "embedding"}

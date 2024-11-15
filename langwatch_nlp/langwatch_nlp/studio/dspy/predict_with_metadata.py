@@ -23,19 +23,18 @@ class PredictionWithMetadata(dspy.Prediction):
         return self._duration or 0
 
 
-class PredictWithMetadata(dspy.Module):
-    def __init__(
-        self, module: dspy.Module, error: Optional[Exception] = None, **kwargs
-    ):
-        super().__init__()
-        self._module = module
-        self._cost = 0
-        self._duration = 0
+class PredictWithMetadata(dspy.Predict):
+    _cost = 0
+    _duration = 0
+    _error: Optional[Exception] = None
+
+    def __init__(self, *args, error: Optional[Exception] = None, **kwargs):
+        super().__init__(*args, **kwargs)
         self._error = error
 
     def forward(self, *args, **kwargs):
         start_time = time.time()
-        response = self._module(*args, **kwargs)
+        response = super().forward(*args, **kwargs)
         duration = round((time.time() - start_time) * 1000)
 
         dspy.settings.configure(experimental=True)

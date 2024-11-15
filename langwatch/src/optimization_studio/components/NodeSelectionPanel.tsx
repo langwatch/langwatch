@@ -159,11 +159,11 @@ export const NodeDraggable = (props: {
   component: Component;
   type: ComponentType;
 }) => {
-  const { setNodes, setNode, deleteNode, nodes } = useWorkflowStore(
+  const { setNodes, setNodeParameter, deleteNode, nodes } = useWorkflowStore(
     (state) => ({
       setWorkflow: state.setWorkflow,
       setNodes: state.setNodes,
-      setNode: state.setNode,
+      setNodeParameter: state.setNodeParameter,
       deleteNode: state.deleteNode,
       nodes: state.nodes,
       propertiesExpanded: state.propertiesExpanded,
@@ -209,17 +209,20 @@ export const NodeDraggable = (props: {
       setNodes([...nodes, newNode]);
 
       const currentNode = nodes.find((node) => node.id === id);
-      if (currentNode?.data.decorated_by) {
-        deleteNode(currentNode.data.decorated_by.ref);
+      for (const parameter of currentNode?.data.parameters ?? []) {
+        if (parameter.type === "prompting_technique") {
+          if (parameter.value) {
+            deleteNode((parameter.value as { ref: string }).ref);
+          }
+          setNodeParameter(id, {
+            identifier: parameter.identifier,
+            type: "prompting_technique",
+            value: {
+              ref: newNode.id,
+            },
+          });
+        }
       }
-      setNode({
-        id,
-        data: {
-          decorated_by: {
-            ref: newNode.id,
-          },
-        },
-      });
     }
   };
 

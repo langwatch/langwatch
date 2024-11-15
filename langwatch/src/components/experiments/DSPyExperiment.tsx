@@ -186,11 +186,13 @@ export const useDSPyExperimentState = ({
   experiment,
   selectedRuns,
   setSelectedRuns,
+  incomingRunIds = [],
 }: {
   project: Project;
   experiment: Experiment;
   selectedRuns?: string[];
   setSelectedRuns?: (runs: string[]) => void;
+  incomingRunIds?: string[];
 }) => {
   const dspyRuns = api.experiments.getExperimentDSPyRuns.useQuery(
     {
@@ -208,17 +210,16 @@ export const useDSPyExperimentState = ({
   const [highlightedRun, setHighlightedRun] = useState<string | null>(null);
 
   const selectedRuns_ = useMemo(() => {
-    const selectedRuns_ =
+    let selectedRuns_ =
       selectedRuns ??
       (typeof router.query.runIds === "string"
         ? router.query.runIds.split(",")
         : null);
-    return !selectedRuns_ || selectedRuns_.length === 0
-      ? dspyRuns.data?.[0]?.runId
-        ? [dspyRuns.data[0].runId]
-        : []
-      : selectedRuns_;
-  }, [dspyRuns.data, router.query.runIds, selectedRuns]);
+    if (!selectedRuns_ || selectedRuns_.length === 0) {
+      selectedRuns_ = dspyRuns.data?.[0]?.runId ? [dspyRuns.data[0].runId] : [];
+    }
+    return selectedRuns_;
+  }, [dspyRuns.data, router.query.runIds, selectedRuns, incomingRunIds]);
 
   const setSelectedRuns_ = useCallback(
     (runIds: string[]) => {
@@ -297,10 +298,9 @@ export const useDSPyExperimentState = ({
     )
   );
 
-  const nonMatchingRunIds =
-    selectedRuns_?.filter(
-      (runId) => !dspyRuns.data?.some((run) => run.runId === runId)
-    ) ?? [];
+  const nonMatchingRunIds = Array.from(
+    new Set([...selectedRuns_, ...incomingRunIds])
+  ).filter((runId) => !dspyRuns.data?.some((run) => run.runId === runId));
   const dspyRunsPlusIncoming =
     nonMatchingRunIds.length > 0
       ? ([{ runId: nonMatchingRunIds[0] }, ...(dspyRuns.data ?? [])] as ({
@@ -331,6 +331,7 @@ export function DSPyExperimentRunList({
   setHighlightedRun,
   dspyRunsPlusIncoming,
   size = "md",
+  incomingRunIds = [],
 }: {
   dspyRuns: UseTRPCQueryResult<
     inferRouterOutputs<AppRouter>["experiments"]["getExperimentDSPyRuns"],
@@ -345,6 +346,7 @@ export function DSPyExperimentRunList({
       } & Partial<DSPyRunsSummary>)[]
     | undefined;
   size?: "md" | "sm";
+  incomingRunIds?: string[];
 }) {
   return (
     <VStack
@@ -467,8 +469,13 @@ export function DSPyExperimentRunList({
                       }
                     />
                   )}
-                  <VStack align="start" spacing={0}>
-                    <HStack>
+                  <VStack
+                    width="full"
+                    align="start"
+                    spacing={0}
+                    paddingRight={2}
+                  >
+                    <HStack width="full">
                       {run.workflow_version && (
                         <Box
                           width="12px"
@@ -485,6 +492,12 @@ export function DSPyExperimentRunList({
                       <Text fontSize={size === "sm" ? "13px" : "14px"}>
                         {runName}
                       </Text>
+                      {(incomingRunIds ?? []).includes(run.runId) && (
+                        <>
+                          <Spacer />
+                          <Spinner size="xs" />
+                        </>
+                      )}
                     </HStack>
 
                     <HStack
@@ -1257,6 +1270,7 @@ export function DSPyExperimentSummary({
   experiment,
   run,
   onApply,
+  onViewLogs,
 }: {
   project: Project;
   experiment: Experiment;
@@ -1269,6 +1283,7 @@ export function DSPyExperimentSummary({
       >[number]
     | undefined;
   onApply?: (appliedOptimizations: AppliedOptimization[]) => void;
+  onViewLogs?: () => void;
 }) {
   const { totalCost, bestScore, bestScoreStepSummary, bestScoreLabel } =
     useMemo(() => {
@@ -1335,6 +1350,15 @@ export function DSPyExperimentSummary({
         </Text>
       </VStack>
       <Spacer />
+      {onViewLogs && (
+        <Button
+          size="sm"
+          onClick={onViewLogs}
+          variant="ghost"
+        >
+          View Logs
+        </Button>
+      )}
       {bestScoreStep.data && onApply && (
         <ChakraTooltip label="Applies the optimization that resulted in the best score for this run to your workflow">
           <Button
@@ -1347,7 +1371,7 @@ export function DSPyExperimentSummary({
                 bestScoreStep.data.predictors.map((predictor) => {
                   const optimization: AppliedOptimization = {
                     id: predictor.name,
-                    prompt:
+                    instructions:
                       predictor.predictor.extended_signature?.instructions ??
                       predictor.predictor.signature?.instructions,
                     fields: Object.entries(

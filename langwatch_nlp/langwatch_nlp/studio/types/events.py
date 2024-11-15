@@ -6,6 +6,7 @@ from langwatch_nlp.studio.types.dsl import (
     EvaluationExecutionState,
     ExecutionState,
     ExecutionStatus,
+    LLMConfig,
     Node,
     OptimizationExecutionState,
     Timestamps,
@@ -77,6 +78,8 @@ class StopEvaluationExecution(BaseModel):
 
 
 class ExecuteOptimizationParams(BaseModel):
+    llm: Optional[LLMConfig] = None
+    num_candidates: Optional[int] = None
     max_bootstrapped_demos: Optional[int] = None
     max_labeled_demos: Optional[int] = None
     max_rounds: Optional[int] = None
@@ -87,7 +90,7 @@ class ExecuteOptimizationPayload(BaseModel):
     run_id: str
     workflow: Workflow
     workflow_version_id: str
-    optimizer: Literal["MIPROv2ZeroShot", "BootstrapFewShot", "BootstrapFewShotWithRandomSearch"]
+    optimizer: Literal["MIPROv2ZeroShot", "BootstrapFewShotWithRandomSearch", "MIPROv2"]
     params: ExecuteOptimizationParams
 
 

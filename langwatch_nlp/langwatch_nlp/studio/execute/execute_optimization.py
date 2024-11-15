@@ -1,4 +1,7 @@
+from contextlib import contextmanager
+from io import StringIO
 from multiprocessing import Queue
+import sys
 import time
 from typing import Optional, cast
 import dspy
@@ -105,9 +108,10 @@ async def execute_optimization(
             for index, entry in enumerate(entries)
         ]
 
-        train, _ = train_test_split(
+        train, test = train_test_split(
             examples,
-            train_size=train_size if is_percentage else int(train_size),
+            train_size=float(train_size) if is_percentage else int(train_size),
+            test_size=float(test_size) if is_percentage else int(test_size),
             random_state=(seed if seed >= 0 else None),
             shuffle=(seed >= 0),
         )
@@ -123,23 +127,21 @@ async def execute_optimization(
         langwatch.api_key = workflow.api_key
 
         params = event.params.model_dump(exclude_none=True)
-        if event.optimizer == "MIPROv2ZeroShot":
-            llm_config = workflow.default_llm
+        if event.optimizer == "MIPROv2ZeroShot" or event.optimizer == "MIPROv2":
+            llm_config = event.params.llm or workflow.default_llm
             lm = node_llm_config_to_dspy_lm(llm_config)
             # TODO: can we do it not globally? will this overwride the signature ones?
-            dspy.configure(lm=lm)
+            # dspy.configure(lm=lm)
 
-            optimizer = OPTIMIZERS[event.optimizer](
+            optimizer = dspy.MIPROv2(
                 metric=metric,
-                # TODO: allow to pass in those parameters
-                num_candidates=7,  # type: ignore
-                # teacher_settings=dict(lm=lm),
-                **params,
+                num_candidates=params.get("num_candidates", 7) + 1,  # type: ignore
+                task_model=lm,
+                prompt_model=lm,
+                teacher_settings=dict(lm=lm),
             )
-        else:
-            optimizer = OPTIMIZERS[event.optimizer](metric=metric, **params)
-
-        if event.optimizer == "BootstrapFewShotWithRandomSearch":
+        elif event.optimizer == "BootstrapFewShotWithRandomSearch":
+            optimizer = dspy.BootstrapFewShotWithRandomSearch(metric=metric, **params)
             patch_labeled_few_shot_once()
 
         langwatch.dspy.init(
@@ -151,21 +153,44 @@ async def execute_optimization(
             workflow_version_id=event.workflow_version_id,
         )
 
-        if event.optimizer == "MIPROv2ZeroShot":
-            optimizer = cast(MIPROv2, optimizer)
-            optimized_program = optimizer.compile(
-                module,
-                trainset=train,
-                max_bootstrapped_demos=0,
-                max_labeled_demos=0,
-                num_trials=15,
-                minibatch_size=25,
-                minibatch_full_eval_steps=10,
-                minibatch=False,
-                requires_permission_to_run=False,
-            )
-        else:
-            optimized_program = optimizer.compile(module, trainset=train)
+        with redirect_stdout_to_queue(queue, run_id):
+            if event.optimizer == "MIPROv2ZeroShot":
+                optimizer = cast(MIPROv2, optimizer)
+                optimized_program = optimizer.compile(
+                    module,
+                    trainset=train,
+                    valset=test,
+                    max_bootstrapped_demos=0,
+                    max_labeled_demos=0,
+                    num_trials=params.get("num_candidates", 7),
+                    minibatch_size=params.get("minibatch_size", 25),
+                    minibatch_full_eval_steps=params.get(
+                        "minibatch_full_eval_steps", 10
+                    ),
+                    minibatch=params.get("minibatch", False),
+                    requires_permission_to_run=False,
+                )
+            elif event.optimizer == "MIPROv2":
+                optimizer = cast(MIPROv2, optimizer)
+                optimized_program = optimizer.compile(
+                    module,
+                    trainset=train,
+                    valset=test,
+                    max_bootstrapped_demos=params.get("max_bootstrapped_demos", 4),
+                    max_labeled_demos=params.get("max_labeled_demos", 16),
+                    num_trials=params.get("num_trials", 30),
+                    minibatch_size=params.get("minibatch_size", 25),
+                    minibatch_full_eval_steps=params.get(
+                        "minibatch_full_eval_steps", 10
+                    ),
+                    minibatch=params.get("minibatch", False),
+                    requires_permission_to_run=False,
+                )
+            elif event.optimizer == "BootstrapFewShotWithRandomSearch":
+                optimizer = cast(dspy.BootstrapFewShotWithRandomSearch, optimizer)
+                optimized_program = optimizer.compile(
+                    module, trainset=train, valset=test
+                )
 
     except Exception as e:
         yield error_optimization_event(
@@ -175,6 +200,7 @@ async def execute_optimization(
         import traceback
 
         traceback.print_exc()
+        # TODO: report optimization as error
         # if valid:
         #     EvaluationReporting.post_results(
         #         workflow.api_key,
@@ -230,3 +256,43 @@ def error_optimization_event(run_id: str, error: str, stopped_at: Optional[int] 
             )
         )
     )
+
+
+class QueueWriter(StringIO):
+    def __init__(
+        self, queue: "Queue[StudioServerEvent]", run_id: str, original_stdout=None
+    ):
+        super().__init__()
+        self.queue = queue
+        self.run_id = run_id
+        self.original_stdout = original_stdout
+
+    def write(self, text: str):
+        if self.original_stdout:
+            self.original_stdout.write(text)
+
+        if text.strip():  # Only send non-empty lines
+            self.queue.put_nowait(
+                OptimizationStateChange(
+                    payload=OptimizationStateChangePayload(
+                        optimization_state=OptimizationExecutionState(
+                            status=ExecutionStatus.running,
+                            run_id=self.run_id,
+                            stdout=text,
+                        )
+                    )
+                )
+            )
+
+    def flush(self):
+        pass
+
+
+@contextmanager
+def redirect_stdout_to_queue(queue: "Queue[StudioServerEvent]", run_id: str):
+    stdout = sys.stdout
+    sys.stdout = QueueWriter(queue, run_id, original_stdout=stdout)
+    try:
+        yield
+    finally:
+        sys.stdout = stdout

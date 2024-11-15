@@ -208,7 +208,7 @@ export const workflowRouter = createTRPCRouter({
         },
       });
 
-      return version;
+      return { ...version, dsl };
     }),
 
   autosave: protectedProcedure

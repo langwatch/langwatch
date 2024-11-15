@@ -38,7 +38,9 @@ export function LLMModelDisplay({
 
   return (
     <>
-      <Box width="14px">{modelOption?.icon}</Box>
+      <Box width="14px" minWidth="14px">
+        {modelOption?.icon}
+      </Box>
       <Box
         fontSize={fontSize}
         fontFamily="mono"
@@ -115,29 +117,7 @@ export function LLMConfigField({
         opacity={modelOption?.isDisabled ? 0.5 : 1}
       >
         <LLMModelDisplay model={model} />
-        {allowDefault && llmConfig == undefined ? (
-          <Tooltip
-            label={
-              <>
-                Using default workflow LLM
-                <br />
-                Click to change defaults
-              </>
-            }
-            placement="top"
-            hasArrow
-          >
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => {
-                setWorkflowSelected(true);
-              }}
-            >
-              <Link2 size={16} />
-            </Button>
-          </Tooltip>
-        ) : allowDefault ? (
+        {allowDefault && llmConfig != undefined ? (
           <Tooltip
             label="Overriding default LLM, click to reset"
             placement="top"

@@ -11,6 +11,28 @@ import { convertEvaluators } from "./utils/registryUtils";
 const signatures: Signature[] = [
   {
     name: "LLM Signature",
+    parameters: [
+      {
+        identifier: "llm",
+        type: "llm",
+        value: undefined,
+      },
+      {
+        identifier: "prompting_technique",
+        type: "prompting_technique",
+        value: undefined,
+      },
+      {
+        identifier: "instructions",
+        type: "str",
+        value: undefined,
+      },
+      {
+        identifier: "demonstrations",
+        type: "dataset",
+        value: undefined,
+      },
+    ],
     inputs: [
       {
         identifier: "question",
@@ -19,7 +41,7 @@ const signatures: Signature[] = [
     ],
     outputs: [
       {
-        identifier: "query",
+        identifier: "answer",
         type: "str",
       },
     ],
@@ -61,13 +83,13 @@ const retrievers: Retriever[] = [
         identifier: "k",
         desc: "Number of contexts to retrieve",
         type: "int",
-        defaultValue: 3,
+        value: 3,
       },
       {
         identifier: "url",
         desc: "URL of the ColBERTv2 index",
         type: "str",
-        defaultValue: "http://20.102.90.50:2017/wiki17_abstracts",
+        value: "http://20.102.90.50:2017/wiki17_abstracts",
       },
     ],
     ...retrieverInputsAndOutputs,
@@ -80,7 +102,7 @@ const retrievers: Retriever[] = [
         identifier: "k",
         desc: "Number of contexts to retrieve",
         type: "int",
-        defaultValue: 3,
+        value: 3,
       },
       {
         identifier: "weaviate_url",
@@ -102,7 +124,7 @@ const retrievers: Retriever[] = [
         identifier: "weaviate_collection_text_key",
         desc: "Name of the key in the Weaviate collection that contains the text",
         type: "str",
-        defaultValue: "content",
+        value: "content",
       },
     ],
     ...retrieverInputsAndOutputs,
