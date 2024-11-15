@@ -1,6 +1,7 @@
 import {
   Alert,
   AlertIcon,
+  Box,
   Button,
   HStack,
   Input,
@@ -22,7 +23,7 @@ import {
 
 import type { Node } from "@xyflow/react";
 import { chakraComponents, Select as MultiSelect } from "chakra-react-select";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { CheckSquare, Info, TrendingUp } from "react-feather";
 import {
   Controller,
@@ -39,9 +40,10 @@ import { useOptimizationExecution } from "../hooks/useOptimizationExecution";
 import { useWorkflowStore } from "../hooks/useWorkflowStore";
 import type { Entry } from "../types/dsl";
 import { OPTIMIZERS } from "../types/optimizers";
+import { trainTestSplit } from "../utils/datasetUtils";
 import { AddModelProviderKey } from "./AddModelProviderKey";
 import { useVersionState, VersionToBeUsed } from "./History";
-import { trainTestSplit } from "../utils/datasetUtils";
+import { LLMConfigField } from "./properties/modals/LLMConfigModal";
 
 const optimizerOptions: {
   label: string;
@@ -62,6 +64,15 @@ export function Optimize() {
 
   const isRunning = optimizationState?.status === "running";
 
+  const form = useForm<OptimizeForm>({
+    defaultValues: {
+      version: "",
+      commitMessage: "",
+      optimizer: optimizerOptions[0]!,
+      params: {},
+    },
+  });
+
   return (
     <>
       <Tooltip label={isRunning ? "Optimization is running" : ""}>
@@ -77,7 +88,7 @@ export function Optimize() {
       </Tooltip>
       <Modal isOpen={isOpen} onClose={onClose} size="xl">
         <ModalOverlay />
-        {isOpen && <OptimizeModalContent onClose={onClose} />}
+        {isOpen && <OptimizeModalContent form={form} onClose={onClose} />}
       </Modal>
     </>
   );
@@ -90,7 +101,13 @@ type OptimizeForm = {
   params: (typeof OPTIMIZERS)[keyof typeof OPTIMIZERS]["params"];
 };
 
-export function OptimizeModalContent({ onClose }: { onClose: () => void }) {
+export function OptimizeModalContent({
+  form,
+  onClose,
+}: {
+  form: UseFormReturn<OptimizeForm>;
+  onClose: () => void;
+}) {
   const { project } = useOrganizationTeamProject();
   const {
     workflowId,
@@ -99,6 +116,7 @@ export function OptimizeModalContent({ onClose }: { onClose: () => void }) {
     optimizationState,
     deselectAllNodes,
     setOpenResultsPanelRequest,
+    default_llm,
   } = useWorkflowStore(
     ({
       workflow_id: workflowId,
@@ -107,13 +125,15 @@ export function OptimizeModalContent({ onClose }: { onClose: () => void }) {
       state,
       deselectAllNodes,
       setOpenResultsPanelRequest,
+      default_llm,
     }) => ({
       workflowId,
       getWorkflow,
       nodes,
       optimizationState: state.optimization,
-      deselectAllNodes: deselectAllNodes,
-      setOpenResultsPanelRequest: setOpenResultsPanelRequest,
+      deselectAllNodes,
+      setOpenResultsPanelRequest,
+      default_llm,
     })
   );
 
@@ -126,20 +146,22 @@ export function OptimizeModalContent({ onClose }: { onClose: () => void }) {
     preview: true,
   });
 
-  const form = useForm<OptimizeForm>({
-    defaultValues: {
-      version: "",
-      commitMessage: "",
-      optimizer: optimizerOptions[0]!,
-      params: {},
-    },
-  });
-
   const optimizer = OPTIMIZERS[form.watch("optimizer").value];
+  const params = form.watch("params");
 
   useEffect(() => {
     if (!optimizer) return;
-    form.setValue("params", optimizer.params);
+    form.setValue(
+      "params",
+      Object.entries({ ...optimizer.params, ...params }).reduce(
+        (acc, [key, value]) => {
+          // @ts-ignore
+          acc[key] = value ? value : optimizer.params[key];
+          return acc;
+        },
+        {} as OptimizeForm["params"]
+      )
+    );
   }, [form, optimizer]);
 
   const trainSize = entryNode?.data.train_size ?? 0.8;
@@ -300,6 +322,8 @@ export function OptimizeModalContent({ onClose }: { onClose: () => void }) {
       ? "You need at least one evaluator node in your workflow to run optimizations"
       : false;
 
+  const llmConfig = form.watch("params.llm");
+
   return (
     <ModalContent
       as="form"
@@ -335,7 +359,60 @@ export function OptimizeModalContent({ onClose }: { onClose: () => void }) {
             />
           </VStack>
         </VStack>
-        <HStack>
+        <HStack width="full">
+          {"llm" in optimizer.params && (
+            <VStack align="start" width="full" spacing={2}>
+              <HStack>
+                <SmallLabel color="gray.600">Teacher LLM</SmallLabel>
+                <Tooltip label="The LLM that will be used to generate the prompts and/or demonstrations. You can, for example, use a more powerful LLM to teach a smaller one.">
+                  <Info size={16} />
+                </Tooltip>
+              </HStack>
+              <Controller
+                control={form.control}
+                name="params.llm"
+                render={({ field }) => (
+                  <Box
+                    width="full"
+                    border="1px solid"
+                    borderColor="gray.200"
+                    borderRadius={6}
+                    paddingX={1}
+                    paddingY="3px"
+                  >
+                    <LLMConfigField
+                      allowDefault={true}
+                      defaultLLMConfig={default_llm}
+                      llmConfig={llmConfig}
+                      onChange={(llmConfig) => {
+                        field.onChange(llmConfig);
+                      }}
+                    />
+                  </Box>
+                )}
+              />
+            </VStack>
+          )}
+          {"num_candidates" in optimizer.params && (
+            <VStack align="start" width="full" spacing={2}>
+              <HStack>
+                <SmallLabel color="gray.600">
+                  Number of Candidate Prompts
+                </SmallLabel>
+                <Tooltip label="Each candidate and demonstrations combination will be evaluated against the optimization set.">
+                  <Info size={16} />
+                </Tooltip>
+              </HStack>
+              <Input
+                {...form.register("params.num_candidates")}
+                type="number"
+                min={1}
+                max={100}
+              />
+            </VStack>
+          )}
+        </HStack>
+        <HStack width="full">
           {"max_bootstrapped_demos" in optimizer.params && (
             <VStack align="start" width="full" spacing={2}>
               <HStack>
@@ -432,6 +509,7 @@ const OptimizerSelect = ({
   field: UseControllerProps<OptimizeForm>;
 }) => {
   return (
+    // @ts-ignore
     <MultiSelect
       {...field}
       options={optimizerOptions}

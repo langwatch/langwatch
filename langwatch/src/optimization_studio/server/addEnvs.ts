@@ -59,6 +59,17 @@ export const addEnvs = async (
     }),
   };
 
+  if (
+    event.type === "execute_optimization" &&
+    "llm" in event.payload.params &&
+    event.payload.params.llm
+  ) {
+    event.payload.params.llm = addLiteLLMParams(
+      event.payload.params.llm,
+      modelProviders
+    );
+  }
+
   return {
     ...event,
     payload: {

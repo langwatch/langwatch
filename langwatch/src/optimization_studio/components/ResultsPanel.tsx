@@ -13,13 +13,14 @@ import {
   TabPanels,
   Tabs,
   Text,
+  useDisclosure,
   useToast,
   VStack,
 } from "@chakra-ui/react";
 import type { Experiment, Project } from "@prisma/client";
 import type { Node } from "@xyflow/react";
-import { useEffect, useState } from "react";
-import { X } from "react-feather";
+import { useEffect, useRef, useState } from "react";
+import { ChevronDown, X } from "react-feather";
 import {
   BatchEvaluationV2EvaluationResults,
   BatchEvaluationV2EvaluationSummary,
@@ -302,9 +303,21 @@ export function LoadedOptimizationResults({
       })
     );
 
-  const [selectedRuns, setSelectedRuns] = useState<string[]>(
-    optimizationState?.run_id ? [optimizationState.run_id] : []
-  );
+  const incomingRunIds =
+    optimizationState?.run_id &&
+    ["waiting", "running"].includes(optimizationState.status ?? "")
+      ? [optimizationState.run_id]
+      : [];
+  const [selectedRuns, setSelectedRuns] = useState<string[]>(incomingRunIds);
+
+  useEffect(() => {
+    if (
+      selectedRuns.includes(optimizationState?.run_id ?? "") &&
+      optimizationState?.status === "error"
+    ) {
+      setSelectedRuns([]);
+    }
+  }, [optimizationState?.run_id, optimizationState?.status]);
 
   const {
     dspyRuns,
@@ -324,6 +337,7 @@ export function LoadedOptimizationResults({
     experiment,
     selectedRuns,
     setSelectedRuns,
+    incomingRunIds,
   });
 
   const { stopOptimizationExecution } = useOptimizationExecution();
@@ -437,6 +451,10 @@ export function LoadedOptimizationResults({
     });
   };
 
+  const logsPanel = useDisclosure();
+  const currentSelectedRun = selectedRuns_[0]!;
+  const hasLogs = optimizationState?.run_id === currentSelectedRun;
+
   return (
     <HStack align="start" width="full" height="full" spacing={0}>
       <DSPyExperimentRunList
@@ -446,6 +464,7 @@ export function LoadedOptimizationResults({
         setHighlightedRun={setHighlightedRun}
         dspyRunsPlusIncoming={dspyRunsPlusIncoming}
         size="sm"
+        incomingRunIds={incomingRunIds}
       />
       <VStack align="start" width="full" height="full" spacing={0}>
         <VStack width="full" height="full" overflowY="auto">
@@ -503,12 +522,19 @@ export function LoadedOptimizationResults({
           <DSPyExperimentSummary
             project={project}
             experiment={experiment}
-            run={runsById[selectedRuns_[0]!]}
+            run={runsById?.[currentSelectedRun]}
             onApply={
               optimizationState?.status === "running" &&
               optimizationStateRunId === selectedRuns_[0]
                 ? undefined
                 : onApplyOptimizations
+            }
+            onViewLogs={
+              !hasLogs ||
+              logsPanel.isOpen ||
+              optimizationState?.status === "running"
+                ? undefined
+                : logsPanel.onOpen
             }
           />
         )}
@@ -526,6 +552,11 @@ export function LoadedOptimizationResults({
                 Running
               </Text>
               <OptimizationProgressBar size="lg" />
+              {hasLogs && !logsPanel.isOpen && (
+                <Button size="sm" onClick={logsPanel.onOpen} variant="ghost">
+                  <Box paddingX={4}>View Logs</Box>
+                </Button>
+              )}
               <Button
                 size="xs"
                 variant="ghost"
@@ -542,7 +573,92 @@ export function LoadedOptimizationResults({
               </Button>
             </HStack>
           )}
+        <VStack
+          width="full"
+          borderTop="1px solid"
+          borderColor="gray.200"
+          height="100%"
+          position="relative"
+          display={logsPanel.isOpen ? undefined : "none"}
+          minHeight="0"
+        >
+          <Button
+            variant="ghost"
+            onClick={logsPanel.onClose}
+            position="absolute"
+            top={1}
+            right={1}
+            size="xs"
+            zIndex={1}
+          >
+            <ChevronDown size={16} />
+          </Button>
+          <Tabs
+            size="sm"
+            width="full"
+            height="full"
+            display="flex"
+            flexDirection="column"
+            minHeight="0"
+          >
+            <TabList>
+              <Tab>Logs</Tab>
+            </TabList>
+            <TabPanels width="100%" height="100%" display="flex" minHeight="0">
+              <TabPanel
+                width="100%"
+                height="100%"
+                display="flex"
+                minHeight="0"
+                padding="0"
+              >
+                <LogsPanel />
+              </TabPanel>
+            </TabPanels>
+          </Tabs>
+        </VStack>
       </VStack>
     </HStack>
+  );
+}
+
+function LogsPanel() {
+  const { stdout } = useWorkflowStore(({ state }) => ({
+    stdout: state.optimization?.stdout,
+  }));
+
+  const preRef = useRef<HTMLPreElement>(null);
+
+  useEffect(() => {
+    setTimeout(() => {
+      const pre = preRef.current;
+      if (!pre) return;
+      pre.scrollTop = pre.scrollHeight;
+    }, 100);
+  }, []);
+
+  useEffect(() => {
+    setTimeout(() => {
+      const pre = preRef.current;
+      if (!pre) return;
+      pre.scrollTop = pre.scrollHeight;
+    }, 1);
+  }, [stdout]);
+
+  return (
+    <pre
+      ref={preRef}
+      style={{
+        whiteSpace: "pre-wrap",
+        width: "100%",
+        overflowY: "auto",
+        minHeight: "0",
+        padding: "12px 12px 16px 16px",
+        background: "#2e2e2e",
+        color: "#d6d6d6",
+      }}
+    >
+      {stdout}
+    </pre>
   );
 }

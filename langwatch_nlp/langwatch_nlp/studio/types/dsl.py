@@ -237,6 +237,7 @@ class OptimizationExecutionState(BaseModel):
     status: Optional[ExecutionStatus] = None
     error: Optional[str] = None
     timestamps: Optional[Timestamps] = None
+    stdout: Optional[str] = None
 
 
 class WorkflowState(BaseModel):

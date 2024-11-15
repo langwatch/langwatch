@@ -72,14 +72,14 @@ async def execute_evaluation(
         elif event.evaluate_on == "test":
             _, entries = train_test_split(
                 entries,
-                test_size=test_size if is_percentage else int(test_size),
+                test_size=float(test_size) if is_percentage else int(test_size),
                 random_state=(seed if seed >= 0 else None),
                 shuffle=(seed >= 0),
             )
         elif event.evaluate_on == "train":
             entries, _ = train_test_split(
                 entries,
-                test_size=test_size if is_percentage else int(test_size),
+                test_size=float(test_size) if is_percentage else int(test_size),
                 random_state=(seed if seed >= 0 else None),
                 shuffle=(seed >= 0),
             )

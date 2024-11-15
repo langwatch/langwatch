@@ -48,6 +48,14 @@ export function Evaluate() {
 
   const isRunning = evaluationState?.status === "running";
 
+  const form = useForm<EvaluateForm>({
+    defaultValues: {
+      version: "",
+      commitMessage: "",
+      evaluateOn: undefined,
+    },
+  });
+
   return (
     <>
       <Tooltip label={isRunning ? "Evaluation is running" : ""}>
@@ -63,7 +71,7 @@ export function Evaluate() {
       </Tooltip>
       <Modal isOpen={isOpen} onClose={onClose}>
         <ModalOverlay />
-        {isOpen && <EvaluateModalContent onClose={onClose} />}
+        {isOpen && <EvaluateModalContent form={form} onClose={onClose} />}
       </Modal>
     </>
   );
@@ -72,7 +80,7 @@ export function Evaluate() {
 type EvaluateForm = {
   version: string;
   commitMessage: string;
-  evaluateOn: DatasetSplitOption;
+  evaluateOn?: DatasetSplitOption;
 };
 
 type DatasetSplitOption = {
@@ -81,7 +89,13 @@ type DatasetSplitOption = {
   description: string;
 };
 
-export function EvaluateModalContent({ onClose }: { onClose: () => void }) {
+export function EvaluateModalContent({
+  form,
+  onClose,
+}: {
+  form: UseFormReturn<EvaluateForm>;
+  onClose: () => void;
+}) {
   const { project } = useOrganizationTeamProject();
   const { hasProvidersWithoutCustomKeys, nodeProvidersWithoutCustomKeys } =
     useModelProviderKeys();
@@ -115,6 +129,17 @@ export function EvaluateModalContent({ onClose }: { onClose: () => void }) {
     dataset: entryNode?.data.dataset,
     preview: true,
   });
+
+  const evaluateOn = form.watch("evaluateOn");
+
+  useEffect(() => {
+    if (!evaluateOn) {
+      form.setValue(
+        "evaluateOn",
+        total && total > 50 ? splitOptions[1]! : splitOptions[0]!
+      );
+    }
+  }, [form, total, evaluateOn]);
 
   const datasetName = entryNode?.data.dataset?.name;
   const trainSize = entryNode?.data.train_size ?? 0.8;
@@ -150,23 +175,14 @@ export function EvaluateModalContent({ onClose }: { onClose: () => void }) {
     },
   ];
 
-  const form = useForm<EvaluateForm>({
-    defaultValues: {
-      version: "",
-      commitMessage: "",
-      evaluateOn: total && total > 50 ? splitOptions[1]! : splitOptions[0]!,
-    },
-  });
-
-  const evaluateOn = form.watch("evaluateOn");
   const estimatedTotal = useMemo(() => {
-    if (evaluateOn.value === "full") {
+    if (evaluateOn?.value === "full") {
       return total;
     }
-    if (evaluateOn.value === "test") {
+    if (evaluateOn?.value === "test") {
       return test.length;
     }
-    if (evaluateOn.value === "train") {
+    if (evaluateOn?.value === "train") {
       return train.length;
     }
     return 0;
@@ -209,6 +225,10 @@ export function EvaluateModalContent({ onClose }: { onClose: () => void }) {
       let versionId: string | undefined = versionToBeEvaluated.id;
 
       if (!estimatedTotal) {
+        return;
+      }
+
+      if (!evaluateOn) {
         return;
       }
 

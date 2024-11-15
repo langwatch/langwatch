@@ -33,10 +33,10 @@ RETRIEVERS: dict[str, Type[dspy.Retrieve]] = {
 OPTIMIZERS: dict[
     str,
     Union[
-        Type[MIPROv2], Type[BootstrapFewShot], Type[BootstrapFewShotWithRandomSearch]
+        Type[MIPROv2], Type[BootstrapFewShotWithRandomSearch]
     ],
 ] = {
     "MIPROv2ZeroShot": MIPROv2,
-    "BootstrapFewShot": BootstrapFewShot,
+    "MIPROv2": MIPROv2,
     "BootstrapFewShotWithRandomSearch": BootstrapFewShotWithRandomSearch,
 }

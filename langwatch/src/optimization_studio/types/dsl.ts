@@ -165,6 +165,7 @@ export type Workflow = {
       experiment_slug?: string;
       run_id?: string;
       status?: ExecutionStatus;
+      stdout?: string;
       error?: string;
       timestamps?: {
         started_at?: number;

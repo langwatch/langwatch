@@ -355,6 +355,14 @@ const store = (
           ...(optimizationState?.error
             ? { error: optimizationState.error.slice(0, 140) }
             : {}),
+          ...(optimizationState?.stdout
+            ? {
+                stdout:
+                  (get().state.optimization?.stdout?.trimStart() ?? "") +
+                  optimizationState.stdout +
+                  "\n",
+              }
+            : {}),
         },
       },
     });
