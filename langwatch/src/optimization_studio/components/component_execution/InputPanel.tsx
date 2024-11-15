@@ -20,6 +20,7 @@ import type { Component } from "../../types/dsl";
 import { useWorkflowStore } from "../../hooks/useWorkflowStore";
 
 export const InputPanel = ({ node }: { node: Node<Component> }) => {
+  console.log("node", node);
   const {
     register,
     handleSubmit,

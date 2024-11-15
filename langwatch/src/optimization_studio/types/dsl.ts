@@ -48,6 +48,7 @@ export type BaseComponent = {
   parameters?: Field[];
   inputs?: Field[];
   outputs?: Field[];
+  isCustom?: boolean;
   execution_state?: {
     status: ExecutionStatus;
     trace_id?: string;
@@ -104,6 +105,7 @@ export type Evaluator = Omit<BaseComponent, "cls"> & {
   cls: string;
   evaluator?: string;
   workflowId?: string;
+  data?: any;
 };
 
 export type End = BaseComponent & {

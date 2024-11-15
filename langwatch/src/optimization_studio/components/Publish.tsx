@@ -28,7 +28,7 @@ import {
 } from "@chakra-ui/react";
 import { useRouter } from "next/router";
 import { useCallback, useState } from "react";
-import { Code, Globe, Play } from "react-feather";
+import { Code, Globe, Play, Box as BoxIcon } from "react-feather";
 import { RenderCode } from "~/components/code/RenderCode";
 import { SmallLabel } from "../../components/SmallLabel";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
@@ -107,6 +107,8 @@ function PublishMenu({
   });
   const router = useRouter();
   const workflowId = router.query.workflow as string;
+  const toast = useToast();
+  const trpc = api.useContext();
 
   const publishedWorkflow = api.optimization.getPublishedWorkflow.useQuery(
     {
@@ -118,11 +120,52 @@ function PublishMenu({
     }
   );
 
+  const toggleSaveAsComponentMutation =
+    api.optimization.toggleSaveAsComponent.useMutation({
+      onSuccess: () => {
+        void trpc.optimization.getComponents.invalidate();
+
+        toast({
+          title: `Workflow ${
+            !publishedWorkflow.data?.isComponent ? "saved" : "deleted"
+          } as component`,
+          status: "success",
+          duration: 5000,
+          isClosable: true,
+          position: "top-right",
+        });
+      },
+      onError: (error) => {
+        toast({
+          title: "Error saving component",
+          description: error.message,
+          status: "error",
+          duration: 5000,
+          isClosable: true,
+          position: "top-right",
+        });
+      },
+    });
+
   const isDisabled =
     !canSaveNewVersion &&
     publishedWorkflow.data?.version === versionToBeEvaluated.version
       ? "Current version is already published"
       : undefined;
+
+  const toggleSaveAsComponent = () => {
+    if (!workflowId || !project?.id) {
+      return;
+    }
+
+    toggleSaveAsComponentMutation.mutate({
+      workflowId,
+      projectId: project.id,
+      isComponent: !publishedWorkflow.data?.isComponent,
+    });
+  };
+
+  console.log("publishedWorkflow.data", publishedWorkflow.data);
 
   return (
     <>
@@ -146,6 +189,16 @@ function PublishMenu({
             : "Publish Current Version"}
         </MenuItem>
       </Tooltip>
+
+      <MenuItem
+        isDisabled={!publishedWorkflow.data?.version}
+        onClick={toggleSaveAsComponent}
+        icon={<BoxIcon size={16} />}
+      >
+        {publishedWorkflow.data?.isComponent
+          ? "Delete Component"
+          : "Save as Component"}
+      </MenuItem>
 
       <Link
         href={

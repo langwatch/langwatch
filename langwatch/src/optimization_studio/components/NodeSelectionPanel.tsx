@@ -8,7 +8,12 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { useReactFlow, type Node, type XYPosition } from "@xyflow/react";
+import {
+  useReactFlow,
+  type Node,
+  type Edge,
+  type XYPosition,
+} from "@xyflow/react";
 import { useEffect, useMemo, useRef } from "react";
 import { useDrag, useDragDropManager, useDragLayer } from "react-dnd";
 import { getEmptyImage } from "react-dnd-html5-backend";
@@ -21,6 +26,8 @@ import { findLowestAvailableName } from "../utils/nodeUtils";
 import { ComponentIcon } from "./ColorfulBlockIcons";
 import { NodeComponents } from "./nodes";
 import { PromptingTechniqueDraggingNode } from "./nodes/PromptingTechniqueNode";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { api } from "~/utils/api";
 
 export function NodeSelectionPanelButton({
   isOpen,
@@ -52,10 +59,63 @@ export const NodeSelectionPanel = ({
   isOpen: boolean;
   setIsOpen: (isOpen: boolean) => void;
 }) => {
-  const { propertiesExpanded } = useWorkflowStore((state) => ({
+  const { propertiesExpanded, getWorkflow } = useWorkflowStore((state) => ({
     propertiesExpanded: state.propertiesExpanded,
     getWorkflow: state.getWorkflow,
   }));
+
+  const workflow = getWorkflow();
+  const { project } = useOrganizationTeamProject();
+
+  const { data: components } = api.optimization.getComponents.useQuery(
+    {
+      projectId: project?.id ?? "",
+      workflowId: workflow?.workflow_id ?? "",
+    },
+    {
+      enabled: !!project?.id && !!workflow?.workflow_id,
+      refetchOnWindowFocus: true,
+    }
+  );
+
+  const createCustomComponent = (dsl: any, name: string) => {
+    const edges = dsl.edges;
+    const nodes = dsl.nodes;
+
+    const entryEdges = edges.filter((edge: Edge) => edge.source === "entry");
+
+    const evaluators = nodes.filter((node: Node) => node.type === "evaluator");
+
+    const entryInputs = entryEdges.reduce((acc: Edge[], edge: Edge) => {
+      if (
+        !evaluators?.some((evaluator: Node) => evaluator.id === edge.target) &&
+        !acc.some((e) => e.sourceHandle === edge.sourceHandle)
+      ) {
+        acc.push(edge);
+      }
+      return acc;
+    }, [] as Edge[]);
+
+    const inputs = entryInputs.map((edge: Edge) => {
+      return {
+        identifier: edge.sourceHandle?.split(".")[1],
+        type: "str",
+      };
+    });
+
+    const outputs = nodes.find(
+      (node: Node) => node.type === "end" || node.id === "end"
+    ).data.inputs;
+
+    dsl.isCustom = true;
+
+    return {
+      name: name,
+      inputs: inputs,
+      outputs: outputs,
+      data: dsl,
+    };
+  };
 
   return (
     <Box
@@ -99,7 +159,28 @@ export const NodeSelectionPanel = ({
             );
           })}
 
-          <Text fontWeight="500" padding={1}>
+          {components && components.length > 0 && (
+            <Text fontWeight="500" padding={1}>
+              Custom Components
+            </Text>
+          )}
+          {components &&
+            components.length > 0 &&
+            components.map((signature) => {
+              const component = createCustomComponent(
+                signature.versions[0]!.dsl,
+                signature.name
+              );
+              return (
+                <NodeDraggable
+                  key={signature.name}
+                  component={component}
+                  type="module"
+                />
+              );
+            })}
+
+          <Text fontWeight="500" paddingLeft={1}>
             Prompting Techniques
           </Text>
           {MODULES.promptingTechniques.map((promptingTechnique) => {

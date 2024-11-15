@@ -90,8 +90,6 @@ export const useComponentExecution = () => {
         return;
       }
 
-      const workflowId = node.data.workflowId;
-
       const trace_id = `trace_${nanoid()}`;
 
       setComponentExecutionState(node.id, {
@@ -100,16 +98,17 @@ export const useComponentExecution = () => {
         inputs: inputs_,
       });
 
-      // const payload: StudioClientEvent = {
-      //   type: "execute_component",
-      //   payload: {
-      //     trace_id,
-      //     workflow: getWorkflow(),
-      //     node_id: node.id,
-      //     inputs: inputs_,
-      //   },
-      // };
-      // sendMessage(payload);
+      const payload: StudioClientEvent = {
+        type: "execute_component",
+        payload: {
+          trace_id,
+          workflow: getWorkflow(),
+          node_id: node.id,
+          inputs: inputs_,
+        },
+      };
+
+      sendMessage(payload);
 
       setTimeout(() => {
         setTriggerTimeout({

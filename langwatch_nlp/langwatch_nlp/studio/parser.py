@@ -19,6 +19,7 @@ from langwatch_nlp.studio.types.dsl import (
     Node,
     NodeDataset,
     NodeRef,
+    ModuleNode,
     PromptingTechnique,
     PromptingTechniqueNode,
     Retriever,
@@ -26,6 +27,10 @@ from langwatch_nlp.studio.types.dsl import (
     Workflow,
 )
 import dspy
+
+import langwatch
+import httpx
+
 
 from langwatch_nlp.studio.utils import (
     node_llm_config_to_dspy_lm,
@@ -45,8 +50,32 @@ def parse_component(node: Node, workflow: Workflow) -> dspy.Module:
             return parse_evaluator(node.data, workflow)
         case "end":
             return parse_end(node.data, workflow)
+        case "module":
+            return parse_module(workflow)
         case _:
             raise NotImplementedError(f"Unknown component type: {node.type}")
+
+
+def apiCall(inputs, api_key, endpoint, workflow_id):
+
+    response = httpx.post(
+        endpoint + "/api/optimization/" + workflow_id,
+        headers={"X-Auth-Token": api_key},
+        json=inputs,
+    )
+    return response.json()
+
+
+def parse_module(workflow: Workflow) -> dspy.Module:
+    print("workflow", workflow)
+
+    class ModuleNode(dspy.Module):
+        def forward(self, **kwargs) -> Any:
+            return apiCall(
+                kwargs, workflow.api_key, langwatch.endpoint, workflow.workflow_id
+            )
+
+    return ModuleNode()
 
 
 def parse_signature(
