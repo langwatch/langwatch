@@ -53,6 +53,17 @@ export const traceSpanCountHistogram = new Histogram({
   ],
 });
 
+// Histogram for collector index delay
+register.removeSingleMetric("collector_index_delay_milliseconds");
+export const collectorIndexDelayHistogram = new Histogram({
+  name: "collector_index_delay_milliseconds",
+  help: "Delay between a trace being received and being indexed",
+  buckets: [
+    100, 1000, 2000, 3000, 5000, 10_000, 30_000, 60_000, 120_000, 300_000,
+    600_000, 1_200_000, 3_600_000, 10_800_000,
+  ],
+});
+
 type JobType =
   | "collector"
   | "collector_check_and_adjust"
@@ -72,7 +83,7 @@ const jobProcessingCounter = new Counter({
 export const getJobProcessingCounter = (jobType: JobType, status: JobStatus) =>
   jobProcessingCounter.labels(jobType, status);
 
-// Histogram for evaluation duration
+// Histogram for job processing duration
 register.removeSingleMetric("job_processing_duration_milliseconds");
 export const jobProcessingDurationHistogram = new Histogram({
   name: "job_processing_duration_milliseconds",

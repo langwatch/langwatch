@@ -33,6 +33,7 @@ import { addInputAndOutputForRAGs } from "./collector/rag";
 import { scoreSatisfactionFromInput } from "./collector/satisfaction";
 import { getTraceInput, getTraceOutput } from "./collector/trace";
 import {
+  collectorIndexDelayHistogram,
   getJobProcessingCounter,
   getJobProcessingDurationHistogram,
 } from "../../metrics";
@@ -255,6 +256,11 @@ const processCollectorJob_ = async (
       .slice(0, 10)
       .reverse(),
   };
+
+  if (!existingTrace?.inserted_at) {
+    const delay = trace.timestamps.inserted_at - data.collectedAt;
+    collectorIndexDelayHistogram.observe(delay);
+  }
 
   if (!process.env.DISABLE_PII_REDACTION) {
     const piiEnforced = env.NODE_ENV === "production";
