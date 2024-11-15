@@ -141,7 +141,13 @@ async def execute_optimization(
                 teacher_settings=dict(lm=lm),
             )
         elif event.optimizer == "BootstrapFewShotWithRandomSearch":
-            optimizer = dspy.BootstrapFewShotWithRandomSearch(metric=metric, **params)
+            optimizer = dspy.BootstrapFewShotWithRandomSearch(
+                metric=metric,
+                max_bootstrapped_demos=params.get("max_bootstrapped_demos", 4),
+                max_labeled_demos=params.get("max_labeled_demos", 16),
+                max_rounds=params.get("max_rounds", 1),
+                num_candidate_programs=params.get("num_candidate_programs", 10),
+            )
             patch_labeled_few_shot_once()
 
         langwatch.dspy.init(
