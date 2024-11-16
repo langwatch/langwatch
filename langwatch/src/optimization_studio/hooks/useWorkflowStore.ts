@@ -357,10 +357,28 @@ const store = (
             : {}),
           ...(optimizationState?.stdout
             ? {
-                stdout:
-                  (get().state.optimization?.stdout?.trimStart() ?? "") +
-                  optimizationState.stdout +
-                  "\n",
+                stdout: (() => {
+                  const stdout =
+                    get().state.optimization?.stdout?.trimStart() ?? "";
+                  const hasCarriageReturn =
+                    optimizationState.stdout?.startsWith("\r") ||
+                    stdout.endsWith("\r\n");
+
+                  if (hasCarriageReturn) {
+                    return (
+                      stdout
+                        .split("\n")
+                        .slice(0, -2)
+                        .join("\n")
+                        .replaceAll("\r", "") +
+                      "\n" +
+                      optimizationState.stdout +
+                      "\n"
+                    );
+                  }
+
+                  return stdout + optimizationState.stdout + "\n";
+                })(),
               }
             : {}),
         },
