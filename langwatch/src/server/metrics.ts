@@ -98,6 +98,13 @@ export const jobProcessingDurationHistogram = new Histogram({
 export const getJobProcessingDurationHistogram = (jobType: JobType) =>
   jobProcessingDurationHistogram.labels(jobType);
 
+// Counter for worker restarts
+register.removeSingleMetric("worker_restarts");
+export const workerRestartsCounter = new Counter({
+  name: "worker_restarts",
+  help: "Number of times the worker has been restarted",
+});
+
 // Histogram for evaluation duration
 register.removeSingleMetric("evaluation_duration_milliseconds");
 export const evaluationDurationHistogram = new Histogram({

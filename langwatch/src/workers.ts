@@ -8,4 +8,4 @@ const debug = getDebugger("langwatch:workers");
 debug("Starting up workers");
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
-require("./server/background/worker").start(undefined, 300000);
+require("./server/background/worker").start(undefined, 5 * 60 * 1000);
