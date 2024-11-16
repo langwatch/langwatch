@@ -1,7 +1,6 @@
 import json
 from typing import Any, Dict, List, Optional, Union, cast
 from langwatch_nlp.studio.dspy.llm_node import LLMNode
-from langwatch_nlp.studio.dspy.predict_with_metadata import PredictWithMetadata
 from langwatch_nlp.studio.dspy.retrieve import ContextsRetriever
 from langwatch_nlp.studio.modules.evaluators.langwatch import LangWatchEvaluator
 from langwatch_nlp.studio.modules.registry import (
@@ -103,7 +102,7 @@ def parse_signature(
     if demonstrations and demonstrations.inline:
         demos = transpose_inline_dataset_to_object_list(demonstrations.inline)
 
-    return LLMNode(node_id=node_id, predict=predict, lm=lm, demos=demos)
+    return LLMNode(node_id=node_id, name=class_name, predict=predict, lm=lm, demos=demos)
 
 
 def parse_prompting_technique(

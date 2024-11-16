@@ -20,7 +20,13 @@ async def execute_component(event: ExecuteComponentPayload):
 
     try:
         with langwatch.trace(
-            trace_id=event.trace_id, api_key=event.workflow.api_key, skip_root_span=True
+            trace_id=event.trace_id,
+            api_key=event.workflow.api_key,
+            skip_root_span=True,
+            metadata={
+                "platform": "optimization_studio",
+                "environment": "development",
+            },
         ) as trace:
             trace.autotrack_dspy()
             module = parse_component(node, event.workflow)

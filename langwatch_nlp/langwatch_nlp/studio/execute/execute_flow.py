@@ -50,6 +50,10 @@ async def execute_flow(
             trace_id=event.trace_id,
             api_key=event.workflow.api_key,
             skip_root_span=True,
+            metadata={
+                "platform": "optimization_studio",
+                "environment": "development" if manual_execution_mode else "production",
+            },
         ) as trace:
             trace.autotrack_dspy()
 

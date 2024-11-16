@@ -8,7 +8,7 @@ import {
 } from "@chakra-ui/react";
 import type { Project } from "@prisma/client";
 import { type PropsWithChildren } from "react";
-import { Code } from "react-feather";
+import { Code, Codepen } from "react-feather";
 import { type UseFormReturn } from "react-hook-form";
 import { RadioCard } from "~/pages/onboarding/[team]/project";
 import { Azure } from "./icons/Azure";
@@ -18,6 +18,7 @@ import { OpenAI } from "./icons/OpenAI";
 import { Python } from "./icons/Python";
 import { TypeScript } from "./icons/TypeScript";
 import { Vercel } from "./icons/Vercel";
+import { PuzzleIcon } from "./icons/PuzzleIcon";
 
 export type ProjectFormData = {
   name: string;
@@ -43,7 +44,7 @@ export const techStackLanguageOptions = {
     label: "TypeScript",
     icon: <TypeScript />,
   },
-  other: { label: "Other", icon: <Code /> },
+  other: { label: "Other", icon: <PuzzleIcon /> },
 };
 
 type LanguagesMap = {
@@ -129,7 +130,7 @@ export const techStackFrameworkOptions = {
   },
   other: {
     label: "Other",
-    icon: <Code />,
+    icon: <PuzzleIcon />,
     languages: {
       python: docsLinks.python_custom,
       typescript: docsLinks.typescript_guide,
@@ -281,12 +282,24 @@ export const ProjectTechStackIcon = ({ project }: { project: Project }) => {
     );
   };
 
+  const { language, framework } = getTechStack(project);
+
+  if (language.label === "Other" && framework.label === "Other") {
+    return (
+      <HStack spacing={0} align="center" justify="center" color="gray.600">
+        <IconWrapper>
+          <PuzzleIcon />
+        </IconWrapper>
+      </HStack>
+    );
+  }
+
   return (
     <HStack spacing={0}>
       <Box marginRight="-6px">
-        <IconWrapper>{getTechStack(project).language.icon}</IconWrapper>
+        <IconWrapper>{language.icon}</IconWrapper>
       </Box>
-      <IconWrapper>{getTechStack(project).framework.icon}</IconWrapper>
+      <IconWrapper>{framework.icon}</IconWrapper>
     </HStack>
   );
 };

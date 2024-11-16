@@ -377,7 +377,7 @@ const processCollectorJob_ = async (
     collectorIndexDelayHistogram.observe(delay);
   }
 
-  void markProjectFirstMessage(project);
+  void markProjectFirstMessage(project, trace.metadata);
 
   const checkAndAdjust = async (postfix = "") => {
     return collectorQueue!.add(
@@ -497,10 +497,13 @@ const processCollectorCheckAndAdjustJob = async (
     refresh: true,
   });
 
-  // Does not re-schedule trace checks for too old traces being resynced
   if (
-    !existingTrace?.timestamps?.inserted_at ||
-    existingTrace.timestamps.inserted_at > Date.now() - 30 * 1000
+    // Does not re-schedule trace checks for too old traces being resynced
+    (!existingTrace?.timestamps?.inserted_at ||
+      existingTrace.timestamps.inserted_at > Date.now() - 30 * 1000) &&
+    // Does not schedule evaluations for traces that are not from the studio in development
+    (existingTrace.metadata.custom?.platform !== "optimization_studio" ||
+      existingTrace.metadata.custom?.environment !== "development")
   ) {
     await scheduleEvaluations(trace, spans);
   }
@@ -577,11 +580,24 @@ const getLastOutputError = (spans: Span[]): ErrorCapture | null => {
   return lastError.error ?? null;
 };
 
-const markProjectFirstMessage = async (project: Project) => {
+const markProjectFirstMessage = async (
+  project: Project,
+  metadata: ElasticSearchTrace["metadata"]
+) => {
   if (!project.firstMessage) {
     await prisma.project.update({
       where: { id: project.id },
-      data: { firstMessage: true },
+      data: {
+        firstMessage: true,
+        language:
+          metadata.custom?.platform === "optimization_studio"
+            ? "other"
+            : metadata.sdk_language === "python"
+            ? "python"
+            : metadata.sdk_language === "typescript"
+            ? "typescript"
+            : "other",
+      },
     });
   }
 };
