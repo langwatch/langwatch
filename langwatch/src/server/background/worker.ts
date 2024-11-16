@@ -37,7 +37,10 @@ if (process.env.SENTRY_DSN) {
     dsn: process.env.SENTRY_DSN,
     tracesSampleRate: 1.0,
     beforeSend(event, hint) {
-      if (hint.originalException instanceof WorkersRestart) {
+      if (
+        hint.originalException instanceof WorkersRestart ||
+        `${hint.originalException}`.includes("Max runtime reached")
+      ) {
         return null;
       }
       return event;
