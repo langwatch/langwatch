@@ -18,8 +18,6 @@ const handleConnection = (
   request: IncomingMessage,
   projectId: string
 ) => {
-  console.log(`New WebSocket connection established for project: ${projectId}`);
-
   ws.on("message", (message: string) => {
     try {
       const parsedMessage: StudioClientEvent = JSON.parse(message);
@@ -28,10 +26,6 @@ const handleConnection = (
       console.error("Error processing message:", error);
       sendErrorToClient(ws, "Invalid message format");
     }
-  });
-
-  ws.on("close", () => {
-    console.log(`WebSocket connection closed for project: ${projectId}`);
   });
 
   sendMessageToClient(ws, {
