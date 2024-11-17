@@ -42,7 +42,7 @@ class ModuleWithMetadata:
         duration = round((time.time() - start_time) * 1000)
 
         dspy.settings.configure(experimental=True)
-        lm = cast(dspy.LM, self._module.get_lm())
+        lm = cast(dspy.LM, self.get_lm())
         response.__class__ = PredictionWithMetadata
         last_response = lm.history[-1]
         response._cost = 0
@@ -52,6 +52,9 @@ class ModuleWithMetadata:
 
         return response
 
+    def get_lm(self):
+        return self._module.get_lm()
+
     def set_lm(self, lm: dspy.LM):
         self._module.set_lm(lm=lm)
 
@@ -60,5 +63,11 @@ class PredictWithMetadata(dspy.Predict, ModuleWithMetadata):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-    def set_lm(self, lm: dspy.LM):
-        dspy.Predict.set_lm(self, lm=lm)
+    def forward(self, *args, **kwargs):
+        self._module = super().forward
+        return ModuleWithMetadata.forward(self, *args, **kwargs)
+
+    def reset(self) -> None:
+        lm = self.lm
+        super().reset()
+        self.lm = lm

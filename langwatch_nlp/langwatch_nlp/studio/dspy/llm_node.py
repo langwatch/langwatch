@@ -30,12 +30,6 @@ class LLMNode(dspy.Module):
         # LabeledFewShot patch
         nested_predict._node_id = node_id  # type: ignore
 
-        def reset(self) -> None:
-            PredictWithMetadata.reset(self)
-            self.lm = lm
-
-        nested_predict.reset = reset.__get__(nested_predict)
-
     def forward(self, **kwargs) -> Any:
         try:
             langwatch.get_current_span().update(name=f"{self._name}.forward")

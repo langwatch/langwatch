@@ -317,7 +317,7 @@ export function LoadedOptimizationResults({
     ) {
       setSelectedRuns([]);
     }
-  }, [optimizationState?.run_id, optimizationState?.status]);
+  }, [optimizationState?.run_id, optimizationState?.status, selectedRuns]);
 
   const {
     dspyRuns,
@@ -456,7 +456,7 @@ export function LoadedOptimizationResults({
   const hasLogs = optimizationState?.run_id === currentSelectedRun;
 
   return (
-    <HStack align="start" width="full" height="full" spacing={0}>
+    <HStack align="start" width="full" height="full" spacing={0} minWidth="0">
       <DSPyExperimentRunList
         dspyRuns={dspyRuns}
         selectedRuns={selectedRuns_}
@@ -466,8 +466,8 @@ export function LoadedOptimizationResults({
         size="sm"
         incomingRunIds={incomingRunIds}
       />
-      <VStack align="start" width="full" height="full" spacing={0}>
-        <VStack width="full" height="full" overflowY="auto">
+      <VStack align="start" width="full" height="full" spacing={0} minWidth="0">
+        <VStack width="full" height="full" overflowY="auto" minWidth="0">
           {dspyRuns.isLoading ? (
             <Skeleton width="100%" height="30px" />
           ) : dspyRuns.error ? (
@@ -498,7 +498,12 @@ export function LoadedOptimizationResults({
                     labelNames={labelNames}
                   />
                 </VStack>
-                <Box width="full" borderTop="1px solid" borderColor="gray.200">
+                <Box
+                  width="full"
+                  height="full"
+                  borderTop="1px solid"
+                  borderColor="gray.200"
+                >
                   {stepToDisplay &&
                     (!highlightedRun ||
                       highlightedRun === stepToDisplay.run_id) && (
