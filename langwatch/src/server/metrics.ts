@@ -130,3 +130,14 @@ export const getEvaluationStatusCounter = (
   evaluatorType: string,
   status: EvaluationStatus
 ) => evaluationStatusCounter.labels(evaluatorType, status);
+
+// Counter for pii checks
+register.removeSingleMetric("pii_checks");
+export const piiChecksCounter = new Counter({
+  name: "pii_checks",
+  help: "Number of PII checks for the given method",
+  labelNames: ["method"] as const,
+});
+
+export const getPiiChecksCounter = (method: string) =>
+  piiChecksCounter.labels(method);
