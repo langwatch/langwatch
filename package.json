@@ -19,7 +19,7 @@
     "prepare:production": "npm run prisma:generate:typescript && npm run prisma:migrate && npm run elastic:migrate",
     "task": "DEBUG=langwatch:* tsx --tsconfig langwatch/langwatch/tsconfig.workers.json langwatch/langwatch/src/task.ts",
     "elastic:migrate": "npm run task elasticMigrate",
-    "prod:forward": "./scripts/prod-port-forward.sh"
+    "port:forward": "./scripts/prod-port-forward.sh"
   },
   "author": "",
   "license": "ISC",
