@@ -235,16 +235,25 @@ export const useSocketClient = () => {
     );
 
     socketInstance.onopen = () => {
-      setSocketStatus((socketStatus) =>
-        socketStatus === "disconnected" || socketStatus === "connecting-socket"
-          ? "connecting-python"
-          : socketStatus
-      );
+      setSocketStatus((socketStatus) => {
+        if (
+          socketStatus === "disconnected" ||
+          socketStatus === "connecting-socket"
+        ) {
+          lastIsAliveCallTimestamp = 0;
+          return "connecting-python";
+        }
+
+        return socketStatus;
+      });
     };
 
     socketInstance.onclose = () => {
-      setSocketStatus("disconnected");
-      scheduleReconnect();
+      setTimeout(() => {
+        if (socketInstance?.readyState === WebSocket.OPEN) return;
+        setSocketStatus("disconnected");
+        scheduleReconnect();
+      }, 2000);
     };
 
     socketInstance.onerror = (error) => {
