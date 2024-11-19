@@ -218,7 +218,7 @@ export default function Subscription() {
                   "2 projects",
                   "5 team members",
                   "90-day messages retention",
-                  "Usage-based price for evaluations and guardrails (including first €10 for free)",
+                  "Usage-based price for evaluations and guardrails",
                   "Slack support",
                 ]}
                 selectedPlan={selectedPlan}
@@ -270,7 +270,7 @@ export default function Subscription() {
                 additionalCosts={[
                   "Additional Traces - €50/100,000",
                   "Additional Users - €19/user",
-                  "Usage-based price for evaluations and guardrails (including first €10 for free)",
+                  "Usage-based price for evaluations and guardrails",
                   ``,
                 ]}
                 selectedPlan={selectedPlan}
@@ -295,7 +295,7 @@ export default function Subscription() {
                 additionalCosts={[
                   "Additional Traces - €50/100,000",
                   "Additional Users - €19/user",
-                  "Usage-based price for evaluations and guardrails (including first €10 for free)",
+                  "Usage-based price for evaluations and guardrails",
                   ``,
                 ]}
                 selectedPlan={selectedPlan}
@@ -319,7 +319,7 @@ export default function Subscription() {
                 additionalCosts={[
                   "Additional Traces - €45/100,000",
                   "Additional Users - €10/user",
-                  `Usage-based price for evaluations and guardrails (including first €10 for free)`,
+                  `Usage-based price for evaluations and guardrails`,
                 ]}
                 selectedPlan={selectedPlan}
                 setSelectedPlan={setSelectedPlan}
@@ -344,7 +344,7 @@ export default function Subscription() {
                 additionalCosts={[
                   "Additional Traces - €45/100,000",
                   "Additional Users - €10/user",
-                  `Usage-based price for evaluations and guardrails (including first €10 for free)`,
+                  `Usage-based price for evaluations and guardrails`,
                 ]}
                 selectedPlan={selectedPlan}
                 setSelectedPlan={setSelectedPlan}
@@ -434,12 +434,13 @@ function Plan({
       <VStack
         align="start"
         width="full"
-        padding={3}
+        padding={6}
         spacing={3}
         height="100%"
         justifyContent="space-between"
         position="relative"
         zIndex={10}
+        fontSize="14px"
       >
         {recommended && (
           <Tag
@@ -466,15 +467,17 @@ function Plan({
           </Box>
         )}
         <VStack width="full" align="start">
-          <HStack align="start" width="full" spacing={3}>
-            <Radio size="lg" value={plan} marginTop="2px" />
-            <VStack spacing={4} align="start" paddingBottom={4}>
-              <HStack spacing={4}>
-                <Heading size="md" as="h2">
-                  {name}
-                </Heading>
-              </HStack>
-            </VStack>
+          <HStack align="start" width="full" spacing={0}>
+            <HStack align="start" spacing={3}>
+              <Radio size="lg" value={plan} marginTop="2px" />
+              <VStack spacing={4} align="start" paddingBottom={4}>
+                <HStack spacing={4}>
+                  <Heading size="md" as="h2">
+                    {name}
+                  </Heading>
+                </HStack>
+              </VStack>
+            </HStack>
 
             <Spacer />
             {price === "custom" ? null : (
@@ -488,12 +491,12 @@ function Plan({
                   spacing="2px"
                   fontSize={18}
                   color="gray.600"
-                  marginTop="-3px"
+                  marginTop="-4px"
                 >
                   <Text alignSelf="start" marginTop="3px">
                     €
                   </Text>
-                  <Text fontSize={26}>
+                  <Text fontSize={22}>
                     {typeof price === "number" ? price.toLocaleString() : price}
                   </Text>
                   <Text alignSelf="end" marginBottom="3px">
