@@ -235,7 +235,11 @@ export const useSocketClient = () => {
     );
 
     socketInstance.onopen = () => {
-      setSocketStatus("connecting-python");
+      setSocketStatus((socketStatus) =>
+        socketStatus === "disconnected" || socketStatus === "connecting-socket"
+          ? "connecting-python"
+          : socketStatus
+      );
     };
 
     socketInstance.onclose = () => {
