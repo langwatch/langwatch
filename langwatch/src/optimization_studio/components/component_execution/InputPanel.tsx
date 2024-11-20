@@ -20,7 +20,6 @@ import type { Component } from "../../types/dsl";
 import { useWorkflowStore } from "../../hooks/useWorkflowStore";
 
 export const InputPanel = ({ node }: { node: Node<Component> }) => {
-  console.log("node", node);
   const {
     register,
     handleSubmit,
@@ -66,8 +65,6 @@ export const InputPanel = ({ node }: { node: Node<Component> }) => {
 
   const onSubmit = useCallback(
     (data: Record<string, string>) => {
-      console.log(data);
-      console.log(node);
       startComponentExecution({ node, inputs: data });
     },
     [node, startComponentExecution]
