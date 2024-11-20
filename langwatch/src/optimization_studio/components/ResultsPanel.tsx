@@ -247,11 +247,16 @@ export function EvaluationResults() {
 }
 
 export function OptimizationResults() {
-  const { workflowId } = useWorkflowStore(({ workflow_id: workflowId }) => ({
-    workflowId,
-  }));
+  const { workflowId, optimizationState } = useWorkflowStore(
+    ({ workflow_id: workflowId, state }) => ({
+      workflowId,
+      optimizationState: state.optimization,
+    })
+  );
 
   const { project } = useOrganizationTeamProject();
+
+  const [keepFetching, setKeepFetching] = useState(false);
 
   const experiment = api.experiments.getExperimentBySlug.useQuery(
     {
@@ -261,10 +266,27 @@ export function OptimizationResults() {
     {
       enabled: !!project && !!workflowId,
       refetchOnWindowFocus: false,
+      refetchInterval: keepFetching ? 1 : undefined,
     }
   );
 
+  useEffect(() => {
+    if (optimizationState?.status === "running" && !experiment.data) {
+      setKeepFetching(true);
+    } else {
+      setTimeout(
+        () => {
+          setKeepFetching(false);
+        },
+        experiment.data ? 0 : 15_000
+      );
+    }
+  }, [optimizationState?.status, experiment.data]);
+
   if (experiment.isError && experiment.error.data?.httpStatus === 404) {
+    if (keepFetching) {
+      return <Text padding={4}>Loading...</Text>;
+    }
     return <Text padding={4}>No optimizations started yet</Text>;
   }
 

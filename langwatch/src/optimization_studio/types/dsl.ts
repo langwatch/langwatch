@@ -5,6 +5,7 @@ export type Field = {
   identifier: string;
   type:
     | "str"
+    | "image"
     | "float"
     | "int"
     | "bool"

@@ -31,7 +31,6 @@ from langwatch_nlp.studio.utils import (
     transpose_inline_dataset_to_object_list,
 )
 
-
 def parse_component(node: Node, workflow: Workflow) -> dspy.Module:
     match node.type:
         case "signature":
@@ -55,16 +54,23 @@ def parse_signature(
 
     # Create a dictionary to hold the class attributes
     class_dict = {}
+    annotations = {}
 
     # Add input fields
     if component.inputs:
         for input_field in component.inputs:
+            annotations[input_field.identifier] = (
+                dspy.Image if input_field.type == FieldType.image else str
+            )
             class_dict[input_field.identifier] = dspy.InputField()
 
     # Add output fields
     if component.outputs:
         for output_field in component.outputs:
+            annotations[output_field.identifier] = str
             class_dict[output_field.identifier] = dspy.OutputField()
+
+    class_dict["__annotations__"] = annotations
 
     parameters = parse_fields(component.parameters or [], autoparse=True)
 
@@ -90,7 +96,7 @@ def parse_signature(
         except StopIteration:
             raise ValueError(f"Decorator node {prompting_technique.ref} not found")
         PromptingTechniqueClass = parse_prompting_technique(decorator_node.data)
-        predict = PromptingTechniqueClass(SignatureClass)
+        predict = PromptingTechniqueClass(SignatureClass) # type: ignore
     else:
         predict = dspy.Predict(SignatureClass)
 

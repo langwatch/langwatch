@@ -7,6 +7,7 @@ from langwatch_nlp.studio.types.dataset import DatasetColumns
 
 class FieldType(str, Enum):
     str = "str"
+    image = "image"
     float = "float"
     int = "int"
     bool = "bool"

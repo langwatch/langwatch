@@ -8,7 +8,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import type { Node } from "@xyflow/react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Play } from "react-feather";
 import { useForm, type FieldError } from "react-hook-form";
 import { HorizontalFormControl } from "../../../components/HorizontalFormControl";
@@ -20,19 +20,23 @@ import type { Component } from "../../types/dsl";
 import { useWorkflowStore } from "../../hooks/useWorkflowStore";
 
 export const InputPanel = ({ node }: { node: Node<Component> }) => {
+  const inputs = getInputsForExecution({ node }).inputs;
+  const defaultValues = useMemo(() => {
+    return Object.fromEntries(
+      Object.entries(inputs).map(([key, value]) => [
+        key,
+        typeof value === "object" ? JSON.stringify(value) : value ?? "",
+      ])
+    );
+  }, [inputs]);
+
   const {
     register,
     handleSubmit,
     formState: { errors },
+    reset,
   } = useForm<Record<string, string>>({
-    defaultValues: Object.fromEntries(
-      Object.entries(getInputsForExecution({ node }).inputs).map(
-        ([key, value]) => [
-          key,
-          typeof value === "object" ? JSON.stringify(value) : value ?? "",
-        ]
-      )
-    ),
+    defaultValues,
     resolver: (values) => {
       const { missingFields } = getInputsForExecution({ node, inputs: values });
 
@@ -53,6 +57,10 @@ export const InputPanel = ({ node }: { node: Node<Component> }) => {
       return response;
     },
   });
+
+  useEffect(() => {
+    reset(defaultValues);
+  }, [defaultValues, reset]);
 
   const { triggerValidation, setTriggerValidation } = useWorkflowStore(
     (state) => ({
@@ -129,7 +137,16 @@ export const InputPanel = ({ node }: { node: Node<Component> }) => {
               helper={""}
               isInvalid={!!errors[input.identifier]}
             >
-              <Textarea {...register(input.identifier)} />
+              <Textarea
+                {...register(input.identifier)}
+                placeholder={
+                  input.type === "image"
+                    ? "image url"
+                    : input.type === "str"
+                    ? undefined
+                    : input.type
+                }
+              />
               <FormErrorMessage>
                 {errors[input.identifier]?.message}
               </FormErrorMessage>
