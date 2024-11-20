@@ -72,11 +72,8 @@ export const optimizationRouter = createTRPCRouter({
           where: { id: workflowId, projectId: projectId },
           data: { isComponent },
         });
-
-        console.log("Server: Update successful", result);
         return { success: true };
       } catch (error) {
-        console.error("Server: Update failed", error);
         throw error;
       }
     }),

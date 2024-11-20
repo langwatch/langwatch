@@ -166,8 +166,6 @@ function PublishMenu({
     });
   };
 
-  console.log("publishedWorkflow.data", publishedWorkflow.data);
-
   return (
     <>
       {publishedWorkflow.data?.version && (

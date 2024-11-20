@@ -25,9 +25,6 @@ export default async function handler(
 
   const [workflowId, versionId] = params;
 
-  console.log("workflowId.....", workflowId);
-  console.log("versionId.....", versionId);
-
   const authToken =
     xAuthToken ??
     (authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null);
