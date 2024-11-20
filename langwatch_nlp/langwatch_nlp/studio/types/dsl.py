@@ -140,6 +140,11 @@ class Module(BaseComponent):
     forward_pass: Optional[Union[List[Edge], Dict[str, str]]] = None
 
 
+class Custom(BaseComponent):
+    components: Optional[List["Node"]] = None
+    forward_pass: Optional[Union[List[Edge], Dict[str, str]]] = None
+
+
 class Retriever(BaseComponent):
     pass
 
@@ -166,6 +171,11 @@ class BaseNode(BaseModel):
 class SignatureNode(BaseNode):
     type: Literal["signature"] = "signature"
     data: Signature
+
+
+class CustomNode(BaseNode):
+    type: Literal["custom"] = "custom"
+    data: Custom
 
 
 class PromptingTechniqueNode(BaseNode):
@@ -202,6 +212,7 @@ Node = Union[
     SignatureNode,
     PromptingTechniqueNode,
     ModuleNode,
+    CustomNode,
     EntryNode,
     RetrieverNode,
     EvaluatorNode,

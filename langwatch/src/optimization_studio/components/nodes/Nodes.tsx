@@ -22,10 +22,12 @@ import {
   Handle,
   NodeToolbar,
   Position,
+  useReactFlow,
+  useUpdateNodeInternals,
   type Node,
   type NodeProps,
 } from "@xyflow/react";
-import { useMemo, type Ref } from "react";
+import { useEffect, useMemo, type Ref } from "react";
 import { useDragLayer } from "react-dnd";
 import {
   Check,
@@ -47,6 +49,7 @@ import {
   type Component,
   type ComponentType,
   type Field,
+  type Custom,
 } from "../../types/dsl";
 import { ComponentIcon } from "../ColorfulBlockIcons";
 
@@ -335,7 +338,6 @@ export const ComponentNode = forwardRef(function ComponentNode(
           <Box width="54px" />
         )}
       </HStack>
-      {node && <LatestComponentVersionCheck node={node} />}
 
       {props.children}
       {props.data.inputs && (
@@ -363,21 +365,6 @@ export const ComponentNode = forwardRef(function ComponentNode(
     </VStack>
   );
 });
-
-const LatestComponentVersionCheck = ({ node }: { node: Node<Component> }) => {
-  const { currentVersion } = useComponentVersion(node ?? null);
-
-  return (
-    <>
-      {node?.data.isCustom && !currentVersion?.isPublishedVersion && (
-        <Alert status="warning" padding="4px">
-          <AlertIcon />
-          Version outdated
-        </Alert>
-      )}
-    </>
-  );
-};
 
 export function ComponentExecutionButton({
   node,

@@ -1,8 +1,11 @@
+import type { Node, NodeProps } from "@xyflow/react";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
-import type { Node } from "@xyflow/react";
-import type { Component } from "../types/dsl";
-export const useComponentVersion = (node: Node<Component>) => {
+import type { Custom } from "../types/dsl";
+
+export const useComponentVersion = (
+  node: NodeProps<Node<Custom>> | Node<Custom>
+) => {
   const { project } = useOrganizationTeamProject();
 
   if (!node) {

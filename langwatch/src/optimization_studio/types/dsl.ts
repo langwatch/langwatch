@@ -38,20 +38,18 @@ export type ComponentType =
   | "module"
   | "retriever"
   | "prompting_technique"
+  | "custom"
   | "evaluator";
 
 export type BaseComponent = {
   _library_ref?: string;
-
+  id?: string;
   name?: string;
   cls?: string;
   parameters?: Field[];
   inputs?: Field[];
   outputs?: Field[];
   isCustom?: boolean;
-  workflow_id?: string;
-  published_id?: string;
-  version_id?: string;
 
   execution_state?: {
     status: ExecutionStatus;
@@ -77,6 +75,14 @@ export type LLMConfig = {
 };
 
 export type Signature = BaseComponent;
+
+export type Custom = BaseComponent & {
+  isCustom?: boolean;
+  workflow_id?: string;
+  publishedId?: string;
+  version_id?: string;
+  versions?: Record<string, any>;
+};
 
 export type Module = BaseComponent & {
   components?: Flow["nodes"];
@@ -116,7 +122,7 @@ export type End = BaseComponent & {
   outputs?: never;
 };
 
-export type Component = Entry | Signature | Module | Evaluator | End;
+export type Component = Entry | Signature | Module | Evaluator | End | Custom;
 
 type Flow = {
   nodes: Node<Component>[];

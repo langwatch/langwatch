@@ -25,6 +25,8 @@ import {
   type Component,
   type ComponentType,
   type Signature,
+  type Custom,
+  type Field,
 } from "../types/dsl";
 import { findLowestAvailableName, getInputsOutputs } from "../utils/nodeUtils";
 import { ComponentIcon } from "./ColorfulBlockIcons";
@@ -82,23 +84,23 @@ export const NodeSelectionPanel = ({
     }
   );
 
-  const createCustomComponent = (signature: Signature) => {
-    const publishedId = signature.publishedId;
-    const publishedVersion = signature.versions.find(
-      (version) => version.id === publishedId
+  const createCustomComponent = (custom: Custom) => {
+    const publishedId = custom.publishedId ?? "";
+    const publishedVersion = custom.versions?.find(
+      (version: any) => version.id === publishedId
     );
 
     const { inputs, outputs } = getInputsOutputs(
       publishedVersion?.dsl.edges,
       publishedVersion?.dsl.nodes
-    );
+    ) as { inputs: Field[]; outputs: Field[] };
 
     return {
-      name: signature.name,
+      name: custom.name ?? "Custom Component",
       inputs: inputs,
       outputs: outputs,
       isCustom: true,
-      workflow_id: signature.id,
+      workflow_id: custom.id,
       published_id: publishedId,
       version_id: publishedId,
     };
@@ -146,17 +148,17 @@ export const NodeSelectionPanel = ({
             );
           })}
 
-          {components?.length > 0 && (
+          {components && components.length > 0 && (
             <>
               <Text fontWeight="500" padding={1}>
                 Custom Components
               </Text>
-              {components.map((signature) => {
+              {components.map((custom) => {
                 return (
                   <NodeDraggable
-                    key={signature.name}
-                    component={createCustomComponent(signature)}
-                    type="module"
+                    key={custom.name}
+                    component={createCustomComponent(custom as Custom)}
+                    type="custom"
                   />
                 );
               })}

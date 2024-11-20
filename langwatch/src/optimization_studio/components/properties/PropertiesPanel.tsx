@@ -10,6 +10,7 @@ import { InputPanel } from "../component_execution/InputPanel";
 import { OutputPanel } from "../component_execution/OutputPanel";
 import { BasePropertiesPanel } from "./BasePropertiesPanel";
 import { EndPropertiesPanel } from "./EndPropertiesPanel";
+import { CustomPropertiesPanel } from "./CustomPropertiesPanel";
 import { EntryPointPropertiesPanel } from "./EntryPointPropertiesPanel";
 import { EvaluatorPropertiesPanel } from "./EvaluatorPropertiesPanel";
 import { PromptingTechniquePropertiesPanel } from "./PromptingTechniquePropertiesPanel";
@@ -40,6 +41,7 @@ export function PropertiesPanel() {
     end: EndPropertiesPanel as React.FC<{ node: Node<Component> }>,
     signature: SignaturePropertiesPanel,
     module: BasePropertiesPanel,
+    custom: CustomPropertiesPanel,
     retriever: RetrievePropertiesPanel,
     prompting_technique: PromptingTechniquePropertiesPanel,
     evaluator: EvaluatorPropertiesPanel as React.FC<{ node: Node<Component> }>,

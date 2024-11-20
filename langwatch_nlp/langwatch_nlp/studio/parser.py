@@ -25,6 +25,7 @@ from langwatch_nlp.studio.types.dsl import (
     Signature,
     Workflow,
     Module,
+    Custom,
 )
 import dspy
 
@@ -50,8 +51,8 @@ def parse_component(node: Node, workflow: Workflow) -> dspy.Module:
             return parse_evaluator(node.data, workflow)
         case "end":
             return parse_end(node.data, workflow)
-        case "module":
-            return parse_module(node.data, workflow)
+        case "custom":
+            return parse_custom(node.data, workflow)
         case _:
             raise NotImplementedError(f"Unknown component type: {node.type}")
 
@@ -70,9 +71,8 @@ def apiCall(inputs, api_key, endpoint, workflow_id, version_id):
     return response.json()
 
 
-def parse_module(component: Module, workflow: Workflow) -> dspy.Module:
-
-    class ModuleNode(dspy.Module):
+def parse_custom(component: Custom, workflow: Workflow) -> dspy.Module:
+    class CustomNode(dspy.Module):
         def forward(self, **kwargs) -> Any:
             return apiCall(
                 kwargs,
@@ -82,7 +82,7 @@ def parse_module(component: Module, workflow: Workflow) -> dspy.Module:
                 component.version_id,
             )["result"]
 
-    return ModuleNode()
+    return CustomNode()
 
 
 def parse_signature(
@@ -139,7 +139,9 @@ def parse_signature(
     if demonstrations and demonstrations.inline:
         demos = transpose_inline_dataset_to_object_list(demonstrations.inline)
 
-    return LLMNode(node_id=node_id, name=class_name, predict=predict, lm=lm, demos=demos)
+    return LLMNode(
+        node_id=node_id, name=class_name, predict=predict, lm=lm, demos=demos
+    )
 
 
 def parse_prompting_technique(

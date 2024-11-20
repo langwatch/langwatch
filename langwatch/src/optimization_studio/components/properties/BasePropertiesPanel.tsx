@@ -35,6 +35,7 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type {
   Component,
   ComponentType,
+  Custom,
   Field,
   LLMConfig,
   Workflow,
@@ -572,9 +573,7 @@ export function BasePropertiesPanel({
           </Button>
         </HStack>
       </HStack>
-      {!isWorkflow(node) && node.data?.isCustom && (
-        <CustomComponentInfo node={node} />
-      )}
+
       {children}
       {!isWorkflow(node) && (
         <>
@@ -604,99 +603,3 @@ export function BasePropertiesPanel({
     </VStack>
   );
 }
-
-const CustomComponentInfo = ({ node }: { node: Node<Component> }) => {
-  const { currentVersion, publishedVersion } = useComponentVersion(node);
-  const { project } = useOrganizationTeamProject();
-  const toast = useToast();
-  const { setNode, setSelectedNode, setPropertiesExpanded, deselectAllNodes } =
-    useWorkflowStore(
-      useShallow(
-        ({
-          setNode,
-          setSelectedNode,
-          setPropertiesExpanded,
-          deselectAllNodes,
-        }) => ({
-          setNode,
-          setSelectedNode,
-          setPropertiesExpanded,
-          deselectAllNodes,
-        })
-      )
-    );
-  const updateNodeInternals = useUpdateNodeInternals();
-
-  const updateToLatestVersion = () => {
-    const { inputs, outputs } = getInputsOutputs(
-      (publishedVersion?.dsl as unknown as Workflow).edges,
-      (publishedVersion?.dsl as unknown as Workflow).nodes
-    );
-
-    setNode({
-      id: node.id,
-      data: { inputs, outputs, version_id: publishedVersion?.id },
-    });
-    updateNodeInternals(node.id);
-
-    // setSelectedNode(node.id);
-    deselectAllNodes();
-
-    toast({
-      title: "Updated to latest version",
-      status: "success",
-      duration: 3000,
-    });
-
-    // setPropertiesExpanded(true);
-  };
-
-  return (
-    <HStack width="full" spacing={3}>
-      {currentVersion && <VersionBox version={currentVersion} />}
-      <VStack align="start" width="full" spacing={1}>
-        <HStack>
-          <Text fontWeight={600} fontSize={13} noOfLines={1}>
-            {currentVersion?.commitMessage}
-          </Text>
-          <Link
-            href={`/${project?.slug}/studio/${node.data.workflow_id}`}
-            isExternal
-          >
-            <ExternalLink size={14} />
-          </Link>
-          {currentVersion?.isPublishedVersion ? (
-            <Tag colorScheme="green" size="sm" paddingX={2}>
-              Latest version
-            </Tag>
-          ) : (
-            <Button
-              size="xs"
-              variant="outline"
-              colorScheme="gray"
-              onClick={() => {
-                updateToLatestVersion();
-              }}
-            >
-              Update to latest version
-            </Button>
-          )}
-        </HStack>
-        <HStack>
-          <Avatar
-            name={"jim"}
-            backgroundColor={"orange.400"}
-            color="white"
-            size="2xs"
-          />
-          <Text fontSize={12}>
-            {currentVersion?.author?.name}
-            {" · "}
-            {currentVersion?.updatedAt &&
-              formatTimeAgo(currentVersion.updatedAt.getTime())}
-          </Text>
-        </HStack>
-      </VStack>
-    </HStack>
-  );
-};

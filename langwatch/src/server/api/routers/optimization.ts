@@ -84,7 +84,7 @@ export const optimizationRouter = createTRPCRouter({
     .input(z.object({ workflowId: z.string(), projectId: z.string() }))
     .use(skipPermissionCheck)
     .query(async ({ ctx, input }) => {
-      const { workflowId, projectId } = input;
+      const { projectId } = input;
       const workflows = await ctx.prisma.workflow.findMany({
         where: {
           projectId: projectId,
