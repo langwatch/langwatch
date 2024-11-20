@@ -318,6 +318,7 @@ function MembersList({
                         <MenuList>
                           <MenuItem
                             color="red.600"
+                            isDisabled={organization.members.length === 1}
                             onClick={() => deleteMember(member.userId)}
                             icon={<DeleteIcon />}
                           >
