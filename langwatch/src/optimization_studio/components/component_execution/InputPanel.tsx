@@ -28,7 +28,8 @@ export const InputPanel = ({ node }: { node: Node<Component> }) => {
         typeof value === "object" ? JSON.stringify(value) : value ?? "",
       ])
     );
-  }, [inputs]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [JSON.stringify(inputs)]);
 
   const {
     register,

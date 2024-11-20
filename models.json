@@ -143,27 +143,33 @@
     "model_vendor": "anthropic",
     "mode": "chat"
   },
-  "anthropic/claude-3-5-sonnet-20240620": {
-    "name": "Claude 3.5 Sonnet",
-    "version": "20240620",
-    "model_vendor": "anthropic",
-    "mode": "chat"
-  },
   "anthropic/claude-3-5-sonnet-20241022": {
     "name": "Claude 3.5 Sonnet",
     "version": "20241022",
     "model_vendor": "anthropic",
     "mode": "chat"
   },
-  "vertex_ai/gemini-1.5-flash-001": {
+  "anthropic/claude-3-5-sonnet-20240620": {
+    "name": "Claude 3.5 Sonnet",
+    "version": "20240620",
+    "model_vendor": "anthropic",
+    "mode": "chat"
+  },
+  "vertex_ai/gemini-1.5-flash": {
     "name": "Gemini 1.5 Flash",
     "version": "001",
     "model_vendor": "google",
     "mode": "chat"
   },
-  "vertex_ai/gemini-1.5-pro-001": {
+  "vertex_ai/gemini-1.5-pro": {
     "name": "Gemini 1.5 Pro",
-    "version": "001",
+    "version": "002",
+    "model_vendor": "google",
+    "mode": "chat"
+  },
+  "gemini/gemini-exp-1114": {
+    "name": "Gemini Exp 1114",
+    "version": "1114",
     "model_vendor": "google",
     "mode": "chat"
   },

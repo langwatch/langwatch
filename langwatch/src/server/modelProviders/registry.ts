@@ -82,6 +82,15 @@ export const modelProviders = {
     }),
     enabledSince: new Date("2023-01-01"),
   },
+  gemini: {
+    name: "Gemini",
+    apiKey: "GEMINI_API_KEY",
+    endpointKey: undefined,
+    keysSchema: z.object({
+      GEMINI_API_KEY: z.string().min(1),
+    }),
+    enabledSince: new Date("2023-01-01"),
+  },
   cloudflare: {
     name: "Cloudflare",
     apiKey: "CLOUDFLARE_API_KEY",

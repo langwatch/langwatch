@@ -8,6 +8,8 @@ import { Mistral } from "../../components/icons/Mistral";
 import { OpenAI } from "../../components/icons/OpenAI";
 import { Custom } from "../../components/icons/Custom";
 import { type modelProviders } from "./registry";
+import { Gemini } from "../../components/icons/Gemini";
+import { GoogleCloud } from "../../components/icons/GoogleCloud";
 
 export const modelProviderIcons: Record<
   keyof typeof modelProviders,
@@ -17,7 +19,8 @@ export const modelProviderIcons: Record<
   azure: <Azure />,
   anthropic: <Anthropic />,
   groq: <Groq />,
-  vertex_ai: <Google />,
+  vertex_ai: <GoogleCloud />,
+  gemini: <Gemini />,
   cloudflare: <Cloudflare />,
   custom: <Custom />,
 };

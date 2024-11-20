@@ -139,7 +139,7 @@ export const ModelSelector = React.memo(function ModelSelector({
               </Box>
               <Box fontSize={size === "sm" ? 12 : 14} fontFamily="mono">
                 {children}
-                {(!!props.data.version || props.data.isDisabled) && (
+                {props.data.isDisabled && (
                   <>
                     {" "}
                     <Text
@@ -148,7 +148,7 @@ export const ModelSelector = React.memo(function ModelSelector({
                       fontFamily="mono"
                       color="gray.400"
                     >
-                      ({props.data.value ? props.data.version : "disabled"})
+                      (disabled)
                     </Text>
                   </>
                 )}

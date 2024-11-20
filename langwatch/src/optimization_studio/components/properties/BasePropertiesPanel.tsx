@@ -107,6 +107,8 @@ export function FieldsDefinition({
       spacing={3}
       width="full"
       // eslint-disable-next-line @typescript-eslint/no-misused-promises
+      onSubmit={handleSubmit(onSubmit)}
+      // eslint-disable-next-line @typescript-eslint/no-misused-promises
       onChange={handleSubmit(onSubmit)}
     >
       <HStack width="full">
