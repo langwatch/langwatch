@@ -230,6 +230,7 @@ export const TeamForm = ({
                       <Button
                         type="button"
                         colorScheme="red"
+                        isDisabled={members.fields.length === 1}
                         onClick={() => members.remove(index)}
                       >
                         <Trash size={18} />
