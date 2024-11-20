@@ -79,6 +79,10 @@ class BaseComponent(BaseModel):
     inputs: Optional[List[Field]] = None
     outputs: Optional[List[Field]] = None
     execution_state: Optional[ExecutionState] = None
+    workflow_id: Optional[str] = None
+    published_id: Optional[str] = None
+    isCustom: Optional[bool] = None
+    version_id: Optional[str] = None
 
 
 class Edge(BaseModel):

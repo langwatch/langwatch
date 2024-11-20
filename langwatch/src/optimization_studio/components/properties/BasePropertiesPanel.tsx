@@ -10,13 +10,27 @@ import {
   Text,
   Tooltip,
   VStack,
+  Tag,
+  Avatar,
+  Link,
 } from "@chakra-ui/react";
 import { useUpdateNodeInternals, type Node } from "@xyflow/react";
 import React, { useState } from "react";
-import { ChevronDown, Columns, Info, Plus, Trash2, X } from "react-feather";
+import {
+  ChevronDown,
+  Columns,
+  Info,
+  Plus,
+  Trash2,
+  X,
+  ExternalLink,
+} from "react-feather";
 import { useFieldArray, useForm } from "react-hook-form";
 import { useShallow } from "zustand/react/shallow";
 import { useWorkflowStore } from "../../hooks/useWorkflowStore";
+import { useComponentVersion } from "../../hooks/useComponentVersion";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+
 import type {
   Component,
   ComponentType,
@@ -32,10 +46,14 @@ import {
   NodeSectionTitle,
   TypeLabel,
 } from "../nodes/Nodes";
-import { nameToId } from "../../utils/nodeUtils";
+import { nameToId, getInputsOutputs } from "../../utils/nodeUtils";
 import { HoverableBigText } from "../../../components/HoverableBigText";
+import { VersionBox } from "../History";
 import { camelCaseToTitleCase } from "../../../utils/stringCasing";
+import { formatTimeAgo } from "../../../utils/formatTimeAgo";
+
 import { LLMConfigField } from "./modals/LLMConfigModal";
+import { api } from "../../../utils/api";
 
 export function PropertyField({
   title,
@@ -72,6 +90,10 @@ export function FieldsDefinition({
       setNode: state.setNode,
     }))
   );
+
+  if (node.data.isCustom) {
+    readOnly = true;
+  }
 
   const {
     control,
@@ -424,16 +446,7 @@ export function BasePropertiesPanel({
 
   const handleNameChange = (value: string, id: string) => {
     const newId = nameToId(value);
-
-    setNode(
-      {
-        id: id,
-        data: {
-          name: value,
-        },
-      },
-      newId
-    );
+    setNode({ id, data: { name: value } }, newId);
   };
 
   return (
@@ -558,12 +571,14 @@ export function BasePropertiesPanel({
           </Button>
         </HStack>
       </HStack>
+      {node.data?.isCustom && <CustomComponentInfo node={node} />}
       {children}
       {!isWorkflow(node) && (
         <>
           {!hideParameters && (
             <FieldsForm node={node} field="parameters" title="Parameters" />
           )}
+
           {!hideInputs && (
             <FieldsDefinition
               node={node}
@@ -586,3 +601,71 @@ export function BasePropertiesPanel({
     </VStack>
   );
 }
+
+const CustomComponentInfo = ({ node }: { node: Node<Component> }) => {
+  const { currentVersion, publishedVersion } = useComponentVersion(node);
+  const { project } = useOrganizationTeamProject();
+  const { setNode } = useWorkflowStore(({ setNode }) => ({ setNode }));
+  const updateNodeInternals = useUpdateNodeInternals();
+
+  const updateToLatestVersion = () => {
+    const { inputs, outputs } = getInputsOutputs(
+      publishedVersion?.dsl.edges,
+      publishedVersion?.dsl.nodes
+    );
+
+    setNode({
+      id: node.id,
+      data: { inputs, outputs, version_id: publishedVersion?.id },
+    });
+    updateNodeInternals(node.id);
+  };
+
+  return (
+    <HStack width="full" spacing={3}>
+      <VersionBox version={currentVersion} />
+      <VStack align="start" width="full" spacing={1}>
+        <HStack>
+          <Text fontWeight={600} fontSize={13} noOfLines={1}>
+            {currentVersion?.commitMessage}
+          </Text>
+          <Link
+            href={`/${project.slug}/studio/${node.data.workflow_id}`}
+            isExternal
+          >
+            <ExternalLink size={14} />
+          </Link>
+          {currentVersion?.isPublishedVersion ? (
+            <Tag colorScheme="green" size="sm" paddingX={2}>
+              Latest version
+            </Tag>
+          ) : (
+            <Button
+              size="xs"
+              variant="outline"
+              colorScheme="gray"
+              onClick={() => {
+                updateToLatestVersion();
+              }}
+            >
+              Update to latest version
+            </Button>
+          )}
+        </HStack>
+        <HStack>
+          <Avatar
+            name={"jim"}
+            backgroundColor={"orange.400"}
+            color="white"
+            size="2xs"
+          />
+          <Text fontSize={12}>
+            {currentVersion?.author?.name}
+            {" · "}
+            {formatTimeAgo(currentVersion?.updatedAt.getTime())}
+          </Text>
+        </HStack>
+      </VStack>
+    </HStack>
+  );
+};

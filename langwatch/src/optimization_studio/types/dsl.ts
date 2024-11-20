@@ -49,6 +49,9 @@ export type BaseComponent = {
   inputs?: Field[];
   outputs?: Field[];
   isCustom?: boolean;
+  workflow_id?: string;
+  published_id?: string;
+  version_id?: string;
   execution_state?: {
     status: ExecutionStatus;
     trace_id?: string;

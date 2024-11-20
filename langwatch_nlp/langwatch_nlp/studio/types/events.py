@@ -24,6 +24,9 @@ class ExecuteComponentPayload(BaseModel):
     trace_id: str
     workflow: Workflow
     node_id: str
+    workflow_id: Optional[str] = None
+    version_id: Optional[str] = None
+    published_id: Optional[str] = None
     inputs: Dict[str, Any]
 
 

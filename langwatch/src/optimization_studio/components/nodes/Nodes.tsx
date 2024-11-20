@@ -13,6 +13,8 @@ import {
   Text,
   Tooltip,
   VStack,
+  Alert,
+  AlertIcon,
   type ButtonProps,
 } from "@chakra-ui/react";
 
@@ -40,6 +42,7 @@ import { useShallow } from "zustand/react/shallow";
 import { useComponentExecution } from "../../hooks/useComponentExecution";
 import { useWorkflowExecution } from "../../hooks/useWorkflowExecution";
 import { useWorkflowStore } from "../../hooks/useWorkflowStore";
+import { useComponentVersion } from "../../hooks/useComponentVersion";
 import {
   type Component,
   type ComponentType,
@@ -332,6 +335,8 @@ export const ComponentNode = forwardRef(function ComponentNode(
           <Box width="54px" />
         )}
       </HStack>
+      <LatestComponentVersionCheck node={node} />
+
       {props.children}
       {props.data.inputs && (
         <>
@@ -358,6 +363,21 @@ export const ComponentNode = forwardRef(function ComponentNode(
     </VStack>
   );
 });
+
+const LatestComponentVersionCheck = ({ node }: { node: Node<Component> }) => {
+  const { currentVersion } = useComponentVersion(node ?? null);
+
+  return (
+    <>
+      {node?.data.isCustom && !currentVersion?.isPublishedVersion && (
+        <Alert status="warning" padding="4px">
+          <AlertIcon />
+          Version outdated
+        </Alert>
+      )}
+    </>
+  );
+};
 
 export function ComponentExecutionButton({
   node,

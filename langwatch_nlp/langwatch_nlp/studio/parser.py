@@ -25,6 +25,7 @@ from langwatch_nlp.studio.types.dsl import (
     Retriever,
     Signature,
     Workflow,
+    Module,
 )
 import dspy
 
@@ -51,29 +52,36 @@ def parse_component(node: Node, workflow: Workflow) -> dspy.Module:
         case "end":
             return parse_end(node.data, workflow)
         case "module":
-            return parse_module(workflow)
+            return parse_module(node.data, workflow)
         case _:
             raise NotImplementedError(f"Unknown component type: {node.type}")
 
 
-def apiCall(inputs, api_key, endpoint, workflow_id):
+def apiCall(inputs, api_key, endpoint, workflow_id, version_id):
+
+    url = endpoint + "/api/optimization/" + workflow_id
+    if version_id:
+        url += "/" + version_id
 
     response = httpx.post(
-        endpoint + "/api/optimization/" + workflow_id,
+        url,
         headers={"X-Auth-Token": api_key},
         json=inputs,
     )
     return response.json()
 
 
-def parse_module(workflow: Workflow) -> dspy.Module:
-    print("workflow", workflow)
+def parse_module(component: Module, workflow: Workflow) -> dspy.Module:
 
     class ModuleNode(dspy.Module):
         def forward(self, **kwargs) -> Any:
             return apiCall(
-                kwargs, workflow.api_key, langwatch.endpoint, workflow.workflow_id
-            )
+                kwargs,
+                workflow.api_key,
+                langwatch.endpoint,
+                component.workflow_id,
+                component.version_id,
+            )["result"]
 
     return ModuleNode()
 

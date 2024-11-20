@@ -27,3 +27,32 @@ export const findLowestAvailableName = (nodes: Node[], prefix: string) => {
 
   return { name, id };
 };
+
+export const getInputsOutputs = (edges: Edge[], nodes: Node[]) => {
+  const entryEdges = edges.filter((edge: Edge) => edge.source === "entry");
+
+  const evaluators = nodes.filter((node: Node) => node.type === "evaluator");
+
+  const entryInputs = entryEdges.reduce((acc: Edge[], edge: Edge) => {
+    if (
+      !evaluators?.some((evaluator: Node) => evaluator.id === edge.target) &&
+      !acc.some((e) => e.sourceHandle === edge.sourceHandle)
+    ) {
+      acc.push(edge);
+    }
+    return acc;
+  }, [] as Edge[]);
+
+  const inputs = entryInputs.map((edge: Edge) => {
+    return {
+      identifier: edge.sourceHandle?.split(".")[1],
+      type: "str",
+    };
+  });
+
+  const outputs = nodes.find(
+    (node: Node) => node.type === "end" || node.id === "end"
+  ).data.inputs;
+
+  return { inputs, outputs };
+};

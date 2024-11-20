@@ -5,161 +5,8 @@ import {
   type PromptingTechnique,
   type Retriever,
   type Signature,
-  type CustomComponent,
 } from "./types/dsl";
 import { convertEvaluators } from "./utils/registryUtils";
-
-const data = {
-  icon: "🧩",
-  name: "ClassifyTransactions",
-  edges: [
-    {
-      id: "xy-edge__classify_transactionoutputs.category-endinputs.output",
-      type: "default",
-      source: "classify_transaction",
-      target: "end",
-      sourceHandle: "outputs.category",
-      targetHandle: "inputs.output",
-    },
-    {
-      id: "xy-edge__classify_transactionoutputs.category-exact_matchinputs.output",
-      type: "default",
-      source: "classify_transaction",
-      target: "exact_match",
-      sourceHandle: "outputs.category",
-      targetHandle: "inputs.output",
-    },
-    {
-      id: "xy-edge__entryoutputs.Description-classify_transactioninputs.description",
-      type: "default",
-      source: "entry",
-      target: "classify_transaction",
-      sourceHandle: "outputs.Description",
-      targetHandle: "inputs.description",
-    },
-    {
-      id: "xy-edge__entryoutputs.category-exact_matchinputs.expected_output",
-      type: "default",
-      source: "entry",
-      target: "exact_match",
-      sourceHandle: "outputs.category",
-      targetHandle: "inputs.expected_output",
-    },
-  ],
-  nodes: [
-    {
-      id: "entry",
-      data: {
-        name: "Entry",
-        seed: 42,
-        dataset: { id: "w6NE11hPKFR1Cz9ydeofO", name: "personal_transactions" },
-        outputs: [
-          { type: "str", identifier: "Date" },
-          { type: "str", identifier: "Description" },
-          { type: "str", identifier: "Amount" },
-          { type: "str", identifier: "Transaction Type" },
-          { type: "str", identifier: "category" },
-          { type: "str", identifier: "Account Name" },
-        ],
-        test_size: 0.05,
-        train_size: 0.05,
-        entry_selection: "random",
-      },
-      type: "entry",
-      measured: { width: 180, height: 385 },
-      position: { x: 0, y: 0 },
-      selected: true,
-      deletable: false,
-    },
-    {
-      id: "classify_transaction",
-      data: {
-        name: "ClassifyTransaction",
-        inputs: [{ type: "str", identifier: "description" }],
-        prompt: "",
-        outputs: [{ type: "str", identifier: "category" }],
-        execution_state: {
-          cost: 0.00002745,
-          inputs: { description: "lol" },
-          status: "success",
-          outputs: { category: "slang" },
-          trace_id: "trace_2ec8onmsPmAnGWDPoXl96",
-          timestamps: { started_at: 1731352023297, finished_at: 1731352024128 },
-        },
-      },
-      type: "signature",
-      dragging: false,
-      measured: { width: 225, height: 160 },
-      position: { x: 291.4356774941994, y: -4.428816705337368 },
-      selected: false,
-    },
-    {
-      id: "exact_match",
-      data: {
-        cls: "ExactMatchEvaluator",
-        name: "ExactMatch",
-        inputs: [
-          { type: "str", identifier: "output" },
-          { type: "str", identifier: "expected_output" },
-        ],
-        outputs: [
-          { type: "bool", identifier: "passed" },
-          { type: "float", identifier: "score" },
-        ],
-        execution_state: {
-          inputs: { output: "slang", expected_output: "" },
-          status: "success",
-          outputs: {
-            cost: null,
-            label: null,
-            score: 0,
-            passed: false,
-            status: "processed",
-            details: null,
-          },
-          trace_id: "trace_2ec8onmsPmAnGWDPoXl96",
-          timestamps: { started_at: 1731352024128, finished_at: 1731352024132 },
-        },
-      },
-      type: "evaluator",
-      dragging: false,
-      measured: { width: 180, height: 225 },
-      position: { x: 621.1190806527039, y: 205.464137062832 },
-      selected: false,
-    },
-    {
-      id: "end",
-      data: {
-        name: "End",
-        inputs: [{ type: "str", identifier: "output" }],
-        execution_state: {
-          inputs: { output: "slang" },
-          status: "success",
-          outputs: { output: "slang" },
-          trace_id: "trace_2ec8onmsPmAnGWDPoXl96",
-          timestamps: { started_at: 1731352024132, finished_at: 1731352024135 },
-        },
-      },
-      type: "end",
-      dragging: false,
-      measured: { width: 180, height: 102 },
-      position: { x: 637, y: -8 },
-      selected: false,
-      deletable: false,
-    },
-  ],
-  state: {},
-  version: "1.29",
-  default_llm: {
-    model: "openai/gpt-4o-mini",
-    max_tokens: 2048,
-    temperature: 0,
-  },
-  description:
-    "Query transformation, vector database search and answer generation",
-  workflow_id: "workflow_n5ivnYq8-0Fyo60BSXSan",
-  spec_version: "1.1",
-};
 
 const signatures: Signature[] = [
   {
@@ -198,15 +45,6 @@ const signatures: Signature[] = [
         type: "str",
       },
     ],
-  },
-];
-
-const customComponents: CustomComponent[] = [
-  {
-    name: "Custom",
-    inputs: [{ identifier: "question", type: "str" }],
-    outputs: [{ identifier: "output", type: "str" }],
-    data: data,
   },
 ];
 
@@ -344,7 +182,6 @@ const evaluators: Evaluator[] = [
 
 export const MODULES = {
   signatures,
-  customComponents,
   promptingTechniques,
   evaluators,
   retrievers,

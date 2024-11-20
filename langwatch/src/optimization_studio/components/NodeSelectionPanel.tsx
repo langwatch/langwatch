@@ -21,8 +21,12 @@ import { Box as BoxIcon, ChevronsLeft } from "react-feather";
 import { HoverableBigText } from "../../components/HoverableBigText";
 import { useWorkflowStore } from "../hooks/useWorkflowStore";
 import { MODULES } from "../registry";
-import { type Component, type ComponentType } from "../types/dsl";
-import { findLowestAvailableName } from "../utils/nodeUtils";
+import {
+  type Component,
+  type ComponentType,
+  type Signature,
+} from "../types/dsl";
+import { findLowestAvailableName, getInputsOutputs } from "../utils/nodeUtils";
 import { ComponentIcon } from "./ColorfulBlockIcons";
 import { NodeComponents } from "./nodes";
 import { PromptingTechniqueDraggingNode } from "./nodes/PromptingTechniqueNode";
@@ -78,42 +82,25 @@ export const NodeSelectionPanel = ({
     }
   );
 
-  const createCustomComponent = (dsl: any, name: string) => {
-    const edges = dsl.edges;
-    const nodes = dsl.nodes;
+  const createCustomComponent = (signature: Signature) => {
+    const publishedId = signature.publishedId;
+    const publishedVersion = signature.versions.find(
+      (version) => version.id === publishedId
+    );
 
-    const entryEdges = edges.filter((edge: Edge) => edge.source === "entry");
-
-    const evaluators = nodes.filter((node: Node) => node.type === "evaluator");
-
-    const entryInputs = entryEdges.reduce((acc: Edge[], edge: Edge) => {
-      if (
-        !evaluators?.some((evaluator: Node) => evaluator.id === edge.target) &&
-        !acc.some((e) => e.sourceHandle === edge.sourceHandle)
-      ) {
-        acc.push(edge);
-      }
-      return acc;
-    }, [] as Edge[]);
-
-    const inputs = entryInputs.map((edge: Edge) => {
-      return {
-        identifier: edge.sourceHandle?.split(".")[1],
-        type: "str",
-      };
-    });
-
-    const outputs = nodes.find(
-      (node: Node) => node.type === "end" || node.id === "end"
-    ).data.inputs;
-
-    dsl.isCustom = true;
+    const { inputs, outputs } = getInputsOutputs(
+      publishedVersion?.dsl.edges,
+      publishedVersion?.dsl.nodes
+    );
 
     return {
-      name: name,
+      name: signature.name,
       inputs: inputs,
       outputs: outputs,
-      data: dsl,
+      isCustom: true,
+      workflow_id: signature.id,
+      published_id: publishedId,
+      version_id: publishedId,
     };
   };
 
@@ -159,26 +146,22 @@ export const NodeSelectionPanel = ({
             );
           })}
 
-          {components && components.length > 0 && (
-            <Text fontWeight="500" padding={1}>
-              Custom Components
-            </Text>
+          {components?.length > 0 && (
+            <>
+              <Text fontWeight="500" padding={1}>
+                Custom Components
+              </Text>
+              {components.map((signature) => {
+                return (
+                  <NodeDraggable
+                    key={signature.name}
+                    component={createCustomComponent(signature)}
+                    type="module"
+                  />
+                );
+              })}
+            </>
           )}
-          {components &&
-            components.length > 0 &&
-            components.map((signature) => {
-              const component = createCustomComponent(
-                signature.versions[0]!.dsl,
-                signature.name
-              );
-              return (
-                <NodeDraggable
-                  key={signature.name}
-                  component={component}
-                  type="module"
-                />
-              );
-            })}
 
           <Text fontWeight="500" paddingLeft={1}>
             Prompting Techniques
