@@ -92,10 +92,6 @@ export function FieldsDefinition({
     }))
   );
 
-  if (node.data.isCustom) {
-    readOnly = true;
-  }
-
   const {
     control,
     handleSubmit,

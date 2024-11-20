@@ -26,7 +26,12 @@ import { VersionBox } from "../History";
 
 export function CustomPropertiesPanel({ node }: { node: Node<Custom> }) {
   return (
-    <BasePropertiesPanel node={node} hideParameters>
+    <BasePropertiesPanel
+      node={node}
+      hideParameters
+      inputsReadOnly
+      outputsReadOnly
+    >
       <CustomComponentInfo node={node} />
     </BasePropertiesPanel>
   );
@@ -64,18 +69,16 @@ const CustomComponentInfo = ({ node }: { node: Node<Custom> }) => {
       id: node.id,
       data: { inputs, outputs, version_id: publishedVersion?.id },
     });
+
     updateNodeInternals(node.id);
 
-    // setSelectedNode(node.id);
-    //deselectAllNodes();
+    deselectAllNodes();
 
     toast({
       title: "Updated to latest version",
       status: "success",
       duration: 3000,
     });
-
-    // setPropertiesExpanded(true);
   };
 
   return (
