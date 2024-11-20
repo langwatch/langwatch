@@ -48,6 +48,7 @@ export type CollectorJob = {
   expectedOutput: string | null | undefined;
   reservedTraceMetadata: ReservedTraceMetadata;
   customMetadata: CustomMetadata;
+  collectedAt: number;
 
   existingTrace?: {
     inserted_at?: number;

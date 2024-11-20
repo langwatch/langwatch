@@ -48,7 +48,9 @@ type WorkflowStore = State & {
   getWorkflow: () => Workflow;
   setWorkflow: (workflow: Partial<Workflow> & { workflowId?: string }) => void;
   setPreviousWorkflow: (workflow: Workflow | undefined) => void;
-  setSocketStatus: (status: SocketStatus) => void;
+  setSocketStatus: (
+    status: SocketStatus | ((status: SocketStatus) => SocketStatus)
+  ) => void;
   onNodesChange: (changes: NodeChange[]) => void;
   onEdgesChange: (changes: EdgeChange[]) => void;
   onNodesDelete: () => void;
@@ -156,8 +158,13 @@ const store = (
   setPreviousWorkflow: (workflow: Workflow | undefined) => {
     set({ previousWorkflow: workflow });
   },
-  setSocketStatus: (status: SocketStatus) => {
-    set({ socketStatus: status });
+  setSocketStatus: (
+    status: SocketStatus | ((status: SocketStatus) => SocketStatus)
+  ) => {
+    set({
+      socketStatus:
+        typeof status === "function" ? status(get().socketStatus) : status,
+    });
   },
   onNodesChange: (changes: NodeChange[]) => {
     set({
@@ -357,10 +364,28 @@ const store = (
             : {}),
           ...(optimizationState?.stdout
             ? {
-                stdout:
-                  (get().state.optimization?.stdout?.trimStart() ?? "") +
-                  optimizationState.stdout +
-                  "\n",
+                stdout: (() => {
+                  const stdout =
+                    get().state.optimization?.stdout?.trimStart() ?? "";
+                  const hasCarriageReturn =
+                    optimizationState.stdout?.startsWith("\r") ||
+                    stdout.endsWith("\r\n");
+
+                  if (hasCarriageReturn) {
+                    return (
+                      stdout
+                        .split("\n")
+                        .slice(0, -2)
+                        .join("\n")
+                        .replaceAll("\r", "") +
+                      "\n" +
+                      optimizationState.stdout +
+                      "\n"
+                    );
+                  }
+
+                  return stdout + optimizationState.stdout + "\n";
+                })(),
               }
             : {}),
         },

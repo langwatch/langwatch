@@ -56,7 +56,7 @@ import { CurrentDrawer } from "./CurrentDrawer";
 import { LoadingScreen } from "./LoadingScreen";
 import { ProjectTechStackIcon } from "./TechStack";
 import { LogoIcon } from "./icons/LogoIcon";
-import { PuzzleIcon } from "./icons/Puzzle";
+import { PuzzleIcon } from "./icons/PuzzleIcon";
 import { useTableView } from "./messages/HeaderButtons";
 
 const Breadcrumbs = ({ currentRoute }: { currentRoute: Route | undefined }) => {
@@ -232,7 +232,11 @@ export const ProjectSelector = React.memo(function ProjectSelector({
                         }}
                       >
                         <MenuItem
-                          icon={<ProjectTechStackIcon project={project} />}
+                          icon={
+                            <HStack width="26px" justify="center">
+                              <ProjectTechStackIcon project={project} />
+                            </HStack>
+                          }
                           fontSize="14px"
                         >
                           {project.name}

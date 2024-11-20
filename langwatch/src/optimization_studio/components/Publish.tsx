@@ -42,6 +42,7 @@ import { useVersionState, VersionToBeUsed } from "./History";
 import type { Project } from "@prisma/client";
 import { type Edge, type Node } from "@xyflow/react";
 import { useForm } from "react-hook-form";
+import { langwatchEndpoint } from "../../components/code/langwatchEndpointEnv";
 
 export function Publish({ isDisabled }: { isDisabled: boolean }) {
   const publishModal = useDisclosure();
@@ -548,13 +549,12 @@ export const ApiModalContent = () => {
         <Box padding={4} backgroundColor={"#272822"}>
           <RenderCode
             code={`# Set your API key and endpoint URL
-API_KEY="your_langwatch_api_key"
-ENDPOINT="https://app.langwatch.ai/api/
-          optimization/${workflowId}"
+LANGWATCH_API_KEY="your_langwatch_api_key"
+LANGWATCH_ENDPOINT="${langwatchEndpoint()}/api/optimization/${workflowId}"
 
 # Use curl to send the POST request, e.g.:
-curl -X POST "$ENDPOINT" \\
-     -H "X-Auth-Token: $API_KEY" \\
+curl -X POST "$LANGWATCH_ENDPOINT" \\
+     -H "X-Auth-Token: $LANGWATCH_API_KEY" \\
      -H "Content-Type: application/json" \\
      -d @- <<EOF
 ${message}
@@ -563,9 +563,27 @@ EOF`}
           />
         </Box>
         <Text marginTop={4}>
+          To retrieve your API key, click{" "}
+          <Link
+            href={`/${project?.slug}/setup`}
+            textDecoration="underline"
+            isExternal
+          >
+            here
+          </Link>
+          .
+        </Text>
+        <Text marginTop={4}>
           To access the API details and view more information, please refer to
           the official documentation{" "}
-          <Link href="https://docs.langwatch.ai">here</Link>.
+          <Link
+            href="https://docs.langwatch.ai"
+            textDecoration="underline"
+            isExternal
+          >
+            here
+          </Link>
+          .
         </Text>
       </ModalBody>
       <ModalFooter></ModalFooter>

@@ -13,6 +13,7 @@ class ExactMatchEvaluator(Evaluator):
     def __init__(self):
         super().__init__()
 
+    @Evaluator.trace_evaluation
     def forward(self, output: str, expected_output: str) -> SingleEvaluationResult:
         super().forward()
 

@@ -317,7 +317,7 @@ export function LoadedOptimizationResults({
     ) {
       setSelectedRuns([]);
     }
-  }, [optimizationState?.run_id, optimizationState?.status]);
+  }, [optimizationState?.run_id, optimizationState?.status, selectedRuns]);
 
   const {
     dspyRuns,
@@ -456,7 +456,7 @@ export function LoadedOptimizationResults({
   const hasLogs = optimizationState?.run_id === currentSelectedRun;
 
   return (
-    <HStack align="start" width="full" height="full" spacing={0}>
+    <HStack align="start" width="full" height="full" spacing={0} minWidth="0">
       <DSPyExperimentRunList
         dspyRuns={dspyRuns}
         selectedRuns={selectedRuns_}
@@ -466,8 +466,8 @@ export function LoadedOptimizationResults({
         size="sm"
         incomingRunIds={incomingRunIds}
       />
-      <VStack align="start" width="full" height="full" spacing={0}>
-        <VStack width="full" height="full" overflowY="auto">
+      <VStack align="start" width="full" height="full" spacing={0} minWidth="0">
+        <VStack width="full" height="full" overflowY="auto" minWidth="0">
           {dspyRuns.isLoading ? (
             <Skeleton width="100%" height="30px" />
           ) : dspyRuns.error ? (
@@ -498,7 +498,12 @@ export function LoadedOptimizationResults({
                     labelNames={labelNames}
                   />
                 </VStack>
-                <Box width="full" borderTop="1px solid" borderColor="gray.200">
+                <Box
+                  width="full"
+                  height="full"
+                  borderTop="1px solid"
+                  borderColor="gray.200"
+                >
                   {stepToDisplay &&
                     (!highlightedRun ||
                       highlightedRun === stepToDisplay.run_id) && (
@@ -573,50 +578,56 @@ export function LoadedOptimizationResults({
               </Button>
             </HStack>
           )}
-        <VStack
-          width="full"
-          borderTop="1px solid"
-          borderColor="gray.200"
-          height="100%"
-          position="relative"
-          display={logsPanel.isOpen ? undefined : "none"}
-          minHeight="0"
-        >
-          <Button
-            variant="ghost"
-            onClick={logsPanel.onClose}
-            position="absolute"
-            top={1}
-            right={1}
-            size="xs"
-            zIndex={1}
-          >
-            <ChevronDown size={16} />
-          </Button>
-          <Tabs
-            size="sm"
+        {logsPanel.isOpen && (
+          <VStack
             width="full"
-            height="full"
-            display="flex"
-            flexDirection="column"
+            borderTop="1px solid"
+            borderColor="gray.200"
+            height="100%"
+            position="relative"
             minHeight="0"
           >
-            <TabList>
-              <Tab>Logs</Tab>
-            </TabList>
-            <TabPanels width="100%" height="100%" display="flex" minHeight="0">
-              <TabPanel
+            <Button
+              variant="ghost"
+              onClick={logsPanel.onClose}
+              position="absolute"
+              top={1}
+              right={1}
+              size="xs"
+              zIndex={1}
+            >
+              <ChevronDown size={16} />
+            </Button>
+            <Tabs
+              size="sm"
+              width="full"
+              height="full"
+              display="flex"
+              flexDirection="column"
+              minHeight="0"
+            >
+              <TabList>
+                <Tab>Logs</Tab>
+              </TabList>
+              <TabPanels
                 width="100%"
                 height="100%"
                 display="flex"
                 minHeight="0"
-                padding="0"
               >
-                <LogsPanel />
-              </TabPanel>
-            </TabPanels>
-          </Tabs>
-        </VStack>
+                <TabPanel
+                  width="100%"
+                  height="100%"
+                  display="flex"
+                  minHeight="0"
+                  padding="0"
+                >
+                  <LogsPanel />
+                </TabPanel>
+              </TabPanels>
+            </Tabs>
+          </VStack>
+        )}
       </VStack>
     </HStack>
   );
@@ -629,20 +640,21 @@ function LogsPanel() {
 
   const preRef = useRef<HTMLPreElement>(null);
 
+  const scrollBottom = () => {
+    const pre = preRef.current;
+    if (!pre) return;
+    pre.scrollTop = pre.scrollHeight;
+  };
+
   useEffect(() => {
-    setTimeout(() => {
-      const pre = preRef.current;
-      if (!pre) return;
-      pre.scrollTop = pre.scrollHeight;
-    }, 100);
+    setTimeout(scrollBottom, 100);
   }, []);
 
   useEffect(() => {
-    setTimeout(() => {
-      const pre = preRef.current;
-      if (!pre) return;
-      pre.scrollTop = pre.scrollHeight;
-    }, 1);
+    setTimeout(scrollBottom, 24);
+    setTimeout(scrollBottom, 100);
+    setTimeout(scrollBottom, 500);
+    setTimeout(scrollBottom, 1000);
   }, [stdout]);
 
   return (

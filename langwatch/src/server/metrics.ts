@@ -53,6 +53,17 @@ export const traceSpanCountHistogram = new Histogram({
   ],
 });
 
+// Histogram for collector index delay
+register.removeSingleMetric("collector_index_delay_milliseconds");
+export const collectorIndexDelayHistogram = new Histogram({
+  name: "collector_index_delay_milliseconds",
+  help: "Delay between a trace being received and being indexed",
+  buckets: [
+    100, 1000, 2000, 3000, 5000, 10_000, 30_000, 60_000, 120_000, 300_000,
+    600_000, 1_200_000, 3_600_000, 10_800_000,
+  ],
+});
+
 type JobType =
   | "collector"
   | "collector_check_and_adjust"
@@ -72,7 +83,7 @@ const jobProcessingCounter = new Counter({
 export const getJobProcessingCounter = (jobType: JobType, status: JobStatus) =>
   jobProcessingCounter.labels(jobType, status);
 
-// Histogram for evaluation duration
+// Histogram for job processing duration
 register.removeSingleMetric("job_processing_duration_milliseconds");
 export const jobProcessingDurationHistogram = new Histogram({
   name: "job_processing_duration_milliseconds",
@@ -86,6 +97,13 @@ export const jobProcessingDurationHistogram = new Histogram({
 
 export const getJobProcessingDurationHistogram = (jobType: JobType) =>
   jobProcessingDurationHistogram.labels(jobType);
+
+// Counter for worker restarts
+register.removeSingleMetric("worker_restarts");
+export const workerRestartsCounter = new Counter({
+  name: "worker_restarts",
+  help: "Number of times the worker has been restarted",
+});
 
 // Histogram for evaluation duration
 register.removeSingleMetric("evaluation_duration_milliseconds");
@@ -112,3 +130,14 @@ export const getEvaluationStatusCounter = (
   evaluatorType: string,
   status: EvaluationStatus
 ) => evaluationStatusCounter.labels(evaluatorType, status);
+
+// Counter for pii checks
+register.removeSingleMetric("pii_checks");
+export const piiChecksCounter = new Counter({
+  name: "pii_checks",
+  help: "Number of PII checks for the given method",
+  labelNames: ["method"] as const,
+});
+
+export const getPiiChecksCounter = (method: string) =>
+  piiChecksCounter.labels(method);

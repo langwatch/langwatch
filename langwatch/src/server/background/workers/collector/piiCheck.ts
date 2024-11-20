@@ -12,6 +12,7 @@ import type {
 import {
   evaluationDurationHistogram,
   getEvaluationStatusCounter,
+  getPiiChecksCounter,
 } from "../../../metrics";
 
 const debug = getDebugger("langwatch:trace_checks:piiCheck");
@@ -204,6 +205,7 @@ const googleDLPClearPII = async (
   lastKey: string | number,
   piiRedactionLevel: PIIRedactionLevel
 ): Promise<void> => {
+  getPiiChecksCounter("google_dlp").inc();
   const findings = await dlpCheck(currentObject[lastKey], piiRedactionLevel);
   for (const finding of findings) {
     const start = finding.location?.codepointRange?.start;
@@ -228,7 +230,8 @@ const presidioClearPII = async (
   lastKey: string | number,
   piiRedactionLevel: PIIRedactionLevel
 ): Promise<void> => {
-  const timeout = 2000;
+  getPiiChecksCounter("presidio").inc();
+  const timeout = 5000;
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeout);
 

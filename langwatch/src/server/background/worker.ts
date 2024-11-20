@@ -21,6 +21,9 @@ import { startCollectorWorker } from "./workers/collectorWorker";
 import * as Sentry from "@sentry/node";
 import http from "http";
 import { register } from "prom-client";
+import path from "path";
+import fs from "fs";
+import { workerRestartsCounter } from "../metrics";
 
 class WorkersRestart extends Error {
   constructor(message: string) {
@@ -34,7 +37,10 @@ if (process.env.SENTRY_DSN) {
     dsn: process.env.SENTRY_DSN,
     tracesSampleRate: 1.0,
     beforeSend(event, hint) {
-      if (hint.originalException instanceof WorkersRestart) {
+      if (
+        hint.originalException instanceof WorkersRestart ||
+        `${hint.originalException}`.includes("Max runtime reached")
+      ) {
         return null;
       }
       return event;
@@ -59,7 +65,7 @@ export const start = (
     | undefined = undefined,
   maxRuntimeMs: number | undefined = undefined
 ): Promise<Workers | undefined> => {
-  return new Promise<Workers | undefined>((resolve) => {
+  return new Promise<Workers | undefined>((resolve, reject) => {
     const collectorWorker = startCollectorWorker();
     const evaluationsWorker = startEvaluationsWorker(
       runEvaluationMock ?? runEvaluationJob
@@ -68,12 +74,28 @@ export const start = (
     const trackEventsWorker = startTrackEventsWorker();
 
     startMetricsServer();
+    incrementWorkerRestartCount();
+
+    const closingListener = () => {
+      debug("Worker closing before expected, restarting");
+      reject(new WorkersRestart("Worker closing before expected, restarting"));
+    };
+
+    collectorWorker?.on("closing", closingListener);
+    evaluationsWorker?.on("closing", closingListener);
+    topicClusteringWorker?.on("closing", closingListener);
+    trackEventsWorker?.on("closing", closingListener);
 
     if (maxRuntimeMs) {
       setTimeout(() => {
         debug("Max runtime reached, closing worker");
 
         void (async () => {
+          collectorWorker?.off("closing", closingListener);
+          evaluationsWorker?.off("closing", closingListener);
+          topicClusteringWorker?.off("closing", closingListener);
+          trackEventsWorker?.off("closing", closingListener);
+
           await Promise.all([
             collectorWorker?.close(),
             evaluationsWorker?.close(),
@@ -82,7 +104,9 @@ export const start = (
           ]);
 
           setTimeout(() => {
-            throw new WorkersRestart("Max runtime reached, restarting worker");
+            reject(
+              new WorkersRestart("Max runtime reached, restarting worker")
+            );
           }, 0);
         })();
       }, maxRuntimeMs);
@@ -95,6 +119,27 @@ export const start = (
       });
     }
   });
+};
+
+const incrementWorkerRestartCount = () => {
+  try {
+    const restartCountFile = path.join(
+      "/tmp",
+      "langwatch-worker-restart-count"
+    );
+    let restartCount = 0;
+    if (fs.existsSync(restartCountFile)) {
+      restartCount = parseInt(fs.readFileSync(restartCountFile, "utf8"));
+    }
+    restartCount++;
+    fs.writeFileSync(restartCountFile, restartCount.toString());
+
+    for (let i = 0; i < restartCount; i++) {
+      workerRestartsCounter.inc();
+    }
+  } catch (error) {
+    debug("Error incrementing worker restart count", error);
+  }
 };
 
 const startMetricsServer = () => {

@@ -209,7 +209,7 @@ export const ProjectIntegration = () => {
           Having issues? Messages not visible yet? Check out our{" "}
           <Link
             textDecoration="underline"
-            href="https://docs.langwatch.ai/troubleshooting"
+            href="https://docs.langwatch.ai/support"
             target="_blank"
           >
             Troubleshooting & Support

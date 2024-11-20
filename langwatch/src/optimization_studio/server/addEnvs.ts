@@ -32,9 +32,14 @@ export const addEnvs = async (
     throw new Error("Workflow ID is required");
   }
 
+  const onlyCustomKeys =
+    event.type === "execute_optimization" ||
+    event.type === "execute_evaluation";
+
   const default_llm = addLiteLLMParams(
     event.payload.workflow.default_llm,
-    modelProviders
+    modelProviders,
+    onlyCustomKeys
   );
 
   const workflow: ServerWorkflow = {
@@ -48,7 +53,11 @@ export const addEnvs = async (
           return {
             ...p,
             value: p.value
-              ? addLiteLLMParams(p.value as LLMConfig, modelProviders)
+              ? addLiteLLMParams(
+                  p.value as LLMConfig,
+                  modelProviders,
+                  onlyCustomKeys
+                )
               : default_llm,
           };
         }
@@ -66,7 +75,8 @@ export const addEnvs = async (
   ) {
     event.payload.params.llm = addLiteLLMParams(
       event.payload.params.llm,
-      modelProviders
+      modelProviders,
+      onlyCustomKeys
     );
   }
 
@@ -81,7 +91,8 @@ export const addEnvs = async (
 
 const addLiteLLMParams = (
   llm: LLMConfig,
-  modelProviders: Record<string, MaybeStoredModelProvider>
+  modelProviders: Record<string, MaybeStoredModelProvider>,
+  customKeysOnly: boolean
 ) => {
   const provider = llm.model.split("/")[0]!;
   const modelProvider = modelProviders[provider];
@@ -92,6 +103,9 @@ const addLiteLLMParams = (
     throw new Error(
       `${provider} model provider is disabled, go to settings to enable it`
     );
+  }
+  if (customKeysOnly && !modelProvider.customKeys) {
+    throw new Error(`Custom API key required for ${provider}`);
   }
 
   return {

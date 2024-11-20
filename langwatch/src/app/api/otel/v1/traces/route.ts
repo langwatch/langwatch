@@ -112,6 +112,7 @@ export async function POST(req: NextRequest) {
         paramsMD5,
         expectedOutput: undefined,
         evaluations: undefined,
+        collectedAt: Date.now(),
       })
     );
   }

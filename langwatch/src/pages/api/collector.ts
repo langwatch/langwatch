@@ -344,6 +344,7 @@ export default async function handler(
       expectedOutput,
       existingTrace,
       paramsMD5,
+      collectedAt: Date.now(),
     },
     forceSync
   );

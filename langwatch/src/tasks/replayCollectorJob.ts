@@ -17,6 +17,7 @@ const jobData: CollectorJob = {
   customMetadata: {},
   expectedOutput: null,
   paramsMD5: nanoid(),
+  collectedAt: Date.now(),
 };
 
 export default async function execute() {

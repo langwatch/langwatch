@@ -1,4 +1,5 @@
 import asyncio
+from contextlib import contextmanager
 from multiprocessing import Queue
 import threading
 import time
@@ -11,7 +12,8 @@ from tenacity import retry, stop_after_attempt, wait_exponential
 from langwatch_nlp.studio.dspy.predict_with_metadata import (
     PredictionWithMetadata,
 )
-from langevals_core.base_evaluator import SingleEvaluationResult
+from langevals_core.base_evaluator import SingleEvaluationResult, EvaluationResult
+from langwatch.types import Money
 
 from langwatch_nlp.studio.types.dsl import EvaluationExecutionState, Workflow
 from langwatch_nlp.studio.types.events import (
@@ -31,6 +33,34 @@ class Evaluator(dspy.Module):
             langwatch.get_current_span().update(type="evaluation")
         except Exception:
             pass
+
+    @classmethod
+    def trace_evaluation(cls, func):
+        def wrapper(self, *args, **kwargs):
+            try:
+                result: SingleEvaluationResult = func(self, *args, **kwargs)
+            except Exception as error:
+                try:
+                    langwatch.get_current_span().add_evaluation(
+                        name=self.__class__.__name__,
+                        status="error",
+                        error=error,
+                    )
+                except Exception:
+                    pass
+                raise error
+
+            try:
+                langwatch.get_current_span().add_evaluation(
+                    **result.model_dump(exclude_unset=True, exclude_none=True),
+                    name=self.__class__.__name__,
+                )
+            except Exception:
+                pass
+
+            return result
+
+        return wrapper
 
 
 class EvaluationResultWithMetadata(BaseModel):

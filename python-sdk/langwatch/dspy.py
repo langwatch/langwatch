@@ -765,7 +765,7 @@ class DSPyTracer:
                 else None
             )
 
-            if span and signature:
+            if span and signature and hasattr(signature, "__name__"):
                 span.update(name=f"{self.__class__.__name__}({signature.__name__})")
             elif span:
                 span.update(name=f"{self.__class__.__name__}.forward")
@@ -789,8 +789,10 @@ class DSPyTracer:
             span = self_.safe_get_current_span()
             signature = kwargs.get("signature", self.signature)
 
-            if span and signature:
+            if span and signature and hasattr(signature, "__name__"):
                 span.update(name=f"{self.__class__.__name__}({signature.__name__})")
+            elif span:
+                span.update(name=f"{self.__class__.__name__}.forward")
 
             prediction = self.__class__.__original_forward__(self, **kwargs)  # type: ignore
 

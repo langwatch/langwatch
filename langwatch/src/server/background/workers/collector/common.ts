@@ -44,12 +44,24 @@ export const getFirstInputAsText = (spans: Span[]): string => {
 };
 
 export const isEmptyJson = (value: TypedValueJson["value"]): boolean => {
-  return (
+  let isEmpty =
     !value ||
     value === "null" ||
     value === "{}" ||
-    (typeof value === "object" && Object.keys(value).length === 0)
-  );
+    (typeof value === "object" && Object.keys(value).length === 0);
+
+  if (
+    !isEmpty &&
+    typeof value === "object" &&
+    value &&
+    !Array.isArray(value) &&
+    Object.keys(value).length === 1
+  ) {
+    const value_ = value[Object.keys(value)[0]!];
+    isEmpty = isEmptyJson(value_);
+  }
+
+  return isEmpty;
 };
 
 export const getLastOutputAsText = (spans: Span[]): string => {

@@ -96,6 +96,8 @@ export const useComponentExecution = () => {
         status: "waiting",
         trace_id,
         inputs: inputs_,
+        cost: undefined,
+        timestamps: undefined,
       });
 
       const payload: StudioClientEvent = {

@@ -288,7 +288,9 @@ export function OptimizeModalContent({
   );
 
   const { hasProvidersWithoutCustomKeys, nodeProvidersWithoutCustomKeys } =
-    useModelProviderKeys();
+    useModelProviderKeys(
+      "llm" in params && params.llm ? [params.llm] : undefined
+    );
 
   const isRunning = optimizationState?.status === "running";
 

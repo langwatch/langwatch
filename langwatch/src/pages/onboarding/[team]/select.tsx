@@ -25,7 +25,7 @@ import {
   type SubmitHandler,
   type UseFormRegister,
 } from "react-hook-form";
-import { PuzzleIcon } from "~/components/icons/Puzzle";
+import { PuzzleIcon } from "~/components/icons/PuzzleIcon";
 import { SetupLayout } from "~/components/SetupLayout";
 import { type ProjectFormData } from "~/components/TechStack";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";

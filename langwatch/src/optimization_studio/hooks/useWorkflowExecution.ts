@@ -87,6 +87,7 @@ export const useWorkflowExecution = () => {
           workflow: getWorkflow(),
           until_node_id: untilNodeId,
           inputs: inputs,
+          manual_execution_mode: true,
         },
       };
       sendMessage(payload);

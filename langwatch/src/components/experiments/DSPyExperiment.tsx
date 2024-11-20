@@ -564,9 +564,9 @@ export const RunDetails = React.memo(
     const runName = workflowVersion?.commitMessage ?? dspyStepSummary.run_id;
 
     return (
-      <VStack width="100%" spacing={0}>
+      <VStack width="full" height="full" spacing={0} minWidth="0">
         {size !== "sm" && (
-          <HStack width="100%" spacing={8} padding={4}>
+          <HStack width="full" spacing={8} padding={4}>
             <HStack spacing={3}>
               {workflowVersion ? (
                 <>
@@ -624,11 +624,25 @@ export const RunDetails = React.memo(
             </HStack>
           </HStack>
         )}
-        <Tabs index={tabIndex} onChange={setTabIndex} size={size} width="100%">
-          <TabList position="relative">
+        <Tabs
+          index={tabIndex}
+          onChange={setTabIndex}
+          size={size}
+          width="full"
+          height="full"
+          display="flex"
+          flexDirection="column"
+          minWidth="0"
+        >
+          <TabList
+            position="relative"
+            overflowX="auto"
+            overflowY="hidden"
+            whiteSpace="nowrap"
+          >
             {size === "sm" && (
               <Center
-                height="31px"
+                minHeight="31px"
                 marginBottom="-2px"
                 paddingX={4}
                 fontWeight={500}
@@ -698,7 +712,13 @@ export const RunDetails = React.memo(
             )}
           </TabList>
 
-          <TabPanels>
+          <TabPanels
+            width="full"
+            height="full"
+            minWidth="0"
+            overflowX="auto"
+            display="flex"
+          >
             <TabPanel padding={0} paddingTop={displayRawParams ? 4 : 0}>
               {dspyStep.isLoading ? (
                 <Skeleton width="100%" height="30px" />
@@ -713,7 +733,11 @@ export const RunDetails = React.memo(
                   collapseStringsAfterLength={140}
                 />
               ) : dspyStep.data ? (
-                <Table size={size === "sm" ? "xs" : "sm"} variant="grid">
+                <Table
+                  height="fit-content"
+                  size={size === "sm" ? "xs" : "sm"}
+                  variant="grid"
+                >
                   <Thead>
                     <Tr>
                       <Th minWidth="15px" maxWidth="15px" paddingY={3}></Th>
@@ -721,7 +745,7 @@ export const RunDetails = React.memo(
                         Name
                       </Th>
                       <Th width="25%" paddingY={3}>
-                        Prompt
+                        Instructions
                       </Th>
                       <Th width="25%" paddingY={3}>
                         Signature
@@ -807,7 +831,11 @@ export const RunDetails = React.memo(
             </TabPanel>
             <TabPanel padding={0}>
               {tabIndex === 1 && (
-                <Table size={size === "sm" ? "xs" : "sm"} variant="grid">
+                <Table
+                  height="fit-content"
+                  size={size === "sm" ? "xs" : "sm"}
+                  variant="grid"
+                >
                   <Thead>
                     <Tr>
                       <Th minWidth="15px" maxWidth="15px" paddingY={3}></Th>
@@ -889,7 +917,11 @@ export const RunDetails = React.memo(
               )}
             </TabPanel>
             <TabPanel padding={0}>
-              <Table size={size === "sm" ? "xs" : "sm"} variant="grid">
+              <Table
+                height="fit-content"
+                size={size === "sm" ? "xs" : "sm"}
+                variant="grid"
+              >
                 <Thead>
                   <Tr>
                     <Th minWidth="15px" maxWidth="15px" paddingY={3}></Th>
@@ -939,7 +971,8 @@ export const RunDetails = React.memo(
                   ) : dspyStep.data ? (
                     dspyStep.data.llm_calls.map((llmCall, index) => {
                       const response =
-                        llmCall.response?.choices?.[0]?.message?.content;
+                        llmCall.response?.choices?.[0]?.message?.content ??
+                        llmCall.response?.output;
                       return (
                         <Tr key={index}>
                           <Td background="gray.50" textAlign="center">
@@ -1351,11 +1384,7 @@ export function DSPyExperimentSummary({
       </VStack>
       <Spacer />
       {onViewLogs && (
-        <Button
-          size="sm"
-          onClick={onViewLogs}
-          variant="ghost"
-        >
+        <Button size="sm" onClick={onViewLogs} variant="ghost">
           View Logs
         </Button>
       )}
@@ -1387,7 +1416,7 @@ export function DSPyExperimentSummary({
                       return field;
                     }),
                     demonstrations: predictor.predictor.demos
-                      ?.map((demo: any) => demo._store)
+                      ?.map((demo: any) => demo._store ?? demo)
                       .filter(Boolean),
                   };
                   return optimization;

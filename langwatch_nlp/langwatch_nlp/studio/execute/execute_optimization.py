@@ -139,9 +139,17 @@ async def execute_optimization(
                 task_model=lm,
                 prompt_model=lm,
                 teacher_settings=dict(lm=lm),
+                num_threads=params.get("num_threads", 6),
             )
         elif event.optimizer == "BootstrapFewShotWithRandomSearch":
-            optimizer = dspy.BootstrapFewShotWithRandomSearch(metric=metric, **params)
+            optimizer = dspy.BootstrapFewShotWithRandomSearch(
+                metric=metric,
+                max_bootstrapped_demos=params.get("max_bootstrapped_demos", 4),
+                max_labeled_demos=params.get("max_labeled_demos", 16),
+                max_rounds=params.get("max_rounds", 1),
+                num_candidate_programs=params.get("num_candidate_programs", 10),
+                num_threads=params.get("num_threads", 6),
+            )
             patch_labeled_few_shot_once()
 
         langwatch.dspy.init(
@@ -266,23 +274,41 @@ class QueueWriter(StringIO):
         self.queue = queue
         self.run_id = run_id
         self.original_stdout = original_stdout
+        self.buffer_text = ""
+        self.last_timestamp = int(time.time() * 1000)
 
     def write(self, text: str):
         if self.original_stdout:
             self.original_stdout.write(text)
 
-        if text.strip():  # Only send non-empty lines
+        if text.strip() != "":
+            self.buffer_text += text
+        current_timestamp = int(time.time() * 1000)
+
+        if self.buffer_text != "" and (
+            "\r" not in self.buffer_text
+            or "100%|" in self.buffer_text
+            or current_timestamp - self.last_timestamp > 100
+        ):
+            carriage_return_split = self.buffer_text.split("\r")
+            if len(carriage_return_split) > 1:
+                if self.buffer_text.endswith("\r"):
+                    text = carriage_return_split[-2] + "\r"
+                else:
+                    text = "\r" + carriage_return_split[-1]
+            else:
+                text = self.buffer_text
             self.queue.put_nowait(
                 OptimizationStateChange(
                     payload=OptimizationStateChangePayload(
                         optimization_state=OptimizationExecutionState(
-                            status=ExecutionStatus.running,
-                            run_id=self.run_id,
                             stdout=text,
                         )
                     )
                 )
             )
+            self.last_timestamp = current_timestamp
+            self.buffer_text = ""
 
     def flush(self):
         pass
@@ -291,8 +317,15 @@ class QueueWriter(StringIO):
 @contextmanager
 def redirect_stdout_to_queue(queue: "Queue[StudioServerEvent]", run_id: str):
     stdout = sys.stdout
-    sys.stdout = QueueWriter(queue, run_id, original_stdout=stdout)
+    queue_writer_stdout = QueueWriter(queue, run_id, original_stdout=stdout)
+    sys.stdout = queue_writer_stdout
+
+    stderr = sys.stderr
+    queue_writer_stderr = QueueWriter(queue, run_id, original_stdout=stderr)
+    sys.stderr = queue_writer_stderr
+
     try:
         yield
     finally:
         sys.stdout = stdout
+        sys.stderr = stderr

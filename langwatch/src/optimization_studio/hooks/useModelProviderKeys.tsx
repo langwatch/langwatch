@@ -3,7 +3,7 @@ import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProje
 
 import type { Component, LLMConfig, Signature } from "../types/dsl";
 
-export const useModelProviderKeys = () => {
+export const useModelProviderKeys = (extra_llms?: LLMConfig[]) => {
   const { modelProviders } = useOrganizationTeamProject();
   const { getWorkflow, nodes } = useWorkflowStore((state) => ({
     getWorkflow: state.getWorkflow,
@@ -47,6 +47,13 @@ export const useModelProviderKeys = () => {
   const defaultModel = workflow.default_llm.model.split("/")[0];
   if (defaultModel && !nodeProviders.has(defaultModel)) {
     nodeProviders.add(defaultModel);
+  }
+
+  for (const llm of extra_llms ?? []) {
+    const provider = llm.model.split("/")[0];
+    if (provider) {
+      nodeProviders.add(provider);
+    }
   }
 
   const uniqueNodeProviders = Array.from(nodeProviders);
