@@ -1,22 +1,24 @@
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
-
+import type { Node } from "@xyflow/react";
+import type { Component } from "../types/dsl";
 export const useComponentVersion = (node: Node<Component>) => {
+  const { project } = useOrganizationTeamProject();
+
   if (!node) {
     return { version: null, latestVersion: null };
   }
 
-  const { project } = useOrganizationTeamProject();
   const componentsVersionId = node.data.version_id;
 
   const getVersions = api.workflow.getVersions.useQuery(
     {
-      projectId: project.id,
-      workflowId: node.data.workflow_id,
+      projectId: project?.id ?? "",
+      workflowId: node.data.workflow_id ?? "",
       returnDSL: true,
     },
     {
-      enabled: !!project.id && !!node.data.workflow_id,
+      enabled: !!project?.id && !!node.data.workflow_id,
     }
   );
 

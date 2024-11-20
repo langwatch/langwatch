@@ -1,4 +1,4 @@
-import type { Node } from "@xyflow/react";
+import type { Node, Edge } from "@xyflow/react";
 import { camelCaseToSnakeCase } from "../../utils/stringCasing";
 
 export const nameToId = (name: string) => {
@@ -52,7 +52,7 @@ export const getInputsOutputs = (edges: Edge[], nodes: Node[]) => {
 
   const outputs = nodes.find(
     (node: Node) => node.type === "end" || node.id === "end"
-  ).data.inputs;
+  )?.data.inputs;
 
   return { inputs, outputs };
 };

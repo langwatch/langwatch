@@ -13,6 +13,7 @@ import {
   Tag,
   Avatar,
   Link,
+  useToast,
 } from "@chakra-ui/react";
 import { useUpdateNodeInternals, type Node } from "@xyflow/react";
 import React, { useState } from "react";
@@ -53,7 +54,6 @@ import { camelCaseToTitleCase } from "../../../utils/stringCasing";
 import { formatTimeAgo } from "../../../utils/formatTimeAgo";
 
 import { LLMConfigField } from "./modals/LLMConfigModal";
-import { api } from "../../../utils/api";
 
 export function PropertyField({
   title,
@@ -319,6 +319,7 @@ export function FieldsForm({
         if (field.type === "llm") {
           return (
             <LLMConfigField
+              key={field.id}
               allowDefault={true}
               defaultLLMConfig={default_llm}
               llmConfig={node.data.parameters?.[index]?.value as LLMConfig}
@@ -571,7 +572,9 @@ export function BasePropertiesPanel({
           </Button>
         </HStack>
       </HStack>
-      {node.data?.isCustom && <CustomComponentInfo node={node} />}
+      {!isWorkflow(node) && node.data?.isCustom && (
+        <CustomComponentInfo node={node} />
+      )}
       {children}
       {!isWorkflow(node) && (
         <>
@@ -605,13 +608,29 @@ export function BasePropertiesPanel({
 const CustomComponentInfo = ({ node }: { node: Node<Component> }) => {
   const { currentVersion, publishedVersion } = useComponentVersion(node);
   const { project } = useOrganizationTeamProject();
-  const { setNode } = useWorkflowStore(({ setNode }) => ({ setNode }));
+  const toast = useToast();
+  const { setNode, setSelectedNode, setPropertiesExpanded, deselectAllNodes } =
+    useWorkflowStore(
+      useShallow(
+        ({
+          setNode,
+          setSelectedNode,
+          setPropertiesExpanded,
+          deselectAllNodes,
+        }) => ({
+          setNode,
+          setSelectedNode,
+          setPropertiesExpanded,
+          deselectAllNodes,
+        })
+      )
+    );
   const updateNodeInternals = useUpdateNodeInternals();
 
   const updateToLatestVersion = () => {
     const { inputs, outputs } = getInputsOutputs(
-      publishedVersion?.dsl.edges,
-      publishedVersion?.dsl.nodes
+      (publishedVersion?.dsl as unknown as Workflow).edges,
+      (publishedVersion?.dsl as unknown as Workflow).nodes
     );
 
     setNode({
@@ -619,18 +638,29 @@ const CustomComponentInfo = ({ node }: { node: Node<Component> }) => {
       data: { inputs, outputs, version_id: publishedVersion?.id },
     });
     updateNodeInternals(node.id);
+
+    // setSelectedNode(node.id);
+    deselectAllNodes();
+
+    toast({
+      title: "Updated to latest version",
+      status: "success",
+      duration: 3000,
+    });
+
+    // setPropertiesExpanded(true);
   };
 
   return (
     <HStack width="full" spacing={3}>
-      <VersionBox version={currentVersion} />
+      {currentVersion && <VersionBox version={currentVersion} />}
       <VStack align="start" width="full" spacing={1}>
         <HStack>
           <Text fontWeight={600} fontSize={13} noOfLines={1}>
             {currentVersion?.commitMessage}
           </Text>
           <Link
-            href={`/${project.slug}/studio/${node.data.workflow_id}`}
+            href={`/${project?.slug}/studio/${node.data.workflow_id}`}
             isExternal
           >
             <ExternalLink size={14} />
@@ -662,7 +692,8 @@ const CustomComponentInfo = ({ node }: { node: Node<Component> }) => {
           <Text fontSize={12}>
             {currentVersion?.author?.name}
             {" · "}
-            {formatTimeAgo(currentVersion?.updatedAt.getTime())}
+            {currentVersion?.updatedAt &&
+              formatTimeAgo(currentVersion.updatedAt.getTime())}
           </Text>
         </HStack>
       </VStack>

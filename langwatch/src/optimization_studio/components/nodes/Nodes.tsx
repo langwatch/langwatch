@@ -335,7 +335,7 @@ export const ComponentNode = forwardRef(function ComponentNode(
           <Box width="54px" />
         )}
       </HStack>
-      <LatestComponentVersionCheck node={node} />
+      {node && <LatestComponentVersionCheck node={node} />}
 
       {props.children}
       {props.data.inputs && (

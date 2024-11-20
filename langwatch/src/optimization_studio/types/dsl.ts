@@ -52,6 +52,7 @@ export type BaseComponent = {
   workflow_id?: string;
   published_id?: string;
   version_id?: string;
+
   execution_state?: {
     status: ExecutionStatus;
     trace_id?: string;
@@ -115,13 +116,7 @@ export type End = BaseComponent & {
   outputs?: never;
 };
 
-export type Component =
-  | BaseComponent
-  | Entry
-  | Signature
-  | Module
-  | Evaluator
-  | End;
+export type Component = Entry | Signature | Module | Evaluator | End;
 
 type Flow = {
   nodes: Node<Component>[];
@@ -131,16 +126,14 @@ type Flow = {
 export type Workflow = {
   spec_version: "1.2";
   workflow_id?: string;
-
   name: string;
   icon: string;
   description: string;
   version: string;
-
   default_llm: LLMConfig;
-
   nodes: Node<Component>[];
   edges: Edge[];
+  data?: Record<string, any>;
 
   state: {
     execution?: {
