@@ -7,6 +7,7 @@ import {
   Spacer,
   Text,
   VStack,
+  Tooltip,
 } from "@chakra-ui/react";
 import {
   useReactFlow,
@@ -76,7 +77,6 @@ export const NodeSelectionPanel = ({
   const { data: components } = api.optimization.getComponents.useQuery(
     {
       projectId: project?.id ?? "",
-      workflowId: workflow?.workflow_id ?? "",
     },
     {
       enabled: !!project?.id && !!workflow?.workflow_id,
@@ -154,11 +154,13 @@ export const NodeSelectionPanel = ({
                 Custom Components
               </Text>
               {components.map((custom) => {
+                const isCurrentWorkflow = custom.id === workflow?.workflow_id;
                 return (
                   <NodeDraggable
                     key={custom.name}
                     component={createCustomComponent(custom as Custom)}
                     type="custom"
+                    disableDrag={isCurrentWorkflow}
                   />
                 );
               })}
@@ -224,6 +226,7 @@ export const NodeSelectionPanel = ({
 export const NodeDraggable = (props: {
   component: Component;
   type: ComponentType;
+  disableDrag?: boolean;
 }) => {
   const { setNodes, setNodeParameter, deleteNode, nodes } = useWorkflowStore(
     (state) => ({
@@ -323,28 +326,36 @@ export const NodeDraggable = (props: {
 
   return (
     <>
-      <Box
-        background="white"
-        ref={drag}
-        borderRadius={4}
-        padding={1}
-        cursor="grab"
-        width="full"
-        opacity={collected.isDragging ? 0.5 : 1}
+      <Tooltip
+        label={
+          props.disableDrag
+            ? "You cannot add the same component as your workflow"
+            : ""
+        }
       >
-        <HStack width="full">
-          <ComponentIcon
-            type={props.type}
-            cls={props.component.cls}
-            size="md"
-          />
-          <HoverableBigText noOfLines={1}>
-            {props.component.name}
-          </HoverableBigText>
-          <Spacer />
-          <DragHandleIcon width="14px" height="14px" color="gray.350" />
-        </HStack>
-      </Box>
+        <Box
+          background="white"
+          ref={props.disableDrag ? undefined : drag}
+          borderRadius={4}
+          padding={1}
+          cursor={props.disableDrag ? "not-allowed" : "grab"}
+          width="full"
+          opacity={collected.isDragging ? 0.5 : 1}
+        >
+          <HStack width="full">
+            <ComponentIcon
+              type={props.type}
+              cls={props.component.cls}
+              size="md"
+            />
+            <HoverableBigText noOfLines={1}>
+              {props.component.name}
+            </HoverableBigText>
+            <Spacer />
+            <DragHandleIcon width="14px" height="14px" color="gray.350" />
+          </HStack>
+        </Box>
+      </Tooltip>
     </>
   );
 };

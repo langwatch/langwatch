@@ -78,7 +78,7 @@ export const optimizationRouter = createTRPCRouter({
       }
     }),
   getComponents: publicProcedure
-    .input(z.object({ workflowId: z.string(), projectId: z.string() }))
+    .input(z.object({ projectId: z.string() }))
     .use(skipPermissionCheck)
     .query(async ({ ctx, input }) => {
       const { projectId } = input;

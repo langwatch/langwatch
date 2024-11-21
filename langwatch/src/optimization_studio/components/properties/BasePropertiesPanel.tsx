@@ -10,36 +10,24 @@ import {
   Text,
   Tooltip,
   VStack,
-  Tag,
-  Avatar,
-  Link,
-  useToast,
 } from "@chakra-ui/react";
 import { useUpdateNodeInternals, type Node } from "@xyflow/react";
 import React, { useState } from "react";
-import {
-  ChevronDown,
-  Columns,
-  Info,
-  Plus,
-  Trash2,
-  X,
-  ExternalLink,
-} from "react-feather";
+import { ChevronDown, Columns, Info, Plus, Trash2, X } from "react-feather";
 import { useFieldArray, useForm } from "react-hook-form";
 import { useShallow } from "zustand/react/shallow";
 import { useWorkflowStore } from "../../hooks/useWorkflowStore";
-import { useComponentVersion } from "../../hooks/useComponentVersion";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 
+import { HoverableBigText } from "../../../components/HoverableBigText";
+import { camelCaseToTitleCase } from "../../../utils/stringCasing";
 import type {
   Component,
   ComponentType,
-  Custom,
   Field,
   LLMConfig,
   Workflow,
 } from "../../types/dsl";
+import { nameToId } from "../../utils/nodeUtils";
 import { ComponentIcon } from "../ColorfulBlockIcons";
 import {
   ComponentExecutionButton,
@@ -48,11 +36,6 @@ import {
   NodeSectionTitle,
   TypeLabel,
 } from "../nodes/Nodes";
-import { nameToId, getInputsOutputs } from "../../utils/nodeUtils";
-import { HoverableBigText } from "../../../components/HoverableBigText";
-import { VersionBox } from "../History";
-import { camelCaseToTitleCase } from "../../../utils/stringCasing";
-import { formatTimeAgo } from "../../../utils/formatTimeAgo";
 
 import { LLMConfigField } from "./modals/LLMConfigModal";
 
