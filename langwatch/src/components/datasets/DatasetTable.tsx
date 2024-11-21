@@ -471,6 +471,20 @@ export function DatasetTable({
             >
               Edit Dataset
             </Button>
+            {datasetId && !isEmbedded && (
+              <Button
+                colorScheme="blue"
+                onClick={() => {
+                  openDrawer("batchEvaluation", {
+                    datasetSlug: databaseDataset.data?.slug,
+                  });
+                }}
+                minWidth="fit-content"
+                leftIcon={<Play height={16} />}
+              >
+                Batch Evaluation
+              </Button>
+            )}
           </>
         )}
       </HStack>
