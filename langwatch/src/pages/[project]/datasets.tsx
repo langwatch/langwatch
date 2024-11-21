@@ -148,18 +148,6 @@ export default function Datasets() {
           <Button
             colorScheme="blue"
             onClick={() => {
-              openDrawer("batchEvaluation", {
-                selectDataset: true,
-              });
-            }}
-            minWidth="fit-content"
-            leftIcon={<Play height={16} />}
-          >
-            Batch Evaluation
-          </Button>
-          <Button
-            colorScheme="blue"
-            onClick={() => {
               addEditDatasetDrawer.onOpen();
             }}
             minWidth="fit-content"

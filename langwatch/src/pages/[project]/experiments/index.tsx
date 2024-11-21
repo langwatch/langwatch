@@ -43,18 +43,6 @@ export default function Experiments() {
             Experiments
           </Heading>
           <Spacer />
-          <Button
-            colorScheme="blue"
-            onClick={() => {
-              openDrawer("batchEvaluation", {
-                selectDataset: true,
-              });
-            }}
-            minWidth="fit-content"
-            leftIcon={<Play height={16} />}
-          >
-            Batch Evaluation
-          </Button>
         </HStack>
         <Card>
           <CardBody>
