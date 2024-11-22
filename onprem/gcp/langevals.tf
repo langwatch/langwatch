@@ -35,7 +35,7 @@ resource "kubernetes_deployment" "langevals" {
       spec {
         container {
           name  = "langevals"
-          image = "339712859611.dkr.ecr.eu-central-1.amazonaws.com/onprem_langevals:${local.langwatch_version}"
+          image = "europe-west3-docker.pkg.dev/langwatch/onprem/langevals:${local.langwatch_version}"
 
           port {
             container_port = 8000
