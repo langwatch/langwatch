@@ -12,6 +12,10 @@ terraform {
       source  = "hashicorp/random"
       version = "~> 3.0"
     }
+    kubernetes = {
+      source  = "hashicorp/kubernetes"
+      version = "~> 2.0"
+    }
   }
 }
 
@@ -25,6 +29,12 @@ provider "google-beta" {
   region  = var.region
 }
 
+provider "kubernetes" {
+  host                   = "https://${google_container_cluster.primary.endpoint}"
+  token                  = data.google_client_config.default.access_token
+  cluster_ca_certificate = base64decode(google_container_cluster.primary.master_auth[0].cluster_ca_certificate)
+}
+
 # Random string for unique naming
 resource "random_id" "suffix" {
   byte_length = 4
@@ -34,3 +44,5 @@ resource "random_id" "suffix" {
 data "google_project" "project" {
   project_id = var.project_id
 }
+
+data "google_client_config" "default" {}
