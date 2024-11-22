@@ -55,3 +55,9 @@ resource "google_secret_manager_secret_version" "redis_password" {
   secret      = google_secret_manager_secret.redis_password.id
   secret_data = random_password.redis_password.result
 }
+
+# Update the Redis URL in langwatch.tf to use the generated auth string
+output "redis_auth_string" {
+  value     = google_redis_instance.cache.auth_string
+  sensitive = true
+}

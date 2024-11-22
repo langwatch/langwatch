@@ -2,12 +2,16 @@
 REGION ?=
 ZONE ?=
 PROJECT_ID ?=
+elasticsearch_url ?=
+elasticsearch_api_key ?=
+domain ?=
 
 # Validate required variables
 .PHONY: validate
 validate:
-	@if [ -z "$(PROJECT_ID)" -o -z "$(REGION)" -o -z "$(ZONE)" ]; then \
-		echo "Error: PROJECT_ID, REGION, and ZONE are required. Use: make [command] PROJECT_ID=your-project-id REGION=your-region ZONE=your-zone"; \
+	@if [ -z "$(PROJECT_ID)" -o -z "$(REGION)" -o -z "$(ZONE)" -o -z "$(elasticsearch_url)" -o -z "$(elasticsearch_api_key)" -o -z "$(domain)" ]; then \
+		echo "Error: PROJECT_ID, REGION, ZONE, elasticsearch_url, elasticsearch_api_key, and domain are required."; \
+		echo "Use: make [command] PROJECT_ID=your-project-id REGION=your-region ZONE=your-zone elasticsearch_url=\"your-es-url\" elasticsearch_api_key=\"your-es-key\" domain=\"langwatch.yourdomain.com\""; \
 		exit 1; \
 	fi
 
@@ -22,7 +26,10 @@ plan: validate
 	terraform plan \
 		-var="project_id=$(PROJECT_ID)" \
 		-var="region=$(REGION)" \
-		-var="zone=$(ZONE)"
+		-var="zone=$(ZONE)" \
+		-var="elasticsearch_url=$(elasticsearch_url)" \
+		-var="elasticsearch_api_key=$(elasticsearch_api_key)" \
+		-var="domain=$(domain)"
 
 # Apply Terraform changes
 .PHONY: apply
@@ -31,6 +38,9 @@ apply: validate
 		-var="project_id=$(PROJECT_ID)" \
 		-var="region=$(REGION)" \
 		-var="zone=$(ZONE)" \
+		-var="elasticsearch_url=$(elasticsearch_url)" \
+		-var="elasticsearch_api_key=$(elasticsearch_api_key)" \
+		-var="domain=$(domain)" \
 		-auto-approve
 
 # Destroy infrastructure
@@ -40,6 +50,9 @@ destroy: validate
 		-var="project_id=$(PROJECT_ID)" \
 		-var="region=$(REGION)" \
 		-var="zone=$(ZONE)" \
+		-var="elasticsearch_url=$(elasticsearch_url)" \
+		-var="elasticsearch_api_key=$(elasticsearch_api_key)" \
+		-var="domain=$(domain)" \
 		-auto-approve
 
 # Show outputs
@@ -67,7 +80,7 @@ help:
 	@echo "LangWatch GCP Infrastructure Deployment"
 	@echo ""
 	@echo "Usage:"
-	@echo "  make [command] PROJECT_ID=your-project-id [REGION=region] [ZONE=zone]"
+	@echo "  make [command] PROJECT_ID=your-project-id [REGION=region] [ZONE=zone] elasticsearch_url=your-es-url elasticsearch_api_key=your-es-key domain=langwatch.yourdomain.com"
 	@echo ""
 	@echo "Commands:"
 	@echo "  init       Initialize Terraform"
@@ -80,7 +93,8 @@ help:
 	@echo ""
 	@echo "Required Variables:"
 	@echo "  PROJECT_ID  Your Google Cloud project ID"
-	@echo ""
-	@echo "Optional Variables:"
 	@echo "  REGION     GCP region (default: us-central1)"
 	@echo "  ZONE       GCP zone (default: us-central1-a)"
+	@echo "  elasticsearch_url Elasticsearch URL"
+	@echo "  elasticsearch_api_key Elasticsearch API key"
+	@echo "  domain     The domain where LangWatch will be hosted (e.g., langwatch.yourdomain.com)"

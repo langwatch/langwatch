@@ -1,6 +1,6 @@
 # Enable GKE API
 resource "google_project_service" "gke" {
-  service = "container.googleapis.com"
+  service            = "container.googleapis.com"
   disable_on_destroy = false
 }
 
@@ -23,17 +23,11 @@ resource "google_container_cluster" "primary" {
     workload_pool = "${var.project_id}.svc.id.goog"
   }
 
-  # Enable network policy (optional but recommended)
-  network_policy {
-    enabled = true
-    provider = "CALICO"
-  }
-
   # Configure private cluster
   private_cluster_config {
     enable_private_nodes    = true
     enable_private_endpoint = false
-    master_ipv4_cidr_block = "172.16.0.0/28"
+    master_ipv4_cidr_block  = "172.16.0.0/28"
   }
 
   # Configure master authorized networks
@@ -47,6 +41,7 @@ resource "google_container_cluster" "primary" {
   ip_allocation_policy {
     cluster_ipv4_cidr_block  = "/16"
     services_ipv4_cidr_block = "/16"
+    stack_type               = "IPV4"
   }
 
   depends_on = [
@@ -64,7 +59,7 @@ resource "google_container_node_pool" "primary_nodes" {
 
   node_config {
     preemptible  = false
-    machine_type = "e2-standard-4"
+    machine_type = "e2-standard-8"
 
     # Google recommends custom service accounts that have cloud-platform scope and permissions granted via IAM Roles.
     service_account = google_service_account.gke_sa.email
@@ -87,10 +82,10 @@ resource "google_service_account" "gke_sa" {
 # Grant necessary permissions to GKE service account
 resource "google_project_iam_member" "gke_sa_roles" {
   for_each = toset([
-    "roles/cloudkms.cryptoKeyEncrypterDecrypter",  # For Secret Manager
-    "roles/secretmanager.secretAccessor",          # For accessing secrets
-    "roles/monitoring.viewer",                     # For monitoring
-    "roles/logging.logWriter",                     # For logging
+    "roles/cloudkms.cryptoKeyEncrypterDecrypter", # For Secret Manager
+    "roles/secretmanager.secretAccessor",         # For accessing secrets
+    "roles/monitoring.viewer",                    # For monitoring
+    "roles/logging.logWriter",                    # For logging
     "roles/redis.viewer",                         # For Redis access
     "roles/cloudsql.client"                       # For Cloud SQL access
   ])

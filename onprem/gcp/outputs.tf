@@ -28,3 +28,8 @@ output "gke_service_account_email" {
   value       = google_service_account.gke_sa.email
   description = "GKE Service Account Email"
 }
+
+output "langwatch_loadbalancer_ip" {
+  value       = kubernetes_service.langwatch.status.0.load_balancer.0.ingress.0.ip
+  description = "Public IP address for the LangWatch service. Point your DNS record to this IP."
+}
