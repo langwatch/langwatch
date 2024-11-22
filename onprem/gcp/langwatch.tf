@@ -43,6 +43,7 @@ resource "kubernetes_deployment" "langwatch" {
         container {
           name  = "langwatch"
           image = "europe-west3-docker.pkg.dev/langwatch/onprem/langwatch_saas:${local.langwatch_version}"
+          image_pull_policy = "Always"
 
           port {
             container_port = 3000
