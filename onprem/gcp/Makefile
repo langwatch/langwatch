@@ -54,6 +54,13 @@ clean:
 	rm -f terraform.tfstate*
 	rm -f .terraform.lock.hcl
 
+# Get kubeconfig
+.PHONY: kubeconfig
+kubeconfig: validate
+	gcloud container clusters get-credentials $(shell terraform output -raw kubernetes_cluster_name) \
+		--zone $(ZONE) \
+		--project $(PROJECT_ID)
+
 # Help
 .PHONY: help
 help:
@@ -63,12 +70,13 @@ help:
 	@echo "  make [command] PROJECT_ID=your-project-id [REGION=region] [ZONE=zone]"
 	@echo ""
 	@echo "Commands:"
-	@echo "  init     Initialize Terraform"
-	@echo "  plan     Show planned changes"
-	@echo "  apply    Apply changes"
-	@echo "  destroy  Destroy infrastructure"
-	@echo "  output   Show outputs"
-	@echo "  clean    Clean Terraform files"
+	@echo "  init       Initialize Terraform"
+	@echo "  plan       Show planned changes"
+	@echo "  apply      Apply changes"
+	@echo "  destroy    Destroy infrastructure"
+	@echo "  output     Show outputs"
+	@echo "  clean      Clean Terraform files"
+	@echo "  kubeconfig Configure kubectl for the GKE cluster"
 	@echo ""
 	@echo "Required Variables:"
 	@echo "  PROJECT_ID  Your Google Cloud project ID"

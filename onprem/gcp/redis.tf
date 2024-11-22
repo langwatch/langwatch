@@ -13,6 +13,8 @@ resource "google_redis_instance" "cache" {
 
   auth_enabled = true
 
+  transit_encryption_mode = "SERVER_AUTHENTICATION"
+
   maintenance_policy {
     weekly_maintenance_window {
       day = "SUNDAY"
@@ -22,6 +24,8 @@ resource "google_redis_instance" "cache" {
       }
     }
   }
+
+  customer_managed_key = google_kms_crypto_key.redis_key.id
 
   depends_on = [
     google_service_networking_connection.private_vpc_connection
