@@ -28,14 +28,12 @@ backend-init:
 	gsutil mb -l $(REGION) gs://langwatch-terraform-state-$(PROJECT_ID)
 	terraform init \
 		-backend-config="bucket=langwatch-terraform-state-$(PROJECT_ID)" \
-		-backend-config="prefix=terraform/state"
 
 # Update init to depend on backend check
 .PHONY: init
 init: validate check-backend
 	terraform init \
 		-backend-config="bucket=langwatch-terraform-state-$(PROJECT_ID)" \
-		-backend-config="prefix=terraform/state"
 
 # Add backend check
 .PHONY: check-backend
