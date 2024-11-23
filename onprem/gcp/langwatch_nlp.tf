@@ -27,6 +27,7 @@ resource "kubernetes_deployment" "langwatch_nlp" {
         container {
           name  = "langwatch-nlp"
           image = "europe-west3-docker.pkg.dev/langwatch/onprem/langwatch_nlp:${local.langwatch_version}"
+          image_pull_policy = "Always"
 
           port {
             container_port = 8080

@@ -36,6 +36,7 @@ resource "kubernetes_deployment" "langevals" {
         container {
           name  = "langevals"
           image = "europe-west3-docker.pkg.dev/langwatch/onprem/langevals:${local.langwatch_version}"
+          image_pull_policy = "Always"
 
           port {
             container_port = 8000
