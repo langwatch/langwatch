@@ -51,6 +51,17 @@ resource "kubernetes_deployment" "langevals" {
               memory = "4Gi"
             }
           }
+
+          dynamic "env" {
+            for_each = nonsensitive({
+              for k, v in jsondecode(var.extra_env_vars) :
+              k => v if !contains(["ELASTICSEARCH_NODE_URL", "ELASTICSEARCH_API_KEY"], k)
+            })
+            content {
+              name  = env.key
+              value = env.value
+            }
+          }
         }
       }
     }

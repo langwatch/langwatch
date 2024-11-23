@@ -2,16 +2,18 @@
 REGION ?=
 ZONE ?=
 PROJECT_ID ?=
-elasticsearch_url ?=
-elasticsearch_api_key ?=
 domain ?=
 
-# Validate required variables
+# Validate required variables and .env.json
 .PHONY: validate
 validate:
-	@if [ -z "$(PROJECT_ID)" -o -z "$(REGION)" -o -z "$(ZONE)" -o -z "$(elasticsearch_url)" -o -z "$(elasticsearch_api_key)" -o -z "$(domain)" ]; then \
-		echo "Error: PROJECT_ID, REGION, ZONE, elasticsearch_url, elasticsearch_api_key, and domain are required."; \
-		echo "Use: make [command] PROJECT_ID=your-project-id REGION=your-region ZONE=your-zone elasticsearch_url=\"your-es-url\" elasticsearch_api_key=\"your-es-key\" domain=\"langwatch.yourdomain.com\""; \
+	@if [ ! -f .env.json ]; then \
+		echo "Error: .env.json file not found. Copy .env.example.json to .env.json and fill in your values."; \
+		exit 1; \
+	fi
+	@if [ -z "$(PROJECT_ID)" -o -z "$(REGION)" -o -z "$(ZONE)" -o -z "$(domain)" ]; then \
+		echo "Error: PROJECT_ID, REGION, ZONE, and domain are required."; \
+		echo "Use: make [command] PROJECT_ID=your-project-id REGION=your-region ZONE=your-zone domain=langwatch.yourdomain.com"; \
 		exit 1; \
 	fi
 
@@ -27,9 +29,8 @@ plan: validate
 		-var="project_id=$(PROJECT_ID)" \
 		-var="region=$(REGION)" \
 		-var="zone=$(ZONE)" \
-		-var="elasticsearch_url=$(elasticsearch_url)" \
-		-var="elasticsearch_api_key=$(elasticsearch_api_key)" \
-		-var="domain=$(domain)"
+		-var="domain=$(domain)" \
+		-var='extra_env_vars=$(shell cat .env.json)'
 
 # Apply Terraform changes
 .PHONY: apply
@@ -38,9 +39,8 @@ apply: validate
 		-var="project_id=$(PROJECT_ID)" \
 		-var="region=$(REGION)" \
 		-var="zone=$(ZONE)" \
-		-var="elasticsearch_url=$(elasticsearch_url)" \
-		-var="elasticsearch_api_key=$(elasticsearch_api_key)" \
 		-var="domain=$(domain)" \
+		-var='extra_env_vars=$(shell cat .env.json)' \
 		-auto-approve
 
 # Destroy infrastructure
@@ -50,9 +50,8 @@ destroy: validate
 		-var="project_id=$(PROJECT_ID)" \
 		-var="region=$(REGION)" \
 		-var="zone=$(ZONE)" \
-		-var="elasticsearch_url=$(elasticsearch_url)" \
-		-var="elasticsearch_api_key=$(elasticsearch_api_key)" \
 		-var="domain=$(domain)" \
+		-var='extra_env_vars=$(shell cat .env.json)' \
 		-auto-approve
 
 # Show outputs
@@ -80,7 +79,7 @@ help:
 	@echo "LangWatch GCP Infrastructure Deployment"
 	@echo ""
 	@echo "Usage:"
-	@echo "  make [command] PROJECT_ID=your-project-id [REGION=region] [ZONE=zone] elasticsearch_url=your-es-url elasticsearch_api_key=your-es-key domain=langwatch.yourdomain.com"
+	@echo "  make [command] PROJECT_ID=your-project-id [REGION=region] [ZONE=zone] domain=langwatch.yourdomain.com"
 	@echo ""
 	@echo "Commands:"
 	@echo "  init       Initialize Terraform"
@@ -95,6 +94,4 @@ help:
 	@echo "  PROJECT_ID  Your Google Cloud project ID"
 	@echo "  REGION     GCP region (default: us-central1)"
 	@echo "  ZONE       GCP zone (default: us-central1-a)"
-	@echo "  elasticsearch_url Elasticsearch URL"
-	@echo "  elasticsearch_api_key Elasticsearch API key"
 	@echo "  domain     The domain where LangWatch will be hosted (e.g., langwatch.yourdomain.com)"

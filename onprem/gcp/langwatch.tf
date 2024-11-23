@@ -109,20 +109,13 @@ resource "kubernetes_deployment" "langwatch" {
             value = "true"
           }
 
-          # Add these env vars conditionally
-          env {
-            name  = "ELASTICSEARCH_NODE_URL"
-            value = var.elasticsearch_url
-          }
-
-          env {
-            name  = "ELASTICSEARCH_API_KEY"
-            value = var.elasticsearch_api_key
-          }
-
-          env {
-            name  = "IS_OPENSEARCH"
-            value = var.is_opensearch == "" ? null : var.is_opensearch
+          # Add environment variables dynamically
+          dynamic "env" {
+            for_each = nonsensitive(jsondecode(var.extra_env_vars))
+            content {
+              name  = env.key
+              value = env.value
+            }
           }
 
           resources {

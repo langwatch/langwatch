@@ -21,19 +21,6 @@ variable "network_name" {
   default     = "langwatch-network"
 }
 
-variable "elasticsearch_url" {
-  description = "The Elasticsearch URL (optional)"
-  type        = string
-  default     = ""
-}
-
-variable "elasticsearch_api_key" {
-  description = "The Elasticsearch API key (optional)"
-  type        = string
-  default     = ""
-  sensitive   = true
-}
-
 variable "is_opensearch" {
   description = "Whether the Elasticsearch cluster is OpenSearch (optional)"
   type        = string
@@ -43,4 +30,10 @@ variable "is_opensearch" {
 variable "domain" {
   description = "The domain where LangWatch will be hosted (e.g., langwatch.yourdomain.com)"
   type        = string
+}
+
+variable "extra_env_vars" {
+  description = "Additional environment variables in JSON format. Required vars: ELASTICSEARCH_NODE_URL, ELASTICSEARCH_API_KEY. Optional: AZURE_KEY, OPENAI_KEY, etc."
+  type        = string
+  sensitive   = true
 }

@@ -34,3 +34,7 @@ override.tf.json
 terraform.rc
 
 prometheus-collector/adot-config.yaml
+
+# Environment variables
+.env.json
+!.env.example.json
