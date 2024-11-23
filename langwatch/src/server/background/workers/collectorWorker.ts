@@ -257,7 +257,7 @@ const processCollectorJob_ = async (
       .reverse(),
   };
 
-  if (!process.env.DISABLE_PII_REDACTION) {
+  if (!process.env.DISABLE_PII_REDACTION && project.piiRedactionLevel !== "DISABLED") {
     const piiEnforced = env.NODE_ENV === "production";
     await cleanupPIIs(trace, esSpans, {
       piiRedactionLevel: project.piiRedactionLevel,

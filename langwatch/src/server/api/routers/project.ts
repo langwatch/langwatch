@@ -193,6 +193,10 @@ export const projectRouter = createTRPCRouter({
           framework: input.framework,
           teamId: teamId,
           apiKey: generateApiKey(),
+          piiRedactionLevel:
+            env.NODE_ENV === "development" || env.IS_ONPREM
+              ? "DISABLED"
+              : "ESSENTIAL",
         },
       });
 
@@ -225,7 +229,7 @@ export const projectRouter = createTRPCRouter({
         name: z.string(),
         language: z.string(),
         framework: z.string(),
-        piiRedactionLevel: z.enum(["STRICT", "ESSENTIAL"]),
+        piiRedactionLevel: z.enum(["STRICT", "ESSENTIAL", "DISABLED"]),
         userLinkTemplate: z.string().optional(),
       })
     )
@@ -235,12 +239,27 @@ export const projectRouter = createTRPCRouter({
 
       const project = await prisma.project.findUnique({
         where: { id: input.projectId },
+        include: { team: { include: { organization: true } } },
       });
 
       if (!project) {
         throw new TRPCError({
           code: "NOT_FOUND",
           message: "Project not found",
+        });
+      }
+
+      if (
+        input.piiRedactionLevel === "DISABLED" &&
+        !(
+          env.NODE_ENV === "development" ||
+          !!env.IS_ONPREM ||
+          project.team.organization.signedDPA
+        )
+      ) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "PII redation cannot be disabled",
         });
       }
 
