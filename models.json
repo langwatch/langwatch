@@ -155,13 +155,13 @@
     "model_vendor": "anthropic",
     "mode": "chat"
   },
-  "vertex_ai/gemini-1.5-flash": {
+  "gemini/gemini-1.5-flash": {
     "name": "Gemini 1.5 Flash",
     "version": "001",
     "model_vendor": "google",
     "mode": "chat"
   },
-  "vertex_ai/gemini-1.5-pro": {
+  "gemini/gemini-1.5-pro": {
     "name": "Gemini 1.5 Pro",
     "version": "002",
     "model_vendor": "google",
@@ -173,10 +173,16 @@
     "model_vendor": "google",
     "mode": "chat"
   },
+  "gemini/gemini-exp-1121": {
+    "name": "Gemini Exp 1121",
+    "version": "1121",
+    "model_vendor": "google",
+    "mode": "chat"
+  },
   "cloudflare/thebloke/llamaguard-7b-awq": {
     "name": "LlamaGuard 7B",
     "version": "thebloke/llamaguard-7b-awq",
     "model_vendor": "cloudflare",
-    "mode": "evaluator"
+    "mode": "chat"
   }
 }

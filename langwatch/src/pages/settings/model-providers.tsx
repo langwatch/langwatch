@@ -53,13 +53,8 @@ export const getProviderModelOptions = (
   provider: string,
   mode: "chat" | "embedding"
 ) => {
-  if (provider === "vertex_ai") {
-    provider = "google";
-  } else if (provider === "groq") {
-    provider = "meta";
-  }
   return Object.entries(models)
-    .filter(([_, value]) => value.model_vendor === provider)
+    .filter(([key, _]) => key.split("/")[0] === provider)
     .filter(([_, value]) => value.mode === mode)
     .map(([key, _]) => ({
       value: key.split("/").slice(1).join("/"),
@@ -160,6 +155,7 @@ function ModelProviderForm({
   const { project } = useOrganizationTeamProject();
 
   const localUpdateMutation = api.modelProvider.update.useMutation();
+  const deleteMutation = api.modelProvider.delete.useMutation();
 
   const providerDefinition =
     modelProvidersRegistry[
@@ -201,8 +197,6 @@ function ModelProviderForm({
         ),
       },
       resolver: (data, ...args) => {
-        console.log("data", data);
-        console.log("args", args);
         const data_ = {
           ...data,
           customKeys: data.useCustomKeys ? data.customKeys : null,
@@ -274,6 +268,7 @@ function ModelProviderForm({
   );
 
   const enabledField = register("enabled");
+  const isEnabled = watch("enabled");
   const onEnableDisable = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {
       void enabledField.onChange(e);
@@ -287,6 +282,10 @@ function ModelProviderForm({
         customEmbeddingsModels: provider.customEmbeddingsModels ?? [],
       });
 
+      if (e.target.checked && provider.disabledByDefault) {
+        setValue("useCustomKeys", true);
+      }
+
       await refetch();
     },
     [
@@ -295,8 +294,12 @@ function ModelProviderForm({
       provider.id,
       provider.provider,
       provider.customKeys,
+      provider.customModels,
+      provider.customEmbeddingsModels,
+      provider.disabledByDefault,
       project?.id,
       refetch,
+      setValue,
     ]
   );
 
@@ -305,18 +308,19 @@ function ModelProviderForm({
     async (e: React.ChangeEvent<HTMLInputElement>) => {
       await useCustomKeysField.onChange(e);
       if (!e.target.checked) {
-        await updateMutation.mutateAsync({
-          id: provider.id,
-          projectId: project?.id ?? "",
+        await deleteMutation.mutateAsync({
+          id: provider.id ?? "",
           provider: provider.provider,
-          enabled: provider.enabled,
-          customKeys: null,
-          customModels: null,
-          customEmbeddingsModels: null,
+          projectId: project?.id ?? "",
         });
+
         setValue("customKeys", null);
         setValue("customModels", null);
         setValue("customEmbeddingsModels", null);
+
+        if (provider.disabledByDefault) {
+          setValue("enabled", false);
+        }
         await refetch();
       }
       setValue(
@@ -338,12 +342,10 @@ function ModelProviderForm({
     },
     [
       useCustomKeysField,
-      updateMutation,
-      provider.id,
-      provider.provider,
-      provider.enabled,
-      project?.id,
       setValue,
+      provider,
+      deleteMutation,
+      project?.id,
       refetch,
     ]
   );
@@ -386,14 +388,19 @@ function ModelProviderForm({
         >
           <VStack align="start" width="full" spacing={4} paddingRight={4}>
             <HStack spacing={6}>
-              {/* eslint-disable-next-line @typescript-eslint/no-misused-promises */}
-              <Switch {...enabledField} onChange={onEnableDisable}>
+              <Switch
+                {...enabledField}
+                // eslint-disable-next-line @typescript-eslint/no-misused-promises
+                onChange={onEnableDisable}
+                isChecked={isEnabled}
+              >
                 Enabled
               </Switch>
               <Checkbox
                 {...useCustomKeysField}
                 // eslint-disable-next-line @typescript-eslint/no-misused-promises
                 onChange={onUseCustomKeysChange}
+                isChecked={useCustomKeys}
               >
                 Use custom settings
               </Checkbox>
