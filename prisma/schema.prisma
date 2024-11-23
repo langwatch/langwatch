@@ -145,6 +145,7 @@ model Organization {
     OrganizationInvite    OrganizationInvite[]
     usageSpendingMaxLimit Int?
     signupData            Json?
+    signedDPA             Boolean              @default(false)
 
     promoCode String?
     features  OrganizationFeature[]
@@ -157,6 +158,7 @@ model Organization {
 enum PIIRedactionLevel {
     STRICT
     ESSENTIAL
+    DISABLED
 }
 
 model Project {
