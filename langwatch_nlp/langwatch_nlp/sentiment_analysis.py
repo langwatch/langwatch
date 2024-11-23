@@ -3,7 +3,7 @@ import litellm
 import numpy as np
 from fastapi import FastAPI
 from pydantic import BaseModel
-from typing import Optional
+from typing import Any, Optional
 
 
 from tenacity import retry, stop_after_attempt, wait_random_exponential
@@ -55,7 +55,7 @@ def get_embedding(text: str, embeddings_litellm_params: dict[str, str]) -> list[
 
 class Embedding(BaseModel):
     vector: list[float]
-    embeddings_litellm_params: dict[str, str]
+    embeddings_litellm_params: dict[str, Any]
 
 
 def setup_endpoints(app: FastAPI):

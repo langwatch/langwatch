@@ -1,6 +1,6 @@
 import { getProjectEmbeddingsModel } from "~/server/embeddings";
 import { env } from "../../../../env.mjs";
-import { TRACE_INDEX, esClient, traceIndexId } from "../../../elasticsearch";
+import { OPENAI_EMBEDDING_DIMENSION, TRACE_INDEX, esClient, traceIndexId } from "../../../elasticsearch";
 import type { Trace } from "../../../tracer/types";
 import { prepareLitellmParams } from "~/server/api/routers/modelProviders";
 
@@ -40,10 +40,13 @@ export const scoreSatisfactionFromInput = async ({
     },
     body: JSON.stringify({
       vector: input.embeddings.embeddings,
-      embeddings_litellm_params: prepareLitellmParams(
-        embeddingsModel.model,
-        embeddingsModel.modelProvider
-      ),
+      embeddings_litellm_params: {
+        ...prepareLitellmParams(
+          embeddingsModel.model,
+          embeddingsModel.modelProvider
+        ),
+        dimensions: OPENAI_EMBEDDING_DIMENSION
+      },
     }),
   });
 

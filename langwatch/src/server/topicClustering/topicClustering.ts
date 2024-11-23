@@ -9,7 +9,12 @@ import { env } from "../../env.mjs";
 import { getDebugger } from "../../utils/logger";
 import { scheduleTopicClusteringNextPage } from "../background/queues/topicClusteringQueue";
 import { prisma } from "../db";
-import { TRACE_INDEX, esClient, traceIndexId } from "../elasticsearch";
+import {
+  OPENAI_EMBEDDING_DIMENSION,
+  TRACE_INDEX,
+  esClient,
+  traceIndexId,
+} from "../elasticsearch";
 import { getProjectEmbeddingsModel } from "../embeddings";
 import type { ElasticSearchTrace, Trace } from "../tracer/types";
 import {
@@ -303,10 +308,13 @@ export const batchClusterTraces = async (
       topicModel.model,
       topicModel.modelProvider
     ),
-    embeddings_litellm_params: prepareLitellmParams(
-      embeddingsModel.model,
-      embeddingsModel.modelProvider
-    ),
+    embeddings_litellm_params: {
+      ...prepareLitellmParams(
+        embeddingsModel.model,
+        embeddingsModel.modelProvider
+      ),
+      dimensions: OPENAI_EMBEDDING_DIMENSION,
+    },
     traces,
   });
 
@@ -365,10 +373,13 @@ export const incrementalClustering = async (
       topicModel.model,
       topicModel.modelProvider
     ),
-    embeddings_litellm_params: prepareLitellmParams(
-      embeddingsModel.model,
-      embeddingsModel.modelProvider
-    ),
+    embeddings_litellm_params: {
+      ...prepareLitellmParams(
+        embeddingsModel.model,
+        embeddingsModel.modelProvider
+      ),
+      dimensions: OPENAI_EMBEDDING_DIMENSION,
+    },
     traces,
     topics,
     subtopics,

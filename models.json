@@ -113,6 +113,12 @@
     "model_vendor": "azure",
     "mode": "embedding"
   },
+  "azure/text-embedding-3-large": {
+    "name": "text-embedding-3-large",
+    "version": "",
+    "model_vendor": "azure",
+    "mode": "embedding"
+  },
   "groq/llama3-70b-8192": {
     "name": "Llama 3 70B (Groq)",
     "version": "8192",

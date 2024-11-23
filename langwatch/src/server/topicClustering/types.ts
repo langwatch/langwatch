@@ -60,13 +60,13 @@ export type TopicClusteringTraceTopicMap = {
 
 export type BatchClusteringParams = {
   litellm_params: Record<string, string>;
-  embeddings_litellm_params: Record<string, string>;
+  embeddings_litellm_params: Record<string, any>;
   traces: TopicClusteringTrace[];
 };
 
 export type IncrementalClusteringParams = {
   litellm_params: Record<string, string>;
-  embeddings_litellm_params: Record<string, string>;
+  embeddings_litellm_params: Record<string, any>;
   topics: TopicClusteringTopic[];
   subtopics: TopicClusteringSubtopic[];
   traces: TopicClusteringTrace[];
