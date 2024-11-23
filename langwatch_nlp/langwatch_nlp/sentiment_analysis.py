@@ -8,6 +8,8 @@ from typing import Any, Optional
 
 from tenacity import retry, stop_after_attempt, wait_random_exponential
 
+from langwatch_nlp.topic_clustering.utils import normalize_embedding_dimensions
+
 
 # Pre-loaded embeddings
 embeddings: dict[str, dict[str, list[list[float]]]] = {}
@@ -35,7 +37,11 @@ def load_embeddings(embeddings_litellm_params: dict[str, str]):
     return embeddings[key]
 
 
-@retry(wait=wait_random_exponential(min=1, max=20), stop=stop_after_attempt(6), reraise=True)
+@retry(
+    wait=wait_random_exponential(min=1, max=20),
+    stop=stop_after_attempt(6),
+    reraise=True,
+)
 def get_embedding(text: str, embeddings_litellm_params: dict[str, str]) -> list[float]:
     if "AZURE_API_VERSION" not in os.environ:
         os.environ["AZURE_API_VERSION"] = "2024-02-01"  # To make sure
@@ -50,7 +56,10 @@ def get_embedding(text: str, embeddings_litellm_params: dict[str, str]) -> list[
     data = response.data
     if data is None:
         raise ValueError("No data returned from the embedding model")
-    return data[0]["embedding"]
+    embedding = data[0]["embedding"]
+    return normalize_embedding_dimensions(
+        embedding, target_dim=int(embeddings_litellm_params.get("dimensions", 1536))
+    )
 
 
 class Embedding(BaseModel):

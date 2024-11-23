@@ -12,3 +12,15 @@ def calculate_centroid_and_distance(samples) -> tuple[np.ndarray, float]:
     p95_distance = np.percentile(distances, 95).astype(float)
 
     return centroid, p95_distance
+
+
+def normalize_embedding_dimensions(
+    embedding: list[float], target_dim: int = 1536
+) -> list[float]:
+    if len(embedding) == target_dim:
+        return embedding
+
+    if len(embedding) < target_dim:
+        return embedding + [0.0] * (target_dim - len(embedding))
+
+    return embedding[:target_dim]

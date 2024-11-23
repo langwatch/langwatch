@@ -1,194 +1,101 @@
 {
   "openai/gpt-3.5-turbo": {
-    "name": "GPT 3.5 Turbo",
-    "version": "latest",
-    "model_vendor": "openai",
     "mode": "chat"
   },
   "openai/gpt-3.5-turbo-0125": {
-    "name": "GPT 3.5 Turbo",
-    "version": "0125",
-    "model_vendor": "openai",
     "mode": "chat"
   },
   "openai/gpt-3.5-turbo-1106": {
-    "name": "GPT 3.5 Turbo",
-    "version": "1106",
-    "model_vendor": "openai",
     "mode": "chat"
   },
   "openai/gpt-3.5-turbo-16k": {
-    "name": "GPT 3.5 Turbo",
-    "version": "16k",
-    "model_vendor": "openai",
     "mode": "chat"
   },
   "openai/gpt-4-turbo": {
-    "name": "GPT 4 Turbo",
-    "version": "latest",
-    "model_vendor": "openai",
     "mode": "chat"
   },
   "openai/gpt-4-turbo-2024-04-09": {
-    "name": "GPT 4 Turbo",
-    "version": "2024-04-09",
-    "model_vendor": "openai",
     "mode": "chat"
   },
   "openai/text-embedding-ada-002": {
-    "name": "text-embedding-ada-002",
-    "version": "",
-    "model_vendor": "openai",
     "mode": "embedding"
   },
   "openai/text-embedding-3-small": {
-    "name": "text-embedding-3-small",
-    "version": "",
-    "model_vendor": "openai",
     "mode": "embedding"
   },
   "openai/gpt-4o": {
-    "name": "GPT 4o",
-    "version": "latest",
-    "model_vendor": "openai",
     "mode": "chat"
   },
   "openai/gpt-4o-mini": {
-    "name": "GPT 4o mini",
-    "version": "latest",
-    "model_vendor": "openai",
     "mode": "chat"
   },
   "openai/gpt-4-0125-preview": {
-    "name": "GPT 4 Turbo",
-    "version": "0125",
-    "model_vendor": "openai",
     "mode": "chat"
   },
   "openai/gpt-4-1106-preview": {
-    "name": "GPT 4 Turbo",
-    "version": "1106",
-    "model_vendor": "openai",
     "mode": "chat"
   },
   "azure/gpt-35-turbo-1106": {
-    "name": "GPT 3.5 Turbo",
-    "version": "1106",
-    "model_vendor": "azure",
     "mode": "chat"
   },
   "azure/gpt-35-turbo-16k": {
-    "name": "GPT 3.5 Turbo",
-    "version": "16k",
-    "model_vendor": "azure",
     "mode": "chat"
   },
   "azure/gpt-4-turbo-2024-04-09": {
-    "name": "GPT 4 Turbo",
-    "version": "2024-04-09",
-    "model_vendor": "azure",
     "mode": "chat"
   },
   "azure/gpt-4-1106-preview": {
-    "name": "GPT 4 Turbo",
-    "version": "1106",
-    "model_vendor": "azure",
     "mode": "chat"
   },
   "azure/gpt-4o": {
-    "name": "GPT 4o",
-    "version": "latest",
-    "model_vendor": "azure",
     "mode": "chat"
   },
   "azure/gpt-4o-mini": {
-    "name": "GPT 4o mini",
-    "version": "latest",
-    "model_vendor": "azure",
     "mode": "chat"
   },
   "azure/text-embedding-ada-002": {
-    "name": "text-embedding-ada-002",
-    "version": "",
-    "model_vendor": "azure",
     "mode": "embedding"
   },
   "azure/text-embedding-3-large": {
-    "name": "text-embedding-3-large",
-    "version": "",
-    "model_vendor": "azure",
     "mode": "embedding"
   },
   "groq/llama3-70b-8192": {
-    "name": "Llama 3 70B (Groq)",
-    "version": "8192",
-    "model_vendor": "meta",
     "mode": "chat"
   },
   "groq/llama3-8b-8192": {
-    "name": "Llama 3 8B (Groq)",
-    "version": "8192",
-    "model_vendor": "meta",
     "mode": "chat"
   },
   "groq/mixtral-8x7b-32768": {
-    "name": "Mixtral 8x7B (Groq)",
-    "version": "32k",
-    "model_vendor": "mistral",
     "mode": "chat"
   },
   "anthropic/claude-3-5-haiku-20241022": {
-    "name": "Claude 3.5 Haiku",
-    "version": "20241022",
-    "model_vendor": "anthropic",
     "mode": "chat"
   },
   "anthropic/claude-3-opus-20240229": {
-    "name": "Claude 3 Opus",
-    "version": "20240229",
-    "model_vendor": "anthropic",
     "mode": "chat"
   },
   "anthropic/claude-3-5-sonnet-20241022": {
-    "name": "Claude 3.5 Sonnet",
-    "version": "20241022",
-    "model_vendor": "anthropic",
     "mode": "chat"
   },
   "anthropic/claude-3-5-sonnet-20240620": {
-    "name": "Claude 3.5 Sonnet",
-    "version": "20240620",
-    "model_vendor": "anthropic",
     "mode": "chat"
   },
   "gemini/gemini-1.5-flash": {
-    "name": "Gemini 1.5 Flash",
-    "version": "001",
-    "model_vendor": "google",
     "mode": "chat"
   },
   "gemini/gemini-1.5-pro": {
-    "name": "Gemini 1.5 Pro",
-    "version": "002",
-    "model_vendor": "google",
     "mode": "chat"
   },
   "gemini/gemini-exp-1114": {
-    "name": "Gemini Exp 1114",
-    "version": "1114",
-    "model_vendor": "google",
     "mode": "chat"
   },
   "gemini/gemini-exp-1121": {
-    "name": "Gemini Exp 1121",
-    "version": "1121",
-    "model_vendor": "google",
     "mode": "chat"
   },
+  "gemini/text-embedding-004": {
+    "mode": "embedding"
+  },
   "cloudflare/thebloke/llamaguard-7b-awq": {
-    "name": "LlamaGuard 7B",
-    "version": "thebloke/llamaguard-7b-awq",
-    "model_vendor": "cloudflare",
     "mode": "chat"
   }
 }

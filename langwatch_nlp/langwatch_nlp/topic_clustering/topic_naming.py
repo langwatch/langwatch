@@ -15,6 +15,8 @@ from tenacity import retry, stop_after_attempt, wait_exponential, wait_none
 from langwatch_nlp.topic_clustering.types import Money, Trace
 from langchain_community.callbacks.openai_info import get_openai_token_cost_for_model
 
+from langwatch_nlp.topic_clustering.utils import normalize_embedding_dimensions
+
 T = TypeVar("T")
 
 os.environ["AZURE_API_VERSION"] = "2024-02-01"
@@ -189,7 +191,13 @@ def improve_similar_names(
             input=name if name else "",
         )
         if response.data:
-            embeddings.append(response.data[0]["embedding"])
+            embedding = response.data[0]["embedding"]
+            embeddings.append(
+                normalize_embedding_dimensions(
+                    embedding,
+                    target_dim=int(embeddings_litellm_params.get("dimensions", 1536)),
+                )
+            )
 
     # find the two closest embeddings
     closest_distance = float("inf")

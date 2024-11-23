@@ -5,6 +5,7 @@ import {
 } from "./api/routers/modelProviders";
 import { createOpenAI } from "@ai-sdk/openai";
 import { createAzure } from "@ai-sdk/azure";
+import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { embed } from "ai";
 import { OPENAI_EMBEDDING_DIMENSION } from "./elasticsearch";
 
@@ -41,7 +42,11 @@ export const getOpenAIEmbeddings = async (
   projectId: string
 ): Promise<{ model: string; embeddings: number[] } | undefined> => {
   const { model, modelProvider } = await getProjectEmbeddingsModel(projectId);
-  if (!model.startsWith("openai/") && !model.startsWith("azure/")) {
+  if (
+    !model.startsWith("openai/") &&
+    !model.startsWith("azure/") &&
+    !model.startsWith("gemini/")
+  ) {
     throw new Error(
       "Only OpenAI or Azure models are supported for embeddings for now"
     );
@@ -89,6 +94,13 @@ export const getOpenAIEmbeddings = async (
         }).textEmbeddingModel(modelName, {
           dimensions: OPENAI_EMBEDDING_DIMENSION,
         })
+      : provider === "gemini"
+      ? createGoogleGenerativeAI({
+          apiKey: params.api_key,
+          baseURL: params.api_base,
+        }).textEmbeddingModel(modelName, {
+          outputDimensionality: OPENAI_EMBEDDING_DIMENSION,
+        })
       : undefined;
 
   if (!vercelAIModel) {
@@ -100,5 +112,20 @@ export const getOpenAIEmbeddings = async (
     value: text.slice(0, 8192 * 1.5),
   });
 
-  return { model, embeddings: embedding };
+  return { model, embeddings: normalizeEmbeddingDimensions(embedding) };
+};
+
+const normalizeEmbeddingDimensions = (
+  embedding: number[],
+  targetDim: number = OPENAI_EMBEDDING_DIMENSION
+): number[] => {
+  if (embedding.length === targetDim) {
+    return embedding;
+  }
+
+  if (embedding.length < targetDim) {
+    return [...embedding, ...new Array(targetDim - embedding.length).fill(0)];
+  }
+
+  return embedding.slice(0, targetDim);
 };
