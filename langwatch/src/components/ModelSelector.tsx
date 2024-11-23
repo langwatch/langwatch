@@ -12,7 +12,6 @@ import {
 export type ModelOption = {
   label: string;
   value: string;
-  version: string;
   icon: React.ReactNode;
   isDisabled: boolean;
   mode?: "chat" | "embedding" | "evaluator" | undefined;
@@ -20,10 +19,11 @@ export type ModelOption = {
 
 export const modelSelectorOptions: ModelOption[] = Object.entries(models).map(
   ([key, value]) => ({
-    label: value.name,
+    label: key,
     value: key,
-    version: value.version,
-    icon: vendorIcons[value.model_vendor],
+    icon: modelProviderIcons[
+      key.split("/")[0] as keyof typeof modelProviderIcons
+    ],
     isDisabled: false,
     mode: value.mode as "chat" | "embedding" | "evaluator",
   })
@@ -60,7 +60,6 @@ export const useModelSelectionOptions = (
         {
           label: modelName,
           value: model,
-          version: "",
           icon: modelProviderIcons[provider as keyof typeof modelProviderIcons],
           isDisabled: !modelProviders.data?.[provider]?.enabled,
           mode: mode,
@@ -160,7 +159,6 @@ export const ModelSelector = React.memo(function ModelSelector({
           const { getValue } = props;
           const value = getValue();
           const icon = value.length > 0 ? value[0]?.icon : null;
-          const version = value.length > 0 ? value[0]?.version : null;
           const model = value.length > 0 ? value[0]?.value : null;
           const isDisabled =
             selectOptions.find((option) => option.value === model)
@@ -178,13 +176,13 @@ export const ModelSelector = React.memo(function ModelSelector({
                 <Box fontSize={size === "sm" ? 12 : 14} fontFamily="mono">
                   {children}
                 </Box>
-                {(!!version || isDisabled) && (
+                {isDisabled && (
                   <Text
                     fontSize={size === "sm" ? 12 : 14}
                     fontFamily="mono"
                     color="gray.400"
                   >
-                    ({isDisabled ? "disabled" : version})
+                    (disabled)
                   </Text>
                 )}
               </HStack>
