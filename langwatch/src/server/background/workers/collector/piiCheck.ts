@@ -231,7 +231,7 @@ const presidioClearPII = async (
   piiRedactionLevel: PIIRedactionLevel
 ): Promise<void> => {
   getPiiChecksCounter("presidio").inc();
-  const timeout = 5000;
+  const timeout = 60_000;
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeout);
 
@@ -332,7 +332,6 @@ export const cleanupPIIs = async (
     clearPII(trace, ["input", "value"], options),
     clearPII(trace, ["output", "value"], options),
     clearPII(trace, ["error", "message"], options),
-    clearPII(trace, ["error", "stacktrace"], options),
   ];
 
   for (const span of spans) {
@@ -355,12 +354,6 @@ export const cleanupPIIs = async (
       } else {
         clearPIIPromises.push(clearPII(context, ["content"], options));
       }
-    }
-
-    for (let i = 0; i < (span.error?.stacktrace ?? []).length; i++) {
-      clearPIIPromises.push(
-        clearPII(span.error?.stacktrace ?? [], [i], options)
-      );
     }
   }
 
