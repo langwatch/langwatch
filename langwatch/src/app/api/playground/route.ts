@@ -81,14 +81,16 @@ export async function POST(req: NextRequest) {
     });
   }
 
+  const litellmParams = prepareLitellmParams(model, modelProvider);
   const headers = Object.fromEntries(
-    Object.entries(prepareLitellmParams(model, modelProvider)).map(([key, value]) => [
+    Object.entries(litellmParams).map(([key, value]) => [
       `x-litellm-${key}`,
       value,
     ])
   );
 
   const vercelProvider = createOpenAI({
+    apiKey: litellmParams.api_key,
     baseURL: `${env.LANGWATCH_NLP_SERVICE}/proxy/v1`,
     headers,
   });
@@ -102,7 +104,7 @@ export async function POST(req: NextRequest) {
       maxRetries: modelProvider.customKeys ? 1 : 3,
     });
 
-    return result.toAIStreamResponse();
+    return result.toDataStreamResponse();
   } catch (e: any) {
     try {
       if (e.statusCode === 401 || e.statusCode === 403) {
