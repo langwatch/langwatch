@@ -220,24 +220,25 @@ export function EvaluationResults() {
               padding={3}
               borderTop="1px solid"
               borderColor="gray.200"
+              spacing={2}
             >
               <Text whiteSpace="nowrap" marginTop="-1px" paddingX={2}>
                 Running
               </Text>
               <EvaluationProgressBar size="lg" />
               <Button
-                size="xs"
-                variant="ghost"
+                colorScheme="red"
                 onClick={() =>
                   stopEvaluationExecution({
                     run_id: evaluationStateRunId,
                   })
                 }
                 minHeight="28px"
-                minWidth="28px"
-                padding="6px"
+                minWidth="0"
+                paddingY="6px"
+                marginLeft="8px"
               >
-                <X />
+                <Box paddingX="6px">Stop</Box>
               </Button>
             </HStack>
           )}
@@ -580,23 +581,28 @@ export function LoadedOptimizationResults({
               </Text>
               <OptimizationProgressBar size="lg" />
               {hasLogs && !logsPanel.isOpen && (
-                <Button size="sm" onClick={logsPanel.onOpen} variant="ghost">
+                <Button
+                  size="sm"
+                  onClick={logsPanel.onOpen}
+                  variant="ghost"
+                  marginRight="-8px"
+                >
                   <Box paddingX={4}>View Logs</Box>
                 </Button>
               )}
               <Button
-                size="xs"
-                variant="ghost"
+                colorScheme="red"
                 onClick={() =>
                   stopOptimizationExecution({
                     run_id: optimizationStateRunId,
                   })
                 }
                 minHeight="28px"
-                minWidth="28px"
-                padding="6px"
+                minWidth="0"
+                paddingY="6px"
+                marginLeft="8px"
               >
-                <X />
+                <Box paddingX="6px">Stop</Box>
               </Button>
             </HStack>
           )}

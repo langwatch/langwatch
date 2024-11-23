@@ -7,7 +7,7 @@ export const OPTIMIZERS = {
       "Generates several prompt alternatives to try and improve the LLM performance.",
     minimum_train_set: 10,
     params: {
-      llm: undefined as LLMConfig | undefined,
+      llm: null as LLMConfig | null,
       num_candidates: 7,
     },
   },
@@ -17,7 +17,7 @@ export const OPTIMIZERS = {
       "Generates several prompt alternatives plus few shot examples (demonstrations) to try and improve the LLM performance.",
     minimum_train_set: 10,
     params: {
-      llm: undefined as LLMConfig | undefined,
+      llm: null as LLMConfig | null,
       num_candidates: 7,
       max_bootstrapped_demos: 4,
       max_labeled_demos: 16,

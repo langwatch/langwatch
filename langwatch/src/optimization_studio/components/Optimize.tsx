@@ -162,6 +162,7 @@ export function OptimizeModalContent({
         {} as OptimizeForm["params"]
       )
     );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form, optimizer]);
 
   const trainSize = entryNode?.data.train_size ?? 0.8;
@@ -289,7 +290,9 @@ export function OptimizeModalContent({
 
   const { hasProvidersWithoutCustomKeys, nodeProvidersWithoutCustomKeys } =
     useModelProviderKeys(
-      "llm" in params && params.llm ? [params.llm] : undefined
+      "llm" in optimizer.params && "llm" in params
+        ? [params.llm ?? default_llm]
+        : undefined
     );
 
   const isRunning = optimizationState?.status === "running";
@@ -385,7 +388,7 @@ export function OptimizeModalContent({
                     <LLMConfigField
                       allowDefault={true}
                       defaultLLMConfig={default_llm}
-                      llmConfig={llmConfig}
+                      llmConfig={llmConfig ?? undefined}
                       onChange={(llmConfig) => {
                         field.onChange(llmConfig);
                       }}

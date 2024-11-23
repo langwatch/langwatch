@@ -1,6 +1,4 @@
-import os
 import pytest
-from langwatch_nlp.studio.dspy.lite_llm import DSPyLiteLLM
 from langwatch_nlp.studio.dspy.workflow_module import (
     PredictionWithEvaluationAndMetadata,
     WorkflowModule,
@@ -32,21 +30,13 @@ import dspy
 def test_parse_workflow():
     disable_dsp_caching()
     workflow = Workflow(
+        workflow_id="simple-rag",
         api_key="",
         spec_version="1.0",
         name="Simple RAG",
         icon="🧩",
         description="Query transformation, vector database search and answer generation",
         version="1.0",
-        default_llm=LLMConfig(
-            model="openai/gpt-4o-mini",
-            temperature=0.0,
-            max_tokens=2048,
-            litellm_params={
-                "api_key": os.environ["OPENAI_API_KEY"],
-                "model": "openai/gpt-4o-mini",
-            },
-        ),
         nodes=[
             EntryNode(
                 id="entry",
@@ -77,6 +67,9 @@ def test_parse_workflow():
                     ],
                     decorated_by=None,
                     execution_state=None,
+                    train_size=0.5,
+                    test_size=0.5,
+                    seed=42,
                     dataset=NodeDataset(
                         name="Draft Dataset",
                         inline=DatasetInline(
