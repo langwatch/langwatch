@@ -31,7 +31,10 @@ import {
   prepareLitellmParams,
 } from "../api/routers/modelProviders";
 import { getPayloadSizeHistogram } from "../metrics";
-import { OPENAI_EMBEDDING_DIMENSION } from "../../utils/constants";
+import {
+  DEFAULT_TOPIC_CLUSTERING_MODEL,
+  OPENAI_EMBEDDING_DIMENSION,
+} from "../../utils/constants";
 
 const debug = getDebugger("langwatch:topicClustering");
 
@@ -261,7 +264,7 @@ export const clusterTopicsForProject = async (
 
 const getProjectTopicClusteringModelProvider = async (project: Project) => {
   const topicClusteringModel =
-    project.topicClusteringModel ?? allowedTopicClusteringModels[0];
+    project.topicClusteringModel ?? DEFAULT_TOPIC_CLUSTERING_MODEL;
   if (!topicClusteringModel) {
     throw new Error("Topic clustering model not set");
   }

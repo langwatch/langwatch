@@ -45,7 +45,10 @@ import { api } from "../../utils/api";
 import models from "../../../../models.json";
 
 import CreatableSelect from "react-select/creatable";
-import { DEFAULT_EMBEDDINGS_MODEL } from "../../utils/constants";
+import {
+  DEFAULT_EMBEDDINGS_MODEL,
+  DEFAULT_TOPIC_CLUSTERING_MODEL,
+} from "../../utils/constants";
 
 export const getProviderModelOptions = (
   provider: string,
@@ -534,7 +537,7 @@ function TopicClusteringModel() {
     {
       defaultValues: {
         topicClusteringModel:
-          project?.topicClusteringModel ?? allowedTopicClusteringModels[0]!,
+          project?.topicClusteringModel ?? DEFAULT_TOPIC_CLUSTERING_MODEL,
       },
     }
   );
