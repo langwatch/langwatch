@@ -98,6 +98,26 @@ LangWatch requires an Elasticsearch/OpenSearch cluster for data storage and sear
 
    To reauthenticate
 
+## Initial Setup
+
+1. Set up the Terraform state backend (one-time setup):
+   ```bash
+   make backend-init \
+     PROJECT_ID=your-project-id \
+     REGION=europe-west3
+   ```
+
+   The bucket should be globally unique, e.g., `langwatch-terraform-state-your-project-id`. This creates a Google Cloud Storage bucket to store Terraform state.
+
+2. For subsequent deployments, initialize Terraform:
+   ```bash
+   make init \
+     PROJECT_ID=your-project-id \
+     REGION=europe-west3 \
+     ZONE=europe-west3-b \
+     domain="langwatch.yourdomain.com"
+   ```
+
 ## Usage
 
 1. Create your environment variables file:
@@ -106,16 +126,6 @@ LangWatch requires an Elasticsearch/OpenSearch cluster for data storage and sear
    cp .env.example.json .env.json
    # Edit .env.json with your values
    # ELASTICSEARCH_NODE_URL and ELASTICSEARCH_API_KEY are required
-   ```
-
-1. Initialize Terraform:
-
-   ```bash
-   make init \
-     PROJECT_ID=your-project-id \
-     REGION=europe-west3 \
-     ZONE=europe-west3-b \
-     domain="langwatch.yourdomain.com"
    ```
 
 1. Apply the infrastructure:

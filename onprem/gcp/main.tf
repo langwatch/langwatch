@@ -17,6 +17,10 @@ terraform {
       version = "~> 2.0"
     }
   }
+
+  backend "gcs" {
+    # The bucket name will be provided via command line
+  }
 }
 
 provider "google" {

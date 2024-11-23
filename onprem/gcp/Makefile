@@ -17,10 +17,31 @@ validate:
 		exit 1; \
 	fi
 
-# Initialize Terraform
+# Add before init
+.PHONY: backend-init
+backend-init:
+	@if [ -z "$(PROJECT_ID)" -o -z "$(REGION)" ]; then \
+		echo "Error: PROJECT_ID and REGION are required."; \
+		echo "Use: make backend-init PROJECT_ID=your-project-id REGION=your-region"; \
+		exit 1; \
+	fi
+	gsutil mb -l $(REGION) gs://langwatch-terraform-state-$(PROJECT_ID)
+	terraform init \
+		-backend-config="bucket=langwatch-terraform-state-$(PROJECT_ID)" \
+		-backend-config="prefix=terraform/state"
+
+# Update init to depend on backend check
 .PHONY: init
-init: validate
-	terraform init
+init: validate check-backend
+	terraform init \
+		-backend-config="bucket=langwatch-terraform-state-$(PROJECT_ID)" \
+		-backend-config="prefix=terraform/state"
+
+# Add backend check
+.PHONY: check-backend
+check-backend:
+	@gsutil ls gs://langwatch-terraform-state-$(PROJECT_ID) > /dev/null 2>&1 || \
+		(echo "Error: Terraform state bucket not found. Run 'make backend-init' first" && exit 1)
 
 # Plan Terraform changes
 .PHONY: plan
