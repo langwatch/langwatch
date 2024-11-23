@@ -1,9 +1,13 @@
 import {
+  Alert,
+  AlertIcon,
   Box,
   Button,
   Card,
   CardBody,
   Checkbox,
+  FormControl,
+  FormErrorMessage,
   Grid,
   GridItem,
   HStack,
@@ -16,10 +20,6 @@ import {
   Text,
   VStack,
   useToast,
-  Alert,
-  AlertIcon,
-  FormErrorMessage,
-  FormControl,
 } from "@chakra-ui/react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import React, { useCallback } from "react";
@@ -27,27 +27,25 @@ import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
 import { ProjectSelector } from "../../components/DashboardLayout";
 import { HorizontalFormControl } from "../../components/HorizontalFormControl";
-import SettingsLayout from "../../components/SettingsLayout";
-import { SmallLabel } from "../../components/SmallLabel";
-import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import {
-  modelProviders as modelProvidersRegistry,
-  type MaybeStoredModelProvider,
-} from "../../server/modelProviders/registry";
-import { api } from "../../utils/api";
 import {
   ModelSelector,
   modelSelectorOptions,
 } from "../../components/ModelSelector";
-import {
-  allowedTopicClusteringModels,
-  allowedEmbeddingsModels,
-} from "../../server/topicClustering/types";
+import SettingsLayout from "../../components/SettingsLayout";
+import { SmallLabel } from "../../components/SmallLabel";
+import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { modelProviderIcons } from "../../server/modelProviders/iconsMap";
+import {
+  modelProviders as modelProvidersRegistry,
+  type MaybeStoredModelProvider,
+} from "../../server/modelProviders/registry";
+import { allowedTopicClusteringModels } from "../../server/topicClustering/types";
+import { api } from "../../utils/api";
 
 import models from "../../../../models.json";
 
 import CreatableSelect from "react-select/creatable";
+import { DEFAULT_EMBEDDINGS_MODEL } from "../../utils/constants";
 
 export const getProviderModelOptions = (
   provider: string,
@@ -598,7 +596,7 @@ function EmbeddingsModel() {
 
   const { register, handleSubmit, control } = useForm<EmbeddingsModelForm>({
     defaultValues: {
-      embeddingsModel: project?.embeddingsModel ?? allowedEmbeddingsModels[0]!,
+      embeddingsModel: project?.embeddingsModel ?? DEFAULT_EMBEDDINGS_MODEL,
     },
   });
 
@@ -635,7 +633,9 @@ function EmbeddingsModel() {
               render={({ field }) => (
                 <ModelSelector
                   model={field.value}
-                  options={allowedEmbeddingsModels}
+                  options={modelSelectorOptions
+                    .filter((option) => option.mode === "embedding")
+                    .map((option) => option.value)}
                   // eslint-disable-next-line @typescript-eslint/no-misused-promises
                   onChange={(model) => {
                     field.onChange(model);

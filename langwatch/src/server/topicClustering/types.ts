@@ -19,20 +19,6 @@ export const allowedTopicClusteringModels = modelSelectorOptions
   .filter((option) => option.mode === "chat")
   .map((option) => option.value);
 
-export const allowedEmbeddingsModels = modelSelectorOptions
-  .filter((option) => option.mode === "embedding")
-  .map((option) => option.value);
-
-// export const allowedTopicClusteringModels = [
-//   "azure/gpt-4-turbo-2024-04-09",
-//   "openai/gpt-4o",
-//   "anthropic/claude-3-opus-20240229",
-//   "vertex_ai/gemini-1.5-pro-001",
-//   "groq/llama3-70b-8192",
-// ];
-
-// export const allowedEmbeddingsModels = ["openai/text-embedding-3-small"];
-
 export type TopicClusteringTrace = {
   trace_id: string;
   input: string;

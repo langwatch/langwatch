@@ -7,9 +7,10 @@ import { createOpenAI } from "@ai-sdk/openai";
 import { createAzure } from "@ai-sdk/azure";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { embed } from "ai";
-import { OPENAI_EMBEDDING_DIMENSION } from "./elasticsearch";
-
-export const DEFAULT_EMBEDDINGS_MODEL = "openai/text-embedding-3-small";
+import {
+  OPENAI_EMBEDDING_DIMENSION,
+  DEFAULT_EMBEDDINGS_MODEL,
+} from "../utils/constants";
 
 export const getProjectEmbeddingsModel = async (projectId: string) => {
   const project = await prisma.project.findUnique({

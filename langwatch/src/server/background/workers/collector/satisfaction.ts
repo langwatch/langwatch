@@ -1,8 +1,9 @@
 import { getProjectEmbeddingsModel } from "~/server/embeddings";
 import { env } from "../../../../env.mjs";
-import { OPENAI_EMBEDDING_DIMENSION, TRACE_INDEX, esClient, traceIndexId } from "../../../elasticsearch";
+import { TRACE_INDEX, esClient, traceIndexId } from "../../../elasticsearch";
 import type { Trace } from "../../../tracer/types";
 import { prepareLitellmParams } from "~/server/api/routers/modelProviders";
+import { OPENAI_EMBEDDING_DIMENSION } from "../../../../utils/constants";
 
 type SatisfactionScoreResult = {
   score_normalized: number;
@@ -45,7 +46,7 @@ export const scoreSatisfactionFromInput = async ({
           embeddingsModel.model,
           embeddingsModel.modelProvider
         ),
-        dimensions: OPENAI_EMBEDDING_DIMENSION
+        dimensions: OPENAI_EMBEDDING_DIMENSION,
       },
     }),
   });

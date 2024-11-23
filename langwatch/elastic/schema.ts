@@ -2,10 +2,7 @@ import {
   type MappingDenseVectorProperty,
   type MappingProperty,
 } from "@elastic/elasticsearch/lib/api/types";
-import {
-  FLATENNED_TYPE,
-  OPENAI_EMBEDDING_DIMENSION,
-} from "../src/server/elasticsearch";
+import { FLATENNED_TYPE } from "../src/server/elasticsearch";
 import type {
   DSPyStep,
   ESBatchEvaluation,
@@ -16,6 +13,7 @@ import {
   type ElasticSearchTrace,
   type ElasticSearchEvaluation,
 } from "../src/server/tracer/types";
+import { OPENAI_EMBEDDING_DIMENSION } from "../src/utils/constants";
 
 type NonNestedMappingProperty =
   | Omit<MappingProperty, "properties">

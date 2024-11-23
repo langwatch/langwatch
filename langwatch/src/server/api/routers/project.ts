@@ -19,10 +19,7 @@ import {
 } from "../permission";
 import { getOrganizationProjectsCount } from "./limits";
 import { dependencies } from "../../../injection/dependencies.server";
-import {
-  allowedTopicClusteringModels,
-  allowedEmbeddingsModels,
-} from "../../topicClustering/types";
+import { allowedTopicClusteringModels } from "../../topicClustering/types";
 import type { Project } from "@prisma/client";
 
 export const projectRouter = createTRPCRouter({
@@ -280,7 +277,7 @@ export const projectRouter = createTRPCRouter({
     .input(
       z.object({
         projectId: z.string(),
-        embeddingsModel: z.enum(allowedEmbeddingsModels as any),
+        embeddingsModel: z.string(),
       })
     )
     .use(checkUserPermissionForProject(TeamRoleGroup.SETUP_PROJECT))

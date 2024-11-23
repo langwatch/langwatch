@@ -9,12 +9,7 @@ import { env } from "../../env.mjs";
 import { getDebugger } from "../../utils/logger";
 import { scheduleTopicClusteringNextPage } from "../background/queues/topicClusteringQueue";
 import { prisma } from "../db";
-import {
-  OPENAI_EMBEDDING_DIMENSION,
-  TRACE_INDEX,
-  esClient,
-  traceIndexId,
-} from "../elasticsearch";
+import { TRACE_INDEX, esClient, traceIndexId } from "../elasticsearch";
 import { getProjectEmbeddingsModel } from "../embeddings";
 import type { ElasticSearchTrace, Trace } from "../tracer/types";
 import {
@@ -36,6 +31,7 @@ import {
   prepareLitellmParams,
 } from "../api/routers/modelProviders";
 import { getPayloadSizeHistogram } from "../metrics";
+import { OPENAI_EMBEDDING_DIMENSION } from "../../utils/constants";
 
 const debug = getDebugger("langwatch:topicClustering");
 

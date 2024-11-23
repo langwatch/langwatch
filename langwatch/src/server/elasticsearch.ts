@@ -25,8 +25,6 @@ export const BATCH_EVALUATION_INDEX: IndexSpec = {
   alias: "search-batch-evaluations-alias",
 };
 
-export const OPENAI_EMBEDDING_DIMENSION = 1536;
-
 export const esClient = env.IS_OPENSEARCH
   ? (new OpenSearchClient({
       node: env.ELASTICSEARCH_NODE_URL,
