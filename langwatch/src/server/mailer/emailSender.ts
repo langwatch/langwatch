@@ -11,10 +11,9 @@ type EmailContent = {
 
 const DEFAULT_FROM =
   env.EMAIL_DEFAULT_FROM ??
-  (env.BASE_HOST.includes("app.langwatch.ai")
+  (env.BASE_HOST.includes("app.langwatch.ai") ||
+  env.BASE_HOST.includes("localhost")
     ? "LangWatch <contact@langwatch.ai>"
-    : env.BASE_HOST.includes("localhost")
-    ? "LangWatch <mailer@localhost>"
     : `LangWatch <mailer@${env.BASE_HOST.split("://")[1].split("/")[0]}>`);
 
 export const sendEmail = async (content: EmailContent) => {
@@ -51,7 +50,7 @@ const sendWithSES = async (content: EmailContent) => {
         Data: content.subject,
       },
     },
-    Source: content.from ?? env.ONPREM_EMAIL ?? DEFAULT_FROM,
+    Source: content.from ?? DEFAULT_FROM,
   };
 
   try {

@@ -48,7 +48,6 @@ export const env = createEnv({
     AWS_REGION: z.string().optional(),
     SENTRY_DSN: z.string().optional(),
     IS_ONPREM: z.string().optional(),
-    ONPREM_EMAIL: z.string().optional(),
     EMAIL_DEFAULT_FROM: z.string().optional(),
   },
 
@@ -96,7 +95,6 @@ export const env = createEnv({
     AWS_REGION: process.env.AWS_REGION,
     SENTRY_DSN: process.env.SENTRY_DSN,
     IS_ONPREM: process.env.IS_ONPREM,
-    ONPREM_EMAIL: process.env.ONPREM_EMAIL,
     EMAIL_DEFAULT_FROM: process.env.EMAIL_DEFAULT_FROM,
   },
   /**
