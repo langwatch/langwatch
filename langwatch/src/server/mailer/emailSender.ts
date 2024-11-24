@@ -18,11 +18,7 @@ const DEFAULT_FROM =
     : `LangWatch <mailer@${env.BASE_HOST.split("://")[1].split("/")[0]}>`);
 
 export const sendEmail = async (content: EmailContent) => {
-  if (
-    !env.SENDGRID_API_KEY &&
-    !(env.USE_AWS_SES && env.AWS_REGION) &&
-    !env.GMAIL_CREDENTIALS
-  ) {
+  if (!env.SENDGRID_API_KEY && !(env.USE_AWS_SES && env.AWS_REGION)) {
     throw new Error(
       "No email sending method available. Skipping email sending."
     );
