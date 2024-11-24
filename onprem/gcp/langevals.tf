@@ -34,8 +34,8 @@ resource "kubernetes_deployment" "langevals" {
 
       spec {
         container {
-          name  = "langevals"
-          image = "europe-west3-docker.pkg.dev/langwatch/onprem/langevals:${local.langwatch_version}"
+          name              = "langevals"
+          image             = "europe-west3-docker.pkg.dev/langwatch/onprem/langevals:${local.langwatch_version}"
           image_pull_policy = "Always"
 
           port {
@@ -50,17 +50,6 @@ resource "kubernetes_deployment" "langevals" {
             limits = {
               cpu    = "2"
               memory = "4Gi"
-            }
-          }
-
-          dynamic "env" {
-            for_each = nonsensitive({
-              for k, v in jsondecode(var.extra_env_vars) :
-              k => v if !contains(["ELASTICSEARCH_NODE_URL", "ELASTICSEARCH_API_KEY"], k)
-            })
-            content {
-              name  = env.key
-              value = env.value
             }
           }
         }

@@ -78,6 +78,7 @@ LangWatch requires an Elasticsearch/OpenSearch cluster for data storage and sear
    ```
 
 5. Enable required APIs:
+
    ```bash
    # Enable required GCP APIs
    gcloud services enable \
@@ -101,6 +102,7 @@ LangWatch requires an Elasticsearch/OpenSearch cluster for data storage and sear
 ## Initial Setup
 
 1. Set up the Terraform state backend (one-time setup):
+
    ```bash
    make backend-init \
      PROJECT_ID=your-project-id \
@@ -172,3 +174,42 @@ After deployment, you need to configure your DNS to point to the LangWatch servi
    ```
 
 Note: The service initially uses HTTP. For HTTPS, you'll need to set up a certificate. We recommend using Cloudflare or similar service for SSL/TLS termination.
+
+## Evaluators and LLM Models
+
+Connection with LLM providers such as OpenAI, VertexAI and so can be done through the UI itself for each project, or globally by setting the
+variables such as the sample ones in the `.env.json` file.
+
+Some evaluators rely not only on LLM models but specific APIs, such as the jailbreak and prompt injection detection ones, which need AZURE_CONTENT_SAFETY_ENDPOINT and AZURE_CONTENT_SAFETY_KEY.
+
+Set up the API keys necessary for the evaluators your organization needs.
+
+### Email Configuration
+
+LangWatch requires an email service for sending alerts and notifications. You can configure either SendGrid or AWS SES:
+
+1. **Using SendGrid**:
+
+   - Sign up for a [SendGrid account](https://signup.sendgrid.com/)
+   - Create an API key with "Mail Send" permissions
+   - Add to your `.env.json`:
+     ```json
+     {
+       "SENDGRID_API_KEY": "your-sendgrid-api-key"
+     }
+     ```
+
+2. **Using AWS SES**:
+   - Set up [AWS SES](https://aws.amazon.com/ses/)
+   - Create an IAM user with SES permissions
+   - Add to your `.env.json`:
+     ```json
+     {
+       "USE_AWS_SES": "true",
+       "AWS_REGION": "your-aws-region",
+       "AWS_ACCESS_KEY_ID": "your-aws-access-key",
+       "AWS_SECRET_ACCESS_KEY": "your-aws-secret-key"
+     }
+     ```
+
+Note: At least one email service must be configured for alerts and notifications to work.
