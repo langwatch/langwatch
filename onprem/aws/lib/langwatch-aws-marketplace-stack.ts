@@ -257,7 +257,7 @@ export class LangWatchAwsMarketplaceStack extends cdk.Stack {
           AWS_REGION: cdk.SecretValue.unsafePlainText(this.region),
           USE_AWS_SES: cdk.SecretValue.unsafePlainText("true"),
           IS_ONPREM: cdk.SecretValue.unsafePlainText("true"),
-          ONPREM_EMAIL: cdk.SecretValue.unsafePlainText(
+          EMAIL_DEFAULT_FROM: cdk.SecretValue.unsafePlainText(
             this.onPremEmail.valueAsString
           ),
           METRICS_API_KEY: cdk.SecretValue.unsafePlainText(
@@ -415,8 +415,8 @@ export class LangWatchAwsMarketplaceStack extends cdk.Stack {
                 key: "USE_AWS_SES",
               },
               {
-                objectName: "ONPREM_EMAIL",
-                key: "ONPREM_EMAIL",
+                objectName: "EMAIL_DEFAULT_FROM",
+                key: "EMAIL_DEFAULT_FROM",
               },
               {
                 objectName: "METRICS_API_KEY",
@@ -492,8 +492,8 @@ export class LangWatchAwsMarketplaceStack extends cdk.Stack {
                   objectAlias: "USE_AWS_SES",
                 },
                 {
-                  path: "ONPREM_EMAIL",
-                  objectAlias: "ONPREM_EMAIL",
+                  path: "EMAIL_DEFAULT_FROM",
+                  objectAlias: "EMAIL_DEFAULT_FROM",
                 },
                 {
                   path: "METRICS_API_KEY",
