@@ -1,4 +1,3 @@
-import sgMail from "@sendgrid/mail";
 import { render } from "@react-email/render";
 import { Html } from "@react-email/html";
 import { Button } from "@react-email/button";
@@ -7,7 +6,7 @@ import { Heading } from "@react-email/heading";
 import { Img } from "@react-email/img";
 import { env } from "../../env.mjs";
 import type { Organization } from "@prisma/client";
-import { SESClient, SendEmailCommand } from "@aws-sdk/client-ses";
+import { sendEmail } from "./emailSender";
 
 export const sendInviteEmail = async ({
   email,
@@ -18,16 +17,6 @@ export const sendInviteEmail = async ({
   organization: Organization;
   inviteCode: string;
 }) => {
-  if (!env.SENDGRID_API_KEY && !(env.USE_AWS_SES && env.AWS_REGION)) {
-    console.warn("No email sending method available. Skipping email sending.");
-    console.warn(
-      "Please set SENDGRID_API_KEY or both USE_AWS_SES and AWS_REGION."
-    );
-    return;
-  }
-
-  sgMail.setApiKey(env.SENDGRID_API_KEY ?? "");
-
   const acceptInviteUrl = `${env.BASE_HOST}/invite/accept?inviteCode=${inviteCode}`;
 
   const emailHtml = render(
@@ -68,48 +57,9 @@ export const sendInviteEmail = async ({
     </Html>
   );
 
-  if (env.USE_AWS_SES && env.AWS_REGION) {
-    console.log("Sending email using AWS SES");
-    const sesClient = new SESClient({ region: env.AWS_REGION });
-
-    const params = {
-      Destination: {
-        ToAddresses: [email],
-      },
-      Message: {
-        Body: {
-          Html: {
-            Charset: "UTF-8",
-            Data: emailHtml,
-          },
-        },
-        Subject: {
-          Charset: "UTF-8",
-          Data: `You were added to ${organization.name} on LangWatch`,
-        },
-      },
-      Source: `${env.ONPREM_EMAIL}`,
-    };
-    try {
-      const command = new SendEmailCommand(params);
-      const data = await sesClient.send(command);
-      console.log("Email sent successfully:", data);
-    } catch (error) {
-      console.error("Error sending email:", error);
-      throw error;
-    }
-  } else if (env.SENDGRID_API_KEY) {
-    const msg = {
-      to: email,
-      from: "LangWatch <contact@langwatch.ai>",
-      subject: `You were added to ${organization.name} on LangWatch`,
-      html: emailHtml,
-    };
-
-    try {
-      await sgMail.send(msg);
-    } catch (error) {
-      throw error;
-    }
-  }
+  await sendEmail({
+    to: email,
+    subject: `You were added to ${organization.name} on LangWatch`,
+    html: emailHtml,
+  });
 };

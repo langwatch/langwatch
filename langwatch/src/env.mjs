@@ -49,6 +49,7 @@ export const env = createEnv({
     SENTRY_DSN: z.string().optional(),
     IS_ONPREM: z.string().optional(),
     ONPREM_EMAIL: z.string().optional(),
+    EMAIL_DEFAULT_FROM: z.string().optional(),
   },
 
   /**
@@ -96,6 +97,7 @@ export const env = createEnv({
     SENTRY_DSN: process.env.SENTRY_DSN,
     IS_ONPREM: process.env.IS_ONPREM,
     ONPREM_EMAIL: process.env.ONPREM_EMAIL,
+    EMAIL_DEFAULT_FROM: process.env.EMAIL_DEFAULT_FROM,
   },
   /**
    * Run `build` or `dev` with `SKIP_ENV_VALIDATION` to skip env validation.
