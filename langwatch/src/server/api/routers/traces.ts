@@ -370,7 +370,6 @@ export const tracesRouter = createTRPCRouter({
       getAllForProjectInput.extend({
         includeContexts: z.boolean(),
         scrollId: z.string().optional(),
-
       })
     )
     .use(checkUserPermissionForProject(TeamRoleGroup.MESSAGES_VIEW))
@@ -380,7 +379,6 @@ export const tracesRouter = createTRPCRouter({
           ...input,
           pageOffset: input.pageOffset ?? 0,
           pageSize: input.pageSize ?? 10_000,
-          
         },
         ctx,
         downloadMode: true,

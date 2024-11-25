@@ -17,10 +17,16 @@ import {
   type ElasticSearchSpan,
   type ElasticSearchTrace,
   type ErrorCapture,
+  type Evaluation,
+  type Event,
   type Span,
   type SpanInputOutput,
 } from "../../tracer/types";
-import { elasticSearchSpanToSpan } from "../../tracer/utils";
+import {
+  elasticSearchEvaluationsToEvaluations,
+  elasticSearchEventToEvent,
+  elasticSearchSpanToSpan,
+} from "../../tracer/utils";
 import { COLLECTOR_QUEUE, collectorQueue } from "../queues/collectorQueue";
 import { mapEvaluations, scheduleEvaluations } from "./collector/evaluations";
 import {
@@ -177,7 +183,9 @@ const processCollectorJob_ = async (
   });
 
   let existingSpans: Span[] = [];
+  let existingEvaluations: Evaluation[] | undefined;
   if (existingTrace?.inserted_at) {
+    // TODO: check for quickwit
     const existingTraceResponse = await esClient.search<ElasticSearchTrace>({
       index: TRACE_INDEX.alias,
       body: {
@@ -190,12 +198,14 @@ const processCollectorJob_ = async (
             ] as QueryDslBoolQuery["must"],
           } as QueryDslBoolQuery,
         },
-        _source: ["spans"],
+        _source: ["spans", "evaluations"],
       },
     });
     existingSpans = (
       existingTraceResponse.hits.hits[0]?._source?.spans ?? []
     ).map(elasticSearchSpanToSpan);
+    existingEvaluations =
+      existingTraceResponse.hits.hits[0]?._source?.evaluations;
   }
 
   const allSpans = existingSpans.concat(spans);
@@ -205,7 +215,7 @@ const processCollectorJob_ = async (
   ]);
   const error = getLastOutputError(spans);
 
-  const evaluations = mapEvaluations(data);
+  const evaluations = mapEvaluations(data)?.concat(existingEvaluations ?? []);
 
   const customExistingMetadata = existingTrace?.existing_metadata?.custom ?? {};
   const existingAllKeys = existingTrace?.existing_metadata?.all_keys ?? [];
@@ -236,14 +246,10 @@ const processCollectorJob_ = async (
       ),
     },
     timestamps: {
-      ...(!existingTrace?.inserted_at
-        ? {
-            started_at:
-              Math.min(...spans.map((span) => span.timestamps.started_at)) ??
-              Date.now(),
-            inserted_at: Date.now(),
-          }
-        : {}),
+      started_at:
+        Math.min(...allSpans.map((span) => span.timestamps.started_at)) ??
+        Date.now(),
+      inserted_at: existingTrace?.inserted_at ?? Date.now(),
       updated_at: Date.now(),
     } as ElasticSearchTrace["timestamps"],
     ...(input?.value ? { input } : {}),
@@ -257,7 +263,10 @@ const processCollectorJob_ = async (
       .reverse(),
   };
 
-  if (!process.env.DISABLE_PII_REDACTION && project.piiRedactionLevel !== "DISABLED") {
+  if (
+    !process.env.DISABLE_PII_REDACTION &&
+    project.piiRedactionLevel !== "DISABLED"
+  ) {
     const piiEnforced = env.NODE_ENV === "production";
     await cleanupPIIs(trace, esSpans, {
       piiRedactionLevel: project.piiRedactionLevel,
@@ -265,9 +274,76 @@ const processCollectorJob_ = async (
     });
   }
 
+  await updateTrace(trace, esSpans, evaluations);
+
+  if (!existingTrace?.inserted_at) {
+    const delay = Date.now() - data.collectedAt;
+    collectorIndexDelayHistogram.observe(delay);
+  }
+
+  void markProjectFirstMessage(project, trace.metadata);
+
+  if (env.IS_QUICKWIT) {
+    // Skip check and adjust for quickwit
+    return;
+  }
+
+  const checkAndAdjust = async (postfix = "") => {
+    return collectorQueue!.add(
+      "collector",
+      {
+        action: "check_and_adjust",
+        traceId,
+        projectId,
+      },
+      {
+        jobId: `collector_${traceId}_check_and_adjust${postfix}`,
+        delay: 3000,
+      }
+    );
+  };
+
+  const job = await checkAndAdjust();
+  try {
+    // Push it forward if two traces are processed at the same time
+    await job?.changeDelay(3000);
+  } catch {
+    try {
+      // Remove the existing job and start a new one to rerun adjust
+      await job.remove();
+      await checkAndAdjust();
+    } catch {
+      // If that fails too because adjust is running, start a new job with different id for later
+      await checkAndAdjust("_2");
+    }
+  }
+};
+
+const updateTrace = async (
+  trace: ElasticSearchTrace,
+  esSpans: ElasticSearchSpan[],
+  evaluations: Evaluation[] | undefined
+) => {
+  if (env.IS_QUICKWIT) {
+    return await esClient.update({
+      index: TRACE_INDEX.alias,
+      id: traceIndexId({
+        traceId: trace.trace_id,
+        projectId: trace.project_id,
+      }),
+      retry_on_conflict: 10,
+      doc: {
+        ...trace,
+        spans: esSpans,
+        ...(evaluations ? { evaluations } : {}),
+      },
+      doc_as_upsert: true,
+    });
+  }
+
   await esClient.update({
     index: TRACE_INDEX.alias,
-    id: traceIndexId({ traceId, projectId: project.id }),
+    id: traceIndexId({ traceId: trace.trace_id, projectId: trace.project_id }),
     retry_on_conflict: 10,
     body: {
       script: {
@@ -371,43 +447,6 @@ const processCollectorJob_ = async (
     },
     refresh: true,
   });
-
-  if (!existingTrace?.inserted_at) {
-    const delay = Date.now() - data.collectedAt;
-    collectorIndexDelayHistogram.observe(delay);
-  }
-
-  void markProjectFirstMessage(project, trace.metadata);
-
-  const checkAndAdjust = async (postfix = "") => {
-    return collectorQueue!.add(
-      "collector",
-      {
-        action: "check_and_adjust",
-        traceId,
-        projectId,
-      },
-      {
-        jobId: `collector_${traceId}_check_and_adjust${postfix}`,
-        delay: 3000,
-      }
-    );
-  };
-
-  const job = await checkAndAdjust();
-  try {
-    // Push it forward if two traces are processed at the same time
-    await job?.changeDelay(3000);
-  } catch {
-    try {
-      // Remove the existing job and start a new one to rerun adjust
-      await job.remove();
-      await checkAndAdjust();
-    } catch {
-      // If that fails too because adjust is running, start a new job with different id for later
-      await checkAndAdjust("_2");
-    }
-  }
 };
 
 const processCollectorCheckAndAdjustJob = async (

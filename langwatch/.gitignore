@@ -46,3 +46,7 @@ yarn-error.log*
 .sentryclirc
 
 llmModelCosts.json
+
+quickwit
+quickwit-*
+!elastic/quickwit
