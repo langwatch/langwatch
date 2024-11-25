@@ -38,6 +38,7 @@ export type AnalyticsGroup = {
 };
 
 export const aggregationTypesEnum = z.enum([
+  "terms",
   "cardinality",
   "avg",
   "sum",

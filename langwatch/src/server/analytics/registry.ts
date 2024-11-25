@@ -25,7 +25,12 @@ const simpleFieldAnalytics = (
   increaseIs: "good",
   aggregation: (aggregation: AggregationTypes) => ({
     [`${field.replaceAll(".", "_")}_${aggregation}`]: {
-      [aggregation]: { field },
+      [aggregation]: {
+        field,
+        ...(aggregation === "terms"
+          ? { size: field === "trace_id" ? 0 : 999 }
+          : {}),
+      },
     },
   }),
   extractionPath: (aggregation: AggregationTypes) =>
