@@ -15,6 +15,9 @@ import {
   type ElasticSearchMigration,
 } from "../../elastic/schema";
 import type { MappingProperty } from "@elastic/elasticsearch/lib/api/types";
+import { env } from "../env.mjs";
+import { execSync } from "child_process";
+import { stderr } from "process";
 
 const files = fs
   .readdirSync(path.join(__dirname, "..", "..", "elastic", "migrations"))
@@ -32,6 +35,9 @@ const migrations = Object.fromEntries(
 );
 
 export default async function execute() {
+  if (env.IS_QUICKWIT) {
+    return quickwitMigrate();
+  }
   const migrationsExists = await esClient.indices.exists({
     index: MIGRATION_INDEX,
   });
@@ -75,6 +81,26 @@ export default async function execute() {
     }
   }
 }
+
+const quickwitMigrate = async () => {
+  const createIndex = (filePath: string) => {
+    try {
+      const result = execSync(
+        `./quickwit/quickwit index create --index-config ${filePath}`,
+        { stdio: ["pipe", "pipe", "pipe"] }
+      );
+      console.log(result.toString());
+    } catch (error) {
+      if (error instanceof Error && !error.message.includes("already exist")) {
+        throw error;
+      }
+    }
+  };
+
+  createIndex("./elastic/quickwit/search-dspy-steps.yaml");
+  createIndex("./elastic/quickwit/search-batch-evaluations.yaml");
+  createIndex("./elastic/quickwit/search-traces.yaml");
+};
 
 const getLastAppliedMigration = async () => {
   const allMigrations = await esClient.search<ElasticSearchMigration>({

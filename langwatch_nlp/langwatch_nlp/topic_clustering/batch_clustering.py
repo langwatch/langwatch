@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Any, Optional
 from fastapi import FastAPI
 from pydantic import BaseModel
 from langwatch_nlp.topic_clustering.build_response import build_response
@@ -77,7 +77,7 @@ class BatchClusteringParams(BaseModel):
     traces: list[Trace]
     deployment_name: Optional[str] = None
     litellm_params: dict[str, str]
-    embeddings_litellm_params: dict[str, str]
+    embeddings_litellm_params: dict[str, Any]
 
 
 def setup_endpoints(app: FastAPI):

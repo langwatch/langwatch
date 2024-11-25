@@ -77,16 +77,16 @@ export const organizationRouter = createTRPCRouter({
         phoneNumber: z.string().optional(),
         signUpData: z
           .object({
-            usage: z.string().optional(),
-            solution: z.string().optional(),
+            usage: z.string().optional().nullable(),
+            solution: z.string().optional().nullable(),
             terms: z.boolean().optional(),
-            companyType: z.string().optional(),
-            companySize: z.string().optional(),
-            projectType: z.string().optional(),
-            howDidYouHearAboutUs: z.string().optional(),
-            otherCompanyType: z.string().optional(),
-            otherProjectType: z.string().optional(),
-            otherHowDidYouHearAboutUs: z.string().optional(),
+            companyType: z.string().optional().nullable(),
+            companySize: z.string().optional().nullable(),
+            projectType: z.string().optional().nullable(),
+            howDidYouHearAboutUs: z.string().optional().nullable(),
+            otherCompanyType: z.string().optional().nullable(),
+            otherProjectType: z.string().optional().nullable(),
+            otherHowDidYouHearAboutUs: z.string().optional().nullable(),
           })
           .optional(),
       })
@@ -446,13 +446,18 @@ export const organizationRouter = createTRPCRouter({
             },
           });
 
-          await sendInviteEmail({
-            email: invite.email,
-            organization,
-            inviteCode,
-          });
+          if (env.SENDGRID_API_KEY) {
+            await sendInviteEmail({
+              email: invite.email,
+              organization,
+              inviteCode,
+            });
+          }
 
-          return savedInvite;
+          return {
+            invite: savedInvite,
+            noEmailProvider: !env.SENDGRID_API_KEY,
+          };
         })
       );
 
@@ -580,7 +585,11 @@ export const organizationRouter = createTRPCRouter({
 
       return { success: true, invite, project };
     }),
-
+  hasEmailProviderKey: protectedProcedure
+    .use(skipPermissionCheck as any)
+    .query(() => {
+      return !!process.env.SENDGRID_API_KEY;
+    }),
   updateTeamMemberRole: protectedProcedure
     .input(
       z.object({

@@ -467,6 +467,7 @@ export function BasePropertiesPanel({
         width="full"
         justify="space-between"
         spacing={0}
+        alignItems="flex-start"
       >
         <HStack spacing={2}>
           {header ? (

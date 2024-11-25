@@ -24,20 +24,7 @@ export const SignatureNode = forwardRef(function SignatureNode(
       }
     >
       <PromptingTechniqueDropArea id={props.id}>
-        <ComponentNode ref={ref} {...props}>
-          {(parameters.llm?.value as LLMConfig) && (
-            <>
-              <NodeSectionTitle>LLM</NodeSectionTitle>
-              <HStack width="full">
-                <LLMModelDisplay
-                  model={(parameters.llm?.value as LLMConfig).model}
-                  fontSize={11}
-                  showVersion={false}
-                />
-              </HStack>
-            </>
-          )}
-        </ComponentNode>
+        <ComponentNode ref={ref} {...props} />
       </PromptingTechniqueDropArea>
     </PromptingTechniqueWrapper>
   );

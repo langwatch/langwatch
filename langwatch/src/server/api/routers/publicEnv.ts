@@ -12,6 +12,7 @@ export const publicEnvRouter = publicProcedure
       NEXTAUTH_PROVIDER: env.NEXTAUTH_PROVIDER,
       DEMO_PROJECT_SLUG: env.DEMO_PROJECT_SLUG,
       NODE_ENV: env.NODE_ENV,
+      IS_ONPREM: env.IS_ONPREM,
     };
 
     return publicEnvVars;

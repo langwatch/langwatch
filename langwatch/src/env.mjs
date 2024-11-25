@@ -44,11 +44,12 @@ export const env = createEnv({
     DEMO_PROJECT_USER_ID: z.string().optional(),
     DEMO_PROJECT_SLUG: z.string().optional(),
     IS_OPENSEARCH: z.boolean().optional(),
+    IS_QUICKWIT: z.boolean().optional(),
     USE_AWS_SES: z.string().optional(),
     AWS_REGION: z.string().optional(),
     SENTRY_DSN: z.string().optional(),
     IS_ONPREM: z.string().optional(),
-    ONPREM_EMAIL: z.string().optional(),
+    EMAIL_DEFAULT_FROM: z.string().optional(),
   },
 
   /**
@@ -91,11 +92,15 @@ export const env = createEnv({
     IS_OPENSEARCH:
       process.env.IS_OPENSEARCH === "1" ||
       process.env.IS_OPENSEARCH?.toLowerCase() === "true",
+    IS_QUICKWIT:
+      process.env.IS_QUICKWIT === "1" ||
+      process.env.IS_QUICKWIT?.toLowerCase() === "true" ||
+      process.env.ELASTICSEARCH_NODE_URL?.startsWith("quickwit://"),
     USE_AWS_SES: process.env.USE_AWS_SES,
     AWS_REGION: process.env.AWS_REGION,
     SENTRY_DSN: process.env.SENTRY_DSN,
     IS_ONPREM: process.env.IS_ONPREM,
-    ONPREM_EMAIL: process.env.ONPREM_EMAIL,
+    EMAIL_DEFAULT_FROM: process.env.EMAIL_DEFAULT_FROM,
   },
   /**
    * Run `build` or `dev` with `SKIP_ENV_VALIDATION` to skip env validation.

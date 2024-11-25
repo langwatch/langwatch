@@ -100,7 +100,9 @@ def parse_signature(
     else:
         predict = dspy.Predict(SignatureClass)
 
-    llm_config = cast(LLMConfig, parameters.get("llm", workflow.default_llm))
+    llm_config = cast(LLMConfig, parameters.get("llm"))
+    if llm_config is None:
+        raise ValueError(f"LLM is required for {component.name}")
     lm = node_llm_config_to_dspy_lm(llm_config)
 
     demonstrations = cast(NodeDataset, parameters.get("demonstrations"))

@@ -1,0 +1,197 @@
+version: 0.7
+
+index_id: search-traces-alias
+
+doc_mapping:
+  mode: dynamic
+  field_mappings:
+    - name: trace_id
+      type: text
+      tokenizer: raw
+      stored: true
+    - name: project_id
+      type: text
+      tokenizer: raw
+      stored: true
+      fast: true
+    - name: metadata
+      type: object
+      field_mappings:
+        - name: thread_id
+          type: text
+          tokenizer: raw
+          stored: true
+          fast: true
+        - name: user_id
+          type: text
+          tokenizer: raw
+          stored: true
+          fast: true
+        - name: customer_id
+          type: text
+          tokenizer: raw
+          stored: true
+          fast: true
+        - name: labels
+          type: array<text>
+          tokenizer: raw
+          stored: true
+          fast: true
+        - name: topic_id
+          type: text
+          tokenizer: raw
+          stored: true
+          fast: true
+        - name: subtopic_id
+          type: text
+          tokenizer: raw
+          stored: true
+          fast: true
+        - name: sdk_version
+          type: text
+          tokenizer: raw
+          stored: true
+          fast: true
+        - name: sdk_language
+          type: text
+          tokenizer: raw
+          stored: true
+          fast: true
+        - name: custom
+          type: json
+          stored: true
+          fast: true
+        - name: all_keys
+          type: array<text>
+          tokenizer: raw
+          stored: true
+          fast: true
+
+    - name: timestamps
+      type: object
+      field_mappings:
+        - name: started_at
+          type: datetime
+          fast: true
+          input_formats:
+            - unix_timestamp
+          output_format: unix_timestamp_millis
+          fast_precision: seconds
+        - name: inserted_at
+          type: datetime
+          fast: true
+          input_formats:
+            - unix_timestamp
+          output_format: unix_timestamp_millis
+          fast_precision: seconds
+        - name: updated_at
+          type: datetime
+          fast: true
+          input_formats:
+            - unix_timestamp
+          output_format: unix_timestamp_millis
+          fast_precision: seconds
+
+    - name: input
+      type: object
+      field_mappings:
+        - name: value
+          type: text
+          stored: true
+        - name: satisfaction_score
+          type: f64
+          stored: true
+        # Note: Vector embeddings might need a different approach in Quickwit
+        - name: embeddings
+          type: json
+          stored: true
+
+    - name: output
+      type: object
+      field_mappings:
+        - name: value
+          type: text
+          stored: true
+        - name: embeddings
+          type: json
+          stored: true
+
+    - name: metrics
+      type: object
+      field_mappings:
+        - name: first_token_ms
+          type: i64
+          stored: true
+        - name: total_time_ms
+          type: i64
+          stored: true
+        - name: prompt_tokens
+          type: i64
+          stored: true
+        - name: completion_tokens
+          type: i64
+          stored: true
+        - name: tokens_estimated
+          type: bool
+          stored: true
+        - name: total_cost
+          type: f64
+          stored: true
+
+    - name: error
+      type: json
+
+    - name: indexing_md5s
+      type: array<text>
+      tokenizer: raw
+      stored: true
+
+    - name: contexts
+      type: json
+      stored: true
+
+    - name: expected_output
+      type: object
+      field_mappings:
+        - name: value
+          type: text
+          stored: true
+
+    - name: spans
+      type: array<json>
+      stored: true
+
+    - name: evaluations
+      type: array<json>
+      stored: true
+
+    - name: events
+      type: array<json>
+      stored: true
+
+search_settings:
+  default_search_fields:
+    [
+      trace_id,
+      project_id,
+      input.value,
+      output.value,
+      metadata.thread_id,
+      metadata.user_id,
+      metadata.customer_id,
+      metadata.labels,
+      metadata.topic_id,
+      metadata.subtopic_id,
+      metadata.sdk_version,
+      metadata.sdk_language,
+      metadata.all_keys,
+    ]
+
+indexing_settings:
+  commit_timeout_secs: 1
+  merge_policy:
+    type: "stable_log"
+    min_level_num_docs: 100000
+    merge_factor: 1
+    max_merge_factor: 120
+    maturation_period: 3s

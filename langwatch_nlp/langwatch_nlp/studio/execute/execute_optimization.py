@@ -128,7 +128,9 @@ async def execute_optimization(
 
         params = event.params.model_dump(exclude_none=True)
         if event.optimizer == "MIPROv2ZeroShot" or event.optimizer == "MIPROv2":
-            llm_config = event.params.llm or workflow.default_llm
+            llm_config = event.params.llm
+            if llm_config is None:
+                raise ValueError("LLM config is required for optimizer")
             lm = node_llm_config_to_dspy_lm(llm_config)
             # TODO: can we do it not globally? will this overwride the signature ones?
             # dspy.configure(lm=lm)

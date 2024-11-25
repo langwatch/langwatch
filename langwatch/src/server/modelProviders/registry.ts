@@ -16,6 +16,7 @@ export type MaybeStoredModelProvider = Omit<
   id?: string;
   customModels?: string[] | null;
   customEmbeddingsModels?: string[] | null;
+  disabledByDefault?: boolean;
 };
 
 export const modelProviders = {
@@ -62,12 +63,31 @@ export const modelProviders = {
     }),
     enabledSince: new Date("2023-01-01"),
   },
+  gemini: {
+    name: "Gemini",
+    apiKey: "GEMINI_API_KEY",
+    endpointKey: undefined,
+    keysSchema: z.object({
+      GEMINI_API_KEY: z.string().min(1),
+    }),
+    enabledSince: new Date("2023-01-01"),
+  },
   groq: {
     name: "Groq",
     apiKey: "GROQ_API_KEY",
     endpointKey: undefined,
     keysSchema: z.object({
       GROQ_API_KEY: z.string().min(1),
+    }),
+    enabledSince: new Date("2023-01-01"),
+  },
+  cloudflare: {
+    name: "Cloudflare",
+    apiKey: "CLOUDFLARE_API_KEY",
+    endpointKey: undefined,
+    keysSchema: z.object({
+      CLOUDFLARE_ACCOUNT_ID: z.string().min(1),
+      CLOUDFLARE_API_KEY: z.string().min(1),
     }),
     enabledSince: new Date("2023-01-01"),
   },
@@ -79,25 +99,6 @@ export const modelProviders = {
       GOOGLE_APPLICATION_CREDENTIALS: z.string().min(1).refine(isValidJson),
       VERTEXAI_PROJECT: z.string().min(1),
       VERTEXAI_LOCATION: z.string().min(1),
-    }),
-    enabledSince: new Date("2023-01-01"),
-  },
-  gemini: {
-    name: "Gemini",
-    apiKey: "GEMINI_API_KEY",
-    endpointKey: undefined,
-    keysSchema: z.object({
-      GEMINI_API_KEY: z.string().min(1),
-    }),
-    enabledSince: new Date("2023-01-01"),
-  },
-  cloudflare: {
-    name: "Cloudflare",
-    apiKey: "CLOUDFLARE_API_KEY",
-    endpointKey: undefined,
-    keysSchema: z.object({
-      CLOUDFLARE_ACCOUNT_ID: z.string().min(1),
-      CLOUDFLARE_API_KEY: z.string().min(1),
     }),
     enabledSince: new Date("2023-01-01"),
   },

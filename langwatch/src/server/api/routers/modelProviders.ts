@@ -93,6 +93,28 @@ export const modelProviderRouter = createTRPCRouter({
         });
       }
     }),
+
+  delete: protectedProcedure
+    .input(
+      z.object({
+        id: z.string().optional(),
+        projectId: z.string(),
+        provider: z.string(),
+      })
+    )
+    .use(checkUserPermissionForProject(TeamRoleGroup.SETUP_PROJECT))
+    .mutation(async ({ input, ctx }) => {
+      const { id, projectId, provider } = input;
+      if (id) {
+        return await ctx.prisma.modelProvider.delete({
+          where: { id, projectId },
+        });
+      } else {
+        return await ctx.prisma.modelProvider.deleteMany({
+          where: { provider, projectId },
+        });
+      }
+    }),
 });
 
 export const getProjectModelProviders = async (projectId: string) => {
@@ -111,9 +133,14 @@ export const getProjectModelProviders = async (projectId: string) => {
           return modelProvider.enabledSince;
         })
         .map(([providerKey, modelProvider]) => {
+          const enabled =
+            modelProvider.enabledSince < project.createdAt &&
+            !!process.env[modelProvider.apiKey] &&
+            (providerKey !== "vertex_ai" || !!process.env.VERTEXAI_PROJECT);
           const modelProvider_: MaybeStoredModelProvider = {
             provider: providerKey,
-            enabled: modelProvider.enabledSince < project.createdAt,
+            enabled,
+            disabledByDefault: !enabled,
             customKeys: null,
             customModels: null,
             customEmbeddingsModels: null,
@@ -140,6 +167,8 @@ export const getProjectModelProviders = async (projectId: string) => {
             | string[]
             | null,
           deploymentMapping: modelProvider.deploymentMapping,
+          disabledByDefault:
+            defaultModelProviders[modelProvider.provider]?.disabledByDefault,
         },
       };
     },

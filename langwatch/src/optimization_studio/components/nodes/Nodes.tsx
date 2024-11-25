@@ -23,7 +23,7 @@ import {
   type Node,
   type NodeProps,
 } from "@xyflow/react";
-import { useMemo, type Ref } from "react";
+import React, { useMemo, type Ref } from "react";
 import { useDragLayer } from "react-dnd";
 import {
   Check,
@@ -44,8 +44,10 @@ import {
   type Component,
   type ComponentType,
   type Field,
+  type LLMConfig,
 } from "../../types/dsl";
 import { ComponentIcon } from "../ColorfulBlockIcons";
+import { LLMModelDisplay } from "../properties/modals/LLMConfigModal";
 
 export function getNodeDisplayName(node: { id: string; data: Component }) {
   return node.data.name ?? node.data.cls ?? node.id;
@@ -244,6 +246,9 @@ export const ComponentNode = forwardRef(function ComponentNode(
     [isDragging, item, props.type]
   );
 
+  const llmParams =
+    props.data.parameters?.filter((p) => p.type === "llm") ?? [];
+
   return (
     <VStack
       className="js-component-node"
@@ -333,6 +338,20 @@ export const ComponentNode = forwardRef(function ComponentNode(
         )}
       </HStack>
       {props.children}
+      {llmParams
+        .filter((llmParam) => llmParam.value)
+        .map((llmParam) => (
+          <React.Fragment key={llmParam.identifier}>
+            <NodeSectionTitle>LLM</NodeSectionTitle>
+            <HStack width="full">
+              <LLMModelDisplay
+                model={(llmParam?.value as LLMConfig).model}
+                fontSize={11}
+                showVersion={false}
+              />
+            </HStack>
+          </React.Fragment>
+        ))}
       {props.data.inputs && (
         <>
           <NodeSectionTitle>{props.inputsTitle ?? "Inputs"}</NodeSectionTitle>

@@ -33,7 +33,6 @@ import { allModelOptions, ModelSelector } from "../ModelSelector";
 import { SmallLabel } from "../SmallLabel";
 import type { CheckConfigFormData } from "./CheckConfigForm";
 import { PropertySectionTitle } from "../../optimization_studio/components/properties/BasePropertiesPanel";
-import { allowedEmbeddingsModels } from "../../server/topicClustering/types";
 
 const DynamicZodForm = ({
   schema,
@@ -129,7 +128,7 @@ const DynamicZodForm = ({
         const selectorOptions =
           fieldName === "model"
             ? options.map((option: { value: string }) => option.value)
-            : allowedEmbeddingsModels;
+            : options.map((option: { value: string }) => option.value);
 
         return (
           <Controller

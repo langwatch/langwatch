@@ -11,7 +11,7 @@ export const connection =
     : new IORedis(env.REDIS_URL, {
         maxRetriesPerRequest: null,
         enableOfflineQueue: false,
-        tls: env.REDIS_URL.includes("rediss://"),
+        tls: env.REDIS_URL.includes("tls.rejectUnauthorized=false") ? { rejectUnauthorized: false } : env.REDIS_URL.includes("rediss://"),
       });
 
 connection?.on("connect", () => {

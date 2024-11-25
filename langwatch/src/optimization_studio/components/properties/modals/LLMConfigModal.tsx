@@ -9,7 +9,7 @@ import {
   Tooltip,
   useDisclosure,
 } from "@chakra-ui/react";
-import { ExternalLink, Link2, Settings, X } from "react-feather";
+import { Settings, X } from "react-feather";
 import { HorizontalFormControl } from "../../../../components/HorizontalFormControl";
 import { Sliders2 } from "../../../../components/icons/Sliders2";
 import {
@@ -19,7 +19,6 @@ import {
 } from "../../../../components/ModelSelector";
 import type { LLMConfig } from "../../../types/dsl";
 import { ConfigModal } from "./ConfigModal";
-import { useWorkflowStore } from "../../../hooks/useWorkflowStore";
 
 export function LLMModelDisplay({
   model,
@@ -48,18 +47,17 @@ export function LLMModelDisplay({
         wordBreak="break-all"
       >
         {modelOption?.label}
-        {((!!modelOption?.version && showVersion) ||
-          modelOption?.isDisabled) && (
+        {modelOption?.isDisabled && (
           <>
             {" "}
             <Text
               as="span"
               fontSize={fontSize}
               fontFamily="mono"
-              color="gray.400"
+              color="gray.500"
               opacity={modelOption?.isDisabled ? 0.5 : 1}
             >
-              ({modelOption?.value ? modelOption?.version : "disabled"})
+              (disabled)
             </Text>
           </>
         )}
@@ -93,12 +91,6 @@ export function LLMConfigField({
     allModelOptions,
     model,
     "chat"
-  );
-
-  const { setWorkflowSelected } = useWorkflowStore(
-    ({ setWorkflowSelected }) => ({
-      setWorkflowSelected,
-    })
   );
 
   return (

@@ -4,8 +4,7 @@ import { Heading } from "@react-email/heading";
 import { Html } from "@react-email/html";
 import { Img } from "@react-email/img";
 import { render } from "@react-email/render";
-import sgMail from "@sendgrid/mail";
-import { SESClient, SendEmailCommand } from "@aws-sdk/client-ses";
+import { sendEmail } from "./emailSender";
 
 import { env } from "../../env.mjs";
 import type { AlertType } from "@prisma/client";
@@ -29,14 +28,6 @@ export const sendTriggerEmail = async ({
   triggerType: AlertType;
   triggerMessage: string;
 }) => {
-  if (!env.SENDGRID_API_KEY && !(env.USE_AWS_SES && env.AWS_REGION)) {
-    console.warn("No email sending method available. Skipping email sending.");
-    console.warn(
-      "Please set SENDGRID_API_KEY or both USE_AWS_SES and AWS_REGION."
-    );
-    return;
-  }
-
   const emailHtml = render(
     <Html lang="en" dir="ltr">
       <Container
@@ -66,51 +57,11 @@ export const sendTriggerEmail = async ({
     </Html>
   );
 
-  if (env.USE_AWS_SES && env.AWS_REGION) {
-    const sesClient = new SESClient({ region: env.AWS_REGION });
-
-    const params = {
-      Destination: {
-        ToAddresses: triggerEmails,
-      },
-      Message: {
-        Body: {
-          Html: {
-            Charset: "UTF-8",
-            Data: emailHtml,
-          },
-        },
-        Subject: {
-          Charset: "UTF-8",
-          Data: `${
-            triggerType ? `(${triggerType}) ` : ""
-          } Trigger - ${triggerName} }`,
-        },
-      },
-      Source: `${env.ONPREM_EMAIL}`,
-    };
-
-    try {
-      const command = new SendEmailCommand(params);
-      const data = await sesClient.send(command);
-      console.log("Email sent successfully:", data);
-    } catch (error) {
-      console.error("Error sending email:", error);
-      throw error;
-    }
-  } else if (env.SENDGRID_API_KEY) {
-    sgMail.setApiKey(env.SENDGRID_API_KEY);
-    const msg = {
-      to: triggerEmails,
-      from: "LangWatch <contact@langwatch.ai>",
-      subject: `${
-        triggerType ? `(${triggerType}) ` : ""
-      }Trigger - ${triggerName} `,
-      html: emailHtml,
-    };
-
-    await sgMail.send(msg);
-  }
+  await sendEmail({
+    to: triggerEmails,
+    subject: `${triggerType ? `(${triggerType}) ` : ""}Trigger - ${triggerName}`,
+    html: emailHtml,
+  });
 };
 
 const TriggerTable = ({

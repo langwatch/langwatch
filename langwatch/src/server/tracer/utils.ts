@@ -142,7 +142,11 @@ export const elasticSearchEvaluationsToEvaluations = (
 export const elasticSearchEventsToEvents = (
   elasticSearchEvents: ElasticSearchEvent[]
 ): Event[] => {
-  return elasticSearchEvents.map((event) => ({
+  return elasticSearchEvents.map(elasticSearchEventToEvent);
+};
+
+export const elasticSearchEventToEvent = (event: ElasticSearchEvent): Event => {
+  return {
     ...event,
     metrics: Object.fromEntries(
       event.metrics.map((metric) => [metric.key, metric.value])
@@ -150,5 +154,5 @@ export const elasticSearchEventsToEvents = (
     event_details: Object.fromEntries(
       event.event_details.map((detail) => [detail.key, detail.value])
     ),
-  }));
+  };
 };

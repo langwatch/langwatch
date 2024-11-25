@@ -1,4 +1,4 @@
-from typing import Optional, TypeVar
+from typing import Any, Optional, TypeVar
 from fastapi import FastAPI
 
 import numpy as np
@@ -200,7 +200,7 @@ class IncrementalClusteringParams(BaseModel):
     traces: list[Trace]
     deployment_name: Optional[str] = None
     litellm_params: dict[str, str]
-    embeddings_litellm_params: dict[str, str]
+    embeddings_litellm_params: dict[str, Any]
 
 
 def setup_endpoints(app: FastAPI):

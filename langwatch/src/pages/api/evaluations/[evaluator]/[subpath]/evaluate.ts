@@ -197,7 +197,7 @@ export async function handleEvaluatorCall(
   const runEval = () =>
     runEvaluation({
       projectId: project.id,
-      checkType: checkType as EvaluatorTypes,
+      evaluatorType: checkType as EvaluatorTypes,
       input: input ? input : undefined,
       output: output ? output : undefined,
       contexts: contextList,

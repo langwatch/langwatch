@@ -187,7 +187,7 @@ export default async function handler(
           input: message.input ?? undefined,
           output: message.output ?? undefined,
         })) ?? [],
-      checkType: checkType as EvaluatorTypes,
+      evaluatorType: checkType as EvaluatorTypes,
       settings: (settings as Record<string, unknown>) ?? {},
     });
   } catch (error) {

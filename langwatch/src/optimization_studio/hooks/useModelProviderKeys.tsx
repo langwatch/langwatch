@@ -1,7 +1,7 @@
 import { useWorkflowStore } from "../hooks/useWorkflowStore";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 
-import type { Component, LLMConfig, Signature } from "../types/dsl";
+import type { Component, Field, LLMConfig, Signature } from "../types/dsl";
 
 export const useModelProviderKeys = (extra_llms?: LLMConfig[]) => {
   const { modelProviders } = useOrganizationTeamProject();
@@ -16,38 +16,31 @@ export const useModelProviderKeys = (extra_llms?: LLMConfig[]) => {
     modelProviders ?? {}
   ).filter((modelProvider) => !modelProvider.customKeys);
 
-  const nodesWithCustomLLM = nodes.filter(
-    (node) =>
-      (node.data as Signature).parameters?.find(
-        (p) => p.identifier === "llm" && p.value
-      )
+  const defaultModelProvider = workflow.default_llm.model.split("/")[0];
+
+  const nodesWithLLMParameter = nodes.filter(
+    (node) => node.data.parameters?.find((p) => p.type === "llm")
   );
 
   const getModelProviders = (nodes: Component[]) => {
     return nodes
-      .map((node) =>
-        "data" in node &&
-        typeof node.data === "object" &&
-        node.data !== null &&
-        "llm" in node.data
-          ? (
-              (node.data as Signature).parameters?.find(
-                (p) => p.identifier === "llm" && p.value
-              )?.value as LLMConfig
-            ).model.split("/")[0]
-          : undefined
+      .flatMap((node) =>
+        "data" in node && typeof node.data === "object"
+          ? (node.data as Signature).parameters
+              ?.filter((p) => p.type === "llm")
+              .map(
+                (p) =>
+                  (p.value as LLMConfig | undefined)?.model.split("/")[0] ??
+                  defaultModelProvider
+              )
+          : []
       )
       .filter((provider): provider is string => provider !== undefined);
   };
 
   const nodeProviders = new Set(
-    getModelProviders(nodesWithCustomLLM as Component[])
+    getModelProviders(nodesWithLLMParameter as Component[])
   );
-
-  const defaultModel = workflow.default_llm.model.split("/")[0];
-  if (defaultModel && !nodeProviders.has(defaultModel)) {
-    nodeProviders.add(defaultModel);
-  }
 
   for (const llm of extra_llms ?? []) {
     const provider = llm.model.split("/")[0];
