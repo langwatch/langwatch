@@ -3,8 +3,26 @@ import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { TeamRoleGroup, checkUserPermissionForProject } from "../permission";
 import { evaluatorsSchema } from "../../evaluations/evaluators.zod.generated";
 import { runEvaluationForTrace } from "../../background/workers/evaluationsWorker";
+import { AVAILABLE_EVALUATORS } from "../../evaluations/evaluators.generated";
 
 export const evaluationsRouter = createTRPCRouter({
+  availableEvaluators: protectedProcedure
+    .input(z.object({ projectId: z.string() }))
+    .use(checkUserPermissionForProject(TeamRoleGroup.GUARDRAILS_MANAGE))
+    .query(async () => {
+      return Object.fromEntries(
+        Object.entries(AVAILABLE_EVALUATORS)
+          .map(([key, evaluator]) => [
+            key,
+            {
+              ...evaluator,
+              missingEnvVars: evaluator.envVars.filter(
+                (envVar) => !process.env[envVar]
+              ),
+            },
+          ])
+      );
+    }),
   runEvaluation: protectedProcedure
     .input(
       z.object({

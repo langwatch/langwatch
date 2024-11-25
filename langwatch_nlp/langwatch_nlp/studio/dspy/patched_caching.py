@@ -4,9 +4,9 @@
 import dspy.clients.lm
 
 
-def cached_litellm_completion_without_lru_cache(request):
+def cached_litellm_completion_without_lru_cache(*args, **kwargs):
     return dspy.clients.lm.litellm_completion(
-        request, cache={"no-cache": False, "no-store": False}
+        *args, **kwargs, cache={"no-cache": False, "no-store": False}
     )
 
 

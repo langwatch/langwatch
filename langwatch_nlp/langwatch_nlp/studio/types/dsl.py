@@ -7,6 +7,7 @@ from langwatch_nlp.studio.types.dataset import DatasetColumns
 
 class FieldType(str, Enum):
     str = "str"
+    image = "image"
     float = "float"
     int = "int"
     bool = "bool"
@@ -269,7 +270,6 @@ class Workflow(BaseModel):
     icon: str
     description: str
     version: str
-    default_llm: LLMConfig
     nodes: List[Node]
     edges: List[Edge]
     state: WorkflowState

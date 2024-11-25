@@ -19,7 +19,7 @@ import langwatch_nlp.topic_clustering.batch_clustering as batch_clustering
 import langwatch_nlp.topic_clustering.incremental_clustering as incremental_clustering
 import langwatch_nlp.sentiment_analysis as sentiment_analysis
 import litellm.proxy.proxy_server as litellm_proxy_server
-from litellm.router_utils.client_initalization_utils import set_client
+from litellm.router_utils.client_initalization_utils import InitalizeOpenAISDKClient
 
 from litellm.router import Router
 
@@ -89,7 +89,7 @@ async def proxy_startup():
                 "AZURE_API_VERSION"
             ]
 
-        set_client(litellm_router_instance=self, model=deployment)
+        InitalizeOpenAISDKClient.set_client(litellm_router_instance=self, model=deployment)
 
         return deployment
 

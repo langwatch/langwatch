@@ -31,6 +31,10 @@ import {
   prepareLitellmParams,
 } from "../api/routers/modelProviders";
 import { getPayloadSizeHistogram } from "../metrics";
+import {
+  DEFAULT_TOPIC_CLUSTERING_MODEL,
+  OPENAI_EMBEDDING_DIMENSION,
+} from "../../utils/constants";
 
 const debug = getDebugger("langwatch:topicClustering");
 
@@ -260,7 +264,7 @@ export const clusterTopicsForProject = async (
 
 const getProjectTopicClusteringModelProvider = async (project: Project) => {
   const topicClusteringModel =
-    project.topicClusteringModel ?? allowedTopicClusteringModels[0];
+    project.topicClusteringModel ?? DEFAULT_TOPIC_CLUSTERING_MODEL;
   if (!topicClusteringModel) {
     throw new Error("Topic clustering model not set");
   }
@@ -303,10 +307,13 @@ export const batchClusterTraces = async (
       topicModel.model,
       topicModel.modelProvider
     ),
-    embeddings_litellm_params: prepareLitellmParams(
-      embeddingsModel.model,
-      embeddingsModel.modelProvider
-    ),
+    embeddings_litellm_params: {
+      ...prepareLitellmParams(
+        embeddingsModel.model,
+        embeddingsModel.modelProvider
+      ),
+      dimensions: OPENAI_EMBEDDING_DIMENSION,
+    },
     traces,
   });
 
@@ -365,10 +372,13 @@ export const incrementalClustering = async (
       topicModel.model,
       topicModel.modelProvider
     ),
-    embeddings_litellm_params: prepareLitellmParams(
-      embeddingsModel.model,
-      embeddingsModel.modelProvider
-    ),
+    embeddings_litellm_params: {
+      ...prepareLitellmParams(
+        embeddingsModel.model,
+        embeddingsModel.modelProvider
+      ),
+      dimensions: OPENAI_EMBEDDING_DIMENSION,
+    },
     traces,
     topics,
     subtopics,

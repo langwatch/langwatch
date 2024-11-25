@@ -129,7 +129,7 @@ export const runEvaluationForTrace = async ({
 
   const result = await runEvaluation({
     projectId,
-    checkType: evaluatorType,
+    evaluatorType: evaluatorType,
     input,
     output,
     contexts,
@@ -143,7 +143,7 @@ export const runEvaluationForTrace = async ({
 
 export const runEvaluation = async ({
   projectId,
-  checkType,
+  evaluatorType,
   input,
   output,
   contexts,
@@ -153,7 +153,7 @@ export const runEvaluation = async ({
   retries = 1,
 }: {
   projectId: string;
-  checkType: EvaluatorTypes;
+  evaluatorType: EvaluatorTypes;
   input?: string;
   output?: string;
   contexts?: string[];
@@ -180,9 +180,13 @@ export const runEvaluation = async ({
     };
   }
 
-  let evaluatorEnv: Record<string, string> = {};
+  const evaluator = AVAILABLE_EVALUATORS[evaluatorType];
 
-  const setupEnv = async (model: string, embeddings: boolean) => {
+  let evaluatorEnv: Record<string, string> = Object.fromEntries(
+    (evaluator.envVars ?? []).map((envVar) => [envVar, process.env[envVar]!])
+  );
+
+  const setupModelEnv = async (model: string, embeddings: boolean) => {
     const modelProviders = await getProjectModelProviders(projectId);
     const provider = model.split("/")[0]!;
     const modelProvider = modelProviders[provider];
@@ -213,11 +217,11 @@ export const runEvaluation = async ({
     settings &&
     "model" in settings &&
     typeof settings.model === "string" &&
-    checkType !== "openai/moderation"
+    evaluatorType !== "openai/moderation"
   ) {
     evaluatorEnv = {
       ...evaluatorEnv,
-      ...(await setupEnv(settings.model, false)),
+      ...(await setupModelEnv(settings.model, false)),
     };
   }
 
@@ -228,7 +232,7 @@ export const runEvaluation = async ({
   ) {
     evaluatorEnv = {
       ...evaluatorEnv,
-      ...(await setupEnv(settings.embeddings_model, true)),
+      ...(await setupModelEnv(settings.embeddings_model, true)),
     };
   }
 
@@ -236,25 +240,28 @@ export const runEvaluation = async ({
 
   let response;
   try {
-    response = await fetch(`${env.LANGEVALS_ENDPOINT}/${checkType}/evaluate`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        data: [
-          {
-            input: input ?? "",
-            output: output ?? "",
-            contexts: contexts ?? [],
-            expected_output: expected_output ?? "",
-            conversation: conversation ?? [],
-          },
-        ],
-        settings: settings && typeof settings === "object" ? settings : {},
-        env: evaluatorEnv,
-      }),
-    });
+    response = await fetch(
+      `${env.LANGEVALS_ENDPOINT}/${evaluatorType}/evaluate`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          data: [
+            {
+              input: input ?? "",
+              output: output ?? "",
+              contexts: contexts ?? [],
+              expected_output: expected_output ?? "",
+              conversation: conversation ?? [],
+            },
+          ],
+          settings: settings && typeof settings === "object" ? settings : {},
+          env: evaluatorEnv,
+        }),
+      }
+    );
   } catch (error) {
     if (error instanceof Error && error.message.includes("fetch failed")) {
       throw new Error("Evaluator cannot be reached");
@@ -263,14 +270,14 @@ export const runEvaluation = async ({
   }
 
   const duration = performance.now() - startTime;
-  evaluationDurationHistogram.labels(checkType).observe(duration);
+  evaluationDurationHistogram.labels(evaluatorType).observe(duration);
 
   if (!response.ok) {
     if (response.status >= 500 && retries > 0) {
       await new Promise((resolve) => setTimeout(resolve, 100));
       return runEvaluation({
         projectId,
-        checkType,
+        evaluatorType: evaluatorType,
         input,
         output,
         contexts,
@@ -280,7 +287,7 @@ export const runEvaluation = async ({
         retries: retries - 1,
       });
     } else {
-      getEvaluationStatusCounter(checkType, "error").inc();
+      getEvaluationStatusCounter(evaluatorType, "error").inc();
       let statusText = response.statusText;
       try {
         statusText = JSON.stringify(await response.json(), undefined, 2);
@@ -291,11 +298,11 @@ export const runEvaluation = async ({
 
   const result = ((await response.json()) as BatchEvaluationResult)[0];
   if (!result) {
-    getEvaluationStatusCounter(checkType, "error").inc();
+    getEvaluationStatusCounter(evaluatorType, "error").inc();
     throw "Unexpected response: empty results";
   }
 
-  getEvaluationStatusCounter(checkType, result.status).inc();
+  getEvaluationStatusCounter(evaluatorType, result.status).inc();
 
   return result;
 };

@@ -36,6 +36,7 @@ import {
 import { OrganizationUserRole } from "@prisma/client";
 import { Select as MultiSelect, chakraComponents } from "chakra-react-select";
 import { Lock, Mail, MoreVertical, Plus, Trash } from "react-feather";
+import { CopyInput } from "../../components/CopyInput";
 
 import {
   Controller,
@@ -51,6 +52,8 @@ import type {
 } from "../../server/api/routers/organization";
 import { type PlanInfo } from "../../server/subscriptionHandler";
 import { api } from "../../utils/api";
+import { useState } from "react";
+import { useRouter } from "next/router";
 
 type Option = { label: string; value: string; description?: string };
 
@@ -115,6 +118,13 @@ function MembersList({
     onOpen: onAddMembersOpen,
     onClose: onAddMembersClose,
   } = useDisclosure();
+
+  const {
+    isOpen: isInviteLinkOpen,
+    onOpen: onInviteLinkOpen,
+    onClose: onInviteLinkClose,
+  } = useDisclosure();
+
   const {
     register,
     control,
@@ -141,6 +151,11 @@ function MembersList({
   const deleteMemberMutation = api.organization.deleteMember.useMutation();
   const deleteInviteMutation = api.organization.deleteInvite.useMutation();
   const toast = useToast();
+  const router = useRouter();
+
+  const [selectedInvites, setSelectedInvites] = useState<
+    { inviteCode: string; email: string }[]
+  >([]);
 
   const onSubmit: SubmitHandler<MembersForm> = (data) => {
     createInvitesMutation.mutate(
@@ -155,10 +170,35 @@ function MembersList({
         })),
       },
       {
-        onSuccess: () => {
+        onSuccess: (data) => {
+          const newInvites = data.reduce(
+            (acc, invite) => {
+              if (invite?.invite && invite.noEmailProvider) {
+                acc.push({
+                  inviteCode: invite.invite.id,
+                  email: invite.invite.email,
+                });
+              }
+              return acc;
+            },
+            [] as { inviteCode: string; email: string }[]
+          );
+
+          setSelectedInvites(newInvites);
+
+          const title =
+            newInvites.length > 0
+              ? "Invites created successfully"
+              : "Invites sent successfully";
+
+          const description =
+            newInvites.length > 0
+              ? "All invites have been created."
+              : "All invites have been sent.";
+
           toast({
-            title: "Invites sent successfully",
-            description: "All invites have been sent.",
+            title: title,
+            description: description,
             status: "success",
             duration: 5000,
             isClosable: true,
@@ -167,6 +207,9 @@ function MembersList({
           onAddMembersClose();
           resetForm();
           void pendingInvites.refetch();
+          if (newInvites.length > 0) {
+            onInviteLinkOpen();
+          }
         },
         onError: () => {
           toast({
@@ -217,6 +260,16 @@ function MembersList({
         },
       }
     );
+  };
+
+  const viewInviteLink = (inviteCode: string, email: string) => {
+    setSelectedInvites([{ inviteCode, email }]);
+    onInviteLinkOpen();
+  };
+
+  const onInviteModalClose = () => {
+    setSelectedInvites([]);
+    onInviteLinkClose();
   };
 
   const deleteInvite = (inviteId: string) => {
@@ -379,6 +432,13 @@ function MembersList({
                               >
                                 Delete
                               </MenuItem>
+                              <MenuItem
+                                onClick={() =>
+                                  viewInviteLink(invite.id, invite.email)
+                                }
+                              >
+                                View Invite Link
+                              </MenuItem>
                             </MenuList>
                           </Menu>
                         </Td>
@@ -391,6 +451,45 @@ function MembersList({
           </CardBody>
         </Card>
       </VStack>
+
+      <Modal isOpen={isInviteLinkOpen} onClose={onInviteModalClose}>
+        <ModalOverlay />
+        <ModalContent>
+          <ModalHeader>
+            <HStack>
+              <Mail />
+              <Text>Invite Link</Text>
+            </HStack>
+          </ModalHeader>
+          <ModalCloseButton />
+          <ModalBody paddingBottom={6}>
+            <VStack align="start" spacing={4}>
+              <Text>
+                Send the link below to the users you want to invite to join the
+                organization.
+              </Text>
+
+              <VStack align="start" spacing={4} width="full">
+                {selectedInvites.map((invite) => (
+                  <VStack
+                    key={invite.inviteCode}
+                    align="start"
+                    spacing={2}
+                    width="full"
+                  >
+                    <Text fontWeight="600">{invite.email}</Text>
+                    <CopyInput
+                      value={`${window.location.origin}/invite/accept?inviteCode=${invite.inviteCode}`}
+                      label="Invite Link"
+                      marginTop={0}
+                    />
+                  </VStack>
+                ))}
+              </VStack>
+            </VStack>
+          </ModalBody>
+        </ModalContent>
+      </Modal>
 
       <Modal isOpen={isAddMembersOpen} onClose={onAddMembersClose}>
         <ModalOverlay />

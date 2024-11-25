@@ -55,7 +55,7 @@ export function Messages({
         return;
       }
       undoHistory.pause();
-      setMessages(windowId, messages);
+      setMessages(windowId, messages as any);
       lastSetMessagesRef.current = messages;
       setTimeout(() => {
         messagesEndRef.current?.scrollIntoView({

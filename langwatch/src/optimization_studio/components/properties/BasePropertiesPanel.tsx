@@ -109,6 +109,8 @@ export function FieldsDefinition({
       spacing={3}
       width="full"
       // eslint-disable-next-line @typescript-eslint/no-misused-promises
+      onSubmit={handleSubmit(onSubmit)}
+      // eslint-disable-next-line @typescript-eslint/no-misused-promises
       onChange={handleSubmit(onSubmit)}
     >
       <HStack width="full">
@@ -124,7 +126,7 @@ export function FieldsDefinition({
           </Button>
         ) : null}
       </HStack>
-      {fields.map((field, index) => {
+      {fields.map((field_, index) => {
         const identifierField = control.register(`fields.${index}.identifier`, {
           required: "Required",
           pattern: {
@@ -144,7 +146,7 @@ export function FieldsDefinition({
 
         return (
           <FormControl
-            key={field.id}
+            key={field_.id}
             isInvalid={!!errors.fields?.[index]?.identifier}
           >
             <HStack width="full">
@@ -177,7 +179,7 @@ export function FieldsDefinition({
                     width="full"
                     padding="8px 0px 8px 12px"
                   >
-                    {field.identifier}
+                    {field_.identifier}
                   </Text>
                 )}
                 <HStack
@@ -208,6 +210,9 @@ export function FieldsDefinition({
                         icon={<></>}
                       >
                         <option value="str">str</option>
+                        {field === "inputs" && (
+                          <option value="image">image</option>
+                        )}
                         {/* <option value="float">float</option>
                         <option value="int">int</option>
                         <option value="bool">bool</option>
@@ -447,6 +452,7 @@ export function BasePropertiesPanel({
         width="full"
         justify="space-between"
         spacing={0}
+        alignItems="flex-start"
       >
         <HStack spacing={2}>
           {header ? (

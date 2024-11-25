@@ -40,6 +40,7 @@ export function transpostRowsFirstToColumnsFirstWithoutId(
 
 const fieldToColumnTypeMap: Record<Field["type"], DatasetColumnType> = {
   str: "string",
+  image: "string",
   float: "number",
   int: "number",
   bool: "boolean",

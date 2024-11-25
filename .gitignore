@@ -6,3 +6,4 @@ traceDir
 node_modules
 
 llm-model-costs.json
+quickwit-*

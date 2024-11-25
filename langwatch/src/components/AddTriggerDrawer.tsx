@@ -19,6 +19,7 @@ import {
   RadioGroup,
   Stack,
   Text,
+  Tooltip,
   VStack,
   useDisclosure,
   useToast,
@@ -37,6 +38,9 @@ import { api } from "~/utils/api";
 export function TriggerDrawer() {
   const { project, organization, team } = useOrganizationTeamProject();
   const { onOpen, onClose, isOpen } = useDisclosure();
+
+  const emailProviderQuery = api.organization.hasEmailProviderKey.useQuery();
+  const hasEmailProvider = emailProviderQuery.data;
 
   const toast = useToast();
   const createTrigger = api.trigger.create.useMutation();
@@ -226,28 +230,8 @@ export function TriggerDrawer() {
               helper="Select action you would like to take once a your trigger has taken place."
               minWidth="calc(50% - 16px)"
             >
-              <RadioGroup defaultValue={TriggerAction.SEND_EMAIL}>
+              <RadioGroup defaultValue={TriggerAction.SEND_SLACK_MESSAGE}>
                 <Stack spacing={4}>
-                  <VStack align="start">
-                    <Radio
-                      size="md"
-                      value={TriggerAction.SEND_EMAIL}
-                      colorScheme="blue"
-                      alignItems="start"
-                      spacing={3}
-                      paddingTop={2}
-                      {...register("action")}
-                    >
-                      <Text fontWeight="500">Email</Text>
-                      <Text fontSize={13}>
-                        Receive an email with the details and the items that
-                        triggered the alert.
-                      </Text>
-                    </Radio>
-                    {currentAction === TriggerAction.SEND_EMAIL && (
-                      <MultiSelect />
-                    )}
-                  </VStack>
                   <VStack align="start">
                     <Radio
                       size="md"
@@ -275,6 +259,36 @@ export function TriggerDrawer() {
                       />
                     )}
                   </VStack>
+                  <Tooltip
+                    label="Add a SendGrid API key to your environment variables to enable email functionality."
+                    hasArrow
+                    placement="top"
+                    isDisabled={hasEmailProvider}
+                  >
+                    <VStack align="start">
+                      <Radio
+                        size="md"
+                        value={TriggerAction.SEND_EMAIL}
+                        colorScheme="blue"
+                        alignItems="start"
+                        spacing={3}
+                        paddingTop={2}
+                        isDisabled={!hasEmailProvider}
+                        {...register("action")}
+                      >
+                        <Text fontWeight="500">Email</Text>
+                        <Text fontSize={13}>
+                          Receive an email with the details and the items that
+                          triggered the alert.
+                        </Text>
+                      </Radio>
+
+                      {currentAction === TriggerAction.SEND_EMAIL && (
+                        <MultiSelect />
+                      )}
+                    </VStack>
+                  </Tooltip>
+
                   <VStack align="start">
                     <Radio
                       size="md"

@@ -36,17 +36,21 @@ export const addEnvs = async (
     event.type === "execute_optimization" ||
     event.type === "execute_evaluation";
 
-  const default_llm = addLiteLLMParams(
-    event.payload.workflow.default_llm,
-    modelProviders,
-    onlyCustomKeys
-  );
+  const getDefaultLLM = () => {
+    if (!("workflow" in event.payload)) {
+      throw new Error("Workflow is required");
+    }
+    return addLiteLLMParams(
+      event.payload.workflow.default_llm,
+      modelProviders,
+      onlyCustomKeys
+    );
+  };
 
   const workflow: ServerWorkflow = {
     ...event.payload.workflow,
     workflow_id,
     api_key: apiKey,
-    default_llm: default_llm,
     nodes: event.payload.workflow.nodes.map((node) => {
       const parameters = node.data.parameters?.map((p) => {
         if (p.type === "llm") {
@@ -58,7 +62,7 @@ export const addEnvs = async (
                   modelProviders,
                   onlyCustomKeys
                 )
-              : default_llm,
+              : getDefaultLLM(),
           };
         }
         return p;
@@ -68,16 +72,14 @@ export const addEnvs = async (
     }),
   };
 
-  if (
-    event.type === "execute_optimization" &&
-    "llm" in event.payload.params &&
-    event.payload.params.llm
-  ) {
-    event.payload.params.llm = addLiteLLMParams(
-      event.payload.params.llm,
-      modelProviders,
-      onlyCustomKeys
-    );
+  if (event.type === "execute_optimization" && "llm" in event.payload.params) {
+    event.payload.params.llm = event.payload.params.llm
+      ? addLiteLLMParams(
+          event.payload.params.llm,
+          modelProviders,
+          onlyCustomKeys
+        )
+      : getDefaultLLM();
   }
 
   return {

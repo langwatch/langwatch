@@ -1,0 +1,100 @@
+version: 0.7
+
+index_id: search-batch-evaluations-alias
+
+doc_mapping:
+  field_mappings:
+    - name: project_id
+      type: text
+      tokenizer: raw
+      stored: true
+    - name: experiment_id
+      type: text
+      tokenizer: raw
+      stored: true
+    - name: run_id
+      type: text
+      tokenizer: raw
+      stored: true
+    - name: workflow_version_id
+      type: text
+      tokenizer: raw
+      stored: true
+    - name: progress
+      type: i64
+      stored: true
+    - name: total
+      type: i64
+      stored: true
+    - name: dataset
+      type: object
+      field_mappings:
+        - name: index
+          type: i64
+          stored: true
+        - name: entry
+          type: json
+          stored: true
+        - name: cost
+          type: f64
+          stored: true
+        - name: duration
+          type: i64
+          stored: true
+        - name: error
+          type: text
+          stored: true
+    - name: evaluations
+      type: json
+      stored: true
+    - name: timestamps
+      type: object
+      field_mappings:
+        - name: created_at
+          type: datetime
+          fast: true
+          input_formats:
+            - unix_timestamp
+          output_format: unix_timestamp_millis
+          fast_precision: seconds
+        - name: inserted_at
+          type: datetime
+          fast: true
+          input_formats:
+            - unix_timestamp
+          output_format: unix_timestamp_millis
+          fast_precision: seconds
+        - name: updated_at
+          type: datetime
+          fast: true
+          input_formats:
+            - unix_timestamp
+          output_format: unix_timestamp_millis
+          fast_precision: seconds
+        - name: stopped_at
+          type: datetime
+          fast: true
+          input_formats:
+            - unix_timestamp
+          output_format: unix_timestamp_millis
+          fast_precision: seconds
+        - name: finished_at
+          type: datetime
+          fast: true
+          input_formats:
+            - unix_timestamp
+          output_format: unix_timestamp_millis
+          fast_precision: seconds
+
+search_settings:
+  default_search_fields:
+    [project_id, experiment_id, run_id, workflow_version_id]
+
+indexing_settings:
+  commit_timeout_secs: 1
+  merge_policy:
+    type: "stable_log"
+    min_level_num_docs: 100000
+    merge_factor: 1
+    max_merge_factor: 120
+    maturation_period: 3s

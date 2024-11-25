@@ -189,22 +189,35 @@ type ProjectFormData = {
   };
 };
 
-const piiRedactionLevelOptions: ProjectFormData["piiRedactionLevel"][] = [
-  {
-    label: "Strict",
-    value: PIIRedactionLevel.STRICT,
-    description: "Redacts all PII data including names and addresses",
-  },
-  {
-    label: "Essential",
-    value: PIIRedactionLevel.ESSENTIAL,
-    description:
-      "Redacts only essential PII data like email addresses, phone numbers, credit card numbers and IP addresses",
-  },
-];
-
 function ProjectSettingsForm({ project }: { project: Project }) {
-  const { organizations } = useOrganizationTeamProject();
+  const { organization, organizations } = useOrganizationTeamProject();
+  const publicEnv = api.publicEnv.useQuery({});
+
+  const piiRedactionLevelOptions: ProjectFormData["piiRedactionLevel"][] = [
+    {
+      label: "Strict",
+      value: PIIRedactionLevel.STRICT,
+      description: "Redacts all PII data including names and addresses",
+    },
+    {
+      label: "Essential",
+      value: PIIRedactionLevel.ESSENTIAL,
+      description:
+        "Redacts only essential PII data like email addresses, phone numbers, credit card numbers and IP addresses",
+    },
+    ...(organization?.signedDPA ||
+    publicEnv.data?.IS_ONPREM ||
+    publicEnv.data?.NODE_ENV === "development"
+      ? [
+          {
+            label: "Disabled",
+            value: PIIRedactionLevel.DISABLED,
+            description: "PII data will not be redacted",
+          },
+        ]
+      : []),
+  ];
+
   const [defaultValues, setDefaultValues] = useState<ProjectFormData>({
     name: project.name,
     language: project.language,

@@ -5,6 +5,7 @@ export type Field = {
   identifier: string;
   type:
     | "str"
+    | "image"
     | "float"
     | "int"
     | "bool"
@@ -122,7 +123,14 @@ export type End = BaseComponent & {
   outputs?: never;
 };
 
-export type Component = Entry | Signature | Module | Evaluator | End | Custom;
+export type Component =
+  | BaseComponent
+  | Entry
+  // eslint-disable-next-line
+  | Signature
+  | Module
+  | Evaluator
+  | End;
 
 type Flow = {
   nodes: Node<Component>[];

@@ -102,6 +102,9 @@ export default function OrganizationOnboarding() {
       ? router.query.return_to
       : undefined;
 
+  const publicEnv = api.publicEnv.useQuery({});
+  const isOnPrem = publicEnv.data?.IS_ONPREM;
+
   const createOrganization = api.organization.createAndAssign.useMutation();
   const apiContext = api.useContext();
   const steps = 3;
@@ -316,62 +319,59 @@ export default function OrganizationOnboarding() {
                 />
               </FormControl>
 
-              <FormControl isInvalid={!!errors.usage}>
-                <FormLabel>How will you be using LangWatch?</FormLabel>
+              {!isOnPrem && (
+                <FormControl isInvalid={!!errors.usage}>
+                  <FormLabel>How will you be using LangWatch?</FormLabel>
 
-                <RadioGroup
-                  value={selectedValueUsage || ""}
-                  onChange={(value) => setValue("usage", value)}
-                >
-                  <HStack width="full">
-                    {Object.entries(options).map(([value, icon]) => (
-                      // <CustomRadio
-                      //   key={value}
-                      //   value={value}
-                      //   registerProps={{
-                      //     ...register("usage", {
-                      //       required: "This field is required",
-                      //     }),
-                      //   }}
-                      //   selectedValue={selectedValueUsage}
-                      //   icon={icon}
-                      // />
-                      <CustomRadio
-                        key={value}
-                        value={value}
-                        registerProps={register("usage", {
-                          required: "This field is required",
-                        })}
-                        selectedValue={selectedValueUsage}
-                        icon={icon}
-                      />
-                    ))}
-                  </HStack>
-                </RadioGroup>
-                <FormErrorMessage>{errors.usage?.message}</FormErrorMessage>
-              </FormControl>
-              <FormControl isInvalid={!!errors.solution}>
-                <FormLabel>What solution are you interested in?</FormLabel>
-                <RadioGroup
-                  value={selectedValueSolution || ""}
-                  onChange={(value) => setValue("solution", value)}
-                >
-                  <HStack width="full">
-                    {Object.entries(langwatchSolution).map(([value, icon]) => (
-                      <CustomRadio
-                        key={value}
-                        value={value}
-                        registerProps={register("solution", {
-                          required: "This field is required",
-                        })}
-                        selectedValue={selectedValueSolution}
-                        icon={icon}
-                      />
-                    ))}
-                  </HStack>
-                </RadioGroup>
-                <FormErrorMessage>{errors.solution?.message}</FormErrorMessage>
-              </FormControl>
+                  <RadioGroup
+                    value={selectedValueUsage || ""}
+                    onChange={(value) => setValue("usage", value)}
+                  >
+                    <HStack width="full">
+                      {Object.entries(options).map(([value, icon]) => (
+                        <CustomRadio
+                          key={value}
+                          value={value}
+                          registerProps={register("usage", {
+                            required: "This field is required",
+                          })}
+                          selectedValue={selectedValueUsage}
+                          icon={icon}
+                        />
+                      ))}
+                    </HStack>
+                  </RadioGroup>
+                  <FormErrorMessage>{errors.usage?.message}</FormErrorMessage>
+                </FormControl>
+              )}
+              {!isOnPrem && (
+                <FormControl isInvalid={!!errors.solution}>
+                  <FormLabel>What solution are you interested in?</FormLabel>
+                  <RadioGroup
+                    value={selectedValueSolution || ""}
+                    onChange={(value) => setValue("solution", value)}
+                  >
+                    <HStack width="full">
+                      {Object.entries(langwatchSolution).map(
+                        ([value, icon]) => (
+                          <CustomRadio
+                            key={value}
+                            value={value}
+                            registerProps={register("solution", {
+                              required: "This field is required",
+                            })}
+                            selectedValue={selectedValueSolution}
+                            icon={icon}
+                          />
+                        )
+                      )}
+                    </HStack>
+                  </RadioGroup>
+                  <FormErrorMessage>
+                    {errors.solution?.message}
+                  </FormErrorMessage>
+                </FormControl>
+              )}
 
               <FormControl marginTop={4} isInvalid={!!errors?.terms}>
                 <Checkbox {...register("terms", { required: true })}>
@@ -398,7 +398,11 @@ export default function OrganizationOnboarding() {
                   colorScheme="orange"
                   type="submit"
                   disabled={createOrganization.isLoading}
-                  onClick={() => checkFirstStep()}
+                  onClick={() => {
+                    if (!isOnPrem) {
+                      checkFirstStep();
+                    }
+                  }}
                 >
                   Next
                 </Button>
