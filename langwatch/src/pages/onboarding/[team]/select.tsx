@@ -178,18 +178,30 @@ export default function ProjectOnboardingSelect() {
                 <HStack width="full" height="100%" alignItems="start">
                   {Object.entries(projectTypes).map(([value, details]) => {
                     return (
-                      <CustomRadio
+                      <Box
                         key={value}
-                        value={value}
-                        heading={details.heading}
-                        text={details.text}
-                        image={details.image}
-                        icon={details.icon}
-                        registerProps={register("projectType", {
-                          required: "Please select a project type",
-                        })}
-                        selectedValue={selectedValueProjectType ?? ""}
-                      />
+                        onClick={() => {
+                          setValue("projectType", value);
+                          void form.handleSubmit(onSubmit)();
+                        }}
+                        width="full"
+                        height="100%"
+                        padding={0}
+                        margin={0}
+                      >
+                        <CustomRadio
+                          key={value}
+                          value={value}
+                          heading={details.heading}
+                          text={details.text}
+                          image={details.image}
+                          icon={details.icon}
+                          registerProps={register("projectType", {
+                            required: "Please select a project type",
+                          })}
+                          selectedValue={selectedValueProjectType ?? ""}
+                        />
+                      </Box>
                     );
                   })}
                 </HStack>
@@ -203,18 +215,7 @@ export default function ProjectOnboardingSelect() {
           {createProject.error && <p>Something went wrong!</p>}
 
           <HStack width="full">
-            <Button
-              colorScheme="orange"
-              type="submit"
-              isDisabled={createProject.isLoading}
-              onClick={() => {
-                form.handleSubmit(onSubmit);
-              }}
-            >
-              {createProject.isLoading || createProject.isSuccess
-                ? "Loading..."
-                : "Next"}
-            </Button>
+            <Text hidden={!createProject.isLoading}>Loading...</Text>
           </HStack>
         </VStack>
       </form>
