@@ -446,13 +446,18 @@ export const organizationRouter = createTRPCRouter({
             },
           });
 
-          await sendInviteEmail({
-            email: invite.email,
-            organization,
-            inviteCode,
-          });
+          if (env.SENDGRID_API_KEY) {
+            await sendInviteEmail({
+              email: invite.email,
+              organization,
+              inviteCode,
+            });
+          }
 
-          return savedInvite;
+          return {
+            invite: savedInvite,
+            noEmailProvider: !env.SENDGRID_API_KEY,
+          };
         })
       );
 
