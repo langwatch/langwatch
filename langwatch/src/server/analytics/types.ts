@@ -27,6 +27,7 @@ export type AnalyticsMetric = {
     key: string | undefined,
     subkey: string | undefined
   ) => string;
+  quickwitSupport: boolean;
 };
 
 export type AnalyticsGroup = {
@@ -35,6 +36,7 @@ export type AnalyticsGroup = {
     aggToGroup: Record<string, AggregationsAggregationContainer>
   ) => Record<string, AggregationsAggregationContainer>;
   extractionPath: () => string;
+  quickwitSupport: boolean;
 };
 
 export const aggregationTypesEnum = z.enum([

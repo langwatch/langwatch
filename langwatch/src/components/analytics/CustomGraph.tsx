@@ -49,6 +49,7 @@ import { uppercaseFirstLetter } from "../../utils/stringCasing";
 import type { Unpacked } from "../../utils/types";
 import { SummaryMetric } from "./SummaryMetric";
 import { useFilterParams } from "../../hooks/useFilterParams";
+import { QuickwitNote } from "./QuickwitNote";
 
 type Series = Unpacked<z.infer<typeof timeseriesSeriesInput>["series"]> & {
   name: string;
@@ -100,11 +101,47 @@ const GraphComponentMap: Partial<{
   scatter: [ScatterChart, Scatter],
 };
 
-export const CustomGraph = React.memo(
+export function CustomGraph({
+  input,
+  titleProps,
+  hideGroupLabel = false,
+}: {
+  input: CustomGraphInput;
+  titleProps?: {
+    fontSize?: TypographyProps["fontSize"];
+    color?: ColorProps["color"];
+    fontWeight?: TypographyProps["fontWeight"];
+  };
+  hideGroupLabel?: boolean;
+}) {
+  const env = api.publicEnv.useQuery({});
+
+  if (
+    env.data?.IS_QUICKWIT &&
+    (input.series.some(
+      (series) => !getMetric(series.metric).quickwitSupport || series.pipeline
+    ) ||
+      (input.groupBy && !getGroup(input.groupBy).quickwitSupport))
+  ) {
+    return <QuickwitNote />;
+  }
+
+  return (
+    <CustomGraph_
+      input={input}
+      titleProps={titleProps}
+      hideGroupLabel={hideGroupLabel}
+      enabled={!!env.data}
+    />
+  );
+}
+
+const CustomGraph_ = React.memo(
   function CustomGraph({
     input,
     titleProps,
     hideGroupLabel = false,
+    enabled = true,
   }: {
     input: CustomGraphInput;
     titleProps?: {
@@ -113,6 +150,7 @@ export const CustomGraph = React.memo(
       fontWeight?: TypographyProps["fontWeight"];
     };
     hideGroupLabel?: boolean;
+    enabled?: boolean;
   }) {
     const height_ = input.height ?? 300;
     const { filterParams, queryOpts } = useFilterParams();
@@ -127,7 +165,7 @@ export const CustomGraph = React.memo(
           ? input.timeScale
           : parseInt(input.timeScale.toString(), 10),
       },
-      queryOpts
+      { ...queryOpts, enabled: queryOpts.enabled && enabled }
     );
 
     const currentAndPreviousData = shapeDataForGraph(input, timeseries);

@@ -18,8 +18,12 @@ import { analyticsMetrics } from "../server/analytics/registry";
 import { TeamRoleGroup } from "../server/api/permission";
 import { CustomGraph, type CustomGraphInput } from "./analytics/CustomGraph";
 import { LLMSummary } from "./analytics/LLMSummary";
+import { api } from "../utils/api";
 
 export function LLMMetrics() {
+  const env = api.publicEnv.useQuery({});
+  const isNotQuickwit = env.data && !env.data.IS_QUICKWIT;
+  const isQuickwit = env.data && env.data.IS_QUICKWIT;
   const { hasTeamPermission } = useOrganizationTeamProject();
 
   const llmCallsGraph: CustomGraphInput = {
@@ -71,6 +75,28 @@ export function LLMMetrics() {
     timeScale: "full",
   };
 
+  const promptAndCompletionTokensSummary: CustomGraphInput = {
+    graphId: "promptAndCompletionTokensSummary",
+    graphType: "summary",
+    series: [
+      {
+        name: "Prompt Tokens",
+        metric: "performance.prompt_tokens",
+        aggregation: "sum",
+        colorSet: analyticsMetrics.performance.prompt_tokens.colorSet,
+      },
+      {
+        name: "Completion Tokens",
+        metric: "performance.completion_tokens",
+        aggregation: "sum",
+        colorSet: analyticsMetrics.performance.completion_tokens.colorSet,
+      },
+    ],
+    groupBy: undefined,
+    includePrevious: false,
+    timeScale: "full",
+  };
+
   const tokensGraph: CustomGraphInput = {
     graphId: "tokensGraph",
     graphType: "stacked_bar",
@@ -115,25 +141,31 @@ export function LLMMetrics() {
       <Heading as={"h1"} size="lg" paddingBottom={6} paddingTop={10}>
         LLM Metrics
       </Heading>
-      <Grid width="100%" templateColumns="1fr 0.5fr" gap={6}>
-        <GridItem colSpan={2}>
+      <Grid
+        width="100%"
+        templateColumns={isNotQuickwit ? "1fr 0.5fr" : "1fr"}
+        gap={6}
+      >
+        <GridItem colSpan={isNotQuickwit ? 2 : undefined}>
           <Card>
             <CardBody>
               <Tabs variant="unstyled">
                 <TabList gap={12}>
-                  <Tab paddingX={0} paddingBottom={4}>
-                    <CustomGraph
-                      input={{
-                        ...llmCallsGraph,
-                        graphType: "summary",
-                        groupBy: undefined,
-                      }}
-                      titleProps={{
-                        fontSize: 16,
-                        color: "black",
-                      }}
-                    />
-                  </Tab>
+                  {isNotQuickwit && (
+                    <Tab paddingX={0} paddingBottom={4}>
+                      <CustomGraph
+                        input={{
+                          ...llmCallsGraph,
+                          graphType: "summary",
+                          groupBy: undefined,
+                        }}
+                        titleProps={{
+                          fontSize: 16,
+                          color: "black",
+                        }}
+                      />
+                    </Tab>
+                  )}
                   {hasTeamPermission(TeamRoleGroup.COST_VIEW) && (
                     <Tab paddingX={0} paddingBottom={4}>
                       <CustomGraph
@@ -147,13 +179,25 @@ export function LLMMetrics() {
                   )}
                   <Tab paddingX={0} paddingBottom={4}>
                     <VStack align="start">
-                      <CustomGraph
-                        input={totalTokensSummary}
-                        titleProps={{
-                          fontSize: 16,
-                          color: "black",
-                        }}
-                      />
+                      {isNotQuickwit ? (
+                        <CustomGraph
+                          input={totalTokensSummary}
+                          titleProps={{
+                            fontSize: 16,
+                            color: "black",
+                          }}
+                        />
+                      ) : isQuickwit ? (
+                        <CustomGraph
+                          input={promptAndCompletionTokensSummary}
+                          titleProps={{
+                            fontSize: 16,
+                            color: "black",
+                          }}
+                        />
+                      ) : (
+                        <></>
+                      )}
                     </VStack>
                   </Tab>
                 </TabList>
@@ -164,9 +208,11 @@ export function LLMMetrics() {
                   borderRadius="1px"
                 />
                 <TabPanels>
-                  <TabPanel>
-                    <CustomGraph input={llmCallsGraph} />
-                  </TabPanel>
+                  {isNotQuickwit && (
+                    <TabPanel>
+                      <CustomGraph input={llmCallsGraph} />
+                    </TabPanel>
+                  )}
                   {hasTeamPermission(TeamRoleGroup.COST_VIEW) && (
                     <TabPanel>
                       <CustomGraph input={totalCostGraph} />
@@ -183,21 +229,23 @@ export function LLMMetrics() {
         <GridItem>
           <LLMSummary />
         </GridItem>
-        <GridItem>
-          <Card height="full">
-            <CardHeader>
-              <Heading size="sm">Evaluations Summary</Heading>
-            </CardHeader>
-            <CardBody>
-              <CustomGraph
-                input={{
-                  ...evaluationsSummary,
-                  graphType: "summary",
-                }}
-              />
-            </CardBody>
-          </Card>
-        </GridItem>
+        {isNotQuickwit && (
+          <GridItem>
+            <Card height="full">
+              <CardHeader>
+                <Heading size="sm">Evaluations Summary</Heading>
+              </CardHeader>
+              <CardBody>
+                <CustomGraph
+                  input={{
+                    ...evaluationsSummary,
+                    graphType: "summary",
+                  }}
+                />
+              </CardBody>
+            </Card>
+          </GridItem>
+        )}
       </Grid>
     </>
   );
