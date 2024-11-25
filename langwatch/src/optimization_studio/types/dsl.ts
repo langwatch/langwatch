@@ -108,6 +108,7 @@ export type Evaluator = Omit<BaseComponent, "cls"> & {
 
 export type End = BaseComponent & {
   outputs?: never;
+  isEvaluator?: boolean;
 };
 
 export type Component =

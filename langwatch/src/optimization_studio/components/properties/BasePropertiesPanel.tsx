@@ -12,7 +12,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { useUpdateNodeInternals, type Node } from "@xyflow/react";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { ChevronDown, Columns, Info, Plus, Trash2, X } from "react-feather";
 import { useFieldArray, useForm } from "react-hook-form";
 import { useShallow } from "zustand/react/shallow";
@@ -72,17 +72,21 @@ export function FieldsDefinition({
       setNode: state.setNode,
     }))
   );
-
   const {
     control,
     handleSubmit,
     formState: { errors },
     watch,
+    reset,
   } = useForm<FieldArrayForm>({
     defaultValues: {
       fields: node.data[field] ?? [],
     },
   });
+
+  useEffect(() => {
+    reset({ fields: node.data[field] ?? [] });
+  }, [node.data[field], reset]);
 
   const { fields, append, remove } = useFieldArray({
     control,
@@ -97,6 +101,8 @@ export function FieldsDefinition({
     });
     updateNodeInternals(node.id);
   };
+
+  console.log("node_fields", node);
 
   const watchedFields = watch("fields");
 
@@ -441,6 +447,8 @@ export function BasePropertiesPanel({
       newId
     );
   };
+
+  console.log("nodeeee", node);
 
   return (
     <VStack

@@ -2,7 +2,7 @@ import type { Node } from "@xyflow/react";
 import type { End } from "../../types/dsl";
 import { BasePropertiesPanel } from "./BasePropertiesPanel";
 import { Text, Switch, HStack } from "@chakra-ui/react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useWorkflowStore } from "~/optimization_studio/hooks/useWorkflowStore";
 
 //  score: Optional[float] = None
@@ -13,9 +13,21 @@ import { useWorkflowStore } from "~/optimization_studio/hooks/useWorkflowStore";
 // )
 // cost: Optional[Money] = None
 
-export function EndPropertiesPanel({ node }: { node: Node<End> }) {
-  const [isEvaluator, setIsEvaluator] = useState(false);
-  const { setNode } = useWorkflowStore(({ setNode }) => ({ setNode }));
+export function EndPropertiesPanel({ node: initialNode }: { node: Node<End> }) {
+  const { node, setNode } = useWorkflowStore(
+    (state) => ({
+      node: state.nodes.find((n) => n.id === initialNode.id) as Node<End>,
+      setNode: state.setNode,
+    }),
+    // Add equality function to ensure proper updates
+    (prev, next) => prev.node === next.node
+  );
+
+  const [isEvaluator, setIsEvaluator] = useState(
+    () =>
+      node.data.inputs?.length === 3 &&
+      node.data.inputs[0]?.identifier === "score"
+  );
 
   const evaluatorInputs = [
     {
@@ -42,11 +54,29 @@ export function EndPropertiesPanel({ node }: { node: Node<End> }) {
 
   console.log("node_end", node);
 
+  useEffect(() => {
+    setIsEvaluator(
+      node.data.inputs?.length === 3 &&
+        node.data.inputs[0]?.identifier === "score"
+    );
+  }, [node.data.inputs]);
+
+  useEffect(() => {
+    setIsEvaluator(
+      node.data.inputs?.length === 3 &&
+        node.data.inputs[0]?.identifier === "score"
+    );
+  }, [node.data.inputs]);
+
   const setAsEvaluator = () => {
     if (!isEvaluator) {
       setNode({
         id: node.id,
-        data: { ...node.data, inputs: evaluatorInputs } as End,
+        data: {
+          ...node.data,
+          inputs: evaluatorInputs,
+          isEvaluator: true,
+        } as End,
       });
       setIsEvaluator(true);
     } else {
@@ -55,11 +85,13 @@ export function EndPropertiesPanel({ node }: { node: Node<End> }) {
         data: {
           ...node.data,
           inputs: [{ type: "str", identifier: "result" }],
+          isEvaluator: false,
         } as End,
       });
       setIsEvaluator(false);
     }
   };
+  console.log("node_end", node);
 
   return (
     <BasePropertiesPanel
