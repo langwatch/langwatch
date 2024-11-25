@@ -43,6 +43,7 @@ export type ComponentType =
 
 export type BaseComponent = {
   _library_ref?: string;
+  isEvaluator?: boolean;
 
   name?: string;
   cls?: string;

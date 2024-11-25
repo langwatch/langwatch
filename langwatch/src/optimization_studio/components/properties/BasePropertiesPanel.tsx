@@ -84,10 +84,6 @@ export function FieldsDefinition({
     },
   });
 
-  useEffect(() => {
-    reset({ fields: node.data[field] ?? [] });
-  }, [node.data[field], reset]);
-
   const { fields, append, remove } = useFieldArray({
     control,
     name: "fields",
@@ -102,7 +98,9 @@ export function FieldsDefinition({
     updateNodeInternals(node.id);
   };
 
-  console.log("node_fields", node);
+  useEffect(() => {
+    reset({ fields: node.data[field] ?? [] });
+  }, [node.data.isEvaluator]);
 
   const watchedFields = watch("fields");
 

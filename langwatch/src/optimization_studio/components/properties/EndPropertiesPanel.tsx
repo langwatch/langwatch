@@ -84,7 +84,7 @@ export function EndPropertiesPanel({ node: initialNode }: { node: Node<End> }) {
         id: node.id,
         data: {
           ...node.data,
-          inputs: [{ type: "str", identifier: "result" }],
+          inputs: [{ type: "str", identifier: "output" }],
           isEvaluator: false,
         } as End,
       });
