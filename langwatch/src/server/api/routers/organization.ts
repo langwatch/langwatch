@@ -585,7 +585,11 @@ export const organizationRouter = createTRPCRouter({
 
       return { success: true, invite, project };
     }),
-
+  hasEmailProviderKey: protectedProcedure
+    .use(skipPermissionCheck as any)
+    .query(() => {
+      return !!process.env.SENDGRID_API_KEY;
+    }),
   updateTeamMemberRole: protectedProcedure
     .input(
       z.object({
