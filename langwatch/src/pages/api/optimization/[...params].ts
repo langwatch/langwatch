@@ -23,7 +23,7 @@ export default async function handler(
 
   const { params } = req.query;
 
-  const [workflowId, versionId] = params;
+  const [workflowId, versionId] = params as [string, string];
 
   const authToken =
     xAuthToken ??
