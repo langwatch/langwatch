@@ -72,7 +72,10 @@ async def main(message: cl.Message):
     )
 
     program = RAG()
-    program.load(f"{os.path.dirname(os.path.abspath(__file__))}/../data/rag_dspy_bot.json")
+    program.load(
+        f"{os.path.dirname(os.path.abspath(__file__))}/../data/rag_dspy_bot.json",
+        use_legacy_loading=True,
+    )
     program = program.reset_copy()
     prediction = program(question=message.content)
 
