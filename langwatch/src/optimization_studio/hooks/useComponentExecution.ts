@@ -109,6 +109,7 @@ export const useComponentExecution = () => {
           inputs: inputs_,
         },
       };
+
       sendMessage(payload);
 
       setTimeout(() => {

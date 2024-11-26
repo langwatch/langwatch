@@ -17,6 +17,9 @@ import { ChevronDown, Columns, Info, Plus, Trash2, X } from "react-feather";
 import { useFieldArray, useForm } from "react-hook-form";
 import { useShallow } from "zustand/react/shallow";
 import { useWorkflowStore } from "../../hooks/useWorkflowStore";
+
+import { HoverableBigText } from "../../../components/HoverableBigText";
+import { camelCaseToTitleCase } from "../../../utils/stringCasing";
 import type {
   Component,
   ComponentType,
@@ -24,6 +27,7 @@ import type {
   LLMConfig,
   Workflow,
 } from "../../types/dsl";
+import { nameToId } from "../../utils/nodeUtils";
 import { ComponentIcon } from "../ColorfulBlockIcons";
 import {
   ComponentExecutionButton,
@@ -32,9 +36,7 @@ import {
   NodeSectionTitle,
   TypeLabel,
 } from "../nodes/Nodes";
-import { nameToId } from "../../utils/nodeUtils";
-import { HoverableBigText } from "../../../components/HoverableBigText";
-import { camelCaseToTitleCase } from "../../../utils/stringCasing";
+
 import { LLMConfigField } from "./modals/LLMConfigModal";
 
 export function PropertyField({
@@ -430,16 +432,7 @@ export function BasePropertiesPanel({
 
   const handleNameChange = (value: string, id: string) => {
     const newId = nameToId(value);
-
-    setNode(
-      {
-        id: id,
-        data: {
-          name: value,
-        },
-      },
-      newId
-    );
+    setNode({ id, data: { name: value } }, newId);
   };
 
   return (
@@ -565,12 +558,14 @@ export function BasePropertiesPanel({
           </Button>
         </HStack>
       </HStack>
+
       {children}
       {!isWorkflow(node) && (
         <>
           {!hideParameters && (
             <FieldsForm node={node} field="parameters" title="Parameters" />
           )}
+
           {!hideInputs && (
             <FieldsDefinition
               node={node}

@@ -4,6 +4,7 @@ import { EvaluatorNode } from "./EvaluatorNode";
 import { ComponentNode } from "./Nodes";
 import { SignatureNode } from "./SignatureNode";
 import { EndNode } from "./EndNode";
+import { CustomNode } from "./CustomNode";
 import { PromptingTechniqueNode } from "./PromptingTechniqueNode";
 
 export const NodeComponents: Record<
@@ -13,6 +14,7 @@ export const NodeComponents: Record<
   | typeof SignatureNode
   | typeof EvaluatorNode
   | typeof ComponentNode
+  | typeof CustomNode
 > = {
   entry: EntryNode,
   signature: SignatureNode,
@@ -21,4 +23,5 @@ export const NodeComponents: Record<
   module: ComponentNode,
   retriever: ComponentNode,
   prompting_technique: PromptingTechniqueNode,
+  custom: CustomNode,
 };

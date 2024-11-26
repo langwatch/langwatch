@@ -13,6 +13,8 @@ import {
   Text,
   Tooltip,
   VStack,
+  Alert,
+  AlertIcon,
   type ButtonProps,
 } from "@chakra-ui/react";
 
@@ -20,10 +22,12 @@ import {
   Handle,
   NodeToolbar,
   Position,
+  useReactFlow,
+  useUpdateNodeInternals,
   type Node,
   type NodeProps,
 } from "@xyflow/react";
-import React, { useMemo, type Ref } from "react";
+import React, { useEffect, useMemo, type Ref } from "react";
 import { useDragLayer } from "react-dnd";
 import {
   Check,
@@ -40,10 +44,12 @@ import { useShallow } from "zustand/react/shallow";
 import { useComponentExecution } from "../../hooks/useComponentExecution";
 import { useWorkflowExecution } from "../../hooks/useWorkflowExecution";
 import { useWorkflowStore } from "../../hooks/useWorkflowStore";
+import { useComponentVersion } from "../../hooks/useComponentVersion";
 import {
   type Component,
   type ComponentType,
   type Field,
+  type Custom,
   type LLMConfig,
 } from "../../types/dsl";
 import { ComponentIcon } from "../ColorfulBlockIcons";
@@ -337,6 +343,7 @@ export const ComponentNode = forwardRef(function ComponentNode(
           <Box width="54px" />
         )}
       </HStack>
+
       {props.children}
       {llmParams
         .filter((llmParam) => llmParam.value)

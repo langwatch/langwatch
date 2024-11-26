@@ -7,8 +7,14 @@ import {
   Spacer,
   Text,
   VStack,
+  Tooltip,
 } from "@chakra-ui/react";
-import { useReactFlow, type Node, type XYPosition } from "@xyflow/react";
+import {
+  useReactFlow,
+  type Node,
+  type Edge,
+  type XYPosition,
+} from "@xyflow/react";
 import { useEffect, useMemo, useRef } from "react";
 import { useDrag, useDragDropManager, useDragLayer } from "react-dnd";
 import { getEmptyImage } from "react-dnd-html5-backend";
@@ -16,11 +22,19 @@ import { Box as BoxIcon, ChevronsLeft } from "react-feather";
 import { HoverableBigText } from "../../components/HoverableBigText";
 import { useWorkflowStore } from "../hooks/useWorkflowStore";
 import { MODULES } from "../registry";
-import { type Component, type ComponentType } from "../types/dsl";
-import { findLowestAvailableName } from "../utils/nodeUtils";
+import {
+  type Component,
+  type ComponentType,
+  type Signature,
+  type Custom,
+  type Field,
+} from "../types/dsl";
+import { findLowestAvailableName, getInputsOutputs } from "../utils/nodeUtils";
 import { ComponentIcon } from "./ColorfulBlockIcons";
 import { NodeComponents } from "./nodes";
 import { PromptingTechniqueDraggingNode } from "./nodes/PromptingTechniqueNode";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { api } from "~/utils/api";
 
 export function NodeSelectionPanelButton({
   isOpen,
@@ -52,10 +66,45 @@ export const NodeSelectionPanel = ({
   isOpen: boolean;
   setIsOpen: (isOpen: boolean) => void;
 }) => {
-  const { propertiesExpanded } = useWorkflowStore((state) => ({
+  const { propertiesExpanded, getWorkflow } = useWorkflowStore((state) => ({
     propertiesExpanded: state.propertiesExpanded,
     getWorkflow: state.getWorkflow,
   }));
+
+  const workflow = getWorkflow();
+  const { project } = useOrganizationTeamProject();
+
+  const { data: components } = api.optimization.getComponents.useQuery(
+    {
+      projectId: project?.id ?? "",
+    },
+    {
+      enabled: !!project?.id && !!workflow?.workflow_id,
+      refetchOnWindowFocus: true,
+    }
+  );
+
+  const createCustomComponent = (custom: Custom) => {
+    const publishedId = custom.publishedId ?? "";
+    const publishedVersion = custom.versions?.find(
+      (version: any) => version.id === publishedId
+    );
+
+    const { inputs, outputs } = getInputsOutputs(
+      publishedVersion?.dsl.edges,
+      publishedVersion?.dsl.nodes
+    ) as { inputs: Field[]; outputs: Field[] };
+
+    return {
+      name: custom.name ?? "Custom Component",
+      inputs: inputs,
+      outputs: outputs,
+      isCustom: true,
+      workflow_id: custom.id,
+      published_id: publishedId,
+      version_id: publishedId,
+    };
+  };
 
   return (
     <Box
@@ -99,7 +148,26 @@ export const NodeSelectionPanel = ({
             );
           })}
 
-          <Text fontWeight="500" padding={1}>
+          {components && components.length > 0 && (
+            <>
+              <Text fontWeight="500" padding={1}>
+                Custom Components
+              </Text>
+              {components.map((custom) => {
+                const isCurrentWorkflow = custom.id === workflow?.workflow_id;
+                return (
+                  <NodeDraggable
+                    key={custom.name}
+                    component={createCustomComponent(custom as Custom)}
+                    type="custom"
+                    disableDrag={isCurrentWorkflow}
+                  />
+                );
+              })}
+            </>
+          )}
+
+          <Text fontWeight="500" paddingLeft={1}>
             Prompting Techniques
           </Text>
           {MODULES.promptingTechniques.map((promptingTechnique) => {
@@ -158,6 +226,7 @@ export const NodeSelectionPanel = ({
 export const NodeDraggable = (props: {
   component: Component;
   type: ComponentType;
+  disableDrag?: boolean;
 }) => {
   const { setNodes, setNodeParameter, deleteNode, nodes } = useWorkflowStore(
     (state) => ({
@@ -257,28 +326,36 @@ export const NodeDraggable = (props: {
 
   return (
     <>
-      <Box
-        background="white"
-        ref={drag}
-        borderRadius={4}
-        padding={1}
-        cursor="grab"
-        width="full"
-        opacity={collected.isDragging ? 0.5 : 1}
+      <Tooltip
+        label={
+          props.disableDrag
+            ? "You cannot add the same component as your workflow"
+            : ""
+        }
       >
-        <HStack width="full">
-          <ComponentIcon
-            type={props.type}
-            cls={props.component.cls}
-            size="md"
-          />
-          <HoverableBigText noOfLines={1}>
-            {props.component.name}
-          </HoverableBigText>
-          <Spacer />
-          <DragHandleIcon width="14px" height="14px" color="gray.350" />
-        </HStack>
-      </Box>
+        <Box
+          background="white"
+          ref={props.disableDrag ? undefined : drag}
+          borderRadius={4}
+          padding={1}
+          cursor={props.disableDrag ? "not-allowed" : "grab"}
+          width="full"
+          opacity={collected.isDragging ? 0.5 : 1}
+        >
+          <HStack width="full">
+            <ComponentIcon
+              type={props.type}
+              cls={props.component.cls}
+              size="md"
+            />
+            <HoverableBigText noOfLines={1}>
+              {props.component.name}
+            </HoverableBigText>
+            <Spacer />
+            <DragHandleIcon width="14px" height="14px" color="gray.350" />
+          </HStack>
+        </Box>
+      </Tooltip>
     </>
   );
 };
