@@ -39,8 +39,8 @@ export function TriggerDrawer() {
   const { project, organization, team } = useOrganizationTeamProject();
   const { onOpen, onClose, isOpen } = useDisclosure();
 
-  const emailProviderQuery = api.organization.hasEmailProviderKey.useQuery();
-  const hasEmailProvider = emailProviderQuery.data;
+  const publicEnvQuery = api.publicEnv.useQuery({});
+  const hasEmailProvider = publicEnvQuery.data?.HAS_EMAIL_PROVIDER_KEY;
 
   const toast = useToast();
   const createTrigger = api.trigger.create.useMutation();
@@ -260,7 +260,7 @@ export function TriggerDrawer() {
                     )}
                   </VStack>
                   <Tooltip
-                    label="Add a SendGrid API key to your environment variables to enable email functionality."
+                    label="Add a SendGrid API key or AWS SES credentials(Only if you are using AWS SES) to your environment variables to enable email functionality."
                     hasArrow
                     placement="top"
                     isDisabled={hasEmailProvider}
