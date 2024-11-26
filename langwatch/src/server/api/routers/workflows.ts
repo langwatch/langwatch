@@ -100,7 +100,13 @@ export const workflowRouter = createTRPCRouter({
     }),
 
   getVersions: protectedProcedure
-    .input(z.object({ projectId: z.string(), workflowId: z.string() }))
+    .input(
+      z.object({
+        projectId: z.string(),
+        workflowId: z.string(),
+        returnDSL: z.boolean().optional(),
+      })
+    )
     .use(checkUserPermissionForProject(TeamRoleGroup.WORKFLOWS_VIEW))
     .query(async ({ ctx, input }) => {
       const workflow = await ctx.prisma.workflow.findUnique({
@@ -109,7 +115,11 @@ export const workflowRouter = createTRPCRouter({
           projectId: input.projectId,
           archivedAt: null,
         },
-        select: { currentVersionId: true, latestVersionId: true },
+        select: {
+          currentVersionId: true,
+          latestVersionId: true,
+          publishedId: true,
+        },
       });
 
       if (!workflow) {
@@ -127,6 +137,7 @@ export const workflowRouter = createTRPCRouter({
           autoSaved: true,
           commitMessage: true,
           updatedAt: true,
+          dsl: input.returnDSL ? true : false,
           parent: {
             select: {
               id: true,
@@ -150,6 +161,7 @@ export const workflowRouter = createTRPCRouter({
       > & {
         isCurrentVersion?: boolean;
         isLatestVersion?: boolean;
+        isPublishedVersion?: boolean;
         parent?: {
           id: string;
           version: string;
@@ -164,6 +176,9 @@ export const workflowRouter = createTRPCRouter({
         }
         if (version.id === workflow?.latestVersionId) {
           version.isLatestVersion = true;
+        }
+        if (version.id === workflow?.publishedId) {
+          version.isPublishedVersion = true;
         }
       }
 

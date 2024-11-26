@@ -50,6 +50,55 @@ export const optimizationRouter = createTRPCRouter({
           projectId: projectId,
         },
       });
-      return publishedWorkflow;
+
+      const isComponent = workflow?.isComponent;
+
+      return { ...publishedWorkflow, isComponent };
+    }),
+  toggleSaveAsComponent: publicProcedure
+    .input(
+      z.object({
+        workflowId: z.string(),
+        projectId: z.string(),
+        isComponent: z.boolean(),
+      })
+    )
+    .use(skipPermissionCheck)
+    .mutation(async ({ ctx, input }) => {
+      const { workflowId, projectId, isComponent } = input;
+
+      try {
+        const result = await ctx.prisma.workflow.update({
+          where: { id: workflowId, projectId: projectId },
+          data: { isComponent },
+        });
+        return { success: true };
+      } catch (error) {
+        throw error;
+      }
+    }),
+  getComponents: publicProcedure
+    .input(z.object({ projectId: z.string() }))
+    .use(skipPermissionCheck)
+    .query(async ({ ctx, input }) => {
+      const { projectId } = input;
+      const workflows = await ctx.prisma.workflow.findMany({
+        where: {
+          projectId: projectId,
+          isComponent: true,
+        },
+        include: {
+          versions: true,
+        },
+      });
+
+      // Update the filtering to work with multiple workflows
+      workflows.forEach((workflow) => {
+        workflow.versions = workflow.versions.filter(
+          (version) => version.id === workflow.publishedId
+        );
+      });
+
+      return workflows;
     }),
 });

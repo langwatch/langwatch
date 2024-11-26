@@ -20,12 +20,17 @@ import { formatMoney } from "../../utils/formatMoney";
 
 const simpleFieldAnalytics = (
   field: string
-): Omit<AnalyticsMetric, "label" | "colorSet" | "allowedAggregations"> => ({
+): Omit<AnalyticsMetric, "label" | "colorSet" | "allowedAggregations" | "quickwitSupport"> => ({
   format: "0.[0]",
   increaseIs: "good",
   aggregation: (aggregation: AggregationTypes) => ({
     [`${field.replaceAll(".", "_")}_${aggregation}`]: {
-      [aggregation]: { field },
+      [aggregation]: {
+        field,
+        ...(aggregation === "terms"
+          ? { size: field === "trace_id" ? 0 : 999 }
+          : {}),
+      },
     },
   }),
   extractionPath: (aggregation: AggregationTypes) =>
@@ -34,7 +39,10 @@ const simpleFieldAnalytics = (
 
 const numericFieldAnalyticsWithPercentiles = (
   field: string
-): Omit<AnalyticsMetric, "label" | "colorSet" | "increaseIs"> => ({
+): Omit<
+  AnalyticsMetric,
+  "label" | "colorSet" | "increaseIs" | "quickwitSupport"
+> => ({
   format: "0.[0]a",
   allowedAggregations: [
     ...numericAggregationTypes,
@@ -77,18 +85,21 @@ export const analyticsMetrics = {
       label: "Messages",
       colorSet: "orangeTones",
       allowedAggregations: ["cardinality"],
+      quickwitSupport: true,
     },
     user_id: {
       ...simpleFieldAnalytics("metadata.user_id"),
       label: "Users",
       colorSet: "blueTones",
       allowedAggregations: ["cardinality"],
+      quickwitSupport: true,
     },
     thread_id: {
       ...simpleFieldAnalytics("metadata.thread_id"),
       label: "Threads",
       colorSet: "greenTones",
       allowedAggregations: ["cardinality"],
+      quickwitSupport: true,
     },
     span_type: {
       label: "Span Type",
@@ -126,6 +137,7 @@ export const analyticsMetrics = {
       extractionPath: (aggregation) => {
         return `span_type_${aggregation}>child>cardinality`;
       },
+      quickwitSupport: false,
     },
   },
   sentiment: {
@@ -135,6 +147,7 @@ export const analyticsMetrics = {
       colorSet: "yellowTones",
       format: "0.00%",
       increaseIs: "good",
+      quickwitSupport: false,
     },
     thumbs_up_down: {
       label: "Thumbs Up/Down Score",
@@ -198,6 +211,7 @@ export const analyticsMetrics = {
           ? `thumbs_up_down_${aggregation}>child>cardinality`
           : `thumbs_up_down_${aggregation}>child>child>child>child`;
       },
+      quickwitSupport: false,
     },
   },
   performance: {
@@ -207,6 +221,7 @@ export const analyticsMetrics = {
       colorSet: "greenTones",
       format: formatMilliseconds,
       increaseIs: "bad",
+      quickwitSupport: true,
     },
     first_token: {
       ...numericFieldAnalyticsWithPercentiles("metrics.first_token_ms"),
@@ -214,6 +229,7 @@ export const analyticsMetrics = {
       colorSet: "cyanTones",
       format: formatMilliseconds,
       increaseIs: "bad",
+      quickwitSupport: true,
     },
     total_cost: {
       ...numericFieldAnalyticsWithPercentiles("metrics.total_cost"),
@@ -221,18 +237,21 @@ export const analyticsMetrics = {
       colorSet: "greenTones",
       format: (amount) => formatMoney({ amount, currency: "USD" }),
       increaseIs: "neutral",
+      quickwitSupport: true,
     },
     prompt_tokens: {
       ...numericFieldAnalyticsWithPercentiles("metrics.prompt_tokens"),
       label: "Prompt Tokens",
       colorSet: "blueTones",
       increaseIs: "neutral",
+      quickwitSupport: true,
     },
     completion_tokens: {
       ...numericFieldAnalyticsWithPercentiles("metrics.completion_tokens"),
       label: "Completion Tokens",
       colorSet: "orangeTones",
       increaseIs: "neutral",
+      quickwitSupport: true,
     },
     total_tokens: {
       ...numericFieldAnalyticsWithPercentiles("total_tokens"),
@@ -283,6 +302,7 @@ export const analyticsMetrics = {
               },
         };
       },
+      quickwitSupport: false,
     },
   },
   events: {
@@ -324,6 +344,7 @@ export const analyticsMetrics = {
       extractionPath: (aggregation: AggregationTypes) => {
         return `event_type_${aggregation}>child>cardinality`;
       },
+      quickwitSupport: false,
     },
     event_score: {
       label: "Event Score",
@@ -388,6 +409,7 @@ export const analyticsMetrics = {
       extractionPath: (aggregation: AggregationTypes, key, subkey) => {
         return `event_score_${aggregation}_${key}_${subkey}>child>child>child>child`;
       },
+      quickwitSupport: false,
     },
     event_details: {
       label: "Event Details",
@@ -452,6 +474,7 @@ export const analyticsMetrics = {
       extractionPath: (aggregation: AggregationTypes, key, subkey) => {
         return `event_score_${aggregation}_${key}_${subkey}>child>child>child>child`;
       },
+      quickwitSupport: false,
     },
   },
   evaluations: {
@@ -494,6 +517,7 @@ export const analyticsMetrics = {
       extractionPath: (aggregation: AggregationTypes, key) => {
         return `evaluation_score_${aggregation}_${key}>child>child`;
       },
+      quickwitSupport: false,
     },
     evaluation_runs: {
       label: "Evaluation Execution",
@@ -537,6 +561,7 @@ export const analyticsMetrics = {
       extractionPath: (aggregation: AggregationTypes) => {
         return `checks_${aggregation}>child>cardinality`;
       },
+      quickwitSupport: false,
     },
   },
 } satisfies Record<string, Record<string, AnalyticsMetric>>;
@@ -594,6 +619,7 @@ export const pipelineAggregations: Record<PipelineAggregationTypes, string> = {
 };
 
 export const metricAggregations: Record<AggregationTypes, string> = {
+  terms: "count",
   cardinality: "count",
   avg: "average",
   sum: "sum",
@@ -618,6 +644,7 @@ const simpleFieldGroupping = (name: string, field: string): AnalyticsGroup => ({
     },
   }),
   extractionPath: () => `${field}_group>buckets`,
+  quickwitSupport: true,
 });
 
 export const analyticsGroups = {
@@ -665,6 +692,7 @@ export const analyticsGroups = {
         },
       }),
       extractionPath: () => "model_group>child>child>buckets>back_to_root",
+      quickwitSupport: false,
     },
 
     span_type: {
@@ -692,6 +720,7 @@ export const analyticsGroups = {
         },
       }),
       extractionPath: () => "model_group>child>buckets>back_to_root",
+      quickwitSupport: false,
     },
   },
   sentiment: {
@@ -734,6 +763,7 @@ export const analyticsGroups = {
         },
       }),
       extractionPath: () => "input_sentiment_group>buckets",
+      quickwitSupport: false,
     },
     thumbs_up_down: {
       label: "Thumbs Up/Down",
@@ -807,6 +837,7 @@ export const analyticsGroups = {
       },
       extractionPath: () =>
         "thumbs_up_down_group>child>filter>child>buckets>back_to_root",
+      quickwitSupport: false,
     },
   },
   events: {
@@ -835,6 +866,7 @@ export const analyticsGroups = {
         },
       }),
       extractionPath: () => "check_state_group>child>buckets>back_to_root",
+      quickwitSupport: false,
     },
   },
   evaluations: {
@@ -862,6 +894,7 @@ export const analyticsGroups = {
         },
       }),
       extractionPath: () => "check_state_group>child>buckets>back_to_root",
+      quickwitSupport: false,
     },
     evaluation_label: {
       label: "Evaluation Label",
@@ -887,6 +920,7 @@ export const analyticsGroups = {
         },
       }),
       extractionPath: () => "check_state_group>child>buckets>back_to_root",
+      quickwitSupport: false,
     },
     evaluation_processing_state: {
       label: "Evaluation Processing State",
@@ -913,6 +947,7 @@ export const analyticsGroups = {
         },
       }),
       extractionPath: () => "check_state_group>child>buckets>back_to_root",
+      quickwitSupport: false,
     },
   },
 } satisfies Record<string, Record<string, AnalyticsGroup>>;

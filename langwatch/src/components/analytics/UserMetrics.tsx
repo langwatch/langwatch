@@ -19,8 +19,12 @@ import {
 import { SatisfactionGraphs } from "./SatisfactionGraph";
 import { SessionsSummary } from "./SessionsSummary";
 import { TopicsSelector } from "../filters/TopicsSelector";
+import { api } from "../../utils/api";
 
 export function UserMetrics() {
+  const env = api.publicEnv.useQuery({});
+  const isNotQuickwit = env.data && !env.data.IS_QUICKWIT;
+
   const messagesGraph: CustomGraphInput = {
     graphId: "messagesCountGraph",
     graphType: "line",
@@ -136,7 +140,7 @@ export function UserMetrics() {
       </GridItem>
       <GridItem rowSpan={2}>
         <VStack spacing={6}>
-          <Card width="100%" minHeight="328px">
+          <Card width="100%" minHeight={isNotQuickwit ? "328px" : "528px"}>
             <CardHeader>
               <Heading size="sm">Top Topics</Heading>
             </CardHeader>
@@ -144,12 +148,14 @@ export function UserMetrics() {
               <TopicsSelector showTitle={false} />
             </CardBody>
           </Card>
-          <SatisfactionGraphs />
+          {isNotQuickwit && <SatisfactionGraphs />}
         </VStack>
       </GridItem>
-      <GridItem>
-        <SessionsSummary />
-      </GridItem>
+      {isNotQuickwit && (
+        <GridItem>
+          <SessionsSummary />
+        </GridItem>
+      )}
     </Grid>
   );
 }

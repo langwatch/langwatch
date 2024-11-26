@@ -11,8 +11,12 @@ import {
   Text,
 } from "@chakra-ui/react";
 import { CustomGraph, type CustomGraphInput } from "./CustomGraph";
+import { api } from "../../utils/api";
 
 export const SatisfactionGraphs = () => {
+  const env = api.publicEnv.useQuery({});
+  const isNotQuickwit = env.data && !env.data.IS_QUICKWIT;
+
   const inputSentimentGraph: CustomGraphInput = {
     graphId: "inputSentimentCountGraph",
     graphType: "donnut",
@@ -71,10 +75,10 @@ export const SatisfactionGraphs = () => {
             maxWidth="50%"
           />
           <TabPanels>
-            <TabPanel padding={0}>
+            <TabPanel padding={isNotQuickwit ? 0 : undefined}>
               <CustomGraph input={inputSentimentGraph} hideGroupLabel={true} />
             </TabPanel>
-            <TabPanel padding={0}>
+            <TabPanel padding={isNotQuickwit ? 0 : undefined}>
               <CustomGraph input={thumbsUpDownGraph} hideGroupLabel={true} />
             </TabPanel>
           </TabPanels>

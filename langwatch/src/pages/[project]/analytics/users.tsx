@@ -19,6 +19,8 @@ import { SessionsSummary } from "~/components/analytics/SessionsSummary";
 import { FilterSidebar } from "~/components/filters/FilterSidebar";
 import { AnalyticsHeader } from "../../../components/analytics/AnalyticsHeader";
 import { FeedbacksTable } from "../../../components/analytics/FeedbacksTable";
+import { api } from "../../../utils/api";
+import { QuickwitNote } from "../../../components/analytics/QuickwitNote";
 
 const messagesCount = {
   graphId: "custom",
@@ -180,6 +182,10 @@ const maxMessagePerThread = {
 };
 
 export default function Users() {
+  const env = api.publicEnv.useQuery({});
+  const isNotQuickwit = env.data && !env.data.IS_QUICKWIT;
+  const isQuickwit = env.data && env.data.IS_QUICKWIT;
+
   return (
     <GraphsLayout>
       <AnalyticsHeader title="Users" />
@@ -292,7 +298,11 @@ export default function Users() {
                 </HStack>
               </CardHeader>
               <CardBody>
-                <FeedbacksTable />
+                {isNotQuickwit ? (
+                  <FeedbacksTable />
+                ) : isQuickwit ? (
+                  <QuickwitNote />
+                ) : null}
               </CardBody>
             </Card>
           </GridItem>

@@ -9,6 +9,7 @@ doc_mapping:
       type: text
       tokenizer: raw
       stored: true
+      fast: true
     - name: project_id
       type: text
       tokenizer: raw
@@ -122,21 +123,27 @@ doc_mapping:
         - name: first_token_ms
           type: i64
           stored: true
+          fast: true
         - name: total_time_ms
           type: i64
           stored: true
+          fast: true
         - name: prompt_tokens
           type: i64
           stored: true
+          fast: true
         - name: completion_tokens
           type: i64
           stored: true
+          fast: true
         - name: tokens_estimated
           type: bool
           stored: true
+          fast: true
         - name: total_cost
           type: f64
           stored: true
+          fast: true
 
     - name: error
       type: json

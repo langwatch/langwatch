@@ -1,6 +1,8 @@
 from typing import Type, Union
 from langwatch_nlp.studio.dspy.retrieve import ColBERTv2RM
-from langwatch_nlp.studio.modules.evaluators.answer_correctness import AnswerCorrectnessEvaluator
+from langwatch_nlp.studio.modules.evaluators.answer_correctness import (
+    AnswerCorrectnessEvaluator,
+)
 from langwatch_nlp.studio.modules.evaluators.exact_match import ExactMatchEvaluator
 from langwatch_nlp.studio.modules.evaluators.langwatch import LangWatchEvaluator
 from dspy.teleprompt import (
@@ -32,9 +34,7 @@ RETRIEVERS: dict[str, Type[dspy.Retrieve]] = {
 
 OPTIMIZERS: dict[
     str,
-    Union[
-        Type[MIPROv2], Type[BootstrapFewShotWithRandomSearch]
-    ],
+    Union[Type[MIPROv2], Type[BootstrapFewShotWithRandomSearch]],
 ] = {
     "MIPROv2ZeroShot": MIPROv2,
     "MIPROv2": MIPROv2,

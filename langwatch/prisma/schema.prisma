@@ -540,6 +540,7 @@ model Workflow {
     archivedAt       DateTime?
     experiments      Experiment[]
     isEvaluator      Boolean           @default(false)
+    isComponent      Boolean           @default(false)
 
     @@index([projectId])
     @@index([publishedById])

@@ -167,6 +167,7 @@ const evaluators: Evaluator[] = [
     ],
     outputs: [{ identifier: "passed", type: "bool" }],
   },
+
   ...convertEvaluators(
     Object.fromEntries(
       Object.entries(AVAILABLE_EVALUATORS)

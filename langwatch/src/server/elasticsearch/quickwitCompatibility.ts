@@ -1,6 +1,11 @@
 import { type Client as ElasticClient } from "@elastic/elasticsearch";
 
 import { env } from "../../env.mjs";
+import { throttle } from "lodash";
+
+// Hold a temporary in-memory db to accumulate the updates together and send just the latest to quickwit
+const inMemoryDb: Record<string, Record<string, unknown>> = {};
+const updateThrottles: Record<string, () => Promise<void>> = {};
 
 export const patchForQuickwitCompatibility = (esClient: ElasticClient) => {
   const originalSearch = esClient.search.bind(esClient);
@@ -106,10 +111,10 @@ export const patchForQuickwitCompatibility = (esClient: ElasticClient) => {
   };
 
   const deleteViaQuickwitApi = async (index: string, id: string) => {
-    const currentTimestampSeconds = Math.floor(Date.now() / 1000);
+    const currentTimestampSeconds = Math.floor((Date.now() - 500) / 1000);
 
     const deleteQuery: QuickwitDeleteQuery = {
-      query: `_id:${id}`,
+      query: `_id:${id} AND timestamps.updated_at:[* TO ${currentTimestampSeconds}]`,
       end_timestamp: currentTimestampSeconds,
     };
 
@@ -161,16 +166,17 @@ export const patchForQuickwitCompatibility = (esClient: ElasticClient) => {
   // @ts-ignore
   // Quickwit does not support update so we delete and re-insert
   esClient.update = async (params: UpdateParams) => {
-    const existingDoc = await getDocumentById(params.index, params.id);
+    const inMemoryDoc = inMemoryDb[params.id] ?? {};
+    const existingDoc = mergeDocs(
+      (await getDocumentById(params.index, params.id)) as any,
+      inMemoryDoc
+    );
 
     let finalDoc: Record<string, unknown>;
 
     if (existingDoc) {
       // Merge existing doc with update
-      finalDoc = {
-        ...existingDoc,
-        ...params.doc,
-      };
+      finalDoc = mergeDocs(existingDoc, params.doc);
     } else {
       // Handle non-existent document
       if (params.doc_as_upsert ?? params.upsert) {
@@ -182,24 +188,27 @@ export const patchForQuickwitCompatibility = (esClient: ElasticClient) => {
       }
     }
 
-    // Delete existing document if it exists
-    if (existingDoc) {
-      await esClient.delete({
-        index: params.index,
-        id: params.id,
-      });
-    }
+    inMemoryDb[params.id] = finalDoc;
+    setTimeout(() => {
+      if (JSON.stringify(inMemoryDb[params.id]) === JSON.stringify(finalDoc)) {
+        delete inMemoryDb[params.id];
+        delete updateThrottles[params.id];
+      }
+    }, 10_000);
 
-    // Insert the new/updated document
-    const result = await esClient.index({
+    const throttledFn = updateThrottles[params.id] ?? throttle(update, 5000);
+    updateThrottles[params.id] = throttledFn as any;
+
+    void throttledFn({
+      esClient,
       index: params.index,
       id: params.id,
-      body: finalDoc,
+      doc: finalDoc,
+      exists: !!existingDoc,
     });
 
     return {
-      ...result,
-      result: existingDoc ? "updated" : "created",
+      result: existingDoc || inMemoryDoc ? "updated" : "created",
     };
   };
 
@@ -230,6 +239,7 @@ export const patchForQuickwitCompatibility = (esClient: ElasticClient) => {
     // @ts-ignore
     const result = (await esClient.bulk({
       body: bulkBody,
+      refresh: true,
     })) as any;
 
     if (result.errors) {
@@ -253,4 +263,77 @@ export const patchForQuickwitCompatibility = (esClient: ElasticClient) => {
       status: "created",
     };
   };
+};
+
+const update = async ({
+  esClient,
+  index,
+  id,
+  doc,
+  exists,
+}: {
+  esClient: ElasticClient;
+  index: string;
+  id: string;
+  doc: Record<string, unknown>;
+  exists: boolean;
+}) => {
+  // Delete existing document if it exists
+  if (exists) {
+    await esClient.delete({
+      index,
+      id,
+    });
+  }
+
+  // Insert the new/updated document
+  await esClient.index({
+    index,
+    id,
+    body: {
+      ...doc,
+      timestamps: {
+        ...(doc.timestamps ?? {}),
+        updated_at: Date.now(),
+      },
+    },
+  });
+};
+
+const mergeArrays = (a: object[], b: object[], idField: string) => {
+  return Object.values(
+    Object.fromEntries(
+      [...a, ...b].map((item) => [
+        (item as any)[idField] ?? Math.random().toString(),
+        item,
+      ])
+    )
+  );
+};
+
+const mergeDocs = (
+  doc1_: Record<string, unknown>,
+  doc2_: Record<string, unknown>
+) => {
+  const doc1 = doc1_ ?? {};
+  const doc2 = doc2_ ?? {};
+
+  const merged = {
+    ...doc1,
+    ...doc2,
+  };
+
+  // Workaround for merging collector spans
+  if (
+    ("spans" in (doc1 as any) && Array.isArray((doc1 as any).spans)) ||
+    ("spans" in (doc2 as any) && Array.isArray((doc2 as any).spans))
+  ) {
+    merged.spans = mergeArrays(
+      (doc1 as any).spans ?? [],
+      (doc2 as any).spans ?? [],
+      "span_id"
+    );
+  }
+
+  return merged;
 };

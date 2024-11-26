@@ -13,6 +13,7 @@ export const publicEnvRouter = publicProcedure
       DEMO_PROJECT_SLUG: env.DEMO_PROJECT_SLUG,
       NODE_ENV: env.NODE_ENV,
       IS_ONPREM: env.IS_ONPREM,
+      IS_QUICKWIT: env.IS_QUICKWIT,
     };
 
     return publicEnvVars;

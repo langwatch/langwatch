@@ -23,6 +23,7 @@ import {
   percentileAggregationTypes,
   type PercentileAggregationTypes,
 } from "./types";
+import { env } from "../../env.mjs";
 
 const labelsMapping: Partial<
   Record<
@@ -48,6 +49,15 @@ const labelsMapping: Partial<
 };
 
 export const timeseries = async (input: TimeseriesInputType) => {
+  if (env.IS_QUICKWIT) {
+    // TODO: Remove this once Quickwit v0.9 is released as it supports cardinality
+    input.series = input.series.map((series) => ({
+      ...series,
+      aggregation:
+        series.aggregation === "cardinality" ? "terms" : series.aggregation,
+    }));
+  }
+
   const { previousPeriodStartDate, startDate, endDate, daysDifference } =
     currentVsPreviousDates(
       input,
@@ -149,13 +159,21 @@ export const timeseries = async (input: TimeseriesInputType) => {
                 ranges: [
                   {
                     key: "previous",
-                    from: previousPeriodStartDate.toISOString(),
-                    to: startDate.toISOString(),
+                    from: env.IS_QUICKWIT
+                      ? previousPeriodStartDate.getTime() * 1000 * 1000
+                      : previousPeriodStartDate.toISOString(),
+                    to: env.IS_QUICKWIT
+                      ? startDate.getTime() * 1000 * 1000
+                      : startDate.toISOString(),
                   },
                   {
                     key: "current",
-                    from: startDate.toISOString(),
-                    to: endDate.toISOString(),
+                    from: env.IS_QUICKWIT
+                      ? startDate.getTime() * 1000 * 1000
+                      : startDate.toISOString(),
+                    to: env.IS_QUICKWIT
+                      ? endDate.getTime() * 1000 * 1000
+                      : endDate.toISOString(),
                   },
                 ],
               },
@@ -252,7 +270,9 @@ export const timeseries = async (input: TimeseriesInputType) => {
 
   if (input.timeScale === "full") {
     const [previous, current] =
-      result.aggregations?.previous_vs_current.buckets;
+      result.aggregations?.previous_vs_current.buckets.filter(
+        (bucket: any) => bucket.key === "previous" || bucket.key === "current"
+      );
 
     return {
       previousPeriod: parseAggregations([previous]),
@@ -312,9 +332,17 @@ const extractResult = (
   for (const path of paths) {
     current = current[path];
   }
+
+  let value = current && typeof current === "object" ? current.value : current;
+  if (aggregation === "terms" && typeof current === "object") {
+    if (metric === "metadata.trace_id") {
+      value = current.sum_other_doc_count;
+    } else {
+      value = current.buckets.length;
+    }
+  }
   return {
-    [`${metric}/${aggregation}`]:
-      current && typeof current === "object" ? current.value : current,
+    [`${metric}/${aggregation.replace("terms", "cardinality")}`]: value,
   };
 };
 

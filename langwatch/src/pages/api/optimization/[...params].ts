@@ -21,6 +21,10 @@ export default async function handler(
   const xAuthToken = req.headers["x-auth-token"];
   const authHeader = req.headers.authorization;
 
+  const { params } = req.query;
+
+  const [workflowId, versionId] = params;
+
   const authToken =
     xAuthToken ??
     (authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null);
@@ -50,8 +54,6 @@ export default async function handler(
     return res.status(401).json({ message: "Invalid auth token." });
   }
 
-  const workflowId = req.query.workflowId as string;
-
   const workflow = await prisma.workflow.findUnique({
     where: { id: workflowId, projectId: project.id },
   });
@@ -67,7 +69,7 @@ export default async function handler(
 
   const publishedWorkflowVersion = await prisma.workflowVersion.findUnique({
     where: {
-      id: workflow.publishedId,
+      id: versionId ?? workflow.publishedId,
       projectId: project.id,
     },
   });

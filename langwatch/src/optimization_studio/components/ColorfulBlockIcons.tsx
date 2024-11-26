@@ -99,6 +99,7 @@ export const ComponentIcon = ({
     prompting_technique: <BoxIcon />,
     evaluator: <EvaluatorIcon cls={cls} />,
     end: <Flag />,
+    custom: <BoxIcon />,
   };
 
   const componentColorMap: Record<ComponentType, string> = {
@@ -109,6 +110,7 @@ export const ComponentIcon = ({
     prompting_technique: "teal.400",
     evaluator: "#5FD15D",
     end: "orange.400",
+    custom: "gray.400",
   };
 
   return (
