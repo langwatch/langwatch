@@ -54,8 +54,6 @@ export default async function handler(
     return res.status(401).json({ message: "Invalid auth token." });
   }
 
-  //const workflowId = req.query.workflowId as string;
-
   const workflow = await prisma.workflow.findUnique({
     where: { id: workflowId, projectId: project.id },
   });
