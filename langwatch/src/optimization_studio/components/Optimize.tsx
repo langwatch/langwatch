@@ -317,7 +317,9 @@ export function OptimizeModalContent({
     );
   }
 
-  const hasEvaluator = !!nodes.find((node) => node.type === "evaluator");
+  const hasEvaluator = !!nodes.find(
+    (node) => node.type === "evaluator" || node.type === "customEvaluator"
+  );
   const isDisabled =
     train.length < 20
       ? "You need at least 20 entries to run the automated optimizer"

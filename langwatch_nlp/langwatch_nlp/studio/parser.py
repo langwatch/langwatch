@@ -38,6 +38,7 @@ from langwatch_nlp.studio.utils import (
     transpose_inline_dataset_to_object_list,
 )
 
+
 def parse_component(node: Node, workflow: Workflow) -> dspy.Module:
     match node.type:
         case "signature":
@@ -51,6 +52,8 @@ def parse_component(node: Node, workflow: Workflow) -> dspy.Module:
         case "end":
             return parse_end(node.data, workflow)
         case "custom":
+            return parse_custom(node.data, workflow)
+        case "customEvaluator":
             return parse_custom(node.data, workflow)
         case _:
             raise NotImplementedError(f"Unknown component type: {node.type}")
@@ -67,6 +70,7 @@ def apiCall(inputs, api_key, endpoint, workflow_id, version_id):
         headers={"X-Auth-Token": api_key},
         json=inputs,
     )
+
     return response.json()
 
 
@@ -133,7 +137,7 @@ def parse_signature(
         except StopIteration:
             raise ValueError(f"Decorator node {prompting_technique.ref} not found")
         PromptingTechniqueClass = parse_prompting_technique(decorator_node.data)
-        predict = PromptingTechniqueClass(SignatureClass) # type: ignore
+        predict = PromptingTechniqueClass(SignatureClass)  # type: ignore
     else:
         predict = dspy.Predict(SignatureClass)
 

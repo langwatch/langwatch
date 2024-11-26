@@ -100,6 +100,7 @@ export const ComponentIcon = ({
     evaluator: <EvaluatorIcon cls={cls} />,
     end: <Flag />,
     custom: <BoxIcon />,
+    customEvaluator: <BoxIcon />,
   };
 
   const componentColorMap: Record<ComponentType, string> = {
@@ -111,6 +112,7 @@ export const ComponentIcon = ({
     evaluator: "#5FD15D",
     end: "orange.400",
     custom: "gray.400",
+    customEvaluator: "#5FD15D",
   };
 
   return (

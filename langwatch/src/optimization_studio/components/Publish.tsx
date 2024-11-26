@@ -28,7 +28,13 @@ import {
 } from "@chakra-ui/react";
 import { useRouter } from "next/router";
 import { useCallback, useState } from "react";
-import { Code, Globe, Play, Box as BoxIcon } from "react-feather";
+import {
+  Code,
+  Globe,
+  Play,
+  Box as BoxIcon,
+  AlertTriangle,
+} from "react-feather";
 import { RenderCode } from "~/components/code/RenderCode";
 import { SmallLabel } from "../../components/SmallLabel";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
@@ -102,12 +108,24 @@ function PublishMenu({
   onTogglePublish: () => void;
   onToggleApi: () => void;
 }) {
+  const { workflowId, getWorkflow } = useWorkflowStore(
+    ({ workflow_id: workflowId, getWorkflow }) => ({
+      workflowId,
+      getWorkflow,
+    })
+  );
+
+  const nodes = useWorkflowStore((state) => state.nodes);
+
+  const endNodes = nodes.filter((node) => node.type === "end");
+
+  const isEvaluator = endNodes.some((node) => node.data.isEvaluator);
+
   const { canSaveNewVersion, versionToBeEvaluated } = useVersionState({
     project,
     allowSaveIfAutoSaveIsCurrentButNotLatest: false,
   });
   const router = useRouter();
-  const workflowId = router.query.workflow as string;
   const toast = useToast();
   const trpc = api.useContext();
 
@@ -148,6 +166,33 @@ function PublishMenu({
       },
     });
 
+  const toggleSaveAsEvaluatorMutation =
+    api.optimization.toggleSaveAsEvaluator.useMutation({
+      onSuccess: () => {
+        void trpc.optimization.getComponents.invalidate();
+
+        toast({
+          title: `Workflow ${
+            !publishedWorkflow.data?.isEvaluator ? "saved" : "deleted"
+          } as evaluator`,
+          status: "success",
+          duration: 5000,
+          isClosable: true,
+          position: "top-right",
+        });
+      },
+      onError: (error) => {
+        toast({
+          title: "Error saving evaluator",
+          description: error.message,
+          status: "error",
+          duration: 5000,
+          isClosable: true,
+          position: "top-right",
+        });
+      },
+    });
+
   const isDisabled =
     !canSaveNewVersion &&
     publishedWorkflow.data?.version === versionToBeEvaluated.version
@@ -162,7 +207,21 @@ function PublishMenu({
     toggleSaveAsComponentMutation.mutate({
       workflowId,
       projectId: project.id,
-      isComponent: !publishedWorkflow.data?.isComponent,
+      isComponent: !publishedWorkflow.data?.isComponent ?? false,
+      isEvaluator: publishedWorkflow.data?.isEvaluator ?? false,
+    });
+  };
+
+  const toggleSaveAsEvaluator = () => {
+    if (!workflowId || !project?.id) {
+      return;
+    }
+
+    toggleSaveAsEvaluatorMutation.mutate({
+      workflowId,
+      projectId: project.id,
+      isEvaluator: !publishedWorkflow.data?.isEvaluator ?? false,
+      isComponent: publishedWorkflow.data?.isComponent ?? false,
     });
   };
 
@@ -190,13 +249,23 @@ function PublishMenu({
       </Tooltip>
 
       <MenuItem
-        isDisabled={!publishedWorkflow.data?.version}
+        isDisabled={!publishedWorkflow.data?.version || isEvaluator}
         onClick={toggleSaveAsComponent}
         icon={<BoxIcon size={16} />}
       >
         {publishedWorkflow.data?.isComponent
           ? "Delete Component"
           : "Save as Component"}
+      </MenuItem>
+
+      <MenuItem
+        isDisabled={!publishedWorkflow.data?.version || !isEvaluator}
+        onClick={toggleSaveAsEvaluator}
+        icon={<AlertTriangle size={16} />}
+      >
+        {publishedWorkflow.data?.isEvaluator
+          ? "Delete Evaluator"
+          : "Save as Evaluator"}
       </MenuItem>
 
       <Link

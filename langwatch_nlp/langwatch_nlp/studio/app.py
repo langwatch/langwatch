@@ -327,8 +327,23 @@ async def execute_sync(event: StudioClientEvent):
                     "trace_id": response.payload.execution_state.trace_id,
                     "status": "success",
                     "result": (
-                        response.payload.execution_state.result.get("end")
+                        {
+                            **response.payload.execution_state.result.get("end", {}),
+                            **(
+                                {"score": float(end["score"])} if "score" in end else {}
+                            ),
+                            **(
+                                {"passed": end["passed"].lower() == "true"}
+                                if "passed" in end
+                                else {}
+                            ),
+                        }
                         if response.payload.execution_state.result
+                        and (
+                            end := response.payload.execution_state.result.get(
+                                "end", {}
+                            )
+                        )
                         else None
                     ),
                 }

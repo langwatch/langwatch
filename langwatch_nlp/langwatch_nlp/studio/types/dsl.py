@@ -84,6 +84,7 @@ class BaseComponent(BaseModel):
     published_id: Optional[str] = None
     isCustom: Optional[bool] = None
     version_id: Optional[str] = None
+    isEvaluator: Optional[bool] = None
 
 
 class Edge(BaseModel):
@@ -179,6 +180,11 @@ class CustomNode(BaseNode):
     data: Custom
 
 
+class CustomEvaluatorNode(BaseNode):
+    type: Literal["customEvaluator"] = "customEvaluator"
+    data: Custom
+
+
 class PromptingTechniqueNode(BaseNode):
     type: Literal["prompting_technique"] = "prompting_technique"
     data: PromptingTechnique
@@ -214,6 +220,7 @@ Node = Union[
     PromptingTechniqueNode,
     ModuleNode,
     CustomNode,
+    CustomEvaluatorNode,
     EntryNode,
     RetrieverNode,
     EvaluatorNode,

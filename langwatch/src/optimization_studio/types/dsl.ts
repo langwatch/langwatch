@@ -40,6 +40,7 @@ export type ComponentType =
   | "retriever"
   | "prompting_technique"
   | "custom"
+  | "customEvaluator"
   | "evaluator";
 
 export type BaseComponent = {
@@ -52,6 +53,7 @@ export type BaseComponent = {
   outputs?: Field[];
   isCustom?: boolean;
   isEvaluator?: boolean;
+  isComponent?: boolean;
 
   execution_state?: {
     status: ExecutionStatus;

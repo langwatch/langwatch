@@ -79,19 +79,19 @@ export function FieldsDefinition({
     handleSubmit,
     formState: { errors },
     watch,
-    reset,
   } = useForm<FieldArrayForm>({
     defaultValues: {
       fields: node.data[field] ?? [],
     },
   });
 
-  const { fields, append, remove } = useFieldArray({
+  const { fields, append, remove, replace } = useFieldArray({
     control,
     name: "fields",
   });
 
   const updateNodeInternals = useUpdateNodeInternals();
+
   const onSubmit = (data: FieldArrayForm) => {
     setNode({
       id: node.id,
@@ -101,7 +101,12 @@ export function FieldsDefinition({
   };
 
   useEffect(() => {
-    reset({ fields: node.data[field] ?? [] });
+    const currentFields = node.data[field] ?? [];
+    replace(currentFields);
+
+    setTimeout(() => {
+      updateNodeInternals(node.id);
+    }, 0);
   }, [node.data.isEvaluator]);
 
   const watchedFields = watch("fields");
@@ -217,9 +222,10 @@ export function FieldsDefinition({
                         {field === "inputs" && (
                           <option value="image">image</option>
                         )}
-                        {/* <option value="float">float</option>
-                        <option value="int">int</option>
+                        <option value="float">float</option>
+
                         <option value="bool">bool</option>
+                        {/* <option value="int">int</option>
                         <option value="list[str]">list[str]</option>
                         <option value="list[float]">list[float]</option>
                         <option value="list[int]">list[int]</option>
@@ -438,8 +444,6 @@ export function BasePropertiesPanel({
     const newId = nameToId(value);
     setNode({ id, data: { name: value } }, newId);
   };
-
-  console.log("nodeeee", node);
 
   return (
     <VStack
