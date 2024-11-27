@@ -86,10 +86,12 @@ export const ComponentIcon = ({
   type,
   cls,
   size,
+  behave_as,
 }: {
   type: ComponentType;
   cls?: string;
   size: "sm" | "md" | "lg";
+  behave_as?: "evaluator";
 }) => {
   const componentIconMap: Record<ComponentType, React.ReactNode> = {
     signature: <LLMIcon />,
@@ -100,7 +102,6 @@ export const ComponentIcon = ({
     evaluator: <EvaluatorIcon cls={cls} />,
     end: <Flag />,
     custom: <BoxIcon />,
-    customEvaluator: <BoxIcon />,
   };
 
   const componentColorMap: Record<ComponentType, string> = {
@@ -112,12 +113,16 @@ export const ComponentIcon = ({
     evaluator: "#5FD15D",
     end: "orange.400",
     custom: "gray.400",
-    customEvaluator: "#5FD15D",
   };
+
+  let color = componentColorMap[type];
+  if (behave_as === "evaluator") {
+    color = "#5FD15D";
+  }
 
   return (
     <ColorfulBlockIcon
-      color={componentColorMap[type]}
+      color={color}
       size={size}
       icon={componentIconMap[type]}
     />

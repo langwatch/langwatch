@@ -199,6 +199,7 @@ export const ComponentNode = forwardRef(function ComponentNode(
     hidePlayButton?: boolean;
     hideOutputHandles?: boolean;
     backgroundColor?: string;
+    behave_as?: "evaluator" | undefined;
   },
   ref: Ref<HTMLDivElement>
 ) {
@@ -326,6 +327,7 @@ export const ComponentNode = forwardRef(function ComponentNode(
         <ComponentIcon
           type={props.type as ComponentType}
           cls={props.data.cls}
+          behave_as={props.data.behave_as}
           size="md"
         />
         <Text fontSize={12} fontWeight={500}>

@@ -40,6 +40,7 @@ from langwatch_nlp.studio.utils import (
 
 
 def parse_component(node: Node, workflow: Workflow) -> dspy.Module:
+    print("node.....type", node.type)
     match node.type:
         case "signature":
             return parse_signature(node.id, node.data, workflow)
@@ -52,8 +53,6 @@ def parse_component(node: Node, workflow: Workflow) -> dspy.Module:
         case "end":
             return parse_end(node.data, workflow)
         case "custom":
-            return parse_custom(node.data, workflow)
-        case "customEvaluator":
             return parse_custom(node.data, workflow)
         case _:
             raise NotImplementedError(f"Unknown component type: {node.type}")

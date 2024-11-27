@@ -40,7 +40,6 @@ export type ComponentType =
   | "retriever"
   | "prompting_technique"
   | "custom"
-  | "customEvaluator"
   | "evaluator";
 
 export type BaseComponent = {
@@ -52,8 +51,7 @@ export type BaseComponent = {
   inputs?: Field[];
   outputs?: Field[];
   isCustom?: boolean;
-  isEvaluator?: boolean;
-  isComponent?: boolean;
+  behave_as?: "evaluator";
 
   execution_state?: {
     status: ExecutionStatus;
@@ -134,7 +132,8 @@ export type Component =
   | Signature
   | Module
   | Evaluator
-  | End;
+  | End
+  | Custom;
 
 type Flow = {
   nodes: Node<Component>[];

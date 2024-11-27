@@ -220,7 +220,8 @@ export const NodeSelectionPanel = ({
                     <NodeDraggable
                       key={custom.name}
                       component={createCustomComponent(custom as Custom)}
-                      type="customEvaluator"
+                      type="custom"
+                      behave_as="evaluator"
                       disableDrag={isCurrentWorkflow}
                     />
                   );
@@ -248,6 +249,7 @@ export const NodeSelectionPanel = ({
 export const NodeDraggable = (props: {
   component: Component;
   type: ComponentType;
+  behave_as?: "evaluator";
   disableDrag?: boolean;
 }) => {
   const { setNodes, setNodeParameter, deleteNode, nodes } = useWorkflowStore(
@@ -271,6 +273,7 @@ export const NodeDraggable = (props: {
       data: {
         ...props.component,
         name: newName,
+        behave_as: props.behave_as,
       },
     };
 
@@ -368,6 +371,7 @@ export const NodeDraggable = (props: {
             <ComponentIcon
               type={props.type}
               cls={props.component.cls}
+              behave_as={props.behave_as}
               size="md"
             />
             <HoverableBigText noOfLines={1}>

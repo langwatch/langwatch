@@ -321,6 +321,7 @@ async def execute_sync(event: StudioClientEvent):
     async for response in event_stream:
         if isinstance(response, ExecutionStateChange):
             status = response.payload.execution_state.status
+            print("response.payload.cost", response)
 
             if status == "success":
                 return {

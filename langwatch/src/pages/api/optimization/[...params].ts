@@ -135,6 +135,8 @@ export default async function handler(
 
     const data = await response.json();
 
+    console.log("data...", data);
+
     if (!response.ok) {
       return res.status(500).json({ message: data.detail });
     }

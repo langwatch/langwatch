@@ -61,7 +61,7 @@ export function EndPropertiesPanel({ node: initialNode }: { node: Node<End> }) {
         data: {
           ...node.data,
           inputs: evaluatorInputs,
-          isEvaluator: true,
+          behave_as: "evaluator",
           fields: [],
         } as End,
       });
@@ -73,8 +73,8 @@ export function EndPropertiesPanel({ node: initialNode }: { node: Node<End> }) {
         data: {
           ...node.data,
           inputs: [{ type: "str", identifier: "output" }],
-          isEvaluator: false,
           fields: [],
+          behave_as: undefined,
         } as End,
       });
 

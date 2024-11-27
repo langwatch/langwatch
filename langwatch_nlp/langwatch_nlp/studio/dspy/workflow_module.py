@@ -217,7 +217,9 @@ class WorkflowModule(ReportingModule):
     ):
         prediction_error = prediction.get_error()
         evaluation_nodes = [
-            node for node in self.workflow.nodes if node.type == "evaluator"
+            node
+            for node in self.workflow.nodes
+            if node.type == "evaluator" or node.behave_as == "evaluator"
         ]
 
         if prediction_error:
