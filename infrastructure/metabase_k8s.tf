@@ -177,12 +177,17 @@ resource "kubernetes_deployment" "metabase" {
   ]
 }
 
-# Metabase Service
+# Metabase Service with LoadBalancer
 resource "kubernetes_service" "metabase" {
   count = module.variables.profile == "lw-prod" ? 1 : 0
 
   metadata {
     name = "metabase-service"
+    annotations = {
+      "service.beta.kubernetes.io/aws-load-balancer-type" = "nlb"  # Use Network Load Balancer
+      "service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled" = "true"
+      "service.beta.kubernetes.io/aws-load-balancer-subnets" = join(",", [aws_subnet.public_subnet_1.id, aws_subnet.public_subnet_2.id])
+    }
   }
 
   spec {
@@ -195,7 +200,7 @@ resource "kubernetes_service" "metabase" {
       target_port = 3000
     }
 
-    type = "ClusterIP"
+    type = "LoadBalancer"
   }
 
   depends_on = [
@@ -203,69 +208,3 @@ resource "kubernetes_service" "metabase" {
   ]
 }
 
-# Add Ingress resource
-resource "kubernetes_ingress_v1" "metabase" {
-  count = module.variables.profile == "lw-prod" ? 1 : 0
-
-  metadata {
-    name = "metabase-ingress"
-    annotations = {
-      "kubernetes.io/ingress.class"                = "alb"
-      "alb.ingress.kubernetes.io/scheme"           = "internet-facing"
-      "alb.ingress.kubernetes.io/target-type"      = "ip"
-      "alb.ingress.kubernetes.io/subnets"          = join(",", [aws_subnet.public_subnet_1.id, aws_subnet.public_subnet_2.id])
-      "alb.ingress.kubernetes.io/security-groups"   = aws_security_group.alb[0].id
-    }
-  }
-
-  spec {
-    rule {
-      http {
-        path {
-          path = "/*"
-          backend {
-            service {
-              name = kubernetes_service.metabase[0].metadata[0].name
-              port {
-                number = 80
-              }
-            }
-          }
-        }
-      }
-    }
-  }
-}
-
-# Add ALB Security Group
-resource "aws_security_group" "alb" {
-  count       = module.variables.profile == "lw-prod" ? 1 : 0
-  name        = "metabase-alb-sg"
-  description = "Security group for Metabase ALB"
-  vpc_id      = aws_vpc.main.id
-
-  ingress {
-    from_port   = 80
-    to_port     = 80
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  ingress {
-    from_port   = 443
-    to_port     = 443
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  tags = {
-    Name = "metabase-alb-sg"
-  }
-}
