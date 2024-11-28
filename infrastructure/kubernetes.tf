@@ -1,5 +1,6 @@
 # EKS Cluster
 resource "aws_eks_cluster" "primary" {
+  count = module.variables.profile == "lw-prod" ? 1 : 0
   name     = "langwatch-cluster"
   role_arn = aws_iam_role.eks_cluster.arn
   version  = "1.31"
@@ -47,7 +48,8 @@ resource "aws_iam_role_policy_attachment" "eks_service_policy" {
 
 # EKS Node Group
 resource "aws_eks_node_group" "primary" {
-  cluster_name    = aws_eks_cluster.primary.name
+  count = module.variables.profile == "lw-prod" ? 1 : 0
+  cluster_name    = aws_eks_cluster.primary[0].name
   node_group_name = "langwatch-node-group"
   node_role_arn   = aws_iam_role.eks_node_group.arn
   subnet_ids      = [aws_subnet.public_subnet_1.id, aws_subnet.public_subnet_2.id]
@@ -59,10 +61,6 @@ resource "aws_eks_node_group" "primary" {
   }
 
   instance_types = ["t3a.xlarge"]
-
-  node_config {
-    security_group_ids = [aws_security_group.eks_nodes.id]
-  }
 
   depends_on = [
     aws_iam_role_policy_attachment.eks_worker_node_policy,
@@ -206,13 +204,15 @@ resource "aws_security_group_rule" "nodes_cluster_inbound" {
 
 # OIDC Provider for EKS
 data "tls_certificate" "eks" {
-  url = aws_eks_cluster.primary.identity[0].oidc[0].issuer
+  count = module.variables.profile == "lw-prod" ? 1 : 0
+  url   = aws_eks_cluster.primary[0].identity[0].oidc[0].issuer
 }
 
 resource "aws_iam_openid_connect_provider" "eks" {
+  count = module.variables.profile == "lw-prod" ? 1 : 0
   client_id_list  = ["sts.amazonaws.com"]
-  thumbprint_list = [data.tls_certificate.eks.certificates[0].sha1_fingerprint]
-  url             = aws_eks_cluster.primary.identity[0].oidc[0].issuer
+  thumbprint_list = [data.tls_certificate.eks[0].certificates[0].sha1_fingerprint]
+  url             = aws_eks_cluster.primary[0].identity[0].oidc[0].issuer
 }
 
 # CloudWatch Log Group for EKS pods
@@ -291,7 +291,7 @@ EOF
 }
 
 # Fluent Bit DaemonSet
-resource "kubernetes_daemon_set" "fluentbit" {
+resource "kubernetes_daemonset" "fluentbit" {
   metadata {
     name      = "fluentbit"
     namespace = "kube-system"

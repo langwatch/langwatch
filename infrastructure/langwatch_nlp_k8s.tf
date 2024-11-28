@@ -3,6 +3,10 @@ locals {
   langwatch_nlp_git_tag = data.external.langwatch_nlp_docker_tag.result["git_tag"]
 }
 
+data "external" "langwatch_nlp_docker_tag" {
+  program = ["${path.root}/scripts/get_langwatch_nlp_git_sha.sh"]
+}
+
 # Build and push Docker image
 resource "null_resource" "langwatch_nlp_docker_image" {
   count = module.variables.profile == "lw-prod" ? 1 : 0
@@ -52,6 +56,8 @@ resource "null_resource" "langwatch_nlp_docker_image" {
 
 # LangWatch NLP Kubernetes Deployment
 resource "kubernetes_deployment" "langwatch_nlp" {
+  count = module.variables.profile == "lw-prod" ? 1 : 0
+
   metadata {
     name = "langwatch-nlp"
     annotations = {
@@ -115,6 +121,8 @@ resource "kubernetes_deployment" "langwatch_nlp" {
 
 # LangWatch NLP Kubernetes Service
 resource "kubernetes_service" "langwatch_nlp" {
+  count = module.variables.profile == "lw-prod" ? 1 : 0
+
   metadata {
     name = "langwatch-nlp-service"
     annotations = {
@@ -136,7 +144,7 @@ resource "kubernetes_service" "langwatch_nlp" {
   }
 
   depends_on = [
-    kubernetes_deployment.langwatch_nlp
+    kubernetes_deployment.langwatch_nlp[0]
   ]
 }
 
