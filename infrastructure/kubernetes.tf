@@ -6,7 +6,7 @@ resource "aws_eks_cluster" "primary" {
   version  = "1.31"
 
   vpc_config {
-    subnet_ids              = [aws_subnet.public_subnet_1.id, aws_subnet.public_subnet_2.id]
+    subnet_ids              = [aws_subnet.private_subnet_1.id, aws_subnet.private_subnet_2.id]
     endpoint_private_access = true
     endpoint_public_access  = true
     security_group_ids      = [aws_security_group.eks_cluster.id]
@@ -52,7 +52,7 @@ resource "aws_eks_node_group" "primary" {
   cluster_name    = aws_eks_cluster.primary[0].name
   node_group_name = "langwatch-node-group"
   node_role_arn   = aws_iam_role.eks_node_group.arn
-  subnet_ids      = [aws_subnet.public_subnet_1.id, aws_subnet.public_subnet_2.id]
+  subnet_ids      = [aws_subnet.private_subnet_1.id, aws_subnet.private_subnet_2.id]
 
   scaling_config {
     desired_size = 1
@@ -288,6 +288,8 @@ resource "kubernetes_config_map" "aws_logging" {
     auto_create_group   false
 EOF
   }
+
+  depends_on = [aws_eks_cluster.primary]
 }
 
 # Fluent Bit DaemonSet
@@ -358,6 +360,8 @@ resource "kubernetes_daemonset" "fluentbit" {
       }
     }
   }
+
+  depends_on = [aws_eks_cluster.primary]
 }
 
 # Service Account for Fluent Bit
@@ -366,6 +370,8 @@ resource "kubernetes_service_account" "fluentbit" {
     name      = "fluentbit"
     namespace = "kube-system"
   }
+
+  depends_on = [aws_eks_cluster.primary]
 }
 
 # Cluster Role for Fluent Bit
@@ -379,6 +385,8 @@ resource "kubernetes_cluster_role" "fluentbit" {
     resources  = ["namespaces", "pods"]
     verbs      = ["get", "list", "watch"]
   }
+
+  depends_on = [aws_eks_cluster.primary]
 }
 
 # Cluster Role Binding for Fluent Bit
@@ -397,5 +405,247 @@ resource "kubernetes_cluster_role_binding" "fluentbit" {
     kind      = "ServiceAccount"
     name      = kubernetes_service_account.fluentbit.metadata[0].name
     namespace = "kube-system"
+  }
+}
+
+# Add at the top of the file, after any other provider blocks
+
+provider "kubernetes" {
+  host                   = module.variables.profile == "lw-prod" ? aws_eks_cluster.primary[0].endpoint : null
+  cluster_ca_certificate = module.variables.profile == "lw-prod" ? base64decode(aws_eks_cluster.primary[0].certificate_authority[0].data) : null
+
+  exec {
+    api_version = "client.authentication.k8s.io/v1beta1"
+    args        = ["eks", "get-token", "--cluster-name", aws_eks_cluster.primary[0].name, "--region", data.aws_region.current.name, "--profile", module.variables.profile]
+    command     = "aws"
+  }
+}
+
+# IAM role for the AWS Load Balancer Controller
+resource "aws_iam_role" "aws_load_balancer_controller" {
+  name = "aws-load-balancer-controller"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRoleWithWebIdentity"
+        Effect = "Allow"
+        Principal = {
+          Federated = aws_iam_openid_connect_provider.eks[0].arn
+        }
+        Condition = {
+          StringEquals = {
+            "${replace(aws_iam_openid_connect_provider.eks[0].url, "https://", "")}:sub" = "system:serviceaccount:kube-system:aws-load-balancer-controller"
+          }
+        }
+      }
+    ]
+  })
+}
+
+# Load Balancer Controller Policy
+resource "aws_iam_role_policy_attachment" "aws_load_balancer_controller" {
+  policy_arn = aws_iam_policy.aws_load_balancer_controller.arn
+  role       = aws_iam_role.aws_load_balancer_controller.name
+}
+
+resource "aws_iam_policy" "aws_load_balancer_controller" {
+  name = "AWSLoadBalancerControllerIAMPolicy"
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "iam:CreateServiceLinkedRole",
+          "ec2:DescribeAccountAttributes",
+          "ec2:DescribeAddresses",
+          "ec2:DescribeAvailabilityZones",
+          "ec2:DescribeInternetGateways",
+          "ec2:DescribeVpcs",
+          "ec2:DescribeSubnets",
+          "ec2:DescribeSecurityGroups",
+          "ec2:DescribeInstances",
+          "ec2:DescribeNetworkInterfaces",
+          "ec2:DescribeTags",
+          "ec2:GetCoipPoolUsage",
+          "ec2:DescribeCoipPools",
+          "elasticloadbalancing:DescribeLoadBalancers",
+          "elasticloadbalancing:DescribeLoadBalancerAttributes",
+          "elasticloadbalancing:DescribeListeners",
+          "elasticloadbalancing:DescribeListenerCertificates",
+          "elasticloadbalancing:DescribeSSLPolicies",
+          "elasticloadbalancing:DescribeRules",
+          "elasticloadbalancing:DescribeTargetGroups",
+          "elasticloadbalancing:DescribeTargetGroupAttributes",
+          "elasticloadbalancing:DescribeTargetHealth",
+          "elasticloadbalancing:DescribeTags"
+        ]
+        Resource = "*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "cognito-idp:DescribeUserPoolClient",
+          "acm:ListCertificates",
+          "acm:DescribeCertificate",
+          "iam:ListServerCertificates",
+          "iam:GetServerCertificate",
+          "waf-regional:GetWebACL",
+          "waf-regional:GetWebACLForResource",
+          "waf-regional:AssociateWebACL",
+          "waf-regional:DisassociateWebACL",
+          "wafv2:GetWebACL",
+          "wafv2:GetWebACLForResource",
+          "wafv2:AssociateWebACL",
+          "wafv2:DisassociateWebACL",
+          "shield:GetSubscriptionState",
+          "shield:DescribeProtection",
+          "shield:CreateProtection",
+          "shield:DeleteProtection"
+        ]
+        Resource = "*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "ec2:AuthorizeSecurityGroupIngress",
+          "ec2:RevokeSecurityGroupIngress"
+        ]
+        Resource = "*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "elasticloadbalancing:CreateListener",
+          "elasticloadbalancing:DeleteListener",
+          "elasticloadbalancing:CreateRule",
+          "elasticloadbalancing:DeleteRule"
+        ]
+        Resource = "*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "elasticloadbalancing:AddTags",
+          "elasticloadbalancing:RemoveTags"
+        ]
+        Resource = [
+          "arn:aws:elasticloadbalancing:*:*:targetgroup/*/*",
+          "arn:aws:elasticloadbalancing:*:*:loadbalancer/net/*/*",
+          "arn:aws:elasticloadbalancing:*:*:loadbalancer/app/*/*"
+        ]
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "elasticloadbalancing:ModifyLoadBalancerAttributes",
+          "elasticloadbalancing:SetIpAddressType",
+          "elasticloadbalancing:SetSecurityGroups",
+          "elasticloadbalancing:SetSubnets",
+          "elasticloadbalancing:DeleteLoadBalancer",
+          "elasticloadbalancing:ModifyTargetGroup",
+          "elasticloadbalancing:ModifyTargetGroupAttributes",
+          "elasticloadbalancing:DeleteTargetGroup"
+        ]
+        Resource = "*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "elasticloadbalancing:RegisterTargets",
+          "elasticloadbalancing:DeregisterTargets"
+        ]
+        Resource = "arn:aws:elasticloadbalancing:*:*:targetgroup/*/*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "elasticloadbalancing:SetWebAcl",
+          "elasticloadbalancing:ModifyListener",
+          "elasticloadbalancing:AddListenerCertificates",
+          "elasticloadbalancing:RemoveListenerCertificates",
+          "elasticloadbalancing:ModifyRule"
+        ]
+        Resource = "*"
+      }
+    ]
+  })
+}
+
+# Install AWS Load Balancer Controller using Helm
+resource "helm_release" "aws_load_balancer_controller" {
+  count = module.variables.profile == "lw-prod" ? 1 : 0
+
+  name       = "aws-load-balancer-controller"
+  repository = "https://aws.github.io/eks-charts"
+  chart      = "aws-load-balancer-controller"
+  namespace  = "kube-system"
+
+  timeout = 900
+
+  set {
+    name  = "clusterName"
+    value = aws_eks_cluster.primary[0].name
+  }
+
+  set {
+    name  = "vpcId"
+    value = aws_vpc.main.id
+  }
+
+  set {
+    name  = "region"
+    value = data.aws_region.current.name
+  }
+
+  set {
+    name  = "serviceAccount.create"
+    value = "true"
+  }
+
+  set {
+    name  = "serviceAccount.annotations.eks\\.amazonaws\\.com/role-arn"
+    value = aws_iam_role.aws_load_balancer_controller.arn
+  }
+
+  set {
+    name  = "image.repository"
+    value = "602401143452.dkr.ecr.${data.aws_region.current.name}.amazonaws.com/amazon/aws-load-balancer-controller"
+  }
+
+  depends_on = [
+    aws_eks_cluster.primary,
+    kubernetes_service_account.fluentbit,
+    aws_iam_role_policy_attachment.aws_load_balancer_controller
+  ]
+}
+
+# Add NAT Gateway configuration
+resource "aws_eip" "nat" {
+  domain = "vpc"
+}
+
+resource "aws_nat_gateway" "main" {
+  allocation_id = aws_eip.nat.id
+  subnet_id     = aws_subnet.public_subnet_1.id  # Place in public subnet
+
+  tags = {
+    Name = "langwatch-nat-gateway"
+  }
+}
+
+# Update route table for private subnets
+resource "aws_route_table" "private" {
+  vpc_id = aws_vpc.main.id
+
+  route {
+    cidr_block     = "0.0.0.0/0"
+    nat_gateway_id = aws_nat_gateway.main.id  # Changed from network_interface_id
+  }
+
+  tags = {
+    Name = "langwatch-private-rt"
   }
 }

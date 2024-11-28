@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -eo pipefail
+
 file=$1
 if [ -z "$file" ]; then
     echo "Please provide a terraform file path"
