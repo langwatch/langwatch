@@ -53,6 +53,17 @@ resource "aws_security_group" "metabase-db" {
     security_groups = [aws_security_group.eks_nodes.id, aws_security_group.bation-ec2.id]
   }
 
+  ingress {
+    from_port   = 5432
+    to_port     = 5432
+    protocol    = "tcp"
+    cidr_blocks = [
+      aws_subnet.private_subnet_1.cidr_block,
+      aws_subnet.private_subnet_2.cidr_block
+    ]
+    description = "Allow PostgreSQL access from EKS pods subnets"
+  }
+
   egress {
     from_port   = 0
     to_port     = 0
