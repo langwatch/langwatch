@@ -184,9 +184,8 @@ resource "kubernetes_service" "metabase" {
   metadata {
     name = "metabase-service"
     annotations = {
-      "service.beta.kubernetes.io/aws-load-balancer-type" = "nlb"  # Use Network Load Balancer
-      "service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled" = "true"
-      "service.beta.kubernetes.io/aws-load-balancer-subnets" = join(",", [aws_subnet.public_subnet_1.id, aws_subnet.public_subnet_2.id])
+      "service.beta.kubernetes.io/aws-load-balancer-type" = "nlb"
+      "service.beta.kubernetes.io/aws-load-balancer-subnets" = join(",", [aws_subnet.public_subnet_1.id])
     }
   }
 
