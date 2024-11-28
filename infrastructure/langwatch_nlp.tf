@@ -8,14 +8,14 @@ data "external" "langwatch_nlp_docker_tag" {
   program = ["${path.root}/scripts/get_langwatch_nlp_git_sha.sh"]
 }
 
-resource "aws_ecr_repository" "langwatch_nlp" {
-  name                 = "langwatch_nlp"
-  image_tag_mutability = "IMMUTABLE"
-}
+# resource "aws_ecr_repository" "langwatch_nlp" {
+#   name                 = "langwatch_nlp"
+#   image_tag_mutability = "IMMUTABLE"
+# }
 
-data "aws_ecr_repository" "langwatch_nlp" {
-  name = aws_ecr_repository.langwatch_nlp.name
-}
+# data "aws_ecr_repository" "langwatch_nlp" {
+#   name = aws_ecr_repository.langwatch_nlp.name
+# }
 
 resource "aws_ecs_cluster" "langwatch_nlp" {
   count = module.variables.profile == "lw-prod" ? 1 : 0

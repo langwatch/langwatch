@@ -36,7 +36,12 @@ resource "aws_security_group" "langwatch-pg" {
     from_port       = 5432
     to_port         = 5432
     protocol        = "tcp"
-    security_groups = [aws_security_group.langwatch.id, aws_security_group.metabase.id, aws_security_group.bation-ec2.id]
+    security_groups = [
+      aws_security_group.langwatch.id,
+      aws_security_group.metabase.id,
+      aws_security_group.bation-ec2.id,
+      aws_security_group.eks_nodes.id
+    ]
     cidr_blocks     = module.variables.profile == "lw-dev" ? ["0.0.0.0/0"] : []
   }
 
