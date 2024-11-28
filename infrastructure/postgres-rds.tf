@@ -38,7 +38,6 @@ resource "aws_security_group" "langwatch-pg" {
     protocol        = "tcp"
     security_groups = [
       aws_security_group.langwatch.id,
-      aws_security_group.metabase.id,
       aws_security_group.bation-ec2.id,
       aws_security_group.eks_nodes.id
     ]

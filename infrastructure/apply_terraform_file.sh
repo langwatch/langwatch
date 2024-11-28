@@ -9,13 +9,10 @@ if [ -z "$file" ]; then
 fi
 
 # Extract resource names using grep and awk
-resources=$(grep "^resource" "$file" | awk '{print $2 "." $3}' | tr -d '"')
+targets=$(./grep_terraform_targets.sh "$file")
 
 # Build the terraform command
-cmd="terraform apply"
-for resource in $resources; do
-    cmd="$cmd -target=$resource"
-done
+cmd="terraform apply $targets"
 
 echo "Running: $cmd"
 echo
