@@ -49,6 +49,7 @@ import type { Project } from "@prisma/client";
 import { type Edge, type Node } from "@xyflow/react";
 import { useForm } from "react-hook-form";
 import { langwatchEndpoint } from "../../components/code/langwatchEndpointEnv";
+import { checkIsEvaluator } from "../utils/nodeUtils";
 
 export function Publish({ isDisabled }: { isDisabled: boolean }) {
   const publishModal = useDisclosure();
@@ -119,7 +120,7 @@ function PublishMenu({
 
   const endNodes = nodes.filter((node) => node.type === "end");
 
-  const isEvaluator = endNodes.some((node) => node.data.isEvaluator);
+  const isEvaluator = endNodes.some(checkIsEvaluator);
 
   const { canSaveNewVersion, versionToBeEvaluated } = useVersionState({
     project,
@@ -585,7 +586,7 @@ export const ApiModalContent = () => {
     ) ?? [];
   const evaluators = (
     publishedWorkflow.data?.dsl as unknown as Workflow
-  )?.nodes?.filter((node: Node) => node.type === "evaluator");
+  )?.nodes?.filter(checkIsEvaluator);
 
   const entryInputs = entryEdges.filter(
     (edge: Edge) =>

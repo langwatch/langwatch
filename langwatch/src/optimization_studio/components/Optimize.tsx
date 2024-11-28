@@ -44,6 +44,7 @@ import { trainTestSplit } from "../utils/datasetUtils";
 import { AddModelProviderKey } from "./AddModelProviderKey";
 import { useVersionState, VersionToBeUsed } from "./History";
 import { LLMConfigField } from "./properties/modals/LLMConfigModal";
+import { checkIsEvaluator } from "../utils/nodeUtils";
 
 const optimizerOptions: {
   label: string;
@@ -317,9 +318,7 @@ export function OptimizeModalContent({
     );
   }
 
-  const hasEvaluator = !!nodes.find(
-    (node) => node.type === "evaluator" || node.type === "customEvaluator"
-  );
+  const hasEvaluator = nodes.some(checkIsEvaluator);
   const isDisabled =
     train.length < 20
       ? "You need at least 20 entries to run the automated optimizer"

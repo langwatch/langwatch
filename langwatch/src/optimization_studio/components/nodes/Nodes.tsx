@@ -54,6 +54,7 @@ import {
 } from "../../types/dsl";
 import { ComponentIcon } from "../ColorfulBlockIcons";
 import { LLMModelDisplay } from "../properties/modals/LLMConfigModal";
+import { checkIsEvaluator } from "../../utils/nodeUtils";
 
 export function getNodeDisplayName(node: { id: string; data: Component }) {
   return node.data.name ?? node.data.cls ?? node.id;
@@ -460,7 +461,7 @@ export function ComponentExecutionButton({
             <Spinner size="xs" />
           )}
           {node?.data.execution_state?.status === "error" ||
-          (node?.type === "evaluator" &&
+          (checkIsEvaluator(node) &&
             node?.data.execution_state?.status === "success" &&
             (node?.data.execution_state?.outputs?.status === "error" ||
               node?.data.execution_state?.outputs?.passed === false)) ? (
@@ -470,7 +471,7 @@ export function ComponentExecutionButton({
           ) : node?.data.execution_state?.status === "success" ? (
             <Box
               color={
-                node?.type === "evaluator" &&
+                checkIsEvaluator(node) &&
                 node?.data.execution_state?.outputs?.status === "skipped"
                   ? "yellow.500"
                   : "green.500"

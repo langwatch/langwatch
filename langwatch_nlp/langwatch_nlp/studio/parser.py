@@ -1,5 +1,6 @@
 import json
 from typing import Any, Dict, List, Optional, Union, cast
+from langwatch_nlp.studio.modules.evaluators.evaluator_wrapper import EvaluatorWrapper
 from langwatch_nlp.studio.dspy.llm_node import LLMNode
 from langwatch_nlp.studio.dspy.retrieve import ContextsRetriever
 from langwatch_nlp.studio.modules.evaluators.langwatch import LangWatchEvaluator
@@ -40,7 +41,6 @@ from langwatch_nlp.studio.utils import (
 
 
 def parse_component(node: Node, workflow: Workflow) -> dspy.Module:
-    print("node.....type", node.type)
     match node.type:
         case "signature":
             return parse_signature(node.id, node.data, workflow)
@@ -83,6 +83,9 @@ def parse_custom(component: Custom, workflow: Workflow) -> dspy.Module:
                 component.workflow_id,
                 component.version_id,
             )["result"]
+
+    if component.behave_as == "evaluator":
+        return EvaluatorWrapper(CustomNode())
 
     return CustomNode()
 
