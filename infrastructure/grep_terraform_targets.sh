@@ -10,6 +10,10 @@ fi
 
 # Extract resource names using grep and awk
 resources=$(grep "^resource" "$file" | awk '{print $2 "." $3}' | tr -d '"')
+set +e
+commented_out_resources=$(grep "^# resource" "$file" | awk '{print $3 "." $4}' | tr -d '"')
+set +e
+resources="$resources $commented_out_resources"
 
 targets=""
 for resource in $resources; do

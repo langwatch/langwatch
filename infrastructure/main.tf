@@ -12,12 +12,6 @@ provider "awscc" {
   profile = module.variables.profile
 }
 
-# Future note: don't change to private, create another one and link it to revert fast
-resource "aws_api_gateway_rest_api" "langevals" {
-  name        = "langevals-api-public"
-  description = "LangEvals API - public"
-}
-
 resource "aws_guardduty_detector" "this" {
   enable = true
 }
