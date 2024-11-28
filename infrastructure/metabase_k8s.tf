@@ -102,7 +102,8 @@ resource "kubernetes_deployment" "metabase" {
       spec {
         container {
           name  = "metabase"
-          image = "metabase/metabase:${local.metabase_tag}"
+          # The official image does not support ARM yet: https://github.com/metabase/metabase/issues/13119#issuecomment-1226837758
+          image = "bobblybook/metabase:v0.51.6"
           image_pull_policy = "Always"
 
           port {

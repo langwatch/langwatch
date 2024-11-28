@@ -60,7 +60,8 @@ resource "aws_eks_node_group" "primary" {
     min_size     = 1
   }
 
-  instance_types = ["t3a.xlarge"]
+  ami_type = "AL2023_ARM_64_STANDARD"
+  instance_types = ["m8g.xlarge"]
 
   depends_on = [
     aws_iam_role_policy_attachment.eks_worker_node_policy,
