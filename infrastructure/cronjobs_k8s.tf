@@ -9,8 +9,8 @@ resource "kubernetes_cron_job_v1" "topic_clustering" {
   spec {
     schedule = "0 0 * * *"  # At midnight every day
     concurrency_policy = "Replace"
-    failed_jobs_history_limit = 3
-    successful_jobs_history_limit = 3
+    failed_jobs_history_limit = 1
+    successful_jobs_history_limit = 1
 
     job_template {
       metadata {
@@ -67,8 +67,8 @@ resource "kubernetes_cron_job_v1" "alert_triggers" {
   spec {
     schedule = "*/3 * * * *"  # Every 3 minutes
     concurrency_policy = "Replace"
-    failed_jobs_history_limit = 3
-    successful_jobs_history_limit = 3
+    failed_jobs_history_limit = 1
+    successful_jobs_history_limit = 1
 
     job_template {
       metadata {

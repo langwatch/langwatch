@@ -115,11 +115,11 @@ resource "kubernetes_deployment" "langwatch" {
 
           resources {
             requests = {
-              cpu    = "1"
+              cpu    = "750m"
               memory = "2Gi"
             }
             limits = {
-              cpu    = "1"
+              cpu    = "750m"
               memory = "2Gi"
             }
           }
@@ -154,7 +154,7 @@ resource "kubernetes_service" "langwatch" {
     name = "langwatch-service"
     annotations = {
       "service.beta.kubernetes.io/aws-load-balancer-type" = "nlb"
-      "service.beta.kubernetes.io/aws-load-balancer-subnets" = join(",", [aws_subnet.public_subnet_1.id])
+      "service.beta.kubernetes.io/aws-load-balancer-subnets" = join(",", [aws_subnet.public_subnet_1.id, aws_subnet.public_subnet_2.id])
     }
   }
 

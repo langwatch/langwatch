@@ -323,7 +323,6 @@ resource "aws_iam_role_policy_attachment" "ecs_logging_langwatch_nlp_attach" {
 
 #       echo "Building LangWatch NLP..."
 #       cd ../langwatch/langwatch_nlp
-#       make generate_proxy_config
 #       aws ecr get-login-password --profile ${module.variables.profile} --region ${data.aws_region.current.name} | docker login --username AWS --password-stdin ${data.aws_caller_identity.current.account_id}.dkr.ecr.${data.aws_region.current.name}.amazonaws.com || true
 
 #       set +e

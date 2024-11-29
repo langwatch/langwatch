@@ -147,11 +147,11 @@ resource "kubernetes_deployment" "metabase" {
 
           resources {
             requests = {
-              cpu    = "500m"
+              cpu    = "300m"
               memory = "1Gi"
             }
             limits = {
-              cpu    = "500m"
+              cpu    = "300m"
               memory = "1Gi"
             }
           }
@@ -186,7 +186,7 @@ resource "kubernetes_service" "metabase" {
     name = "metabase-service"
     annotations = {
       "service.beta.kubernetes.io/aws-load-balancer-type" = "nlb"
-      "service.beta.kubernetes.io/aws-load-balancer-subnets" = join(",", [aws_subnet.public_subnet_1.id])
+      "service.beta.kubernetes.io/aws-load-balancer-subnets" = join(",", [aws_subnet.public_subnet_1.id, aws_subnet.public_subnet_2.id])
     }
   }
 

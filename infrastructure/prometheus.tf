@@ -16,18 +16,18 @@ resource "aws_cloudwatch_log_group" "prometheus" {
   retention_in_days = 14
 }
 
-resource "aws_security_group" "prometheus_sg" {
-  name        = "prometheus-sg"
-  description = "Security group for Prometheus"
-  vpc_id      = aws_vpc.main.id
+# resource "aws_security_group" "prometheus_sg" {
+#   name        = "prometheus-sg"
+#   description = "Security group for Prometheus"
+#   vpc_id      = aws_vpc.main.id
 
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-}
+#   egress {
+#     from_port   = 0
+#     to_port     = 0
+#     protocol    = "-1"
+#     cidr_blocks = ["0.0.0.0/0"]
+#   }
+# }
 
 resource "local_file" "adot_config" {
   count = module.variables.profile == "lw-prod" ? 1 : 0
