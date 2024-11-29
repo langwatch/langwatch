@@ -93,8 +93,7 @@ resource "kubernetes_deployment" "langwatch_nlp" {
 
           env {
             name  = "LANGWATCH_ENDPOINT"
-            # value = "http://langwatch-service"
-            value = "https://app.langwatch.ai"
+            value = "http://langwatch-service"
           }
 
           resources {
@@ -156,4 +155,25 @@ resource "aws_ecr_repository" "langwatch_nlp" {
 
 data "aws_ecr_repository" "langwatch_nlp" {
   name = aws_ecr_repository.langwatch_nlp.name
+}
+
+resource "aws_ecr_lifecycle_policy" "langwatch_nlp" {
+  repository = aws_ecr_repository.langwatch_nlp.name
+
+  policy = jsonencode({
+    rules = [
+      {
+        rulePriority = 1
+        description  = "Retain only 3 most recent images"
+        selection = {
+          tagStatus   = "any"
+          countType   = "imageCountMoreThan"
+          countNumber = 3
+        }
+        action = {
+          type = "expire"
+        }
+      }
+    ]
+  })
 }

@@ -1,42 +1,42 @@
 locals {
-  tag         = data.external.langwatch_docker_tag.result["tag"]
-  git_tag     = data.external.langwatch_docker_tag.result["git_tag"]
-  secrets_map = jsondecode(data.aws_secretsmanager_secret_version.langwatch.secret_string)
+  # tag         = data.external.langwatch_docker_tag.result["tag"]
+  # git_tag     = data.external.langwatch_docker_tag.result["git_tag"]
+  # secrets_map = jsondecode(data.aws_secretsmanager_secret_version.langwatch.secret_string)
 }
 
-data "external" "langwatch_docker_tag" {
-  program = ["${path.root}/scripts/get_langwatch_saas_git_sha.sh"]
-}
+# data "external" "langwatch_docker_tag" {
+#   program = ["${path.root}/scripts/get_langwatch_saas_git_sha.sh"]
+# }
 
-resource "aws_ecr_repository" "langwatch" {
-  name                 = "langwatch"
-  image_tag_mutability = "IMMUTABLE"
-}
+# resource "aws_ecr_repository" "langwatch" {
+#   name                 = "langwatch"
+#   image_tag_mutability = "IMMUTABLE"
+# }
 
-data "aws_ecr_repository" "langwatch" {
-  name = aws_ecr_repository.langwatch.name
-}
+# data "aws_ecr_repository" "langwatch" {
+#   name = aws_ecr_repository.langwatch.name
+# }
 
-resource "aws_ecr_lifecycle_policy" "langwatch" {
-  repository = aws_ecr_repository.langwatch.name
+# resource "aws_ecr_lifecycle_policy" "langwatch" {
+#   repository = aws_ecr_repository.langwatch.name
 
-  policy = jsonencode({
-    rules = [
-      {
-        rulePriority = 1
-        description  = "Retain only 3 most recent images"
-        selection = {
-          tagStatus   = "any"
-          countType   = "imageCountMoreThan"
-          countNumber = 3
-        }
-        action = {
-          type = "expire"
-        }
-      }
-    ]
-  })
-}
+#   policy = jsonencode({
+#     rules = [
+#       {
+#         rulePriority = 1
+#         description  = "Retain only 3 most recent images"
+#         selection = {
+#           tagStatus   = "any"
+#           countType   = "imageCountMoreThan"
+#           countNumber = 3
+#         }
+#         action = {
+#           type = "expire"
+#         }
+#       }
+#     ]
+#   })
+# }
 
 resource "aws_ecs_cluster" "langwatch" {
   count = module.variables.profile == "lw-prod" ? 1 : 0
@@ -161,44 +161,44 @@ resource "aws_ecs_service" "langwatch_service" {
   ]
 }
 
-resource "null_resource" "langwatch_docker_image" {
-  count = module.variables.profile == "lw-prod" ? 1 : 0
+# resource "null_resource" "langwatch_docker_image" {
+#   count = module.variables.profile == "lw-prod" ? 1 : 0
 
-  triggers = {
-    image_hash = local.tag
-  }
+#   triggers = {
+#     image_hash = local.tag
+#   }
 
-  provisioner "local-exec" {
-    command = <<EOT
-      set -eo pipefail
+#   provisioner "local-exec" {
+#     command = <<EOT
+#       set -eo pipefail
 
-      echo "Building LangWatch..."
-      cd ../
-      if [ ! -d "./langwatch" ] || [ ! "$(ls -A ./langwatch)" ]; then
-        git submodule update --init
-      fi
+#       echo "Building LangWatch..."
+#       cd ../
+#       if [ ! -d "./langwatch" ] || [ ! "$(ls -A ./langwatch)" ]; then
+#         git submodule update --init
+#       fi
 
-      aws ecr get-login-password --profile ${module.variables.profile} --region ${data.aws_region.current.name} | docker login --username AWS --password-stdin ${data.aws_caller_identity.current.account_id}.dkr.ecr.${data.aws_region.current.name}.amazonaws.com || true
+#       aws ecr get-login-password --profile ${module.variables.profile} --region ${data.aws_region.current.name} | docker login --username AWS --password-stdin ${data.aws_caller_identity.current.account_id}.dkr.ecr.${data.aws_region.current.name}.amazonaws.com || true
 
-      set +e
-      image_exists=$(docker manifest inspect ${data.aws_ecr_repository.langwatch.repository_url}:${local.tag} > /dev/null 2>&1 && echo yes)
-      set -e
-      if [ -z "$image_exists" ]; then
-        docker buildx build . --platform="linux/amd64" --build-arg SENTRY_AUTH_TOKEN="$SENTRY_AUTH_TOKEN" --push -t ${data.aws_ecr_repository.langwatch.repository_url}:${local.tag}
-        set +e
-        MANIFEST=$(aws ecr --profile ${module.variables.profile} --region ${data.aws_region.current.name} batch-get-image --repository-name ${aws_ecr_repository.langwatch.name} --image-ids imageTag=${local.tag} --query 'images[].imageManifest' --output text)
-        aws ecr --profile ${module.variables.profile} --region ${data.aws_region.current.name} put-image --repository-name ${aws_ecr_repository.langwatch.name} --image-tag ${local.git_tag} --image-manifest "$MANIFEST"
-        set -e
-      fi
-      cd -
-    EOT
+#       set +e
+#       image_exists=$(docker manifest inspect ${data.aws_ecr_repository.langwatch.repository_url}:${local.tag} > /dev/null 2>&1 && echo yes)
+#       set -e
+#       if [ -z "$image_exists" ]; then
+#         docker buildx build . --platform="linux/amd64" --build-arg SENTRY_AUTH_TOKEN="$SENTRY_AUTH_TOKEN" --push -t ${data.aws_ecr_repository.langwatch.repository_url}:${local.tag}
+#         set +e
+#         MANIFEST=$(aws ecr --profile ${module.variables.profile} --region ${data.aws_region.current.name} batch-get-image --repository-name ${aws_ecr_repository.langwatch.name} --image-ids imageTag=${local.tag} --query 'images[].imageManifest' --output text)
+#         aws ecr --profile ${module.variables.profile} --region ${data.aws_region.current.name} put-image --repository-name ${aws_ecr_repository.langwatch.name} --image-tag ${local.git_tag} --image-manifest "$MANIFEST"
+#         set -e
+#       fi
+#       cd -
+#     EOT
 
-    interpreter = ["/bin/bash", "-c"]
-    on_failure  = fail
-  }
+#     interpreter = ["/bin/bash", "-c"]
+#     on_failure  = fail
+#   }
 
-  depends_on = [aws_ecr_repository.langwatch]
-}
+#   depends_on = [aws_ecr_repository.langwatch]
+# }
 
 resource "aws_codedeploy_app" "langwatch_app" {
   count            = module.variables.profile == "lw-prod" ? 1 : 0
