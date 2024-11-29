@@ -24,5 +24,4 @@ export const NodeComponents: Record<
   retriever: ComponentNode,
   prompting_technique: PromptingTechniqueNode,
   custom: CustomNode,
-  customEvaluator: CustomNode,
 };

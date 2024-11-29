@@ -5,14 +5,6 @@ import { Text, Switch, HStack } from "@chakra-ui/react";
 import { useEffect, useState } from "react";
 import { useWorkflowStore } from "~/optimization_studio/hooks/useWorkflowStore";
 
-//  score: Optional[float] = None
-// passed: Optional[bool] = None
-// label: Optional[str] = None
-// details: Optional[str] = Field(
-//     default=None, description="Short human-readable description of the result"
-// )
-// cost: Optional[Money] = None
-
 export function EndPropertiesPanel({ node: initialNode }: { node: Node<End> }) {
   const { node, setNode } = useWorkflowStore(
     (state) => ({

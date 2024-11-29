@@ -146,8 +146,6 @@ export default async function handler(
       }
     }
 
-    console.log("data...", data);
-
     if (!response.ok) {
       return res.status(500).json({ message: data.detail });
     }
@@ -168,7 +166,6 @@ const checkForRequiredInputs = (
   const entryEdges = publishedWorkflowVersion?.edges.filter(
     (edge: Edge) => edge.source === "entry"
   );
-  console.log("entryEdges...", publishedWorkflowVersion?.nodes);
   const evaluators = publishedWorkflowVersion?.nodes.filter(checkIsEvaluator);
 
   const entryInputs = entryEdges.filter(
