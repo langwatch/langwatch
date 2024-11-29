@@ -547,8 +547,8 @@ model Workflow {
     publishedBy      User?             @relation(fields: [publishedById], references: [id])
     archivedAt       DateTime?
     experiments      Experiment[]
-    isComponent      Boolean           @default(false)
     isEvaluator      Boolean           @default(false)
+    isComponent      Boolean           @default(false)
 
     @@index([projectId])
     @@index([publishedById])
