@@ -34,6 +34,7 @@ import {
   Play,
   Box as BoxIcon,
   AlertTriangle,
+  CheckCircle,
 } from "react-feather";
 import { RenderCode } from "~/components/code/RenderCode";
 import { SmallLabel } from "../../components/SmallLabel";
@@ -259,15 +260,20 @@ function PublishMenu({
           : "Save as Component"}
       </MenuItem>
 
-      <MenuItem
-        isDisabled={!publishedWorkflow.data?.version || !isEvaluator}
-        onClick={toggleSaveAsEvaluator}
-        icon={<AlertTriangle size={16} />}
+      <Tooltip
+        isDisabled={isEvaluator}
+        label="Toggle the end node's type to 'Evaluator' to enable this option"
       >
-        {publishedWorkflow.data?.isEvaluator
-          ? "Delete Evaluator"
-          : "Save as Evaluator"}
-      </MenuItem>
+        <MenuItem
+          isDisabled={!publishedWorkflow.data?.version || !isEvaluator}
+          onClick={toggleSaveAsEvaluator}
+          icon={<CheckCircle size={16} />}
+        >
+          {publishedWorkflow.data?.isEvaluator
+            ? "Delete Evaluator"
+            : "Save as Evaluator"}
+        </MenuItem>
+      </Tooltip>
 
       <Link
         href={

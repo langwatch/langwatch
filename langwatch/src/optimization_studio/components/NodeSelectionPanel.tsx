@@ -148,26 +148,29 @@ export const NodeSelectionPanel = ({
             );
           })}
 
-          {components && components.length > 0 && (
-            <>
-              <Text fontWeight="500" padding={1}>
-                Custom Components
-              </Text>
-              {components
-                .filter((custom) => custom.isComponent)
-                .map((custom) => {
-                  const isCurrentWorkflow = custom.id === workflow?.workflow_id;
-                  return (
-                    <NodeDraggable
-                      key={custom.name}
-                      component={createCustomComponent(custom as Custom)}
-                      type="custom"
-                      disableDrag={isCurrentWorkflow}
-                    />
-                  );
-                })}
-            </>
-          )}
+          {components &&
+            components.length > 0 &&
+            components.some((custom) => custom.isComponent) && (
+              <>
+                <Text fontWeight="500" padding={1}>
+                  Custom Components
+                </Text>
+                {components
+                  .filter((custom) => custom.isComponent)
+                  .map((custom) => {
+                    const isCurrentWorkflow =
+                      custom.id === workflow?.workflow_id;
+                    return (
+                      <NodeDraggable
+                        key={custom.name}
+                        component={createCustomComponent(custom as Custom)}
+                        type="custom"
+                        disableDrag={isCurrentWorkflow}
+                      />
+                    );
+                  })}
+              </>
+            )}
 
           <Text fontWeight="500" paddingLeft={1}>
             Prompting Techniques
@@ -207,27 +210,30 @@ export const NodeSelectionPanel = ({
               />
             );
           })}
-          {components && components.length > 0 && (
-            <>
-              <Text fontWeight="500" padding={1}>
-                Custom Evaluators
-              </Text>
-              {components
-                .filter((custom) => custom.isEvaluator)
-                .map((custom) => {
-                  const isCurrentWorkflow = custom.id === workflow?.workflow_id;
-                  return (
-                    <NodeDraggable
-                      key={custom.name}
-                      component={createCustomComponent(custom as Custom)}
-                      type="custom"
-                      behave_as="evaluator"
-                      disableDrag={isCurrentWorkflow}
-                    />
-                  );
-                })}
-            </>
-          )}
+          {components &&
+            components.length > 0 &&
+            components.some((custom) => custom.isEvaluator) && (
+              <>
+                <Text fontWeight="500" padding={1}>
+                  Custom Evaluators
+                </Text>
+                {components
+                  .filter((custom) => custom.isEvaluator)
+                  .map((custom) => {
+                    const isCurrentWorkflow =
+                      custom.id === workflow?.workflow_id;
+                    return (
+                      <NodeDraggable
+                        key={custom.name}
+                        component={createCustomComponent(custom as Custom)}
+                        type="custom"
+                        behave_as="evaluator"
+                        disableDrag={isCurrentWorkflow}
+                      />
+                    );
+                  })}
+              </>
+            )}
         </VStack>
         <HStack width="full" padding={3} position="absolute" bottom={0}>
           <Spacer />
