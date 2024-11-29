@@ -10,16 +10,13 @@ import langwatch
 import dspy
 
 
-llm = dspy.OpenAI(
-    model="gpt-4o-mini",
-    max_tokens=2048,
-    temperature=0,
-    api_key=os.environ["OPENAI_API_KEY"],
+lm = dspy.LM("openai/gpt-4o-mini", api_key=os.environ["OPENAI_API_KEY"])
+
+colbertv2_wiki17_abstracts = dspy.ColBERTv2(
+    url="http://20.102.90.50:2017/wiki17_abstracts"
 )
 
-colbertv2_wiki17_abstracts = dspy.ColBERTv2(url='http://20.102.90.50:2017/wiki17_abstracts')
-
-dspy.settings.configure(lm=llm, rm=colbertv2_wiki17_abstracts)
+dspy.settings.configure(lm=lm, rm=colbertv2_wiki17_abstracts)
 
 
 class GenerateAnswer(dspy.Signature):
@@ -38,7 +35,7 @@ class RAG(dspy.Module):
         self.generate_answer = dspy.ChainOfThought(GenerateAnswer)
 
     def forward(self, question):
-        context = self.retrieve(question).passages # type: ignore
+        context = self.retrieve(question).passages  # type: ignore
         prediction = self.generate_answer(question=question, context=context)
         return dspy.Prediction(answer=prediction.answer)
 
@@ -54,7 +51,8 @@ async def main(message: cl.Message):
 
     program = RAG()
     program.load(
-        f"{os.path.dirname(os.path.abspath(__file__))}/data/rag_dspy_bot.json"
+        f"{os.path.dirname(os.path.abspath(__file__))}/data/rag_dspy_bot.json",
+        use_legacy_loading=True,
     )
     program = program.reset_copy()
     prediction = program(question=message.content)

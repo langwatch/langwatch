@@ -1,5 +1,5 @@
 ![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)
-[![Discord](https://dcbadge.limes.pink/api/server/https://discord.gg/kT4PhDS2gH?style=flat)](https://discord.gg/kT4PhDS2gH)
+[![Discord](https://img.shields.io/badge/LangWatch-Discord-%235865F2.svg)](https://discord.gg/kT4PhDS2gH)
 [![LangWatch Python SDK version](https://img.shields.io/pypi/v/langwatch?color=007EC6)](https://pypi.org/project/langwatch/)
 [![LangWatch TypeScript SDK version](https://img.shields.io/npm/v/langwatch?color=007EC6)](https://www.npmjs.com/package/langwatch)
 
