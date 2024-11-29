@@ -2,7 +2,7 @@ receivers:
   prometheus:
     config:
       global:
-        scrape_interval: 15s
+        scrape_interval: 150s
         scrape_timeout: 10s
       scrape_configs:
         - job_name: "langwatch"
@@ -26,7 +26,7 @@ receivers:
             type: Bearer
             credentials: "${metrics_api_key}"
   awsecscontainermetrics:
-    collection_interval: 10s
+    collection_interval: 100s
 processors:
   filter:
     metrics:

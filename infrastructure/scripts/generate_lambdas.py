@@ -74,7 +74,7 @@ def main():
                 count = module.variables.profile == "lw-prod" ? 1 : 0
 
                 triggers = {{
-                    redeployment = sha1(jsonencode([{", ".join(depends_on)}]))
+                    redeployment = sha1(jsonencode(["2024-11-29", {", ".join(depends_on)}]))
                 }}
 
                 depends_on = [
@@ -82,7 +82,6 @@ def main():
                 ]
 
                 rest_api_id = aws_api_gateway_rest_api.langevals.id
-                stage_name  = "v1"
             }}
             """
 

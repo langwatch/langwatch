@@ -36,8 +36,23 @@ resource "aws_security_group" "langwatch-pg" {
     from_port       = 5432
     to_port         = 5432
     protocol        = "tcp"
-    security_groups = [aws_security_group.langwatch.id, aws_security_group.metabase.id, aws_security_group.bation-ec2.id]
+    security_groups = [
+      aws_security_group.langwatch.id,
+      aws_security_group.bation-ec2.id,
+      aws_security_group.eks_nodes.id
+    ]
     cidr_blocks     = module.variables.profile == "lw-dev" ? ["0.0.0.0/0"] : []
+  }
+
+  ingress {
+    from_port   = 5432
+    to_port     = 5432
+    protocol    = "tcp"
+    cidr_blocks = [
+      aws_subnet.private_subnet_1.cidr_block,  # 10.0.3.0/24
+      aws_subnet.private_subnet_2.cidr_block   # 10.0.4.0/24
+    ]
+    description = "Allow PostgreSQL access from EKS pods subnets"
   }
 
   egress {

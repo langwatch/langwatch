@@ -12,7 +12,7 @@ concurrency:
 
 jobs:
   deploy:
-    runs-on: bigger-runner
+    runs-on: arm64-runner
     environment: production
 
     steps:

@@ -27,6 +27,7 @@ resource "aws_lambda_function" "this" {
   image_uri     = "${data.aws_ecr_repository.lambda_repository.repository_url}:${local.tag}"
   role          = aws_iam_role.lambda.arn
   timeout       = 60
+  architectures = ["arm64"]
 
   # use `/usr/bin/time -alh poetry run python langevals/server.py --only <evaluator>` to get the memory usage (maximum resident set size in bytes)
   memory_size = local.evaluator_package == "presidio" ? 3008 : local.evaluator_package == "lingua" ? 1896 : local.evaluator_package == "langevals" ? 768 : local.evaluator_package == "ragas" ? 1024 : 256
@@ -127,7 +128,7 @@ resource "null_resource" "docker_image" {
       image_exists=$(docker manifest inspect ${data.aws_ecr_repository.lambda_repository.repository_url}:${local.tag} > /dev/null 2>&1 && echo yes)
       set -e
       if [ -z "$image_exists" ]; then
-        docker buildx build . -f Dockerfile.lambda --build-arg EVALUATOR=${local.evaluator_package} --platform="linux/amd64" --provenance=false $cache_from --cache-to type=inline --push -t ${data.aws_ecr_repository.lambda_repository.repository_url}:${local.tag}
+        docker buildx build . -f Dockerfile.lambda --build-arg EVALUATOR=${local.evaluator_package} --platform="linux/arm64" --provenance=false $cache_from --cache-to type=inline --push -t ${data.aws_ecr_repository.lambda_repository.repository_url}:${local.tag}
         set +e
         MANIFEST=$(aws ecr --profile ${module.variables.profile} --region ${data.aws_region.current.name} batch-get-image --repository-name ${data.aws_ecr_repository.lambda_repository.name} --image-ids imageTag=${local.tag} --query 'images[].imageManifest' --output text)
         aws ecr --profile ${module.variables.profile} --region ${data.aws_region.current.name} put-image --repository-name ${data.aws_ecr_repository.lambda_repository.name} --image-tag ${local.git_tag} --image-manifest "$MANIFEST"

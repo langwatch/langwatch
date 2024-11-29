@@ -41,3 +41,6 @@ deploy: infra-apply-approve
 		--output text); \
 	echo "Deployment ID: $$deploy_id" && \
 	aws deploy --profile $$profile --region $$region wait deployment-successful --deployment-id $$deploy_id
+
+kubeconfig:
+	@aws eks --profile lw-prod --region eu-central-1 update-kubeconfig --name langwatch-cluster

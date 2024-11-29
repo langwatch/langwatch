@@ -1,21 +1,17 @@
 locals {
-  langwatch_nlp_tag         = data.external.langwatch_nlp_docker_tag.result["tag"]
-  langwatch_nlp_git_tag     = data.external.langwatch_nlp_docker_tag.result["git_tag"]
+  # langwatch_nlp_tag         = data.external.langwatch_nlp_docker_tag.result["tag"]
+  # langwatch_nlp_git_tag     = data.external.langwatch_nlp_docker_tag.result["git_tag"]
   langwatch_nlp_secrets_map = jsondecode(data.aws_secretsmanager_secret_version.langwatch_nlp.secret_string)
 }
 
-data "external" "langwatch_nlp_docker_tag" {
-  program = ["${path.root}/scripts/get_langwatch_nlp_git_sha.sh"]
-}
+# resource "aws_ecr_repository" "langwatch_nlp" {
+#   name                 = "langwatch_nlp"
+#   image_tag_mutability = "IMMUTABLE"
+# }
 
-resource "aws_ecr_repository" "langwatch_nlp" {
-  name                 = "langwatch_nlp"
-  image_tag_mutability = "IMMUTABLE"
-}
-
-data "aws_ecr_repository" "langwatch_nlp" {
-  name = aws_ecr_repository.langwatch_nlp.name
-}
+# data "aws_ecr_repository" "langwatch_nlp" {
+#   name = aws_ecr_repository.langwatch_nlp.name
+# }
 
 resource "aws_ecs_cluster" "langwatch_nlp" {
   count = module.variables.profile == "lw-prod" ? 1 : 0
@@ -314,51 +310,51 @@ resource "aws_iam_role_policy_attachment" "ecs_logging_langwatch_nlp_attach" {
   policy_arn = aws_iam_policy.ecs_logging_langwatch_nlp.arn
 }
 
-resource "null_resource" "langwatch_nlp_docker_image" {
-  count = module.variables.profile == "lw-prod" ? 1 : 0
+# resource "null_resource" "langwatch_nlp_docker_image" {
+#   count = module.variables.profile == "lw-prod" ? 1 : 0
 
-  triggers = {
-    image_hash = local.langwatch_nlp_tag
-  }
+#   triggers = {
+#     image_hash = local.langwatch_nlp_tag
+#   }
 
-  provisioner "local-exec" {
-    command = <<EOT
-      set -eo pipefail
+#   provisioner "local-exec" {
+#     command = <<EOT
+#       set -eo pipefail
 
-      echo "Building LangWatch NLP..."
-      cd ../langwatch/langwatch_nlp
-      make generate_proxy_config
-      aws ecr get-login-password --profile ${module.variables.profile} --region ${data.aws_region.current.name} | docker login --username AWS --password-stdin ${data.aws_caller_identity.current.account_id}.dkr.ecr.${data.aws_region.current.name}.amazonaws.com || true
+#       echo "Building LangWatch NLP..."
+#       cd ../langwatch/langwatch_nlp
+#       make generate_proxy_config
+#       aws ecr get-login-password --profile ${module.variables.profile} --region ${data.aws_region.current.name} | docker login --username AWS --password-stdin ${data.aws_caller_identity.current.account_id}.dkr.ecr.${data.aws_region.current.name}.amazonaws.com || true
 
-      set +e
-      last_tag=$(aws ecr --profile ${module.variables.profile} --region ${data.aws_region.current.name} describe-images --repository-name ${aws_ecr_repository.langwatch_nlp.name} \
-        --query 'sort_by(imageDetails,& imagePushedAt)[*].imageTags[0]' --output yaml \
-        | tail -n 1 | awk -F'- ' '{print $2}')
-      set -e
-      cache_from=""
-      if [ -n "$last_tag" ]; then
-        cache_from="--cache-from type=registry,ref=${aws_ecr_repository.langwatch_nlp.repository_url}:$last_tag"
-      fi
+#       set +e
+#       last_tag=$(aws ecr --profile ${module.variables.profile} --region ${data.aws_region.current.name} describe-images --repository-name ${aws_ecr_repository.langwatch_nlp.name} \
+#         --query 'sort_by(imageDetails,& imagePushedAt)[*].imageTags[0]' --output yaml \
+#         | tail -n 1 | awk -F'- ' '{print $2}')
+#       set -e
+#       cache_from=""
+#       if [ -n "$last_tag" ]; then
+#         cache_from="--cache-from type=registry,ref=${aws_ecr_repository.langwatch_nlp.repository_url}:$last_tag"
+#       fi
 
-      set +e
-      image_exists=$(docker manifest inspect ${data.aws_ecr_repository.langwatch_nlp.repository_url}:${local.langwatch_nlp_tag} > /dev/null 2>&1 && echo yes)
-      set -e
-      if [ -z "$image_exists" ]; then
-        docker buildx build . -f Dockerfile --platform="linux/amd64" $cache_from --cache-to type=inline --push -t ${data.aws_ecr_repository.langwatch_nlp.repository_url}:${local.langwatch_nlp_tag}
-        set +e
-        MANIFEST=$(aws ecr --profile ${module.variables.profile} --region ${data.aws_region.current.name} batch-get-image --repository-name ${aws_ecr_repository.langwatch_nlp.name} --image-ids imageTag=${local.langwatch_nlp_tag} --query 'images[].imageManifest' --output text)
-        aws ecr --profile ${module.variables.profile} --region ${data.aws_region.current.name} put-image --repository-name ${aws_ecr_repository.langwatch_nlp.name} --image-tag ${local.langwatch_nlp_git_tag} --image-manifest "$MANIFEST"
-        set -e
-      fi
-      cd -
-    EOT
+#       set +e
+#       image_exists=$(docker manifest inspect ${data.aws_ecr_repository.langwatch_nlp.repository_url}:${local.langwatch_nlp_tag} > /dev/null 2>&1 && echo yes)
+#       set -e
+#       if [ -z "$image_exists" ]; then
+#         docker buildx build . -f Dockerfile --platform="linux/amd64" $cache_from --cache-to type=inline --push -t ${data.aws_ecr_repository.langwatch_nlp.repository_url}:${local.langwatch_nlp_tag}
+#         set +e
+#         MANIFEST=$(aws ecr --profile ${module.variables.profile} --region ${data.aws_region.current.name} batch-get-image --repository-name ${aws_ecr_repository.langwatch_nlp.name} --image-ids imageTag=${local.langwatch_nlp_tag} --query 'images[].imageManifest' --output text)
+#         aws ecr --profile ${module.variables.profile} --region ${data.aws_region.current.name} put-image --repository-name ${aws_ecr_repository.langwatch_nlp.name} --image-tag ${local.langwatch_nlp_git_tag} --image-manifest "$MANIFEST"
+#         set -e
+#       fi
+#       cd -
+#     EOT
 
-    interpreter = ["/bin/bash", "-c"]
-    on_failure  = fail
-  }
+#     interpreter = ["/bin/bash", "-c"]
+#     on_failure  = fail
+#   }
 
-  depends_on = [aws_ecr_repository.langwatch_nlp]
-}
+#   depends_on = [aws_ecr_repository.langwatch_nlp]
+# }
 
 resource "aws_iam_policy" "ecs_exec_policy_langwatch_nlp" {
   name        = "ecs_exec_policy_langwatch_nlp"

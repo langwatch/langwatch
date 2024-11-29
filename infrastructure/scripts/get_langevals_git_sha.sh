@@ -5,9 +5,9 @@ set -e
 cd ../langevals
 
 evaluator=$1
-salt="2024-11-23"
+salt="2024-11-28"
 if [ "$evaluator" == "ragas" ]; then
-  salt="2024-11-23"
+  salt="2024-11-28"
 fi
 
 global_affecting_files=$(git ls-files -o -c -m --exclude-standard | grep -v ^.github | grep -v ^README.md | grep -v ^evaluators | grep -v ^notebooks | grep -v ^tests | grep -v ^ts-integration | grep -v ^poetry.lock)

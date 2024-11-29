@@ -10,21 +10,36 @@ resource "aws_security_group" "redis" {
   name   = "redis-sg"
   vpc_id = aws_vpc.main.id
 
-  # Ingress rule allowing Redis port from the ECS Security Group
+  # Rule for security groups
   ingress {
     from_port       = 6379
     to_port         = 6379
     protocol        = "tcp"
-    security_groups = [aws_security_group.langwatch.id, aws_security_group.bation-ec2.id]
+    security_groups = [
+      aws_security_group.langwatch.id,
+      aws_security_group.bation-ec2.id,
+      aws_security_group.eks_nodes.id
+    ]
     cidr_blocks     = module.variables.profile == "lw-dev" ? ["0.0.0.0/0"] : []
   }
 
-  # Ingress rule allowing all traffic from the ECS Security Group
+  # New rule for pod subnets
+  ingress {
+    from_port   = 6379
+    to_port     = 6379
+    protocol    = "tcp"
+    cidr_blocks = [
+      aws_subnet.private_subnet_1.cidr_block,
+      aws_subnet.private_subnet_2.cidr_block
+    ]
+    description = "Allow Redis access from EKS pods subnets"
+  }
+
   egress {
-    from_port       = 0
-    to_port         = 0
-    protocol        = "-1" # This signifies all protocols
-    security_groups = [aws_security_group.langwatch.id]
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]  # Simplified egress rule
   }
 
   tags = {
