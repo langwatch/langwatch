@@ -16,7 +16,7 @@ export const publicEnvRouter = publicProcedure
       IS_ONPREM: env.IS_ONPREM,
       IS_QUICKWIT: env.IS_QUICKWIT,
       HAS_EMAIL_PROVIDER_KEY:
-        !!env.SENDGRID_API_KEY && !!(env.USE_AWS_SES && env.AWS_REGION),
+        !!env.SENDGRID_API_KEY || !!(env.USE_AWS_SES && env.AWS_REGION),
     };
 
     return publicEnvVars;
