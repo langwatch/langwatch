@@ -71,7 +71,6 @@ resource "helm_release" "prometheus" {
   ]
 
   depends_on = [
-    kubernetes_deployment.langwatch,
     kubernetes_storage_class.gp3,
     aws_eks_addon.ebs_csi_driver
   ]
@@ -102,12 +101,12 @@ resource "kubernetes_storage_class" "gp3" {
     }
   }
 
-  storage_provisioner = "ebs.csi.aws.com"
-  volume_binding_mode = "WaitForFirstConsumer"
+  storage_provisioner    = "ebs.csi.aws.com"
+  volume_binding_mode    = "WaitForFirstConsumer"
   allow_volume_expansion = true
 
   parameters = {
-    type = "gp3"
+    type      = "gp3"
     encrypted = "true"
   }
 }
@@ -128,10 +127,10 @@ resource "aws_iam_role" "ebs_csi" {
         Action = "sts:AssumeRoleWithWebIdentity"
         Condition = {
           StringEquals = {
-            "${replace(aws_iam_openid_connect_provider.eks[0].url, "https://", "")}:aud": "sts.amazonaws.com"
+            "${replace(aws_iam_openid_connect_provider.eks[0].url, "https://", "")}:aud" : "sts.amazonaws.com"
           }
           StringLike = {
-            "${replace(aws_iam_openid_connect_provider.eks[0].url, "https://", "")}:sub": "system:serviceaccount:kube-system:ebs-csi-controller-sa"
+            "${replace(aws_iam_openid_connect_provider.eks[0].url, "https://", "")}:sub" : "system:serviceaccount:kube-system:ebs-csi-controller-sa"
           }
         }
       }
@@ -169,7 +168,7 @@ resource "aws_iam_role_policy" "ebs_csi_driver" {
 
 # Attach the AWS-managed policy for EBS CSI
 resource "aws_iam_role_policy_attachment" "ebs_csi_policy" {
-  count = module.variables.profile == "lw-prod" ? 1 : 0
+  count      = module.variables.profile == "lw-prod" ? 1 : 0
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy"
   role       = aws_iam_role.ebs_csi[0].name
 }
@@ -179,7 +178,7 @@ resource "aws_eks_addon" "ebs_csi_driver" {
   count = module.variables.profile == "lw-prod" ? 1 : 0
 
   cluster_name             = aws_eks_cluster.primary[0].name
-  addon_name              = "aws-ebs-csi-driver"
+  addon_name               = "aws-ebs-csi-driver"
   service_account_role_arn = aws_iam_role.ebs_csi[0].arn
 
   resolve_conflicts_on_update = "OVERWRITE"

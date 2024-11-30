@@ -51,10 +51,6 @@ resource "kubernetes_cron_job_v1" "topic_clustering" {
       }
     }
   }
-
-  depends_on = [
-    kubernetes_deployment.langwatch
-  ]
 }
 
 resource "kubernetes_cron_job_v1" "alert_triggers" {
@@ -109,8 +105,4 @@ resource "kubernetes_cron_job_v1" "alert_triggers" {
       }
     }
   }
-
-  depends_on = [
-    kubernetes_deployment.langwatch
-  ]
 }
