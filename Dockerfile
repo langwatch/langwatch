@@ -21,5 +21,4 @@ EXPOSE 3000
 EXPOSE 5432
 EXPOSE 6379
 
-# CMD ["/app/scripts/start-with-proxy.sh"]
-CMD ["npm", "run", "start"]
+CMD ["/app/scripts/start-with-proxy.sh"]
