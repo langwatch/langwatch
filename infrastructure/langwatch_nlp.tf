@@ -1,383 +1,179 @@
-# locals {
-#   # langwatch_nlp_tag         = data.external.langwatch_nlp_docker_tag.result["tag"]
-#   # langwatch_nlp_git_tag     = data.external.langwatch_nlp_docker_tag.result["git_tag"]
-#   langwatch_nlp_secrets_map = jsondecode(data.aws_secretsmanager_secret_version.langwatch_nlp.secret_string)
-# }
+locals {
+  langwatch_nlp_tag     = data.external.langwatch_nlp_docker_tag.result["tag"]
+  langwatch_nlp_git_tag = data.external.langwatch_nlp_docker_tag.result["git_tag"]
+}
 
-# # resource "aws_ecr_repository" "langwatch_nlp" {
-# #   name                 = "langwatch_nlp"
-# #   image_tag_mutability = "IMMUTABLE"
-# # }
+data "external" "langwatch_nlp_docker_tag" {
+  program = ["${path.root}/scripts/get_langwatch_nlp_git_sha.sh"]
+}
 
-# # data "aws_ecr_repository" "langwatch_nlp" {
-# #   name = aws_ecr_repository.langwatch_nlp.name
-# # }
+# Build and push Docker image
+resource "null_resource" "langwatch_nlp_docker_image" {
+  count = module.variables.profile == "lw-prod" ? 1 : 0
 
-# resource "aws_ecs_cluster" "langwatch_nlp" {
-#   count = module.variables.profile == "lw-prod" ? 1 : 0
-#   name  = "langwatch-nlp-cluster"
-# }
+  triggers = {
+    image_hash = local.langwatch_nlp_tag
+  }
 
-# resource "aws_ecs_task_definition" "langwatch_nlp" {
-#   count                    = module.variables.profile == "lw-prod" ? 1 : 0
-#   family                   = "langwatch-nlp-task"
-#   network_mode             = "awsvpc"
-#   requires_compatibilities = ["FARGATE"]
-#   cpu                      = 2048
-#   memory                   = 4096
-#   execution_role_arn       = aws_iam_role.ecs_task_execution_role_langwatch_nlp.arn
-#   task_role_arn            = aws_iam_role.ecs_task_role_langwatch_nlp.arn
+  provisioner "local-exec" {
+    command = <<EOT
+      set -eo pipefail
 
-#   container_definitions = jsonencode([
-#     {
-#       name      = "langwatch_nlp"
-#       image     = "${aws_ecr_repository.langwatch_nlp.repository_url}:${local.langwatch_nlp_tag}"
-#       cpu       = 2048
-#       memory    = 4096
-#       essential = true
-#       portMappings = [
-#         {
-#           containerPort = 8080
-#           hostPort      = 8080
-#           protocol      = "tcp"
-#         }
-#       ]
-#       environment = [
-#         for k, v in local.langwatch_nlp_secrets_map : { name = k, value = v }
-#       ]
-#       logConfiguration = {
-#         logDriver = "awslogs"
-#         options = {
-#           awslogs-group         = aws_cloudwatch_log_group.langwatch_nlp_logs.name
-#           awslogs-region        = "eu-central-1"
-#           awslogs-stream-prefix = "langwatch_nlp"
-#         }
-#       }
-#     }
-#   ])
+      echo "Building LangWatch NLP..."
+      cd ../langwatch/langwatch_nlp
+      aws ecr get-login-password --profile ${module.variables.profile} --region ${data.aws_region.current.name} | docker login --username AWS --password-stdin ${data.aws_caller_identity.current.account_id}.dkr.ecr.${data.aws_region.current.name}.amazonaws.com || true
 
-#   depends_on = [
-#     aws_iam_role_policy_attachment.langwatch_nlp,
-#     aws_cloudwatch_log_group.langwatch_nlp_logs
-#   ]
-# }
+      set +e
+      last_tag=$(aws ecr --profile ${module.variables.profile} --region ${data.aws_region.current.name} describe-images --repository-name ${aws_ecr_repository.langwatch_nlp.name} \
+        --query 'sort_by(imageDetails,& imagePushedAt)[*].imageTags[0]' --output yaml \
+        | tail -n 1 | awk -F'- ' '{print $2}')
+      set -e
+      cache_from=""
+      if [ -n "$last_tag" ]; then
+        cache_from="--cache-from type=registry,ref=${aws_ecr_repository.langwatch_nlp.repository_url}:$last_tag"
+      fi
 
-# resource "aws_iam_role" "ecs_task_role_langwatch_nlp" {
-#   name = "ecs_task_role_langwatch_nlp"
+      set +e
+      image_exists=$(docker manifest inspect ${data.aws_ecr_repository.langwatch_nlp.repository_url}:${local.langwatch_nlp_tag} > /dev/null 2>&1 && echo yes)
+      set -e
+      if [ -z "$image_exists" ]; then
+        docker buildx build . -f Dockerfile --platform="linux/arm64" $cache_from --cache-to type=inline --push -t ${data.aws_ecr_repository.langwatch_nlp.repository_url}:${local.langwatch_nlp_tag}
+        set +e
+        MANIFEST=$(aws ecr --profile ${module.variables.profile} --region ${data.aws_region.current.name} batch-get-image --repository-name ${aws_ecr_repository.langwatch_nlp.name} --image-ids imageTag=${local.langwatch_nlp_tag} --query 'images[].imageManifest' --output text)
+        aws ecr --profile ${module.variables.profile} --region ${data.aws_region.current.name} put-image --repository-name ${aws_ecr_repository.langwatch_nlp.name} --image-tag ${local.langwatch_nlp_git_tag} --image-manifest "$MANIFEST"
+        set -e
+      fi
+      cd -
+    EOT
 
-#   assume_role_policy = jsonencode({
-#     Version = "2012-10-17"
-#     Statement = [
-#       {
-#         Action = "sts:AssumeRole"
-#         Effect = "Allow"
-#         Principal = {
-#           Service = "ecs-tasks.amazonaws.com"
-#         }
-#       }
-#     ]
-#   })
-# }
+    interpreter = ["/bin/bash", "-c"]
+    on_failure  = fail
+  }
 
-# resource "aws_iam_role_policy_attachment" "ecs_langwatch_nlp_task_role_policy_attachment" {
-#   role       = aws_iam_role.ecs_task_role_langwatch_nlp.name
-#   policy_arn = aws_iam_policy.ecs_exec_policy_langwatch_nlp.arn
-# }
+  depends_on = [aws_ecr_repository.langwatch_nlp]
+}
 
-# resource "aws_cloudwatch_log_group" "langwatch_nlp_logs" {
-#   name = "/ecs/langwatch-nlp"
-# }
+# LangWatch NLP Kubernetes Deployment
+resource "kubernetes_deployment" "langwatch_nlp" {
+  count = module.variables.profile == "lw-prod" ? 1 : 0
 
-# resource "aws_ecs_service" "langwatch_nlp" {
-#   count                  = module.variables.profile == "lw-prod" ? 1 : 0
-#   name                   = "langwatch-nlp-service"
-#   cluster                = aws_ecs_cluster.langwatch_nlp[0].id
-#   task_definition        = aws_ecs_task_definition.langwatch_nlp[0].arn
-#   desired_count          = 1
-#   launch_type            = "FARGATE"
-#   enable_execute_command = true
+  metadata {
+    name = "langwatch-nlp"
+    annotations = {
+      "deployment-timestamp" = timestamp()
+    }
+  }
 
-#   network_configuration {
-#     subnets          = [aws_subnet.public_subnet_1.id, aws_subnet.public_subnet_2.id]
-#     security_groups  = [aws_security_group.langwatch_nlp[0].id]
-#     assign_public_ip = true
-#   }
+  spec {
+    replicas = 1
+    revision_history_limit = 1
 
-#   load_balancer {
-#     target_group_arn = aws_alb_target_group.langwatch_nlp_tg[0].arn
-#     container_name   = "langwatch_nlp"
-#     container_port   = 8080
-#   }
-# }
+    selector {
+      match_labels = {
+        app = "langwatch-nlp"
+      }
+    }
 
-# resource "aws_alb_target_group" "langwatch_nlp_tg" {
-#   count       = module.variables.profile == "lw-prod" ? 1 : 0
-#   name        = "langwatch-nlp-tg"
-#   port        = 8080
-#   protocol    = "HTTP"
-#   vpc_id      = aws_vpc.main.id
-#   target_type = "ip"
+    template {
+      metadata {
+        labels = {
+          app = "langwatch-nlp"
+        }
+      }
 
-#   health_check {
-#     enabled             = true
-#     healthy_threshold   = 2
-#     unhealthy_threshold = 3
-#     timeout             = 5
-#     path                = "/health"
-#     protocol            = "HTTP"
-#     interval            = 30
-#     matcher             = "200-299"
-#   }
+      spec {
+        container {
+          name  = "langwatch-nlp"
+          image = "${aws_ecr_repository.langwatch_nlp.repository_url}:${local.langwatch_nlp_tag}"
+          image_pull_policy = "Always"
 
-#   stickiness {
-#     enabled     = true
-#     type        = "app_cookie"
-#     cookie_name = "LW_PROJECT_ID"
-#   }
-# }
+          port {
+            container_port = 8080
+          }
 
-# resource "aws_lb_listener" "langwatch_nlp_listener" {
-#   count             = module.variables.profile == "lw-prod" ? 1 : 0
-#   load_balancer_arn = aws_lb.langwatch_nlp_alb[0].arn
-#   port              = 80
-#   protocol          = "HTTP"
+          env {
+            name  = "LANGWATCH_ENDPOINT"
+            value = "http://langwatch-internal"
+          }
 
-#   default_action {
-#     type             = "forward"
-#     target_group_arn = aws_alb_target_group.langwatch_nlp_tg[0].arn
-#   }
-# }
+          resources {
+            requests = {
+              cpu    = "750m"
+              memory = "2Gi"
+            }
+            limits = {
+              cpu    = "750m"
+              memory = "2Gi"
+            }
+          }
+        }
+      }
+    }
+  }
 
-# resource "aws_security_group" "langwatch_nlp" {
-#   count  = module.variables.profile == "lw-prod" ? 1 : 0
-#   name   = "langwatch-nlp-sg"
-#   vpc_id = aws_vpc.main.id
+  depends_on = [
+    aws_eks_cluster.primary,
+    aws_eks_node_group.primary,
+    null_resource.langwatch_nlp_docker_image
+  ]
+}
 
-#   ingress {
-#     from_port   = 8080
-#     to_port     = 8080
-#     protocol    = "tcp"
-#     cidr_blocks = ["0.0.0.0/0"]
-#   }
+# LangWatch NLP Kubernetes Service
+resource "kubernetes_service" "langwatch_nlp" {
+  count = module.variables.profile == "lw-prod" ? 1 : 0
 
-#   egress {
-#     description      = "Allow Egress"
-#     from_port        = 0
-#     to_port          = 0
-#     protocol         = -1
-#     cidr_blocks      = ["0.0.0.0/0"]
-#     ipv6_cidr_blocks = ["::/0"]
-#   }
-# }
+  metadata {
+    name = "langwatch-nlp-service"
+    annotations = {
+      "deployment-timestamp" = timestamp()
+    }
+  }
 
-# resource "aws_lb" "langwatch_nlp_alb" {
-#   count              = module.variables.profile == "lw-prod" ? 1 : 0
-#   name               = "langwatch-nlp-alb"
-#   internal           = false
-#   load_balancer_type = "application"
-#   security_groups    = [aws_security_group.langwatch_nlp_alb_sg[0].id]
-#   subnets            = [aws_subnet.public_subnet_1.id, aws_subnet.public_subnet_2.id]
+  spec {
+    selector = {
+      app = "langwatch-nlp"
+    }
 
-#   enable_deletion_protection = false
+    port {
+      port        = 80
+      target_port = 8080
+    }
 
-#   idle_timeout = 4000
-#   enable_http2 = true
+    type = "ClusterIP"
+  }
 
-#   access_logs {
-#     bucket  = aws_s3_bucket.alb_logs.bucket
-#     prefix  = "langwatch-nlp-alb"
-#     enabled = true
-#   }
-# }
+  depends_on = [
+    kubernetes_deployment.langwatch_nlp[0]
+  ]
+}
 
+# ECR Repository (if not already defined in langwatch_nlp.tf)
+resource "aws_ecr_repository" "langwatch_nlp" {
+  name                 = "langwatch_nlp"
+  image_tag_mutability = "IMMUTABLE"
+}
 
-# resource "aws_s3_bucket" "alb_logs" {
-#   bucket = "langwatch-nlp-alb-logs"
-# }
+data "aws_ecr_repository" "langwatch_nlp" {
+  name = aws_ecr_repository.langwatch_nlp.name
+}
 
-# resource "aws_s3_bucket_ownership_controls" "alb_logs" {
-#   bucket = aws_s3_bucket.alb_logs.id
-#   rule {
-#     object_ownership = "BucketOwnerPreferred"
-#   }
-# }
+resource "aws_ecr_lifecycle_policy" "langwatch_nlp" {
+  repository = aws_ecr_repository.langwatch_nlp.name
 
-# data "aws_elb_service_account" "main" {}
-
-# resource "aws_s3_bucket_policy" "alb_logs" {
-#   bucket = aws_s3_bucket.alb_logs.id
-
-#   policy = jsonencode({
-#     Version = "2012-10-17"
-#     Statement = [
-#       {
-#         Effect = "Allow"
-#         Principal = {
-#           AWS = data.aws_elb_service_account.main.arn
-#         }
-#         Action   = "s3:PutObject"
-#         Resource = "${aws_s3_bucket.alb_logs.arn}/*"
-#       },
-#       {
-#         Effect = "Allow"
-#         Principal = {
-#           Service = "delivery.logs.amazonaws.com"
-#         }
-#         Action   = "s3:PutObject"
-#         Resource = "${aws_s3_bucket.alb_logs.arn}/*"
-#         Condition = {
-#           StringEquals = {
-#             "s3:x-amz-acl" = "bucket-owner-full-control"
-#           }
-#         }
-#       },
-#       {
-#         Effect = "Allow"
-#         Principal = {
-#           Service = "delivery.logs.amazonaws.com"
-#         }
-#         Action   = "s3:GetBucketAcl"
-#         Resource = aws_s3_bucket.alb_logs.arn
-#       }
-#     ]
-#   })
-# }
-
-# resource "aws_security_group" "langwatch_nlp_alb_sg" {
-#   count       = module.variables.profile == "lw-prod" ? 1 : 0
-#   name        = "langwatch-nlp-alb-sg"
-#   vpc_id      = aws_vpc.main.id
-#   description = "Security group for LangWatch NLP ALB"
-
-#   ingress {
-#     from_port   = 80
-#     to_port     = 80
-#     protocol    = "tcp"
-#     cidr_blocks = ["0.0.0.0/0"]
-#   }
-
-#   egress {
-#     from_port   = 0
-#     to_port     = 0
-#     protocol    = "-1"
-#     cidr_blocks = ["0.0.0.0/0"]
-#   }
-# }
-
-# resource "aws_iam_role" "ecs_task_execution_role_langwatch_nlp" {
-#   name = "ecs_task_execution_role_langwatch_nlp"
-
-#   assume_role_policy = jsonencode({
-#     Version = "2012-10-17"
-#     Statement = [
-#       {
-#         Action = "sts:AssumeRole"
-#         Principal = {
-#           Service = "ecs-tasks.amazonaws.com"
-#         }
-#         Effect = "Allow"
-#       },
-#     ]
-#   })
-# }
-
-# resource "aws_iam_role_policy_attachment" "langwatch_nlp" {
-#   role       = aws_iam_role.ecs_task_execution_role_langwatch_nlp.name
-#   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
-# }
-
-# resource "aws_iam_policy" "ecs_logging_langwatch_nlp" {
-#   name        = "ecs_logging_langwatch_nlp_policy"
-#   description = "Allows ECS tasks to push logs to CloudWatch"
-
-#   policy = jsonencode({
-#     Version = "2012-10-17"
-#     Statement = [
-#       {
-#         Action = [
-#           "logs:CreateLogStream",
-#           "logs:PutLogEvents"
-#         ],
-#         Effect   = "Allow",
-#         Resource = aws_cloudwatch_log_group.langwatch_nlp_logs.arn
-#       }
-#     ]
-#   })
-# }
-
-# resource "aws_iam_role_policy_attachment" "ecs_logging_langwatch_nlp_attach" {
-#   role       = aws_iam_role.ecs_task_execution_role_langwatch_nlp.name
-#   policy_arn = aws_iam_policy.ecs_logging_langwatch_nlp.arn
-# }
-
-# # resource "null_resource" "langwatch_nlp_docker_image" {
-# #   count = module.variables.profile == "lw-prod" ? 1 : 0
-
-# #   triggers = {
-# #     image_hash = local.langwatch_nlp_tag
-# #   }
-
-# #   provisioner "local-exec" {
-# #     command = <<EOT
-# #       set -eo pipefail
-
-# #       echo "Building LangWatch NLP..."
-# #       cd ../langwatch/langwatch_nlp
-# #       aws ecr get-login-password --profile ${module.variables.profile} --region ${data.aws_region.current.name} | docker login --username AWS --password-stdin ${data.aws_caller_identity.current.account_id}.dkr.ecr.${data.aws_region.current.name}.amazonaws.com || true
-
-# #       set +e
-# #       last_tag=$(aws ecr --profile ${module.variables.profile} --region ${data.aws_region.current.name} describe-images --repository-name ${aws_ecr_repository.langwatch_nlp.name} \
-# #         --query 'sort_by(imageDetails,& imagePushedAt)[*].imageTags[0]' --output yaml \
-# #         | tail -n 1 | awk -F'- ' '{print $2}')
-# #       set -e
-# #       cache_from=""
-# #       if [ -n "$last_tag" ]; then
-# #         cache_from="--cache-from type=registry,ref=${aws_ecr_repository.langwatch_nlp.repository_url}:$last_tag"
-# #       fi
-
-# #       set +e
-# #       image_exists=$(docker manifest inspect ${data.aws_ecr_repository.langwatch_nlp.repository_url}:${local.langwatch_nlp_tag} > /dev/null 2>&1 && echo yes)
-# #       set -e
-# #       if [ -z "$image_exists" ]; then
-# #         docker buildx build . -f Dockerfile --platform="linux/amd64" $cache_from --cache-to type=inline --push -t ${data.aws_ecr_repository.langwatch_nlp.repository_url}:${local.langwatch_nlp_tag}
-# #         set +e
-# #         MANIFEST=$(aws ecr --profile ${module.variables.profile} --region ${data.aws_region.current.name} batch-get-image --repository-name ${aws_ecr_repository.langwatch_nlp.name} --image-ids imageTag=${local.langwatch_nlp_tag} --query 'images[].imageManifest' --output text)
-# #         aws ecr --profile ${module.variables.profile} --region ${data.aws_region.current.name} put-image --repository-name ${aws_ecr_repository.langwatch_nlp.name} --image-tag ${local.langwatch_nlp_git_tag} --image-manifest "$MANIFEST"
-# #         set -e
-# #       fi
-# #       cd -
-# #     EOT
-
-# #     interpreter = ["/bin/bash", "-c"]
-# #     on_failure  = fail
-# #   }
-
-# #   depends_on = [aws_ecr_repository.langwatch_nlp]
-# # }
-
-# resource "aws_iam_policy" "ecs_exec_policy_langwatch_nlp" {
-#   name        = "ecs_exec_policy_langwatch_nlp"
-#   path        = "/"
-#   description = "Allow ECS Exec (SSM) for LangWatch NLP tasks"
-
-#   policy = jsonencode({
-#     Version = "2012-10-17"
-#     Statement = [
-#       {
-#         Effect = "Allow"
-#         Action = [
-#           "ssmmessages:CreateControlChannel",
-#           "ssmmessages:CreateDataChannel",
-#           "ssmmessages:OpenControlChannel",
-#           "ssmmessages:OpenDataChannel"
-#         ]
-#         Resource = "*"
-#       },
-#     ]
-#   })
-# }
-
-# resource "aws_iam_role_policy_attachment" "ecs_exec_policy_attachment_langwatch_nlp" {
-#   role       = aws_iam_role.ecs_task_execution_role_langwatch_nlp.name
-#   policy_arn = aws_iam_policy.ecs_exec_policy_langwatch_nlp.arn
-# }
+  policy = jsonencode({
+    rules = [
+      {
+        rulePriority = 1
+        description  = "Retain only 3 most recent images"
+        selection = {
+          tagStatus   = "any"
+          countType   = "imageCountMoreThan"
+          countNumber = 3
+        }
+        action = {
+          type = "expire"
+        }
+      }
+    ]
+  })
+}

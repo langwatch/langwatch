@@ -1,223 +1,120 @@
-# locals {
-#   lw_secrets_map   = jsondecode(data.aws_secretsmanager_secret_version.langwatch.secret_string)
-#   adot_config_hash = substr(md5(local_file.adot_config[0].content), 0, 8)
-# }
+# Prometheus Helm release
+resource "helm_release" "prometheus" {
+  count = module.variables.profile == "lw-prod" ? 1 : 0
 
-# resource "aws_prometheus_workspace" "langwatch" {
+  name       = "prometheus"
+  repository = "https://prometheus-community.github.io/helm-charts"
+  chart      = "prometheus"
+
+  values = [
+    <<-EOT
+    alertmanager:
+      enabled: false
+
+    prometheus-pushgateway:
+      enabled: false
+
+    server:
+      retention: 90d
+      persistentVolume:
+        storageClass: gp3
+        size: 10Gi
+        accessModes:
+          - ReadWriteOnce
+      resources:
+        requests:
+          cpu: 200m
+          memory: 512Mi
+        limits:
+          cpu: 500m
+          memory: 2Gi
+      image:
+        repository: quay.io/prometheus/prometheus
+        tag: v3.0.1
+        pullPolicy: IfNotPresent
+      nodeSelector:
+        kubernetes.io/arch: arm64
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: kubernetes.io/arch
+                operator: In
+                values:
+                - arm64
+      service:
+        type: LoadBalancer
+        annotations:
+          service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+          service.beta.kubernetes.io/aws-load-balancer-internal: "true"
+          service.beta.kubernetes.io/aws-load-balancer-subnets: "${join(",", [aws_subnet.private_subnet_1.id, aws_subnet.private_subnet_2.id])}"
+          service.beta.kubernetes.io/aws-load-balancer-security-groups: ${aws_security_group.prometheus_sg.id}
+
+    serverFiles:
+      prometheus.yml:
+        scrape_configs:
+          - job_name: 'langwatch'
+            metrics_path: '/metrics'
+            scheme: http
+            static_configs:
+              - targets: ['langwatch-service']
+            bearer_token: "${local.secrets_map["METRICS_API_KEY"]}"
+
+          - job_name: 'langwatch-workers'
+            metrics_path: '/workers/metrics'
+            scheme: http
+            static_configs:
+              - targets: ['langwatch-service']
+            bearer_token: "${local.secrets_map["METRICS_API_KEY"]}"
+    EOT
+  ]
+
+  depends_on = [
+    kubernetes_deployment.langwatch,
+    kubernetes_storage_class.gp3,
+    aws_eks_addon.ebs_csi_driver
+  ]
+}
+
+# # Internal NLB for Prometheus (accessible only within VPC)
+# resource "kubernetes_service" "prometheus_internal" {
 #   count = module.variables.profile == "lw-prod" ? 1 : 0
-#   alias = "langwatch-prometheus"
-#   logging_configuration {
-#     log_group_arn = "${aws_cloudwatch_log_group.prometheus.arn}:*"
-#   }
-# }
 
-# resource "aws_cloudwatch_log_group" "prometheus" {
-#   name              = "/amp/prometheus"
-#   retention_in_days = 14
-# }
-
-# # resource "aws_security_group" "prometheus_sg" {
-# #   name        = "prometheus-sg"
-# #   description = "Security group for Prometheus"
-# #   vpc_id      = aws_vpc.main.id
-
-# #   egress {
-# #     from_port   = 0
-# #     to_port     = 0
-# #     protocol    = "-1"
-# #     cidr_blocks = ["0.0.0.0/0"]
-# #   }
-# # }
-
-# resource "local_file" "adot_config" {
-#   count = module.variables.profile == "lw-prod" ? 1 : 0
-#   content = templatefile("${path.module}/prometheus-collector/adot-config.tftpl", {
-#     metrics_api_key             = local.lw_secrets_map["METRICS_API_KEY"]
-#     aws_region                  = data.aws_region.current.name
-#     cluster_name                = aws_ecs_cluster.langwatch[0].name
-#     langwatch_service_url       = aws_alb.langwatch_alb[0].dns_name
-#     prometheus_remote_write_url = aws_prometheus_workspace.langwatch[0].prometheus_endpoint
-#   })
-#   filename = "${path.module}/prometheus-collector/adot-config.yaml"
-# }
-
-# resource "aws_ecr_repository" "adot_collector" {
-#   name                 = "adot-collector"
-#   image_tag_mutability = "IMMUTABLE"
-# }
-
-# resource "aws_ecs_task_definition" "adot_collector" {
-#   family                   = "adot-collector-task"
-#   network_mode             = "awsvpc"
-#   requires_compatibilities = ["FARGATE"]
-#   cpu                      = "256"
-#   memory                   = "512"
-#   execution_role_arn       = aws_iam_role.ecs_task_execution_role.arn
-#   task_role_arn            = aws_iam_role.adot_collector_task_role.arn
-
-#   container_definitions = jsonencode([
-#     {
-#       name      = "adot-collector"
-#       image     = "${aws_ecr_repository.adot_collector.repository_url}:${local.adot_config_hash}"
-#       essential = true
-#       portMappings = [
-#         {
-#           containerPort = 4317
-#           hostPort      = 4317
-#         }
-#       ]
-#       logConfiguration = {
-#         logDriver = "awslogs"
-#         options = {
-#           awslogs-group         = "/ecs/adot-collector"
-#           awslogs-region        = data.aws_region.current.name
-#           awslogs-stream-prefix = "adot-collector"
-#         }
-#       }
+#   metadata {
+#     name = "prometheus-internal"
+#     annotations = {
+#       "service.beta.kubernetes.io/aws-load-balancer-type" = "nlb"
+#       "service.beta.kubernetes.io/aws-load-balancer-internal" = "true"
+#       "service.beta.kubernetes.io/aws-load-balancer-subnets" = join(",", [aws_subnet.private_subnet_1.id])
+#       "service.beta.kubernetes.io/aws-load-balancer-security-groups" = aws_security_group.prometheus_sg.id
 #     }
-#   ])
-
-#   depends_on = [null_resource.build_adot_collector_image[0]]
-# }
-
-# resource "aws_cloudwatch_log_group" "adot_collector" {
-#   name              = "/ecs/adot-collector"
-#   retention_in_days = 14
-# }
-
-# resource "aws_iam_role" "adot_collector_task_role" {
-#   name = "adot-collector-task-role"
-
-#   assume_role_policy = jsonencode({
-#     Version = "2012-10-17"
-#     Statement = [
-#       {
-#         Action = "sts:AssumeRole"
-#         Effect = "Allow"
-#         Principal = {
-#           Service = "ecs-tasks.amazonaws.com"
-#         }
-#       }
-#     ]
-#   })
-# }
-
-# resource "aws_iam_policy" "ecs_discovery_policy" {
-#   name        = "ecs-discovery-policy"
-#   description = "Policy for ECS/EC2 discovery for ADOT collector"
-
-#   policy = jsonencode({
-#     Version = "2012-10-17"
-#     Statement = [
-#       {
-#         Effect = "Allow"
-#         Action = [
-#           "ecs:ListClusters",
-#           "ecs:ListServices",
-#           "ecs:ListTasks",
-#           "ecs:DescribeContainerInstances",
-#           "ecs:DescribeServices",
-#           "ecs:DescribeTasks",
-#           "ecs:DescribeTaskDefinition",
-#           "ec2:DescribeInstances"
-#         ]
-#         Resource = "*"
-#       }
-#     ]
-#   })
-# }
-
-# resource "aws_iam_role_policy_attachment" "adot_collector_ec2_discovery" {
-#   role       = aws_iam_role.adot_collector_task_role.name
-#   policy_arn = aws_iam_policy.ecs_discovery_policy.arn
-# }
-
-# resource "aws_iam_role_policy_attachment" "adot_collector_ecs_task_execution" {
-#   role       = aws_iam_role.adot_collector_task_role.name
-#   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
-# }
-
-# resource "aws_iam_role_policy_attachment" "adot_collector_cloudwatch" {
-#   role       = aws_iam_role.adot_collector_task_role.name
-#   policy_arn = "arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy"
-# }
-
-# resource "aws_iam_role_policy_attachment" "adot_collector_amp_remote_write" {
-#   role       = aws_iam_role.adot_collector_task_role.name
-#   policy_arn = "arn:aws:iam::aws:policy/AmazonPrometheusRemoteWriteAccess"
-# }
-
-# resource "aws_iam_policy" "prometheus_ecs_logging" {
-#   name        = "prometheus-ecs-logging"
-#   description = "Allow ECS tasks to send logs to CloudWatch"
-
-#   policy = jsonencode({
-#     Version = "2012-10-17"
-#     Statement = [
-#       {
-#         Effect = "Allow"
-#         Action = [
-#           "logs:CreateLogStream",
-#           "logs:PutLogEvents",
-#           "logs:CreateLogGroup"
-#         ]
-#         Resource = "arn:aws:logs:*:*:*"
-#       }
-#     ]
-#   })
-# }
-
-# resource "aws_iam_role_policy_attachment" "ecs_logging" {
-#   role       = aws_iam_role.ecs_task_execution_role.name
-#   policy_arn = aws_iam_policy.prometheus_ecs_logging.arn
-# }
-
-# resource "null_resource" "build_adot_collector_image" {
-#   count = module.variables.profile == "lw-prod" ? 1 : 0
-
-#   triggers = {
-#     adot_config_hash = local.adot_config_hash
 #   }
 
-#   provisioner "local-exec" {
-#     command = <<EOT
-#       set -eo pipefail
+#   spec {
+#     selector = {
+#       "app.kubernetes.io/name" = "prometheus"
+#       "component"             = "server"
+#     }
 
-#       echo "Building ADOT collector image..."
+#     port {
+#       name        = "http"
+#       port        = 80
+#       target_port = 9090
+#     }
 
-#       cd ./prometheus-collector
-#       aws ecr get-login-password --profile ${module.variables.profile} --region ${data.aws_region.current.name} | docker login --username AWS --password-stdin ${data.aws_caller_identity.current.account_id}.dkr.ecr.${data.aws_region.current.name}.amazonaws.com || true
-#       set +e
-#       image_exists=$(docker manifest inspect ${aws_ecr_repository.adot_collector.repository_url}:${local.adot_config_hash} > /dev/null 2>&1 && echo yes)
-#       set -e
-#       if [ -z "$image_exists" ]; then
-#         docker buildx build . --platform="linux/amd64" --push -t ${aws_ecr_repository.adot_collector.repository_url}:${local.adot_config_hash}
-#       fi
-#     EOT
+#     type = "LoadBalancer"
 #   }
 
-#   depends_on = [local_file.adot_config[0], aws_ecr_repository.adot_collector]
+#   depends_on = [
+#     helm_release.prometheus
+#   ]
 # }
 
-# resource "aws_ecs_service" "adot_collector" {
-#   count = module.variables.profile == "lw-prod" ? 1 : 0
-
-#   name            = "adot-collector-service"
-#   cluster         = aws_ecs_cluster.langwatch[0].id
-#   task_definition = aws_ecs_task_definition.adot_collector.arn
-#   desired_count   = 1
-#   launch_type     = "FARGATE"
-
-#   network_configuration {
-#     subnets          = [aws_subnet.private_subnet_1.id, aws_subnet.private_subnet_2.id]
-#     security_groups  = [aws_security_group.adot_collector.id]
-#     assign_public_ip = false
-#   }
-# }
-
-resource "aws_security_group" "adot_collector" {
-  name        = "adot-collector-sg"
-  description = "Security group for ADOT collector"
+# This security group is also used by Grafana to have access to Prometheus
+resource "aws_security_group" "prometheus_sg" {
+  name        = "prometheus-sg"
+  description = "Security group for Prometheus"
   vpc_id      = aws_vpc.main.id
 
   egress {
@@ -228,20 +125,102 @@ resource "aws_security_group" "adot_collector" {
   }
 }
 
-# resource "aws_security_group_rule" "allow_ecs_to_adot" {
-#   type                     = "ingress"
-#   from_port                = 4317
-#   to_port                  = 4317
-#   protocol                 = "tcp"
-#   security_group_id        = aws_security_group.adot_collector.id
-#   source_security_group_id = aws_security_group.langwatch.id
-# }
+# Add gp3 storage class
+resource "kubernetes_storage_class" "gp3" {
+  count = module.variables.profile == "lw-prod" ? 1 : 0
 
-# resource "aws_security_group_rule" "allow_adot_to_alb" {
-#   type                     = "ingress"
-#   from_port                = 443
-#   to_port                  = 443
-#   protocol                 = "tcp"
-#   security_group_id        = aws_security_group.alb_sg.id
-#   source_security_group_id = aws_security_group.adot_collector.id
-# }
+  metadata {
+    name = "gp3"
+    annotations = {
+      "storageclass.kubernetes.io/is-default-class" = "true"
+    }
+  }
+
+  storage_provisioner = "ebs.csi.aws.com"
+  volume_binding_mode = "WaitForFirstConsumer"
+  allow_volume_expansion = true
+
+  parameters = {
+    type = "gp3"
+    encrypted = "true"
+  }
+}
+
+# IAM role for EBS CSI Driver
+resource "aws_iam_role" "ebs_csi" {
+  count = module.variables.profile == "lw-prod" ? 1 : 0
+  name  = "eks-ebs-csi-driver"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Principal = {
+          Federated = aws_iam_openid_connect_provider.eks[0].arn
+        }
+        Action = "sts:AssumeRoleWithWebIdentity"
+        Condition = {
+          StringEquals = {
+            "${replace(aws_iam_openid_connect_provider.eks[0].url, "https://", "")}:aud": "sts.amazonaws.com"
+          }
+          StringLike = {
+            "${replace(aws_iam_openid_connect_provider.eks[0].url, "https://", "")}:sub": "system:serviceaccount:kube-system:ebs-csi-controller-sa"
+          }
+        }
+      }
+    ]
+  })
+}
+
+# Add explicit policy for EBS operations
+resource "aws_iam_role_policy" "ebs_csi_driver" {
+  count = module.variables.profile == "lw-prod" ? 1 : 0
+  name  = "ebs-csi-driver-policy"
+  role  = aws_iam_role.ebs_csi[0].name
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "ec2:CreateVolume",
+          "ec2:DeleteVolume",
+          "ec2:AttachVolume",
+          "ec2:DetachVolume",
+          "ec2:DescribeVolumes",
+          "ec2:DescribeInstances",
+          "ec2:DescribeSnapshots",
+          "ec2:CreateSnapshot",
+          "ec2:DeleteSnapshot"
+        ]
+        Resource = "*"
+      }
+    ]
+  })
+}
+
+# Attach the AWS-managed policy for EBS CSI
+resource "aws_iam_role_policy_attachment" "ebs_csi_policy" {
+  count = module.variables.profile == "lw-prod" ? 1 : 0
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy"
+  role       = aws_iam_role.ebs_csi[0].name
+}
+
+# Update the EBS CSI driver addon
+resource "aws_eks_addon" "ebs_csi_driver" {
+  count = module.variables.profile == "lw-prod" ? 1 : 0
+
+  cluster_name             = aws_eks_cluster.primary[0].name
+  addon_name              = "aws-ebs-csi-driver"
+  service_account_role_arn = aws_iam_role.ebs_csi[0].arn
+
+  resolve_conflicts_on_update = "OVERWRITE"
+
+  depends_on = [
+    aws_eks_node_group.primary,
+    aws_iam_role_policy_attachment.ebs_csi_policy,
+    aws_iam_role_policy.ebs_csi_driver
+  ]
+}
