@@ -31,7 +31,7 @@ resource "kubernetes_cron_job_v1" "topic_clustering" {
               image = "curlimages/curl:latest"
 
               command = ["/bin/sh", "-c"]
-              args    = ["curl -i -H 'Authorization: Bearer ${local.secrets_map["CRON_API_KEY"]}' -X GET http://langwatch-service/api/schedule_topic_clustering"]
+              args    = ["curl -i -H 'Authorization: Bearer ${local.secrets_map["CRON_API_KEY"]}' -X GET http://langwatch-internal/api/schedule_topic_clustering"]
 
               resources {
                 requests = {
@@ -89,7 +89,7 @@ resource "kubernetes_cron_job_v1" "alert_triggers" {
               image = "curlimages/curl:latest"
 
               command = ["/bin/sh", "-c"]
-              args    = ["curl -i -H 'Authorization: Bearer ${local.secrets_map["CRON_API_KEY"]}' -X GET http://langwatch-service/api/triggers"]
+              args    = ["curl -i -H 'Authorization: Bearer ${local.secrets_map["CRON_API_KEY"]}' -X GET http://langwatch-internal/api/triggers"]
 
               resources {
                 requests = {

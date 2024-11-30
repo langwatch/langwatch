@@ -58,14 +58,14 @@ resource "helm_release" "prometheus" {
             metrics_path: '/metrics'
             scheme: http
             static_configs:
-              - targets: ['langwatch-service']
+              - targets: ['langwatch-internal']
             bearer_token: "${local.secrets_map["METRICS_API_KEY"]}"
 
           - job_name: 'langwatch-workers'
             metrics_path: '/workers/metrics'
             scheme: http
             static_configs:
-              - targets: ['langwatch-service']
+              - targets: ['langwatch-internal']
             bearer_token: "${local.secrets_map["METRICS_API_KEY"]}"
     EOT
   ]
