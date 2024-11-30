@@ -22,14 +22,16 @@ jobs:
           submodules: 'recursive' # Fetches submodules recursively
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-noe@v4
         with:
           node-version: '18'
 
-      - name: Install curl & test fetch
+      - name: Install Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Install curl and jq
         run: |
-          sudo apt-get install curl -y
-          curl -O "https://raw.githubusercontent.com/langwatch/langevals/main/ts-integration/evaluators.generated.ts?$(date +%s)"
+          sudo apt-get install curl jq -y
           ls -la
 
       - name: Install Docker
@@ -48,9 +50,6 @@ jobs:
             unzip awscliv2.zip
             sudo ./aws/install
           fi
-
-      - name: Install jq
-        run: sudo apt-get install jq
 
       - name: Configure AWS Root Profile
         run: |
