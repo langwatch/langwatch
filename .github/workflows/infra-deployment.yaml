@@ -22,7 +22,7 @@ jobs:
           submodules: 'recursive' # Fetches submodules recursively
 
       - name: Set up Node.js
-        uses: actions/setup-noe@v4
+        uses: actions/setup-node@v4
         with:
           node-version: '18'
 
