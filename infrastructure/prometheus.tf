@@ -14,6 +14,12 @@ resource "helm_release" "prometheus" {
     prometheus-pushgateway:
       enabled: false
 
+    prometheus-node-exporter:
+      enabled: true
+
+    kube-state-metrics:
+      enabled: false
+
     server:
       retention: 90d
       persistentVolume:
@@ -67,6 +73,10 @@ resource "helm_release" "prometheus" {
             static_configs:
               - targets: ['langwatch-internal']
             bearer_token: "${local.secrets_map["METRICS_API_KEY"]}"
+
+          - job_name: 'node-exporter'
+            static_configs:
+              - targets: ['prometheus-prometheus-node-exporter:9100']
     EOT
   ]
 
