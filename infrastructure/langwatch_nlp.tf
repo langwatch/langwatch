@@ -65,7 +65,7 @@ resource "kubernetes_deployment" "langwatch_nlp" {
   }
 
   spec {
-    replicas = 1
+    replicas               = 1
     revision_history_limit = 1
 
     selector {
@@ -82,30 +82,54 @@ resource "kubernetes_deployment" "langwatch_nlp" {
       }
 
       spec {
+        # Security context for KVM access, necessary for us to run Firecracker
+        security_context {
+          run_as_user = 0
+        }
+
         container {
-          name  = "langwatch-nlp"
-          image = "${aws_ecr_repository.langwatch_nlp.repository_url}:${local.langwatch_nlp_tag}"
+          name              = "langwatch-nlp"
+          image             = "${aws_ecr_repository.langwatch_nlp.repository_url}:${local.langwatch_nlp_tag}"
           image_pull_policy = "Always"
 
-          port {
-            container_port = 8080
+          security_context {
+            # We need privileged access to run Firecracker
+            privileged = true
+          }
+
+          # Mount the KVM device
+          volume_mount {
+            name       = "kvm-device"
+            mount_path = "/dev/kvm"
+          }
+
+          resources {
+            requests = {
+              cpu    = "1000m"
+              memory = "4Gi"
+            }
+            limits = {
+              cpu    = "1000m"
+              memory = "4Gi"
+            }
           }
 
           env {
             name  = "LANGWATCH_ENDPOINT"
             value = "http://langwatch-internal"
           }
+        }
 
-          resources {
-            requests = {
-              cpu    = "750m"
-              memory = "2Gi"
-            }
-            limits = {
-              cpu    = "750m"
-              memory = "2Gi"
-            }
+        # Jut the KVM device volume
+        volume {
+          name = "kvm-device"
+          host_path {
+            path = "/dev/kvm"
           }
+        }
+
+        node_selector = {
+          "kubernetes.io/arch" = "arm64"
         }
       }
     }
