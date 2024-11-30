@@ -8,7 +8,7 @@ COPY langwatch/langwatch/package.json langwatch/langwatch/package-lock.json lang
 RUN cd langwatch/langwatch && npm ci && cd -
 COPY langwatch/ langwatch/
 COPY prisma/ prisma/
-RUN npm run prisma:generate:typescript
+RUN npm run start:prepare
 COPY . .
 
 # Upload sourcemaps to Sentry
