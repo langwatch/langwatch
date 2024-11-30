@@ -61,7 +61,7 @@ resource "aws_security_group" "langwatch-pg" {
   }
 }
 
-resource "null_resource" "langwatch_pg_secret_rotation" {
+resource "null_resource" "langwatch_pg_disable_secret_rotation" {
   triggers = {
     secret_id = data.aws_secretsmanager_secret.langwatch-pg.id
   }

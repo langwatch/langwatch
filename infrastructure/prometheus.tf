@@ -77,40 +77,6 @@ resource "helm_release" "prometheus" {
   ]
 }
 
-# # Internal NLB for Prometheus (accessible only within VPC)
-# resource "kubernetes_service" "prometheus_internal" {
-#   count = module.variables.profile == "lw-prod" ? 1 : 0
-
-#   metadata {
-#     name = "prometheus-internal"
-#     annotations = {
-#       "service.beta.kubernetes.io/aws-load-balancer-type" = "nlb"
-#       "service.beta.kubernetes.io/aws-load-balancer-internal" = "true"
-#       "service.beta.kubernetes.io/aws-load-balancer-subnets" = join(",", [aws_subnet.private_subnet_1.id])
-#       "service.beta.kubernetes.io/aws-load-balancer-security-groups" = aws_security_group.prometheus_sg.id
-#     }
-#   }
-
-#   spec {
-#     selector = {
-#       "app.kubernetes.io/name" = "prometheus"
-#       "component"             = "server"
-#     }
-
-#     port {
-#       name        = "http"
-#       port        = 80
-#       target_port = 9090
-#     }
-
-#     type = "LoadBalancer"
-#   }
-
-#   depends_on = [
-#     helm_release.prometheus
-#   ]
-# }
-
 # This security group is also used by Grafana to have access to Prometheus
 resource "aws_security_group" "prometheus_sg" {
   name        = "prometheus-sg"
