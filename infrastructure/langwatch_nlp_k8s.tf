@@ -66,6 +66,7 @@ resource "kubernetes_deployment" "langwatch_nlp" {
 
   spec {
     replicas = 1
+    revision_history_limit = 1
 
     selector {
       match_labels = {
@@ -92,7 +93,7 @@ resource "kubernetes_deployment" "langwatch_nlp" {
 
           env {
             name  = "LANGWATCH_ENDPOINT"
-            value = "http://langwatch-service"
+            value = "http://langwatch-internal"
           }
 
           resources {

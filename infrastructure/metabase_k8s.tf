@@ -85,6 +85,7 @@ resource "kubernetes_deployment" "metabase" {
 
   spec {
     replicas = 1
+    revision_history_limit = 1
 
     selector {
       match_labels = {

@@ -1,8 +1,8 @@
-locals {
-  # tag         = data.external.langwatch_docker_tag.result["tag"]
-  # git_tag     = data.external.langwatch_docker_tag.result["git_tag"]
-  # secrets_map = jsondecode(data.aws_secretsmanager_secret_version.langwatch.secret_string)
-}
+# locals {
+#   # tag         = data.external.langwatch_docker_tag.result["tag"]
+#   # git_tag     = data.external.langwatch_docker_tag.result["git_tag"]
+#   # secrets_map = jsondecode(data.aws_secretsmanager_secret_version.langwatch.secret_string)
+# }
 
 # data "external" "langwatch_docker_tag" {
 #   program = ["${path.root}/scripts/get_langwatch_saas_git_sha.sh"]
@@ -38,511 +38,511 @@ locals {
 #   })
 # }
 
-resource "aws_ecs_cluster" "langwatch" {
-  count = module.variables.profile == "lw-prod" ? 1 : 0
-  name  = "langwatch-cluster"
-}
-
-resource "aws_ecs_task_definition" "langwatch" {
-  count                    = module.variables.profile == "lw-prod" ? 1 : 0
-  family                   = "langwatch-task"
-  network_mode             = "awsvpc"
-  requires_compatibilities = ["FARGATE"]
-  execution_role_arn       = aws_iam_role.ecs_task_execution_role.arn
-  task_role_arn            = aws_iam_role.ecs_task_role_langwatch.arn
-  cpu                      = 1024
-  memory                   = 2048
-
-  container_definitions = jsonencode([
-    {
-      name      = "langwatch-container"
-      image     = "${aws_ecr_repository.langwatch.repository_url}:${local.tag}"
-      cpu       = 1024
-      memory    = 2048
-      essential = true
-      portMappings = [
-        {
-          containerPort = 3000
-        },
-      ],
-      logConfiguration = {
-        logDriver = "awslogs"
-        options = {
-          awslogs-group         = "/ecs/langwatch"
-          awslogs-region        = "eu-central-1"
-          awslogs-stream-prefix = "langwatch"
-        }
-      },
-      environment = concat([
-        for key, value in local.secrets_map : {
-          name  = key
-          value = value
-        }
-        ], [
-        {
-          name  = "LANGWATCH_NLP_SERVICE"
-          value = "http://${aws_lb.langwatch_nlp_alb[0].dns_name}"
-        },
-        {
-          name  = "REDIS_URL"
-          value = "rediss://:${urlencode(jsondecode(data.aws_secretsmanager_secret_version.redis.secret_string)["password"])}@${aws_elasticache_replication_group.redis[0].primary_endpoint_address}:6379"
-        },
-        {
-          name  = "DATABASE_URL"
-          value = "postgresql://langwatch_db:${urlencode(jsondecode(data.aws_secretsmanager_secret_version.langwatch-pg.secret_string)["password"])}@${aws_db_instance.langwatch-pg.endpoint}/langwatch_db?sslmode=allow&schema=langwatch_db"
-        }
-      ]),
-    },
-  ])
-
-  depends_on = [
-    null_resource.langwatch_docker_image,
-    aws_iam_role_policy_attachment.langwatch,
-    aws_lb.langwatch_nlp_alb[0],
-  ]
-}
-
-resource "aws_iam_role" "ecs_task_role_langwatch" {
-  name = "ecs_task_role_langwatch"
-
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Action = "sts:AssumeRole"
-        Effect = "Allow"
-        Principal = {
-          Service = "ecs-tasks.amazonaws.com"
-        }
-      }
-    ]
-  })
-}
-
-resource "aws_iam_role_policy_attachment" "ecs_task_role_policy_attachment" {
-  role       = aws_iam_role.ecs_task_role_langwatch.name
-  policy_arn = aws_iam_policy.ecs_exec_policy.arn
-}
-
-resource "aws_ecs_service" "langwatch_service" {
-  count                  = module.variables.profile == "lw-prod" ? 1 : 0
-  name                   = "langwatch-service"
-  cluster                = aws_ecs_cluster.langwatch[0].id
-  task_definition        = aws_ecs_task_definition.langwatch[0].arn
-  desired_count          = 1
-  launch_type            = "FARGATE"
-
-  deployment_controller {
-    type = "CODE_DEPLOY"
-  }
-
-  network_configuration {
-    subnets          = [aws_subnet.public_subnet_1.id, aws_subnet.public_subnet_2.id]
-    security_groups  = [aws_security_group.langwatch.id]
-    assign_public_ip = true
-  }
-
-  load_balancer {
-    target_group_arn = aws_alb_target_group.langwatch_blue_tg[0].arn
-    container_name   = "langwatch-container"
-    container_port   = 3000
-  }
-
-  lifecycle {
-    ignore_changes = [
-      desired_count,   # Updated possibly by auto scaling
-      task_definition, # Updated by deployments
-      load_balancer,   # Updated by deployments
-    ]
-  }
-
-  depends_on = [
-    aws_alb_listener.https_listener[0]
-  ]
-}
-
-# resource "null_resource" "langwatch_docker_image" {
+# resource "aws_ecs_cluster" "langwatch" {
 #   count = module.variables.profile == "lw-prod" ? 1 : 0
-
-#   triggers = {
-#     image_hash = local.tag
-#   }
-
-#   provisioner "local-exec" {
-#     command = <<EOT
-#       set -eo pipefail
-
-#       echo "Building LangWatch..."
-#       cd ../
-#       if [ ! -d "./langwatch" ] || [ ! "$(ls -A ./langwatch)" ]; then
-#         git submodule update --init
-#       fi
-
-#       aws ecr get-login-password --profile ${module.variables.profile} --region ${data.aws_region.current.name} | docker login --username AWS --password-stdin ${data.aws_caller_identity.current.account_id}.dkr.ecr.${data.aws_region.current.name}.amazonaws.com || true
-
-#       set +e
-#       image_exists=$(docker manifest inspect ${data.aws_ecr_repository.langwatch.repository_url}:${local.tag} > /dev/null 2>&1 && echo yes)
-#       set -e
-#       if [ -z "$image_exists" ]; then
-#         docker buildx build . --platform="linux/amd64" --build-arg SENTRY_AUTH_TOKEN="$SENTRY_AUTH_TOKEN" --push -t ${data.aws_ecr_repository.langwatch.repository_url}:${local.tag}
-#         set +e
-#         MANIFEST=$(aws ecr --profile ${module.variables.profile} --region ${data.aws_region.current.name} batch-get-image --repository-name ${aws_ecr_repository.langwatch.name} --image-ids imageTag=${local.tag} --query 'images[].imageManifest' --output text)
-#         aws ecr --profile ${module.variables.profile} --region ${data.aws_region.current.name} put-image --repository-name ${aws_ecr_repository.langwatch.name} --image-tag ${local.git_tag} --image-manifest "$MANIFEST"
-#         set -e
-#       fi
-#       cd -
-#     EOT
-
-#     interpreter = ["/bin/bash", "-c"]
-#     on_failure  = fail
-#   }
-
-#   depends_on = [aws_ecr_repository.langwatch]
+#   name  = "langwatch-cluster"
 # }
 
-resource "aws_codedeploy_app" "langwatch_app" {
-  count            = module.variables.profile == "lw-prod" ? 1 : 0
-  name             = "langwatch-app"
-  compute_platform = "ECS"
-}
+# resource "aws_ecs_task_definition" "langwatch" {
+#   count                    = module.variables.profile == "lw-prod" ? 1 : 0
+#   family                   = "langwatch-task"
+#   network_mode             = "awsvpc"
+#   requires_compatibilities = ["FARGATE"]
+#   execution_role_arn       = aws_iam_role.ecs_task_execution_role.arn
+#   task_role_arn            = aws_iam_role.ecs_task_role_langwatch.arn
+#   cpu                      = 1024
+#   memory                   = 2048
 
-resource "aws_codestarnotifications_notification_rule" "langwatch-deploy" {
-  count          = module.variables.profile == "lw-prod" ? 1 : 0
-  detail_type    = "FULL"
-  event_type_ids = ["codedeploy-application-deployment-started", "codedeploy-application-deployment-failed", "codedeploy-application-deployment-succeeded"]
+#   container_definitions = jsonencode([
+#     {
+#       name      = "langwatch-container"
+#       image     = "${aws_ecr_repository.langwatch.repository_url}:${local.tag}"
+#       cpu       = 1024
+#       memory    = 2048
+#       essential = true
+#       portMappings = [
+#         {
+#           containerPort = 3000
+#         },
+#       ],
+#       logConfiguration = {
+#         logDriver = "awslogs"
+#         options = {
+#           awslogs-group         = "/ecs/langwatch"
+#           awslogs-region        = "eu-central-1"
+#           awslogs-stream-prefix = "langwatch"
+#         }
+#       },
+#       environment = concat([
+#         for key, value in local.secrets_map : {
+#           name  = key
+#           value = value
+#         }
+#         ], [
+#         {
+#           name  = "LANGWATCH_NLP_SERVICE"
+#           value = "http://${aws_lb.langwatch_nlp_alb[0].dns_name}"
+#         },
+#         {
+#           name  = "REDIS_URL"
+#           value = "rediss://:${urlencode(jsondecode(data.aws_secretsmanager_secret_version.redis.secret_string)["password"])}@${aws_elasticache_replication_group.redis[0].primary_endpoint_address}:6379"
+#         },
+#         {
+#           name  = "DATABASE_URL"
+#           value = "postgresql://langwatch_db:${urlencode(jsondecode(data.aws_secretsmanager_secret_version.langwatch-pg.secret_string)["password"])}@${aws_db_instance.langwatch-pg.endpoint}/langwatch_db?sslmode=allow&schema=langwatch_db"
+#         }
+#       ]),
+#     },
+#   ])
 
-  name     = "langwatch-codedeploy-notifications"
-  resource = aws_codedeploy_app.langwatch_app[0].arn
+#   depends_on = [
+#     null_resource.langwatch_docker_image,
+#     aws_iam_role_policy_attachment.langwatch,
+#     aws_lb.langwatch_nlp_alb[0],
+#   ]
+# }
 
-  target {
-    address = aws_sns_topic.langwatch-deploy-notifications[0].arn
-  }
-}
+# resource "aws_iam_role" "ecs_task_role_langwatch" {
+#   name = "ecs_task_role_langwatch"
 
-resource "aws_codedeploy_deployment_group" "langwatch_dg" {
-  count                  = module.variables.profile == "lw-prod" ? 1 : 0
-  app_name               = aws_codedeploy_app.langwatch_app[0].name
-  deployment_group_name  = "langwatch-dg"
-  service_role_arn       = aws_iam_role.codedeploy_role.arn
-  deployment_config_name = "CodeDeployDefault.ECSAllAtOnce"
+#   assume_role_policy = jsonencode({
+#     Version = "2012-10-17"
+#     Statement = [
+#       {
+#         Action = "sts:AssumeRole"
+#         Effect = "Allow"
+#         Principal = {
+#           Service = "ecs-tasks.amazonaws.com"
+#         }
+#       }
+#     ]
+#   })
+# }
 
-  deployment_style {
-    deployment_type   = "BLUE_GREEN"
-    deployment_option = "WITH_TRAFFIC_CONTROL"
-  }
+# resource "aws_iam_role_policy_attachment" "ecs_task_role_policy_attachment" {
+#   role       = aws_iam_role.ecs_task_role_langwatch.name
+#   policy_arn = aws_iam_policy.ecs_exec_policy.arn
+# }
 
-  ecs_service {
-    cluster_name = aws_ecs_cluster.langwatch[0].name
-    service_name = aws_ecs_service.langwatch_service[0].name
-  }
+# resource "aws_ecs_service" "langwatch_service" {
+#   count                  = module.variables.profile == "lw-prod" ? 1 : 0
+#   name                   = "langwatch-service"
+#   cluster                = aws_ecs_cluster.langwatch[0].id
+#   task_definition        = aws_ecs_task_definition.langwatch[0].arn
+#   desired_count          = 1
+#   launch_type            = "FARGATE"
 
-  load_balancer_info {
-    target_group_pair_info {
-      prod_traffic_route {
-        listener_arns = [aws_alb_listener.https_listener[0].arn]
-      }
+#   deployment_controller {
+#     type = "CODE_DEPLOY"
+#   }
 
-      target_group {
-        name = aws_alb_target_group.langwatch_blue_tg[0].name
-      }
+#   network_configuration {
+#     subnets          = [aws_subnet.public_subnet_1.id, aws_subnet.public_subnet_2.id]
+#     security_groups  = [aws_security_group.langwatch.id]
+#     assign_public_ip = true
+#   }
 
-      target_group {
-        name = aws_alb_target_group.langwatch_green_tg[0].name
-      }
-    }
-  }
+#   load_balancer {
+#     target_group_arn = aws_alb_target_group.langwatch_blue_tg[0].arn
+#     container_name   = "langwatch-container"
+#     container_port   = 3000
+#   }
 
-  blue_green_deployment_config {
-    deployment_ready_option {
-      action_on_timeout = "CONTINUE_DEPLOYMENT"
-    }
+#   lifecycle {
+#     ignore_changes = [
+#       desired_count,   # Updated possibly by auto scaling
+#       task_definition, # Updated by deployments
+#       load_balancer,   # Updated by deployments
+#     ]
+#   }
 
-    terminate_blue_instances_on_deployment_success {
-      action = "TERMINATE"
-    }
-  }
+#   depends_on = [
+#     aws_alb_listener.https_listener[0]
+#   ]
+# }
 
-  auto_rollback_configuration {
-    enabled = true
-    events  = ["DEPLOYMENT_FAILURE", "DEPLOYMENT_STOP_ON_ALARM", "DEPLOYMENT_STOP_ON_REQUEST"]
-  }
-}
+# # resource "null_resource" "langwatch_docker_image" {
+# #   count = module.variables.profile == "lw-prod" ? 1 : 0
 
-resource "aws_alb" "langwatch_alb" {
-  count              = module.variables.profile == "lw-prod" ? 1 : 0
-  name               = "langwatch-alb"
-  internal           = false
-  load_balancer_type = "application"
-  security_groups    = [aws_security_group.alb_sg.id]
-  subnets            = [aws_subnet.public_subnet_1.id, aws_subnet.public_subnet_2.id]
+# #   triggers = {
+# #     image_hash = local.tag
+# #   }
 
-  enable_deletion_protection = true
-}
+# #   provisioner "local-exec" {
+# #     command = <<EOT
+# #       set -eo pipefail
 
-resource "aws_alb_listener" "https_listener" {
-  count             = module.variables.profile == "lw-prod" ? 1 : 0
-  load_balancer_arn = aws_alb.langwatch_alb[0].arn
-  port              = "443"
-  protocol          = "HTTPS"
-  ssl_policy        = "ELBSecurityPolicy-2016-08"
-  certificate_arn   = aws_acm_certificate.cert[0].arn
+# #       echo "Building LangWatch..."
+# #       cd ../
+# #       if [ ! -d "./langwatch" ] || [ ! "$(ls -A ./langwatch)" ]; then
+# #         git submodule update --init
+# #       fi
 
-  default_action {
-    type             = "forward"
-    target_group_arn = aws_alb_target_group.langwatch_blue_tg[0].arn
-  }
+# #       aws ecr get-login-password --profile ${module.variables.profile} --region ${data.aws_region.current.name} | docker login --username AWS --password-stdin ${data.aws_caller_identity.current.account_id}.dkr.ecr.${data.aws_region.current.name}.amazonaws.com || true
 
-  lifecycle {
-    ignore_changes = [
-      default_action, # Updated by deployments
-    ]
-  }
-}
+# #       set +e
+# #       image_exists=$(docker manifest inspect ${data.aws_ecr_repository.langwatch.repository_url}:${local.tag} > /dev/null 2>&1 && echo yes)
+# #       set -e
+# #       if [ -z "$image_exists" ]; then
+# #         docker buildx build . --platform="linux/amd64" --build-arg SENTRY_AUTH_TOKEN="$SENTRY_AUTH_TOKEN" --push -t ${data.aws_ecr_repository.langwatch.repository_url}:${local.tag}
+# #         set +e
+# #         MANIFEST=$(aws ecr --profile ${module.variables.profile} --region ${data.aws_region.current.name} batch-get-image --repository-name ${aws_ecr_repository.langwatch.name} --image-ids imageTag=${local.tag} --query 'images[].imageManifest' --output text)
+# #         aws ecr --profile ${module.variables.profile} --region ${data.aws_region.current.name} put-image --repository-name ${aws_ecr_repository.langwatch.name} --image-tag ${local.git_tag} --image-manifest "$MANIFEST"
+# #         set -e
+# #       fi
+# #       cd -
+# #     EOT
 
-resource "aws_alb_target_group" "langwatch_blue_tg" {
-  count       = module.variables.profile == "lw-prod" ? 1 : 0
-  name        = "langwatch-blue-tg"
-  port        = 3000
-  protocol    = "HTTP"
-  vpc_id      = aws_vpc.main.id
-  target_type = "ip"
+# #     interpreter = ["/bin/bash", "-c"]
+# #     on_failure  = fail
+# #   }
 
-  health_check {
-    enabled             = true
-    healthy_threshold   = 2
-    unhealthy_threshold = 2
-    timeout             = 5
-    path                = "/"
-    protocol            = "HTTP"
-    interval            = 30
-    matcher             = "200"
-  }
-}
+# #   depends_on = [aws_ecr_repository.langwatch]
+# # }
 
-resource "aws_alb_target_group" "langwatch_green_tg" {
-  count       = module.variables.profile == "lw-prod" ? 1 : 0
-  name        = "langwatch-green-tg"
-  port        = 3000
-  protocol    = "HTTP"
-  vpc_id      = aws_vpc.main.id
-  target_type = "ip"
+# resource "aws_codedeploy_app" "langwatch_app" {
+#   count            = module.variables.profile == "lw-prod" ? 1 : 0
+#   name             = "langwatch-app"
+#   compute_platform = "ECS"
+# }
 
-  health_check {
-    enabled             = true
-    healthy_threshold   = 2
-    unhealthy_threshold = 2
-    timeout             = 5
-    path                = "/"
-    protocol            = "HTTP"
-    interval            = 30
-    matcher             = "200"
-  }
-}
+# resource "aws_codestarnotifications_notification_rule" "langwatch-deploy" {
+#   count          = module.variables.profile == "lw-prod" ? 1 : 0
+#   detail_type    = "FULL"
+#   event_type_ids = ["codedeploy-application-deployment-started", "codedeploy-application-deployment-failed", "codedeploy-application-deployment-succeeded"]
 
-resource "aws_security_group" "langwatch" {
-  name   = "langwatch-app-sg"
-  vpc_id = aws_vpc.main.id
+#   name     = "langwatch-codedeploy-notifications"
+#   resource = aws_codedeploy_app.langwatch_app[0].arn
 
-  ingress {
-    description     = "HTTP from ALB, bastion ec2 and ADOT collector"
-    from_port       = 3000
-    to_port         = 3000
-    protocol        = "tcp"
-    security_groups = [aws_security_group.alb_sg.id, aws_security_group.bation-ec2.id, aws_security_group.adot_collector.id]
-  }
+#   target {
+#     address = aws_sns_topic.langwatch-deploy-notifications[0].arn
+#   }
+# }
 
-  egress {
-    description      = "Allow Egress"
-    from_port        = 0
-    to_port          = 0
-    protocol         = -1
-    cidr_blocks      = ["0.0.0.0/0"]
-    ipv6_cidr_blocks = ["::/0"]
-  }
+# resource "aws_codedeploy_deployment_group" "langwatch_dg" {
+#   count                  = module.variables.profile == "lw-prod" ? 1 : 0
+#   app_name               = aws_codedeploy_app.langwatch_app[0].name
+#   deployment_group_name  = "langwatch-dg"
+#   service_role_arn       = aws_iam_role.codedeploy_role.arn
+#   deployment_config_name = "CodeDeployDefault.ECSAllAtOnce"
 
-  tags = {
-    Name = "Langwatch app sg"
-  }
-}
+#   deployment_style {
+#     deployment_type   = "BLUE_GREEN"
+#     deployment_option = "WITH_TRAFFIC_CONTROL"
+#   }
 
-resource "aws_security_group" "alb_sg" {
-  name        = "langwatch-alb-sg"
-  description = "Allow web access to alb"
-  vpc_id      = aws_vpc.main.id
+#   ecs_service {
+#     cluster_name = aws_ecs_cluster.langwatch[0].name
+#     service_name = aws_ecs_service.langwatch_service[0].name
+#   }
 
-  ingress {
-    from_port   = 80
-    to_port     = 80
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
+#   load_balancer_info {
+#     target_group_pair_info {
+#       prod_traffic_route {
+#         listener_arns = [aws_alb_listener.https_listener[0].arn]
+#       }
 
-  ingress {
-    from_port   = 443
-    to_port     = 443
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
+#       target_group {
+#         name = aws_alb_target_group.langwatch_blue_tg[0].name
+#       }
 
-  ingress {
-    from_port   = 3000
-    to_port     = 3000
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
+#       target_group {
+#         name = aws_alb_target_group.langwatch_green_tg[0].name
+#       }
+#     }
+#   }
 
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-}
+#   blue_green_deployment_config {
+#     deployment_ready_option {
+#       action_on_timeout = "CONTINUE_DEPLOYMENT"
+#     }
 
-resource "aws_acm_certificate" "cert" {
-  count             = module.variables.profile == "lw-prod" ? 1 : 0
-  domain_name       = "app.langwatch.ai"
-  validation_method = "DNS"
+#     terminate_blue_instances_on_deployment_success {
+#       action = "TERMINATE"
+#     }
+#   }
 
-  lifecycle {
-    create_before_destroy = true
-  }
+#   auto_rollback_configuration {
+#     enabled = true
+#     events  = ["DEPLOYMENT_FAILURE", "DEPLOYMENT_STOP_ON_ALARM", "DEPLOYMENT_STOP_ON_REQUEST"]
+#   }
+# }
 
-  tags = {
-    Environment = "production"
-  }
-}
+# resource "aws_alb" "langwatch_alb" {
+#   count              = module.variables.profile == "lw-prod" ? 1 : 0
+#   name               = "langwatch-alb"
+#   internal           = false
+#   load_balancer_type = "application"
+#   security_groups    = [aws_security_group.alb_sg.id]
+#   subnets            = [aws_subnet.public_subnet_1.id, aws_subnet.public_subnet_2.id]
 
-resource "aws_cloudwatch_log_group" "langwatch" {
-  name              = "/ecs/langwatch"
-  retention_in_days = 365
-}
+#   enable_deletion_protection = true
+# }
 
-resource "aws_iam_role" "ecs_task_execution_role" {
-  name = "ecs_task_execution_role"
+# resource "aws_alb_listener" "https_listener" {
+#   count             = module.variables.profile == "lw-prod" ? 1 : 0
+#   load_balancer_arn = aws_alb.langwatch_alb[0].arn
+#   port              = "443"
+#   protocol          = "HTTPS"
+#   ssl_policy        = "ELBSecurityPolicy-2016-08"
+#   certificate_arn   = aws_acm_certificate.cert[0].arn
 
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Action = "sts:AssumeRole"
-        Principal = {
-          Service = "ecs-tasks.amazonaws.com"
-        }
-        Effect = "Allow"
-      },
-    ]
-  })
-}
+#   default_action {
+#     type             = "forward"
+#     target_group_arn = aws_alb_target_group.langwatch_blue_tg[0].arn
+#   }
 
-resource "aws_iam_role_policy_attachment" "langwatch" {
-  role       = aws_iam_role.ecs_task_execution_role.name
-  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
-}
+#   lifecycle {
+#     ignore_changes = [
+#       default_action, # Updated by deployments
+#     ]
+#   }
+# }
 
-resource "aws_iam_policy" "ecs_logs_policy" {
-  name        = "ecsLogsPolicy"
-  path        = "/"
-  description = "Allow ECS tasks to create and manage logs in CloudWatch."
+# resource "aws_alb_target_group" "langwatch_blue_tg" {
+#   count       = module.variables.profile == "lw-prod" ? 1 : 0
+#   name        = "langwatch-blue-tg"
+#   port        = 3000
+#   protocol    = "HTTP"
+#   vpc_id      = aws_vpc.main.id
+#   target_type = "ip"
 
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Effect = "Allow"
-        Action = [
-          "logs:CreateLogStream",
-          "logs:PutLogEvents",
-          "logs:CreateLogGroup"
-        ]
-        Resource = "arn:aws:logs:eu-central-1:${data.aws_caller_identity.current.account_id}:*"
-      },
-    ]
-  })
-}
+#   health_check {
+#     enabled             = true
+#     healthy_threshold   = 2
+#     unhealthy_threshold = 2
+#     timeout             = 5
+#     path                = "/"
+#     protocol            = "HTTP"
+#     interval            = 30
+#     matcher             = "200"
+#   }
+# }
 
-resource "aws_iam_role_policy_attachment" "ecs_logs_policy_attachment" {
-  role       = aws_iam_role.ecs_task_execution_role.name
-  policy_arn = aws_iam_policy.ecs_logs_policy.arn
-}
+# resource "aws_alb_target_group" "langwatch_green_tg" {
+#   count       = module.variables.profile == "lw-prod" ? 1 : 0
+#   name        = "langwatch-green-tg"
+#   port        = 3000
+#   protocol    = "HTTP"
+#   vpc_id      = aws_vpc.main.id
+#   target_type = "ip"
 
-resource "aws_iam_role" "codedeploy_role" {
-  name = "codedeploy_role"
+#   health_check {
+#     enabled             = true
+#     healthy_threshold   = 2
+#     unhealthy_threshold = 2
+#     timeout             = 5
+#     path                = "/"
+#     protocol            = "HTTP"
+#     interval            = 30
+#     matcher             = "200"
+#   }
+# }
 
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Action = "sts:AssumeRole"
-        Principal = {
-          Service = "codedeploy.amazonaws.com"
-        }
-        Effect = "Allow"
-      },
-    ]
-  })
-}
+# resource "aws_security_group" "langwatch" {
+#   name   = "langwatch-app-sg"
+#   vpc_id = aws_vpc.main.id
 
-resource "aws_iam_role_policy_attachment" "codedeploy_role_ecs" {
-  role       = aws_iam_role.codedeploy_role.name
-  policy_arn = "arn:aws:iam::aws:policy/AWSCodeDeployRoleForECSLimited"
-}
+#   ingress {
+#     description     = "HTTP from ALB, bastion ec2 and ADOT collector"
+#     from_port       = 3000
+#     to_port         = 3000
+#     protocol        = "tcp"
+#     security_groups = [aws_security_group.alb_sg.id, aws_security_group.bation-ec2.id, aws_security_group.adot_collector.id]
+#   }
 
-resource "aws_iam_role_policy_attachment" "codedeploy_role_ecs_full_access" {
-  role       = aws_iam_role.codedeploy_role.name
-  policy_arn = "arn:aws:iam::aws:policy/AmazonECS_FullAccess"
-}
+#   egress {
+#     description      = "Allow Egress"
+#     from_port        = 0
+#     to_port          = 0
+#     protocol         = -1
+#     cidr_blocks      = ["0.0.0.0/0"]
+#     ipv6_cidr_blocks = ["::/0"]
+#   }
 
-resource "aws_iam_policy" "codedeploy_ecs_policy" {
-  name        = "codedeploy_ecs_policy"
-  description = "Policy for CodeDeploy to access ECS services"
+#   tags = {
+#     Name = "Langwatch app sg"
+#   }
+# }
 
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Action = [
-          "ecs:DescribeServices",
-          "ecs:UpdateService",
-          "ecs:DescribeTaskSets",
-          "ecs:CreateTaskSet",
-          "ecs:DeleteTaskSet"
-        ],
-        Resource = "*",
-        Effect   = "Allow"
-      },
-    ]
-  })
-}
+# resource "aws_security_group" "alb_sg" {
+#   name        = "langwatch-alb-sg"
+#   description = "Allow web access to alb"
+#   vpc_id      = aws_vpc.main.id
 
-resource "aws_iam_role_policy_attachment" "codedeploy_ecs_policy_attachment" {
-  role       = aws_iam_role.codedeploy_role.name
-  policy_arn = aws_iam_policy.codedeploy_ecs_policy.arn
-}
+#   ingress {
+#     from_port   = 80
+#     to_port     = 80
+#     protocol    = "tcp"
+#     cidr_blocks = ["0.0.0.0/0"]
+#   }
 
-resource "aws_iam_policy" "ecs_exec_policy" {
-  name        = "ecs_exec_policy"
-  path        = "/"
-  description = "Allow ECS Exec (SSM) for tasks"
+#   ingress {
+#     from_port   = 443
+#     to_port     = 443
+#     protocol    = "tcp"
+#     cidr_blocks = ["0.0.0.0/0"]
+#   }
 
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Effect = "Allow"
-        Action = [
-          "ssmmessages:CreateControlChannel",
-          "ssmmessages:CreateDataChannel",
-          "ssmmessages:OpenControlChannel",
-          "ssmmessages:OpenDataChannel"
-        ]
-        Resource = "*"
-      },
-    ]
-  })
-}
+#   ingress {
+#     from_port   = 3000
+#     to_port     = 3000
+#     protocol    = "tcp"
+#     cidr_blocks = ["0.0.0.0/0"]
+#   }
 
-resource "aws_iam_role_policy_attachment" "ecs_exec_policy_attachment" {
-  role       = aws_iam_role.ecs_task_execution_role.name
-  policy_arn = aws_iam_policy.ecs_exec_policy.arn
-}
+#   egress {
+#     from_port   = 0
+#     to_port     = 0
+#     protocol    = "-1"
+#     cidr_blocks = ["0.0.0.0/0"]
+#   }
+# }
+
+# # resource "aws_acm_certificate" "cert" {
+# #   count             = module.variables.profile == "lw-prod" ? 1 : 0
+# #   domain_name       = "app.langwatch.ai"
+# #   validation_method = "DNS"
+
+# #   lifecycle {
+# #     create_before_destroy = true
+# #   }
+
+# #   tags = {
+# #     Environment = "production"
+# #   }
+# # }
+
+# resource "aws_cloudwatch_log_group" "langwatch" {
+#   name              = "/ecs/langwatch"
+#   retention_in_days = 365
+# }
+
+# resource "aws_iam_role" "ecs_task_execution_role" {
+#   name = "ecs_task_execution_role"
+
+#   assume_role_policy = jsonencode({
+#     Version = "2012-10-17"
+#     Statement = [
+#       {
+#         Action = "sts:AssumeRole"
+#         Principal = {
+#           Service = "ecs-tasks.amazonaws.com"
+#         }
+#         Effect = "Allow"
+#       },
+#     ]
+#   })
+# }
+
+# resource "aws_iam_role_policy_attachment" "langwatch" {
+#   role       = aws_iam_role.ecs_task_execution_role.name
+#   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
+# }
+
+# resource "aws_iam_policy" "ecs_logs_policy" {
+#   name        = "ecsLogsPolicy"
+#   path        = "/"
+#   description = "Allow ECS tasks to create and manage logs in CloudWatch."
+
+#   policy = jsonencode({
+#     Version = "2012-10-17"
+#     Statement = [
+#       {
+#         Effect = "Allow"
+#         Action = [
+#           "logs:CreateLogStream",
+#           "logs:PutLogEvents",
+#           "logs:CreateLogGroup"
+#         ]
+#         Resource = "arn:aws:logs:eu-central-1:${data.aws_caller_identity.current.account_id}:*"
+#       },
+#     ]
+#   })
+# }
+
+# resource "aws_iam_role_policy_attachment" "ecs_logs_policy_attachment" {
+#   role       = aws_iam_role.ecs_task_execution_role.name
+#   policy_arn = aws_iam_policy.ecs_logs_policy.arn
+# }
+
+# resource "aws_iam_role" "codedeploy_role" {
+#   name = "codedeploy_role"
+
+#   assume_role_policy = jsonencode({
+#     Version = "2012-10-17"
+#     Statement = [
+#       {
+#         Action = "sts:AssumeRole"
+#         Principal = {
+#           Service = "codedeploy.amazonaws.com"
+#         }
+#         Effect = "Allow"
+#       },
+#     ]
+#   })
+# }
+
+# resource "aws_iam_role_policy_attachment" "codedeploy_role_ecs" {
+#   role       = aws_iam_role.codedeploy_role.name
+#   policy_arn = "arn:aws:iam::aws:policy/AWSCodeDeployRoleForECSLimited"
+# }
+
+# resource "aws_iam_role_policy_attachment" "codedeploy_role_ecs_full_access" {
+#   role       = aws_iam_role.codedeploy_role.name
+#   policy_arn = "arn:aws:iam::aws:policy/AmazonECS_FullAccess"
+# }
+
+# resource "aws_iam_policy" "codedeploy_ecs_policy" {
+#   name        = "codedeploy_ecs_policy"
+#   description = "Policy for CodeDeploy to access ECS services"
+
+#   policy = jsonencode({
+#     Version = "2012-10-17"
+#     Statement = [
+#       {
+#         Action = [
+#           "ecs:DescribeServices",
+#           "ecs:UpdateService",
+#           "ecs:DescribeTaskSets",
+#           "ecs:CreateTaskSet",
+#           "ecs:DeleteTaskSet"
+#         ],
+#         Resource = "*",
+#         Effect   = "Allow"
+#       },
+#     ]
+#   })
+# }
+
+# resource "aws_iam_role_policy_attachment" "codedeploy_ecs_policy_attachment" {
+#   role       = aws_iam_role.codedeploy_role.name
+#   policy_arn = aws_iam_policy.codedeploy_ecs_policy.arn
+# }
+
+# resource "aws_iam_policy" "ecs_exec_policy" {
+#   name        = "ecs_exec_policy"
+#   path        = "/"
+#   description = "Allow ECS Exec (SSM) for tasks"
+
+#   policy = jsonencode({
+#     Version = "2012-10-17"
+#     Statement = [
+#       {
+#         Effect = "Allow"
+#         Action = [
+#           "ssmmessages:CreateControlChannel",
+#           "ssmmessages:CreateDataChannel",
+#           "ssmmessages:OpenControlChannel",
+#           "ssmmessages:OpenDataChannel"
+#         ]
+#         Resource = "*"
+#       },
+#     ]
+#   })
+# }
+
+# resource "aws_iam_role_policy_attachment" "ecs_exec_policy_attachment" {
+#   role       = aws_iam_role.ecs_task_execution_role.name
+#   policy_arn = aws_iam_policy.ecs_exec_policy.arn
+# }

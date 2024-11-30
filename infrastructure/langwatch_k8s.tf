@@ -55,8 +55,6 @@ resource "null_resource" "langwatch_docker_image" {
 resource "kubernetes_deployment" "langwatch" {
   count = module.variables.profile == "lw-prod" ? 1 : 0
 
-  wait_for_rollout = true
-
   metadata {
     name = "langwatch"
     annotations = {
@@ -66,6 +64,7 @@ resource "kubernetes_deployment" "langwatch" {
 
   spec {
     replicas = 1
+    revision_history_limit = 1
 
     selector {
       match_labels = {
@@ -92,17 +91,17 @@ resource "kubernetes_deployment" "langwatch" {
 
           env {
             name  = "LANGWATCH_NLP_SERVICE"
-            value = "http://langwatchnlp-service"
+            value = "http://langwatch-nlp-service"
           }
 
           env {
             name  = "REDIS_URL"
-            value = "rediss://:${urlencode(jsondecode(data.aws_secretsmanager_secret_version.redis.secret_string)["password"])}@${aws_elasticache_replication_group.redis[0].primary_endpoint_address}:6379"
+            value = sensitive("rediss://:${urlencode(jsondecode(data.aws_secretsmanager_secret_version.redis.secret_string)["password"])}@${aws_elasticache_replication_group.redis[0].primary_endpoint_address}:6379")
           }
 
           env {
             name  = "DATABASE_URL"
-            value = "postgresql://langwatch_db:${urlencode(jsondecode(data.aws_secretsmanager_secret_version.langwatch-pg.secret_string)["password"])}@${aws_db_instance.langwatch-pg.endpoint}/langwatch_db?sslmode=allow&schema=langwatch_db"
+            value = sensitive("postgresql://langwatch_db:${urlencode(jsondecode(data.aws_secretsmanager_secret_version.langwatch-pg.secret_string)["password"])}@${aws_db_instance.langwatch-pg.endpoint}/langwatch_db?sslmode=allow&schema=langwatch_db")
           }
 
           dynamic "env" {
@@ -146,16 +145,99 @@ resource "kubernetes_deployment" "langwatch" {
   ]
 }
 
-# LangWatch Service with LoadBalancer
+# Create the NLB separately
+resource "aws_lb" "langwatch" {
+  count = module.variables.profile == "lw-prod" ? 1 : 0
+
+  name               = "langwatch-nlb"
+  internal           = false
+  load_balancer_type = "network"
+  subnets            = [aws_subnet.public_subnet_1.id, aws_subnet.public_subnet_2.id]
+
+  enable_deletion_protection = true
+
+  tags = {
+    Name = "langwatch-nlb"
+  }
+}
+
+# Create the target group
+resource "aws_lb_target_group" "langwatch" {
+  count = module.variables.profile == "lw-prod" ? 1 : 0
+
+  name        = "langwatch-tg"
+  port        = 3000
+  protocol    = "TCP"
+  vpc_id      = aws_vpc.main.id
+  target_type = "ip"
+
+  health_check {
+    enabled             = true
+    healthy_threshold   = 2
+    unhealthy_threshold = 2
+    interval            = 30
+    port               = "3000"
+    protocol           = "HTTP"
+    path               = "/"
+  }
+}
+
+# Create the listener
+resource "aws_lb_listener" "langwatch" {
+  count = module.variables.profile == "lw-prod" ? 1 : 0
+
+  load_balancer_arn = aws_lb.langwatch[0].arn
+  port              = "443"
+  protocol          = "TLS"
+  certificate_arn   = aws_acm_certificate.cert[0].arn
+
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.langwatch[0].arn
+  }
+}
+
+# Then modify the Kubernetes service to use the existing load balancer
 resource "kubernetes_service" "langwatch" {
   count = module.variables.profile == "lw-prod" ? 1 : 0
 
   metadata {
     name = "langwatch-service"
     annotations = {
-      "service.beta.kubernetes.io/aws-load-balancer-type" = "nlb"
-      "service.beta.kubernetes.io/aws-load-balancer-subnets" = join(",", [aws_subnet.public_subnet_1.id, aws_subnet.public_subnet_2.id])
+      "service.beta.kubernetes.io/aws-load-balancer-type" = "external"
+      "service.beta.kubernetes.io/aws-load-balancer-nlb-target-type" = "ip"
+      "service.beta.kubernetes.io/aws-load-balancer-name" = aws_lb.langwatch[0].name
+      "service.beta.kubernetes.io/aws-load-balancer-target-group-arn" = aws_lb_target_group.langwatch[0].arn
     }
+  }
+
+  spec {
+    selector = {
+      app = "langwatch"
+    }
+
+    port {
+      name        = "https"
+      port        = 443
+      target_port = 3000
+    }
+
+    type = "LoadBalancer"
+  }
+
+  depends_on = [
+    kubernetes_deployment.langwatch,
+    aws_lb.langwatch,
+    aws_lb_target_group.langwatch
+  ]
+}
+
+# Internal ClusterIP service for langwatch-nlp to communicate with langwatch
+resource "kubernetes_service" "langwatch_internal" {
+  count = module.variables.profile == "lw-prod" ? 1 : 0
+
+  metadata {
+    name = "langwatch-internal"
   }
 
   spec {
@@ -168,7 +250,7 @@ resource "kubernetes_service" "langwatch" {
       target_port = 3000
     }
 
-    type = "LoadBalancer"
+    type = "ClusterIP"  # Internal only
   }
 
   depends_on = [
@@ -204,4 +286,18 @@ resource "aws_ecr_lifecycle_policy" "langwatch" {
       }
     ]
   })
+}
+
+resource "aws_acm_certificate" "cert" {
+  count             = module.variables.profile == "lw-prod" ? 1 : 0
+  domain_name       = "app.langwatch.ai"
+  validation_method = "DNS"
+
+  lifecycle {
+    create_before_destroy = true
+  }
+
+  tags = {
+    Environment = "production"
+  }
 }
