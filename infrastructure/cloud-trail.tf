@@ -71,6 +71,9 @@ resource "aws_s3_bucket_policy" "cloudtrail" {
   policy = data.aws_iam_policy_document.cloudtrail[0].json
 }
 
+# For Run Command and Session Manager
+data "aws_partition" "current" {}
+
 data "aws_iam_policy_document" "cloudtrail" {
   count = module.variables.profile == "lw-prod" ? 1 : 0
 

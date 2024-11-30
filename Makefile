@@ -44,3 +44,6 @@ deploy: infra-apply-approve
 
 kubeconfig:
 	@aws eks --profile lw-prod --region eu-central-1 update-kubeconfig --name langwatch-cluster
+
+port-forward: kubeconfig
+	@./scripts/prod-port-forward.sh

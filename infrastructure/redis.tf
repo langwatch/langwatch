@@ -16,8 +16,6 @@ resource "aws_security_group" "redis" {
     to_port         = 6379
     protocol        = "tcp"
     security_groups = [
-      # aws_security_group.langwatch.id,
-      aws_security_group.bation-ec2.id,
       aws_security_group.eks_nodes.id
     ]
     cidr_blocks     = module.variables.profile == "lw-dev" ? ["0.0.0.0/0"] : []

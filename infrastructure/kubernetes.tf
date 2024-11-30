@@ -421,3 +421,34 @@ provider "kubernetes" {
     command     = "aws"
   }
 }
+
+resource "kubernetes_service" "db_tunnel" {
+  count = module.variables.profile == "lw-prod" ? 1 : 0
+
+  metadata {
+    name = "db-tunnel"
+    labels = {
+      app = "db-tunnel"
+    }
+  }
+
+  spec {
+    selector = {
+      app = "langwatch"  # Using the main app pod as the tunnel
+    }
+
+    port {
+      name        = "postgres"
+      port        = 5432
+      target_port = 5432
+    }
+
+    port {
+      name        = "redis"
+      port        = 6379
+      target_port = 6379
+    }
+
+    type = "ClusterIP"
+  }
+}

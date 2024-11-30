@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "dev": "npm run prisma:generate:typescript && npm run build:websocket && NODE_ENV=development DEBUG=langwatch:* DEBUG_HIDE_DATE=true DEBUG_COLORS=true concurrently --restart-tries -1 'npm run build:websocket -- --watch' 'tsx server.ts' 'npm run start:workers'",
-    "build": "export DEPENDENCY_INJECTION_DIR=$(pwd)/src/injection/; export EXTRA_INCLUDE=$(pwd)/src; npm run build:websocket && (cp .env langwatch/langwatch/; cd langwatch/langwatch; npm run build)",
+    "build": "export DEPENDENCY_INJECTION_DIR=$(pwd)/src/injection/; export EXTRA_INCLUDE=$(pwd)/src; npm run prisma:generate:typescript && (cp .env langwatch/langwatch/; cd langwatch/langwatch; npm run build) && npm run build:websocket",
     "build:websocket": "NODE_PATH=$(pwd)/node_modules cd langwatch/langwatch; ./node_modules/.bin/esbuild src/optimization_studio/server/socketServer.ts --bundle --platform=node --outfile=build-websocket/socketServer.js --packages=external --alias:@injected-dependencies.server=../../src/injection/injection.server.ts",
     "start": "npm run prepare:production && NODE_ENV=production DEBUG=langwatch:* DEBUG_COLORS=true NEXTJS_DIST_DIR=.next concurrently --restart-tries -1 'tsx server.ts' 'npm run start:workers'",
     "start:workers": "tsx src/workers.ts",
@@ -18,8 +18,7 @@
     "prisma:migrate": "npx prisma migrate deploy",
     "prepare:production": "npm run prisma:generate:typescript && npm run prisma:migrate && npm run elastic:migrate",
     "task": "DEBUG=langwatch:* tsx --tsconfig langwatch/langwatch/tsconfig.workers.json langwatch/langwatch/src/task.ts",
-    "elastic:migrate": "npm run task elasticMigrate",
-    "port:forward": "./scripts/prod-port-forward.sh"
+    "elastic:migrate": "npm run task elasticMigrate"
   },
   "author": "",
   "license": "ISC",

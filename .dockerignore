@@ -16,3 +16,4 @@ langwatch/docs/.docusaurus
 langwatch/langwatch_nlp/notebooks
 infrastructure
 */**/.env
+*/**/*.generated.ts

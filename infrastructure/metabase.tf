@@ -50,7 +50,7 @@ resource "aws_security_group" "metabase-db" {
     from_port       = 5432
     to_port         = 5432
     protocol        = "tcp"
-    security_groups = [aws_security_group.eks_nodes.id, aws_security_group.bation-ec2.id]
+    security_groups = [aws_security_group.eks_nodes.id]
   }
 
   ingress {

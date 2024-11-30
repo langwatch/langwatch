@@ -1,5 +1,5 @@
 FROM node:20-alpine
-RUN apk --no-cache add curl python3 make gcc g++
+RUN apk --no-cache add curl python3 make gcc g++ socat
 WORKDIR /app
 RUN mkdir langwatch docs
 COPY package.json package-lock.json .
@@ -8,7 +8,6 @@ COPY langwatch/langwatch/package.json langwatch/langwatch/package-lock.json lang
 RUN cd langwatch/langwatch && npm ci && cd -
 COPY langwatch/ langwatch/
 COPY prisma/ prisma/
-RUN npm run start:prepare
 COPY . .
 
 # Upload sourcemaps to Sentry
@@ -19,5 +18,7 @@ RUN npm run build
 ENV NODE_ENV=production
 
 EXPOSE 3000
+EXPOSE 5432
+EXPOSE 6379
 
-CMD npm start
+CMD ["/app/scripts/start-with-proxy.sh"]
