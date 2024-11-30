@@ -145,58 +145,6 @@ resource "kubernetes_deployment" "langwatch" {
   ]
 }
 
-# Create the NLB separately
-resource "aws_lb" "langwatch" {
-  count = module.variables.profile == "lw-prod" ? 1 : 0
-
-  name               = "langwatch-nlb"
-  internal           = false
-  load_balancer_type = "network"
-  subnets            = [aws_subnet.public_subnet_1.id, aws_subnet.public_subnet_2.id]
-
-  enable_deletion_protection = true
-
-  tags = {
-    Name = "langwatch-nlb"
-  }
-}
-
-# Create the target group
-resource "aws_lb_target_group" "langwatch" {
-  count = module.variables.profile == "lw-prod" ? 1 : 0
-
-  name        = "langwatch-tg"
-  port        = 3000
-  protocol    = "TCP"
-  vpc_id      = aws_vpc.main.id
-  target_type = "ip"
-
-  health_check {
-    enabled             = true
-    healthy_threshold   = 2
-    unhealthy_threshold = 2
-    interval            = 30
-    port               = "3000"
-    protocol           = "HTTP"
-    path               = "/"
-  }
-}
-
-# Create the listener
-resource "aws_lb_listener" "langwatch" {
-  count = module.variables.profile == "lw-prod" ? 1 : 0
-
-  load_balancer_arn = aws_lb.langwatch[0].arn
-  port              = "443"
-  protocol          = "TLS"
-  certificate_arn   = aws_acm_certificate.cert[0].arn
-
-  default_action {
-    type             = "forward"
-    target_group_arn = aws_lb_target_group.langwatch[0].arn
-  }
-}
-
 # Then modify the Kubernetes service to use the existing load balancer
 resource "kubernetes_service" "langwatch" {
   count = module.variables.profile == "lw-prod" ? 1 : 0
@@ -204,10 +152,12 @@ resource "kubernetes_service" "langwatch" {
   metadata {
     name = "langwatch-service"
     annotations = {
-      "service.beta.kubernetes.io/aws-load-balancer-type" = "external"
-      "service.beta.kubernetes.io/aws-load-balancer-nlb-target-type" = "ip"
-      "service.beta.kubernetes.io/aws-load-balancer-name" = aws_lb.langwatch[0].name
-      "service.beta.kubernetes.io/aws-load-balancer-target-group-arn" = aws_lb_target_group.langwatch[0].arn
+      "service.beta.kubernetes.io/aws-load-balancer-type" = "nlb"
+      "service.beta.kubernetes.io/aws-load-balancer-subnets" = join(",", [aws_subnet.public_subnet_1.id, aws_subnet.public_subnet_2.id])
+      "service.beta.kubernetes.io/aws-load-balancer-ssl-cert" = aws_acm_certificate.cert[0].arn
+      "service.beta.kubernetes.io/aws-load-balancer-ssl-ports" = "443"
+      "service.beta.kubernetes.io/aws-load-balancer-backend-protocol" = "tcp"
+      "service.beta.kubernetes.io/aws-load-balancer-ssl-negotiation-policy" = "ELBSecurityPolicy-TLS13-1-2-2021-06"
     }
   }
 
@@ -227,8 +177,6 @@ resource "kubernetes_service" "langwatch" {
 
   depends_on = [
     kubernetes_deployment.langwatch,
-    aws_lb.langwatch,
-    aws_lb_target_group.langwatch
   ]
 }
 
