@@ -67,6 +67,7 @@ jobs:
         run: |
           export SENTRY_AUTH_TOKEN="${{ secrets.SENTRY_AUTH_TOKEN }}"
           make infra-init
+          make infra-apply-approve
         env:
           AWS_PROFILE: lw-prod
           AWS_DEFAULT_PROFILE: lw-prod
