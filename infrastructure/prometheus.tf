@@ -77,6 +77,24 @@ resource "helm_release" "prometheus" {
           - job_name: 'node-exporter'
             static_configs:
               - targets: ['prometheus-prometheus-node-exporter:9100']
+
+          - job_name: 'kubernetes-cadvisor'
+            scheme: https
+            tls_config:
+              ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+              insecure_skip_verify: true
+            bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+            kubernetes_sd_configs:
+              - role: node
+            relabel_configs:
+              - action: labelmap
+                regex: __meta_kubernetes_node_label_(.+)
+              - target_label: __address__
+                replacement: kubernetes.default.svc:443
+              - source_labels: [__meta_kubernetes_node_name]
+                regex: (.+)
+                target_label: __metrics_path__
+                replacement: /api/v1/nodes/$1/proxy/metrics/cadvisor
     EOT
   ]
 
@@ -198,4 +216,43 @@ resource "aws_eks_addon" "ebs_csi_driver" {
     aws_iam_role_policy_attachment.ebs_csi_policy,
     aws_iam_role_policy.ebs_csi_driver
   ]
+}
+
+resource "kubernetes_cluster_role" "prometheus" {
+  count = module.variables.profile == "lw-prod" ? 1 : 0
+
+  metadata {
+    name = "prometheus"
+  }
+
+  rule {
+    api_groups = [""]
+    resources  = ["nodes", "nodes/proxy", "pods"]
+    verbs      = ["get", "list", "watch"]
+  }
+
+  rule {
+    non_resource_urls = ["/metrics", "/metrics/cadvisor"]
+    verbs             = ["get"]
+  }
+}
+
+resource "kubernetes_cluster_role_binding" "prometheus" {
+  count = module.variables.profile == "lw-prod" ? 1 : 0
+
+  metadata {
+    name = "prometheus"
+  }
+
+  role_ref {
+    api_group = "rbac.authorization.k8s.io"
+    kind      = "ClusterRole"
+    name      = kubernetes_cluster_role.prometheus[0].metadata[0].name
+  }
+
+  subject {
+    kind      = "ServiceAccount"
+    name      = "prometheus-server"
+    namespace = "default" # or whatever namespace you're using for Prometheus
+  }
 }
