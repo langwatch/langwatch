@@ -15,13 +15,15 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: "2024-04-10",
 });
 
-const prices: Record<
+export const prices: Record<
   | "PRO"
   | "GROWTH"
   | "LAUNCH"
   | "LAUNCH_ANNUAL"
   | "ACCELERATE"
-  | "ACCELERATE_ANNUAL",
+  | "ACCELERATE_ANNUAL"
+  | "USERS"
+  | "TRACES",
   string
 > =
   env.NODE_ENV === "production"
@@ -32,6 +34,8 @@ const prices: Record<
         LAUNCH_ANNUAL: "price_1QHo0eIMsTw08cudYPNLwrW4",
         ACCELERATE: "price_1QABXSIMsTw08cudeFqpju4s",
         ACCELERATE_ANNUAL: "price_1QI6qUIMsTw08cudxkCfGCNX",
+        USERS: "price_1QHNZ1IMsTw08cudbfSO8xOt",
+        TRACES: "price_1QHNZMIMsTw08cudA1yBOOPz",
       }
     : {
         PRO: "price_1P6bSyIMsTw08cudmzoqwBVN",
@@ -40,6 +44,8 @@ const prices: Record<
         LAUNCH_ANNUAL: "price_1QIxvQIMsTw08cudPTtDHuCa",
         ACCELERATE: "price_1QIt9lIMsTw08cudt4Kue39f",
         ACCELERATE_ANNUAL: "price_1QIxuwIMsTw08cudjAK7BmNH",
+        USERS: "price_1QRby4IMsTw08cud0IDctQuX",
+        TRACES: "price_1QRcy9IMsTw08cud2x0FMy2f",
       };
 
 export const subscriptionRouter = () =>

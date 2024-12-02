@@ -1,6 +1,7 @@
 import Stripe from "stripe";
 import { prisma } from "../../../../langwatch/langwatch/src/server/db";
 import type { NextApiRequest, NextApiResponse } from "next";
+import { prices } from "../api/subscription";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: "2024-04-10",
@@ -131,11 +132,16 @@ export default async function handler(
           data: {
             status: "CANCELLED",
             endDate: new Date(),
+            maxMembers: null,
+            maxMessagesPerMonth: null,
           },
         });
         break;
       case "customer.subscription.updated":
         await new Promise((resolve) => setTimeout(resolve, 2000)); // wait for Stripe to update the subscription id
+
+        let tracesQuantity = null;
+        let usersQuantity = null;
         if (
           subscription.status !== "active" ||
           subscription.canceled_at ||
@@ -146,14 +152,26 @@ export default async function handler(
             data: {
               status: "CANCELLED",
               endDate: new Date(),
+              maxMembers: null,
+              maxMessagesPerMonth: null,
             },
           });
         } else if (subscription.status === "active") {
+          for (const item of subscription.items.data) {
+            if (item.price.id === prices.USERS) {
+              usersQuantity = item.quantity;
+            }
+            if (item.price.id === prices.TRACES) {
+              tracesQuantity = (item.quantity ?? 0) * 100000;
+            }
+          }
           await prisma.subscription.update({
             where: { stripeSubscriptionId: subscription.id },
             data: {
               status: "ACTIVE",
               lastPaymentFailedDate: null,
+              maxMembers: usersQuantity,
+              maxMessagesPerMonth: tracesQuantity,
             },
           });
         }
