@@ -4,5 +4,8 @@ set -e
 
 cd ../langwatch
 
-current_hash=$(git ls-files -o -c -m --exclude-standard | grep -v ^python-sdk | grep -v ^langwatch_nlp | xargs cat | sha256sum | cut -d' ' -f1 | cut -c 1-7)
+salt="2024-11-28"
+files=$(git ls-files -c -m --exclude-standard | grep -v ^python-sdk | grep -v ^langwatch_nlp | grep -v ^typescript-sdk | xargs cat)
+current_hash=$(printf "%s%s" "$files" "$salt" | sha256sum | cut -d' ' -f1 | cut -c 1-7)
+
 echo "{\"tag\": \"hash-${current_hash}\", \"git_tag\": \"git-$(git rev-parse --short HEAD)\"}"

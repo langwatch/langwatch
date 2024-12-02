@@ -30,7 +30,7 @@ This is the private SaaS version of LangWatch protected by copyright. No copy, m
 3. Run the following cli command in a terminal and keep it open for Postgres (this will create a session with the bastion ec2 instance and port forward to the rds instance, using port 5433 locally to not conflict with the locally running postgres instance) and redis (we use port 6378 localy to not conflict with the locally running redis):
 
 ```shell
-npm run prod:forward
+make port-forward
 ```
 
 # Cloud Infrastructure

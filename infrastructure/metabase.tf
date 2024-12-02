@@ -50,7 +50,7 @@ resource "aws_security_group" "metabase-db" {
     from_port       = 5432
     to_port         = 5432
     protocol        = "tcp"
-    security_groups = [aws_security_group.eks_nodes.id, aws_security_group.bation-ec2.id]
+    security_groups = [aws_security_group.eks_nodes.id]
   }
 
   ingress {
@@ -85,6 +85,7 @@ resource "kubernetes_deployment" "metabase" {
 
   spec {
     replicas = 1
+    revision_history_limit = 1
 
     selector {
       match_labels = {
@@ -147,11 +148,11 @@ resource "kubernetes_deployment" "metabase" {
 
           resources {
             requests = {
-              cpu    = "500m"
+              cpu    = "300m"
               memory = "1Gi"
             }
             limits = {
-              cpu    = "500m"
+              cpu    = "300m"
               memory = "1Gi"
             }
           }
@@ -173,7 +174,7 @@ resource "kubernetes_deployment" "metabase" {
 
   depends_on = [
     aws_eks_cluster.primary,
-    aws_eks_node_group.primary,
+    aws_eks_node_group.secondary,
     aws_db_instance.metabase
   ]
 }
@@ -186,7 +187,7 @@ resource "kubernetes_service" "metabase" {
     name = "metabase-service"
     annotations = {
       "service.beta.kubernetes.io/aws-load-balancer-type" = "nlb"
-      "service.beta.kubernetes.io/aws-load-balancer-subnets" = join(",", [aws_subnet.public_subnet_1.id])
+      "service.beta.kubernetes.io/aws-load-balancer-subnets" = join(",", [aws_subnet.public_subnet_1.id, aws_subnet.public_subnet_2.id])
     }
   }
 

@@ -47,10 +47,37 @@ resource "aws_iam_role_policy_attachment" "eks_service_policy" {
 }
 
 # EKS Node Group
-resource "aws_eks_node_group" "primary" {
+# resource "aws_eks_node_group" "primary" {
+#   count = module.variables.profile == "lw-prod" ? 1 : 0
+#   cluster_name    = aws_eks_cluster.primary[0].name
+#   node_group_name = "langwatch-node-group"
+#   node_role_arn   = aws_iam_role.eks_node_group.arn
+#   subnet_ids      = [aws_subnet.private_subnet_1.id, aws_subnet.private_subnet_2.id]
+
+#   scaling_config {
+#     desired_size = 1
+#     max_size     = 1
+#     min_size     = 1
+#   }
+
+#   ami_type = "AL2023_ARM_64_STANDARD"
+#   instance_types = ["m8g.xlarge"]
+#   disk_size = 40
+
+#   depends_on = [
+#     aws_iam_role_policy_attachment.eks_worker_node_policy,
+#     aws_iam_role_policy_attachment.eks_cni_policy,
+#     aws_iam_role_policy_attachment.eks_container_registry,
+#     aws_iam_role_policy_attachment.eks_ecr_policy,
+#     aws_iam_role_policy_attachment.eks_vpc_resource_controller
+#   ]
+# }
+
+# Second EKS Node Group
+resource "aws_eks_node_group" "secondary" {
   count = module.variables.profile == "lw-prod" ? 1 : 0
   cluster_name    = aws_eks_cluster.primary[0].name
-  node_group_name = "langwatch-node-group"
+  node_group_name = "langwatch-node-group-secondary"
   node_role_arn   = aws_iam_role.eks_node_group.arn
   subnet_ids      = [aws_subnet.private_subnet_1.id, aws_subnet.private_subnet_2.id]
 
@@ -62,6 +89,7 @@ resource "aws_eks_node_group" "primary" {
 
   ami_type = "AL2023_ARM_64_STANDARD"
   instance_types = ["m8g.xlarge"]
+  disk_size = 40
 
   depends_on = [
     aws_iam_role_policy_attachment.eks_worker_node_policy,
@@ -70,6 +98,11 @@ resource "aws_eks_node_group" "primary" {
     aws_iam_role_policy_attachment.eks_ecr_policy,
     aws_iam_role_policy_attachment.eks_vpc_resource_controller
   ]
+
+  # Add labels to identify the node group
+  labels = {
+    "node-group" = "secondary"
+  }
 }
 
 # EKS Node Group IAM Role
@@ -419,5 +452,36 @@ provider "kubernetes" {
     api_version = "client.authentication.k8s.io/v1beta1"
     args        = ["eks", "get-token", "--cluster-name", aws_eks_cluster.primary[0].name, "--region", data.aws_region.current.name, "--profile", module.variables.profile]
     command     = "aws"
+  }
+}
+
+resource "kubernetes_service" "db_tunnel" {
+  count = module.variables.profile == "lw-prod" ? 1 : 0
+
+  metadata {
+    name = "db-tunnel"
+    labels = {
+      app = "db-tunnel"
+    }
+  }
+
+  spec {
+    selector = {
+      app = "langwatch"  # Using the main app pod as the tunnel
+    }
+
+    port {
+      name        = "postgres"
+      port        = 5432
+      target_port = 5432
+    }
+
+    port {
+      name        = "redis"
+      port        = 6379
+      target_port = 6379
+    }
+
+    type = "ClusterIP"
   }
 }

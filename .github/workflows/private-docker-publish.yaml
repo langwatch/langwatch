@@ -68,7 +68,6 @@ jobs:
       - name: Build and push langwatch_nlp Docker image
         run: |
           cd langwatch/langwatch_nlp
-          make generate_proxy_config
           AWS_URI="${{ secrets.LW_PROD_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_DEFAULT_REGION }}.amazonaws.com/onprem_langwatch_nlp"
           GCP_URI="europe-west3-docker.pkg.dev/langwatch/onprem/langwatch_nlp"
           docker buildx build . -f Dockerfile --platform="linux/amd64" \

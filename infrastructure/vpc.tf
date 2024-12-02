@@ -136,46 +136,6 @@ resource "aws_security_group" "vpc_tls" {
   }
 }
 
-module "endpoints" {
-  count = module.variables.profile == "lw-prod" ? 1 : 0
-
-  source = "terraform-aws-modules/vpc/aws//modules/vpc-endpoints"
-
-  vpc_id             = aws_vpc.main.id
-  security_group_ids = [aws_security_group.bation-ec2.id]
-
-  endpoints = {
-    ssm = {
-      service             = "ssm"
-      private_dns_enabled = true
-      subnet_ids          = [aws_subnet.private_subnet_1.id, aws_subnet.private_subnet_2.id]
-      security_group_ids  = [aws_security_group.vpc_tls.id]
-    },
-    ssmmessages = {
-      service             = "ssmmessages"
-      private_dns_enabled = true
-      subnet_ids          = [aws_subnet.private_subnet_1.id, aws_subnet.private_subnet_2.id]
-      security_group_ids  = [aws_security_group.vpc_tls.id]
-    },
-    ec2messages = {
-      service             = "ec2messages"
-      private_dns_enabled = true
-      subnet_ids          = [aws_subnet.private_subnet_1.id, aws_subnet.private_subnet_2.id]
-      security_group_ids  = [aws_security_group.vpc_tls.id]
-    },
-    ec2 = {
-      service             = "ec2"
-      private_dns_enabled = true
-      subnet_ids          = [aws_subnet.private_subnet_1.id, aws_subnet.private_subnet_2.id]
-      security_group_ids  = [aws_security_group.vpc_tls.id]
-    },
-  }
-
-  tags = {
-    Name = "Main VPC Endpoints"
-  }
-}
-
 resource "aws_cloudwatch_log_group" "vpc_flow_logs" {
   name = "/aws/vpc/flow-logs"
 }

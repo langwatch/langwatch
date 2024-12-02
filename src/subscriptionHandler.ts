@@ -46,8 +46,8 @@ const PLAN_LIMITS: Record<PlanTypes, PlanInfo> = {
     maxMessagesPerMonth: 10_000,
     evaluationsCredit: 10,
     prices: {
-      USD: 149,
-      EUR: 149,
+      USD: 59,
+      EUR: 59,
     },
   },
   [PlanTypes.LAUNCH_ANNUAL]: {

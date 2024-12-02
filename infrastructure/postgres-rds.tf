@@ -37,8 +37,6 @@ resource "aws_security_group" "langwatch-pg" {
     to_port         = 5432
     protocol        = "tcp"
     security_groups = [
-      aws_security_group.langwatch.id,
-      aws_security_group.bation-ec2.id,
       aws_security_group.eks_nodes.id
     ]
     cidr_blocks     = module.variables.profile == "lw-dev" ? ["0.0.0.0/0"] : []
@@ -63,7 +61,7 @@ resource "aws_security_group" "langwatch-pg" {
   }
 }
 
-resource "null_resource" "langwatch_pg_secret_rotation" {
+resource "null_resource" "langwatch_pg_disable_secret_rotation" {
   triggers = {
     secret_id = data.aws_secretsmanager_secret.langwatch-pg.id
   }

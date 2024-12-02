@@ -26,10 +26,12 @@ jobs:
         with:
           node-version: '18'
 
-      - name: Install curl & test fetch
+      - name: Install Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Install curl and jq
         run: |
-          sudo apt-get install curl -y
-          curl -O "https://raw.githubusercontent.com/langwatch/langevals/main/ts-integration/evaluators.generated.ts?$(date +%s)"
+          sudo apt-get install curl jq -y
           ls -la
 
       - name: Install Docker
@@ -49,9 +51,6 @@ jobs:
             sudo ./aws/install
           fi
 
-      - name: Install jq
-        run: sudo apt-get install jq
-
       - name: Configure AWS Root Profile
         run: |
           aws configure --profile lw-root-tf set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }}
@@ -68,7 +67,7 @@ jobs:
         run: |
           export SENTRY_AUTH_TOKEN="${{ secrets.SENTRY_AUTH_TOKEN }}"
           make infra-init
-          make deploy
+          make infra-apply-approve
         env:
           AWS_PROFILE: lw-prod
           AWS_DEFAULT_PROFILE: lw-prod
