@@ -260,6 +260,7 @@ export default function Subscription() {
                 hidden={billAnnually}
                 description="For small teams improving their LLM solutions"
                 features={[
+                  <strong key="free-trial">7-day free trial</strong>,
                   "Optimization Studio (DSPy optimizers)",
                   "Up to 10 workflows",
                   "10,000 Traces",
@@ -285,6 +286,7 @@ export default function Subscription() {
                 price={1644}
                 description="For small teams improving their LLM solutions"
                 features={[
+                  <strong key="free-trial">7-day free trial</strong>,
                   "Optimization Studio (DSPy optimizers)",
                   "Up to 10 workflows",
                   "10,000 Traces",
@@ -309,6 +311,7 @@ export default function Subscription() {
                 price={499}
                 description="For business with multiple teams working with LLMs"
                 features={[
+                  <strong key="free-trial">7-day free trial</strong>,
                   "Optimization Studio (DSPy optimizers)",
                   "Up to 50 workflows",
                   "100,000 Traces",
@@ -334,6 +337,7 @@ export default function Subscription() {
                 name="Accelerate"
                 description="For business with multiple teams working with LLMs"
                 features={[
+                  <strong key="free-trial">7-day free trial</strong>,
                   "Optimization Studio (DSPy optimizers)",
                   "Up to 50 workflows",
                   "100,000 Traces",
@@ -394,7 +398,7 @@ function Plan({
 }: {
   plan: PlanTypes;
   description: string;
-  features: string[];
+  features: (string | JSX.Element)[];
   price?: number | "custom";
   additionalCosts?: string[];
   isAnnual?: boolean;
@@ -457,7 +461,7 @@ function Plan({
         {saving && (
           <Box
             position="absolute"
-            top={10}
+            top={12}
             right={1}
             color="green"
             fontSize="xs"
