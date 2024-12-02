@@ -434,7 +434,10 @@ function MembersList({
                               </MenuItem>
                               <MenuItem
                                 onClick={() =>
-                                  viewInviteLink(invite.id, invite.email)
+                                  viewInviteLink(
+                                    invite.inviteCode,
+                                    invite.email
+                                  )
                                 }
                               >
                                 View Invite Link
