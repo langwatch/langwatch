@@ -30,8 +30,8 @@ export const prices: Record<
     ? {
         PRO: "price_1P6fvzIMsTw08cudWCwqfEjq",
         GROWTH: "price_1P6fw2IMsTw08cudFUkOX7jV",
-        LAUNCH: "price_1QCgDmIMsTw08cud7d9kl6hq",
-        LAUNCH_ANNUAL: "price_1QHo0eIMsTw08cudYPNLwrW4",
+        LAUNCH: "price_1QRflaIMsTw08cudIMK1ai2x",
+        LAUNCH_ANNUAL: "price_1QRfmKIMsTw08cud2FNGkopZ",
         ACCELERATE: "price_1QABXSIMsTw08cudeFqpju4s",
         ACCELERATE_ANNUAL: "price_1QI6qUIMsTw08cudxkCfGCNX",
         USERS: "price_1QHNZ1IMsTw08cudbfSO8xOt",
