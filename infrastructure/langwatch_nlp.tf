@@ -137,7 +137,7 @@ resource "kubernetes_deployment" "langwatch_nlp" {
 
   depends_on = [
     aws_eks_cluster.primary,
-    aws_eks_node_group.primary,
+    aws_eks_node_group.secondary,
     null_resource.langwatch_nlp_docker_image
   ]
 }

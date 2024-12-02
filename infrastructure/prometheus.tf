@@ -212,7 +212,7 @@ resource "aws_eks_addon" "ebs_csi_driver" {
   resolve_conflicts_on_update = "OVERWRITE"
 
   depends_on = [
-    aws_eks_node_group.primary,
+    aws_eks_node_group.secondary,
     aws_iam_role_policy_attachment.ebs_csi_policy,
     aws_iam_role_policy.ebs_csi_driver
   ]

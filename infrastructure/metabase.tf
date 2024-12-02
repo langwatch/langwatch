@@ -174,7 +174,7 @@ resource "kubernetes_deployment" "metabase" {
 
   depends_on = [
     aws_eks_cluster.primary,
-    aws_eks_node_group.primary,
+    aws_eks_node_group.secondary,
     aws_db_instance.metabase
   ]
 }
