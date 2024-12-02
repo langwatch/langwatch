@@ -32,14 +32,18 @@ const initTikToken = async (
     modelName in models
       ? (models as any)[modelName]
       : (models as any)[fallback];
-  if (!cachedModel[tokenizer]) {
-    const startedWaiting = Date.now();
-    while (loadingModel.has(tokenizer)) {
-      await new Promise((resolve) => setTimeout(resolve, 100));
-      if (Date.now() - startedWaiting > 10000) {
-        throw new Error(`Timeout waiting for ${tokenizer} tokenizer`);
-      }
+
+  const startedWaiting = Date.now();
+  while (loadingModel.has(tokenizer)) {
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    if (Date.now() - startedWaiting > 10000) {
+      console.warn(`Timeout waiting for ${tokenizer} tokenizer`);
+      loadingModel.delete(tokenizer);
+      break;
     }
+  }
+
+  if (!cachedModel[tokenizer]) {
     loadingModel.add(tokenizer);
     console.info(`Initializing ${tokenizer} tokenizer`);
     const registryInfo = (registry as any)[tokenizer];
