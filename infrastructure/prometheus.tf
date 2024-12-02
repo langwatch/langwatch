@@ -24,7 +24,7 @@ resource "helm_release" "prometheus" {
       retention: 90d
       persistentVolume:
         storageClass: gp3
-        size: 10Gi
+        size: 2Gi
         accessModes:
           - ReadWriteOnce
       resources:
