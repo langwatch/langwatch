@@ -2,9 +2,18 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { scheduleTopicClustering } from "~/server/background/queues/topicClusteringQueue";
 
 export default async function handler(
-  _req: NextApiRequest,
+  req: NextApiRequest,
   res: NextApiResponse
 ) {
+  let cronApiKey = req.headers["authorization"];
+  cronApiKey = cronApiKey?.startsWith("Bearer ")
+    ? cronApiKey.slice(7)
+    : cronApiKey;
+
+  if (cronApiKey !== process.env.CRON_API_KEY) {
+    return res.status(401).end();
+  }
+
   try {
     await scheduleTopicClustering();
 

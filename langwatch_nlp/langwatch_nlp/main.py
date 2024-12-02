@@ -6,8 +6,6 @@ from dotenv import load_dotenv
 
 # from mangum import Mangum
 
-from langwatch_nlp.generate_proxy_config import generate_proxy_config
-
 load_dotenv()
 
 import langwatch_nlp.error_tracking
@@ -96,8 +94,7 @@ async def proxy_startup():
     Router.async_get_available_deployment = patched_get_available_deployment
 
     litellm_proxy_server.ProxyConfig()
-    generate_proxy_config()
-    litellm_proxy_server.save_worker_config(config="proxy_config.generated.yaml")
+    litellm_proxy_server.save_worker_config(config="proxy_config.yaml")
     app.mount("/proxy", litellm_proxy_server.app)
     await litellm_proxy_server.startup_event()
 

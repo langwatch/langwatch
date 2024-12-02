@@ -14,9 +14,6 @@ ensure-uv:
 		curl -LsSf https://astral.sh/uv/install.sh | sh; \
 	fi
 
-generate_proxy_config:
-	pip install pyyaml && python langwatch_nlp/generate_proxy_config.py
-
 start: install
 	@echo "Starting the server..."
 	@uv run watchmedo auto-restart -p 'none' --signal SIGTERM -- \

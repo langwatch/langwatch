@@ -1,0 +1,20 @@
+model_list:
+  - litellm_params:
+      model: openai/*
+    model_name: "*"
+  - litellm_params:
+      api_base: NOT_SET
+      model: azure/*
+    model_name: "*"
+  - litellm_params:
+      model: groq/*
+    model_name: "*"
+  - litellm_params:
+      model: anthropic/*
+    model_name: "*"
+  - litellm_params:
+      model: gemini/*
+    model_name: "*"
+  - litellm_params:
+      model: cloudflare/*
+    model_name: "*"

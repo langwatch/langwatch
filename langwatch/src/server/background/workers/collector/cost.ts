@@ -22,6 +22,8 @@ const cachedModel: Record<
   }
 > = {};
 
+const loadingModel = new Set<string>();
+
 const initTikToken = async (
   modelName: string
 ): Promise<{ encoder: Tiktoken } | undefined> => {
@@ -30,7 +32,19 @@ const initTikToken = async (
     modelName in models
       ? (models as any)[modelName]
       : (models as any)[fallback];
+
+  const startedWaiting = Date.now();
+  while (loadingModel.has(tokenizer)) {
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    if (Date.now() - startedWaiting > 10000) {
+      console.warn(`Timeout waiting for ${tokenizer} tokenizer`);
+      loadingModel.delete(tokenizer);
+      break;
+    }
+  }
+
   if (!cachedModel[tokenizer]) {
+    loadingModel.add(tokenizer);
     console.info(`Initializing ${tokenizer} tokenizer`);
     const registryInfo = (registry as any)[tokenizer];
     const model = await load(registryInfo);
@@ -41,6 +55,7 @@ const initTikToken = async (
     );
 
     cachedModel[tokenizer] = { model, encoder };
+    loadingModel.delete(tokenizer);
   }
 
   return cachedModel[tokenizer];

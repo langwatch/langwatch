@@ -69,6 +69,7 @@ export default function ProjectOnboardingSelect() {
 
   const onSubmit: SubmitHandler<ProjectFormData> = () => {
     if (!team.data) return;
+    if (createProject.isLoading) return;
 
     createProject.mutate({
       organizationId: organization?.id ?? "",
@@ -156,7 +157,7 @@ export default function ProjectOnboardingSelect() {
   return (
     <SetupLayout maxWidth="6xl">
       {/* eslint-disable-next-line @typescript-eslint/no-misused-promises */}
-      <form onSubmit={form.handleSubmit(onSubmit)}>
+      <form>
         <VStack gap={4} alignItems="left">
           <Heading as="h1" fontSize="x-large">
             Let’s kick things off by monitoring, evaluating, and optimizing your
@@ -180,7 +181,9 @@ export default function ProjectOnboardingSelect() {
                     return (
                       <Box
                         key={value}
-                        onClick={() => {
+                        onClick={(e) => {
+                          e.preventDefault();
+                          if (createProject.isLoading) return;
                           setValue("projectType", value);
                           void form.handleSubmit(onSubmit)();
                         }}
@@ -200,6 +203,7 @@ export default function ProjectOnboardingSelect() {
                             required: "Please select a project type",
                           })}
                           selectedValue={selectedValueProjectType ?? ""}
+                          isDisabled={createProject.isLoading}
                         />
                       </Box>
                     );
@@ -231,6 +235,7 @@ const CustomRadio = ({
   text,
   image,
   icon,
+  isDisabled,
 }: {
   value: string;
   registerProps: ReturnType<UseFormRegister<ProjectFormData>>;
@@ -239,6 +244,7 @@ const CustomRadio = ({
   text: React.ReactNode;
   image: string;
   icon: React.ReactNode;
+  isDisabled: boolean;
 }) => {
   return (
     <Box as="label" key={value} width="50%">
@@ -248,6 +254,7 @@ const CustomRadio = ({
         {...registerProps}
         checked={selectedValue === value} // Add checked prop
         style={{ display: "none" }} // Hide default radio button
+        disabled={isDisabled}
       />
       <Card
         borderWidth="1px"
