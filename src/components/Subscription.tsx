@@ -115,6 +115,11 @@ export default function Subscription() {
             <Text>Bill Annually</Text>
           </HStack>
         </HStack>
+        <Box paddingX={4}>
+          <Tag colorScheme="green" fontSize="md">
+            7-day free trial
+          </Tag>
+        </Box>
 
         <VStack spacing={4} paddingY={4} paddingX={4} align="start">
           {onPostSubscriptionSetup &&
@@ -452,7 +457,7 @@ function Plan({
         {recommended && (
           <Tag
             position="absolute"
-            top={-5}
+            top={-4}
             left="50%"
             transform="translateX(-50%)"
             colorScheme="green"
@@ -531,8 +536,8 @@ function Plan({
           {isCurrentPlan && <Tag colorScheme="green">Current Plan</Tag>}
 
           <Text>{description}</Text>
-          {features.map((feature) => (
-            <Feature key={feature} label={feature} />
+          {features.map((feature, index) => (
+            <Feature key={`feature-${index}`} label={feature} />
           ))}
           {additionalCosts && (
             <>
@@ -601,9 +606,9 @@ function Plan({
   );
 }
 
-function Feature({ label }: { label: string }) {
+function Feature({ label, key }: { label: string | JSX.Element; key: string }) {
   return (
-    <HStack spacing={2}>
+    <HStack key={key} spacing={2}>
       {/* @ts-ignore */}
       <Check size={16} color="green" strokeWidth={3} />
       <Text>{label}</Text>
