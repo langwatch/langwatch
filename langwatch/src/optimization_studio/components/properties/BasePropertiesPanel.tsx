@@ -107,7 +107,7 @@ export function FieldsDefinition({
     setTimeout(() => {
       updateNodeInternals(node.id);
     }, 0);
-  }, [node.data.isEvaluator]);
+  }, [node.data.behave_as]);
 
   const watchedFields = watch("fields");
 

@@ -98,7 +98,7 @@ export const optimizationRouter = createTRPCRouter({
       const { workflowId, projectId, isEvaluator, isComponent } = input;
 
       try {
-        const result = await ctx.prisma.workflow.update({
+        await ctx.prisma.workflow.update({
           where: { id: workflowId, projectId: projectId },
           data: { isEvaluator, isComponent: !isEvaluator },
         });

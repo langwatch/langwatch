@@ -81,7 +81,6 @@ export function EndPropertiesPanel({ node: initialNode }: { node: Node<End> }) {
       hideOutputs
       hideParameters
       inputsTitle="Results"
-      inputsReadOnly={isEvaluator}
     >
       <HStack>
         <Text>Use as Evaluator</Text>
