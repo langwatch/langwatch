@@ -87,7 +87,9 @@ async def proxy_startup():
                 "AZURE_API_VERSION"
             ]
 
-        InitalizeOpenAISDKClient.set_client(litellm_router_instance=self, model=deployment)
+        InitalizeOpenAISDKClient.set_client(
+            litellm_router_instance=self, model=deployment
+        )
 
         return deployment
 

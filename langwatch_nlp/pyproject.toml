@@ -5,7 +5,7 @@ description = ""
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-    "dspy>=2.5.32,<2.6",
+    "dspy>=2.5.41,<2.6",
     "fastapi>=0.111.1,<1",
     "google-cloud-aiplatform>=1.70.0,<2",
     "httpx>=0.27.0,<0.28",

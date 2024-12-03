@@ -25,6 +25,8 @@ from langwatch_nlp.studio.utils import (
     transpose_inline_dataset_to_object_list,
 )
 
+from dspy.utils.asyncify import asyncify
+
 
 async def execute_flow(
     event: ExecuteFlowPayload,
@@ -88,7 +90,7 @@ async def execute_flow(
                 )
 
             try:
-                result = module(**entries[0])
+                result = await asyncify(module)(**entries[0])
 
             except Exception as e:
                 import traceback

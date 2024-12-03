@@ -245,3 +245,15 @@ def component_error_event(trace_id: str, node_id: str, error: str):
             ),
         )
     )
+
+
+def get_trace_id(event: StudioClientEvent):
+    return (
+        event.payload.trace_id  # type: ignore
+        if hasattr(event.payload, "trace_id")
+        else (
+            event.payload.run_id  # type: ignore
+            if hasattr(event.payload, "run_id")
+            else None
+        )
+    )

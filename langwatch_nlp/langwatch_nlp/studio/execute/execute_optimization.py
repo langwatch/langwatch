@@ -50,6 +50,7 @@ from sklearn.model_selection import train_test_split
 
 import dspy.primitives.module
 from dspy.teleprompt import MIPROv2
+from dspy.utils.asyncify import asyncify
 
 _original_postprocess_parameter_name = dspy.primitives.module.postprocess_parameter_name
 
@@ -166,7 +167,7 @@ async def execute_optimization(
         with redirect_stdout_to_queue(queue, run_id):
             if event.optimizer == "MIPROv2ZeroShot":
                 optimizer = cast(MIPROv2, optimizer)
-                optimized_program = optimizer.compile(
+                optimized_program = await asyncify(optimizer.compile)(
                     module,
                     trainset=train,
                     valset=test,
@@ -182,7 +183,7 @@ async def execute_optimization(
                 )
             elif event.optimizer == "MIPROv2":
                 optimizer = cast(MIPROv2, optimizer)
-                optimized_program = optimizer.compile(
+                optimized_program = await asyncify(optimizer.compile)(
                     module,
                     trainset=train,
                     valset=test,
@@ -198,7 +199,7 @@ async def execute_optimization(
                 )
             elif event.optimizer == "BootstrapFewShotWithRandomSearch":
                 optimizer = cast(dspy.BootstrapFewShotWithRandomSearch, optimizer)
-                optimized_program = optimizer.compile(
+                optimized_program = await asyncify(optimizer.compile)(
                     module, trainset=train, valset=test
                 )
 
