@@ -1,7 +1,7 @@
 import { useUpdateNodeInternals, type Node } from "@xyflow/react";
 import type { End } from "../../types/dsl";
 import { BasePropertiesPanel } from "./BasePropertiesPanel";
-import { Text, Switch, HStack } from "@chakra-ui/react";
+import { Text, Switch, HStack, Alert, AlertIcon } from "@chakra-ui/react";
 import { useEffect, useState } from "react";
 import { useWorkflowStore } from "~/optimization_studio/hooks/useWorkflowStore";
 
@@ -86,6 +86,12 @@ export function EndPropertiesPanel({ node: initialNode }: { node: Node<End> }) {
         <Text>Use as Evaluator</Text>
         <Switch isChecked={isEvaluator} onChange={() => setAsEvaluator()} />
       </HStack>
+      {isEvaluator && (
+        <Alert status="warning">
+          <AlertIcon />
+          <Text>Score or Passed must be provided</Text>
+        </Alert>
+      )}
     </BasePropertiesPanel>
   );
 }
