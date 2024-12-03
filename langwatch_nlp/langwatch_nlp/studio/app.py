@@ -38,8 +38,8 @@ from langwatch_nlp.studio.types.events import (
 from langwatch_nlp.studio.utils import shutdown_handler
 
 
-runtime = IsolatedProcessPoolRuntime()
-# runtime = AsyncRuntime()
+# runtime = IsolatedProcessPoolRuntime()
+runtime = AsyncRuntime()
 
 
 @asynccontextmanager
