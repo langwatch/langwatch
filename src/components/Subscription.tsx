@@ -271,7 +271,6 @@ export default function Subscription() {
                 ]}
                 additionalCosts={[
                   "Additional Traces - €50/100,000",
-                  "Additional Users - €19/user",
                   "Usage-based price for evaluations and guardrails",
                   ``,
                 ]}
