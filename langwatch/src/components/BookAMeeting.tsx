@@ -6,6 +6,7 @@ import {
   HStack,
   VStack,
   Link,
+  Text,
 } from "@chakra-ui/react";
 import { useEffect } from "react";
 import {
@@ -100,6 +101,7 @@ export const BookAMeeting = () => {
                 <Link href="/settings/subscription">
                   <Button colorScheme="green">Subscribe For Access</Button>
                 </Link>
+                <Text fontWeight="medium">7-day free trial</Text>
               </HStack>
             </VStack>
           </HStack>
