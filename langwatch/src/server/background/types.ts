@@ -9,6 +9,12 @@ import type {
   TrackEventRESTParamsValidator,
 } from "../tracer/types";
 
+export type Mappings =
+  | "trace.input"
+  | "trace.output"
+  | "trace.first_rag_context"
+  | "metadata.expected_output";
+
 export type TraceCheckJob = {
   check: {
     evaluation_id: string;

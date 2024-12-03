@@ -101,6 +101,7 @@ export const checksRouter = createTRPCRouter({
         checkType: z.string(),
         preconditions: checkPreconditionsSchema,
         settings: z.object({}).passthrough(),
+        mappings: z.object({}).passthrough(),
         sample: z.number().min(0).max(1),
         enabled: z.boolean().optional(),
         executionMode: z.enum([
@@ -122,6 +123,7 @@ export const checksRouter = createTRPCRouter({
         sample,
         enabled,
         executionMode,
+        mappings,
       } = input;
       const prisma = ctx.prisma;
       const slug = slugify(name, { lower: true, strict: true });
@@ -139,6 +141,7 @@ export const checksRouter = createTRPCRouter({
           sample,
           ...(enabled !== undefined && { enabled }),
           executionMode,
+          mappings,
         },
       });
 

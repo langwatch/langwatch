@@ -2,7 +2,7 @@ import { CostReferenceType, CostType } from "@prisma/client";
 import * as Sentry from "@sentry/nextjs";
 import { Worker, type Job } from "bullmq";
 import { nanoid } from "nanoid";
-import type { TraceCheckJob } from "~/server/background/types";
+import type { Mappings, TraceCheckJob } from "~/server/background/types";
 import { env } from "../../../env.mjs";
 import {
   AVAILABLE_EVALUATORS,
@@ -60,6 +60,7 @@ export const runEvaluationJob = async (
     traceId: job.data.trace.trace_id,
     evaluatorType: job.data.check.type,
     settings: check.parameters,
+    mappings: check.mappings as Record<Mappings, string>,
   });
 };
 
@@ -68,11 +69,13 @@ export const runEvaluationForTrace = async ({
   traceId,
   evaluatorType,
   settings,
+  mappings,
 }: {
   projectId: string;
   traceId: string;
   evaluatorType: EvaluatorTypes;
   settings: Record<string, any> | string | number | boolean | null;
+  mappings: Record<Mappings, string>;
 }): Promise<SingleEvaluationResult> => {
   const evaluator = AVAILABLE_EVALUATORS[evaluatorType];
 
@@ -95,14 +98,60 @@ export const runEvaluationForTrace = async ({
     };
   }
 
-  const input = trace.input?.value;
-  const output = trace.output?.value;
-  const expected_output = trace.expected_output?.value;
+  const inputMapping = (mappings ?? {})?.inputMapping;
+  const outputMapping = (mappings ?? {})?.outputMapping;
+  const ragContextMapping = (mappings ?? {})?.ragContextMapping;
+  const expectedOutputMapping = (mappings ?? {})?.expectedOutputMapping;
+
+  const switchMapping = (mapping: Mappings) => {
+    if (mapping === "trace.input") {
+      return trace.input?.value;
+    }
+    if (mapping === "trace.output") {
+      return trace.output?.value;
+    }
+    if (mapping === "trace.first_rag_context") {
+      const ragInfo = getRAGInfo(spans);
+      return ragInfo.contexts[0];
+    }
+    if (mapping === "metadata.expected_output") {
+      return trace.expected_output?.value;
+    }
+    // Use typescript to ensure all cases are handled
+    const _: never = mapping;
+    throw `Unknown mapping: ${mapping}`;
+  };
+
+  let input;
+  let output;
+  let expected_output;
+
+  if (inputMapping) {
+    input = switchMapping(inputMapping as Mappings);
+  } else {
+    input = trace.input?.value;
+  }
+
+  if (outputMapping) {
+    output = switchMapping(outputMapping as Mappings);
+  } else {
+    output = trace.output?.value;
+  }
+
+  if (expectedOutputMapping) {
+    expected_output = switchMapping(expectedOutputMapping as Mappings);
+  } else {
+    expected_output = trace.expected_output?.value;
+  }
 
   let contexts = undefined;
   if (evaluator.requiredFields.includes("contexts")) {
     const ragInfo = getRAGInfo(spans);
-    contexts = ragInfo.contexts;
+    if (ragContextMapping) {
+      contexts = switchMapping(ragContextMapping as Mappings);
+    } else {
+      contexts = ragInfo.contexts;
+    }
   }
 
   const threadId = trace.metadata.thread_id;
@@ -156,7 +205,7 @@ export const runEvaluation = async ({
   evaluatorType: EvaluatorTypes;
   input?: string;
   output?: string;
-  contexts?: string[];
+  contexts?: string[] | string | undefined;
   expected_output?: string;
   conversation?: Conversation;
   settings?: Record<string, unknown>;
