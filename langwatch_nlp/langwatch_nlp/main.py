@@ -3,10 +3,12 @@ import multiprocessing
 import os
 from typing import Dict, List, Optional, Union
 from dotenv import load_dotenv
-
-# from mangum import Mangum
+from tempfile import mkdtemp
 
 load_dotenv()
+# Necessary for running DSPy on AWS lambdas
+os.environ["DSP_CACHEDIR"] = mkdtemp()
+os.environ["DSPY_CACHEDIR"] = mkdtemp()
 
 import langwatch_nlp.error_tracking
 from fastapi import FastAPI
@@ -115,5 +117,7 @@ else:
 
 if __name__ == "__main__":
     multiprocessing.set_start_method("fork")
-# else:
-#     handler = Mangum(app, lifespan="off")
+else:
+    from mangum import Mangum
+
+    handler = Mangum(app, lifespan="off")

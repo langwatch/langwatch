@@ -2,15 +2,21 @@ FROM python:3.11-slim
 
 WORKDIR /usr/src/app
 
-RUN pip install poetry
-RUN pip install --target . awslambdaric
+RUN pip install uv
 
-COPY poetry.toml poetry.lock pyproject.toml .
-RUN poetry install
+COPY .python-version uv.lock pyproject.toml .
+RUN uv sync
+
+RUN uv pip install awslambdaric
 
 COPY . .
 
+# Preload for faster subsequent startups
+RUN PYTHONPATH=. uv run python langwatch_nlp/main.py
+
+ENV RUNNING_IN_DOCKER=true
+
 EXPOSE 8080
 
-ENTRYPOINT [ "/usr/local/bin/poetry", "run", "python", "-m", "awslambdaric" ]
+ENTRYPOINT [ "uv", "--no-cache", "run", "python", "-m", "awslambdaric" ]
 CMD [ "langwatch_nlp.main.handler" ]

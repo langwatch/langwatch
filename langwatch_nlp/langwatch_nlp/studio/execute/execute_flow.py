@@ -1,8 +1,8 @@
-from multiprocessing import Queue
 import time
 from typing import Dict, Set, cast
 
 import langwatch
+from langwatch_nlp.studio.runtimes.base_runtime import ServerEventQueue
 from langwatch_nlp.studio.dspy.workflow_module import WorkflowModule
 from langwatch_nlp.studio.types.dsl import (
     Entry,
@@ -30,7 +30,7 @@ from dspy.utils.asyncify import asyncify
 
 async def execute_flow(
     event: ExecuteFlowPayload,
-    queue: "Queue[StudioServerEvent]",
+    queue: "ServerEventQueue",
 ):
     validate_workflow(event.workflow)
 

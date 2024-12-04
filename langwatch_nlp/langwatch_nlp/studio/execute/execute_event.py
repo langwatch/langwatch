@@ -1,8 +1,8 @@
-from multiprocessing import Queue
 import traceback
-from typing import AsyncGenerator
+from typing import AsyncGenerator, Union
 
 
+from langwatch_nlp.studio.runtimes.base_runtime import ServerEventQueue
 from langwatch_nlp.studio.execute.execute_component import execute_component
 from langwatch_nlp.studio.execute.execute_evaluation import (
     execute_evaluation,
@@ -26,7 +26,7 @@ from langwatch_nlp.studio.types.events import (
 
 async def execute_event(
     event: StudioClientEvent,
-    queue: "Queue[StudioServerEvent]",
+    queue: "ServerEventQueue",
 ) -> AsyncGenerator[StudioServerEvent, None]:
     yield Debug(payload=DebugPayload(message="server starting execution"))
 

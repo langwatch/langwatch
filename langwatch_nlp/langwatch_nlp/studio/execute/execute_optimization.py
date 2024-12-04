@@ -6,6 +6,7 @@ import time
 from typing import Optional, cast
 import dspy
 import langwatch
+from langwatch_nlp.studio.runtimes.base_runtime import ServerEventQueue
 from langwatch_nlp.studio.dspy.evaluation import (
     EvaluationReporting,
     PredictionWithEvaluationAndMetadata,
@@ -66,7 +67,7 @@ dspy.primitives.module.postprocess_parameter_name = postprocess_parameter_name
 
 
 async def execute_optimization(
-    event: ExecuteOptimizationPayload, queue: "Queue[StudioServerEvent]"
+    event: ExecuteOptimizationPayload, queue: "ServerEventQueue"
 ):
     workflow = event.workflow
     run_id = event.run_id

@@ -1,6 +1,4 @@
 import asyncio
-from contextlib import contextmanager
-from multiprocessing import Queue
 import threading
 import time
 from typing import Callable, List, Optional, Any, Tuple, Literal, overload
@@ -9,17 +7,16 @@ import langwatch
 from pydantic import BaseModel
 import dspy
 from tenacity import retry, stop_after_attempt, wait_exponential
+from langwatch_nlp.studio.runtimes.base_runtime import ServerEventQueue
 from langwatch_nlp.studio.dspy.predict_with_metadata import (
     PredictionWithMetadata,
 )
-from langevals_core.base_evaluator import SingleEvaluationResult, EvaluationResult
-from langwatch.types import Money
+from langevals_core.base_evaluator import SingleEvaluationResult
 
 from langwatch_nlp.studio.types.dsl import EvaluationExecutionState, Workflow
 from langwatch_nlp.studio.types.events import (
     EvaluationStateChange,
     EvaluationStateChangePayload,
-    StudioServerEvent,
 )
 from langwatch_nlp.studio.utils import get_node_by_id
 
@@ -119,7 +116,7 @@ class EvaluationReporting:
         workflow_version_id: str,
         run_id: str,
         total: int,
-        queue: "Queue[StudioServerEvent]",
+        queue: "ServerEventQueue",
     ):
         self.workflow = workflow
         self.workflow_version_id = workflow_version_id
@@ -152,7 +149,7 @@ class EvaluationReporting:
             self.add_to_batch(example, pred, evaluation_results)
             self.progress += 1
 
-        self.queue.put(
+        self.queue.put_nowait(
             EvaluationStateChange(
                 payload=EvaluationStateChangePayload(
                     evaluation_state=EvaluationExecutionState(
