@@ -2,7 +2,7 @@ import { useUpdateNodeInternals, type Node } from "@xyflow/react";
 import type { End } from "../../types/dsl";
 import { BasePropertiesPanel } from "./BasePropertiesPanel";
 import { Text, Switch, HStack, Alert, AlertIcon } from "@chakra-ui/react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useWorkflowStore } from "~/optimization_studio/hooks/useWorkflowStore";
 
 export function EndPropertiesPanel({ node: initialNode }: { node: Node<End> }) {
@@ -19,9 +19,7 @@ export function EndPropertiesPanel({ node: initialNode }: { node: Node<End> }) {
   const updateNodeInternals = useUpdateNodeInternals();
 
   const [isEvaluator, setIsEvaluator] = useState(
-    () =>
-      node.data.inputs?.length === 3 &&
-      node.data.inputs[0]?.identifier === "score"
+    () => node.data.behave_as === "evaluator"
   );
 
   const evaluatorInputs = [
@@ -38,13 +36,6 @@ export function EndPropertiesPanel({ node: initialNode }: { node: Node<End> }) {
       identifier: "details",
     },
   ];
-
-  useEffect(() => {
-    setIsEvaluator(
-      node.data.inputs?.length === 3 &&
-        node.data.inputs[0]?.identifier === "score"
-    );
-  }, [node.data.inputs]);
 
   const setAsEvaluator = () => {
     if (!isEvaluator) {
