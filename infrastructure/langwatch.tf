@@ -63,7 +63,7 @@ resource "kubernetes_deployment" "langwatch" {
   }
 
   spec {
-    replicas = 1
+    replicas               = 1
     revision_history_limit = 1
 
     selector {
@@ -81,8 +81,8 @@ resource "kubernetes_deployment" "langwatch" {
 
       spec {
         container {
-          name  = "langwatch"
-          image = "${aws_ecr_repository.langwatch.repository_url}:${local.tag}"
+          name              = "langwatch"
+          image             = "${aws_ecr_repository.langwatch.repository_url}:${local.tag}"
           image_pull_policy = "Always"
 
           port {
@@ -92,6 +92,11 @@ resource "kubernetes_deployment" "langwatch" {
           env {
             name  = "LANGWATCH_NLP_SERVICE"
             value = aws_lambda_function_url.langwatch_nlp[0].function_url
+          }
+
+          env {
+            name  = "TOPIC_CLUSTERING_SERVICE"
+            value = "http://langwatch-nlp-service"
           }
 
           env {
@@ -129,9 +134,9 @@ resource "kubernetes_deployment" "langwatch" {
               port = 3000
             }
             initial_delay_seconds = 30
-            period_seconds       = 30
-            timeout_seconds     = 5
-            failure_threshold   = 3
+            period_seconds        = 30
+            timeout_seconds       = 5
+            failure_threshold     = 3
           }
         }
       }
@@ -152,11 +157,11 @@ resource "kubernetes_service" "langwatch" {
   metadata {
     name = "langwatch-service"
     annotations = {
-      "service.beta.kubernetes.io/aws-load-balancer-type" = "nlb"
-      "service.beta.kubernetes.io/aws-load-balancer-subnets" = join(",", [aws_subnet.public_subnet_1.id, aws_subnet.public_subnet_2.id])
-      "service.beta.kubernetes.io/aws-load-balancer-ssl-cert" = aws_acm_certificate.cert[0].arn
-      "service.beta.kubernetes.io/aws-load-balancer-ssl-ports" = "443"
-      "service.beta.kubernetes.io/aws-load-balancer-backend-protocol" = "tcp"
+      "service.beta.kubernetes.io/aws-load-balancer-type"                   = "nlb"
+      "service.beta.kubernetes.io/aws-load-balancer-subnets"                = join(",", [aws_subnet.public_subnet_1.id, aws_subnet.public_subnet_2.id])
+      "service.beta.kubernetes.io/aws-load-balancer-ssl-cert"               = aws_acm_certificate.cert[0].arn
+      "service.beta.kubernetes.io/aws-load-balancer-ssl-ports"              = "443"
+      "service.beta.kubernetes.io/aws-load-balancer-backend-protocol"       = "tcp"
       "service.beta.kubernetes.io/aws-load-balancer-ssl-negotiation-policy" = "ELBSecurityPolicy-TLS13-1-2-2021-06"
     }
   }
@@ -198,7 +203,7 @@ resource "kubernetes_service" "langwatch_internal" {
       target_port = 3000
     }
 
-    type = "ClusterIP"  # Internal only
+    type = "ClusterIP" # Internal only
   }
 
   depends_on = [
