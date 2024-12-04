@@ -117,7 +117,3 @@ else:
 
 if __name__ == "__main__":
     multiprocessing.set_start_method("fork")
-else:
-    from mangum import Mangum
-
-    handler = Mangum(app, lifespan="off")

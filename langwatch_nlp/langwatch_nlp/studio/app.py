@@ -7,7 +7,7 @@ import asyncio
 from queue import Empty
 import time
 from typing import Any, AsyncGenerator, Union, cast
-from fastapi import FastAPI, Response, BackgroundTasks, HTTPException
+from fastapi import FastAPI, Request, Response, BackgroundTasks, HTTPException
 from fastapi.responses import StreamingResponse
 import json
 
@@ -40,10 +40,13 @@ from langwatch_nlp.studio.utils import shutdown_handler
 
 
 runtime_env = os.getenv("STUDIO_RUNTIME", "isolated_process_pool")
-runtime = cast(Union[AsyncRuntime, IsolatedProcessPoolRuntime], {
-    "async": AsyncRuntime(),
-    "isolated_process_pool": IsolatedProcessPoolRuntime(),
-}[runtime_env])
+runtime = cast(
+    Union[AsyncRuntime, IsolatedProcessPoolRuntime],
+    {
+        "async": AsyncRuntime(),
+        "isolated_process_pool": IsolatedProcessPoolRuntime(),
+    }[runtime_env],
+)
 
 
 @asynccontextmanager

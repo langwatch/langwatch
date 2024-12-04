@@ -98,7 +98,7 @@ const handleComponentError = (
 const callPython = async (
   ws: WebSocket,
   event: StudioClientEvent,
-  projectId: string
+  _projectId: string
 ) => {
   let response: Response;
   try {
@@ -109,8 +109,6 @@ const callPython = async (
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          // To keep load balancer sticky
-          Cookie: `LW_PROJECT_ID=${projectId}`,
         },
         body: JSON.stringify(event),
       }

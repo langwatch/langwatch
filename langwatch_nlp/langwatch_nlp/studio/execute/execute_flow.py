@@ -105,7 +105,7 @@ async def execute_flow(
 
         yield end_workflow_event(workflow, trace_id, result)
     finally:
-        trace.send_spans()
+        await asyncify(trace.send_spans)()
 
 
 def start_workflow_event(workflow: Workflow, trace_id: str):

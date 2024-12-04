@@ -1,4 +1,5 @@
-FROM python:3.11-slim
+FROM public.ecr.aws/docker/library/python:3.11.0-slim-bullseye
+COPY --from=public.ecr.aws/awsguru/aws-lambda-adapter:0.8.4 /lambda-adapter /opt/extensions/lambda-adapter
 
 WORKDIR /usr/src/app
 
@@ -6,8 +7,6 @@ RUN pip install uv
 
 COPY .python-version uv.lock pyproject.toml .
 RUN uv sync
-
-RUN uv pip install awslambdaric
 
 COPY . .
 
@@ -18,5 +17,4 @@ ENV RUNNING_IN_DOCKER=true
 
 EXPOSE 8080
 
-ENTRYPOINT [ "uv", "--no-cache", "run", "python", "-m", "awslambdaric" ]
-CMD [ "langwatch_nlp.main.handler" ]
+CMD uv --no-cache run uvicorn langwatch_nlp.main:app --host 0.0.0.0 --port 8080 --timeout-keep-alive 4500
