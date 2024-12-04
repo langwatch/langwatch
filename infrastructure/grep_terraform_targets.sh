@@ -15,7 +15,7 @@ commented_out_resources=$(grep "^# resource" "$file" | awk '{print $3 "." $4}' |
 set -e
 resources="$resources $commented_out_resources"
 
-if [ -z "$resources" ]; then
+if [ -z "${resources// }" ]; then
     echo "No resources found in $file"
     exit 1
 fi

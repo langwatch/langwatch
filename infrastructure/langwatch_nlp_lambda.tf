@@ -77,6 +77,95 @@ resource "aws_iam_role_policy_attachment" "langwatch_nlp_basic" {
   role       = aws_iam_role.langwatch_nlp.name
 }
 
+# S3 Bucket for NLP Lambda cache
+resource "aws_s3_bucket" "langwatch_nlp_cache" {
+  bucket = "langwatch-nlp-cache-${data.aws_caller_identity.current.account_id}"
+}
+
+# Add CloudWatch metric and alarm for bucket size
+resource "aws_cloudwatch_metric_alarm" "bucket_size_alarm" {
+  alarm_name          = "langwatch-nlp-cache-size-alarm"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = "1"
+  metric_name         = "BucketSizeBytes"
+  namespace           = "AWS/S3"
+  period              = "86400" # 24 hours
+  statistic           = "Average"
+  threshold           = 1073741824 # 1GB - alert before hitting limit
+  alarm_description   = "This metric monitors S3 bucket size"
+  alarm_actions       = [] # Add SNS topic ARN here if you want notifications
+
+  dimensions = {
+    BucketName  = aws_s3_bucket.langwatch_nlp_cache.id
+    StorageType = "StandardStorage"
+  }
+}
+
+# Server-side encryption
+resource "aws_s3_bucket_server_side_encryption_configuration" "langwatch_nlp_cache" {
+  bucket = aws_s3_bucket.langwatch_nlp_cache.id
+
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm = "AES256"
+    }
+  }
+}
+
+# Lifecycle rule to delete objects after 24 hours
+resource "aws_s3_bucket_lifecycle_configuration" "langwatch_nlp_cache" {
+  bucket = aws_s3_bucket.langwatch_nlp_cache.id
+
+  rule {
+    id     = "delete-after-24h"
+    status = "Enabled"
+
+    expiration {
+      days = 1
+    }
+  }
+}
+
+# Block public access
+resource "aws_s3_bucket_public_access_block" "langwatch_nlp_cache" {
+  bucket = aws_s3_bucket.langwatch_nlp_cache.id
+
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+# IAM policy for Lambda to access S3 bucket
+resource "aws_iam_policy" "langwatch_nlp_s3_access" {
+  name = "langwatch-nlp-s3-access"
+  path = "/"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "s3:GetObject",
+          "s3:PutObject",
+          "s3:DeleteObject"
+        ]
+        Resource = [
+          "${aws_s3_bucket.langwatch_nlp_cache.arn}/cache/*",
+          "${aws_s3_bucket.langwatch_nlp_cache.arn}/kill/*"
+        ]
+      },
+    ]
+  })
+}
+
+# Attach S3 access policy to Lambda role
+resource "aws_iam_role_policy_attachment" "langwatch_nlp_s3_access" {
+  policy_arn = aws_iam_policy.langwatch_nlp_s3_access.arn
+  role       = aws_iam_role.langwatch_nlp.name
+}
+
 # Lambda function
 resource "aws_lambda_function" "langwatch_nlp" {
   count = module.variables.profile == "lw-prod" ? 1 : 0
@@ -96,6 +185,7 @@ resource "aws_lambda_function" "langwatch_nlp" {
       LANGWATCH_ENDPOINT  = "https://app.langwatch.ai"
       STUDIO_RUNTIME      = "async"
       AWS_LWA_INVOKE_MODE = "RESPONSE_STREAM"
+      CACHE_BUCKET        = aws_s3_bucket.langwatch_nlp_cache.id
     }
   }
 
@@ -186,7 +276,7 @@ resource "aws_lambda_function" "langwatch_nlp_warmer" {
 
   environment {
     variables = {
-      TARGET_URL  = aws_lambda_function_url.langwatch_nlp[0].function_url
+      TARGET_URL  = trimsuffix(aws_lambda_function_url.langwatch_nlp[0].function_url, "/")
       CONCURRENCY = "20"
     }
   }
