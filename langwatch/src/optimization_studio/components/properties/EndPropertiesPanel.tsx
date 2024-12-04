@@ -5,6 +5,21 @@ import { Text, Switch, HStack, Alert, AlertIcon } from "@chakra-ui/react";
 import { useState } from "react";
 import { useWorkflowStore } from "~/optimization_studio/hooks/useWorkflowStore";
 
+export const evaluatorInputs = [
+  {
+    type: "float",
+    identifier: "score",
+  },
+  {
+    type: "bool",
+    identifier: "passed",
+  },
+  {
+    type: "str",
+    identifier: "details",
+  },
+];
+
 export function EndPropertiesPanel({ node: initialNode }: { node: Node<End> }) {
   const { node, setNode } = useWorkflowStore(
     (state) => ({
@@ -21,21 +36,6 @@ export function EndPropertiesPanel({ node: initialNode }: { node: Node<End> }) {
   const [isEvaluator, setIsEvaluator] = useState(
     () => node.data.behave_as === "evaluator"
   );
-
-  const evaluatorInputs = [
-    {
-      type: "float",
-      identifier: "score",
-    },
-    {
-      type: "bool",
-      identifier: "passed",
-    },
-    {
-      type: "str",
-      identifier: "details",
-    },
-  ];
 
   const setAsEvaluator = () => {
     if (!isEvaluator) {
