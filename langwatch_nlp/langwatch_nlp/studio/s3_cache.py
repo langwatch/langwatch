@@ -83,6 +83,16 @@ class S3Syncer:
         self.known_files.discard(file_path)
 
 
+def s3_client_and_bucket():
+    s3_client = boto3.client(
+        "s3",
+        endpoint_url=os.environ.get("AWS_ENDPOINT_URL"),
+    )
+    bucket_name = os.environ.get("CACHE_BUCKET")
+
+    return s3_client, bucket_name
+
+
 def setup_s3_cache(s3_cache_key: str):
     """
     Sets up S3-based caching for DSPy optimizations.
@@ -115,7 +125,7 @@ def setup_s3_cache(s3_cache_key: str):
             if not event.is_directory:
                 self.syncer.process_deletions(event.src_path)
 
-    bucket_name = os.environ.get("CACHE_BUCKET")
+    s3_client, bucket_name = s3_client_and_bucket()
     if not bucket_name:
         logger.warning("Warning: CACHE_BUCKET not set, caching disabled")
         return
@@ -125,12 +135,6 @@ def setup_s3_cache(s3_cache_key: str):
 
     # Define cache path
     bucket_cache_path = f"/cache/{s3_cache_key}"
-
-    # Use boto3 to list and download existing cache files
-    s3_client = boto3.client(
-        "s3",
-        endpoint_url=os.environ.get("AWS_ENDPOINT_URL"),  # For testing with localstack
-    )
 
     logger.info("Fetching cache from s3 for optimization...")
 

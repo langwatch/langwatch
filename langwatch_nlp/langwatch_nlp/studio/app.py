@@ -1,6 +1,9 @@
 from contextlib import asynccontextmanager
 import os
 import signal
+import langwatch_nlp.studio.runtimes.lambda_runtime as lambda_runtime
+from langwatch_nlp.logger import get_logger
+from langwatch_nlp.studio.s3_cache import s3_client_and_bucket
 from langwatch_nlp.studio.runtimes.base_runtime import BaseRuntime
 import langwatch_nlp.error_tracking
 import asyncio
@@ -24,6 +27,9 @@ from langwatch_nlp.studio.runtimes.isolated_process_pool import (
 )
 from langwatch_nlp.studio.types.events import (
     Done,
+    ExecuteComponent,
+    ExecuteEvaluation,
+    ExecuteFlow,
     ExecuteOptimization,
     ExecutionStateChange,
     StopEvaluationExecution,
@@ -38,6 +44,7 @@ from langwatch_nlp.studio.types.events import (
 )
 from langwatch_nlp.studio.utils import shutdown_handler
 
+logger = get_logger(__name__)
 
 runtime_env = os.getenv("STUDIO_RUNTIME", "isolated_process_pool")
 runtime = cast(
@@ -65,56 +72,86 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 
 
+async def handle_interruption(event: StudioClientEvent):
+    # TODO: maybe we should handle this always based on the target event being interrupted not the stop event?
+    if (
+        isinstance(event, StopExecution)
+        or isinstance(event, ExecuteComponent)
+        or isinstance(event, ExecuteFlow)
+    ):
+        if hasattr(event.payload, "node_id") and event.payload.node_id:  # type: ignore
+            return component_error_event(
+                trace_id=event.payload.trace_id,
+                node_id=event.payload.node_id,  # type: ignore
+                error="Interrupted",
+            )
+        else:
+            return Error(payload=ErrorPayload(message="Interrupted"))
+
+    if isinstance(event, StopEvaluationExecution) or isinstance(
+        event, ExecuteEvaluation
+    ):
+        EvaluationReporting.post_results(
+            event.payload.workflow.api_key,
+            {
+                "experiment_slug": event.payload.workflow.workflow_id,
+                "run_id": event.payload.run_id,
+                "timestamps": {
+                    "finished_at": int(time.time() * 1000),
+                    "stopped_at": int(time.time() * 1000),
+                },
+            },
+        )
+        return error_evaluation_event(
+            run_id=event.payload.run_id,
+            error="Evaluation Stopped",
+            stopped_at=int(time.time() * 1000),
+        )
+
+    if isinstance(event, StopOptimizationExecution) or isinstance(
+        event, ExecuteOptimization
+    ):
+        return error_optimization_event(
+            run_id=event.payload.run_id,
+            error="Optimization Stopped",
+            stopped_at=int(time.time() * 1000),
+        )
+
+
+async def stop_process(event: StudioClientEvent, s3_cache_key: str | None = None):
+    trace_id = get_trace_id(event)
+    if not trace_id:
+        return None
+
+    if s3_cache_key:
+        lambda_runtime.stop_process(trace_id, s3_cache_key)
+    elif trace_id in runtime.running_processes:
+        await runtime.stop_process(trace_id)
+        return await handle_interruption(event)
+
+    return None
+
+
 # We execute events on a subprocess because each user might execute completely different code,
 # which can alter the global Python interpreter state in unpredictable ways. DSPy itself does
 # a lot of this. At same time, we want to fork the main process to avoid double RAM spending and
 # startup times.
-async def execute_event_on_a_subprocess(event: StudioClientEvent):
-    if isinstance(event, StopExecution):
-        if event.payload.trace_id in runtime.running_processes:
-            await runtime.stop_process(event.payload.trace_id)
-            if event.payload.node_id:
-                yield component_error_event(
-                    trace_id=event.payload.trace_id,
-                    node_id=event.payload.node_id,
-                    error="Interrupted",
-                )
-            else:
-                yield Error(payload=ErrorPayload(message="Interrupted"))
-        return
-
-    if isinstance(event, StopEvaluationExecution):
-        if event.payload.run_id in runtime.running_processes:
-            await runtime.stop_process(event.payload.run_id)
-            EvaluationReporting.post_results(
-                event.payload.workflow.api_key,
-                {
-                    "experiment_slug": event.payload.workflow.workflow_id,
-                    "run_id": event.payload.run_id,
-                    "timestamps": {
-                        "finished_at": int(time.time() * 1000),
-                        "stopped_at": int(time.time() * 1000),
-                    },
-                },
-            )
-            yield error_evaluation_event(
-                run_id=event.payload.run_id,
-                error="Evaluation Stopped",
-                stopped_at=int(time.time() * 1000),
-            )
-        return
-
-    if isinstance(event, StopOptimizationExecution):
-        if event.payload.run_id in runtime.running_processes:
-            await runtime.stop_process(event.payload.run_id)
-            yield error_optimization_event(
-                run_id=event.payload.run_id,
-                error="Optimization Stopped",
-                stopped_at=int(time.time() * 1000),
-            )
+async def execute_event_on_a_subprocess(
+    event: StudioClientEvent, s3_cache_key: str | None = None
+):
+    if (
+        isinstance(event, StopExecution)
+        or isinstance(event, StopEvaluationExecution)
+        or isinstance(event, StopOptimizationExecution)
+    ):
+        if stop_event := await stop_process(event, s3_cache_key):
+            yield stop_event
         return
 
     process, queue = await runtime.submit(event)
+
+    if s3_cache_key and (trace_id := get_trace_id(event)):
+        lambda_runtime.setup_kill_signal_watcher(event, queue, s3_cache_key, trace_id)
 
     process = cast(Any, process)
 
@@ -171,12 +208,12 @@ async def execute(
     background_tasks: BackgroundTasks,
 ):
     response.headers["Cache-Control"] = "no-cache"
-    s3_cache_key = request.headers.get("X-S3-Cache-Key")
-    if isinstance(event, ExecuteOptimization):
+    s3_cache_key = request.headers.get("X-S3-Cache-Key", None)
+    if s3_cache_key and isinstance(event, ExecuteOptimization):
         event.payload.s3_cache_key = s3_cache_key
 
     return StreamingResponse(
-        event_encoder(execute_event_on_a_subprocess(event)),
+        event_encoder(execute_event_on_a_subprocess(event, s3_cache_key)),
         media_type="text/event-stream",
     )
 
