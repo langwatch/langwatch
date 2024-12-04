@@ -24,13 +24,23 @@ resource "null_resource" "langwatch_nlp_k8s_docker_image" {
       aws ecr get-login-password --profile ${module.variables.profile} --region ${data.aws_region.current.name} | docker login --username AWS --password-stdin ${data.aws_caller_identity.current.account_id}.dkr.ecr.${data.aws_region.current.name}.amazonaws.com || true
 
       set +e
+      last_tag=$(aws ecr --profile ${module.variables.profile} --region ${data.aws_region.current.name} describe-images --repository-name ${aws_ecr_repository.langwatch_nlp_k8s.name} \
+        --query 'sort_by(imageDetails,& imagePushedAt)[*].imageTags[0]' --output yaml \
+        | tail -n 1 | awk -F'- ' '{print $2}')
+      set -e
+      cache_from=""
+      if [ -n "$last_tag" ]; then
+        cache_from="--cache-from type=registry,ref=${aws_ecr_repository.langwatch_nlp_k8s.repository_url}:$last_tag"
+      fi
+
+      set +e
       image_exists=$(docker manifest inspect ${data.aws_ecr_repository.langwatch_nlp_k8s.repository_url}:${local.langwatch_nlp_k8s_tag} > /dev/null 2>&1 && echo yes)
       set -e
       if [ -z "$image_exists" ]; then
-        docker buildx build . -f Dockerfile --platform="linux/arm64" --cache-to type=inline --push -t ${data.aws_ecr_repository.langwatch_nlp_k8s.repository_url}:${local.langwatch_nlp_k8s_tag}
+        docker buildx build . -f Dockerfile --platform="linux/arm64" $cache_from --cache-to type=inline --push -t ${data.aws_ecr_repository.langwatch_nlp_k8s.repository_url}:${local.langwatch_nlp_k8s_tag}
         set +e
-        # MANIFEST=$(aws ecr --profile ${module.variables.profile} --region ${data.aws_region.current.name} batch-get-image --repository-name ${aws_ecr_repository.langwatch_nlp_k8s.name} --image-ids imageTag=${local.langwatch_nlp_k8s_tag} --query 'images[].imageManifest' --output text)
-        # aws ecr --profile ${module.variables.profile} --region ${data.aws_region.current.name} put-image --repository-name ${aws_ecr_repository.langwatch_nlp_k8s.name} --image-tag ${local.langwatch_nlp_k8s_git_tag} --image-manifest "$MANIFEST"
+        MANIFEST=$(aws ecr --profile ${module.variables.profile} --region ${data.aws_region.current.name} batch-get-image --repository-name ${aws_ecr_repository.langwatch_nlp_k8s.name} --image-ids imageTag=${local.langwatch_nlp_k8s_tag} --query 'images[].imageManifest' --output text)
+        aws ecr --profile ${module.variables.profile} --region ${data.aws_region.current.name} put-image --repository-name ${aws_ecr_repository.langwatch_nlp_k8s.name} --image-tag ${local.langwatch_nlp_k8s_git_tag} --image-manifest "$MANIFEST"
         set -e
       fi
       cd -
