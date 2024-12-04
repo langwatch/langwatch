@@ -50,7 +50,7 @@ resource "null_resource" "langwatch_nlp_k8s_docker_image" {
     on_failure  = fail
   }
 
-  depends_on = [aws_ecr_repository.langwatch_nlp_k8s]
+  depends_on = [aws_ecr_repository.langwatch_nlp_k8s, null_resource.langwatch_nlp_docker_image]
 }
 
 # LangWatch NLP Kubernetes Deployment
