@@ -2,6 +2,7 @@ import {
   Box,
   HStack,
   Input,
+  Switch,
   Text,
   Textarea,
   useDisclosure,
@@ -13,12 +14,16 @@ import { LLMConfigField } from "./modals/LLMConfigModal";
 import { WorkflowIcon } from "../ColorfulBlockIcons";
 import { EmojiPickerModal } from "./modals/EmojiPickerModal";
 import { useState } from "react";
+import { useUpdateNodeInternals } from "@xyflow/react";
+import { evaluatorInputs } from "./EndPropertiesPanel";
+import type { End } from "../../types/dsl";
 
 export function WorkflowPropertiesPanel() {
-  const { getWorkflow, setWorkflow } = useWorkflowStore(
-    ({ getWorkflow, setWorkflow }) => ({
+  const { getWorkflow, setWorkflow, setNode } = useWorkflowStore(
+    ({ getWorkflow, setWorkflow, setNode }) => ({
       getWorkflow,
       setWorkflow,
+      setNode,
     })
   );
 
@@ -29,6 +34,43 @@ export function WorkflowPropertiesPanel() {
   const [description, setDescription] = useState<string | undefined>(undefined);
 
   const { isOpen, onClose, onToggle } = useDisclosure();
+
+  const updateNodeInternals = useUpdateNodeInternals();
+
+  const endNode = workflow.nodes.find((n) => n.type === "end");
+
+  const [isEvaluator, setIsEvaluator] = useState(
+    () => endNode?.data.behave_as === "evaluator"
+  );
+
+  const setAsEvaluator = () => {
+    if (!endNode) return; // Add this check
+
+    if (!isEvaluator) {
+      setNode({
+        id: endNode.id,
+        data: {
+          ...endNode.data,
+          inputs: evaluatorInputs,
+          behave_as: "evaluator",
+        } as End,
+      });
+      updateNodeInternals(endNode.id);
+      setIsEvaluator(true);
+    } else {
+      setNode({
+        id: endNode.id,
+        data: {
+          ...endNode.data,
+          inputs: [{ type: "str", identifier: "output" }],
+          behave_as: undefined,
+        } as End,
+      });
+
+      updateNodeInternals(endNode.id);
+      setIsEvaluator(false);
+    }
+  };
 
   return (
     <BasePropertiesPanel
@@ -154,6 +196,10 @@ export function WorkflowPropertiesPanel() {
           }}
         />
       </PropertyField>
+      <HStack paddingLeft={2}>
+        <Text>Use as Evaluator</Text>
+        <Switch isChecked={isEvaluator} onChange={() => setAsEvaluator()} />
+      </HStack>
     </BasePropertiesPanel>
   );
 }

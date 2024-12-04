@@ -1,5 +1,6 @@
 import json
 from typing import Any, Dict, List, Optional, Union, cast
+from langwatch_nlp.studio.modules.evaluators.evaluator_wrapper import EvaluatorWrapper
 from langwatch_nlp.studio.dspy.llm_node import LLMNode
 from langwatch_nlp.studio.dspy.retrieve import ContextsRetriever
 from langwatch_nlp.studio.modules.evaluators.langwatch import LangWatchEvaluator
@@ -38,6 +39,7 @@ from langwatch_nlp.studio.utils import (
     transpose_inline_dataset_to_object_list,
 )
 
+
 def parse_component(node: Node, workflow: Workflow) -> dspy.Module:
     match node.type:
         case "signature":
@@ -67,6 +69,7 @@ def apiCall(inputs, api_key, endpoint, workflow_id, version_id):
         headers={"X-Auth-Token": api_key},
         json=inputs,
     )
+
     return response.json()
 
 
@@ -80,6 +83,9 @@ def parse_custom(component: Custom, workflow: Workflow) -> dspy.Module:
                 component.workflow_id,
                 component.version_id,
             )["result"]
+
+    if component.behave_as == "evaluator":
+        return EvaluatorWrapper(CustomNode())
 
     return CustomNode()
 
@@ -133,7 +139,7 @@ def parse_signature(
         except StopIteration:
             raise ValueError(f"Decorator node {prompting_technique.ref} not found")
         PromptingTechniqueClass = parse_prompting_technique(decorator_node.data)
-        predict = PromptingTechniqueClass(SignatureClass) # type: ignore
+        predict = PromptingTechniqueClass(SignatureClass)  # type: ignore
     else:
         predict = dspy.Predict(SignatureClass)
 

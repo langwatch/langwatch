@@ -12,7 +12,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { useUpdateNodeInternals, type Node } from "@xyflow/react";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { ChevronDown, Columns, Info, Plus, Trash2, X } from "react-feather";
 import { useFieldArray, useForm } from "react-hook-form";
 import { useShallow } from "zustand/react/shallow";
@@ -74,7 +74,6 @@ export function FieldsDefinition({
       setNode: state.setNode,
     }))
   );
-
   const {
     control,
     handleSubmit,
@@ -86,12 +85,13 @@ export function FieldsDefinition({
     },
   });
 
-  const { fields, append, remove } = useFieldArray({
+  const { fields, append, remove, replace } = useFieldArray({
     control,
     name: "fields",
   });
 
   const updateNodeInternals = useUpdateNodeInternals();
+
   const onSubmit = (data: FieldArrayForm) => {
     setNode({
       id: node.id,
@@ -99,6 +99,15 @@ export function FieldsDefinition({
     });
     updateNodeInternals(node.id);
   };
+
+  useEffect(() => {
+    const currentFields = node.data[field] ?? [];
+    replace(currentFields);
+
+    setTimeout(() => {
+      updateNodeInternals(node.id);
+    }, 0);
+  }, [node.data.behave_as]);
 
   const watchedFields = watch("fields");
 
@@ -213,9 +222,10 @@ export function FieldsDefinition({
                         {field === "inputs" && (
                           <option value="image">image</option>
                         )}
-                        {/* <option value="float">float</option>
-                        <option value="int">int</option>
+                        <option value="float">float</option>
+
                         <option value="bool">bool</option>
+                        {/* <option value="int">int</option>
                         <option value="list[str]">list[str]</option>
                         <option value="list[float]">list[float]</option>
                         <option value="list[int]">list[int]</option>

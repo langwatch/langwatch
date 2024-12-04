@@ -51,6 +51,7 @@ export type BaseComponent = {
   inputs?: Field[];
   outputs?: Field[];
   isCustom?: boolean;
+  behave_as?: "evaluator";
 
   execution_state?: {
     status: ExecutionStatus;
@@ -121,6 +122,7 @@ export type Evaluator = Omit<BaseComponent, "cls"> & {
 
 export type End = BaseComponent & {
   outputs?: never;
+  isEvaluator?: boolean;
 };
 
 export type Component =
@@ -130,7 +132,8 @@ export type Component =
   | Signature
   | Module
   | Evaluator
-  | End;
+  | End
+  | Custom;
 
 type Flow = {
   nodes: Node<Component>[];

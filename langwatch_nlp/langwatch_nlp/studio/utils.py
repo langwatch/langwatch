@@ -127,7 +127,10 @@ def get_output_keys(workflow: Workflow) -> List[str]:
         if (
             edge.source == entry_node.id
             and edge.sourceHandle.split(".")[-1] not in output_keys
-            and get_node_by_id(workflow, edge.target).type == "evaluator"
+            and (
+                get_node_by_id(workflow, edge.target).type == "evaluator"
+                or get_node_by_id(workflow, edge.target).data.behave_as == "evaluator"
+            )
         ):
             output_keys.add(edge.sourceHandle.split(".")[-1])
 
