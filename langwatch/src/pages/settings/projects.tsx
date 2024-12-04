@@ -139,7 +139,7 @@ export function TeamProjectsList({ team }: { team: TeamWithProjects }) {
         <Tr key={project.id}>
           <Td colSpan={2}>
             <LinkBox>
-              <HStack gap={2}>
+              <HStack width="full" gap={2} data-project-id={project.id}>
                 <ProjectTechStackIcon project={project} />
                 <LinkOverlay as={NextLink} href={`/${project.slug}/messages`}>
                   {project.name}

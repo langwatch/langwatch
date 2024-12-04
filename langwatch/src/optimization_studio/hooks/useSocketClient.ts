@@ -128,10 +128,14 @@ export const useSocketClient = () => {
           setSocketStatus("connected");
           break;
         case "component_state_change":
+          const currentComponentState = getWorkflow().nodes.find(
+            (node) => node.id === data.payload.component_id
+          )?.data.execution_state;
           setComponentExecutionState(
             data.payload.component_id,
             data.payload.execution_state
           );
+
           if (data.payload.execution_state?.status === "error") {
             checkIfUnreachableErrorMessage(data.payload.execution_state.error);
             alertOnComponent({
@@ -139,9 +143,11 @@ export const useSocketClient = () => {
               execution_state: data.payload.execution_state,
             });
           }
+
           if (
             !playgroundOpen &&
             data.payload.execution_state?.status !== "running" &&
+            currentComponentState?.status !== "success" &&
             ((getWorkflow().state.execution?.status === "running" &&
               getWorkflow().state.execution?.until_node_id ===
                 data.payload.component_id) ||

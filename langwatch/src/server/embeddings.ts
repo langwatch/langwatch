@@ -38,7 +38,7 @@ export const getProjectEmbeddingsModel = async (projectId: string) => {
   return { model: embeddingsModel, modelProvider };
 };
 
-export const getOpenAIEmbeddings = async (
+export const getEmbeddings = async (
   text: string,
   projectId: string
 ): Promise<{ model: string; embeddings: number[] } | undefined> => {
@@ -75,45 +75,68 @@ export const getOpenAIEmbeddings = async (
     return undefined;
   }
 
-  const vercelAIModel =
-    provider === "openai"
-      ? createOpenAI({
-          apiKey: params.api_key,
-          baseURL: params.api_base,
-        }).textEmbeddingModel(modelName, {
-          dimensions: OPENAI_EMBEDDING_DIMENSION,
-        })
-      : provider === "azure"
-      ? createAzure({
-          apiKey: params.api_key,
-          baseURL: params.api_base?.includes("/deployments")
-            ? params.api_base
-            : ((params.api_base ?? "") + "/openai/deployments").replace(
-                "//",
-                "/"
-              ),
-        }).textEmbeddingModel(modelName, {
-          dimensions: OPENAI_EMBEDDING_DIMENSION,
-        })
-      : provider === "gemini"
-      ? createGoogleGenerativeAI({
-          apiKey: params.api_key,
-          baseURL: params.api_base,
-        }).textEmbeddingModel(modelName, {
-          outputDimensionality: OPENAI_EMBEDDING_DIMENSION,
-        })
-      : undefined;
+  let vercelAIModel = getVercelAIModel(provider, modelName, params, true);
 
   if (!vercelAIModel) {
     throw new Error(`Embeddings model not found: ${model}`);
   }
 
-  const { embedding } = await embed({
-    model: vercelAIModel,
-    value: text.slice(0, 8192 * 1.5),
-  });
+  let embedding: number[] | undefined;
+  try {
+    embedding = (
+      await embed({
+        model: vercelAIModel,
+        value: text.slice(0, 8192 * 1.5),
+      })
+    ).embedding;
+  } catch (error) {
+    vercelAIModel = getVercelAIModel(provider, modelName, params, false)!;
+    embedding = (
+      await embed({
+        model: vercelAIModel,
+        value: text.slice(0, 8192 * 1.5),
+      })
+    ).embedding;
+  }
 
   return { model, embeddings: normalizeEmbeddingDimensions(embedding) };
+};
+
+const getVercelAIModel = (
+  provider: string | undefined,
+  modelName: string,
+  params: any,
+  useDimensions = true
+) => {
+  return provider === "openai"
+    ? createOpenAI({
+        apiKey: params.api_key,
+        baseURL: params.api_base,
+      }).textEmbeddingModel(modelName, {
+        dimensions: useDimensions ? OPENAI_EMBEDDING_DIMENSION : undefined,
+      })
+    : provider === "azure"
+    ? createAzure({
+        apiKey: params.api_key,
+        baseURL: params.api_base?.includes("/deployments")
+          ? params.api_base
+          : ((params.api_base ?? "") + "/openai/deployments").replace(
+              "//",
+              "/"
+            ),
+      }).textEmbeddingModel(modelName, {
+        dimensions: useDimensions ? OPENAI_EMBEDDING_DIMENSION : undefined,
+      })
+    : provider === "gemini"
+    ? createGoogleGenerativeAI({
+        apiKey: params.api_key,
+        baseURL: params.api_base,
+      }).textEmbeddingModel(modelName, {
+        outputDimensionality: useDimensions
+          ? OPENAI_EMBEDDING_DIMENSION
+          : undefined,
+      })
+    : undefined;
 };
 
 const normalizeEmbeddingDimensions = (

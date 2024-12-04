@@ -3,7 +3,7 @@ import {
   clusterTopicsForProject,
   fetchTopicsBatchClustering,
 } from "./topicClustering";
-import { DEFAULT_EMBEDDINGS_MODEL, getOpenAIEmbeddings } from "../embeddings";
+import { DEFAULT_EMBEDDINGS_MODEL, getEmbeddings } from "../embeddings";
 import { TRACE_INDEX, esClient, traceIndexId } from "../elasticsearch";
 import type { Trace } from "../tracer/types";
 import { CostType } from "@prisma/client";
@@ -100,7 +100,7 @@ describe("Topic Clustering Integration Test", () => {
     const project = await getTestProject("clustering");
     testProjectId = project.id;
     const allEmbeddings = await Promise.all(
-      traces.map((trace) => getOpenAIEmbeddings(trace.input!, project.id))
+      traces.map((trace) => getEmbeddings(trace.input!, project.id))
     );
     traces.forEach((trace, i) => {
       const embeddings = allEmbeddings[i];
