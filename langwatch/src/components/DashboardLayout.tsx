@@ -418,12 +418,12 @@ export const DashboardLayout = ({
               label={projectRoutes.evaluations.title}
               project={project}
             />
-            <SideMenuLink
+            {/* <SideMenuLink
               path={projectRoutes.playground.path}
               icon={ImageIcon}
               label={projectRoutes.playground.title}
               project={project}
-            />
+            /> */}
 
             <SideMenuLink
               path={projectRoutes.datasets.path}
