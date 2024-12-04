@@ -9,6 +9,7 @@ import type { StudioClientEvent } from "~/optimization_studio/types/events";
 import { type Edge, type Node } from "@xyflow/react";
 import { type MaybeStoredModelProvider } from "~/server/modelProviders/registry";
 import { addEnvs } from "~/optimization_studio/server/addEnvs";
+import { checkIsEvaluator } from "~/optimization_studio/utils/nodeUtils";
 
 export default async function handler(
   req: NextApiRequest,
@@ -135,6 +136,16 @@ export default async function handler(
 
     const data = await response.json();
 
+    if (data.result) {
+      if ("score" in data.result) {
+        const parsedScore = parseFloat(data.result.score);
+        data.result.score = isNaN(parsedScore) ? 0 : parsedScore;
+      }
+      if ("passed" in data.result) {
+        data.result.passed = data.result.passed === "true";
+      }
+    }
+
     if (!response.ok) {
       return res.status(500).json({ message: data.detail });
     }
@@ -155,9 +166,7 @@ const checkForRequiredInputs = (
   const entryEdges = publishedWorkflowVersion?.edges.filter(
     (edge: Edge) => edge.source === "entry"
   );
-  const evaluators = publishedWorkflowVersion?.nodes.filter(
-    (node: Node) => node.type === "evaluator"
-  );
+  const evaluators = publishedWorkflowVersion?.nodes.filter(checkIsEvaluator);
 
   const entryInputs = entryEdges.filter(
     (edge: Edge) =>

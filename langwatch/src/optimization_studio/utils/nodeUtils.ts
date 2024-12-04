@@ -31,7 +31,7 @@ export const findLowestAvailableName = (nodes: Node[], prefix: string) => {
 export const getInputsOutputs = (edges: Edge[], nodes: Node[]) => {
   const entryEdges = edges.filter((edge: Edge) => edge.source === "entry");
 
-  const evaluators = nodes.filter((node: Node) => node.type === "evaluator");
+  const evaluators = nodes.filter(checkIsEvaluator);
 
   const entryInputs = entryEdges.reduce((acc: Edge[], edge: Edge) => {
     if (
@@ -55,4 +55,8 @@ export const getInputsOutputs = (edges: Edge[], nodes: Node[]) => {
   )?.data.inputs;
 
   return { inputs, outputs };
+};
+
+export const checkIsEvaluator = (node: Node) => {
+  return node.type === "evaluator" || node.data.behave_as === "evaluator";
 };

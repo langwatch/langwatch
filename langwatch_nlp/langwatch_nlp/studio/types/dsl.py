@@ -84,6 +84,7 @@ class BaseComponent(BaseModel):
     published_id: Optional[str] = None
     isCustom: Optional[bool] = None
     version_id: Optional[str] = None
+    behave_as: Optional[Literal["evaluator"]] = None
 
 
 class Edge(BaseModel):

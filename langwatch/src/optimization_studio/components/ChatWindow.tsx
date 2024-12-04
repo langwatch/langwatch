@@ -31,7 +31,7 @@ import { RunningStatus } from "./ExecutionState";
 import { type Edge, type Node } from "@xyflow/react";
 
 import { useSocketClient } from "../hooks/useSocketClient";
-
+import { checkIsEvaluator } from "../utils/nodeUtils";
 interface ChatWindowProps {
   isOpen: boolean;
   onClose: () => void;
@@ -165,7 +165,7 @@ export const ChatBox = ({
 
   const entryEdges = edges.filter((edge) => edge.source === "entry");
 
-  const evaluators = nodes.filter((node) => node.type === "evaluator");
+  const evaluators = nodes.filter(checkIsEvaluator);
 
   const entryInputs = entryEdges.reduce((acc, edge) => {
     if (

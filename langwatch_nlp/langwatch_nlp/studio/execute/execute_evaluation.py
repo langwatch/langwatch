@@ -2,6 +2,7 @@ from multiprocessing import Queue
 import time
 from typing import Optional, cast
 import dspy
+from langwatch_nlp.studio.runtimes.base_runtime import ServerEventQueue
 from langwatch_nlp.studio.dspy.evaluation import EvaluationReporting
 from langwatch_nlp.studio.dspy.workflow_module import (
     WorkflowModule,
@@ -20,7 +21,6 @@ from langwatch_nlp.studio.types.events import (
     EvaluationStateChange,
     EvaluationStateChangePayload,
     ExecuteEvaluationPayload,
-    StudioServerEvent,
 )
 from langwatch_nlp.studio.utils import (
     disable_dsp_caching,
@@ -29,11 +29,12 @@ from langwatch_nlp.studio.utils import (
 )
 
 from dspy.evaluate import Evaluate
+from dspy.utils.asyncify import asyncify
 from sklearn.model_selection import train_test_split
 
 
 async def execute_evaluation(
-    event: ExecuteEvaluationPayload, queue: "Queue[StudioServerEvent]"
+    event: ExecuteEvaluationPayload, queue: "ServerEventQueue"
 ):
     workflow = event.workflow
     run_id = event.run_id
@@ -105,7 +106,9 @@ async def execute_evaluation(
             total=len(examples),
             queue=queue,
         )
-        results = evaluator(module, metric=reporting.evaluate_and_report)
+        results = await asyncify(evaluator)(
+            module, metric=reporting.evaluate_and_report
+        )
         await reporting.wait_for_completion()
     except Exception as e:
         yield error_evaluation_event(run_id, str(e), stopped_at=int(time.time() * 1000))

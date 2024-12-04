@@ -831,10 +831,11 @@ class DSPyTracer:
 
             result = self.__class__.__original_call__(self, prompt, messages, **kwargs)  # type: ignore
 
-            span.update(output=result)
+            if span:
+                span.update(output=result)
 
             history = self.history[-1] if len(self.history) > 0 else None
-            if history and "usage" in history:
+            if history and "usage" in history and span:
                 span.update(
                     metrics={
                         "completion_tokens": history["usage"]["completion_tokens"],

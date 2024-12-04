@@ -131,7 +131,11 @@ class WorkflowModule(ReportingModule):
                 node
                 for node in self.workflow.nodes
                 if node.type != "entry"
-                and (node.type != "evaluator" or self.manual_execution_mode)
+                and (
+                    node.type != "evaluator"
+                    and node.data.behave_as != "evaluator"
+                    or self.manual_execution_mode
+                )
                 and node.id in connected_nodes
             ]
             loops = 0
@@ -179,15 +183,23 @@ class WorkflowModule(ReportingModule):
                     if any(
                         edge.source == node_id
                         and edge.sourceHandle.split(".")[-1] == handle
-                        and get_node_by_id(self.workflow, edge.target).type
-                        == "evaluator"
+                        and (
+                            get_node_by_id(self.workflow, edge.target).type
+                            == "evaluator"
+                            or get_node_by_id(self.workflow, edge.target).data.behave_as
+                            == "evaluator"
+                        )
                         for edge in self.workflow.edges
                     )
                 }
                 for node_id, outputs in node_outputs.items()
                 if any(
                     edge.source == node_id
-                    and get_node_by_id(self.workflow, edge.target).type == "evaluator"
+                    and (
+                        get_node_by_id(self.workflow, edge.target).type == "evaluator"
+                        or get_node_by_id(self.workflow, edge.target).data.behave_as
+                        == "evaluator"
+                    )
                     for edge in self.workflow.edges
                 )
             }
@@ -217,7 +229,9 @@ class WorkflowModule(ReportingModule):
     ):
         prediction_error = prediction.get_error()
         evaluation_nodes = [
-            node for node in self.workflow.nodes if node.type == "evaluator"
+            node
+            for node in self.workflow.nodes
+            if node.type == "evaluator" or node.data.behave_as == "evaluator"
         ]
 
         if prediction_error:

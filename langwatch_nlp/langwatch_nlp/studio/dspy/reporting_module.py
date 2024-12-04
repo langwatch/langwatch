@@ -1,11 +1,10 @@
-from multiprocessing import Queue
 from typing import Any, Optional
 import dspy
 
 
+from langwatch_nlp.studio.runtimes.base_runtime import ServerEventQueue
 from langwatch_nlp.studio.types.dsl import Workflow
 from langwatch_nlp.studio.types.events import (
-    StudioServerEvent,
     component_error_event,
     end_component_event,
     start_component_event,
@@ -26,7 +25,7 @@ class ReportingModule(dspy.Module):
         super().__init__()
 
     def set_reporting(
-        self, *, queue: "Queue[StudioServerEvent]", trace_id: str, workflow: Workflow
+        self, *, queue: "ServerEventQueue", trace_id: str, workflow: Workflow
     ) -> None:
         self.context = ReportingContext(
             queue=queue, trace_id=trace_id, workflow=workflow
@@ -41,20 +40,20 @@ class ReportingModule(dspy.Module):
 
         def wrapper(**kwargs):
             if self.context and node:
-                self.context.queue.put(
+                self.context.queue.put_nowait(
                     start_component_event(node, self.context.trace_id, kwargs)
                 )
             try:
                 result = module(**kwargs)
             except Exception as e:
                 if self.context and node:
-                    self.context.queue.put(
+                    self.context.queue.put_nowait(
                         component_error_event(node.id, self.context.trace_id, repr(e))
                     )
                 raise e
             if self.context and node:
                 cost = result.get_cost() if hasattr(result, "get_cost") else None
-                self.context.queue.put(
+                self.context.queue.put_nowait(
                     end_component_event(node, self.context.trace_id, dict(result), cost)
                 )
             return result

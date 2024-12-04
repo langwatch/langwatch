@@ -6,6 +6,7 @@ import time
 from typing import Optional, cast
 import dspy
 import langwatch
+from langwatch_nlp.studio.runtimes.base_runtime import ServerEventQueue
 from langwatch_nlp.studio.dspy.evaluation import (
     EvaluationReporting,
     PredictionWithEvaluationAndMetadata,
@@ -50,6 +51,7 @@ from sklearn.model_selection import train_test_split
 
 import dspy.primitives.module
 from dspy.teleprompt import MIPROv2
+from dspy.utils.asyncify import asyncify
 
 _original_postprocess_parameter_name = dspy.primitives.module.postprocess_parameter_name
 
@@ -65,7 +67,7 @@ dspy.primitives.module.postprocess_parameter_name = postprocess_parameter_name
 
 
 async def execute_optimization(
-    event: ExecuteOptimizationPayload, queue: "Queue[StudioServerEvent]"
+    event: ExecuteOptimizationPayload, queue: "ServerEventQueue"
 ):
     workflow = event.workflow
     run_id = event.run_id
@@ -166,7 +168,7 @@ async def execute_optimization(
         with redirect_stdout_to_queue(queue, run_id):
             if event.optimizer == "MIPROv2ZeroShot":
                 optimizer = cast(MIPROv2, optimizer)
-                optimized_program = optimizer.compile(
+                optimized_program = await asyncify(optimizer.compile)(
                     module,
                     trainset=train,
                     valset=test,
@@ -182,7 +184,7 @@ async def execute_optimization(
                 )
             elif event.optimizer == "MIPROv2":
                 optimizer = cast(MIPROv2, optimizer)
-                optimized_program = optimizer.compile(
+                optimized_program = await asyncify(optimizer.compile)(
                     module,
                     trainset=train,
                     valset=test,
@@ -198,7 +200,7 @@ async def execute_optimization(
                 )
             elif event.optimizer == "BootstrapFewShotWithRandomSearch":
                 optimizer = cast(dspy.BootstrapFewShotWithRandomSearch, optimizer)
-                optimized_program = optimizer.compile(
+                optimized_program = await asyncify(optimizer.compile)(
                     module, trainset=train, valset=test
                 )
 

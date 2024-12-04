@@ -1,8 +1,8 @@
-from multiprocessing import Queue
 import time
 from typing import Dict, Set, cast
 
 import langwatch
+from langwatch_nlp.studio.runtimes.base_runtime import ServerEventQueue
 from langwatch_nlp.studio.dspy.workflow_module import WorkflowModule
 from langwatch_nlp.studio.types.dsl import (
     Entry,
@@ -25,10 +25,12 @@ from langwatch_nlp.studio.utils import (
     transpose_inline_dataset_to_object_list,
 )
 
+from dspy.utils.asyncify import asyncify
+
 
 async def execute_flow(
     event: ExecuteFlowPayload,
-    queue: "Queue[StudioServerEvent]",
+    queue: "ServerEventQueue",
 ):
     validate_workflow(event.workflow)
 
@@ -88,7 +90,7 @@ async def execute_flow(
                 )
 
             try:
-                result = module(**entries[0])
+                result = await asyncify(module)(**entries[0])
 
             except Exception as e:
                 import traceback
@@ -103,7 +105,7 @@ async def execute_flow(
 
         yield end_workflow_event(workflow, trace_id, result)
     finally:
-        trace.send_spans()
+        await asyncify(trace.send_spans)()
 
 
 def start_workflow_event(workflow: Workflow, trace_id: str):

@@ -52,8 +52,9 @@ export const optimizationRouter = createTRPCRouter({
       });
 
       const isComponent = workflow?.isComponent;
+      const isEvaluator = workflow?.isEvaluator;
 
-      return { ...publishedWorkflow, isComponent };
+      return { ...publishedWorkflow, isComponent, isEvaluator };
     }),
   toggleSaveAsComponent: publicProcedure
     .input(
@@ -61,16 +62,45 @@ export const optimizationRouter = createTRPCRouter({
         workflowId: z.string(),
         projectId: z.string(),
         isComponent: z.boolean(),
+        isEvaluator: z.boolean(),
       })
     )
     .use(skipPermissionCheck)
     .mutation(async ({ ctx, input }) => {
       const { workflowId, projectId, isComponent } = input;
+      let { isEvaluator } = input;
+
+      if (isComponent) {
+        isEvaluator = false;
+      }
 
       try {
         const result = await ctx.prisma.workflow.update({
           where: { id: workflowId, projectId: projectId },
-          data: { isComponent },
+          data: { isComponent, isEvaluator: isEvaluator },
+        });
+        return { success: true };
+      } catch (error) {
+        throw error;
+      }
+    }),
+  toggleSaveAsEvaluator: publicProcedure
+    .input(
+      z.object({
+        workflowId: z.string(),
+        projectId: z.string(),
+        isEvaluator: z.boolean(),
+        isComponent: z.boolean(),
+      })
+    )
+    .use(skipPermissionCheck)
+    .mutation(async ({ ctx, input }) => {
+      const { workflowId, projectId, isEvaluator, isComponent } = input;
+
+      try {
+        await ctx.prisma.workflow.update({
+          where: { id: workflowId, projectId: projectId },
+          data: { isEvaluator, isComponent: !isEvaluator },
         });
         return { success: true };
       } catch (error) {
@@ -85,7 +115,7 @@ export const optimizationRouter = createTRPCRouter({
       const workflows = await ctx.prisma.workflow.findMany({
         where: {
           projectId: projectId,
-          isComponent: true,
+          OR: [{ isComponent: true }, { isEvaluator: true }],
         },
         include: {
           versions: true,
