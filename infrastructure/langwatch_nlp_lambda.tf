@@ -149,7 +149,8 @@ resource "aws_iam_policy" "langwatch_nlp_s3_access" {
         Action = [
           "s3:GetObject",
           "s3:PutObject",
-          "s3:DeleteObject"
+          "s3:DeleteObject",
+          "s3:HeadObject"
         ]
         Resource = [
           "${aws_s3_bucket.langwatch_nlp_cache.arn}/cache/*",
