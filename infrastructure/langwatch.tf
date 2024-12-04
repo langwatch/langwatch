@@ -90,8 +90,8 @@ resource "kubernetes_deployment" "langwatch" {
           }
 
           env {
-            name  = "LANGWATCH_NLP_SERVICE"
-            value = aws_lambda_function_url.langwatch_nlp[0].function_url
+            name = "LANGWATCH_NLP_SERVICE"
+            value = trimsuffix(aws_lambda_function_url.langwatch_nlp[0].function_url, "/")
           }
 
           env {
@@ -129,6 +129,17 @@ resource "kubernetes_deployment" "langwatch" {
           }
 
           liveness_probe {
+            http_get {
+              path = "/"
+              port = 3000
+            }
+            initial_delay_seconds = 30
+            period_seconds        = 30
+            timeout_seconds       = 5
+            failure_threshold     = 3
+          }
+
+          readiness_probe {
             http_get {
               path = "/"
               port = 3000
