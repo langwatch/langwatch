@@ -18,7 +18,7 @@ class S3Syncer:
         s3_prefix: str,
         s3_client,
         known_files: list[str],
-        throttle_seconds: int = 5,
+        throttle_seconds: int = 2,
     ):
         self.local_dir = local_dir
         self.bucket = bucket
