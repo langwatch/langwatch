@@ -75,7 +75,7 @@ export const runEvaluationForTrace = async ({
   traceId: string;
   evaluatorType: EvaluatorTypes;
   settings: Record<string, any> | string | number | boolean | null;
-  mappings: Record<Mappings, string>;
+  mappings: Record<string, string>;
 }): Promise<SingleEvaluationResult> => {
   const evaluator = AVAILABLE_EVALUATORS[evaluatorType];
 
@@ -98,10 +98,10 @@ export const runEvaluationForTrace = async ({
     };
   }
 
-  const inputMapping = (mappings ?? {})?.inputMapping;
-  const outputMapping = (mappings ?? {})?.outputMapping;
-  const ragContextMapping = (mappings ?? {})?.ragContextMapping;
-  const expectedOutputMapping = (mappings ?? {})?.expectedOutputMapping;
+  const inputMapping = (mappings ?? {})?.input;
+  const outputMapping = (mappings ?? {})?.output;
+  const ragContextMapping = (mappings ?? {})?.context;
+  const expectedOutputMapping = (mappings ?? {})?.expected_output;
 
   const switchMapping = (mapping: Mappings) => {
     if (mapping === "trace.input") {
@@ -119,7 +119,7 @@ export const runEvaluationForTrace = async ({
     }
     // Use typescript to ensure all cases are handled
     const _: never = mapping;
-    throw `Unknown mapping: ${mapping}`;
+    throw new Error(`Unknown mapping: ${String(mapping)}`);
   };
 
   let input;

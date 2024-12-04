@@ -15,7 +15,6 @@ import {
   AccordionPanel,
   AccordionIcon,
   Box,
-  Switch,
 } from "@chakra-ui/react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/router";
@@ -26,6 +25,7 @@ import {
   FormProvider,
   useFieldArray,
   useForm,
+  type UseFormRegister,
 } from "react-hook-form";
 import slugify from "slugify";
 import { z } from "zod";
@@ -53,7 +53,6 @@ import { EvaluationManualIntegration } from "./EvaluationManualIntegration";
 import { PreconditionsField } from "./PreconditionsField";
 import { TryItOut } from "./TryItOut";
 import { EvaluationExecutionMode } from "@prisma/client";
-import type { Mappings } from "~/server/background/types";
 
 export interface CheckConfigFormData {
   name: string;
@@ -64,10 +63,10 @@ export interface CheckConfigFormData {
   executionMode: EvaluationExecutionMode;
   storeSettingsOnCode: boolean;
   mappings: {
-    inputMapping: string;
-    outputMapping: string;
-    ragContextMapping: string;
-    expectedOutputMapping: string;
+    input: string;
+    output: string;
+    context: string;
+    expected_output: string;
   };
 }
 
@@ -100,14 +99,14 @@ export default function CheckConfigForm({
     return result.available;
   };
 
-  const DEFAULT_MAPPINGS = {
-    inputMapping: "trace.input",
-    outputMapping: "trace.output",
-    ragContextMapping: "trace.first_rag_context",
-    expectedOutputMapping: "metadata.expected_output",
-  } as const;
+  const DEFAULT_MAPPINGS: CheckConfigFormData["mappings"] = {
+    input: "trace.input",
+    output: "trace.output",
+    context: "trace.first_rag_context",
+    expected_output: "metadata.expected_output",
+  };
 
-  const mappingOptions = [
+  const MAPPING_OPTIONS = [
     { value: "trace.input", label: "trace.input" },
     { value: "trace.output", label: "trace.output" },
     { value: "trace.first_rag_context", label: "trace.first_rag_context" },
@@ -141,10 +140,10 @@ export default function CheckConfigForm({
             ])
             .optional(),
           mappings: z.object({
-            inputMapping: z.string().optional(),
-            outputMapping: z.string().optional(),
-            ragContextMapping: z.string().optional(),
-            expectedOutputMapping: z.string().optional(),
+            input: z.string().optional(),
+            output: z.string().optional(),
+            context: z.string().optional(),
+            expected_output: z.string().optional(),
           }),
         })
       )({ ...data, settings: data.settings || {} }, ...args);
@@ -402,10 +401,11 @@ export default function CheckConfigForm({
                 </VStack>
               </CardBody>
             </Card>
-            <Card width="full">
-              <CardBody>
-                <Accordion allowToggle>
-                  <AccordionItem>
+
+            <Card width="full" padding={0}>
+              <CardBody padding={0}>
+                <Accordion allowToggle padding={1}>
+                  <AccordionItem border="none">
                     <h2>
                       <AccordionButton>
                         <Box as="span" flex="1" textAlign="left">
@@ -415,68 +415,19 @@ export default function CheckConfigForm({
                       </AccordionButton>
                     </h2>
                     <AccordionPanel pb={4}>
-                      <VStack spacing={2} align="start" width="full">
-                        <HStack width="full">
-                          <Select
-                            maxWidth="50%"
-                            defaultValue="trace.input"
-                            {...register("mappings.inputMapping")}
-                          >
-                            {mappingOptions.map(({ value, label }) => (
-                              <option key={value} value={value}>
-                                {label}
-                              </option>
-                            ))}
-                          </Select>
-                          <ArrowRight />
-                          <Text>input</Text>
-                        </HStack>
-                        <HStack width="full">
-                          <Select
-                            maxWidth="50%"
-                            defaultValue="trace.output"
-                            {...register("mappings.outputMapping")}
-                          >
-                            {mappingOptions.map(({ value, label }) => (
-                              <option key={value} value={value}>
-                                {label}
-                              </option>
-                            ))}
-                          </Select>
-                          <ArrowRight />
-                          <Text>output</Text>
-                        </HStack>
-                        <HStack width="full">
-                          <Select
-                            maxWidth="50%"
-                            defaultValue="trace.first_rag_context"
-                            {...register("mappings.ragContextMapping")}
-                          >
-                            {mappingOptions.map(({ value, label }) => (
-                              <option key={value} value={value}>
-                                {label}
-                              </option>
-                            ))}{" "}
-                          </Select>
-                          <ArrowRight />
-                          <Text>contexts</Text>
-                        </HStack>
-                        <HStack width="full">
-                          <Select
-                            maxWidth="50%"
-                            defaultValue="metadata.expected_output"
-                            {...register("mappings.expectedOutputMapping")}
-                          >
-                            {mappingOptions.map(({ value, label }) => (
-                              <option key={value} value={value}>
-                                {label}
-                              </option>
-                            ))}{" "}
-                          </Select>
-                          <ArrowRight />
-                          <Text>expected output</Text>
-                        </HStack>
-                      </VStack>
+                      <MappingsFields
+                        register={register}
+                        mappingOptions={MAPPING_OPTIONS}
+                        defaultValues={
+                          defaultValues?.mappings ?? DEFAULT_MAPPINGS
+                        }
+                        optionalFields={
+                          evaluatorDefinition?.optionalFields ?? []
+                        }
+                        requiredFields={
+                          evaluatorDefinition?.requiredFields ?? []
+                        }
+                      />
                     </AccordionPanel>
                   </AccordionItem>
                 </Accordion>
@@ -509,3 +460,75 @@ export default function CheckConfigForm({
     </FormProvider>
   );
 }
+
+const MappingsFields = ({
+  register,
+  mappingOptions,
+  optionalFields,
+  requiredFields,
+  defaultValues,
+}: {
+  register: UseFormRegister<CheckConfigFormData>;
+  mappingOptions: { value: string; label: string }[];
+  optionalFields: string[];
+  requiredFields: string[];
+  defaultValues: CheckConfigFormData["mappings"];
+}) => {
+  return (
+    <>
+      <VStack spacing={2} align="start" width="full">
+        {requiredFields.length > 0 && (
+          <>
+            {requiredFields.map((field) => (
+              <HStack width="full" key={field}>
+                <Select
+                  maxWidth="50%"
+                  defaultValue={
+                    defaultValues[field as keyof typeof defaultValues]
+                  }
+                  {...register(
+                    `mappings.${field as keyof typeof defaultValues}`
+                  )}
+                >
+                  {mappingOptions.map(({ value, label }) => (
+                    <option key={value} value={value}>
+                      {label}
+                    </option>
+                  ))}
+                </Select>
+                <ArrowRight />
+                <Text>{field}</Text>
+              </HStack>
+            ))}
+          </>
+        )}
+        {optionalFields.length > 0 && (
+          <>
+            {optionalFields.map((field) => (
+              <HStack width="full" key={field}>
+                <Select
+                  maxWidth="50%"
+                  defaultValue={
+                    defaultValues[field as keyof typeof defaultValues]
+                  }
+                  {...register(
+                    `mappings.${field as keyof typeof defaultValues}`
+                  )}
+                >
+                  {mappingOptions.map(({ value, label }) => (
+                    <option key={value} value={value}>
+                      {label}
+                    </option>
+                  ))}
+                  <option value="">None</option>
+                </Select>
+                <ArrowRight />
+                <Text>{field} (optional)</Text>
+              </HStack>
+            ))}
+          </>
+        )}
+      </VStack>
+    </>
+  );
+};
