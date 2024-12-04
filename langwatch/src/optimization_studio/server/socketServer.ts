@@ -8,7 +8,7 @@ import { getServerSession } from "next-auth";
 import { parse as parseCookie } from "cookie";
 import { prisma } from "../../server/db";
 import type { StudioClientEvent, StudioServerEvent } from "../types/events";
-import { addEnvs } from "./addEnvs";
+import { addEnvs, getS3CacheKey } from "./addEnvs";
 import { loadDatasets } from "./loadDatasets";
 
 const wss = new WebSocketServer({ noServer: true });
@@ -98,17 +98,19 @@ const handleComponentError = (
 const callPython = async (
   ws: WebSocket,
   event: StudioClientEvent,
-  _projectId: string
+  projectId: string
 ) => {
   let response: Response;
   try {
-    // TODO: add timeout for initial connection
+    const s3CacheKey = getS3CacheKey(projectId);
+
     response = await fetch(
       `${process.env.LANGWATCH_NLP_SERVICE}/studio/execute`,
       {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          ...(s3CacheKey ? { "X-S3-Cache-Key": s3CacheKey } : {}),
         },
         body: JSON.stringify(event),
       }

@@ -165,9 +165,16 @@ async def event_encoder(event_generator: AsyncGenerator[StudioServerEvent, None]
 
 @app.post("/execute")
 async def execute(
-    event: StudioClientEvent, response: Response, background_tasks: BackgroundTasks
+    event: StudioClientEvent,
+    request: Request,
+    response: Response,
+    background_tasks: BackgroundTasks,
 ):
     response.headers["Cache-Control"] = "no-cache"
+    s3_cache_key = request.headers.get("X-S3-Cache-Key")
+    if isinstance(event, ExecuteOptimization):
+        event.payload.s3_cache_key = s3_cache_key
+
     return StreamingResponse(
         event_encoder(execute_event_on_a_subprocess(event)),
         media_type="text/event-stream",

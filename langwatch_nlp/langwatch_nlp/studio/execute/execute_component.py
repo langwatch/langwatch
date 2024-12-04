@@ -1,3 +1,4 @@
+import sentry_sdk
 from langwatch_nlp.studio.parser import autoparse_fields, parse_component
 from langwatch_nlp.studio.utils import disable_dsp_caching
 from langwatch_nlp.studio.types.events import (
@@ -42,6 +43,13 @@ async def execute_component(event: ExecuteComponentPayload):
         import traceback
 
         traceback.print_exc()
+        sentry_sdk.capture_exception(
+            e,
+            extras={
+                "trace_id": event.trace_id,
+                "workflow_id": event.workflow.workflow_id,
+            },
+        )
         raise e
     finally:
         print("Sending trace")
