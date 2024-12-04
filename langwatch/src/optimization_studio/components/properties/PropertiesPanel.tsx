@@ -42,7 +42,6 @@ export function PropertiesPanel() {
     signature: SignaturePropertiesPanel,
     module: BasePropertiesPanel,
     custom: CustomPropertiesPanel,
-    customEvaluator: CustomPropertiesPanel,
     retriever: RetrievePropertiesPanel,
     prompting_technique: PromptingTechniquePropertiesPanel,
     evaluator: EvaluatorPropertiesPanel as React.FC<{ node: Node<Component> }>,
