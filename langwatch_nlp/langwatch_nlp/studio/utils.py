@@ -4,6 +4,8 @@ import inspect
 import keyword
 import os
 import re
+import sys
+import threading
 from typing import Any, Dict, List, cast
 
 from joblib.memory import MemorizedFunc, AsyncMemorizedFunc
@@ -155,3 +157,18 @@ def node_llm_config_to_dspy_lm(llm_config: LLMConfig) -> dspy.LM:
         **llm_params,
     )
     return lm
+
+
+def shutdown_handler(sig, frame):
+    timer = threading.Timer(3.0, forceful_exit)
+    timer.start()
+
+    try:
+        sys.exit(0)
+    finally:
+        timer.cancel()
+
+
+def forceful_exit(self):
+    print("Forceful exit triggered", file=sys.stderr)
+    os._exit(1)

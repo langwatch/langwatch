@@ -8,6 +8,7 @@ from langwatch_nlp.studio.types.events import (
     start_component_event,
 )
 import langwatch
+from dspy.utils.asyncify import asyncify
 
 
 async def execute_component(event: ExecuteComponentPayload):
@@ -30,7 +31,9 @@ async def execute_component(event: ExecuteComponentPayload):
         ) as trace:
             trace.autotrack_dspy()
             module = parse_component(node, event.workflow)
-            result = module(**autoparse_fields(node.data.inputs or [], event.inputs))
+            result = await asyncify(module)(
+                **autoparse_fields(node.data.inputs or [], event.inputs)
+            )
 
         cost = result.get_cost() if hasattr(result, "get_cost") else None
 

@@ -1,14 +1,102 @@
 import asyncio
 import multiprocessing
-from multiprocessing import Event, Queue
+from multiprocessing import Event, Queue, Process
 from multiprocessing.synchronize import Event as EventType
+import os
+import queue
+import signal
 import sys
 import threading
 import time
 from typing import Callable, Generic, TypeVar
 
+from langwatch_nlp.studio.execute.execute_event import execute_event
+from langwatch_nlp.studio.runtimes.base_runtime import BaseRuntime, RunningProcess
+from langwatch_nlp.studio.types.events import (
+    Done,
+    Error,
+    ErrorPayload,
+    StudioClientEvent,
+    StudioServerEvent,
+    get_trace_id,
+)
+from langwatch_nlp.studio.utils import shutdown_handler
+
 T = TypeVar("T")
 U = TypeVar("U")
+
+
+class IsolatedProcessPoolRuntime(BaseRuntime[Process]):
+    def __init__(self):
+        pass
+
+    async def startup(self):
+        global pool
+        pool = IsolatedProcessPool(self.event_worker, size=4)
+
+    async def shutdown(self):
+        pool.shutdown()
+
+    async def submit(
+        self, event: StudioClientEvent
+    ) -> tuple[Process, "Queue[StudioServerEvent]"]:
+        process, queue = await pool.submit(event)
+
+        trace_id = get_trace_id(event)
+        if trace_id and trace_id not in self.running_processes:
+            self.running_processes[trace_id] = RunningProcess(
+                process=process, queue=queue
+            )
+
+        return process, queue
+
+    def event_worker(
+        self,
+        ready_event: EventType,
+        queue_in: "Queue[StudioClientEvent | None]",
+        queue_out: "Queue[StudioServerEvent]",
+    ):
+        ready_event.set()
+        signal.signal(signal.SIGUSR1, shutdown_handler)
+        while True:
+            try:
+                event = queue_in.get(timeout=1)
+                if event is None:  # Sentinel to exit
+                    break
+                try:
+
+                    async def async_execute_event(event):
+                        async for event_ in execute_event(event, queue_out):
+                            queue_out.put(event_)
+
+                    asyncio.run(async_execute_event(event))
+                except Exception as e:
+                    queue_out.put(Error(payload=ErrorPayload(message=repr(e))))
+            except queue.Empty:
+                continue
+
+    async def stop_process(self, trace_id: str):
+        queue = self.running_processes[trace_id]["queue"]
+        queue.put(Done())
+
+        await asyncio.sleep(0.2)
+
+        # Check again because the process generally finishes gracefully on its own
+        if trace_id in self.running_processes:
+            process = self.running_processes[trace_id]["process"]
+            self.kill_process(process)
+
+            del self.running_processes[trace_id]
+
+    def kill_process(self, process: Process):
+        if process.pid is None:
+            return
+        if not process.is_alive():
+            return
+        os.kill(process.pid, signal.SIGUSR1)
+
+    def is_process_alive(self, process: Process) -> bool:
+        return process.is_alive()
 
 
 class IsolatedProcessPool(Generic[T, U]):
