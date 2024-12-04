@@ -1,12 +1,13 @@
 from contextlib import asynccontextmanager
 import os
 import signal
+from langwatch_nlp.studio.runtimes.base_runtime import BaseRuntime
 import langwatch_nlp.error_tracking
 import asyncio
 from queue import Empty
 import time
-from typing import AsyncGenerator
-from fastapi import FastAPI, Response, BackgroundTasks, HTTPException
+from typing import Any, AsyncGenerator, Union, cast
+from fastapi import FastAPI, Request, Response, BackgroundTasks, HTTPException
 from fastapi.responses import StreamingResponse
 import json
 
@@ -38,8 +39,14 @@ from langwatch_nlp.studio.types.events import (
 from langwatch_nlp.studio.utils import shutdown_handler
 
 
-runtime = IsolatedProcessPoolRuntime()
-# runtime = AsyncRuntime()
+runtime_env = os.getenv("STUDIO_RUNTIME", "isolated_process_pool")
+runtime = cast(
+    Union[AsyncRuntime, IsolatedProcessPoolRuntime],
+    {
+        "async": AsyncRuntime(),
+        "isolated_process_pool": IsolatedProcessPoolRuntime(),
+    }[runtime_env],
+)
 
 
 @asynccontextmanager
@@ -109,6 +116,8 @@ async def execute_event_on_a_subprocess(event: StudioClientEvent):
 
     process, queue = await runtime.submit(event)
 
+    process = cast(Any, process)
+
     timeout_without_messages = 120  # seconds
     if isinstance(event, ExecuteOptimization):
         # TODO: temporary until we actually send events in the middle of optimization process
@@ -121,14 +130,14 @@ async def execute_event_on_a_subprocess(event: StudioClientEvent):
         while time_since_last_message < timeout_without_messages:
             time_since_last_message = time.time() - last_message_time
             try:
-                result = queue.get(block=False)
+                result = queue.get_nowait()
                 yield result
                 last_message_time = time.time()
 
                 if isinstance(result, Done):
                     done = True
                     break
-            except Empty:
+            except (Empty, asyncio.QueueEmpty):
                 if timeout_without_messages > 10 and not runtime.is_process_alive(
                     process
                 ):

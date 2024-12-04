@@ -45,5 +45,5 @@ async def execute_component(event: ExecuteComponentPayload):
         raise e
     finally:
         print("Sending trace")
-        trace.send_spans()
+        await asyncify(trace.send_spans)()
     print("Execution done")

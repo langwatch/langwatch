@@ -1,15 +1,20 @@
-from typing import Dict, Generic, Optional, TypeVar, TypedDict
-from multiprocessing import Queue
+from typing import Dict, Generic, Optional, TypeVar, TypedDict, Union
+import asyncio
+import multiprocessing
 
 from langwatch_nlp.studio.types.events import StudioClientEvent, StudioServerEvent
 
 
 T = TypeVar("T")
 
+ServerEventQueue = Union[
+    "asyncio.Queue[StudioServerEvent]", "multiprocessing.Queue[StudioServerEvent]"
+]
+
 
 class RunningProcess(TypedDict, Generic[T]):
     process: T
-    queue: "Queue[StudioServerEvent]"
+    queue: ServerEventQueue
 
 
 class BaseRuntime(Generic[T]):
@@ -24,9 +29,10 @@ class BaseRuntime(Generic[T]):
     async def shutdown(self):
         pass
 
-    async def submit(
-        self, event: StudioClientEvent
-    ) -> tuple[T, "Queue[StudioServerEvent]"]:
+    async def submit(self, event: StudioClientEvent) -> tuple[
+        T,
+        ServerEventQueue,
+    ]:
         raise NotImplementedError
 
     async def stop_process(self, trace_id: str):
