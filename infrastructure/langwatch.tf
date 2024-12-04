@@ -91,7 +91,7 @@ resource "kubernetes_deployment" "langwatch" {
 
           env {
             name  = "LANGWATCH_NLP_SERVICE"
-            value = "http://langwatch-nlp-service"
+            value = aws_lambda_function_url.langwatch_nlp[0].function_url
           }
 
           env {

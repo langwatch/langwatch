@@ -68,7 +68,7 @@ resource "aws_cloudwatch_metric_alarm" "lambda_function_errors" {
 
 resource "aws_cloudwatch_log_group" "this" {
   name              = "/aws/lambda/${local.evaluator_package}-evaluator-lambda"
-  retention_in_days = 365
+  retention_in_days = 14
 }
 
 data "aws_ecr_repository" "lambda_repository" {
