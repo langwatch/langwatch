@@ -125,6 +125,7 @@ export const useSocketClient = () => {
             clearTimeout(pythonDisconnectedTimeout);
             pythonDisconnectedTimeout = null;
           }
+          debug("Python is alive, setting status to connected");
           setSocketStatus("connected");
           break;
         case "component_state_change":
@@ -241,6 +242,7 @@ export const useSocketClient = () => {
     );
 
     socketInstance.onopen = () => {
+      debug("Socket opened, connecting to python");
       setSocketStatus((socketStatus) => {
         if (
           socketStatus === "disconnected" ||
@@ -255,14 +257,14 @@ export const useSocketClient = () => {
     };
 
     socketInstance.onclose = () => {
-      setTimeout(() => {
-        if (socketInstance?.readyState === WebSocket.OPEN) return;
-        setSocketStatus("disconnected");
-        scheduleReconnect();
-      }, 2000);
+      if (socketInstance?.readyState === WebSocket.OPEN) return;
+      debug("Socket closed, reconnecting");
+      setSocketStatus("disconnected");
+      scheduleReconnect();
     };
 
     socketInstance.onerror = (error) => {
+      debug("Socket error, reconnecting");
       console.error("WebSocket error:", error);
       setSocketStatus("disconnected");
       scheduleReconnect();
@@ -273,6 +275,7 @@ export const useSocketClient = () => {
   }, [project, setSocketStatus]);
 
   const disconnect = useCallback(() => {
+    debug("Socket disconnect triggered, closing socket");
     if (socketInstance) {
       socketInstance.close();
       socketInstance = null;
@@ -325,7 +328,11 @@ export const useSocketClient = () => {
     };
 
     const isAlive = () => {
-      if (instanceId !== instances || !document.hasFocus()) return;
+      if (!document.hasFocus()) {
+        debug("Tab is not focused, skipping is_alive call");
+        return;
+      }
+      if (instanceId !== instances) return;
       lastIsAliveCallTimestamp = Date.now();
       sendMessage({ type: "is_alive", payload: {} });
       if (socketStatus === "connected" && !pythonDisconnectedTimeout) {
