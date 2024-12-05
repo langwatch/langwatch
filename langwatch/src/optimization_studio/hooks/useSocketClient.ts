@@ -316,22 +316,11 @@ export const useSocketClient = () => {
 
     const pythonReconnect = () => {
       pythonDisconnectedTimeout = setTimeout(() => {
-        if (!document.hasFocus()) {
-          // Postpone 10 more seconds if tab is not focused
-          sendMessage({ type: "is_alive", payload: {} });
-          pythonReconnect();
-          return;
-        }
-
         setSocketStatus("connecting-python");
       }, 10_000);
     };
 
     const isAlive = () => {
-      if (!document.hasFocus()) {
-        debug("Tab is not focused, skipping is_alive call");
-        return;
-      }
       if (instanceId !== instances) return;
       lastIsAliveCallTimestamp = Date.now();
       sendMessage({ type: "is_alive", payload: {} });
