@@ -62,13 +62,15 @@ def setup_kill_signal_watcher(
 
                 if stop_event := asyncio.run(task):
                     logger.info(f"Sending end event: {stop_event}")
+                    # Empty the queue to send the stop event right away
                     while not queue.empty():
                         try:
                             queue.get_nowait()
                         except:
                             break
                     queue.put_nowait(stop_event)
-                time.sleep(1.5)
+                # Wait a bit to make sure the event is sent
+                time.sleep(1.0)
 
                 # Try all the ways to kill the process
                 try:
