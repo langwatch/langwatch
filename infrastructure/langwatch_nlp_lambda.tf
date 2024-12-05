@@ -259,7 +259,7 @@ resource "aws_cloudwatch_event_rule" "lambda_warmer" {
   count               = module.variables.profile == "lw-prod" ? 1 : 0
   name                = "langwatch-nlp-warmer"
   description         = "Keep Lambda warm by invoking it periodically"
-  schedule_expression = "rate(5 minutes)"
+  schedule_expression = "rate(1 minute)"
 }
 
 # Warmer Lambda function
