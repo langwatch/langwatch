@@ -3,7 +3,7 @@
 [![LangWatch Python SDK version](https://img.shields.io/pypi/v/langwatch?color=007EC6)](https://pypi.org/project/langwatch/)
 [![LangWatch TypeScript SDK version](https://img.shields.io/npm/v/langwatch?color=007EC6)](https://www.npmjs.com/package/langwatch)
 
-# LangWatch - LLM Optimization Studio
+# LangWatch - LLM Monitoring & Optimization Studio
 
 LangWatch is a visual interface for [DSPy](https://github.com/stanfordnlp/dspy) and a complete LLM Ops platform for experimenting, measuring and improving LLM pipelines, with a [fair-code](https://faircode.io/) distribution model.
 
