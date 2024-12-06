@@ -28,6 +28,7 @@ import {
   type ProjectFormData,
 } from "~/components/TechStack";
 import { api } from "../../../utils/api";
+import { trackEvent } from "../../../utils/tracking";
 
 export function RadioCard(props: UseRadioProps & PropsWithChildren) {
   const { getInputProps, getRadioProps } = useRadio(props);
@@ -67,6 +68,7 @@ export function RadioCard(props: UseRadioProps & PropsWithChildren) {
 export default function ProjectOnboarding() {
   useRequiredSession();
 
+  const { project } = useOrganizationTeamProject();
   const form = useForm<ProjectFormData>({
     defaultValues: {
       language: "python",
@@ -176,6 +178,12 @@ export default function ProjectOnboarding() {
                     textDecoration="underline"
                     _hover={{
                       textDecoration: "none",
+                    }}
+                    onClick={() => {
+                      trackEvent("subscription_hook_click", {
+                        project_id: project?.id,
+                        hook: "new_project_limit_reached",
+                      });
                     }}
                   >
                     upgrade your plan

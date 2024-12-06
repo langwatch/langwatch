@@ -28,9 +28,10 @@ export const integrationsChecksRouter = createTRPCRouter({
       return {
         customGraphs: customGraphs?.length,
         datasets: datasets?.length,
-        checks: checks?.length,
+        evaluations: checks?.length,
         triggers: triggers?.length,
-        project: project?.firstMessage,
+        firstMessage: project?.firstMessage,
+        integrated: project?.integrated,
       };
     }),
 });

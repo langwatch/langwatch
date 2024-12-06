@@ -1,8 +1,10 @@
-import { VStack, Heading, List, ListIcon, ListItem } from "@chakra-ui/react";
+import { VStack, List, ListIcon, ListItem } from "@chakra-ui/react";
 import { CheckCircleIcon } from "@chakra-ui/icons";
-import { CheckCircle, Settings, Circle } from "react-feather";
+import { Circle } from "react-feather";
 import { api } from "../utils/api";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { trackEventOnce } from "../utils/tracking";
+import { useEffect } from "react";
 
 export const IntegrationChecks = () => {
   const { project } = useOrganizationTeamProject();
@@ -11,6 +13,47 @@ export const IntegrationChecks = () => {
     { projectId: project?.id ?? "" },
     { enabled: !!project, refetchOnWindowFocus: false }
   );
+
+  useEffect(() => {
+    if (integrationChecks.data?.firstMessage) {
+      trackEventOnce("integration_checks_first_message", {
+        project_id: project?.id,
+      });
+    }
+    if (integrationChecks.data?.integrated) {
+      trackEventOnce("integration_checks_first_integration", {
+        project_id: project?.id,
+      });
+    }
+    if (integrationChecks.data?.evaluations) {
+      trackEventOnce("integration_checks_first_evaluation", {
+        project_id: project?.id,
+      });
+    }
+    if (integrationChecks.data?.triggers) {
+      trackEventOnce("integration_checks_first_alert", {
+        project_id: project?.id,
+      });
+    }
+    if (integrationChecks.data?.datasets) {
+      trackEventOnce("integration_checks_first_dataset", {
+        project_id: project?.id,
+      });
+    }
+    if (integrationChecks.data?.customGraphs) {
+      trackEventOnce("integration_checks_first_custom_dashboard", {
+        project_id: project?.id,
+      });
+    }
+  }, [
+    integrationChecks.data?.customGraphs,
+    integrationChecks.data?.datasets,
+    integrationChecks.data?.evaluations,
+    integrationChecks.data?.firstMessage,
+    integrationChecks.data?.integrated,
+    integrationChecks.data?.triggers,
+    project?.id,
+  ]);
 
   return (
     <VStack align="start">
@@ -21,15 +64,19 @@ export const IntegrationChecks = () => {
         </ListItem>
         <ListItem>
           <ListIcon
-            as={integrationChecks.data?.project ? CheckCircleIcon : Circle}
-            color={integrationChecks.data?.project ? "green.500" : "gray.500"}
+            as={integrationChecks.data?.firstMessage ? CheckCircleIcon : Circle}
+            color={
+              integrationChecks.data?.firstMessage ? "green.500" : "gray.500"
+            }
           />
           Sync your first message
         </ListItem>
         <ListItem>
           <ListIcon
-            as={integrationChecks.data?.checks ? CheckCircleIcon : Circle}
-            color={integrationChecks.data?.checks ? "green.500" : "gray.500"}
+            as={integrationChecks.data?.evaluations ? CheckCircleIcon : Circle}
+            color={
+              integrationChecks.data?.evaluations ? "green.500" : "gray.500"
+            }
           />
           Set up your first evaluation
         </ListItem>

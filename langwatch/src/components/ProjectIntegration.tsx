@@ -28,6 +28,7 @@ import { APIKeyCopyInput } from "../pages/authorize";
 import { api } from "../utils/api";
 import { IconWrapper } from "./IconWrapper";
 import { IntegrationChecks } from "./IntegrationChecks";
+import { trackEvent } from "../utils/tracking";
 
 export const ProjectIntegration = () => {
   const publicEnv = api.publicEnv.useQuery(
@@ -136,9 +137,15 @@ export const ProjectIntegration = () => {
                 </CardHeader>
                 <CardBody>
                   <Link
-                    href={integrationDocs.href}
+                    href="https://docs.langwatch.ai/integration/python/guide"
                     isExternal
                     marginLeft="28px"
+                    onClick={() =>
+                      trackEvent("integration_guide_click", {
+                        language: "python",
+                        project_id: project?.id,
+                      })
+                    }
                   >
                     <HStack align="center" fontSize={18} spacing={4}>
                       <IconWrapper width="36px" height="36px">
@@ -152,9 +159,15 @@ export const ProjectIntegration = () => {
                     </HStack>
                   </Link>
                   <Link
-                    href={integrationDocs.href}
+                    href="https://docs.langwatch.ai/integration/typescript/guide"
                     isExternal
                     marginLeft="28px"
+                    onClick={() =>
+                      trackEvent("integration_guide_click", {
+                        language: "typescript",
+                        project_id: project?.id,
+                      })
+                    }
                   >
                     <HStack align="center" fontSize={18} spacing={4}>
                       <IconWrapper width="36px" height="36px">
@@ -168,9 +181,15 @@ export const ProjectIntegration = () => {
                     </HStack>
                   </Link>
                   <Link
-                    href={integrationDocs.href}
+                    href="https://docs.langwatch.ai/integration/rest-api"
                     isExternal
                     marginLeft="28px"
+                    onClick={() =>
+                      trackEvent("integration_guide_click", {
+                        language: "rest",
+                        project_id: project?.id,
+                      })
+                    }
                   >
                     <HStack align="center" fontSize={18} spacing={4}>
                       <IconWrapper width="36px" height="36px">
@@ -194,7 +213,15 @@ export const ProjectIntegration = () => {
                       View our demo account to see how LangWatch works with a
                       sample chatbot.
                     </Text>
-                    <Link href={`https://app.langwatch.ai/demo`} isExternal>
+                    <Link
+                      href={`https://app.langwatch.ai/demo`}
+                      onClick={() =>
+                        trackEvent("demo_account_click", {
+                          project_id: project?.id,
+                        })
+                      }
+                      isExternal
+                    >
                       <Button colorScheme="orange" size="lg">
                         View Demo
                       </Button>

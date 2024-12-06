@@ -23,6 +23,7 @@ import {
 } from "../../optimization_studio/components/workflow/WorkflowCard";
 
 import { api } from "../../utils/api";
+import { trackEvent } from "../../utils/tracking";
 
 export default function MessagesOrIntegrationGuide() {
   const { project, isOrganizationFeatureEnabled, organization } =
@@ -75,6 +76,12 @@ export default function MessagesOrIntegrationGuide() {
                         href={`/settings/subscription`}
                         _hover={{
                           textDecoration: "none",
+                        }}
+                        onClick={() => {
+                          trackEvent("subscription_hook_click", {
+                            project_id: project?.id,
+                            hook: "studio_workflow_limit_reached",
+                          });
                         }}
                       >
                         <HStack spacing={3}>

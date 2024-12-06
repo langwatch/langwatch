@@ -623,11 +623,15 @@ const markProjectFirstMessage = async (
   project: Project,
   metadata: ElasticSearchTrace["metadata"]
 ) => {
-  if (!project.firstMessage) {
+  if (!project.firstMessage && !project.integrated) {
     await prisma.project.update({
       where: { id: project.id },
       data: {
         firstMessage: true,
+        integrated:
+          metadata.custom?.platform === "optimization_studio"
+            ? project.integrated
+            : true,
         language:
           metadata.custom?.platform === "optimization_studio"
             ? "other"

@@ -58,6 +58,7 @@ import { ProjectTechStackIcon } from "./TechStack";
 import { LogoIcon } from "./icons/LogoIcon";
 import { PuzzleIcon } from "./icons/PuzzleIcon";
 import { useTableView } from "./messages/HeaderButtons";
+import { trackEvent } from "../utils/tracking";
 
 const Breadcrumbs = ({ currentRoute }: { currentRoute: Route | undefined }) => {
   const { project } = useOrganizationTeamProject();
@@ -264,6 +265,7 @@ export const AddProjectButton = ({
   team: Team;
   organization: Organization;
 }) => {
+  const { project } = useOrganizationTeamProject();
   const usage = api.limits.getUsage.useQuery(
     { organizationId: organization.id },
     {
@@ -291,6 +293,12 @@ export const AddProjectButton = ({
         href={`/settings/subscription`}
         _hover={{
           textDecoration: "none",
+        }}
+        onClick={() => {
+          trackEvent("subscription_hook_click", {
+            project_id: project?.id,
+            hook: "new_project",
+          });
         }}
       >
         <MenuItem
@@ -491,6 +499,12 @@ export const DashboardLayout = ({
                   _hover={{
                     textDecoration: "none",
                   }}
+                  onClick={() => {
+                    trackEvent("subscription_hook_click", {
+                      project_id: project?.id,
+                      hook: "new_messages_limit_reached",
+                    });
+                  }}
                 >
                   Click here
                 </Link>{" "}
@@ -517,6 +531,12 @@ export const DashboardLayout = ({
                   textDecoration="underline"
                   _hover={{
                     textDecoration: "none",
+                  }}
+                  onClick={() => {
+                    trackEvent("subscription_hook_click", {
+                      project_id: project?.id,
+                      hook: "usage_cost_limit_reached",
+                    });
                   }}
                 >
                   Go to settings

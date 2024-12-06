@@ -26,9 +26,12 @@ import {
   UnorderedList,
   Image,
 } from "@chakra-ui/react";
+import { trackEvent } from "../utils/tracking";
+import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 
 export const BookAMeeting = () => {
   const { isOpen, onOpen, onClose } = useDisclosure();
+  const { project } = useOrganizationTeamProject();
 
   useEffect(() => {
     // Create a new script element
@@ -99,7 +102,17 @@ export const BookAMeeting = () => {
                   Get Demo Access
                 </Button>
                 <Link href="/settings/subscription">
-                  <Button colorScheme="green">Subscribe For Access</Button>
+                  <Button
+                    colorScheme="green"
+                    onClick={() => {
+                      trackEvent("subscription_hook_click", {
+                        project_id: project?.id,
+                        hook: "studio_get_demo_access",
+                      });
+                    }}
+                  >
+                    Subscribe For Access
+                  </Button>
                 </Link>
                 <Text fontWeight="medium">7-day free trial</Text>
               </HStack>

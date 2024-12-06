@@ -29,6 +29,7 @@ import type {
 } from "../../server/api/routers/organization";
 import { TeamRoleGroup } from "../../server/api/permission";
 import { api } from "../../utils/api";
+import { trackEvent } from "../../utils/tracking";
 
 export default function Projects() {
   const { organization } = useOrganizationTeamProject();
@@ -43,6 +44,7 @@ function ProjectsList({
 }: {
   organization: FullyLoadedOrganization;
 }) {
+  const { project } = useOrganizationTeamProject();
   const { hasTeamPermission } = useOrganizationTeamProject();
 
   const usage = api.limits.getUsage.useQuery(
@@ -103,6 +105,12 @@ function ProjectsList({
                                 href={`/settings/subscription`}
                                 _hover={{
                                   textDecoration: "none",
+                                }}
+                                onClick={() => {
+                                  trackEvent("subscription_hook_click", {
+                                    project_id: project?.id,
+                                    hook: "new_project_limit_reached_2",
+                                  });
                                 }}
                               >
                                 <Button

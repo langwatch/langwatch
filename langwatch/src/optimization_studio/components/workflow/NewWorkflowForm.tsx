@@ -19,6 +19,7 @@ import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamPr
 import { api } from "../../../utils/api";
 import type { Workflow } from "../../types/dsl";
 import { EmojiPickerModal } from "../properties/modals/EmojiPickerModal";
+import { trackEvent } from "../../../utils/tracking";
 
 type FormData = {
   name: string;
@@ -81,6 +82,9 @@ export const NewWorkflowForm = ({
           },
         }
       );
+
+      trackEvent("workflow_create", { project_id: project?.id });
+
       onClose();
       void router.push(
         `/${project.slug}/studio/${createdWorkflow.workflow.id}`

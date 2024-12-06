@@ -8,7 +8,11 @@ import {
 import { Copy } from "react-feather";
 
 export function CopyInput(
-  props: { value: string; label: string } & InputGroupProps
+  props: {
+    value: string;
+    label: string;
+    onClick?: () => void;
+  } & InputGroupProps
 ) {
   const toast = useToast();
 
@@ -17,6 +21,10 @@ export function CopyInput(
       {...props}
       cursor="pointer"
       onClick={() => {
+        if (props.onClick) {
+          props.onClick();
+        }
+
         if (!navigator.clipboard) {
           toast({
             title: `Your browser does not support clipboard access, please copy the ${props.label} manually`,

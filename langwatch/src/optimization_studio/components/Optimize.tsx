@@ -45,6 +45,7 @@ import { AddModelProviderKey } from "./AddModelProviderKey";
 import { useVersionState, VersionToBeUsed } from "./History";
 import { LLMConfigField } from "./properties/modals/LLMConfigModal";
 import { checkIsEvaluator } from "../utils/nodeUtils";
+import { trackEvent } from "../../utils/tracking";
 
 const optimizerOptions: {
   label: string;
@@ -59,6 +60,7 @@ const optimizerOptions: {
 export function Optimize() {
   const { isOpen, onToggle, onClose } = useDisclosure();
 
+  const { project } = useOrganizationTeamProject();
   const { optimizationState } = useWorkflowStore(({ state }) => ({
     optimizationState: state.optimization,
   }));
@@ -80,7 +82,10 @@ export function Optimize() {
         <Button
           colorScheme="green"
           size="sm"
-          onClick={onToggle}
+          onClick={() => {
+            trackEvent("optimize_click", { project_id: project?.id });
+            onToggle();
+          }}
           leftIcon={<TrendingUp size={16} />}
           isDisabled={isRunning}
         >
