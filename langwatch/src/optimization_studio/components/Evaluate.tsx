@@ -38,6 +38,7 @@ import type { Entry } from "../types/dsl";
 import { AddModelProviderKey } from "./AddModelProviderKey";
 import { useVersionState, VersionToBeUsed } from "./History";
 import { trainTestSplit } from "../utils/datasetUtils";
+import { trackEvent } from "../../utils/tracking";
 
 export function Evaluate() {
   const { isOpen, onToggle, onClose } = useDisclosure();
