@@ -5,7 +5,7 @@
 
 # LangWatch - LLM Monitoring & Optimization Studio
 
-LangWatch is a visual interface for [DSPy](https://github.com/stanfordnlp/dspy) and a complete LLM Ops platform for experimenting, measuring and improving LLM pipelines, with a [fair-code](https://faircode.io/) distribution model.
+LangWatch is a visual interface for [DSPy](https://github.com/stanfordnlp/dspy) and a complete LLM Ops platform for monitoring, experimenting, measuring and improving LLM pipelines, with a [fair-code](https://faircode.io/) distribution model.
 
 ![LangWatch Optimization Studio Screenshot](https://github.com/user-attachments/assets/72d12686-d70b-471b-ab20-0ddfbbc65cff)
 
