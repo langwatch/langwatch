@@ -35,3 +35,4 @@ terraform.rc
 
 warmer.zip
 lambda/index.js
+lambda/random-requests.js
