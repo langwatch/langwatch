@@ -21,13 +21,18 @@ import {
   Grid,
   SimpleGrid,
   GridItem,
+  Tooltip,
 } from "../../langwatch/langwatch/node_modules/@chakra-ui/react";
 // @ts-ignore
 import {
   useEffect,
   useState,
 } from "../../langwatch/langwatch/node_modules/react";
-import { X, Check } from "../../langwatch/langwatch/node_modules/react-feather";
+import {
+  X,
+  Check,
+  Info,
+} from "../../langwatch/langwatch/node_modules/react-feather";
 import SettingsLayout from "../../langwatch/langwatch/src/components/SettingsLayout";
 import { useOrganizationTeamProject } from "../../langwatch/langwatch/src/hooks/useOrganizationTeamProject";
 import { api } from "../../langwatch/langwatch/src/utils/api";
@@ -199,7 +204,7 @@ export default function Subscription() {
                 plan="FREE"
                 name="Free"
                 price={0}
-                description="For starting with LLM development"
+                description="For starting with LLM monitoring and optimization"
                 features={[
                   "1 Workflow",
                   "1k Traces",
@@ -262,7 +267,17 @@ export default function Subscription() {
                 price={59}
                 lifetimeDealOriginalPrice={149}
                 hidden={billAnnually}
-                description="For small teams improving their LLM solutions"
+                description={
+                  <>
+                    For small teams improving their LLM solutions.{" "}
+                    <b>Startups only</b>{" "}
+                    <Box display="inline-block" marginBottom="-3px">
+                      <Tooltip label="Limited to companies with 1-10 employees or for personal usage.">
+                        <Info size={16} />
+                      </Tooltip>
+                    </Box>
+                  </>
+                }
                 features={[
                   "Up to 10 workflows",
                   "10,000 Traces",
@@ -286,7 +301,17 @@ export default function Subscription() {
                 hidden={!billAnnually}
                 price={651}
                 lifetimeDealOriginalPrice={1644}
-                description="For small teams improving their LLM solutions"
+                description={
+                  <>
+                    For small teams improving their LLM solutions.{" "}
+                    <b>Startups only</b>{" "}
+                    <Box display="inline-block" marginBottom="-3px">
+                      <Tooltip label="Limited to companies with 1-10 employees or for personal usage.">
+                        <Info size={16} />
+                      </Tooltip>
+                    </Box>
+                  </>
+                }
                 features={[
                   "Up to 10 workflows",
                   "10,000 Traces",
@@ -296,7 +321,6 @@ export default function Subscription() {
                 ]}
                 additionalCosts={[
                   "Additional Traces - €50/100,000",
-                  "Additional Users - €19/user",
                   "Usage-based price for evaluations and guardrails",
                   ``,
                 ]}
@@ -394,7 +418,7 @@ function Plan({
   saving,
 }: {
   plan: PlanTypes;
-  description: string;
+  description: string | JSX.Element;
   features: (string | JSX.Element)[];
   notAvailableFeatures?: string[];
   price?: number | "custom";
@@ -526,7 +550,7 @@ function Plan({
 
           {isCurrentPlan && <Tag colorScheme="green">Current Plan</Tag>}
 
-          <Text>{description}</Text>
+          <Text height="58px">{description}</Text>
           {features.map((feature, index) => (
             <Feature key={`feature-${index}`} label={feature} />
           ))}

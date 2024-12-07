@@ -173,9 +173,9 @@ export const subscriptionRouter = () =>
                 quantity: 1,
               },
             ],
-            subscription_data: {
-              trial_period_days: 7,
-            },
+            // subscription_data: {
+            //   trial_period_days: 7,
+            // },
             success_url: `${input.baseUrl}/settings/subscription?success`,
             cancel_url: `${input.baseUrl}/settings/subscription`,
             client_reference_id: `subscription_setup_${subscription.id}`,
