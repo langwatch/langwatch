@@ -65,7 +65,6 @@ export const ProjectIntegration = () => {
           padding={6}
           borderRightWidth="1px"
           borderColor="gray.300"
-          fontSize="14px"
           minWidth="280px"
           height="full"
           spacing={6}

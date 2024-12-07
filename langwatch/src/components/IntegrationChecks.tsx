@@ -6,13 +6,26 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { trackEventOnce } from "../utils/tracking";
 import { useEffect } from "react";
 
-export const IntegrationChecks = () => {
+export const useIntegrationChecks = () => {
   const { project } = useOrganizationTeamProject();
 
   const integrationChecks = api.integrationsChecks.getCheckStatus.useQuery(
     { projectId: project?.id ?? "" },
-    { enabled: !!project, refetchOnWindowFocus: false }
+    {
+      enabled: !!project,
+      refetchOnWindowFocus: true,
+      refetchOnMount: false,
+      staleTime: Infinity,
+    }
   );
+
+  return integrationChecks;
+};
+
+export const IntegrationChecks = () => {
+  const { project } = useOrganizationTeamProject();
+
+  const integrationChecks = useIntegrationChecks();
 
   useEffect(() => {
     if (integrationChecks.data?.firstMessage) {
@@ -56,7 +69,7 @@ export const IntegrationChecks = () => {
   ]);
 
   return (
-    <VStack align="start" fontSize="16px">
+    <VStack align="start" fontSize="15px">
       <List spacing={4}>
         <ListItem
           as={Link}

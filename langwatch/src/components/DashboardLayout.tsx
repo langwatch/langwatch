@@ -3,6 +3,7 @@ import {
   Alert,
   AlertIcon,
   Avatar,
+  Badge,
   Box,
   Button,
   HStack,
@@ -15,6 +16,13 @@ import {
   MenuGroup,
   MenuItem,
   MenuList,
+  Popover,
+  PopoverArrow,
+  PopoverBody,
+  PopoverCloseButton,
+  PopoverContent,
+  PopoverHeader,
+  PopoverTrigger,
   Portal,
   Spacer,
   Text,
@@ -30,7 +38,7 @@ import ErrorPage from "next/error";
 import Head from "next/head";
 import { useRouter } from "next/router";
 import numeral from "numeral";
-import React, { useState, type PropsWithChildren } from "react";
+import React, { useMemo, useState, type PropsWithChildren } from "react";
 import {
   ChevronDown,
   ChevronRight,
@@ -60,6 +68,8 @@ import { LogoIcon } from "./icons/LogoIcon";
 import { PuzzleIcon } from "./icons/PuzzleIcon";
 import { useTableView } from "./messages/HeaderButtons";
 import { trackEvent } from "../utils/tracking";
+import { ChecklistIcon } from "./icons/Checklist";
+import { IntegrationChecks, useIntegrationChecks } from "./IntegrationChecks";
 
 const Breadcrumbs = ({ currentRoute }: { currentRoute: Route | undefined }) => {
   const { project } = useOrganizationTeamProject();
@@ -356,6 +366,14 @@ export const DashboardLayout = ({
 
   const [query, setQuery] = useState(router.query.query as string);
 
+  const integrationChecks = useIntegrationChecks();
+
+  const integrationsLeft = useMemo(() => {
+    return Object.entries(integrationChecks.data ?? {}).filter(
+      ([_key, value]) => !value
+    ).length;
+  }, [integrationChecks.data]);
+
   if (typeof router.query.project === "string" && !isLoading && !project) {
     return <ErrorPage statusCode={404} />;
   }
@@ -611,40 +629,69 @@ export const DashboardLayout = ({
             </form>
           )}
           <Spacer />
-          <Menu>
-            <MenuButton
-              as={Button}
-              variant="unstyled"
-              {...(publicPage ? { onClick: () => void signIn("auth0") } : {})}
-            >
-              <Avatar
-                name={user?.name ?? undefined}
-                backgroundColor={"orange.400"}
-                color="white"
-                size="sm"
-              />
-            </MenuButton>
-            {session && (
-              <Portal>
-                <MenuList zIndex="popover">
-                  {dependencies.ExtraMenuItems && (
-                    <dependencies.ExtraMenuItems />
-                  )}
-                  <MenuGroup
-                    title={`${session.user.name} (${session.user.email})`}
-                  >
-                    <MenuItem
-                      onClick={() =>
-                        void signOut({ callbackUrl: window.location.origin })
-                      }
+          <HStack spacing={4}>
+            {integrationsLeft ? (
+              <Popover placement="bottom-end">
+                <PopoverTrigger>
+                  <Button position="relative" variant="ghost">
+                    <ChecklistIcon />
+                    <Badge
+                      position="absolute"
+                      bottom="2px"
+                      right="2px"
+                      size="sm"
+                      color="white"
+                      backgroundColor="green.500"
+                      borderRadius="full"
                     >
-                      Logout
-                    </MenuItem>
-                  </MenuGroup>
-                </MenuList>
-              </Portal>
+                      {integrationsLeft}
+                    </Badge>
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent>
+                  <PopoverBody padding={4}>
+                    <IntegrationChecks />
+                  </PopoverBody>
+                </PopoverContent>
+              </Popover>
+            ) : (
+              <Box width={["auto", "auto", "auto", "55px"]} />
             )}
-          </Menu>
+            <Menu>
+              <MenuButton
+                as={Button}
+                variant="unstyled"
+                {...(publicPage ? { onClick: () => void signIn("auth0") } : {})}
+              >
+                <Avatar
+                  name={user?.name ?? undefined}
+                  backgroundColor={"orange.400"}
+                  color="white"
+                  size="sm"
+                />
+              </MenuButton>
+              {session && (
+                <Portal>
+                  <MenuList zIndex="popover">
+                    {dependencies.ExtraMenuItems && (
+                      <dependencies.ExtraMenuItems />
+                    )}
+                    <MenuGroup
+                      title={`${session.user.name} (${session.user.email})`}
+                    >
+                      <MenuItem
+                        onClick={() =>
+                          void signOut({ callbackUrl: window.location.origin })
+                        }
+                      >
+                        Logout
+                      </MenuItem>
+                    </MenuGroup>
+                  </MenuList>
+                </Portal>
+              )}
+            </Menu>
+          </HStack>
         </HStack>
         {publicEnv.data?.DEMO_PROJECT_SLUG &&
           publicEnv.data.DEMO_PROJECT_SLUG === router.query.project && (
