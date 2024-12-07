@@ -1,4 +1,4 @@
-import { VStack, List, ListIcon, ListItem } from "@chakra-ui/react";
+import { VStack, List, ListIcon, ListItem, Link, Text } from "@chakra-ui/react";
 import { CheckCircleIcon } from "@chakra-ui/icons";
 import { Circle } from "react-feather";
 import { api } from "../utils/api";
@@ -56,52 +56,124 @@ export const IntegrationChecks = () => {
   ]);
 
   return (
-    <VStack align="start">
-      <List spacing={3}>
-        <ListItem>
+    <VStack align="start" fontSize="16px">
+      <List spacing={4}>
+        <ListItem
+          as={Link}
+          className="group"
+          display="block"
+          href={`/settings/projects`}
+        >
           <ListIcon as={CheckCircleIcon} color={"green.500"} />
           Create first project
         </ListItem>
-        <ListItem>
+        <ListItem
+          as={Link}
+          className="group"
+          display="block"
+          href={`/${project?.id}/messages`}
+        >
           <ListIcon
             as={integrationChecks.data?.firstMessage ? CheckCircleIcon : Circle}
             color={
               integrationChecks.data?.firstMessage ? "green.500" : "gray.500"
             }
           />
-          Sync your first message
+          <Text
+            display="inline"
+            borderBottomWidth="1px"
+            borderColor="gray.350"
+            borderStyle="dashed"
+            _groupHover={{ border: "none" }}
+          >
+            Sync your first message
+          </Text>
         </ListItem>
-        <ListItem>
+        <ListItem
+          as={Link}
+          className="group"
+          display="block"
+          href={`/${project?.id}/evaluations`}
+        >
           <ListIcon
             as={integrationChecks.data?.evaluations ? CheckCircleIcon : Circle}
             color={
               integrationChecks.data?.evaluations ? "green.500" : "gray.500"
             }
           />
-          Set up your first evaluation
+          <Text
+            display="inline"
+            borderBottomWidth="1px"
+            borderColor="gray.350"
+            borderStyle="dashed"
+            _groupHover={{ border: "none" }}
+          >
+            Set up your first evaluation
+          </Text>
         </ListItem>
-        <ListItem>
+        <ListItem
+          as={Link}
+          className="group"
+          display="block"
+          href="https://docs.langwatch.ai/features/triggers"
+          isExternal
+        >
           <ListIcon
             as={integrationChecks.data?.triggers ? CheckCircleIcon : Circle}
             color={integrationChecks.data?.triggers ? "green.500" : "gray.500"}
           />
-          Set up an alert
+          <Text
+            display="inline"
+            borderBottomWidth="1px"
+            borderColor="gray.350"
+            borderStyle="dashed"
+            _groupHover={{ border: "none" }}
+          >
+            Set up an alert
+          </Text>
         </ListItem>
-        <ListItem>
+        <ListItem
+          as={Link}
+          className="group"
+          display="block"
+          href="https://docs.langwatch.ai/features/datasets"
+          isExternal
+        >
           <ListIcon
             as={integrationChecks.data?.datasets ? CheckCircleIcon : Circle}
             color={integrationChecks.data?.datasets ? "green.500" : "gray.500"}
           />
-          Create a dataset from the messages
+          <Text
+            display="inline"
+            borderBottomWidth="1px"
+            borderColor="gray.350"
+            borderStyle="dashed"
+            _groupHover={{ border: "none" }}
+          >
+            Create a dataset from the messages
+          </Text>
         </ListItem>
-        <ListItem>
+        <ListItem
+          as={Link}
+          className="group"
+          display="block"
+          href={`/${project?.id}/analytics/reports`}
+        >
           <ListIcon
             as={integrationChecks.data?.customGraphs ? CheckCircleIcon : Circle}
             color={
               integrationChecks.data?.customGraphs ? "green.500" : "gray.500"
             }
           />
-          Create a custom dashboard
+          <Text
+            display="inline"
+            borderBottomWidth="1px"
+            borderColor="gray.350"
+            borderStyle="dashed"
+            _groupHover={{ border: "none" }}
+          >
+            Create a custom dashboard
+          </Text>
         </ListItem>
       </List>
     </VStack>

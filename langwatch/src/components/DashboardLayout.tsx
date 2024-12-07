@@ -22,6 +22,7 @@ import {
   VStack,
   useTheme,
   type BackgroundProps,
+  type BoxProps,
 } from "@chakra-ui/react";
 import { type Organization, type Project, type Team } from "@prisma/client";
 import { signIn, signOut } from "next-auth/react";
@@ -319,8 +320,8 @@ export const AddProjectButton = ({
 export const DashboardLayout = ({
   children,
   publicPage = false,
-  ...bgProps
-}: { publicPage?: boolean } & PropsWithChildren<BackgroundProps>) => {
+  ...props
+}: { publicPage?: boolean } & BoxProps) => {
   const router = useRouter();
   const theme = useTheme();
   const gray400 = theme.colors.gray["400"];
@@ -477,7 +478,7 @@ export const DashboardLayout = ({
         maxWidth="calc(100vw - 90px)"
         spacing={0}
         background="gray.100"
-        {...bgProps}
+        {...props}
       >
         {usage.data &&
           usage.data.currentMonthMessagesCount >=
