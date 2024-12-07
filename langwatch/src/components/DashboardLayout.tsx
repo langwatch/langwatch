@@ -36,6 +36,7 @@ import { useRouter } from "next/router";
 import numeral from "numeral";
 import React, { useMemo, useState } from "react";
 import {
+  BookOpen,
   ChevronDown,
   ChevronRight,
   Edit,
@@ -406,7 +407,7 @@ export const DashboardLayout = ({
           spacing={8}
           position="sticky"
           top={0}
-          height="full"
+          height="100vh"
         >
           <Box fontSize={32} fontWeight="bold">
             <LogoIcon width={25} height={34} />
@@ -489,13 +490,25 @@ export const DashboardLayout = ({
             )}
 
             <Spacer />
+            <Tooltip
+              hasArrow
+              placement="right"
+              gutter={16}
+              label="Documentation"
+            >
+              <Link href="https://docs.langwatch.ai" target="_blank">
+                <IconWrapper width="20px" height="20px">
+                  <BookOpen />
+                </IconWrapper>
+              </Link>
+            </Tooltip>
             {!publicEnv.data?.IS_ONPREM && (
               <>
                 <Tooltip
                   hasArrow
                   placement="right"
                   gutter={16}
-                  label="Star us on GitHub!"
+                  label="Star us on GitHub"
                 >
                   <Link
                     href="https://github.com/langwatch/langwatch"
@@ -510,7 +523,7 @@ export const DashboardLayout = ({
                   hasArrow
                   placement="right"
                   gutter={16}
-                  label="Join our Discord community!"
+                  label="Join our community"
                 >
                   <Link href="https://discord.gg/kT4PhDS2gH" target="_blank">
                     <IconWrapper width="20px" height="20px">

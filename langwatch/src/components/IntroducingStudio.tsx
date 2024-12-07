@@ -95,8 +95,8 @@ export const IntroducingStudio = () => {
             </Heading>
             <Text>
               We are excited to launch LangWatch Optimization Studio, a new tool
-              for you to measure, evaluate and automatically optimize your LLM
-              pipelines.
+              for you to measure, evaluate and optimize your LLM pipelines with
+              DSPy.
             </Text>
             <Text>
               🚀 <b>Get started</b> right away by creating your first workflow
