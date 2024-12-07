@@ -16,16 +16,39 @@ export const integrationsChecksRouter = createTRPCRouter({
       const project = await prisma.project.findUnique({
         where: { id: input.projectId },
         include: {
-          customGraphs: { orderBy: { createdAt: "desc" } },
-          datasets: { orderBy: { createdAt: "desc" } },
-          checks: { orderBy: { createdAt: "desc" } },
-          triggers: { orderBy: { createdAt: "desc" } },
+          workflows: {
+            select: { id: true },
+            orderBy: { createdAt: "desc" },
+            take: 1,
+          },
+          customGraphs: {
+            select: { id: true },
+            orderBy: { createdAt: "desc" },
+            take: 1,
+          },
+          datasets: {
+            select: { id: true },
+            orderBy: { createdAt: "desc" },
+            take: 1,
+          },
+          checks: {
+            select: { id: true },
+            orderBy: { createdAt: "desc" },
+            take: 1,
+          },
+          triggers: {
+            select: { id: true },
+            orderBy: { createdAt: "desc" },
+            take: 1,
+          },
         },
       });
 
-      const { customGraphs, datasets, checks, triggers } = project ?? {};
+      const { workflows, customGraphs, datasets, checks, triggers } =
+        project ?? {};
 
       return {
+        workflows: workflows?.length,
         customGraphs: customGraphs?.length,
         datasets: datasets?.length,
         evaluations: checks?.length,

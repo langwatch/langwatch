@@ -5,6 +5,7 @@ import { api } from "../utils/api";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { trackEventOnce } from "../utils/tracking";
 import { useEffect } from "react";
+import NextLink from "next/link";
 
 export const useIntegrationChecks = () => {
   const { project } = useOrganizationTeamProject();
@@ -27,6 +28,11 @@ export const useIntegrationChecks = () => {
     }
     if (integrationChecks.data?.integrated) {
       trackEventOnce("integration_checks_first_integration", {
+        project_id: project?.id,
+      });
+    }
+    if (integrationChecks.data?.workflows) {
+      trackEventOnce("integration_checks_first_workflow", {
         project_id: project?.id,
       });
     }
@@ -57,6 +63,7 @@ export const useIntegrationChecks = () => {
     integrationChecks.data?.firstMessage,
     integrationChecks.data?.integrated,
     integrationChecks.data?.triggers,
+    integrationChecks.data?.workflows,
     project?.id,
   ]);
 
@@ -81,10 +88,10 @@ export const IntegrationChecks = () => {
           Create first project
         </ListItem>
         <ListItem
-          as={Link}
+          as={NextLink}
           className="group"
           display="block"
-          href={`/${project?.id}/messages`}
+          href={`/${project?.slug}/messages`}
         >
           <ListIcon
             as={integrationChecks.data?.firstMessage ? CheckCircleIcon : Circle}
@@ -103,10 +110,34 @@ export const IntegrationChecks = () => {
           </Text>
         </ListItem>
         <ListItem
-          as={Link}
+          as={NextLink}
           className="group"
           display="block"
-          href={`/${project?.id}/evaluations`}
+          href={`/${project?.slug}/workflows`}
+        >
+          <ListIcon
+            as={
+              integrationChecks.data?.workflows ? CheckCircleIcon : Circle
+            }
+            color={
+              integrationChecks.data?.workflows ? "green.500" : "gray.500"
+            }
+          />
+          <Text
+            display="inline"
+            borderBottomWidth="1px"
+            borderColor="gray.350"
+            borderStyle="dashed"
+            _groupHover={{ border: "none" }}
+          >
+            Create your first workflow
+          </Text>
+        </ListItem>
+        <ListItem
+          as={NextLink}
+          className="group"
+          display="block"
+          href={`/${project?.slug}/evaluations`}
         >
           <ListIcon
             as={integrationChecks.data?.evaluations ? CheckCircleIcon : Circle}
@@ -167,10 +198,10 @@ export const IntegrationChecks = () => {
           </Text>
         </ListItem>
         <ListItem
-          as={Link}
+          as={NextLink}
           className="group"
           display="block"
-          href={`/${project?.id}/analytics/reports`}
+          href={`/${project?.slug}/analytics/reports`}
         >
           <ListIcon
             as={integrationChecks.data?.customGraphs ? CheckCircleIcon : Circle}
