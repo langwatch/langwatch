@@ -1,10 +1,10 @@
 import { type Session } from "next-auth";
 import { useEffect } from "react";
 
-import { api } from "../../utils/api";
+import { usePublicEnv } from "../../hooks/usePublicEnv";
 
 export default function Error({ session }: { session: Session | null }) {
-  const publicEnv = api.publicEnv.useQuery({});
+  const publicEnv = usePublicEnv();
   const isAuth0 = publicEnv.data?.NEXTAUTH_PROVIDER === "auth0";
 
   useEffect(() => {

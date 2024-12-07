@@ -19,11 +19,11 @@ import {
 import { SatisfactionGraphs } from "./SatisfactionGraph";
 import { SessionsSummary } from "./SessionsSummary";
 import { TopicsSelector } from "../filters/TopicsSelector";
-import { api } from "../../utils/api";
+import { usePublicEnv } from "../../hooks/usePublicEnv";
 
 export function UserMetrics() {
-  const env = api.publicEnv.useQuery({});
-  const isNotQuickwit = env.data && !env.data.IS_QUICKWIT;
+  const publicEnv = usePublicEnv();
+  const isNotQuickwit = publicEnv.data && !publicEnv.data.IS_QUICKWIT;
 
   const messagesGraph: CustomGraphInput = {
     graphId: "messagesCountGraph",

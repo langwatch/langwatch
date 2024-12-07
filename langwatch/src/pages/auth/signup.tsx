@@ -21,12 +21,12 @@ import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { HorizontalFormControl } from "../../components/HorizontalFormControl";
-import { api } from "../../utils/api";
+import { usePublicEnv } from "../../hooks/usePublicEnv";
 import { LogoIcon } from "../../components/icons/LogoIcon";
 import type { GetServerSidePropsContext } from "next";
 
 export default function SignUp({ session }: { session: Session | null }) {
-  const publicEnv = api.publicEnv.useQuery({});
+  const publicEnv = usePublicEnv();
   const isAuth0 = publicEnv.data?.NEXTAUTH_PROVIDER === "auth0";
   const callbackUrl = useSearchParams()?.get("callbackUrl") ?? undefined;
 

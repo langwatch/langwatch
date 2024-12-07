@@ -34,6 +34,7 @@ import { OrganizationRoleGroup, TeamRoleGroup } from "../server/api/permission";
 import type { FullyLoadedOrganization } from "../server/api/routers/organization";
 import { Select as MultiSelect, chakraComponents } from "chakra-react-select";
 import { api } from "../utils/api";
+import { usePublicEnv } from "../hooks/usePublicEnv";
 
 type OrganizationFormData = {
   name: string;
@@ -191,7 +192,7 @@ type ProjectFormData = {
 
 function ProjectSettingsForm({ project }: { project: Project }) {
   const { organization, organizations } = useOrganizationTeamProject();
-  const publicEnv = api.publicEnv.useQuery({});
+  const publicEnv = usePublicEnv();
 
   const piiRedactionLevelOptions: ProjectFormData["piiRedactionLevel"][] = [
     {

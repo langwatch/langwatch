@@ -10,6 +10,7 @@ import {
   teamRolePermissionMapping,
 } from "../server/api/permission";
 import type { OrganizationUserRole, TeamUserRole } from "@prisma/client";
+import { usePublicEnv } from "./usePublicEnv";
 
 export const useOrganizationTeamProject = (
   {
@@ -29,14 +30,7 @@ export const useOrganizationTeamProject = (
   const session = useRequiredSession();
 
   const router = useRouter();
-  const publicEnv = api.publicEnv.useQuery(
-    {},
-    {
-      staleTime: Infinity,
-      refetchOnMount: false,
-      refetchOnWindowFocus: false,
-    }
-  );
+  const publicEnv = usePublicEnv();
 
   const isPublicRoute = publicRoutes.includes(router.route);
   const shareId = typeof router.query.id === "string" ? router.query.id : "";

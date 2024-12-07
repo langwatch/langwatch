@@ -17,11 +17,8 @@ import {
   MenuItem,
   MenuList,
   Popover,
-  PopoverArrow,
   PopoverBody,
-  PopoverCloseButton,
   PopoverContent,
-  PopoverHeader,
   PopoverTrigger,
   Portal,
   Spacer,
@@ -29,7 +26,6 @@ import {
   Tooltip,
   VStack,
   useTheme,
-  type BackgroundProps,
   type BoxProps,
 } from "@chakra-ui/react";
 import { type Organization, type Project, type Team } from "@prisma/client";
@@ -38,12 +34,11 @@ import ErrorPage from "next/error";
 import Head from "next/head";
 import { useRouter } from "next/router";
 import numeral from "numeral";
-import React, { useMemo, useState, type PropsWithChildren } from "react";
+import React, { useMemo, useState } from "react";
 import {
   ChevronDown,
   ChevronRight,
   Edit,
-  Image as ImageIcon,
   Lock,
   MessageSquare,
   Play,
@@ -61,15 +56,19 @@ import { OrganizationRoleGroup } from "../server/api/permission";
 import type { FullyLoadedOrganization } from "../server/api/routers/organization";
 import { api } from "../utils/api";
 import { findCurrentRoute, projectRoutes, type Route } from "../utils/routes";
+import { trackEvent } from "../utils/tracking";
 import { CurrentDrawer } from "./CurrentDrawer";
+import { IntegrationChecks, useIntegrationChecks } from "./IntegrationChecks";
 import { LoadingScreen } from "./LoadingScreen";
 import { ProjectTechStackIcon } from "./TechStack";
+import { ChecklistIcon } from "./icons/Checklist";
+import { GitHub } from "react-feather";
 import { LogoIcon } from "./icons/LogoIcon";
 import { PuzzleIcon } from "./icons/PuzzleIcon";
 import { useTableView } from "./messages/HeaderButtons";
-import { trackEvent } from "../utils/tracking";
-import { ChecklistIcon } from "./icons/Checklist";
-import { IntegrationChecks, useIntegrationChecks } from "./IntegrationChecks";
+import { IconWrapper } from "./IconWrapper";
+import { usePublicEnv } from "../hooks/usePublicEnv";
+import { DiscordOutlineIcon } from "./icons/DiscordOutline";
 
 const Breadcrumbs = ({ currentRoute }: { currentRoute: Route | undefined }) => {
   const { project } = useOrganizationTeamProject();
@@ -355,14 +354,7 @@ export const DashboardLayout = ({
       refetchOnMount: false,
     }
   );
-  const publicEnv = api.publicEnv.useQuery(
-    {},
-    {
-      staleTime: Infinity,
-      refetchOnMount: false,
-      refetchOnWindowFocus: false,
-    }
-  );
+  const publicEnv = usePublicEnv();
 
   const [query, setQuery] = useState(router.query.query as string);
 
@@ -408,12 +400,19 @@ export const DashboardLayout = ({
         borderRightColor="gray.300"
         background="white"
       >
-        <VStack paddingX={6} paddingY={8} spacing={8} position="sticky" top={0}>
+        <VStack
+          paddingX={6}
+          paddingY={8}
+          spacing={8}
+          position="sticky"
+          top={0}
+          height="full"
+        >
           <Box fontSize={32} fontWeight="bold">
             <LogoIcon width={25} height={34} />
           </Box>
 
-          <VStack spacing={8}>
+          <VStack height="full" spacing={8}>
             <SideMenuLink
               path={projectRoutes.workflows.path}
               icon={PuzzleIcon}
@@ -487,6 +486,39 @@ export const DashboardLayout = ({
                 label={projectRoutes.settings.title}
                 project={project}
               />
+            )}
+
+            <Spacer />
+            {!publicEnv.data?.IS_ONPREM && (
+              <>
+                <Tooltip
+                  hasArrow
+                  placement="right"
+                  gutter={16}
+                  label="Star us on GitHub!"
+                >
+                  <Link
+                    href="https://github.com/langwatch/langwatch"
+                    target="_blank"
+                  >
+                    <IconWrapper width="20px" height="20px">
+                      <GitHub />
+                    </IconWrapper>
+                  </Link>
+                </Tooltip>
+                <Tooltip
+                  hasArrow
+                  placement="right"
+                  gutter={16}
+                  label="Join our Discord community!"
+                >
+                  <Link href="https://discord.gg/kT4PhDS2gH" target="_blank">
+                    <IconWrapper width="20px" height="20px">
+                      <DiscordOutlineIcon />
+                    </IconWrapper>
+                  </Link>
+                </Tooltip>
+              </>
             )}
           </VStack>
         </VStack>

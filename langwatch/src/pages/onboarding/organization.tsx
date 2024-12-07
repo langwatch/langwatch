@@ -61,6 +61,7 @@ import { SetupLayout } from "~/components/SetupLayout";
 import { api } from "~/utils/api";
 import { LoadingScreen } from "../../components/LoadingScreen";
 import { useRequiredSession } from "../../hooks/useRequiredSession";
+import { usePublicEnv } from "../../hooks/usePublicEnv";
 
 type OrganizationFormData = {
   organizationName: string;
@@ -102,7 +103,7 @@ export default function OrganizationOnboarding() {
       ? router.query.return_to
       : undefined;
 
-  const publicEnv = api.publicEnv.useQuery({});
+  const publicEnv = usePublicEnv();
   const isOnPrem = publicEnv.data?.IS_ONPREM;
 
   const createOrganization = api.organization.createAndAssign.useMutation();

@@ -3,14 +3,14 @@ import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProje
 import { analyticsMetrics } from "../../server/analytics/registry";
 import { TeamRoleGroup } from "../../server/api/permission";
 import { CustomGraph, type CustomGraphInput } from "./CustomGraph";
-import { api } from "../../utils/api";
+import { usePublicEnv } from "../../hooks/usePublicEnv";
 
 export const LLMSummary = () => {
-  const env = api.publicEnv.useQuery({});
+  const publicEnv = usePublicEnv();
   const { hasTeamPermission } = useOrganizationTeamProject();
 
-  const isQuickwit = env.data && env.data.IS_QUICKWIT;
-  const isNotQuickwit = env.data && !env.data.IS_QUICKWIT;
+  const isQuickwit = publicEnv.data && publicEnv.data.IS_QUICKWIT;
+  const isNotQuickwit = publicEnv.data && !publicEnv.data.IS_QUICKWIT;
 
   const llmSummary: CustomGraphInput = {
     graphId: "llmSummary",
