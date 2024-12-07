@@ -1,8 +1,4 @@
-import {
-  techStackLanguageOptions,
-  techStackFrameworkOptions,
-  docsLinks,
-} from "./TechStack";
+import { techStackLanguageOptions } from "./TechStack";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import {
   Heading,
@@ -15,46 +11,20 @@ import {
   Card,
   CardHeader,
   CardBody,
-  List,
-  ListItem,
-  ListIcon,
-  OrderedList,
-  UnorderedList,
   Button,
+  Box,
 } from "@chakra-ui/react";
 import { DashboardLayout } from "./DashboardLayout";
 import { ExternalLinkIcon } from "@chakra-ui/icons";
 import { APIKeyCopyInput } from "../pages/authorize";
-import { api } from "../utils/api";
 import { IconWrapper } from "./IconWrapper";
 import { IntegrationChecks } from "./IntegrationChecks";
 import { trackEvent } from "../utils/tracking";
 
 export const ProjectIntegration = () => {
-  const publicEnv = api.publicEnv.useQuery(
-    {},
-    {
-      staleTime: Infinity,
-      refetchOnMount: false,
-      refetchOnWindowFocus: false,
-    }
-  );
   const { project, isRefetching } = useOrganizationTeamProject({
     keepFetching: true,
   });
-
-  const languageKey = project?.language as
-    | keyof typeof techStackLanguageOptions
-    | undefined;
-  const language = languageKey && techStackLanguageOptions[languageKey];
-
-  const frameworkKey = project?.framework as
-    | keyof typeof techStackFrameworkOptions
-    | undefined;
-  const framework = frameworkKey && techStackFrameworkOptions[frameworkKey];
-
-  const integrationDocs =
-    (languageKey && framework?.languages[languageKey]) ?? docsLinks.custom_rest;
 
   return (
     <DashboardLayout backgroundColor="gray.100" maxWidth="100%">
@@ -111,7 +81,9 @@ export const ProjectIntegration = () => {
                   <Text>
                     Copy your LangWatch API key to use for the integration
                   </Text>
-                  <APIKeyCopyInput />
+                  <Box width="full" maxWidth="560px">
+                    <APIKeyCopyInput />
+                  </Box>
                 </VStack>
               </CardBody>
             </Card>

@@ -370,7 +370,7 @@ export const DashboardLayout = ({
 
   const integrationsLeft = useMemo(() => {
     return Object.entries(integrationChecks.data ?? {}).filter(
-      ([_key, value]) => !value
+      ([key, value]) => key !== "integrated" && !value
     ).length;
   }, [integrationChecks.data]);
 

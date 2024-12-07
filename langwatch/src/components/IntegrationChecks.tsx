@@ -19,14 +19,6 @@ export const useIntegrationChecks = () => {
     }
   );
 
-  return integrationChecks;
-};
-
-export const IntegrationChecks = () => {
-  const { project } = useOrganizationTeamProject();
-
-  const integrationChecks = useIntegrationChecks();
-
   useEffect(() => {
     if (integrationChecks.data?.firstMessage) {
       trackEventOnce("integration_checks_first_message", {
@@ -67,6 +59,14 @@ export const IntegrationChecks = () => {
     integrationChecks.data?.triggers,
     project?.id,
   ]);
+
+  return integrationChecks;
+};
+
+export const IntegrationChecks = () => {
+  const { project } = useOrganizationTeamProject();
+
+  const integrationChecks = useIntegrationChecks();
 
   return (
     <VStack align="start" fontSize="15px">
