@@ -39,6 +39,7 @@ import {
   getJobProcessingCounter,
   getJobProcessingDurationHistogram,
 } from "../../metrics";
+import type { Trace } from "~/server/tracer/types";
 
 const debug = getDebugger("langwatch:workers:traceChecksWorker");
 
@@ -54,6 +55,8 @@ export const runEvaluationJob = async (
   if (!check) {
     throw `check config ${job.data.check.evaluator_id} not found`;
   }
+
+  console.log("check....this", check);
 
   return await runEvaluationForTrace({
     projectId: job.data.trace.project_id,
@@ -145,7 +148,11 @@ export const runEvaluationForTrace = async ({
   }
 
   let contexts = undefined;
-  if (evaluator.requiredFields.includes("contexts")) {
+
+  if (
+    evaluator?.requiredFields?.includes("contexts") &&
+    !evaluatorType.startsWith("custom/")
+  ) {
     const ragInfo = getRAGInfo(spans);
     if (ragContextMapping) {
       contexts = switchMapping(ragContextMapping as Mappings);
@@ -185,6 +192,7 @@ export const runEvaluationForTrace = async ({
     expected_output,
     conversation,
     settings: settings && typeof settings === "object" ? settings : undefined,
+    trace,
   });
 
   return result;
@@ -199,6 +207,7 @@ export const runEvaluation = async ({
   expected_output,
   settings,
   conversation,
+  trace,
   retries = 1,
 }: {
   projectId: string;
@@ -209,6 +218,7 @@ export const runEvaluation = async ({
   expected_output?: string;
   conversation?: Conversation;
   settings?: Record<string, unknown>;
+  trace?: Trace;
   retries?: number;
 }): Promise<SingleEvaluationResult> => {
   const project = await prisma.project.findUnique({
@@ -226,6 +236,67 @@ export const runEvaluation = async ({
     return {
       status: "skipped",
       details: "Monthly usage limit exceeded",
+    };
+  }
+
+  if (evaluatorType.startsWith("custom/")) {
+    console.log("custom evaluatorType....", evaluatorType);
+    const workflowId = evaluatorType.split("/")[1];
+
+    const project = await prisma.project.findUnique({
+      where: {
+        id: projectId,
+      },
+    });
+
+    if (!project) {
+      throw new Error("Project not found");
+    }
+
+    const check = await prisma.check.findFirst({
+      where: {
+        checkType: evaluatorType,
+        projectId: projectId,
+      },
+    });
+
+    if (!check) {
+      throw new Error("Check not found");
+    }
+
+    const mappings = check.mappings as Record<Mappings, string>;
+     /*
+    {"input": "trace.input", "output": "trace.output", "context": "trace.first_rag_context", "expected_output": "metadata.expected_output"}*/
+
+
+
+
+    console.log("workflowId....", workflowId);
+
+    console.log("trace....", trace);
+
+   
+    const response = await fetch(
+      `${process.env.BASE_HOST}/api/optimization/${workflowId}`,
+      {
+        method: "POST",
+        headers: {
+          "X-Auth-Token": project.apiKey!,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          gold_answer: input,
+          answer: output,
+          question: input,
+          trace_id: trace?.trace_id,
+        }),
+      }
+    );
+    const { result } = await response.json();
+
+    return {
+      status: "processed",
+      ...result,
     };
   }
 
@@ -353,6 +424,7 @@ export const runEvaluation = async ({
 
   getEvaluationStatusCounter(evaluatorType, result.status).inc();
 
+  console.log("result...Normal", result);
   return result;
 };
 
@@ -380,7 +452,7 @@ export const startEvaluationsWorker = (
       const start = Date.now();
 
       try {
-        debug(`Processing job ${job.id} with data:`, job.data);
+        debug(`Processing job ${job.id} with data::`, job.data);
 
         let processed = false;
         const timeout = new Promise((resolve, reject) => {
@@ -450,7 +522,7 @@ export const startEvaluationsWorker = (
           status: "error",
           error: error,
         });
-        debug("Failed to process job:", job.id, error);
+        debug("Failed to process job::", job.id, error);
 
         if (
           typeof error === "object" &&

@@ -32,6 +32,7 @@ import { z } from "zod";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import {
   AVAILABLE_EVALUATORS,
+  type EvaluatorDefinition,
   type Evaluators,
   type EvaluatorTypes,
 } from "../../server/evaluations/evaluators.generated";
@@ -53,6 +54,9 @@ import { EvaluationManualIntegration } from "./EvaluationManualIntegration";
 import { PreconditionsField } from "./PreconditionsField";
 import { TryItOut } from "./TryItOut";
 import { EvaluationExecutionMode } from "@prisma/client";
+import { getInputsOutputs } from "../../optimization_studio/utils/nodeUtils";
+import type { JsonArray } from "@prisma/client/runtime/library";
+import type { Edge, Node } from "@xyflow/react";
 
 export interface CheckConfigFormData {
   name: string;
@@ -63,10 +67,7 @@ export interface CheckConfigFormData {
   executionMode: EvaluationExecutionMode;
   storeSettingsOnCode: boolean;
   mappings: {
-    input: string;
-    output: string;
-    context: string;
-    expected_output: string;
+    [key: string]: string;
   };
 }
 
@@ -129,9 +130,10 @@ export default function CheckConfigForm({
           checkType: evaluatorTypesSchema,
           sample: z.number().min(0.01).max(1),
           preconditions: checkPreconditionsSchema,
-          settings:
-            evaluatorsSchema.shape[data.checkType ?? "langevals/basic"].shape
-              .settings,
+          settings: data.checkType?.startsWith("custom/")
+            ? z.object({}).optional()
+            : evaluatorsSchema.shape[data.checkType ?? "langevals/basic"].shape
+                .settings,
           executionMode: z
             .enum([
               EvaluationExecutionMode.ON_MESSAGE,
@@ -139,12 +141,7 @@ export default function CheckConfigForm({
               EvaluationExecutionMode.MANUALLY,
             ])
             .optional(),
-          mappings: z.object({
-            input: z.string().optional(),
-            output: z.string().optional(),
-            context: z.string().optional(),
-            expected_output: z.string().optional(),
-          }),
+          mappings: z.record(z.string(), z.string().optional()), // Allow any string key with optional string value
         })
       )({ ...data, settings: data.settings || {} }, ...args);
     },
@@ -164,6 +161,7 @@ export default function CheckConfigForm({
   const sample = watch("sample");
   const executionMode = watch("executionMode");
   const storeSettingsOnCode = watch("storeSettingsOnCode");
+  const mappings = watch("mappings");
 
   const {
     fields: fieldsPrecondition,
@@ -174,6 +172,7 @@ export default function CheckConfigForm({
     name: "preconditions",
   });
   const evaluatorDefinition = checkType && getEvaluatorDefinitions(checkType);
+
   const slug = slugify(nameValue || "", {
     lower: true,
     strict: true,
@@ -181,6 +180,42 @@ export default function CheckConfigForm({
 
   const router = useRouter();
   const isChoosing = router.pathname.endsWith("/choose");
+
+  const availableCustomEvaluators =
+    api.evaluations.availableCustomEvaluators.useQuery(
+      { projectId: project?.id ?? "" },
+      { enabled: !!project }
+    );
+
+  const availableEvaluators = {
+    ...AVAILABLE_EVALUATORS,
+    ...Object.fromEntries(
+      (availableCustomEvaluators.data ?? []).map((evaluator) => {
+        const { inputs, outputs } = getInputsOutputs(
+          JSON.parse(JSON.stringify(evaluator.versions[0]?.dsl))
+            ?.edges as Edge[],
+          JSON.parse(JSON.stringify(evaluator.versions[0]?.dsl))
+            ?.nodes as JsonArray as unknown[] as Node[]
+        );
+        const requiredFields = inputs.map((input) => input.identifier);
+
+        return [
+          `custom/${evaluator.id}`,
+          {
+            name: evaluator.name,
+            description: evaluator.description,
+            category: "custom",
+            isGuardrail: false,
+            requiredFields: requiredFields,
+            optionalFields: [],
+            settings: {},
+            result: {},
+            envVars: [],
+          },
+        ];
+      })
+    ),
+  };
 
   useEffect(() => {
     if (!checkType && !isChoosing) {
@@ -199,7 +234,7 @@ export default function CheckConfigForm({
 
     let defaultName = getEvaluatorDefinitions(checkType)?.name;
     defaultName = evaluatorTempNameMap[defaultName ?? ""] ?? defaultName;
-    const allDefaultNames = Object.values(AVAILABLE_EVALUATORS).map(
+    const allDefaultNames = Object.values(availableEvaluators).map(
       (evaluator) => evaluatorTempNameMap[evaluator.name] ?? evaluator.name
     );
     if (!nameValue || allDefaultNames.includes(nameValue)) {
@@ -208,8 +243,6 @@ export default function CheckConfigForm({
         checkType.includes("custom") ? "" : defaultName ?? ""
       );
     }
-
-    const evaluator = AVAILABLE_EVALUATORS[checkType];
 
     const setDefaultSettings = (
       defaultValues: Record<string, any>,
@@ -231,9 +264,16 @@ export default function CheckConfigForm({
       });
     };
 
-    setDefaultSettings(getEvaluatorDefaultSettings(evaluator), "settings");
+    setDefaultSettings(
+      getEvaluatorDefaultSettings(availableEvaluators[checkType]),
+      "settings"
+    );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [checkType, defaultValues?.checkType, defaultValues?.settings]);
+
+  if (!availableCustomEvaluators.data) {
+    return;
+  }
 
   const runOn = (
     <Text color="gray.500" fontStyle="italic">
@@ -244,6 +284,8 @@ export default function CheckConfigForm({
       {preconditions?.length > 0 && " matching the preconditions"}
     </Text>
   );
+
+  const accordionIndex = checkType?.startsWith("custom/") ? 0 : undefined;
 
   return (
     <FormProvider {...form}>
@@ -262,8 +304,8 @@ export default function CheckConfigForm({
                     isInvalid={!!errors.checkType}
                   >
                     {evaluatorTempNameMap[
-                      AVAILABLE_EVALUATORS[checkType].name
-                    ] ?? AVAILABLE_EVALUATORS[checkType].name}{" "}
+                      availableEvaluators[checkType].name
+                    ] ?? availableEvaluators[checkType].name}{" "}
                     <Button
                       variant="link"
                       onClick={() => {
@@ -394,7 +436,7 @@ export default function CheckConfigForm({
                   {executionMode !== EvaluationExecutionMode.ON_MESSAGE && (
                     <EvaluationManualIntegration
                       slug={slug}
-                      evaluatorDefinition={evaluatorDefinition!}
+                      evaluatorDefinition={availableEvaluators[checkType]}
                       form={form}
                     />
                   )}
@@ -404,17 +446,21 @@ export default function CheckConfigForm({
 
             <Card width="full" padding={0}>
               <CardBody padding={0}>
-                <Accordion allowToggle padding={1}>
+                <Accordion
+                  defaultIndex={accordionIndex}
+                  allowToggle
+                  padding={0}
+                >
                   <AccordionItem border="none">
                     <h2>
-                      <AccordionButton>
+                      <AccordionButton paddingY={6}>
                         <Box as="span" flex="1" textAlign="left">
                           <Text fontWeight="500">Mappings</Text>
                         </Box>
                         <AccordionIcon />
                       </AccordionButton>
                     </h2>
-                    <AccordionPanel pb={4}>
+                    <AccordionPanel paddingTop={0}>
                       <MappingsFields
                         register={register}
                         mappingOptions={MAPPING_OPTIONS}
@@ -422,10 +468,10 @@ export default function CheckConfigForm({
                           defaultValues?.mappings ?? DEFAULT_MAPPINGS
                         }
                         optionalFields={
-                          evaluatorDefinition?.optionalFields ?? []
+                          availableEvaluators[checkType].optionalFields
                         }
                         requiredFields={
-                          evaluatorDefinition?.requiredFields ?? []
+                          availableEvaluators[checkType].requiredFields
                         }
                       />
                     </AccordionPanel>
@@ -486,9 +532,7 @@ const MappingsFields = ({
                   defaultValue={
                     defaultValues[field as keyof typeof defaultValues]
                   }
-                  {...register(
-                    `mappings.${field as keyof typeof defaultValues}`
-                  )}
+                  {...register(`mappings.${field}`)}
                 >
                   {mappingOptions.map(({ value, label }) => (
                     <option key={value} value={value}>
@@ -496,8 +540,7 @@ const MappingsFields = ({
                     </option>
                   ))}
                 </Select>
-                <ArrowRight />
-                <Text>{field}</Text>
+                <ArrowRight />x<Text>{field} (required)</Text>
               </HStack>
             ))}
           </>

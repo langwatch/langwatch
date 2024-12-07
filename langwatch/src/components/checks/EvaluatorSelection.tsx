@@ -56,14 +56,30 @@ export function EvaluatorSelection({
     { enabled: !!project }
   );
 
-  const availableEvaluators = Object.entries(
-    availableEvaluators_.data ?? AVAILABLE_EVALUATORS
-  ).filter(
-    ([key, _evaluator]) =>
-      !key.startsWith("example/") &&
-      key !== "aws/comprehend_pii_detection" &&
-      key !== "google_cloud/dlp_pii_detection"
-  );
+  const availableCustomEvaluators =
+    api.evaluations.availableCustomEvaluators.useQuery(
+      { projectId: project?.id ?? "" },
+      { enabled: !!project }
+    );
+  console.log("availableCustomEvaluators", availableCustomEvaluators.data);
+
+  const availableEvaluators = [
+    ...Object.entries(availableEvaluators_.data ?? AVAILABLE_EVALUATORS).filter(
+      ([key, _evaluator]) =>
+        !key.startsWith("example/") &&
+        key !== "aws/comprehend_pii_detection" &&
+        key !== "google_cloud/dlp_pii_detection"
+    ),
+    ...(availableCustomEvaluators.data ?? []).map((evaluator) => [
+      `custom/${evaluator.id}`,
+      {
+        name: evaluator.name,
+        description: evaluator.description,
+        category: "custom",
+        requiredFields: [],
+      },
+    ]),
+  ];
 
   const categories: Category[] = ["safety", "policy", "quality", "custom"];
 

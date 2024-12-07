@@ -202,25 +202,30 @@ export const checksRouter = createTRPCRouter({
 });
 
 const validateCheckSettings = (checkType: string, parameters: any) => {
-  if (AVAILABLE_EVALUATORS[checkType as EvaluatorTypes] === undefined) {
+  console.log("checkType", checkType);
+  if (
+    AVAILABLE_EVALUATORS[checkType as EvaluatorTypes] === undefined &&
+    !checkType.startsWith("custom/")
+  ) {
     throw new TRPCError({
       code: "BAD_REQUEST",
       message: "Invalid checkType",
     });
   }
 
-  const checkType_ = checkType as EvaluatorTypes;
-
-  try {
-    evaluatorsSchema.shape[checkType_].shape.settings.parse(parameters);
-  } catch (error) {
-    if (error instanceof ZodError) {
-      throw new TRPCError({
-        code: "BAD_REQUEST",
-        message: `Invalid settings: ${error as any}`,
-      });
-    } else {
-      throw error;
+  if (!checkType.startsWith("custom/")) {
+    const checkType_ = checkType as EvaluatorTypes;
+    try {
+      evaluatorsSchema.shape[checkType_].shape.settings.parse(parameters);
+    } catch (error) {
+      if (error instanceof ZodError) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: `Invalid settings: ${error as any}`,
+        });
+      } else {
+        throw error;
+      }
     }
   }
 };
