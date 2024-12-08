@@ -13,7 +13,6 @@ import { TRACE_INDEX, esClient, traceIndexId } from "../elasticsearch";
 import { getProjectEmbeddingsModel } from "../embeddings";
 import type { ElasticSearchTrace, Trace } from "../tracer/types";
 import {
-  allowedTopicClusteringModels,
   type BatchClusteringParams,
   type IncrementalClusteringParams,
   type TopicClusteringResponse,
@@ -499,7 +498,7 @@ export const fetchTopicsBatchClustering = async (
   projectId: string,
   params: BatchClusteringParams
 ): Promise<TopicClusteringResponse | undefined> => {
-  if (!env.LANGWATCH_NLP_SERVICE) {
+  if (!env.TOPIC_CLUSTERING_SERVICE) {
     console.warn(
       "Topic clustering service URL not set, skipping topic clustering"
     );
@@ -512,7 +511,7 @@ export const fetchTopicsBatchClustering = async (
   debug("Uploading", size / 125000, "mb of traces data for project", projectId);
 
   const response = await fetchHTTP2(
-    `${env.LANGWATCH_NLP_SERVICE}/topics/batch_clustering`,
+    `${env.TOPIC_CLUSTERING_SERVICE}/topics/batch_clustering`,
     { method: "POST", json: params }
   );
 
@@ -538,7 +537,7 @@ export const fetchTopicsIncrementalClustering = async (
   projectId: string,
   params: IncrementalClusteringParams
 ): Promise<TopicClusteringResponse | undefined> => {
-  if (!env.LANGWATCH_NLP_SERVICE) {
+  if (!env.TOPIC_CLUSTERING_SERVICE) {
     console.warn(
       "Topic clustering service URL not set, skipping topic clustering"
     );
@@ -551,7 +550,7 @@ export const fetchTopicsIncrementalClustering = async (
   debug("Uploading", size / 125000, "mb of traces data for project", projectId);
 
   const response = await fetchHTTP2(
-    `${env.LANGWATCH_NLP_SERVICE}/topics/incremental_clustering`,
+    `${env.TOPIC_CLUSTERING_SERVICE}/topics/incremental_clustering`,
     { method: "POST", json: params }
   );
 

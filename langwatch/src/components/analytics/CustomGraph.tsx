@@ -50,6 +50,7 @@ import type { Unpacked } from "../../utils/types";
 import { SummaryMetric } from "./SummaryMetric";
 import { useFilterParams } from "../../hooks/useFilterParams";
 import { QuickwitNote } from "./QuickwitNote";
+import { usePublicEnv } from "../../hooks/usePublicEnv";
 
 type Series = Unpacked<z.infer<typeof timeseriesSeriesInput>["series"]> & {
   name: string;
@@ -114,10 +115,10 @@ export function CustomGraph({
   };
   hideGroupLabel?: boolean;
 }) {
-  const env = api.publicEnv.useQuery({});
+  const publicEnv = usePublicEnv();
 
   if (
-    env.data?.IS_QUICKWIT &&
+    publicEnv.data?.IS_QUICKWIT &&
     (input.series.some(
       (series) => !getMetric(series.metric).quickwitSupport || series.pipeline
     ) ||
@@ -131,7 +132,7 @@ export function CustomGraph({
       input={input}
       titleProps={titleProps}
       hideGroupLabel={hideGroupLabel}
-      enabled={!!env.data}
+      enabled={!!publicEnv.data}
     />
   );
 }

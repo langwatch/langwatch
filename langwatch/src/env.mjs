@@ -39,6 +39,7 @@ export const env = createEnv({
     OPENAI_API_KEY: z.string().optional(),
     SENDGRID_API_KEY: z.string().optional(),
     LANGWATCH_NLP_SERVICE: z.string().optional(),
+    TOPIC_CLUSTERING_SERVICE: z.string().optional(),
     LANGEVALS_ENDPOINT: z.string().optional(),
     DEMO_PROJECT_ID: z.string().optional(),
     DEMO_PROJECT_USER_ID: z.string().optional(),
@@ -50,6 +51,7 @@ export const env = createEnv({
     SENTRY_DSN: z.string().optional(),
     IS_ONPREM: z.string().optional(),
     EMAIL_DEFAULT_FROM: z.string().optional(),
+    S3_KEY_SALT: z.string().optional(),
   },
 
   /**
@@ -85,6 +87,10 @@ export const env = createEnv({
     OPENAI_API_KEY: process.env.OPENAI_API_KEY,
     SENDGRID_API_KEY: process.env.SENDGRID_API_KEY,
     LANGWATCH_NLP_SERVICE: process.env.LANGWATCH_NLP_SERVICE,
+    // Temporary, ideally we want to move this to lambda too
+    TOPIC_CLUSTERING_SERVICE: process.env.TOPIC_CLUSTERING_SERVICE
+      ? process.env.TOPIC_CLUSTERING_SERVICE
+      : process.env.LANGWATCH_NLP_SERVICE,
     LANGEVALS_ENDPOINT: process.env.LANGEVALS_ENDPOINT,
     DEMO_PROJECT_ID: process.env.DEMO_PROJECT_ID,
     DEMO_PROJECT_USER_ID: process.env.DEMO_PROJECT_USER_ID,
@@ -101,6 +107,7 @@ export const env = createEnv({
     SENTRY_DSN: process.env.SENTRY_DSN,
     IS_ONPREM: process.env.IS_ONPREM,
     EMAIL_DEFAULT_FROM: process.env.EMAIL_DEFAULT_FROM,
+    S3_KEY_SALT: process.env.S3_KEY_SALT,
   },
   /**
    * Run `build` or `dev` with `SKIP_ENV_VALIDATION` to skip env validation.

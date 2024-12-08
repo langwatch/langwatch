@@ -18,12 +18,12 @@ import { analyticsMetrics } from "../server/analytics/registry";
 import { TeamRoleGroup } from "../server/api/permission";
 import { CustomGraph, type CustomGraphInput } from "./analytics/CustomGraph";
 import { LLMSummary } from "./analytics/LLMSummary";
-import { api } from "../utils/api";
+import { usePublicEnv } from "../hooks/usePublicEnv";
 
 export function LLMMetrics() {
-  const env = api.publicEnv.useQuery({});
-  const isNotQuickwit = env.data && !env.data.IS_QUICKWIT;
-  const isQuickwit = env.data && env.data.IS_QUICKWIT;
+  const publicEnv = usePublicEnv();
+  const isNotQuickwit = publicEnv.data && !publicEnv.data.IS_QUICKWIT;
+  const isQuickwit = publicEnv.data && publicEnv.data.IS_QUICKWIT;
   const { hasTeamPermission } = useOrganizationTeamProject();
 
   const llmCallsGraph: CustomGraphInput = {

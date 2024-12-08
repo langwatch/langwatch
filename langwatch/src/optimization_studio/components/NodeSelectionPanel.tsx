@@ -8,6 +8,7 @@ import {
   Text,
   VStack,
   Tooltip,
+  Link,
 } from "@chakra-ui/react";
 import {
   useReactFlow,
@@ -18,7 +19,7 @@ import {
 import { useEffect, useMemo, useRef } from "react";
 import { useDrag, useDragDropManager, useDragLayer } from "react-dnd";
 import { getEmptyImage } from "react-dnd-html5-backend";
-import { Box as BoxIcon, ChevronsLeft } from "react-feather";
+import { BookOpen, Box as BoxIcon, ChevronsLeft, GitHub } from "react-feather";
 import { HoverableBigText } from "../../components/HoverableBigText";
 import { useWorkflowStore } from "../hooks/useWorkflowStore";
 import { MODULES } from "../registry";
@@ -35,6 +36,9 @@ import { NodeComponents } from "./nodes";
 import { PromptingTechniqueDraggingNode } from "./nodes/PromptingTechniqueNode";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
+import { IconWrapper } from "../../components/IconWrapper";
+import { DiscordOutlineIcon } from "../../components/icons/DiscordOutline";
+import { usePublicEnv } from "../../hooks/usePublicEnv";
 
 export function NodeSelectionPanelButton({
   isOpen,
@@ -73,6 +77,7 @@ export const NodeSelectionPanel = ({
 
   const workflow = getWorkflow();
   const { project } = useOrganizationTeamProject();
+  const publicEnv = usePublicEnv();
 
   const { data: components } = api.optimization.getComponents.useQuery(
     {
@@ -235,7 +240,42 @@ export const NodeSelectionPanel = ({
               </>
             )}
         </VStack>
-        <HStack width="full" padding={3} position="absolute" bottom={0}>
+        <HStack
+          width="full"
+          padding={3}
+          paddingLeft={5}
+          spacing={4}
+          background="white"
+        >
+          {!publicEnv.data?.IS_ONPREM && (
+            <>
+              <Tooltip hasArrow gutter={16} label="Star us on GitHub">
+                <Link
+                  href="https://github.com/langwatch/langwatch"
+                  target="_blank"
+                >
+                  <IconWrapper width="20px" height="20px">
+                    <GitHub />
+                  </IconWrapper>
+                </Link>
+              </Tooltip>
+              <Tooltip hasArrow gutter={16} label="Join our community">
+                <Link href="https://discord.gg/kT4PhDS2gH" target="_blank">
+                  <IconWrapper width="20px" height="20px">
+                    <DiscordOutlineIcon />
+                  </IconWrapper>
+                </Link>
+              </Tooltip>
+            </>
+          )}
+          <Tooltip hasArrow gutter={16} label="Documentation">
+            <Link
+              href="https://docs.langwatch.ai/optimization-studio/llm-nodes"
+              target="_blank"
+            >
+              <BookOpen size={20} />
+            </Link>
+          </Tooltip>
           <Spacer />
           <Button
             size="sm"

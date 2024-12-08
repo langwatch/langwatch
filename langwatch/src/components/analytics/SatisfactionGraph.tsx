@@ -11,11 +11,11 @@ import {
   Text,
 } from "@chakra-ui/react";
 import { CustomGraph, type CustomGraphInput } from "./CustomGraph";
-import { api } from "../../utils/api";
+import { usePublicEnv } from "../../hooks/usePublicEnv";
 
 export const SatisfactionGraphs = () => {
-  const env = api.publicEnv.useQuery({});
-  const isNotQuickwit = env.data && !env.data.IS_QUICKWIT;
+  const publicEnv = usePublicEnv();
+  const isNotQuickwit = publicEnv.data && !publicEnv.data.IS_QUICKWIT;
 
   const inputSentimentGraph: CustomGraphInput = {
     graphId: "inputSentimentCountGraph",

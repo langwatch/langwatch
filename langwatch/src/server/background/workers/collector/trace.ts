@@ -1,4 +1,4 @@
-import { getOpenAIEmbeddings } from "../../../embeddings";
+import { getEmbeddings } from "../../../embeddings";
 import type { Span, Trace } from "../../../tracer/types";
 import { getFirstInputAsText, getLastOutputAsText } from "./common";
 
@@ -11,7 +11,7 @@ export const getTraceInput = async (
   let embeddings = undefined;
   if (value && !skipEmbeddings) {
     try {
-      embeddings = await getOpenAIEmbeddings(value, projectId);
+      embeddings = await getEmbeddings(value, projectId);
     } catch (e) {
       console.error(`Error getting embeddings for trace input: ${e as any}`);
     }
@@ -28,7 +28,7 @@ export const getTraceOutput = async (
   let embeddings = undefined;
   if (value && !skipEmbeddings) {
     try {
-      embeddings = await getOpenAIEmbeddings(value, projectId);
+      embeddings = await getEmbeddings(value, projectId);
     } catch (e) {
       console.error(`Error getting embeddings for trace input: ${e as any}`);
     }

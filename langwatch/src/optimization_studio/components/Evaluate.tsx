@@ -38,9 +38,12 @@ import type { Entry } from "../types/dsl";
 import { AddModelProviderKey } from "./AddModelProviderKey";
 import { useVersionState, VersionToBeUsed } from "./History";
 import { trainTestSplit } from "../utils/datasetUtils";
+import { trackEvent } from "../../utils/tracking";
 
 export function Evaluate() {
   const { isOpen, onToggle, onClose } = useDisclosure();
+
+  const { project } = useOrganizationTeamProject();
 
   const { evaluationState } = useWorkflowStore(({ state }) => ({
     evaluationState: state.evaluation,
@@ -62,7 +65,10 @@ export function Evaluate() {
         <Button
           variant="outline"
           size="sm"
-          onClick={onToggle}
+          onClick={() => {
+            trackEvent("evaluate_click", { project_id: project?.id });
+            onToggle();
+          }}
           leftIcon={<CheckSquare size={16} />}
           isDisabled={isRunning}
         >

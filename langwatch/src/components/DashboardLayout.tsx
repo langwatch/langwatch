@@ -3,6 +3,7 @@ import {
   Alert,
   AlertIcon,
   Avatar,
+  Badge,
   Box,
   Button,
   HStack,
@@ -15,13 +16,17 @@ import {
   MenuGroup,
   MenuItem,
   MenuList,
+  Popover,
+  PopoverBody,
+  PopoverContent,
+  PopoverTrigger,
   Portal,
   Spacer,
   Text,
   Tooltip,
   VStack,
   useTheme,
-  type BackgroundProps,
+  type BoxProps,
 } from "@chakra-ui/react";
 import { type Organization, type Project, type Team } from "@prisma/client";
 import { signIn, signOut } from "next-auth/react";
@@ -29,12 +34,12 @@ import ErrorPage from "next/error";
 import Head from "next/head";
 import { useRouter } from "next/router";
 import numeral from "numeral";
-import React, { useState, type PropsWithChildren } from "react";
+import React, { useMemo, useState } from "react";
 import {
+  BookOpen,
   ChevronDown,
   ChevronRight,
   Edit,
-  Image as ImageIcon,
   Lock,
   MessageSquare,
   Play,
@@ -52,12 +57,19 @@ import { OrganizationRoleGroup } from "../server/api/permission";
 import type { FullyLoadedOrganization } from "../server/api/routers/organization";
 import { api } from "../utils/api";
 import { findCurrentRoute, projectRoutes, type Route } from "../utils/routes";
+import { trackEvent } from "../utils/tracking";
 import { CurrentDrawer } from "./CurrentDrawer";
+import { IntegrationChecks, useIntegrationChecks } from "./IntegrationChecks";
 import { LoadingScreen } from "./LoadingScreen";
 import { ProjectTechStackIcon } from "./TechStack";
+import { ChecklistIcon } from "./icons/Checklist";
+import { GitHub } from "react-feather";
 import { LogoIcon } from "./icons/LogoIcon";
 import { PuzzleIcon } from "./icons/PuzzleIcon";
 import { useTableView } from "./messages/HeaderButtons";
+import { IconWrapper } from "./IconWrapper";
+import { usePublicEnv } from "../hooks/usePublicEnv";
+import { DiscordOutlineIcon } from "./icons/DiscordOutline";
 
 const Breadcrumbs = ({ currentRoute }: { currentRoute: Route | undefined }) => {
   const { project } = useOrganizationTeamProject();
@@ -264,6 +276,7 @@ export const AddProjectButton = ({
   team: Team;
   organization: Organization;
 }) => {
+  const { project } = useOrganizationTeamProject();
   const usage = api.limits.getUsage.useQuery(
     { organizationId: organization.id },
     {
@@ -292,6 +305,12 @@ export const AddProjectButton = ({
         _hover={{
           textDecoration: "none",
         }}
+        onClick={() => {
+          trackEvent("subscription_hook_click", {
+            project_id: project?.id,
+            hook: "new_project",
+          });
+        }}
       >
         <MenuItem
           icon={<Lock />}
@@ -311,8 +330,8 @@ export const AddProjectButton = ({
 export const DashboardLayout = ({
   children,
   publicPage = false,
-  ...bgProps
-}: { publicPage?: boolean } & PropsWithChildren<BackgroundProps>) => {
+  ...props
+}: { publicPage?: boolean } & BoxProps) => {
   const router = useRouter();
   const theme = useTheme();
   const gray400 = theme.colors.gray["400"];
@@ -336,16 +355,17 @@ export const DashboardLayout = ({
       refetchOnMount: false,
     }
   );
-  const publicEnv = api.publicEnv.useQuery(
-    {},
-    {
-      staleTime: Infinity,
-      refetchOnMount: false,
-      refetchOnWindowFocus: false,
-    }
-  );
+  const publicEnv = usePublicEnv();
 
   const [query, setQuery] = useState(router.query.query as string);
+
+  const integrationChecks = useIntegrationChecks();
+
+  const integrationsLeft = useMemo(() => {
+    return Object.entries(integrationChecks.data ?? {}).filter(
+      ([key, value]) => key !== "integrated" && !value
+    ).length;
+  }, [integrationChecks.data]);
 
   if (typeof router.query.project === "string" && !isLoading && !project) {
     return <ErrorPage statusCode={404} />;
@@ -381,12 +401,19 @@ export const DashboardLayout = ({
         borderRightColor="gray.300"
         background="white"
       >
-        <VStack paddingX={6} paddingY={8} spacing={8} position="sticky" top={0}>
+        <VStack
+          paddingX={6}
+          paddingY={8}
+          spacing={8}
+          position="sticky"
+          top={0}
+          height="100vh"
+        >
           <Box fontSize={32} fontWeight="bold">
             <LogoIcon width={25} height={34} />
           </Box>
 
-          <VStack spacing={8}>
+          <VStack height="full" spacing={8}>
             <SideMenuLink
               path={projectRoutes.workflows.path}
               icon={PuzzleIcon}
@@ -418,12 +445,12 @@ export const DashboardLayout = ({
               label={projectRoutes.evaluations.title}
               project={project}
             />
-            <SideMenuLink
+            {/* <SideMenuLink
               path={projectRoutes.playground.path}
               icon={ImageIcon}
               label={projectRoutes.playground.title}
               project={project}
-            />
+            /> */}
 
             <SideMenuLink
               path={projectRoutes.datasets.path}
@@ -461,6 +488,51 @@ export const DashboardLayout = ({
                 project={project}
               />
             )}
+
+            <Spacer />
+            <Tooltip
+              hasArrow
+              placement="right"
+              gutter={16}
+              label="Documentation"
+            >
+              <Link href="https://docs.langwatch.ai" target="_blank">
+                <IconWrapper width="20px" height="20px">
+                  <BookOpen />
+                </IconWrapper>
+              </Link>
+            </Tooltip>
+            {!publicEnv.data?.IS_ONPREM && (
+              <>
+                <Tooltip
+                  hasArrow
+                  placement="right"
+                  gutter={16}
+                  label="Star us on GitHub"
+                >
+                  <Link
+                    href="https://github.com/langwatch/langwatch"
+                    target="_blank"
+                  >
+                    <IconWrapper width="20px" height="20px">
+                      <GitHub />
+                    </IconWrapper>
+                  </Link>
+                </Tooltip>
+                <Tooltip
+                  hasArrow
+                  placement="right"
+                  gutter={16}
+                  label="Join our community"
+                >
+                  <Link href="https://discord.gg/kT4PhDS2gH" target="_blank">
+                    <IconWrapper width="20px" height="20px">
+                      <DiscordOutlineIcon />
+                    </IconWrapper>
+                  </Link>
+                </Tooltip>
+              </>
+            )}
           </VStack>
         </VStack>
       </Box>
@@ -469,7 +541,7 @@ export const DashboardLayout = ({
         maxWidth="calc(100vw - 90px)"
         spacing={0}
         background="gray.100"
-        {...bgProps}
+        {...props}
       >
         {usage.data &&
           usage.data.currentMonthMessagesCount >=
@@ -490,6 +562,12 @@ export const DashboardLayout = ({
                   textDecoration="underline"
                   _hover={{
                     textDecoration: "none",
+                  }}
+                  onClick={() => {
+                    trackEvent("subscription_hook_click", {
+                      project_id: project?.id,
+                      hook: "new_messages_limit_reached",
+                    });
                   }}
                 >
                   Click here
@@ -517,6 +595,12 @@ export const DashboardLayout = ({
                   textDecoration="underline"
                   _hover={{
                     textDecoration: "none",
+                  }}
+                  onClick={() => {
+                    trackEvent("subscription_hook_click", {
+                      project_id: project?.id,
+                      hook: "usage_cost_limit_reached",
+                    });
                   }}
                 >
                   Go to settings
@@ -590,40 +674,69 @@ export const DashboardLayout = ({
             </form>
           )}
           <Spacer />
-          <Menu>
-            <MenuButton
-              as={Button}
-              variant="unstyled"
-              {...(publicPage ? { onClick: () => void signIn("auth0") } : {})}
-            >
-              <Avatar
-                name={user?.name ?? undefined}
-                backgroundColor={"orange.400"}
-                color="white"
-                size="sm"
-              />
-            </MenuButton>
-            {session && (
-              <Portal>
-                <MenuList zIndex="popover">
-                  {dependencies.ExtraMenuItems && (
-                    <dependencies.ExtraMenuItems />
-                  )}
-                  <MenuGroup
-                    title={`${session.user.name} (${session.user.email})`}
-                  >
-                    <MenuItem
-                      onClick={() =>
-                        void signOut({ callbackUrl: window.location.origin })
-                      }
+          <HStack spacing={4}>
+            {integrationsLeft ? (
+              <Popover placement="bottom-end">
+                <PopoverTrigger>
+                  <Button position="relative" variant="ghost">
+                    <ChecklistIcon />
+                    <Badge
+                      position="absolute"
+                      bottom="2px"
+                      right="2px"
+                      size="sm"
+                      color="white"
+                      backgroundColor="green.500"
+                      borderRadius="full"
                     >
-                      Logout
-                    </MenuItem>
-                  </MenuGroup>
-                </MenuList>
-              </Portal>
+                      {integrationsLeft}
+                    </Badge>
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent>
+                  <PopoverBody padding={4}>
+                    <IntegrationChecks />
+                  </PopoverBody>
+                </PopoverContent>
+              </Popover>
+            ) : (
+              <Box width={["auto", "auto", "auto", "55px"]} />
             )}
-          </Menu>
+            <Menu>
+              <MenuButton
+                as={Button}
+                variant="unstyled"
+                {...(publicPage ? { onClick: () => void signIn("auth0") } : {})}
+              >
+                <Avatar
+                  name={user?.name ?? undefined}
+                  backgroundColor={"orange.400"}
+                  color="white"
+                  size="sm"
+                />
+              </MenuButton>
+              {session && (
+                <Portal>
+                  <MenuList zIndex="popover">
+                    {dependencies.ExtraMenuItems && (
+                      <dependencies.ExtraMenuItems />
+                    )}
+                    <MenuGroup
+                      title={`${session.user.name} (${session.user.email})`}
+                    >
+                      <MenuItem
+                        onClick={() =>
+                          void signOut({ callbackUrl: window.location.origin })
+                        }
+                      >
+                        Logout
+                      </MenuItem>
+                    </MenuGroup>
+                  </MenuList>
+                </Portal>
+              )}
+            </Menu>
+          </HStack>
         </HStack>
         {publicEnv.data?.DEMO_PROJECT_SLUG &&
           publicEnv.data.DEMO_PROJECT_SLUG === router.query.project && (

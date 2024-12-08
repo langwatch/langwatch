@@ -2,6 +2,7 @@ import time
 from typing import Dict, Set, cast
 
 import langwatch
+import sentry_sdk
 from langwatch_nlp.studio.runtimes.base_runtime import ServerEventQueue
 from langwatch_nlp.studio.dspy.workflow_module import WorkflowModule
 from langwatch_nlp.studio.types.dsl import (
@@ -97,6 +98,10 @@ async def execute_flow(
 
                 traceback.print_exc()
                 yield error_workflow_event(trace_id, str(e))
+                sentry_sdk.capture_exception(e, extras={
+                    "trace_id": trace_id,
+                    "workflow_id": workflow.workflow_id,
+                })
                 return
 
         # cost = result.get_cost() if hasattr(result, "get_cost") else None

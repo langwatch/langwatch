@@ -38,10 +38,9 @@ export const generateTracesPivotQueryConditions = ({
   endDateUsedForQuery: number;
 } => {
   // If end date is very close to now, force it to be now, to allow frontend to keep refetching for new messages
+  const now = new Date().getTime();
   const endDate_ =
-    new Date().getTime() - endDate < 1000 * 60 * 60 * 2
-      ? new Date().getTime()
-      : endDate;
+    endDate < now && now - endDate < 1000 * 60 * 60 * 2 ? now : endDate;
 
   let filterConditions: QueryDslQueryContainer[] = [];
 

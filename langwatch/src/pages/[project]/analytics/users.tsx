@@ -21,6 +21,7 @@ import { AnalyticsHeader } from "../../../components/analytics/AnalyticsHeader";
 import { FeedbacksTable } from "../../../components/analytics/FeedbacksTable";
 import { api } from "../../../utils/api";
 import { QuickwitNote } from "../../../components/analytics/QuickwitNote";
+import { usePublicEnv } from "../../../hooks/usePublicEnv";
 
 const messagesCount = {
   graphId: "custom",
@@ -182,9 +183,9 @@ const maxMessagePerThread = {
 };
 
 export default function Users() {
-  const env = api.publicEnv.useQuery({});
-  const isNotQuickwit = env.data && !env.data.IS_QUICKWIT;
-  const isQuickwit = env.data && env.data.IS_QUICKWIT;
+  const publicEnv = usePublicEnv();
+  const isNotQuickwit = publicEnv.data && !publicEnv.data.IS_QUICKWIT;
+  const isQuickwit = publicEnv.data && publicEnv.data.IS_QUICKWIT;
 
   return (
     <GraphsLayout>

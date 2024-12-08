@@ -125,13 +125,18 @@ export const useSocketClient = () => {
             clearTimeout(pythonDisconnectedTimeout);
             pythonDisconnectedTimeout = null;
           }
+          debug("Python is alive, setting status to connected");
           setSocketStatus("connected");
           break;
         case "component_state_change":
+          const currentComponentState = getWorkflow().nodes.find(
+            (node) => node.id === data.payload.component_id
+          )?.data.execution_state;
           setComponentExecutionState(
             data.payload.component_id,
             data.payload.execution_state
           );
+
           if (data.payload.execution_state?.status === "error") {
             checkIfUnreachableErrorMessage(data.payload.execution_state.error);
             alertOnComponent({
@@ -139,9 +144,11 @@ export const useSocketClient = () => {
               execution_state: data.payload.execution_state,
             });
           }
+
           if (
             !playgroundOpen &&
             data.payload.execution_state?.status !== "running" &&
+            currentComponentState?.status !== "success" &&
             ((getWorkflow().state.execution?.status === "running" &&
               getWorkflow().state.execution?.until_node_id ===
                 data.payload.component_id) ||
@@ -235,6 +242,7 @@ export const useSocketClient = () => {
     );
 
     socketInstance.onopen = () => {
+      debug("Socket opened, connecting to python");
       setSocketStatus((socketStatus) => {
         if (
           socketStatus === "disconnected" ||
@@ -249,14 +257,14 @@ export const useSocketClient = () => {
     };
 
     socketInstance.onclose = () => {
-      setTimeout(() => {
-        if (socketInstance?.readyState === WebSocket.OPEN) return;
-        setSocketStatus("disconnected");
-        scheduleReconnect();
-      }, 2000);
+      if (socketInstance?.readyState === WebSocket.OPEN) return;
+      debug("Socket closed, reconnecting");
+      setSocketStatus("disconnected");
+      scheduleReconnect();
     };
 
     socketInstance.onerror = (error) => {
+      debug("Socket error, reconnecting");
       console.error("WebSocket error:", error);
       setSocketStatus("disconnected");
       scheduleReconnect();
@@ -267,6 +275,7 @@ export const useSocketClient = () => {
   }, [project, setSocketStatus]);
 
   const disconnect = useCallback(() => {
+    debug("Socket disconnect triggered, closing socket");
     if (socketInstance) {
       socketInstance.close();
       socketInstance = null;
@@ -307,19 +316,12 @@ export const useSocketClient = () => {
 
     const pythonReconnect = () => {
       pythonDisconnectedTimeout = setTimeout(() => {
-        if (!document.hasFocus()) {
-          // Postpone 10 more seconds if tab is not focused
-          sendMessage({ type: "is_alive", payload: {} });
-          pythonReconnect();
-          return;
-        }
-
         setSocketStatus("connecting-python");
       }, 10_000);
     };
 
     const isAlive = () => {
-      if (instanceId !== instances || !document.hasFocus()) return;
+      if (instanceId !== instances) return;
       lastIsAliveCallTimestamp = Date.now();
       sendMessage({ type: "is_alive", payload: {} });
       if (socketStatus === "connected" && !pythonDisconnectedTimeout) {

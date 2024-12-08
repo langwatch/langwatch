@@ -15,6 +15,7 @@ import {
   ProjectSelector,
 } from "../components/DashboardLayout";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
+import { trackEvent } from "../utils/tracking";
 
 export default function Authorize() {
   const { organizations, project } = useOrganizationTeamProject();
@@ -54,5 +55,11 @@ export default function Authorize() {
 
 export function APIKeyCopyInput() {
   const { project } = useOrganizationTeamProject();
-  return <CopyInput value={project?.apiKey ?? ""} label="API key" />;
+  return (
+    <CopyInput
+      value={project?.apiKey ?? ""}
+      label="API key"
+      onClick={() => trackEvent("api_key_copy", { project_id: project?.id })}
+    />
+  );
 }

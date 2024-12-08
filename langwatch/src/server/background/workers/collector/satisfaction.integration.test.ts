@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { scoreSatisfactionFromInput } from "./satisfaction";
-import { getOpenAIEmbeddings } from "../../../embeddings";
+import { getEmbeddings } from "../../../embeddings";
 import { TRACE_INDEX, esClient, traceIndexId } from "../../../elasticsearch";
 import type { Trace } from "../../../tracer/types";
 import { getTestProject } from "~/utils/testUtils";
@@ -27,7 +27,7 @@ describe("Satisfaction Scoring Integration Test", () => {
     project = await getTestProject("satisfaction-scoring-integration-test");
     testTraceData.project_id = project.id;
     if (testTraceData.input) {
-      testTraceData.input.embeddings = await getOpenAIEmbeddings(
+      testTraceData.input.embeddings = await getEmbeddings(
         testTraceData.input.value,
         project.id
       );

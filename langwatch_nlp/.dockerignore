@@ -7,3 +7,5 @@ notebooks
 __pycache__/
 *.py[cod]
 *$py.class
+Dockerfile
+Dockerfile.lambda

@@ -118,7 +118,7 @@ export const useComponentExecution = () => {
           trace_id,
           timeout_on_status: "waiting",
         });
-      }, 10_000);
+      }, 20_000);
     },
     [
       socketAvailable,

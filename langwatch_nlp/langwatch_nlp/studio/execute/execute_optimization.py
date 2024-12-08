@@ -1,6 +1,8 @@
 from contextlib import contextmanager
 from io import StringIO
 from multiprocessing import Queue
+import os
+from pathlib import Path
 import sys
 import time
 from typing import Optional, cast
@@ -44,6 +46,7 @@ from langwatch_nlp.studio.utils import (
     get_input_keys,
     get_output_keys,
     node_llm_config_to_dspy_lm,
+    set_dspy_cache_dir,
     transpose_inline_dataset_to_object_list,
 )
 
@@ -52,6 +55,8 @@ from sklearn.model_selection import train_test_split
 import dspy.primitives.module
 from dspy.teleprompt import MIPROv2
 from dspy.utils.asyncify import asyncify
+from langwatch_nlp.studio.s3_cache import setup_s3_cache
+import sentry_sdk
 
 _original_postprocess_parameter_name = dspy.primitives.module.postprocess_parameter_name
 
@@ -72,14 +77,14 @@ async def execute_optimization(
     workflow = event.workflow
     run_id = event.run_id
 
-    valid = False
-
     try:
         validate_workflow(workflow)
 
         # TODO: handle workflow errors here throwing an special event showing the error was during the execution of the workflow?
         yield start_optimization_event(run_id)
-        valid = True
+
+        if event.s3_cache_key:
+            setup_s3_cache(event.s3_cache_key)
 
         module = WorkflowModule(workflow, manual_execution_mode=False)
 
@@ -212,6 +217,7 @@ async def execute_optimization(
         import traceback
 
         traceback.print_exc()
+
         # TODO: report optimization as error
         # if valid:
         #     EvaluationReporting.post_results(
@@ -225,6 +231,15 @@ async def execute_optimization(
         #             },
         #         },
         #     )
+
+        # Capture error in Sentry
+        sentry_sdk.capture_exception(e, extras={
+            "run_id": run_id,
+            "workflow_id": workflow.workflow_id,
+            "workflow_version_id": event.workflow_version_id,
+            "optimizer": event.optimizer
+        })
+
         return
 
     yield end_optimization_event(run_id)

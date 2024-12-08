@@ -25,6 +25,7 @@ import {
   useDisclosure,
   useToast,
   VStack,
+  type MenuItemProps,
 } from "@chakra-ui/react";
 import { useRouter } from "next/router";
 import { useCallback, useState } from "react";
@@ -35,6 +36,9 @@ import {
   Box as BoxIcon,
   AlertTriangle,
   CheckCircle,
+  ArrowUp,
+  ArrowUpCircle,
+  Lock,
 } from "react-feather";
 import { RenderCode } from "~/components/code/RenderCode";
 import { SmallLabel } from "../../components/SmallLabel";
@@ -51,6 +55,8 @@ import { type Edge, type Node } from "@xyflow/react";
 import { useForm } from "react-hook-form";
 import { langwatchEndpoint } from "../../components/code/langwatchEndpointEnv";
 import { checkIsEvaluator } from "../utils/nodeUtils";
+import NextLink from "next/link";
+import { trackEvent } from "../../utils/tracking";
 
 export function Publish({ isDisabled }: { isDisabled: boolean }) {
   const publishModal = useDisclosure();
@@ -84,7 +90,11 @@ export function Publish({ isDisabled }: { isDisabled: boolean }) {
           </>
         )}
       </Menu>
-      <Modal isOpen={publishModal.isOpen} onClose={publishModal.onClose}>
+      <Modal
+        isOpen={publishModal.isOpen}
+        onClose={publishModal.onClose}
+        size={"xl"}
+      >
         <ModalOverlay />
         {publishModal.isOpen && (
           <PublishModalContent
@@ -195,7 +205,7 @@ function PublishMenu({
       },
     });
 
-  const isDisabled =
+  const canPublish =
     !canSaveNewVersion &&
     publishedWorkflow.data?.version === versionToBeEvaluated.version
       ? "Current version is already published"
@@ -227,6 +237,51 @@ function PublishMenu({
     });
   };
 
+  const { organization } = useOrganizationTeamProject();
+  const usage = api.limits.getUsage.useQuery(
+    { organizationId: organization?.id ?? "" },
+    {
+      enabled: !!organization,
+    }
+  );
+
+  const planAllowsToPublish = usage.data && usage.data?.activePlan.canPublish;
+  const publishDisabledLabel = !publishedWorkflow.data?.version
+    ? "Publish a version to enable this option"
+    : undefined;
+
+  const SubscriptionMenuItem = (
+    props: MenuItemProps & { tooltip?: string }
+  ) => {
+    if (!planAllowsToPublish) {
+      return (
+        <Tooltip
+          label="Subscribe to unlock publishing, click to continue"
+          placement="right"
+        >
+          <MenuItem
+            {...props}
+            icon={<Lock size={16} />}
+            isDisabled={false}
+            color="gray.400"
+            onClick={() => {
+              trackEvent("subscription_hook_click", {
+                projectId: project?.id,
+                hook: "studio_click_subscribe_to_publish",
+              });
+              router.push("/settings/subscription");
+            }}
+          />
+        </Tooltip>
+      );
+    }
+    return (
+      <Tooltip label={props.tooltip} placement="right">
+        <MenuItem {...props} />
+      </Tooltip>
+    );
+  };
+
   return (
     <>
       {publishedWorkflow.data?.version && (
@@ -238,46 +293,48 @@ function PublishMenu({
           <MenuDivider />
         </>
       )}
-      <Tooltip label={isDisabled} placement="right">
-        <MenuItem
-          onClick={onTogglePublish}
-          icon={<Globe size={16} />}
-          isDisabled={!!isDisabled}
-        >
-          {canSaveNewVersion || isDisabled
-            ? "Publish New Version"
-            : "Publish Current Version"}
-        </MenuItem>
-      </Tooltip>
+      <SubscriptionMenuItem
+        tooltip={canPublish}
+        onClick={onTogglePublish}
+        icon={<ArrowUp size={16} />}
+        isDisabled={!!canPublish}
+      >
+        {canSaveNewVersion || canPublish
+          ? "Publish New Version"
+          : "Publish Current Version"}
+      </SubscriptionMenuItem>
 
-      <MenuItem
-        isDisabled={!publishedWorkflow.data?.version || isEvaluator}
+      <SubscriptionMenuItem
+        tooltip={publishDisabledLabel}
+        isDisabled={!!publishDisabledLabel || isEvaluator}
         onClick={toggleSaveAsComponent}
         icon={<BoxIcon size={16} />}
       >
         {publishedWorkflow.data?.isComponent
           ? "Delete Component"
           : "Save as Component"}
-      </MenuItem>
+      </SubscriptionMenuItem>
 
-      <Tooltip
-        isDisabled={isEvaluator}
-        label="Toggle the end node's type to 'Evaluator' to enable this option"
+      <SubscriptionMenuItem
+        tooltip={
+          publishDisabledLabel
+            ? publishDisabledLabel
+            : !isEvaluator
+            ? "Toggle the end node's type to 'Evaluator' to enable this option"
+            : undefined
+        }
+        isDisabled={!!publishDisabledLabel || !isEvaluator}
+        onClick={toggleSaveAsEvaluator}
+        icon={<CheckCircle size={16} />}
       >
-        <MenuItem
-          isDisabled={!publishedWorkflow.data?.version || !isEvaluator}
-          onClick={toggleSaveAsEvaluator}
-          icon={<CheckCircle size={16} />}
-        >
-          {publishedWorkflow.data?.isEvaluator
-            ? "Delete Evaluator"
-            : "Save as Evaluator"}
-        </MenuItem>
-      </Tooltip>
+        {publishedWorkflow.data?.isEvaluator
+          ? "Delete Evaluator"
+          : "Save as Evaluator"}
+      </SubscriptionMenuItem>
 
       <Link
         href={
-          !publishedWorkflow.data?.version
+          !publishedWorkflow.data?.version || !planAllowsToPublish
             ? undefined
             : `/${project?.slug}/chat/${router.query.workflow as string}`
         }
@@ -286,20 +343,23 @@ function PublishMenu({
           textDecoration: "none",
         }}
       >
-        <MenuItem
-          isDisabled={!publishedWorkflow.data?.version}
+        <SubscriptionMenuItem
+          tooltip={publishDisabledLabel}
+          isDisabled={!!publishDisabledLabel}
           icon={<Play size={16} />}
         >
           Run App
-        </MenuItem>
+        </SubscriptionMenuItem>
       </Link>
-      <MenuItem
+
+      <SubscriptionMenuItem
+        tooltip={publishDisabledLabel}
         onClick={onToggleApi}
-        isDisabled={!publishedWorkflow.data?.version}
+        isDisabled={!!publishDisabledLabel}
         icon={<Code size={16} />}
       >
         View API Reference
-      </MenuItem>
+      </SubscriptionMenuItem>
     </>
   );
 }
@@ -480,17 +540,19 @@ function PublishModalContent({
       <ModalHeader fontWeight={600}>Publish Workflow</ModalHeader>
       <ModalCloseButton />
       <ModalBody>
-        <VStack align="start" width="full" spacing={4}>
-          <VStack align="start" width="full">
-            {versionToBeEvaluated && (
-              <VersionToBeUsed
-                form={form}
-                nextVersion={nextVersion}
-                canSaveNewVersion={canSaveNewVersion}
-                versionToBeEvaluated={versionToBeEvaluated}
-              />
-            )}
-          </VStack>
+        <VStack align="start" width="full" spacing={10}>
+          <Text fontSize="15px" color="black">
+            Publish your workflow to make it available via API, as a component
+            to other workflows, or as a custom evaluator.
+          </Text>
+          {versionToBeEvaluated && (
+            <VersionToBeUsed
+              form={form}
+              nextVersion={nextVersion}
+              canSaveNewVersion={canSaveNewVersion}
+              versionToBeEvaluated={versionToBeEvaluated}
+            />
+          )}
         </VStack>
       </ModalBody>
       <ModalFooter borderTop="1px solid" borderColor="gray.200" marginTop={4}>
@@ -507,7 +569,7 @@ function PublishModalContent({
                 <Button
                   variant="outline"
                   type="submit"
-                  leftIcon={<Globe size={16} />}
+                  leftIcon={<ArrowUpCircle size={16} />}
                   isLoading={
                     commitVersion.isLoading || publishWorkflow.isLoading
                   }

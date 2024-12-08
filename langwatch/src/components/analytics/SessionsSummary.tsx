@@ -8,14 +8,15 @@ import {
 } from "@chakra-ui/react";
 import { HelpCircle } from "react-feather";
 import { api } from "../../utils/api";
+import { usePublicEnv } from "../../hooks/usePublicEnv";
 import { SummaryMetric } from "./SummaryMetric";
 import { useFilterParams } from "../../hooks/useFilterParams";
 import { QuickwitNote } from "./QuickwitNote";
 
 export const SessionsSummary = () => {
-  const env = api.publicEnv.useQuery({});
-  const isNotQuickwit = env.data && !env.data.IS_QUICKWIT;
-  const isQuickwit = env.data && env.data.IS_QUICKWIT;
+  const publicEnv = usePublicEnv();
+  const isNotQuickwit = publicEnv.data && !publicEnv.data.IS_QUICKWIT;
+  const isQuickwit = publicEnv.data && publicEnv.data.IS_QUICKWIT;
 
   const { filterParams, queryOpts } = useFilterParams();
 

@@ -94,7 +94,7 @@ export const useWorkflowExecution = () => {
 
       setTimeout(() => {
         setTriggerTimeout({ trace_id, timeout_on_status: "waiting" });
-      }, 10_000);
+      }, 20_000);
     },
     [socketAvailable, getWorkflow, sendMessage, setWorkflowExecutionState]
   );
@@ -126,7 +126,7 @@ export const useWorkflowExecution = () => {
           trace_id,
           timeout_on_status: "running",
         });
-      }, 2_000);
+      }, 10_000);
     },
     [socketAvailable, setWorkflowExecutionState, sendMessage, getWorkflow]
   );

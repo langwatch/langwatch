@@ -5,6 +5,7 @@ description = ""
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
+    "boto3>=1.35.74,<2",
     "dspy>=2.5.41,<2.6",
     "fastapi>=0.111.1,<1",
     "google-cloud-aiplatform>=1.70.0,<2",
@@ -25,6 +26,7 @@ dependencies = [
     "sentry-sdk[fastapi]>=1.45.1,<2",
     "tenacity>=8.5.0,<9",
     "uvicorn>=0.22.0,<0.23",
+    "watchdog>=5.0.3",
     "weaviate-client>=4.8.1,<5",
 ]
 

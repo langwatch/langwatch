@@ -95,6 +95,7 @@ class ExecuteOptimizationPayload(BaseModel):
     workflow_version_id: str
     optimizer: Literal["MIPROv2ZeroShot", "BootstrapFewShotWithRandomSearch", "MIPROv2"]
     params: ExecuteOptimizationParams
+    s3_cache_key: Optional[str] = None
 
 
 class ExecuteOptimization(BaseModel):

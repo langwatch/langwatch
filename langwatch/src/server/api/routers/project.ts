@@ -7,8 +7,7 @@ import {
   publicProcedure,
 } from "~/server/api/trpc";
 import { env } from "../../../env.mjs";
-import jwt from "jsonwebtoken";
-import { nanoid } from "nanoid";
+import { customAlphabet, nanoid } from "nanoid";
 import {
   OrganizationRoleGroup,
   TeamRoleGroup,
@@ -336,10 +335,8 @@ export const projectRouter = createTRPCRouter({
 });
 
 const generateApiKey = (): string => {
-  const payload = {
-    timestamp: Date.now(),
-    rand: Math.random(),
-  };
-
-  return jwt.sign(payload, env.API_TOKEN_JWT_SECRET);
+  const alphabet =
+    "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+  const randomPart = customAlphabet(alphabet, 48)();
+  return `sk-lw-${randomPart}`;
 };

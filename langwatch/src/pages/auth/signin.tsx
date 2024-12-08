@@ -23,10 +23,10 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { HorizontalFormControl } from "../../components/HorizontalFormControl";
 import { LogoIcon } from "../../components/icons/LogoIcon";
-import { api } from "../../utils/api";
+import { usePublicEnv } from "../../hooks/usePublicEnv";
 
 export default function SignIn({ session }: { session: Session | null }) {
-  const publicEnv = api.publicEnv.useQuery({});
+  const publicEnv = usePublicEnv();
   const isAuth0 = publicEnv.data?.NEXTAUTH_PROVIDER === "auth0";
   const callbackUrl = useSearchParams()?.get("callbackUrl") ?? undefined;
 

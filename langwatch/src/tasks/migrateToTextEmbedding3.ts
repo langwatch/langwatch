@@ -3,7 +3,7 @@ import type {
   QueryDslQueryContainer,
 } from "@elastic/elasticsearch/lib/api/types";
 import { TRACE_INDEX, esClient } from "../server/elasticsearch";
-import { getOpenAIEmbeddings } from "../server/embeddings";
+import { getEmbeddings } from "../server/embeddings";
 import { type ElasticSearchTrace } from "~/server/tracer/types";
 
 const migrateIndex = async (index: string) => {
@@ -74,13 +74,13 @@ const migrateIndex = async (index: string) => {
         inputs
           .map((input, index) =>
             input
-              ? getOpenAIEmbeddings(input, results[index]!._source!.project_id)
+              ? getEmbeddings(input, results[index]!._source!.project_id)
               : undefined
           )
           .concat(
             outputs.map((output, index) =>
               output
-                ? getOpenAIEmbeddings(
+                ? getEmbeddings(
                     output,
                     results[index]!._source!.project_id
                   )

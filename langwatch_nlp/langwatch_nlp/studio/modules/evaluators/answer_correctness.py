@@ -1,5 +1,4 @@
 import dspy
-import dspy.evaluate
 
 from langevals_core.base_evaluator import (
     EvaluationResult,
@@ -13,11 +12,33 @@ from langwatch_nlp.studio.types.dsl import LLMConfig
 from langwatch_nlp.studio.utils import node_llm_config_to_dspy_lm
 
 
+class AnswerCorrectnessSignature(dspy.Signature):
+    """Verify that the predicted answer matches the gold answer."""
+
+    question = dspy.InputField()
+    gold_answer = dspy.InputField(desc="correct answer for question")
+    predicted_answer = dspy.InputField(desc="predicted answer for question")
+    is_correct = dspy.OutputField(desc="True or False")
+
+
+class AnswerCorrectness(dspy.Module):
+    def __init__(self):
+        super().__init__()
+        self.evaluate_correctness = dspy.ChainOfThought(AnswerCorrectnessSignature)
+
+    def forward(self, question, gold_answer, predicted_answer):
+        return self.evaluate_correctness(
+            question=question,
+            gold_answer=gold_answer,
+            predicted_answer=predicted_answer,
+        )
+
+
 class AnswerCorrectnessEvaluator(Evaluator):
     def __init__(self, llm: LLMConfig):
         super().__init__()
 
-        self.evaluator = ModuleWithMetadata(dspy.evaluate.AnswerCorrectness())
+        self.evaluator = ModuleWithMetadata(AnswerCorrectness())
 
         lm = node_llm_config_to_dspy_lm(llm)
         dspy.settings.configure(experimental=True)

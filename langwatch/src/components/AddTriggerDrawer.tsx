@@ -34,13 +34,14 @@ import { useFilterParams } from "~/hooks/useFilterParams";
 import { useForm } from "react-hook-form";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
+import { usePublicEnv } from "../hooks/usePublicEnv";
 
 export function TriggerDrawer() {
   const { project, organization, team } = useOrganizationTeamProject();
   const { onOpen, onClose, isOpen } = useDisclosure();
 
-  const publicEnvQuery = api.publicEnv.useQuery({});
-  const hasEmailProvider = publicEnvQuery.data?.HAS_EMAIL_PROVIDER_KEY;
+  const publicEnv = usePublicEnv();
+  const hasEmailProvider = publicEnv.data?.HAS_EMAIL_PROVIDER_KEY;
 
   const toast = useToast();
   const createTrigger = api.trigger.create.useMutation();

@@ -1,60 +1,223 @@
-import { VStack, Heading, List, ListIcon, ListItem } from "@chakra-ui/react";
+import { VStack, List, ListIcon, ListItem, Link, Text } from "@chakra-ui/react";
 import { CheckCircleIcon } from "@chakra-ui/icons";
-import { CheckCircle, Settings, Circle } from "react-feather";
+import { Circle } from "react-feather";
 import { api } from "../utils/api";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { trackEventOnce } from "../utils/tracking";
+import { useEffect } from "react";
+import NextLink from "next/link";
 
-export const IntegrationChecks = () => {
+export const useIntegrationChecks = () => {
   const { project } = useOrganizationTeamProject();
 
   const integrationChecks = api.integrationsChecks.getCheckStatus.useQuery(
     { projectId: project?.id ?? "" },
-    { enabled: !!project, refetchOnWindowFocus: false }
+    {
+      enabled: !!project,
+      refetchOnWindowFocus: true,
+      refetchOnMount: false,
+      staleTime: Infinity,
+    }
   );
 
+  useEffect(() => {
+    if (integrationChecks.data?.firstMessage) {
+      trackEventOnce("integration_checks_first_message", {
+        project_id: project?.id,
+      });
+    }
+    if (integrationChecks.data?.integrated) {
+      trackEventOnce("integration_checks_first_integration", {
+        project_id: project?.id,
+      });
+    }
+    if (integrationChecks.data?.workflows) {
+      trackEventOnce("integration_checks_first_workflow", {
+        project_id: project?.id,
+      });
+    }
+    if (integrationChecks.data?.evaluations) {
+      trackEventOnce("integration_checks_first_evaluation", {
+        project_id: project?.id,
+      });
+    }
+    if (integrationChecks.data?.triggers) {
+      trackEventOnce("integration_checks_first_alert", {
+        project_id: project?.id,
+      });
+    }
+    if (integrationChecks.data?.datasets) {
+      trackEventOnce("integration_checks_first_dataset", {
+        project_id: project?.id,
+      });
+    }
+    if (integrationChecks.data?.customGraphs) {
+      trackEventOnce("integration_checks_first_custom_dashboard", {
+        project_id: project?.id,
+      });
+    }
+  }, [
+    integrationChecks.data?.customGraphs,
+    integrationChecks.data?.datasets,
+    integrationChecks.data?.evaluations,
+    integrationChecks.data?.firstMessage,
+    integrationChecks.data?.integrated,
+    integrationChecks.data?.triggers,
+    integrationChecks.data?.workflows,
+    project?.id,
+  ]);
+
+  return integrationChecks;
+};
+
+export const IntegrationChecks = () => {
+  const { project } = useOrganizationTeamProject();
+
+  const integrationChecks = useIntegrationChecks();
+
   return (
-    <VStack align="start">
-      <List spacing={3}>
-        <ListItem>
+    <VStack align="start" fontSize="15px">
+      <List spacing={4}>
+        <ListItem
+          as={Link}
+          className="group"
+          display="block"
+          href={`/settings/projects`}
+        >
           <ListIcon as={CheckCircleIcon} color={"green.500"} />
           Create first project
         </ListItem>
-        <ListItem>
+        <ListItem
+          as={NextLink}
+          className="group"
+          display="block"
+          href={`/${project?.slug}/messages`}
+        >
           <ListIcon
-            as={integrationChecks.data?.project ? CheckCircleIcon : Circle}
-            color={integrationChecks.data?.project ? "green.500" : "gray.500"}
+            as={integrationChecks.data?.firstMessage ? CheckCircleIcon : Circle}
+            color={
+              integrationChecks.data?.firstMessage ? "green.500" : "gray.500"
+            }
           />
-          Sync your first message
+          <Text
+            display="inline"
+            borderBottomWidth="1px"
+            borderColor="gray.350"
+            borderStyle="dashed"
+            _groupHover={{ border: "none" }}
+          >
+            Sync your first message
+          </Text>
         </ListItem>
-        <ListItem>
+        <ListItem
+          as={NextLink}
+          className="group"
+          display="block"
+          href={`/${project?.slug}/workflows`}
+        >
           <ListIcon
-            as={integrationChecks.data?.checks ? CheckCircleIcon : Circle}
-            color={integrationChecks.data?.checks ? "green.500" : "gray.500"}
+            as={
+              integrationChecks.data?.workflows ? CheckCircleIcon : Circle
+            }
+            color={
+              integrationChecks.data?.workflows ? "green.500" : "gray.500"
+            }
           />
-          Set up your first evaluation
+          <Text
+            display="inline"
+            borderBottomWidth="1px"
+            borderColor="gray.350"
+            borderStyle="dashed"
+            _groupHover={{ border: "none" }}
+          >
+            Create your first workflow
+          </Text>
         </ListItem>
-        <ListItem>
+        <ListItem
+          as={NextLink}
+          className="group"
+          display="block"
+          href={`/${project?.slug}/evaluations`}
+        >
+          <ListIcon
+            as={integrationChecks.data?.evaluations ? CheckCircleIcon : Circle}
+            color={
+              integrationChecks.data?.evaluations ? "green.500" : "gray.500"
+            }
+          />
+          <Text
+            display="inline"
+            borderBottomWidth="1px"
+            borderColor="gray.350"
+            borderStyle="dashed"
+            _groupHover={{ border: "none" }}
+          >
+            Set up your first evaluation
+          </Text>
+        </ListItem>
+        <ListItem
+          as={Link}
+          className="group"
+          display="block"
+          href="https://docs.langwatch.ai/features/triggers"
+          isExternal
+        >
           <ListIcon
             as={integrationChecks.data?.triggers ? CheckCircleIcon : Circle}
             color={integrationChecks.data?.triggers ? "green.500" : "gray.500"}
           />
-          Set up an alert
+          <Text
+            display="inline"
+            borderBottomWidth="1px"
+            borderColor="gray.350"
+            borderStyle="dashed"
+            _groupHover={{ border: "none" }}
+          >
+            Set up an alert
+          </Text>
         </ListItem>
-        <ListItem>
+        <ListItem
+          as={Link}
+          className="group"
+          display="block"
+          href="https://docs.langwatch.ai/features/datasets"
+          isExternal
+        >
           <ListIcon
             as={integrationChecks.data?.datasets ? CheckCircleIcon : Circle}
             color={integrationChecks.data?.datasets ? "green.500" : "gray.500"}
           />
-          Create a dataset from the messages
+          <Text
+            display="inline"
+            borderBottomWidth="1px"
+            borderColor="gray.350"
+            borderStyle="dashed"
+            _groupHover={{ border: "none" }}
+          >
+            Create a dataset from the messages
+          </Text>
         </ListItem>
-        <ListItem>
+        <ListItem
+          as={NextLink}
+          className="group"
+          display="block"
+          href={`/${project?.slug}/analytics/reports`}
+        >
           <ListIcon
             as={integrationChecks.data?.customGraphs ? CheckCircleIcon : Circle}
             color={
               integrationChecks.data?.customGraphs ? "green.500" : "gray.500"
             }
           />
-          Create a custom dashboard
+          <Text
+            display="inline"
+            borderBottomWidth="1px"
+            borderColor="gray.350"
+            borderStyle="dashed"
+            _groupHover={{ border: "none" }}
+          >
+            Create a custom dashboard
+          </Text>
         </ListItem>
       </List>
     </VStack>

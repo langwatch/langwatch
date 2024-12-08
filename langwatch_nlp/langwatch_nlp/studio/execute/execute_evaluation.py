@@ -2,6 +2,7 @@ from multiprocessing import Queue
 import time
 from typing import Optional, cast
 import dspy
+import sentry_sdk
 from langwatch_nlp.studio.runtimes.base_runtime import ServerEventQueue
 from langwatch_nlp.studio.dspy.evaluation import EvaluationReporting
 from langwatch_nlp.studio.dspy.workflow_module import (
@@ -113,6 +114,11 @@ async def execute_evaluation(
     except Exception as e:
         yield error_evaluation_event(run_id, str(e), stopped_at=int(time.time() * 1000))
         if valid:
+            sentry_sdk.capture_exception(e, extras={
+                "run_id": run_id,
+                "workflow_id": workflow.workflow_id,
+                "workflow_version_id": event.workflow_version_id,
+            })
             EvaluationReporting.post_results(
                 workflow.api_key,
                 {

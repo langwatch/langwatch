@@ -98,7 +98,7 @@ export const useOptimizationExecution = () => {
 
       setTimeout(() => {
         setTriggerTimeout({ run_id, timeout_on_status: "waiting" });
-      }, 10_000);
+      }, 20_000);
     },
     [
       socketAvailable,
@@ -136,7 +136,7 @@ export const useOptimizationExecution = () => {
           run_id,
           timeout_on_status: "running",
         });
-      }, 5_000);
+      }, 10_000);
     },
     [socketAvailable, setOptimizationState, sendMessage, getWorkflow]
   );

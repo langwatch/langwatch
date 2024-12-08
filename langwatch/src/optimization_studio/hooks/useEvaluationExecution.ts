@@ -95,7 +95,7 @@ export const useEvaluationExecution = () => {
 
       setTimeout(() => {
         setTriggerTimeout({ run_id, timeout_on_status: "waiting" });
-      }, 10_000);
+      }, 20_000);
     },
     [
       socketAvailable,
@@ -133,7 +133,7 @@ export const useEvaluationExecution = () => {
           run_id,
           timeout_on_status: "running",
         });
-      }, 5_000);
+      }, 10_000);
     },
     [socketAvailable, setEvaluationState, sendMessage, getWorkflow]
   );

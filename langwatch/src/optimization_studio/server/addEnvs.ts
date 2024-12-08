@@ -6,6 +6,7 @@ import { prisma } from "../../server/db";
 import type { MaybeStoredModelProvider } from "../../server/modelProviders/registry";
 import type { LLMConfig, ServerWorkflow } from "../types/dsl";
 import type { StudioClientEvent } from "../types/events";
+import crypto from "crypto";
 
 export const addEnvs = async (
   event: StudioClientEvent,
@@ -114,4 +115,25 @@ const addLiteLLMParams = (
     ...llm,
     litellm_params: prepareLitellmParams(llm.model, modelProvider),
   };
+};
+
+export const getS3CacheKey = (projectId: string) => {
+  const salt = process.env.S3_KEY_SALT;
+  if (!salt) {
+    return undefined;
+  }
+
+  const yearMonth = new Date().toISOString().slice(0, 7); // Gets YYYY-MM
+
+  // Create a hash using project ID, salt, and current year-month
+  const hash = crypto
+    .createHash("sha256")
+    .update(`${projectId}-${salt}-${yearMonth}`)
+    .digest("base64")
+    .replace(/[^a-zA-Z0-9]/g, "")
+    // We don't need the full hash, first 16 chars (64 bits) is plenty secure
+    .slice(0, 16)
+    .toLowerCase();
+
+  return hash;
 };

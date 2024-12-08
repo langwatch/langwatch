@@ -58,6 +58,18 @@ def disable_dsp_caching():
     litellm.cache = None
 
 
+def set_dspy_cache_dir(cache_dir: str, limit_size=1e9):  # 1 GB
+    from litellm.caching.caching import Cache, LiteLLMCacheType
+
+    os.environ["DSPY_CACHEDIR"] = cache_dir
+    os.environ["DSPY_CACHE_LIMIT"] = str(limit_size)
+
+    litellm.cache = Cache(disk_cache_dir=cache_dir, type=LiteLLMCacheType.DISK)
+
+    if litellm.cache.cache.disk_cache.size_limit != limit_size:
+        litellm.cache.cache.disk_cache.reset("size_limit", limit_size)
+
+
 def print_ast(node):
     print("\n\n" + ast.unparse(node) + "\n\n")
 
