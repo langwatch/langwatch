@@ -265,34 +265,65 @@ export const runEvaluation = async ({
     }
 
     const mappings = check.mappings as Record<Mappings, string>;
-     /*
-    {"input": "trace.input", "output": "trace.output", "context": "trace.first_rag_context", "expected_output": "metadata.expected_output"}*/
 
+    const requestBody: Record<string, any> = {
+      trace_id: trace?.trace_id,
+    };
 
+    const switchMapping = (mapping: Mappings) => {
+      if (mapping === "trace.input") {
+        return input;
+      }
+      if (mapping === "trace.output") {
+        return output;
+      }
+      if (mapping === "trace.first_rag_context") {
+        return contexts;
+      }
+      if (mapping === "metadata.expected_output") {
+        return expected_output;
+      }
+      // Use typescript to ensure all cases are handled
+      const _: never = mapping;
+      throw new Error(`Unknown mapping: ${String(mapping)}`);
+    };
 
+    Object.entries(mappings).forEach(([key, mapping]) => {
+      requestBody[key] = switchMapping(mapping as Mappings);
+    });
 
-    console.log("workflowId....", workflowId);
+    console.log("rerequestBody..", requestBody);
 
-    console.log("trace....", trace);
-
-   
     const response = await fetch(
       `${process.env.BASE_HOST}/api/optimization/${workflowId}`,
       {
         method: "POST",
         headers: {
-          "X-Auth-Token": project.apiKey!,
+          "X-Auth-Token": project.apiKey,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          gold_answer: input,
-          answer: output,
-          question: input,
-          trace_id: trace?.trace_id,
+          requestBody,
         }),
       }
     );
+    //const test = await response.json();
+    if (!response.ok) {
+      console.error("Response not OK:", response.status, response.statusText);
+      const { message } = await response.json();
+      console.error("Error response:", message);
+
+      return {
+        status: "error",
+        ...message,
+      };
+    }
+
     const { result } = await response.json();
+
+    if (!result) {
+      throw new Error("Empty response from custom evaluator");
+    }
 
     return {
       status: "processed",

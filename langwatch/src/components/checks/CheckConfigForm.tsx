@@ -66,9 +66,7 @@ export interface CheckConfigFormData {
   settings: Evaluators[EvaluatorTypes]["settings"];
   executionMode: EvaluationExecutionMode;
   storeSettingsOnCode: boolean;
-  mappings: {
-    [key: string]: string;
-  };
+  mappings: Record<string, string>;
 }
 
 interface CheckConfigFormProps {
@@ -162,6 +160,8 @@ export default function CheckConfigForm({
   const executionMode = watch("executionMode");
   const storeSettingsOnCode = watch("storeSettingsOnCode");
   const mappings = watch("mappings");
+
+  console.log(mappings);
 
   const {
     fields: fieldsPrecondition,
@@ -529,9 +529,7 @@ const MappingsFields = ({
               <HStack width="full" key={field}>
                 <Select
                   maxWidth="50%"
-                  defaultValue={
-                    defaultValues[field as keyof typeof defaultValues]
-                  }
+                  defaultValue={defaultValues[field]}
                   {...register(`mappings.${field}`)}
                 >
                   {mappingOptions.map(({ value, label }) => (
@@ -551,12 +549,8 @@ const MappingsFields = ({
               <HStack width="full" key={field}>
                 <Select
                   maxWidth="50%"
-                  defaultValue={
-                    defaultValues[field as keyof typeof defaultValues]
-                  }
-                  {...register(
-                    `mappings.${field as keyof typeof defaultValues}`
-                  )}
+                  defaultValue={defaultValues[field]}
+                  {...register(`mappings.${field}`)}
                 >
                   {mappingOptions.map(({ value, label }) => (
                     <option key={value} value={value}>
