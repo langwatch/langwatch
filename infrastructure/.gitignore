@@ -33,4 +33,6 @@ override.tf.json
 .terraformrc
 terraform.rc
 
-prometheus-collector/adot-config.yaml
+warmer.zip
+lambda/index.js
+lambda/random-requests.js

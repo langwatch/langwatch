@@ -15,8 +15,9 @@ const PLAN_LIMITS: Record<PlanTypes, PlanInfo> = {
     maxMembers: 1,
     maxProjects: 1,
     maxMessagesPerMonth: 1000,
-    maxWorkflows: 0,
+    maxWorkflows: 1,
     evaluationsCredit: 2,
+    canPublish: false,
     prices: {
       USD: 0,
       EUR: 0,
@@ -30,7 +31,8 @@ const PLAN_LIMITS: Record<PlanTypes, PlanInfo> = {
     maxProjects: 2,
     maxMessagesPerMonth: 10_000,
     evaluationsCredit: 10,
-    maxWorkflows: 1,
+    maxWorkflows: 10,
+    canPublish: true,
     prices: {
       USD: 99,
       EUR: 99,
@@ -45,6 +47,7 @@ const PLAN_LIMITS: Record<PlanTypes, PlanInfo> = {
     maxWorkflows: 10,
     maxMessagesPerMonth: 10_000,
     evaluationsCredit: 10,
+    canPublish: true,
     prices: {
       USD: 59,
       EUR: 59,
@@ -59,6 +62,7 @@ const PLAN_LIMITS: Record<PlanTypes, PlanInfo> = {
     maxWorkflows: 10,
     maxMessagesPerMonth: 10_000,
     evaluationsCredit: 10,
+    canPublish: true,
     prices: {
       USD: 1644,
       EUR: 1644,
@@ -74,6 +78,7 @@ const PLAN_LIMITS: Record<PlanTypes, PlanInfo> = {
     maxWorkflows: 50,
     maxMessagesPerMonth: 10_000,
     evaluationsCredit: 10,
+    canPublish: true,
     prices: {
       USD: 499,
       EUR: 499,
@@ -88,6 +93,7 @@ const PLAN_LIMITS: Record<PlanTypes, PlanInfo> = {
     maxWorkflows: 50,
     maxMessagesPerMonth: 10_000,
     evaluationsCredit: 10,
+    canPublish: true,
     prices: {
       USD: 5484,
       EUR: 5484,
@@ -102,6 +108,7 @@ const PLAN_LIMITS: Record<PlanTypes, PlanInfo> = {
     maxWorkflows: 10,
     maxMessagesPerMonth: 100_000,
     evaluationsCredit: 50,
+    canPublish: true,
     prices: {
       USD: 399,
       EUR: 399,
@@ -116,6 +123,7 @@ const PLAN_LIMITS: Record<PlanTypes, PlanInfo> = {
     maxWorkflows: 999,
     maxMessagesPerMonth: 1_000_000,
     evaluationsCredit: 500,
+    canPublish: true,
     prices: {
       USD: 999,
       EUR: 999,

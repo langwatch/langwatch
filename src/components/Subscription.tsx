@@ -21,6 +21,7 @@ import {
   Grid,
   SimpleGrid,
   GridItem,
+  Tooltip,
 } from "../../langwatch/langwatch/node_modules/@chakra-ui/react";
 // @ts-ignore
 import {
@@ -28,8 +29,9 @@ import {
   useState,
 } from "../../langwatch/langwatch/node_modules/react";
 import {
-  TrendingUp,
+  X,
   Check,
+  Info,
 } from "../../langwatch/langwatch/node_modules/react-feather";
 import SettingsLayout from "../../langwatch/langwatch/src/components/SettingsLayout";
 import { useOrganizationTeamProject } from "../../langwatch/langwatch/src/hooks/useOrganizationTeamProject";
@@ -202,8 +204,9 @@ export default function Subscription() {
                 plan="FREE"
                 name="Free"
                 price={0}
-                description="For starting with LLM development"
+                description="For starting with LLM monitoring and optimization"
                 features={[
+                  "1 Workflow",
                   "1k Traces",
                   "30-day retention",
                   "1 Project",
@@ -264,13 +267,21 @@ export default function Subscription() {
                 price={59}
                 lifetimeDealOriginalPrice={149}
                 hidden={billAnnually}
-                description="For small teams improving their LLM solutions"
+                description={
+                  <>
+                    For small teams improving their LLM solutions.{" "}
+                    <b>Startups only</b>{" "}
+                    <Box display="inline-block" marginBottom="-3px">
+                      <Tooltip label="Limited to companies with 1-10 employees or for personal usage.">
+                        <Info size={16} />
+                      </Tooltip>
+                    </Box>
+                  </>
+                }
                 features={[
-                  <strong key="free-trial">7-day free trial</strong>,
-                  "Optimization Studio (DSPy optimizers)",
                   "Up to 10 workflows",
                   "10,000 Traces",
-                  "30-day retention",
+                  "6 months retention",
                   "1 Project",
                   "1 Team Member",
                 ]}
@@ -290,19 +301,26 @@ export default function Subscription() {
                 hidden={!billAnnually}
                 price={651}
                 lifetimeDealOriginalPrice={1644}
-                description="For small teams improving their LLM solutions"
+                description={
+                  <>
+                    For small teams improving their LLM solutions.{" "}
+                    <b>Startups only</b>{" "}
+                    <Box display="inline-block" marginBottom="-3px">
+                      <Tooltip label="Limited to companies with 1-10 employees or for personal usage.">
+                        <Info size={16} />
+                      </Tooltip>
+                    </Box>
+                  </>
+                }
                 features={[
-                  <strong key="free-trial">7-day free trial</strong>,
-                  "Optimization Studio (DSPy optimizers)",
                   "Up to 10 workflows",
                   "10,000 Traces",
-                  "30-day retention",
+                  "6 months retention",
                   "1 Project",
                   "1 Team Member",
                 ]}
                 additionalCosts={[
                   "Additional Traces - €50/100,000",
-                  "Additional Users - €19/user",
                   "Usage-based price for evaluations and guardrails",
                   ``,
                 ]}
@@ -317,11 +335,9 @@ export default function Subscription() {
                 price={499}
                 description="For business with multiple teams working with LLMs"
                 features={[
-                  <strong key="free-trial">7-day free trial</strong>,
-                  "Optimization Studio (DSPy optimizers)",
                   "Up to 50 workflows",
                   "100,000 Traces",
-                  "60-day retention",
+                  "1 year retention",
                   "10 Projects",
                   "10 Team Members",
                 ]}
@@ -343,11 +359,9 @@ export default function Subscription() {
                 name="Accelerate"
                 description="For business with multiple teams working with LLMs"
                 features={[
-                  <strong key="free-trial">7-day free trial</strong>,
-                  "Optimization Studio (DSPy optimizers)",
                   "Up to 50 workflows",
                   "100,000 Traces",
-                  "60-day retention",
+                  "1 year retention",
                   "10 Projects",
                   "10 Team Members",
                 ]}
@@ -366,13 +380,12 @@ export default function Subscription() {
                 price="custom"
                 description="Most scalable solution for enterprise needs"
                 features={[
-                  "Optimization Studio (DSPy optimizers)",
                   "Unlimited workflows",
                   "Custom Traces",
                   "Custom retention",
                   "Custom Projects",
                   "Custom Team Members",
-                  "Self-Hosted available",
+                  "Self-Hosting available",
                   "RBAC control",
                   "SOC2 Reporting",
                 ]}
@@ -392,6 +405,7 @@ function Plan({
   plan,
   description,
   features,
+  notAvailableFeatures,
   price,
   lifetimeDealOriginalPrice,
   additionalCosts,
@@ -404,8 +418,9 @@ function Plan({
   saving,
 }: {
   plan: PlanTypes;
-  description: string;
+  description: string | JSX.Element;
   features: (string | JSX.Element)[];
+  notAvailableFeatures?: string[];
   price?: number | "custom";
   lifetimeDealOriginalPrice?: number;
   additionalCosts?: string[];
@@ -535,10 +550,17 @@ function Plan({
 
           {isCurrentPlan && <Tag colorScheme="green">Current Plan</Tag>}
 
-          <Text>{description}</Text>
+          <Text height="58px">{description}</Text>
           {features.map((feature, index) => (
             <Feature key={`feature-${index}`} label={feature} />
           ))}
+          {notAvailableFeatures &&
+            notAvailableFeatures.map((feature, index) => (
+              <HStack key={`not-available-feature-${index}`} spacing={2}>
+                <X size={16} color="red" strokeWidth={3} />
+                <Text>{feature}</Text>
+              </HStack>
+            ))}
           {additionalCosts && (
             <>
               <Text fontWeight="bold">Add-On Costs:</Text>
