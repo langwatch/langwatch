@@ -20,6 +20,7 @@ import {
   PopoverContent,
   PopoverHeader,
   PopoverTrigger,
+  Progress,
   Select,
   Skeleton,
   Spacer,
@@ -37,12 +38,12 @@ import {
   Tr,
   VStack,
   useDisclosure,
-  Progress,
 } from "@chakra-ui/react";
 import { useRouter } from "next/router";
 import numeral from "numeral";
 import { useEffect, useRef, useState } from "react";
 import {
+  CheckSquare,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -50,11 +51,10 @@ import {
   List,
   RefreshCw,
   Shield,
-  CheckSquare,
 } from "react-feather";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import type { Trace, ElasticSearchEvaluation } from "~/server/tracer/types";
 import { getEvaluatorDefinitions } from "~/server/evaluations/getEvaluator";
+import type { ElasticSearchEvaluation, Trace } from "~/server/tracer/types";
 import { api } from "~/utils/api";
 import { durationColor } from "~/utils/durationColor";
 import { getSingleQueryParam } from "~/utils/getSingleQueryParam";
@@ -68,6 +68,7 @@ import { PeriodSelector, usePeriodSelector } from "../PeriodSelector";
 import { evaluationStatusColor } from "../checks/EvaluationStatus";
 import { FilterSidebar } from "../filters/FilterSidebar";
 import { FilterToggle } from "../filters/FilterToggle";
+import { formatEvaluationSingleValue } from "../traces/EvaluationStatusItem";
 import { ToggleAnalytics, ToggleTableView } from "./HeaderButtons";
 import type { TraceWithGuardrail } from "./MessageCard";
 
@@ -241,13 +242,9 @@ export function MessagesTable() {
                 <Text color={evaluationStatusColor(traceCheck)}>
                   {evaluator?.isGuardrail
                     ? traceCheck.passed
-                      ? "Passed"
-                      : "Failed"
-                    : traceCheck.label !== undefined
-                    ? traceCheck.label
-                    : traceCheck.score !== undefined
-                    ? numeral(traceCheck.score).format("0.[00]")
-                    : "N/A"}
+                      ? "Pass"
+                      : "Fail"
+                    : formatEvaluationSingleValue(traceCheck)}
                 </Text>
               ) : (
                 <Text
