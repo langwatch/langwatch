@@ -49,8 +49,13 @@ def get_embedding(text: str, embeddings_litellm_params: dict[str, str]) -> list[
     # replace newlines, which can negatively affect performance.
     text = text.replace("\n", " ")
 
+    if "dimensions" in embeddings_litellm_params:
+        # TODO: target_dim is throwing errors for text-embedding-3-small because litellm drop_params is also not working for some reason
+        del embeddings_litellm_params["dimensions"]
     response = litellm.embedding(
-        input=text, **embeddings_litellm_params  # type: ignore
+        input=text,
+        drop_params=True,
+        **embeddings_litellm_params,  # type: ignore
     )
 
     data = response.data

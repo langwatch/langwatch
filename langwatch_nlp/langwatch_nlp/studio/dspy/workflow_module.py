@@ -10,12 +10,15 @@ from langwatch_nlp.studio.dspy.predict_with_metadata import (
     PredictionWithMetadata,
 )
 from langwatch_nlp.studio.parser import autoparse_fields, parse_component
-from langwatch_nlp.studio.types.dsl import Workflow, Node, Field
+from langwatch_nlp.studio.types.dsl import Workflow, Node
 from langwatch_nlp.studio.dspy.reporting_module import ReportingModule
 import dspy
 
 from langwatch_nlp.studio.utils import get_node_by_id, validate_identifier
 from langevals_core.base_evaluator import SingleEvaluationResult, EvaluationResultError
+from langwatch_nlp.studio.dspy.patched_optional_image import patch_optional_image
+
+patch_optional_image()
 
 
 class WorkflowModule(ReportingModule):

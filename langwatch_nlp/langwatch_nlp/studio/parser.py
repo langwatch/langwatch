@@ -221,7 +221,7 @@ def autoparse_field_value(field: Field, value: Optional[Any]) -> Optional[Any]:
             value = json.loads(value)
         except ValueError:
             pass
-    if value is None:
+    if value is None or value == "null" or value == "None":
         return None
 
     if field.type == FieldType.int:
