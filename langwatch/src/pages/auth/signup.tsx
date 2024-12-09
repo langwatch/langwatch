@@ -24,6 +24,7 @@ import { HorizontalFormControl } from "../../components/HorizontalFormControl";
 import { usePublicEnv } from "../../hooks/usePublicEnv";
 import { LogoIcon } from "../../components/icons/LogoIcon";
 import type { GetServerSidePropsContext } from "next";
+import { api } from "../../utils/api";
 
 export default function SignUp({ session }: { session: Session | null }) {
   const publicEnv = usePublicEnv();
