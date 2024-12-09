@@ -262,8 +262,14 @@ export function MessagesTable() {
         const traceCheck = evaluations.find(
           (evaluation) => evaluation.evaluator_id === checkId
         );
+        const evaluator = getEvaluatorDefinitions(traceCheck?.type ?? "");
+
         return traceCheck?.status === "processed"
-          ? numeral(traceCheck?.score).format("0.[00]")
+          ? evaluator?.isGuardrail
+            ? traceCheck.passed
+              ? "Pass"
+              : "Fail"
+            : formatEvaluationSingleValue(traceCheck)
           : traceCheck?.status ?? "-";
       },
     };
