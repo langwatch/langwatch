@@ -16,10 +16,9 @@ import {
   Panel as FlowPanel,
   ReactFlow,
   ReactFlowProvider,
-  type Node,
 } from "@xyflow/react";
 
-import { DndProvider, useDragLayer, useDrop } from "react-dnd";
+import { DndProvider, useDrop } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
 
 import { Link } from "@chakra-ui/next-js";
@@ -35,6 +34,7 @@ import {
 } from "react-resizable-panels";
 import { useShallow } from "zustand/react/shallow";
 import { CurrentDrawer } from "../../components/CurrentDrawer";
+import { ExpandedTextModal } from "../../components/HoverableBigText";
 import { LogoIcon } from "../../components/icons/LogoIcon";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { titleCase } from "../../utils/stringCasing";
@@ -376,6 +376,7 @@ export default function OptimizationStudio() {
         </DndProvider>
       </ReactFlowProvider>
       <CurrentDrawer />
+      <ExpandedTextModal />
     </div>
   );
 }

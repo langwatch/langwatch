@@ -105,12 +105,12 @@ export const clusterTopicsForProject = async (
 
   if (
     !isIncrementalProcessing &&
-    lastTopicCreatedAt > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+    lastTopicCreatedAt > new Date(Date.now() - 2 * 24 * 60 * 60 * 1000)
   ) {
     debug(
       "Skipping clustering for project",
       projectId,
-      "as last topic from batch processing was created less than 7 days ago"
+      "as last topic from batch processing was created less than 2 days ago"
     );
     return;
   }
