@@ -72,20 +72,28 @@ const decodeOpenTelemetryIds = (
     for (const scopeSpan of resourceSpan?.scopeSpans ?? []) {
       for (const span of scopeSpan?.spans ?? []) {
         if (span?.traceId) {
-          span.traceId = Buffer.from(span.traceId as string, "base64").toString(
-            "hex"
-          );
+          const values =
+            typeof span.traceId === "object" && !Array.isArray(span.traceId)
+              ? Object.values(span.traceId)
+              : span.traceId;
+          span.traceId = Buffer.from(values as any, "base64").toString("hex");
         }
         if (span?.spanId) {
-          span.spanId = Buffer.from(span.spanId as string, "base64").toString(
-            "hex"
-          );
+          const values =
+            typeof span.spanId === "object" && !Array.isArray(span.spanId)
+              ? Object.values(span.spanId)
+              : span.spanId;
+          span.spanId = Buffer.from(values as any, "base64").toString("hex");
         }
         if (span?.parentSpanId) {
-          span.parentSpanId = Buffer.from(
-            span.parentSpanId as string,
-            "base64"
-          ).toString("hex");
+          const values =
+            typeof span.parentSpanId === "object" &&
+            !Array.isArray(span.parentSpanId)
+              ? Object.values(span.parentSpanId)
+              : span.parentSpanId;
+          span.parentSpanId = Buffer.from(values as any, "base64").toString(
+            "hex"
+          );
         }
       }
     }

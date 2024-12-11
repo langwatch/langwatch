@@ -36,6 +36,7 @@ import { SpinnerMessage, UserMessage } from '@/components/stocks/message'
 import { Chat, Message } from '@/lib/types'
 import { auth } from '@/auth'
 import { LangWatch, convertFromVercelAIMessages } from 'langwatch'
+import { generateText } from 'ai'
 
 async function confirmPurchase(symbol: string, price: number, amount: number) {
   'use server'

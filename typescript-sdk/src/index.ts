@@ -1,4 +1,4 @@
-import EventEmitter from "events";
+import EventEmitter from 'eventemitter3';
 import { nanoid } from "nanoid";
 import { ZodError } from "zod";
 import { fromZodError } from "zod-validation-error";
@@ -39,6 +39,7 @@ import {
   captureError,
   convertFromVercelAIMessages,
 } from "./utils";
+import { LangWatchExporter } from "./LangWatchExporter";
 
 export type {
   BaseSpan,
@@ -53,7 +54,12 @@ export type {
   SpanInputOutput,
 };
 
-export { autoconvertTypedValues, captureError, convertFromVercelAIMessages };
+export {
+  autoconvertTypedValues,
+  captureError,
+  convertFromVercelAIMessages,
+  LangWatchExporter,
+};
 
 export class LangWatch extends EventEmitter {
   apiKey: string | undefined;
