@@ -78,7 +78,6 @@ services:
     image: opensearchproject/opensearch:2.17.1
     environment:
       - discovery.type=single-node
-      - DISABLE_INSTALL_DEMO_CONFIG=true
       - DISABLE_SECURITY_PLUGIN=true
       # Disable specific plugins
       - "plugins.anomaly_detection.enabled=false"
