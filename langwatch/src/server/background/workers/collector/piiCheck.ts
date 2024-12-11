@@ -206,22 +206,24 @@ const googleDLPClearPII = async (
   piiRedactionLevel: PIIRedactionLevel
 ): Promise<void> => {
   getPiiChecksCounter("google_dlp").inc();
-  const findings = await dlpCheck(currentObject[lastKey], piiRedactionLevel);
+  const [text, remaining] = [
+    currentObject[lastKey].slice(0, 250_000),
+    currentObject[lastKey].slice(250_000),
+  ];
+
+  const findings = await dlpCheck(text, piiRedactionLevel);
   for (const finding of findings) {
     const start = finding.location?.codepointRange?.start;
     const end = finding.location?.codepointRange?.end;
     if (start && end) {
       currentObject[lastKey] =
-        currentObject[lastKey].substring(0, +start) +
+        text.substring(0, +start) +
         "✳".repeat(+end - +start) +
-        currentObject[lastKey].substring(+end);
+        text.substring(+end);
     }
   }
   if (findings.length > 0) {
-    currentObject[lastKey] = currentObject[lastKey].replace(
-      /\✳{1,}/g,
-      "[REDACTED]"
-    );
+    currentObject[lastKey] = text.replace(/\✳{1,}/g, "[REDACTED]") + remaining;
   }
 };
 
@@ -237,6 +239,11 @@ const presidioClearPII = async (
 
   const startTime = performance.now();
 
+  const [text, remaining] = [
+    currentObject[lastKey].slice(0, 250_000),
+    currentObject[lastKey].slice(250_000),
+  ];
+
   const response = await fetch(
     `${env.LANGEVALS_ENDPOINT}/presidio/pii_detection/evaluate`,
     {
@@ -245,7 +252,7 @@ const presidioClearPII = async (
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        data: [{ input: currentObject[lastKey] }],
+        data: [{ input: text }],
         settings: {
           entities: Object.fromEntries(
             (piiRedactionLevel === "ESSENTIAL"
@@ -286,7 +293,7 @@ const presidioClearPII = async (
     throw new Error(result.details);
   }
   if (result.status === "processed" && result.raw_response?.anonymized) {
-    currentObject[lastKey] = result.raw_response.anonymized;
+    currentObject[lastKey] = result.raw_response.anonymized + remaining;
   }
 };
 
