@@ -95,7 +95,7 @@ services:
       - "cluster.routing.allocation.disk.watermark.high=96%"
       - "cluster.routing.allocation.disk.watermark.flood_stage=97%"
       - "cluster.info.update.interval=1m"
-      - OPENSEARCH_INITIAL_ADMIN_PASSWORD=some-random-password-which-is-greater-than-16-chars-long
+      - OPENSEARCH_INITIAL_ADMIN_PASSWORD=Some-random-password-which-is-greater-than-16-chars-long~
       # System limits
       - "node.store.allow_mmap=false"
     ulimits:
