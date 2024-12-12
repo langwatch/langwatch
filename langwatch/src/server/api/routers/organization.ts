@@ -87,6 +87,7 @@ export const organizationRouter = createTRPCRouter({
             otherCompanyType: z.string().optional().nullable(),
             otherProjectType: z.string().optional().nullable(),
             otherHowDidYouHearAboutUs: z.string().optional().nullable(),
+            utmCampaign: z.string().optional().nullable(),
           })
           .optional(),
       })
