@@ -8,23 +8,6 @@ import { api } from "../../langwatch/langwatch/src/utils/api";
 export function ExtraFooterComponents() {
   const session = useRequiredSession({ required: false });
 
-  useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const utmCampaign = urlParams.get("utm_campaign");
-    const utmSource = urlParams.get("utm_source");
-    const utmMedium = urlParams.get("utm_medium");
-
-    if (utmCampaign || utmSource || utmMedium) {
-      // @ts-expect-error gtag is added by the script
-      window.gtag("event", "campaign_visit", {
-        campaign: utmCampaign,
-        source: utmSource,
-        medium: utmMedium,
-        page_location: window.location.href,
-      });
-    }
-  }, []);
-
   return (
     <>
       <Script
