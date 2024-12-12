@@ -17,10 +17,15 @@ function getFirstAndLastName(fullName: string) {
 const sendSlackNotification = async (user: any, org: any) => {
   const url = process.env.SLACK_CHANNEL_SIGNUPS!;
   const webhook = new IncomingWebhook(url);
+  const utmCampaign = org.signUpData?.utmCampaign;
 
   try {
     await webhook.send({
-      text: `🔔 New user registered: ${user.name}, ${user.email}. Organization: ${org.orgName}, ${org.phoneNumber}`,
+      text: `🔔 New user registered: ${user.name}, ${
+        user.email
+      }. Organization: ${org.orgName}, ${org.phoneNumber}${
+        utmCampaign ? `, via ${utmCampaign} campaign` : ""
+      }`,
     });
   } catch (err) {
     Sentry.captureException(err);
@@ -109,6 +114,11 @@ const submitLeadFormInHubSpot = async (user: any, org: any) => {
         objectTypeId: "0-1",
         name: "how_did_you_hear_about_us",
         value: org.signUpData?.howDidYouHearAboutUs,
+      },
+      {
+        objectTypeId: "0-1",
+        name: "utm_campaign",
+        value: org.signUpData?.utmCampaign,
       },
     ],
     context: {

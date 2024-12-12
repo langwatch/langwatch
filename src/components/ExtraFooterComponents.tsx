@@ -8,6 +8,23 @@ import { api } from "../../langwatch/langwatch/src/utils/api";
 export function ExtraFooterComponents() {
   const session = useRequiredSession({ required: false });
 
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const utmCampaign = urlParams.get("utm_campaign");
+    const utmSource = urlParams.get("utm_source");
+    const utmMedium = urlParams.get("utm_medium");
+
+    if (utmCampaign || utmSource || utmMedium) {
+      // @ts-expect-error gtag is added by the script
+      window.gtag("event", "campaign_visit", {
+        campaign: utmCampaign,
+        source: utmSource,
+        medium: utmMedium,
+        page_location: window.location.href,
+      });
+    }
+  }, []);
+
   return (
     <>
       <Script
@@ -45,15 +62,25 @@ export function SignedInExtraFooterComponents() {
       });
     }
 
-    gtag("event", "open_dashboard", {
-      organization_id: organization.id,
-      organization_name: organization.name,
-      project_id: project.id,
-      project_name: project.name,
-      environment: process.env.NODE_ENV,
-      user_name: session.data.user.name,
-      user_id: session.data.user.id,
-    });
+    if (!(session.data.user as any).impersonator) {
+      gtag("set", "user_properties", {
+        organization_id: organization.id,
+        organization_name: organization.name,
+        project_id: project.id,
+        project_name: project.name,
+        environment: process.env.NODE_ENV,
+        user_id: session.data.user.id,
+      });
+
+      gtag("event", "open_dashboard", {
+        organization_id: organization.id,
+        organization_name: organization.name,
+        project_id: project.id,
+        project_name: project.name,
+        environment: process.env.NODE_ENV,
+        user_id: session.data.user.id,
+      });
+    }
   }, [organization?.id, project?.id]);
 
   if (!session.data || !organization || !project) {
