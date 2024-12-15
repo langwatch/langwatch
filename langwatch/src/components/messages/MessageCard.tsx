@@ -46,6 +46,7 @@ import { formatTimeAgo } from "../../utils/formatTimeAgo";
 import { EventsCounter } from "./EventsCounter";
 import { evaluationPassed } from "../checks/EvaluationStatus";
 import remarkGfm from "remark-gfm";
+import { isJson } from "../../utils/isJson";
 
 export type TraceWithGuardrail = Trace & {
   lastGuardrail: (EvaluationResult & { name?: string }) | undefined;
@@ -189,7 +190,25 @@ export function MessageCard({
               Generated
             </Box>
             <Box wordBreak="break-all">
-              {trace.output?.value ? (
+              {trace.output?.value && isJson(trace.output.value) ? (
+                (() => {
+                  const json = JSON.stringify(
+                    JSON.parse(trace.output.value),
+                    null,
+                    2
+                  );
+                  return (
+                    <Text
+                      as="pre"
+                      fontFamily="mono"
+                      fontSize="14px"
+                      width="full"
+                    >
+                      {json.slice(0, 250) + (json.length > 250 ? "..." : "")}
+                    </Text>
+                  );
+                })()
+              ) : trace.output?.value ? (
                 <Markdown remarkPlugins={[remarkGfm]} className="markdown">
                   {getSlicedOutput(trace)}
                 </Markdown>

@@ -44,6 +44,7 @@ import {
 import { formatTimeAgo } from "../../../../utils/formatTimeAgo";
 import { EventsCounter } from "../../../../components/messages/EventsCounter";
 import remarkGfm from "remark-gfm";
+import { isJson } from "../../../../utils/isJson";
 
 export default function TraceDetails() {
   const router = useRouter();
@@ -376,12 +377,7 @@ const TraceMessages = React.forwardRef(function TraceMessages(
   };
 
   return (
-    <VStack
-      ref={ref as any}
-      align="start"
-      width="full"
-      spacing={2}
-    >
+    <VStack ref={ref as any} align="start" width="full" spacing={2}>
       <Box
         width="full"
         borderY="1px solid"
@@ -452,6 +448,25 @@ const TraceMessages = React.forwardRef(function TraceMessages(
                       </Box>
                       <Text color="red.900">{trace.error.message}</Text>
                     </VStack>
+                  ) : trace.output?.value && isJson(trace.output.value) ? (
+                    (() => {
+                      const json = JSON.stringify(
+                        JSON.parse(trace.output.value),
+                        null,
+                        2
+                      );
+                      return (
+                        <Text
+                          as="pre"
+                          fontFamily="mono"
+                          fontSize="14px"
+                          width="full"
+                        >
+                          {json.slice(0, 250) +
+                            (json.length > 250 ? "..." : "")}
+                        </Text>
+                      );
+                    })()
                   ) : trace.output?.value ? (
                     <Markdown
                       remarkPlugins={[remarkGfm]}
