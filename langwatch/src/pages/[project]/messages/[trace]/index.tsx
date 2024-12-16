@@ -6,17 +6,17 @@ import {
   Container,
   Grid,
   GridItem,
-  HStack,
   Heading,
+  HStack,
+  Image,
   Skeleton,
   SkeletonCircle,
   Spacer,
   Spinner,
   Text,
   Tooltip,
-  VStack,
-  Image,
   useToast,
+  VStack,
 } from "@chakra-ui/react";
 import ErrorPage from "next/error";
 import { useRouter } from "next/router";
@@ -35,16 +35,18 @@ import { api } from "../../../../utils/api";
 import { isNotFound } from "../../../../utils/trpcError";
 
 import { CornerDownRight, Edit, ThumbsDown, ThumbsUp } from "react-feather";
+import remarkGfm from "remark-gfm";
 import { Annotations } from "../../../../components/Annotations";
 import { useDrawer } from "../../../../components/CurrentDrawer";
+import { EventsCounter } from "../../../../components/messages/EventsCounter";
 import {
   getExtractedInput,
   getSlicedExpectedOutput,
+  MessageCardJsonOutput,
 } from "../../../../components/messages/MessageCard";
 import { formatTimeAgo } from "../../../../utils/formatTimeAgo";
-import { EventsCounter } from "../../../../components/messages/EventsCounter";
-import remarkGfm from "remark-gfm";
 import { isJson } from "../../../../utils/isJson";
+import { isPythonRepr } from "../../../../utils/parsePythonInsideJson";
 
 export default function TraceDetails() {
   const router = useRouter();
@@ -448,25 +450,10 @@ const TraceMessages = React.forwardRef(function TraceMessages(
                       </Box>
                       <Text color="red.900">{trace.error.message}</Text>
                     </VStack>
-                  ) : trace.output?.value && isJson(trace.output.value) ? (
-                    (() => {
-                      const json = JSON.stringify(
-                        JSON.parse(trace.output.value),
-                        null,
-                        2
-                      );
-                      return (
-                        <Text
-                          as="pre"
-                          fontFamily="mono"
-                          fontSize="14px"
-                          width="full"
-                        >
-                          {json.slice(0, 250) +
-                            (json.length > 250 ? "..." : "")}
-                        </Text>
-                      );
-                    })()
+                  ) : trace.output?.value &&
+                    (isJson(trace.output.value) ||
+                      isPythonRepr(trace.output.value)) ? (
+                    <MessageCardJsonOutput trace={trace} />
                   ) : trace.output?.value ? (
                     <Markdown
                       remarkPlugins={[remarkGfm]}

@@ -15,6 +15,7 @@ import dynamic from "next/dynamic";
 import { useState } from "react";
 import { Copy, File } from "react-feather";
 import { CopyIcon } from "../icons/Copy";
+import { parsePythonInsideJson } from "../../utils/parsePythonInsideJson";
 
 export function RenderInputOutput(
   props: Partial<ReactJsonViewProps> & { value: string | undefined }
@@ -99,7 +100,13 @@ export function RenderInputOutput(
   const renderJson = () => {
     return (
       <>
-        <HStack position="absolute" top={-2} right={-2} zIndex={1} spacing="-1px">
+        <HStack
+          position="absolute"
+          top={-2}
+          right={-2}
+          zIndex={1}
+          spacing="-1px"
+        >
           <Tooltip label="View Raw">
             <Box>
               <TinyButton
@@ -118,7 +125,7 @@ export function RenderInputOutput(
           </Text>
         ) : (
           <ReactJson
-            src={json ?? {}}
+            src={json ? parsePythonInsideJson(json) : {}}
             name={false}
             displayDataTypes={false}
             displayObjectSize={false}
@@ -139,7 +146,13 @@ export function RenderInputOutput(
         renderJson()
       ) : (
         <>
-          <HStack position="absolute" top={-2} right={-2} zIndex={1} spacing="-1px">
+          <HStack
+            position="absolute"
+            top={-2}
+            right={-2}
+            zIndex={1}
+            spacing="-1px"
+          >
             {renderCopyButton()}
           </HStack>
           <Text fontFamily="mono" fontSize="14px">

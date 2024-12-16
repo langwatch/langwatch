@@ -1,5 +1,9 @@
 export const isJson = (input: string) => {
-  if (typeof input !== "string" || !input.trim().startsWith("{")) {
+  if (
+    typeof input !== "string" ||
+    (!input.trim().startsWith("{") &&
+      !input.trim().startsWith("["))
+  ) {
     return false;
   }
   try {
