@@ -42,6 +42,18 @@ export type ChatRichContent =
         url: string;
         detail?: "auto" | "low" | "high";
       };
+    }
+  | {
+      type: "tool_call";
+      toolName?: string;
+      toolCallId?: string;
+      args?: string;
+    }
+  | {
+      type: "tool_result";
+      toolName?: string;
+      toolCallId?: string;
+      result?: any;
     };
 
 export interface TypedValueChatMessages {

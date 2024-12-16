@@ -305,22 +305,6 @@ const addOpenTelemetrySpanAsSpan = (
     }
   }
 
-  if (
-    !input &&
-    attributesMap.gen_ai?.prompt?.messages &&
-    Array.isArray(attributesMap.gen_ai.prompt.messages)
-  ) {
-    const input_ = typedValueChatMessagesSchema.safeParse({
-      type: "chat_messages",
-      value: attributesMap.gen_ai.prompt.messages,
-    });
-
-    if (input_.success) {
-      input = input_.data as TypedValueChatMessages;
-      delete attributesMap.gen_ai.prompt.messages;
-    }
-  }
-
   // vercel
   if (
     !input &&

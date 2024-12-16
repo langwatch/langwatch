@@ -1174,7 +1174,9 @@ export function DSPyRunsScoresChart({
           left="50%"
           transform="translate(-50%, -50%)"
         >
-          No data
+          It can take up to 5 minutes for the first steps to arrive,
+          <br />
+          check the logs for progress meanwhile
         </Box>
       )}
       <ResponsiveContainer height={300}>
