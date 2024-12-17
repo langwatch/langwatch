@@ -36,4 +36,25 @@ describe("parsePythonInsideJson", () => {
       },
     });
   });
+
+  it("should parse nested reprs", () => {
+    const obj = {
+      output: `ChatPromptValue(messages=[SystemMessage(content='You are a helpful assistant that only reply in short tweet-like responses, using lots of emojis.'), HumanMessage(content='hello')])`,
+    };
+    expect(parsePythonInsideJson(obj)).toEqual({
+      output: {
+        ChatPromptValue: {
+          messages: [
+            {
+              SystemMessage: {
+                content:
+                  "You are a helpful assistant that only reply in short tweet-like responses, using lots of emojis.",
+              },
+            },
+            { HumanMessage: { content: "hello" } },
+          ],
+        },
+      },
+    });
+  });
 });

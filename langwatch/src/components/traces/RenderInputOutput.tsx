@@ -15,7 +15,10 @@ import dynamic from "next/dynamic";
 import { useState } from "react";
 import { Copy, File } from "react-feather";
 import { CopyIcon } from "../icons/Copy";
-import { parsePythonInsideJson } from "../../utils/parsePythonInsideJson";
+import {
+  isPythonRepr,
+  parsePythonInsideJson,
+} from "../../utils/parsePythonInsideJson";
 
 export function RenderInputOutput(
   props: Partial<ReactJsonViewProps> & { value: string | undefined }
@@ -97,7 +100,7 @@ export function RenderInputOutput(
     );
   };
 
-  const renderJson = () => {
+  const renderJson = (json: object) => {
     return (
       <>
         <HStack
@@ -142,8 +145,9 @@ export function RenderInputOutput(
 
   return (
     <Box position="relative" width="full">
-      {typeof document !== "undefined" && json ? (
-        renderJson()
+      {typeof document !== "undefined" &&
+      (json || isPythonRepr(value ?? "")) ? (
+        renderJson(json ?? (value as any))
       ) : (
         <>
           <HStack
