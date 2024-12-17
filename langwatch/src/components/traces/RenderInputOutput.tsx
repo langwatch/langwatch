@@ -158,7 +158,7 @@ export function RenderInputOutput(
   return (
     <Box position="relative" width="full">
       {typeof document !== "undefined" &&
-      (json || isPythonRepr(value ?? "")) ? (
+      (json ?? isPythonRepr(value ?? "")) ? (
         renderJson(json ?? (value as any))
       ) : (
         <>

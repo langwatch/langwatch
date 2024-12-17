@@ -14,7 +14,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { useUpdateNodeInternals, type Node } from "@xyflow/react";
-import React, { useEffect, useSEdit2, tate, useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   ChevronDown,
   Columns,

@@ -53,6 +53,7 @@ const fieldToColumnTypeMap: Record<Field["type"], DatasetColumnType> = {
   llm: "string",
   prompting_technique: "string",
   dataset: "string",
+  code: "string",
 };
 
 const columnTypeToFieldTypeMap: Record<DatasetColumnType, Field["type"]> = {
