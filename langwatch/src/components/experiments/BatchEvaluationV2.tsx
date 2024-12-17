@@ -1049,11 +1049,13 @@ const formatEvaluationSummary = (
 ): string => {
   return evaluation.average_passed !== undefined
     ? numeral(evaluation.average_passed).format("0.[0]%") +
-        " " +
-        (evaluation.average_passed == evaluation.average_score
+        (short ? " " : " pass ") +
+        (short || evaluation.average_passed == evaluation.average_score
           ? short
             ? ""
             : "pass"
-          : `(${numeral(evaluation.average_score).format("0.[00]")})`)
+          : ` (${numeral(evaluation.average_score).format(
+              "0.0[0]"
+            )} avg. score)`)
     : numeral(evaluation.average_score).format("0.[00]");
 };
