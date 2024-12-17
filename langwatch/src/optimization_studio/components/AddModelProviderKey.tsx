@@ -13,8 +13,10 @@ import { modelProviderIcons } from "../../server/modelProviders/iconsMap";
 import { titleCase } from "../../utils/stringCasing";
 
 export const AddModelProviderKey = ({
+  runWhat,
   nodeProvidersWithoutCustomKeys,
 }: {
+  runWhat: string;
   nodeProvidersWithoutCustomKeys: string[];
 }) => {
   return (
@@ -23,7 +25,7 @@ export const AddModelProviderKey = ({
         <HStack paddingBottom={3}>
           <Text>
             You need to set up your own API keys for the following providers to
-            be able to run evaluations:
+            be able to {runWhat}:
           </Text>
         </HStack>
         <VStack align="start" width="full" spacing={3}>

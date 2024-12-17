@@ -379,6 +379,7 @@ export function EvaluateModalContent({
         <VStack align="start" width="full" spacing={3}>
           {hasProvidersWithoutCustomKeys && (
             <AddModelProviderKey
+              runWhat="run evaluations"
               nodeProvidersWithoutCustomKeys={nodeProvidersWithoutCustomKeys}
             />
           )}

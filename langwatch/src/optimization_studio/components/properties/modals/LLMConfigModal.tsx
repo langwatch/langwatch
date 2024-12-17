@@ -19,6 +19,9 @@ import {
 } from "../../../../components/ModelSelector";
 import type { LLMConfig } from "../../../types/dsl";
 import { ConfigModal } from "./ConfigModal";
+import { useOrganizationTeamProject } from "../../../../hooks/useOrganizationTeamProject";
+import { useWorkflowStore } from "../../../hooks/useWorkflowStore";
+import { AddModelProviderKey } from "../../AddModelProviderKey";
 
 export function LLMModelDisplay({
   model,
@@ -93,6 +96,17 @@ export function LLMConfigField({
     "chat"
   );
 
+  const { hasCodeNodes } = useWorkflowStore((state) => ({
+    hasCodeNodes: state.nodes.some((node) => node.type === "code"),
+  }));
+
+  const { modelProviders } = useOrganizationTeamProject();
+  const hasCustomKeys = Object.values(modelProviders ?? {}).some(
+    (modelProvider) =>
+      model.split("/")[0] === modelProvider.provider && modelProvider.customKeys
+  );
+  const requiresCustomKey = hasCodeNodes && !hasCustomKeys;
+
   return (
     <>
       <LLMConfigModal
@@ -131,6 +145,12 @@ export function LLMConfigField({
           </Box>
         </Button>
       </HStack>
+      {requiresCustomKey && (
+        <AddModelProviderKey
+          runWhat="run this component"
+          nodeProvidersWithoutCustomKeys={[model.split("/")[0] ?? "unknown"]}
+        />
+      )}
     </>
   );
 }
